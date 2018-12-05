@@ -92,7 +92,7 @@
                     (article (if (position (schar name 0) "AEIOU") "an" "a")))
                (aver (not (string= package "SB-XC")))
                `(defun ,pred (object)
-                  ,@(unless (eql (mismatch package "SB!") 3)
+                  ,@(unless (eql (mismatch package "SB-") 3)
                       (list (format nil
                                     "Return true if OBJECT is ~A ~A, and NIL otherwise."
                                     article

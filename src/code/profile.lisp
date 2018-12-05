@@ -15,7 +15,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (export 'sb-kernel::profile-deinit "SB-KERNEL"))
 
-(in-package "SB-PROFILE") ; (SB-, not SB!, since we're built in warm load.)
+(in-package "SB-PROFILE")
 
 
 ;;;; COUNTER object

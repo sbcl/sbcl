@@ -154,7 +154,7 @@
  ;;
  ;; FIXME: Should this be :SB-CYCLE-COUNTER instead? If so, then the same goes
  ;; for :COMPARE-AND-SWAP-VOPS as well, and a bunch of others. Perhaps
- ;; built-time convenience features like this should all live in eg. SB!INT
+ ;; built-time convenience features like this should all live in eg. SB-INT
  ;; instead?
  ;;
  ; :cycle-counter

@@ -76,6 +76,7 @@
   (labels ((possibly-ungood-package-reference (string)
              ;; We want to see nothing SB-package-like at all
              (or (search "sb-" string :test #'char-equal)
+                 ;; catch mistakes due to imitating the way things used to be
                  (search "sb!" string :test #'char-equal)))
            (possibly-format-control (string)
              (when (find #\~ string)

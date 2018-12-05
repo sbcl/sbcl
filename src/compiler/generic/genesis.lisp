@@ -1352,8 +1352,6 @@ core and return a descriptor to it."
 
 (setf (get 'find-package :sb-cold-funcall-handler/for-value)
       (lambda (descriptor &aux (name (base-string-from-core descriptor)))
-        (when (= (mismatch name "SB!") 3)
-          (setq name (concatenate 'string "SB-" (subseq name 3))))
         (or (cdr (gethash name *cold-package-symbols*))
             (error "Genesis could not find a target package named ~S" name))))
 
@@ -1803,7 +1801,7 @@ core and return a descriptor to it."
      (lambda (pkgcons)
       (destructuring-bind (pkg-name . pkg-info) pkgcons
         (let ((shadow
-               ;; Record shadowing symbols (except from SB-XC) in SB! packages.
+               ;; Record shadowing symbols (except from SB-XC) in SB- packages.
                (when (eql (mismatch pkg-name "SB-") 3)
                  ;; Be insensitive to the host's ordering.
                  (sort (remove (find-package "SB-XC")
@@ -3726,7 +3724,7 @@ III. initially undefined function references (alphabetically):
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
       ;; from common-lisp-exports.lisp-expr.
-      ;; Packages whose names match SB!THING were set up on the host according
+      ;; Packages whose names match SB-THING were set up on the host according
       ;; to "package-data-list.lisp-expr" which expresses the desired target
       ;; package configuration, so we can just mirror the host into the target.
       ;; But by waiting to observe calls to COLD-INTERN that occur during the
@@ -3754,7 +3752,7 @@ III. initially undefined function references (alphabetically):
               (aver layout)
               (write-slots layout *host-layout-of-layout* :info dd))))
         (when verbose
-          (format t "~&; SB!Loader: (~D~@{+~D~}) structs/consts/funs/methods/other~%"
+          (format t "~&; SB-Loader: (~D~@{+~D~}) structs/consts/funs/methods/other~%"
                   (length *known-structure-classoids*)
                   (length *!cold-defconstants*)
                   (length *!cold-defuns*)

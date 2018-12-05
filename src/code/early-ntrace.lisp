@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-DEBUG") ; (SB-, not SB!, since we're built in warm load.)
+(in-package "SB-DEBUG")
 
 (defvar *trace-indentation-step* 2
   "the increase in trace indentation at each call level")

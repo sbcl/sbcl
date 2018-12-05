@@ -1325,19 +1325,6 @@
             (if (not first-colon)
                 (load-time-value (find-package "COMMON-LISP-USER") t)
                 (let ((package-name (subseq name 0 first-colon)))
-
-                  ;; Hack the package-name into a bang package.
-                  ;; This is horrible, but it will go away soon.
-                  #+sb-xc-host
-                  (when (member symbol '("PRINT-SYMBOL-WITH-PREFIX"
-                                         "PRINT-DEPRECATION-REPLACEMENTS"
-                                         "PRINT-TYPE"
-                                         "PRINT-TYPE-SPECIFIER"
-                                         "FORMAT-MILLISECONDS"
-                                         "FORMAT-MICROSECONDS")
-                                :test #'string=)
-                    (setf (char package-name 2) #\!))
-
                   (or (find-package package-name)
                       ;; FIXME: should be PACKAGE-ERROR? Could we just
                       ;; use FIND-UNDELETED-PACKAGE-OR-LOSE?

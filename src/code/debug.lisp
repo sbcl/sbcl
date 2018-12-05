@@ -758,7 +758,7 @@ the current thread are replaced with dummy objects which can safely escape."
                           (debug-source-namestring source))))))
       (when (or (eq print-frame-source :always)
                 ;; Avoid showing sources for internals,
-                ;; it will either fail anyway due to all the SB! and
+                ;; it will either fail anyway due to the
                 ;; reader conditionals or show something nobody has
                 ;; any iterest in.
                 (not (eql (search "SYS:SRC;" path) 0)))

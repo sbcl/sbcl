@@ -514,7 +514,7 @@ has written, having proved that it is unreachable."))
       (let ((*print-level* 2)
             (*print-pretty* nil))
         ;; It's arbitrary how this name is stringified.
-        ;; Using ~A in lieu of ~S prevents "SB!" strings from getting in.
+        ;; Using ~A in lieu of ~S prevents "SB-" strings from getting in.
         (format nil
                 "~{~{~A~^ ~}~^ => ~}"
                 #+sb-xc-host (list (list (caar context)))

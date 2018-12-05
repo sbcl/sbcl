@@ -581,12 +581,6 @@ Experimental: interface subject to change."
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!")
   "the current package")
 
-(define-condition bootstrap-package-not-found (condition)
-  ((name :initarg :name :reader bootstrap-package-name)))
-(defun debootstrap-package (&optional condition)
-  (invoke-restart
-   (find-restart-or-control-error 'debootstrap-package condition)))
-
 (defun find-package (package-designator)
   "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
 must be a string designator, in which case the package it names is located and returned.
@@ -632,18 +626,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
                   (nicknamed (when nicknames
                                (cdr (assoc string nicknames :test #'string=))))
                   (packageoid (or nicknamed (%get-package string *package-names*))))
-             (if (and (null packageoid)
-                      ;; FIXME: should never need 'debootstrap' hack
-                      (let ((mismatch (mismatch "SB!" string)))
-                        (and mismatch (= mismatch 3))))
-                 (restart-case
-                     (signal 'bootstrap-package-not-found :name string)
-                   (debootstrap-package ()
-                     (if (string= string "SB-XC")
-                         *cl-package*
-                         (find-package
-                          (substitute #\- #\! string :count 1)))))
-                 packageoid))))
+             packageoid)))
     ;; Is there a fundamental reason we don't declare the FTYPE
     ;; of FIND-PACKAGE-USING-PACKAGE letting the compiler do the checking?
     (t (error 'type-error

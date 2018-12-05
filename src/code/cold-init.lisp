@@ -60,16 +60,7 @@
                      (write-line "failed AVER:")
                      (write expr)
                      (terpri)
-                     (funcall f expr)))
-
-    (encapsulate-1
-     'find-package
-     (lambda (f designator)
-       (cond ((packagep designator) designator)
-             (t (funcall f (let ((s (string designator)))
-                             (if (eql (mismatch s "SB!") 3)
-                                 (concatenate 'string "SB-" (subseq s 3))
-                                 s))))))))
+                     (funcall f expr))))
   names)
 
 (defmacro !with-init-wrappers (&rest forms)
