@@ -413,6 +413,7 @@ but is in fact a problem for either, in theory. Consider:
   (lo-value :c-type "long" :type (unsigned-byte 64))
   (hi-value :c-type "long" :type (unsigned-byte 64)))
 
+#!+sb-simd-pack-256
 (!define-primitive-object (simd-pack-256
                           :lowtag other-pointer-lowtag
                           :widetag simd-pack-256-widetag)
