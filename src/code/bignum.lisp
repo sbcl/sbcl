@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!BIGNUM")
+(in-package "SB-BIGNUM")
 
 ;;;; notes
 

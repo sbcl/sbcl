@@ -41,7 +41,7 @@
 
 ;;; We don't want to clutter the bignum code.
 #!+(or x86 x86-64)
-(define-source-transform sb!bignum:%bignum-ref (bignum index)
+(define-source-transform sb-bignum:%bignum-ref (bignum index)
   ;; KLUDGE: We use TRULY-THE here because even though the bignum code
   ;; is (currently) compiled with (SAFETY 0), the compiler insists on
   ;; inserting CAST nodes to ensure that INDEX is of the correct type.
@@ -49,7 +49,7 @@
   ;; interfere with the operation of FOLD-INDEX-ADDRESSING, below.
   ;; This scenario is a problem for the more user-visible case of
   ;; folding as well.  --njf, 2006-12-01
-  `(sb!bignum:%bignum-ref-with-offset ,bignum
+  `(sb-bignum:%bignum-ref-with-offset ,bignum
                                       (truly-the bignum-index ,index) 0))
 
 #!+(or x86 x86-64)
@@ -77,9 +77,9 @@
                                                    '(value))))))))
 
 #!+(or x86 x86-64)
-(deftransform sb!bignum:%bignum-ref-with-offset
+(deftransform sb-bignum:%bignum-ref-with-offset
     ((bignum index offset) * * :node node)
-  (fold-index-addressing 'sb!bignum:%bignum-ref-with-offset
+  (fold-index-addressing 'sb-bignum:%bignum-ref-with-offset
                          sb-vm:n-word-bits sb-vm:other-pointer-lowtag
                          sb-vm:bignum-digits-offset
                          index offset))

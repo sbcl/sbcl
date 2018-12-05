@@ -226,7 +226,7 @@ variable: an unreadable object representing the error is printed instead.")
        (if *print-radix* 4 0) ; #rNN or trailing decimal
        (ceiling (if (fixnump object)
                     sb-vm:n-positive-fixnum-bits
-                    (* (%bignum-length object) sb!bignum::digit-size))
+                    (* (%bignum-length object) sb-bignum::digit-size))
                 bits-per-char))))
 
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro

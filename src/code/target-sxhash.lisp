@@ -292,7 +292,7 @@
                  ;; FIXNUM is handled in the outer typecase, but we also see it
                  ;; in SXHASH-NUMBER because of RATIONAL and (COMPLEX RATIONAL).
                  (fixnum (sxhash x))    ; through DEFTRANSFORM
-                 (integer (sb!bignum:sxhash-bignum x))
+                 (integer (sb-bignum:sxhash-bignum x))
                  (single-float (sxhash x)) ; through DEFTRANSFORM
                  (double-float (sxhash x)) ; through DEFTRANSFORM
                  #!+long-float (long-float (error "stub: no LONG-FLOAT"))

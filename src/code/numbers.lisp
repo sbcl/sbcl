@@ -1138,7 +1138,7 @@ and the number of 0 bits if INTEGER is negative."
   ;; input rightward 2 bits, consing a new bignum just to read 1 bit.
   (if (and (<= 0 size sb-vm:n-positive-fixnum-bits)
            (typep integer 'bignum))
-      (sb!bignum::ldb-bignum=>fixnum size posn integer)
+      (sb-bignum::ldb-bignum=>fixnum size posn integer)
       (logand (ash integer (- posn))
               (1- (ash 1 size)))))
 

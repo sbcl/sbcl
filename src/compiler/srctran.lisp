@@ -3346,7 +3346,7 @@
 ;;; Assert correctness of build order. (Need not be exhaustive)
 (eval-when (:compile-toplevel) #!+x86-64 (error "Expected %MULTIPLY-HIGH vop"))
 (define-source-transform %multiply-high (x y)
-  `(values (sb!bignum:%multiply ,x ,y)))
+  `(values (sb-bignum:%multiply ,x ,y)))
 )
 
 ;;; If the divisor is constant and both args are positive and fit in a

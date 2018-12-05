@@ -12,7 +12,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!BIGNUM")
+(in-package "SB-BIGNUM")
 
 ;;; Return T if the least significant N-BITS bits of BIGNUM are all
 ;;; zero, else NIL. If the integer-length of BIGNUM is less than N-BITS,
