@@ -34,16 +34,17 @@ static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
 lispobj alloc_code_object (unsigned boxed_nwords, unsigned unboxed_nbytes,
-                           unsigned serialno)
+                           unsigned __attribute__((unused)) serialno)
 {
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
      * pseudo atomic. Here, we rely on gc being inhibited. */
-    if (read_TLS(GC_INHIBIT, arch_os_get_current_thread()) == NIL)
+    struct thread *th = arch_os_get_current_thread();
+    if (read_TLS(GC_INHIBIT, th) == NIL)
         lose("alloc_code_object called with GC enabled.");
 
-    struct code * code;
-    struct thread __attribute__((unused)) *th = arch_os_get_current_thread();
+    int total_size = ALIGN_UP(boxed_nwords*N_WORD_BYTES + unboxed_nbytes,
+                              2*N_WORD_BYTES);
 
     /* Since alloc_code_object is run under WITHOUT-GCING it doesn't
      * actaully need to be pseudo-atomic, this is just to appease the
@@ -54,11 +55,9 @@ lispobj alloc_code_object (unsigned boxed_nwords, unsigned unboxed_nbytes,
      * free_pages_lock depending on availability of space in the region */
     int result = thread_mutex_lock(&allocation_lock);
     gc_assert(!result);
-    code = (struct code *)
-      lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1],
-                 ALIGN_UP(boxed_nwords*N_WORD_BYTES + unboxed_nbytes,
-                          2*N_WORD_BYTES),
-                 CODE_PAGE_TYPE, arch_os_get_current_thread());
+    struct code *code = (struct code *)
+      lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1], total_size,
+                 CODE_PAGE_TYPE, th);
     result = thread_mutex_unlock(&allocation_lock);
     gc_assert(!result);
 
