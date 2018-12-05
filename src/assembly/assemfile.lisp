@@ -59,7 +59,11 @@
                                 :run-scheduler nil)
                   (asmstream-data-section asmstream)
                   (asmstream-code-section asmstream)
-                  (asmstream-elsewhere-section asmstream))))
+                  (asmstream-elsewhere-section asmstream)
+                  ;; append a simple-fun table with 0 functions
+                  (let ((trailer (sb!assem::make-section)))
+                    (sb!assem:emit trailer `(.skip ,(* 2 sb!vm:n-word-bytes)))
+                    trailer))))
             (dump-assembler-routines segment
                                      (segment-buffer segment)
                                      (sb!assem::segment-fixup-notes segment)
