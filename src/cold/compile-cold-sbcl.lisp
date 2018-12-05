@@ -112,7 +112,7 @@
 
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
-(setf (sb-xc:macro-function 'sb!int:quasiquote)
+(setf (sb-xc:macro-function 'sb-int:quasiquote)
       (lambda (form env)
         (the sb-kernel:lexenv-designator env)
         (sb-impl::expand-quasiquote (second form) t)))

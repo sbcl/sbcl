@@ -45,30 +45,30 @@
 
 #-clisp ; DO-ALL-SYMBOLS seems to kill CLISP at random
 (do-all-symbols (s)
-  (when (and (sb!int:info :function :inlinep s)
-             (eq (sb!int:info :function :where-from s) :assumed))
+  (when (and (sb-int:info :function :inlinep s)
+             (eq (sb-int:info :function :where-from s) :assumed))
       (warn "Did you forget to define ~S?" s)))
 
 ;; enable this too see which vops were or weren't used
 #+nil
 (when (hash-table-p sb-c::*static-vop-usage-counts*)
   (format t "Vops used:~%")
-  (dolist (cell (sort (sb!int:%hash-table-alist sb-c::*static-vop-usage-counts*)
+  (dolist (cell (sort (sb-int:%hash-table-alist sb-c::*static-vop-usage-counts*)
                       #'> :key #'cdr))
     (format t "~6d ~s~%" (cdr cell) (car cell))))
 
 (when sb-c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)
-    (sb!int:call-with-each-globaldb-name
+    (sb-int:call-with-each-globaldb-name
      (lambda (name)
-       (let* ((cell (sb!int:info :function :emitted-full-calls name))
-              (inlinep (eq (sb!int:info :function :inlinep name) :inline))
-              (info (sb!int:info :function :info name)))
+       (let* ((cell (sb-int:info :function :emitted-full-calls name))
+              (inlinep (eq (sb-int:info :function :inlinep name) :inline))
+              (info (sb-int:info :function :info name)))
          (if (and cell
                   (or inlinep
                       (and info (sb-c::fun-info-templates info))
-                      (sb!int:info :function :compiler-macro-function name)
-                      (sb!int:info :function :source-transform name)))
+                      (sb-int:info :function :compiler-macro-function name)
+                      (sb-int:info :function :source-transform name)))
              (if inlinep
                  ;; A full call to an inline function almost always indicates
                  ;; an out-of-order definition. If not an inline function,

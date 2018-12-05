@@ -42,7 +42,7 @@
     (not (null (gethash vop-name ht)))))
 
 (defun any-vop-translates-p (fun-name)
-  (let ((f (intern "INFO" "SB!INT")))
+  (let ((f (intern "INFO" "SB-INT")))
     (when (fboundp f)
       (let ((info (funcall f :function :info fun-name)))
         (if info

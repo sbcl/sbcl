@@ -12,7 +12,7 @@
 
 ;; These have to be stated three times:
 ;;  - once for the host if self-hosted,
-;;  - once for the cross-compiler (but substituting SB!INT for SB-INT)
+;;  - once for the cross-compiler
 ;;  - once again for warm load.
 
 ;; This avoids muffling "could not optimize away %SAP-ALIEN"

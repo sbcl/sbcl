@@ -157,11 +157,11 @@
 ;;;  - static for efficiency of access but need not be
 (defconstant-eqx !per-thread-c-interface-symbols
   `((*free-interrupt-context-index* 0)
-    (sb!sys:*allow-with-interrupts* t)
-    (sb!sys:*interrupts-enabled* t)
+    (sb-sys:*allow-with-interrupts* t)
+    (sb-sys:*interrupts-enabled* t)
     *alloc-signal*
-    sb!sys:*interrupt-pending*
-    #!+sb-thruption sb!sys:*thruption-pending*
+    sb-sys:*interrupt-pending*
+    #!+sb-thruption sb-sys:*thruption-pending*
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*

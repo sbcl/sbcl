@@ -178,7 +178,7 @@
   sb-impl::buffer
   sb-c::vop
   sb-c::basic-combination
-  sb!sys:fd-stream
+  sb-sys:fd-stream
   layout
   (sb-assem:segment object-not-assem-segment)
   sb-c::cblock

@@ -84,7 +84,7 @@
   "Give the world a shove and hope it spins."
 
   #!+sb-show
-  (sb!int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
+  (sb-int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
   (/show0 "entering !COLD-INIT")
   (setq *readtable* (make-readtable)
         *print-length* 6 *print-level* 3)

@@ -1594,7 +1594,7 @@ core and return a descriptor to it."
       ;; and not an immediate processor.
       (let ((handle (allocate-symbol
                      (if (or (eq (info :function :kind symbol) :special-form)
-                             (member symbol '(sb!sys:with-pinned-objects)))
+                             (member symbol '(sb-sys:with-pinned-objects)))
                          sb-vm:extended-symbol-size
                          sb-vm:symbol-size)
                      (symbol-name symbol)

@@ -303,7 +303,7 @@ Experimental."
            (incf linenum)
            (unless (or (search "BEFORE-XC-TESTS" line)
                        (search "SB-COLD" line)
-                       (search "SB!INT:!DEFINE-LOAD-TIME-GLOBAL" line)
+                       (search "SB-INT:!DEFINE-LOAD-TIME-GLOBAL" line)
                        (search "*!INITIAL-LAYOUTS*" line)
                        (search "*!INITIAL-SYMBOLS*" line)
                        (search "*!INITIAL-ASSEMBLER-ROUTINES*" line)

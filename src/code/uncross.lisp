@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!INT")
+(in-package "SB-INT")
 
 ;;; In the target system's compiler, uncrossing is just identity.
 #-sb-xc-host

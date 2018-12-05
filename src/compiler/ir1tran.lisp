@@ -1021,7 +1021,7 @@
                             (load-time-value
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.
-                              (mapcar #'find-package '(sb-c sb!int sb-impl
+                              (mapcar #'find-package '(sb-c sb-int sb-impl
                                                        sb-kernel sb-pcl))
                              t))))))
     (and *allow-instrumenting*

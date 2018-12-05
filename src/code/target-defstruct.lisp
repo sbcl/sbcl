@@ -32,7 +32,7 @@
       (destructuring-bind (kind raw-type . index) spec
         (if (eq kind :unbound)
             (setf (%instance-ref instance index)
-                  (sb!sys:%primitive make-unbound-marker))
+                  (sb-sys:%primitive make-unbound-marker))
             (macrolet ((make-case ()
                            `(ecase raw-type
                               ((t)

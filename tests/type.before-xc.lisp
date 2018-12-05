@@ -13,7 +13,7 @@
 ;;;; more information.
 
 (unless (find-package "BEFORE-XC-TESTS")
-  (make-package "BEFORE-XC-TESTS" :use '("SB-XC" "SB-KERNEL" "SB!INT")))
+  (make-package "BEFORE-XC-TESTS" :use '("SB-XC" "SB-KERNEL" "SB-INT")))
 (do-external-symbols (s "SB-XC") ; Import all symbols from SB-XC, then use CL
   (shadowing-import s "BEFORE-XC-TESTS"))
 (import '(sb-kernel::type-union2) "BEFORE-XC-TESTS")
@@ -193,7 +193,7 @@
 ;; the target compiler returns NIL for this CTYPEP call involving KEYWORDP.
 ;; therefore the cross-compiler should too.
 (assert (not (ctypep :x86 (specifier-type '(satisfies keywordp)))))
-(let* ((info (sb!int:info :function :info 'keywordp))
+(let* ((info (sb-int:info :function :info 'keywordp))
        (attributes (sb-c::fun-info-attributes info)))
   (unwind-protect
        (progn

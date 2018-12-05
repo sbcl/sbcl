@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!SYS")
+(in-package "SB-SYS")
 
 ;;; Check that target machine features are set up consistently with
 ;;; this file.

@@ -101,7 +101,7 @@
              ;; with non-macro functions will be too hairy to compile.
              (if (eq (cdr binding) *macro*)
                  (cons (car binding)
-                       (cons 'sb!sys:macro
+                       (cons 'sb-sys:macro
                              (cdr (assoc (car binding) new-expanders))))
                  (cons (car binding)
                        :bogus)))
@@ -109,7 +109,7 @@
              ;; And likewise for symbol macros.
              (if (eq (cdr binding) *symbol-macro*)
                  (cons (car binding)
-                       (cons 'sb!sys:macro
+                       (cons 'sb-sys:macro
                              (cdr (assoc (car binding) new-symbol-expansions))))
                  (cons (car binding)
                        :bogus))))
@@ -1000,7 +1000,7 @@
   (program-destructuring-bind (values &body body) args
     (if (null values)
         (eval-progn body env)
-        (sb!sys:with-pinned-objects ((%eval (car values) env))
+        (sb-sys:with-pinned-objects ((%eval (car values) env))
           (eval-with-pinned-objects (cons (cdr values) body) env)))))
 
 (defvar *eval-dispatch-functions* nil)
@@ -1050,7 +1050,7 @@
        ((truly-the)            (eval-the (cdr exp) env))
        ;; Not a special form, but a macro whose expansion wouldn't be
        ;; handled correctly by the evaluator.
-       ((sb!sys:with-pinned-objects) (eval-with-pinned-objects (cdr exp) env))
+       ((sb-sys:with-pinned-objects) (eval-with-pinned-objects (cdr exp) env))
        (t
         (let ((dispatcher (getf *eval-dispatch-functions* (car exp))))
           (cond
@@ -1146,7 +1146,7 @@
   (let ((native-funs (sb-c::lexenv-funs lexenv))
         (native-vars (sb-c::lexenv-vars lexenv)))
     (flet ((is-macro (thing)
-             (and (consp thing) (eq (car thing) 'sb!sys:macro))))
+             (and (consp thing) (eq (car thing) 'sb-sys:macro))))
       (when (or (sb-c::lexenv-blocks lexenv)
                 (sb-c::lexenv-cleanup lexenv)
                 (sb-c::lexenv-lambda lexenv)

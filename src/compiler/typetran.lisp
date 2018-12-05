@@ -86,7 +86,7 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
-                   #!+(vop-translates sb!int:fixnump-instance-ref)
+                   #!+(vop-translates sb-int:fixnump-instance-ref)
                    ((and (type= type (specifier-type 'fixnum))
                          (let ((use (lvar-uses object)) index)
                            (and (combination-p use)

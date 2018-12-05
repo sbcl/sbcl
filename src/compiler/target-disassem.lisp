@@ -13,7 +13,7 @@
 
 ;;;; FIXME: A lot of stupid package prefixes would go away if DISASSEM
 ;;;; would use the SB-DI package. And some more would go away if it would
-;;;; use SB!SYS (in order to get to the SAP-FOO operators).
+;;;; use SB-SYS (in order to get to the SAP-FOO operators).
 
 (defstruct (instruction (:conc-name inst-)
                         (:constructor

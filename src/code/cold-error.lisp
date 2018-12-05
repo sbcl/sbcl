@@ -223,7 +223,7 @@ of condition handling occurring."
         (write-char #\space)
         (write (get-lisp-obj-address arguments) :radix t :base 16)
         (terpri)))
-    (when (eq action 'lose) (sb!sys:%primitive sb-c:halt))))
+    (when (eq action 'lose) (sb-sys:%primitive sb-c:halt))))
 (defun style-warn (datum &rest arguments)
   (declare (notinline warn))
   (apply 'warn datum arguments))

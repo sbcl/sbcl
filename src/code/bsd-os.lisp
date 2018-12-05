@@ -79,8 +79,8 @@
 (defun software-version ()
   "Return a string describing version of the supporting software, or NIL
    if not available."
-  (or sb!sys::*software-version*
-      (setf sb!sys::*software-version*
+  (or sb-sys::*software-version*
+      (setf sb-sys::*software-version*
             (sysctl :str ctl-kern kern-osrelease))))
 
 ;;; Return system time, user time and number of page faults.

@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!INT")
+(in-package "SB-INT")
 
 ;; Inlining these allows type inference to work.
 (declaim (inline sb-xc:dpb sb-xc:ldb sb-xc:mask-field))

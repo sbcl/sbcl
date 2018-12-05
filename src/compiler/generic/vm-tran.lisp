@@ -330,12 +330,12 @@
                                       (simple-array t)
                                       *)
   ;; KLUDGE: why the percent signs?  Well, ARRAY and INDEX are
-  ;; respectively exported from the CL and SB!INT packages, which
+  ;; respectively exported from the CL and SB-INT packages, which
   ;; means that they're visible to all sorts of things.  If the
   ;; compiler can prove that the call to ARRAY-HEADER-P, below, either
   ;; returns T or NIL, it will delete the irrelevant branch.  However,
   ;; user code might have got here with a variable named CL:ARRAY, and
-  ;; quite often compiler code with a variable named SB!INT:INDEX, so
+  ;; quite often compiler code with a variable named SB-INT:INDEX, so
   ;; this can generate code deletion notes for innocuous user code:
   ;; (DEFUN F (ARRAY I) (DECLARE (SIMPLE-VECTOR ARRAY)) (AREF ARRAY I))
   ;; -- CSR, 2003-04-01
@@ -582,7 +582,7 @@
 ;;; issues) even for byte moves. In SBCL, we're converting to byte
 ;;; moves as problems are discovered with the old code, and this is
 ;;; currently (ca. sbcl-0.6.12.30) the main interface for code in
-;;; SB-KERNEL and SB!SYS (e.g. i/o code). It's not clear that it's the
+;;; SB-KERNEL and SB-SYS (e.g. i/o code). It's not clear that it's the
 ;;; ideal interface, though, and it probably deserves some thought.
 (deftransform %byte-blt ((src src-start dst dst-start dst-end)
                          ((or (simple-unboxed-array (*)) system-area-pointer)
@@ -788,10 +788,10 @@
 ;; MAKE-UNBOUND-MARKER is an ordinary function, not a macro.
 #-sb-xc-host
 (defun make-unbound-marker () ; for interpreters
-  (sb!sys:%primitive make-unbound-marker))
+  (sb-sys:%primitive make-unbound-marker))
 ;; Get the main compiler to transform MAKE-UNBOUND-MARKER
 ;; without the fopcompiler seeing it - the fopcompiler does
 ;; expand compiler-macros, but not source-transforms -
 ;; because %PRIMITIVE is not generally fopcompilable.
 (sb-c:define-source-transform make-unbound-marker ()
-  `(sb!sys:%primitive make-unbound-marker))
+  `(sb-sys:%primitive make-unbound-marker))

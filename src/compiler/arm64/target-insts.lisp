@@ -324,7 +324,7 @@
          (error-number (ldb (byte 8 13) inst))
          (length (sb-kernel::error-length error-number))
          (index offset))
-    (declare (type sb!sys:system-area-pointer sap)
+    (declare (type sb-sys:system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
            (loop repeat length do (sb-c::sap-read-var-integerf sap index))

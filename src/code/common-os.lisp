@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!SYS")
+(in-package "SB-SYS")
 
 (sb-alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
 (sb-alien:define-alien-variable ("core_string" *native-core-string*) (* char))
