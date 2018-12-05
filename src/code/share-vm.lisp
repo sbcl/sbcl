@@ -20,7 +20,7 @@
     `(progn ,@body)
     #!-(or x86 x86-64)
     `(with-pinned-objects ((without-gcing
-                             (sb!di::code-object-from-context ,context)))
+                             (sb-di::code-object-from-context ,context)))
        ,@body))
 
 ;;;; OS-CONTEXT-T

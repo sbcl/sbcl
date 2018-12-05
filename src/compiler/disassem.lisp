@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!DISASSEM")
+(in-package "SB-DISASSEM")
 
 ;;; types and defaults
 
@@ -437,7 +437,7 @@
   (labels ((tempvars (n)
              (if (plusp n)
                  (cons (package-symbolicate
-                        (load-time-value (find-package "SB!DISASSEM"))
+                        (load-time-value (find-package "SB-DISASSEM"))
                         ".T" (write-to-string (incf *!temp-var-counter*)))
                        (tempvars (1- n))))))
     (let* ((arg-cell (assq arg funstate))

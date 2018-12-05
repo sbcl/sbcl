@@ -28,7 +28,7 @@
 (defsetf word-sap-ref %set-word-sap-ref)
 
 ;;; from debug-int.lisp
-(in-package "SB!DI")
+(in-package "SB-DI")
 (defsetf stack-ref %set-stack-ref)
 (defsetf debug-var-value %set-debug-var-value)
 (defsetf debug-var-value %set-debug-var-value)

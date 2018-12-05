@@ -638,7 +638,7 @@
  ("src/code/target-thread"     :not-host)
  ("src/code/timer" :not-host)
 
- ;; defines SB!DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
+ ;; defines SB-DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
  ("src/code/interr" :not-host)
 

@@ -230,7 +230,7 @@
             sb!interpreter:prepare-for-compile
             sb!interpreter::reconstruct-syntactic-closure-env)
           ;; Other
-          '(sb!debug::find-interrupted-name-and-frame
+          '(sb-debug::find-interrupted-name-and-frame
             sb-impl::encapsulate-generic-function
             sb-impl::encapsulated-generic-function-p
             sb-impl::get-processes-status-changes

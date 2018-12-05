@@ -267,7 +267,7 @@
     ;; which would result in an error.
     (setf *standard-readtable* *readtable*))
   (setf *readtable* (copy-readtable *standard-readtable*))
-  (setf sb!debug:*debug-readtable* (copy-readtable *standard-readtable*))
+  (setf sb-debug:*debug-readtable* (copy-readtable *standard-readtable*))
   (sb!pretty:!pprint-cold-init)
   (setq *print-level* nil *print-length* nil) ; restore defaults
 
@@ -276,7 +276,7 @@
   (/show0 "enabling internal errors")
   (setf (extern-alien "internal_errors_enabled" int) 1)
 
-  (show-and-call sb!disassem::!compile-inst-printers)
+  (show-and-call sb-disassem::!compile-inst-printers)
 
   ;; Toggle some readonly bits
   (dovector (sc sb-c:*backend-sc-numbers*)
@@ -388,8 +388,8 @@ process to continue normally."
   (time-reinit)
   ;; If the debugger was disabled in the saved core, we need to
   ;; re-disable ldb again.
-  (when (eq *invoke-debugger-hook* 'sb!debug::debugger-disabled-hook)
-    (sb!debug::disable-debugger))
+  (when (eq *invoke-debugger-hook* 'sb-debug::debugger-disabled-hook)
+    (sb-debug::disable-debugger))
   (call-hooks "initialization" *init-hooks*))
 
 ;;;; some support for any hapless wretches who end up debugging cold

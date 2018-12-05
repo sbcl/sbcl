@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!DEBUG")
+(in-package "SB-DEBUG")
 
 ;;;; variables and constants
 
@@ -525,31 +525,31 @@ information."
 ;;; This includes the ARG-COUNT-ERROR and UNDEFINED-FUNCTION coming from
 ;;; undefined-tramp.
 (defun early-frame-nth-arg (n frame)
-  (let* ((escaped (sb!di::compiled-frame-escaped frame))
-         (pointer (sb!di::frame-pointer frame))
-         (arg-count (sb!di::sub-access-debug-var-slot
+  (let* ((escaped (sb-di::compiled-frame-escaped frame))
+         (pointer (sb-di::frame-pointer frame))
+         (arg-count (sb-di::sub-access-debug-var-slot
                      pointer sb-c:arg-count-sc escaped)))
     (if (and (>= n 0)
              (< n arg-count))
-        (sb!di::sub-access-debug-var-slot
+        (sb-di::sub-access-debug-var-slot
          pointer
          (sb-c:standard-arg-location-sc n)
          escaped)
         (error "Index ~a out of bounds for ~a supplied argument~:p." n arg-count))))
 
 (defun early-frame-args (frame)
-  (let* ((escaped (sb!di::compiled-frame-escaped frame))
-         (pointer (sb!di::frame-pointer frame))
-         (arg-count (sb!di::sub-access-debug-var-slot
+  (let* ((escaped (sb-di::compiled-frame-escaped frame))
+         (pointer (sb-di::frame-pointer frame))
+         (arg-count (sb-di::sub-access-debug-var-slot
                      pointer sb-c:arg-count-sc escaped)))
     (loop for i below arg-count
-          collect (sb!di::sub-access-debug-var-slot
+          collect (sb-di::sub-access-debug-var-slot
                    pointer
                    (sb-c:standard-arg-location-sc i)
                    escaped))))
 
 (defun frame-args-as-list (frame)
-  (when (sb!di::all-args-available-p frame)
+  (when (sb-di::all-args-available-p frame)
     (return-from frame-args-as-list
       (early-frame-args frame)))
   (handler-case
@@ -598,7 +598,7 @@ information."
   (values name
           (if (and (consp args)
                    ;; EARLY-FRAME-ARGS doesn't include arg-count
-                   (not (sb!di::all-args-available-p frame)))
+                   (not (sb-di::all-args-available-p frame)))
               (rest args)
               args)
           info))
@@ -750,7 +750,7 @@ the current thread are replaced with dummy objects which can safely escape."
       (format stream " [~{~(~A~)~^,~}]" info)))
   (when print-frame-source
     (let* ((loc (frame-code-location frame))
-           (path (and (sb!di::compiled-debug-fun-p
+           (path (and (sb-di::compiled-debug-fun-p
                        (code-location-debug-fun loc))
                       (handler-case (code-location-debug-source loc)
                         (no-debug-blocks ())
@@ -1283,7 +1283,7 @@ forms that explicitly control this kind of evaluation.")
   ;; arg count errors are checked before anything is set up but they
   ;; are reported in the elsewhere segment, which is after start-pc saved in the
   ;; debug function, defeating the checks.
-  (and (not (sb!di::all-args-available-p frame))
+  (and (not (sb-di::all-args-available-p frame))
        (eq (debug-var-validity var location) :valid)))
 
 (eval-when (:execute :compile-toplevel)
@@ -1394,7 +1394,7 @@ forms that explicitly control this kind of evaluation.")
   (define-var-operation :set value))
 
 ;;; This returns the COUNT'th arg as the user sees it from args, the
-;;; result of SB!DI:DEBUG-FUN-LAMBDA-LIST. If this returns a
+;;; result of SB-DI:DEBUG-FUN-LAMBDA-LIST. If this returns a
 ;;; potential DEBUG-VAR from the lambda-list, then the second value is
 ;;; T. If this returns a keyword symbol or a value from a rest arg,
 ;;; then the second value is NIL.
@@ -1434,7 +1434,7 @@ forms that explicitly control this kind of evaluation.")
   "Return the N'th argument's value if possible. Argument zero is the first
    argument in a frame's default printed representation. Count keyword/value
    pairs as separate arguments."
-  (when (sb!di::all-args-available-p *current-frame*)
+  (when (sb-di::all-args-available-p *current-frame*)
     (return-from arg
       (early-frame-nth-arg n *current-frame*)))
   (multiple-value-bind (var lambda-var-p)
@@ -1672,7 +1672,7 @@ forms that explicitly control this kind of evaluation.")
             (setf any-p t)
             (when (var-valid-in-frame-p v location)
               (setf any-valid-p t)
-              (case (sb!di::debug-var-info v)
+              (case (sb-di::debug-var-info v)
                 (:more-context
                  (setf more-context (debug-var-value v *current-frame*)))
                 (:more-count
@@ -1795,7 +1795,7 @@ forms that explicitly control this kind of evaluation.")
       ;; This VOP will run the neccessary cleanup forms, reset the fp, and
       ;; then call the supplied function.
       (sb-vm::%primitive sb-vm::unwind-to-frame-and-call
-                         (sb!di::frame-pointer frame)
+                         (sb-di::frame-pointer frame)
                          (find-enclosing-uwp frame)
                          #!-x86-64
                          (lambda ()
@@ -1824,20 +1824,20 @@ forms that explicitly control this kind of evaluation.")
         ;; XEPs do not bind anything, nothing to restore.
         ;; But they may call other code through SATISFIES
         ;; declaration, check that the interrupt is actually in the XEP.
-        (and (sb!di::compiled-frame-escaped frame)
+        (and (sb-di::compiled-frame-escaped frame)
              sb-kernel::*interr-current-bsp*)
         (let* ((compiled-debug-fun (and
-                                    (typep debug-fun 'sb!di::compiled-debug-fun)
-                                    (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))
+                                    (typep debug-fun 'sb-di::compiled-debug-fun)
+                                    (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun)))
                (bsp-save-offset (and compiled-debug-fun
                                      (sb-c::compiled-debug-fun-bsp-save compiled-debug-fun))))
           (when bsp-save-offset
-            (sb!di::sub-access-debug-var-slot (sb!di::frame-pointer frame) bsp-save-offset))))))
+            (sb-di::sub-access-debug-var-slot (sb-di::frame-pointer frame) bsp-save-offset))))))
 
 (defun find-enclosing-catch-block (frame)
   ;; Walk the catch block chain looking for the first entry with an address
   ;; higher than the pointer for FRAME or a null pointer.
-  (let* ((frame-pointer (sb!di::frame-pointer frame))
+  (let* ((frame-pointer (sb-di::frame-pointer frame))
          (current-block (int-sap (ldb (byte #.sb-vm:n-word-bits 0)
                                       (ash sb-vm::*current-catch-block*
                                            sb-vm:n-fixnum-tag-bits))))
@@ -1856,7 +1856,7 @@ forms that explicitly control this kind of evaluation.")
 (defun find-enclosing-uwp (frame)
   ;; Walk the UWP chain looking for the first entry with an address
   ;; higher than the pointer for FRAME or a null pointer.
-  (let* ((frame-pointer (sb!di::frame-pointer frame))
+  (let* ((frame-pointer (sb-di::frame-pointer frame))
          (current-uwp (int-sap (ldb (byte #.sb-vm:n-word-bits 0)
                                     (ash sb-vm::*current-unwind-protect-block*
                                          sb-vm:n-fixnum-tag-bits))))
@@ -1921,7 +1921,7 @@ forms that explicitly control this kind of evaluation.")
   ;; XEPs do not bind anything, nothing to restore
   (find-binding-stack-pointer frame)
   #!-unwind-to-frame-and-call-vop
-  (find 'sb-c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
+  (find 'sb-c:debug-catch-tag (sb-di::frame-catches frame) :key #'car))
 
 (defun frame-has-debug-vars-p (frame)
   (debug-var-info-available

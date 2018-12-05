@@ -1785,7 +1785,7 @@ core and return a descriptor to it."
   (let (syms)
     (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB!SEQUENCE"
                                    "SB!PROFILE" "SB!EXT" "SB-VM"
-                                   "SB-C" "SB!FASL" "SB!DEBUG")
+                                   "SB-C" "SB!FASL" "SB-DEBUG")
                                  :external)
       (loop
          (multiple-value-bind (foundp sym accessibility package) (iter)

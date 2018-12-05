@@ -46,7 +46,7 @@
   (def parse-deprecated-type (condition) condition)
   (def serious-condition (condition) condition)
   (def error (serious-condition) condition serious-condition)
-  (def sb!di:debug-condition (serious-condition) condition serious-condition)
+  (def sb-di:debug-condition (serious-condition) condition serious-condition)
   (def stream-error (error) condition serious-condition error)
   (def reference-condition (condition) condition)
   )

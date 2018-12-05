@@ -140,8 +140,8 @@
     sb-kernel::unhandled-trap-error
     ;; On these it's called through the internal errors mechanism
     #!-(or arm arm64 x86-64) undefined-alien-fun-error
-    sb!di::handle-breakpoint
-    sb!di::handle-single-step-trap
+    sb-di::handle-breakpoint
+    sb-di::handle-single-step-trap
     #!+win32 sb-kernel::handle-win32-exception
     #!+sb-thruption sb!thread::run-interruption
     enter-alien-callback

@@ -12,8 +12,8 @@
 
 (in-package "SB-IMPL")
 
-(declaim (special sb!debug:*in-the-debugger*
-                  sb!debug:*stack-top-hint*
+(declaim (special sb-debug:*in-the-debugger*
+                  sb-debug:*stack-top-hint*
                   *handler-clusters*
                   *restart-clusters*
                   *gc-inhibit* *gc-pending*

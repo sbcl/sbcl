@@ -1368,7 +1368,7 @@ on this semaphore, then N of them is woken up."
       ;; Don't invoke the debugger on errors in cleanup forms in unwind-protect
       (setf sb!ext:*invoke-debugger-hook*
             (lambda (c h)
-              (sb!debug::debugger-disabled-hook c h :quit nil)
+              (sb-debug::debugger-disabled-hook c h :quit nil)
               (abort-thread :allow-exit t)))
       (dolist (thread (list-all-threads))
         (cond ((eq thread current))
@@ -1574,7 +1574,7 @@ session."
                                      (catch '%return-from-thread
                                        (sb-c::inspect-unwinding
                                         (apply real-function arguments)
-                                        #'sb!di::catch-runaway-unwind))
+                                        #'sb-di::catch-runaway-unwind))
                                   (when *exit-in-process*
                                     (sb-impl::call-exit-hooks))))
                              #!+sb-safepoint

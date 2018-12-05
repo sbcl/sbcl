@@ -671,7 +671,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (format *compiler-trace-output*
                           "~|~%disassembly of code for ~S~2%" component)
                   #-sb-xc-host
-                  (sb!disassem:disassemble-assem-segment
+                  (sb-disassem:disassemble-assem-segment
                    bytes ranges *compiler-trace-output*)))
 
               (funcall (etypecase object

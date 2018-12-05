@@ -197,7 +197,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
   (declare (ignore signal))
   (declare (type system-area-pointer info))
   (let ((code (sb-unix::siginfo-code info)))
-    (multiple-value-bind (op operands) (sb!di::decode-arithmetic-error-operands context)
+    (multiple-value-bind (op operands) (sb-di::decode-arithmetic-error-operands context)
      (with-interrupts
        ;; Reset the accumulated exceptions, may be needed on other
        ;; platforms too, at least Linux doesn't seem to require it.

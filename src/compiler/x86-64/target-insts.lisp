@@ -56,9 +56,9 @@
 ;; because it has no field specification and no prefilter.
 ;; (It's specified directly in the MOV instruction definition)
 (defun reg-imm-data (dchunk dstate) dchunk
-  (aref (sb!disassem::dstate-filtered-values dstate) 4))
+  (aref (sb-disassem::dstate-filtered-values dstate) 4))
 
-(defstruct (machine-ea (:include sb!disassem::filtered-arg)
+(defstruct (machine-ea (:include sb-disassem::filtered-arg)
                        (:copier nil)
                        (:constructor %make-machine-ea))
   base disp index scale)
@@ -197,7 +197,7 @@
            (type (unsigned-byte 3) r/m))
   (flet ((make-machine-ea (base &optional disp index scale)
            (let ((ea (the machine-ea
-                       (sb!disassem::new-filtered-arg dstate #'%make-machine-ea))))
+                       (sb-disassem::new-filtered-arg dstate #'%make-machine-ea))))
              (setf (machine-ea-base ea) base
                    (machine-ea-disp ea) disp
                    (machine-ea-index ea) index
@@ -247,7 +247,7 @@
 (defun unboxed-constant-ref (dstate addr disp)
   (when (and (minusp disp)
              (awhen (seg-code (dstate-segment dstate))
-               (sb!disassem::points-to-code-constant-p addr it)))
+               (sb-disassem::points-to-code-constant-p addr it)))
     (sap-ref-word (int-sap addr) 0)))
 
 (define-load-time-global thread-slot-names

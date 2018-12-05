@@ -199,7 +199,7 @@ comments from CMU CL:
 (defun find-info-for (function)
   (declare (type function function))
   (let* ((function (%primitive closure-fun function))
-         (component (sb!di::fun-code-header function)))
+         (component (sb-di::fun-code-header function)))
     (do ((end (code-header-words component))
          (i sb-vm:code-constants-offset (1+ i)))
         ((= end i))

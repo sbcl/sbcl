@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!DI")
+(in-package "SB-DI")
 
 ;;; FIXME: There are an awful lot of package prefixes in this code.
 ;;; Couldn't we have SB-DI use the SB-C and SB-VM packages?
@@ -1826,7 +1826,7 @@ register."
                       ;; cold-init. In lieu of adding smarts to the
                       ;; build framework to handle this, we use an
                       ;; explicit load-time-value form.
-                      (load-time-value (find-package "SB!DEBUG"))))))))
+                      (load-time-value (find-package "SB-DEBUG"))))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB-C::COMPILED-DEBUG-FUN, returning a vector
@@ -2061,7 +2061,7 @@ register."
                 (compiled-code-location-context code-location))))
             (t context)))))
 
-(defun error-context (&optional (frame sb!debug:*stack-top-hint*))
+(defun error-context (&optional (frame sb-debug:*stack-top-hint*))
   (when frame
     (code-location-context (frame-code-location frame))))
 
@@ -2069,7 +2069,7 @@ register."
   (let* ((alien-context (sb-alien:sap-alien context (* os-context-t)))
          (fp (int-sap (context-register alien-context
                                         sb-vm::cfp-offset)))
-         (sb!debug:*stack-top-hint* (find-interrupted-frame))
+         (sb-debug:*stack-top-hint* (find-interrupted-frame))
          (error-context (error-context)))
     (and error-context
          (values (car error-context)
@@ -2902,10 +2902,10 @@ register."
                        (t
                         (binds (list sym validity var))))))))))
       (when (and more-context more-count)
-        (let ((more (assoc 'sb!debug::more (binds))))
+        (let ((more (assoc 'sb-debug::more (binds))))
           (if more
               (setf (second more) :ambiguous)
-              (binds (list 'sb!debug::more :more more-context more-count)))))
+              (binds (list 'sb-debug::more :more more-context more-count)))))
       (dolist (bind (binds))
         (let ((name (first bind))
               (var (third bind)))

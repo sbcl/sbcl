@@ -34,7 +34,7 @@
                (dolist (item messages)
                  (princ item *terminal-io*))
                (terpri *terminal-io*)
-               (sb!debug:print-backtrace :stream *terminal-io* :emergency-best-effort t)
+               (sb-debug:print-backtrace :stream *terminal-io* :emergency-best-effort t)
                (force-output *terminal-io*)
                (invoke-debugger
                 (coerce-to-condition "Maximum error nesting depth exceeded"

@@ -1721,7 +1721,7 @@
                                     (,flet-name ,segment-name)))))))))
     `(progn
        #-sb-xc-host ; The disassembler is not used on the host.
-       (setf (get ',defun-name 'sb!disassem::instruction-flavors)
+       (setf (get ',defun-name 'sb-disassem::instruction-flavors)
              (list ,@pdefs))
        ,(when emitter
           `(defun ,defun-name (.operands. ,segment-name ,@(cdr lambda-list))

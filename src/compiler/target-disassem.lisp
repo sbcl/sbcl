@@ -9,10 +9,10 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!DISASSEM")
+(in-package "SB-DISASSEM")
 
 ;;;; FIXME: A lot of stupid package prefixes would go away if DISASSEM
-;;;; would use the SB!DI package. And some more would go away if it would
+;;;; would use the SB-DI package. And some more would go away if it would
 ;;;; use SB!SYS (in order to get to the SAP-FOO operators).
 
 (defstruct (instruction (:conc-name inst-)
@@ -1181,7 +1181,7 @@
                (awhen (sfcache-last-location-retrieved cache)
                  (code-location= loc it))))
       (values nil nil)
-      (let ((form (sb!debug::code-location-source-form loc context nil)))
+      (let ((form (sb-debug::code-location-source-form loc context nil)))
         (when cache
           (setf (sfcache-debug-source cache)
                 (code-location-debug-source loc))
@@ -1267,7 +1267,7 @@
   (declare (type debug-fun debug-fun))
   (let ((sc-vec sb-c::*backend-sc-numbers*)
         (groups nil)
-        (debug-vars (sb!di::debug-fun-debug-vars debug-fun)))
+        (debug-vars (sb-di::debug-fun-debug-vars debug-fun)))
     (and debug-vars
          (dotimes (debug-var-offset
                    (length debug-vars)
@@ -1277,7 +1277,7 @@
              #+nil
              (format t ";;; At offset ~W: ~S~%" debug-var-offset debug-var)
              (let* ((sc+offset
-                     (sb!di::compiled-debug-var-sc+offset debug-var))
+                     (sb-di::compiled-debug-var-sc+offset debug-var))
                     (sb-name
                      (sb-c:sb-name
                       (sb-c:sc-sb (aref sc-vec
@@ -1344,7 +1344,7 @@
           (do-debug-fun-blocks (block debug-fun)
             (let ((first-location-in-block-p t))
               (do-debug-block-locations (loc block)
-                (let ((pc (sb!di::compiled-code-location-pc loc)))
+                (let ((pc (sb-di::compiled-code-location-pc loc)))
 
                   ;; Put blank lines in at block boundaries
                   (when (and first-location-in-block-p
@@ -1380,7 +1380,7 @@
 
                   ;; Keep track of variable live-ness as best we can.
                   (let ((live-set
-                         (copy-seq (sb!di::compiled-code-location-live-set
+                         (copy-seq (sb-di::compiled-code-location-live-set
                                     loc))))
                     (add-hook
                      pc
@@ -1474,7 +1474,7 @@
                         (when first-block-seen-p
                           (setf nil-block-seen-p t))))
                  (setf last-debug-fun
-                       (sb!di::make-compiled-debug-fun fmap-entry code)))))))
+                       (sb-di::make-compiled-debug-fun fmap-entry code)))))))
         (let ((max-offset (%code-text-size code)))
           (when (and first-block-seen-p last-debug-fun)
             (add-seg last-offset
@@ -1526,7 +1526,7 @@
               (setf last-offset fun-map-entry))
              (sb-c::compiled-debug-fun
               (setf last-debug-fun
-                    (sb!di::make-compiled-debug-fun fun-map-entry code)))))
+                    (sb-di::make-compiled-debug-fun fun-map-entry code)))))
           (when last-debug-fun
             (add-seg last-offset
                      (- (%code-text-size code) last-offset)

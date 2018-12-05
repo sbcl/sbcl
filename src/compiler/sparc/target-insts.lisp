@@ -137,7 +137,7 @@
      ;; A reference to a static symbol or static function (reg =
      ;; %NULL)
      (or (maybe-note-nil-indexed-symbol-slot-ref immed-val dstate)
-         #+nil (sb!disassem::maybe-note-static-function immed-val dstate)))
+         #+nil (sb-disassem::maybe-note-static-function immed-val dstate)))
     (t
      (let ((sethi (assoc rs1 *note-sethi-inst*)))
        (when sethi

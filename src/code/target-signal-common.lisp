@@ -64,7 +64,7 @@
     ;; previous signal handler when the next signal is delivered
     ;; provided there is no WITH-INTERRUPTS.
     (let ((*unblock-deferrables-on-enabling-interrupts-p* t)
-          (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'invoke-interruption)))
+          (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'invoke-interruption)))
       (with-interrupt-bindings
         (sb!thread::without-thread-waiting-for (:already-without-interrupts t)
           (allow-with-interrupts

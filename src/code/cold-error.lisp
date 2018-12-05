@@ -77,7 +77,7 @@
   (%signal (apply #'coerce-to-condition datum 'simple-condition 'signal arguments)))
 (defun %signal (condition)
   (let ((handler-clusters *handler-clusters*)
-        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* '%signal)))
+        (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* '%signal)))
     (when *break-on-signals*
       (maybe-break-on-signal condition))
     (do ((cluster (pop handler-clusters) (pop handler-clusters)))
@@ -122,7 +122,7 @@
      ;; This is almost totally unhelpful. Running with #!+sb-show does not mean
      ;; that you care to see an additional 16K characters of output
      ;; each time this macro is used when no error is actually happening.
-     #| #!+sb-show (sb!debug:print-backtrace :count 8) ; arbitrary truncation |#
+     #| #!+sb-show (sb-debug:print-backtrace :count 8) ; arbitrary truncation |#
      ,@forms))
 ;;; This symbol isn't removed automatically because it's exported,
 ;;; but nothing can use it after the build is complete.
@@ -165,7 +165,7 @@
   (infinite-error-protect
    (let ((condition (apply #'coerce-to-condition datum 'simple-error 'error
                            arguments))
-         (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'error)))
+         (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'error)))
      (/show0 "signalling CONDITION from within ERROR")
      (%signal condition)
      (/show0 "done signalling CONDITION within ERROR")
@@ -178,7 +178,7 @@
       (let ((condition (apply #'coerce-to-condition datum
                               'simple-error 'cerror arguments)))
         (with-condition-restarts condition (list (find-restart 'continue))
-          (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'cerror)))
+          (let ((sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'cerror)))
             (%signal condition)
             (invoke-debugger condition))))))
   nil)
@@ -191,7 +191,7 @@
 (defun %break (what &optional (datum "break") &rest arguments)
   (infinite-error-protect
    (with-simple-restart (continue "Return from ~S." what)
-     (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* '%break)))
+     (let ((sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* '%break)))
        (invoke-debugger
         (apply #'coerce-to-condition datum 'simple-condition what arguments)))))
   nil)
@@ -200,7 +200,7 @@
   "Print a message and invoke the debugger without allowing any possibility
 of condition handling occurring."
   (let ((*debugger-hook* nil) ; as specifically required by ANSI
-        (sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint* 'break)))
+        (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'break)))
     (apply #'%break 'break datum arguments)))
 
 ;;; These functions definitions are for cold-init.

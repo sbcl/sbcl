@@ -209,7 +209,7 @@ with that condition (or with no condition) will be returned."
 
 ;;; To reduce expansion size of RESTART-CASE
 (defun with-simple-condition-restarts (function cerror-arg datum &rest arguments)
-  (let ((sb!debug:*stack-top-hint* (or sb!debug:*stack-top-hint*
+  (let ((sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint*
                                        'with-simple-condition-restarts))
         (condition (apply #'coerce-to-condition datum
                           (case function

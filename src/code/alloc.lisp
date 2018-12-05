@@ -308,7 +308,7 @@
                  (when (> free-ptr limit)
                    (cond (errorp
                           (format t "~&Immobile space exhausted~%")
-                          (sb!debug:print-backtrace)
+                          (sb-debug:print-backtrace)
                           (sb-impl::%halt))
                          (t
                           (return-from allocate-immobile-bytes 0))))

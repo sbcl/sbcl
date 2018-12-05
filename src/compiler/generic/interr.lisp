@@ -181,7 +181,7 @@
   layout
   (sb!assem:segment object-not-assem-segment)
   sb-c::cblock
-  sb!disassem:disassem-state
+  sb-disassem:disassem-state
   sb-c::ctran
   sb-c::clambda
   sb-c:tn
@@ -194,7 +194,7 @@
   type-class
   sb-c::lvar
   sb-c::vop-info
-  (sb!disassem:instruction object-not-disassembler-instruction)
+  (sb-disassem:instruction object-not-disassembler-instruction)
   ((mod 1114112) object-not-unicode-code-point)
   (sb-c::node object-not-compiler-node)
   sequence
