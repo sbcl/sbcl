@@ -128,7 +128,7 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
 #!+win32
 (defun os-random-seed ()
   (/show0 "Getting randomness from CryptGenRandom")
-  (or (sb!win32:crypt-gen-random 32)
+  (or (sb-win32:crypt-gen-random 32)
       (fallback-random-seed)))
 
 (defun seed-random-state (&optional state)

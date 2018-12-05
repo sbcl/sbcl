@@ -162,7 +162,7 @@ corresponds to NAME, or NIL if there is none."
            (type unix-file-mode mode)
            #!+win32
            (ignore mode))
-  #!+win32 (sb!win32:unixlike-open path flags :overlapped overlapped)
+  #!+win32 (sb-win32:unixlike-open path flags :overlapped overlapped)
   #!-win32
   (with-restarted-syscall (value errno)
     (int-syscall ("open" c-string int int)
@@ -175,7 +175,7 @@ corresponds to NAME, or NIL if there is none."
 ;;; associated with it.
 (/show0 "unix.lisp 391")
 (defun unix-close (fd)
-  #!+win32 (sb!win32:unixlike-close fd)
+  #!+win32 (sb-win32:unixlike-close fd)
   #!-win32 (declare (type unix-fd fd))
   #!-win32 (void-syscall ("close" int) fd))
 
@@ -200,7 +200,7 @@ corresponds to NAME, or NIL if there is none."
                                mode)))
         (if (minusp fd)
             (values nil (get-errno))
-            (values #!-win32 fd #!+win32 (sb!win32::duplicate-and-unwrap-fd fd)
+            (values #!-win32 fd #!+win32 (sb-win32::duplicate-and-unwrap-fd fd)
                     (octets-to-string template-buffer)))))))
 
 ;;;; resourcebits.h
@@ -270,7 +270,7 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-isatty (fd)
   (declare (type unix-fd fd))
   #!-win32 (int-syscall ("isatty" int) fd)
-  #!+win32 (sb!win32::windows-isatty fd))
+  #!+win32 (sb-win32::windows-isatty fd))
 
 (defun unix-lseek (fd offset whence)
   "Unix-lseek accepts a file descriptor and moves the file pointer by
@@ -288,7 +288,7 @@ corresponds to NAME, or NIL if there is none."
                                              #!+largefile "lseek_largefile"
                                              (function off-t int off-t int))
                         fd offset whence)
-          #!+win32 (sb!win32:lseeki64 fd offset whence)))
+          #!+win32 (sb-win32:lseeki64 fd offset whence)))
     (if (minusp result)
         (values nil (get-errno))
       (values result 0))))
@@ -347,7 +347,7 @@ corresponds to NAME, or NIL if there is none."
 
 #!+win32
 (defun unix-pipe ()
-  (sb!win32::windows-pipe))
+  (sb-win32::windows-pipe))
 
 ;; Windows mkdir() doesn't take the mode argument. It's cdecl, so we could
 ;; actually call it passing the mode argument, but some sharp-eyed reader
@@ -892,7 +892,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 (defun unix-fstat (fd)
   #!-win32
   (declare (type unix-fd fd))
-  (#!-win32 funcall #!+win32 sb!win32::call-with-crt-fd
+  (#!-win32 funcall #!+win32 sb-win32::call-with-crt-fd
    (lambda (fd)
      (with-alien ((buf (struct wrapped_stat)))
        (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))

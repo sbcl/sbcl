@@ -1,5 +1,5 @@
 {
-    printf("(in-package \"SB!WIN32\")\n\n");
+    printf("(in-package \"SB-WIN32\")\n\n");
 
     defconstant ("input-record-size", sizeof (INPUT_RECORD));
 

@@ -34,5 +34,5 @@
   (alien-funcall (extern-alien "strerror" (function c-string int)) errno))
 
 #!+win32
-(defun strerror (&optional (errno (sb!win32:get-last-error)))
-  (sb!win32:format-system-message errno))
+(defun strerror (&optional (errno (sb-win32:get-last-error)))
+  (sb-win32:format-system-message errno))

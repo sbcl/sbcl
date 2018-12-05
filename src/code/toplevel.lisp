@@ -21,8 +21,8 @@
           (probe-file (merge-pathnames "sbclrc" sbcl-homedir))))
       #!+win32
       (merge-pathnames "sbcl\\sbclrc"
-                       (sb!win32::get-folder-pathname
-                        sb!win32::csidl_common_appdata))
+                       (sb-win32::get-folder-pathname
+                        sb-win32::csidl_common_appdata))
       #!-win32
       "/etc/sbclrc"))
 
@@ -161,7 +161,7 @@ means to wait indefinitely.")
 
 #!+(and win32 (not sb-thread))
 (defun %sleep (seconds)
-  (sb!win32:millisleep (truncate (* seconds 1000))))
+  (sb-win32:millisleep (truncate (* seconds 1000))))
 
 (defun sleep (seconds)
   "This function causes execution to be suspended for SECONDS. SECONDS may be

@@ -358,7 +358,7 @@
                                                    sb-unix:codeset)
                                                   "LATIN-1")
                                               "KEYWORD")
-                             #!+win32 (sb!win32::ansi-codepage)))
+                             #!+win32 (sb-win32::ansi-codepage)))
         (let ((entry (get-external-format external-format)))
           (cond
             (entry

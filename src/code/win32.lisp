@@ -12,7 +12,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!WIN32")
+(in-package "SB-WIN32")
 
 ;;; Alien definitions for commonly used Win32 types.  Woe unto whoever
 ;;; tries to untangle this someday for 64-bit Windows.

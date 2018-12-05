@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!WIN32")
+(in-package "SB-WIN32")
 
 ;;;
 ;;; An awful lot of this stuff is stubbed out for now. We basically

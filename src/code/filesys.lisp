@@ -334,7 +334,7 @@
     (case query-for
       ((:existence :truename)
        (multiple-value-bind (file kind)
-           (sb!win32::native-probe-file-name filename)
+           (sb-win32::native-probe-file-name filename)
          (when (and (not file) kind)
            (setf file filename))
          ;; The following OR was an AND, but that breaks files like NUL,
@@ -350,14 +350,14 @@
            (errorp
             (simple-file-perror
              "Failed to find the ~*~A~2:* of ~A"
-             filename (sb!win32:get-last-error) query-for)))))
+             filename (sb-win32:get-last-error) query-for)))))
       (:write-date
        (cond
-         ((sb!win32::native-file-write-date filename))
+         ((sb-win32::native-file-write-date filename))
          (errorp
           (simple-file-perror
            "Failed to find the ~*~A~2:* of ~A"
-           filename (sb!win32:get-last-error) query-for)))))))
+           filename (sb-win32:get-last-error) query-for)))))))
 
 #!-win32
 (defun %query-file-system (pathname query-for errorp)
@@ -537,8 +537,8 @@ per standard Unix unlink() behaviour."
       (close file))
     (multiple-value-bind (res err)
         #!-win32 (sb-unix:unix-unlink namestring)
-        #!+win32 (or (sb!win32::native-delete-file namestring)
-                     (values nil (sb!win32:get-last-error)))
+        #!+win32 (or (sb-win32::native-delete-file namestring)
+                     (values nil (sb-win32:get-last-error)))
         (unless res
           (simple-file-perror "couldn't delete ~A" namestring err))))
   t)
@@ -604,8 +604,8 @@ exist or if is a file or a symbolic link."
              (let ((namestring (native-namestring dir :as-file t)))
                (multiple-value-bind (res errno)
                  #!+win32
-                 (or (sb!win32::native-delete-directory namestring)
-                     (values nil (sb!win32:get-last-error)))
+                 (or (sb-win32::native-delete-directory namestring)
+                     (values nil (sb-win32:get-last-error)))
                  #!-win32
                  (values
                   (not (minusp (alien-funcall
@@ -676,7 +676,7 @@ system. HOST argument is ignored by SBCL."
    (parse-native-namestring
     (or (user-homedir-namestring)
         #!+win32
-        (sb!win32::get-folder-namestring sb!win32::csidl_profile))
+        (sb-win32::get-folder-namestring sb-win32::csidl_profile))
     *physical-host*
     *default-pathname-defaults*
     :as-directory t)))
@@ -815,7 +815,7 @@ filenames."
                          `(funcall ,',one-iter)))
               ,@body)))
        #!+win32
-       (sb!win32::native-call-with-directory-iterator
+       (sb-win32::native-call-with-directory-iterator
         #'iterate ,namestring ,errorp)
        #!-win32
        (call-with-native-directory-iterator #'iterate ,namestring ,errorp))))

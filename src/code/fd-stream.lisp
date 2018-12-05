@@ -954,7 +954,7 @@
 (defun sysread-may-block-p (stream)
   #!+win32
   ;; This answers T at EOF on win32, I think.
-  (not (sb!win32:handle-listen (fd-stream-fd stream)))
+  (not (sb-win32:handle-listen (fd-stream-fd stream)))
   #!-win32
   (not (sb-unix:unix-simple-poll (fd-stream-fd stream) :input 0)))
 
@@ -1922,7 +1922,7 @@
   (flush-input-buffer stream)
   #!+win32
   (progn
-    (sb!win32:handle-clear-input (fd-stream-fd stream))
+    (sb-win32:handle-clear-input (fd-stream-fd stream))
     (setf (fd-stream-listen stream) nil))
   #!-win32
   (catch 'eof-input-catcher
@@ -1942,7 +1942,7 @@
                   (or (not (eql (buffer-head ibuf) (buffer-tail ibuf)))
                       (fd-stream-listen fd-stream)
                       #!+win32
-                      (sb!win32:handle-listen (fd-stream-fd fd-stream))
+                      (sb-win32:handle-listen (fd-stream-fd fd-stream))
                       #!-win32
                       ;; If the read can block, LISTEN will certainly return NIL.
                       (if (sysread-may-block-p fd-stream)
@@ -2087,7 +2087,7 @@
      (let* ((handle (fd-stream-fd fd-stream))
             (element-size (fd-stream-element-size fd-stream)))
        (multiple-value-bind (got native-size)
-           (sb!win32:get-file-size-ex handle 0)
+           (sb-win32:get-file-size-ex handle 0)
          (if (zerop got)
              ;; Might be a block device, in which case we fall back to
              ;; a non-atomic workaround:
@@ -2470,7 +2470,7 @@
                   (sb-unix:unix-open namestring mask mode
                                      #!+win32 :overlapped #!+win32 overlapped)
                   (values nil #!-win32 sb-unix:enoent
-                              #!+win32 sb!win32::error_file_not_found))
+                              #!+win32 sb-win32::error_file_not_found))
             (flet ((vanilla-open-error ()
                      (simple-file-perror "error opening ~S" pathname errno)))
               (cond ((numberp fd)
@@ -2503,7 +2503,7 @@
                           (close stream)
                           stream))))
                     ((eql errno #!-win32 sb-unix:enoent
-                                #!+win32 sb!win32::error_file_not_found)
+                                #!+win32 sb-win32::error_file_not_found)
                      (case if-does-not-exist
                        (:error (vanilla-open-error))
                        (:create
@@ -2511,7 +2511,7 @@
                                     pathname))
                        (t nil)))
                     ((and (eql errno #!-win32 sb-unix:eexist
-                                     #!+win32 sb!win32::error_file_exists)
+                                     #!+win32 sb-win32::error_file_exists)
                           (null if-exists))
                      nil)
                     (t
@@ -2555,7 +2555,7 @@
 (defun stdstream-external-format (fd)
   #!-win32 (declare (ignore fd))
   (let* ((keyword (cond #!+(and win32 sb-unicode)
-                        ((sb!win32::console-handle-p fd)
+                        ((sb-win32::console-handle-p fd)
                          :ucs-2)
                         (t
                          (default-external-format))))
@@ -2573,18 +2573,18 @@
   (with-simple-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
         #!-win32 (values 0 1 2)
-        #!+win32 (sb!win32::get-std-handles)
+        #!+win32 (sb-win32::get-std-handles)
       (labels (#!+win32
                (nul-stream (name inputp outputp)
                  (let* ((nul-name #.(coerce "NUL" 'simple-base-string))
                         (nul-handle
                           (cond
                             ((and inputp outputp)
-                             (sb!win32:unixlike-open nul-name sb-unix:o_rdwr))
+                             (sb-win32:unixlike-open nul-name sb-unix:o_rdwr))
                             (inputp
-                             (sb!win32:unixlike-open nul-name sb-unix:o_rdonly))
+                             (sb-win32:unixlike-open nul-name sb-unix:o_rdonly))
                             (outputp
-                             (sb!win32:unixlike-open nul-name sb-unix:o_wronly))
+                             (sb-win32:unixlike-open nul-name sb-unix:o_wronly))
                             (t
                              ;; Not quite sure what to do in this case.
                              nil))))
@@ -2690,7 +2690,7 @@
 (defun !make-cold-stderr-stream ()
   (let ((stderr
           #!-win32 2
-          #!+win32 (sb!win32::get-std-handle-or-null sb!win32::+std-error-handle+)))
+          #!+win32 (sb-win32::get-std-handle-or-null sb-win32::+std-error-handle+)))
     (%make-fd-stream
      :out (lambda (stream ch)
             (declare (ignore stream))
