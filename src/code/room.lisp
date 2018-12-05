@@ -546,11 +546,11 @@ We could try a few things to mitigate this:
                  ;; current range. But what if it contributed 0 bytes to the range?
                  ;;
                  ;;     N : #x8000 bytes used
-                 ;;   N+1 : #x0100 bytes used
+                 ;;   N+1 : #x8000 bytes used
                  ;;   N+2 : 0 bytes used        <- PAGE-INDEX now points here
                  ;;   N+3 : initially 0 bytes, then gets some bytes
                  ;;
-                 ;; We invoked the map function with page_address(N) for #x8100 bytes.
+                 ;; We invoked the map function with page_address(N) for #x10000 bytes.
                  ;; Suppose that function consed a partly unboxed object starting on
                  ;; page N+2 extending to page N+3, and that NEXT-FREE-PAGE was greater
                  ;; than both to begin with, so the termination condition isn't in play.
