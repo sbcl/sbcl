@@ -169,52 +169,52 @@
             sb!gray:stream-write-char
             sb!gray:stream-write-sequence
             sb!gray:stream-write-string
-            sb!sequence:concatenate
-            sb!sequence:copy-seq
-            sb!sequence:count
-            sb!sequence:count-if
-            sb!sequence:count-if-not
-            sb!sequence:delete
-            sb!sequence:delete-duplicates
-            sb!sequence:delete-if
-            sb!sequence:delete-if-not
-            (setf sb!sequence:elt)
-            sb!sequence:elt
-            sb!sequence:emptyp
-            sb!sequence:fill
-            sb!sequence:find
-            sb!sequence:find-if
-            sb!sequence:find-if-not
-            (setf sb!sequence:iterator-element)
-            sb!sequence:iterator-endp
-            sb!sequence:iterator-step
-            sb!sequence:length
-            sb!sequence:make-sequence-iterator
-            sb!sequence:make-sequence-like
-            sb!sequence:map
-            sb!sequence:merge
-            sb!sequence:mismatch
-            sb!sequence:nreverse
-            sb!sequence:nsubstitute
-            sb!sequence:nsubstitute-if
-            sb!sequence:nsubstitute-if-not
-            sb!sequence:position
-            sb!sequence:position-if
-            sb!sequence:position-if-not
-            sb!sequence:reduce
-            sb!sequence:remove
-            sb!sequence:remove-duplicates
-            sb!sequence:remove-if
-            sb!sequence:remove-if-not
-            sb!sequence:replace
-            sb!sequence:reverse
-            sb!sequence:search
-            sb!sequence:sort
-            sb!sequence:stable-sort
-            sb!sequence:subseq
-            sb!sequence:substitute
-            sb!sequence:substitute-if
-            sb!sequence:substitute-if-not)
+            sb-sequence:concatenate
+            sb-sequence:copy-seq
+            sb-sequence:count
+            sb-sequence:count-if
+            sb-sequence:count-if-not
+            sb-sequence:delete
+            sb-sequence:delete-duplicates
+            sb-sequence:delete-if
+            sb-sequence:delete-if-not
+            (setf sb-sequence:elt)
+            sb-sequence:elt
+            sb-sequence:emptyp
+            sb-sequence:fill
+            sb-sequence:find
+            sb-sequence:find-if
+            sb-sequence:find-if-not
+            (setf sb-sequence:iterator-element)
+            sb-sequence:iterator-endp
+            sb-sequence:iterator-step
+            sb-sequence:length
+            sb-sequence:make-sequence-iterator
+            sb-sequence:make-sequence-like
+            sb-sequence:map
+            sb-sequence:merge
+            sb-sequence:mismatch
+            sb-sequence:nreverse
+            sb-sequence:nsubstitute
+            sb-sequence:nsubstitute-if
+            sb-sequence:nsubstitute-if-not
+            sb-sequence:position
+            sb-sequence:position-if
+            sb-sequence:position-if-not
+            sb-sequence:reduce
+            sb-sequence:remove
+            sb-sequence:remove-duplicates
+            sb-sequence:remove-if
+            sb-sequence:remove-if-not
+            sb-sequence:replace
+            sb-sequence:reverse
+            sb-sequence:search
+            sb-sequence:sort
+            sb-sequence:stable-sort
+            sb-sequence:subseq
+            sb-sequence:substitute
+            sb-sequence:substitute-if
+            sb-sequence:substitute-if-not)
           ;; Fast interpreter
           #!+sb-fasteval
           '(sb!interpreter:%fun-type

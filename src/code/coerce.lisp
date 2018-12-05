@@ -46,7 +46,7 @@
   (declare (type sequence sequence))
   (dx-let ((result (list nil)))
     (let ((splice result))
-      (sb!sequence:dosequence (elt sequence (cdr result))
+      (sb-sequence:dosequence (elt sequence (cdr result))
         (let ((cell (list elt)))
           (setf (cdr splice) cell splice cell))))))
 
@@ -218,7 +218,7 @@
              (if (sequencep object)
                  (cond
                    ((type= type (specifier-type 'list))
-                    (sb!sequence:make-sequence-like
+                    (sb-sequence:make-sequence-like
                      nil (length object) :initial-contents object))
                    ((type= type (specifier-type 'null))
                     (if (= (length object) 0)
@@ -234,7 +234,7 @@
                               (sequence-type-length-mismatch-error type length))
                             (unless (>= length min)
                               (sequence-type-length-mismatch-error type length)))
-                        (sb!sequence:make-sequence-like
+                        (sb-sequence:make-sequence-like
                          nil length :initial-contents object))))
                    (t (sequence-type-too-hairy (type-specifier type))))
                  (coerce-error))))
@@ -252,7 +252,7 @@
          (let ((prototype (sb!mop:class-prototype
                            (sb!pcl:ensure-class-finalized
                             (find-class output-type-spec)))))
-           (sb!sequence:make-sequence-like
+           (sb-sequence:make-sequence-like
             prototype (length object) :initial-contents object)))
         ((csubtypep type (specifier-type 'function))
          (coerce-to-fun object))

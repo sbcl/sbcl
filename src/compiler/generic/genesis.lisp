@@ -1783,7 +1783,7 @@ core and return a descriptor to it."
   ;; and not cold-init, I think we should use an ordinary DEFPACKAGE for
   ;; the added-on bits. What I've done is somewhat of a fragile kludge.
   (let (syms)
-    (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB!SEQUENCE"
+    (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB-SEQUENCE"
                                    "SB!PROFILE" "SB!EXT" "SB-VM"
                                    "SB-C" "SB!FASL" "SB-DEBUG")
                                  :external)

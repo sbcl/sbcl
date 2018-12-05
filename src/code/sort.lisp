@@ -37,7 +37,7 @@
                           :check-fill-pointer t)
           (sort-vector vector start end predicate-fun key-fun-or-nil))
         sequence)
-      (apply #'sb!sequence:sort sequence predicate args))))
+      (apply #'sb-sequence:sort sequence predicate args))))
 
 ;;;; stable sorting
 (defun stable-sort (sequence predicate &rest args &key key)
@@ -57,7 +57,7 @@
           (stable-sort-vector sequence
                               predicate-fun
                               (and key (%coerce-callable-to-fun key))))
-      (apply #'sb!sequence:stable-sort sequence predicate args))))
+      (apply #'sb-sequence:stable-sort sequence predicate args))))
 
 ;;; FUNCALL-USING-KEY saves us a function call sometimes.
 (eval-when (:compile-toplevel :execute)
@@ -456,6 +456,6 @@
               ;; sequence.  Note that the one builtin method optimizes
               ;; for NIL as the key fun, and we correctly preserve a
               ;; NIL here.
-              (sb!sequence:merge
+              (sb-sequence:merge
                prototype sequence1 sequence2 pred-fun :key key-fun))))
       (t (bad-sequence-type-error result-type)))))

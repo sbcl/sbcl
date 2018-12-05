@@ -783,7 +783,7 @@
 
 (deftransform fill ((seq item &key (start 0) (end nil))
                     ((and sequence (not vector) (not list)) t &key (:start t) (:end t)))
-  `(sb!sequence:fill seq item
+  `(sb-sequence:fill seq item
                      :start start
                      :end (%check-generic-sequence-bounds seq start end)))
 
@@ -1253,7 +1253,7 @@
 
 (deftransform subseq ((seq start &optional end)
                       ((and sequence (not vector) (not list)) t &optional t))
-  '(sb!sequence:subseq seq start end))
+  '(sb-sequence:subseq seq start end))
 
 (deftransform copy-seq ((seq) (vector))
   (let ((type (lvar-type seq)))
@@ -1270,7 +1270,7 @@
   '(list-copy-seq* seq))
 
 (deftransform copy-seq ((seq) ((and sequence (not vector) (not list))))
-  '(sb!sequence:copy-seq seq))
+  '(sb-sequence:copy-seq seq))
 
 (deftransform search ((pattern text &key start1 start2 end1 end2 test test-not
                                key from-end)
