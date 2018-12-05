@@ -171,16 +171,16 @@
     ;; and results.
     (if (or (some (lambda (type)
                     (and (alien-integer-type-p type)
-                         (> (sb!alien::alien-integer-type-bits type) 32)))
+                         (> (sb-alien::alien-integer-type-bits type) 32)))
                   arg-types)
             (and (alien-integer-type-p result-type)
-                 (> (sb!alien::alien-integer-type-bits result-type) 32)))
+                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
         (collect ((new-args) (lambda-vars) (new-arg-types))
                  (dolist (type arg-types)
                    (let ((arg (gensym)))
                      (lambda-vars arg)
                      (cond ((and (alien-integer-type-p type)
-                                 (> (sb!alien::alien-integer-type-bits type) 32))
+                                 (> (sb-alien::alien-integer-type-bits type) 32))
                             ;; 64-bit long long types are stored in
                             ;; consecutive locations, endian word order,
                             ;; aligned to 8 bytes.
@@ -198,9 +198,9 @@
                             (new-args arg)
                             (new-arg-types type)))))
                  (cond ((and (alien-integer-type-p result-type)
-                             (> (sb!alien::alien-integer-type-bits result-type) 32))
+                             (> (sb-alien::alien-integer-type-bits result-type) 32))
                         (let ((new-result-type
-                               (let ((sb!alien::*values-type-okay* t))
+                               (let ((sb-alien::*values-type-okay* t))
                                  (parse-alien-type
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
@@ -311,7 +311,7 @@
 (defun alien-callback-accessor-form (type sap offset)
   (let ((parsed-type type))
     (if (alien-integer-type-p parsed-type)
-        (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+        (let ((bits (sb-alien::alien-integer-type-bits parsed-type)))
                (let ((byte-offset
                       (cond ((< bits n-word-bits)
                              (- n-word-bytes

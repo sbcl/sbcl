@@ -522,7 +522,7 @@
         (case (info :variable :kind symbol)
           (:macro (error "Tried to set a symbol-macrolet!"))
           (:alien (let ((type (info :variable :alien-info symbol)))
-                    (setf (sb!alien::%heap-alien type) value)))
+                    (setf (sb-alien::%heap-alien type) value)))
           (t
            (let ((type (sb-c::info :variable :type symbol)))
              (when type
@@ -548,7 +548,7 @@
           (t (values (cdr binding) :variable)))
         (case (info :variable :kind symbol)
           (:macro (values (macroexpand-1 symbol) :expansion))
-          (:alien (values (sb!alien-internals:alien-value symbol) :variable))
+          (:alien (values (sb-alien-internals:alien-value symbol) :variable))
           (t (values (symbol-value symbol) :variable))))))
 
 ;;; Retrieve the function/macro binding of the symbol NAME in

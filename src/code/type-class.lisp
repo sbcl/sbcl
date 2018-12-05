@@ -730,7 +730,7 @@
   (car-type (missing-arg) :type ctype :read-only t)
   (cdr-type (missing-arg) :type ctype :read-only t))
 
-(in-package "SB!ALIEN")
+(in-package "SB-ALIEN")
 (def!struct (alien-type
              (:copier nil)
              (:constructor make-alien-type

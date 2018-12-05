@@ -627,7 +627,7 @@ exist or if is a file or a symbolic link."
           (delete-dir physical)))))
 
 
-(sb!alien:define-alien-variable ("sbcl_home" *sbcl-home*) c-string)
+(sb-alien:define-alien-variable ("sbcl_home" *sbcl-home*) c-string)
 
 (defun sbcl-homedir-pathname ()
   (let ((env (posix-getenv "SBCL_HOME")))

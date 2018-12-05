@@ -345,7 +345,7 @@ the stack without triggering overflow protection.")
     (list (make-hash-table :test 'equal :synchronized t)))
   (declaim (type (cons hash-table) *code-coverage-info*)))
 
-(in-package "SB!ALIEN")
+(in-package "SB-ALIEN")
 
 ;;; Information describing a heap-allocated alien.
 (def!struct (heap-alien-info (:copier nil))

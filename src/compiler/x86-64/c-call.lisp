@@ -139,16 +139,16 @@
     (aver (= (length arg-types) (length args)))
     (if (or (some #'(lambda (type)
                       (and (alien-integer-type-p type)
-                           (> (sb!alien::alien-integer-type-bits type) 64)))
+                           (> (sb-alien::alien-integer-type-bits type) 64)))
                   arg-types)
             (and (alien-integer-type-p result-type)
-                 (> (sb!alien::alien-integer-type-bits result-type) 64)))
+                 (> (sb-alien::alien-integer-type-bits result-type) 64)))
         (collect ((new-args) (lambda-vars) (new-arg-types))
           (dolist (type arg-types)
             (let ((arg (gensym)))
               (lambda-vars arg)
               (cond ((and (alien-integer-type-p type)
-                          (> (sb!alien::alien-integer-type-bits type) 64))
+                          (> (sb-alien::alien-integer-type-bits type) 64))
                      ;; CLH: FIXME! This should really be
                      ;; #xffffffffffffffff. nyef says: "Passing
                      ;; 128-bit integers to ALIEN functions on x86-64
@@ -163,9 +163,9 @@
                      (new-args arg)
                      (new-arg-types type)))))
           (cond ((and (alien-integer-type-p result-type)
-                      (> (sb!alien::alien-integer-type-bits result-type) 64))
+                      (> (sb-alien::alien-integer-type-bits result-type) 64))
                  (let ((new-result-type
-                        (let ((sb!alien::*values-type-okay* t))
+                        (let ((sb-alien::*values-type-okay* t))
                           (parse-alien-type
                            (if (alien-integer-type-signed result-type)
                                '(values (unsigned 64) (signed 64))
@@ -266,7 +266,7 @@
   (:generator 0
     (move rbx function)
     (emit-c-call vop rax rbx args
-                 sb!alien::*alien-fun-type-varargs-default*
+                 sb-alien::*alien-fun-type-varargs-default*
                  #!+sb-safepoint pc-save)))
 
 ;;; Calls to C can generally be made without loading a register

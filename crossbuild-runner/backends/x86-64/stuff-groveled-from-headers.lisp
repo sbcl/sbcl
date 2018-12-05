@@ -1,7 +1,7 @@
 ;;;; This is an automatically generated file, please do not hand-edit it.
 ;;;; See the program "grovel-headers.c".
 
-(in-package "SB!ALIEN")
+(in-package "SB-ALIEN")
 
 ;;;flags for dlopen()
 (defconstant rtld-lazy 1) ; #x1

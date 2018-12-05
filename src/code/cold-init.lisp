@@ -367,7 +367,7 @@ process to continue normally."
   #!+win32
   (setf sb!win32::*ansi-codepage* nil)
   (setf *default-external-format* nil)
-  (setf sb!alien::*default-c-string-external-format* nil)
+  (setf sb-alien::*default-c-string-external-format* nil)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
     (finalizers-reinit)

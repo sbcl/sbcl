@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!ALIEN")
+(in-package "SB-ALIEN")
 
 (define-alien-routine dlopen system-area-pointer
   (file c-string) (mode int))

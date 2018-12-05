@@ -141,16 +141,16 @@
     ;; and results.
     (if (or (some #'(lambda (type)
                       (and (alien-integer-type-p type)
-                           (> (sb!alien::alien-integer-type-bits type) 32)))
+                           (> (sb-alien::alien-integer-type-bits type) 32)))
                   arg-types)
             (and (alien-integer-type-p result-type)
-                 (> (sb!alien::alien-integer-type-bits result-type) 32)))
+                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
         (collect ((new-args) (lambda-vars) (new-arg-types))
                  (dolist (type arg-types)
                    (let ((arg (gensym)))
                      (lambda-vars arg)
                      (cond ((and (alien-integer-type-p type)
-                                 (> (sb!alien::alien-integer-type-bits type) 32))
+                                 (> (sb-alien::alien-integer-type-bits type) 32))
                             ;; 64-bit long long types are stored in
                             ;; consecutive locations, endian word order,
                             ;; aligned to 8 bytes.
@@ -178,9 +178,9 @@
                             (new-args arg)
                             (new-arg-types type)))))
                  (cond ((and (alien-integer-type-p result-type)
-                             (> (sb!alien::alien-integer-type-bits result-type) 32))
+                             (> (sb-alien::alien-integer-type-bits result-type) 32))
                         (let ((new-result-type
-                               (let ((sb!alien::*values-type-okay* t))
+                               (let ((sb-alien::*values-type-okay* t))
                                  (parse-alien-type
                                   (if (alien-integer-type-signed result-type)
                                       #!-little-endian
@@ -297,7 +297,7 @@
   ;; can't we have something like the :ARG-TN methods for all of this
   ;; mess?  -- AB, 2015-Nov-02
   (let* ((parsed-type (parse-alien-type type nil))
-         (alignment-bits (sb!alien::alien-type-alignment parsed-type))
+         (alignment-bits (sb-alien::alien-type-alignment parsed-type))
          (alignment-bytes (truncate alignment-bits n-byte-bits))
          ;; OFFSET is at least 32-bit aligned, we're trying to pick
          ;; out the cases where we need 64-bit alignment.
@@ -306,7 +306,7 @@
      (ecase *backend-byte-order*
        (:big-endian
         (if (alien-integer-type-p parsed-type)
-            (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+            (let ((bits (sb-alien::alien-integer-type-bits parsed-type)))
               (let ((byte-offset
                      (cond ((< bits n-word-bits)
                             (- n-word-bytes
@@ -352,7 +352,7 @@ and a pointer to the arguments."
              (let ((offset (* words-processed n-word-bytes)))
                (cond ((not (alien-float-type-p type))
                       (when (and (alien-integer-type-p type)
-                                 (> (sb!alien::alien-integer-type-bits type)
+                                 (> (sb-alien::alien-integer-type-bits type)
                                     n-word-bits)
                                  (oddp words-processed))
                         (pop gprs)
@@ -448,7 +448,7 @@ and a pointer to the arguments."
                   (inst lwc1 (make-fpr 1) sp (+ n-callee-register-args-bytes
                                                 n-word-bytes)))))
               ((and (alien-integer-type-p result-type)
-                    (> (sb!alien::alien-integer-type-bits result-type)
+                    (> (sb-alien::alien-integer-type-bits result-type)
                        n-word-bits))
                (inst lw v0 sp n-callee-register-args-bytes)
                (inst lw v1 sp (+ n-callee-register-args-bytes n-word-bytes)))

@@ -201,7 +201,7 @@
   sb-c::functional
   ((member t nil) object-not-boolean)
   sb-c::lambda-var
-  sb!alien::alien-type-class
+  sb-alien::alien-type-class
   lexenv
   ;; simple vector-of-anything is called a "rank-1-array"
   ;; because "simple-vector" means (simple-array t (*))

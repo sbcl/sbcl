@@ -415,7 +415,7 @@
 (define-info-type (:variable :macro-expansion) :type-spec t)
 
 (define-info-type (:variable :alien-info)
-  :type-spec (or null sb!alien-internals:heap-alien-info))
+  :type-spec (or null sb-alien-internals:heap-alien-info))
 
 (define-info-type (:variable :documentation) :type-spec (or string null))
 
@@ -523,13 +523,13 @@
   :default :unknown)
 (define-info-type (:alien-type :translator) :type-spec (or function null))
 (define-info-type (:alien-type :definition)
-  :type-spec (or null sb!alien-internals:alien-type))
+  :type-spec (or null sb-alien-internals:alien-type))
 (define-info-type (:alien-type :struct)
-  :type-spec (or null sb!alien-internals:alien-type))
+  :type-spec (or null sb-alien-internals:alien-type))
 (define-info-type (:alien-type :union)
-  :type-spec (or null sb!alien-internals:alien-type))
+  :type-spec (or null sb-alien-internals:alien-type))
 (define-info-type (:alien-type :enum)
-  :type-spec (or null sb!alien-internals:alien-type))
+  :type-spec (or null sb-alien-internals:alien-type))
 
 ;;;; ":SETF" subsection - Data pertaining to expansion of the omnipotent macro.
 (define-info-type (:setf :documentation) :type-spec (or string null))

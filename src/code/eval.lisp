@@ -173,7 +173,7 @@
              ;; with DEFINE-SYMBOL-MACRO, keeping the code walkers
              ;; happy.
              (:alien
-              (sb!alien-internals:alien-value exp))))
+              (sb-alien-internals:alien-value exp))))
           (list
            (let ((name (first exp))
                  (n-args (1- (length exp))))

@@ -104,7 +104,7 @@
                           sb-vm:static-symbol-p)))))
 
 ;;; The set of types of which no object can be a member during cross-compilation.
-(dolist (symbol '(alien system-area-pointer sb!alien-internals:alien-value
+(dolist (symbol '(alien system-area-pointer sb-alien-internals:alien-value
                   code-component fdefn lra extended-sequence
                   sb!pcl::%method-function
                   sb!pcl::standard-instance sb!pcl::standard-funcallable-instance
@@ -446,8 +446,8 @@
                      `(parse-alien-type ',(unparse-alien-type
                                            (heap-alien-info-type host-object))
                                         nil)
-                     (sb!alien::heap-alien-info-alien-name host-object)
-                     (sb!alien::heap-alien-info-datap host-object)))
+                     (sb-alien::heap-alien-info-alien-name host-object)
+                     (sb-alien::heap-alien-info-datap host-object)))
             (classoid-cell
              (format stream "#.(FIND-CLASSOID-CELL '~S)"
                      (classoid-cell-name host-object)))

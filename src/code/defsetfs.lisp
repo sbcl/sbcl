@@ -13,7 +13,7 @@
 ;;;; files for more information.
 
 ;;; from alieneval.lisp
-(in-package "SB!ALIEN")
+(in-package "SB-ALIEN")
 (defsetf slot %set-slot)
 (defsetf deref (alien &rest indices) (value)
   `(%set-deref ,alien ,value ,@indices))

@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!ALIEN")
+(in-package "SB-ALIEN")
 
 (defglobal *alien-type-classes* (make-hash-table :test 'eq))
 

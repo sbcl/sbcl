@@ -121,7 +121,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 #ifdef _WIN32
     #include "grovel-headers-win32.h"
 #else
-    printf("(in-package \"SB!ALIEN\")\n\n");
+    printf("(in-package \"SB-ALIEN\")\n\n");
 
     printf (";;;flags for dlopen()\n");
 

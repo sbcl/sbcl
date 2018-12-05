@@ -796,7 +796,7 @@
               ((and (constant-lvar-p function) (stringp (lvar-value function)))
                (vop* call-out-named call block (arg-operands) (result-operands)
                      (lvar-value function)
-                     (sb!alien::alien-fun-type-varargs type)))
+                     (sb-alien::alien-fun-type-varargs type)))
               (t
                (vop* call-out call block
                      ((lvar-tn call block function) arg-operands)

@@ -231,10 +231,10 @@
 ;;     (aver (= (length arg-types) (length args)))
 ;;     (if (or (some (lambda (type)
 ;;                     (and (alien-integer-type-p type)
-;;                          (> (sb!alien::alien-integer-type-bits type) 64)))
+;;                          (> (sb-alien::alien-integer-type-bits type) 64)))
 ;;                   arg-types)
 ;;             (and (alien-integer-type-p result-type)
-;;                  (> (sb!alien::alien-integer-type-bits result-type) 64)))
+;;                  (> (sb-alien::alien-integer-type-bits result-type) 64)))
 ;;         (collect ((new-args) (lambda-vars) (new-arg-types))
 ;;                  (loop with i = 0
 ;;                        for type in arg-types
@@ -242,7 +242,7 @@
 ;;                        do
 ;;                        (lambda-vars arg)
 ;;                        (cond ((and (alien-integer-type-p type)
-;;                                    (> (sb!alien::alien-integer-type-bits type) 64))
+;;                                    (> (sb-alien::alien-integer-type-bits type) 64))
 ;;                               (when (oddp i)
 ;;                                 ;; long-long is only passed in pairs of r0-r1 and r2-r3,
 ;;                                 ;; and the stack is double-word aligned
@@ -264,9 +264,9 @@
 ;;                               (new-args arg)
 ;;                               (new-arg-types type))))
 ;;                  (cond ((and (alien-integer-type-p result-type)
-;;                              (> (sb!alien::alien-integer-type-bits result-type) 64))
+;;                              (> (sb-alien::alien-integer-type-bits result-type) 64))
 ;;                         (let ((new-result-type
-;;                                 (let ((sb!alien::*values-type-okay* t))
+;;                                 (let ((sb-alien::*values-type-okay* t))
 ;;                                   (parse-alien-type
 ;;                                    (if (alien-integer-type-signed result-type)
 ;;                                        '(values (unsigned 64) (signed 64))
@@ -296,7 +296,7 @@
 (defun alien-callback-accessor-form (type sap offset)
   (let ((parsed-type type))
     (if (alien-integer-type-p parsed-type)
-        (let ((bits (sb!alien::alien-integer-type-bits parsed-type)))
+        (let ((bits (sb-alien::alien-integer-type-bits parsed-type)))
                (let ((byte-offset
                       (cond ((< bits n-word-bits)
                              (- n-word-bytes

@@ -510,7 +510,7 @@
                                           (1- (ash 1 sb-vm:word-shift))))))))
 
 (declaim (inline valid-lisp-pointer-p))
-(sb!alien:define-alien-routine valid-lisp-pointer-p sb!alien:int
+(sb-alien:define-alien-routine valid-lisp-pointer-p sb-alien:int
   (pointer system-area-pointer))
 
 ;;; There are many opportunities for things to go wrong when searching
@@ -588,8 +588,8 @@
   (declare (system-area-pointer pc))
   (macrolet ((heap-scan ()
                `(let ((component-ptr
-                       (sb!alien:alien-funcall
-                        (sb!alien:extern-alien
+                       (sb-alien:alien-funcall
+                        (sb-alien:extern-alien
                          "component_ptr_from_pc"
                          (function system-area-pointer system-area-pointer))
                         pc)))
@@ -708,7 +708,7 @@
 (defun find-saved-fp-and-pc (fp)
   (block nil
     (walk-binding-stack
-     'sb!alien-internals:*saved-fp*
+     'sb-alien-internals:*saved-fp*
      (lambda (x)
        (when x
          (let* ((saved-fp (descriptor-sap x))
@@ -937,7 +937,7 @@
            (sb-vm::current-thread-offset-sap
             #!-alpha n
             #!+alpha (* 2 n))))
-    (sb!alien:sap-alien context-pointer (* os-context-t))))
+    (sb-alien:sap-alien context-pointer (* os-context-t))))
 
 ;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
 ;;; an indirection table, but the debugger needs to know the actual
@@ -1013,7 +1013,7 @@
 
 #!+(or x86 x86-64)
 (defun escaped-frame-from-context (context)
-  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
     (let ((code (code-object-from-context context)))
       (/noshow0 "got CODE")
@@ -1038,7 +1038,7 @@
 
 #!-(or x86 x86-64)
 (defun escaped-frame-from-context (context)
-  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
     (let ((code (code-object-from-context context)))
       (/noshow0 "got CODE")
@@ -1105,12 +1105,12 @@ register."
 ;;; undefined-function.
 #!+(or x86 x86-64)
 (defun code-object-from-context (context)
-  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (declare (type (sb-alien:alien (* os-context-t)) context))
   (code-header-from-pc (context-pc context)))
 
 #!-(or x86 x86-64)
 (defun code-object-from-context (context)
-  (declare (type (sb!alien:alien (* os-context-t)) context))
+  (declare (type (sb-alien:alien (* os-context-t)) context))
   ;; The GC constraint on the program counter on precisely-scavenged
   ;; backends is that it partakes of the interior-pointer nature.
   ;; Which means that it may be within the scope of an object other
@@ -2066,7 +2066,7 @@ register."
     (code-location-context (frame-code-location frame))))
 
 (defun decode-arithmetic-error-operands (context)
-  (let* ((alien-context (sb!alien:sap-alien context (* os-context-t)))
+  (let* ((alien-context (sb-alien:sap-alien context (* os-context-t)))
          (fp (int-sap (context-register alien-context
                                         sb-vm::cfp-offset)))
          (sb!debug:*stack-top-hint* (find-interrupted-frame))
@@ -3277,21 +3277,21 @@ register."
 ;;; returns the overwritten bits. You must call this in a context in
 ;;; which GC is disabled, so that Lisp doesn't move objects around
 ;;; that C is pointing to.
-(sb!alien:define-alien-routine "breakpoint_install" sb!alien:unsigned-int
-  (code-obj sb!alien:unsigned)
-  (pc-offset sb!alien:int))
+(sb-alien:define-alien-routine "breakpoint_install" sb-alien:unsigned-int
+  (code-obj sb-alien:unsigned)
+  (pc-offset sb-alien:int))
 
 ;;; This removes the break instruction and replaces the original
 ;;; instruction. You must call this in a context in which GC is disabled
 ;;; so Lisp doesn't move objects around that C is pointing to.
-(sb!alien:define-alien-routine "breakpoint_remove" sb!alien:void
-  (code-obj sb!alien:unsigned)
-  (pc-offset sb!alien:int)
-  (old-inst sb!alien:unsigned-int))
+(sb-alien:define-alien-routine "breakpoint_remove" sb-alien:void
+  (code-obj sb-alien:unsigned)
+  (pc-offset sb-alien:int)
+  (old-inst sb-alien:unsigned-int))
 
-(sb!alien:define-alien-routine "breakpoint_do_displaced_inst" sb!alien:void
+(sb-alien:define-alien-routine "breakpoint_do_displaced_inst" sb-alien:void
   (scp (* os-context-t))
-  (orig-inst sb!alien:unsigned-int))
+  (orig-inst sb-alien:unsigned-int))
 
 ;;;; breakpoint handlers (layer between C and exported interface)
 
@@ -3400,7 +3400,7 @@ register."
                    bpt)))))
 
 (defun signal-context-frame (signal-context)
-  (let* ((scp (sb!alien:sap-alien signal-context (* os-context-t)))
+  (let* ((scp (sb-alien:sap-alien signal-context (* os-context-t)))
          (cfp (int-sap (sb-vm:context-register scp sb-vm::cfp-offset))))
     (compute-calling-frame cfp
                            ;; KLUDGE: This argument is ignored on
@@ -3428,7 +3428,7 @@ register."
   ;; FIXME: This looks brittle: what if we are interrupted somewhere
   ;; here? ...or do we have interrupts disabled here?
   (delete-breakpoint-data data)
-  (let* ((scp (sb!alien:sap-alien signal-context (* os-context-t)))
+  (let* ((scp (sb-alien:sap-alien signal-context (* os-context-t)))
          (frame (signal-context-frame signal-context))
          (component (breakpoint-data-component data))
          (cookie (gethash component *fun-end-cookies*)))
@@ -3557,7 +3557,7 @@ register."
     ;; sense in signaling the condition.
     (when step-info
       (let ((*step-frame*
-             (signal-context-frame (sb!alien::alien-sap context))))
+             (signal-context-frame (sb-alien::alien-sap context))))
         (sb-impl::step-form step-info
                             ;; We could theoretically store information in
                             ;; the debug-info about to determine the
@@ -3693,7 +3693,7 @@ register."
   (when (plusp *free-interrupt-context-index*)
     (handler-case
         (signal-context-frame
-         (sb!alien:alien-sap
+         (sb-alien:alien-sap
           (nth-interrupt-context (1- *free-interrupt-context-index*))))
       ((or error debug-condition) ()))))
 

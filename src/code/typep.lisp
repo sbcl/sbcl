@@ -192,7 +192,7 @@
             (error "invalid type specifier: ~S" hairy-spec))
           (and (funcall (symbol-function (cadr hairy-spec)) object) t)))))
     (alien-type-type
-     (sb!alien-internals:alien-typep object (alien-type-type-alien-type type)))
+     (sb-alien-internals:alien-typep object (alien-type-type-alien-type type)))
     (fun-type
      (if strict
          (error "Function types are not a legal argument to TYPEP:~%  ~S"

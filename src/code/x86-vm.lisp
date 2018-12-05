@@ -109,7 +109,7 @@
 
 #!+(or linux sunos)
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
-    (sb!alien:unsigned 32)
+    (sb-alien:unsigned 32)
   (context (* os-context-t)))
 
 ;;;; INTERNAL-ERROR-ARGS

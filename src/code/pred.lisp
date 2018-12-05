@@ -257,10 +257,10 @@
             (name (classoid-name classoid)))
        (if (%instancep object)
            (case name
-             (sb!alien-internals:alien-value
+             (sb-alien-internals:alien-value
               `(alien
-                ,(sb!alien-internals:unparse-alien-type
-                  (sb!alien-internals:alien-value-type object))))
+                ,(sb-alien-internals:unparse-alien-type
+                  (sb-alien-internals:alien-value-type object))))
              (t
               (let ((pname (classoid-proper-name classoid)))
                 (if (classoid-p pname)

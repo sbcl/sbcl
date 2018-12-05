@@ -222,16 +222,16 @@
     ;; and results.
     (if (or (some #'(lambda (type)
                       (and (alien-integer-type-p type)
-                           (> (sb!alien::alien-integer-type-bits type) 32)))
+                           (> (sb-alien::alien-integer-type-bits type) 32)))
                   arg-types)
             (and (alien-integer-type-p result-type)
-                 (> (sb!alien::alien-integer-type-bits result-type) 32)))
+                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
         (collect ((new-args) (lambda-vars) (new-arg-types))
           (dolist (type arg-types)
             (let ((arg (gensym)))
               (lambda-vars arg)
               (cond ((and (alien-integer-type-p type)
-                          (> (sb!alien::alien-integer-type-bits type) 32))
+                          (> (sb-alien::alien-integer-type-bits type) 32))
                      (when (or
                             (oddp gprs)
                             (and
@@ -277,9 +277,9 @@
                      (new-args arg)
                      (new-arg-types type)))))
                  (cond ((and (alien-integer-type-p result-type)
-                             (> (sb!alien::alien-integer-type-bits result-type) 32))
+                             (> (sb-alien::alien-integer-type-bits result-type) 32))
                         (let ((new-result-type
-                               (let ((sb!alien::*values-type-okay* t))
+                               (let ((sb-alien::*values-type-okay* t))
                                  (parse-alien-type
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
@@ -315,16 +315,16 @@
     ;; and results.
     (if (or (some #'(lambda (type)
                       (and (alien-integer-type-p type)
-                           (> (sb!alien::alien-integer-type-bits type) 32)))
+                           (> (sb-alien::alien-integer-type-bits type) 32)))
                   arg-types)
             (and (alien-integer-type-p result-type)
-                 (> (sb!alien::alien-integer-type-bits result-type) 32)))
+                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
         (collect ((new-args) (lambda-vars) (new-arg-types))
                  (dolist (type arg-types)
                    (let ((arg (gensym)))
                      (lambda-vars arg)
                      (cond ((and (alien-integer-type-p type)
-                                 (> (sb!alien::alien-integer-type-bits type) 32))
+                                 (> (sb-alien::alien-integer-type-bits type) 32))
                             ;; 64-bit long long types are stored in
                             ;; consecutive locations, most significant word
                             ;; first (big-endian).
@@ -338,9 +338,9 @@
                             (new-args arg)
                             (new-arg-types type)))))
                  (cond ((and (alien-integer-type-p result-type)
-                             (> (sb!alien::alien-integer-type-bits result-type) 32))
+                             (> (sb-alien::alien-integer-type-bits result-type) 32))
                         (let ((new-result-type
-                               (let ((sb!alien::*values-type-okay* t))
+                               (let ((sb-alien::*values-type-okay* t))
                                  (parse-alien-type
                                   (if (alien-integer-type-signed result-type)
                                       '(values (signed 32) (unsigned 32))
@@ -454,11 +454,11 @@
 (progn
   (defun alien-callback-accessor-form (type sap offset)
     (let ((parsed-type (parse-alien-type type nil)))
-      (cond ((sb!alien::alien-integer-type-p parsed-type)
+      (cond ((sb-alien::alien-integer-type-p parsed-type)
              ;; Unaligned access is slower, but possible, so this is nice and
              ;; simple. Also, we're a big-endian machine, so we need to get
              ;; byte offsets correct.
-             (let ((bits (sb!alien::alien-type-bits parsed-type)))
+             (let ((bits (sb-alien::alien-type-bits parsed-type)))
                (let ((byte-offset
                       (cond ((< bits n-word-bits)
                              (- n-word-bytes
@@ -663,13 +663,13 @@
               (inst ld r0 stack-pointer (* 2 n-word-bytes))
               (inst mtlr r0)
               (cond
-                ((sb!alien::alien-single-float-type-p result-type)
+                ((sb-alien::alien-single-float-type-p result-type)
                  (let ((f1 (make-fpr 1)))
                    (inst lfs f1 stack-pointer (- return-area-pos))))
-                ((sb!alien::alien-double-float-type-p result-type)
+                ((sb-alien::alien-double-float-type-p result-type)
                  (let ((f1 (make-fpr 1)))
                    (inst lfd f1 stack-pointer (- return-area-pos))))
-                ((sb!alien::alien-void-type-p result-type)
+                ((sb-alien::alien-void-type-p result-type)
                  ;; Nothing to do
                  )
                 (t
@@ -806,13 +806,13 @@
               (inst ld r0 sp (* 2 n-word-bytes))
               (inst mtlr r0)
               (cond
-                ((sb!alien::alien-single-float-type-p result-type)
+                ((sb-alien::alien-single-float-type-p result-type)
                  (let ((f1 (make-fpr 1)))
                    (inst lfs f1 sp (- (* n-return-area-words n-word-bytes)))))
-                ((sb!alien::alien-double-float-type-p result-type)
+                ((sb-alien::alien-double-float-type-p result-type)
                  (let ((f1 (make-fpr 1)))
                    (inst lfd f1 sp (- (* n-return-area-words n-word-bytes)))))
-                ((sb!alien::alien-void-type-p result-type)
+                ((sb-alien::alien-void-type-p result-type)
                  ;; Nothing to do
                  )
                 (t

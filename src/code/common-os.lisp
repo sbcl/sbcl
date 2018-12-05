@@ -11,11 +11,11 @@
 
 (in-package "SB!SYS")
 
-(sb!alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
-(sb!alien:define-alien-variable ("core_string" *native-core-string*) (* char))
-(sb!alien:define-alien-routine
- os-get-runtime-executable-path sb!alien:c-string (external-path boolean))
-(sb!alien:define-alien-variable
+(sb-alien:define-alien-variable ("posix_argv" *native-posix-argv*) (* (* char)))
+(sb-alien:define-alien-variable ("core_string" *native-core-string*) (* char))
+(sb-alien:define-alien-routine
+ os-get-runtime-executable-path sb-alien:c-string (external-path boolean))
+(sb-alien:define-alien-variable
  ("saved_runtime_path" *native-saved-runtime-path*) (* char))
 (define-load-time-global *core-string* "")
 
@@ -54,15 +54,15 @@
   (/show0 "setting *CORE-STRING*")
   (init-var-ignoring-errors
    *core-string*
-   (sb!alien:cast *native-core-string* sb!alien:c-string)
+   (sb-alien:cast *native-core-string* sb-alien:c-string)
    :default "")
   (/show0 "setting *POSIX-ARGV*")
   (init-var-ignoring-errors
    *posix-argv*
    (loop for i from 0
-         for arg = (sb!alien:deref *native-posix-argv* i)
-         until (sb!alien:null-alien arg)
-         collect (sb!alien:cast arg sb!alien:c-string)))
+         for arg = (sb-alien:deref *native-posix-argv* i)
+         until (sb-alien:null-alien arg)
+         collect (sb-alien:cast arg sb-alien:c-string)))
   (/show0 "setting *DEFAULT-PATHNAME-DEFAULTS*")
   ;; Temporary value, so that #'PARSE-NATIVE-NAMESTRING won't blow up
   ;; when we call it below.
@@ -78,6 +78,6 @@
   (init-var-ignoring-errors
    *runtime-pathname*
    (let ((exe (os-get-runtime-executable-path t))
-         (saved (sb!alien:cast *native-saved-runtime-path* sb!alien:c-string)))
+         (saved (sb-alien:cast *native-saved-runtime-path* sb-alien:c-string)))
      (when (or exe saved) (native-pathname (or exe saved)))))
   (/show0 "leaving OS-COLD-INIT-OR-REINIT"))

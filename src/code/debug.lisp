@@ -1111,16 +1111,16 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
   ;; This is not inside the UNLESS to ensure that LDB is disabled
   ;; regardless of what the old value of *INVOKE-DEBUGGER-HOOK* was.
   ;; This might matter for example when restoring a core.
-  (sb!alien:alien-funcall (sb!alien:extern-alien "disable_lossage_handler"
-                                                 (function sb!alien:void))))
+  (sb-alien:alien-funcall (sb-alien:extern-alien "disable_lossage_handler"
+                                                 (function sb-alien:void))))
 
 (defun enable-debugger ()
   "Restore the debugger if it has been turned off by DISABLE-DEBUGGER."
   (when (eql *invoke-debugger-hook* 'debugger-disabled-hook)
     (setf *invoke-debugger-hook* *old-debugger-hook*
           *old-debugger-hook* nil))
-  (sb!alien:alien-funcall (sb!alien:extern-alien "enable_lossage_handler"
-                                                 (function sb!alien:void))))
+  (sb-alien:alien-funcall (sb-alien:extern-alien "enable_lossage_handler"
+                                                 (function sb-alien:void))))
 
 (defun show-restarts (restarts s)
   (cond ((null restarts)
