@@ -26,7 +26,7 @@
                 ;; Given a string "OBJECT-NOT-foo-ERROR", pull out the "foo"
                 (subseq (string symbol) 11 (- (length (string symbol)) 6))))))
 
-;; Define SB!C:+BACKEND-INTERNAL-ERRORS+ as a vector of pairs.
+;; Define SB-C:+BACKEND-INTERNAL-ERRORS+ as a vector of pairs.
 ;; General errors have the form ("description-of-foo" . foo-ERROR)
 ;; and type errors are (type-spec . OBJECT-NOT-<type-spec>-ERRROR)
 (macrolet
@@ -71,7 +71,7 @@
               type-errors)))
         ;; Error number must be of type (unsigned-byte 8).
         (assert (<= (length list) 256))
-        `(defconstant-eqx sb!c:+backend-internal-errors+
+        `(defconstant-eqx sb-c:+backend-internal-errors+
                ,(map 'vector
                      (lambda (x)
                        (if (symbolp x)
@@ -170,44 +170,44 @@
 
   ;; Now, in approximate order of descending popularity.
   ;; If we exceed 255 error numbers, trailing ones can be deleted arbitrarily.
-  sb!c:storage-class ; the single most popular type
-  sb!c:tn-ref
+  sb-c:storage-class ; the single most popular type
+  sb-c:tn-ref
   index
   ctype
   sb!impl::buffer
-  sb!c::vop
-  sb!c::basic-combination
+  sb-c::vop
+  sb-c::basic-combination
   sb!sys:fd-stream
   layout
   (sb!assem:segment object-not-assem-segment)
-  sb!c::cblock
+  sb-c::cblock
   sb!disassem:disassem-state
-  sb!c::ctran
-  sb!c::clambda
-  sb!c:tn
+  sb-c::ctran
+  sb-c::clambda
+  sb-c:tn
   ((or function symbol) object-not-callable)
-  sb!c:component
+  sb-c:component
   ((or index null) object-not-index-or-null)
   stream
-  sb!c::ir2-block
-  sb!c::ir2-component
+  sb-c::ir2-block
+  sb-c::ir2-component
   type-class
-  sb!c::lvar
-  sb!c::vop-info
+  sb-c::lvar
+  sb-c::vop-info
   (sb!disassem:instruction object-not-disassembler-instruction)
   ((mod 1114112) object-not-unicode-code-point)
-  (sb!c::node object-not-compiler-node)
+  (sb-c::node object-not-compiler-node)
   sequence
-  sb!c::functional
+  sb-c::functional
   ((member t nil) object-not-boolean)
-  sb!c::lambda-var
+  sb-c::lambda-var
   sb!alien::alien-type-class
   lexenv
   ;; simple vector-of-anything is called a "rank-1-array"
   ;; because "simple-vector" means (simple-array t (*))
   ((simple-array * (*)) object-not-simple-rank-1-array)
   hash-table
-  sb!c::combination
+  sb-c::combination
   numeric-type
   defstruct-description
   sb!format::format-directive
@@ -216,16 +216,16 @@
   ansi-stream))
 
 (defun error-number-or-lose (name)
-  (or (position name sb!c:+backend-internal-errors+
+  (or (position name sb-c:+backend-internal-errors+
                 :key #'cadr :test #'eq)
       (error "unknown internal error: ~S" name)))
 
 (defun error-length (error-number)
-  (if (array-in-bounds-p sb!c:+backend-internal-errors+ error-number)
-      (cddr (svref sb!c:+backend-internal-errors+ error-number))
+  (if (array-in-bounds-p sb-c:+backend-internal-errors+ error-number)
+      (cddr (svref sb-c:+backend-internal-errors+ error-number))
       0))
 
-#-sb-xc-host ; no SB!C:SAP-READ-VAR-INTEGERF
+#-sb-xc-host ; no SB-C:SAP-READ-VAR-INTEGERF
 (defun decode-internal-error-args (sap trap-number &optional error-number)
   (let ((error-number (cond (error-number)
                             ((>= trap-number sb-vm:error-trap)
@@ -239,5 +239,5 @@
       (declare (type (unsigned-byte 8) length))
       (values error-number
               (loop repeat length with index = 0
-                    collect (sb!c:sap-read-var-integerf sap index))
+                    collect (sb-c:sap-read-var-integerf sap index))
               trap-number))))

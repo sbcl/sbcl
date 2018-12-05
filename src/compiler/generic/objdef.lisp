@@ -35,9 +35,9 @@
 (!define-primitive-object (cons :type cons
                                :lowtag list-pointer-lowtag
                                :alloc-trans cons)
-  (car :ref-trans car :set-trans sb!c::%rplaca :init :arg
+  (car :ref-trans car :set-trans sb-c::%rplaca :init :arg
        :cas-trans %compare-and-swap-car)
-  (cdr :ref-trans cdr :set-trans sb!c::%rplacd :init :arg
+  (cdr :ref-trans cdr :set-trans sb-c::%rplacd :init :arg
        :cas-trans %compare-and-swap-cdr))
 
 (!define-primitive-object (instance :lowtag instance-pointer-lowtag
@@ -138,7 +138,7 @@
                                  :widetag t)
   ;; FILL-POINTER of an ARRAY is in the same place as LENGTH of a
   ;; VECTOR -- see SHRINK-VECTOR.
-  (length :ref-trans sb!c::vector-length
+  (length :ref-trans sb-c::vector-length
           :type index)
   (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
 

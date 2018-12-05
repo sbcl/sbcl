@@ -55,7 +55,7 @@
            (create-alien-type-class-if-necessary ',name ',defstruct-name
                                                  ',(or include 'root)))
          (setf (info :source-location :alien-type ',name)
-               (sb!c:source-location))
+               (sb-c:source-location))
          (def!struct (,defstruct-name
                         (:include ,include-defstruct
                                   (class ',name)

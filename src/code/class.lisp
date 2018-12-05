@@ -172,7 +172,7 @@
 (defmethod make-load-form ((layout layout) &optional env)
   (declare (ignore env))
   (when (layout-invalid layout)
-    (sb!c::compiler-error "can't dump reference to obsolete class: ~S"
+    (sb-c::compiler-error "can't dump reference to obsolete class: ~S"
                           (layout-classoid layout)))
   (let* ((classoid (layout-classoid layout))
          (name (classoid-name classoid)))
@@ -184,7 +184,7 @@
                 (bug "xc MAKE-LOAD-FORM on undefined layout"))
                (t 0))))
     (unless name
-      (sb!c::compiler-error "can't dump anonymous LAYOUT: ~S" layout))
+      (sb-c::compiler-error "can't dump anonymous LAYOUT: ~S" layout))
     ;; Since LAYOUT refers to a class which refers back to the LAYOUT,
     ;; we have to do this in two stages, like the TREE-WITH-PARENT
     ;; example in the MAKE-LOAD-FORM entry in the ANSI spec.
@@ -733,7 +733,7 @@ between the ~A definition and the ~A definition"
   ;; FIXME: explain why this isn't (LAYOUT-FOR-STD-CLASS-P LAYOUT).
   (if (layout-for-std-class-p (layout-of object))
       (sb!pcl::check-wrapper-validity object)
-      (sb!c::%layout-invalid-error object layout)))
+      (sb-c::%layout-invalid-error object layout)))
 
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those

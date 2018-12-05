@@ -138,10 +138,10 @@
                                 (list (primitive-type-or-lose ',name)
                                       (sc-or-lose ',stack-sc)
                                       (lambda (node block fp value res)
-                                        (sb!c::vop ,ref node block
+                                        (sb-c::vop ,ref node block
                                                    fp value res))
                                       (lambda (node block fp new-val value)
-                                        (sb!c::vop ,set node block
+                                        (sb-c::vop ,set node block
                                                    fp new-val value)))))))))
     (foo (double-float double-stack
                        ancestor-frame-ref/double-float
@@ -214,7 +214,7 @@
               (* (max (if (> nargs register-arg-count)
                           nargs
                           0)
-                      (sb!c::sb-size (sb-or-lose 'stack)))
+                      (sb-c::sb-size (sb-or-lose 'stack)))
                  n-word-bytes)))
       (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rsp-offset)
       (make-normal-tn *fixnum-primitive-type*)))
@@ -231,7 +231,7 @@
           (stack-size (* (max (if (> nargs register-arg-count)
                                   nargs
                                   0)
-                              (sb!c::sb-size (sb-or-lose 'stack)))
+                              (sb-c::sb-size (sb-or-lose 'stack)))
                          n-word-bytes)))
       (cond ((= fp-offset stack-size)
              (inst sub rsp-tn stack-size)
@@ -261,7 +261,7 @@
 (defun default-unknown-values (vop values nvals node)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals))
-  (let ((type (sb!c::basic-combination-derived-type node)))
+  (let ((type (sb-c::basic-combination-derived-type node)))
     (cond
       ((<= nvals 1)
        (note-this-location vop :single-value-return)
@@ -373,7 +373,7 @@
 ;;; them.)
 (defun receive-unknown-values (args nargs start count node)
   (declare (type tn args nargs start count))
-  (let ((type (sb!c::basic-combination-derived-type node))
+  (let ((type (sb-c::basic-combination-derived-type node))
         (variable-values (gen-label))
         (stack-values (gen-label))
         (done (gen-label))
@@ -438,13 +438,13 @@
 (defun check-ocfp-and-return-pc (old-fp return-pc)
   #+nil
   (format t "*known-return: old-fp ~S, tn-kind ~S; ~S ~S~%"
-          old-fp (tn-kind old-fp) (sb!c::tn-save-tn old-fp)
-          (tn-kind (sb!c::tn-save-tn old-fp)))
+          old-fp (tn-kind old-fp) (sb-c::tn-save-tn old-fp)
+          (tn-kind (sb-c::tn-save-tn old-fp)))
   #+nil
   (format t "*known-return: return-pc ~S, tn-kind ~S; ~S ~S~%"
           return-pc (tn-kind return-pc)
-          (sb!c::tn-save-tn return-pc)
-          (tn-kind (sb!c::tn-save-tn return-pc)))
+          (sb-c::tn-save-tn return-pc)
+          (tn-kind (sb-c::tn-save-tn return-pc)))
   (unless (and (sc-is old-fp control-stack)
                (= (tn-offset old-fp) ocfp-save-offset))
     (error "ocfp not on stack in standard save location?"))
@@ -813,7 +813,7 @@
                                            :static-call
                                            :named-call)))
                                (target
-                                 (if (and (sb!c::code-immobile-p node)
+                                 (if (and (sb-c::code-immobile-p node)
                                           (not step-instrumenting))
                                      fixup
                                      (progn
@@ -865,7 +865,7 @@
 
 ;;; Invoke the function-designator FUN.
 (defun tail-call-unnamed (fun type vop)
-  (let ((relative-call (sb!c::code-immobile-p vop))
+  (let ((relative-call (sb-c::code-immobile-p vop))
         (fun-ea (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
                     fun)))
     (case type
@@ -1200,7 +1200,7 @@
     DONE))
 
 (define-vop (more-kw-arg)
-  (:translate sb!c::%more-kw-arg)
+  (:translate sb-c::%more-kw-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target keyword))
@@ -1214,7 +1214,7 @@
                            (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 (define-vop (more-arg/c)
-  (:translate sb!c::%more-arg)
+  (:translate sb-c::%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:info index)
@@ -1225,7 +1225,7 @@
     (inst mov value (ea (- (* index n-word-bytes)) object))))
 
 (define-vop (more-arg)
-  (:translate sb!c::%more-arg)
+  (:translate sb-c::%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target value))
@@ -1303,7 +1303,7 @@
 ;;; below the current stack top.
 (define-vop (more-arg-context)
   (:policy :fast-safe)
-  (:translate sb!c::%more-arg-context)
+  (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg) :target count))
   (:arg-types positive-fixnum (:constant fixnum))
   (:info fixed)
@@ -1361,7 +1361,7 @@
 ;; in regard to SB-C::%TYPE-CHECK-ERROR. Figure out why.
 (define-vop (type-check-error/word)
   (:policy :fast-safe)
-  (:translate sb!c::%type-check-error)
+  (:translate sb-c::%type-check-error)
   (:args (object :scs (signed-reg unsigned-reg))
          ;; Types are trees of symbols, so 'any-reg' is not
          ;; really possible.
@@ -1376,7 +1376,7 @@
     (error-call vop 'object-not-type-error object type)))
 (define-vop (type-check-error/word/c)
   (:policy :fast-safe)
-  (:translate sb!c::%type-check-error/c)
+  (:translate sb-c::%type-check-error/c)
   (:args (object :scs (signed-reg unsigned-reg)))
   (:arg-types untagged-num (:constant symbol) (:constant t))
   (:info errcode *location-context*)

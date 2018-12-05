@@ -323,8 +323,8 @@ error if any of PACKAGES is not a valid package designator."
 
 (defun lexically-unlocked-symbol-p (symbol)
   (member symbol
-          (if (boundp 'sb!c::*lexenv*)
-              (let ((list (sb!c::lexenv-disabled-package-locks sb!c::*lexenv*)))
+          (if (boundp 'sb-c::*lexenv*)
+              (let ((list (sb-c::lexenv-disabled-package-locks sb-c::*lexenv*)))
                 ;; The so-called LIST might be an interpreter env.
                 #!+sb-fasteval
                 (unless (listp list)
@@ -332,7 +332,7 @@ error if any of PACKAGES is not a valid package designator."
                     (sb!interpreter::lexically-unlocked-symbol-p
                      symbol list)))
                 list)
-              sb!c::*disabled-package-locks*)))
+              sb-c::*disabled-package-locks*)))
 
 ;;;; more package-locking these are NOPs unless :sb-package-locks is
 ;;;; in target features. Cross-compiler NOPs for these are in cross-misc.
@@ -1791,7 +1791,7 @@ PACKAGE."
                                                (logand start-state 3))))))
                      (when (zerop index)
                        (return (advance start-state))))))
-          (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+          (declare (optimize (sb-c::insert-array-bounds-checks 0)))
           (if (logtest start-state +package-iter-check-shadows+)
               (let ((shadows (package-%shadowing-symbols (this-package))))
                 (scan (not (member sym shadows :test #'string=))))
@@ -1807,7 +1807,7 @@ PACKAGE."
                        ;; The warning is enough. It's ugly that both happen.
                        (warn "Compile-time package lock violation:~%  ~A"
                              condition)
-                       (sb!c:compiler-error condition))
+                       (sb-c:compiler-error condition))
                       (:eval
                        (eval-error condition))))))
     (with-single-package-locked-error (:symbol symbol control))))

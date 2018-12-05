@@ -1056,7 +1056,7 @@ of specialized arrays is supported."
         ((typep array 'vector)
          (list (length array)))
         (t
-         (sb!c::%type-check-error/c array 'object-not-array-error nil))))
+         (sb-c::%type-check-error/c array 'object-not-array-error nil))))
 
 (defun array-total-size (array)
   "Return the total number of elements in the Array."
@@ -1066,7 +1066,7 @@ of specialized arrays is supported."
         ((typep array 'vector)
          (length array))
         (t
-         (sb!c::%type-check-error/c array 'object-not-array-error nil))))
+         (sb-c::%type-check-error/c array 'object-not-array-error nil))))
 
 (defun array-displacement (array)
   "Return the values of :DISPLACED-TO and :DISPLACED-INDEX-offset

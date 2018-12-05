@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Return the maximum number of bits an integer of the supplied type
 ;;; can take up, or NIL if it is unbounded. The second (third) value

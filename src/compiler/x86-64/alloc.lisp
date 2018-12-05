@@ -57,7 +57,7 @@
 
 ;;; Insert allocation profiler instrumentation
 (defun instrument-alloc (size node)
-  (when (policy node (> sb!c::instrument-consing 1))
+  (when (policy node (> sb-c::instrument-consing 1))
     (let ((skip-instrumentation (gen-label)))
       (inst mov temp-reg-tn
             (ea (* n-word-bytes thread-profile-data-slot) thread-base-tn))
@@ -74,7 +74,7 @@
                         'enable-alloc-counter
                         'enable-sized-alloc-counter)))
         (cond ((or (not node) ; assembly routine
-                   (sb!c::code-immobile-p node))
+                   (sb-c::code-immobile-p node))
                (inst call (make-fixup helper :assembly-routine)) ; 5 bytes
                (emit-alignment 3 :long-nop))
               (t
@@ -329,7 +329,7 @@
         ;; It would also be good to skip zero-fill of specialized vectors
         ;; perhaps in a policy-dependent way. At worst you'd see random
         ;; bits, and CLHS says consequences are undefined.
-        (when sb!c::*msan-unpoison*
+        (when sb-c::*msan-unpoison*
           ;; Unpoison all DX vectors regardless of widetag.
           ;; Mark the header and length as valid, not just the payload.
           #!+linux ; unimplemented for others
@@ -354,7 +354,7 @@
               (inst mov words result) ; restore 'words'
               (inst lea result ; recompute the tagged pointer
                     (ea other-pointer-lowtag rsp-tn)))))
-        (unless (sb!c::vector-initialized-p node)
+        (unless (sb-c::vector-initialized-p node)
           (let ((data-addr
                   (ea (- (* vector-data-offset n-word-bytes) other-pointer-lowtag)
                       result)))
@@ -531,7 +531,7 @@
   (:vop-var vop)
   (:generator 1
     (let ((tramp (make-fixup 'funcallable-instance-tramp :assembly-routine)))
-      (if (sb!c::code-immobile-p vop)
+      (if (sb-c::code-immobile-p vop)
           (inst lea result (ea tramp rip-tn))
           (inst mov result tramp)))))
 
@@ -603,7 +603,7 @@
 #!+immobile-space
 (macrolet ((c-call (name)
              `(let ((c-fun (make-fixup ,name :foreign)))
-                (inst call (cond ((sb!c::code-immobile-p node) c-fun)
+                (inst call (cond ((sb-c::code-immobile-p node) c-fun)
                                  (t (progn (inst mov temp-reg-tn c-fun)
                                            temp-reg-tn)))))))
 (define-vop (alloc-immobile-fixedobj)

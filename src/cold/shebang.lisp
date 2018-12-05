@@ -38,7 +38,7 @@
   (concatenate 'string "SB-" (string (target-platform-keyword)) "-ASM"))
 
 (defun any-vop-named-p (vop-name)
-  (let ((ht (symbol-value (find-symbol "*BACKEND-PARSED-VOPS*" "SB!C"))))
+  (let ((ht (symbol-value (find-symbol "*BACKEND-PARSED-VOPS*" "SB-C"))))
     (not (null (gethash vop-name ht)))))
 
 (defun any-vop-translates-p (fun-name)
@@ -46,7 +46,7 @@
     (when (fboundp f)
       (let ((info (funcall f :function :info fun-name)))
         (if info
-            (let ((f (intern "FUN-INFO-TEMPLATES" "SB!C")))
+            (let ((f (intern "FUN-INFO-TEMPLATES" "SB-C")))
               (and (fboundp f) (not (null (funcall f info))))))))))
 
 (defvar *feature-eval-results-file* "output/feature-tests.lisp-expr")
@@ -183,7 +183,7 @@
 ;;; similar to SB!XC:*FEATURES*, and chill.lisp was set up to work
 ;;; for that). For an explanation of what it really does, look
 ;;; elsewhere.
-;;; FIXME: Can we just assign SB!C:*BACKEND-SUBFEATURES* directly?
+;;; FIXME: Can we just assign SB-C:*BACKEND-SUBFEATURES* directly?
 ;;; (This has nothing whatsoever to do with the so-called "shebang" reader)
 (export '*shebang-backend-subfeatures*)
 (declaim (type list *shebang-backend-subfeatures*))

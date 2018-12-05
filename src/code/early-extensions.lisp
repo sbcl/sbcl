@@ -542,7 +542,7 @@ precise source locations in case conditions are signaled during the
 execution of BODY.
 
 NOTE: This interface is experimental and subject to change."
-  #-sb-xc-host `(sb!c::call-with-current-source-form
+  #-sb-xc-host `(sb-c::call-with-current-source-form
                  (lambda () ,@body) ,@forms)
   #+sb-xc-host `(progn (list ,@forms) ,@body))
 
@@ -1458,7 +1458,7 @@ NOTE: This interface is experimental and subject to change."
 
 (defun setup-variable-in-final-deprecation
     (software version name replacement-spec)
-  (sb!c::%define-symbol-macro
+  (sb-c::%define-symbol-macro
    name
    `(deprecation-error
      ,software ,version 'variable ',name

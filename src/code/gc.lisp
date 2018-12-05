@@ -35,7 +35,7 @@
 #!-gencgc
 (defun dynamic-usage ()
   (truly-the word
-             (- (sap-int (sb!c::dynamic-space-free-pointer))
+             (- (sap-int (sb-c::dynamic-space-free-pointer))
                 (current-dynamic-space-start))))
 
 (defun static-space-usage ()

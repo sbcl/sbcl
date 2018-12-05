@@ -28,17 +28,17 @@
              name))
     ;; The name of the lambda is (MACRO-FUNCTION name)
     ;; which does not conflict with any legal function name.
-    (let ((def (make-macro-lambda (sb!c::debug-name 'macro-function name)
+    (let ((def (make-macro-lambda (sb-c::debug-name 'macro-function name)
                                   lambda-list body 'defmacro name)))
       `(progn
          ;; %COMPILER-DEFMACRO just performs a check for duplicate definitions
          ;; within a file.
          (eval-when (:compile-toplevel)
-           (sb!c::%compiler-defmacro :macro-function ',name))
+           (sb-c::%compiler-defmacro :macro-function ',name))
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (sb!c::%defmacro ',name ,def (sb!c:source-location)))))))
+           (sb-c::%defmacro ',name ,def (sb-c:source-location)))))))
 
-(defun sb!c::%defmacro (name definition source-location)
+(defun sb-c::%defmacro (name definition source-location)
   (declare (ignorable source-location)) ; xc-host doesn't use
             ;; old note (ca. 1985, maybe:-): "Eventually %%DEFMACRO
             ;; should deal with clearing old compiler information for

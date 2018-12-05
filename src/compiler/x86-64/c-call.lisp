@@ -131,9 +131,9 @@
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
-  (aver (sb!c::constant-lvar-p type))
-  (let* ((type (sb!c::lvar-value type))
-         (env (sb!c::node-lexenv node))
+  (aver (sb-c::constant-lvar-p type))
+  (let* ((type (sb-c::lvar-value type))
+         (env (sb-c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -188,7 +188,7 @@
                                        :arg-types (new-arg-types)
                                        :result-type result-type)
                                     ,@(new-args))))))
-        (sb!c::give-up-ir1-transform))))
+        (sb-c::give-up-ir1-transform))))
 
 ;;; The ABI is vague about how signed sub-word integer return values
 ;;; are handled, but since gcc versions >=4.3 no longer do sign
@@ -294,7 +294,7 @@
     (inst lea rax (rip-relative-ea label))
     (emit-label label)
     (move pc-save rax))
-  (when sb!c::*msan-unpoison*
+  (when sb-c::*msan-unpoison*
     (inst mov rax (thread-slot-ea thread-msan-param-tls-slot))
     ;; Unpoison parameters
     (do ((n 0 (+ n n-word-bytes))
@@ -322,7 +322,7 @@
   ;; one jump in a statically linked executable.
 
   (inst call (cond ((tn-p fun) fun)
-                   ((sb!c::code-immobile-p vop) (make-fixup fun :foreign))
+                   ((sb-c::code-immobile-p vop) (make-fixup fun :foreign))
                    (t (ea (make-fixup fun :foreign 8)))))
   ;; For the undefined alien error
   (note-this-location vop :internal-error)

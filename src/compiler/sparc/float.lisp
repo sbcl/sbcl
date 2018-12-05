@@ -2501,7 +2501,7 @@
 ) ; PROGN
 
 #+nil
-(in-package "SB!C")
+(in-package "SB-C")
 ;;; FIXME
 #+nil
 (progn
@@ -2514,7 +2514,7 @@
       (case (length args)
         ((0 2) (values nil t))
         (1 `(values ,(first args)))
-        (t (sb!c::associate-arguments 'min (first args) (rest args))))
+        (t (sb-c::associate-arguments 'min (first args) (rest args))))
       (values nil t)))
 
 (define-source-transform max (&rest args)
@@ -2522,7 +2522,7 @@
       (case (length args)
         ((0 2) (values nil t))
         (1 `(values ,(first args)))
-        (t (sb!c::associate-arguments 'max (first args) (rest args))))
+        (t (sb-c::associate-arguments 'max (first args) (rest args))))
       (values nil t)))
 
 ;; Derive the types of max and min

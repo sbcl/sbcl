@@ -170,7 +170,7 @@
             ,vector-form))
          ,@(cond ((not other-form-p)
                   `((t
-                     (sb!c::%type-check-error ,sequence '(or list vector)
+                     (sb-c::%type-check-error ,sequence '(or list vector)
                                               nil))))
                  (other-form
                   `(((extended-sequence-p ,sequence)
@@ -178,7 +178,7 @@
                        (declare (ignorable ,sequence))
                        ,other-form))
                     (t
-                     (sb!c::%type-check-error/c
+                     (sb-c::%type-check-error/c
                       ,sequence 'sb!kernel::object-not-sequence-error nil)))))))
 
 ;;; Like SEQ-DISPATCH-CHECKING, but also assert that OTHER-FORM produces
@@ -352,7 +352,7 @@
                          (car list)))
                   (declare (type index count)))
                 (locally
-                    (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                   (when (>= index (length sequence))
                     (signal-index-too-large-error sequence index))
                   (aref sequence index))
@@ -596,7 +596,7 @@
            collect
            (multiple-value-bind (basher value-transform)
                (if et
-                   (sb!c::find-basher saetp)
+                   (sb-c::find-basher saetp)
                    '(lambda (item vector start length)
                      (declare (ignore item start length))
                      (data-nil-vector-ref (truly-the (simple-array nil (*)) vector) 0)))
@@ -604,8 +604,8 @@
                (aref %%fill-bashers%% ,(sb-vm:saetp-typecode saetp))
                (cons #',basher
                      ,(if et
-                          `(lambda (sb!c::item)
-                             (declare (type ,et sb!c::item))
+                          `(lambda (sb-c::item)
+                             (declare (type ,et sb-c::item))
                              ,value-transform)
                           '#'identity))))
            else do
@@ -695,7 +695,7 @@
 ;;;; REPLACE
 (defun vector-replace (vector1 vector2 start1 start2 end1 diff)
   (declare ((or (eql -1) index) start1 start2 end1)
-           (optimize (sb!c::insert-array-bounds-checks 0))
+           (optimize (sb-c::insert-array-bounds-checks 0))
            ((integer -1 1) diff))
   (let ((tag1 (%other-pointer-widetag vector1))
         (tag2 (%other-pointer-widetag vector2)))
@@ -1100,7 +1100,7 @@ many elements are copied."
 (macrolet ((def (name element-type &rest dispatch)
              `(defun ,name (&rest sequences)
                 (declare (explicit-check)
-                         (optimize (sb!c::insert-array-bounds-checks 0)))
+                         (optimize (sb-c::insert-array-bounds-checks 0)))
                 (let ((length 0))
                   (declare (index length))
                   (do-rest-arg ((seq) sequences)
@@ -1372,7 +1372,7 @@ many elements are copied."
 ;;; safety is turned off for vectors and lists but kept for generic
 ;;; sequences.
 (defun map-into (result-sequence function &rest sequences)
-  (declare (optimize (sb!c::check-tag-existence 0)))
+  (declare (optimize (sb-c::check-tag-existence 0)))
   (declare (dynamic-extent function))
   (let ((really-fun (%coerce-callable-to-fun function)))
     (etypecase result-sequence

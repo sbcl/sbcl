@@ -59,9 +59,9 @@
       `(eval-when (:compile-toplevel :load-toplevel :execute)
          ,@(when *new-auxiliary-types*
              `((%def-auxiliary-alien-types ',*new-auxiliary-types*
-                                           (sb!c:source-location))))
+                                           (sb-c:source-location))))
          ,@(when name
-             `((%define-alien-type ',name ',alien-type (sb!c:source-location))))))))
+             `((%define-alien-type ',name ',alien-type (sb-c:source-location))))))))
 
 (defstruct (alien-type-class (:copier nil))
   (name nil :type symbol)

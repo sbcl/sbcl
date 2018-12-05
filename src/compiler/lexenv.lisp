@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; support for the idiom (in MACROEXPAND and elsewhere) that NIL is
 ;;; to be taken as a null lexical environment.

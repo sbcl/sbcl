@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (deftype byte-buffer () '(vector (unsigned-byte 8)))
 (defvar *byte-buffer*)
@@ -289,7 +289,7 @@
   (declare (type source-info info))
   (let ((file-info (get-toplevelish-file-info info)))
     (multiple-value-call
-        (if function #'sb!c::make-core-debug-source #'make-debug-source)
+        (if function #'sb-c::make-core-debug-source #'make-debug-source)
      :compiled (source-info-start-time info)
      :namestring (or *source-namestring*
                      (make-file-info-namestring
@@ -735,9 +735,9 @@
        ;; so if there's only one function, pick that as the component name.
        ;; Otherwise preserve whatever crummy name was already assigned.
        :name (let* ((2comp (component-info component))
-                    (entries (sb!c::ir2-component-entries 2comp)))
+                    (entries (sb-c::ir2-component-entries 2comp)))
                (or (and (not (cdr entries))
-                        (sb!c::entry-info-name (car entries)))
+                        (sb-c::entry-info-name (car entries)))
                    (component-name component)))
        :fun-map fun-map
        :tlf-num+offset (pack-tlf-num+offset

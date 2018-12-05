@@ -272,7 +272,7 @@
   EQL to the new value, the code is not portable (undefined behavior). The
   third argument is an optional documentation string for the variable."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-     (sb!c::%defconstant ',name ,value (sb!c:source-location)
+     (sb-c::%defconstant ',name ,value (sb-c:source-location)
                          ,@(and docp `(',doc)))))
 
 (defvar *!removable-symbols* nil)
@@ -316,7 +316,7 @@
 ;;; The extra magic is that we need to discern between constants simple enough
 ;;; to assigned during genesis (cold-load) from those assigned in cold-init.
 ;;; This choice informs the compiler how to emit references to the symbol.
-(defvar sb!c::*!const-value-deferred* '())
+(defvar sb-c::*!const-value-deferred* '())
 #-sb-xc-host
 (eval-when (:compile-toplevel)
   (sb!xc:defmacro defconstant-eqx (symbol expr eqx &optional doc)
@@ -325,8 +325,8 @@
          (eval-when (:compile-toplevel)
            (sb!xc:defconstant ,symbol (%defconstant-eqx-value ',symbol ,expr ,eqx))
            ,@(unless constp
-               `((push ',symbol sb!c::*!const-value-deferred*))))
+               `((push ',symbol sb-c::*!const-value-deferred*))))
          (eval-when (:load-toplevel)
-           (sb!c::%defconstant ',symbol
+           (sb-c::%defconstant ',symbol
              ,(if constp `',(constant-form-value expr) expr)
-             (sb!c:source-location) ,@(when doc (list doc))))))))
+             (sb-c:source-location) ,@(when doc (list doc))))))))

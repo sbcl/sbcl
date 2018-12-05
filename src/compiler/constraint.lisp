@@ -46,7 +46,7 @@
 ;;; fail to infer (< I FIXNUM): it does not understand that this
 ;;; constraint follows from (TYPEP I (INTEGER 0 0)).
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; *CONSTRAINT-UNIVERSE* gets bound in IR1-PHASES to a fresh,
 ;;; zero-length, non-zero-total-size vector-with-fill-pointer.

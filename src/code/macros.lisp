@@ -148,9 +148,9 @@ invoked. In that case it will store into PLACE and start over."
 
 (sb!xc:defmacro define-symbol-macro (name expansion)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
-    (sb!c::%define-symbol-macro ',name ',expansion (sb!c:source-location))))
+    (sb-c::%define-symbol-macro ',name ',expansion (sb-c:source-location))))
 
-(defun sb!c::%define-symbol-macro (name expansion source-location)
+(defun sb-c::%define-symbol-macro (name expansion source-location)
   (unless (symbolp name)
     (error 'simple-type-error :datum name :expected-type 'symbol
            :format-control "Symbol macro name is not a symbol: ~S."
@@ -184,18 +184,18 @@ invoked. In that case it will store into PLACE and start over."
                     name))
   ;; DEBUG-NAME is called primarily for its side-effect of asserting
   ;; that (COMPILER-MACRO-FUNCTION x) is not a legal function name.
-  (let ((def (make-macro-lambda (sb!c::debug-name 'compiler-macro name)
+  (let ((def (make-macro-lambda (sb-c::debug-name 'compiler-macro name)
                                 lambda-list body 'define-compiler-macro name
-                                :accessor 'sb!c::compiler-macro-args)))
+                                :accessor 'sb-c::compiler-macro-args)))
     `(progn
           (eval-when (:compile-toplevel)
-           (sb!c::%compiler-defmacro :compiler-macro-function ',name))
+           (sb-c::%compiler-defmacro :compiler-macro-function ',name))
           (eval-when (:compile-toplevel :load-toplevel :execute)
-           (sb!c::%define-compiler-macro ',name ,def)))))
+           (sb-c::%define-compiler-macro ',name ,def)))))
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun sb!c::%define-compiler-macro (name definition)
-    (sb!c::warn-if-compiler-macro-dependency-problem name)
+  (defun sb-c::%define-compiler-macro (name definition)
+    (sb-c::warn-if-compiler-macro-dependency-problem name)
     ;; FIXME: warn about incompatible lambda list with
     ;; respect to parent function?
     (setf (sb!xc:compiler-macro-function name) definition)
@@ -519,7 +519,7 @@ invoked. In that case it will store into PLACE and start over."
   Do a declaration or declarations for the global environment."
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      ,@(mapcar (lambda (spec)
-                 `(sb!c::%proclaim ',spec (sb!c:source-location)))
+                 `(sb-c::%proclaim ',spec (sb-c:source-location)))
                specs)))
 
 ;; Avoid unknown return values in emitted code for PRINT-UNREADABLE-OBJECT
@@ -555,7 +555,7 @@ invoked. In that case it will store into PLACE and start over."
       (values nil `(funcall ,funarg . ,arg-forms))
     (let ((fn-sym (sb!xc:gensym))) ; for ONCE-ONLY-ish purposes
       (values `((,fn-sym (%coerce-callable-to-fun ,funarg)))
-              `(sb!c::%funcall ,fn-sym . ,arg-forms)))))
+              `(sb-c::%funcall ,fn-sym . ,arg-forms)))))
 
 ;;; Ordinarily during self-build, nothing would need this macro except the
 ;;; calls in src/code/list, and src/code/seq.

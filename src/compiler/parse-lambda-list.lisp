@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defconstant-eqx lambda-list-parser-states
@@ -112,7 +112,7 @@
              (probably-ll-keyword-p (arg)
                ;; Compiler doesn't see that the check is manually done. :-(
                #-sb-xc-host
-               (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+               (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                (and (symbolp arg)
                     (let ((name (symbol-name arg)))
                       (and (plusp (length name))
@@ -1177,7 +1177,7 @@
                   `((declare ,declared-lambda-list)))
               ,@(if outer-decls (list outer-decls))
               ,@(and (not env) (eq envp t) `((declare (ignore ,@ll-env))))
-              ,@(sb!c:macro-policy-decls)
+              ,@(sb-c:macro-policy-decls)
               (,@(if kind
                      `(named-ds-bind ,(if (eq kind :special-form)
                                           `(:special-form . ,name)

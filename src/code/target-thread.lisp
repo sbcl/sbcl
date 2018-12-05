@@ -1572,7 +1572,7 @@ session."
                                (multiple-value-list
                                 (unwind-protect
                                      (catch '%return-from-thread
-                                       (sb!c::inspect-unwinding
+                                       (sb-c::inspect-unwinding
                                         (apply real-function arguments)
                                         #'sb!di::catch-runaway-unwind))
                                   (when *exit-in-process*

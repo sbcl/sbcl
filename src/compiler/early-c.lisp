@@ -13,7 +13,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; ANSI limits on compilation
 (defconstant sb!xc:call-arguments-limit sb!xc:most-positive-fixnum

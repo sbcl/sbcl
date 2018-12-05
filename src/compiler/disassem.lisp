@@ -394,7 +394,7 @@
                                    instruction-format ~W bits wide.~:>"
                              (arg-name arg) bytespec format-length))
                     (correct-dchunk-bytespec-for-endianness
-                     bytespec format-length sb!c:*backend-byte-order*))
+                     bytespec format-length sb-c:*backend-byte-order*))
                   fields)))
   arg)
 

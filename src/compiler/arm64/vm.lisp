@@ -313,10 +313,10 @@
 
 (defun combination-implementation-style (node)
   (flet ((valid-funtype (args result)
-           (sb!c::valid-fun-use node
-                                (sb!c::specifier-type
+           (sb-c::valid-fun-use node
+                                (sb-c::specifier-type
                                  `(function ,args ,result)))))
-    (case (sb!c::combination-fun-source-name node)
+    (case (sb-c::combination-fun-source-name node)
       (logtest
        (if (or (valid-funtype '(signed-word signed-word) '*)
                (valid-funtype '(word word) '*))
@@ -336,11 +336,11 @@
                                       ,type)
                                     'unsigned-byte)
                      (destructuring-bind (size posn integer)
-                         (sb!c::basic-combination-args node)
+                         (sb-c::basic-combination-args node)
                        (declare (ignore integer))
-                       (and (plusp (sb!c::lvar-value posn))
-                            (<= (+ (sb!c::lvar-value size)
-                                   (sb!c::lvar-value posn))
+                       (and (plusp (sb-c::lvar-value posn))
+                            (<= (+ (sb-c::lvar-value size)
+                                   (sb-c::lvar-value posn))
                                 width))))))
          (if (or (validp 'word (1- n-word-bits))
                  (validp 'signed-word (1- n-word-bits)))

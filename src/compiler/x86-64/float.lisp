@@ -1549,7 +1549,7 @@
 (defknown swap-complex ((complex float)) (complex float)
     (foldable flushable movable always-translatable))
 (defoptimizer (swap-complex derive-type) ((x))
-  (sb!c::lvar-type x))
+  (sb-c::lvar-type x))
 (defun swap-complex (x)
   (complex (imagpart x) (realpart x)))
 (define-vop (swap-complex-single-float)

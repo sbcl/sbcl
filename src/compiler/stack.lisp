@@ -15,7 +15,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Scan through BLOCK looking for uses of :UNKNOWN lvars that have
 ;;; their DEST outside of the block. We do some checking to verify the

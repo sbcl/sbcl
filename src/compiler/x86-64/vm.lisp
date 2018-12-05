@@ -384,7 +384,7 @@
                ;; is used to determine whether it's immediate.
                #!+(and (not (host-feature sb-xc-host)) immobile-space (not immobile-symbols))
                (or (logbitp +initial-core-symbol-bit+ (get-header-data value))
-                   (and (sb!c::core-object-p sb!c::*compile-object*)
+                   (and (sb-c::core-object-p sb-c::*compile-object*)
                         (immobile-space-obj-p value)))
 
                (static-symbol-p value))
@@ -476,12 +476,12 @@
 (defconstant cfp-offset rbp-offset) ; pfw - needed by stuff in /code
 
 (defun combination-implementation-style (node)
-  (declare (type sb!c::combination node))
+  (declare (type sb-c::combination node))
   (flet ((valid-funtype (args result)
-           (sb!c::valid-fun-use node
-                                (sb!c::specifier-type
+           (sb-c::valid-fun-use node
+                                (sb-c::specifier-type
                                  `(function ,args ,result)))))
-    (case (sb!c::combination-fun-source-name node)
+    (case (sb-c::combination-fun-source-name node)
       (logtest
        (cond
          ((or (valid-funtype '(fixnum fixnum) '*)
@@ -496,8 +496,8 @@
        (cond
          ((or (and (valid-funtype '#.`((integer 0 ,(- 63 n-fixnum-tag-bits))
                                        fixnum) '*)
-                   (sb!c::constant-lvar-p
-                    (first (sb!c::basic-combination-args node))))
+                   (sb-c::constant-lvar-p
+                    (first (sb-c::basic-combination-args node))))
               (valid-funtype '((integer 0 63) (signed-byte 64)) '*)
               (valid-funtype '((integer 0 63) (unsigned-byte 64)) '*))
           (values :transform '(lambda (index integer)

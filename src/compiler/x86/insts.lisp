@@ -582,11 +582,11 @@
         (t
          (format stream "~A PTR [" (symbol-name (ea-size ea)))
          (when (ea-base ea)
-           (write-string (sb!c::location-print-name (ea-base ea)) stream)
+           (write-string (sb-c::location-print-name (ea-base ea)) stream)
            (when (ea-index ea)
              (write-string "+" stream)))
          (when (ea-index ea)
-           (write-string (sb!c::location-print-name (ea-index ea)) stream))
+           (write-string (sb-c::location-print-name (ea-index ea)) stream))
          (unless (= (ea-scale ea) 1)
            (format stream "*~A" (ea-scale ea)))
          (typecase (ea-disp ea)
@@ -679,7 +679,7 @@
 (defun dword-reg-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'registers)
-       (eq (sb!c:sc-operand-size (tn-sc thing)) :dword)))
+       (eq (sb-c:sc-operand-size (tn-sc thing)) :dword)))
 
 (defun register-p (thing)
   (and (tn-p thing)
@@ -700,7 +700,7 @@
 (defun operand-size (thing)
   (typecase thing
     (tn
-     (or (sb!c:sc-operand-size (tn-sc thing))
+     (or (sb-c:sc-operand-size (tn-sc thing))
          (error "can't tell the size of ~S ~S" thing (sc-name (tn-sc thing)))))
     (ea
      (ea-size thing))
@@ -2585,7 +2585,7 @@
                ((consp offset)
                 (setf (label-usedp (car offset)) t))))))))
 
-(defun sb!c::branch-opcode-p (mnemonic)
+(defun sb-c::branch-opcode-p (mnemonic)
   (member mnemonic (load-time-value
                     (mapcar #'sb!assem::op-encoder-name
                             '(call ret jmp jecxz break int iret
@@ -2595,7 +2595,7 @@
 
 ;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
-(defun sb!c::replace-coverage-instruction (inst-buffer inst-index label offset)
+(defun sb-c::replace-coverage-instruction (inst-buffer inst-index label offset)
   (setf (svref inst-buffer inst-index)
         `(mov ,(make-ea :byte
                         :disp (make-fixup nil

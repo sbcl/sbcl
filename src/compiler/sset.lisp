@@ -17,7 +17,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information. (This file no)
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Each structure that may be placed in a SSET must include the
 ;;; SSET-ELEMENT structure. We allow an initial value of NIL to mean

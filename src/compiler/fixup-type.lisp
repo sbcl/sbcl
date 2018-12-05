@@ -1,4 +1,4 @@
-(in-package "SB!C")
+(in-package "SB-C")
 
 (!begin-collecting-cold-init-forms)
 

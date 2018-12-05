@@ -449,7 +449,7 @@
                                    :environment nil))
          (ll-decl (third lexpr))
          (defun-name (symbolicate "PARSE-<" name ">")))
-    (aver (and (eq (car ll-decl) 'declare) (caadr ll-decl) 'sb!c::lambda-list))
+    (aver (and (eq (car ll-decl) 'declare) (caadr ll-decl) 'sb-c::lambda-list))
     `(progn
        (defun ,defun-name (,context spec)
          ,ll-decl

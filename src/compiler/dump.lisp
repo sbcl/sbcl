@@ -11,7 +11,7 @@
 
 (in-package "SB!FASL")
 ;;; KLUDGE: Even though we're IN-PACKAGE SB!FASL, some of the code in
-;;; here is awfully chummy with the SB!C package. CMU CL didn't have
+;;; here is awfully chummy with the SB-C package. CMU CL didn't have
 ;;; any separation between the two packages, and a lot of tight
 ;;; coupling remains. -- WHN 2001-06-04
 
@@ -74,7 +74,7 @@
   ;; try to dump a structure that isn't in this hash table, we lose.
   (valid-structures (make-hash-table :test 'eq) :type hash-table)
   ;; DEBUG-SOURCE written at the very beginning
-  (source-info nil :type (or null sb!c::debug-source)))
+  (source-info nil :type (or null sb-c::debug-source)))
 
 ;;; This structure holds information about a circularity.
 (defstruct (circularity (:copier nil))
@@ -453,8 +453,8 @@
 ;;; Emit a funcall of the function and return the handle for the
 ;;; result.
 (defun fasl-dump-load-time-value-lambda (fun file no-skip)
-  (declare (type sb!c::clambda fun) (type fasl-output file))
-  (let ((handle (gethash (sb!c::leaf-info fun)
+  (declare (type sb-c::clambda fun) (type fasl-output file))
+  (let ((handle (gethash (sb-c::leaf-info fun)
                          (fasl-output-entry-table file))))
     (aver handle)
     (dump-push handle file)
@@ -827,7 +827,7 @@
                (dump-byte widetag file))
              (dovector (i vector)
                (dump-integer-as-n-bytes
-                (ecase sb!c:*backend-byte-order*
+                (ecase sb-c:*backend-byte-order*
                   (:little-endian i)
                   (:big-endian (octet-swap i bits))) ; signed or unsigned OK
                 bytes file))))
@@ -1042,7 +1042,7 @@
            (type fasl-output fasl-output))
   (dump-fixups fixups fasl-output)
   (let* ((2comp (component-info component))
-         (constants (sb!c:ir2-component-constants 2comp))
+         (constants (sb-c:ir2-component-constants 2comp))
          (header-length (length constants)))
     (collect ((patches))
       ;; Dump the constants, noting any :ENTRY constants that have to
@@ -1051,15 +1051,15 @@
         (let ((entry (aref constants i)))
           (etypecase entry
             (constant
-             (dump-object (sb!c::constant-value entry) fasl-output))
+             (dump-object (sb-c::constant-value entry) fasl-output))
             (cons
              (ecase (car entry)
                (:entry
-                (let* ((info (sb!c::leaf-info (cdr entry)))
+                (let* ((info (sb-c::leaf-info (cdr entry)))
                        (handle (gethash info
                                         (fasl-output-entry-table
                                          fasl-output))))
-                  (declare (type sb!c::entry-info info))
+                  (declare (type sb-c::entry-info info))
                   (cond
                    (handle
                     (dump-push handle fasl-output))
@@ -1078,14 +1078,14 @@
              (dump-fop 'fop-misc-trap fasl-output)))))
 
       ;; Dump the debug info.
-      (let ((info (sb!c::debug-info-for-component component))
+      (let ((info (sb-c::debug-info-for-component component))
             (*dump-only-valid-structures* nil))
-        (setf (sb!c::debug-info-source info)
+        (setf (sb-c::debug-info-source info)
               (fasl-output-source-info fasl-output))
         (dump-object info fasl-output))
 
       (dump-fop 'fop-load-code fasl-output
-                (if (sb!c::code-immobile-p component) 1 0)
+                (if (sb-c::code-immobile-p component) 1 0)
                 header-length code-length)
 
       (dump-segment code-segment code-length fasl-output)
@@ -1142,12 +1142,12 @@
   (dump-word (fasl-output-table-free file) file)
 
   #!+sb-dyncount
-  (let ((info (sb!c::ir2-component-dyncount-info (component-info component))))
+  (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))
     (when info
       (fasl-validate-structure info file)))
 
   (let* ((2comp (component-info component))
-         (entries (sb!c::ir2-component-entries 2comp))
+         (entries (sb-c::ir2-component-entries 2comp))
          (nfuns (length entries))
          (code-handle
           (dump-code-object component code-segment code-length fixups file))
@@ -1155,10 +1155,10 @@
 
     (dolist (entry entries)
       (dump-push code-handle file)
-      (dump-object (sb!c::entry-info-name entry) file)
-      (dump-object (sb!c::entry-info-arguments entry) file)
-      (dump-object (sb!c::entry-info-type entry) file)
-      (dump-object (sb!c::entry-info-form/doc/xrefs entry) file)
+      (dump-object (sb-c::entry-info-name entry) file)
+      (dump-object (sb-c::entry-info-arguments entry) file)
+      (dump-object (sb-c::entry-info-type entry) file)
+      (dump-object (sb-c::entry-info-form/doc/xrefs entry) file)
       (dump-fop 'fop-fun-entry file (decf fun-index))
       (let ((entry-handle (dump-pop file)))
         (setf (gethash entry (fasl-output-entry-table file)) entry-handle)
@@ -1173,8 +1173,8 @@
   (values))
 
 (defun dump-push-previously-dumped-fun (fun fasl-output)
-  (declare (type sb!c::clambda fun))
-  (let ((handle (gethash (sb!c::leaf-info fun)
+  (declare (type sb-c::clambda fun))
+  (let ((handle (gethash (sb-c::leaf-info fun)
                          (fasl-output-entry-table fasl-output))))
     (aver handle)
     (dump-push handle fasl-output))
@@ -1183,7 +1183,7 @@
 ;;; Dump a FOP-FUNCALL to call an already-dumped top level lambda at
 ;;; load time.
 (defun fasl-dump-toplevel-lambda-call (fun fasl-output)
-  (declare (type sb!c::clambda fun))
+  (declare (type sb-c::clambda fun))
   (dump-push-previously-dumped-fun fun fasl-output)
   (dump-fop 'fop-funcall-for-effect fasl-output)
   (dump-byte 0 fasl-output)

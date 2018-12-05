@@ -103,7 +103,7 @@
           ;; If the SATISFIES function is not foldable, we cannot answer!
           (let* ((form `(,(second hairy-spec) ',obj)))
             (multiple-value-bind (ok result)
-                (sb!c::constant-function-call-p form nil nil)
+                (sb-c::constant-function-call-p form nil nil)
               (values (not (null result)) ok)))))))))
 
 ;;;; miscellaneous interfaces
@@ -296,7 +296,7 @@ Experimental."
                        (search "*!INITIAL-ASSEMBLER-ROUTINES*" line)
                        (search "*!LOAD-TIME-VALUES*" line)
                        (search "(SB!FASL:*!COLD-" line)
-                       (search "#S(SB!C::RESTART-LOCATION" line))
+                       (search "#S(SB-C::RESTART-LOCATION" line))
              (let ((form (read-from-string line)))
                (destructuring-bind (obj typespec xc-winp xc-certainp) form
                  (binding* (((winp certainp)

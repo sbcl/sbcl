@@ -12,7 +12,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;;; utilities used during code generation
 
@@ -110,7 +110,7 @@
 ;;; * EMIT-INLINE-CONSTANT: receives a constant descriptor and its associated
 ;;;    label. Emits the constant.
 ;;;
-;;; Implementing this feature lets VOP generators use sb!c:register-inline-constant
+;;; Implementing this feature lets VOP generators use sb-c:register-inline-constant
 ;;; to get handles (as returned by sb-vm:inline-constant-value) from constant
 ;;; descriptors.
 ;;;
@@ -344,7 +344,7 @@
             (bug "Oversized code component?"))
           ;; Assert that we are aligned for storing uint32_t
           (aver (not (logtest index #b11)))
-          (dolist (entry (sb!c::ir2-component-entries
+          (dolist (entry (sb-c::ir2-component-entries
                           (component-info component)))
             (let ((val (label-position (entry-info-offset entry))))
               (push val fun-table)

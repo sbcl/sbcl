@@ -66,11 +66,11 @@ is guessed from the one supplied."
         `(eval-when (:compile-toplevel :load-toplevel :execute)
            ,@(when *new-auxiliary-types*
                `((%def-auxiliary-alien-types ',*new-auxiliary-types*
-                                             (sb!c:source-location))))
+                                             (sb-c:source-location))))
            (%define-alien-variable ',lisp-name
                                    ',alien-name
                                    ',alien-type
-                                   (sb!c:source-location)))))))
+                                   (sb-c:source-location)))))))
 
 ;;; Do the actual work of DEFINE-ALIEN-VARIABLE.
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -183,7 +183,7 @@ This is SETFable."
               ;; expanding into non-standard special forms.
               ;; And the LET has to look exactly like this, not LET*
               ;; and no other bindings.
-              `((let ((sb!c:*alien-stack-pointer* sb!c:*alien-stack-pointer*))
+              `((let ((sb-c:*alien-stack-pointer* sb-c:*alien-stack-pointer*))
                   ,@body)))
              (t
               body))))))
@@ -299,7 +299,7 @@ Examples:
 #!-sb-fluid (declaim (inline %make-alien))
 (defun %make-alien (bytes)
   (declare (type index bytes)
-           (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
+           (optimize (sb-c:alien-funcall-saves-fp-and-pc 0)))
   (let ((sap (alien-funcall (extern-alien "malloc"
                                           (function system-area-pointer size-t))
                             bytes)))
@@ -318,7 +318,7 @@ Examples:
   (declare #-sb-xc-host (muffle-conditions compiler-note)
            (optimize (speed 3)))
   ;; No need to link to the previous value, it can be fetched from the binding stack.
-  (let ((*saved-fp* (sb!c::current-fp-fixnum)))
+  (let ((*saved-fp* (sb-c::current-fp-fixnum)))
     (funcall fn)))
 
 #!-sb-fluid (declaim (inline free-alien))
@@ -684,7 +684,7 @@ type specifies the argument and result types."
                        (parms (make-gensym-list (length args))))
                    (compile nil
                             `(lambda (,fun ,@parms)
-                               (declare (optimize (sb!c::insert-step-conditions 0)))
+                               (declare (optimize (sb-c::insert-step-conditions 0)))
                                (declare (type (alien ,type) ,fun))
                                (alien-funcall ,fun ,@parms)))))
            (setf (alien-fun-type-stub type) stub))

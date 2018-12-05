@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; A DEFINITION-SOURCE-LOCATION contains two packed fixnums in the INDICES slot,
 ;;; and unless there is a non-nil plist, does not store the plist.

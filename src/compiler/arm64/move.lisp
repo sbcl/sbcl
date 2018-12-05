@@ -163,7 +163,7 @@
 (defun load-store-two-words (vop1 vop2)
   (let ((register-sb (sb-or-lose 'sb-vm::registers))
         used-load-tn)
-    (declare (notinline sb!c::vop-name)) ; too late
+    (declare (notinline sb-c::vop-name)) ; too late
     (labels ((register-p (tn)
                (and (tn-p tn)
                     (eq (sc-sb (tn-sc tn)) register-sb)))
@@ -171,11 +171,11 @@
                (and (tn-p tn)
                     (sc-is tn control-stack)))
              (source (vop)
-               (tn-ref-tn (sb!c::vop-args  vop)))
+               (tn-ref-tn (sb-c::vop-args  vop)))
              (dest (vop)
-               (tn-ref-tn (sb!c::vop-results vop)))
+               (tn-ref-tn (sb-c::vop-results vop)))
              (load-tn (vop)
-               (tn-ref-load-tn (sb!c::vop-args vop)))
+               (tn-ref-load-tn (sb-c::vop-args vop)))
              (suitable-offsets-p (tn1 tn2)
                (and (= (abs (- (tn-offset tn1)
                                (tn-offset tn2)))
@@ -275,18 +275,18 @@
                       (inst ldp dest1 dest2
                             (@ fp (* (tn-offset source1) n-word-bytes)))
                       t))))
-      (case (sb!c::vop-name vop1)
+      (case (sb-c::vop-name vop1)
         (move
          (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)))
-        (sb!c::move-operand
-         (cond ((and (equal (sb!c::vop-codegen-info vop1)
-                            (sb!c::vop-codegen-info vop2))
-                     (memq (car (sb!c::vop-codegen-info vop1))
+        (sb-c::move-operand
+         (cond ((and (equal (sb-c::vop-codegen-info vop1)
+                            (sb-c::vop-codegen-info vop2))
+                     (memq (car (sb-c::vop-codegen-info vop1))
                            '(load-stack store-stack)))
                 (do-moves (source vop1) (source vop2) (dest vop1) (dest vop2)))))
         (move-arg
-         (let ((fp1 (tn-ref-tn (tn-ref-across (sb!c::vop-args vop1))))
-               (fp2 (tn-ref-tn (tn-ref-across (sb!c::vop-args vop2))))
+         (let ((fp1 (tn-ref-tn (tn-ref-across (sb-c::vop-args vop1))))
+               (fp2 (tn-ref-tn (tn-ref-across (sb-c::vop-args vop2))))
                (dest1 (dest vop1))
                (dest2 (dest vop2)))
            (when (eq fp1 fp2)
@@ -295,7 +295,7 @@
                         (stack-p dest2))
                    fp1
                    cfp-tn)
-               (tn-ref-load-tn (tn-ref-across (sb!c::vop-args vop1)))))))))))
+               (tn-ref-load-tn (tn-ref-across (sb-c::vop-args vop1)))))))))))
 
 
 ;;;; ILLEGAL-MOVE
@@ -338,7 +338,7 @@
   (:vop-var vop)
   (:note "constant load")
   (:generator 1
-    (cond ((sb!c::tn-leaf x)
+    (cond ((sb-c::tn-leaf x)
            (load-immediate-word y (tn-value x)))
           (t
            (load-constant vop x y)

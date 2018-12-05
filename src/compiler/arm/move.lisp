@@ -172,7 +172,7 @@
   (:vop-var vop)
   (:note "constant load")
   (:generator 1
-    (cond ((sb!c::tn-leaf x)
+    (cond ((sb-c::tn-leaf x)
            (load-immediate-word y (tn-value x)))
           (t
            (load-constant vop x y)

@@ -12,7 +12,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; We make a pass over the component's environments, assigning argument
 ;;; passing locations and return conventions and TNs for local variables.

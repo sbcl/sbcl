@@ -4,7 +4,7 @@
 ;;;; reachable blocks, and delete any unreferenced CLAMBDAs and
 ;;;; blocks.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; A CLAMBDA is deemed to be "externally referenced" if:
 ;;;   - It is of KIND :TOPLEVEL (a toplevel CLAMBDA).

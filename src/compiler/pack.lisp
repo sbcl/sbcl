@@ -955,7 +955,7 @@
 ;;;
 ;;; We return a conflicting TN if there is a conflict.
 (defun load-tn-offset-conflicts-in-sb (op sb offset)
-  (declare (type tn-ref op) (type sb!c::finite-sb-template sb) (type index offset))
+  (declare (type tn-ref op) (type sb-c::finite-sb-template sb) (type index offset))
   (aver (eq (sb-kind sb) :finite))
   (let ((vop (tn-ref-vop op)))
     (labels ((tn-overlaps (tn)

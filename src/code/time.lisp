@@ -465,9 +465,9 @@ EXPERIMENTAL: Interface subject to change."
     (setq old-real-time (get-internal-real-time))
     (let ((start-gc-internal-run-time *gc-run-time*)
           (*eval-calls* 0)
-          (sb!c::*lambda-conversions* 0)
+          (sb-c::*lambda-conversions* 0)
           (aborted t))
-      (declare (special *eval-calls* sb!c::*lambda-conversions*))
+      (declare (special *eval-calls* sb-c::*lambda-conversions*))
       (multiple-value-bind (h0 l0) (read-cycle-counter)
         (unwind-protect
              (multiple-value-prog1 (apply fun arguments)
@@ -494,7 +494,7 @@ EXPERIMENTAL: Interface subject to change."
                     ;; cycle counting isn't supported everywhere.
                     (when cycles
                       (note :processor-cycles cycles #'zerop))
-                    (note :lambdas-converted sb!c::*lambda-conversions* #'zerop)
+                    (note :lambdas-converted sb-c::*lambda-conversions* #'zerop)
                     (note :eval-calls *eval-calls* #'zerop)
                     (note :gc-run-time-ms gc-internal-run-time)
                     (note :system-run-time-us system-run-time)

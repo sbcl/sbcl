@@ -656,4 +656,4 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
 
 ;;; a convenient way to get into the assembly-level debugger
 (defun %halt ()
-  (%primitive sb!c:halt))
+  (%primitive sb-c:halt))

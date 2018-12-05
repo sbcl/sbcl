@@ -199,10 +199,10 @@
                                 (list (primitive-type-or-lose ',name)
                                       (sc-or-lose ',stack-sc)
                                       (lambda (node block fp value res)
-                                        (sb!c::vop ,ref node block
+                                        (sb-c::vop ,ref node block
                                                    fp value res))
                                       (lambda (node block fp new-val value)
-                                        (sb!c::vop ,set node block
+                                        (sb-c::vop ,set node block
                                                    fp new-val value)))))))))
     (foo (double-float double-stack
                        ancestor-frame-ref/double-float
@@ -298,7 +298,7 @@
 (defun default-unknown-values (vop values nvals node)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals))
-  (let ((type (sb!c::basic-combination-derived-type node)))
+  (let ((type (sb-c::basic-combination-derived-type node)))
     (cond
       ((<= nvals 1)
        (note-this-location vop :single-value-return)
@@ -505,7 +505,7 @@
 ;;; them.)
 (defun receive-unknown-values (args nargs start count node)
   (declare (type tn args nargs start count))
-  (let ((type (sb!c::basic-combination-derived-type node))
+  (let ((type (sb-c::basic-combination-derived-type node))
         (variable-values (gen-label))
         (stack-values (gen-label))
         (done (gen-label)))
@@ -558,13 +558,13 @@
 (defun check-ocfp-and-return-pc (old-fp return-pc)
   #+nil
   (format t "*known-return: old-fp ~S, tn-kind ~S; ~S ~S~%"
-          old-fp (tn-kind old-fp) (sb!c::tn-save-tn old-fp)
-          (tn-kind (sb!c::tn-save-tn old-fp)))
+          old-fp (tn-kind old-fp) (sb-c::tn-save-tn old-fp)
+          (tn-kind (sb-c::tn-save-tn old-fp)))
   #+nil
   (format t "*known-return: return-pc ~S, tn-kind ~S; ~S ~S~%"
           return-pc (tn-kind return-pc)
-          (sb!c::tn-save-tn return-pc)
-          (tn-kind (sb!c::tn-save-tn return-pc)))
+          (sb-c::tn-save-tn return-pc)
+          (tn-kind (sb-c::tn-save-tn return-pc)))
   (unless (and (sc-is old-fp control-stack)
                (= (tn-offset old-fp) ocfp-save-offset))
     (error "ocfp not on stack in standard save location?"))
@@ -1268,7 +1268,7 @@
     DONE))
 
 (define-vop (more-kw-arg)
-  (:translate sb!c::%more-kw-arg)
+  (:translate sb-c::%more-kw-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg immediate) :to (:result 1) :target keyword))
@@ -1288,7 +1288,7 @@
                                   :disp n-word-bytes))))))
 
 (define-vop (more-arg/c)
-  (:translate sb!c::%more-arg)
+  (:translate sb-c::%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:info index)
@@ -1300,7 +1300,7 @@
                                     :disp (- (* index n-word-bytes))))))
 
 (define-vop (more-arg)
-    (:translate sb!c::%more-arg)
+    (:translate sb-c::%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target value))
@@ -1374,7 +1374,7 @@
 ;;; below the current stack top.
 (define-vop (more-arg-context)
   (:policy :fast-safe)
-  (:translate sb!c::%more-arg-context)
+  (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg) :target count))
   (:arg-types positive-fixnum (:constant fixnum))
   (:info fixed)

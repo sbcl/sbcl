@@ -928,7 +928,7 @@
 
 ;; Specialised mask-signed-field VOPs.
 (define-vop (mask-signed-field-word/c)
-  (:translate sb!c::mask-signed-field)
+  (:translate sb-c::mask-signed-field)
   (:policy :fast-safe)
   (:args (x :scs (signed-reg unsigned-reg) :target r))
   (:arg-types (:constant (integer 0 64)) untagged-num)
@@ -943,7 +943,7 @@
            (inst sbfm r x 0 (1- width))))))
 
 (define-vop (mask-signed-field-bignum/c)
-  (:translate sb!c::mask-signed-field)
+  (:translate sb-c::mask-signed-field)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target r))
   (:arg-types (:constant (integer 0 64)) bignum)
@@ -956,7 +956,7 @@
     (inst sbfm r r 0 (1- width))))
 
 (define-vop (mask-signed-field-fixnum)
-  (:translate sb!c::mask-signed-field)
+  (:translate sb-c::mask-signed-field)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target r))
   (:arg-types (:constant (eql #.n-fixnum-bits)) t)

@@ -27,7 +27,7 @@
                        ;; Does DX actually help? INLINE should win anyway.
                        (dx-flet ((,wrapper (,@elements)
                                   (declare (optimize
-                                            (sb!c::check-tag-existence 0)))
+                                            (sb-c::check-tag-existence 0)))
                                   (let ((,value ,call-it))
                                     (,test ,value
                                       (return-from ,blockname
@@ -62,7 +62,7 @@
                 ;; compiler hacking right now, so I'll just work
                 ;; around the apparent problem by using a compiler
                 ;; macro instead. -- WHN 20000410
-                  (sb!c:define-source-transform ,name (pred &rest sequences)
+                  (sb-c:define-source-transform ,name (pred &rest sequences)
                     (expand pred sequences
                             ',found-test ',found-result ',unfound-result))
                   #-sb-xc-host ; don't redefine CL builtins!

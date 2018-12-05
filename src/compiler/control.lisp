@@ -16,7 +16,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Insert BLOCK in the emission order after the block AFTER.
 (defun add-to-emit-order (block after)

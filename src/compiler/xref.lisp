@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (declaim (type list *xref-kinds*))
 (defglobal *xref-kinds* '(:binds :calls :sets :references :macroexpands))

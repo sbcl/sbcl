@@ -79,7 +79,7 @@
   ;; extensions, so we can use something arbitrary.
   ".lisp-obj")
 (defvar *target-assem-obj-suffix*
-  ;; Target fasl files from SB!C:ASSEMBLE-FILE are LOADed via GENESIS.
+  ;; Target fasl files from SB-C:ASSEMBLE-FILE are LOADed via GENESIS.
   ;; The source files are compiled once as assembly files and once as
   ;; normal lisp files.  In the past, they were kept separate by
   ;; clever symlinking in the source tree, but that became less clean
@@ -612,7 +612,7 @@
 (defun target-compile-stem (stem flags)
   (funcall *in-target-compilation-mode-fn*
            (lambda ()
-             (progv (list (intern "*SOURCE-NAMESTRING*" "SB!C"))
+             (progv (list (intern "*SOURCE-NAMESTRING*" "SB-C"))
                     (list (lpnify-stem stem))
                (loop
                 (with-simple-restart (recompile "Recompile")

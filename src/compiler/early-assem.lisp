@@ -66,13 +66,13 @@
   (usedp nil :type boolean)) ; whether it was ever used as a branch target
 
 (defmethod print-object ((label label) stream)
-  (cond ((not (boundp 'sb!c::*compiler-ir-obj-map*))
+  (cond ((not (boundp 'sb-c::*compiler-ir-obj-map*))
          (print-unreadable-object (label stream :type t :identity t)))
         ((or *print-escape* *print-readably*)
          (print-unreadable-object (label stream :type t)
-           (prin1 (sb!c:label-id label) stream)))
+           (prin1 (sb-c:label-id label) stream)))
         (t
-         (format stream "L~D" (sb!c:label-id label)))))
+         (format stream "L~D" (sb-c:label-id label)))))
 
 ;;; Not only can DEFINE-ASSEMBLY-ROUTINE not work in the target,
 ;;; the cross-compiler never sees a DEFUN for any of the helper functions
@@ -85,9 +85,9 @@
       (if (atom name&options)
           (values name&options nil)
           (values (car name&options) (cdr name&options)))
-    (let ((regs (mapcar (lambda (var) (apply #'sb!c::parse-reg-spec var))
+    (let ((regs (mapcar (lambda (var) (apply #'sb-c::parse-reg-spec var))
                         vars)))
-      (declare (special sb!c::*emit-assembly-code-not-vops-p*))
-      (if sb!c::*emit-assembly-code-not-vops-p*
-          (sb!c::emit-assemble name options regs code)
-          (sb!c::emit-assemble-vop name options regs))))))
+      (declare (special sb-c::*emit-assembly-code-not-vops-p*))
+      (if sb-c::*emit-assembly-code-not-vops-p*
+          (sb-c::emit-assemble name options regs code)
+          (sb-c::emit-assemble-vop name options regs))))))

@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; This phase runs before IR2 conversion, initializing each XEP's
 ;;; ENTRY-INFO structure. We call the VM-supplied

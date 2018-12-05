@@ -92,7 +92,7 @@
            ;; slow, so if anyone cares about performance of
            ;; non-toplevel DEFSTRUCTs, it should be rewritten to be
            ;; cleverer. -- WHN 2002-10-23
-           (sb!c:compiler-notify
+           (sb-c:compiler-notify
             "implementation limitation: ~
              Non-toplevel DEFSTRUCT constructors are slow.")
            (with-unique-names (layout)
@@ -324,7 +324,7 @@
                ;; the definition the class.
                `((eval-when (:compile-toplevel :load-toplevel :execute)
                    (%defstruct-package-locks ',dd))))
-           (%defstruct ',dd ',inherits (sb!c:source-location))
+           (%defstruct ',dd ',inherits (sb-c:source-location))
            (eval-when (:compile-toplevel :load-toplevel :execute)
              (%compiler-defstruct ',dd ',inherits))
            ,@(when (eq expanding-into-code-for :target)
@@ -348,7 +348,7 @@
              (%proclaim-defstruct-ctors ',dd)
              (setf (info :typed-structure :info ',name) ',dd))
            (setf (info :source-location :typed-structure ',name)
-                 (sb!c:source-location))
+                 (sb-c:source-location))
            ,@(when (eq expanding-into-code-for :target)
                `(,@(typed-accessor-definitions dd)
                  ,@(typed-predicate-definitions dd)
@@ -399,7 +399,7 @@
   (multiple-value-bind (forms name)
       (!expander-for-defstruct
        (etypecase env
-         (sb!kernel:lexenv (sb!c::null-lexenv-p env))
+         (sb!kernel:lexenv (sb-c::null-lexenv-p env))
          ;; a LOCALLY environment would be fine,
          ;; but is not an important case to handle.
          #!+sb-fasteval (sb!interpreter:basic-env nil)
@@ -1207,7 +1207,7 @@ unless :NAMED is also specified.")))
 (defun %proclaim-defstruct-ctors (dd)
   (dolist (ctor (dd-constructors dd))
     (let ((ftype (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
-      (sb!c:proclaim-ftype (car ctor) dd ftype :declared))))
+      (sb-c:proclaim-ftype (car ctor) dd ftype :declared))))
 
 ;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
 ;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
@@ -1270,9 +1270,9 @@ unless :NAMED is also specified.")))
                            accessor-name
                            (dsd-name dsd))))))))
 
-    (awhen (remove-if-not #'sb!c::emitted-full-call-count fnames)
-      (sb!c:compiler-style-warn
-       'sb!c:inlining-dependency-failure
+    (awhen (remove-if-not #'sb-c::emitted-full-call-count fnames)
+      (sb-c:compiler-style-warn
+       'sb-c:inlining-dependency-failure
        ;; This message omits the http://en.wikipedia.org/wiki/Serial_comma
        :format-control "~@<Previously compiled call~P to ~
 ~{~/sb!ext:print-symbol-with-prefix/~^~#[~; and~:;,~] ~} ~
@@ -1754,7 +1754,7 @@ or they must be declared locally notinline at each call site.~@:>"
           (when rest (vars (car rest)))
           (setq keys (rewrite keys (key) parse-key-arg-spec))
           (dolist (arg (aux-vars)) (vars arg))))
-      `(,(sb!c::make-lambda-list
+      `(,(sb-c::make-lambda-list
           llks nil req opt rest keys
           ;; &AUX vars which do not initialize a slot are not mentioned
           ;; in the lambda list, though it's not clear what to do if
@@ -2152,10 +2152,10 @@ or they must be declared locally notinline at each call site.~@:>"
   ;  If the resulting CREATION-FORM and INIT-FORM are equivalent to those
   ;; returned from MAKE-LOAD-FORM-SAVING-SLOTS, return 'SB-FASL::FOP-STRUCT.
   ;; If the object can be ignored, return :IGNORE-IT and NIL.
-  (defun sb!c::%make-load-form (constant)
+  (defun sb-c::%make-load-form (constant)
     (multiple-value-bind (creation-form init-form)
         (handler-case (sb!xc:make-load-form constant (make-null-lexenv))
-          (error (condition) (sb!c:compiler-error condition)))
+          (error (condition) (sb-c:compiler-error condition)))
       (cond ((eq creation-form :ignore-it) (values :ignore-it nil))
             ((and (listp creation-form)
                   (typep constant 'structure-object)

@@ -400,7 +400,7 @@
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; layout for this type being used by the compiler
 (define-info-type (:type :compiler-layout)

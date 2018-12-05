@@ -47,7 +47,7 @@
       (declare (type bit-offset count))
       (if (zerop count)
           number
-          (ecase sb!c:*backend-byte-order*
+          (ecase sb-c:*backend-byte-order*
             (:big-endian
                (ash (ldb (byte (- sb-vm:n-word-bits count) 0) number) count))
             (:little-endian
@@ -63,7 +63,7 @@
       (declare (type bit-offset count))
       (if (zerop count)
           number
-          (ecase sb!c:*backend-byte-order*
+          (ecase sb-c:*backend-byte-order*
             (:big-endian
                (ash number (- count)))
             (:little-endian

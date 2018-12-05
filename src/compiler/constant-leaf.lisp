@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; This file was split out from 'node' because it contains a reference to
 ;;; an IR2 structure and has no explicit references from IR1 structures

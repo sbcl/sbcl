@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; SBCL has no proper byte compiler (having ditched the rather
 ;;; ambitious and slightly flaky byte compiler inherited from CMU CL)
@@ -190,7 +190,7 @@
                   (or (member function '(sb!impl::%defun
                                          sb!pcl::!trivial-defmethod
                                          sb!kernel::%defstruct))
-                      (and (eq function 'sb!c::%defconstant)
+                      (and (eq function 'sb-c::%defconstant)
                            ;; %DEFCONSTANT is fopcompilable only if the value
                            ;; is trivially a compile-time constant,
                            ;; and not, e.g. (COMPLICATED-FOLDABLE-EXPR),
@@ -383,7 +383,7 @@
                       ;; the function handle on the FOP stack.
                       ((function)
                        (fopcompile-function fasl (second form) path for-value-p))
-                      ;; KLUDGE! SB!C:SOURCE-LOCATION calls are normally handled
+                      ;; KLUDGE! SB-C:SOURCE-LOCATION calls are normally handled
                       ;; by a compiler-macro. But if SPACE > DEBUG we choose not
                       ;; to record locations, which is strange because the main
                       ;; compiler does not have similar logic afaict.

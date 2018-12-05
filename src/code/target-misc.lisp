@@ -167,7 +167,7 @@ the file system."
   (declare (type function def))
   ;; should've been checked by DEFMACRO DEFUN
   (aver (legal-fun-name-p name))
-  (sb!c:%compiler-defun name nil inline-lambda dxable-args)
+  (sb-c:%compiler-defun name nil inline-lambda dxable-args)
   (when (fboundp name)
     (warn 'redefinition-with-defun :name name :new-function def))
   (setf (fdefinition name) def)
@@ -175,11 +175,11 @@ the file system."
   ;; also checks package locks. By doing this here we let (SETF
   ;; FDEFINITION) do the load-time package lock checking before
   ;; we frob any existing inline expansions.
-  (sb!c::%set-inline-expansion name nil inline-lambda dxable-args)
-  (sb!c::note-name-defined name :function)
+  (sb-c::%set-inline-expansion name nil inline-lambda dxable-args)
+  (sb-c::note-name-defined name :function)
   name)
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (defun real-function-name (name)
   ;; Resolve the actual name of the function named by NAME

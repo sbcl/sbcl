@@ -438,7 +438,7 @@ distinct from the global value. Can also be SETF."
   (setq new-symbol (make-symbol (symbol-name symbol)))
   (when copy-props
     (%set-symbol-value new-symbol
-                       (%primitive sb!c:fast-symbol-value symbol))
+                       (%primitive sb-c:fast-symbol-value symbol))
     (setf (symbol-plist new-symbol)
           (copy-list (symbol-plist symbol)))
     (when (fboundp symbol)

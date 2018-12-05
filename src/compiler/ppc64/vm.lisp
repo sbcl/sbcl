@@ -342,12 +342,12 @@
       (immediate-constant "Immed"))))
 
 (defun combination-implementation-style (node)
-  (declare (type sb!c::combination node))
+  (declare (type sb-c::combination node))
   (flet ((valid-funtype (args result)
-           (sb!c::valid-fun-use node
-                                (sb!c::specifier-type
+           (sb-c::valid-fun-use node
+                                (sb-c::specifier-type
                                  `(function ,args ,result)))))
-    (case (sb!c::combination-fun-source-name node)
+    (case (sb-c::combination-fun-source-name node)
       (logtest
        (cond
          ((or (valid-funtype '(fixnum fixnum) '*)
@@ -371,10 +371,10 @@
                                       ,type)
                                     'fixnum)
                      (destructuring-bind (size posn integer)
-                         (sb!c::basic-combination-args node)
+                         (sb-c::basic-combination-args node)
                        (declare (ignore integer))
-                       (<= (+ (sb!c::lvar-value size)
-                              (sb!c::lvar-value posn))
+                       (<= (+ (sb-c::lvar-value size)
+                              (sb-c::lvar-value posn))
                            width)))))
          (if (or (validp 'fixnum 29)
                  (validp '(signed-byte 32) 32)

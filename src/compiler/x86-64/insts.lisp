@@ -92,7 +92,7 @@
     ;; Alternatively, the lower bound #xFFFFFFFF80000000 could
     ;; be spelled as (MASK-FIELD (BYTE 33 31) -1)
     ((integer #.(- (expt 2 64) (expt 2 31)) #.most-positive-word)
-     (sb!c::mask-signed-field 32 imm))
+     (sb-c::mask-signed-field 32 imm))
     (t nil)))
 ;;; Like above but for 8 bit signed immediate operands. In this case we need
 ;;; to know the operand size, because, for example #xffcf is a signed imm8
@@ -110,7 +110,7 @@
          (when (case operand-size
                  (:word (typep imm '(integer #xFF80 #xFFFF)))
                  (:dword (typep imm '(integer #xFFFFFF80 #xFFFFFFFF))))
-           (sb!c::mask-signed-field 8 imm)))))
+           (sb-c::mask-signed-field 8 imm)))))
 
 ;;;; disassembler argument types
 
@@ -1393,7 +1393,7 @@
 (defun operand-size (thing)
   (typecase thing
     (tn
-     (or (sb!c:sc-operand-size (tn-sc thing))
+     (or (sb-c:sc-operand-size (tn-sc thing))
          (error "can't tell the size of ~S" thing)))
     (reg
      (let ((id (reg-id thing)))
@@ -3447,7 +3447,7 @@
        (label+addend
         (setf (label-usedp (label+addend-label disp)) t))))))
 
-(defun sb!c::branch-opcode-p (mnemonic)
+(defun sb-c::branch-opcode-p (mnemonic)
   (member mnemonic (load-time-value
                     (mapcar #'sb!assem::op-encoder-name
                             '(call ret jmp jrcxz break int iret
@@ -3457,7 +3457,7 @@
 
 ;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
-(defun sb!c::replace-coverage-instruction (inst-buffer inst-index label offset)
+(defun sb-c::replace-coverage-instruction (inst-buffer inst-index label offset)
   (setf (svref inst-buffer inst-index)
         `(mov :byte ,(rip-relative-ea label offset) 1)))
 

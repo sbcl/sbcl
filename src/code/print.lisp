@@ -1631,10 +1631,10 @@ variable: an unreadable object representing the error is printed instead.")
                (when fun-name
                  (write-char #\Space stream)
                  (write fun-name :stream stream))
-               (cond ((not (typep dinfo 'sb!c::debug-info)))
-                     ((neq (sb!c::debug-info-name dinfo) fun-name)
+               (cond ((not (typep dinfo 'sb-c::debug-info)))
+                     ((neq (sb-c::debug-info-name dinfo) fun-name)
                       (write-string ", " stream)
-                      (output-object (sb!c::debug-info-name dinfo) stream)))))))))
+                      (output-object (sb-c::debug-info-name dinfo) stream)))))))))
 
 #!-(or x86 x86-64)
 (defmethod print-object ((lra lra) stream)

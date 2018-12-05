@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
 ;;; order to avoid boxing.
@@ -69,7 +69,7 @@
            (floor length sb-vm:n-word-bits)
          (flet ((mix-into-result (num)
                   (mixf result
-                        ,(ecase sb!c:*backend-byte-order*
+                        ,(ecase sb-c:*backend-byte-order*
                                 (:little-endian
                                  '(logand num most-positive-fixnum))
                                 ;; FIXME: I'm not certain that
@@ -89,7 +89,7 @@
                result
                (mix-into-result
                 (logand (ash (1- (ash 1 n-bits-remaining))
-                             ,(ecase sb!c:*backend-byte-order*
+                             ,(ecase sb-c:*backend-byte-order*
                                      (:little-endian 0)
                                      (:big-endian
                                       '(- sb-vm:n-word-bits

@@ -1504,7 +1504,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
   (when (and (typep string 'sb!kernel:simple-character-string)
              (eq (string-output-stream-element-type stream) 'base-char))
     (do ((i (1- end) (1- i))) ((< i start))
-      (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+      (declare (optimize (sb-c::insert-array-bounds-checks 0)))
       (the base-char (char string i))))
   (let* ((full-length (- end start))
          (length full-length)
@@ -1707,7 +1707,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     result))
 
 (defun finite-base-string-ouch (stream character)
-  (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
   (let ((pointer (finite-base-string-output-stream-pointer stream))
         (buffer (finite-base-string-output-stream-buffer stream)))
     (cond ((= pointer (length buffer))

@@ -52,8 +52,8 @@
   (fill (symbol-value 'sb!impl::*info-types*) nil)
   (clrhash (symbol-value 'sb!kernel::*forward-referenced-layouts*))
   (setf (symbol-value 'sb!kernel:*type-system-initialized*) nil)
-  (makunbound 'sb!c::*backend-primitive-type-names*)
-  (makunbound 'sb!c::*backend-primitive-type-aliases*)
+  (makunbound 'sb-c::*backend-primitive-type-names*)
+  (makunbound 'sb-c::*backend-primitive-type-aliases*)
 
   (format t "~&; Parallel build: Reloading compilation artifacts~%")
   ;; Now it works to load fasls.
@@ -74,7 +74,7 @@
   ;; used only in cross-compilation.
   ;;
   ;; Note that files which are marked :ASSEM, to cause them to be
-  ;; processed with SB!C:ASSEMBLE-FILE when we're running under the
+  ;; processed with SB-C:ASSEMBLE-FILE when we're running under the
   ;; cross-compiler or the target lisp, are still processed here, just
   ;; with the ordinary Lisp compiler, and this is intentional, in
   ;; order to make the compiler aware of the definitions of assembly

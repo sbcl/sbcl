@@ -12,7 +12,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;;; cost estimation
 
@@ -346,7 +346,7 @@
                    (remove-if (lambda (spec)
                                 (or (stringp spec)
                                     (typep spec '(cons (eql or)))))
-                              sb!c:+backend-internal-errors+
+                              sb-c:+backend-internal-errors+
                               :key #'car)))
            ;; This is effectively a compact read-only binned hashtable.
            (hashtable (make-array (logior (length entries) 1)
@@ -366,7 +366,7 @@
                    (cadr entry)))
            (remove-if-not (lambda (spec)
                             (typep spec '(cons (eql or))))
-                          sb!c:+backend-internal-errors+
+                          sb-c:+backend-internal-errors+
                           :key #'car)))
 (declaim (simple-vector **type-spec-unions-interr-symbols**))
 

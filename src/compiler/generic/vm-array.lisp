@@ -191,7 +191,7 @@
                 :key #'sb-vm:saetp-specifier :test #'equal)
       (error "No saetp for ~S" element-type)))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (defun find-saetp (element-type)
   (find element-type sb-vm:*specialized-array-element-type-properties*

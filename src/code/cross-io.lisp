@@ -39,7 +39,7 @@
              `(defun ,name (&rest args)
                 (declare (ignore args))
                 (error "stub called"))))
-  (def-stub sb!c::make-form-tracking-stream-observer)
+  (def-stub sb-c::make-form-tracking-stream-observer)
   (def-stub form-tracking-stream-form-start-char-pos)
   (def-stub form-tracking-stream-form-start-byte-pos)
   (def-stub line/col-from-charpos)

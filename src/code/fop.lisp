@@ -11,7 +11,7 @@
   `(macrolet ((fop-stack-ref (i)
                 `(locally
                      #-sb-xc-host
-                     (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                     (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                    (svref ,',stack-var (truly-the index ,i)))))
      (let* (,@(when stack-expr
                 (list `(,stack-var (the simple-vector ,stack-expr))))
@@ -554,9 +554,9 @@
     (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
       (let* ((debug-info-index (+ ptr n-constants))
              (n-boxed-words (+ sb-vm:code-constants-offset n-constants))
-             (code (sb!c:allocate-code-object
+             (code (sb-c:allocate-code-object
                     (if (eql immobile-p 1) :immobile :dynamic)
-                    (align-up n-boxed-words sb!c::code-boxed-words-align)
+                    (align-up n-boxed-words sb-c::code-boxed-words-align)
                     n-code-bytes)))
         (setf (%code-debug-info code) (svref stack debug-info-index))
         (loop for i of-type index from sb-vm:code-constants-offset
@@ -564,10 +564,10 @@
               do (setf (code-header-ref code i) (svref stack j)))
         (with-pinned-objects (code)
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
-          (sb!c::apply-fasl-fixups stack code))
+          (sb-c::apply-fasl-fixups stack code))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
-                     '(cons (eql sb!c::coverage-map)))
+                     '(cons (eql sb-c::coverage-map)))
           ;; Record this in the global list of coverage-instrumented code.
           (atomic-push (make-weak-pointer code) (cdr *code-coverage-info*)))
         code))))
@@ -669,10 +669,10 @@
         (#x6d structure-object)
         (#x6e condition)
         (#x6f definition-source-location)
-        (#x70 sb!c::debug-fun)
-        (#x71 sb!c::compiled-debug-fun)
-        (#x72 sb!c::debug-info)
-        (#x73 sb!c::compiled-debug-info)
-        (#x74 sb!c::debug-source)
+        (#x70 sb-c::debug-fun)
+        (#x71 sb-c::compiled-debug-fun)
+        (#x72 sb-c::debug-info)
+        (#x73 sb-c::compiled-debug-info)
+        (#x74 sb-c::debug-source)
         (#x75 defstruct-description)
         (#x76 defstruct-slot-description)))

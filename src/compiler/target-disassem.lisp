@@ -516,7 +516,7 @@
     (if arg
         (setf (dstate-filtered-arg-pool-free dstate) (filtered-arg-next arg))
         (setf arg (funcall constructor)))
-    (sb!c::push-in filtered-arg-next arg (dstate-filtered-arg-pool-in-use dstate))
+    (sb-c::push-in filtered-arg-next arg (dstate-filtered-arg-pool-in-use dstate))
     arg))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
@@ -631,7 +631,7 @@
                                         :trailing-space nil))
 
                           (dolist (item (inst-prefilters inst))
-                            (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                            (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                             ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
                             (flet ((extract-byte (spec-index)
                                      (let* ((byte-spec (svref item spec-index))
@@ -696,7 +696,7 @@
         (let ((arg (dstate-filtered-arg-pool-in-use dstate)))
           (loop (unless arg (return))
                 (let ((saved-next (filtered-arg-next arg)))
-                  (sb!c::push-in filtered-arg-next arg
+                  (sb-c::push-in filtered-arg-next arg
                                  (dstate-filtered-arg-pool-free dstate))
                   (setq arg saved-next))))
         (setf (dstate-filtered-arg-pool-in-use dstate) nil)
@@ -738,7 +738,7 @@
     (map-segment-instructions
      (lambda (chunk inst)
        (declare (type dchunk chunk) (type instruction inst))
-       (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+       (declare (optimize (sb-c::insert-array-bounds-checks 0)))
        (loop with list = (inst-labeller inst)
              while list
              ;; item = #(FUNCTION PREFILTERED-VALUE-INDEX)
@@ -1196,7 +1196,7 @@
 
 (defun code-fun-map (code)
   (declare (type code-component code))
-  (sb!c::compiled-debug-info-fun-map (%code-debug-info code)))
+  (sb-c::compiled-debug-info-fun-map (%code-debug-info code)))
 
 ;;; Assuming that CODE-OBJ is pinned, return true if ADDR is anywhere
 ;;; between the tagged pointer and the first occuring simple-fun.
@@ -1265,7 +1265,7 @@
 ;;; variable mappings from DEBUG-FUN.
 (defun storage-info-for-debug-fun (debug-fun)
   (declare (type debug-fun debug-fun))
-  (let ((sc-vec sb!c::*backend-sc-numbers*)
+  (let ((sc-vec sb-c::*backend-sc-numbers*)
         (groups nil)
         (debug-vars (sb!di::debug-fun-debug-vars debug-fun)))
     (and debug-vars
@@ -1279,12 +1279,12 @@
              (let* ((sc+offset
                      (sb!di::compiled-debug-var-sc+offset debug-var))
                     (sb-name
-                     (sb!c:sb-name
-                      (sb!c:sc-sb (aref sc-vec
-                                        (sb!c:sc+offset-scn sc+offset))))))
+                     (sb-c:sb-name
+                      (sb-c:sc-sb (aref sc-vec
+                                        (sb-c:sc+offset-scn sc+offset))))))
                #+nil
                (format t ";;; SET: ~S[~W]~%"
-                       sb-name (sb!c:sc+offset-offset sc+offset))
+                       sb-name (sb-c:sc+offset-offset sc+offset))
                (unless (null sb-name)
                  (let ((group (cdr (assoc sb-name groups))))
                    (when (null group)
@@ -1292,7 +1292,7 @@
                      (push `(,sb-name . ,group) groups))
                    (let* ((locations (location-group-locations group))
                           (length (length locations))
-                          (offset (sb!c:sc+offset-offset sc+offset)))
+                          (offset (sb-c:sc+offset-offset sc+offset)))
                      (when (>= offset length)
                        (setf locations (adjust-array locations
                                                      (max (* 2 length) (1+ offset)))
@@ -1452,14 +1452,14 @@
                           last-debug-fun)
                  (setf last-debug-fun nil))
                (setf last-offset fmap-entry))
-              (sb!c::compiled-debug-fun
-               (let ((name (sb!c::compiled-debug-fun-name fmap-entry))
-                     (kind (sb!c::compiled-debug-fun-kind fmap-entry)))
+              (sb-c::compiled-debug-fun
+               (let ((name (sb-c::compiled-debug-fun-name fmap-entry))
+                     (kind (sb-c::compiled-debug-fun-kind fmap-entry)))
                  #+nil
                  (format t ";;; SAW ~S ~S ~S,~S ~W,~W~%"
                          name kind first-block-seen-p nil-block-seen-p
                          last-offset
-                         (sb!c::compiled-debug-fun-start-pc fmap-entry))
+                         (sb-c::compiled-debug-fun-start-pc fmap-entry))
                  (cond (#+nil (eq last-offset fun-offset)
                         (and (equal name fname)
                              (null kind)
@@ -1497,7 +1497,7 @@
   (declare (type code-component code)
            (type offset start-offset)
            (type disassem-length length))
-  (unless (sb!c::compiled-debug-info-p (%code-debug-info code))
+  (unless (sb-c::compiled-debug-info-p (%code-debug-info code))
     (return-from get-code-segments
       (list (make-code-segment code start-offset length))))
   (let ((segments nil)
@@ -1524,7 +1524,7 @@
                        last-debug-fun)
               (setf last-debug-fun nil)
               (setf last-offset fun-map-entry))
-             (sb!c::compiled-debug-fun
+             (sb-c::compiled-debug-fun
               (setf last-debug-fun
                     (sb!di::make-compiled-debug-fun fun-map-entry code)))))
           (when last-debug-fun
@@ -1871,7 +1871,7 @@
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint
     (setf (gethash (+ sb-vm:gc-safepoint-page-addr
-                      sb!c:+backend-page-bytes+
+                      sb-c:+backend-page-bytes+
                       (- sb-vm:gc-safepoint-trap-offset)) addr->name)
           "safepoint"))
   (let ((found (gethash address addr->name)))
@@ -2109,16 +2109,16 @@
     (note (lambda (s) (prin1 symbol s)) dstate)))
 
 (defun get-internal-error-name (errnum)
-  (cadr (svref sb!c:+backend-internal-errors+ errnum)))
+  (cadr (svref sb-c:+backend-internal-errors+ errnum)))
 
 (defun get-random-tn-name (sc+offset)
-  (let ((sc (sb!c:sc+offset-scn sc+offset))
-        (offset (sb!c:sc+offset-offset sc+offset)))
+  (let ((sc (sb-c:sc+offset-scn sc+offset))
+        (offset (sb-c:sc+offset-offset sc+offset)))
     (if (= sc sb-vm:immediate-sc-number)
         (princ-to-string offset)
-        (sb!c:location-print-name
-         (sb!c:make-random-tn :kind :normal
-                              :sc (svref sb!c:*backend-sc-numbers* sc)
+        (sb-c:location-print-name
+         (sb-c:make-random-tn :kind :normal
+                              :sc (svref sb-c:*backend-sc-numbers* sc)
                               :offset offset)))))
 
 ;;; When called from an error break instruction's :DISASSEM-CONTROL (or
@@ -2165,9 +2165,9 @@
          (emit-note (symbol-name (get-internal-error-name errnum)))
          (dolist (sc+offset sc+offsets)
            (emit-err-arg)
-           (if (= (sb!c:sc+offset-scn sc+offset)
+           (if (= (sb-c:sc+offset-scn sc+offset)
                   sb-vm:constant-sc-number)
-               (note-code-constant (* (1- (sb!c:sc+offset-offset sc+offset))
+               (note-code-constant (* (1- (sb-c:sc+offset-offset sc+offset))
                                       sb-vm:n-word-bytes)
                                    dstate)
                (emit-note (get-random-tn-name sc+offset))))))
@@ -2191,7 +2191,7 @@
     (declare (type system-area-pointer sap)
              (type (unsigned-byte 8) length))
     (cond (length-only
-           (loop repeat length do (sb!c:sap-read-var-integerf sap index))
+           (loop repeat length do (sb-c:sap-read-var-integerf sap index))
            (values 0 (- index offset) nil nil error-byte))
           (t
            (collect ((sc+offsets)
@@ -2200,7 +2200,7 @@
                (lengths 1)) ;; error-number
              (loop repeat length do
                    (let ((old-index index))
-                     (sc+offsets (sb!c:sap-read-var-integerf sap index))
+                     (sc+offsets (sb-c:sap-read-var-integerf sap index))
                      (lengths (- index old-index))))
              (values error-number
                      (- index offset)

@@ -141,9 +141,9 @@
 
 (deftransform %compare-and-swap-symbol-value ((symbol old new)
                                               ((constant-arg symbol) t t))
-  (if (eq (info :variable :kind (sb!c::lvar-value symbol)) :global)
+  (if (eq (info :variable :kind (sb-c::lvar-value symbol)) :global)
       `(%cas-symbol-global-value symbol old new)
-      (sb!c::give-up-ir1-transform)))
+      (sb-c::give-up-ir1-transform)))
 
 (macrolet (;; Logic common to thread-aware SET and CAS. CELL is assigned
            ;; to the location that should be accessed to modify SYMBOL's
@@ -430,7 +430,7 @@
   (:generator 38
     #!+immobile-code
     (let ((tramp (make-fixup 'undefined-fdefn :assembly-routine)))
-     (if (sb!c::code-immobile-p vop)
+     (if (sb-c::code-immobile-p vop)
          (inst lea temp (ea tramp rip-tn))
          (inst mov temp tramp))
      ;; Compute displacement from the call site

@@ -29,8 +29,8 @@
            (slot-info (structure-instance-accessor-p fun)))
       (when (and slot-info (not (dsd-read-only (cdr slot-info))))
         (dx-let ((setter `(setf ,fun)))
-          (when (and (not (sb!c::fun-locally-defined-p setter env))
-                     (not (sb!c::fun-lexically-notinline-p setter env)))
+          (when (and (not (sb-c::fun-locally-defined-p setter env))
+                     (not (sb-c::fun-lexically-notinline-p setter env)))
             slot-info)))))) ; caller needs the (DD . DSD) pair
 
 ;;; The inverse for a generalized-variable reference function is stored in
@@ -75,7 +75,7 @@
                   (values nil nil vals `(setq ,form ,(car vals)) form))))
           (let ((fname (car form)))
             ;; Local functions inhibit global SETF methods.
-            (unless (sb!c::fun-locally-defined-p fname environment)
+            (unless (sb-c::fun-locally-defined-p fname environment)
               (awhen (info :setf :expander fname)
                 (return-from retry
                   (typecase it
@@ -166,14 +166,14 @@
       (return-from setf nil))
     (destructuring-bind (place value-form . more) args
       (when more
-        (return-from setf `(progn ,@(sb!c::explode-setq form 'error))))
+        (return-from setf `(progn ,@(sb-c::explode-setq form 'error))))
       (when (atom (setq place (macroexpand-for-setf place env)))
         (return-from setf `(setq ,place ,value-form)))
 
       (let ((fun (car place)))
         (when (and (symbolp fun)
                    ;; Local definition of FUN precludes global knowledge.
-                   (not (sb!c::fun-locally-defined-p fun env)))
+                   (not (sb-c::fun-locally-defined-p fun env)))
           (let ((inverse (info :setf :expander fun)))
             ;; NIL is not a valid setf inverse name, for two reasons:
             ;;  1. you can't define a function named NIL,
@@ -307,7 +307,7 @@
   the list. Keyword arguments are accepted as per the ADJOIN function."
   ;; Can't specify the actual keywords above since, apparently,
   ;; non-constant keywords should be accepted.
-  (declare (sb!c::lambda-list (obj place &key key test test-not)))
+  (declare (sb-c::lambda-list (obj place &key key test test-not)))
   ;; Passing AFTER-ARGS-BINDP = NIL causes the forms subsequent to PLACE
   ;; to be inserted literally as-is, giving the (apparently) desired behavior
   ;; of *not* evaluating them before the Read/Modify/Write of PLACE, which
@@ -488,7 +488,7 @@
                       (cons ,(length stores)
                             (named-lambda (%defsetf ,access-fn)
                                           (,subforms ,env-var ,@stores)
-                              (declare (sb!c::lambda-list ,lambda-list))
+                              (declare (sb-c::lambda-list ,lambda-list))
                               ,@(if outer-decls (list outer-decls))
                               ,@(unless env `((declare (ignore ,env-var))))
                               (apply (lambda ,lambda-list

@@ -18,7 +18,7 @@
        ;; NB: It does not in general work to set the lambda-list of a closure,
        ;; but all constant-type-expanders have NIL as the lambda-list
        ;; because if they didn't, they wouldn't be constant.
-       (declare (sb!c::lambda-list ()))
+       (declare (sb-c::lambda-list ()))
        (if (cdr whole)
            (error 'sb!kernel::arg-count-error
                   :kind 'deftype :name (car whole) :args (cdr whole)
@@ -57,7 +57,7 @@
                 #-sb-xc-host
                 (check-deprecated-type (constant-form-value it))
                 (values `(constant-type-expander ',name ,it) doc
-                        '(sb!c:source-location)))
+                        '(sb-c:source-location)))
                (t
                 ;; FIXME: it seems non-ANSI-compliant to pretend every lexenv
                 ;; is nil. See also lp#309140.

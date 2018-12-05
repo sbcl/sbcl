@@ -39,7 +39,7 @@
               (sb!xc:proclaim `(ftype ,(type-specifier type) ,name)))
              (class
               (when (eq (info :function :where-from name) :assumed)
-                (sb!c:proclaim-ftype name type nil :defined))))))
+                (sb-c:proclaim-ftype name type nil :defined))))))
 
     (defun preinform-compiler-about-accessors (kind readers writers)
       (flet ((inform (names type)

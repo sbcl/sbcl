@@ -128,9 +128,9 @@
 
 
 (deftransform %alien-funcall ((function type &rest args) * * :node node)
-  (aver (sb!c::constant-lvar-p type))
-  (let* ((type (sb!c::lvar-value type))
-         (env (sb!c::node-lexenv node))
+  (aver (sb-c::constant-lvar-p type))
+  (let* ((type (sb-c::lvar-value type))
+         (env (sb-c::node-lexenv node))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -181,7 +181,7 @@
                                        :arg-types (new-arg-types)
                                        :result-type result-type)
                                     ,@(new-args))))))
-        (sb!c::give-up-ir1-transform))))
+        (sb-c::give-up-ir1-transform))))
 
 ;;; The ABI is vague about how signed sub-word integer return values
 ;;; are handled, but since gcc versions >=4.3 no longer do sign
@@ -329,7 +329,7 @@
 (define-vop (set-fpu-word-for-c)
   (:node-var node)
   (:generator 0
-    (when (policy node (= sb!c::float-accuracy 3))
+    (when (policy node (= sb-c::float-accuracy 3))
       (inst sub esp-tn 4)
       (inst fnstcw (make-ea :word :base esp-tn))
       (inst wait)
@@ -340,7 +340,7 @@
 (define-vop (set-fpu-word-for-lisp)
   (:node-var node)
   (:generator 0
-    (when (policy node (= sb!c::float-accuracy 3))
+    (when (policy node (= sb-c::float-accuracy 3))
       (inst fnstcw (make-ea :word :base esp-tn))
       (inst wait)
       (inst and (make-ea :word :base esp-tn) #xfeff)

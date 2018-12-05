@@ -94,7 +94,7 @@ which can be found at <http://sbcl.sourceforge.net/>.~:@>"
 (deftype package-locked-error () nil)
 (deftype symbol-package-locked-error () nil)
 
-(define-condition sb!c:inlining-dependency-failure
+(define-condition sb-c:inlining-dependency-failure
     ;; By inheriting from WARNING, not STYLE-WARNING,
     ;; we hold ourselves to a higher standard.
     (simple-warning) ())

@@ -16,7 +16,7 @@
 ;;;; probably be good to rename this file to "call-type.lisp" or
 ;;;; "ir1-type.lisp" or something.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (declaim (type (or function null) *lossage-fun* *unwinnage-fun* *ctype-test-fun*))
 

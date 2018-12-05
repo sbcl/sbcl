@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; the largest number of TNs whose liveness changes that we can have
 ;;; in any block
@@ -1064,7 +1064,7 @@
 
 (declaim (freeze-type tn))
 (defmethod print-object ((tn tn) stream)
-  (cond ((not (boundp 'sb!c::*compiler-ir-obj-map*))
+  (cond ((not (boundp 'sb-c::*compiler-ir-obj-map*))
          (print-unreadable-object (tn stream :type t :identity t)))
         (t
          (print-unreadable-object (tn stream :type t)

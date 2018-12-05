@@ -54,7 +54,7 @@
             (declare (inline (setf slot-value)))
             (block ,name ,@forms))))
       ;; Why is SOURCE-LOC needed? Lambdas should know their location.
-      (sb!c::source-location))))
+      (sb-c::source-location))))
 
 (defvar *!trivial-methods* '()) ; necessary methods for system startup
 (defvar *!documentation-methods* nil) ; saved up for after PCL bootstrap

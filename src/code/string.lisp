@@ -131,7 +131,7 @@
                        (scale (index)
                          `(truly-the sb-vm:signed-word
                            (ash (truly-the index ,index) char-shift))))
-              (declare (optimize (sb!c:alien-funcall-saves-fp-and-pc 0)))
+              (declare (optimize (sb-c:alien-funcall-saves-fp-and-pc 0)))
               (with-pinned-objects (string1 string2)
                 (zerop (alien-funcall
                         (extern-alien "memcmp"
@@ -143,7 +143,7 @@
                `(return-from string=*
                   (let ((string1 (truly-the (simple-array ,type1 1) string1))
                         (string2 (truly-the (simple-array ,type2 1) string2)))
-                    (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                    (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                     (do ((index1 start1 (1+ index1))
                          (index2 start2 (1+ index2)))
                         ((>= index1 end1) t)

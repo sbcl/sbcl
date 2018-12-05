@@ -19,7 +19,7 @@
     (declare (ignore env)) ; could be policy-sensitive (but isn't)
     "Bind the variables in LAMBDA-LIST to the corresponding values in the
 tree structure resulting from the evaluation of EXPRESSION."
-    `(binding* ,(sb!c::expand-ds-bind lambda-list expression t nil)
+    `(binding* ,(sb-c::expand-ds-bind lambda-list expression t nil)
        ,@body))
 
   (let ()
@@ -29,7 +29,7 @@ tree structure resulting from the evaluation of EXPRESSION."
     (sb!xc:defmacro named-ds-bind (name lambda-list expression &body body
                                         &environment env)
       (declare (ignore env)) ; could be policy-sensitive (but isn't)
-      `(binding* ,(sb!c::expand-ds-bind lambda-list expression t nil name
+      `(binding* ,(sb-c::expand-ds-bind lambda-list expression t nil name
                                         (and (eq (car name) :macro)
                                              (eq (cddr name) 'deftype)
                                              ''*))

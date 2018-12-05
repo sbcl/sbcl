@@ -21,7 +21,7 @@
                        (:copier nil))
   (declarations (missing-arg) :type list :read-only t) ; in their original form
   ;; lexical policy. Don't read directly. Use ENV-POLICY instead.
-  (%policy nil :type sb!c::policy :read-only t)
+  (%policy nil :type sb-c::policy :read-only t)
 
   ;; A vector parallel to the bound symbols in a LET or LAMBDA frame.
   (binding-typechecks +none+ :type value-vector)
@@ -57,7 +57,7 @@
 ;; a lexical (static) aspect that can be moved into the 'decl-scope' object.
 (defstruct (basic-env ; 6 words incl. header word.
              (:conc-name env-)
-             (:include sb!c::abstract-lexenv)
+             (:include sb-c::abstract-lexenv)
              (:constructor make-basic-env (parent payload symbols contour))
              ;(:predicate nil)
              (:copier nil))

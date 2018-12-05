@@ -83,14 +83,14 @@
     (if (eq sub-accessor 'nthcdr) ; random N
         (lambda (access-form env)
           (declare (ignore env))
-          (declare (sb!c::lambda-list (n list)))
+          (declare (sb-c::lambda-list (n list)))
           (destructuring-bind (n list) (cdr access-form) ; for effect
             (declare (ignore n list)))
           (expand '(nthcdr) access-form))
         ;; NTHCDR of fixed N, or CxxxxR composition
         (lambda (access-form env)
           (declare (ignore env))
-          (declare (sb!c::lambda-list (list)))
+          (declare (sb-c::lambda-list (list)))
           (destructuring-bind (list) (cdr access-form) ; for effect
             (declare (ignore list)))
           (expand sub-accessor access-form))))))
@@ -359,8 +359,8 @@ with bits from the corresponding position in the new value.")
 (export '(0-arg-nil 1-arg-nil 2-arg-nil 3-arg-nil n-arg-nil
           1-arg-t n-arg-t)
         "SB-IMPL") ; export to prevent death by tree-shaker
-(defun n-arg-nil () (declare (optimize (sb!c::verify-arg-count 0))) nil)
-(defun n-arg-t   () (declare (optimize (sb!c::verify-arg-count 0))) t)
+(defun n-arg-nil () (declare (optimize (sb-c::verify-arg-count 0))) nil)
+(defun n-arg-t   () (declare (optimize (sb-c::verify-arg-count 0))) t)
 (defun 0-arg-nil () nil)
 (defun 1-arg-nil (a) (declare (ignore a)) nil)
 (defun 1-arg-t   (a) (declare (ignore a)) t)

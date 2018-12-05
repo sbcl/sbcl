@@ -26,9 +26,9 @@
 ;;; may then have to wade through some irrelevant warnings).
 (declaim (declaration inhibit-warnings))
 
-;;; SB!C::LAMBDA-LIST declarations can be ignored.
+;;; SB-C::LAMBDA-LIST declarations can be ignored.
 ;;; Cross-compilation does not rely on introspection for anything.
-(declaim (declaration sb!c::lambda-list))
+(declaim (declaration sb-c::lambda-list))
 
 (declaim (declaration explicit-check always-bound))
 

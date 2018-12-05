@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; We turn IDENTITY into PROG1 so that it is obvious that it just
 ;;; returns the first value of its argument. Ditto for VALUES with one

@@ -1578,8 +1578,8 @@
             (push variable ignore))
           (push (list variable value) bind)))))
 
-  (sb!c:define-source-transform write (object &rest keys)
+  (sb-c:define-source-transform write (object &rest keys)
     (expand 'write object keys))
 
-  (sb!c:define-source-transform write-to-string (object &rest keys)
+  (sb-c:define-source-transform write-to-string (object &rest keys)
     (expand 'write-to-string object keys)))

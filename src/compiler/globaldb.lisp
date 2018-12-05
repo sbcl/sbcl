@@ -333,11 +333,11 @@
 ;;; If only (B) is stored, then this is a DXABLE-ARGS.
 ;;; If both, this is an INLINING-DATA.
 (define-info-type (:function :inlining-data)
-    :type-spec (or list sb!c::dxable-args sb!c::inlining-data))
+    :type-spec (or list sb-c::dxable-args sb-c::inlining-data))
 
 ;;; This specifies whether this function may be expanded inline. If
 ;;; null, we don't care.
-(define-info-type (:function :inlinep) :type-spec sb!c::inlinep)
+(define-info-type (:function :inlinep) :type-spec sb-c::inlinep)
 
 ;;; Track how many times IR2 converted a call to this function as a full call
 ;;; that was not in the scope of a local or global notinline declaration.
@@ -372,7 +372,7 @@
 
 ;;; If a function is "known" to the compiler, then this is a FUN-INFO
 ;;; structure containing the info used to special-case compilation.
-(define-info-type (:function :info) :type-spec (or sb!c::fun-info null))
+(define-info-type (:function :info) :type-spec (or sb-c::fun-info null))
 
 ;;; This is a type specifier <t> such that if an argument X to the function
 ;;; does not satisfy (TYPEP x <t>) then the function definitely returns NIL.

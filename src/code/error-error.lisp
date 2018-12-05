@@ -21,7 +21,7 @@
   (let ((*error-error-depth* (1+ *error-error-depth*)))
     (when (> *error-error-depth* 4)
       (/show0 "*ERROR-ERROR-DEPTH* too big, trying HALT")
-      (%primitive sb!c:halt)
+      (%primitive sb-c:halt)
       (/show0 "*ERROR-ERROR-DEPTH* too big, trying THROW")
       (throw 'toplevel-catcher nil))
     ;; We can be somewhat more relaxed now, the above will save us.
@@ -70,6 +70,6 @@
             (t
              (safely-print "Will try to halt this thread as a last resort.")
              (/show0 "*ERROR-ERROR-DEPTH* too big, trying HALT")
-             (%primitive sb!c:halt)
+             (%primitive sb-c:halt)
              (/show0 "*ERROR-ERROR-DEPTH* too big, trying THROW")
              (throw '%abort-thread nil))))))))

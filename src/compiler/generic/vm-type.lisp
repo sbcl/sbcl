@@ -283,7 +283,7 @@
   ;; There is a unit test that the supported architectures don't generate
   ;; excessively large code, so hopefully it'll not get broken.
   (let ((info (info :function :info '%other-pointer-subtype-p)))
-    (unless (and info (sb!c::fun-info-templates info))
+    (unless (and info (sb-c::fun-info-templates info))
       (return-from widetags-from-union-type (values nil types))))
   (let (widetags remainder)
     ;; A little optimization for (OR BIGNUM other). Without this, there would

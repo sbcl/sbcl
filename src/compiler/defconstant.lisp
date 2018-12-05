@@ -21,9 +21,9 @@
 ;;; already able to generate some warnings about host constant usage.
 #+sb-xc-host
 (progn
-  (defun (setf sb!c::xc-constant-value) (newval sym)
+  (defun (setf sb-c::xc-constant-value) (newval sym)
     (setf (get (uncross sym) :sb-xc-constant-val) newval))
-  (defun sb!c::xc-constant-value (sym) ; return 2 values as does (INFO ...)
+  (defun sb-c::xc-constant-value (sym) ; return 2 values as does (INFO ...)
     (multiple-value-bind (indicator value foundp)
         (get-properties (symbol-plist (uncross sym)) '(:sb-xc-constant-val))
       (declare (ignore indicator))
@@ -33,7 +33,7 @@
                 about-to-modify-symbol-value))
 ;;; the guts of DEFCONSTANT
 
-(defun sb!c::%defconstant (name value source-location &optional (doc nil docp))
+(defun sb-c::%defconstant (name value source-location &optional (doc nil docp))
   #+sb-xc-host (declare (ignore doc docp))
   (unless (symbolp name)
     (error "The constant name is not a symbol: ~S" name))
@@ -71,7 +71,7 @@
                                   :new-value value))
                       (declare (ignore ignore))
                       (when aborted
-                        (return-from sb!c::%defconstant name))))))
+                        (return-from sb-c::%defconstant name))))))
             (warn "redefining a MAKUNBOUND constant: ~S" name)))
        (:unknown
         ;; (This is OK -- undefined variables are of this kind. So we
@@ -103,9 +103,9 @@
     ;; unscrew the cross-compilation package hacks so that that translation
     ;; doesn't happen. Perhaps: * Replace SB-XC with SB-CL. SB-CL exports all
     ;; the symbols which ANSI requires to be exported from CL. * Make a
-    ;; nickname SB!CL which behaves like SB!XC. * Go through the
+    ;; nickname SB-CL which behaves like SB!XC. * Go through the
     ;; loaded-on-the-host code making every target definition be in SB-CL.
-    ;; E.g. SB!XC:DEFMACRO DEFCONSTANT becomes SB!XC:DEFMACRO SB!CL:DEFCONSTANT.
+    ;; E.g. SB!XC:DEFMACRO DEFCONSTANT becomes SB!XC:DEFMACRO SB-CL:DEFCONSTANT.
     ;; * Make IN-TARGET-COMPILATION-MODE do UNUSE-PACKAGE CL and
     ;; USE-PACKAGE SB-CL in each of the target packages (then undo it
     ;; on exit). * Make the cross-compiler's implementation of EVAL-WHEN
@@ -127,6 +127,6 @@
     ;; It would certainly be awesome if this was only needed for symbols
     ;; in CL. Unfortunately, that is not the case. Maybe some are moved
     ;; back in CL later on?
-    (setf (sb!c::xc-constant-value name) value))
+    (setf (sb-c::xc-constant-value name) value))
   (setf (info :variable :kind name) :constant)
   name)

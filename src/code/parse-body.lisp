@@ -28,7 +28,7 @@
                     ;; .. and says that the consequences of multiple
                     ;; doc strings are unspecified.
                     ;; That's probably not something the programmer intends.
-                    (sb!c:compiler-warn "Duplicate doc string ~S" x)
+                    (sb-c:compiler-warn "Duplicate doc string ~S" x)
                     t)))
          (declaration-p (x)
            (when (listp x)

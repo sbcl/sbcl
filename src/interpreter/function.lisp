@@ -19,8 +19,8 @@
                                  &optional (pretty-arglist lambda-list)))
              (:copier nil))
   (source-location
-   (let ((s (sb!c::make-definition-source-location)))
-     (if (sb!c::definition-source-location-namestring s) s)))
+   (let ((s (sb-c::make-definition-source-location)))
+     (if (sb-c::definition-source-location-namestring s) s)))
   (name        0 :read-only nil)
   (lambda-list 0 :read-only nil)
   (pretty-arglist) ; same as what a generic-function terms it

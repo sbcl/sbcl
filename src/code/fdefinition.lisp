@@ -214,7 +214,7 @@
 ;;; encapsulations of the same name.
 (defun encapsulate (name type function)
   (let* ((fdefn (find-fdefn name))
-         (underlying-fun (sb!c:safe-fdefn-fun fdefn)))
+         (underlying-fun (sb-c:safe-fdefn-fun fdefn)))
     (when (typep underlying-fun 'generic-function)
       (return-from encapsulate
         (encapsulate-generic-function underlying-fun type function)))

@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; We track pred/succ info at the IR2-block level, extrapolating
 ;;; most of the data from IR1 to initialise.

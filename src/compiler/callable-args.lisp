@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (defun assert-function-designator (caller lvars lvar annotation policy)
   (destructuring-bind (args &optional results &rest options) annotation

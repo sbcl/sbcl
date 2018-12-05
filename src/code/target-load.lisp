@@ -69,20 +69,20 @@
                          (eval-tlf form index)))
                    (return))))))
         (if pathname
-            (let* ((info (sb!c::make-file-source-info
+            (let* ((info (sb-c::make-file-source-info
                           pathname (stream-external-format stream)))
-                   (sb!c::*source-info* info))
-              (setf (sb!c::source-info-stream info) stream)
-              (sb!c::do-forms-from-info ((form current-index) info
-                                         'sb!c::input-error-in-load)
-                (sb!c::with-source-paths
-                  (sb!c::find-source-paths form current-index)
+                   (sb-c::*source-info* info))
+              (setf (sb-c::source-info-stream info) stream)
+              (sb-c::do-forms-from-info ((form current-index) info
+                                         'sb-c::input-error-in-load)
+                (sb-c::with-source-paths
+                  (sb-c::find-source-paths form current-index)
                   (eval-form form current-index))))
-            (let ((sb!c::*source-info* nil))
+            (let ((sb-c::*source-info* nil))
               (do ((form (read stream nil *eof-object*)
                          (read stream nil *eof-object*)))
                   ((eq form *eof-object*))
-                (sb!c::with-source-paths
+                (sb-c::with-source-paths
                   (eval-form form nil))))))))
   t)
 
@@ -149,10 +149,10 @@
                              ;; scope, and I can't find anything under PROCLAIM or
                              ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
                              ;; behavior. Hmm. -- WHN 2001-04-06
-                             (sb!c::*policy* sb!c::*policy*))
+                             (sb-c::*policy* sb-c::*policy*))
                          (if faslp
                              (load-as-fasl stream verbose print)
-                             (sb!c:with-compiler-error-resignalling
+                             (sb-c:with-compiler-error-resignalling
                                  (load-as-source stream :verbose verbose
                                                         :print print))))))
              (call-with-load-bindings #'thunk stream))))
@@ -280,7 +280,7 @@
           (setf (gethash name ht) (list* offset (1- next-offset) i)))))))
 
 (defun !warm-load (file)
-  (restart-case (let ((sb!c::*source-namestring*
+  (restart-case (let ((sb-c::*source-namestring*
                        (format nil "SYS:~A" (substitute #\; #\/ file))))
                   (load file))
     (abort ()

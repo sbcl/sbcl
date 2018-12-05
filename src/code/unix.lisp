@@ -66,7 +66,7 @@
     (setf name
           (concatenate 'string #!+win32 "_" (subseq name 3))))
   `(locally
-    (declare (optimize (sb!c::float-accuracy 0)))
+    (declare (optimize (sb-c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
                                 ,@args)))
       (if (minusp result)
@@ -78,7 +78,7 @@
 ;;; never really get an error.
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
   `(locally
-    (declare (optimize (sb!c::float-accuracy 0)))
+    (declare (optimize (sb-c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
                                  ,@args)))
       (if (minusp result)

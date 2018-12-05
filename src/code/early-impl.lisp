@@ -44,7 +44,7 @@
 (!defvar *pseudo-atomic-bits* 0)
 
 #!+c-stack-is-control-stack
-(setf (info :variable :always-bound 'sb!c:*alien-stack-pointer*) :always-bound)
+(setf (info :variable :always-bound 'sb-c:*alien-stack-pointer*) :always-bound)
 
 ;;; A unique GC id. This is supplied for code that needs to detect
 ;;; whether a GC has happened since some earlier point in time. For

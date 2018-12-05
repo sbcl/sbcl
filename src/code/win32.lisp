@@ -434,7 +434,7 @@
 (defmacro syscall ((name ret-type &rest arg-types) success-form &rest args)
   (with-funcname (sname name)
     `(locally
-       (declare (optimize (sb!c::float-accuracy 0)))
+       (declare (optimize (sb-c::float-accuracy 0)))
        (let ((result (alien-funcall
                        (extern-alien ,sname
                                      (function ,ret-type ,@arg-types))
@@ -448,7 +448,7 @@
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
   (with-funcname (sname name)
     `(locally
-       (declare (optimize (sb!c::float-accuracy 0)))
+       (declare (optimize (sb-c::float-accuracy 0)))
        (let ((result (alien-funcall
                        (extern-alien ,sname (function bool ,@arg-types))
                        ,@args)))

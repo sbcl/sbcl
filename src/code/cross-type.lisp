@@ -128,7 +128,7 @@
   (setf (get symbol :cross-typep-hint) :use-host-typep))
 
 ;;; Instance types that will be forward-referenced
-(dolist (symbol '(lexenv sb!c::abstract-lexenv
+(dolist (symbol '(lexenv sb-c::abstract-lexenv
                   sb!assem:label
                   condition restart style-warning step-condition
                   class sb!pcl::condition-class error
@@ -363,7 +363,7 @@
                         ;; even for non-STRINGs.)
                        (let ((form `(,predicate-name ',host-object)))
                          (multiple-value-bind (ok result)
-                             (sb!c::constant-function-call-p form nil nil)
+                             (sb-c::constant-function-call-p form nil nil)
                            (values (not (null result)) ok))))
                       (t
                        ;; Do as (DEFUN %%TYPEP) in 'typep' does, except for the

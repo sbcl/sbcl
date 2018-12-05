@@ -26,7 +26,7 @@
 (declaim (inline pack-3-codepoints))
 (defun pack-3-codepoints (first &optional (second 0) (third 0))
   (declare (type (unsigned-byte 21) first second third))
-  (sb!c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
+  (sb-c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
 
 (macrolet ((frob ()
              (flet ((coerce-it (array)
@@ -566,7 +566,7 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
         (page-var (gensym "PAGE")))
     `(block nil
        (locally
-           (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+           (declare (optimize (sb-c::insert-array-bounds-checks 0)))
          (let ((,code-var (char-code ,char)))
            (let* ((,shifted-var (ash ,code-var -6))
                   (,page-var (if (>= ,shifted-var (length **character-case-pages**))

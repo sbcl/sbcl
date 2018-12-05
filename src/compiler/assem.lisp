@@ -115,12 +115,12 @@
 (defprinter (segment :identity t))
 
 ;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
-(defun sb!c::note-fixup (segment kind fixup)
+(defun sb-c::note-fixup (segment kind fixup)
   (emit-back-patch
    segment
    0
    (lambda (segment posn)
-     (push (sb!c::make-fixup-note kind fixup
+     (push (sb-c::make-fixup-note kind fixup
                                   (- posn (segment-header-skew segment)))
            (segment-fixup-notes segment)))))
 
@@ -217,7 +217,7 @@
   ;; with the segment as its one argument.
   (emitter (missing-arg) :type (or null function))
   ;; The attributes of this instruction.
-  (attributes (instruction-attributes) :type sb!c:attributes)
+  (attributes (instruction-attributes) :type sb-c:attributes)
   ;; Number of instructions or cycles of delay before additional
   ;; instructions can read our writes.
   (delay 0 :type (and fixnum unsigned-byte))
@@ -293,7 +293,7 @@
       (unless (typep thing '(or function label))
         (let ((inst thing))
           (let ((vop (car inst)))
-            (when (sb!c::vop-p vop) (pop inst)))
+            (when (sb-c::vop-p vop) (pop inst)))
           (unless (member (car inst) '(.align .byte .skip .coverage-mark))
             (dolist (operand (cdr inst))
               (if (label-p operand)
@@ -404,7 +404,7 @@
 '(progn
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
-      (sb!c:location-number read)
+      (sb-c:location-number read)
     #!+sb-show-assem (format *trace-output*
                              "~&~S reads ~S[~W for ~W]~%"
                              inst read loc-num size)
@@ -441,7 +441,7 @@
 
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
-      (sb!c:location-number write)
+      (sb-c:location-number write)
     #!+sb-show-assem (format *trace-output*
                              "~&~S writes ~S[~W for ~W]~%"
                              inst write loc-num size)
@@ -669,7 +669,7 @@
     (assemble (segment)
      (dolist (inst results)
        (if (eq inst :nop)
-           (sb!c:emit-nop segment)
+           (sb-c:emit-nop segment)
            (funcall (inst-emitter inst) segment))))
     (setf (segment-run-scheduler segment) t))
 
@@ -1330,7 +1330,7 @@
         (etypecase operation
           (cons
            (let ((first (car operation)))
-             (when (sb!c::vop-p first)
+             (when (sb-c::vop-p first)
                (setq **current-vop** first)
                (pop operation)))
            (block op
@@ -1418,13 +1418,13 @@
       (replace contents buf :start1 start))))
 
 (defun trace-inst (section mnemonic operands)
-  (when sb!c::*compiler-trace-output*
+  (when sb-c::*compiler-trace-output*
     (let* ((asmstream *asmstream*)
            (section-name
             (if (eq section (asmstream-code-section asmstream))
                 :regular
                 :elsewhere)))
-      (sb!c::trace-instruction section-name **current-vop** mnemonic operands
+      (sb-c::trace-instruction section-name **current-vop** mnemonic operands
                                (asmstream-tracing-state asmstream)))))
 
 (defmacro inst (&whole whole instruction &rest args &environment env)
@@ -1460,7 +1460,7 @@
        (trace-inst dest mnemonic operands)
        (let ((v **current-vop**)
              (inst `(,mnemonic . ,operands)))
-         (aver (typep v '(or null sb!c::vop)))
+         (aver (typep v '(or null sb-c::vop)))
          (emit dest (if v (cons v inst) inst))))
       (segment ; streaming out of the assembler
        ;; Pass operands to the machine instruction encoder as a list and as
@@ -1621,7 +1621,7 @@
                   forms)))
         `(defun ,name (,segment-arg ,@(arg-names))
            (declare (type segment ,segment-arg) ,@(arg-types))
-           ,@(ecase sb!c:*backend-byte-order*
+           ,@(ecase sb-c:*backend-byte-order*
                (:little-endian (nreverse forms))
                (:big-endian forms))
            ',name)))))
@@ -1685,13 +1685,13 @@
       (unless cost (setf cost 1))
       #!+sb-dyncount
       (push `(when (segment-collect-dynamic-statistics ,segment-name)
-               (let* ((info (sb!c:ir2-component-dyncount-info
-                             (sb!c:component-info
-                              sb!c:*component-being-compiled*)))
-                      (costs (sb!c:dyncount-info-costs info))
-                      (block-number (sb!c:block-number
-                                     (sb!c:ir2-block-block
-                                      (sb!c:vop-block ,vop-name)))))
+               (let* ((info (sb-c:ir2-component-dyncount-info
+                             (sb-c:component-info
+                              sb-c:*component-being-compiled*)))
+                      (costs (sb-c:dyncount-info-costs info))
+                      (block-number (sb-c:block-number
+                                     (sb-c:ir2-block-block
+                                      (sb-c:vop-block ,vop-name)))))
                  (incf (aref costs block-number) ,cost)))
             emitter)
       (when assem-scheduler-p

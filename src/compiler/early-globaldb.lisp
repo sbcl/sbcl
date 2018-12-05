@@ -262,7 +262,7 @@
 ;;;; functions and VOPs. To save space and allow for quick set
 ;;;; operations, we represent the attributes as bits in a fixnum.
 
-(in-package "SB!C")
+(in-package "SB-C")
 (def!type attributes () 'fixnum)
 
 ;;; Given a list of attribute names and an alist that translates them

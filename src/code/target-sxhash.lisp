@@ -233,7 +233,7 @@
     (logxor (ash hash (- sb-vm:n-positive-fixnum-bits 32)) hash))
   #!-(and compact-instance-header x86-64)
   (locally
-   (declare (optimize (sb!c::type-check 0)))
+   (declare (optimize (sb-c::type-check 0)))
    (let ((hash (sb!pcl::standard-instance-hash-code instance)))
      (if (not (eql hash 0))
          hash
@@ -249,7 +249,7 @@
   ;; whether it is STANDARD-FUNCALLABLE-INSTANCE. Let's assume it is.
   (declare (function fin))
   (locally
-   (declare (optimize (sb!c::type-check 0)))
+   (declare (optimize (sb-c::type-check 0)))
    #!+compact-instance-header
    (sb-vm::get-header-data-high
     (sb!pcl::standard-funcallable-instance-clos-slots fin))

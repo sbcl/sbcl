@@ -300,7 +300,7 @@
   (defvar *interned-signed-byte-types*)
   (defvar *interned-unsigned-byte-types*)
   (macrolet ((int-type (low high)
-               `(interned-numeric-type (when (sb!c::find-saetp spec) spec)
+               `(interned-numeric-type (when (sb-c::find-saetp spec) spec)
                                        :class 'integer :enumerable t
                                        :low ,low :high ,high)))
     (setq *interned-signed-byte-types*
@@ -975,7 +975,7 @@ expansion happened."
 ;;;
 #+sb-xc-host
 (progn
-(sb!c::define-source-transform specifier-type (type-spec &environment env)
+(sb-c::define-source-transform specifier-type (type-spec &environment env)
   (or (and (sb!xc:constantp type-spec env)
            (let ((parse (specifier-type (constant-form-value type-spec env))))
              (cond

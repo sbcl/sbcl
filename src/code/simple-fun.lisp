@@ -410,7 +410,7 @@
   (declare (type (unsigned-byte 16) fun-index))
   (when (< fun-index (code-n-entries code-obj))
     (truly-the function
-      (values (%primitive sb!c:compute-fun code-obj
+      (values (%primitive sb-c:compute-fun code-obj
                 (with-pinned-objects (code-obj)
                   (%code-fun-offset code-obj fun-index)))))))
 
@@ -512,7 +512,7 @@
 
 ;;; Set (SYMBOL-FUNCTION SYMBOL) to a closure that signals an error,
 ;;; preventing funcall/apply of macros and special operators.
-(defun sb!c::install-guard-function (symbol fun-name)
+(defun sb-c::install-guard-function (symbol fun-name)
   ;; (SETF SYMBOL-FUNCTION) goes out of its way to disallow this closure,
   ;; but we can trivially replicate its low-level effect.
   (let ((fdefn (find-or-create-fdefn symbol))
@@ -575,7 +575,7 @@
     (when (funcall test value)
       (return value))))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; This is target-only code, so doesn't belong in 'debug-info.lisp'
 (flet ((unpack-tlf-num+offset (integer &aux (bytepos 0))

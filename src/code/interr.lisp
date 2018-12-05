@@ -15,7 +15,7 @@
 ;;;; internal errors
 
 (macrolet ((def-it ()
-             (let ((n (1+ (position-if 'stringp sb!c:+backend-internal-errors+
+             (let ((n (1+ (position-if 'stringp sb-c:+backend-internal-errors+
                                        :key #'car :from-end t))))
                `(progn
                   (defconstant n-internal-error-handlers ,n)
@@ -33,7 +33,7 @@
         (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" max))))
   `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
          (named-lambda ,(string name) (,@args)
-           (declare (optimize (sb!c::verify-arg-count 0)))
+           (declare (optimize (sb-c::verify-arg-count 0)))
            ,@body)))
 
 ;;; Backtrace code may want to know the error that caused
@@ -48,7 +48,7 @@
 (defun restart-undefined (name condition fdefn-or-symbol context)
   (multiple-value-bind (tn-offset pc-offset)
       (if context
-          (sb!c::decode-restart-location context)
+          (sb-c::decode-restart-location context)
           (car *current-internal-error-args*))
     (labels ((retry-value (value)
                (or (typecase value
@@ -137,12 +137,12 @@
            (make-condition 'undefined-function
                            :name name
                            :not-yet-loaded
-                           (cond ((member name sb!c::*fun-names-in-this-file*
+                           (cond ((member name sb-c::*fun-names-in-this-file*
                                           :test #'equal)
                                   t)
-                                 ((and (boundp 'sb!c:*lexenv*)
-                                       (sb!c::fun-locally-defined-p
-                                        name sb!c:*lexenv*))
+                                 ((and (boundp 'sb-c:*lexenv*)
+                                       (sb-c::fun-locally-defined-p
+                                        name sb-c:*lexenv*))
                                   :local))))
          #!+undefined-fun-restarts
          context)
@@ -205,7 +205,7 @@
 
 (defun restart-unbound (symbol condition context)
   (multiple-value-bind (tn-offset pc-offset)
-      (sb!c::decode-restart-location context)
+      (sb-c::decode-restart-location context)
     (labels ((retry-value (value)
                (multiple-value-bind (type defined)
                    (info :variable :type symbol)
@@ -257,8 +257,8 @@
          (condition (make-condition 'unbound-variable
                                     :name symbol
                                     :not-yet-loaded
-                                    (cond ((and (boundp 'sb!c:*lexenv*)
-                                                (sb!c:lexenv-find symbol vars))
+                                    (cond ((and (boundp 'sb-c:*lexenv*)
+                                                (sb-c:lexenv-find symbol vars))
                                            :local)))))
     (if context
         (restart-unbound symbol condition context)
@@ -372,7 +372,7 @@
   (let (#!+unwind-to-frame-and-call-vop
         (*interr-current-bsp*
           ;; Needs to be done before anything is bound
-          (%primitive sb!c:current-binding-pointer)))
+          (%primitive sb-c:current-binding-pointer)))
     (infinite-error-protect
      (let ((alien-context (sap-alien context (* os-context-t))))
        (multiple-value-bind (error-number arguments
@@ -387,7 +387,7 @@
                  (fp (int-sap (sb-vm:context-register alien-context
                                                       sb-vm::cfp-offset))))
              (if (and (>= error-number (length **internal-error-handlers**))
-                      (< error-number (length sb!c:+backend-internal-errors+)))
+                      (< error-number (length sb-c:+backend-internal-errors+)))
                  (let ((context (sb!di:error-context)))
                    (if (typep context '(cons (eql :struct-read)))
                        ;; This was shoehorned into being a "type error"
@@ -410,7 +410,7 @@
                               :datum (sb!di::sub-access-debug-var-slot
                                       fp (first arguments) alien-context)
                               :expected-type
-                              (car (svref sb!c:+backend-internal-errors+
+                              (car (svref sb-c:+backend-internal-errors+
                                           error-number))
                               :context context)))
                  (let ((handler

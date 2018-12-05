@@ -14,4 +14,4 @@
 (defun xc-compile-file (file)
   (sb!xc:with-compilation-unit ()
     (sb!xc:compile-file file :trace-file *standard-output*)
-    (setf sb!c::*undefined-warnings* nil)))
+    (setf sb-c::*undefined-warnings* nil)))

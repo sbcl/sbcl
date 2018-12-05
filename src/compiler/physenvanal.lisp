@@ -13,7 +13,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Do environment analysis on the code in COMPONENT. This involves
 ;;; various things:
@@ -482,7 +482,7 @@
              (code `(%primitive set-nsp ,(ref-leaf node))))))))
     (flet ((coalesce-unbinds (code)
              code
-              #!+(vop-named sb!c:unbind-n)
+              #!+(vop-named sb-c:unbind-n)
               (loop with cleanup
                     while code
                     do (setf cleanup (pop code))

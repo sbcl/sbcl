@@ -89,7 +89,7 @@
 ;;; In SBCL, as in CMU CL before it, the environment is represented
 ;;; with a structure that holds alists for the functional things,
 ;;; variables, blocks, etc. Except for SYMBOL-MACROLET, only the
-;;; SB!C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
+;;; SB-C::LEXENV-FUNS slot is relevant. It holds: Alist (Name . What),
 ;;; where What is either a functional (a local function) or a list
 ;;; (MACRO . <function>) (a local macro, with the specifier expander.)
 ;;; Note that Name may be a (SETF <name>) function. Accessors are
@@ -97,7 +97,7 @@
 ;;;
 ;;; If WITH-AUGMENTED-ENVIRONMENT is called from WALKER-ENVIRONMENT-BIND
 ;;; this code hides the WALKER version of an environment
-;;; inside the SB!C::LEXENV structure.
+;;; inside the SB-C::LEXENV structure.
 ;;;
 ;;; In CMUCL (and former SBCL), This used to be a list of lists of form
 ;;; (<gensym-name> MACRO . #<interpreted-function>) in the :functions slot

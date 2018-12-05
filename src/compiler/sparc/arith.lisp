@@ -650,8 +650,8 @@
              fast-ash-left/unsigned=>unsigned))
 (deftransform ash-left-mod32 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb!c::constant-lvar-p count)
-    (sb!c::give-up-ir1-transform))
+  (when (sb-c::constant-lvar-p count)
+    (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
 ;;;; Binary conditional VOPs:
@@ -1107,7 +1107,7 @@
   (:generator 1
     (inst sll result digit count)))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (deftransform * ((x y)
                  ((unsigned-byte 32) (constant-arg (unsigned-byte 32)))

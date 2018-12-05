@@ -162,7 +162,7 @@
           (error-tags tag)
           (errors tag)
           (errors
-           (sb!c::internal-type-error-call var type))))
+           (sb-c::internal-type-error-call var type))))
 
       `(block ,block
          (tagbody
@@ -1158,7 +1158,7 @@ and the number of 0 bits if INTEGER is negative."
     (logior (logand newbyte mask)
             (logand integer (lognot mask)))))
 
-(defun sb!c::mask-signed-field (size integer)
+(defun sb-c::mask-signed-field (size integer)
   "Extract SIZE lower bits from INTEGER, considering them as a
 2-complement SIZE-bits representation of a signed integer."
   (macrolet ((msf (size integer)
@@ -1170,14 +1170,14 @@ and the number of 0 bits if INTEGER is negative."
       ((integer 1 #.sb-vm:n-fixnum-bits)
        (number-dispatch ((integer integer))
          ((fixnum) (msf size integer))
-         ((bignum) (let ((fix (sb!c::mask-signed-field #.sb-vm:n-fixnum-bits (%bignum-ref integer 0))))
+         ((bignum) (let ((fix (sb-c::mask-signed-field #.sb-vm:n-fixnum-bits (%bignum-ref integer 0))))
                      (if (= size #.sb-vm:n-fixnum-bits)
                          fix
                          (msf size fix))))))
       ((integer (#.sb-vm:n-fixnum-bits) #.sb-vm:n-word-bits)
        (number-dispatch ((integer integer))
          ((fixnum) integer)
-         ((bignum) (let ((word (sb!c::mask-signed-field #.sb-vm:n-word-bits (%bignum-ref integer 0))))
+         ((bignum) (let ((word (sb-c::mask-signed-field #.sb-vm:n-word-bits (%bignum-ref integer 0))))
                      (if (= size #.sb-vm:n-word-bits)
                          word
                          (msf size word))))))
@@ -1413,26 +1413,26 @@ and the number of 0 bits if INTEGER is negative."
                        (declare (integer x))
                        (etypecase x
                          ((signed-byte ,width) x)
-                         (fixnum (sb!c::mask-signed-field ,width x))
-                         (bignum (sb!c::mask-signed-field ,width x)))))
+                         (fixnum (sb-c::mask-signed-field ,width x))
+                         (bignum (sb-c::mask-signed-field ,width x)))))
                 (,name ,@(loop for arg in lambda-list
                                collect `(prepare-argument ,arg)))))))
     (flet ((do-mfuns (class)
-             (loop for infos being each hash-value of (sb!c::modular-class-funs class)
+             (loop for infos being each hash-value of (sb-c::modular-class-funs class)
                    ;; FIXME: We need to process only "toplevel" functions
                    when (listp infos)
                    do (loop for info in infos
-                            for name = (sb!c::modular-fun-info-name info)
-                            and width = (sb!c::modular-fun-info-width info)
-                            and signedp = (sb!c::modular-fun-info-signedp info)
-                            and lambda-list = (sb!c::modular-fun-info-lambda-list info)
+                            for name = (sb-c::modular-fun-info-name info)
+                            and width = (sb-c::modular-fun-info-width info)
+                            and signedp = (sb-c::modular-fun-info-signedp info)
+                            and lambda-list = (sb-c::modular-fun-info-lambda-list info)
                             if signedp
                             do (forms (signed-definition name lambda-list width))
                             else
                             do (forms (unsigned-definition name lambda-list width))))))
-      (do-mfuns sb!c::*untagged-unsigned-modular-class*)
-      (do-mfuns sb!c::*untagged-signed-modular-class*)
-      (do-mfuns sb!c::*tagged-modular-class*)))
+      (do-mfuns sb-c::*untagged-unsigned-modular-class*)
+      (do-mfuns sb-c::*untagged-signed-modular-class*)
+      (do-mfuns sb-c::*tagged-modular-class*)))
   `(progn ,@(sort (forms) #'string< :key #'cadr)))
 
 ;;; KLUDGE: these out-of-line definitions can't use the modular
@@ -1457,5 +1457,5 @@ and the number of 0 bits if INTEGER is negative."
 (defun sb-vm::ash-left-modfx (integer amount)
   (let ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)))
     (etypecase integer
-      (fixnum (sb!c::mask-signed-field fixnum-width (ash integer amount)))
-      (integer (sb!c::mask-signed-field fixnum-width (ash (sb!c::mask-signed-field fixnum-width integer) amount))))))
+      (fixnum (sb-c::mask-signed-field fixnum-width (ash integer amount)))
+      (integer (sb-c::mask-signed-field fixnum-width (ash (sb-c::mask-signed-field fixnum-width integer) amount))))))

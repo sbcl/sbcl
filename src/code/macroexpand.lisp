@@ -92,7 +92,7 @@
                         ((null kind) (global-expansion))
                         (t (values nil nil)))))
                (lexenv
-                (let ((def (cdr (assoc sym (sb!c::lexenv-vars env)))))
+                (let ((def (cdr (assoc sym (sb-c::lexenv-vars env)))))
                   (cond ((null def) (global-expansion))
                         ((listp def) (values (cdr def) t))
                         (t (values nil nil)))))))))

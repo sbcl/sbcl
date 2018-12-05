@@ -160,7 +160,7 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
                                 (unless ,boundp ,value) (not ,boundp))))
        (let ((,boundp (%boundp ',name)))
          (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
-                     (sb!c:source-location))))))
+                     (sb-c:source-location))))))
 
 (defmacro define-load-time-global (name value &optional (doc nil docp))
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
@@ -176,4 +176,4 @@ See also DEFGLOBAL which assigns the VALUE at compile-time too."
          (%compiler-defglobal ',name :eventually nil nil))
        (let ((,boundp (%boundp ',name)))
          (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
-                     (sb!c:source-location))))))
+                     (sb-c:source-location))))))

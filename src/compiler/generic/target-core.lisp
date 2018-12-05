@@ -14,7 +14,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Map of code-component -> list of PC offsets at which allocations occur.
 ;;; This table is needed in order to enable allocation profiling.
@@ -70,7 +70,7 @@
                (abs-fixups (elt preserved-lists 1)))
            (when (or abs-fixups rel-fixups)
              (setf (sb-vm::%code-fixups code-obj)
-                   (sb!c::pack-code-fixup-locs abs-fixups rel-fixups))))
+                   (sb-c::pack-code-fixup-locs abs-fixups rel-fixups))))
          (awhen (elt preserved-lists 2)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))
@@ -161,7 +161,7 @@
   (let ((debug-info (debug-info-for-component component)))
     (let* ((2comp (component-info component))
            (constants (ir2-component-constants 2comp))
-           (nboxed (align-up (length constants) sb!c::code-boxed-words-align))
+           (nboxed (align-up (length constants) sb-c::code-boxed-words-align))
            (code-obj (allocate-code-object
                       (component-mem-space component) nboxed length)))
 

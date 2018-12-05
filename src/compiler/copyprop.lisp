@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; In copy propagation, we manipulate sets of TNs. We only consider
 ;;; TNs whose sole write is by a MOVE VOP. This allows us to use a

@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 #!-sb-fluid
 (declaim (inline clear-bit-vector set-bit-vector bit-vector-replace

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; Regarding several reader-conditionalized MUFFLE-CONDITION declarations
 ;;; throughout this file, here's why: Transforms produce sexprs that as far

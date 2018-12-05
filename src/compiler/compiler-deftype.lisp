@@ -51,7 +51,7 @@
   #-sb-xc-host
   (when doc
     (setf (documentation name 'type) doc))
-  (sb!c::%note-type-defined name)
+  (sb-c::%note-type-defined name)
   name)
 
 (/show0 "compiler-deftype.lisp end of file")

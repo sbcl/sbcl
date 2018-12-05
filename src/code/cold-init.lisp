@@ -279,12 +279,12 @@
   (show-and-call sb!disassem::!compile-inst-printers)
 
   ;; Toggle some readonly bits
-  (dovector (sc sb!c:*backend-sc-numbers*)
+  (dovector (sc sb-c:*backend-sc-numbers*)
     (when sc
-      (logically-readonlyize (sb!c::sc-move-funs sc))
-      (logically-readonlyize (sb!c::sc-load-costs sc))
-      (logically-readonlyize (sb!c::sc-move-vops sc))
-      (logically-readonlyize (sb!c::sc-move-costs sc))))
+      (logically-readonlyize (sb-c::sc-move-funs sc))
+      (logically-readonlyize (sb-c::sc-load-costs sc))
+      (logically-readonlyize (sb-c::sc-move-vops sc))
+      (logically-readonlyize (sb-c::sc-move-costs sc))))
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
   #!+hpux (%primitive sb-vm::setup-return-from-lisp-stub)

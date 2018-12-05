@@ -616,7 +616,7 @@
                 (number-dispatch ((x real))
                   (((foreach single-float double-float #!+long-float long-float
                      sb-vm:signed-word
-                     ,@(and (sb!c::template-translates-arg-p '%double-float 0 'word)
+                     ,@(and (sb-c::template-translates-arg-p '%double-float 0 'word)
                             '(word))))
                    (coerce x ',type))
                   ((ratio)

@@ -15,8 +15,8 @@
 #+clisp (setf custom:*suppress-check-redefinition* t)
 
 ;;; Run the cross-compiler to produce cold fasl files.
-(setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
-(setq sb!c::*static-vop-usage-counts* (make-hash-table))
+(setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
+(setq sb-c::*static-vop-usage-counts* (make-hash-table))
 (let (fail
       variables
       functions
@@ -28,10 +28,10 @@
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.
     #!+(or x86 x86-64 arm64) ; until all the rest are clean
-    (when sb!c::*undefined-warnings*
+    (when sb-c::*undefined-warnings*
       (setf fail t)
-      (dolist (warning sb!c::*undefined-warnings*)
-        (case (sb!c::undefined-warning-kind warning)
+      (dolist (warning sb-c::*undefined-warnings*)
+        (case (sb-c::undefined-warning-kind warning)
           (:variable (setf variables t))
           (:type (setf types t))
           (:function (setf functions t))))))
@@ -51,13 +51,13 @@
 
 ;; enable this too see which vops were or weren't used
 #+nil
-(when (hash-table-p sb!c::*static-vop-usage-counts*)
+(when (hash-table-p sb-c::*static-vop-usage-counts*)
   (format t "Vops used:~%")
-  (dolist (cell (sort (sb!int:%hash-table-alist sb!c::*static-vop-usage-counts*)
+  (dolist (cell (sort (sb!int:%hash-table-alist sb-c::*static-vop-usage-counts*)
                       #'> :key #'cdr))
     (format t "~6d ~s~%" (cdr cell) (car cell))))
 
-(when sb!c::*track-full-called-fnames*
+(when sb-c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)
     (sb!int:call-with-each-globaldb-name
      (lambda (name)
@@ -66,7 +66,7 @@
               (info (sb!int:info :function :info name)))
          (if (and cell
                   (or inlinep
-                      (and info (sb!c::fun-info-templates info))
+                      (and info (sb-c::fun-info-templates info))
                       (sb!int:info :function :compiler-macro-function name)
                       (sb!int:info :function :source-transform name)))
              (if inlinep
@@ -96,15 +96,15 @@
 ;; After cross-compiling, show me a list of types that checkgen
 ;; would have liked to use primitive traps for but couldn't.
 #+nil
-(let ((l (sb-impl::%hash-table-alist sb!c::*checkgen-used-types*)))
+(let ((l (sb-impl::%hash-table-alist sb-c::*checkgen-used-types*)))
   (format t "~&Types needed by checkgen: ('+' = has internal error number)~%")
   (setq l (sort l #'> :key #'cadr))
   (loop for (type-spec . (count . interr-p)) in l
         do (format t "~:[ ~;+~] ~5D ~S~%" interr-p count type-spec))
   (format t "~&Error numbers not used by checkgen:~%")
-  (loop for (spec symbol) across sb!c:+backend-internal-errors+
+  (loop for (spec symbol) across sb-c:+backend-internal-errors+
         when (and (not (stringp spec))
-                  (not (gethash spec sb!c::*checkgen-used-types*)))
+                  (not (gethash spec sb-c::*checkgen-used-types*)))
         do (format t "       ~S~%" spec)))
 
 ;; Print some information about how well the type operator caches performed

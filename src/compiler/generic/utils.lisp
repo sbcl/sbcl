@@ -135,7 +135,7 @@
   (list (make-stack-pointer-tn)
         (cond #!+x86-64 ;; needs support from receive-unknown-values
               (unused-count
-               (sb!c::make-unused-tn))
+               (sb-c::make-unused-tn))
               (t
                (make-normal-tn *fixnum-primitive-type*)))))
 

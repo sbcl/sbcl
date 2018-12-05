@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 #| No calls to #'SOURCE-LOCATION must happen from this file because:
 ;; - it would imply lack of location information for the definition,

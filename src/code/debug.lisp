@@ -528,12 +528,12 @@ information."
   (let* ((escaped (sb!di::compiled-frame-escaped frame))
          (pointer (sb!di::frame-pointer frame))
          (arg-count (sb!di::sub-access-debug-var-slot
-                     pointer sb!c:arg-count-sc escaped)))
+                     pointer sb-c:arg-count-sc escaped)))
     (if (and (>= n 0)
              (< n arg-count))
         (sb!di::sub-access-debug-var-slot
          pointer
-         (sb!c:standard-arg-location-sc n)
+         (sb-c:standard-arg-location-sc n)
          escaped)
         (error "Index ~a out of bounds for ~a supplied argument~:p." n arg-count))))
 
@@ -541,11 +541,11 @@ information."
   (let* ((escaped (sb!di::compiled-frame-escaped frame))
          (pointer (sb!di::frame-pointer frame))
          (arg-count (sb!di::sub-access-debug-var-slot
-                     pointer sb!c:arg-count-sc escaped)))
+                     pointer sb-c:arg-count-sc escaped)))
     (loop for i below arg-count
           collect (sb!di::sub-access-debug-var-slot
                    pointer
-                   (sb!c:standard-arg-location-sc i)
+                   (sb-c:standard-arg-location-sc i)
                    escaped))))
 
 (defun frame-args-as-list (frame)
@@ -584,7 +584,7 @@ information."
                         (setf reversed-result
                               (append (reverse
                                        (multiple-value-list
-                                        (sb!c::%more-arg-values context 0 count)))
+                                        (sb-c::%more-arg-values context 0 count)))
                                       reversed-result))
                         (return-from enumerating))
                       (push (make-unprintable-object "unavailable &MORE argument")
@@ -613,7 +613,7 @@ information."
                  (butlast args 2)
                  (if (fixnump count)
                      (multiple-value-list
-                      (sb!c:%more-arg-values context 0 count))
+                      (sb-c:%more-arg-values context 0 count))
                      (list
                       (make-unprintable-object "more unavailable arguments")))))
               args)
@@ -1686,7 +1686,7 @@ forms that explicitly control this kind of evaluation.")
           (when (and more-context more-count)
             (format *debug-io* "~S  =  ~S~%"
                     'more
-                    (multiple-value-list (sb!c:%more-arg-values more-context 0 more-count))))
+                    (multiple-value-list (sb-c:%more-arg-values more-context 0 more-count))))
           (cond
            ((not any-p)
             (format *debug-io*
@@ -1813,7 +1813,7 @@ forms that explicitly control this kind of evaluation.")
   #!-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (replace-frame-catch-tag frame
-                                   'sb!c:debug-catch-tag
+                                   'sb-c:debug-catch-tag
                                    tag)
     (throw tag thunk)))
 
@@ -1830,7 +1830,7 @@ forms that explicitly control this kind of evaluation.")
                                     (typep debug-fun 'sb!di::compiled-debug-fun)
                                     (sb!di::compiled-debug-fun-compiler-debug-fun debug-fun)))
                (bsp-save-offset (and compiled-debug-fun
-                                     (sb!c::compiled-debug-fun-bsp-save compiled-debug-fun))))
+                                     (sb-c::compiled-debug-fun-bsp-save compiled-debug-fun))))
           (when bsp-save-offset
             (sb!di::sub-access-debug-var-slot (sb!di::frame-pointer frame) bsp-save-offset))))))
 
@@ -1921,7 +1921,7 @@ forms that explicitly control this kind of evaluation.")
   ;; XEPs do not bind anything, nothing to restore
   (find-binding-stack-pointer frame)
   #!-unwind-to-frame-and-call-vop
-  (find 'sb!c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
+  (find 'sb-c:debug-catch-tag (sb!di::frame-catches frame) :key #'car))
 
 (defun frame-has-debug-vars-p (frame)
   (debug-var-info-available

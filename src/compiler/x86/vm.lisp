@@ -433,7 +433,7 @@
          (offset (tn-offset tn)))
     (ecase sb
       (registers
-       (let ((name-vec (case (sb!c:sc-operand-size sc)
+       (let ((name-vec (case (sb-c:sc-operand-size sc)
                          (:byte  +byte-register-names+)
                          (:word  +word-register-names+)
                          (:dword +dword-register-names+))))
@@ -449,12 +449,12 @@
       (noise (symbol-name (sc-name sc))))))
 
 (defun combination-implementation-style (node)
-  (declare (type sb!c::combination node))
+  (declare (type sb-c::combination node))
   (flet ((valid-funtype (args result)
-           (sb!c::valid-fun-use node
-                                (sb!c::specifier-type
+           (sb-c::valid-fun-use node
+                                (sb-c::specifier-type
                                  `(function ,args ,result)))))
-    (case (sb!c::combination-fun-source-name node)
+    (case (sb-c::combination-fun-source-name node)
       (logtest
        (cond
          ((valid-funtype '(fixnum fixnum) '*)
@@ -467,7 +467,7 @@
       (logbitp
        (cond
          ((and (valid-funtype '((integer 0 29) fixnum) '*)
-               (sb!c::constant-lvar-p (first (sb!c::basic-combination-args node))))
+               (sb-c::constant-lvar-p (first (sb-c::basic-combination-args node))))
           (values :transform '(lambda (index integer)
                                (%logbitp integer index))))
          ((valid-funtype '((integer 0 31) (signed-byte 32)) '*)

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;;; DEFKNOWNs
 
@@ -194,7 +194,7 @@
 
 #!-64-bit-registers
 (progn
-#!+#.(cl:if (cl:eq :little-endian sb!c:*backend-byte-order*) '(and) '(or))
+#!+#.(cl:if (cl:eq :little-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (sap-ref-32 sap offset)
@@ -214,7 +214,7 @@
        (%set-sap-ref-32 sap offset (logand value #xffffffff))
        (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32)))))
 
-#!+#.(cl:if (cl:eq :big-endian sb!c:*backend-byte-order*) '(and) '(or))
+#!+#.(cl:if (cl:eq :big-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (ash (sap-ref-32 sap offset) 32)

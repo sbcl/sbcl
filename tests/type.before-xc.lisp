@@ -194,13 +194,13 @@
 ;; therefore the cross-compiler should too.
 (assert (not (ctypep :x86 (specifier-type '(satisfies keywordp)))))
 (let* ((info (sb!int:info :function :info 'keywordp))
-       (attributes (sb!c::fun-info-attributes info)))
+       (attributes (sb-c::fun-info-attributes info)))
   (unwind-protect
        (progn
-         (setf (sb!c::fun-info-attributes info)
-               (logior attributes (sb!c::ir1-attributes sb!c::foldable)))
+         (setf (sb-c::fun-info-attributes info)
+               (logior attributes (sb-c::ir1-attributes sb-c::foldable)))
          (assert (ctypep :x86 (specifier-type '(satisfies keywordp)))))
-    (setf (sb!c::fun-info-attributes info) attributes)))
+    (setf (sb-c::fun-info-attributes info) attributes)))
 (assert (not (type= (specifier-type '(member :x86))
                     (specifier-type '(and (member :x86) (satisfies keywordp))))))
 #+nil

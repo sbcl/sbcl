@@ -97,8 +97,8 @@
                (make-result-state))))))
 
 (deftransform %alien-funcall ((function type &rest args))
-  (aver (sb!c::constant-lvar-p type))
-  (let* ((type (sb!c::lvar-value type))
+  (aver (sb-c::constant-lvar-p type))
+  (let* ((type (sb-c::lvar-value type))
          (arg-types (alien-fun-type-arg-types type))
          (result-type (alien-fun-type-result-type type)))
     (aver (= (length arg-types) (length args)))
@@ -176,7 +176,7 @@
                               :arg-types (new-arg-types)
                               :result-type result-type)
                            ,@(new-args))))))
-        (sb!c::give-up-ir1-transform))))
+        (sb-c::give-up-ir1-transform))))
 
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)

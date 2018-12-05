@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (def-alloc '%make-structure-instance 1 :structure-alloc
            sb-vm:instance-widetag sb-vm:instance-pointer-lowtag

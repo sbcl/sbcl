@@ -22,14 +22,14 @@
 ;; Do as I say, not as I do.
 (defun code-deletion-note-p (x)
   (eq (type-of x) 'sb!ext:code-deletion-note))
-(setq sb!c::*handled-conditions*
+(setq sb-c::*handled-conditions*
       `((,(sb!kernel:specifier-type
            '(or (satisfies unable-to-optimize-note-p)
                 (satisfies code-deletion-note-p)))
          . muffle-warning)))
 
 (defun proclaim-target-optimization ()
-  (sb!c::init-xc-policy #+cons-profiling '((sb!c::instrument-consing 2)))
+  (sb-c::init-xc-policy #+cons-profiling '((sb-c::instrument-consing 2)))
   (let ((debug (if (position :sb-show sb!xc:*features*) 2 1)))
     (sb!xc:proclaim
      `(optimize
@@ -45,9 +45,9 @@
        ;; sbcl-internal optimization declarations:
        ;;
        ;; never insert stepper conditions
-       (sb!c:insert-step-conditions 0)
+       (sb-c:insert-step-conditions 0)
        ;; save FP and PC for alien calls -- or not
-       (sb!c:alien-funcall-saves-fp-and-pc #!+x86 3 #!-x86 0)))))
+       (sb-c:alien-funcall-saves-fp-and-pc #!+x86 3 #!-x86 0)))))
 
 ;;; A note about CLISP compatibility:
 ;;; CLISP uses *READTABLE* when loading '.fas' files, and so we shouldn't put
@@ -107,7 +107,7 @@
       (funcall fun))))
 
 (setf *target-compile-file* #'sb!xc:compile-file)
-(setf *target-assemble-file* #'sb!c:assemble-file)
+(setf *target-assemble-file* #'sb-c:assemble-file)
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
 
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
@@ -117,7 +117,7 @@
         (the sb!kernel:lexenv-designator env)
         (sb!impl::expand-quasiquote (second form) t)))
 
-(setq sb!c::*track-full-called-fnames* :minimal) ; Change this as desired
+(setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 
 ;;; Keep these in order by package, then symbol.
 (dolist (sym
@@ -240,7 +240,7 @@
             sb!impl::stringify-string-designator
             sb!impl::stringify-string-designators
             sb!impl::unencapsulate-generic-function)))
-  (setf (gethash sym sb!c::*undefined-fun-whitelist*) t))
+  (setf (gethash sym sb-c::*undefined-fun-whitelist*) t))
 
 #+#.(cl:if (cl:find-package "HOST-SB-POSIX") '(and) '(or))
 (defun parallel-make-host-2 (max-jobs)

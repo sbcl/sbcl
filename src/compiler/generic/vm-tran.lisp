@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; We need to define these predicates, since the TYPEP source
 ;;; transform picks whichever predicate was defined last when there
@@ -455,7 +455,7 @@
                            (numx
                             (logand
                              (ash mask
-                                  ,(ecase sb!c:*backend-byte-order*
+                                  ,(ecase sb-c:*backend-byte-order*
                                      (:little-endian 0)
                                      (:big-endian
                                       '(- sb-vm:n-word-bits extra))))
@@ -463,7 +463,7 @@
                            (numy
                             (logand
                              (ash mask
-                                  ,(ecase sb!c:*backend-byte-order*
+                                  ,(ecase sb-c:*backend-byte-order*
                                      (:little-endian 0)
                                      (:big-endian
                                       '(- sb-vm:n-word-bits extra))))
@@ -505,7 +505,7 @@
                     ;; rather than a right-shift to fill in zeros on the left
                     ;; then by a left-shift to left-align the 1s?
                     (bits (logand (ash mask
-                                       ,(ecase sb!c:*backend-byte-order*
+                                       ,(ecase sb-c:*backend-byte-order*
                                                (:little-endian 0)
                                                (:big-endian
                                                 '(- sb-vm:n-word-bits extra))))
@@ -793,5 +793,5 @@
 ;; without the fopcompiler seeing it - the fopcompiler does
 ;; expand compiler-macros, but not source-transforms -
 ;; because %PRIMITIVE is not generally fopcompilable.
-(sb!c:define-source-transform make-unbound-marker ()
+(sb-c:define-source-transform make-unbound-marker ()
   `(sb!sys:%primitive make-unbound-marker))

@@ -493,7 +493,7 @@
                             (list ,@direct-default-initargs)
                             ',(all-readers)
                             ',(all-writers)
-                            (sb!c:source-location)
+                            (sb-c:source-location)
                             ,@(and documentation
                                    `(,documentation)))
          ;; This needs to be after %DEFINE-CONDITION in case :REPORT
@@ -1379,18 +1379,18 @@ handled by any other handler, it will be muffled.")
   #!+sb-eval
   (when (typep function 'sb!eval:interpreted-function)
     (return-from function-file-namestring
-      (sb!c:definition-source-location-namestring
+      (sb-c:definition-source-location-namestring
           (sb!eval:interpreted-function-source-location function))))
   #!+sb-fasteval
   (when (typep function 'sb!interpreter:interpreted-function)
     (return-from function-file-namestring
       (awhen (sb!interpreter:fun-source-location function)
-        (sb!c:definition-source-location-namestring it))))
+        (sb-c:definition-source-location-namestring it))))
   (let* ((fun (%fun-fun function))
          (code (fun-code-header fun))
          (debug-info (%code-debug-info code))
          (debug-source (when debug-info
-                         (sb!c::debug-info-source debug-info)))
+                         (sb-c::debug-info-source debug-info)))
          (namestring (when debug-source
                        (debug-source-namestring debug-source))))
     namestring))
@@ -1445,10 +1445,10 @@ handled by any other handler, it will be muffled.")
           (old-location (when (typep old 'generic-function)
                           (sb!pcl::definition-source old)))
           (old-namestring (when old-location
-                            (sb!c:definition-source-location-namestring old-location)))
+                            (sb-c:definition-source-location-namestring old-location)))
           (new-location (redefinition-warning-new-location warning))
           (new-namestring (when new-location
-                           (sb!c:definition-source-location-namestring new-location))))
+                           (sb-c:definition-source-location-namestring new-location))))
      (and old-namestring
           new-namestring
           (string= old-namestring new-namestring)))))
@@ -1463,10 +1463,10 @@ handled by any other handler, it will be muffled.")
    (let* ((old-method (redefinition-with-defmethod-old-method warning))
           (old-location (sb!pcl::definition-source old-method))
           (old-namestring (when old-location
-                            (sb!c:definition-source-location-namestring old-location)))
+                            (sb-c:definition-source-location-namestring old-location)))
           (new-location (redefinition-warning-new-location warning))
           (new-namestring (when new-location
-                            (sb!c:definition-source-location-namestring new-location))))
+                            (sb-c:definition-source-location-namestring new-location))))
          (and new-namestring
               old-namestring
               (string= new-namestring old-namestring)))))
@@ -1786,7 +1786,7 @@ the restart does not exist."))
 
 ;; After (or if) we deem this the optimal name for this condition,
 ;; it should be exported from SB-EXT so that people can muffle it.
-(define-condition sb!c:inlining-dependency-failure (simple-style-warning) ())
+(define-condition sb-c:inlining-dependency-failure (simple-style-warning) ())
 
 
 (define-condition layout-invalid (type-error)

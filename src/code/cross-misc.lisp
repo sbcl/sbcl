@@ -210,7 +210,7 @@
 
 ;;;; Variables which have meaning only to the cross-compiler, defined here
 ;;;; in lieu of #+sb-xc-host elsewere which messes up toplevel form numbers.
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; For macro lambdas that are processed by the host
 (declaim (declaration top-level-form))
@@ -238,7 +238,7 @@
         (setf (aref a i) code)))))
 
 ;;;; Stubs for host
-(defun sb!c:compile-in-lexenv (lambda lexenv &rest rest)
+(defun sb-c:compile-in-lexenv (lambda lexenv &rest rest)
   (declare (ignore lexenv))
   (assert (null rest))
   (compile nil lambda))

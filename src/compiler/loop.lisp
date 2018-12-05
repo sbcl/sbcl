@@ -12,7 +12,7 @@
 ;;; Stuff to annotate the flow graph with information about the loops in it.
 ;;;
 ;;; Written by Rob MacLachlan
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; FIND-DOMINATORS  --  Internal
 ;;;

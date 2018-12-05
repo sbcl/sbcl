@@ -69,7 +69,7 @@
 (flet ((prognify (forms env)
          (cond ((not forms) nil)
                ((and (singleton-p forms)
-                     (sb!c:policy env (= sb!c:store-coverage-data 0)))
+                     (sb-c:policy env (= sb-c:store-coverage-data 0)))
                 (car forms))
                (t `(progn ,@forms)))))
   ;; COND defined in terms of IF
@@ -239,24 +239,24 @@ evaluated as a PROGN."
            (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
            (lambda `(lambda ,lambda-list ,@lambda-guts))
            (named-lambda `(named-lambda ,name ,lambda-list
-                           ,@(when *top-level-form-p* '((declare (sb!c::top-level-form))))
+                           ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
                            ,@(when doc (list doc)) ,@lambda-guts))
            (dxable-args (extract-dx-args lambda-list decls))
            (inline-thing
             (or (sb!kernel::defstruct-generated-defn-p name lambda-list body)
                 (when (save-inline-expansion-p name)
                   ;; we want to attempt to inline, so complain if we can't
-                  (acond ((sb!c:maybe-inline-syntactic-closure lambda env)
+                  (acond ((sb-c:maybe-inline-syntactic-closure lambda env)
                           (list 'quote it))
                          (t
                           (#+sb-xc-host warn
-                           #-sb-xc-host sb!c:maybe-compiler-notify
+                           #-sb-xc-host sb-c:maybe-compiler-notify
                            "lexical environment too hairy, can't inline DEFUN ~S"
                            name)
                           nil))))))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb!c:%compiler-defun ',name t ,inline-thing ',dxable-args))
+           (sb-c:%compiler-defun ',name t ,inline-thing ',dxable-args))
          (%defun ',name ,named-lambda
                  ,@(when (or inline-thing dxable-args) (list inline-thing))
                  ,@(when dxable-args `(',dxable-args)))
@@ -267,7 +267,7 @@ evaluated as a PROGN."
          ;; function, then the warning ought not to have been issued at all.
          ,@(when (typep name '(cons (eql setf)))
              `((eval-when (:compile-toplevel :execute)
-                 (sb!c::warn-if-setf-macro ',name))
+                 (sb-c::warn-if-setf-macro ',name))
                ',name))))))
 
 
@@ -284,7 +284,7 @@ evaluated as a PROGN."
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
      (%defvar ',var
-              (sb!c:source-location)
+              (sb-c:source-location)
               ,@(and valp
                      `((unless (%boundp ',var) ,val)))
               ,@(and docp
@@ -301,7 +301,7 @@ evaluated as a PROGN."
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
-     (%defparameter ',var ,val (sb!c:source-location)
+     (%defparameter ',var ,val (sb-c:source-location)
                     ,@(and docp
                            `(',doc)))))
 
@@ -309,7 +309,7 @@ evaluated as a PROGN."
   (sb!xc:proclaim `(global ,name))
   (when assign-it-p
     (set-symbol-global-value name value))
-  (sb!c::process-variable-declaration
+  (sb-c::process-variable-declaration
    name 'always-bound
    ;; don't "weaken" the proclamation if it's in fact always bound now
    (if (eq (info :variable :always-bound name) :always-bound)
@@ -671,7 +671,7 @@ evaluated as a PROGN."
                    (name (cadr handler)))
                (cond ((and (eq quote 'function)
                            (or (assq name (local-functions))
-                               (sb!c::fun-locally-defined-p name env)))
+                               (sb-c::fun-locally-defined-p name env)))
                       `(cons ,(case (car test)
                                 ((named-lambda function) test)
                                 (t `(load-time-value ,test t)))
@@ -691,7 +691,7 @@ evaluated as a PROGN."
                       ;; an apparent use of the form at runtime,
                       ;; so instead use SAFE-FDEFN-FUN on the fdefn.
                       (when (eq (car handler) 'function)
-                        (dummy-forms `(sb!c:safe-fdefn-fun
+                        (dummy-forms `(sb-c:safe-fdefn-fun
                                        (load-time-value
                                         (find-or-create-fdefn ',name) t))))
                       ;; Resolve to an fdefn at load-time.
@@ -754,7 +754,7 @@ evaluated as a PROGN."
                        `(find-classoid-cell ',type :create t))
                       (t ; No runtime consing here- not a closure.
                        `(named-lambda (%handler-bind ,type) (c)
-                          (declare (optimize (sb!c::verify-arg-count 0)))
+                          (declare (optimize (sb-c::verify-arg-count 0)))
                           (typep c ',type))))
                 ;; Compute the handler expression.
                 ;; Unless the expression is ({FUNCTION|QUOTE} <sym>), then create a
@@ -846,7 +846,7 @@ specification."
                          ;; Need to catch FP errors here!
                          #!+x86 (multiple-value-prog1 ,form (float-wait)))
                        ,@(reverse local-funs))
-               (declare (optimize (sb!c::check-tag-existence 0)))
+               (declare (optimize (sb-c::check-tag-existence 0)))
                (block ,block
                  ;; KLUDGE: We use a dx CONS cell instead of just assigning to
                  ;; the variable directly, so that we can stack allocate

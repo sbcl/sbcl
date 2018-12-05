@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (declaim (special *compiler-error-bailout*))
 
@@ -283,7 +283,7 @@
                 (:alien
                  (info :variable :alien-info name))
                 ;; FIXME: The return value in this case should really be
-                ;; of type SB!C::LEAF.  I don't feel too badly about it,
+                ;; of type SB-C::LEAF.  I don't feel too badly about it,
                 ;; because the MACRO idiom is scattered throughout this
                 ;; file, but it should be cleaned up so we're not
                 ;; throwing random conses around.  --njf 2002-03-23
@@ -1020,7 +1020,7 @@
                             (load-time-value
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.
-                              (mapcar #'find-package '(sb!c sb!int sb!impl
+                              (mapcar #'find-package '(sb-c sb!int sb!impl
                                                        sb!kernel sb!pcl))
                              t))))))
     (and *allow-instrumenting*

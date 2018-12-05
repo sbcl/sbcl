@@ -29,7 +29,7 @@
 (in-package "SB!FASL")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (use-package "SB-COREFILE")) ; not SB!COREFILE
+  (use-package "SB-COREFILE")) ; not SB-COREFILE
 
 (defconstant core-magic
   (logior (ash (sb!xc:char-code #\S) 24)
@@ -233,7 +233,7 @@
   ;; a BIGNUM if the host's fixnum is limited in size.
   ;; So it's not clear whether this test belongs here, because if we do need it,
   ;; then it best belongs where we assign space addresses in the first place.
-  (let ((target-space-alignment sb!c:+backend-page-bytes+))
+  (let ((target-space-alignment sb-c:+backend-page-bytes+))
     (unless (zerop (rem byte-address target-space-alignment))
       (error "The byte address #X~X is not aligned on a #X~X-byte boundary."
              byte-address target-space-alignment)))
@@ -781,7 +781,7 @@ core and return a descriptor to it."
         (low-bits (double-float-low-bits x)))
     (ecase sb-vm:n-word-bits
       (32
-       (ecase sb!c:*backend-byte-order*
+       (ecase sb-c:*backend-byte-order*
          (:little-endian
           (write-wordindexed/raw address index low-bits)
           (write-wordindexed/raw address (1+ index) high-bits))
@@ -789,7 +789,7 @@ core and return a descriptor to it."
           (write-wordindexed/raw address index high-bits)
           (write-wordindexed/raw address (1+ index) low-bits))))
       (64
-       (let ((bits (ecase sb!c:*backend-byte-order*
+       (let ((bits (ecase sb-c:*backend-byte-order*
                      (:little-endian (logior low-bits (ash high-bits 32)))
                      (:big-endian (logior (logand high-bits #xffffffff)
                                           (ash low-bits 32))))))
@@ -1200,7 +1200,7 @@ core and return a descriptor to it."
       (built-in-classoid
        (let ((translation (specifier-type type-name)))
          (aver (not (contains-unknown-type-p translation)))
-         (let ((predicate (find translation sb!c::*backend-type-predicates*
+         (let ((predicate (find translation sb-c::*backend-type-predicates*
                                 :test #'type= :key #'car)))
            (cond (predicate (cdr predicate))
                  ((eq type-name 'stream) 'streamp)
@@ -1785,7 +1785,7 @@ core and return a descriptor to it."
   (let (syms)
     (with-package-iterator (iter '("SB!PCL" "SB!MOP" "SB!GRAY" "SB!SEQUENCE"
                                    "SB!PROFILE" "SB!EXT" "SB-VM"
-                                   "SB!C" "SB!FASL" "SB!DEBUG")
+                                   "SB-C" "SB!FASL" "SB!DEBUG")
                                  :external)
       (loop
          (multiple-value-bind (foundp sym accessibility package) (iter)
@@ -2003,7 +2003,7 @@ core and return a descriptor to it."
     (push stuff (cdr gf))))
 
 (defun attach-classoid-cells-to-symbols (hashtable)
-  (let ((num (sb!c::meta-info-number (sb!c::meta-info :type :classoid-cell)))
+  (let ((num (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
         (layout (gethash 'sb!kernel::classoid-cell *cold-layouts*)))
     (when (plusp (hash-table-count *classoid-cells*))
       (aver layout))
@@ -2260,7 +2260,7 @@ core and return a descriptor to it."
       (ecase (car item)
         (:relative (relative (cdr item)))
         (:absolute (absolute (cdr item)))))
-    (number-to-core (sb!c::pack-code-fixup-locs (absolute) (relative)))))
+    (number-to-core (sb-c::pack-code-fixup-locs (absolute) (relative)))))
 
 #!+sb-dynamic-core
 (defun dyncore-note-symbol (symbol-name datap)
@@ -2667,7 +2667,7 @@ core and return a descriptor to it."
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
-            (sb!c::%defconstant
+            (sb-c::%defconstant
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
                (push (cold-cons (cold-intern name) (list-to-core rest))
@@ -2746,7 +2746,7 @@ core and return a descriptor to it."
   (progn immobile-p) ; potentially unused
   (let* (;; The number of constants is rounded up to even (if required)
             ;; to ensure that the code vector will be properly aligned.
-            (aligned-n-boxed-words (align-up n-boxed-words sb!c::code-boxed-words-align))
+            (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
                   (or #!+immobile-code (and (eql immobile-p 1) *immobile-varyobj*)
@@ -3109,7 +3109,7 @@ core and return a descriptor to it."
           (format t "#define ~A ~A~A /* 0x~X ~@[ -- ~A ~]*/~%" name value suffix value doc))))
     (terpri))
 
-  (format t "#define BACKEND_PAGE_BYTES ~D~%" sb!c:+backend-page-bytes+)
+  (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
   #!+gencgc ; value never needed in Lisp, so therefore not a defconstant
   (format t "#define GENCGC_CARD_SHIFT ~D~%"
             (1- (integer-length sb-vm:gencgc-card-bytes)))
@@ -3125,7 +3125,7 @@ core and return a descriptor to it."
   ;; Assembly code needs only the constants for UNDEFINED_[ALIEN_]FUN_ERROR
   ;; but to avoid imparting that knowledge here, we'll expose all error
   ;; number constants except for OBJECT-NOT-<x>-ERROR ones.
-  (loop for (description name) across sb!c:+backend-internal-errors+
+  (loop for (description name) across sb-c:+backend-internal-errors+
         for i from 0
         when (stringp description)
         do (format t "#define ~A ~D~%" (c-symbol-name name) i))
@@ -3153,7 +3153,7 @@ core and return a descriptor to it."
   #!+sb-safepoint
   (format t "#define GC_SAFEPOINT_TRAP_ADDR ((void*)0x~XUL) /* ~:*~A */~%"
             (+ sb-vm:gc-safepoint-page-addr
-               sb!c:+backend-page-bytes+
+               sb-c:+backend-page-bytes+
                (- sb-vm:gc-safepoint-trap-offset)))
 
   (dolist (symbol '(sb-vm:float-traps-byte
@@ -3171,9 +3171,9 @@ core and return a descriptor to it."
   ;; C code needs strings for describe_internal_error()
   (format stream "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
           (map 'list 'sb!kernel::!c-stringify-internal-error
-               sb!c:+backend-internal-errors+))
+               sb-c:+backend-internal-errors+))
   (format stream "#define INTERNAL_ERROR_NARGS {~{~S~^, ~}}~2%"
-          (map 'list #'cddr sb!c:+backend-internal-errors+)))
+          (map 'list #'cddr sb-c:+backend-internal-errors+)))
 
 (defun write-tagnames-h (out)
   (labels
@@ -3362,8 +3362,8 @@ core and return a descriptor to it."
     int size;
     int position;
 };~2%")
-    (write-array "sc_and_offset_sc_number_bytes" sb!c::+sc+offset-scn-bytes+)
-    (write-array "sc_and_offset_offset_bytes"    sb!c::+sc+offset-offset-bytes+)))
+    (write-array "sc_and_offset_sc_number_bytes" sb-c::+sc+offset-scn-bytes+)
+    (write-array "sc_and_offset_offset_bytes"    sb-c::+sc+offset-offset-bytes+)))
 
 ;;;; writing map file
 
@@ -3452,10 +3452,10 @@ III. initially undefined function references (alphabetically):
   (force-output core-file)
   (let* ((posn (file-position core-file))
          (bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
-         (pages (ceiling bytes sb!c:+backend-page-bytes+))
-         (total-bytes (* pages sb!c:+backend-page-bytes+)))
+         (pages (ceiling bytes sb-c:+backend-page-bytes+))
+         (total-bytes (* pages sb-c:+backend-page-bytes+)))
 
-    (file-position core-file (* sb!c:+backend-page-bytes+ (1+ data-page)))
+    (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
     (when verbose
       (format t "writing ~S byte~:P [~S page~:P] from ~S~%"
               total-bytes pages gspace))
@@ -3518,7 +3518,7 @@ III. initially undefined function references (alphabetically):
                  usage ptes (+ pte-offset sb-vm:n-word-bytes))))
     (force-output core-file)
     (let ((posn (file-position core-file)))
-      (file-position core-file (* sb!c:+backend-page-bytes+ (1+ data-page)))
+      (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
       (write-bigvec-as-sequence ptes core-file :end pte-bytes)
       (force-output core-file)
       (file-position core-file posn))
@@ -3795,7 +3795,7 @@ III. initially undefined function references (alphabetically):
       (dolist (pair (sort (%hash-table-alist *code-fixup-notes*) #'< :key #'car))
         (write-wordindexed (make-random-descriptor (car pair))
                            sb-vm::code-fixups-slot (repack-fixups (cdr pair))))
-      (cold-set 'sb!c::*!cold-allocation-point-fixups*
+      (cold-set 'sb-c::*!cold-allocation-point-fixups*
                 (vector-in-core *allocation-point-fixup-notes*))
       (when core-file-name
         (finish-symbols))
@@ -3838,7 +3838,7 @@ III. initially undefined function references (alphabetically):
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb-vm:primitive-object-name obj))))))
         (dolist (class '(classoid defstruct-description hash-table layout package
-                         sb!c::compiled-debug-info sb!c::compiled-debug-fun))
+                         sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class)) stream)))
         (with-open-file (stream (format nil "~A/thread-init.inc" c-header-dir-name)

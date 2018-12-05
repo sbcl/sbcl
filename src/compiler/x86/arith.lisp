@@ -322,7 +322,7 @@
   (:arg-types unsigned-num signed-num))
 
 (define-vop (mask-signed-field-fixnum)
-  (:translate sb!c::mask-signed-field)
+  (:translate sb-c::mask-signed-field)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target r))
   (:arg-types (:constant (eql #.n-fixnum-bits)) t)
@@ -928,7 +928,7 @@ constant shift greater than word length")))
     (inst sar result :cl)
     (inst and result (lognot fixnum-tag-mask))))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (defknown %lea (integer integer (member 1 2 4 8) (signed-byte 32))
   integer
@@ -1476,8 +1476,8 @@ constant shift greater than word length")))
              fast-ash-left/unsigned=>unsigned))
 (deftransform ash-left-mod32 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb!c::constant-lvar-p count)
-    (sb!c::give-up-ir1-transform))
+  (when (sb-c::constant-lvar-p count)
+    (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
 
 (define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
@@ -1489,11 +1489,11 @@ constant shift greater than word length")))
              fast-ash-left/fixnum=>fixnum))
 (deftransform ash-left-modfx ((integer count)
                               (fixnum (unsigned-byte 5)))
-  (when (sb!c::constant-lvar-p count)
-    (sb!c::give-up-ir1-transform))
+  (when (sb-c::constant-lvar-p count)
+    (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-modfx/fixnum=>fixnum integer count))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (defknown sb-vm::%lea-mod32 (integer integer (member 1 2 4 8) (signed-byte 32))
   (unsigned-byte 32)
@@ -1913,7 +1913,7 @@ constant shift greater than word length")))
     (inst shr tmp 18)
     (inst xor y tmp)))
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 (defun mask-result (class width result)
   (ecase class

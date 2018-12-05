@@ -759,7 +759,7 @@ line break."
                            (and pred (fboundp pred)
                                 (symbol-function pred))))))))
       ;; avoid compiling code for CONS, ARRAY, VECTOR, etc
-      (awhen (assoc ctype sb!c::*backend-type-predicates* :test #'type=)
+      (awhen (assoc ctype sb-c::*backend-type-predicates* :test #'type=)
         (symbol-function (cdr it)))
       ;; OK, compile something
       (let ((name
@@ -812,9 +812,9 @@ line break."
             :operation operation)))
 
 (defun defer-type-checker (entry)
-  (let ((saved-nonce sb!c::*type-cache-nonce*))
+  (let ((saved-nonce sb-c::*type-cache-nonce*))
     (lambda (obj)
-      (let ((nonce sb!c::*type-cache-nonce*))
+      (let ((nonce sb-c::*type-cache-nonce*))
         (if (eq nonce saved-nonce)
             nil
             (let ((ctype (specifier-type (pprint-dispatch-entry-type entry))))
@@ -848,7 +848,7 @@ line break."
                           (lambda (c)
                             (warn "~S is not a recognized type specifier"
                                   (parse-unknown-type-specifier c)))))
-                      (sb!c::careful-specifier-type type))
+                      (sb-c::careful-specifier-type type))
                     (error "~S is not a valid type-specifier" type)))
          (consp (and (cons-type-p ctype)
                      (eq (cons-type-cdr-type ctype) *universal-type*)

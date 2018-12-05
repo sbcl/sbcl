@@ -47,14 +47,14 @@
     (let ((fun
             ;; This tells the compiler where the lambda comes from, in case it
             ;; wants to report any problems.
-            (let ((sb!c::*source-form-context-alist*
+            (let ((sb-c::*source-form-context-alist*
                     (acons lambda *eval-source-context*
-                           sb!c::*source-form-context-alist*)))
+                           sb-c::*source-form-context-alist*)))
               (handler-bind (;; Compiler notes just clutter up the REPL:
                              ;; anyone caring about performance should not
                              ;; be using EVAL.
                              (compiler-note #'muffle-warning))
-                (sb!c:compile-in-lexenv lambda lexenv nil *eval-source-info*
+                (sb-c:compile-in-lexenv lambda lexenv nil *eval-source-info*
                                         *eval-tlf-index* (not call))))))
       (declare (function fun))
       (if call
@@ -102,12 +102,12 @@
            ;; undefined things can be accumulated [and
            ;; then thrown away, as it happens]). -- CSR,
            ;; 2002-10-24
-           (let* ((sb!c:*lexenv* lexenv)
-                  (sb!c::*free-funs* (make-hash-table :test 'equal))
-                  (sb!c::*free-vars* (make-hash-table :test 'eq))
-                  (sb!c::*undefined-warnings* nil))
+           (let* ((sb-c:*lexenv* lexenv)
+                  (sb-c::*free-funs* (make-hash-table :test 'equal))
+                  (sb-c::*free-vars* (make-hash-table :test 'eq))
+                  (sb-c::*undefined-warnings* nil))
              ;; FIXME: VALUES declaration
-             (sb!c::process-decls decls
+             (sb-c::process-decls decls
                                   vars
                                   funs
                                   :lexenv lexenv
@@ -150,7 +150,7 @@
   (declare (optimize (safety 1)))
   ;; (aver (lexenv-simple-p lexenv))
   (incf *eval-calls*)
-  (sb!c:with-compiler-error-resignalling
+  (sb-c:with-compiler-error-resignalling
     (let ((exp (macroexpand original-exp lexenv)))
       (handler-bind ((eval-error
                        (lambda (condition)
@@ -183,8 +183,8 @@
                   (error "wrong number of args to FUNCTION:~% ~S" exp))
                 (let ((name (second exp)))
                   (if (and (legal-fun-name-p name)
-                           (not (consp (let ((sb!c:*lexenv* lexenv))
-                                         (sb!c:lexenv-find name funs)))))
+                           (not (consp (let ((sb-c:*lexenv* lexenv))
+                                         (sb-c:lexenv-find name funs)))))
                       (%coerce-name-to-fun name)
                       ;; FIXME: This is a bit wasteful: it would be nice to call
                       ;; COMPILE-IN-LEXENV with the lambda-form directly, but
@@ -234,7 +234,7 @@
                 (destructuring-bind (eval-when situations &rest body) exp
                   (declare (ignore eval-when))
                   (multiple-value-bind (ct lt e)
-                      (sb!c:parse-eval-when-situations situations)
+                      (sb-c:parse-eval-when-situations situations)
                     ;; CLHS 3.8 - Special Operator EVAL-WHEN: The use of
                     ;; the situation :EXECUTE (or EVAL) controls whether
                     ;; evaluation occurs for other EVAL-WHEN forms; that
@@ -250,20 +250,20 @@
                 (simple-eval-locally (rest exp) lexenv))
                ((macrolet)
                 (destructuring-bind (definitions &rest body) (rest exp)
-                  (let ((sb!c:*lexenv* lexenv))
-                    (sb!c::funcall-in-macrolet-lexenv
+                  (let ((sb-c:*lexenv* lexenv))
+                    (sb-c::funcall-in-macrolet-lexenv
                      definitions
                      (lambda (&optional funs)
-                       (simple-eval-locally body sb!c:*lexenv*
+                       (simple-eval-locally body sb-c:*lexenv*
                                             :funs funs))
                      :eval))))
                ((symbol-macrolet)
                 (destructuring-bind (definitions &rest body) (rest exp)
-                  (let ((sb!c:*lexenv* lexenv))
-                    (sb!c::funcall-in-symbol-macrolet-lexenv
+                  (let ((sb-c:*lexenv* lexenv))
+                    (sb-c::funcall-in-symbol-macrolet-lexenv
                      definitions
                      (lambda (&optional vars)
-                       (simple-eval-locally body sb!c:*lexenv*
+                       (simple-eval-locally body sb-c:*lexenv*
                                             :vars vars))
                      :eval))))
                ((if)
@@ -302,7 +302,7 @@
         (simple-eval-in-lexenv exp lexenv)
         (sb!eval:eval-in-native-environment exp lexenv)))
   #!+sb-fasteval
-  (sb!c:with-compiler-error-resignalling
+  (sb-c:with-compiler-error-resignalling
    (sb!interpreter:eval-in-environment exp lexenv))
   #!-(or sb-eval sb-fasteval)
   (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv))))
@@ -318,7 +318,7 @@
 (defun eval-tlf (original-exp tlf-index &optional lexenv)
   (let ((*eval-source-context* original-exp)
         (*eval-tlf-index* tlf-index)
-        (*eval-source-info* sb!c::*source-info*))
+        (*eval-source-info* sb-c::*source-info*))
     (eval-in-lexenv original-exp lexenv)))
 
 ;;; miscellaneous full function definitions of things which are

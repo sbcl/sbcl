@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!C")
+(in-package "SB-C")
 
 ;;; If non-NIL, emit assembly code. If NIL, emit VOP templates.
 (defvar *emit-assembly-code-not-vops-p* nil)

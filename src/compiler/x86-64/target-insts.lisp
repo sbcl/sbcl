@@ -450,7 +450,7 @@
        (t
         (handle-break-args #'snarf-error-junk trap stream dstate))))))
 
-(defun sb!c::convert-alloc-point-fixups (code locs)
+(defun sb-c::convert-alloc-point-fixups (code locs)
   ;; Find the instruction which jumps over the profiling code,
   ;; and record the offset, and not the instruction that makes the call
   ;; to enable the counter. The instructions preceding the call comprise

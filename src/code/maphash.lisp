@@ -22,7 +22,7 @@
 
 (define-compiler-macro maphash (&whole form function-designator hash-table
                                 &environment env)
-  (when (sb!c:policy env (> space speed))
+  (when (sb-c:policy env (> space speed))
     (return-from maphash form))
   (with-unique-names (fun table size i kv-vector key value)
     `(let* ((,fun (%coerce-callable-to-fun ,function-designator))
@@ -50,7 +50,7 @@
                     ;; so (1- I) isn't checked for being an INDEX, but would
                     ;; nonetheless be checked against the array bound despite
                     ;; being obviously valid; so we force elision of the test.
-                    (locally (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                    (locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                       (aref ,kv-vector (1- ,i)))))
                (unless (empty-ht-slot-p ,key)
                  (funcall ,fun ,key ,value)))))))))
@@ -102,7 +102,7 @@ for."
                             (unless (empty-ht-slot-p value)
                               (let ((key
                                      (locally
-                                      (declare (optimize (sb!c::insert-array-bounds-checks 0)))
+                                      (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                                       (aref kv-vector (1- i)))))
                                 (unless (empty-ht-slot-p key)
                                   (return (values t key value)))))))))))
