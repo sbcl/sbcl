@@ -44,13 +44,6 @@
 ;;; "target's floating point is IEEE" in the code, but I can't see how
 ;;; to express that.
 ;;;
-;;; KLUDGE: It's sort of weird that these functions return signed
-;;; 32-bit values instead of unsigned 32-bit values. This is the way
-;;; that the CMU CL machine-dependent functions behaved, and I've
-;;; copied that behavior, but it seems to me that it'd be more
-;;; idiomatic to return unsigned 32-bit values. Maybe someday the
-;;; machine-dependent functions could be tweaked to return unsigned
-;;; 32-bit values?
 (defun single-float-bits (x)
   (declare (type single-float x))
   (assert (= (float-radix x) 2))
