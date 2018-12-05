@@ -955,7 +955,7 @@
 ;;; (OR (SIGNED-BYTE 32) (UNSIGNED-BYTE 32)), so we provide a more
 ;;; restricted emitter here.
 (defun emit-signed-dword (segment value)
-  (declare (type sb!assem:segment segment)
+  (declare (type sb-assem:segment segment)
            (type (signed-byte 32) value))
   (declare (inline emit-dword))
   (emit-dword segment value))
@@ -1154,7 +1154,7 @@
 ;;; this use of REG (we can't actually assert that since we don't know
 ;;; which REX bit should have been set, nor which bits were set).
 ;;; However, we can assert absence of REX if so called for.
-(declaim (ftype (sfunction (reg sb!assem:segment) (mod 8)) reg-encoding))
+(declaim (ftype (sfunction (reg sb-assem:segment) (mod 8)) reg-encoding))
 (defun reg-encoding (reg segment &aux (id (reg-id reg)))
   (cond ((and (is-gpr-id-p id)
               (eq (gpr-id-size-class id) +size-class-byte+)
@@ -1212,7 +1212,7 @@
 ;;; this saves some consing, but also allows removal of 2 or 3 storage classes.
 ;;; (i.e. We should never need to ask for a vop temporary that is DWORD-REG
 ;;; because you can't usefully pack 2 dwords in a qword)
-(defun sb!assem::perform-operand-lowering (operands)
+(defun sb-assem::perform-operand-lowering (operands)
   (mapcar (lambda (operand)
             (cond ((typep operand '(cons tn (eql :high-byte)))
                    (get-gpr :byte (+ 16 (the (mod 4) (tn-offset (car operand))))))
@@ -2430,7 +2430,7 @@
 ;;; Emit a sequence of single- or multi-byte NOPs to fill AMOUNT many
 ;;; bytes with the smallest possible number of such instructions.
 (defun emit-long-nop (segment amount)
-  (declare (type sb!assem:segment segment)
+  (declare (type sb-assem:segment segment)
            (type index amount))
   ;; Pack all instructions into one byte vector to save space.
   (let* ((bytes #.(!coerce-to-specialized
@@ -3438,7 +3438,7 @@
                             collect (prog1 (ldb (byte 8 0) val)
                                       (setf val (ash val -8)))))))))
 
-(defun sb!assem::%mark-used-labels (operand)
+(defun sb-assem::%mark-used-labels (operand)
   (when (typep operand 'ea)
     (let ((disp (ea-disp operand)))
       (typecase disp
@@ -3449,7 +3449,7 @@
 
 (defun sb-c::branch-opcode-p (mnemonic)
   (member mnemonic (load-time-value
-                    (mapcar #'sb!assem::op-encoder-name
+                    (mapcar #'sb-assem::op-encoder-name
                             '(call ret jmp jrcxz break int iret
                               loop loopz loopnz syscall
                               byte word dword)) ; unexplained phenomena

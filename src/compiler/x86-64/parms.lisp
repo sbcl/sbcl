@@ -13,8 +13,8 @@
 
 (in-package "SB-VM")
 
-(defconstant sb!assem:assem-scheduler-p nil)
-(defconstant sb!assem:+inst-alignment-bytes+ 1)
+(defconstant sb-assem:assem-scheduler-p nil)
+(defconstant sb-assem:+inst-alignment-bytes+ 1)
 
 (defconstant +backend-fasl-file-implementation+ :x86-64)
 (defconstant-eqx +fixup-kinds+ #(:absolute :relative :absolute64)

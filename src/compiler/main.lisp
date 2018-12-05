@@ -654,7 +654,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                            *compiler-trace-output*)))
                 (generate-code component))
 
-            (let ((bytes (sb!assem:segment-contents-as-vector segment))
+            (let ((bytes (sb-assem:segment-contents-as-vector segment))
                   (object *compile-object*)
                   (*elsewhere-label* elsewhere-label)) ; KLUDGE
 

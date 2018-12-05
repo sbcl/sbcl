@@ -258,7 +258,7 @@
     (let* ((stream (open name
                          :direction :output
                          :if-exists :supersede
-                         :element-type 'sb!assem:assembly-unit))
+                         :element-type 'sb-assem:assembly-unit))
            (res (make-fasl-output :stream stream)))
       ;; Before the actual FASL header, write a shebang line using the current
       ;; runtime path, so our fasls can be executed directly from the shell.
@@ -956,7 +956,7 @@
 ;;;; component (function) dumping
 
 (defun dump-segment (segment code-length fasl-output)
-  (declare (type sb!assem:segment segment)
+  (declare (type sb-assem:segment segment)
            (type fasl-output fasl-output))
   (let* ((stream (fasl-output-stream fasl-output))
          (n-written (write-segment-contents segment stream)))

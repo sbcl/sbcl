@@ -369,7 +369,7 @@
                                    (car pieces)))
                   forms)))
         `(defun ,(symbolicate "EMIT-" name) (segment ,@(arg-names))
-           (declare (type sb!assem:segment segment) ,@(arg-types))
+           (declare (type sb-assem:segment segment) ,@(arg-types))
            ,@(ecase *backend-byte-order*
                (:little-endian (nreverse forms))
                (:big-endian forms))

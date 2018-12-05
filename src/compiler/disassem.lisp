@@ -34,7 +34,7 @@
 ;; and disassembler for other supported backends,
 ;; if that backend has been converted to use a distinct ASM package.
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter sb!assem::*backend-instruction-set-package*
+  (defparameter sb-assem::*backend-instruction-set-package*
     (find-package #.(sb-cold::backend-asm-package-name))))
 
 ;; How many columns of output to allow for the address preceding each line.

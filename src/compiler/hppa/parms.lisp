@@ -2,9 +2,9 @@
 
 ; normally assem-scheduler-p is t, and nil if debugging the assembler
 ; but apparently we don't trust any of the instruction definitions.
-(defconstant sb!assem:assem-scheduler-p nil)
-(defconstant sb!assem:+inst-alignment-bytes+ 4)
-(defconstant sb!assem:+assem-max-locations+ 68) ; see number-location
+(defconstant sb-assem:assem-scheduler-p nil)
+(defconstant sb-assem:+inst-alignment-bytes+ 4)
+(defconstant sb-assem:+assem-max-locations+ 68) ; see number-location
 
 (defconstant +backend-fasl-file-implementation+ :hppa)
 (defconstant +backend-page-bytes+ 4096)

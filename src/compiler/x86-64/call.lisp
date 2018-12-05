@@ -172,7 +172,7 @@
   (:info start-lab)
   (:generator 1
     (let ((nop-kind
-           (shiftf (sb!assem::asmstream-inter-function-padding sb!assem:*asmstream*)
+           (shiftf (sb-assem::asmstream-inter-function-padding sb-assem:*asmstream*)
                    :nop)))
       (emit-alignment n-lowtag-bits (if (eq nop-kind :nop) #x90 0)))
     (emit-label start-lab)

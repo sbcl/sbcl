@@ -98,7 +98,7 @@
 ;;; * INLINE-CONSTANT-VALUE: given a canonical constant descriptor, computes
 ;;;    two values:
 ;;;     1. A label that will be used to emit the constant (usually a
-;;;         sb!assem:label)
+;;;         sb-assem:label)
 ;;;     2. A value that will be returned to code generators referring to
 ;;;         the constant (on x86oids, an EA object)
 ;;; * SORT-INLINE-CONSTANTS: Receives a vector of unique constants;
@@ -282,7 +282,7 @@
                    (funcall gen vop)))))))
 
     ;; Truncate the final assembly code buffer to length
-    (sb!assem::truncate-section-to-length (asmstream-code-section asmstream))
+    (sb-assem::truncate-section-to-length (asmstream-code-section asmstream))
 
     (coverage-mark-lowering-pass component asmstream)
 
@@ -292,7 +292,7 @@
            (start-fun-table (gen-label))
            (n-entries (length (ir2-component-entries (component-info component))))
            (fun-table-section
-            (let ((section (sb!assem::make-section)))
+            (let ((section (sb-assem::make-section)))
               ;; Create space for the simple-fun offset table:
               ;;  1 uint32 * N simple-funs
               ;;  1 uint16 for the number of simple-funs
@@ -354,7 +354,7 @@
         (aver (= (+ index 2) (length octets))))
       (values segment (label-position end-text) fun-table
               (asmstream-elsewhere-label asmstream)
-              (sb!assem::segment-fixup-notes segment)))))
+              (sb-assem::segment-fixup-notes segment)))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))
@@ -381,7 +381,7 @@
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))
         (previous-mark))
-    (dolist (buffer (reverse (sb!assem::section-buf-chain
+    (dolist (buffer (reverse (sb-assem::section-buf-chain
                               (asmstream-code-section asmstream))))
       (dotimes (i (length buffer))
         (let ((item (svref buffer i)))

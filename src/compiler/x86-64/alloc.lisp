@@ -110,7 +110,7 @@
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
         ;; Yuck.
-        (in-elsewhere (sb!assem::assembling-to-elsewhere-p))
+        (in-elsewhere (sb-assem::assembling-to-elsewhere-p))
         ;; thread->alloc_region.free_pointer
         (free-pointer
          #!+sb-thread (thread-slot-ea thread-alloc-region-slot)

@@ -211,7 +211,7 @@
                                 :unknown-return))
     (inst compute-code code-tn lip lra-label temp)
     ;; Pick off the single-value case first.
-    (sb!assem:without-scheduling ()
+    (sb-assem:without-scheduling ()
 
       ;; Default register values for single-value return case.
       ;; The callee returns with condition bits CLEAR in the

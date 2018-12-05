@@ -199,7 +199,7 @@
 
      (defun ,name ,lambda-list
        (declare (ignorable ,(car lambda-list)))
-       (sb!assem:assemble ()
+       (sb-assem:assemble ()
          ,@body))))
 
 (defglobal *sc-vop-slots*

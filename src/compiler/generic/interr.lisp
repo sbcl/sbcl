@@ -179,7 +179,7 @@
   sb-c::basic-combination
   sb!sys:fd-stream
   layout
-  (sb!assem:segment object-not-assem-segment)
+  (sb-assem:segment object-not-assem-segment)
   sb-c::cblock
   sb-disassem:disassem-state
   sb-c::ctran

@@ -234,7 +234,7 @@ default-value-8
            (type unsigned-byte nvals) (type tn move-temp temp))
   (if (<= nvals 1)
       (progn
-        (sb!assem:without-scheduling ()
+        (sb-assem:without-scheduling ()
           (note-this-location vop :single-value-return)
           (move csp-tn ocfp-tn)
           (inst nop))
@@ -243,7 +243,7 @@ default-value-8
             (defaulting-done (gen-label))
             (default-stack-vals (gen-label)))
         ;; Branch off to the MV case.
-        (sb!assem:without-scheduling ()
+        (sb-assem:without-scheduling ()
           (note-this-location vop :unknown-return)
           (if (> nvals register-arg-count)
               (inst addic. temp nargs-tn (- (fixnumize register-arg-count)))
@@ -318,7 +318,7 @@ default-value-8
   (declare (type tn args nargs start count temp))
   (let ((variable-values (gen-label))
         (done (gen-label)))
-    (sb!assem:without-scheduling ()
+    (sb-assem:without-scheduling ()
       (inst b variable-values)
       (inst nop))
 
@@ -772,7 +772,7 @@ default-value-8
                   ;; it is essential (due to it being an interior
                   ;; pointer) that the function itself be in a
                   ;; register before the raw-addr is loaded.
-                  (sb!assem:without-scheduling ()
+                  (sb-assem:without-scheduling ()
                     (loadw function name-pass fdefn-fun-slot
                         other-pointer-lowtag)
                     (loadw entry-point name-pass fdefn-raw-addr-slot

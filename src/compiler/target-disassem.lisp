@@ -581,7 +581,7 @@
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
                                     (dstate-cur-offs dstate)))
                 (chunk
-                 (if (= sb!assem:+inst-alignment-bytes+ 1)
+                 (if (= sb-assem:+inst-alignment-bytes+ 1)
                      ;; Don't read beyond the segment. This can occur with DISASSEMBLE-MEMORY
                      ;; on a function whose code ends in pad bytes that are not an integral
                      ;; number of instructions, and maybe you're so unlucky as to be
@@ -851,7 +851,7 @@
                    control))))))
 
 (defun !compile-inst-printers ()
-  (let ((package sb!assem::*backend-instruction-set-package*)
+  (let ((package sb-assem::*backend-instruction-set-package*)
         (cache (list (list :printer) (list :prefilter) (list :labeller))))
     (do-symbols (symbol package)
       (awhen (get symbol 'instruction-flavors)
@@ -862,7 +862,7 @@
               (mapcar (lambda (x) (length (cdr x))) cache)))))
 
 ;;; Get the instruction-space, creating it if necessary.
-(defun get-inst-space (&key (package sb!assem::*backend-instruction-set-package*)
+(defun get-inst-space (&key (package sb-assem::*backend-instruction-set-package*)
                             force)
   (let ((ispace *disassem-inst-space*))
     (when (or force (null ispace))
@@ -1007,7 +1007,7 @@
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
-  (let ((alignment sb!assem:+inst-alignment-bytes+)
+  (let ((alignment sb-assem:+inst-alignment-bytes+)
         (arg-column
          (+ 2 ; for the leading "; " on each line
             (or *disassem-location-column-width* 0)
@@ -2242,7 +2242,7 @@
   ;; But if you need all these macros to exist for some reason,
   ;; then define one of the two following features to keep them:
   #!-(or sb-fluid sb-retain-assembler-macros)
-  (do-symbols (symbol sb!assem::*backend-instruction-set-package*)
+  (do-symbols (symbol sb-assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format)))
 

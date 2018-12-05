@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!ASSEM")
+(in-package "SB-ASSEM")
 
 ;;; FIXME: It might make sense to use SB-VM:BYTE-FOO values here
 ;;; instead of the various ASSEMBLY-UNIT-FOO things, and then define a

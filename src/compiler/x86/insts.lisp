@@ -2568,7 +2568,7 @@
 ;;; of confusion I have about what is allowed to reach the instruction
 ;;; emitter as a raw fixup, a fixup wrapped in an EA, a label wrapped
 ;;; in a fixup wrapped in an EA etc.
-(defun sb!assem::%mark-used-labels (operand)
+(defun sb-assem::%mark-used-labels (operand)
   (named-let recurse ((operand operand))
     (etypecase operand
       ((or integer tn keyword null))
@@ -2587,7 +2587,7 @@
 
 (defun sb-c::branch-opcode-p (mnemonic)
   (member mnemonic (load-time-value
-                    (mapcar #'sb!assem::op-encoder-name
+                    (mapcar #'sb-assem::op-encoder-name
                             '(call ret jmp jecxz break int iret
                               loop loopz loopnz syscall
                               byte word dword)) ; unexplained phenomena
