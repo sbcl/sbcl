@@ -400,7 +400,7 @@ variable: an unreadable object representing the error is printed instead.")
     (flet ((output-token (name)
              (declare (type simple-string name))
              (cond ((or (and (readtable-normalization readtable)
-                             (not (sb!unicode:normalized-p name :nfkc)))
+                             (not (sb-unicode:normalized-p name :nfkc)))
                         (symbol-quotep name readtable))
                     ;; Output NAME surrounded with |'s,
                     ;; and with any embedded |'s or \'s escaped.

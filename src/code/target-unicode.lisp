@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!UNICODE")
+(in-package "SB-UNICODE")
 
 (declaim (type simple-vector **special-numerics**))
 (sb-ext:define-load-time-global **special-numerics**

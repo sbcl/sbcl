@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!DYNCOUNT")
+(in-package "SB-DYNCOUNT")
 
 #|
 comments from CMU CL:

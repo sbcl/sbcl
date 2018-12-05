@@ -134,7 +134,7 @@
 
   (show-and-call !character-database-cold-init)
   (show-and-call !character-name-database-cold-init)
-  (show-and-call sb!unicode::!unicode-properties-cold-init)
+  (show-and-call sb-unicode::!unicode-properties-cold-init)
 
   ;; All sorts of things need INFO and/or (SETF INFO).
   (/show0 "about to SHOW-AND-CALL !GLOBALDB-COLD-INIT")

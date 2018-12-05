@@ -65,7 +65,7 @@
 ;;;;      United States of America
 ;;;;      +1-617-221-1000
 
-(in-package "SB!LOOP")
+(in-package "SB-LOOP")
 
 ;;;; The design of this LOOP is intended to permit, using mostly the same
 ;;;; kernel of code, up to three different "loop" macros:

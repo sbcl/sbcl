@@ -295,10 +295,7 @@
     ;; can without referring to any other packages.
     (dolist (package-data package-data-list)
       (let* ((name (package-data-name package-data))
-             (package (make-package
-                       name
-                       :nicknames (list (concatenate 'string "SB!" (subseq name 3)))
-                       :use nil)))
+             (package (make-package name :use nil)))
         (shadowing-import *shadowing-imports* package)
         ;; Walk the tree of exported names, exporting each name.
         (dolist (string (flatten (package-data-export package-data)))
@@ -358,8 +355,6 @@
   (when (find-package pkg-name)
     (delete-package pkg-name))
   (let ((pkg (make-package pkg-name
-                           :nicknames
-                           (list (concatenate 'string "SB!" (subseq pkg-name 3)))
                            :use '("CL" "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
                                   "SB-SYS" ; for SAP accessors
                                   ;; Dependence of the assembler on the compiler

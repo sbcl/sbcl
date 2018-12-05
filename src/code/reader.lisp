@@ -1112,7 +1112,7 @@ standard Lisp readtable when NIL."
     (reset-read-buffer token-buf)
     (macrolet ((clear-str-to-normalize ()
                `(progn
-                  (loop for char across (sb!unicode:normalize-string
+                  (loop for char across (sb-unicode:normalize-string
                                          (subseq str-to-normalize 0 normalize-ptr)
                                          :nfkc) do
                        (ouch-read-buffer char token-buf))
