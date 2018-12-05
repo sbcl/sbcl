@@ -329,7 +329,7 @@ error if any of PACKAGES is not a valid package designator."
                 #!+sb-fasteval
                 (unless (listp list)
                   (return-from lexically-unlocked-symbol-p
-                    (sb!interpreter::lexically-unlocked-symbol-p
+                    (sb-interpreter::lexically-unlocked-symbol-p
                      symbol list)))
                 list)
               sb-c::*disabled-package-locks*)))

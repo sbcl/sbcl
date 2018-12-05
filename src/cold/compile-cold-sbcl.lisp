@@ -217,18 +217,18 @@
             sb-sequence:substitute-if-not)
           ;; Fast interpreter
           #!+sb-fasteval
-          '(sb!interpreter:%fun-type
-            sb!interpreter:env-policy
-            sb!interpreter:eval-in-environment
-            sb!interpreter:find-lexical-fun
-            sb!interpreter:find-lexical-var
-            sb!interpreter::flush-everything
-            sb!interpreter::fun-lexically-notinline-p
-            sb!interpreter:lexenv-from-env
-            sb!interpreter::lexically-unlocked-symbol-p
-            sb!interpreter:list-locals
-            sb!interpreter:prepare-for-compile
-            sb!interpreter::reconstruct-syntactic-closure-env)
+          '(sb-interpreter:%fun-type
+            sb-interpreter:env-policy
+            sb-interpreter:eval-in-environment
+            sb-interpreter:find-lexical-fun
+            sb-interpreter:find-lexical-var
+            sb-interpreter::flush-everything
+            sb-interpreter::fun-lexically-notinline-p
+            sb-interpreter:lexenv-from-env
+            sb-interpreter::lexically-unlocked-symbol-p
+            sb-interpreter:list-locals
+            sb-interpreter:prepare-for-compile
+            sb-interpreter::reconstruct-syntactic-closure-env)
           ;; Other
           '(sb-debug::find-interrupted-name-and-frame
             sb-impl::encapsulate-generic-function

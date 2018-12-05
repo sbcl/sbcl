@@ -531,8 +531,8 @@
 (defknown %set-funcallable-instance-info (function index t) t ())
 
 #!+sb-fasteval
-(defknown sb!interpreter:fun-proto-fn (sb!interpreter:interpreted-function)
-  sb!interpreter::interpreted-fun-prototype (flushable))
+(defknown sb-interpreter:fun-proto-fn (sb-interpreter:interpreted-function)
+  sb-interpreter::interpreted-fun-prototype (flushable))
 
 
 (defknown %data-vector-and-index (array index)

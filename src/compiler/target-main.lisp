@@ -108,11 +108,11 @@
   (multiple-value-bind (sexpr lexenv)
       (typecase definition
         #!+sb-fasteval
-        (sb!interpreter:interpreted-function
-         (sb!interpreter:prepare-for-compile definition))
+        (sb-interpreter:interpreted-function
+         (sb-interpreter:prepare-for-compile definition))
         #!+sb-eval
-        (sb!eval:interpreted-function
-         (sb!eval:prepare-for-compile definition))
+        (sb-eval:interpreted-function
+         (sb-eval:prepare-for-compile definition))
         (t
          (values definition lexenv)))
     (multiple-value-bind (compiled-definition warnings-p failure-p)

@@ -121,8 +121,8 @@
 
 (sb-xc:deftype compiled-function ()
   '(and function
-        #!+sb-fasteval (not sb!interpreter:interpreted-function)
-        #!+sb-eval (not sb!eval:interpreted-function)))
+        #!+sb-fasteval (not sb-interpreter:interpreted-function)
+        #!+sb-eval (not sb-eval:interpreted-function)))
 
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))
 

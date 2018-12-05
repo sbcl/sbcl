@@ -184,12 +184,12 @@
         (return-from %fun-name
           (sb-mop:generic-function-name function)))
        #!+sb-eval
-       (sb!eval:interpreted-function
-        (return-from %fun-name (sb!eval:interpreted-function-debug-name function)))
+       (sb-eval:interpreted-function
+        (return-from %fun-name (sb-eval:interpreted-function-debug-name function)))
        #!+sb-fasteval
-       (sb!interpreter:interpreted-function
+       (sb-interpreter:interpreted-function
         (return-from %fun-name
-          (let ((name (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function))))
+          (let ((name (sb-interpreter:proto-fn-name (sb-interpreter:fun-proto-fn function))))
             (unless (eql name 0)
               name)))))))
   (%simple-fun-name (%fun-fun function)))
@@ -205,35 +205,35 @@
        (generic-function
         (setf (sb-mop:generic-function-name function) new-value))
        #!+sb-eval
-       (sb!eval:interpreted-function
-        (setf (sb!eval:interpreted-function-debug-name function) new-value))
+       (sb-eval:interpreted-function
+        (setf (sb-eval:interpreted-function-debug-name function) new-value))
        #!+sb-fasteval
-       (sb!interpreter:interpreted-function
-        (setf (sb!interpreter:proto-fn-name (sb!interpreter:fun-proto-fn function))
+       (sb-interpreter:interpreted-function
+        (setf (sb-interpreter:proto-fn-name (sb-interpreter:fun-proto-fn function))
               new-value)))))
   new-value)
 
 (defun %fun-lambda-list (function)
   (typecase function
     #!+sb-fasteval
-    (sb!interpreter:interpreted-function
-     (sb!interpreter:proto-fn-pretty-arglist
-      (sb!interpreter:fun-proto-fn function)))
+    (sb-interpreter:interpreted-function
+     (sb-interpreter:proto-fn-pretty-arglist
+      (sb-interpreter:fun-proto-fn function)))
     #!+sb-eval
-    (sb!eval:interpreted-function
-     (sb!eval:interpreted-function-debug-lambda-list function))
+    (sb-eval:interpreted-function
+     (sb-eval:interpreted-function-debug-lambda-list function))
     (t
      (%simple-fun-arglist (%fun-fun function)))))
 
 (defun (setf %fun-lambda-list) (new-value function)
   (typecase function
     #!+sb-fasteval
-    (sb!interpreter:interpreted-function
-     (setf (sb!interpreter:proto-fn-pretty-arglist
-            (sb!interpreter:fun-proto-fn function)) new-value))
+    (sb-interpreter:interpreted-function
+     (setf (sb-interpreter:proto-fn-pretty-arglist
+            (sb-interpreter:fun-proto-fn function)) new-value))
     #!+sb-eval
-    (sb!eval:interpreted-function
-     (setf (sb!eval:interpreted-function-debug-lambda-list function) new-value))
+    (sb-eval:interpreted-function
+     (setf (sb-eval:interpreted-function-debug-lambda-list function) new-value))
     ;; FIXME: Eliding general funcallable-instances for now.
     ((or simple-fun closure)
      (setf (%simple-fun-arglist (%fun-fun function)) new-value)))
@@ -252,7 +252,7 @@
     #!+sb-fasteval
     ;; Obtain a list of the right shape, usually with T for each
     ;; arg type, but respecting local declarations if any.
-    (sb!interpreter:interpreted-function (sb!interpreter:%fun-type function))
+    (sb-interpreter:interpreted-function (sb-interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
 ;;; A FUN-SRC structure appears in %SIMPLE-FUN-INFO of any function for

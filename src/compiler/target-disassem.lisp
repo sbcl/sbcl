@@ -1629,8 +1629,8 @@
          ;; FIXME: interpreted methods need to be compiled as above.
          (list thing (sb-pcl::%method-function-fast-function thing)))
     ((or (cons (eql lambda))
-         #!+sb-fasteval sb!interpreter:interpreted-function
-         #!+sb-eval sb!eval:interpreted-function)
+         #!+sb-fasteval sb-interpreter:interpreted-function
+         #!+sb-eval sb-eval:interpreted-function)
      (compile nil thing))
     (function thing)
     (t nil)))

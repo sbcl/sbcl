@@ -289,7 +289,7 @@
 ;;; This definition will be replaced after the interpreter is compiled.
 ;;; Until then we just always compile.
 #!+sb-fasteval
-(defun sb!interpreter:eval-in-environment (exp lexenv)
+(defun sb-interpreter:eval-in-environment (exp lexenv)
   (let ((exp (macroexpand exp lexenv)))
     (if (symbolp exp)
         (symbol-value exp)
@@ -300,10 +300,10 @@
   (let ((lexenv (or lexenv (make-null-lexenv))))
     (if (eq *evaluator-mode* :compile)
         (simple-eval-in-lexenv exp lexenv)
-        (sb!eval:eval-in-native-environment exp lexenv)))
+        (sb-eval:eval-in-native-environment exp lexenv)))
   #!+sb-fasteval
   (sb-c:with-compiler-error-resignalling
-   (sb!interpreter:eval-in-environment exp lexenv))
+   (sb-interpreter:eval-in-environment exp lexenv))
   #!-(or sb-eval sb-fasteval)
   (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv))))
 

@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!EVAL")
+(in-package "SB-EVAL")
 
 (!defparameter *eval-level* -1)
 (!defparameter *eval-verbose* nil)

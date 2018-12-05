@@ -177,9 +177,9 @@ only."
   ;; local function definitions (ordinary) can shadow a global macro
   (typecase env
     #!+(and sb-fasteval (host-feature sb-xc))
-    (sb!interpreter:basic-env
+    (sb-interpreter:basic-env
      (multiple-value-bind (kind def)
-         (sb!interpreter:find-lexical-fun env symbol)
+         (sb-interpreter:find-lexical-fun env symbol)
        (when def
          (return-from sb-xc:macro-function (when (eq kind :macro) def)))))
     (lexenv

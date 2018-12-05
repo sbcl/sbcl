@@ -841,8 +841,8 @@
   (typecase env
     (null nil)
     #!+(and sb-fasteval (host-feature sb-xc))
-    (sb!interpreter:basic-env
-     (values (sb!interpreter:find-lexical-fun env name)))
+    (sb-interpreter:basic-env
+     (values (sb-interpreter:find-lexical-fun env name)))
     (t
      (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
        (and fun (not (global-var-p fun)))))))
@@ -1636,7 +1636,7 @@
   (typecase thing
     (policy thing)
     #!+(and sb-fasteval (host-feature sb-xc))
-    (sb!interpreter:basic-env (sb!interpreter:env-policy thing))
+    (sb-interpreter:basic-env (sb-interpreter:env-policy thing))
     (null **baseline-policy**)
     (t (lexenv-policy (etypecase thing
                         (lexenv thing)

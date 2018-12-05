@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!INTERPRETER")
+(in-package "SB-INTERPRETER")
 
 (defstruct (interpreted-fun-prototype
              (:predicate proto-fn-p)

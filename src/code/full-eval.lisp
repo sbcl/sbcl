@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!EVAL")
+(in-package "SB-EVAL")
 
 ;; (declaim (optimize (speed 3) (debug 1) (safety 1)))
 

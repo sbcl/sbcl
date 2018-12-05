@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!INTERPRETER")
+(in-package "SB-INTERPRETER")
 
 ;; +NONE+ is not accidentally acceptable - as would be NIL -
 ;; to functions accepting a SEQUENCE type.

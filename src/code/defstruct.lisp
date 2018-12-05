@@ -402,7 +402,7 @@
          (sb-kernel:lexenv (sb-c::null-lexenv-p env))
          ;; a LOCALLY environment would be fine,
          ;; but is not an important case to handle.
-         #!+sb-fasteval (sb!interpreter:basic-env nil)
+         #!+sb-fasteval (sb-interpreter:basic-env nil)
          (null t))
        name-and-options slot-descriptions :target)
     `(progn ,@forms ',name)))

@@ -84,9 +84,9 @@
              (typecase env
                (null (global-expansion))
                #!+(and sb-fasteval (host-feature sb-xc))
-               (sb!interpreter:basic-env
+               (sb-interpreter:basic-env
                 (multiple-value-bind (cell kind frame-ptr def)
-                    (sb!interpreter:find-lexical-var env sym)
+                    (sb-interpreter:find-lexical-var env sym)
                   (declare (ignore cell frame-ptr))
                   (cond ((eq kind :macro) (values def t))
                         ((null kind) (global-expansion))

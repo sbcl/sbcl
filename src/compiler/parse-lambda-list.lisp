@@ -905,12 +905,12 @@
                       :minimum min :maximum max))
      #!+sb-eval
      (:eval
-      (error 'sb!eval::arg-count-program-error
+      (error 'sb-eval::arg-count-program-error
              ;; This is stupid. Maybe we should just say
              ;;  "error parsing special form"?
              ;; It would be more sensible than mentioning
              ;; a random nonstandard macro.
-             :kind 'sb!eval::program-destructuring-bind
+             :kind 'sb-eval::program-destructuring-bind
              :args input :lambda-list lambda-list
              :minimum min :maximum max))
      (t

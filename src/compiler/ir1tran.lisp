@@ -95,8 +95,8 @@
          (typecase env
            (null nil)
            #!+(and sb-fasteval (host-feature sb-xc))
-           (sb!interpreter:basic-env
-            (sb!interpreter::fun-lexically-notinline-p name env))
+           (sb-interpreter:basic-env
+            (sb-interpreter::fun-lexically-notinline-p name env))
            (t
             (let ((fun (cdr (assoc name (lexenv-funs env) :test #'equal))))
               ;; FIXME: this seems to omit FUNCTIONAL

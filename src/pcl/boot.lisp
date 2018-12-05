@@ -519,7 +519,7 @@ bootstrapping.
 
 (defun expand-defmethod (name proto-gf proto-method qualifiers lambda-list
                          body env)
-  (binding* (;; ENV could be of type SB!INTERPRETER:BASIC-ENV but I
+  (binding* (;; ENV could be of type SB-INTERPRETER:BASIC-ENV but I
              ;; don't care to figure out what parts of PCL would have
              ;; to change to accept that, so coerce.
              (env (sb-kernel:coerce-to-lexenv env))

@@ -1381,7 +1381,7 @@ register."
        ;; in backtraces, but if the debugger needs to detect that the frame is
        ;; interpreted for other purposes, it can specify PRETTY = NIL.
        (cond #!+sb-fasteval
-             ((and (typep name '(cons (eql sb!interpreter::.eval.)))
+             ((and (typep name '(cons (eql sb-interpreter::.eval.)))
                    pretty)
               (if (singleton-p (cdr name)) (cadr name) (cdr name)))
              (t name))))
@@ -1416,11 +1416,11 @@ register."
        ;; Show them as the name of the interpreted function being applied.
        #!+sb-fasteval
        ((let ((name (sb-c::compiled-debug-fun-name compiler-debug-fun)))
-          (when (typep name '(cons (eql sb!interpreter::.apply.)))
+          (when (typep name '(cons (eql sb-interpreter::.apply.)))
             ;; Find a variable named FUN.
-            (awhen (car (debug-fun-symbol-vars debug-fun 'sb!interpreter::fun))
+            (awhen (car (debug-fun-symbol-vars debug-fun 'sb-interpreter::fun))
               (let ((val (debug-var-value it frame))) ; Ensure it's a function
-                (when (typep val 'sb!interpreter:interpreted-function)
+                (when (typep val 'sb-interpreter:interpreted-function)
                   (%fun-name val))))))) ; Get its name
        ((sb-c::compiled-debug-fun-closure-save compiler-debug-fun)
         (%fun-name
