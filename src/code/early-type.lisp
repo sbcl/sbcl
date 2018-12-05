@@ -721,6 +721,15 @@
    :type (cons #||(member #.*simd-pack-element-types*) ||#)
    :read-only t))
 
+#!+sb-simd-pack-256
+(defstruct (simd-pack-256-type
+            (:include ctype (class-info (type-class-or-lose 'simd-pack-256)))
+            (:constructor %make-simd-pack-256-type (element-type))
+            (:copier nil))
+  (element-type (missing-arg)
+   :type (cons #||(member #.*simd-pack-element-types*) ||#)
+   :read-only t))
+
 #!+sb-simd-pack
 (defun make-simd-pack-type (element-type)
   (aver (neq element-type *wild-type*))
@@ -735,6 +744,19 @@
          (when (csubtypep element-type (specifier-type pack-type))
            (return (list pack-type)))))))
 
+#!+sb-simd-pack-256
+(defun make-simd-pack-256-type (element-type)
+  (aver (neq element-type *wild-type*))
+  (if (eq element-type *empty-type*)
+      *empty-type*
+      (%make-simd-pack-256-type
+       (dolist (pack-type *simd-pack-element-types*
+                (error "~S element type must be a subtype of ~
+                         ~{~/sb-impl:print-type-specifier/~#[~;, or ~
+                         ~:;, ~]~}."
+                       'simd-pack-256 *simd-pack-element-types*))
+         (when (csubtypep element-type (specifier-type pack-type))
+           (return (list pack-type)))))))
 
 ;;;; type utilities
 
@@ -1017,7 +1039,8 @@ expansion happened."
       (built-in-classoid t)
       (classoid nil)
       ;; HAIRY is just an s-expression, so it's dumpable. Same for simd-pack
-      ((or named-type character-set-type hairy-type #!+sb-simd-pack simd-pack-type)
+      ((or named-type character-set-type hairy-type #!+sb-simd-pack simd-pack-type
+                                                    #!+sb-simd-pack-256 simd-pack-256-type)
        t))))
 
 (setf (get '!specifier-type :sb-cold-funcall-handler/for-value)

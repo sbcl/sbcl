@@ -636,6 +636,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #ifdef SIMD_PACK_WIDETAG
         case SIMD_PACK_WIDETAG:
 #endif
+#ifdef SIMD_PACK_256_WIDETAG
+        case SIMD_PACK_256_WIDETAG:
+#endif
             continue;
         default:
           if (other_immediate_lowtag_p(widetag)

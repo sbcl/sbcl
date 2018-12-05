@@ -3810,6 +3810,64 @@ used for a COMPLEX component.~:@>"
            *empty-type*)))
 
   (!define-superclasses simd-pack ((simd-pack)) !cold-init-forms))
+
+#!+sb-simd-pack-256
+(progn
+  (!define-type-class simd-pack-256 :enumerable nil
+                      :might-contain-other-types nil)
+
+  ;; Though this involves a recursive call to parser, parsing context need not
+  ;; be passed down, because an unknown-type condition is an immediate failure.
+  (!def-type-translator simd-pack-256 (&optional (element-type-spec '*))
+     (if (eql element-type-spec '*)
+         (%make-simd-pack-256-type *simd-pack-element-types*)
+         (make-simd-pack-256-type (single-value-specifier-type element-type-spec))))
+
+  (!define-type-method (simd-pack-256 :negate) (type)
+     (let ((remaining (set-difference *simd-pack-element-types*
+                                      (simd-pack-256-type-element-type type)))
+           (not-simd-pack-256 (make-negation-type (specifier-type 'simd-pack-256))))
+       (if remaining
+           (type-union not-simd-pack-256 (%make-simd-pack-256-type remaining))
+           not-simd-pack-256)))
+
+  (!define-type-method (simd-pack-256 :unparse) (type)
+     (let ((eltypes (simd-pack-256-type-element-type type)))
+       (cond ((equal eltypes *simd-pack-element-types*)
+              'simd-pack-256)
+             ((= 1 (length eltypes))
+              `(simd-pack-256 ,(first eltypes)))
+             (t
+              `(or ,@(mapcar (lambda (eltype)
+                               `(simd-pack-256 ,eltype))
+                             eltypes))))))
+
+  (!define-type-method (simd-pack-256 :simple-=) (type1 type2)
+     (declare (type simd-pack-256-type type1 type2))
+     (values
+      (null (set-exclusive-or (simd-pack-256-type-element-type type1)
+                              (simd-pack-256-type-element-type type2)))
+      t))
+
+  (!define-type-method (simd-pack-256 :simple-subtypep) (type1 type2)
+     (declare (type simd-pack-256-type type1 type2))
+     (subsetp (simd-pack-256-type-element-type type1)
+              (simd-pack-256-type-element-type type2)))
+
+  (!define-type-method (simd-pack-256 :simple-union2) (type1 type2)
+     (declare (type simd-pack-256-type type1 type2))
+     (%make-simd-pack-256-type (union (simd-pack-256-type-element-type type1)
+                                  (simd-pack-256-type-element-type type2))))
+
+  (!define-type-method (simd-pack-256 :simple-intersection2) (type1 type2)
+     (declare (type simd-pack-256-type type1 type2))
+     (let ((intersection (intersection (simd-pack-256-type-element-type type1)
+                                       (simd-pack-256-type-element-type type2))))
+       (if intersection
+           (%make-simd-pack-256-type intersection)
+           *empty-type*)))
+
+  (!define-superclasses simd-pack-256 ((simd-pack-256)) !cold-init-forms))
 
 ;;;; utilities shared between cross-compiler and target system
 

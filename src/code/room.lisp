@@ -1130,8 +1130,9 @@ We could try a few things to mitigate this:
                ;; and/or visit the slots of each simple-fun but not the fun per se.
                )
             ,.(make-case '(or float (complex float) bignum
-                              #+sb-simd-pack simd-pack
-                              system-area-pointer)) ; nothing to do
+                           #+sb-simd-pack simd-pack
+                           #+sb-simd-pack-256 simd-pack-256
+                           system-area-pointer)) ; nothing to do
             ,.(make-case 'weak-pointer `(weak-pointer-value ,obj))
             ,.(make-case 'ratio `(%numerator ,obj) `(%denominator ,obj))
             ;; Visitor won't be invoked on (COMPLEX float)

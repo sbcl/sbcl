@@ -322,7 +322,8 @@
                (typep value
                       '(or
                         #-sb-xc-host
-                        (or unboxed-array #!+sb-simd-pack simd-pack)
+                        (or unboxed-array #!+sb-simd-pack simd-pack
+                                          #!+sb-simd-pack-256 simd-pack-256)
                         #+sb-xc-host
                         (and array (not (array t)))
                         symbol

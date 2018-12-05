@@ -152,6 +152,7 @@
   ((complex double-float) object-not-complex-double-float)
   #!+long-float ((complex long-float) object-not-complex-long-float)
   #!+sb-simd-pack simd-pack
+  #!+sb-simd-pack-256 simd-pack-256
   weak-pointer
   instance
   #!+sb-unicode

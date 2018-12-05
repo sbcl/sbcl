@@ -357,9 +357,18 @@
 #!+sb-simd-pack
 (!define-fop 88 :not-host (fop-simd-pack)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
-    (%make-simd-pack (fast-read-s-integer 8)
-                     (fast-read-u-integer 8)
-                     (fast-read-u-integer 8))))
+    (let ((tag (fast-read-s-integer 8)))
+      (cond #!+sb-simd-pack-256
+            ((logbitp 2 tag)
+             (%make-simd-pack-256 (logand tag #b11)
+                                  (fast-read-u-integer 8)
+                                  (fast-read-u-integer 8)
+                                  (fast-read-u-integer 8)
+                                  (fast-read-u-integer 8)))
+            (t
+             (%make-simd-pack tag
+                              (fast-read-u-integer 8)
+                              (fast-read-u-integer 8)))))))
 
 ;;;; loading lists
 

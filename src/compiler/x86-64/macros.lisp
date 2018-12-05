@@ -52,6 +52,14 @@
       ((single-sse-reg double-sse-reg)
        (aver (xmm-tn-p src))
        (inst movaps dst src))
+      #!+sb-simd-pack-256
+      ((int-avx2-reg avx2-reg)
+       (aver (xmm-tn-p src))
+       (inst vmovdqa dst src))
+      #!+sb-simd-pack-256
+      ((single-avx2-reg double-avx2-reg)
+       (aver (xmm-tn-p src))
+       (inst vmovaps dst src))
       (t
        (inst mov dst src)))))
 

@@ -373,6 +373,16 @@
                 (dump-integer-as-n-bytes (%simd-pack-low  x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-high x) 8 file))
               (equal-save-object x file))
+             #!+(and (not (host-feature sb-xc-host)) sb-simd-pack-256)
+             (simd-pack-256
+              (unless (equal-check-table x file)
+                (dump-fop 'fop-simd-pack file)
+                (dump-integer-as-n-bytes (logior (%simd-pack-256-tag x) 4) 8 file)
+                (dump-integer-as-n-bytes (%simd-pack-256-0 x) 8 file)
+                (dump-integer-as-n-bytes (%simd-pack-256-1 x) 8 file)
+                (dump-integer-as-n-bytes (%simd-pack-256-2 x) 8 file)
+                (dump-integer-as-n-bytes (%simd-pack-256-3 x) 8 file))
+              (equal-save-object x file))
              (t
               ;; This probably never happens, since bad things tend to
               ;; be detected during IR1 conversion.

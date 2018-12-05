@@ -939,6 +939,12 @@ between the ~A definition and the ~A definition"
       :translation simd-pack
       :codes (#.sb-vm:simd-pack-widetag)
       :prototype-form (%make-simd-pack-ub64 42 42))
+     #!+sb-simd-pack-256
+     (simd-pack-256
+      :translation simd-pack-256
+      :codes (#.sb-vm:simd-pack-256-widetag)
+      :prototype-form ;; (%make-simd-pack-256-ub64 42 42 42 42)
+      (%make-simd-pack-ub64 42 42))
      (real :translation real :inherits (number))
      (float
       :translation float

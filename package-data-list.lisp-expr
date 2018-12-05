@@ -942,16 +942,28 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "SCHEDULE-TIMER" "UNSCHEDULE-TIMER" "LIST-ALL-TIMERS"
 
                ;; SIMD pack
-               #!+sb-simd-pack("SIMD-PACK"
-                               "SIMD-PACK-P"
-                               "%MAKE-SIMD-PACK-UB32"
-                               "%MAKE-SIMD-PACK-UB64"
-                               "%MAKE-SIMD-PACK-DOUBLE"
-                               "%MAKE-SIMD-PACK-SINGLE"
-                               "%SIMD-PACK-UB32S"
-                               "%SIMD-PACK-UB64S"
-                               "%SIMD-PACK-DOUBLES"
-                               "%SIMD-PACK-SINGLES")
+               #!+sb-simd-pack
+               ("SIMD-PACK"
+                "SIMD-PACK-P"
+                "%MAKE-SIMD-PACK-UB32"
+                "%MAKE-SIMD-PACK-UB64"
+                "%MAKE-SIMD-PACK-DOUBLE"
+                "%MAKE-SIMD-PACK-SINGLE"
+                "%SIMD-PACK-UB32S"
+                "%SIMD-PACK-UB64S"
+                "%SIMD-PACK-DOUBLES"
+                "%SIMD-PACK-SINGLES")
+               #!+sb-simd-pack-256
+               ("SIMD-PACK-256"
+                "SIMD-PACK-256-P"
+                "%MAKE-SIMD-PACK-256-UB32"
+                "%MAKE-SIMD-PACK-256-UB64"
+                "%MAKE-SIMD-PACK-256-DOUBLE"
+                "%MAKE-SIMD-PACK-256-SINGLE"
+                "%SIMD-PACK-256-UB32S"
+                "%SIMD-PACK-256-UB64S"
+                "%SIMD-PACK-256-DOUBLES"
+                "%SIMD-PACK-256-SINGLES")
 
                ;; versioning utility
                "ASSERT-VERSION->="
@@ -1593,6 +1605,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%MAKE-LIST"
                "%MAKE-RATIO"
                #!+sb-simd-pack "%MAKE-SIMD-PACK"
+               #!+sb-simd-pack-256 "%MAKE-SIMD-PACK-256"
                "%MAKE-STRUCTURE-INSTANCE"
                "%MAKE-STRUCTURE-INSTANCE-ALLOCATOR"
                "%MAP" "%MAP-FOR-EFFECT-ARITY-1"
@@ -1650,9 +1663,14 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "%SET-SYMBOL-HASH"
                "%SIN" "%SIN-QUICK" "%SINGLE-FLOAT"
                "%SINH" "%SQRT" "%SXHASH-STRING" "%SXHASH-SIMPLE-STRING"
-               #!+sb-simd-pack("%SIMD-PACK-TAG"
-                               "%SIMD-PACK-LOW"
-                               "%SIMD-PACK-HIGH")
+               #!+sb-simd-pack
+               ("%SIMD-PACK-TAG"
+                "%SIMD-PACK-LOW"
+                "%SIMD-PACK-HIGH")
+               #!+sb-simd-pack-256
+               ("%SIMD-PACK-256-TAG"
+                "%SIMD-PACK-256-0" "%SIMD-PACK-256-1"
+                "%SIMD-PACK-256-2" "%SIMD-PACK-256-3")
                "%SXHASH-SIMPLE-SUBSTRING" "%TAN" "%TAN-QUICK" "%TANH"
                "THE*"
                "%UNARY-ROUND"
@@ -1891,6 +1909,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-LONG-FLOAT-ERROR"
                #!+sb-simd-pack
                "OBJECT-NOT-SIMD-PACK-ERROR"
+               #!+sb-simd-pack-256
+               "OBJECT-NOT-SIMD-PACK-256-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-COMPLEX-SINGLE-FLOAT-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-DOUBLE-FLOAT-ERROR"
                "OBJECT-NOT-SIMPLE-ARRAY-ERROR"
@@ -2003,6 +2023,11 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                                "SIMD-PACK-TYPE"
                                "SIMD-PACK-TYPE-ELEMENT-TYPE"
                                "*SIMD-PACK-ELEMENT-TYPES*")
+               #!+sb-simd-pack-256("SIMD-PACK-256-SINGLE"
+                                   "SIMD-PACK-256-DOUBLE"
+                                   "SIMD-PACK-256-INT"
+                                   "SIMD-PACK-256-TYPE"
+                                   "SIMD-PACK-256-TYPE-ELEMENT-TYPE")
                "STACK-REF" "STREAM-DESIGNATOR" "STRING-DESIGNATOR"
                "STRING-FILL*"
                "STRUCTURE-CTOR-LAMBDA-PARTS"
@@ -3091,6 +3116,13 @@ structure representations"
                                "SIMD-PACK-LO-VALUE-SLOT"
                                "SIMD-PACK-SIZE"
                                "SIMD-PACK-WIDETAG")
+               #!+sb-simd-pack-256("SIMD-PACK-256-TAG-SLOT"
+                                   "SIMD-PACK-256-P0-SLOT"
+                                   "SIMD-PACK-256-P1-SLOT"
+                                   "SIMD-PACK-256-P2-SLOT"
+                                   "SIMD-PACK-256-P3-SLOT"
+                                   "SIMD-PACK-256-SIZE"
+                                   "SIMD-PACK-256-WIDETAG")
                #!-64-bit
                ("COMPLEX-SINGLE-FLOAT-IMAG-SLOT" "COMPLEX-SINGLE-FLOAT-REAL-SLOT")
                #!+64-bit

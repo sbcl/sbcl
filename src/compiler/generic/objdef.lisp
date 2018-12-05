@@ -413,117 +413,128 @@ but is in fact a problem for either, in theory. Consider:
   (lo-value :c-type "long" :type (unsigned-byte 64))
   (hi-value :c-type "long" :type (unsigned-byte 64)))
 
+(!define-primitive-object (simd-pack-256
+                          :lowtag other-pointer-lowtag
+                          :widetag simd-pack-256-widetag)
+  (tag :ref-trans %simd-pack-256-tag
+       :attributes (movable flushable)
+       :type fixnum)
+  (p0 :c-type "long" :type (unsigned-byte 64))
+  (p1 :c-type "long" :type (unsigned-byte 64))
+  (p2 :c-type "long" :type (unsigned-byte 64))
+  (p3 :c-type "long" :type (unsigned-byte 64)))
+
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
 ;;; can take care of maintaining Lisp and C versions.
 (!define-primitive-object (thread :size primitive-thread-object-length)
-  ;; no_tls_value_marker is borrowed very briefly at thread startup to
-  ;; pass the address of initial-function into new_thread_trampoline.
-  ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
-  ;; of a symbol is initialized to zero
-  (no-tls-value-marker)
-  (os-thread :c-type "os_thread_t")
-  ;; This is the original address at which the memory was allocated,
-  ;; which may have different alignment then what we prefer to use.
-  ;; Kept here so that when the thread dies we can release the whole
-  ;; memory we reserved.
-  (os-address :c-type "void *" :pointer t)
+                          ;; no_tls_value_marker is borrowed very briefly at thread startup to
+                          ;; pass the address of initial-function into new_thread_trampoline.
+                          ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
+                          ;; of a symbol is initialized to zero
+                          (no-tls-value-marker)
+                          (os-thread :c-type "os_thread_t")
+                          ;; This is the original address at which the memory was allocated,
+                          ;; which may have different alignment then what we prefer to use.
+                          ;; Kept here so that when the thread dies we can release the whole
+                          ;; memory we reserved.
+                          (os-address :c-type "void *" :pointer t)
 
-  ;; Keep these next six slots (alloc-region being figured in as 1 slot)
-  ;; near the beginning of the structure so that x86[-64] assembly code
-  ;; can use single-byte displacements from thread-base-tn.
-  ;; Doing so reduces code size for allocation sequences and special variable
-  ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
-  ;; aligned displacement fitting in a signed byte.
-  ;;
-  ;; Information for constructing deterministic consing profile.
-  (profile-data :c-type "uword_t *" :pointer t)
-  #!+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
-  #!+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
-  ;; next two not used in C, but this wires the TLS offsets to small values
-  #!+(and x86-64 sb-thread)
-  (current-catch-block :special *current-catch-block*)
-  #!+(and x86-64 sb-thread)
-  (current-unwind-protect-block :special *current-unwind-protect-block*)
-  (alien-stack-pointer :c-type "lispobj *" :pointer t
-                       :special *alien-stack-pointer*)
-  (binding-stack-pointer :c-type "lispobj *" :pointer t
-                         :special *binding-stack-pointer*)
-  (stepping)
-  ;; END of slots to keep near the beginning.
+                          ;; Keep these next six slots (alloc-region being figured in as 1 slot)
+                          ;; near the beginning of the structure so that x86[-64] assembly code
+                          ;; can use single-byte displacements from thread-base-tn.
+                          ;; Doing so reduces code size for allocation sequences and special variable
+                          ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
+                          ;; aligned displacement fitting in a signed byte.
+                          ;;
+                          ;; Information for constructing deterministic consing profile.
+                          (profile-data :c-type "uword_t *" :pointer t)
+                          #!+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
+                          #!+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
+                          ;; next two not used in C, but this wires the TLS offsets to small values
+                          #!+(and x86-64 sb-thread)
+                          (current-catch-block :special *current-catch-block*)
+                          #!+(and x86-64 sb-thread)
+                          (current-unwind-protect-block :special *current-unwind-protect-block*)
+                          (alien-stack-pointer :c-type "lispobj *" :pointer t
+                                               :special *alien-stack-pointer*)
+                          (binding-stack-pointer :c-type "lispobj *" :pointer t
+                                                 :special *binding-stack-pointer*)
+                          (stepping)
+                          ;; END of slots to keep near the beginning.
 
-  ;; TODO: these slots should be accessible using (SIGNED-BYTE 8) displacement
-  ;; from the thread base. We've nearly exhausted small positive indices
-  ;; so the slots will have to precede 'struct thread' in memory.
-  (varyobj-space-addr)
-  (varyobj-card-count)
-  (varyobj-card-marks)
-  (dynspace-addr)
-  (dynspace-card-count)
-  (dynspace-pte-base)
+                          ;; TODO: these slots should be accessible using (SIGNED-BYTE 8) displacement
+                          ;; from the thread base. We've nearly exhausted small positive indices
+                          ;; so the slots will have to precede 'struct thread' in memory.
+                          (varyobj-space-addr)
+                          (varyobj-card-count)
+                          (varyobj-card-marks)
+                          (dynspace-addr)
+                          (dynspace-card-count)
+                          (dynspace-pte-base)
 
-  ;; These aren't accessed (much) from Lisp, so don't really care
-  ;; if it takes a 4-byte displacement.
-  (alien-stack-start :c-type "lispobj *" :pointer t)
-  (binding-stack-start :c-type "lispobj *" :pointer t
-                       :special *binding-stack-start*)
+                          ;; These aren't accessed (much) from Lisp, so don't really care
+                          ;; if it takes a 4-byte displacement.
+                          (alien-stack-start :c-type "lispobj *" :pointer t)
+                          (binding-stack-start :c-type "lispobj *" :pointer t
+                                               :special *binding-stack-start*)
 
-  #!+(and sb-thread (not sb-safepoint))
-  (state-sem :c-type "os_sem_t *" :pointer t)
-  #!+(and sb-thread (not sb-safepoint))
-  (state-not-running-sem :c-type "os_sem_t *" :pointer t)
-  #!+(and sb-thread (not sb-safepoint))
-  (state-not-running-waitcount :c-type "int" :length 1)
-  #!+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-sem :c-type "os_sem_t *" :pointer t)
-  #!+(and sb-thread (not sb-safepoint))
-  (state-not-stopped-waitcount :c-type "int" :length 1)
-  (control-stack-start :c-type "lispobj *" :pointer t
-                       :special *control-stack-start*)
-  (control-stack-end :c-type "lispobj *" :pointer t
-                     :special *control-stack-end*)
-  (control-stack-guard-page-protected)
-  #!+win32 (private-events :c-type "struct private_events" :length 2)
-  (this :c-type "struct thread *" :pointer t)
-  (prev :c-type "struct thread *" :pointer t)
-  (next :c-type "struct thread *" :pointer t)
-  ;; starting, running, suspended, dead
-  (state :c-type "lispobj")
+                          #!+(and sb-thread (not sb-safepoint))
+                          (state-sem :c-type "os_sem_t *" :pointer t)
+                          #!+(and sb-thread (not sb-safepoint))
+                          (state-not-running-sem :c-type "os_sem_t *" :pointer t)
+                          #!+(and sb-thread (not sb-safepoint))
+                          (state-not-running-waitcount :c-type "int" :length 1)
+                          #!+(and sb-thread (not sb-safepoint))
+                          (state-not-stopped-sem :c-type "os_sem_t *" :pointer t)
+                          #!+(and sb-thread (not sb-safepoint))
+                          (state-not-stopped-waitcount :c-type "int" :length 1)
+                          (control-stack-start :c-type "lispobj *" :pointer t
+                                               :special *control-stack-start*)
+                          (control-stack-end :c-type "lispobj *" :pointer t
+                                             :special *control-stack-end*)
+                          (control-stack-guard-page-protected)
+                          #!+win32 (private-events :c-type "struct private_events" :length 2)
+                          (this :c-type "struct thread *" :pointer t)
+                          (prev :c-type "struct thread *" :pointer t)
+                          (next :c-type "struct thread *" :pointer t)
+                          ;; starting, running, suspended, dead
+                          (state :c-type "lispobj")
 
-  #!+x86 (tls-cookie)                          ;  LDT index
-  (interrupt-data :c-type "struct interrupt_data *"
-                  :pointer t)
-  ;; For various reasons related to pseudo-atomic and interrupt
-  ;; handling, we need to know if the machine context is in Lisp code
-  ;; or not.  On non-threaded targets, this is a global variable in
-  ;; the runtime, but it's clearly a per-thread value.
-  #!+sb-thread
-  (foreign-function-call-active :c-type "boolean")
-  ;; Same as above for the location of the current control stack frame.
-  #!+(and sb-thread (not (or x86 x86-64)))
-  (control-frame-pointer :c-type "lispobj *")
-  ;; Same as above for the location of the current control stack
-  ;; pointer.  This is also used on threaded x86oids to allow LDB to
-  ;; print an approximation of the CSP as needed.
-  #!+sb-thread
-  (control-stack-pointer :c-type "lispobj *")
-  #!+mach-exception-handler
-  (mach-port-name :c-type "mach_port_name_t")
-  ;; Context base pointer for running on top of system libraries built using
-  ;; -fomit-frame-pointer.  Currently truly required and implemented only
-  ;; for (and win32 x86-64), but could be generalized to other platforms if
-  ;; needed:
-  #!+win32 (carried-base-pointer :c-type "os_context_register_t")
-  #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
-  #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
-  #!+(and sb-safepoint-strictly (not win32))
-  (sprof-alloc-region :c-type "struct alloc_region" :length 4)
-  ;; The following slot's existence must NOT be conditional on #+msan
-  #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
-  ;; function-layout is needed for closure creation. it's constant,
-  ;; but we need somewhere to read it from.
-  #!+(and immobile-space 64-bit sb-thread) (function-layout))
+                          #!+x86 (tls-cookie) ;  LDT index
+                          (interrupt-data :c-type "struct interrupt_data *"
+                                          :pointer t)
+                          ;; For various reasons related to pseudo-atomic and interrupt
+                          ;; handling, we need to know if the machine context is in Lisp code
+                          ;; or not.  On non-threaded targets, this is a global variable in
+                          ;; the runtime, but it's clearly a per-thread value.
+                          #!+sb-thread
+                          (foreign-function-call-active :c-type "boolean")
+                          ;; Same as above for the location of the current control stack frame.
+                          #!+(and sb-thread (not (or x86 x86-64)))
+                          (control-frame-pointer :c-type "lispobj *")
+                          ;; Same as above for the location of the current control stack
+                          ;; pointer.  This is also used on threaded x86oids to allow LDB to
+                          ;; print an approximation of the CSP as needed.
+                          #!+sb-thread
+                          (control-stack-pointer :c-type "lispobj *")
+                          #!+mach-exception-handler
+                          (mach-port-name :c-type "mach_port_name_t")
+                          ;; Context base pointer for running on top of system libraries built using
+                          ;; -fomit-frame-pointer.  Currently truly required and implemented only
+                          ;; for (and win32 x86-64), but could be generalized to other platforms if
+                          ;; needed:
+                          #!+win32 (carried-base-pointer :c-type "os_context_register_t")
+                          #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
+                          #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
+                          #!+(and sb-safepoint-strictly (not win32))
+                          (sprof-alloc-region :c-type "struct alloc_region" :length 4)
+                          ;; The following slot's existence must NOT be conditional on #+msan
+                          #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
+                          ;; function-layout is needed for closure creation. it's constant,
+                          ;; but we need somewhere to read it from.
+                          #!+(and immobile-space 64-bit sb-thread) (function-layout))
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable
 ;;; that does not map onto a thread slot.

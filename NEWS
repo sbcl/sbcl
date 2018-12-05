@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.4.14:
+  * enhancement: added AVX2 instructions on x86-64, which can be used with
+    SB-SIMD-PACK.
+
 changes in sbcl-1.4.14 relative to sbcl-1.4.13:
   * enhancement: attempting to build on openbsd 6.0 or newer without
     the wxallowed mount option now results in a more useful error message.

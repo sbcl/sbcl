@@ -19,6 +19,8 @@
             ea-p ea-base ea-index size-nbyte
             ea make-ea ea-disp rip-relative-ea) "SB-VM")
   ;; Imports from SB-VM into this package
+  #!+sb-simd-pack-256
+  (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             #!+avx2 sb-vm::avx2-reg
@@ -75,7 +77,8 @@
     (:word  2)
     (:dword 4)
     (:qword 8)
-    (:oword 16)))
+    (:oword 16)
+    (:hword 32)))
 
 (defun is-size-p (arg) (member arg '(:byte :word :dword :qword)))
 
@@ -1222,7 +1225,11 @@
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
                   #!+avx2
-                  ((eq (sc-name (tn-sc operand)) 'avx2-reg)
+                  ((memq (sc-name (tn-sc operand))
+                         '(avx2-reg
+                           int-avx2-reg
+                           double-avx2-reg
+                           single-avx2-reg))
                    (get-avx2 (tn-offset operand)))
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'float-registers)
                    (get-fpr (tn-offset operand)))
@@ -3376,7 +3383,14 @@
        (simd-pack
         (setq constant
               (list :sse (logior (%simd-pack-low first)
-                                 (ash (%simd-pack-high first) 64))))))))
+                                 (ash (%simd-pack-high first) 64)))))
+       #!+sb-simd-pack-256
+       (simd-pack-256
+        (setq constant
+              (list :avx2 (logior (%simd-pack-256-0 first)
+                                  (ash (%simd-pack-256-1 first) 64)
+                                  (ash (%simd-pack-256-2 first) 128)
+                                  (ash (%simd-pack-256-3 first) 192))))))))
   (destructuring-bind (type value) constant
     (ecase type
       ((:byte :word :dword :qword)
@@ -3406,16 +3420,19 @@
                                  (single-float-bits (realpart value)))))))
       ((:oword :sse)
          (aver (integerp value))
-         (cons :oword value))
+       (cons :oword value))
+      ((:hword :avx2)
+       (aver (integerp value))
+       (cons :hword value))
       ((:complex-double-float)
-         (aver (typep value '(complex double-float)))
-         (cons :oword
-               (logior (ash (double-float-high-bits (imagpart value)) 96)
-                       (ash (double-float-low-bits (imagpart value)) 64)
-                       (ash (ldb (byte 32 0)
-                                 (double-float-high-bits (realpart value)))
-                            32)
-                       (double-float-low-bits (realpart value))))))))
+       (aver (typep value '(complex double-float)))
+       (cons :oword
+             (logior (ash (double-float-high-bits (imagpart value)) 96)
+                     (ash (double-float-low-bits (imagpart value)) 64)
+                     (ash (ldb (byte 32 0)
+                               (double-float-high-bits (realpart value)))
+                          32)
+                     (double-float-low-bits (realpart value))))))))
 
 (defun inline-constant-value (constant)
   (declare (ignore constant)) ; weird!

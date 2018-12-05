@@ -1699,6 +1699,42 @@ variable: an unreadable object representing the error is printed instead.")
                           'simd-pack
                           (split-num low 0) (split-num low 32)
                           (split-num high 0) (split-num high 32))))))))))
+
+#!+sb-simd-pack-256
+(defmethod print-object ((pack simd-pack-256) stream)
+  (cond ((and *print-readably* *read-eval*)
+         (multiple-value-bind (format maker extractor)
+             (etypecase pack
+               ((simd-pack-256 double-float)
+                (values "#.(~@{~S~^ ~})"
+                        '%make-simd-pack-256-double #'%simd-pack-256-doubles))
+               ((simd-pack-256 single-float)
+                (values "#.(~@{~S~^ ~})"
+                        '%make-simd-pack-256-single #'%simd-pack-256-singles))
+               (t
+                (values "#.(~S~@{ #X~16,'0X~})"
+                        '%make-simd-pack-256-ub64 #'%simd-pack-256-ub64s)))
+           (multiple-value-call
+               #'format stream format maker (funcall extractor pack))))
+        (*print-readably*
+         (print-not-readable-error pack stream))
+        (t
+         (print-unreadable-object (pack stream)
+           (etypecase pack
+             ((simd-pack-256 double-float)
+              (multiple-value-call #'format stream "~S~@{ ~,13E~}"
+                'simd-pack-256
+                (%simd-pack-256-doubles pack)))
+             ((simd-pack-256 single-float)
+              (multiple-value-call #'format stream "~S~@{ ~,7E~}"
+                'simd-pack-256
+                (%simd-pack-256-singles pack)))
+             (t
+              (multiple-value-bind (p0 p1 p2 p3)
+                  (%simd-pack-256-ub64s pack)
+                (format stream "~S~@{ ~16,'0X~}"
+                        'simd-pack-256
+                        p0 p1 p2 p3))))))))
 
 ;;;; functions
 

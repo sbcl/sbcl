@@ -44,8 +44,8 @@
 
 ;;; the maximum alignment we can guarantee given the object format. If
 ;;; the loader only loads objects 8-byte aligned, we can't do any
-;;; better then that ourselves.
-(defconstant max-alignment sb-vm:n-lowtag-bits)
+;;; better than that ourselves.
+(defconstant max-alignment 5)
 
 (deftype alignment ()
   `(integer 0 ,max-alignment))

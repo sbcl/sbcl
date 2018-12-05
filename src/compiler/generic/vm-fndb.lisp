@@ -310,12 +310,52 @@
       (values double-float double-float)
       (flushable movable foldable)))
 
+#!+sb-simd-pack-256
+(progn
+  (defknown simd-pack-256-p (t) boolean (foldable movable flushable))
+  (defknown %simd-pack-256-tag (simd-pack-256) fixnum (movable flushable))
+  (defknown %make-simd-pack-256 (fixnum (unsigned-byte 64) (unsigned-byte 64)
+                                        (unsigned-byte 64) (unsigned-byte 64))
+      simd-pack-256
+      (flushable movable foldable))
+  (defknown %make-simd-pack-256-double (double-float double-float double-float double-float)
+      (simd-pack-256 double-float)
+      (flushable movable foldable))
+  (defknown %make-simd-pack-256-single (single-float single-float single-float single-float
+                                        single-float single-float single-float single-float)
+      (simd-pack-256 single-float)
+      (flushable movable foldable))
+  (defknown %make-simd-pack-256-ub32 ((unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32)
+                                      (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32))
+      (simd-pack-256 integer)
+      (flushable movable foldable))
+  (defknown %make-simd-pack-256-ub64 ((unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64))
+      (simd-pack-256 integer)
+      (flushable movable foldable))
+  (defknown (%simd-pack-256-0 %simd-pack-256-1 %simd-pack-256-2 %simd-pack-256-3) (simd-pack-256)
+      (unsigned-byte 64)
+      (flushable movable foldable))
+  (defknown %simd-pack-256-ub32s (simd-pack-256)
+      (values (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32)
+              (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32) (unsigned-byte 32))
+      (flushable movable foldable))
+  (defknown %simd-pack-256-ub64s (simd-pack-256)
+      (values (unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64) (unsigned-byte 64))
+      (flushable movable foldable))
+  (defknown %simd-pack-256-singles (simd-pack-256)
+      (values single-float single-float single-float single-float
+              single-float single-float single-float single-float)
+      (flushable movable foldable))
+  (defknown %simd-pack-256-doubles (simd-pack-256)
+      (values double-float double-float double-float double-float)
+      (flushable movable foldable)))
+
 ;;;; threading
 
 (defknown (dynamic-space-free-pointer binding-stack-pointer-sap
                                       control-stack-pointer-sap)  ()
-  system-area-pointer
-  (flushable))
+    system-area-pointer
+    (flushable))
 
 (defknown ensure-symbol-tls-index (symbol) (and fixnum unsigned-byte))
 

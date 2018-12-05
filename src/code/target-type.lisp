@@ -34,7 +34,8 @@
          member-type
          character-set-type
          built-in-classoid
-         #!+sb-simd-pack simd-pack-type)
+         #!+sb-simd-pack simd-pack-type
+         #!+sb-simd-pack-256 simd-pack-256-type)
      (values (%%typep obj type)
              t))
     (array-type
@@ -168,6 +169,18 @@
          (svref (load-time-value
                  (coerce (cons (specifier-type 'simd-pack)
                                (mapcar (lambda (x) (specifier-type `(simd-pack ,x)))
+                                       *simd-pack-element-types*))
+                         'vector)
+                 t)
+                (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
+                    (1+ tag)
+                    0))))
+      #!+sb-simd-pack-256
+      (simd-pack-256
+       (let ((tag (%simd-pack-256-tag x)))
+         (svref (load-time-value
+                 (coerce (cons (specifier-type 'simd-pack-256)
+                               (mapcar (lambda (x) (specifier-type `(simd-pack-256 ,x)))
                                        *simd-pack-element-types*))
                          'vector)
                  t)

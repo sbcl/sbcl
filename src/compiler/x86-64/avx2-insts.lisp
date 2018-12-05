@@ -230,8 +230,9 @@
             (reg-7-p
              (cond ((ea-p thing)
                     (let ((base (ea-base thing)))
-                      (when (and base (neq base rip-tn))
-                        (reg-id (tn-reg base)))))
+                      (if (and base (neq base rip-tn))
+                          (reg-id (tn-reg base))
+                          0)))
                    ((register-p thing)
                     (reg-id thing))
                    (0)))))
@@ -242,11 +243,11 @@
     (let ((vvvv (if vvvv
                     (reg-id-num (reg-id vvvv))
                     0)))
-     (if (and (= 0 x w b)
-              (= opcode-prefix #x0F))
-         (emit-two-byte-vex segment r vvvv l prefix)
-         (emit-three-byte-vex segment r x b opcode-prefix
-                              w vvvv l prefix)))))
+      (if (and (= 0 x w b)
+               (= opcode-prefix #x0F))
+          (emit-two-byte-vex segment r vvvv l prefix)
+          (emit-three-byte-vex segment r x b opcode-prefix
+                               w vvvv l prefix)))))
 
 (defun emit-avx2-inst (segment thing reg prefix opcode
                        &key (remaining-bytes 0)
@@ -637,10 +638,10 @@
                                    `(aver (not (register-p ,(if nds
                                                                 'src2
                                                                 'src)))))
-                                (emit-avx2-inst segment dst
-                                                ,(if nds
-                                                     'src2
-                                                     'src)
+                                (emit-avx2-inst segment ,(if nds
+                                                             'src2
+                                                             'src)
+                                                dst
                                                 ,prefix ,opcode-from
                                                 :opcode-prefix ,opcode-prefix
                                                 ,@(and nds
@@ -651,8 +652,8 @@
                           ,(when force-to-mem
                              `(aver (not (register-p dst))))
                           (emit-avx2-inst segment
-                                          src
-                                          dst ,prefix ,opcode-to
+                                          dst src
+                                          ,prefix ,opcode-to
                                           :opcode-prefix ,opcode-prefix
                                           :l ,l))))))))
   ;; direction bit?
@@ -694,10 +695,10 @@
 
 (flet ((move-ymm<->gpr (segment dst src w)
          (cond ((xmm-register-p dst)
-                (emit-avx2-inst segment dst src #x66 #x6e :l 0 :w w))
+                (emit-avx2-inst segment src dst #x66 #x6e :l 0 :w w))
                (t
                 (aver (xmm-register-p src))
-                (emit-avx2-inst segment src dst #x66 #x7e :l 0 :w w)))))
+                (emit-avx2-inst segment dst src #x66 #x7e :l 0 :w w)))))
   (define-instruction vmovd (segment dst src)
     (:emitter (move-ymm<->gpr segment dst src 0))
     . #.(append (avx2-inst-printer-list 'ymm-ymm/mem #x66 #x6e
@@ -738,7 +739,6 @@
                                           :more-fields `((imm nil :type 'imm-byte))
                                           :printer `(:name :tab reg ", " vvvv ", " reg/mem ", " imm))
                 (:emitter
-                 (aver (and (xmm-register-p dst) (xmm-register-p src) (not (xmm-register-p src2))))
                  (emit-avx2-inst segment src2 dst ,prefix ,op
                                  :opcode-prefix ,op-prefix
                                  :vvvv src

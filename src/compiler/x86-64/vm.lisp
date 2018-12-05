@@ -135,7 +135,9 @@
   #!+sb-simd-pack (int-sse-immediate immediate-constant)
   #!+sb-simd-pack (double-sse-immediate immediate-constant)
   #!+sb-simd-pack (single-sse-immediate immediate-constant)
-
+  #!+sb-simd-pack-256 (int-avx2-immediate immediate-constant)
+  #!+sb-simd-pack-256 (double-avx2-immediate immediate-constant)
+  #!+sb-simd-pack-256 (single-avx2-immediate immediate-constant)
   (immediate immediate-constant)
 
   ;;
@@ -160,6 +162,12 @@
   (double-sse-stack stack :element-size 2)
   #!+sb-simd-pack
   (single-sse-stack stack :element-size 2)
+  #!+sb-simd-pack-256
+  (int-avx2-stack stack :element-size 4)
+  #!+sb-simd-pack-256
+  (double-avx2-stack stack :element-size 4)
+  #!+sb-simd-pack-256
+  (single-avx2-stack stack :element-size 4)
 
   ;;
   ;; magic SCs
@@ -269,6 +277,24 @@
   #!+avx2
   (avx2-reg float-registers
    :locations #.*float-regs*)
+  #!+sb-simd-pack-256
+  (int-avx2-reg float-registers
+               :locations #.*float-regs*
+               :constant-scs (int-avx2-immediate)
+               :save-p t
+               :alternate-scs (int-avx2-stack))
+  #!+sb-simd-pack-256
+  (double-avx2-reg float-registers
+                  :locations #.*float-regs*
+                  :constant-scs (double-avx2-immediate)
+                  :save-p t
+                  :alternate-scs (double-avx2-stack))
+  #!+sb-simd-pack-256
+  (single-avx2-reg float-registers
+                  :locations #.*float-regs*
+                  :constant-scs (single-avx2-immediate)
+                  :save-p t
+                  :alternate-scs (single-avx2-stack))
 
   (catch-block stack :element-size catch-block-size)
   (unwind-block stack :element-size unwind-block-size)))
@@ -286,19 +312,24 @@
 (defparameter *complex-sc-names* '(complex-single-reg complex-single-stack
                                    complex-double-reg complex-double-stack))
 #!+sb-simd-pack
-;;; FIXME: there is no SSE-STACK storage class
 (defparameter *oword-sc-names* '(sse-reg int-sse-reg single-sse-reg double-sse-reg
-                                 sse-stack int-sse-stack single-sse-stack double-sse-stack))
+                                 int-sse-stack single-sse-stack double-sse-stack))
+#!+sb-simd-pack-256
+(defparameter *hword-sc-names* '(avx2-reg int-avx2-reg single-avx2-reg double-avx2-reg
+                                   int-avx2-stack single-avx2-stack double-avx2-stack))
 ) ; EVAL-WHEN
 (!define-storage-classes
   . #.(mapcar (lambda (class-spec)
                 (let ((size
-                       (case (car class-spec)
-                         (#.*oword-sc-names*   :oword)
-                         (#.*qword-sc-names*   :qword)
-                         (#.*float-sc-names*   :float)
-                         (#.*double-sc-names*  :double)
-                         (#.*complex-sc-names* :complex))))
+                        (case (car class-spec)
+                          #!+sb-simd-pack
+                          (#.*oword-sc-names*   :oword)
+                          #!+sb-simd-pack-256
+                          (#.*hword-sc-names*   :hword)
+                          (#.*qword-sc-names*   :qword)
+                          (#.*float-sc-names*   :float)
+                          (#.*double-sc-names*  :double)
+                          (#.*complex-sc-names* :complex))))
                   (append class-spec (if size (list :operand-size size)))))
               *storage-class-defs*))
 
@@ -409,7 +440,13 @@
     #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
     ((simd-pack single-float) single-sse-immediate-sc-number)
     #!+(and sb-simd-pack (not (host-feature sb-xc-host)))
-    (simd-pack int-sse-immediate-sc-number)))
+    (simd-pack int-sse-immediate-sc-number)
+    #!+(and sb-simd-pack-256 (not (host-feature sb-xc-host)))
+    ((simd-pack-256 double-float) double-avx2-immediate-sc-number)
+    #!+(and sb-simd-pack-256 (not (host-feature sb-xc-host)))
+    ((simd-pack-256 single-float) single-avx2-immediate-sc-number)
+    #!+(and sb-simd-pack-256 (not (host-feature sb-xc-host)))
+    (simd-pack-256 int-avx2-immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))

@@ -112,7 +112,7 @@
                   sb-format::fmt-control
                   #!+sb-eval sb!eval:interpreted-function
                   #!+sb-fasteval sb!interpreter:interpreted-function
-                  weak-pointer simd-pack))
+                  weak-pointer simd-pack simd-pack-256))
   (setf (get symbol :cross-typep-hint) :certainly-nil))
 
 ;;; The set of objects for which it's accurate to use the host's type system

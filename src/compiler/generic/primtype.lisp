@@ -102,6 +102,16 @@
    :type (simd-pack integer))
   (!def-primitive-type-alias simd-pack
    '(:or simd-pack-single simd-pack-double simd-pack-int)))
+#!+sb-simd-pack-256
+(progn
+  (!def-primitive-type simd-pack-256-single (single-avx2-reg descriptor-reg)
+    :type (simd-pack-256 single-float))
+  (!def-primitive-type simd-pack-256-double (double-avx2-reg descriptor-reg)
+    :type (simd-pack-256 double-float))
+  (!def-primitive-type simd-pack-256-int (int-avx2-reg descriptor-reg)
+   :type (simd-pack-256 integer))
+  (!def-primitive-type-alias simd-pack-256
+   '(:or simd-pack-256-single simd-pack-256-double simd-pack-256-int)))
 
 ;;; primitive other-pointer array types
 (/show0 "primtype.lisp 96")
@@ -386,12 +396,24 @@
                   (exactly simd-pack-single))
                  ((member 'double-float eltypes)
                   (exactly simd-pack-double)))))
+        #!+sb-simd-pack-256
+        (simd-pack-256-type
+         (let ((eltypes (simd-pack-256-type-element-type type)))
+           (cond ((member 'integer eltypes)
+                  (exactly simd-pack-256-int))
+                 ((member 'single-float eltypes)
+                  (exactly simd-pack-256-single))
+                 ((member 'double-float eltypes)
+                  (exactly simd-pack-256-double)))))
         (built-in-classoid
          (case (classoid-name type)
            #!+sb-simd-pack
            ;; Can't tell what specific type; assume integers.
            (simd-pack
             (exactly simd-pack-int))
+           #!+sb-simd-pack-256
+           (simd-pack-256
+            (exactly simd-pack-256-int))
            ((complex function system-area-pointer weak-pointer)
             (values (primitive-type-or-lose (classoid-name type)) t))
            (cons-type

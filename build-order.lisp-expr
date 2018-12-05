@@ -506,6 +506,8 @@
  ("src/compiler/target/float")
  #!+sb-simd-pack
  ("src/compiler/target/simd-pack")
+  #!+sb-simd-pack-256
+ ("src/compiler/target/simd-pack-256")
  ("src/compiler/target/sap")
  ("src/compiler/target/system")
  ("src/compiler/target/char")

@@ -142,6 +142,7 @@
   (def-type-predicate-wrapper short-float-p)
   (def-type-predicate-wrapper single-float-p)
   #!+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
+  #!+sb-simd-pack-256 (def-type-predicate-wrapper simd-pack-256-p)
   (def-type-predicate-wrapper %instancep)
   (def-type-predicate-wrapper funcallable-instance-p)
   (def-type-predicate-wrapper symbolp)
@@ -248,7 +249,7 @@
            ((eq object nil) 'null)
            ((eq (symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
-    ((or array complex #!+sb-simd-pack simd-pack)
+    ((or array complex #!+sb-simd-pack simd-pack #!+sb-simd-pack-256 simd-pack-256)
      (let ((sb-kernel::*unparse-allow-negation* nil))
        (declare (special sb-kernel::*unparse-allow-negation*)) ; forward ref
        (type-specifier (ctype-of object))))

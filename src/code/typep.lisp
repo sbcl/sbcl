@@ -152,14 +152,20 @@
           (let* ((tag (%simd-pack-tag object))
                  (name (nth tag *simd-pack-element-types*)))
             (not (not (member name (simd-pack-type-element-type type)))))))
+    #!+sb-simd-pack-256
+    (simd-pack-256-type
+     (and (simd-pack-256-p object)
+          (let* ((tag (%simd-pack-256-tag object))
+                 (name (nth tag *simd-pack-element-types*)))
+            (not (not (member name (simd-pack-256-type-element-type type)))))))
     (character-set-type
      (and (characterp object)
-         (let ((code (char-code object))
-               (pairs (character-set-type-pairs type)))
-           (dolist (pair pairs nil)
-             (destructuring-bind (low . high) pair
-               (when (<= low code high)
-                 (return t)))))))
+          (let ((code (char-code object))
+                (pairs (character-set-type-pairs type)))
+            (dolist (pair pairs nil)
+              (destructuring-bind (low . high) pair
+                (when (<= low code high)
+                  (return t)))))))
     (unknown-type
      ;; dunno how to do this ANSIly -- WHN 19990413
      #+sb-xc-host (error "stub: %%TYPEP UNKNOWN-TYPE in xcompilation host")
