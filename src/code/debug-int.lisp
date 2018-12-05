@@ -596,10 +596,6 @@
                   (unless (sap= component-ptr (int-sap 0))
                     (%make-lisp-obj
                      (logior (sap-int component-ptr) sb-vm:other-pointer-lowtag))))))
-    #!+immobile-space
-    (sb!thread::with-system-mutex (sb-vm::*immobile-space-mutex* :without-gcing t)
-      (heap-scan))
-    #!-immobile-space
     (without-gcing (heap-scan))))
 
 ;;;; (OR X86 X86-64) support

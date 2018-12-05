@@ -286,32 +286,34 @@
                 nil-value)
           (unallocate hole-addr)
           (if (eql (setq hole-addr next) 0) (return))))))
-   (let ((addr
-          (or (and *immobile-freelist*
-                   (or (find-in-freelist n-bytes '=) ; 1. Exact match?
-                       ;; 2. Try splitting a hole, adding some slack so that
-                       ;;    both pieces can potentially be used.
-                       (let ((found (find-in-freelist (+ n-bytes 192) '<=)))
-                         (when found
-                           (let* ((actual-size (hole-size found))
-                                  (remaining (- actual-size n-bytes)))
-                             (aver (not (logtest actual-size lowtag-mask)))
-                             (setf (hole-size found) remaining) ; Shorten the lower piece
-                             (add-to-freelist found)
-                             (+ found remaining)))))) ; Consume the upper piece
-              ;; 3. Extend the frontier.
-              (let* ((addr (sap-int *varyobj-space-free-pointer*))
-                     (free-ptr (+ addr n-bytes))
-                     (limit (+ varyobj-space-start varyobj-space-size)))
-                (when (> free-ptr limit)
-                  (cond (errorp
-                         (format t "~&Immobile space exhausted~%")
-                         (sb!debug:print-backtrace)
-                         (sb!impl::%halt))
-                        (t
-                         (return-from allocate-immobile-bytes 0))))
-                (set-varyobj-space-free-pointer free-ptr)
-                addr))))
+   (let* ((residual)
+          (shrunk-size)
+          (addr
+           (or (and *immobile-freelist*
+                    (or (find-in-freelist n-bytes '=) ; 1. Exact match?
+                        ;; 2. Try splitting a hole, adding some slack so that
+                        ;;    both pieces can potentially be used.
+                        (let ((found (find-in-freelist (+ n-bytes 192) '<=)))
+                          (when found
+                            (let* ((actual-size (hole-size found))
+                                   (remaining (- actual-size n-bytes)))
+                              (aver (not (logtest actual-size lowtag-mask)))
+                              (setq residual found ; Shorten the lower piece
+                                    shrunk-size remaining)
+                              (+ found remaining)))))) ; Consume the upper piece
+               ;; 3. Extend the frontier.
+               (let* ((addr (sap-int *varyobj-space-free-pointer*))
+                      (free-ptr (+ addr n-bytes))
+                      (limit (+ varyobj-space-start varyobj-space-size)))
+                 (when (> free-ptr limit)
+                   (cond (errorp
+                          (format t "~&Immobile space exhausted~%")
+                          (sb!debug:print-backtrace)
+                          (sb!impl::%halt))
+                         (t
+                          (return-from allocate-immobile-bytes 0))))
+                 (set-varyobj-space-free-pointer free-ptr)
+                 addr))))
      (aver (not (logtest addr lowtag-mask))) ; Assert proper alignment
      ;; Compute the start and end of the first page consumed.
      (let* ((page-start (logandc2 addr (1- immobile-card-bytes)))
@@ -346,6 +348,17 @@
      (#!+64-bit system-area-ub64-fill
       #!-64-bit system-area-ub32-fill
       0 (int-sap addr) 2 (- (ash n-bytes (- word-shift)) 2))
+     ;; Only after making the new object can we reduce the size of the hole
+     ;; that contained the new allocation (if it entailed chopping a hole
+     ;; into parts). In this way, heap scans do not read junk.
+     (when residual
+       (setf (hole-size residual) shrunk-size)
+       (add-to-freelist residual))
+     ;; The object is live despite not having a tagged pointer yet nor
+     ;; this code being pseudoatomic, because the mutex acquire has
+     ;; :WITHOUT-GCING. Ideally we'd have some notion of hazard pointers
+     ;; that could prevent GC from evicting objects from pointed-to pages
+     ;; so that we needn't inhibit GC.
      (%make-lisp-obj (logior addr lowtag)))))
 
 (defun allocate-immobile-vector (widetag length words)

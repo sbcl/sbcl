@@ -142,6 +142,51 @@
           :type index)
   (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
 
+#|
+Proposed change to code header representation which allows computing
+code object sized based on reading only 1 word, not 2.
+
+  |       total size      | widetag |
+  | (3 bytes less 2 bits) |         |
+  +-----------------------+---------+  [32-bit words]
+  |      N boxed header words       |
+  +---------------------------------+
+  max total payload size in words = #x3fffff
+
+  |            total size           | gc_gen | 0 | 0 | widetag |
+  |            (4 bytes)            |        |   |   |         |
+  +------------------------------------------------------------+  [64-bit words]
+  |            serial#              |   N boxed header words   |
+  |            (4 bytes)            |        (4 bytes)         |
+  +------------------------------------------------------------+
+  the two zero bytes are reserved for future use
+  max total payload size in words = uint_max
+
+For both:
+  code-size = (total words - boxed words) * n-word-bytes
+  text-size = code-size - n padding bytes
+  bit 31 of word 0 = fullcgc mark bit
+  bit 30           = touched since last GC bit
+
+This will be important to make heap scans more bulletproof
+in the presence of code object allocation, since most architectures
+can not atomically store and load 16 bytes at once.
+This is more problematic in immobile space than dynamic space,
+but is in fact a problem for either, in theory. Consider:
+
+ Thread 1:                     |   Thread 2
+ --------                      |   --------
+ Store header word @ A = N     |
+                               |   Load word 0 @ A
+                               |   Load word @ A + 1 = 0
+                               |     compute total size = N words
+ Store header word @ A + 1     |
+ Store unboxed bytes @ A + N   |
+  ...                          |
+                               |   Load unboxed word @ A + N -> crash
+
+|#
+
 ;;; The header contains the size of slots and constants in words.
 (!define-primitive-object (code :type code-component
                                 :lowtag other-pointer-lowtag
