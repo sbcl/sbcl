@@ -107,7 +107,7 @@
 
   ;; Ensure that *CURRENT-THREAD* and *HANDLER-CLUSTERS* have sane values.
   ;; create_thread_struct() assigned NIL/unbound-marker respectively.
-  (sb!thread::init-initial-thread)
+  (sb-thread::init-initial-thread)
   (show-and-call sb-kernel::!target-error-cold-init)
 
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
@@ -147,7 +147,7 @@
   ;; cold-init-wrappers are closures. Installing a closure as a
   ;; named function requires consing immobile space code.
   #!+immobile-code (setq sb-vm::*immobile-space-mutex*
-                         (sb!thread:make-mutex :name "Immobile space"))
+                         (sb-thread:make-mutex :name "Immobile space"))
   (!with-init-wrappers (show-and-call sb-kernel::!primordial-type-cold-init))
   (show-and-call !world-lock-cold-init)
   (show-and-call !classes-cold-init)
@@ -351,7 +351,7 @@ process to continue normally."
       (os-exit (or code 1) :abort t)
       (let ((code (or code 0)))
         (with-deadline (:seconds nil :override t)
-          (sb!thread:grab-mutex *exit-lock*))
+          (sb-thread:grab-mutex *exit-lock*))
         (setf *exit-in-process* code
               *exit-timeout* timeout)
         (throw '%end-of-the-world t)))
@@ -360,8 +360,8 @@ process to continue normally."
 ;;;; initialization functions
 
 (defun thread-init-or-reinit ()
-  (sb!thread::init-job-control)
-  (sb!thread::get-foreground))
+  (sb-thread::init-job-control)
+  (sb-thread::get-foreground))
 
 (defun reinit ()
   #!+win32
@@ -374,7 +374,7 @@ process to continue normally."
     ;; Create *CURRENT-THREAD* first, since initializing a stream calls
     ;; ALLOC-BUFFER which calls FINALIZE which acquires **FINALIZER-STORE-LOCK**
     ;; which needs a valid thread in order to grab a mutex.
-    (sb!thread::init-initial-thread)
+    (sb-thread::init-initial-thread)
     ;; Initialize streams first, so that any errors can be printed later
     (stream-reinit t)
     (os-cold-init-or-reinit)

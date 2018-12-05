@@ -620,7 +620,7 @@ NOTE: This interface is experimental and subject to change."
       ;; global variable before the vector's header+length have been set.
       ;; Without a barrier, this would be theoretically possible if the
       ;; architecture allows out-of-order memory writes.
-      (sb!thread:barrier (:write)
+      (sb-thread:barrier (:write)
         (reset-stats)
         (setq cache (make-array size :initial-element 0)))
       (set! symbol cache))))
@@ -712,7 +712,7 @@ NOTE: This interface is experimental and subject to change."
                            ;; This barrier is a no-op on all multi-threaded SBCL
                            ;; architectures. No CPU except Alpha will move a
                            ;; load prior to a load on which it depends.
-                           (sb!thread:barrier (:data-dependency))
+                           (sb-thread:barrier (:data-dependency))
                            (locally (declare (type ,line-type ,entry))
                              (let* ,(case (length temps)
                                      (2 `((,(first temps) (car ,entry))
@@ -753,7 +753,7 @@ NOTE: This interface is experimental and subject to change."
                    ;; MUST NOT be observed by another thread before its cells
                    ;; are filled. Equally bad, the 'output' cells in the line
                    ;; could be 0 while the 'input' cells matched something.
-                   (sb!thread:barrier (:write))
+                   (sb-thread:barrier (:write))
                    (cond ((eql (svref ,cache idx1) 0)
                           (setf (svref ,cache idx1) ,entry))
                          ((eql (svref ,cache idx2) 0)

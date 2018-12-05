@@ -7,7 +7,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!THREAD")
+(in-package "SB-THREAD")
 
 (def!type thread-name () 'simple-string)
 

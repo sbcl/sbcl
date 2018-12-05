@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!THREAD")
+(in-package "SB-THREAD")
 
 (defmacro with-mutex ((mutex) &body body)
   (declare (ignore mutex))

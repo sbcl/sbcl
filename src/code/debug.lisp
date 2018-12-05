@@ -77,7 +77,7 @@ provide bindings for printer control variables.")
   "Should the debugger display beginner-oriented help messages?")
 
 (defun debug-prompt (stream)
-  (sb!thread::get-foreground)
+  (sb-thread::get-foreground)
   (format stream
           "~%~W~:[~;[~W~]] "
           (frame-number *current-frame*)
@@ -361,7 +361,7 @@ possible while navigating and ignoring possible errors."
               ((print-not-readable #'print-unreadably))
             (fresh-line stream)
             (when print-thread
-              (format stream "Backtrace for: ~S~%" sb!thread:*current-thread*))
+              (format stream "Backtrace for: ~S~%" sb-thread:*current-thread*))
             (map-backtrace (lambda (frame)
                              (restart-case
                                  (if emergency-best-effort
@@ -466,13 +466,13 @@ information."
     (and (sb-vm:is-lisp-pointer a)
          (cond ((and (<= (get-lisp-obj-address sb-vm:*control-stack-start*) a)
                      (< a (get-lisp-obj-address sb-vm:*control-stack-end*)))
-                sb!thread:*current-thread*)
+                sb-thread:*current-thread*)
                (all-threads
                 ;; find a stack whose base is nearest and below A.
                 ;; this is likely to return a wrong answer during thread creation/deletion
                 ;; due to the 'rotate' operations which are incrementally performed
                 ;; on the binary search tree.
-                (binding* ((node (bst-find<= a sb!thread::*stack-addr-table*) :exit-if-null)
+                (binding* ((node (bst-find<= a sb-thread::*stack-addr-table*) :exit-if-null)
                            (data (bst-node-data node)))
                   (when (< a (car data))
                     (cdr data))))))))
@@ -919,7 +919,7 @@ the current thread are replaced with dummy objects which can safely escape."
     (format stream
             "debugger invoked on a ~S~@[ in thread ~_~A~]: ~2I~_~A"
             (type-of condition)
-            #!+sb-thread sb!thread:*current-thread*
+            #!+sb-thread sb-thread:*current-thread*
             #!-sb-thread nil
             condition))
   (terpri stream))
@@ -954,7 +954,7 @@ the current thread are replaced with dummy objects which can safely escape."
                   '*nested-debug-condition*
                   (cell-error-name *nested-debug-condition*)))))
 
-    (let ((background-p (sb!thread::debugger-wait-until-foreground-thread
+    (let ((background-p (sb-thread::debugger-wait-until-foreground-thread
                          *debug-io*)))
 
       ;; After the initial error/condition/whatever announcement to
@@ -986,7 +986,7 @@ the current thread are replaced with dummy objects which can safely escape."
                         (show-restarts *debug-restarts* *debug-io*))
                       (internal-debug))
                  (when background-p
-                   (sb!thread:release-foreground)))))
+                   (sb-thread:release-foreground)))))
         (if (find 'abort *debug-restarts* :key #'restart-name)
             (debug)
             (restart-case (let* ((restarts (compute-restarts condition))
@@ -998,7 +998,7 @@ the current thread are replaced with dummy objects which can safely escape."
               (abort ()
                 :report (lambda (stream)
                           (format stream "~@<Exit from the current thread.~@:>"))
-                (sb!thread:abort-thread :allow-exit t))))))))
+                (sb-thread:abort-thread :allow-exit t))))))))
 
 ;;; this function is for use in *INVOKE-DEBUGGER-HOOK* when ordinary
 ;;; ANSI behavior has been suppressed by the "--disable-debugger"
@@ -1034,7 +1034,7 @@ the current thread are replaced with dummy objects which can safely escape."
            (format *error-output*
                    "~&~@<Unhandled ~S~@[ in thread ~S~]: ~2I~_~A~:>~2%"
                    (type-of condition)
-                   #!+sb-thread sb!thread:*current-thread*
+                   #!+sb-thread sb-thread:*current-thread*
                    #!-sb-thread nil
                    condition)
            (finish-output *error-output*))
@@ -1042,7 +1042,7 @@ the current thread are replaced with dummy objects which can safely escape."
            (format *error-output*
                    "~&Unhandled ~S~@[ in thread ~S~]:~%"
                    (type-of condition)
-                   #!+sb-thread sb!thread:*current-thread*
+                   #!+sb-thread sb-thread:*current-thread*
                    #!-sb-thread nil)
            (describe condition *error-output*)
            (finish-output *error-output*))

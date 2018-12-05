@@ -53,7 +53,7 @@
   system-area-pointer)
 
 (define-load-time-global *immobile-space-mutex*
-    (sb!thread:make-mutex :name "Immobile space"))
+    (sb-thread:make-mutex :name "Immobile space"))
 
 (eval-when (:compile-toplevel)
   (assert (eql code-code-size-slot 1))
@@ -270,7 +270,7 @@
   (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
   (aver (>= n-bytes (* 4 n-word-bytes)))
-  (sb!thread::with-system-mutex (*immobile-space-mutex* :without-gcing t)
+  (sb-thread::with-system-mutex (*immobile-space-mutex* :without-gcing t)
    (unless (zerop varyobj-holes)
      ;; If deferred sweep needs to happen, do so now.
      ;; Concurrency could potentially be improved here: at most one thread

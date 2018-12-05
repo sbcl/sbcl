@@ -86,7 +86,7 @@
   (storage (make-info-storage 30) :type simple-vector)
   (comparator #'equal :type function)
   (hash-function #'globaldb-sxhashoid :type function)
-  (mutex (sb!thread:make-mutex))
+  (mutex (sb-thread:make-mutex))
   ;; the number of phantom entries for simulated deletion.
   ;; Our tombstones are not the usual ones. Ordinarily an open-addressing
   ;; table will use tombstone keys that can be written over if inserting a new
@@ -195,11 +195,11 @@
 ;;
 (defun %wait-for-rehash (env storage)
   ;; kinda spin, except not quite that bad
-  (loop (sb!thread:thread-yield) ; relinquish time slice, supposing it helps
+  (loop (sb-thread:thread-yield) ; relinquish time slice, supposing it helps
         (if (eq (info-env-storage env) storage)
             ;; Grab and release the mutex for no other reason than to
             ;; observe that a rehasher doesn't (for the moment) have it.
-            (sb!thread::with-recursive-system-lock ((info-env-mutex env))) ; do nothing, retry
+            (sb-thread::with-recursive-system-lock ((info-env-mutex env))) ; do nothing, retry
             (return (info-env-storage env)))))
 
 ;; Look in info-environment ENV for the name KEY. Arguments are like GETHASH.
@@ -229,7 +229,7 @@
     ;; so we _don't_ need a barrier after resetting 'storage' and 'index'.
     :hit (let ((index (value-index)))
            (loop (let ((value
-                        (sb!thread:barrier (:read) (svref storage index))))
+                        (sb-thread:barrier (:read) (svref storage index))))
                    (if (info-value-moved-p value)
                        (setq storage (info-storage-next storage)
                              index (info-forwarding-pointer-target value))
@@ -252,7 +252,7 @@
   (aver (not (member key '(0 -1))))
   (labels ((follow/update (array value-index)
              (let ((value ; see INFO-GETHASH for this barrier's rationale
-                    (sb!thread:barrier (:read) (svref array value-index))))
+                    (sb-thread:barrier (:read) (svref array value-index))))
                (if (info-value-moved-p value)
                    (follow/update (info-storage-next array)
                                   (info-forwarding-pointer-target value))
@@ -283,7 +283,7 @@
         (let ((old-count (info-env-adjust-count env 1)))
           (declare (type info-cell-index old-count))
           (when (>= old-count (info-storage-threshold storage))
-            (sb!thread::with-recursive-system-lock ((info-env-mutex env))
+            (sb-thread::with-recursive-system-lock ((info-env-mutex env))
               ;; any thread could have beaten us to rehashing
               (when (eq (info-env-storage env) storage)
                 (info-env-rehash env)))
@@ -320,7 +320,7 @@
          (old-capacity (info-storage-capacity old-storage))
          (new-capacity (info-storage-capacity new-storage)))
 
-    (sb!thread:barrier (:write) ; Publish NEW-STORAGE before scanning keys.
+    (sb-thread:barrier (:write) ; Publish NEW-STORAGE before scanning keys.
       (setf (info-storage-next old-storage) new-storage))
 
     (loop for old-key-index of-type info-cell-index
@@ -347,7 +347,7 @@
                ;; and CAS in a forwarding pointer. Repeat until successful.
                (loop
                  ;; Force VALUE to memory before publishing relocated status
-                 (sb!thread:barrier (:write)
+                 (sb-thread:barrier (:write)
                    (setf (svref new-storage new-value-index) value))
                  (let ((actual-old
                         (info-cas

@@ -143,9 +143,9 @@
     sb-di::handle-breakpoint
     sb-di::handle-single-step-trap
     #!+win32 sb-kernel::handle-win32-exception
-    #!+sb-thruption sb!thread::run-interruption
+    #!+sb-thruption sb-thread::run-interruption
     enter-alien-callback
-    #!+sb-thread sb!thread::enter-foreign-callback
+    #!+sb-thread sb-thread::enter-foreign-callback
     #!+(and sb-safepoint-strictly (not win32))
     sb-unix::signal-handler-callback)
   #'equal)
@@ -213,7 +213,7 @@
 
     ;; List of Lisp specials bindings made by create_thread_struct()
     ;; excluding the names in !PER-THREAD-C-INTERFACE-SYMBOLS.
-    sb!thread::*thread-initial-bindings*
+    sb-thread::*thread-initial-bindings*
 
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order

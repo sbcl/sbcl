@@ -264,7 +264,7 @@ waiting."
                    do (return-from wait-until-fd-usable t)
                    else
                    do (when to-sec (maybe-update-timeout))
-                   #!+win32 (sb!thread:thread-yield)))))))
+                   #!+win32 (sb-thread:thread-yield)))))))
 
 ;;; Wait for up to timeout seconds for an event to happen. Make sure all
 ;;; pending events are processed before returning.

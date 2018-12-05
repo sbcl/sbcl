@@ -132,7 +132,7 @@
              (:conc-name %timer-)
              (:constructor
               make-timer
-              (function &key name (thread sb!thread:*current-thread*)))
+              (function &key name (thread sb-thread:*current-thread*)))
              (:copier nil))
   "Timer type. Do not rely on timers being structs as it may change in
 future versions."
@@ -141,7 +141,7 @@ future versions."
   (expire-time        1   :type (or null real))
   (repeat-interval    nil :type (or null (real 0)))
   (catch-up           nil :type boolean)
-  (thread             nil :type (or sb!thread:thread boolean))
+  (thread             nil :type (or sb-thread:thread boolean))
   (interrupt-function nil :type (or null function))
   (cancel-function    nil :type (or null function)))
 
@@ -182,15 +182,15 @@ from now. For timers with a repeat interval it returns true."
 
 ;;; The scheduler
 
-(define-load-time-global *scheduler-lock* (sb!thread:make-mutex :name "Scheduler lock"))
+(define-load-time-global *scheduler-lock* (sb-thread:make-mutex :name "Scheduler lock"))
 
 (defmacro with-scheduler-lock ((&optional) &body body)
   ;; Don't let the SIGALRM handler mess things up.
-  `(sb!thread::with-system-mutex (*scheduler-lock*)
+  `(sb-thread::with-system-mutex (*scheduler-lock*)
      ,@body))
 
 (defun under-scheduler-lock-p ()
-  (sb!thread:holding-mutex-p *scheduler-lock*))
+  (sb-thread:holding-mutex-p *scheduler-lock*))
 
 (define-load-time-global *schedule* (make-priority-queue :key #'%timer-expire-time))
 
@@ -210,7 +210,7 @@ from now. For timers with a repeat interval it returns true."
 (defun make-cancellable-interruptor (timer)
   ;; return a list of two functions: one that does the same as
   ;; FUNCTION until the other is called, from when it does nothing.
-  (let ((mutex (sb!thread:make-mutex))
+  (let ((mutex (sb-thread:make-mutex))
         (cancelledp nil)
         (function (if (%timer-repeat-interval timer)
                       (lambda ()
@@ -223,12 +223,12 @@ from now. For timers with a repeat interval it returns true."
        ;; Use WITHOUT-INTERRUPTS for the acquiring lock to avoid
        ;; unblocking deferrables unless it's inevitable.
        (without-interrupts
-         (sb!thread:with-recursive-lock (mutex)
+         (sb-thread:with-recursive-lock (mutex)
            (unless cancelledp
              (allow-with-interrupts
                (funcall function))))))
      (lambda ()
-       (sb!thread:with-recursive-lock (mutex)
+       (sb-thread:with-recursive-lock (mutex)
          (setq cancelledp t))))))
 
 (defun %schedule-timer (timer)
@@ -317,8 +317,8 @@ triggers."
                     (catch-up (%timer-catch-up timer))
                     (thread (%timer-thread timer)))
     (when expire-time
-      (if (and (sb!thread::thread-p thread)
-               (not (sb!thread:thread-alive-p thread)))
+      (if (and (sb-thread::thread-p thread)
+               (not (sb-thread:thread-alive-p thread)))
           (unschedule-timer timer)
           (with-scheduler-lock ()
             ;; Schedule at regular intervals. If TIMER has not finished
@@ -368,7 +368,7 @@ triggers."
         (prog1
             (setf *waitable-timer-handle* (os-create-wtimer))
           (setf *timer-thread*
-                (sb!thread:make-thread
+                (sb-thread:make-thread
                  (lambda ()
                    (loop while
                         (or (zerop
@@ -381,8 +381,8 @@ triggers."
   (defun itimer-emulation-deinit ()
     (with-scheduler-lock ()
       (when *timer-thread*
-        (sb!thread:terminate-thread *timer-thread*)
-        (sb!thread:join-thread *timer-thread* :default nil))
+        (sb-thread:terminate-thread *timer-thread*)
+        (sb-thread:join-thread *timer-thread* :default nil))
       (when *waitable-timer-handle*
         (os-close-wtimer *waitable-timer-handle*)
         (setf *waitable-timer-handle* nil))))
@@ -432,16 +432,16 @@ triggers."
   (let ((function (%timer-interrupt-function timer))
         (thread (%timer-thread timer)))
     (if (eq t thread)
-        (sb!thread:make-thread function :name (format nil "Timer ~A"
+        (sb-thread:make-thread function :name (format nil "Timer ~A"
                                                       (%timer-name timer)))
         ;; Don't run the timer directly in the current thread.
         ;; The signal that interrupt-thread sends is blocked so it'll get queued
         ;; and processed after exiting from SIGALRM-HANDLER.
         ;; That way we process all pending signals and release the *SCHEDULER-LOCK*.
-        (let ((thread (or thread sb!thread:*current-thread*)))
+        (let ((thread (or thread sb-thread:*current-thread*)))
           (handler-case
-              (sb!thread:interrupt-thread thread function)
-            (sb!thread:interrupt-thread-error (c)
+              (sb-thread:interrupt-thread thread function)
+            (sb-thread:interrupt-thread-error (c)
               (declare (ignore c))
               (warn "Timer ~S failed to interrupt thread ~S."
                     timer thread)))))))

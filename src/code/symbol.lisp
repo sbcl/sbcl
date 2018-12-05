@@ -233,13 +233,13 @@ distinct from the global value. Can also be SETF."
         ;; The pointer from the new cons to the old info must be persisted
         ;; to memory before the symbol's info slot points to the cons.
         ;; [x86oid doesn't need the barrier, others might]
-        (sb!thread:barrier (:write)
+        (sb-thread:barrier (:write)
           (setq newcell (cons nil info)))
         (loop (let ((old (%compare-and-swap-symbol-info symbol info newcell)))
                 (cond ((eq old info) (return newcell)) ; win
                       ((consp old) (return old))) ; somebody else made a cons!
                 (setq info old)
-                (sb!thread:barrier (:write) ; Retry using same newcell
+                (sb-thread:barrier (:write) ; Retry using same newcell
                   (rplacd newcell info)))))))
 
 (declaim (inline %compare-and-swap-symbol-plist

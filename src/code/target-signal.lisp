@@ -112,14 +112,14 @@
   ;; SAPs are dx allocated, close over the values, not the SAPs.
   (let ((thread (without-gcing
                   ;; Hold off GCing until *current-thread* is set up
-                  (setf sb!thread:*current-thread*
-                        (sb!thread::make-signal-handling-thread :name "signal handler"
+                  (setf sb-thread:*current-thread*
+                        (sb-thread::make-signal-handling-thread :name "signal handler"
                                                                 :signal-number signal))))
         (info (sap-ref-sap args 0))
         (context (sap-ref-sap args sb-vm:n-word-bytes)))
     (dx-flet ((callback ()
                 (funcall run-handler signal info context)))
-      (sb!thread::initial-thread-function-trampoline thread nil
+      (sb-thread::initial-thread-function-trampoline thread nil
                                                      #'callback nil))))
 
 
@@ -169,7 +169,7 @@
                  ;; Then enter the debugger like BREAK.
                  (%break 'sigint int))))))
     #!+sb-safepoint
-    (let ((target (sb!thread::foreground-thread)))
+    (let ((target (sb-thread::foreground-thread)))
       ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
       ;; interrupt right away, because deferrables are blocked.  Rather,
       ;; the kernel would arrange for the SIGPIPE to hit when the SIGINT
@@ -180,11 +180,11 @@
       ;; explicitly at the end).  Only as long as safepoint builds pretend
       ;; to cooperate with signals -- that is, as long as SIGINT-HANDLER
       ;; is used at all -- detect this situation and work around it.
-      (if (eq target sb!thread:*current-thread*)
+      (if (eq target sb-thread:*current-thread*)
           (interrupt-it)
-          (sb!thread:interrupt-thread target #'interrupt-it)))
+          (sb-thread:interrupt-thread target #'interrupt-it)))
     #!-sb-safepoint
-    (sb!thread:interrupt-thread (sb!thread::foreground-thread)
+    (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
 #!-sb-wtimer
@@ -205,7 +205,7 @@
 ;;; from the kernel.
 (defun sigpipe-handler (signal code sb-kernel:*current-internal-error-context*)
   (declare (ignore signal code))
-  (sb!thread::run-interruption))
+  (sb-thread::run-interruption))
 
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
 (defun sigchld-handler  (signal code context)

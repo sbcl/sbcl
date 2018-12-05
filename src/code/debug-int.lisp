@@ -684,7 +684,7 @@
                     (get-lisp-obj-address (symbol-tls-index symbol)))
          (current-value
            #!+sb-thread
-           (sap-ref-lispobj (sb!thread::current-thread-sap) tls-index)
+           (sap-ref-lispobj (sb-thread::current-thread-sap) tls-index)
            #!-sb-thread
            (symbol-value symbol)))
     (unless (eq (get-lisp-obj-address current-value)

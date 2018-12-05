@@ -927,7 +927,7 @@ core and return a descriptor to it."
 ;;;; symbol magic
 
 ;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
-(defvar *genesis-tls-counter* sb!thread::tls-index-start)
+(defvar *genesis-tls-counter* sb-thread::tls-index-start)
 
 #!+sb-thread
 (progn
@@ -1744,7 +1744,7 @@ core and return a descriptor to it."
   #!+sb-thread
   (let ((bindings sb-kernel::*!thread-initial-bindings*))
     ;; Assign the initialization vector for create_thread_struct()
-    (cold-set 'sb!thread::*thread-initial-bindings*
+    (cold-set 'sb-thread::*thread-initial-bindings*
               (vector-in-core
                (mapcar (lambda (pair &aux (name (car pair)))
                          ;; Sanity check - no overlap with GC/interrupt controls

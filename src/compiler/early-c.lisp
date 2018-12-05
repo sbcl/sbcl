@@ -139,15 +139,15 @@ the stack without triggering overflow protection.")
 (defglobal **world-lock** nil)
 #-sb-xc-host
 (!cold-init-forms
- (setf **world-lock** (sb!thread:make-mutex :name "World Lock")))
+ (setf **world-lock** (sb-thread:make-mutex :name "World Lock")))
 (!defun-from-collected-cold-init-forms !world-lock-cold-init)
 
 #-sb-xc-host
 (define-load-time-global *static-linker-lock*
-    (sb!thread:make-mutex :name "static linker"))
+    (sb-thread:make-mutex :name "static linker"))
 
 (defmacro with-world-lock (() &body body)
-  `(sb!thread:with-recursive-lock (**world-lock**)
+  `(sb-thread:with-recursive-lock (**world-lock**)
      ,@body))
 
 ;;; unique ID for the next object created (to let us track object

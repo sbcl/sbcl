@@ -15,7 +15,7 @@
   `(let ((mutex (hash-table-lock (finalizer-id-map **finalizer-store**))))
      ;; This does not inhibit GC, though the hashtable operations will,
      ;; as is (currently) required for tables with non-null weakness.
-     (sb!thread::with-recursive-system-lock (mutex)
+     (sb-thread::with-recursive-system-lock (mutex)
        ;; Grab the store again inside the lock in case the array was enlarged
        ;; after we referenced the mutex but before we acquired it.
        (let ((,var **finalizer-store**))
@@ -119,7 +119,7 @@ Examples:
                    (t
                     (setq id (incf (finalizer-max-id store)))
                     (unless (< id (length store))
-                      (sb!thread:barrier (:write)
+                      (sb-thread:barrier (:write)
                         ;; We must completely copy the old vector into the new
                         ;; before publishing the new in **FINALIZER-STORE**.
                         ;; Perhaps a cleverer way to size up is to have a tree
@@ -279,30 +279,30 @@ Examples:
   ;; between stopping the thread and writing to disk will be synchronous.
   ;; Restarting a saved core resets the flag to T.
   (define-load-time-global *finalizer-thread* t)
-  (declaim (type (or sb!thread:thread boolean) *finalizer-thread*))
+  (declaim (type (or sb-thread:thread boolean) *finalizer-thread*))
   (define-load-time-global *finalizer-queue-lock*
-      (sb!thread:make-mutex :name "finalizer"))
+      (sb-thread:make-mutex :name "finalizer"))
   (define-load-time-global *finalizer-queue*
-      (sb!thread:make-waitqueue :name "finalizer")))
+      (sb-thread:make-waitqueue :name "finalizer")))
 
 (defun run-pending-finalizers ()
   (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
     (cond #!+sb-thread
           ((%instancep *finalizer-thread*)
-           (sb!thread::with-system-mutex (*finalizer-queue-lock*)
-             (sb!thread:condition-notify *finalizer-queue*)))
+           (sb-thread::with-system-mutex (*finalizer-queue-lock*)
+             (sb-thread:condition-notify *finalizer-queue*)))
           #!+sb-thread
           ((eq *finalizer-thread* t) ; Create a new thread
-           (sb!thread:make-thread
+           (sb-thread:make-thread
             (lambda ()
               (when (eq t (cas *finalizer-thread* t
-                               sb!thread:*current-thread*))
+                               sb-thread:*current-thread*))
                 ;; Don't enter the loop if this thread lost the
                 ;; competition to become a finalizer thread.
                 (loop
                   (scan-finalizers)
                   ;; Wait for a notification
-                  (sb!thread::with-system-mutex (*finalizer-queue-lock*)
+                  (sb-thread::with-system-mutex (*finalizer-queue-lock*)
                     ;; Don't go to sleep if *FINALIZER-THREAD* became NIL
                     (unless *finalizer-thread*
                       (return))
@@ -310,7 +310,7 @@ Examples:
                     ;; since it is always legal to call SCAN-FINALIZERS
                     ;; even when it has nothing to do.
                     ;; Spurious wakeup is of no concern to us here.
-                    (sb!thread:condition-wait
+                    (sb-thread:condition-wait
                      *finalizer-queue* *finalizer-queue-lock*)))))
             :name "finalizer"
             :ephemeral t))
@@ -328,6 +328,6 @@ Examples:
       ;; Setting to NIL causes the thread to exit after waking
       (setq thread (cas *finalizer-thread* thread nil))
       (when (%instancep thread) ; only if it was a thread, do this
-        (sb!thread::with-system-mutex (*finalizer-queue-lock*)
-          (sb!thread:condition-notify *finalizer-queue*))
-        (sb!thread:join-thread thread))))) ; wait for it
+        (sb-thread::with-system-mutex (*finalizer-queue-lock*)
+          (sb-thread:condition-notify *finalizer-queue*))
+        (sb-thread:join-thread thread))))) ; wait for it

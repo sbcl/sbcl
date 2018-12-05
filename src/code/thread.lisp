@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB!THREAD")
+(in-package "SB-THREAD")
 
 (!define-thread-local *current-thread* nil
       "Bound in each thread to the thread itself.")
@@ -38,7 +38,7 @@ stale value, use MUTEX-OWNER instead."
   "Test whether the current thread is holding MUTEX."
   ;; This is about the only use for which a stale value of owner is
   ;; sufficient.
-  (eq sb!thread:*current-thread* (mutex-%owner mutex)))
+  (eq sb-thread:*current-thread* (mutex-%owner mutex)))
 
 (defsetf mutex-value set-mutex-value)
 

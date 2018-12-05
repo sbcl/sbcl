@@ -66,7 +66,7 @@
     (let ((*unblock-deferrables-on-enabling-interrupts-p* t)
           (sb-debug:*stack-top-hint* (or sb-debug:*stack-top-hint* 'invoke-interruption)))
       (with-interrupt-bindings
-        (sb!thread::without-thread-waiting-for (:already-without-interrupts t)
+        (sb-thread::without-thread-waiting-for (:already-without-interrupts t)
           (allow-with-interrupts
             (nlx-protect (funcall function)
               ;; We've been running with deferrables

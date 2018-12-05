@@ -77,7 +77,7 @@
                                                     ,hash-table)))))
                         (error-fun))
                       (setf (,thread-slot-accessor ,hash-table)
-                            sb!thread::*current-thread*)
+                            sb-thread::*current-thread*)
                       (body-fun))
                  (unless (and ,@(when (eq operation :read)
                                   `((null (hash-table-writing-thread
@@ -88,10 +88,10 @@
                                            ,hash-table))
                                     (eq (hash-table-writing-thread
                                          ,hash-table)
-                                        sb!thread::*current-thread*))))
+                                        sb-thread::*current-thread*))))
                    (error-fun))
                  (when (eq (,thread-slot-accessor ,hash-table)
-                           sb!thread::*current-thread*)
+                           sb-thread::*current-thread*)
                    ;; this is not 100% correct here and may hide
                    ;; concurrent access in rare circumstances.
                    (setf (,thread-slot-accessor ,hash-table) nil)))
@@ -683,7 +683,7 @@ multiple threads accessing the same hash-table without locking."
     (cond ((rehash-p)
            ;; Use recursive locks since for weak tables the lock has
            ;; already been acquired.
-           (sb!thread::with-recursive-system-lock
+           (sb-thread::with-recursive-system-lock
                ((hash-table-lock hash-table))
              ;; Repeat the condition inside the lock to ensure that if
              ;; two reader threads enter MAYBE-REHASH at the same time
@@ -701,7 +701,7 @@ multiple threads accessing the same hash-table without locking."
                    (rehash hash-table new-size new-kv-vector new-next-vector
                            new-hash-vector new-index-vector))))))
           ((rehash-without-growing-p)
-           (sb!thread::with-recursive-system-lock
+           (sb-thread::with-recursive-system-lock
                ((hash-table-lock hash-table) :without-gcing t)
              (when (rehash-without-growing-p)
                (rehash-without-growing hash-table)))))))
@@ -722,7 +722,7 @@ multiple threads accessing the same hash-table without locking."
                 (locally (declare (inline ,@inline))
                   ,@body))))
        (if (hash-table-weak-p ,hash-table)
-           (sb!thread::with-recursive-system-lock
+           (sb-thread::with-recursive-system-lock
                ((hash-table-lock ,hash-table) :without-gcing t)
              (,body-fun))
            (with-pinned-objects ,pin
@@ -730,7 +730,7 @@ multiple threads accessing the same hash-table without locking."
                  ;; We use a "system" lock here because it is very
                  ;; slightly faster, as it doesn't re-enable
                  ;; interrupts.
-                 (sb!thread::with-recursive-system-lock
+                 (sb-thread::with-recursive-system-lock
                      ((hash-table-lock ,hash-table))
                    (,body-fun))
                  (,body-fun)))))))

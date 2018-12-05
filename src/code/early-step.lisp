@@ -36,7 +36,7 @@
 ;; Adding a file of target-only code for these isn't worth the trouble.
 #-sb-xc-host
 (symbol-macrolet ((place
-                   #!+sb-thread (sb!thread::thread-stepping)
+                   #!+sb-thread (sb-thread::thread-stepping)
                    #!-sb-thread *stepping*))
   (defun (setf stepping) (new-value)
     (setf place new-value))

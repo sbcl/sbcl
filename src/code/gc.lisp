@@ -154,7 +154,7 @@ statistics are appended to it."
 
 ;;; For GENCGC all generations < GEN will be GC'ed.
 
-(define-load-time-global *already-in-gc* (sb!thread:make-mutex :name "GC lock"))
+(define-load-time-global *already-in-gc* (sb-thread:make-mutex :name "GC lock"))
 
 (defun sub-gc (gen)
   (cond (*gc-inhibit*
@@ -200,7 +200,7 @@ statistics are appended to it."
            ;; Let's make sure we're not interrupted and that none of
            ;; the deadline or deadlock detection stuff triggers.
            (without-interrupts
-             (sb!thread::without-thread-waiting-for
+             (sb-thread::without-thread-waiting-for
                  (:already-without-interrupts t)
                (let ((sb-impl::*deadline* nil)
                      (epoch *gc-epoch*))
@@ -215,7 +215,7 @@ statistics are appended to it."
                     ;; execute the remainder of the GC: stopping the
                     ;; world with interrupts disabled is the mother of
                     ;; all critical sections.
-                    (cond ((sb!thread:with-mutex (*already-in-gc* :wait-p nil)
+                    (cond ((sb-thread:with-mutex (*already-in-gc* :wait-p nil)
                              (unsafe-clear-roots gen)
                              (gc-stop-the-world)
                              t)
@@ -270,7 +270,7 @@ statistics are appended to it."
   ;; but it's not permissible to invoke CONDITION-NOTIFY from a
   ;; dying thread, so we still need the guard for that, but not
   ;; the guard for whether interupts are enabled.
-  (when (sb!thread:thread-alive-p sb!thread:*current-thread*)
+  (when (sb-thread:thread-alive-p sb-thread:*current-thread*)
     (let ((threadp #!+sb-thread (%instancep sb-impl::*finalizer-thread*)))
       (when threadp
         ;; It's OK to frob a condition variable regardless of
@@ -280,7 +280,7 @@ statistics are appended to it."
         ;; That's my excuse anyway, not having looked more in-depth.
         (run-pending-finalizers))
       (when *allow-with-interrupts*
-        (sb!thread::without-thread-waiting-for ()
+        (sb-thread::without-thread-waiting-for ()
          (with-interrupts
            (unless threadp
              (run-pending-finalizers))

@@ -38,7 +38,7 @@
 (defun sigint-%break (format-string &rest format-arguments)
   (flet ((break-it ()
            (apply #'%break 'sigint format-string format-arguments)))
-    (sb!thread:interrupt-thread (sb!thread::foreground-thread) #'break-it)))
+    (sb-thread:interrupt-thread (sb-thread::foreground-thread) #'break-it)))
 ||#
 
 ;;; Map Windows Exception code to condition names: symbols or strings

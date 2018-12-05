@@ -477,7 +477,7 @@
 ;;; A two-level lookup is used- it works better than mixing all
 ;;; pathname components into a hash key.
 (define-load-time-global *pathnames* (make-array 211 :initial-element nil))
-(define-load-time-global *pathnames-lock* (sb!thread:make-mutex :name "Pathnames"))
+(define-load-time-global *pathnames-lock* (sb-thread:make-mutex :name "Pathnames"))
 
 (defun %make-pathname (host device directory name type version)
   (if (or device (neq host *physical-host*))
@@ -531,7 +531,7 @@
             ;; on the double-check, allocate it now
             (let ((pathname (%%make-pathname *physical-host* nil (car dir-holder)
                                              name type version)))
-              (sb!thread::with-system-mutex (*pathnames-lock*)
+              (sb-thread::with-system-mutex (*pathnames-lock*)
                 (when (>= n-candidates 10)
                   ;; Rehash into a larger vector
                   (let* ((old-len (length vector))

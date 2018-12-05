@@ -58,7 +58,7 @@
   (declare (function function))
   ;; FIXME: Since name conflicts can be signalled while holding the
   ;; mutex, user code can be run leading to lock ordering problems.
-  (sb!thread:with-recursive-lock (*package-graph-lock*)
+  (sb-thread:with-recursive-lock (*package-graph-lock*)
     (funcall function)))
 
 ;;; a map from package names to packages
@@ -67,7 +67,7 @@
 
 (defmacro with-package-names ((table-var &key) &body body)
   `(let ((,table-var *package-names*))
-     (sb!thread::with-recursive-system-lock ((info-env-mutex ,table-var))
+     (sb-thread::with-recursive-system-lock ((info-env-mutex ,table-var))
        ,@body)))
 
 (defmethod make-load-form ((p package) &optional environment)
@@ -1676,7 +1676,7 @@ PACKAGE."
 (defvar *!initial-symbols*)
 
 (defun !package-cold-init ()
-  (setf *package-graph-lock* (sb!thread:make-mutex :name "Package Graph Lock")
+  (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock")
         *package-names*
         (make-info-hashtable
          :comparator (named-lambda "PKG-NAME=" (a b)

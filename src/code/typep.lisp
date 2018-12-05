@@ -225,7 +225,7 @@
                     (lambda (cache object)
                       (%%typep object (cdr (truly-the cons cache)))))))
           (setf (cdr cache) ctype)
-          (sb!thread:barrier (:write))
+          (sb-thread:barrier (:write))
           (setf (car cache) fun)
           (funcall fun cache object)))))
 

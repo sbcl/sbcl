@@ -132,7 +132,7 @@
                   sb!assem:label
                   condition restart style-warning step-condition
                   class sb!pcl::condition-class error
-                  hash-table sb!thread:mutex
+                  hash-table sb-thread:mutex
                   sb!pretty:pprint-dispatch-table
                   compiler-note
                   deprecation-condition
