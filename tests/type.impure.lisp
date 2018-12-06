@@ -21,157 +21,169 @@
              (or (equal '(nil nil) list)
                  (equal '(t t) list)))))
 
-(let ((types '(character
-               integer fixnum (integer 0 10)
-               single-float (single-float -1.0 1.0) (single-float 0.1)
-               (real 4 8) (real -1 7) (real 2 11)
-               null symbol keyword
-               (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
-              (member #\a #\c #\d #\f) (integer -1 1)
-               unsigned-byte
-               (rational -1 7) (rational -2 4)
-               ratio
-               )))
-  (dolist (i types)
-    ;(format t "type I=~S~%" i)
-    (dolist (j types)
-      ;(format t "  type J=~S~%" j)
-      (assert (subtypep i `(or ,i ,j)))
-      (assert (subtypep i `(or ,j ,i)))
-      (assert (subtypep i `(or ,i ,i ,j)))
-      (assert (subtypep i `(or ,j ,i)))
-      (dolist (k types)
-        ;(format t "    type K=~S~%" k)
-        (assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
-        (assert (subtypep `(or ,i ,j) `(or ,k ,j ,i)))))))
+(with-test (:name (subtypep or))
+  (let ((types '(character
+                 integer fixnum (integer 0 10)
+                 single-float (single-float -1.0 1.0) (single-float 0.1)
+                 (real 4 8) (real -1 7) (real 2 11)
+                 null symbol keyword
+                 (member #\a #\b #\c) (member 1 #\a) (member 3.0 3.3)
+                 (member #\a #\c #\d #\f) (integer -1 1)
+                 unsigned-byte
+                 (rational -1 7) (rational -2 4)
+                 ratio
+                 )))
+    (dolist (i types)
+      (dolist (j types)
+        (assert (subtypep i `(or ,i ,j)))
+        (assert (subtypep i `(or ,j ,i)))
+        (assert (subtypep i `(or ,i ,i ,j)))
+        (assert (subtypep i `(or ,j ,i)))
+        (dolist (k types)
+          (assert (subtypep `(or ,i ,j) `(or ,i ,j ,k)))
+          (assert (subtypep `(or ,i ,j) `(or ,k ,j ,i))))))))
 
 ;;; gotchas that can come up in handling subtypeness as "X is a
 ;;; subtype of Y if each of the elements of X is a subtype of Y"
-(let ((subtypep-values (multiple-value-list
-                        (subtypep '(single-float -1.0 1.0)
-                                  '(or (real -100.0 0.0)
-                                       (single-float 0.0 100.0))))))
-  (assert (member subtypep-values
-                  '(;; The system isn't expected to
-                    ;; understand the subtype relationship.
-                    (nil nil)
-                    ;; But if it does, that'd be neat.
-                    (t t)
-                    ;; (And any other return would be wrong.)
-                    )
-                  :test #'equal)))
+(with-test (:name (subtypep single-float real or))
+  ;; The system isn't expected to understand the subtype
+  ;; relationship. But if it does, that'd be neat.
+  (assert-t-t-or-uncertain (subtypep '(single-float -1.0 1.0)
+                                     '(or (real -100.0 0.0)
+                                          (single-float 0.0 100.0)))))
 
-(assert (subtypep 'single-float 'float))
+(with-test (:name (subtypep single-float float))
+  (assert (subtypep 'single-float 'float)))
 
-(assert (type-evidently-= '(integer 0 10) '(or (integer 0 5) (integer 4 10))))
+(with-test (:name (:type= integer :ranges or))
+  (assert (type-evidently-= '(integer 0 10)
+                            '(or (integer 0 5) (integer 4 10)))))
 
 ;;; Bug 50(c,d): numeric types with empty ranges should be NIL
-(assert (type-evidently-= 'nil '(integer (0) (0))))
-(assert (type-evidently-= 'nil '(rational (0) (0))))
-(assert (type-evidently-= 'nil '(float (0.0) (0.0))))
+(with-test (:name (:type= integer rational float :empty :bug-50c :bug-50d))
+  (assert (type-evidently-= 'nil '(integer (0) (0))))
+  (assert (type-evidently-= 'nil '(rational (0) (0))))
+  (assert (type-evidently-= 'nil '(float (0.0) (0.0)))))
 
 ;;; sbcl-0.6.10 did (UPGRADED-ARRAY-ELEMENT-TYPE 'SOME-UNDEF-TYPE)=>T
 ;;; and (UPGRADED-COMPLEX-PART-TYPE 'SOME-UNDEF-TYPE)=>T.
-(assert-error (upgraded-array-element-type 'some-undef-type))
-(assert (eql (upgraded-array-element-type t) t))
-(assert-error (upgraded-complex-part-type 'some-undef-type))
-(assert (subtypep (upgraded-complex-part-type 'fixnum) 'real))
+(with-test (:name (upgraded-array-element-type :undefined))
+  (assert-error (upgraded-array-element-type 'some-undef-type))
+  (assert (eql (upgraded-array-element-type t) t)))
+
+(with-test (:name (upgraded-complex-part-type :undefined))
+  (assert-error (upgraded-complex-part-type 'some-undef-type))
+  (assert (subtypep (upgraded-complex-part-type 'fixnum) 'real)))
 
 ;;; Do reasonable things with undefined types, and with compound types
 ;;; built from undefined types.
-;;;
-;;; part I: TYPEP
-(assert (typep #(11) '(simple-array t 1)))
-(assert (typep #(11) '(simple-array (or integer symbol) 1)))
-(assert-error (typep #(11) '(simple-array undef-type 1)))
-(assert (not (typep 11 '(simple-array undef-type 1))))
-;;; part II: SUBTYPEP
-
-(assert (subtypep '(vector some-undef-type) 'vector))
-(assert (not (subtypep '(vector some-undef-type) 'integer)))
-(assert-nil-nil (subtypep 'utype-1 'utype-2))
-(assert-nil-nil (subtypep '(vector utype-1) '(vector utype-2)))
-(assert-nil-nil (subtypep '(vector utype-1) '(vector t)))
-(assert-nil-nil (subtypep '(vector t) '(vector utype-2)))
+(with-test (:name (typep :undefined :compound))
+  (assert (typep #(11) '(simple-array t 1)))
+  (assert (typep #(11) '(simple-array (or integer symbol) 1)))
+  (assert-error (typep #(11) '(simple-array undef-type 1)))
+  (assert (not (typep 11 '(simple-array undef-type 1)))))
+(with-test (:name (subtypep :undefined :compound))
+  (assert (subtypep '(vector some-undef-type) 'vector))
+  (assert (not (subtypep '(vector some-undef-type) 'integer)))
+  (assert-nil-nil (subtypep 'utype-1 'utype-2))
+  (assert-nil-nil (subtypep '(vector utype-1) '(vector utype-2)))
+  (assert-nil-nil (subtypep '(vector utype-1) '(vector t)))
+  (assert-nil-nil (subtypep '(vector t) '(vector utype-2))))
 
 ;;; ANSI specifically disallows bare AND and OR symbols as type specs.
-(assert-error (typep 11 'and))
-(assert-error (typep 11 'or))
-(assert-error (typep 11 'member))
-(assert-error (typep 11 'values))
-(assert-error (typep 11 'eql))
-(assert-error (typep 11 'satisfies))
-(assert-error (typep 11 'not))
+(with-test (:name (typep :bare :compound error))
+  (assert-error (typep 11 'and))
+  (assert-error (typep 11 'or))
+  (assert-error (typep 11 'member))
+  (assert-error (typep 11 'values))
+  (assert-error (typep 11 'eql))
+  (assert-error (typep 11 'satisfies))
+  (assert-error (typep 11 'not)))
 ;;; and while it doesn't specifically disallow illegal compound
 ;;; specifiers from the CL package, we don't have any.
-(assert-error (subtypep 'fixnum '(fixnum 1)))
-(assert-error (subtypep 'class '(list)))
-(assert-error (subtypep 'foo '(ratio 1/2 3/2)))
-(assert-error (subtypep 'character '(character 10)))
+(with-test (:name (subtypep :illegal :compound error))
+  (assert-error (subtypep 'fixnum '(fixnum 1)))
+  (assert-error (subtypep 'class '(list)))
+  (assert-error (subtypep 'foo '(ratio 1/2 3/2)))
+  (assert-error (subtypep 'character '(character 10))))
 #+nil ; doesn't yet work on PCL-derived internal types
 (assert-error (subtypep 'lisp '(class)))
 #+nil
 (assert-error (subtypep 'bar '(method number number)))
 
 ;;; Of course empty lists of subtypes are still OK.
-(assert (typep 11 '(and)))
-(assert (not (typep 11 '(or))))
+(with-test (:name (typep :empty and or))
+  (assert (typep 11 '(and)))
+  (assert (not (typep 11 '(or)))))
 
 ;;; bug 12: type system didn't grok nontrivial intersections
-(assert (subtypep '(and symbol (satisfies keywordp)) 'symbol))
-(assert (not (subtypep '(and symbol (satisfies keywordp)) 'null)))
-(assert (subtypep 'keyword 'symbol))
-(assert (not (subtypep 'symbol 'keyword)))
-(assert (subtypep 'ratio 'real))
-(assert (subtypep 'ratio 'number))
+(with-test (:name (subtypep and :bug-12))
+  (assert-t-t (subtypep '(and symbol (satisfies keywordp)) 'symbol))
+  (assert-nil-t (subtypep '(and symbol (satisfies keywordp)) 'null))
+  (assert-t-t (subtypep 'keyword 'symbol))
+  (assert-nil-t (subtypep 'symbol 'keyword))
+  (assert-t-t (subtypep 'ratio 'real))
+  (assert-t-t (subtypep 'ratio 'number)))
 
 ;;; bug 50.g: Smarten up hairy type specifiers slightly. We may wish
 ;;; to revisit this, perhaps by implementing a COMPLEMENT type
 ;;; (analogous to UNION and INTERSECTION) to take the logic out of the
 ;;; HAIRY domain.
-(assert-nil-t (subtypep 'atom 'cons))
-(assert-nil-t (subtypep 'cons 'atom))
+(with-test (:name (subtypep atom cons :bug-50g))
+  (assert-nil-t (subtypep 'atom 'cons))
+  (assert-nil-t (subtypep 'cons 'atom)))
+
 ;;; These two are desireable but not necessary for ANSI conformance;
 ;;; maintenance work on other parts of the system broke them in
 ;;; sbcl-0.7.13.11 -- CSR
-#+nil
-(assert-nil-t (subtypep '(not list) 'cons))
-#+nil
-(assert-nil-t (subtypep '(not float) 'single-float))
-(assert-t-t (subtypep '(not atom) 'cons))
-(assert-t-t (subtypep 'cons '(not atom)))
+(with-test (:name (subtypep not atom list cons))
+  #+nil
+  (assert-nil-t (subtypep '(not list) 'cons))
+  #+nil
+  (assert-nil-t (subtypep '(not float) 'single-float))
+  (assert-t-t (subtypep '(not atom) 'cons))
+  (assert-t-t (subtypep 'cons '(not atom))))
+
 ;;; ANSI requires that SUBTYPEP relationships among built-in primitive
 ;;; types never be uncertain, i.e. never return NIL as second value.
 ;;; Prior to about sbcl-0.7.2.6, ATOM caused a lot of problems here
 ;;; (because it's a negation type, implemented as a HAIRY-TYPE, and
 ;;; CMU CL's HAIRY-TYPE logic punted a lot).
-(assert-t-t (subtypep 'integer 'atom))
-(assert-t-t (subtypep 'function 'atom))
-(assert-nil-t (subtypep 'list 'atom))
-(assert-nil-t (subtypep 'atom 'integer))
-(assert-nil-t (subtypep 'atom 'function))
-(assert-nil-t (subtypep 'atom 'list))
+(with-test (:name (subtypep integer function atom list))
+  (assert-t-t (subtypep 'integer 'atom))
+  (assert-t-t (subtypep 'function 'atom))
+  (assert-nil-t (subtypep 'list 'atom))
+  (assert-nil-t (subtypep 'atom 'integer))
+  (assert-nil-t (subtypep 'atom 'function))
+  (assert-nil-t (subtypep 'atom 'list)))
+
 ;;; ATOM is equivalent to (NOT CONS):
-(assert-t-t (subtypep 'integer '(not cons)))
-(assert-nil-t (subtypep 'list '(not cons)))
-(assert-nil-t (subtypep '(not cons) 'integer))
-(assert-nil-t (subtypep '(not cons) 'list))
+(with-test (:name (subtypep atom cons cons))
+  (assert-t-t (subtypep 'integer '(not cons)))
+  (assert-nil-t (subtypep 'list '(not cons)))
+  (assert-nil-t (subtypep '(not cons) 'integer))
+  (assert-nil-t (subtypep '(not cons) 'list)))
+
 ;;; And we'd better check that all the named types are right. (We also
 ;;; do some more tests on ATOM here, since once CSR experimented with
 ;;; making it a named type.)
-(assert-t-t (subtypep 'nil 'nil))
-(assert-t-t (subtypep 'nil 'atom))
-(assert-t-t (subtypep 'nil 't))
-(assert-nil-t (subtypep 'atom 'nil))
-(assert-t-t (subtypep 'atom 'atom))
-(assert-t-t (subtypep 'atom 't))
-(assert-nil-t (subtypep 't 'nil))
-(assert-nil-t (subtypep 't 'atom))
-(assert-t-t (subtypep 't 't))
+(with-test (:name (subtypep nil atom t))
+  (assert-t-t (subtypep 'nil 'nil))
+  (assert-t-t (subtypep 'nil 'atom))
+  (assert-t-t (subtypep 'nil 't))
+  (assert-nil-t (subtypep 'atom 'nil))
+  (assert-t-t (subtypep 'atom 'atom))
+  (assert-t-t (subtypep 'atom 't))
+  (assert-nil-t (subtypep 't 'nil))
+  (assert-nil-t (subtypep 't 'atom))
+  (assert-t-t (subtypep 't 't)))
+
 ;;; Also, LIST is now somewhat special, in that (NOT LIST) should be
 ;;; recognized as a subtype of ATOM:
-(assert-t-t (subtypep '(not list) 'atom))
-(assert-nil-t (subtypep 'atom '(not list)))
+(with-test (:name (subtypep not list atom))
+  (assert-t-t (subtypep '(not list) 'atom))
+  (assert-nil-t (subtypep 'atom '(not list))))
+
 ;;; These used to fail, because when the two arguments to subtypep are
 ;;; of different specifier-type types (e.g. HAIRY and UNION), there
 ;;; are two applicable type methods -- in this case
@@ -181,61 +193,70 @@
 ;;; them returns NIL, NIL (indicating uncertainty) it should try the
 ;;; other. However, as of sbcl-0.7.2.6 or so, CALL-NEXT-METHOD-ish
 ;;; logic in those type methods fixed it.
-(assert-nil-t (subtypep '(not cons) 'list))
-(assert-nil-t (subtypep '(not single-float) 'float))
+(with-test (:name (subtypep not list float))
+  (assert-nil-t (subtypep '(not cons) 'list))
+  (assert-nil-t (subtypep '(not single-float) 'float)))
+
 ;;; Somewhere along the line (probably when adding CALL-NEXT-METHOD-ish
 ;;; logic in SUBTYPEP type methods) we fixed bug 58 too:
-(assert-t-t (subtypep '(and zilch integer) 'zilch))
-(assert-t-t (subtypep '(and integer zilch) 'zilch))
+(with-test (:name (subtypep and integer :unknown))
+  (assert-t-t (subtypep '(and zilch integer) 'zilch))
+  (assert-t-t (subtypep '(and integer zilch) 'zilch)))
 
 ;;; Bug 84: SB-KERNEL:CSUBTYPEP was a bit enthusiastic at
 ;;; special-casing calls to subtypep involving *EMPTY-TYPE*,
 ;;; corresponding to the NIL type-specifier; we were bogusly returning
 ;;; NIL, T (indicating surety) for the following:
-(assert-nil-nil (subtypep '(satisfies some-undefined-fun) 'nil))
+(with-test (:name (subtypep satisfies :undefined-function nil :bug-84))
+  (assert-nil-nil (subtypep '(satisfies some-undefined-fun) 'nil)))
 
 ;;; It turns out that, as of sbcl-0.7.2, we require to be able to
 ;;; detect this to compile src/compiler/node.lisp (and in particular,
 ;;; the definition of the component structure). Since it's a sensible
 ;;; thing to want anyway, let's test for it here:
-(assert-t-t (subtypep '(or some-undefined-type (member :no-ir2-yet :dead))
-                      '(or some-undefined-type (member :no-ir2-yet :dead))))
+(with-test (:name (subtypep or :unknown member))
+  (assert-t-t (subtypep '(or some-undefined-type (member :no-ir2-yet :dead))
+                        '(or some-undefined-type (member :no-ir2-yet :dead)))))
+
 ;;; BUG 158 (failure to compile loops with vector references and
 ;;; increments of greater than 1) was a symptom of type system
 ;;; uncertainty, to wit:
-(assert-t-t (subtypep '(and (mod 536870911) (or (integer 0 0) (integer 2 536870912)))
-                      '(mod 536870911))) ; aka SB-INT:INDEX.
+(with-test (:name (subtypep and or mod integer :bug-158))
+  (assert-t-t (subtypep '(and (mod 536870911) (or (integer 0 0) (integer 2 536870912)))
+                        '(mod 536870911)))) ; aka SB-INT:INDEX.
+
 ;;; floating point types can be tricky.
-(assert-t-t (subtypep '(member 0.0) '(single-float 0.0 0.0)))
-(assert-t-t (subtypep '(member -0.0) '(single-float 0.0 0.0)))
-(assert-t-t (subtypep '(member 0.0) '(single-float -0.0 0.0)))
-(assert-t-t (subtypep '(member -0.0) '(single-float 0.0 -0.0)))
-(assert-t-t (subtypep '(member 0.0d0) '(double-float 0.0d0 0.0d0)))
-(assert-t-t (subtypep '(member -0.0d0) '(double-float 0.0d0 0.0d0)))
-(assert-t-t (subtypep '(member 0.0d0) '(double-float -0.0d0 0.0d0)))
-(assert-t-t (subtypep '(member -0.0d0) '(double-float 0.0d0 -0.0d0)))
+(with-test (:name (subtypep float single-float double-float member not))
+  (assert-t-t (subtypep '(member 0.0) '(single-float 0.0 0.0)))
+  (assert-t-t (subtypep '(member -0.0) '(single-float 0.0 0.0)))
+  (assert-t-t (subtypep '(member 0.0) '(single-float -0.0 0.0)))
+  (assert-t-t (subtypep '(member -0.0) '(single-float 0.0 -0.0)))
+  (assert-t-t (subtypep '(member 0.0d0) '(double-float 0.0d0 0.0d0)))
+  (assert-t-t (subtypep '(member -0.0d0) '(double-float 0.0d0 0.0d0)))
+  (assert-t-t (subtypep '(member 0.0d0) '(double-float -0.0d0 0.0d0)))
+  (assert-t-t (subtypep '(member -0.0d0) '(double-float 0.0d0 -0.0d0)))
 
-(assert-nil-t (subtypep '(single-float 0.0 0.0) '(member 0.0)))
-(assert-nil-t (subtypep '(single-float 0.0 0.0) '(member -0.0)))
-(assert-nil-t (subtypep '(single-float -0.0 0.0) '(member 0.0)))
-(assert-nil-t (subtypep '(single-float 0.0 -0.0) '(member -0.0)))
-(assert-nil-t (subtypep '(double-float 0.0d0 0.0d0) '(member 0.0d0)))
-(assert-nil-t (subtypep '(double-float 0.0d0 0.0d0) '(member -0.0d0)))
-(assert-nil-t (subtypep '(double-float -0.0d0 0.0d0) '(member 0.0d0)))
-(assert-nil-t (subtypep '(double-float 0.0d0 -0.0d0) '(member -0.0d0)))
+  (assert-nil-t (subtypep '(single-float 0.0 0.0) '(member 0.0)))
+  (assert-nil-t (subtypep '(single-float 0.0 0.0) '(member -0.0)))
+  (assert-nil-t (subtypep '(single-float -0.0 0.0) '(member 0.0)))
+  (assert-nil-t (subtypep '(single-float 0.0 -0.0) '(member -0.0)))
+  (assert-nil-t (subtypep '(double-float 0.0d0 0.0d0) '(member 0.0d0)))
+  (assert-nil-t (subtypep '(double-float 0.0d0 0.0d0) '(member -0.0d0)))
+  (assert-nil-t (subtypep '(double-float -0.0d0 0.0d0) '(member 0.0d0)))
+  (assert-nil-t (subtypep '(double-float 0.0d0 -0.0d0) '(member -0.0d0)))
 
-(assert-t-t (subtypep '(member 0.0 -0.0) '(single-float 0.0 0.0)))
-(assert-t-t (subtypep '(single-float 0.0 0.0) '(member 0.0 -0.0)))
-(assert-t-t (subtypep '(member 0.0d0 -0.0d0) '(double-float 0.0d0 0.0d0)))
-(assert-t-t (subtypep '(double-float 0.0d0 0.0d0) '(member 0.0d0 -0.0d0)))
+  (assert-t-t (subtypep '(member 0.0 -0.0) '(single-float 0.0 0.0)))
+  (assert-t-t (subtypep '(single-float 0.0 0.0) '(member 0.0 -0.0)))
+  (assert-t-t (subtypep '(member 0.0d0 -0.0d0) '(double-float 0.0d0 0.0d0)))
+  (assert-t-t (subtypep '(double-float 0.0d0 0.0d0) '(member 0.0d0 -0.0d0)))
 
-(assert-t-t (subtypep '(not (single-float 0.0 0.0)) '(not (member 0.0))))
-(assert-t-t (subtypep '(not (double-float 0.0d0 0.0d0)) '(not (member 0.0d0))))
+  (assert-t-t (subtypep '(not (single-float 0.0 0.0)) '(not (member 0.0))))
+  (assert-t-t (subtypep '(not (double-float 0.0d0 0.0d0)) '(not (member 0.0d0))))
 
-(assert-t-t (subtypep '(float -0.0) '(float 0.0)))
-(assert-t-t (subtypep '(float 0.0) '(float -0.0)))
-(assert-t-t (subtypep '(float (0.0)) '(float (-0.0))))
-(assert-t-t (subtypep '(float (-0.0)) '(float (0.0))))
+  (assert-t-t (subtypep '(float -0.0) '(float 0.0)))
+  (assert-t-t (subtypep '(float 0.0) '(float -0.0)))
+  (assert-t-t (subtypep '(float (0.0)) '(float (-0.0))))
+  (assert-t-t (subtypep '(float (-0.0)) '(float (0.0)))))
 
 (with-test (:name :member-type-and-numeric)
   ;; (MEMBER 0s0 -s0) used to appear to parse correctly,
@@ -387,14 +408,18 @@
      (assert (subtypep (find-class 'stream) (find-class t)))
      (assert (subtypep (find-class 'fundamental-stream) 'stream))
      (assert (not (subtypep 'stream 'fundamental-stream)))))
+
 ;;; Test under the interpreter.
-(eval *tests-of-inline-type-tests*)
-(format t "~&/done with interpreted *TESTS-OF-INLINE-TYPE-TESTS*~%")
+(with-test (:name (:inline-type-tests :interpreted))
+  (eval *tests-of-inline-type-tests*)
+  (format t "~&/done with interpreted *TESTS-OF-INLINE-TYPE-TESTS*~%"))
+
 ;;; Test under the compiler.
 (defun tests-of-inline-type-tests ()
   #.*tests-of-inline-type-tests*)
-(tests-of-inline-type-tests)
-(format t "~&/done with compiled (TESTS-OF-INLINE-TYPE-TESTS)~%")
+(with-test (:name (:inline-type-tests :compiled))
+  (tests-of-inline-type-tests)
+  (format t "~&/done with compiled (TESTS-OF-INLINE-TYPE-TESTS)~%"))
 
 ;;; Redefinition of classes should alter the type hierarchy (BUG 140):
 (defclass superclass () ())
@@ -412,176 +437,177 @@
   (declare (type (vector bar) x))
   (aref x 1))
 (deftype bar () 'single-float)
-(assert (eql (foo (make-array 3 :element-type 'bar :initial-element 0.0f0))
-             0.0f0))
+(with-test (:name (array :unknown :element-type))
+  (assert (eql (foo (make-array 3 :element-type 'bar :initial-element 0.0f0))
+               0.0f0)))
 
-;;; bug 260a
-(assert-t-t
- (let* ((s (gensym))
-        (t1 (sb-kernel:specifier-type s)))
-   (eval `(defstruct ,s))
-   (sb-kernel:type= t1 (sb-kernel:specifier-type s))))
+(with-test (:name (sb-kernel:type= :bug-260a))
+  (let* ((s (gensym))
+         (t1 (sb-kernel:specifier-type s)))
+    (eval `(defstruct ,s))
+    (assert-t-t (sb-kernel:type= t1 (sb-kernel:specifier-type s)))))
 
 ;;; bug found by PFD's random subtypep tester
-(let ((t1 '(cons rational (cons (not rational) (cons integer t))))
-      (t2 '(not (cons (integer 0 1) (cons single-float long-float)))))
-  (assert-t-t (subtypep t1 t2))
-  (assert-nil-t (subtypep t2 t1))
-  (assert-t-t (subtypep `(not ,t2) `(not ,t1)))
-  (assert-nil-t (subtypep `(not ,t1) `(not ,t2))))
+(with-test (:name (subtypep cons rational integer single-float))
+  (let ((t1 '(cons rational (cons (not rational) (cons integer t))))
+        (t2 '(not (cons (integer 0 1) (cons single-float long-float)))))
+    (assert-t-t (subtypep t1 t2))
+    (assert-nil-t (subtypep t2 t1))
+    (assert-t-t (subtypep `(not ,t2) `(not ,t1)))
+    (assert-nil-t (subtypep `(not ,t1) `(not ,t2)))))
 
 ;;; not easily visible to user code, but this used to be very
 ;;; confusing.
-(with-test (:name (:ctor :typep-function))
+(with-test (:name (:ctor typep function))
   (assert (eval '(typep (sb-pcl::ensure-ctor
                          (list 'sb-pcl::ctor (gensym)) nil nil nil)
                         'function))))
-(with-test (:name (:ctor :functionp))
+(with-test (:name (:ctor functionp))
   (assert (functionp (sb-pcl::ensure-ctor
                       (list 'sb-pcl::ctor (gensym)) nil nil nil))))
 ;;; some new (2008-10-03) ways of going wrong...
-(with-test (:name (:ctor-allocate-instance :typep-function))
+(with-test (:name (:ctor allocate-instance typep function))
   (assert (eval '(typep (allocate-instance (find-class 'sb-pcl::ctor))
                         'function))))
-(with-test (:name (:ctor-allocate-instance :functionp))
+(with-test (:name (:ctor allocate-instance functionp))
   (assert (functionp (allocate-instance (find-class 'sb-pcl::ctor)))))
 
 ;;; from PFD ansi-tests
-(with-test (:name (:subtypep :complex-cons-type))
- (let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
-                   (integer -234496 215373))
-             integer))
-       (t2 '(cons (cons (cons integer integer)
-                   (integer -234496 215373))
-             t)))
-   (assert (null (values (subtypep `(not ,t2) `(not ,t1)))))))
+(with-test (:name (subtypep :complex-cons-type))
+  (let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
+                    (integer -234496 215373))
+              integer))
+        (t2 '(cons (cons (cons integer integer)
+                    (integer -234496 215373))
+              t)))
+    (assert-nil-t (subtypep `(not ,t2) `(not ,t1)))))
 
 (defstruct misc-629a)
 (defclass misc-629b () ())
 (defclass misc-629c () () (:metaclass sb-mop:funcallable-standard-class))
 
-(assert (typep (make-misc-629a) 'sb-kernel:instance))
-(assert-t-t (subtypep `(member ,(make-misc-629a)) 'sb-kernel:instance))
-(assert-nil-t (subtypep `(and (member ,(make-misc-629a)) sb-kernel:instance)
-                        nil))
-(let ((misc-629a (make-misc-629a)))
-  (assert-t-t (subtypep `(member ,misc-629a)
-                        `(and (member ,misc-629a) sb-kernel:instance)))
-  (assert-t-t (subtypep `(and (member ,misc-629a)
-                          sb-kernel:funcallable-instance)
-                        nil)))
+(with-test (:name (typep subtypep defstruct defclass))
+  (assert (typep (make-misc-629a) 'sb-kernel:instance))
+  (assert-t-t (subtypep `(member ,(make-misc-629a)) 'sb-kernel:instance))
+  (assert-nil-t (subtypep `(and (member ,(make-misc-629a)) sb-kernel:instance)
+                          nil))
+  (let ((misc-629a (make-misc-629a)))
+    (assert-t-t (subtypep `(member ,misc-629a)
+                          `(and (member ,misc-629a) sb-kernel:instance)))
+    (assert-t-t (subtypep `(and (member ,misc-629a)
+                                sb-kernel:funcallable-instance)
+                          nil)))
 
-(assert (typep (make-instance 'misc-629b) 'sb-kernel:instance))
-(assert-t-t (subtypep `(member ,(make-instance 'misc-629b))
-                      'sb-kernel:instance))
-(assert-nil-t (subtypep `(and (member ,(make-instance 'misc-629b))
-                          sb-kernel:instance)
-                        nil))
-(let ((misc-629b (make-instance 'misc-629b)))
-  (assert-t-t (subtypep `(member ,misc-629b)
-                        `(and (member ,misc-629b) sb-kernel:instance)))
-  (assert-t-t (subtypep `(and (member ,misc-629b)
-                          sb-kernel:funcallable-instance)
-                        nil)))
+  (assert (typep (make-instance 'misc-629b) 'sb-kernel:instance))
+  (assert-t-t (subtypep `(member ,(make-instance 'misc-629b))
+                        'sb-kernel:instance))
+  (assert-nil-t (subtypep `(and (member ,(make-instance 'misc-629b))
+                                sb-kernel:instance)
+                          nil))
+  (let ((misc-629b (make-instance 'misc-629b)))
+    (assert-t-t (subtypep `(member ,misc-629b)
+                          `(and (member ,misc-629b) sb-kernel:instance)))
+    (assert-t-t (subtypep `(and (member ,misc-629b)
+                                sb-kernel:funcallable-instance)
+                          nil)))
 
-(assert (typep (make-instance 'misc-629c) 'sb-kernel:funcallable-instance))
-(assert-t-t (subtypep `(member ,(make-instance 'misc-629c))
-                      'sb-kernel:funcallable-instance))
-(assert-nil-t (subtypep `(and (member ,(make-instance 'misc-629c))
-                          sb-kernel:funcallable-instance)
-                        nil))
-(let ((misc-629c (make-instance 'misc-629c)))
-  (assert-t-t (subtypep `(member ,misc-629c)
-                        `(and (member ,misc-629c)
-                          sb-kernel:funcallable-instance)))
-  (assert-t-t (subtypep `(and (member ,misc-629c)
-                          sb-kernel:instance)
-                        nil)))
+  (assert (typep (make-instance 'misc-629c) 'sb-kernel:funcallable-instance))
+  (assert-t-t (subtypep `(member ,(make-instance 'misc-629c))
+                        'sb-kernel:funcallable-instance))
+  (assert-nil-t (subtypep `(and (member ,(make-instance 'misc-629c))
+                                sb-kernel:funcallable-instance)
+                          nil))
+  (let ((misc-629c (make-instance 'misc-629c)))
+    (assert-t-t (subtypep `(member ,misc-629c)
+                          `(and (member ,misc-629c)
+                                sb-kernel:funcallable-instance)))
+    (assert-t-t (subtypep `(and (member ,misc-629c)
+                                sb-kernel:instance)
+                          nil))))
 
 ;;; this was broken during the FINALIZE-INHERITANCE rearrangement; the
 ;;; MAKE-INSTANCE finalizes the superclass, thus invalidating the
 ;;; subclass, so SUBTYPEP must be prepared to deal with
 (defclass ansi-tests-defclass1 () ())
 (defclass ansi-tests-defclass3 (ansi-tests-defclass1) ())
-(make-instance 'ansi-tests-defclass1)
-(assert-t-t (subtypep 'ansi-tests-defclass3 'standard-object))
+(with-test (:name (subtypep defclass make-instance))
+  (make-instance 'ansi-tests-defclass1)
+  (assert-t-t (subtypep 'ansi-tests-defclass3 'standard-object)))
 
 ;;; so was this
-(let ((class (eval '(defclass to-be-type-ofed () ()))))
-  (setf (find-class 'to-be-type-ofed) nil)
-  (assert (eq (type-of (make-instance class)) class)))
+(with-test (:name (type-of defclass :undefine))
+  (let ((class (eval '(defclass to-be-type-ofed () ()))))
+    (setf (find-class 'to-be-type-ofed) nil)
+    (assert (eq (type-of (make-instance class)) class))))
 
 ;;; accuracy of CONS :SIMPLE-TYPE-=
 (deftype goldbach-1 () '(satisfies even-and-greater-then-two-p))
 (deftype goldbach-2 () '(satisfies sum-of-two-primes-p))
 
-(multiple-value-bind (ok win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
-                     (sb-kernel:specifier-type '(cons goldbach-1 integer)))
-  (assert ok)
-  (assert win))
+(with-test (:name (sb-kernel:type= cons satisfies integer))
+  (assert-t-t
+   (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
+                    (sb-kernel:specifier-type '(cons goldbach-1 integer))))
 
-;; See FIXME in type method for CONS :SIMPLE-TYPE-=
-#+nil
-(multiple-value-bind (ok win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
-                     (sb-kernel:specifier-type '(cons goldbach-1 single-float)))
-  (assert (not ok))
-  (assert win))
+  ;; See FIXME in type method for CONS :SIMPLE-TYPE-=
+  #+nil
+  (assert-nil-t
+   (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
+                    (sb-kernel:specifier-type '(cons goldbach-1 single-float))))
 
-(multiple-value-bind (ok win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
-                     (sb-kernel:specifier-type '(cons goldbach-2 single-float)))
-  (assert (not ok))
-  (assert (not win)))
+  (assert-nil-nil
+   (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
+                    (sb-kernel:specifier-type '(cons goldbach-2 single-float)))))
 
 ;;; precise unions of array types (was bug 306a)
 (defun bug-306-a (x)
   (declare (optimize speed)
            (type (or (array cons) (array vector)) x))
   (elt (aref x 0) 0))
-(assert (= 0 (bug-306-a #((0)))))
+(with-test (:name (array :element-type aref optimize speed :bug-306-a))
+  (assert (= 0 (bug-306-a #((0))))))
 
 ;;; FUNCALLABLE-INSTANCE is a subtype of function.
-(assert-t-t (subtypep '(and pathname function) nil))
-(assert-t-t (subtypep '(and pathname sb-kernel:funcallable-instance) nil))
-(assert (not (subtypep '(and stream function) nil)))
-(assert (not (subtypep '(and stream sb-kernel:funcallable-instance) nil)))
-(assert (not (subtypep '(and function standard-object) nil)))
-(assert (not (subtypep '(and sb-kernel:funcallable-instance standard-object) nil)))
+(with-test (:name (subtypep function sb-kernel:funcallable-instance))
+  (assert-t-t (subtypep '(and pathname function) nil))
+  (assert-t-t (subtypep '(and pathname sb-kernel:funcallable-instance) nil))
+  (assert (not (subtypep '(and stream function) nil)))
+  (assert (not (subtypep '(and stream sb-kernel:funcallable-instance) nil)))
+  (assert (not (subtypep '(and function standard-object) nil)))
+  (assert (not (subtypep '(and sb-kernel:funcallable-instance standard-object) nil))))
 
 ;;; also, intersections of classes with INSTANCE should not be too
 ;;; general
-(assert (not (typep #'print-object '(and standard-object sb-kernel:instance))))
-(assert (not (subtypep 'standard-object '(and standard-object sb-kernel:instance))))
+(with-test (:name (subtypep standard-object sb-kernel:instance))
+  (assert (not (typep #'print-object '(and standard-object sb-kernel:instance))))
+  (assert (not (subtypep 'standard-object '(and standard-object sb-kernel:instance)))))
 
-(assert-t-t
- (subtypep '(or simple-array simple-string) '(or simple-string simple-array)))
-(assert-t-t
- (subtypep '(or simple-string simple-array) '(or simple-array simple-string)))
-(assert-t-t
- (subtypep '(or fixnum simple-string end-of-file parse-error fixnum vector)
-           '(or fixnum vector end-of-file parse-error fixnum simple-string)))
+(with-test (:name (subtypep simple-array simple-string condition or))
+  (assert-t-t
+   (subtypep '(or simple-array simple-string) '(or simple-string simple-array)))
+  (assert-t-t
+   (subtypep '(or simple-string simple-array) '(or simple-array simple-string)))
+  (assert-t-t
+   (subtypep '(or fixnum simple-string end-of-file parse-error fixnum vector)
+             '(or fixnum vector end-of-file parse-error fixnum simple-string))))
 
-#+sb-eval
-(assert-t-t
- (subtypep '(and function (not compiled-function)
-             (not sb-eval:interpreted-function))
-           nil))
-#+sb-fasteval
-(assert-t-t
- (subtypep '(and function (not compiled-function)
-             (not sb-interpreter:interpreted-function))
-           nil))
+(with-test (:name (subtypep function compiled-function :interpreted-function))
+  #+sb-eval
+  (assert-t-t (subtypep '(and function (not compiled-function)
+                          (not sb-eval:interpreted-function))
+                        nil))
+  #+sb-fasteval
+  (assert-t-t (subtypep '(and function (not compiled-function)
+                          (not sb-interpreter:interpreted-function))
+                        nil)))
 
 ;;; weakening of union type checks
 (defun weaken-union-1 (x)
   (declare (optimize speed))
   (car x))
-(multiple-value-bind (res err)
-    (ignore-errors (weaken-union-1 "askdjhasdkj"))
-  (assert (not res))
-  (assert (typep err 'type-error)))
+(with-test (:name (:weaken-union type-error 1))
+  (assert-error (weaken-union-1 "askdjhasdkj") type-error))
+
 (defun weaken-union-2 (x)
   (declare (optimize speed)
            (type (or cons fixnum) x))
@@ -590,12 +616,13 @@
     (cons
      (setf (car x) 3)
      x)))
-(multiple-value-bind (res err)
-    (ignore-errors (weaken-union-2 "asdkahsdkhj"))
-  (assert (not res))
-  (assert (typep err 'type-error))
-  (assert (or (equal '(or cons fixnum) (type-error-expected-type err))
-              (equal '(or fixnum cons) (type-error-expected-type err)))))
+(with-test (:name (:weaken-union type-error 2))
+  (multiple-value-bind (res err)
+      (ignore-errors (weaken-union-2 "asdkahsdkhj"))
+    (assert (not res))
+    (assert (typep err 'type-error))
+    (assert (or (equal '(or cons fixnum) (type-error-expected-type err))
+                (equal '(or fixnum cons) (type-error-expected-type err))))))
 
 ;;; TYPEXPAND & Co
 
@@ -611,7 +638,7 @@
       'null
       `(cons ,element-type (list-of-length ,(1- length) ,element-type))))
 
-(with-test (:name :typexpand-1)
+(with-test (:name sb-ext:typexpand-1)
   (multiple-value-bind (expansion-1 expandedp-1)
       (sb-ext:typexpand-1 '(another-deftype symbol))
     (assert expandedp-1)
@@ -625,7 +652,7 @@
         (assert (not expandedp-3))
         (assert (eq expansion-2 expansion-3))))))
 
-(with-test (:name :typexpand.1)
+(with-test (:name (sb-ext:typexpand 1))
   (multiple-value-bind (expansion-1 expandedp-1)
       (sb-ext:typexpand '(another-deftype symbol))
     (assert expandedp-1)
@@ -635,11 +662,11 @@
       (assert (not expandedp-2))
       (assert (eq expansion-1 expansion-2)))))
 
-(with-test (:name :typexpand.2)
+(with-test (:name (sb-ext:typexpand 2))
   (assert (equal (sb-ext:typexpand '(list-of-length 3 fixnum))
                  '(cons fixnum (list-of-length 2 fixnum)))))
 
-(with-test (:name :typexpand-all)
+(with-test (:name sb-ext:typexpand-all)
   (assert (equal (sb-ext:typexpand-all '(list-of-length 3))
                  '(cons t (cons t (cons t null)))))
   (assert (equal (sb-ext:typexpand-all '(list-of-length 3 fixnum))
@@ -647,14 +674,13 @@
 
 (defclass a-deftype () ())
 
-(with-test (:name (:typexpand-1 :after-type-redefinition-to-class))
+(with-test (:name (sb-ext:typexpand-1 :after-type-redefinition-to-class))
   (multiple-value-bind (expansion expandedp)
       (sb-ext:typexpand-1 '#1=(a-deftype symbol))
     (assert (not expandedp))
     (assert (eq expansion '#1#))))
 
-
-(with-test (:name :defined-type-name-p)
+(with-test (:name sb-ext:defined-type-name-p)
   (assert (not (sb-ext:defined-type-name-p '#:foo)))
   (assert (sb-ext:defined-type-name-p 'a-deftype))
   (assert (sb-ext:defined-type-name-p 'structure-foo1))
@@ -664,31 +690,30 @@
   (dolist (prim-type '(t nil fixnum cons atom))
     (assert (sb-ext:defined-type-name-p prim-type))))
 
+(with-test (:name (sb-ext:valid-type-specifier-p))
+  (macrolet ((yes (spec) `(assert (sb-ext:valid-type-specifier-p ',spec)))
+             (no  (spec) `(assert (not (sb-ext:valid-type-specifier-p ',spec)))))
+    (no  (cons #(frob) *))
+    (no  list-of-length)
+    (no  (list-of-length 5 #(x)))
+    (yes (list-of-length 5 fixnum))
 
-(with-test (:name :valid-type-specifier-p)
-  (macrolet ((yes (form) `(assert ,form))
-             (no  (form) `(assert (not ,form))))
-    (no  (sb-ext:valid-type-specifier-p '(cons #(frob) *)))
-    (no  (sb-ext:valid-type-specifier-p 'list-of-length))
-    (no  (sb-ext:valid-type-specifier-p '(list-of-length 5 #(x))))
-    (yes (sb-ext:valid-type-specifier-p '(list-of-length 5 fixnum)))
+    (yes structure-foo1)
+    (no  (structure-foo1 x))
+    (yes condition-foo1)
+    (yes standard-class-foo1)
+    (yes structure-class-foo1)
 
-    (yes (sb-ext:valid-type-specifier-p 'structure-foo1))
-    (no  (sb-ext:valid-type-specifier-p '(structure-foo1 x)))
-    (yes (sb-ext:valid-type-specifier-p 'condition-foo1))
-    (yes (sb-ext:valid-type-specifier-p 'standard-class-foo1))
-    (yes (sb-ext:valid-type-specifier-p 'structure-class-foo1))
+    (yes readtable)
+    (no  (readtable))
+    (no  (readtable x))
 
-    (yes (sb-ext:valid-type-specifier-p 'readtable))
-    (no  (sb-ext:valid-type-specifier-p '(readtable)))
-    (no  (sb-ext:valid-type-specifier-p '(readtable x)))
+    (yes (values))
+    (no  values)
+    (yes (and))
+    (no  and)))
 
-    (yes (sb-ext:valid-type-specifier-p '(values)))
-    (no  (sb-ext:valid-type-specifier-p 'values))
-    (yes (sb-ext:valid-type-specifier-p '(and)))
-    (no  (sb-ext:valid-type-specifier-p 'and))))
-
-(with-test (:name (:valid-type-specifier-p :introspection-test))
+(with-test (:name (sb-ext:valid-type-specifier-p :introspection-test))
   (flet ((map-functions (fn)
            (do-all-symbols (s)
              (when (and (fboundp s)
@@ -696,32 +721,24 @@
                         (not (special-operator-p s)))
                (funcall fn s)))))
     (map-functions
-     #'(lambda (s)
-         (let* ((fun   (sb-kernel:%fun-fun (fdefinition s)))
-                (ftype (sb-kernel:%simple-fun-type fun)))
-           (unless (sb-ext:valid-type-specifier-p ftype)
-             (format *error-output*
-                     "~@<~S returned NIL on ~S's FTYPE: ~2I~_~S~@:>"
-                     'sb-ext:valid-type-specifier-p
-                     s
-                     ftype )
-             (error "FAILURE")))))))
+     (lambda (name)
+       (let* ((fun   (sb-kernel:%fun-fun (fdefinition name)))
+              (ftype (sb-kernel:%simple-fun-type fun)))
+         (unless (sb-ext:valid-type-specifier-p ftype)
+           (error "~@<~S returned NIL on ~S's FTYPE: ~2I~_~S~@:>"
+                  'sb-ext:valid-type-specifier-p name ftype)))))))
 
 (with-test (:name (:bug-309128 1))
   (let* ((s (gensym))
          (t1 (sb-kernel:specifier-type s)))
     (eval `(defstruct ,s))
-    (multiple-value-bind (ok sure)
-        (sb-kernel:csubtypep t1 (sb-kernel:specifier-type s))
-      (assert (and ok sure)))))
+    (assert-t-t (sb-kernel:csubtypep t1 (sb-kernel:specifier-type s)))))
 
 (with-test (:name (:bug-309128 2))
   (let* ((s (gensym))
          (t1 (sb-kernel:specifier-type s)))
     (eval `(defstruct ,s))
-    (multiple-value-bind (ok sure)
-        (sb-kernel:csubtypep (sb-kernel:specifier-type s) t1)
-      (assert (and ok sure)))))
+    (assert-t-t (sb-kernel:csubtypep (sb-kernel:specifier-type s) t1))))
 
 (with-test (:name (:bug-309128 3))
   (let* ((s (gensym))
@@ -730,23 +747,20 @@
          (t2 (sb-kernel:specifier-type s2)))
     (eval `(deftype ,s2 () ',s))
     (eval `(defstruct ,s))
-    (multiple-value-bind (ok sure) (sb-kernel:csubtypep t1 t2)
-      (assert (and ok sure)))))
+    (assert-t-t (sb-kernel:csubtypep t1 t2))))
 
-(with-test (:name :unknown-type-not=-for-sure)
+(with-test (:name (sb-kernel:type= :unknown-type :not-equal))
   (let* ((type (gensym "FOO"))
          (spec1 (sb-kernel:specifier-type `(vector ,type)))
          (spec2 (sb-kernel:specifier-type `(vector single-float))))
     (eval `(deftype ,type () 'double-float))
-    (multiple-value-bind (ok sure) (sb-kernel:type= spec1 spec2)
-      (assert (not ok))
-      (assert sure))))
+    (assert-nil-t (sb-kernel:type= spec1 spec2))))
 
 (defclass subtypep-fwd-test1 (subtypep-fwd-test-unknown1) ())
 (defclass subtypep-fwd-test2 (subtypep-fwd-test-unknown2) ())
 (defclass subtypep-fwd-testb1 (subtypep-fwd-testb-unknown1) ())
 (defclass subtypep-fwd-testb2 (subtypep-fwd-testb-unknown2 subtypep-fwd-testb1) ())
-(with-test (:name (:subtypep :forward-referenced-classes))
+(with-test (:name (subtypep :forward-referenced-classes))
   (flet ((test (c1 c2 b1 b2)
            (multiple-value-bind (x1 x2) (subtypep c1 c2)
              (unless (and (eq b1 x1) (eq b2 x2))
@@ -994,9 +1008,9 @@
     (eval `(progn (defclass ,class () ())
                   (lambda (x) (typep x ',class))
                   (setf (find-class ',class) nil)))
-    (let ((fun (checked-compile `(lambda (x) (typep x ',class))
-                                :allow-style-warnings t)))
-      (assert-error (funcall fun 10))
-      (assert (handler-case (not (sb-kernel:specifier-type class))
-                (sb-kernel:parse-unknown-type ()
-                  t))))))
+    (checked-compile-and-assert (:allow-style-warnings t)
+        `(lambda (x) (typep x ',class))
+      ((10) (condition '(or error sb-kernel:parse-unknown-type))))
+    (assert (handler-case (not (sb-kernel:specifier-type class))
+              (sb-kernel:parse-unknown-type ()
+                t)))))
