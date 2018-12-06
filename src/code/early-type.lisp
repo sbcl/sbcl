@@ -427,9 +427,18 @@
                     ;; negative bignum
                     (int-type nil #.(1- sb-xc:most-negative-fixnum))))))
           (rational
-           (when (and (eq complexp :real) (bounds-unbounded-p low high))
-             (literal-ctype (interned-numeric-type nil :class 'rational)
-                            rational))))
+           (cond ((and (eq complexp :real) (bounds-unbounded-p low high))
+                  (literal-ctype (interned-numeric-type nil :class 'rational)
+                      rational))
+                 ((and (eq complexp :complex) (bounds-unbounded-p low high))
+                  (literal-ctype (interned-numeric-type nil :complexp :complex
+                                                            :class 'rational)
+                      (complex rational)))))
+          ((nil)
+           (and (not format)
+                (not complexp)
+                (bounds-unbounded-p low high)
+                (literal-ctype (interned-numeric-type nil :complexp nil) number))))
         (%make-numeric-type :class class :format format :complexp complexp
                             :low low :high high :enumerable enumerable))))
 
