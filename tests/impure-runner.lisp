@@ -29,9 +29,10 @@
           file *evaluator-mode*)
   (restart-case
       (handler-bind
+          ;; TODO use make-error-handler
           ((error (lambda (condition)
-                    (push (list :unhandled-error file)
-                          *failures*)
+                    (push (make-result :file (pathname file) :status :unhandled-error)
+                          *results*)
                     (cond (*break-on-error*
                            (test-util:really-invoke-debugger condition))
                           (t
@@ -42,6 +43,6 @@
         (let ((*package* (find-package :cl-user)))
           (funcall test-fun file)))
     (skip-file ()
-      (format t ">>>~a<<<~%"*failures*)))
+      (format t ">>>~a<<<~%" *results*)))
   (report-test-status)
   (exit :code 104))

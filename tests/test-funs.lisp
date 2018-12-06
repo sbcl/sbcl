@@ -54,6 +54,6 @@
     (let ((process (sb-ext:run-program "/bin/sh"
                                        (list (native-namestring file))
                                        :output *error-output*)))
-      (let ((*failures* nil))
+      (let ((*results* '()))
         (test-util:report-test-status))
       (sb-ext:exit :code (process-exit-code process)))))

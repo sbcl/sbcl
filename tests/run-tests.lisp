@@ -9,9 +9,11 @@
 
 (load "colorize.lisp")
 
-(defvar *all-failures* nil)
+(defvar *all-results* nil)
 (defvar *break-on-error* nil)
 (defvar *report-skipped-tests* nil)
+(defvar *report-style* :describe)
+(defvar *report-target* *standard-output*)
 (defvar *explicit-test-files* nil)
 
 (load "test-funs")
@@ -39,72 +41,161 @@
             (setf test-util:*break-on-expected-failure* t))
            ((string= arg "--report-skipped-tests")
             (setf *report-skipped-tests* t))
+           ((string= arg "--report-style")
+            (let ((style (intern (string-upcase (pop remainder)) :keyword)))
+              (setf *report-style* style)))
+           ((string= arg "--report-target")
+            (setf *report-target* (pop remainder)))
            ((string= arg "--no-color"))
            (t
             (push (truename (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
   (with-open-file (log "test.log" :direction :output
-                       :if-exists :overwrite
-                       :if-does-not-exist :create)
+                                  :if-exists :overwrite
+                                  :if-does-not-exist :create)
     (pure-runner (pure-load-files) 'load-test log)
     (pure-runner (pure-cload-files) 'cload-test log)
     (impure-runner (impure-load-files) 'load-test log)
     (impure-runner (impure-cload-files) 'cload-test log)
     #-win32 (impure-runner (sh-files) 'sh-test log))
-  (report)
+  (unless (eq *report-style* :describe)
+    (report :describe *standard-output*))
+  (report *report-style* *report-target*)
   (sb-ext:exit :code (if (unexpected-failures)
                          1
                          104)))
 
-(defun report ()
-  (terpri)
-  (format t "Finished running tests.~%")
+(defun report (&optional (style :describe) (target *standard-output*))
+  (let ((reporter (ecase style
+                    (:describe #'report/describe)
+                    (:junit    #'report/junit))))
+    (etypecase target
+      (stream
+       (funcall reporter target))
+      ((or string pathname)
+       (with-open-file (stream target :if-does-not-exist :create
+                               :direction :output
+                               :if-exists :supersede)
+         (funcall reporter stream))))))
+
+(defun report/describe (stream)
+  (terpri stream)
+  (format stream "Finished running tests.~%")
   (let ((skipcount 0)
         (*print-pretty* nil))
-    (cond (*all-failures*
-           (format t "Status:~%")
-           (dolist (fail (reverse *all-failures*))
-             (cond ((eq (car fail) :unhandled-error)
-                    (output-colored-text (car fail)
-                                          " Unhandled Error")
-                    (format t " ~a~%"
-                            (enough-namestring (second fail))))
-                   ((eq (car fail) :invalid-exit-status)
-                    (output-colored-text (car fail)
-                                          " Invalid exit status:")
-                    (format t " ~a~%"
-                            (enough-namestring (second fail))))
-                   ((eq (car fail) :skipped-disabled)
-                    (when *report-skipped-tests*
-                      (format t " ~20a ~a / ~a~%"
-                              "Skipped (irrelevant):"
-                              (enough-namestring (second fail))
-                              (third fail)))
-                    (incf skipcount))
-                   (t
-                    (output-colored-text
-                     (first fail)
-                     (ecase (first fail)
-                       (:expected-failure " Expected failure:")
-                       (:unexpected-failure " Failure:")
-                       (:leftover-thread " Leftover thread (broken):")
-                       (:unexpected-success " Unexpected success:")
-                       (:skipped-broken " Skipped (broken):")
-                       (:skipped-disabled " Skipped (irrelevant):")))
-                    (format t " ~a / ~a~%"
-                            (enough-namestring (second fail))
-                            (third fail)))))
+    (cond ((failures)
+           (format stream "Status:~%")
+           (dolist (failure (reverse (failures)))
+             (with-accessors ((status result-status)
+                              (file result-file)
+                              (name result-name)
+                              (condition result-condition))
+                 failure
+               (case status
+                 (:unhandled-error
+                  (output-colored-text status
+                                       " Unhandled Error")
+                  (format stream " ~a~%"
+                          (enough-namestring file)))
+                 (:invalid-exit-status
+                  (output-colored-text status
+                                       " Invalid exit status:")
+                  (format stream " ~a~%"
+                          (enough-namestring file)))
+                 (:skipped-disabled
+                  (when *report-skipped-tests*
+                    (format stream " ~20a ~a / ~a~%"
+                            "Skipped (irrelevant):"
+                            (enough-namestring file)
+                            name))
+                  (incf skipcount))
+                 (t
+                  (format stream "~20a ~a / ~a~%"
+                          (ecase status
+                            (:expected-failure " Expected failure:")
+                            (:unexpected-failure " Failure:")
+                            (:leftover-thread " Leftover thread (broken):")
+                            (:unexpected-success " Unexpected success:")
+                            (:skipped-broken " Skipped (broken):")
+                            (:skipped-disabled " Skipped (irrelevant):"))
+                          (enough-namestring file)
+                          name)))))
            (when (> skipcount 0)
              (format t " (~a tests skipped for this combination of platform and features)~%"
                      skipcount)))
           (t
            (format t "All tests succeeded~%")))))
 
+(defun failure-status-p (status)
+  (member status '(:unexpected-failure :leftover-thread
+                   :unexpected-success)))
+
+(defun error-status-p (status)
+  (member status '(:unhandled-error :invalid-exit-status)))
+
+(defun legalize-string (string)
+  (with-output-to-string (stream)
+    (loop :for character :across string :do
+       (write-string
+        (case character
+          (#\" "&quot;")
+          (#\& "&amp;")
+          (#\< "&lt;")
+          (#\> "&gt;")
+          (t   (string character)))
+        stream))))
+
+(defun legalize-component (component)
+  (legalize-string (princ-to-string component)))
+
+(defun report/junit (stream)
+  (format stream "<testsuite name=~S ~
+                             hostname=~S ~
+                             timestamp=~S ~
+                             time=\"~D\" ~
+                             failures=\"~D\" ~
+                             errors=\"~D\" ~
+                  >~%"
+          (format nil "~(~A~)-evaluator-mode" *test-evaluator-mode*)
+          (legalize-string (machine-instance))
+          "1"
+          1
+          (count-if #'failure-status-p *all-results* :key #'result-status)
+          (count-if #'error-status-p *all-results* :key #'result-status))
+  (dolist (result (reverse *all-results*))
+    (with-accessors ((pathname result-file) (name result-name)
+                     (reason result-status) (condition result-condition)) result
+      (format stream "~2@T<testcase name=\"~(~A.~{~A~^_~}~)\" ~
+                                    class=~S ~
+                                    time=\"~D\" ~
+                          >~%"
+              (enough-namestring pathname)
+              (etypecase name
+                (null '("?"))
+                (list (mapcar #'legalize-component name))
+                ((or string symbol) (list (legalize-component name))))
+              "DummyClass"
+              1)
+      (case reason
+        (:unexpected-failure
+         (format stream "~4@T<failure type=\"failure\" message=~S/>~%"
+                 (legalize-string condition)))
+        (:leftover-thread
+         (format stream "~4@T<failure type=\"failure\" message=\"Leftover thread (broken)\"/>~%"))
+        (:unexpected-success
+         (format stream "~4@T<failure type=\"failure\" message=\"Unexpected success\"/>~%"))
+        (:unhandled-error
+         (format stream "~4@T<failure type=\"error\" message=\"Unhandled Error\"/>~%"))
+        (:invalid-exit-status
+         (format stream "~4@T<failure type=\"error\" message=\"Invalid exit status\"/>~%")))
+      (format stream "~2@T</testcase>~%")))
+  (format stream "</testsuite>~%"))
+
 (defun pure-runner (files test-fun log)
   (when files
     (format t "// Running pure tests (~a)~%" test-fun)
     (let ((*package* (find-package :cl-user))
-          (*failures* nil))
+          (*results* '()))
       (setup-cl-user)
       (dolist (file files)
         (format t "// Running ~a in ~a evaluator mode~%"
@@ -122,7 +213,7 @@
                     (format log "~5d - ~a~%" (- end start) file)
                     (force-output log)))))
           (skip-file ())))
-      (append-failures))))
+      (append-results))))
 
 (defun run-in-child-sbcl (load eval)
   (process-exit-code
@@ -163,13 +254,13 @@
             (with-open-file (stream "test-status.lisp-expr"
                                     :direction :input
                                     :if-does-not-exist :error)
-              (append-failures (read stream)))
-            (push (list :invalid-exit-status file)
-                  *all-failures*))))))
+              (append-results (read stream)))
+            (push (make-result :file file :status :invalid-exit-status)
+                  *all-results*))))))
 
 (defun make-error-handler (file)
   (lambda (condition)
-    (push (list :unhandled-error file) *failures*)
+    (push (make-result :file file :status :unhandled-error) *results*)
     (cond (*break-on-error*
            (test-util:really-invoke-debugger condition))
           (t
@@ -178,16 +269,21 @@
            (sb-debug:print-backtrace)))
     (invoke-restart 'skip-file)))
 
-(defun append-failures (&optional (failures *failures*))
-  (setf *all-failures* (append failures *all-failures*)))
+(defun append-results (&optional (results *results*))
+  (setf *all-results* (append results *all-results*)))
+
+(defun failures ()
+  (remove :success *all-results* :key #'result-status))
 
 (defun unexpected-failures ()
   (remove-if (lambda (x)
-               (or (eq (car x) :expected-failure)
-                   (eq (car x) :unexpected-success)
-                   (eq (car x) :skipped-broken)
-                   (eq (car x) :skipped-disabled)))
-             *all-failures*))
+               (member (result-status x)
+                       '(:success
+                         :expected-failure
+                         :unexpected-success
+                         :skipped-broken
+                         :skipped-disabled)))
+             *all-results*))
 
 (defun setup-cl-user ()
   (use-package :test-util)

@@ -1,6 +1,8 @@
 (defpackage :test-util
   (:use :cl :sb-ext)
-  (:export #:with-test #:report-test-status #:*failures*
+  (:export #:result-file #:result-name #:result-status #:result-condition #:make-result
+           #:with-test #:report-test-status #:*results*
+
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
 
@@ -18,13 +20,14 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
 
+           ;; RUNTIME
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
 (in-package :test-util)
 
 (defvar *test-count* 0)
 (defvar *test-file* nil)
-(defvar *failures* nil)
+(defvar *results* '())
 (defvar *break-on-failure* nil)
 (defvar *break-on-expected-failure* nil)
 
@@ -59,6 +62,21 @@
 (defun log-msg/non-pretty (stream &rest args)
   (let ((*print-pretty* nil))
     (apply #'log-msg stream args)))
+
+(defun required-argument (&optional name)
+  (error "Missing required argument~@[ ~S~]" name))
+
+(defstruct result
+  (file (required-argument :file) :type pathname :read-only t)
+  (name nil :type (or null string symbol cons) :read-only t)
+  (status (required-argument :status) :type keyword :read-only t)
+  (condition nil :type (or null string condition) :read-only t))
+
+(defmethod print-object ((object result) stream)
+  (if *print-escape*
+      (call-next-method)
+      (print-unreadable-object (object stream :type t :identity t)
+        (format stream "~A ~A" (result-name object) (result-status object)))))
 
 (defun run-test (test-function name fails-on)
   (start-test)
@@ -100,8 +118,13 @@
           (return-from run-test)))
       (if (expected-failure-p fails-on)
           (fail-test :unexpected-success name nil)
-          ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-          (log-msg/non-pretty *trace-output* "Success ~S" name)))))
+          (progn
+            (push (make-result :file *test-file*
+                               :name name
+                               :status :success)
+                  *results*)
+            ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
+            (log-msg/non-pretty *trace-output* "Success ~S" name))))))
 
 ;;; Like RUN-TEST but do not perform any of the automated thread management.
 ;;; Since multiple threads are executing tests, there is no reason to kill
@@ -169,10 +192,10 @@
 
 (defun report-test-status ()
   (with-standard-io-syntax
-      (with-open-file (stream "test-status.lisp-expr"
-                              :direction :output
-                              :if-exists :supersede)
-        (format stream "~s~%" *failures*))))
+    (with-open-file (stream "test-status.lisp-expr"
+                            :direction :output
+                            :if-exists :supersede)
+      (format stream "~s~%" *results*))))
 
 (defun start-test ()
   (unless (eq *test-file* *load-pathname*)
@@ -192,8 +215,11 @@
                type test-name condition)
       (log-msg *trace-output* "~@<~A ~S ~:_due to ~S: ~4I~:_\"~A\"~:>"
                type test-name (type-of condition) condition))
-  (push (list type *test-file* (or test-name *test-count*))
-        *failures*)
+  (push (make-result :file *test-file*
+                     :name (or test-name *test-count*)
+                     :status type
+                     :condition (princ-to-string condition))
+        *results*)
   (unless (stringp condition)
     (when (or (and *break-on-failure*
                    (not (eq type :expected-failure)))
