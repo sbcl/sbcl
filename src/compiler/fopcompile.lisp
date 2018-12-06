@@ -257,6 +257,7 @@
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
 (defun constant-fopcompilable-p (constant)
+  (declare (optimize (debug 1))) ;; TCO
   (let ((xset (alloc-xset)))
     (labels ((grovel (value)
                ;; Unless VALUE is an object which which obviously

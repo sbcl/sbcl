@@ -40,7 +40,6 @@
        (sb-ext:inhibit-warnings #-clisp 2 #+clisp 3)
        ;; SAFETY = SPEED (and < 3) should provide reasonable safety,
        ;; but might skip some unreasonably expensive stuff
-       ;; (e.g. %DETECT-STACK-EXHAUSTION in sbcl-0.7.2).
        (safety 2) (space 1) (speed 2)
        ;; sbcl-internal optimization declarations:
        ;;
