@@ -61,10 +61,6 @@
                     )
                   :test #'equal)))
 
-(defun type-evidently-= (x y)
-  (and (subtypep x y)
-       (subtypep y x)))
-
 (assert (subtypep 'single-float 'float))
 
 (assert (type-evidently-= '(integer 0 10) '(or (integer 0 5) (integer 4 10))))

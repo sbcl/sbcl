@@ -9,28 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-
-;;;; Utilities
-
 (enable-test-parallelism)
-
-(defun ctype= (left right)
-  (let ((a (sb-kernel:specifier-type left)))
-    ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
-    ;; operation if A and B are EQ.
-    ;; To actually exercise the type operation, remove the memoized parse.
-    (sb-int:drop-all-hash-caches)
-    (let ((b (sb-kernel:specifier-type right)))
-      (assert (not (eq a b)))
-      (sb-kernel:type= a b))))
-
-(defmacro assert-tri-eq (expected-result expected-certainp form)
-  (sb-int:with-unique-names (result certainp)
-    `(multiple-value-bind (,result ,certainp) ,form
-       (assert (eq ,expected-result ,result))
-       (assert (eq ,expected-certainp ,certainp)))))
-
-;;;; Tests
 
 (with-test (:name (typexpand-1 typexpand typexpand-all :check-lexenv))
   (flet ((try (f) (assert-error (funcall f 'hash-table 3))))

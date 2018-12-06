@@ -4,6 +4,11 @@
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
 
+           ;; type tools
+           #:type-evidently-=
+           #:ctype=
+           #:assert-tri-eq
+
            ;; thread tools
            #:make-kill-thread #:make-join-thread
            ;; cause tests to run in multiple threads
@@ -36,6 +41,31 @@
 
 (sb-posix:putenv (format nil "SBCL_MACHINE_TYPE=~A" (machine-type)))
 (sb-posix:putenv (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type)))
+
+
+;;; Type tools
+
+(defun type-evidently-= (x y)
+  (and (subtypep x y) (subtypep y x)))
+
+(defun ctype= (left right)
+  (let ((a (sb-kernel:specifier-type left)))
+    ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
+    ;; operation if A and B are EQ.
+    ;; To actually exercise the type operation, remove the memoized parse.
+    (sb-int:drop-all-hash-caches)
+    (let ((b (sb-kernel:specifier-type right)))
+      (assert (not (eq a b)))
+      (sb-kernel:type= a b))))
+
+(defmacro assert-tri-eq (expected-result expected-certainp form)
+  (sb-int:with-unique-names (result certainp)
+    `(multiple-value-bind (,result ,certainp) ,form
+       (assert (eq ,expected-result ,result))
+       (assert (eq ,expected-certainp ,certainp)))))
+
+
+;;; Thread tools
 
 #+sb-thread
 (defun make-kill-thread (&rest args)
