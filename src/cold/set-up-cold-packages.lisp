@@ -61,9 +61,11 @@
   (sb-ext:without-package-locks
    (dolist (pkg (list-all-packages))
      (let ((name (package-name pkg)))
-       (unless (member name '("KEYWORD" "COMMON-LISP"  "COMMON-LISP-USER"
-                              "SB-COLD" "SB-XC")
-                       :test #'string=)
+       (unless (or (member name '("KEYWORD" "COMMON-LISP"  "COMMON-LISP-USER"
+                                  "SB-COLD" "SB-XC")
+                           :test #'string=)
+                   #+swank
+                   (search "SWANK" name))
          ;; This also removes nicknames SEQUENCE and SB-C-CALL.
          (rename-package pkg (concatenate 'string "HOST-" name)))))))
 
