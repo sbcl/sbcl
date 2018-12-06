@@ -122,3 +122,32 @@
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)
 (define-type-predicate non-null-symbol-p (and symbol (not null)))
+
+(defglobal *backend-type-predicates-grouped*
+    (let (plist)
+      (loop for (type . pred) in *backend-type-predicates*
+            for class = (#-sb-xc-host %instance-layout
+                         #+sb-xc-host type-of
+                         type)
+            do (push pred (getf plist class))
+               (push type (getf plist class)))
+      (map 'vector (lambda (x)
+                     (if (listp x)
+                         (coerce x 'vector)
+                         x))
+           plist)))
+(declaim (simple-vector *backend-type-predicates-grouped*))
+
+(defun backend-type-predicate (type)
+  (flet ((vector-getf (vector key test)
+           (loop for i below (length vector) by 2
+                 when (funcall test (svref vector i) key)
+                 return (svref vector (1+ i)))))
+    (declare (inline vector-getf))
+    (let ((group (vector-getf *backend-type-predicates-grouped*
+                              (#-sb-xc-host %instance-layout
+                               #+sb-xc-host type-of type)
+                              #'eq)))
+      (when group
+        (vector-getf (truly-the simple-vector group)
+                     type #'type=)))))

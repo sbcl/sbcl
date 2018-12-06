@@ -759,8 +759,8 @@ line break."
                            (and pred (fboundp pred)
                                 (symbol-function pred))))))))
       ;; avoid compiling code for CONS, ARRAY, VECTOR, etc
-      (awhen (assoc ctype sb-c::*backend-type-predicates* :test #'type=)
-        (symbol-function (cdr it)))
+      (awhen (sb-c::backend-type-predicate ctype)
+        (symbol-function it))
       ;; OK, compile something
       (let ((name
              ;; Keep name as a string, because NAMED-LAMBDA with a symbol

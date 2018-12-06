@@ -980,12 +980,9 @@
                      `(eql ,object ',value))))
          (handler-case
              (or
-              (let ((pred (cdr (assoc ctype *backend-type-predicates*
-                                      :test #'type=))))
+              (let ((pred (backend-type-predicate ctype)))
                 (when pred `(,pred ,object)))
-              (let ((pred (cdr (assoc (type-negation ctype)
-                                      *backend-type-predicates*
-                                      :test #'type=))))
+              (let ((pred (backend-type-predicate (type-negation ctype))))
                 (when pred `(not (,pred ,object)))))
            #+sb-xc-host
            (sb-kernel::cross-type-warning

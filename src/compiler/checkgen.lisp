@@ -47,8 +47,7 @@
         0)
       (when (eq type *empty-type*)
         0)
-      (let ((found (cdr (assoc type *backend-type-predicates*
-                               :test #'type=))))
+      (let ((found (backend-type-predicate type)))
         (if found
             (+ (fun-guessed-cost found) (fun-guessed-cost 'eq))
             nil))
