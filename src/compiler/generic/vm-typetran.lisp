@@ -129,25 +129,36 @@
             for class = (#-sb-xc-host %instance-layout
                          #+sb-xc-host type-of
                          type)
-            do (push pred (getf plist class))
-               (push type (getf plist class)))
+            do (push type (getf plist class))
+               (push pred (getf plist class)))
       (map 'vector (lambda (x)
                      (if (listp x)
-                         (coerce x 'vector)
+                         (concatenate 'vector
+                                      (list
+                                       (every (lambda (x)
+                                                (or (symbolp x)
+                                                    (sb-kernel::ctype-eq-comparable x)))
+                                              x))
+                                      (nreverse x))
                          x))
            plist)))
 (declaim (simple-vector *backend-type-predicates-grouped*))
 
 (defun backend-type-predicate (type)
-  (flet ((vector-getf (vector key test)
-           (loop for i below (length vector) by 2
+  #-sb-xc-host
+  (declare (optimize (insert-array-bounds-checks 0)))
+  (flet ((vector-getf (vector key test &optional (start 0))
+           (loop for i from start below (length vector) by 2
                  when (funcall test (svref vector i) key)
                  return (svref vector (1+ i)))))
     (declare (inline vector-getf))
-    (let ((group (vector-getf *backend-type-predicates-grouped*
-                              (#-sb-xc-host %instance-layout
-                               #+sb-xc-host type-of type)
-                              #'eq)))
+    (let ((group (truly-the (or simple-vector null)
+                            (vector-getf *backend-type-predicates-grouped*
+                                         (#-sb-xc-host %instance-layout
+                                          #+sb-xc-host type-of type)
+                                         #'eq))))
       (when group
-        (vector-getf (truly-the simple-vector group)
-                     type #'type=)))))
+        (if (and (svref group 0)
+                 (sb-kernel::ctype-eq-comparable type))
+            (vector-getf (truly-the simple-vector group) type #'eq 1)
+            (vector-getf (truly-the simple-vector group) type #'type= 1))))))

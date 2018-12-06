@@ -957,6 +957,10 @@
         (t
          (memoize (!invoke-type-method :simple-= :complex-= type1 type2)))))
 
+(declaim (inline ctype-eq-comparable))
+(defun ctype-eq-comparable (ctype)
+  (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
+
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
 ;;; the conservative assumption is =.
