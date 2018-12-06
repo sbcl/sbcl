@@ -137,7 +137,8 @@
                                       (list
                                        (every (lambda (x)
                                                 (or (symbolp x)
-                                                    (sb-kernel::ctype-eq-comparable x)))
+                                                    (and (sb-kernel::ctype-eq-comparable x)
+                                                         (sb-kernel::ctype-interned-p x))))
                                               x))
                                       (nreverse x))
                          x))

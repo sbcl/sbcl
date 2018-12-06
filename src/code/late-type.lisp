@@ -961,6 +961,9 @@
 (defun ctype-eq-comparable (ctype)
   (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
 
+(defun ctype-interned-p (ctype)
+  (minusp (type-hash-value ctype)))
+
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
 ;;; the conservative assumption is =.
