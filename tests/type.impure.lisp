@@ -513,25 +513,25 @@
 
 ;;; accuracy of CONS :SIMPLE-TYPE-=
 (deftype goldbach-1 () '(satisfies even-and-greater-then-two-p))
-(deftype goldbach-2 () ' (satisfies sum-of-two-primes-p))
+(deftype goldbach-2 () '(satisfies sum-of-two-primes-p))
 
 (multiple-value-bind (ok win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach1 integer))
-                     (sb-kernel:specifier-type '(cons goldbach1 integer)))
+    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
+                     (sb-kernel:specifier-type '(cons goldbach-1 integer)))
   (assert ok)
   (assert win))
 
 ;; See FIXME in type method for CONS :SIMPLE-TYPE-=
 #+nil
 (multiple-value-bind (ok win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach1 integer))
-                     (sb-kernel:specifier-type '(cons goldbach1 single-float)))
+    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
+                     (sb-kernel:specifier-type '(cons goldbach-1 single-float)))
   (assert (not ok))
   (assert win))
 
 (multiple-value-bind (ok win)
-    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach1 integer))
-                     (sb-kernel:specifier-type '(cons goldbach2 single-float)))
+    (sb-kernel:type= (sb-kernel:specifier-type '(cons goldbach-1 integer))
+                     (sb-kernel:specifier-type '(cons goldbach-2 single-float)))
   (assert (not ok))
   (assert (not win)))
 
