@@ -5,6 +5,7 @@
 #include "lispregs.h"
 #include "gc-internal.h"
 #include "gc-private.h"
+#include "code.h"
 #include "genesis/closure.h"
 #include "genesis/cons.h"
 #include "genesis/constants.h"
@@ -164,7 +165,7 @@ static int find_ref(lispobj* source, lispobj target)
             int wordindex = &function_ptr->name - source;
             for (j=0; j<4; ++j) check_ptr(wordindex+j, source[wordindex+j]);
         })
-        scan_limit = code_header_words(header);
+        scan_limit = code_header_words((struct code*)source);
         break;
     case FDEFN_WIDETAG:
         check_ptr(3, fdefn_callee_lispobj((struct fdefn*)source));
@@ -735,7 +736,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 int wordindex = &function_ptr->name - where;
                 for (j=0; j<4; ++j) check_ptr(where[wordindex+j]);
             })
-            scan_limit = code_header_words(header);
+            scan_limit = code_header_words((struct code*)where);
             break;
         case FDEFN_WIDETAG:
             check_ptr(fdefn_callee_lispobj((struct fdefn*)where));

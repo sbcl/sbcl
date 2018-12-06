@@ -48,6 +48,7 @@
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "alloc.h"
+#include "code.h"
 #include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
@@ -2732,7 +2733,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             case CODE_HEADER_WIDETAG:
                 {
                 struct code *code = (struct code *) where;
-                sword_t nheader_words = code_header_words(code->header);
+                sword_t nheader_words = code_header_words(code);
                 gc_assert(fixnump(where[1])); // code_size
                 /* Verify the boxed section of the code data block */
                 state->min_pointee_gen = 8; // initialize to "positive infinity"
@@ -2766,8 +2767,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                          where, my_gen, state->min_pointee_gen,
                          rememberedp ? "written" : "not written");
 #endif
-                count = ALIGN_UP(nheader_words +
-                                 code_unboxed_nwords(code->code_size), 2);
+                count = code_total_nwords(code);
                 break;
                 }
             case FDEFN_WIDETAG:
@@ -4313,7 +4313,6 @@ static inline boolean obj_gen_lessp(lispobj obj, generation_index_t b)
 sword_t scav_code_header(lispobj *object, lispobj header)
 {
     ++n_scav_calls[CODE_HEADER_WIDETAG/4];
-    sword_t n_header_words = code_header_words(header);
 
     int my_gen = gen_of((lispobj)object) & 7;
     if (my_gen == from_space) {
@@ -4342,6 +4341,7 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         // gc_assert(!card_protected_p(object));
 
         /* Scavenge the boxed section of the code data block. */
+        sword_t n_header_words = code_header_words((struct code *)object);
         scavenge(object + 2, n_header_words - 2);
 
         /* Scavenge the boxed section of each function object in the
@@ -4371,5 +4371,5 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         ++n_scav_skipped[CODE_HEADER_WIDETAG/4];
     }
 done:
-    return ALIGN_UP(n_header_words + code_unboxed_nwords(object[1]), 2);
+    return code_total_nwords((struct code*)object);
 }

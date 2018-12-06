@@ -56,6 +56,7 @@
 #include "var-io.h"
 #include "immobile-space.h"
 #include "unaligned.h"
+#include "code.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1692,9 +1693,9 @@ static void fixup_space(lispobj* where, size_t n_words)
           break;
         case CODE_HEADER_WIDETAG:
           // Fixup the constant pool.
-          adjust_words(where+1, code_header_words(header_word)-1, 0);
-          // Fixup all embedded simple-funs
           code = (struct code*)where;
+          adjust_words(where+2, code_header_words(code)-2, 0);
+          // Fixup all embedded simple-funs
           for_each_simple_fun(i, f, code, 1, {
               f->self = adjust_fun_entrypoint(f->self);
               adjust_words(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f), 0);
@@ -1903,7 +1904,7 @@ static boolean executable_object_p(lispobj* obj)
 {
     int widetag = widetag_of(obj);
     return widetag == FDEFN_WIDETAG ||
-        (widetag == CODE_HEADER_WIDETAG && code_header_words(*obj) == 4
+        (widetag == CODE_HEADER_WIDETAG && code_header_words((struct code*)obj) == 4
          && lowtag_of(((struct code*)obj)->debug_info) == FUN_POINTER_LOWTAG)
         || widetag == FUNCALLABLE_INSTANCE_WIDETAG;
 }
@@ -2287,7 +2288,7 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
 {
     struct varint_unpacker unpacker;
     varint_unpacker_init(&unpacker, fixups);
-    char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
+    char* instructions = code_text_start(code);
     int prev_loc = 0, loc;
     // The unpacker will produce successive values followed by a zero. There may
     // be a second data stream for the relative fixups which we ignore.

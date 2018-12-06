@@ -20,6 +20,7 @@
 #include "genesis/vector.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#include "code.h"
 #include "immobile-space.h"
 #include "queue.h"
 
@@ -328,7 +329,7 @@ static void trace_object(lispobj* where)
             gc_mark_range(SIMPLE_FUN_SCAV_START(fun),
                           SIMPLE_FUN_SCAV_NWORDS(fun));
         })
-        scan_to = code_header_words(header);
+        scan_to = code_header_words((struct code*)where);
         break;
     case FDEFN_WIDETAG:
         gc_mark_obj(fdefn_callee_lispobj((struct fdefn*)where));

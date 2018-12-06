@@ -25,6 +25,7 @@
 #include "gc-internal.h"
 #include "immobile-space.h"
 #include "hopscotch.h"
+#include "code.h"
 
 static boolean gcable_pointer_p(lispobj pointer)
 {
@@ -180,7 +181,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                     for (j=0; j<SIMPLE_FUN_SCAV_NWORDS(fun); ++j)
                         coalesce_obj(fun_slots+j, ht);
                 })
-                nwords = code_header_words(header);
+                nwords = code_header_words((struct code*)where);
                 break;
             default:
                 if (unboxed_obj_widetag_p(widetag))

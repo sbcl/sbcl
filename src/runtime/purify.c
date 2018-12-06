@@ -37,6 +37,7 @@
 #include "genesis/layout.h"
 #include "genesis/defstruct-description.h"
 #include "genesis/hash-table.h"
+#include "code.h"
 
 /* We don't ever do purification with GENCGC as of 1.0.5.*. There was
  * a lot of hairy and fragile ifdeffage in here to support purify on
@@ -248,9 +249,7 @@ static lispobj
 ptrans_code(lispobj thing)
 {
     struct code *code = (struct code *)native_pointer(thing);
-    long nwords =
-        ALIGN_UP(code_header_words(code->header) + code_unboxed_nwords(code->code_size),
-                 2);
+    long nwords = code_total_nwords(code);
 
     struct code *new = (struct code *)newspace_alloc(nwords,1); /* constant */
 
@@ -274,7 +273,7 @@ ptrans_code(lispobj thing)
 
     /* Scavenge the constants. */
     pscav(new->constants,
-          code_header_words(new->header) - (offsetof(struct code, constants) >> WORD_SHIFT),
+          code_header_words(new) - (offsetof(struct code, constants) >> WORD_SHIFT),
           1);
 
     /* Scavenge all the functions. */

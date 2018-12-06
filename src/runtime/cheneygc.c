@@ -32,7 +32,7 @@
 #include "genesis/primitive-objects.h"
 #include "thread.h"
 #include "arch.h"
-
+#include "code.h"
 #include "private-cons.inc"
 
 /* So you need to debug? */
@@ -466,7 +466,7 @@ void gc_show_pte(lispobj obj)
 sword_t scav_code_header(lispobj *where, lispobj header)
 {
     struct code *code = (struct code *) where;
-    sword_t n_header_words = code_header_words(header);
+    sword_t n_header_words = code_header_words(code);
 
     /* Scavenge the boxed section of the code data block. */
     scavenge(where + 2, n_header_words - 2);
@@ -478,5 +478,5 @@ sword_t scav_code_header(lispobj *where, lispobj header)
                  SIMPLE_FUN_SCAV_NWORDS(function_ptr));
     })
 
-    return ALIGN_UP(n_header_words + code_unboxed_nwords(code->code_size), 2);
+    return code_total_nwords(code);
 }

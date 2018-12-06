@@ -299,6 +299,7 @@ static inline struct code* get_asm_routine_code_component() {
 #include "genesis/hash-table.h"
 #include "genesis/layout.h"
 #include "genesis/vector.h"
+#include "code.h"
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {
@@ -378,11 +379,11 @@ static void __attribute__((unused))
 adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_vaddr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    // Dynamic space is a always relocated before immobile space,
+    // Dynamic space always gets relocated before immobile space does,
     // and dynamic space code does not use fixups (except on 32-bit x86).
     // So if we're here, it must be to relocate an immobile object.
     // If 'code->fixups' is a bignum, the pointer itself was already fixed up.
-    char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
+    char* instructions = code_text_start(code);
     struct varint_unpacker unpacker;
 
     varint_unpacker_init(&unpacker, code->fixups);
@@ -540,9 +541,9 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             continue;
         case CODE_HEADER_WIDETAG:
             // Fixup the constant pool. The word at where+1 is a fixnum.
-            adjust_pointers(where+2, code_header_words(header_word)-2, adj);
-            // Fixup all embedded simple-funs
             code = (struct code*)where;
+            adjust_pointers(where+2, code_header_words(code)-2, adj);
+            // Fixup all embedded simple-funs
             for_each_simple_fun(i, f, code, 1, {
                 fix_fun_header_layout((lispobj*)f, adj);
 #if FUN_SELF_FIXNUM_TAGGED
@@ -681,7 +682,7 @@ static void relocate_heap(struct heap_adjust* adj)
     // Assembler routines move with varyobj space.
     // (They're in readonly space if no immobile space)
     struct code* code = get_asm_routine_code_component();
-    lispobj* jump_table = (lispobj*)code + code_header_words(code->header);
+    lispobj* jump_table = (lispobj*)code_text_start(code);
     for ( ; *jump_table ; ++jump_table )
         adjust_word_at(jump_table, adj);
     // Pointers within varyobj space to varyobj space do not need adjustment
@@ -1108,8 +1109,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(sym)->header) == SYMBOL_WIDETAG
                 && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
-                return code_header_words(code->header)*N_WORD_BYTES
-                    + fixnum_value(CONS(table->data[i+1])->car) + (os_vm_address_t)code;
+                return code_text_start(code) + fixnum_value(CONS(table->data[i+1])->car);
         // Something is wrong if we have a hashtable but find nothing.
         fprintf(stderr, "WARNING: get_asm_routine_by_name(%s) failed\n",
                 name);

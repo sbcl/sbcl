@@ -83,29 +83,6 @@ do {                                                                   \
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
-/* Code component trailer words:
- *                                                   v code size
- *      | fun_offset | fun_offset | .... | N-entries |
- *                                       ^
- *                 fun_table pointer ---/
- *
- * The fun_table pointer is aligned at a 4-byte boundary.
- */
-static inline unsigned int*
-code_fun_table(struct code* code) {
-  return (unsigned int*)
-      ((char*)code + code_header_words(code->header) * N_WORD_BYTES
-       // Cast out high 32 bits of code_size if lispobj is 64 bits.
-       + fixnum_value((uint32_t)code->code_size) - sizeof (uint16_t));
-}
-static inline unsigned short
-code_n_funs(struct code* code) {
-    // immobile space filler objects appear to be code but have no simple-funs.
-    // Should probably consider changing the widetag to FILLER_WIDETAG.
-    return code_header_words(code->header)
-        ? *((unsigned short*)code_fun_table(code)) >> 4 : 0;
-}
-
 // Test for presence of a bit in vector's header.
 // As a special case, if 'val' is 0, then test for all bits clear.
 #define is_vector_subtype(header, val) \
@@ -118,26 +95,6 @@ code_n_funs(struct code* code) {
     (((subtype_VectorWeakVisited|subtype_VectorWeak) << N_WIDETAG_BITS) \
      | SIMPLE_VECTOR_WIDETAG)); \
   v->header ^= subtype_VectorWeakVisited << N_WIDETAG_BITS
-
-// Iterate over the native pointers to each function in 'code_var'
-// offsets are stored as the number of bytes into the instructions
-// portion of the code object at which the simple-fun object resides.
-// We use bytes, not words, because that's what the COMPUTE-FUN vop expects.
-#define for_each_simple_fun(index_var,fun_var,code_var,assertp,guts)        \
-  { int _nfuns_ = code_n_funs(code_var);                                    \
-    if (_nfuns_ > 0) {                                                      \
-      char *_insts_ = (char*)(code_var) +                                   \
-        (code_header_words((code_var)->header)<<WORD_SHIFT);                \
-      int index_var = 0;                                                    \
-      unsigned int* _offsets_ = code_fun_table(code_var) - 1;               \
-      do {                                                                  \
-       struct simple_fun* fun_var                                           \
-           = (struct simple_fun*)(_insts_ + _offsets_[-index_var]);         \
-       if (assertp)                                                         \
-         gc_assert(widetag_of(&fun_var->header)==SIMPLE_FUN_WIDETAG);       \
-       guts ;                                                               \
-      } while (++index_var < _nfuns_);                                      \
-  }}
 
 #define SIMPLE_FUN_SCAV_START(fun_ptr) &fun_ptr->name
 #define SIMPLE_FUN_SCAV_NWORDS(fun_ptr) ((lispobj*)fun_ptr->code - &fun_ptr->name)

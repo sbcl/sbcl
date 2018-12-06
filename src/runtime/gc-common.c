@@ -39,6 +39,7 @@
 #include "arch.h"
 #include "gc.h"
 #include "hopscotch.h"
+#include "code.h"
 #include "genesis/primitive-objects.h"
 #include "genesis/static-symbols.h"
 #include "genesis/layout.h"
@@ -337,10 +338,8 @@ trans_code(struct code *code)
 
     /* prepare to transport the code vector */
     lispobj l_code = (lispobj) LOW_WORD(code) | OTHER_POINTER_LOWTAG;
-    sword_t nheader_words = code_header_words(code->header);
-    sword_t ncode_words = code_unboxed_nwords(code->code_size);
     lispobj l_new_code = copy_large_object(l_code,
-                                           ALIGN_UP(nheader_words + ncode_words, 2),
+                                           code_total_nwords(code),
                                            CODE_PAGE_TYPE);
 
 #ifdef LISP_FEATURE_GENCGC
@@ -376,9 +375,7 @@ trans_code(struct code *code)
 #ifdef LISP_FEATURE_GENCGC
     /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
        spaces once when all copying is done. */
-    os_flush_icache((os_vm_address_t) (((sword_t *)new_code) + nheader_words),
-                    ncode_words * sizeof(sword_t));
-
+    os_flush_icache(code_text_start(new_code), code_text_size(new_code));
 #endif
 
     gencgc_apply_code_fixups(code, new_code);
@@ -398,9 +395,7 @@ trans_code_header(lispobj object)
 static sword_t
 size_code_header(lispobj *where)
 {
-    struct code* c = (struct code*)where;
-    return ALIGN_UP(code_header_words(c->header) + code_unboxed_nwords(c->code_size),
-                    2);
+    return code_total_nwords((struct code*)where);
 }
 
 #ifdef RETURN_PC_WIDETAG

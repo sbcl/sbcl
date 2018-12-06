@@ -367,28 +367,7 @@ fixnum_value(lispobj n)
     return (sword_t)n >> N_FIXNUM_TAG_BITS;
 }
 
-// Return signed int in case something tries to compute the number of boxed
-// words excluding the header word itself using "code_header_words(header) - 1",
-// which, for a filler needs to come out as negative, not a huge positive.
-static inline sword_t
-code_header_words(lispobj header) // given header = code->header
-{
-#ifdef LISP_FEATURE_64_BIT
-    return header >> 32;
-#else
-    /* Mask out bits reserved for GC */
-    return HeaderValue(header & ~((1 << 31) | (1 << 30)));
-#endif
-}
-
 #include "align.h"
-static inline unsigned int
-code_unboxed_nwords(lispobj n) // given n = code->code_size
-{
-    // Return ceiling |N / N_WORD_BYTES|
-    // Cast out high 32 bits of code_size if lispobj is 64 bits.
-    return (fixnum_value((uint32_t)n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
-}
 
 #if defined(LISP_FEATURE_WIN32)
 /* KLUDGE: Avoid double definition of boolean by rpcndr.h included via

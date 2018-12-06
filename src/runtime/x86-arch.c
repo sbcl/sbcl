@@ -348,8 +348,7 @@ arch_install_interrupt_handlers()
 void
 gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
 {
-    char* code_start_addr = (char*)(code_header_words(new_code->header)
-                                    + (lispobj*)new_code);
+    char* code_start_addr = code_text_start(new_code);
     os_vm_size_t displacement = (char*)new_code - (char*)old_code;
     lispobj fixups = new_code->fixups;
     /* It will be a nonzero integer if valid, or 0 if there are no fixups */

@@ -23,7 +23,7 @@
 #include "sbcl.h"
 #include "print.h"
 #include "runtime.h"
-#include "gc-internal.h"
+#include "code.h"
 #include <stdarg.h>
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include <errno.h>
@@ -742,7 +742,7 @@ static void print_otherptr(lispobj obj)
 #if N_WORD_BYTES == 8
         print_obj("serial#: ", (*ptr>>32));
 #endif
-        count = code_header_words(((struct code*)(ptr-1))->header);
+        count = code_header_words((struct code*)(ptr-1));
         for_each_simple_fun(fun_index, fun, (struct code*)(ptr-1), 0, {
             sprintf(buffer, "f[%d]: ", fun_index);
             print_obj(buffer, make_lispobj(fun,FUN_POINTER_LOWTAG));
