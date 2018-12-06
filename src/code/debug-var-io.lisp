@@ -186,7 +186,6 @@
 ;;; A somewhat bad (slow and not-very-squishy) compressor
 ;;; that gets between 15% and 20% space savings in debug blocks.
 ;;; Lengthy input may be compressible by as much as 3:1.
-#-sb-xc-host
 (declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
                 lz-compress))
 (defun lz-compress (input)
@@ -244,10 +243,10 @@
            (coerce output '(simple-array (unsigned-byte 8) (*)))
            #-sb-xc-host
            (%shrink-vector (%array-data output) (fill-pointer output))))
+      #+(or)
       (aver (equalp input (lz-decompress result)))
       result)))
 
-#-sb-xc-host
 (declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
                 lz-decompress))
 (defun lz-decompress (input)
