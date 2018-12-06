@@ -208,9 +208,9 @@
   unused01-widetag                          ;  5E       5E
   #!+sb-simd-pack
   simd-pack-widetag                         ;       65       65
-  #!-(and sb-simd-pack avx2)
+  #!-sb-simd-pack-256
   unused03-widetag                          ;  62   69  62   69
-  #!+(and sb-simd-pack avx2)
+  #!+sb-simd-pack-256
   simd-pack-256-widetag                     ;  62   69  62   69
   filler-widetag                            ;  66   6D  66   6D
   unused04-widetag                          ;  6A   71  6A   71
