@@ -26,6 +26,7 @@
 #include "pseudo-atomic.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
+#include "code.h"
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
