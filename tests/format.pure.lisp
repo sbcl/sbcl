@@ -9,6 +9,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(enable-test-parallelism)
+
 (defvar *format-mode*)
 
 (defun format* (format-control &rest arguments)

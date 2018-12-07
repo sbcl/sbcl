@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(enable-test-parallelism)
+
 ;;; Tests in this file that rely on properties of the distribution of
 ;;; the random numbers are designed to be fast and have a very low
 ;;; probability of false positives, generally of the order of (expt 10 -60).

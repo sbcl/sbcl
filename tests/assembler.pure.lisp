@@ -14,6 +14,8 @@
 (cl:in-package "SB-VM")
 (use-package "TEST-UTIL")
 
+(enable-test-parallelism)
+
 ;; this is architecture-agnostic
 (defun test-assemble (inst expect)
   (let ((segment (sb-assem:make-segment)))
@@ -22,13 +24,13 @@
              (sb-assem::perform-operand-lowering (cdr inst))))
     (let* ((buf (sb-assem::segment-buffer segment))
            (string
-            (with-output-to-string (stream)
-              (with-pinned-objects (buf)
-                (let ((sb-disassem:*disassem-location-column-width* 0))
-                  (sb-disassem:disassemble-memory
-                   (sap-int (vector-sap buf))
-                   (sb-assem::segment-current-posn segment)
-                   :stream stream)))))
+             (with-output-to-string (stream)
+               (with-pinned-objects (buf)
+                 (let ((sb-disassem:*disassem-location-column-width* 0))
+                   (sb-disassem:disassemble-memory
+                    (sap-int (vector-sap buf))
+                    (sb-assem::segment-current-posn segment)
+                    :stream stream)))))
            (line (string-left-trim'(#\; #\ )
                                   (subseq string (1+ (position #\newline string))
                                           (1- (length string)))))) ; chop final newline

@@ -1,3 +1,5 @@
+(enable-test-parallelism)
+
 (with-test (:name (make-array :bad-initial-contents))
   (assert
    (nth-value 1
