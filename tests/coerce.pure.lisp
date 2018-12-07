@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 (with-test (:name (coerce complex :numeric-types))
   (labels ((function/optimized (type rationalp)
              (checked-compile `(lambda (input)

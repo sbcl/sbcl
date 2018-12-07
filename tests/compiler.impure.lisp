@@ -15,8 +15,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 ;; The tests in this file do not work under the legacy interpreter.
 ;; They mostly do work in the fast interpreter, and are either harmless
 ;; or actually reasonable things to test.

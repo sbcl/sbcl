@@ -11,9 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package sb-vm)
-
-(use-package :test-util)
+(cl:in-package "SB-VM")
+(use-package "TEST-UTIL")
 
 ;; this is architecture-agnostic
 (defun test-assemble (inst expect)

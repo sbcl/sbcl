@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 (with-test (:name :backq-smoke-test)
   (assert (equalp (macroexpand '`#(() a #(#() nil x) #()))
                   ''#(NIL A #(#() NIL X) #()))))

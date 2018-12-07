@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 ;;; not really a test for observable behaviour, but: make sure that
 ;;; all generic functions on startup have lambda lists known to the
 ;;; system, because some functionality (e.g. &key argument checking)

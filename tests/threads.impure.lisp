@@ -15,8 +15,8 @@
 ;;;; WHITE-BOX TESTS
 
 (shadowing-import 'assertoid:assert-error)
-(use-package :sb-thread)
-(use-package :sb-sys)
+(use-package "SB-THREAD")
+(use-package "SB-SYS")
 
 (setf sb-unix::*on-dangerous-wait* :error)
 
