@@ -289,35 +289,31 @@
     (emit-inline-constants)
     (let* ((fun-table)
            (end-text (gen-label))
-           (start-fun-table (gen-label))
-           (n-entries (length (ir2-component-entries (component-info component))))
-           (fun-table-section
-            (let ((section (sb-assem::make-section)))
-              ;; Create space for the simple-fun offset table:
-              ;;  1 uint32 * N simple-funs
-              ;;  1 uint16 for the number of simple-funs
-              (emit section
-                    end-text `(.align 2) start-fun-table
-                    `(.skip ,(+ (* n-entries 4) 2)))
-              section))
+           (info (component-info component))
+           (n-entries (length (ir2-component-entries info)))
+           (n-boxed (length (ir2-component-constants info)))
+           ;; Skew is either 0 or N-WORD-BYTES depending on whether the boxed
+           ;; header length is even or odd
+           (skew (if (and (= code-boxed-words-align 1) (oddp n-boxed))
+                     sb-vm:n-word-bytes
+                     0))
            (segment
             (assemble-sections
-               (make-segment :header-skew
-                             (if (and (= code-boxed-words-align 1)
-                                      (oddp (length (ir2-component-constants
-                                                     (component-info component)))))
-                                 sb-vm:n-word-bytes
-                                 0)
+               (make-segment :header-skew skew
                              :run-scheduler (default-segment-run-scheduler)
                              :inst-hook (default-segment-inst-hook))
                (asmstream-data-section asmstream)
                (asmstream-code-section asmstream)
                (asmstream-elsewhere-section asmstream)
-               fun-table-section))
+               ;; Create space for the simple-fun offset table:
+               ;;  1 uint32 * N simple-funs
+               ;;  1 uint16 reserved for future use
+               ;;  1 uint16 for the number of simple-funs
+               (emit (sb-assem::make-section)
+                     end-text `(.align 2) `(.skip ,(* (1+ n-entries) 4))
+                     `(.align ,sb-vm:n-lowtag-bits))))
            (octets
-            (segment-buffer segment))
-           (index
-            (label-position start-fun-table)))
+            (segment-buffer segment)))
       (flet ((store-ub16 (index val)
                  (multiple-value-bind (b0 b1)
                      #!+little-endian
@@ -338,20 +334,22 @@
                          (aref octets (+ index 1)) b1
                          (aref octets (+ index 2)) b2
                          (aref octets (+ index 3)) b3))))
-        (let ((padding (- index (label-position end-text))))
-          (unless (and (typep n-entries '(unsigned-byte 12))
-                       (typep padding '(unsigned-byte 4)))
-            (bug "Oversized code component?"))
-          ;; Assert that we are aligned for storing uint32_t
-          (aver (not (logtest index #b11)))
+        (let ((index (length octets)))
+          ;; Total size of the code object must be multiple of 2 lispwords
+          (aver (not (logtest (+ skew index) sb-vm:lowtag-mask)))
+          (let ((padding
+                 (- index (* (1+ n-entries) 4) (label-position end-text))))
+            (unless (and (typep n-entries '(unsigned-byte 12))
+                         (typep padding '(unsigned-byte 4)))
+              (bug "Oversized code component?"))
+            (store-ub16 (- index 2) (logior (ash n-entries 4) padding)))
+          (decf index (* 4 (1+ n-entries)))
           (dolist (entry (sb-c::ir2-component-entries
                           (component-info component)))
             (let ((val (label-position (entry-info-offset entry))))
               (push val fun-table)
               (store-ub32 index val)
-              (incf index 4)))
-          (store-ub16 index (logior (ash n-entries 4) padding)))
-        (aver (= (+ index 2) (length octets))))
+              (incf index 4)))))
       (values segment (label-position end-text) fun-table
               (asmstream-elsewhere-label asmstream)
               (sb-assem::segment-fixup-notes segment)))))

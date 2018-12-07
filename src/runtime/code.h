@@ -63,28 +63,26 @@ static inline char* code_text_start(struct code* code) {
 
 /* Code component trailer words:
  *
- *      | fun_offset | fun_offset | .... | N-entries |
- *                                       ^           total size
- *                 fun_table pointer ---/
+ *                               (uint16)   (uint16)
+ * ... | offset | offset | .... |    0    | N-entries |
+ *            fun_table_pointer ^          total size ^
  *
  * The fun_table pointer is aligned at a 4-byte boundary.
  */
 static inline unsigned int*
 code_fun_table(struct code* code) {
-  return (unsigned int*)
-      (code_text_start(code) + code_unboxed_nbytes_(code->code_size) - sizeof (uint16_t));
+  return (unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code)-4);
 }
 static inline unsigned short
 code_n_funs(struct code* code) {
     // immobile space filler objects appear to be code but have no simple-funs.
     // Should probably consider changing the widetag to FILLER_WIDETAG.
-    return code_header_words(code) ? *((unsigned short*)code_fun_table(code)) >> 4 : 0;
+    return code_header_words(code) ? 1[(unsigned short*)code_fun_table(code)] >> 4 : 0;
 }
 
 /// The length in bytes of the unboxed portion excluding the simple-fun offset table.
 static inline int code_text_size(struct code* c) {
-    return code_unboxed_nbytes_(c->code_size)
-        - (code_n_funs(c) * sizeof (uint32_t)) - sizeof (uint16_t);
+    return code_unboxed_nbytes_(c->code_size) - (1+code_n_funs(c)) * sizeof (uint32_t);
 }
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions

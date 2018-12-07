@@ -278,7 +278,7 @@
   ;; - a list (symbol . args) for a machine instruction or assembler directive
   ;; - a label
   ;; - a function to emit a postit
-  (dolist (thing things)
+  (dolist (thing things section)
     (let ((vector (the simple-vector (section-last-buf section)))
           (index (section-buf-index section)))
       (unless (< index (length vector))

@@ -391,18 +391,24 @@
   ;; subtracting the size of trailing uint16_t puts us one byte beyond
   ;; the last fun-index, so subtract an extra uint32_t as well.
   (sap-ref-32 (code-instructions code-obj)
-              (- (%code-code-size code-obj) (* 4 (1+ fun-index)) 2)))
+              (- (%code-code-size code-obj) (* 4 fun-index) 8)))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
 ;;; machine instructions. It's generally ok to use either accessor if searching
 ;;; for a function that encloses a given program counter, since the PC won't be
 ;;; in the data range. But all the same, it looks nicer in disassemblies to avoid
 ;;; examining bytes that aren't instructions.
+;;; NOTE: this definition of 'code-text-size' is almost but not exactly identical
+;;;       to the one in 'code.h'. This logic subtracts the padding amount,
+;;;       which is essential to getting the proper disassembly length for the
+;;;       final simple-fun if instructions have variable length (as on x86).
+;;;       The C definition doesn't really care about that minor detail
+;;;       so it might overreport the size by the padding amount.
 (declaim (inline %code-text-size))
 (defun %code-text-size (code-obj)
   (- (%code-code-size code-obj)
-     ;; There are N-ENTRIES uint32_t integers, and a uint16_t
-     (+ 2 (* 4 (code-n-entries code-obj)))
+     ;; There are N-ENTRIES uint32_t integers, and 2 occurrences of uint16_t
+     (* 4 (1+ (code-n-entries code-obj)))
      ;; Subtract between 0 and 15 bytes of padding
      (logand (code-fun-table-trailer-word code-obj) #xf)))
 

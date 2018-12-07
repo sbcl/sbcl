@@ -2797,12 +2797,17 @@ core and return a descriptor to it."
 
 (defun compute-fun (code-object fun-index)
   (let ((fun-offset
+         ;; The final uint16 in the unboxed area is the count of simple-funs.
+         ;; Preceding it is a uint16 (always zero) for alignment.
+         ;; One uint32 prior to that is the offset of the 0th entry, so subtract
+         ;; 8 bytes from the total object size to get the index of the 0th entry.
+         ;; See related function %CODE-FUN-OFFSET.
          (bvref-32 (descriptor-mem code-object)
                    (+ (descriptor-byte-offset code-object)
                       (code-header-bytes code-object)
                       (code-unboxed-size code-object)
-                      -2 ; skip back past the trailing CODE-N-ENTRIES
-                      (* (1+ fun-index) -4))))) ; and back to the desired index
+                      -8
+                      (* fun-index -4))))) ; and back to the desired index
     (let ((fun (+ (logandc2 (descriptor-bits code-object) sb-vm:lowtag-mask)
                   (code-header-bytes code-object)
                   fun-offset)))
