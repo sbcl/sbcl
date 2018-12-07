@@ -40,6 +40,7 @@
 #include "validate.h"
 #include "gc-internal.h"
 #include "pseudo-atomic.h"
+#include "code.h"
 
 #include <errno.h>
 
@@ -299,7 +300,6 @@ static inline struct code* get_asm_routine_code_component() {
 #include "genesis/hash-table.h"
 #include "genesis/layout.h"
 #include "genesis/vector.h"
-#include "code.h"
 
 static inline sword_t calc_adjustment(struct heap_adjust* adj, lispobj x)
 {

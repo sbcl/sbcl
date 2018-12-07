@@ -13,7 +13,7 @@
 #define _CODE_H_
 
 #include "genesis/code.h"
-#include "gc-internal.h" // for gc_asser()
+#include "gc-internal.h" // for gc_assert()
 
 /// Internal use only (within this header)
 static inline sword_t code_boxed_nwords_(lispobj header)
