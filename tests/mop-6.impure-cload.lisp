@@ -14,17 +14,13 @@
 ;;; This file contains simple tests for COMPUTE-SLOTS :AROUND
 ;;; respecting the order requested by the primary method.
 
-(defpackage "MOP-6"
-  (:use "CL" "SB-MOP" "TEST-UTIL"))
-(in-package "MOP-6")
-
 ;;; COMPUTE-SLOTS :AROUND respecting requested order
 (defclass slot-rearrangement-class (standard-class)
   ())
-(defmethod compute-slots ((c slot-rearrangement-class))
+(defmethod sb-mop:compute-slots ((c slot-rearrangement-class))
   (reverse (call-next-method)))
-(defmethod validate-superclass ((c slot-rearrangement-class)
-                                (s standard-class))
+(defmethod sb-mop:validate-superclass ((c slot-rearrangement-class)
+                                       (s standard-class))
   t)
 (defclass rearranged-class ()
   ((a :initarg :a :initform 1)
@@ -33,8 +29,9 @@
 
 (with-test (:name (:compute-slots :standard-class :order))
   (let ((class (find-class 'rearranged-class)))
-    (finalize-inheritance class)
-    (assert (equal (mapcar #'slot-definition-name (class-slots class))
+    (sb-mop:finalize-inheritance class)
+    (assert (equal (mapcar #'sb-mop:slot-definition-name
+                           (sb-mop:class-slots class))
                    '(b a)))))
 (with-test (:name (:compute-slots :standard-class :slots))
   (let ((r (make-instance 'rearranged-class))
@@ -44,12 +41,12 @@
     (assert (eql (slot-value r2 'a) 3))
     (assert (eql (slot-value r2 'b) 4))))
 
-(defclass funcallable-slot-rearrangement-class (funcallable-standard-class)
+(defclass funcallable-slot-rearrangement-class (sb-mop:funcallable-standard-class)
   ())
-(defmethod compute-slots ((c funcallable-slot-rearrangement-class))
+(defmethod sb-mop:compute-slots ((c funcallable-slot-rearrangement-class))
   (reverse (call-next-method)))
-(defmethod validate-superclass ((c funcallable-slot-rearrangement-class)
-                                (s funcallable-standard-class))
+(defmethod sb-mop:validate-superclass ((c funcallable-slot-rearrangement-class)
+                                       (s sb-mop:funcallable-standard-class))
   t)
 (defclass funcallable-rearranged-class ()
   ((a :initarg :a :initform 1)
@@ -58,9 +55,11 @@
 
 (with-test (:name (:compute-slots :funcallable-standard-class :order))
   (let ((class (find-class 'funcallable-rearranged-class)))
-    (finalize-inheritance class)
-    (assert (equal (mapcar #'slot-definition-name (class-slots class))
+    (sb-mop:finalize-inheritance class)
+    (assert (equal (mapcar #'sb-mop:slot-definition-name
+                           (sb-mop:class-slots class))
                    '(b a)))))
+
 (with-test (:name (:compute-slots :funcallable-standard-class :slots))
   (let ((r (make-instance 'funcallable-rearranged-class))
         (r2 (make-instance 'funcallable-rearranged-class :a 3 :b 4)))
@@ -68,7 +67,8 @@
     (assert (eql (slot-value r 'b) 2))
     (assert (eql (slot-value r2 'a) 3))
     (assert (eql (slot-value r2 'b) 4))))
+
 (with-test (:name (:compute-slots :funcallable-standard-clas :function))
   (let ((r (make-instance 'funcallable-rearranged-class)))
-    (set-funcallable-instance-function r (lambda (x) (list "Hello, World!" x)))
+    (sb-mop:set-funcallable-instance-function r (lambda (x) (list "Hello, World!" x)))
     (assert (equal (funcall r 3) '("Hello, World!" 3)))))

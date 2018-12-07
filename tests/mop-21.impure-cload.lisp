@@ -14,14 +14,9 @@
 ;;; Pascal Costanza's implementation of beta methods, lightly
 ;;; modified.  Contains a specialization of MAKE-METHOD-LAMBDA.
 
-(defpackage "MOP-21"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-21")
-
 (defclass beta-generic-function (standard-generic-function)
   ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 
 (defclass beta-method (standard-method)
   ((betap :reader betap :initarg :betap :initform nil)))
@@ -73,7 +68,7 @@
           `(call-method ,(first around) (,@(rest around) (make-method ,form)))
           form))))
 
-(defmethod make-method-lambda
+(defmethod sb-mop:make-method-lambda
     ((gf beta-generic-function) method-prototype lambda-expression environment)
   (declare (ignore method-prototype environment))
   (let ((method-args (gensym))
@@ -85,7 +80,7 @@
                 (declare (dynamic-extent args))
                 (if (null ,next-methods)
                     (error "There is no next method for ~S." ,gf)
-                    (funcall (method-function (car ,next-methods))
+                    (funcall (sb-mop:method-function (car ,next-methods))
                              (if args args ,method-args)
                              (cdr ,next-methods)
                              ,inner-runs)))
@@ -94,7 +89,7 @@
                 (declare (dynamic-extent args))
                 (if (null ,inner-runs)
                     (error "There is no inner method for ~S." ,gf)
-                    (funcall (method-function (caar ,inner-runs))
+                    (funcall (sb-mop:method-function (caar ,inner-runs))
                              (if args args ,method-args)
                              (cdar ,inner-runs)
                              (cdr ,inner-runs))))
@@ -123,11 +118,17 @@
 ;;; before DEFCLASS- and DEFGENERIC-load-time.
 (mapcar #'eval
         (list
-         '(defmethod test ((object top)) 'top)
+         '(defmethod test ((object top))
+           (declare (ignore object))
+           'top)
          '(defmethod test :beta ((object middle))
+           (declare (ignore object))
            (list 'middle (call-inner-method) (call-next-method)))
-         '(defmethod test :beta ((object bottom)) 'bottom)))
+         '(defmethod test :beta ((object bottom))
+           (declare (ignore object))
+           'bottom)))
 
-(assert (equal '(middle bottom top) (test (make-instance 'bottom))))
-(assert (equal 'top (test (make-instance 'top))))
-(assert (null (ignore-errors (test (make-instance 'middle)))))
+(with-test (:name (:mop-21))
+  (assert (equal '(middle bottom top) (test (make-instance 'bottom))))
+  (assert (equal 'top (test (make-instance 'top))))
+  (assert (null (ignore-errors (test (make-instance 'middle))))))

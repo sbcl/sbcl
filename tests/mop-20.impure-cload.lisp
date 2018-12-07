@@ -14,11 +14,6 @@
 ;;; this file tests that user-defined methods can be used in
 ;;; combination (ahem) with hairy bits of method-combination.
 
-(defpackage "MOP-20"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-20")
-
 ;;; Simple test case from Pascal Costanza
 (defgeneric test (arg)
   (:method (arg) (format t "~D" arg) arg))
@@ -26,25 +21,26 @@
 (defun define-around-test ()
   (multiple-value-bind
         (method-lambda method-args)
-      (make-method-lambda
-       #'test (class-prototype (generic-function-method-class #'test))
+      (sb-mop:make-method-lambda
+       #'test (sb-mop:class-prototype (sb-mop:generic-function-method-class #'test))
        '(lambda (arg) (call-next-method)) ())
     (let ((method (apply #'make-instance
-                         (generic-function-method-class #'test)
+                         (sb-mop:generic-function-method-class #'test)
                          :qualifiers '(:around)
                          :lambda-list '(arg)
                          :specializers (list (find-class 't))
                          :function (compile nil method-lambda)
                          method-args)))
-      (add-method #'test method))))
+      (sb-mop:add-method #'test method))))
 
 (defun run-test ()
   (define-around-test)
   (test 42))
 
-(assert (string= (with-output-to-string (*standard-output*)
-                   (assert (= (run-test) 42)))
-                 "42"))
+(with-test (:name (:mop-20 1))
+  (assert (string= (with-output-to-string (*standard-output*)
+                     (assert (= (run-test) 42)))
+                   "42")))
 
 ;;; Slightly more complex test cases, from Bruno Haible (sbcl-devel
 ;;; 2004-06-11).  First the setup.
@@ -71,20 +67,19 @@
           (append unspecialized-required-part
                   (subseq required-part (length required-part)))))
     `(progn
-      (add-method #',name
+      (sb-mop:add-method #',name
        (make-instance 'user-method
         :qualifiers ',qualifiers
         :lambda-list ',unspecialized-lambdalist
         :specializers ',specializers
         :function
-
         #'(lambda (arguments next-methods-list)
             (flet ((next-method-p () next-methods-list)
                    (call-next-method (&rest new-arguments)
                      (unless new-arguments (setq new-arguments arguments))
                      (if (null next-methods-list)
                          (error "no next method for arguments ~:s" arguments)
-                         (funcall (method-function (first next-methods-list))
+                         (funcall (sb-mop:method-function (first next-methods-list))
                                   new-arguments (rest next-methods-list)))))
               (apply #'(lambda ,unspecialized-lambdalist ,@body) arguments)))))
       ',name)))
@@ -98,7 +93,9 @@
   (def-user-method test-um03 ((x rational))
     (list* 'rational x (not (null (next-method-p))) (call-next-method)))
   (defmethod test-um03 ((x real))
-    (list 'real x (not (null (next-method-p)))))
+    (list 'real x (not (null (next-method-p))))))
+
+(with-test (:name (:mop-20 2))
   (assert (equal (test-um03 17) '(integer 17 t rational 17 t real 17 nil))))
 
 ;;; these two used to fail in slightly different ways
@@ -116,7 +113,9 @@
   (defmethod test-um10 :around ((x rational))
     (list* 'around-rational x (not (null (next-method-p))) (call-next-method)))
   (defmethod test-um10 :around ((x real))
-    (list* 'around-real x (not (null (next-method-p))) (call-next-method)))
+    (list* 'around-real x (not (null (next-method-p))) (call-next-method))))
+
+(with-test (:name (:mop-20 3))
   (assert (equal (test-um10 17)
                  '(around-integer 17 t
                    around-rational 17 t
@@ -139,7 +138,9 @@
   (defmethod test-um12 :around ((x rational))
     (list* 'around-rational x (not (null (next-method-p))) (call-next-method)))
   (def-user-method test-um12 :around ((x real))
-    (list* 'around-real x (not (null (next-method-p))) (call-next-method)))
+    (list* 'around-real x (not (null (next-method-p))) (call-next-method))))
+
+(with-test (:name (:mop-20 4))
   (assert (equal (test-um12 17)
                  '(around-integer 17 t
                    around-rational 17 t

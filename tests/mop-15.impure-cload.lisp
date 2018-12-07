@@ -15,20 +15,15 @@
 ;;; that when FINALIZE-INHERITANCE is called on a class, it returns
 ;;; before subclasses are finalized.
 
-(defpackage "MOP-15"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-15")
-
 (defclass mop-15-class (standard-class) ())
 
-(defmethod validate-superclass ((s mop-15-class) (super standard-class))
+(defmethod sb-mop:validate-superclass ((s mop-15-class) (super standard-class))
   t)
 
 (defvar *count* 0)
 (defvar *max-count* 0)
 
-(defmethod finalize-inheritance ((c mop-15-class))
+(defmethod sb-mop:finalize-inheritance ((c mop-15-class))
   (let ((*count* (1+ *count*)))
     (when (> *count* *max-count*)
       (setf *max-count* *count*))
@@ -42,7 +37,8 @@
   ()
   (:metaclass mop-15-class))
 
-(finalize-inheritance (find-class 'super))
-(finalize-inheritance (find-class  'sub))
+(with-test (:name :mop-15)
+  (sb-mop:finalize-inheritance (find-class 'super))
+  (sb-mop:finalize-inheritance (find-class  'sub))
 
-(assert (= *max-count* 1))
+  (assert (= *max-count* 1)))

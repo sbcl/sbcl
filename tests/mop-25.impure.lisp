@@ -14,18 +14,13 @@
 ;;; be sure that the :FUNCTION initarg to initialize methods overrides
 ;;; any system-provided function.
 
-(defpackage "MOP-25"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-25")
-
 (defclass typechecking-reader-method (standard-reader-method)
   ())
 
 (defmethod initialize-instance
     ((method typechecking-reader-method) &rest initargs &key slot-definition)
-  (let ((name (slot-definition-name slot-definition))
-        (type (slot-definition-type slot-definition)))
+  (let ((name (sb-mop:slot-definition-name slot-definition))
+        (type (sb-mop:slot-definition-type slot-definition)))
     (apply #'call-next-method method
            :function #'(lambda (args next-methods)
                          (declare (ignore next-methods))
@@ -40,7 +35,7 @@
 (defclass typechecking-reader-class (standard-class)
   ())
 
-(defmethod validate-superclass ((c1 typechecking-reader-class) (c2 standard-class))
+(defmethod sb-mop:validate-superclass ((c1 typechecking-reader-class) (c2 standard-class))
   t)
 
 (defmethod reader-method-class
@@ -52,13 +47,11 @@
   ((pair :type (cons symbol (cons symbol null)) :initarg :pair :accessor testclass25-pair))
   (:metaclass typechecking-reader-class))
 
-(assert (equal '(t t t nil t)
-               (macrolet ((succeeds (form)
-                            `(not (nth-value 1 (ignore-errors ,form)))))
-                 (let ((p (list 'abc 'def))
-                       (x (make-instance 'testclass25)))
-                   (list (succeeds (make-instance 'testclass25 :pair '(seventeen 17)))
-                         (succeeds (setf (testclass25-pair x) p))
-                         (succeeds (setf (second p) 456))
-                         (succeeds (testclass25-pair x))
-                         (succeeds (slot-value x 'pair)))))))
+(with-test (:name (:mop-24))
+  (let ((p (list 'abc 'def))
+        (x (make-instance 'testclass25)))
+    (assert-no-signal (make-instance 'testclass25 :pair '(seventeen 17)))
+    (assert-no-signal (setf (testclass25-pair x) p))
+    (assert-no-signal (setf (second p) 456))
+    (assert-no-signal (testclass25-pair x))
+    (assert-no-signal (slot-value x 'pair))))

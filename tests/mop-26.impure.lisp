@@ -21,8 +21,6 @@
 ;;; function.  So it's fine if this test starts failing, as long as
 ;;; it's deliberate.
 
-(in-package "CL-USER")
-
 (defclass super () ())
 (defclass sub (super) ())
 
@@ -32,11 +30,13 @@
 (let ((spec (sb-pcl::class-eq-specializer (find-class 'super))))
   (eval `(defmethod test ((x ,spec)) t)))
 
-(assert (test (make-instance 'super)))
-(assert (null (test (make-instance 'sub))))
+(with-test (:name (:mop-26 1))
+  (assert (test (make-instance 'super)))
+  (assert (null (test (make-instance 'sub)))))
 
 (let ((spec (sb-pcl::class-eq-specializer (find-class 't))))
   (eval `(defmethod test ((x ,spec)) (class-of x))))
 
-(assert (test (make-instance 'super)))
-(assert (null (test (make-instance 'sub))))
+(with-test (:name (:mop-26 2))
+  (assert (test (make-instance 'super)))
+  (assert (null (test (make-instance 'sub)))))

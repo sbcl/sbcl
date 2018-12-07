@@ -13,22 +13,17 @@
 
 ;;; this file tests the protocol for Reinitialization of Class Metaobjects
 
-(defpackage "MOP-18"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-18")
-
 (defvar *in-reinitialize-instance* nil)
 
 (defvar *finalized-class* nil)
 
 (defclass test-standard-class (standard-class) ())
 
-(defmethod validate-superclass
+(defmethod sb-mop:validate-superclass
     ((class test-standard-class) (superclass standard-class))
   t)
 
-(defmethod finalize-inheritance :before ((class test-standard-class))
+(defmethod sb-mop:finalize-inheritance :before ((class test-standard-class))
   (when *in-reinitialize-instance*
     (setf *finalized-class* class)))
 
@@ -40,23 +35,25 @@
 (defclass test-standard-object () ((slot))
   (:metaclass test-standard-class))
 
-(unless (class-finalized-p (find-class 'test-standard-object))
-  (finalize-inheritance (find-class 'test-standard-object)))
+(unless (sb-mop:class-finalized-p (find-class 'test-standard-object))
+  (sb-mop:finalize-inheritance (find-class 'test-standard-object)))
 
-(assert (class-slots (find-class 'test-standard-object)))
-(assert (null *finalized-class*))
-(reinitialize-instance (find-class 'test-standard-object) :direct-slots nil)
-(assert (eq *finalized-class* (find-class 'test-standard-object)))
-(assert (null (class-slots (find-class 'test-standard-object))))
+(with-test (:name (:mop-18 1))
+  (assert (sb-mop:class-slots (find-class 'test-standard-object)))
+  (assert (null *finalized-class*))
+  (reinitialize-instance (find-class 'test-standard-object) :direct-slots nil)
+  (assert (eq *finalized-class* (find-class 'test-standard-object)))
+  (assert (null (sb-mop:class-slots (find-class 'test-standard-object)))))
 
-(defclass test-funcallable-standard-class (funcallable-standard-class) ())
+(defclass test-funcallable-standard-class (sb-mop:funcallable-standard-class)
+  ())
 
-(defmethod validate-superclass
+(defmethod sb-mop:validate-superclass
     ((class test-funcallable-standard-class)
-     (superclass funcallable-standard-class))
+     (superclass sb-mop:funcallable-standard-class))
   t)
 
-(defmethod finalize-inheritance :before
+(defmethod sb-mop:finalize-inheritance :before
     ((class test-funcallable-standard-class))
   (when *in-reinitialize-instance*
     (setf *finalized-class* class)))
@@ -69,12 +66,13 @@
 (defclass test-funcallable-standard-object () ((slot))
   (:metaclass test-funcallable-standard-class))
 
-(unless (class-finalized-p (find-class 'test-funcallable-standard-object))
-  (finalize-inheritance (find-class 'test-funcallable-standard-object)))
+(unless (sb-mop:class-finalized-p (find-class 'test-funcallable-standard-object))
+  (sb-mop:finalize-inheritance (find-class 'test-funcallable-standard-object)))
 
-(assert (class-slots (find-class 'test-funcallable-standard-object)))
-(assert (eq *finalized-class* (find-class 'test-standard-object)))
-(reinitialize-instance (find-class 'test-funcallable-standard-object)
-                       :direct-slots nil)
-(assert (eq *finalized-class* (find-class 'test-funcallable-standard-object)))
-(assert (null (class-slots (find-class 'test-funcallable-standard-object))))
+(with-test (:name (:mop-18 2))
+  (assert (sb-mop:class-slots (find-class 'test-funcallable-standard-object)))
+  (assert (eq *finalized-class* (find-class 'test-standard-object)))
+  (reinitialize-instance (find-class 'test-funcallable-standard-object)
+                         :direct-slots nil)
+  (assert (eq *finalized-class* (find-class 'test-funcallable-standard-object)))
+  (assert (null (sb-mop:class-slots (find-class 'test-funcallable-standard-object)))))

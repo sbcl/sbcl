@@ -13,11 +13,6 @@
 
 ;;; Some slot-valuish things in combination with user-defined methods
 
-(defpackage "MOP-24"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-24")
-
 (defclass user-method (standard-method) (myslot))
 
 (defmacro def-user-method (name &rest rest)
@@ -54,7 +49,7 @@
                      (unless new-arguments (setq new-arguments arguments))
                      (if (null next-methods-list)
                          (error "no next method for arguments ~:s" arguments)
-                         (funcall (method-function (first next-methods-list))
+                         (funcall (sb-mop:method-function (first next-methods-list))
                                   new-arguments (rest next-methods-list)))))
               (apply #'(lambda ,unspecialized-lambdalist ,@body) arguments)))))
       ',name)))
@@ -77,7 +72,9 @@
     (list* 'sub (slot-value x 'a) (slot-value x 'b)
            (not (null (next-method-p))) (call-next-method)))
   (defmethod test-um03 ((x super))
-    (list 'super (slot-value x 'a) (not (null (next-method-p)))))
+    (list 'super (slot-value x 'a) (not (null (next-method-p))))))
+
+(with-test (:name (:mop-24 1))
   (assert (equal (test-um03 (make-instance 'super)) '(super 3 nil)))
   (assert (equal (test-um03 (make-instance 'sub)) '(sub 3 4 t super 3 nil)))
   (assert (equal (test-um03 (make-instance 'subsub))
@@ -102,7 +99,9 @@
            (not (null (next-method-p))) (call-next-method)))
   (defmethod test-um10 :around ((x super))
     (list* 'around-super (slot-value x 'a)
-           (not (null (next-method-p))) (call-next-method)))
+           (not (null (next-method-p))) (call-next-method))))
+
+(with-test (:name (:mop-24 2))
   (assert (equal (test-um10 (make-instance 'super))
                  '(around-super 3 t super 3 nil)))
   (assert (equal (test-um10 (make-instance 'sub))
@@ -130,7 +129,9 @@
            (not (null (next-method-p))) (call-next-method)))
   (def-user-method test-um12 :around ((x super))
     (list* 'around-super (slot-value x 'a)
-           (not (null (next-method-p))) (call-next-method)))
+           (not (null (next-method-p))) (call-next-method))))
+
+(with-test (:name (:mop-24 3))
   (assert (equal (test-um12 (make-instance 'super))
                  '(around-super 3 t super 3 nil)))
   (assert (equal (test-um12 (make-instance 'sub))

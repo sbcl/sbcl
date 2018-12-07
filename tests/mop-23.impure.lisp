@@ -14,14 +14,9 @@
 ;;; Extending MAKE-METHOD-LAMBDA, and making sure that the resulting
 ;;; method functions compile without warnings.
 
-(defpackage "MOP-23"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-23")
-
 (defclass verbose-generic-function (standard-generic-function) ()
-  (:metaclass funcallable-standard-class))
-(defmethod make-method-lambda
+  (:metaclass sb-mop:funcallable-standard-class))
+(defmethod sb-mop:make-method-lambda
     ((gf verbose-generic-function) method lambda env)
   (multiple-value-bind (lambda initargs)
       (call-next-method)
@@ -37,9 +32,10 @@
 (handler-bind ((warning #'error))
   (eval '(defmethod foo ((x integer)) (1+ x))))
 
-(assert (string= (with-output-to-string (*trace-output*)
-                   (assert (= (foo 3) 4)))
-                 "Called a method!"))
+(with-test (:name (:mop-23 sb-mop:make-method-lambda  1))
+  (assert (string= (with-output-to-string (*trace-output*)
+                     (assert (= (foo 3) 4)))
+                   "Called a method!")))
 
 (defclass super () ((a :initarg :a)))
 (defclass sub (super) (b))
@@ -49,16 +45,18 @@
   (eval '(defmethod foo :around ((x super))
           (list (slot-value x 'a) (call-next-method)))))
 
-(assert (string= (with-output-to-string (*trace-output*)
-                   (assert (equal (foo (make-instance 'sub :a 4))
-                                  '(4 nil))))
-                 "Called a method!Called a method!"))
+(with-test (:name (:mop-23 sb-mop:make-method-lambda 3))
+  (assert (string= (with-output-to-string (*trace-output*)
+                     (assert (equal (foo (make-instance 'sub :a 4))
+                                    '(4 nil))))
+                   "Called a method!Called a method!")))
 
 (defclass super ()
   ((b :initform 3)
    (a :initarg :a)))
 
-(assert (string= (with-output-to-string (*trace-output*)
-                   (assert (equal (foo (make-instance 'sub :a 5))
-                                  '(5 t))))
-                 "Called a method!Called a method!"))
+(with-test (:name (:mop-23 sb-mop:make-method-lambda 3))
+  (assert (string= (with-output-to-string (*trace-output*)
+                     (assert (equal (foo (make-instance 'sub :a 5))
+                                    '(5 t))))
+                   "Called a method!Called a method!")))

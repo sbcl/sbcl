@@ -14,11 +14,6 @@
 ;;; this file tests the programmatic class example from pp.67-69 of
 ;;; AMOP.
 
-(defpackage "MOP-17"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-17")
-
 (defun make-programmatic-instance (superclass-names &rest initargs)
   (apply #'make-instance
          (find-programmatic-class
@@ -29,8 +24,8 @@
   (let ((class (find-if
                  (lambda (class)
                    (equal superclasses
-                          (class-direct-superclasses class)))
-                 (class-direct-subclasses (car superclasses)))))
+                          (sb-mop:class-direct-superclasses class)))
+                 (sb-mop:class-direct-subclasses (car superclasses)))))
     (or class
         (make-programmatic-class superclasses))))
 
@@ -49,12 +44,14 @@
 (defclass top-labeled (label-type) ())
 (defclass bottom-labeled (label-type) ())
 
-(assert (null (class-direct-subclasses (find-class 'circle))))
+(with-test (:name (:mop-17 1))
+  (assert (null (sb-mop:class-direct-subclasses (find-class 'circle)))))
 
 (defvar *i1* (make-programmatic-instance '(circle orange top-labeled)))
 (defvar *i2* (make-programmatic-instance '(circle magenta bottom-labeled)))
 (defvar *i3* (make-programmatic-instance '(circle orange top-labeled)))
 
-(assert (not (eq *i1* *i3*)))
+(with-test (:name (:mop-17 2))
+  (assert (not (eq *i1* *i3*)))
 
-(assert (= (length (class-direct-subclasses (find-class 'circle))) 2))
+  (assert (= (length (sb-mop:class-direct-subclasses (find-class 'circle))) 2)))

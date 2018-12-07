@@ -17,24 +17,17 @@
 ;;; superclass.  (This used to fail in cache-filling code: see reports
 ;;; from Levente Mészáros sbcl-devel 2006-04-19)
 
-(defpackage :dc
-  (:use
-    #:cl
-    #:sb-mop))
-
-(in-package :dc)
-
 (defclass dwim-slot-definition
-  (standard-slot-definition)
+  (sb-mop:standard-slot-definition)
   ())
 
 (defclass dwim-direct-slot-definition
-  (standard-direct-slot-definition dwim-slot-definition)
+  (sb-mop:standard-direct-slot-definition dwim-slot-definition)
   ())
 
 (defclass dwim-effective-slot-definition
   (extra-effective-slot-definition
-   standard-effective-slot-definition dwim-slot-definition)
+   sb-mop:standard-effective-slot-definition dwim-slot-definition)
   ())
 (defclass dwim-attribute-slot-definition
   (dwim-slot-definition)

@@ -14,7 +14,6 @@
 ;;; This file contains simple tests for
 ;;; SET-FUNCALLABLE-INSTANCE-FUNCTION on FUNCALLABLE-INSTANCEs
 
-
 ;;; from Justin Dubs on comp.lang.lisp
 (defclass fn ()
   ()
@@ -30,9 +29,10 @@
                                               (setf *fn* fn)
                                               (1+ x))))
 
-(let ((fun (make-instance 'fn)))
-  (assert (= (funcall fun 42) 43))
-  (assert (eq *fn* fun)))
+(with-test (:name (:mop-5 1))
+  (let ((fun (make-instance 'fn)))
+    (assert (= (funcall fun 42) 43))
+    (assert (eq *fn* fun))))
 
 ;;; from Tony Martinez sbcl-devel
 (defclass counter ()
@@ -45,9 +45,10 @@
      instance
      ;; When run, this function doesn't print the instance, but (what
      ;; I think is) itself.
-     (lambda () (print instance)))
+     (lambda () (print instance (make-broadcast-stream))))
     instance))
 
 (defparameter *counter* (make-counter :start 666))
 
-(assert (eq (funcall *counter*) *counter*))
+(with-test (:name (:mop-5 2))
+  (assert (eq (funcall *counter*) *counter*)))

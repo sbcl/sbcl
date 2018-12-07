@@ -18,23 +18,22 @@
 ;;; effective slot definitions to be available during class
 ;;; finalization)
 
-(defpackage "MOP-29"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-29")
-
 (defclass my-class (standard-class)
   ())
-(defmethod validate-superclass ((class my-class) (super-class standard-class))
+
+(defmethod sb-mop:validate-superclass ((class my-class) (super-class standard-class))
   t)
+
 (defvar *foo*)
+
 ;;; the specialization of OBJECT here triggers the PV optimization;
 ;;; with an unspecialized argument, the SLOT-VALUE is not optimized.
-(defmethod slot-value-using-class
+(defmethod sb-mop:slot-value-using-class
     ((class my-class) (object standard-object) eslotd)
   (if *foo*
       (setf (slot-value object 'id) 42)
       (call-next-method)))
+
 (defclass my-object ()
   ((id :type integer :reader id-of))
   (:metaclass my-class))
@@ -55,4 +54,6 @@
       (assert (= (id-of object) 42))
       (assert (= (slot-value object 'id) 42)))))
 (compile 'test-global-accessors)
-(test-global-accessors)
+
+(with-test (:name (:mop-29))
+  (test-global-accessors))
