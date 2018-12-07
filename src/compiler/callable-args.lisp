@@ -151,7 +151,7 @@
                   (when lvar
                     (call lvar annotation)))))))))
 
-(defun lvar-fun-type (lvar &optional defined-here)
+(defun lvar-fun-type (lvar &optional defined-here declared-only)
   ;; Handle #'function,  'function and (lambda (x y))
   (let* ((use (principal-lvar-use lvar))
          (lvar-type (lvar-type lvar))
@@ -171,6 +171,7 @@
                               ((:defined :defined-here)
                                (if (or (and (defined-fun-p leaf)
                                             (eq (defined-fun-inlinep leaf) :notinline))
+                                       declared-only
                                        (and defined-here
                                             (eq (leaf-where-from leaf) :defined))
                                        (fun-lexically-notinline-p (leaf-%source-name leaf)

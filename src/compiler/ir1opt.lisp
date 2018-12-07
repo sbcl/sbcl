@@ -964,7 +964,7 @@
                       (cond ((global-var-p leaf)
                              (values (leaf-type leaf) (leaf-defined-type leaf)))
                             ((eq kind :unknown-keys)
-                             (values (lvar-fun-type fun) nil))
+                             (values (lvar-fun-type fun t t) nil))
                             (t
                              (values nil nil)))
                     (when (or (and (eq kind :unknown-keys)
@@ -1249,7 +1249,7 @@
        (multiple-value-bind (leaf info)
            (let* ((uses (lvar-uses fun-lvar))
                   (leaf (when (ref-p uses) (ref-leaf uses))))
-             (validate-call-type call (lvar-fun-type fun-lvar) leaf))
+             (validate-call-type call (lvar-fun-type fun-lvar t t) leaf))
          (cond ((functional-p leaf)
                 (convert-call-if-possible
                  (lvar-uses (basic-combination-fun call))
