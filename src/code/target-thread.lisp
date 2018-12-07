@@ -913,7 +913,8 @@ IF-NOT-OWNER is :FORCE)."
   #!+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
-    (aver (eq me (mutex-%owner mutex)))
+    (unless (eq me (mutex-%owner mutex))
+      (error "The current thread is not holding ~s." mutex))
     (let ((status :interrupted))
       ;; Need to disable interrupts so that we don't miss grabbing
       ;; the mutex on our way out.
