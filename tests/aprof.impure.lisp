@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#-x86-64 (sb-ext:exit :code 104) ;; not implemented elsewhere
+#-(and x86-64 sb-thread) (sb-ext:exit :code 104) ;; not implemented elsewhere
 
 (with-test (:name :aprof-smoketest-struct
             ;; reverse-engineering the allocation instructions fails but should not
