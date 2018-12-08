@@ -196,8 +196,7 @@
 
 (define-vop (test-fixnum-mod-power-of-two)
   (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+                      unsigned-reg signed-reg)))
   (:arg-types *
               (:constant (satisfies power-of-two-limit-p)))
   (:translate fixnum-mod-p)
@@ -206,16 +205,13 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 2
-     (aver (not (sc-is value immediate)))
-     (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
-                           hi
-                           (fixnumize hi))))
+     (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
+                          hi
+                          (fixnumize hi))))
        (inst tst value (lognot fixnum-hi)))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned-imm)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+  (:args (value :scs (any-reg unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
               (:constant (satisfies encodable-immediate)))
   (:translate fixnum-mod-p)
@@ -224,7 +220,6 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
-     (aver (not (sc-is value immediate)))
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                           hi
                           (fixnumize hi))))
@@ -237,8 +232,7 @@
 ;;; more immediates.
 (define-vop (test-fixnum-mod-tagged-unsigned-imm+1)
   (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+                      unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
               (:constant (satisfies encodable-immediate+1)))
   (:translate fixnum-mod-p)
@@ -247,16 +241,13 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
-     (aver (not (sc-is value immediate)))
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                           (1+ hi)
                           (fixnumize (1+ hi)))))
        (inst cmp value fixnum-hi))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+  (:args (value :scs (any-reg unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
               (:constant fixnum))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -266,7 +257,6 @@
   (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
-     (aver (not (sc-is value immediate)))
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                           hi
                           (fixnumize hi))))

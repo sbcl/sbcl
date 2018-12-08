@@ -222,7 +222,7 @@
 
 (define-vop (test-fixnum-mod-power-of-two)
   (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg)))
+                      unsigned-reg signed-reg)))
   (:arg-types *
               (:constant (satisfies power-of-two-limit-p)))
   (:translate fixnum-mod-p)
@@ -261,8 +261,7 @@
     (inst cmp value (fixnumize hi))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg)))
+  (:args (value :scs (any-reg unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
               (:constant fixnum))
   (:temporary (:scs (non-descriptor-reg)) temp)
