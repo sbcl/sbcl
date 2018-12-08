@@ -20,6 +20,13 @@
          (inst movn y (ldb (byte 64 0) (lognot val))))
         ((encode-logical-immediate val)
          (inst orr y zr-tn val))
+        ((loop for i below 64 by 16
+               for part = (ldb (byte 16 i) val)
+               for zeroed = (dpb 0 (byte 16 i) val)
+               thereis (cond ((encode-logical-immediate zeroed)
+                              (inst orr y zr-tn zeroed)
+                              (inst movk y part i)
+                              t))))
         ((minusp val)
          (loop with first = t
                for i below 64 by 16
