@@ -228,7 +228,6 @@
   (:translate fixnum-mod-p)
   (:conditional :eq)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 2
      (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
@@ -243,7 +242,6 @@
   (:translate fixnum-mod-p)
   (:conditional :ls)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
      (inst cmp value hi)))
@@ -255,7 +253,6 @@
   (:translate fixnum-mod-p)
   (:conditional :ls)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
     (inst cmp value (fixnumize hi))))
@@ -268,7 +265,6 @@
   (:translate fixnum-mod-p)
   (:conditional :ls)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
@@ -283,7 +279,6 @@
   (:translate fixnum-mod-p)
   (:conditional)
   (:info target not-p hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 5
     (let ((fixnum-hi (fixnumize hi)))
@@ -308,7 +303,6 @@
   (:temporary (:scs (any-reg)) temp)
   (:conditional)
   (:info target not-p hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 6
     #.(assert (= fixnum-tag-mask 1))

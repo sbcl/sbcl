@@ -142,7 +142,6 @@
   (:translate base-char-p)
   (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
   (:conditional :eq)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
     (inst and temp value (lognot #x7F00))
@@ -154,7 +153,6 @@
   (:arg-types character)
   (:translate base-char-p)
   (:conditional :eq)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 3
     (inst tst value (lognot #x7FFF))))
@@ -165,7 +163,6 @@
   (:arg-types character)
   (:translate base-char-p)
   (:conditional :lt)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 2
     (inst cmp value base-char-code-limit)))

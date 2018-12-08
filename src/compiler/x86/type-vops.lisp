@@ -281,7 +281,6 @@
   (:translate sb-c::fixnum-mod-p)
   (:conditional :e)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
      (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
@@ -296,7 +295,6 @@
   (:translate sb-c::fixnum-mod-p)
   (:conditional :be)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 5
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
@@ -310,7 +308,6 @@
   (:translate sb-c::fixnum-mod-p)
   (:conditional)
   (:info target not-p hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 6
      (let* ((fixnum-hi (fixnumize hi))

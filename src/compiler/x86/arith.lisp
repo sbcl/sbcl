@@ -488,7 +488,6 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 6
     (move eax x)
     (inst mul eax y)
@@ -540,7 +539,6 @@
   (:result-types tagged-num tagged-num)
   (:note "inline fixnum arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 30
     (move eax x)
     (inst cdq)
@@ -594,7 +592,6 @@
   (:result-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 32
     (move eax x)
     (inst xor edx edx)
@@ -645,7 +642,6 @@
   (:result-types signed-num signed-num)
   (:note "inline (signed-byte 32) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 32
     (move eax x)
     (inst cdq)
