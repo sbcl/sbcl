@@ -1367,8 +1367,8 @@
                     (return-from op))
                    (.comment ; ignore it
                     (return-from op))))
-               (apply mnemonic operands segment
-                      (perform-operand-lowering operands)))))
+               (instruction-hooks segment)
+               (apply mnemonic segment (perform-operand-lowering operands)))))
           (label (%emit-label segment **current-vop** operation))
           (function (%emit-postit segment operation)))))
     (finalize-segment segment)
@@ -1463,12 +1463,8 @@
          (aver (typep v '(or null sb-c::vop)))
          (emit dest (if v (cons v inst) inst))))
       (segment ; streaming out of the assembler
-       ;; Pass operands to the machine instruction encoder as a list and as
-       ;; spread arguments. The list alleviates the need for emitter to listify
-       ;; operands prior to calling any instruction hooks. The spread arguments
-       ;; allow the compiler to generate normal &OPTIONAL / &KEY parsing code
-       ;; in lieu of our generating a destructuring-bind to achieve the same.
-       (apply mnemonic operands dest (perform-operand-lowering operands)))))
+       (instruction-hooks dest)
+       (apply mnemonic dest (perform-operand-lowering operands)))))
   (values))
 
 (defun emit-label (label)
@@ -1680,8 +1676,6 @@
           (t
            (error "unknown option: ~S" option)))))
     (when emitter
-      (push `(instruction-hooks ,segment-name ,sym-name .operands.)
-            emitter)
       (unless cost (setf cost 1))
       #!+sb-dyncount
       (push `(when (segment-collect-dynamic-statistics ,segment-name)
@@ -1724,13 +1718,12 @@
        (setf (get ',defun-name 'sb-disassem::instruction-flavors)
              (list ,@pdefs))
        ,(when emitter
-          `(defun ,defun-name (.operands. ,segment-name ,@(cdr lambda-list))
+          `(defun ,defun-name (,segment-name ,@(cdr lambda-list))
              (declare ,@decls)
              (let ,(and vop-name `((,vop-name **current-vop**)))
                ,@emitter))))))
 
-(defun instruction-hooks (segment mnemonic operands)
-  (declare (ignore mnemonic operands))
+(defun instruction-hooks (segment)
   (let ((postits (segment-postits segment)))
     (setf (segment-postits segment) nil)
     (dolist (postit postits)

@@ -20,8 +20,9 @@
 (defun test-assemble (inst expect)
   (let ((segment (sb-assem:make-segment)))
     (sb-assem:assemble (segment 'nil)
-      (apply (sb-assem::op-encoder-name (car inst)) (cdr inst) segment
-             (sb-assem::perform-operand-lowering (cdr inst))))
+        (apply #'sb-assem::%inst
+               (sb-assem::op-encoder-name (car inst))
+               (cdr inst)))
     (let* ((buf (sb-assem::segment-buffer segment))
            (string
              (with-output-to-string (stream)
