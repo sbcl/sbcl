@@ -1421,39 +1421,41 @@
                                  &optional def-lo def-hi (increasingp t))
   (etypecase arg
     (numeric-type
-     (cond ((eq (numeric-type-complexp arg) :complex)
-            (make-numeric-type :class (numeric-type-class arg)
-                               :format (numeric-type-format arg)
-                               :complexp :complex))
-           ((numeric-type-real-p arg)
-            (let* ((format (case (numeric-type-class arg)
-                             ((integer rational) 'single-float)
-                             (t (numeric-type-format arg))))
-                   (bound-type (or format 'float)))
-              ;; If the argument is a subset of the "principal" domain
-              ;; of the function, we can compute the bounds because
-              ;; the function is monotonic. We can't do this in
-              ;; general for these periodic functions because we can't
-              ;; (and don't want to) do the argument reduction in
-              ;; exactly the same way as the functions themselves do
-              ;; it.
-              (if (csubtypep arg domain)
-                  (let ((res-lo (bound-func fun (numeric-type-low arg) nil))
-                        (res-hi (bound-func fun (numeric-type-high arg) nil)))
-                    (unless increasingp
-                      (rotatef res-lo res-hi))
+     (flet ((floatify-format ()
+              (case (numeric-type-class arg)
+                ((integer rational) 'single-float)
+                (t (numeric-type-format arg)))))
+       (cond ((eq (numeric-type-complexp arg) :complex)
+              (make-numeric-type :class 'float
+                                 :format (floatify-format)
+                                 :complexp :complex))
+             ((numeric-type-real-p arg)
+              (let* ((format (floatify-format))
+                     (bound-type (or format 'float)))
+                ;; If the argument is a subset of the "principal" domain
+                ;; of the function, we can compute the bounds because
+                ;; the function is monotonic. We can't do this in
+                ;; general for these periodic functions because we can't
+                ;; (and don't want to) do the argument reduction in
+                ;; exactly the same way as the functions themselves do
+                ;; it.
+                (if (csubtypep arg domain)
+                    (let ((res-lo (bound-func fun (numeric-type-low arg) nil))
+                          (res-hi (bound-func fun (numeric-type-high arg) nil)))
+                      (unless increasingp
+                        (rotatef res-lo res-hi))
+                      (make-numeric-type
+                       :class 'float
+                       :format format
+                       :low (coerce-numeric-bound res-lo bound-type)
+                       :high (coerce-numeric-bound res-hi bound-type)))
                     (make-numeric-type
                      :class 'float
                      :format format
-                     :low (coerce-numeric-bound res-lo bound-type)
-                     :high (coerce-numeric-bound res-hi bound-type)))
-                  (make-numeric-type
-                   :class 'float
-                   :format format
-                   :low (and def-lo (coerce def-lo bound-type))
-                   :high (and def-hi (coerce def-hi bound-type))))))
-           (t
-            (float-or-complex-float-type arg def-lo def-hi))))))
+                     :low (and def-lo (coerce def-lo bound-type))
+                     :high (and def-hi (coerce def-hi bound-type))))))
+             (t
+              (float-or-complex-float-type arg def-lo def-hi)))))))
 
 (defoptimizer (sin derive-type) ((num))
   (one-arg-derive-type

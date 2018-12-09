@@ -441,3 +441,18 @@
               (values (truncate (the single-float x)))))))
     (ctu:assert-no-consing (funcall f 1f0))
     (ctu:assert-no-consing (funcall f (float most-negative-fixnum 1f0)))))
+
+(with-test (:name :trig-derive-type-complex-rational)
+  (macrolet ((test (fun type)
+               `(checked-compile-and-assert
+                 ()
+                 '(lambda (a)
+                   (declare ((complex ,type) a))
+                   (,fun a))
+                 ((#C(1 2)) (eval '(,fun #C(1 2)))))))
+    (test sin integer)
+    (test cos integer)
+    (test tan integer)
+    (test sin rational)
+    (test cos rational)
+    (test tan rational)))
