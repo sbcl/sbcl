@@ -336,7 +336,7 @@ sufficiently motivated to do lengthy fixes."
                ;; from a no-longer-existing stack frame - so only examine
                ;; outgoing references within the dynamic space.
                ;; As to why the pointing object didn't die - who knows?
-               (and (heap-allocated-p part)
+               (and (eq (heap-allocated-p part) :dynamic)
                     (typep part 'ctype)
                     ;; PART is not interesting if it points to an interned
                     ;; ctype, because that's already a canonical object.
