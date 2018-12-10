@@ -625,6 +625,15 @@
              #!-gencgc 0))
     (write-wordindexed/raw des 0 (logior (ash gen 24) header-word))))
 
+(defun write-code-header-words (descriptor boxed unboxed serialno)
+  #!-64-bit (setq serialno 0)
+  (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
+    (write-header-word descriptor
+                       (logior (ash total-words sb-vm::code-header-size-shift)
+                               sb-vm:code-header-widetag)))
+  (write-wordindexed/raw descriptor 1
+                         (logior (ash serialno 32) (* boxed sb-vm:n-word-bytes))))
+
 (defun write-header-data+tag (des header-data widetag)
   (write-header-word des (logior (ash header-data sb-vm:n-widetag-bits)
                                  widetag)))
@@ -2141,10 +2150,14 @@ core and return a descriptor to it."
 (defvar *cold-assembler-routines*)
 (defvar *cold-static-call-fixups*)
 
-;;; Basically the same as the real CODE-HEADER-WORDS * n-word-bytes
-(defun code-header-bytes (code-object) ; Return boxed part size in bytes
+;;: See picture in 'objdef'
+(defun code-total-size (code-object) ; Return total size in bytes
   (* (ash (get-header-data code-object) (+ #!+64-bit -24))
      sb-vm:n-word-bytes))
+
+;; Boxed header length is stored directly in bytes, not words
+(defun code-header-bytes (code-object)
+  (ldb (byte 32 0) (read-bits-wordindexed code-object sb-vm:code-boxed-size-slot)))
 
 (defun lookup-assembler-reference (symbol &optional (mode :direct) (errorp t))
   (let* ((code-component *cold-assembler-obj*)
@@ -2169,12 +2182,6 @@ core and return a descriptor to it."
 (defvar *code-fixup-notes*)
 (defvar *allocation-point-fixup-notes*)
 
-(defun code-unboxed-size (code)
-  ;; though ALLOCATE-CODE-OBJECT imposes a size limit, the exact limit
-  ;; doesn't matter, provided we examine only the low 4 bytes.
-  (ash (ldb (byte 32 0) (read-bits-wordindexed code sb-vm:code-code-size-slot))
-       (- sb-vm:n-fixnum-tag-bits)))
-
 (declaim (ftype (sfunction (descriptor sb-vm:word sb-vm:word keyword keyword)
                            descriptor)
                 cold-fixup))
@@ -2190,10 +2197,7 @@ core and return a descriptor to it."
     #!+(or x86 x86-64)
     (let* ((gspace-data (descriptor-mem code-object))
            (obj-start-addr (logandc2 (descriptor-bits code-object) sb-vm:lowtag-mask))
-           (code-end-addr
-            (+ obj-start-addr
-               (code-header-bytes code-object)
-               (code-unboxed-size code-object)))
+           (code-end-addr (+ obj-start-addr (code-total-size code-object)))
            (gspace-base (gspace-byte-address (descriptor-gspace code-object)))
            (in-dynamic-space
             (= (gspace-identifier (descriptor-intuit-gspace code-object))
@@ -2751,12 +2755,8 @@ core and return a descriptor to it."
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
-       (write-header-word des
-                          (sb-vm::make-code-header-word aligned-n-boxed-words))
-       (write-wordindexed des sb-vm:code-code-size-slot
-                          (make-random-descriptor
-                           (logior #!+64-bit (ash (incf *code-serialno*) 32)
-                                   (ash code-size sb-vm:n-fixnum-tag-bits))))
+      (write-code-header-words des aligned-n-boxed-words code-size
+                               (incf *code-serialno*))
        (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
        (do ((index (1- n-boxed-words) (1- index)))
            ((< index sb-vm:code-constants-offset))
@@ -2804,8 +2804,7 @@ core and return a descriptor to it."
          ;; See related function %CODE-FUN-OFFSET.
          (bvref-32 (descriptor-mem code-object)
                    (+ (descriptor-byte-offset code-object)
-                      (code-header-bytes code-object)
-                      (code-unboxed-size code-object)
+                      (code-total-size code-object)
                       -8
                       (* fun-index -4))))) ; and back to the desired index
     (let ((fun (+ (logandc2 (descriptor-bits code-object) sb-vm:lowtag-mask)
@@ -2847,10 +2846,7 @@ core and return a descriptor to it."
                   (+ (ash header-n-words sb-vm:word-shift) length)
                   sb-vm:other-pointer-lowtag)))
     (setf *cold-assembler-obj* asm-code)
-    (write-header-word asm-code
-                       (sb-vm::make-code-header-word header-n-words))
-    (write-wordindexed asm-code sb-vm:code-code-size-slot
-                       (make-fixnum-descriptor rounded-length))
+    (write-code-header-words asm-code header-n-words rounded-length 0)
     (let ((start (+ (descriptor-byte-offset asm-code)
                     (ash header-n-words sb-vm:word-shift))))
       (read-bigvec-as-sequence-or-die (descriptor-mem asm-code)

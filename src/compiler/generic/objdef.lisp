@@ -143,62 +143,56 @@
   (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
 
 #|
-Proposed change to code header representation which allows computing
-code object sized based on reading only 1 word, not 2.
+Code header representation:
 
-  |       total size      | widetag |
+  |       total words     | widetag |
   | (3 bytes less 2 bits) |         |
   +-----------------------+---------+  [32-bit words]
-  |      N boxed header words       |
+  |      N boxed header bytes       |
   +---------------------------------+
   max total payload size in words = #x3fffff
 
-  |            total size           | gc_gen | 0 | 0 | widetag |
+  |            total words          | gc_gen | 0 | 0 | widetag |
   |            (4 bytes)            |        |   |   |         |
   +------------------------------------------------------------+  [64-bit words]
-  |            serial#              |   N boxed header words   |
+  |            serial#              |   N boxed header bytes   |
   |            (4 bytes)            |        (4 bytes)         |
   +------------------------------------------------------------+
+
   the two zero bytes are reserved for future use
   max total payload size in words = uint_max
+    (should probably made the same as for 32-bit word size for consistency)
 
 For both:
-  code-size = (total words - boxed words) * n-word-bytes
-  text-size = code-size - n padding bytes
+  code-size = total words * n-word-bytes - boxed bytes
+  text-size = code-size - simple-fun table size - padding bytes
   bit 31 of word 0 = fullcgc mark bit
   bit 30           = touched since last GC bit
+  The boxed byte count is stored "raw" (i.e. it's not a tagged value,
+  but it has fixnum nature)
 
-This will be important to make heap scans more bulletproof
-in the presence of code object allocation, since most architectures
-can not atomically store and load 16 bytes at once.
-This is more problematic in immobile space than dynamic space,
-but is in fact a problem for either, in theory. Consider:
+Since most architectures can not atomically store and load 2 words at once,
+it is essential that code size be computable by loading a single word
+to make backtrace reliable (i.e. in the heap search step).
 
- Thread 1:                     |   Thread 2
- --------                      |   --------
- Store header word @ A = N     |
-                               |   Load word 0 @ A
-                               |   Load word @ A + 1 = 0
-                               |     compute total size = N words
- Store header word @ A + 1     |
- Store unboxed bytes @ A + N   |
-  ...                          |
-                               |   Load unboxed word @ A + N -> crash
-
+Note that vector objects require reading their length from a non-header word,
+but this not subject to a data race because only 1 word conveys the size.
+In addition there are no vectors on code pages which are the pages scanned
+during backtrace.
 |#
 
-;;; The header contains the size of slots and constants in words.
+;;; The header contains the total size of the object (including
+;;; the header itself) in words.
 (!define-primitive-object (code :type code-component
                                 :lowtag other-pointer-lowtag
                                 :widetag code-header-widetag)
-  ;; This is the size of instructions in bytes, not aligned.
-  ;; Adding the size from the header and aligned code-size will yield
-  ;; the total size of the code-object.
-  ;; The upper 4 bytes in 8-byte words can be used for ancillary data.
-  (code-size :type index
-             :ref-known (flushable movable)
-             :ref-trans #!+64-bit %%code-code-size ; serialno + size
-                        #!-64-bit %code-code-size)
+  ;; This is the length of the boxed section, in bytes, not tagged.
+  ;; It will be a multiple of the word size.
+  ;; It can be accessed as a tagged value in Lisp by shifting.
+  ;; The upper 4 bytes store code-serial# on 64-bit words.
+  (boxed-size :type fixnum ; see above figure
+              :ref-known (flushable movable)
+              :ref-trans %code-boxed-size)
   (debug-info :type t
               :ref-known (flushable)
               :ref-trans %code-debug-info
@@ -543,6 +537,31 @@ but is in fact a problem for either, in theory. Consider:
 ;;; This constant is the index prior to scaling.
 (defconstant sb-thread::tls-index-start primitive-thread-object-length)
 
-(defmacro make-code-header-word (boxed-nwords)
-  `(logior (ash ,boxed-nwords #!+64-bit 32 #!-64-bit n-widetag-bits)
-           code-header-widetag))
+(defconstant code-header-size-shift #!+64-bit 32 #!-64-bit n-widetag-bits)
+(declaim (inline code-object-size code-header-words %code-code-size))
+#-sb-xc-host
+(progn
+  (defun code-object-size (code)
+    (declare (code-component code))
+    #!-64-bit (ash (logand (get-header-data code) #x3FFFFF) word-shift)
+    #!+64-bit (ash (ash (get-header-data code) -24) word-shift))
+
+  (defun code-header-words (code)
+    (declare (code-component code))
+    ;; The values stored is an untagged byte count.  If N-FIXNUM-TAG-BITS is the same
+    ;; as WORD-SHIFT, then it can be conveniently read as word count with no shifting.
+    ;; Putting an upper bound on the word count improves the generated code, no matter
+    ;; that it's an excessive bound. 22 bits expresses the maximum object size
+    ;; for 32-bit words. The boxed count can't in practice be that large.
+    (ldb (byte 22 0) (ash (%code-boxed-size code) (- n-fixnum-tag-bits word-shift))))
+
+  (defun %code-code-size (code)
+    (declare (code-component code))
+    (- (code-object-size code) (ash (code-header-words code) word-shift)))
+
+  (defun %code-serialno (code)
+    (declare (code-component code) (ignorable code))
+    #!+64-bit ; extract high 4 bytes of boxed-size slot
+    (ash (%code-boxed-size code) (- n-fixnum-tag-bits 32)))
+
+) ; end PROGN

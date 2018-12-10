@@ -194,10 +194,6 @@
             (round-to-dualword (+ (* vector-data-offset n-word-bytes)
                                   n-data-octets)))))
 
-(defun code-component-size (x) ; in bytes
-  (declare (code-component x))
-  (round-to-dualword (+ (* (code-header-words x) n-word-bytes) (%code-code-size x))))
-
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (if (is-lisp-pointer (get-lisp-obj-address object))
@@ -230,7 +226,7 @@
                                (nth-value 2 (reconstitute-vector
                                              object room-info))))))
                      (code-component
-                      (return-from primitive-object-size (code-component-size object)))
+                      (return-from primitive-object-size (code-object-size object)))
                      (t
                       ;; Other things (symbol, fdefn, value-cell, etc)
                       ;; don't have a sizer, so use GET-HEADER-DATA
@@ -290,7 +286,7 @@
            (let ((c (tagged-object other-pointer-lowtag)))
              (values c
                      code-header-widetag
-                     (code-component-size c))))
+                     (code-object-size c))))
 
           (:other
            (values (tagged-object other-pointer-lowtag)

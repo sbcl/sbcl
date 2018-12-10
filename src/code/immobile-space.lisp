@@ -136,7 +136,7 @@
           ;; Compute code bounds
           (let* ((code-begin (- (get-lisp-obj-address code)
                                 sb-vm:other-pointer-lowtag))
-                 (code-end (+ code-begin (sb-vm::code-component-size code))))
+                 (code-end (+ code-begin (sb-vm::code-object-size code))))
             ;; Loop over function's assembly code
             (dx-flet ((process-inst (chunk inst)
                (when (or (eq inst jmp) (eq inst call))

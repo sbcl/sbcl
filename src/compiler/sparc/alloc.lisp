@@ -72,36 +72,6 @@
 
 ;;;; Special purpose inline allocators.
 
-(define-vop (allocate-code-object)
-  ;; BOXED is a count of words as a fixnum; it is therefore also a byte count
-  ;; as a raw value because n-fixnum-tag-bits = word-shift.
-  (:args (boxed :scs (any-reg) :to :save)
-         (unboxed-arg :scs (any-reg) :to :save))
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:scs (non-descriptor-reg)) size)
-  (:temporary (:scs (non-descriptor-reg)) unboxed)
-  (:generator 100
-    (inst srl unboxed unboxed-arg word-shift)
-    (inst add unboxed lowtag-mask)
-    (inst and unboxed (lognot lowtag-mask))
-    (pseudo-atomic ()
-      ;;
-      ;; This looks like another dreadful type pun. CSR - 2002-02-06
-      ;;
-      ;; Not any more, or not in that sense at least, because the
-      ;; "p/a bit is also the highest lowtag bit" assumption is now hidden
-      ;; in the allocation macro.  DFL - 2012-10-01
-      ;;
-      ;; Figure out how much space we really need and allocate it.
-      (inst add size boxed unboxed)
-      (allocation result size other-pointer-lowtag :temp-tn ndescr)
-      (inst sll ndescr boxed (- n-widetag-bits word-shift))
-      (inst or ndescr code-header-widetag)
-      (storew ndescr result 0 other-pointer-lowtag)
-      (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
-      (storew null-tn result code-debug-info-slot other-pointer-lowtag))))
-
 (define-vop (make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -184,8 +154,13 @@
   (:generator 6
     (inst add bytes extra (* (1+ words) n-word-bytes))
     (inst sll header bytes (- n-widetag-bits 2))
-    (inst add header header (+ (ash -2 n-widetag-bits) type))
-    (inst and bytes (lognot lowtag-mask))
+    ;; The specified EXTRA value is the exact value placed in the header
+    ;; as the word count when allocating code.
+    (cond ((= type code-header-widetag)
+           (inst add header header type))
+          (t
+           (inst add header header (+ (ash -2 n-widetag-bits) type))
+           (inst and bytes (lognot lowtag-mask))))
     (pseudo-atomic ()
       (allocation result bytes lowtag :temp-tn temp)
       (storew header result 0 lowtag))))

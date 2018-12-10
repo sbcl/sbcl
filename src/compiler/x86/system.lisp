@@ -139,25 +139,22 @@
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw sap code 0 other-pointer-lowtag)
-    (inst shl sap 2) ; shift out the two GC-reserved bits
-    (inst shr sap (+ 2 n-widetag-bits))
-    (inst lea sap (make-ea :byte :base code :index sap :scale 4
+    ;; load boxed header size in bytes
+    (loadw sap code 1 other-pointer-lowtag)
+    (inst lea sap (make-ea :byte :base code :index sap
                            :disp (- other-pointer-lowtag)))))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg) :to (:result 0))
-         (offset :scs (signed-reg unsigned-reg) :to (:result 0)))
+         (offset :scs (signed-reg unsigned-reg) :to :eval :target func))
   (:arg-types * positive-fixnum)
-  (:results (func :scs (descriptor-reg) :from (:argument 0)))
-  (:generator 10
-    (loadw func code 0 other-pointer-lowtag)
-    (inst shl func 2) ; shift out the two GC-reserved bits
-    (inst shr func (+ 2 n-widetag-bits))
-    (inst lea func
-          (make-ea :byte :base offset :index func :scale 4
-                   :disp (- fun-pointer-lowtag other-pointer-lowtag)))
-    (inst add func code)))
+  (:results (func :scs (descriptor-reg) :from :eval))
+  (:generator 3
+    (move func offset)
+    ;; add boxed header size in bytes
+    (inst add func (make-ea :dword :base code :disp (- 4 other-pointer-lowtag)))
+    (inst lea func (make-ea :byte :base code :index func
+                            :disp (- fun-pointer-lowtag other-pointer-lowtag)))))
 
 ;;; This vop is quite magical - because 'closure-fun' is a raw program counter,
 ;;; as soon as it's loaded into a register, it prevents the underlying fun from

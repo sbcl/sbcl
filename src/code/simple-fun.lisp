@@ -350,11 +350,6 @@
 
 ;;;; CODE-COMPONENT
 
-(declaim (inline code-header-words))
-(defun code-header-words (code)
-  #!+64-bit (ash (get-header-data code) -24)
-  #!-64-bit (ldb (byte 22 0) (get-header-data code)))
-
 (defun %code-entry-points (code-obj) ; DO NOT USE IN NEW CODE
   (%code-entry-point code-obj 0))
 
@@ -372,7 +367,8 @@
 (declaim (inline code-fun-table-trailer-word))
 (defun code-fun-table-trailer-word (code-obj)
   (with-pinned-objects (code-obj)
-    (sap-ref-16 (code-instructions code-obj) (- (%code-code-size code-obj) 2))))
+    (sap-ref-16 (int-sap (get-lisp-obj-address code-obj))
+                (- (code-object-size code-obj) 2 sb-vm:other-pointer-lowtag))))
 
 ;;; Return the number of simple-funs in CODE-OBJ
 ;;; Keep in sync with C function code_n_funs()
@@ -390,8 +386,9 @@
   (declare ((unsigned-byte 16) fun-index))
   ;; subtracting the size of trailing uint16_t puts us one byte beyond
   ;; the last fun-index, so subtract an extra uint32_t as well.
-  (sap-ref-32 (code-instructions code-obj)
-              (- (%code-code-size code-obj) (* 4 fun-index) 8)))
+  (sap-ref-32 (int-sap (get-lisp-obj-address code-obj))
+              (- (code-object-size code-obj) (* 4 fun-index) 8
+                 sb-vm:other-pointer-lowtag)))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
 ;;; machine instructions. It's generally ok to use either accessor if searching

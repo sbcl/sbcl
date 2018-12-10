@@ -177,9 +177,7 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr n-widetag-bits ndescr)
-    (inst sll ndescr word-shift ndescr)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst addq ndescr offset ndescr)
     (inst subq ndescr (- other-pointer-lowtag fun-pointer-lowtag) ndescr)
     (inst addq code ndescr func)))

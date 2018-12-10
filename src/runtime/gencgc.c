@@ -3493,16 +3493,16 @@ collect_garbage(generation_index_t last_gen)
     }
     gc_close_all_regions();
 
+    /* Immobile space generation bits are lazily updated for gen0
+       (not touched on every object allocation) so do it now */
+    update_immobile_nursery_bits();
+
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0)
         verify_heap(VERIFY_PRE_GC);
 
     if (gencgc_verbose > 1)
         print_generation_stats();
-
-    /* Immobile space generation bits are lazily updated for gen0
-       (not touched on every object allocation) so do it now */
-    update_immobile_nursery_bits();
 
     if (gc_mark_only) {
         garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0);

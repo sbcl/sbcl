@@ -28,7 +28,7 @@
                 #:alien-value-sap #:alien-value-type)
   (:import-from "SB-C" #:+backend-page-bytes+)
   (:import-from "SB-VM" #:map-objects-in-range #:reconstitute-object
-                #:%closure-callee #:code-component-size)
+                #:%closure-callee #:code-object-size)
   (:import-from "SB-DISASSEM" #:get-inst-space #:find-inst
                 #:make-dstate #:%make-segment
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
@@ -333,7 +333,7 @@
                           (+ header-bytes (aref fun-map (1- i)))))
             (end-pc (if (< (1+ i) (length fun-map))
                         (+ header-bytes (aref fun-map (1+ i)))
-                        (sb-vm::code-component-size code))))
+                        (code-object-size code))))
         (unless (= end-pc start-pc)
           ;; Collapse adjacent address ranges named the same.
           ;; Use EQUALP instead of EQUAL to compare names
@@ -800,7 +800,7 @@
     ;; the unboxed bytes have an odd size in words making the total even.
     (format output " .byte ~{0x~x~^,~}~%"
             (loop for i from max-end
-                  below (- (code-component-size code)
+                  below (- (code-object-size code)
                            (* (code-header-words code) n-word-bytes))
                   collect (sap-ref-8 text-sap i)))))
 
@@ -918,7 +918,7 @@
                                      start-offs)
                                   nbytes output nil core)))))
       (format output " .quad 0, 0~%") ; trailer with SIMPLE-FUN count of 0
-      (let ((size (code-component-size code-component))) ; No need to pin
+      (let ((size (code-object-size code-component))) ; No need to pin
         (incf code-addr size)
         (setf total-code-size size)))
     (format output "~%# end of lisp asm routines~2%")
@@ -930,15 +930,16 @@
       (ecase (%widetag-of (sap-ref-word (int-sap (translate-ptr code-addr spaces)) 0))
         (#.code-header-widetag
          (let* ((code (make-code-obj code-addr))
-                (objsize (code-component-size code)))
+                (objsize (code-object-size code)))
            (incf total-code-size objsize)
            (cond
              ((< (code-header-words code) 4) ; filler object
-              (let ((nbytes (code-component-size code)))
+              (let ((sap (int-sap (- (get-lisp-obj-address code) other-pointer-lowtag))))
                 (format output " .quad 0x~x, 0x~x~% .fill 0x~x~%# ~x:~%"
-                        code-header-widetag (ash nbytes n-fixnum-tag-bits)
-                        (- nbytes (* 2 n-word-bytes))
-                        (+ code-addr nbytes))))
+                        (sap-ref-word sap 0)
+                        (sap-ref-word sap n-word-bytes)
+                        (- objsize (* 2 n-word-bytes))
+                        (+ code-addr objsize))))
              ((%instancep (%code-debug-info code)) ; assume it's a COMPILED-DEBUG-INFO
               (aver (plusp (code-n-entries code)))
               (let* ((source

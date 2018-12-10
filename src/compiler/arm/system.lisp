@@ -171,10 +171,7 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    ;; CODE-HEADER-WIDETAG is #x38, which has the top two bits clear,
-    ;; so we don't to clear the low bits here.  If we do, use BIC.
-    (inst mov ndescr (lsr ndescr (- n-widetag-bits word-shift)))
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst sub ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
@@ -185,10 +182,8 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    ;; CODE-HEADER-WIDETAG is #x38, which has the top two bits clear,
-    ;; so we don't to clear the low bits here.  If we do, use BIC.
-    (inst add ndescr offset (lsr ndescr (- n-widetag-bits word-shift)))
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
+    (inst add ndescr offset ndescr)
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
 ;;;

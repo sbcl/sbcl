@@ -68,29 +68,6 @@
   (:variant t))
 
 ;;;; Special purpose inline allocators.
-#!-gencgc
-(define-vop (allocate-code-object)
-  ;; BOXED is a count of words as a fixnum; it is therefore also a byte count
-  ;; as a raw value because n-fixnum-tag-bits = word-shift.
-  (:args (boxed :scs (any-reg))
-         (unboxed-arg :scs (any-reg) :to :save))
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:scs (non-descriptor-reg)) size)
-  (:temporary (:scs (non-descriptor-reg)) unboxed)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
-  (:generator 100
-    (inst mov unboxed (lsr unboxed-arg word-shift))
-    (inst add unboxed unboxed lowtag-mask)
-    (inst bic unboxed unboxed lowtag-mask)
-    (inst mov ndescr (lsl boxed (- n-widetag-bits word-shift)))
-    (inst orr ndescr ndescr code-header-widetag)
-    (inst add size boxed unboxed)
-    (pseudo-atomic (pa-flag)
-      (allocation result size other-pointer-lowtag :flag-tn pa-flag)
-      (storew ndescr result 0 other-pointer-lowtag)
-      (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
-      (storew null-tn result code-debug-info-slot other-pointer-lowtag))))
 
 (define-vop (make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
@@ -186,12 +163,17 @@
   (:generator 6
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
-    (inst add bytes extra (* (1- words) n-word-bytes))
+    (if (= type code-header-widetag)
+        (inst add bytes extra 0)
+        (inst add bytes extra (* (1- words) n-word-bytes)))
     (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity
-    (inst add bytes bytes (* 2 n-word-bytes))
+    ;; The specified EXTRA value is the exact value placed in the header
+    ;; as the word count when allocating code.
+    (unless (= type code-header-widetag)
+      (inst add bytes bytes (* 2 n-word-bytes)))
     (inst bic bytes bytes lowtag-mask)
     ;; Allocate the object and set its header
     (pseudo-atomic (pa-flag)

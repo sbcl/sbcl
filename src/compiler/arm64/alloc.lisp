@@ -69,30 +69,6 @@
   (:variant t))
 
 ;;;; Special purpose inline allocators.
-#!-gencgc
-(define-vop (allocate-code-object)
-  (:args (boxed-arg :scs (unsigned-reg))
-         (unboxed-arg :scs (any-reg) :to :save))
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:scs (non-descriptor-reg)) size)
-  (:temporary (:scs (any-reg) :from (:argument 0)) boxed)
-  (:temporary (:scs (non-descriptor-reg)) unboxed)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
-  (:temporary (:scs (interior-reg)) lip)
-  (:generator 100
-    (inst lsl boxed boxed-arg word-shift)
-    (inst lsr unboxed unboxed-arg word-shift)
-    (inst add unboxed unboxed lowtag-mask)
-    (inst and unboxed unboxed (bic-mask lowtag-mask))
-    (inst lsl ndescr boxed (- n-widetag-bits word-shift))
-    (inst orr ndescr ndescr code-header-widetag)
-    (inst add size boxed unboxed)
-    (pseudo-atomic (pa-flag)
-      (allocation result size other-pointer-lowtag :flag-tn pa-flag :lip lip)
-      (storew ndescr result 0 other-pointer-lowtag)
-      (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
-      (storew null-tn result code-debug-info-slot other-pointer-lowtag))))
 
 (define-vop (make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))
@@ -183,6 +159,7 @@
   (:temporary (:sc non-descriptor-reg) pa-flag header)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 6
+    #!+cheneygc (bug "cheneygc not working for arm64")
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
     (inst lsl bytes extra (- word-shift n-fixnum-tag-bits))

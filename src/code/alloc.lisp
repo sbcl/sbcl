@@ -56,7 +56,7 @@
     (sb-thread:make-mutex :name "Immobile space"))
 
 (eval-when (:compile-toplevel)
-  (assert (eql code-code-size-slot 1))
+  (assert (eql code-boxed-size-slot 1))
   (assert (eql code-debug-info-slot 2)))
 
 (define-alien-variable "varyobj_holes" long)
@@ -104,16 +104,12 @@
 
 (declaim (inline hole-size))
 (defun hole-size (hole-address) ; in bytes
-  (the (and fixnum unsigned-byte)
-    (sap-ref-lispobj (int-sap hole-address) (ash code-code-size-slot word-shift))))
+  (ash (sap-ref-32 (int-sap hole-address) 4) word-shift))
 
 (declaim (inline (setf hole-size)))
 (defun (setf hole-size) (new-size hole) ; NEW-SIZE is in bytes
-  ;; FIXME: (SETF SET-REF-LISPOBJ) does not accept a fixnum
-  ;; because 'any-reg' is not an allowed storage class.
-  (setf (sap-ref-word (int-sap hole) (ash code-code-size-slot word-shift))
-        ;; 0 boxed words, so %CODE-CODE-SIZE covers everything.
-        (ash new-size n-fixnum-tag-bits)))
+  (setf (sap-ref-32 (int-sap hole) 4) (ash new-size (- word-shift)))
+  new-size)
 
 (declaim (inline hole-end-address))
 (defun hole-end-address (hole-address)
@@ -423,8 +419,9 @@
 
 (defun alloc-immobile-trampoline ()
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
-                      #.(make-code-header-word 4) ; boxed word count
-                      (ash (* 2 n-word-bytes) n-fixnum-tag-bits))))
+                      ;; total word count
+                      (logior (ash 6 code-header-size-shift) code-header-widetag)
+                      (* 4 n-word-bytes)))) ; boxed size in bytes
 
 ;;; Test whether there is room to allocate NBYTES.
 ;;; This only looks at the space in the frontier, not the free space list.
@@ -463,18 +460,20 @@
   ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
   ;; makes things deterministic per se. If multiple threads are allocating
   ;; code objects, the order is unpredictable.
-  (let ((serialno (atomic-incf sb-fasl::*code-serialno*)))
-    ;; FIXME: remove this use of WITHOUT-GCing and use pseudo-atomic.
+  (let ((total-words (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2))
+        (serialno (atomic-incf sb-fasl::*code-serialno*)))
+    ;; FIXME: it seems possible now to use pseudo-atomic instead of
+    ;; without-gcing, except in the immobile code case.
     (without-gcing
       (block nil
         #!+immobile-code
         (when (member space '(:immobile :auto))
           (let ((code (allocate-immobile-bytes
-                          (align-up (+ (* boxed n-word-bytes) unboxed)
-                                    (* 2 n-word-bytes))
-                          (make-code-header-word boxed)
+                          (ash total-words word-shift)
+                          (logior (ash total-words code-header-size-shift)
+                                  code-header-widetag)
                           (logior (logand (ash serialno 32) most-positive-word)
-                                  (ash unboxed n-fixnum-tag-bits))
+                                  (* boxed n-word-bytes))
                           other-pointer-lowtag
                           (eq space :immobile))))
             (unless (eql code 0)
@@ -485,20 +484,22 @@
          (alien-funcall (extern-alien "alloc_code_object"
                                       (function unsigned (unsigned 32)
                                                 (unsigned 32) (unsigned 32)))
-                        boxed unboxed serialno)))))
-  #!-gencgc
-  (%primitive allocate-code-object boxed unboxed))
-
-#!+64-bit
-(progn
-  (declaim (inline %code-code-size))
-  (defun %code-serialno (code) ; return high 4 bytes
-    (ash (%%code-code-size code) (- n-fixnum-tag-bits 32)))
-  (defun %code-code-size (code) ; clip to max imposed by allocate-code-object
-    (ldb (byte 22 0) (%%code-code-size code))))
-
-;; Placeholder function so that the PRINT-OBJECT method doesn't
-;; have to worry about whether this accessor exists.
-#!-64-bit
-(defun %code-serialno (code)
-  (declare (ignore code)))
+                        total-words boxed serialno)))))
+  #!+cheneygc
+  ;; Something like this could work for gencgc, except there we have a different
+  ;; problem - that of segregating code from data.
+  (let* ((total-words
+          (the index (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
+         (code
+          (%primitive var-alloc total-words 'alloc-code
+                      ;; subtract 1 because var-alloc always adds 1 word
+                      ;; for the header, which is not right for code objects.
+                      -1 code-header-widetag other-pointer-lowtag)))
+    ;; The 1st slot beyond the header stores the boxed header size in bytes
+    ;; as an untagged number, which on 32-bit architectures has the same
+    ;; representation as a tagged value denoting a count in words.
+    ;; 64-bit architectures do not use this code path.
+    #!+64-bit (bug "No can do")
+    (setf (code-header-ref code code-boxed-size-slot) boxed
+          (code-header-ref code code-debug-info-slot) nil)
+    code))

@@ -162,9 +162,8 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srwi ndescr ndescr n-widetag-bits)
-    (inst slwi ndescr ndescr word-shift)
+    ;; FIXME: should be zero-extending 4 byte load
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst subi ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
@@ -175,9 +174,8 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srwi ndescr ndescr n-widetag-bits)
-    (inst slwi ndescr ndescr word-shift)
+    ;; FIXME: should be zero-extending 4 byte load
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst add ndescr ndescr offset)
     (inst addi ndescr ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst add func code ndescr)))

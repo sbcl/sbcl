@@ -78,32 +78,6 @@
 
 
 ;;;; Special purpose inline allocators.
-#!-gencgc
-(define-vop (allocate-code-object)
-  ;; BOXED is a count of words as a fixnum; it is therefore also a byte count
-  ;; as a raw value because n-fixnum-tag-bits = word-shift.
-  (:args (boxed :scs (any-reg) :to :save)
-         (unboxed-arg :scs (any-reg) :to :save))
-  (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) ndescr)
-  (:temporary (:scs (non-descriptor-reg)) size)
-  (:temporary (:scs (non-descriptor-reg)) unboxed)
-  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
-  (:generator 100
-    (inst srwi unboxed unboxed-arg word-shift)
-    (inst addi unboxed unboxed lowtag-mask)
-    (inst clrrwi unboxed unboxed n-lowtag-bits)
-    (pseudo-atomic (pa-flag)
-      ;; Note: we don't have to subtract off the 4 that was added by
-      ;; pseudo-atomic, because oring in other-pointer-lowtag just adds
-      ;; it right back.
-      (inst add size boxed unboxed)
-      (allocation result size other-pointer-lowtag :temp-tn ndescr :flag-tn pa-flag)
-      (inst slwi ndescr boxed (- n-widetag-bits word-shift))
-      (inst ori ndescr ndescr code-header-widetag)
-      (storew ndescr result 0 other-pointer-lowtag)
-      (storew unboxed-arg result code-code-size-slot other-pointer-lowtag)
-      (storew null-tn result code-debug-info-slot other-pointer-lowtag))))
 
 (define-vop (make-fdefn)
   (:args (name :scs (descriptor-reg) :to :eval))

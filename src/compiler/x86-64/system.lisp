@@ -216,20 +216,20 @@
   (:results (sap :scs (sap-reg) :from (:argument 0)))
   (:result-types system-area-pointer)
   (:generator 10
-    (inst mov :dword sap (ea (- 4 other-pointer-lowtag) code))
-    (inst lea sap (ea (- other-pointer-lowtag) code sap n-word-bytes))))
+    ;; load boxed header size in bytes
+    (inst mov :dword sap (ea (- n-word-bytes other-pointer-lowtag) code))
+    (inst lea sap (ea (- other-pointer-lowtag) code sap))))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg) :to (:result 0))
-         (offset :scs (signed-reg unsigned-reg) :to (:result 0)))
+         (offset :scs (signed-reg unsigned-reg) :to :eval :target func))
   (:arg-types * positive-fixnum)
-  (:results (func :scs (descriptor-reg) :from (:argument 0)))
-  (:generator 10
-    (inst mov :dword func (ea (- 4 other-pointer-lowtag) code))
-    (inst lea func
-          (ea (- fun-pointer-lowtag other-pointer-lowtag)
-              offset func n-word-bytes))
-    (inst add func code)))
+  (:results (func :scs (descriptor-reg) :from :eval))
+  (:generator 3
+    (move func offset)
+    ;; add boxed header size in bytes
+    (inst add :dword func (ea (- n-word-bytes other-pointer-lowtag) code))
+    (inst lea func (ea (- fun-pointer-lowtag other-pointer-lowtag) code func))))
 
 ;;; This vop is quite magical - because 'closure-fun' is a raw program counter,
 ;;; as soon as it's loaded into a register, it prevents the underlying fun from

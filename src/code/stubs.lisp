@@ -86,8 +86,6 @@
   (def value-cell-ref)
   (def %caller-frame ())
   (def %caller-pc ())
-  ;; %code-code-size is an inline fun on 64-bit
-  #-64-bit (def %code-code-size)
   (def %code-debug-info)
   #+(or x86 immobile-space) (def sb-vm::%code-fixups)
 

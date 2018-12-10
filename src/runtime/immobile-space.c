@@ -1065,8 +1065,9 @@ static void make_filler(void* where, int nbytes)
         lose("can't place filler @ %p - too small", where);
     else { // Create a filler object.
         struct code* code  = (struct code*)where;
-        code->header       = CODE_HEADER_WIDETAG; // 0 boxed words
-        code->code_size    = make_fixnum(nbytes);
+        code->header       = ((uword_t)nbytes << (CODE_HEADER_SIZE_SHIFT-WORD_SHIFT))
+                             | CODE_HEADER_WIDETAG;
+        code->boxed_size   = 0;
         code->debug_info   = varyobj_holes;
         varyobj_holes      = (lispobj)code;
     }

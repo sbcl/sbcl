@@ -15,50 +15,29 @@
 #include "genesis/code.h"
 #include "gc-internal.h" // for gc_assert()
 
-/// Internal use only (within this header)
-static inline sword_t code_boxed_nwords_(lispobj header)
-{
+static inline int code_total_nwords(struct code* c) {
 #ifdef LISP_FEATURE_64_BIT
-    return header >> 32;
+    return c->header >> 32;
 #else
     /* Mask out bits reserved for GC */
-    return HeaderValue(header & ~((1 << 31) | (1 << 30)));
+    return (c->header >> N_WIDETAG_BITS) & 0x3FFFFF;
 #endif
 }
 
-/// Internal use only (within this header)
-static inline unsigned int
-code_unboxed_nbytes_(lispobj n) // given n = code->code_size
-{
-    // Cast out high 32 bits of code_size if lispobj is 64 bits.
-    return fixnum_value((uint32_t)n);
-}
-
-/// Internal use only (within this header)
-static inline unsigned int
-code_unboxed_nwords_(lispobj n)
-{
-    // Return ceiling |N / N_WORD_BYTES|
-    return (code_unboxed_nbytes_(n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
-}
-
-//// Interfaces
-
 // Return signed int in case something tries to compute the number of boxed
-// words excluding the header word itself using "code_boxed_nwords(header) - 1",a
+// words excluding the header word itself using "code_header_words(header) - 1",
 // which, for a filler needs to come out as negative, not a huge positive.
+static inline sword_t code_header_nbytes(struct code* c)
+{
+  return (c->boxed_size & 0xFFFFFFFF);
+}
 static inline sword_t code_header_words(struct code* c)
 {
-    return code_boxed_nwords_(c->header);
-}
-
-static inline int code_total_nwords(struct code* c) {
-   return ALIGN_UP(code_boxed_nwords_(c->header) + code_unboxed_nwords_(c->code_size),
-                   2);
+  return code_header_nbytes(c) >> WORD_SHIFT;
 }
 
 static inline char* code_text_start(struct code* code) {
-    return (char*)code + N_WORD_BYTES * code_header_words(code);
+    return (char*)code + code_header_nbytes(code);
 }
 
 /* Code component trailer words:
@@ -71,18 +50,19 @@ static inline char* code_text_start(struct code* code) {
  */
 static inline unsigned int*
 code_fun_table(struct code* code) {
-  return (unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code)-4);
+    return (unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 4);
 }
 static inline unsigned short
 code_n_funs(struct code* code) {
     // immobile space filler objects appear to be code but have no simple-funs.
     // Should probably consider changing the widetag to FILLER_WIDETAG.
-    return code_header_words(code) ? 1[(unsigned short*)code_fun_table(code)] >> 4 : 0;
+    return code_header_nbytes(code) ? 1[(unsigned short*)code_fun_table(code)] >> 4 : 0;
 }
 
 /// The length in bytes of the unboxed portion excluding the simple-fun offset table.
 static inline int code_text_size(struct code* c) {
-    return code_unboxed_nbytes_(c->code_size) - (1+code_n_funs(c)) * sizeof (uint32_t);
+    return N_WORD_BYTES * code_total_nwords(c)
+           - code_header_nbytes(c) - (1+code_n_funs(c)) * sizeof (uint32_t);
 }
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions

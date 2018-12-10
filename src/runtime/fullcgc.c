@@ -520,14 +520,14 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                     goto cons;
                 struct code* code  = (struct code*)where;
                 // Keep in sync with the definition of filler_obj_p()
-                lispobj header = CODE_HEADER_WIDETAG;
-                if (code->header != header) {
+                if (!filler_obj_p((lispobj*)code)) {
                     page_index_t page = find_page_index(where);
                     int gen = page >= 0 ? page_table[page].gen
                       : __immobile_obj_gen_bits(where);
                     NOTE_GARBAGE(gen, where, nwords, zeroed, {
-                        code->header = header;
-                        code->code_size = make_fixnum(nwords * N_WORD_BYTES);
+                        code->boxed_size = 0;
+                        code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
+                                     | CODE_HEADER_WIDETAG;
                         memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
                     })
                 }
