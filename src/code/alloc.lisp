@@ -447,11 +447,10 @@
 (defun immobile-space-obj-p (obj)
   (immobile-space-addr-p (get-lisp-obj-address obj)))
 
-;;; Enforce limit on boxed words dependent on how many bits it gets in header.
-;;; Enforce limit on unboxed size. 22 bits = 4MiB, quite generous for code.
-(declaim (ftype (sfunction (t (unsigned-byte #!+64-bit 32 #!-64-bit 22)
-                              (unsigned-byte 22))
-                           code-component)
+;;; Enforce limit on boxed words based on maximum total number of words
+;;; that can be indicated in the header for 32-bit words.
+;;; 22 bits = 4MiB, quite generous for one code object.
+(declaim (ftype (sfunction (t (unsigned-byte 22) unsigned-byte) code-component)
                 allocate-code-object))
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
@@ -460,11 +459,8 @@
 (defun allocate-code-object (space boxed unboxed)
   (declare (ignorable space))
   (let* ((total-words
-          (the index (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
-         ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
-         ;; makes things deterministic per se. If multiple threads are allocating
-         ;; code objects, the order is unpredictable.
-         (serialno (atomic-incf sb-fasl::*code-serialno*))
+          (the (unsigned-byte 22) ; Enforce limit on total words as well
+               (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
          (code
           #!+gencgc
           (or #!+immobile-code
@@ -489,14 +485,21 @@
                       ;; subtract 1 because var-alloc always adds 1 word
                       ;; for the header, which is not right for code objects.
                       -1 code-header-widetag other-pointer-lowtag)))
-    (declare (ignorable serialno))
     ;; The 1st slot beyond the header stores the boxed header size in bytes
     ;; as an untagged number, which has the same representation as a tagged
     ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
     ;; This slot is allowed to be 0 prior to writing any pointer descriptors
     ;; into the object.
+    ;; Use ATOMIC-INCF on the serialno to get automatic wraparound,
+    ;; and not because atomicity makes things deterministic, which it doesn't
+    ;; if there are several threads allocating code.
+    ;; TODO: this unnecessarily calls CODE-HEADER-SET if code cards use soft
+    ;; marking. Maybe pin the object and use (SETF SAP-REF-WORD) instead.
     (setf (code-header-ref code code-boxed-size-slot)
-          (logior (ash boxed (- word-shift n-fixnum-tag-bits))
-                  #!+64-bit (ash serialno (- 32 n-fixnum-tag-bits))))
+          (%make-lisp-obj
+           (logior (ash boxed word-shift)
+                   #!+64-bit
+                   (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
+                           most-positive-word))))
     (setf (%code-debug-info code) nil)
     code))
