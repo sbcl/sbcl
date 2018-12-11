@@ -261,7 +261,7 @@
       (setf (hole-size hole) (- hole-end hole))))
   (add-to-freelist hole))
 
-(defun allocate-immobile-bytes (n-bytes word0 word1 lowtag errorp)
+(defun allocate-immobile-obj (n-bytes word0 word1 lowtag errorp)
   (declare (type (and fixnum unsigned-byte) n-bytes))
   (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
@@ -307,7 +307,7 @@
                           (sb-debug:print-backtrace)
                           (sb-impl::%halt))
                          (t
-                          (return-from allocate-immobile-bytes 0))))
+                          (return-from allocate-immobile-obj nil))))
                  (set-varyobj-space-free-pointer free-ptr)
                  addr))))
      (aver (not (logtest addr lowtag-mask))) ; Assert proper alignment
@@ -357,12 +357,15 @@
      ;; so that we needn't inhibit GC.
      (%make-lisp-obj (logior addr lowtag)))))
 
+;;; I don't know whether immobile space vectors actually work.
+;;; I think the idea was to use them as fd-stream buffers when applicable
+;;; instead of having a finalizer on OS-allocated memory.
 (defun allocate-immobile-vector (widetag length words)
-  (allocate-immobile-bytes (pad-data-block (+ words vector-data-offset))
-                           widetag
-                           (fixnumize length)
-                           other-pointer-lowtag
-                           t))
+  (allocate-immobile-obj (pad-data-block (+ words vector-data-offset))
+                         widetag
+                         (fixnumize length)
+                         other-pointer-lowtag
+                         t))
 
 (defun allocate-immobile-simple-vector (n-elements)
   (allocate-immobile-vector simple-vector-widetag n-elements n-elements))
@@ -456,50 +459,44 @@
 ;;; are made for alignment considerations or the fixed slots.
 (defun allocate-code-object (space boxed unboxed)
   (declare (ignorable space))
-  #!+gencgc
-  ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
-  ;; makes things deterministic per se. If multiple threads are allocating
-  ;; code objects, the order is unpredictable.
-  (let ((total-words (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2))
-        (serialno (atomic-incf sb-fasl::*code-serialno*)))
-    ;; FIXME: it seems possible now to use pseudo-atomic instead of
-    ;; without-gcing, except in the immobile code case.
-    (without-gcing
-      (block nil
-        #!+immobile-code
-        (when (member space '(:immobile :auto))
-          (let ((code (allocate-immobile-bytes
-                          (ash total-words word-shift)
-                          (logior (ash total-words code-header-size-shift)
-                                  code-header-widetag)
-                          (logior (logand (ash serialno 32) most-positive-word)
-                                  (* boxed n-word-bytes))
-                          other-pointer-lowtag
-                          (eq space :immobile))))
-            (unless (eql code 0)
-              (setf (%code-debug-info code) nil)
-              (return code))
-            #+nil (warn "immobile code space is too small")))
-        (%make-lisp-obj
-         (alien-funcall (extern-alien "alloc_code_object"
-                                      (function unsigned (unsigned 32)
-                                                (unsigned 32) (unsigned 32)))
-                        total-words boxed serialno)))))
-  #!+cheneygc
-  ;; Something like this could work for gencgc, except there we have a different
-  ;; problem - that of segregating code from data.
   (let* ((total-words
           (the index (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
+         ;; This uses ATOMIC-INCF to get automatic wraparound, not because atomicity
+         ;; makes things deterministic per se. If multiple threads are allocating
+         ;; code objects, the order is unpredictable.
+         (serialno (atomic-incf sb-fasl::*code-serialno*))
          (code
+          #!+gencgc
+          (or #!+immobile-code
+              (when (member space '(:immobile :auto))
+                ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
+                (allocate-immobile-obj (ash total-words word-shift)
+                                       (logior (ash total-words code-header-size-shift)
+                                               code-header-widetag)
+                                       0
+                                       other-pointer-lowtag
+                                       (eq space :immobile)))
+              ;; This case could use pseudo-atomic instead of without-gcing, but
+              ;; we will need a different lisp trampoline which calls a different
+              ;; C function so that it allocates to a code region.
+              (without-gcing
+               (%make-lisp-obj
+                (alien-funcall (extern-alien "alloc_code_object"
+                                             (function unsigned (unsigned 32)))
+                               total-words))))
+          #!+cheneygc
           (%primitive var-alloc total-words 'alloc-code
                       ;; subtract 1 because var-alloc always adds 1 word
                       ;; for the header, which is not right for code objects.
                       -1 code-header-widetag other-pointer-lowtag)))
+    (declare (ignorable serialno))
     ;; The 1st slot beyond the header stores the boxed header size in bytes
-    ;; as an untagged number, which on 32-bit architectures has the same
-    ;; representation as a tagged value denoting a count in words.
-    ;; 64-bit architectures do not use this code path.
-    #!+64-bit (bug "No can do")
-    (setf (code-header-ref code code-boxed-size-slot) boxed
-          (code-header-ref code code-debug-info-slot) nil)
+    ;; as an untagged number, which has the same representation as a tagged
+    ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
+    ;; This slot is allowed to be 0 prior to writing any pointer descriptors
+    ;; into the object.
+    (setf (code-header-ref code code-boxed-size-slot)
+          (logior (ash boxed (- word-shift n-fixnum-tag-bits))
+                  #!+64-bit (ash serialno (- 32 n-fixnum-tag-bits))))
+    (setf (%code-debug-info code) nil)
     code))

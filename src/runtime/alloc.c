@@ -33,14 +33,8 @@ boolean alloc_profiling;              // enabled flag
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
-lispobj alloc_code_object (unsigned total_words, unsigned boxed_words, unsigned serialno)
+lispobj alloc_code_object (unsigned total_words)
 {
-    // serialno needs to be 0 for 32-bit builds.
-    // It should probably consume an extra slot so that we can use serial#
-    // for the same purpose regardless of word size.
-#ifndef LISP_FEATURE_64_BIT
-    serialno = 0;
-#endif
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
      * pseudo atomic. Here, we rely on gc being inhibited. */
@@ -65,10 +59,6 @@ lispobj alloc_code_object (unsigned total_words, unsigned boxed_words, unsigned 
     clear_pseudo_atomic_atomic(th);
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
-    // boxed_size as stored is an untagged byte count. It can be read in Lisp as a
-    // tagged fixnum due alignment considerations.
-    code->boxed_size = ((uword_t)serialno << 32) | (boxed_words*N_WORD_BYTES);
-    code->debug_info = NIL;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 #endif
