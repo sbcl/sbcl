@@ -382,8 +382,7 @@
 
 (defun alloc-immobile-symbol ()
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag symbol-size
-                      (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag)
-                      nil)))
+                      (logior (ash (1- symbol-size) n-widetag-bits) symbol-widetag))))
 (defun make-immobile-symbol (name)
   (let ((symbol (truly-the symbol (alloc-immobile-symbol))))
     ;; no pin, it's immobile (and obviously live)
@@ -398,33 +397,40 @@
 
 (defun alloc-immobile-fdefn ()
   (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag fdefn-size
-                      (logior (ash (1- fdefn-size) n-widetag-bits) fdefn-widetag)
-                      nil)))
+                      (logior (ash (1- fdefn-size) n-widetag-bits) fdefn-widetag))))
 
 #!+immobile-code
 (progn
 (defun alloc-immobile-gf ()
   (values (%primitive alloc-immobile-fixedobj fun-pointer-lowtag 6 ; kludge
-                      (logior (ash 5 n-widetag-bits) funcallable-instance-widetag)
-                      nil)))
+                      (logior (ash 5 n-widetag-bits) funcallable-instance-widetag))))
 (defun make-immobile-gf (layout slot-vector)
   (let ((gf (truly-the funcallable-instance (alloc-immobile-gf))))
     ;; Set layout prior to writing raw slots
     (setf (%funcallable-instance-layout gf) layout)
-    (setf (sap-ref-word (int-sap (get-lisp-obj-address gf))
-                        (- (ash funcallable-instance-trampoline-slot word-shift)
-                           fun-pointer-lowtag))
-          (truly-the word
-           (+ (get-lisp-obj-address gf) (- fun-pointer-lowtag) (ash 4 word-shift))))
+    ;; just being pedantic - liveness is preserved by the stack reference,
+    ;; and address is fixed, by definition.
+    (with-pinned-objects (gf)
+      (let ((addr (logandc2 (get-lisp-obj-address gf) lowtag-mask)))
+        (setf (sap-ref-word (int-sap addr)
+                            (ash funcallable-instance-trampoline-slot word-shift))
+              (truly-the word (+ addr (ash 4 word-shift))))))
     (%set-funcallable-instance-info gf 0 slot-vector)
     (!set-fin-trampoline gf)
     gf))
 
 (defun alloc-immobile-trampoline ()
-  (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
-                      ;; total word count
-                      (logior (ash 6 code-header-size-shift) code-header-widetag)
-                      (* 4 n-word-bytes)))) ; boxed size in bytes
+  (let ((obj (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
+                         ;; total word count
+                         (logior (ash 6 code-header-size-shift) code-header-widetag))))
+    (with-pinned-objects (obj)
+      (setf (sap-ref-word (int-sap (get-lisp-obj-address obj))
+                          (- (ash code-boxed-size-slot word-shift)
+                             other-pointer-lowtag))
+            ;; The 'fixups' slot permanently contains 0. Therefore we can say that
+            ;; there are only 3 boxed header words instead of the usual 4 words.
+            (* 3 n-word-bytes))) ; boxed size in bytes, untagged
+    obj))
 
 ;;; Test whether there is room to allocate NBYTES.
 ;;; This only looks at the space in the frontier, not the free space list.

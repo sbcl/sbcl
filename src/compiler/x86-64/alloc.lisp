@@ -607,7 +607,7 @@
                                  (t (progn (inst mov temp-reg-tn c-fun)
                                            temp-reg-tn)))))))
 (define-vop (alloc-immobile-fixedobj)
-  (:info lowtag size word0 word1)
+  (:info lowtag size header)
   (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
   (:temporary (:sc unsigned-reg :to :eval :offset rsi-offset) c-arg2)
   (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
@@ -616,17 +616,13 @@
   (:node-var node)
   (:generator 50
    (inst mov c-arg1 size)
-   (inst mov c-arg2 word0)
+   (inst mov c-arg2 header)
    ;; RSP needn't be restored because the allocators all return immediately
    ;; which has that effect
    (inst and rsp-tn -16)
    (pseudo-atomic ()
      (c-call "alloc_fixedobj")
-     (inst lea result (ea lowtag c-result))
-     ;; If code, the next word must be set within the P-A
-     ;; otherwise the GC would compute the wrong object size.
-     (when word1
-       (inst mov :qword (ea (- n-word-bytes lowtag) result) word1)))))
+     (inst lea result (ea lowtag c-result)))))
 (define-vop (alloc-immobile-layout)
   (:args (slots :scs (descriptor-reg) :target c-arg1))
   (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset)

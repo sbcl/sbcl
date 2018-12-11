@@ -161,11 +161,12 @@
 
 #!+immobile-code
 (progn
+(defconstant trampoline-entry-offset n-word-bytes)
 (defun fun-immobilize (fun)
   (let ((code (truly-the (values code-component &optional)
                          (sb-vm::alloc-immobile-trampoline))))
     (setf (%code-debug-info code) fun)
-    (let ((sap (code-instructions code))
+    (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
                  (ash code-debug-info-slot word-shift))))
       ;; For a funcallable-instance, the instruction sequence is:
@@ -214,8 +215,9 @@
     (with-pinned-objects (fdefn trampoline fun)
       (let* ((jmp-target
               (if trampoline
-                  ;; Jump right to code-instructions. There's no simple-fun.
-                  (sap-int (code-instructions trampoline))
+                  ;; Jump right to code-instructions + N. There's no simple-fun.
+                  (sap-int (sap+ (code-instructions trampoline)
+                                 trampoline-entry-offset))
                   ;; CLOSURE-CALLEE accesses the self pointer of a funcallable
                   ;; instance w/ builtin trampoline, or a simple-fun.
                   ;; But the result is shifted by N-FIXNUM-TAG-BITS because

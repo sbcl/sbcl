@@ -1905,7 +1905,7 @@ static boolean executable_object_p(lispobj* obj)
 {
     int widetag = widetag_of(obj);
     return widetag == FDEFN_WIDETAG ||
-        (widetag == CODE_HEADER_WIDETAG && code_header_words((struct code*)obj) == 4
+        (widetag == CODE_HEADER_WIDETAG && code_header_words((struct code*)obj) >= 3
          && lowtag_of(((struct code*)obj)->debug_info) == FUN_POINTER_LOWTAG)
         || widetag == FUNCALLABLE_INSTANCE_WIDETAG;
 }
