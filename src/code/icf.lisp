@@ -64,20 +64,21 @@
                                                             other-pointer-lowtag))
                                         newval)))
                               (weak-pointer-value
-                               `(let ((newval-gen (generation-of newval)))
-                                  ;; Preserve GC invariant that a weak pointer
-                                  ;; can't point to an object younger than itself.
-                                  (cond ((and (fixnump newval-gen)
-                                              (< newval-gen (generation-of object)))
-                                         #+nil
-                                         (warn "Can't update weak pointer ~s" object))
-                                        (t
-                                         (with-pinned-objects (object)
-                                           (setf (sap-ref-lispobj
-                                                  (int-sap (get-lisp-obj-address object))
-                                                  (- (ash weak-pointer-value-slot word-shift)
-                                                     other-pointer-lowtag))
-                                                 newval))))))
+                               ;; Preserve gencgc invariant that a weak pointer
+                               ;; can't point to an object younger than itself.
+                               `(cond #+gencgc
+                                      ((let ((newval-gen (generation-of newval)))
+                                         (and (fixnump newval-gen)
+                                              (< newval-gen (generation-of object))))
+                                       #+nil
+                                       (warn "Can't update weak pointer ~s" object))
+                                      (t
+                                       (with-pinned-objects (object)
+                                         (setf (sap-ref-lispobj
+                                                (int-sap (get-lisp-obj-address object))
+                                                (- (ash weak-pointer-value-slot word-shift)
+                                                   other-pointer-lowtag))
+                                               newval)))))
                               (%primitive
                                (ecase (cadr place)
                                  (fast-symbol-global-value
