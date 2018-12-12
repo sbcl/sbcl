@@ -24,7 +24,7 @@ expect_load_error ()
         ;;; But loading the file should fail.
         (multiple-value-bind (value0 value1) (ignore-errors (load *))
             (assert (null value0))
-            (format t "VALUE1=~S (~A)~%" value1 value1)
+            ;(format t "VALUE1=~S (~A)~%" value1 value1)
             (assert (typep value1 'error)))
         (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
@@ -35,7 +35,7 @@ EOF
     run_sbcl <<EOF
         (multiple-value-bind (value0 value1) (ignore-errors (load "$f"))
             (assert (null value0))
-            (format t "VALUE1=~S (~A)~%" value1 value1)
+            ;(format t "VALUE1=~S (~A)~%" value1 value1)
             (assert (typep value1 'error)))
         (sb-ext:exit :code $EXIT_LISP_WIN)
 EOF
