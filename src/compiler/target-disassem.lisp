@@ -1694,7 +1694,8 @@
                         (sap-int
                          (code-instructions code-component)))))
                 (when (or (< code-offs 0)
-                          ;; Allow looking past instruction bytes if you want
+                          ;; Allow displaying beyond code-text-size
+                          ;; but not beyond code-code-size.
                           (> code-offs (%code-code-size code-component)))
                   (error "address ~X not in the code component ~S"
                          address code-component))
