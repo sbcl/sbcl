@@ -665,7 +665,7 @@
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
 
  #!-(or x86 x86-64)
- ("src/compiler/target/sanctify" :not-host)
+ ("src/compiler/generic/sanctify" :not-host)
 
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
