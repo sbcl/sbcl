@@ -200,7 +200,8 @@
            (move result (tn-ref-tn things)))
           (t
            (macrolet
-               ((store-car (tn list &optional (slot cons-car-slot))
+               ((store-slot (tn list &optional (slot cons-car-slot)
+                                               (lowtag list-pointer-lowtag))
                   `(let ((reg
                           ;; FIXME: single-float gets placed in the boxed header
                           ;; rather than just doing an immediate store.
@@ -210,30 +211,50 @@
                              temp)
                             (t
                              (encode-value-if-immediate ,tn)))))
-                     (storew reg ,list ,slot list-pointer-lowtag))))
+                     (storew reg ,list ,slot ,lowtag))))
              (let* ((cons-cells (if star (1- num) num))
                     (stack-allocate-p (node-stack-allocate-p node))
                     (size (* (pad-data-block cons-size) cons-cells)))
                (unless stack-allocate-p
                  (instrument-alloc size node))
                (pseudo-atomic (:elide-if stack-allocate-p)
-                (allocation res size node stack-allocate-p list-pointer-lowtag)
-                (move ptr res)
-                (dotimes (i (1- cons-cells))
-                  (store-car (tn-ref-tn things) ptr)
-                  (setf things (tn-ref-across things))
-                  (inst add ptr (pad-data-block cons-size))
-                  (storew ptr ptr (- cons-cdr-slot cons-size)
-                          list-pointer-lowtag))
-                (store-car (tn-ref-tn things) ptr)
-                (cond (star
+                (allocation res size node stack-allocate-p
+                            (if (= cons-cells 2) 0 list-pointer-lowtag))
+                (multiple-value-bind (last-base-reg lowtag car cdr)
+                    (cond
+                      ((= cons-cells 2)
+                       ;; Note that this does not use the 'ptr' register at all.
+                       ;; It would require a different vop to free that register up.
+                       (store-slot (tn-ref-tn things) res cons-car-slot 0)
                        (setf things (tn-ref-across things))
-                       (store-car (tn-ref-tn things) ptr cons-cdr-slot))
+                       (inst lea temp (ea (+ (* cons-size n-word-bytes) list-pointer-lowtag) res))
+                       (store-slot temp res cons-cdr-slot 0)
+                       (values res 0 (+ cons-size cons-car-slot) (+ cons-size cons-cdr-slot)))
+                      ;; 1 cons IR1-transforms to CONS which IR2-converts as FIXED-ALLOC.
+                      ((= cons-cells 1) (bug "Why?")) ; shoulda been CONS
                       (t
-                       (storew nil-value ptr cons-cdr-slot
-                               list-pointer-lowtag)))
-                (aver (null (tn-ref-across things)))))
-             (move result res))))))
+                       (move ptr res)
+                       (dotimes (i (1- cons-cells))
+                         (store-slot (tn-ref-tn things) ptr)
+                         (setf things (tn-ref-across things))
+                         (inst add ptr (pad-data-block cons-size))
+                         (storew ptr ptr (- cons-cdr-slot cons-size)
+                                 list-pointer-lowtag))
+                       (values ptr list-pointer-lowtag cons-car-slot cons-cdr-slot)))
+                  (store-slot (tn-ref-tn things) last-base-reg car lowtag)
+                  (cond (star
+                         (setf things (tn-ref-across things))
+                         (store-slot (tn-ref-tn things) last-base-reg cdr lowtag))
+                        (t
+                         (storew* nil-value last-base-reg cdr lowtag
+                                  (not stack-allocate-p))))
+                  (cond ((= cons-cells 2)
+                         (if (location= result res)
+                             (inst or :byte result list-pointer-lowtag)
+                             (inst lea result (ea list-pointer-lowtag res))))
+                        (t
+                         (move result res)))))))
+           (aver (null (tn-ref-across things)))))))
 
 (define-vop (list list-or-list*)
   (:variant nil))
