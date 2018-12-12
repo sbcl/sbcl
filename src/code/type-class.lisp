@@ -717,8 +717,8 @@
   ;; types never have exclusive bounds, i.e. they may have them on
   ;; input, but they're canonicalized to inclusive bounds before we
   ;; store them here.
-  (low nil :type (or number cons null) :read-only t)
-  (high nil :type (or number cons null) :read-only t))
+  (low nil :type (or real (cons real null) null) :read-only t)
+  (high nil :type (or real (cons real null) null) :read-only t))
 
 ;;; A CONS-TYPE is used to represent a CONS type.
 (defstruct (cons-type (:include ctype (class-info (type-class-or-lose 'cons)))
