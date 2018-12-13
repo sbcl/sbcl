@@ -131,7 +131,7 @@
   (flushable))
 
 #!+gencgc
-(defknown generation-of (t) (or (signed-byte 8) null) (flushable movable))
+(defknown generation-of (t) (or (signed-byte 8) null) (flushable))
 
 ;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags.
 ;;; When dealing with known other-pointers (dispatching on array
@@ -364,14 +364,14 @@
 
 (defknown sb-vm::current-thread-offset-sap (fixnum)
   system-area-pointer (flushable))
-(defknown (current-sp current-fp) () system-area-pointer (movable flushable))
-(defknown current-fp-fixnum () fixnum (movable flushable))
+(defknown (current-sp current-fp) () system-area-pointer (flushable))
+(defknown current-fp-fixnum () fixnum (flushable))
 (defknown stack-ref (system-area-pointer index) t (flushable))
 (defknown %set-stack-ref (system-area-pointer index t) t ())
 (defknown lra-code-header (t) t (movable flushable))
 (defknown fun-code-header (t) t (movable flushable))
 (defknown %make-lisp-obj (sb-vm:word) t (movable flushable))
-(defknown get-lisp-obj-address (t) sb-vm:word (movable flushable))
+(defknown get-lisp-obj-address (t) sb-vm:word (flushable))
 
 ;;;; 32-bit logical operations
 
@@ -396,7 +396,7 @@
   (flushable))
 
 (defknown %bignum-length (bignum) bignum-length
-  (foldable flushable movable))
+  (foldable flushable))
 
 (defknown %bignum-set-length (bignum bignum-length) bignum
   ())
