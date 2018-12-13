@@ -59,7 +59,7 @@ static inline unsigned short code_trailer_len(struct code* code) {
     // Do not attempt to read the trailer len from a code page filler object.
     // Fillers are recognizable by boxed_size == 0.
     return code->boxed_size ?
-      *(unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 2) : 0;
+      *(unsigned short*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 2) : 0;
 }
 static inline unsigned short code_n_funs(struct code* code) {
     // Do not attempt to read the fun table size from a code object with no trailer.

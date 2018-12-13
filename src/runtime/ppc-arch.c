@@ -318,7 +318,9 @@ allocation_trap_p(os_context_t * context)
     return 0;
 }
 
+#ifndef boxed_region
 #define boxed_region gc_alloc_region[0]
+#endif
 
 void
 handle_allocation_trap(os_context_t * context)
