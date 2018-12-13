@@ -27,43 +27,55 @@ static inline int code_total_nwords(struct code* c) {
 // Return signed int in case something tries to compute the number of boxed
 // words excluding the header word itself using "code_header_words(header) - 1",
 // which, for a filler needs to come out as negative, not a huge positive.
-static inline sword_t code_header_nbytes(struct code* c)
+static inline sword_t code_boxed_len(struct code* c)
 {
-  return (c->boxed_size & 0xFFFFFFFF);
+    return (c->boxed_size & 0xFFFFFFFF); // byte count
 }
 static inline sword_t code_header_words(struct code* c)
 {
-  return code_header_nbytes(c) >> WORD_SHIFT;
-}
-
-static inline char* code_text_start(struct code* code) {
-    return (char*)code + code_header_nbytes(code);
+    return code_boxed_len(c) >> WORD_SHIFT; // word count
 }
 
 /* Code component trailer words:
  *
- *                               (uint16)   (uint16)
- * ... | offset | offset | .... |    0    | N-entries |
- *            fun_table_pointer ^          total size ^
+ *            fun table pointer v
+ * ... | offset | offset | .... |   N-funs  |  datalen   |
+ *                                 (uint16)    (uint16)
+ *     | -----------       code trailer     -------------|
+ *
+ *     ^ end of instructions              end of object  ^
  *
  * The fun_table pointer is aligned at a 4-byte boundary.
+ * The final uint16 is the length of the code trailer, including the bytes
+ * comprising that length field itself, and the preceding count (n-funs) field.
+ * Thus the minimum trailer size should be 4 for any normal code object.
+ * Immobile trampolines are a special case - they indicate 0 trailer length,
+ * but the final 2 bytes are present since they have to be read.
  */
-static inline unsigned int*
-code_fun_table(struct code* code) {
+static inline unsigned int* code_fun_table(struct code* code) {
     return (unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 4);
 }
-static inline unsigned short
-code_n_funs(struct code* code) {
-    // immobile space filler objects appear to be code but have no simple-funs.
-    // Should probably consider changing the widetag to FILLER_WIDETAG.
-    return code_header_nbytes(code) ? 1[(unsigned short*)code_fun_table(code)] >> 4 : 0;
+static inline unsigned short code_trailer_len(struct code* code) {
+    // Do not attempt to read the trailer len from a code page filler object.
+    // Fillers are recognizable by boxed_size == 0.
+    return code->boxed_size ?
+      *(unsigned int*)((char*)code + N_WORD_BYTES*code_total_nwords(code) - 2) : 0;
+}
+static inline unsigned short code_n_funs(struct code* code) {
+    // Do not attempt to read the fun table size from a code object with no trailer.
+    // If there is a nonzero trailer length, assume it is at least enough to store
+    // the length of the fun table.
+    return !code_trailer_len(code) ? 0 : *(unsigned short*)code_fun_table(code) >> 4;
 }
 
-/// The length in bytes of the unboxed portion excluding the simple-fun offset table.
-static inline int code_text_size(struct code* c) {
-    return N_WORD_BYTES * code_total_nwords(c)
-           - code_header_nbytes(c) - (1+code_n_funs(c)) * sizeof (uint32_t);
+static inline char* code_text_start(struct code* code) {
+    return (char*)code + code_boxed_len(code);
 }
+/// The length in bytes of the unboxed portion excluding the trailer.
+static inline int code_text_size(struct code* c) {
+    return N_WORD_BYTES * code_total_nwords(c) - code_boxed_len(c) - code_trailer_len(c);
+}
+
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions
 // portion of the code object at which the simple-fun object resides.

@@ -337,15 +337,16 @@
         (let ((index (length octets)))
           ;; Total size of the code object must be multiple of 2 lispwords
           (aver (not (logtest (+ skew index) sb-vm:lowtag-mask)))
-          (let ((padding
-                 (- index (* (1+ n-entries) 4) (label-position end-text))))
-            (unless (and (typep n-entries '(unsigned-byte 12))
+          (let* ((trailer-len (* (1+ n-entries) 4))
+                 (padding (- index trailer-len (label-position end-text))))
+            (unless (and (typep trailer-len '(unsigned-byte 16))
+                         (typep n-entries '(unsigned-byte 12))
                          (typep padding '(unsigned-byte 4)))
               (bug "Oversized code component?"))
-            (store-ub16 (- index 2) (logior (ash n-entries 4) padding)))
-          (decf index (* 4 (1+ n-entries)))
-          (dolist (entry (sb-c::ir2-component-entries
-                          (component-info component)))
+            (store-ub16 (- index 2) trailer-len)
+            (store-ub16 (- index 4) (logior (ash n-entries 4) padding))
+            (decf index trailer-len))
+          (dolist (entry (ir2-component-entries info))
             (let ((val (label-position (entry-info-offset entry))))
               (push val fun-table)
               (store-ub32 index val)

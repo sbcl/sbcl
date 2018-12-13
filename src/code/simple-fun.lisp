@@ -357,41 +357,49 @@
 (defun code-obj-is-filler-p (code-obj)
   ;; See also HOLE-P in the allocator (same thing but using SAPs)
   ;; and filler_obj_p() in the C code
-  (eql (code-header-words code-obj) 0))
+  (eql (sb-vm::%code-boxed-size code-obj) 0))
 
-;;; The fun-table-trailer-word is a uint16_t at the end of the unboxed bytes
+;;; The last 'uint16' in the object holds the trailer length (see 'src/runtime/code.h')
+;;; but do not attempt to read it if the object is a filler.
+(declaim (inline code-trailer-len))
+(defun code-trailer-len (code-obj)
+  (if (code-obj-is-filler-p code-obj)
+      0
+      (with-pinned-objects (code-obj)
+        (sap-ref-16 (int-sap (get-lisp-obj-address code-obj))
+                    (- (code-object-size code-obj) 2 sb-vm:other-pointer-lowtag)))))
+
+;;; The fun-table-count is a uint16_t at the end of the unboxed bytes
 ;;; containing two subfields:
 ;;;  12 bits for the number of simple-funs in the code component
 ;;;   4 bits for the number of pad bytes added to align the fun-offset-table
 ;;;     (this is strictly more bits than needed to represent the padding)
-(declaim (inline code-fun-table-trailer-word))
-(defun code-fun-table-trailer-word (code-obj)
-  (with-pinned-objects (code-obj)
-    (sap-ref-16 (int-sap (get-lisp-obj-address code-obj))
-                (- (code-object-size code-obj) 2 sb-vm:other-pointer-lowtag))))
+(declaim (inline code-fun-table-count))
+(defun code-fun-table-count (code-obj)
+  (if (eql (code-trailer-len code-obj) 0)
+      0
+      (with-pinned-objects (code-obj)
+        (sap-ref-16 (int-sap (get-lisp-obj-address code-obj))
+                    (- (code-object-size code-obj) 4 sb-vm:other-pointer-lowtag)))))
 
 ;;; Return the number of simple-funs in CODE-OBJ
 ;;; Keep in sync with C function code_n_funs()
 (defun code-n-entries (code-obj)
   (declare (type code-component code-obj))
-  (if (code-obj-is-filler-p code-obj)
-      0
-      (ash (code-fun-table-trailer-word code-obj) -4)))
+  (ash (code-fun-table-count code-obj) -4))
 
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
 ;;; Caller is responsible for wrapping WITH-PINNED-OBJECTS around this.
 (declaim (inline %code-fun-offset))
 (defun %code-fun-offset (code-obj fun-index)
-  (declare ((unsigned-byte 16) fun-index))
-  ;; subtracting the size of trailing uint16_t puts us one byte beyond
-  ;; the last fun-index, so subtract an extra uint32_t as well.
+  (declare ((unsigned-byte 12) fun-index))
   (sap-ref-32 (int-sap (get-lisp-obj-address code-obj))
               (- (code-object-size code-obj) (* 4 fun-index) 8
                  sb-vm:other-pointer-lowtag)))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
-;;; machine instructions. It's generally ok to use either accessor if searching
+;;; machine instructions. It's generally ok to use TEXT-SIZE or CODE-SIZE if searching
 ;;; for a function that encloses a given program counter, since the PC won't be
 ;;; in the data range. But all the same, it looks nicer in disassemblies to avoid
 ;;; examining bytes that aren't instructions.
@@ -404,10 +412,9 @@
 (declaim (inline %code-text-size))
 (defun %code-text-size (code-obj)
   (- (%code-code-size code-obj)
-     ;; There are N-ENTRIES uint32_t integers, and 2 occurrences of uint16_t
-     (* 4 (1+ (code-n-entries code-obj)))
+     (code-trailer-len code-obj)
      ;; Subtract between 0 and 15 bytes of padding
-     (logand (code-fun-table-trailer-word code-obj) #xf)))
+     (logand (code-fun-table-count code-obj) #xf)))
 
 (defun %code-entry-point (code-obj fun-index)
   (declare (type (unsigned-byte 16) fun-index))
