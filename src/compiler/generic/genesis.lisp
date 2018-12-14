@@ -3396,12 +3396,17 @@ core and return a descriptor to it."
                        (push `(,fdefn-bits ,name) undefs)
                        (push `(,fdefn-bits ,(descriptor-bits fun) ,name) funs))))
                *cold-fdefn-objects*)
-      (format t "~%~|~%II. defined functions (alphabetically):
+      (format t "~%~|~%II.A. defined functions (alphabetically):
 
      FDEFN   FUNCTION  NAME
 ========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
               (sort funs #'string<
                     :key (lambda (x) (fun-name-block-name (caddr x)))))
+      (format t "~%~|~%II.B. defined functions (numerically):
+
+     FDEFN   FUNCTION  NAME
+========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
+              (sort funs #'< :key #'second))
 
       (format t "~%~|
 (a note about initially undefined function references: These functions
