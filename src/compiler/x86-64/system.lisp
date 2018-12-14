@@ -220,6 +220,25 @@
     (inst mov :dword sap (ea (- n-word-bytes other-pointer-lowtag) code))
     (inst lea sap (ea (- other-pointer-lowtag) code sap))))
 
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg immediate) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 10
+    ;; get the object size in words
+    (inst mov :dword res (ea (- 4 other-pointer-lowtag) code))
+    (cond ((sc-is offset immediate)
+           (inst mov :dword res (ea (- (tn-value offset) other-pointer-lowtag)
+                                    code res n-word-bytes)))
+          (t
+           ;; compute sum of object size in bytes + negative offset - lowtag
+           (inst lea :dword res (ea (- other-pointer-lowtag) offset res n-word-bytes))
+           (inst mov :dword res (ea code res))))))
+
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg unsigned-reg) :to :eval :target func))

@@ -167,6 +167,23 @@
     (inst subi ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 10
+    (loadw res code 0 other-pointer-lowtag) ; get object size in words
+    ;; Shift out the widetag, shift left by 2 bits to convert words to bytes,
+    ;; mask off the GC bits.
+    (inst rlwinm res res 26 8 29)
+    (inst add res res offset)
+    (inst subi res res other-pointer-lowtag)
+    (inst lwzx res code res)))
+
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
          (offset :scs (signed-reg unsigned-reg)))

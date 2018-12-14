@@ -359,28 +359,35 @@
   ;; and filler_obj_p() in the C code
   (eql (sb-vm::%code-boxed-size code-obj) 0))
 
+#+(or sparc arm64 alpha hppa)
+(defun code-trailer-ref (code offset)
+  (with-pinned-objects (code)
+    (sap-ref-32 (int-sap (get-lisp-obj-address code))
+                (+ (code-object-size code) offset (- other-pointer-lowtag)))))
+
 ;;; The last 'uint16' in the object holds the trailer length (see 'src/runtime/code.h')
 ;;; but do not attempt to read it if the object is a filler.
 (declaim (inline code-trailer-len))
 (defun code-trailer-len (code-obj)
   (if (code-obj-is-filler-p code-obj)
       0
-      (with-pinned-objects (code-obj)
-        (sap-ref-16 (int-sap (get-lisp-obj-address code-obj))
-                    (- (code-object-size code-obj) 2 sb-vm:other-pointer-lowtag)))))
+      (let ((word (code-trailer-ref code-obj -4)))
+        ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
+        #!+little-endian (ldb (byte 16 16) word)
+        #!+big-endian    (ldb (byte 16  0) word))))
 
-;;; The fun-table-count is a uint16_t at the end of the unboxed bytes
+;;; The fun-table-count is a uint16_t immediately preceding the trailer length
 ;;; containing two subfields:
 ;;;  12 bits for the number of simple-funs in the code component
 ;;;   4 bits for the number of pad bytes added to align the fun-offset-table
-;;;     (this is strictly more bits than needed to represent the padding)
 (declaim (inline code-fun-table-count))
 (defun code-fun-table-count (code-obj)
   (if (eql (code-trailer-len code-obj) 0)
       0
-      (with-pinned-objects (code-obj)
-        (sap-ref-16 (int-sap (get-lisp-obj-address code-obj))
-                    (- (code-object-size code-obj) 4 sb-vm:other-pointer-lowtag)))))
+      (let ((word (code-trailer-ref code-obj -4)))
+        ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
+        #!+little-endian (ldb (byte 16  0) word)
+        #!+big-endian    (ldb (byte 16 16) word))))
 
 ;;; Return the number of simple-funs in CODE-OBJ
 ;;; Keep in sync with C function code_n_funs()
@@ -390,13 +397,10 @@
 
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
-;;; Caller is responsible for wrapping WITH-PINNED-OBJECTS around this.
 (declaim (inline %code-fun-offset))
 (defun %code-fun-offset (code-obj fun-index)
   (declare ((unsigned-byte 12) fun-index))
-  (sap-ref-32 (int-sap (get-lisp-obj-address code-obj))
-              (- (code-object-size code-obj) (* 4 fun-index) 8
-                 sb-vm:other-pointer-lowtag)))
+  (code-trailer-ref code-obj (* -4 (+ fun-index 2))))
 
 ;;; Subtract from %CODE-CODE-SIZE the number of trailing data bytes which aren't
 ;;; machine instructions. It's generally ok to use TEXT-SIZE or CODE-SIZE if searching
@@ -421,8 +425,7 @@
   (when (< fun-index (code-n-entries code-obj))
     (truly-the function
       (values (%primitive sb-c:compute-fun code-obj
-                (with-pinned-objects (code-obj)
-                  (%code-fun-offset code-obj fun-index)))))))
+                          (%code-fun-offset code-obj fun-index))))))
 
 (defun code-entry-points (code-obj) ; FIXME: obsolete
   (let ((a (make-array (code-n-entries code-obj))))
@@ -442,14 +445,13 @@
                (min 0)
                (max (1- n-entries)))
           (declare ((unsigned-byte 16) min max))
-          (with-pinned-objects (code)
-            (loop
+          (loop
              (let* ((index (floor (+ min max) 2))
                     (guess (%code-fun-offset code index)))
                (cond ((< guess offset) (setq min (1+ index)))
                      ((> guess offset) (setq max (1- index)))
                      (t (return index)))
-               (aver (<= min max)))))))))
+               (aver (<= min max))))))))
 
 ;;; Return the starting address of FUN's code as a SAP.
 ;;; FUN must be pinned.
@@ -495,7 +497,6 @@
   (declare (simple-fun simple-fun))
   (let* ((code (fun-code-header simple-fun))
          (max-index (1- (code-n-entries code))))
-    (with-pinned-objects (code)
       (- (cond ((eq simple-fun (%code-entry-point code max-index))
                 (if index
                     (aver (= index max-index))
@@ -507,7 +508,7 @@
                     (setq index (%simple-fun-index simple-fun)))
                 (%code-fun-offset code (1+ index))))
          (%code-fun-offset code index)
-         (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))))
+         (ash sb-vm:simple-fun-code-offset sb-vm:word-shift))))
 
 (defun code-n-unboxed-data-bytes (code-obj)
   ;; If the number of boxed words (from the header) is not the same as

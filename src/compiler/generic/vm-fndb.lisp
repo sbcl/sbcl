@@ -498,6 +498,9 @@
 ;;; set with SETF.
 (defknown code-header-ref (t index) t (flushable))
 (defknown code-header-set (t index t) t ())
+;;; Extract a 4-byte element relative to the end of CODE-OBJ.
+;;; The index should be strictly negative and a multiple of 4.
+(defknown code-trailer-ref (t fixnum) (unsigned-byte 32) (flushable always-translatable))
 
 (defknown fun-subtype (function) (member . #.sb-vm::+function-widetags+)
   (flushable))

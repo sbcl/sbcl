@@ -144,6 +144,36 @@
     (inst lea sap (make-ea :byte :base code :index sap
                            :disp (- other-pointer-lowtag)))))
 
+(eval-when (:compile-toplevel)
+  (aver (not (logtest code-header-widetag #b11000000))))
+
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg immediate) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 10
+    ;; get the object size in words
+    (inst mov res (make-ea :dword :base code :disp (- other-pointer-lowtag)))
+    (inst shl res 2) ; shift out the GC bits
+    ;; Then shift right to clear the widetag, plus 2 more to the right since we just
+    ;; left-shifted to zeroize bits. Then shift left 2 to convert words to bytes.
+    ;; The '>>2' and '<<2' cancel out because we don't need to clear all 8 bits
+    ;; of the widetag, as CODE-HEADER-WIDETAG already has bits 6 and 7 clear.
+    ;; Other places assume the same, though without much commentary.
+    ;; It's brittle magic, save for the AVER above which ensures that it works.
+    (inst shr res n-widetag-bits)
+    (cond ((sc-is offset immediate)
+           (inst mov res (make-ea :dword :disp (- (tn-value offset) other-pointer-lowtag)
+                                  :base code :index res)))
+          (t
+           (inst add res offset)
+           (inst mov res (make-ea :dword :base code :index res
+                                  :disp (- other-pointer-lowtag)))))))
+
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg) :to (:result 0))
          (offset :scs (signed-reg unsigned-reg) :to :eval :target func))
