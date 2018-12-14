@@ -65,6 +65,16 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
+(define-vop (fun-header-data)
+  (:translate fun-header-data)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst srl res n-widetag-bits res)))
+
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
@@ -74,19 +84,6 @@
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
     (inst srl res n-widetag-bits res)))
-
-(define-vop (get-closure-length)
-  (:translate get-closure-length)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (inst srl res n-widetag-bits res)
-    (inst li short-header-max-words temp)
-    (inst and res temp res)))
 
 ;;; FIXME-lav, not sure we need data of type immediate and zero, test without,
 ;;; if so revert to old hppa code

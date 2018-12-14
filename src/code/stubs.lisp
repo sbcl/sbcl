@@ -48,7 +48,6 @@
   (def %byte-blt (src src-start dst dst-start dst-end))
   (def get-header-data)
   (def set-header-data (x val))
-  (def get-closure-length)
   (def widetag-of)
   (def %other-pointer-widetag)
   (def vector-sap)

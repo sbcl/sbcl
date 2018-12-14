@@ -25,7 +25,19 @@
 (define-load-time-global **closure-extra-values**
     (make-hash-table :test 'eq :weakness :key :synchronized t))
 
-(macrolet ((extendedp-bit () #x800000)
+(defconstant closure-extra-data-indicator #x8000)
+(eval-when (:compile-toplevel)
+  (aver (zerop (logand sb-vm:short-header-max-words
+                       closure-extra-data-indicator))))
+
+(declaim (inline get-closure-length))
+(defun get-closure-length (f)
+  (logand (fun-header-data f) sb-vm:short-header-max-words))
+
+(macrolet ((extendedp-bit ()
+             ;; The closure header is updated using sap-ref-n.
+             ;; Why not use SET-HEADER-DATA???
+             (ash closure-extra-data-indicator sb-vm:n-widetag-bits))
            (%closure-index-set (closure index val)
              ;; Use the identical convention as %CLOSURE-INDEX-REF for the index.
              ;; There are no closure slot setters, and in fact SLOT-SET
@@ -50,9 +62,7 @@
   (defun set-closure-extra-values (closure permit-copy data)
     (declare (closure closure))
     (let ((payload-len (get-closure-length (truly-the function closure)))
-          (extendedp (logtest (with-pinned-objects (closure)
-                                (closure-header-word closure))
-                              (extendedp-bit))))
+          (extendedp (logtest (fun-header-data closure) closure-extra-data-indicator)))
       (when (and (not extendedp) permit-copy (oddp payload-len))
         ;; PAYLOAD-LEN includes the trampoline, so the number of slots we would
         ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
@@ -106,8 +116,9 @@
                   (%closure-index-set closure (1- payload-len) data)
                   t))
         (setf (gethash closure **closure-extra-values**) data)))
-    closure)
-  (defun pack-closure-extra-values (name docstring)
+    closure))
+
+(defun pack-closure-extra-values (name docstring)
     ;; Return one of:
     ;;   (a) Just a name => NAME
     ;;   (b) Just a docstring => DOCSTRING
@@ -117,25 +128,24 @@
     ;; if exactly one part is present, the generalized accessor for the other
     ;; part should report whatever the underlying simple-fun does.
     ;; i.e. setting docstring does not cause (%FUN-NAME CLOSURE) to be NIL.
-    (cond ((or (and (not (unbound-marker-p name))
-                    (not (unbound-marker-p docstring)))
-               (typep name '(or string null (cons t (or string null)))))
-           (cons name docstring))
-          ((unbound-marker-p docstring) name)
-          (t docstring)))
-  (defun closure-extra-values (closure &aux (unbound (make-unbound-marker)))
+  (cond ((or (and (not (unbound-marker-p name))
+                  (not (unbound-marker-p docstring)))
+             (typep name '(or string null (cons t (or string null)))))
+         (cons name docstring))
+        ((unbound-marker-p docstring) name)
+        (t docstring)))
+
+(defun closure-extra-values (closure &aux (unbound (make-unbound-marker)))
     ;; Return name and documentation of closure as two values.
     ;; Either or both can be the unbound marker.
     ;; Following the convention established by SET-CLOSURE-EXTRA-VALUES,
     ;; an even-length payload takes the last slot for the name,
     ;; and an odd-length payload uses the global hashtable.
-    (declare (closure closure))
-    (with-pinned-objects (closure)
-      (if (not (logtest (closure-header-word closure) (extendedp-bit)))
+  (declare (closure closure))
+  (let ((header-data (fun-header-data closure)))
+      (if (not (logtest closure-extra-data-indicator header-data))
           (values unbound unbound)
-          ;; CLOSUREP doesn't imply FUNCTIONP, so GET-CLOSURE-LENGTH
-          ;; issues an additional check. Silly.
-          (let* ((len (get-closure-length (truly-the function closure)))
+          (let* ((len (logand header-data sb-vm:short-header-max-words))
                  (data
                   ;; GET-CLOSURE-LENGTH counts the 'fun' slot in the length,
                   ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
@@ -152,13 +162,14 @@
              ;; NIL represents an explicit docstring of NIL, not the name.
              ((or string null) (values unbound data))
              (t (values data unbound)))))))
-  ;; Return T if and only if CLOSURE has extra values that are physically
-  ;; in the object, not in the external hash-table.
-  (defun closure-has-extra-values-slot-p (closure)
-    (declare (closure closure))
-    (with-pinned-objects (closure)
-      (and (logtest (closure-header-word closure) (extendedp-bit))
-           (evenp (get-closure-length (truly-the function closure)))))))
+
+;; Return T if and only if CLOSURE has extra values that are physically
+;; in the object, not in the external hash-table.
+(defun closure-has-extra-values-slot-p (closure)
+  (declare (closure closure))
+  (let ((header-data (fun-header-data closure)))
+    (and (logtest closure-extra-data-indicator header-data)
+         (evenp (logand header-data sb-vm:short-header-max-words)))))
 
 (defconstant +closure-name-index+ 0)
 (defconstant +closure-doc-index+ 1)
@@ -342,11 +353,10 @@
 (declaim (inline %fun-code-offset))
 (defun %fun-code-offset (simple-fun)
   (declare (type simple-fun simple-fun))
-  (ash (ash (with-pinned-objects (simple-fun)
-              (sap-ref-32 (int-sap (get-lisp-obj-address simple-fun))
-                          (- sb-vm:fun-pointer-lowtag)))
-            (- sb-vm:n-widetag-bits))
-       sb-vm:word-shift))
+  ;; A fun header can't really point backwards this many words, but it's ok-
+  ;; the point is to mask out the layout pointer bits (if compact-instance-header).
+  ;; The largest representable code size (in words) is ~22 bits for 32-bit words.
+  (ash (ldb (byte 24 0) (fun-header-data simple-fun)) sb-vm:word-shift))
 
 ;;;; CODE-COMPONENT
 

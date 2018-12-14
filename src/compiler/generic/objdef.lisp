@@ -256,6 +256,12 @@ during backtrace.
         :ref-known (flushable)
         :set-trans (setf %simple-fun-info)
         :set-known ())
+  ;; FIXME: This is a poor name for this slot, because SIMPLE-FUN-CODE
+  ;; ought to mean the code object in which this simple-fun is contained.
+  ;; Probably a better name would be INSTS, especially as SIMPLE-FUN-CODE-OFFSET
+  ;; is the constant naming the displacement of this slot from the beginning of
+  ;; the fun, but it ought to mean how far this fun is from the code header.
+  ;; This will be quite disastrous to clean up and not make mistakes about it.
   (code :rest-p t :c-type "unsigned char"))
 
 #!-(or x86 x86-64)

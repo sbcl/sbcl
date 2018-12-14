@@ -105,6 +105,16 @@
   (:result-types positive-fixnum)
   (:generator 1 (load-type result function fun-pointer-lowtag))))
 
+(define-vop (fun-header-data)
+  (:translate fun-header-data)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst shr res n-widetag-bits)))
+
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
@@ -114,17 +124,6 @@
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
     (inst shr res n-widetag-bits)))
-
-(define-vop (get-closure-length)
-  (:translate get-closure-length)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (inst movzx '(:word :dword) res (ea (1+ (- fun-pointer-lowtag)) x))
-    (inst btr :dword res 15) ; Clear the NAMEDP header bit
-    (inst shl :dword res n-fixnum-tag-bits)))
 
 ;;; This operation is racy with GC and therefore slightly dangerous, especially
 ;;; on objects in immobile space which reserve byte 3 of the header for GC.
