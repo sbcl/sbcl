@@ -497,7 +497,7 @@
 ;;; Extract a 4-byte element relative to the end of CODE-OBJ.
 ;;; The index should be strictly negative and a multiple of 4.
 (defknown code-trailer-ref (t fixnum) (unsigned-byte 32)
-  (flushable #!-(or sparc alpha hppa) always-translatable))
+  (flushable #!-(or sparc alpha hppa ppc64) always-translatable))
 
 (defknown fun-subtype (function) (member . #.sb-vm::+function-widetags+)
   (flushable))
