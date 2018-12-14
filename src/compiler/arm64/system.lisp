@@ -164,6 +164,20 @@
     (inst add sap code ndescr)
     (inst sub sap sap other-pointer-lowtag)))
 
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 10
+    (inst ldr (32-bit-reg res) (@ code (- 4 other-pointer-lowtag)))
+    (inst add res offset (lsl res word-shift))
+    (inst sub res res other-pointer-lowtag)
+    (inst ldr (32-bit-reg res) (@ code res))))
+
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
          (offset :scs (signed-reg unsigned-reg)))
