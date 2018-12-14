@@ -363,7 +363,7 @@
 (defun code-trailer-ref (code offset)
   (with-pinned-objects (code)
     (sap-ref-32 (int-sap (get-lisp-obj-address code))
-                (+ (code-object-size code) offset (- other-pointer-lowtag)))))
+                (+ (code-object-size code) offset (- sb-vm:other-pointer-lowtag)))))
 
 ;;; The last 'uint16' in the object holds the trailer length (see 'src/runtime/code.h')
 ;;; but do not attempt to read it if the object is a filler.
