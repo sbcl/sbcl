@@ -245,7 +245,7 @@
 
 (define-vop (%instance-ref-eq)
   (:args (instance :scs (descriptor-reg))
-         (x :scs (descriptor-reg immediate)))
+         (x :scs (descriptor-reg any-reg immediate)))
   (:arg-types * (:constant (unsigned-byte 16)) *)
   (:info slot)
   (:translate %instance-ref-eq)
