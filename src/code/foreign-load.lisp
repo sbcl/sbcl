@@ -186,6 +186,9 @@ is never in the linkage-table."
               (error 'undefined-alien-error :name symbol))
              #!+linkage-table
              ((not addr)
+              ;; If we can report the actual name when an undefined
+              ;; alien is called don't warn.
+              #!-(arm arm64 x86-64)
               (style-warn 'sb-kernel:undefined-alien-style-warning
                           :symbol symbol)
               (setf (gethash symbol undefineds) t)
@@ -205,7 +208,7 @@ is never in the linkage-table."
     (plusp (hash-table-count symbols)))
   (defun list-dynamic-foreign-symbols ()
     (loop for symbol being each hash-key in symbols
-         collect symbol))
+          collect symbol))
   (defun list-undefined-foreign-symbols ()
     (loop for symbol being each hash-key in undefineds
           collect symbol)))
