@@ -2664,3 +2664,14 @@
           `(lambda ()
              (defmethod foo ((bar keyword))))
         (() (condition 'sb-pcl:class-not-found-error))))))
+
+(defclass removing-a-class () ())
+
+(defvar *removing-a-class* (sb-ext:make-weak-pointer (find-class 'removing-a-class)))
+(setf (find-class 'removing-a-class) nil)
+(sb-mop:remove-direct-subclass (find-class 'standard-object)
+                               (sb-ext:weak-pointer-value *removing-a-class*))
+
+(with-test (:name :removing-a-class)
+  (sb-ext:gc :full t)
+  (assert (not (sb-ext:weak-pointer-value *removing-a-class*))))

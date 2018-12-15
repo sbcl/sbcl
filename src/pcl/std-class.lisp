@@ -173,11 +173,20 @@
 ;;; here, the values are read by an automatically generated reader method.
 (defmethod add-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
-    (pushnew subclass direct-subclasses :test #'eq)
+    (with-world-lock ()
+      (pushnew subclass direct-subclasses :test #'eq))
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
-    (setq direct-subclasses (remove subclass direct-subclasses))
+    (with-world-lock ()
+      (setq direct-subclasses (remove subclass direct-subclasses))
+      ;; Remove from classoid subclasses as well.
+      (let ((classoid (class-classoid subclass)))
+        (dovector (super-layout (layout-inherits (classoid-layout classoid)))
+          (let* ((super (layout-classoid super-layout))
+                 (subclasses (classoid-subclasses super)))
+            (when subclasses
+              (remhash classoid subclasses))))))
     subclass))
 
 ;;; Maintaining the direct-methods and direct-generic-functions backpointers.
