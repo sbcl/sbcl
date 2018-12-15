@@ -979,7 +979,9 @@
         (:info
          (setf (vop-parse-info-args parse) (rest spec)))
         (:ignore
-         (setf (vop-parse-ignores parse) (rest spec)))
+         (setf (vop-parse-ignores parse)
+               (append (vop-parse-ignores parse)
+                       (rest spec))))
         (:variant
          (setf (vop-parse-variant parse) (rest spec)))
         (:variant-vars

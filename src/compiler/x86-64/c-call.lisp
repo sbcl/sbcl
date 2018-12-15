@@ -249,6 +249,21 @@
 #!+sb-safepoint
 (defconstant thread-saved-csp-offset -1)
 
+(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+  (defun destroyed-c-registers ()
+    (let ((gprs (list rcx-offset rdx-offset
+                      #!-win32 rsi-offset #!-win32 rdi-offset
+                      r8-offset r9-offset r10-offset r11-offset))
+          (vars))
+      (append
+       (loop for gpr in gprs
+             collect `(:temporary (:sc any-reg :offset ,gpr :from :eval :to :result)
+                                  ,(car (push (gensym) vars))))
+       (loop for float below 15
+             collect `(:temporary (:sc single-reg :offset ,float :from :eval :to :result)
+                                  ,(car (push (gensym) vars))))
+       `((:ignore ,@vars))))))
+
 (define-vop (call-out)
   (:args (function :scs (sap-reg)
                    :target rbx)
@@ -262,12 +277,12 @@
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
   (:ignore results)
   (:vop-var vop)
-  (:save-p t)
   (:generator 0
     (move rbx function)
     (emit-c-call vop rax rbx args
                  sb-alien::*alien-fun-type-varargs-default*
-                 #!+sb-safepoint pc-save)))
+                 #!+sb-safepoint pc-save))
+  . #.(destroyed-c-registers))
 
 ;;; Calls to C can generally be made without loading a register
 ;;; with the function. We receive the function name as an info argument.
@@ -281,9 +296,9 @@
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
   (:ignore results)
   (:vop-var vop)
-  (:save-p t)
   (:generator 0
-    (emit-c-call vop rax c-symbol args varargsp #!+sb-safepoint pc-save)))
+    (emit-c-call vop rax c-symbol args varargsp #!+sb-safepoint pc-save))
+  . #.(destroyed-c-registers))
 
 (defun emit-c-call (vop rax fun args varargsp #!+sb-safepoint pc-save)
   (declare (ignorable varargsp))
