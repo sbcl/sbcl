@@ -188,7 +188,7 @@ is never in the linkage-table."
              ((not addr)
               ;; If we can report the actual name when an undefined
               ;; alien is called don't warn.
-              #!-(arm arm64 x86-64)
+              #!-(or arm arm64 x86-64)
               (style-warn 'sb-kernel:undefined-alien-style-warning
                           :symbol symbol)
               (setf (gethash symbol undefineds) t)
