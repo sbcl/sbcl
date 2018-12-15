@@ -1014,17 +1014,39 @@ care."
 
 ;;; THE with some options for the CAST
 (def-ir1-translator the* (((value-type &key context silent-conflict
+                                       derive-type-only
                                        truly) form)
                           start next result)
-  (let* ((policy (lexenv-policy *lexenv*))
-         (value-type (values-specifier-type value-type))
-         (cast (the-in-policy value-type form (if truly
-                                                  **zero-typecheck-policy**
-                                                  policy)
-                              start next result)))
-    (when cast
-      (setf (cast-context cast) context)
-      (setf (cast-silent-conflict cast) silent-conflict))))
+  (let ((value-type (values-specifier-type value-type)))
+    (cond (derive-type-only
+           ;; For something where we really know the type and need no mismatch checking,
+           ;; e.g. structure accessors
+           (let ((before-uses (and result
+                                   (lvar-uses result))))
+             (ir1-convert start next result form)
+             (when result
+               ;; Would be great for IR1-CONVERT to return the uses it creates
+               (let ((new-uses (lvar-uses result)))
+                 (derive-node-type (cond ((consp new-uses)
+                                          ;; Handle just a single use for now,
+                                          ;; doubt it'll be useful for multiple uses.
+                                          (aver (= (1- (length new-uses))
+                                                   (if (consp before-uses)
+                                                       (length before-uses)
+                                                       1)))
+                                          (car new-uses))
+                                         (t
+                                          new-uses))
+                                   value-type)))))
+          (t
+           (let* ((policy (lexenv-policy *lexenv*))
+                  (cast (the-in-policy value-type form (if truly
+                                                           **zero-typecheck-policy**
+                                                           policy)
+                                       start next result)))
+             (when cast
+               (setf (cast-context cast) context)
+               (setf (cast-silent-conflict cast) silent-conflict)))))))
 
 (def-ir1-translator with-annotations ((annotations form)
                                       start next result)
