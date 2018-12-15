@@ -174,13 +174,16 @@
 ;;; RESULT-TN.
 (defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p
                     &aux (bytes (pad-data-block size)))
-  (unless stack-allocate-p
-    (instrument-alloc bytes node))
-  (pseudo-atomic (:elide-if stack-allocate-p)
-      (allocation result-tn bytes node stack-allocate-p other-pointer-lowtag)
-      (storew* (logior (ash (1- size) n-widetag-bits) widetag)
-               result-tn 0 other-pointer-lowtag
-               (not stack-allocate-p))))
+  (let ((header (logior (ash (1- size) n-widetag-bits) widetag)))
+    (cond (stack-allocate-p
+           (allocation result-tn bytes node t other-pointer-lowtag)
+           (storew header result-tn 0 other-pointer-lowtag))
+          (t
+           (instrument-alloc bytes node)
+           (pseudo-atomic ()
+             (allocation result-tn bytes node nil 0)
+             (storew* header result-tn 0 0 t)
+             (inst or :byte result-tn other-pointer-lowtag))))))
 
 ;;;; CONS, LIST and LIST*
 (define-vop (list-or-list*)
