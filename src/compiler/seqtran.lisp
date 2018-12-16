@@ -667,8 +667,7 @@
                                   (single-float-bits tmp))
                                  #!+64-bit
                                  (:double-float
-                                  (logior (ash (double-float-high-bits tmp) 32)
-                                          (double-float-low-bits tmp)))
+                                  (double-float-bits tmp))
                                  #!+64-bit
                                  (:complex-single-float
                                   (logior (ash (single-float-bits (imagpart tmp)) 32)
@@ -698,8 +697,7 @@
                                           `(single-float-bits item))
                                          #!+64-bit
                                          (:double-float
-                                          `(logior (ash (double-float-high-bits item) 32)
-                                                   (double-float-low-bits item)))
+                                          `(double-float-bits item))
                                          #!+64-bit
                                          (:complex-single-float
                                           `(logior (ash (single-float-bits (imagpart item)) 32)

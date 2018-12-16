@@ -2518,8 +2518,7 @@
         (:double-float
          (aver (typep value 'double-float))
          (cons (if alignedp :oword :qword)
-               (ldb (byte 64 0) (logior (ash (double-float-high-bits value) 32)
-                                        (double-float-low-bits value)))))
+               (ldb (byte 64 0) (double-float-bits-bits value))))
         (:complex-single-float
          (aver (typep value '(complex single-float)))
          (cons (if alignedp :oword :qword)
@@ -2530,12 +2529,8 @@
         (:complex-double-float
          (aver (typep value '(complex double-float)))
          (cons :oword
-               (logior (ash (double-float-high-bits (imagpart value)) 96)
-                       (ash (double-float-low-bits (imagpart value)) 64)
-                       (ash (ldb (byte 32 0)
-                                 (double-float-high-bits (realpart value)))
-                            32)
-                       (double-float-low-bits (realpart value)))))
+               (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
+                       (ldb (byte 64 0) (double-float-bits (realpart value))))))
         (:fixup
          (cons :fixup value))))))
 

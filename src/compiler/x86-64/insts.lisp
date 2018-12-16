@@ -3427,10 +3427,8 @@
       ((:complex-double-float)
        (aver (typep value '(complex double-float)))
        (cons :oword
-             (ldb (byte 128 0)
-                  (logior (ash (double-float-bits (imagpart value)) 64)
-                          (ldb (byte 64 0)
-                               (double-float-bits (realpart value))))))))))
+             (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
+                     (ldb (byte 64 0) (double-float-bits (realpart value)))))))))
 
 (defun inline-constant-value (constant)
   (declare (ignore constant)) ; weird!
