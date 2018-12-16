@@ -687,7 +687,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
-    printf ' :float-eql-vops :integer-eql-vop' >> $ltf
+    printf ' :integer-eql-vop' >> $ltf
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in

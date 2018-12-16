@@ -196,11 +196,6 @@
  ;; from 4% to 8% in typical applications. (Your mileage may vary).
  ; :compact-instance-header
 
- ;; Enabled automatically for platforms which implement VOPs for EQL
- ;; of single and double floats.
- ;;
- ; :float-eql-vops
-
  ;; Peter Van Eynde's increase-bulletproofness code for CMU CL
  ;;
  ;; Some of the code which was #+high-security before the fork has now

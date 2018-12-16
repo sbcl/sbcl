@@ -623,3 +623,32 @@
 
 (defknown (%unary-truncate %unary-round) (real) integer
   (movable foldable flushable))
+
+(macrolet
+    ((def (name kind width signedp)
+       (let ((type (ecase signedp
+                     ((nil) 'unsigned-byte)
+                     ((t) 'signed-byte))))
+         `(progn
+            (defknown ,name (integer (integer 0)) (,type ,width)
+                      (foldable flushable movable))
+            (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
+              (when (and (<= width ,width)
+                         (or (and (constant-lvar-p count)
+                                  (plusp (lvar-value count)))
+                             (csubtypep (lvar-type count)
+                                        (specifier-type '(and unsigned-byte fixnum)))))
+                (cut-to-width integer ,kind width ,signedp)
+                ',name))
+            (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
+                  `(ash ,',width))))))
+  ;; This should really be dependent on SB-VM:N-WORD-BITS, but since we
+  ;; don't have a true Alpha64 port yet, we'll have to stick to
+  ;; SB-VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
+  #.`(progn
+       #!+(or x86 x86-64 arm arm64)
+       (def sb-vm::ash-left-modfx
+           :tagged ,(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) t)
+       (def ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)
+                     "SB-VM")
+           :untagged ,sb-vm:n-machine-word-bits nil)))

@@ -622,14 +622,15 @@
      (values)))
 
 ;;;; transforms for EQL of floating point values
-#!-float-eql-vops
+#!-(vop-named sb-vm::eql/single-float)
 (deftransform eql ((x y) (single-float single-float))
   '(= (single-float-bits x) (single-float-bits y)))
 
-#!-float-eql-vops
+#!-(vop-named sb-vm::eql/double-float)
 (deftransform eql ((x y) (double-float double-float))
-  '(and (= (double-float-low-bits x) (double-float-low-bits y))
-        (= (double-float-high-bits x) (double-float-high-bits y))))
+  #!-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
+                  (= (double-float-high-bits x) (double-float-high-bits y)))
+  #!+64-bit '(= (double-float-bits x) (double-float-bits y)))
 
 
 ;;;; modular functions
@@ -655,35 +656,6 @@
   (define-good-signed-modular-funs
       logand logandc1 logandc2 logeqv logior lognand lognor lognot
       logorc1 logorc2 logxor))
-
-(macrolet
-    ((def (name kind width signedp)
-       (let ((type (ecase signedp
-                     ((nil) 'unsigned-byte)
-                     ((t) 'signed-byte))))
-         `(progn
-            (defknown ,name (integer (integer 0)) (,type ,width)
-                      (foldable flushable movable))
-            (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
-              (when (and (<= width ,width)
-                         (or (and (constant-lvar-p count)
-                                  (plusp (lvar-value count)))
-                             (csubtypep (lvar-type count)
-                                        (specifier-type '(and unsigned-byte fixnum)))))
-                (cut-to-width integer ,kind width ,signedp)
-                ',name))
-            (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
-                  `(ash ,',width))))))
-  ;; This should really be dependent on SB-VM:N-WORD-BITS, but since we
-  ;; don't have a true Alpha64 port yet, we'll have to stick to
-  ;; SB-VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
-  #.`(progn
-       #!+(or x86 x86-64 arm arm64)
-       (def sb-vm::ash-left-modfx
-           :tagged ,(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) t)
-       (def ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)
-                     "SB-VM")
-           :untagged ,sb-vm:n-machine-word-bits nil)))
 
 ;;;; word-wise logical operations
 

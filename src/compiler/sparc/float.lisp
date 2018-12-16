@@ -832,7 +832,7 @@
                   (:variant :long ,yep ,nope)))))
   (frob < :l :ge </single-float </double-float #!+long-float </long-float)
   (frob > :g :le >/single-float >/double-float #!+long-float >/long-float)
-  (frob = :eq :ne eql/single-float eql/double-float #!+long-float eql/long-float))
+  (frob = :eq :ne =/single-float =/double-float #!+long-float =/long-float))
 
 #!+long-float
 (deftransform eql ((x y) (long-float long-float))

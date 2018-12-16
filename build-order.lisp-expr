@@ -478,7 +478,6 @@
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")
- ("src/compiler/generic/vm-tran")
  ("src/compiler/locall")
  ("src/compiler/dfo")
  ("src/compiler/dce")
@@ -538,6 +537,7 @@
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
+ ("src/compiler/generic/vm-tran")
  ("src/compiler/generic/late-type-vops")
  ("src/compiler/target/type-vops")
  ("src/compiler/typetran")

@@ -441,7 +441,7 @@
                   (:variant :double ,yep ,nope)))))
   (frob < :lt :ge </single-float </double-float)
   (frob > :gt :le >/single-float >/double-float)
-  (frob = :eq :ne eql/single-float eql/double-float))
+  (frob = :eq :ne =/single-float =/double-float))
 
 
 ;;;; Conversion:
