@@ -1,6 +1,4 @@
-(in-package :cl-user)
-
-(with-test (:name :constantp-conservatively-nil)
+(with-test (:name (constantp :conservatively nil))
   (assert (not (constantp '(if))))
   (assert (not (constantp '(if . 1))))
   (assert (not (constantp '(if 1))))
@@ -8,14 +6,14 @@
   (assert (not (constantp '(if 1 2 . 3))))
   (assert (not (constantp '(if 1 2 3 4)))))
 
-(with-test (:name (:bogus-block constantp))
+(with-test (:name (constantp :bogus-block))
   (assert
    (nth-value 1
               (checked-compile `(lambda (&optional (x (block 1 10))) x)
                                :allow-failure t)))
   (assert (not (constantp '(block 1 10)))))
 
-(with-test (:name :progv)
+(with-test (:name (constantp progv))
   (assert
    (not (constantp '(progv '(*s*) nil *s*))))
   (assert
@@ -35,7 +33,7 @@
   (assert
    (not (constantp '(progv '(sb-c::**world-lock**) '(10) 10)))))
 
-(with-test (:name :the)
+(with-test (:name (constantp the))
   (assert
    (not (constantp '(the (satisfies eval) 10))))
   (assert
