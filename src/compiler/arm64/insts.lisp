@@ -2518,7 +2518,7 @@
         (:double-float
          (aver (typep value 'double-float))
          (cons (if alignedp :oword :qword)
-               (ldb (byte 64 0) (double-float-bits-bits value))))
+               (ldb (byte 64 0) (double-float-bits value))))
         (:complex-single-float
          (aver (typep value '(complex single-float)))
          (cons (if alignedp :oword :qword)
