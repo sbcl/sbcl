@@ -354,7 +354,6 @@
 
 (defgeneric specializer-type-specifier
     (proto-generic-function proto-method specializer)
-  #+sb-doc
   (:documentation
    "Return a type specifier for SPECIALIZER, a non-parsed specializer
 form or a SPECIALIZER instance.
