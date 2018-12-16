@@ -61,27 +61,6 @@
       class))
 
 ;;; interface
-(defun specializer-from-type (type &aux args)
-  ;; Avoid style-warning about compiler-macro being unavailable.
-  (declare (notinline make-instance))
-  (when (symbolp type)
-    (return-from specializer-from-type (find-class type)))
-  (when (consp type)
-    (setq args (cdr type) type (car type)))
-  (cond ((symbolp type)
-         (or (ecase type
-               (class    (coerce-to-class (car args)))
-               (prototype (make-instance 'class-prototype-specializer
-                                         :class (coerce-to-class (car args))))
-               (class-eq (class-eq-specializer (coerce-to-class (car args))))
-               (eql      (intern-eql-specializer (car args))))))
-        ;; FIXME: do we still need this?
-        ((and (null args) (typep type 'classoid))
-         (or (classoid-pcl-class type)
-             (ensure-non-standard-class (classoid-name type) type)))
-        ((specializerp type) type)))
-
-;;; interface
 (defun type-from-specializer (specl)
   (cond ((eq specl t)
          t)

@@ -3,6 +3,8 @@
 changes relative to sbcl-1.4.14:
   * enhancement: added AVX2 instructions on x86-64, which can be used with
     SB-SIMD-PACK.
+  * enhancement: specializer name parsing is less lenient and signals a
+    specific condition in case of syntax errors. (lp#1808681)
 
 changes in sbcl-1.4.14 relative to sbcl-1.4.13:
   * enhancement: attempting to build on openbsd 6.0 or newer without
@@ -25,8 +27,8 @@ changes in sbcl-1.4.12 relative to sbcl-1.4.11:
     have been removed.
   * minor incompatible change: some changes to the (internal) implementation
     details of the x86 and x86-64 have necessitated changes to some low-level
-    libraries. 
-  * enhancement: attempting to transfer control through GO or RETURN-FROM to 
+    libraries.
+  * enhancement: attempting to transfer control through GO or RETURN-FROM to
     frames which no longer exist are now caught and handled by the debugger.
   * enhancement: identical code (at the machine instruction level) can now be
     shared between functions, if explicitly requested.
@@ -54,7 +56,7 @@ changes in sbcl-1.4.11 relative to sbcl-1.4.10:
     improved.
   * optimization: checking widetags involves fewer conditional jumps on x86
     and x86-64.
-  * bug fix: fix a number of bugs related to constant improper lists as 
+  * bug fix: fix a number of bugs related to constant improper lists as
     sequence arguments (lp#1768563, lp#1768568, lp#1768652)
 
 changes in sbcl-1.4.10 relative to sbcl-1.4.9:

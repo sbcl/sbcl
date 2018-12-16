@@ -2622,7 +2622,8 @@ package is deprecated in favour of SB-MOP."
                "ENSURE-CLASS-FINALIZED"
 
                "ILLEGAL-CLASS-NAME-ERROR"
-               "CLASS-NOT-FOUND-ERROR")
+               "CLASS-NOT-FOUND-ERROR"
+               "SPECIALIZER-NAME-SYNTAX-ERROR")
       ;; FIXME: After a little while, these reexports can probably go
       ;; away, as they're superseded by the use of SB-MOP as the
       ;; publically-accessible package.
