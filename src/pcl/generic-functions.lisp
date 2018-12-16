@@ -284,7 +284,27 @@
 
 (defgeneric map-dependents (metaobject function))
 
-(defgeneric parse-specializer-using-class (generic-function specializer-name))
+(defgeneric parse-specializer-using-class (generic-function specializer-name)
+  (:documentation
+   "Parse SPECIALIZER-NAME into a specializer object suitable for GENERIC-FUNCTION.
+
+If SPECIALIZER-NAME is not well-formed with respect to the specializer
+syntax of GENERIC-FUNCTION, an error of type
+SB-PCL:SPECIALIZER-NAME-SYNTAX-ERROR is signaled.
+
+If GENERIC-FUNCTION is a STANDARD-GENERIC-FUNCTION and
+SPECIALIZER-NAME is a symbol that does not name an existing class, an
+error of type SB-PCL:CLASS-NOT-FOUND-ERROR is signaled.
+
+Other errors may be signaled for generic function classes other than
+STANDARD-GENERIC-FUNCTION.
+
+If GENERIC-FUNCTION is a STANDARD-GENERIC-FUNCTION and
+SPECIALIZER-NAME is of the form (eql OBJECT), OBJECT is not
+evaluated (in contrast to DEFMETHOD's behavior).
+
+NOTE: This generic function is part of an SBCL-specific experimental
+protocol. Interface subject to change."))
 
 (defgeneric remove-boundp-method (class generic-function))
 
