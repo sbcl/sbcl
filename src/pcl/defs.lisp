@@ -72,7 +72,7 @@
          (or (ecase type
                (class    (coerce-to-class (car args)))
                (prototype (make-instance 'class-prototype-specializer
-                                         :object (coerce-to-class (car args))))
+                                         :class (coerce-to-class (car args))))
                (class-eq (class-eq-specializer (coerce-to-class (car args))))
                (eql      (intern-eql-specializer (car args))))))
         ;; FIXME: do we still need this?
