@@ -11,11 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(defun type= (left right)
-  (and (subtypep left right) (subtypep right left)))
-
 ;;; Custom specializer 1
 ;;;
 ;;; Always signals an error when parsing the specializer specifier.
@@ -68,14 +63,12 @@
                       (sb-pcl:specializer-type-specifier
                        proto-gf proto-method specializer)))
                (case expected
-                 (error
-                  (assert-error (compute-it)))
                  (warning
                   (assert (null (assert-signal (compute-it) warning))))
                  (style-warning
                   (assert (null (assert-signal (compute-it) style-warning))))
                  (t
-                  (assert (type= (compute-it) expected)))))))
+                  (assert (type-evidently-= (compute-it) expected)))))))
       ;; Non-parsed class specializers
       (test 'package                            'package)
       (test 'integer                            'integer)
@@ -91,7 +84,7 @@
       (test 'custom-3                           'custom-3)
 
       ;; Parsed EQL and CLASS-EQ specializers
-      (test (parse '(eql 5))                    '(eql 5) )
+      (test (parse '(eql 5))                    '(eql 5))
       (test (parse '(sb-pcl::class-eq integer)) 'integer)
       (test (parse '(sb-pcl::class-eq class))   nil)
 
