@@ -236,8 +236,6 @@
 
  ("src/code/thread" :not-host) ; provides *CURRENT-THREAD* for target-signal
  ("src/code/target-signal-common" :not-host)
- #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
- #!+win32 ("src/code/target-exception" :not-host)
 
  ("src/code/bignum"     :not-host)
  ("src/code/numbers"    :not-host)
@@ -353,6 +351,8 @@
  ("src/code/source-location")
  ("src/code/early-class")
  ("src/code/condition" :not-host)
+ #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
+ #!+win32 ("src/code/target-exception" :not-host)
  ("src/code/toplevel"  :not-host)
  ("src/code/parse-defmacro-errors")
  ("src/code/format-directive")
