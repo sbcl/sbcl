@@ -125,7 +125,9 @@
                            (fixnumize value)
                            value))
                      index)))
-      (cond ((typep bound '(integer * -1))
+      (cond ((eql bound -1)
+             (inst cbnz index error))
+            ((typep bound '(integer * -1))
              ;; Power of two bound, can be checked for fixnumness at
              ;; the same time as it always occupies a consecutive bit
              ;; range, everything else, including the tag, has to be

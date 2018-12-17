@@ -120,7 +120,9 @@
              ;; the same time as it always occupies a consecutive bit
              ;; range, everything else, including the tag, has to be
              ;; zero.
-             (inst test index bound)
+             (inst test index (if (eql bound -1)
+                                  index ;; zero?
+                                  bound))
              (inst jmp :ne error))
             (t
              (when (and %test-fixnum (not (integerp index)))
