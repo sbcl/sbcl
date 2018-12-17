@@ -339,9 +339,10 @@ place with bits from the low-order end of the new value."
 (locally (declare (notinline info)) ; can't inline
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (%defsetf 'truly-the (info :setf :expander 'the))
+  (%defsetf 'the* (info :setf :expander 'the))
 
   (%defsetf 'mask-field (info :setf :expander 'ldb)
-  "The first argument is a byte specifier. The second is any place form
+            "The first argument is a byte specifier. The second is any place form
 acceptable to SETF. Replaces the specified byte of the number in this place
 with bits from the corresponding position in the new value.")
 
