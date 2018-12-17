@@ -559,3 +559,11 @@
       '(lambda (type)
         (make-array 1 :element-type type))
     (('(or (eql -16) unsigned-byte)) #(0) :test #'equalp)))
+
+(with-test (:name :check-bound-signed-bound-notes)
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (x y)
+         (declare (fixnum y))
+         (svref x (+ y 2)))
+    ((#(1 2 3) 0) 3)))

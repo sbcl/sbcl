@@ -123,7 +123,7 @@
       (let ((dest (when lvar (lvar-dest lvar))))
         (cond ((and (cast-p dest)
                     (not (cast-type-check dest))
-                    (immediately-used-p lvar node))
+                    (almost-immediately-used-p lvar node))
                (let ((dtype (node-derived-type node))
                      (atype (node-derived-type dest)))
                  (when (values-types-equal-or-intersect
