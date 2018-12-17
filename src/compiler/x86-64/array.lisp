@@ -129,23 +129,39 @@
   (:variant t)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:generator 5
+  (:generator 6
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index))
           (bound (if (sc-is bound immediate)
-                     (fixnumize (tn-value bound))
+                     (let ((value (tn-value bound)))
+                       (cond ((and %test-fixnum
+                                   (power-of-two-limit-p (1- value)))
+                              (lognot (fixnumize (1- value))))
+                             ((sc-is index any-reg descriptor-reg)
+                              (fixnumize value))
+                             (t
+                              value)))
                      bound))
-          (index (if (sc-is index immediate)
+          (index (if (and (sc-is index immediate)
+                          (sc-is bound any-reg descriptor-reg))
                      (fixnumize (tn-value index))
                      index)))
-      (when (and %test-fixnum (not (integerp index)))
-        (%test-fixnum index nil error t))
-      (cond ((integerp bound)
-             (inst cmp index bound)
-             (inst jmp :nb error))
+      (cond ((typep bound '(integer * -1))
+             ;; Power of two bound, can be checked for fixnumness at
+             ;; the same time as it always occupies a consequetive bit
+             ;; range, everything else, including the tag, has to be
+             ;; zero.
+             (inst test index bound)
+             (inst jmp :ne error))
             (t
-             (inst cmp bound index)
-             (inst jmp :be error))))))
+             (when (and %test-fixnum (not (integerp index)))
+               (%test-fixnum index nil error t))
+             (cond ((integerp bound)
+                    (inst cmp index bound)
+                    (inst jmp :nb error))
+                   (t
+                    (inst cmp bound index)
+                    (inst jmp :be error))))))))
 (define-vop (check-bound/fast check-bound)
   (:policy :fast)
   (:variant nil)
@@ -158,6 +174,15 @@
   (:arg-types * * tagged-num)
   (:variant nil)
   (:variant-cost 4))
+
+(define-vop (check-bound/untagged check-bound)
+  (:args (array)
+         (bound :scs (unsigned-reg signed-reg))
+         (index :scs (unsigned-reg signed-reg)))
+  (:arg-types * (:or unsigned-num signed-num)
+                (:or unsigned-num signed-num))
+  (:variant nil)
+  (:variant-cost 5))
 
 ;;;; accessors/setters
 

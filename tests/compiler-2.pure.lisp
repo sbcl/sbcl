@@ -1929,3 +1929,14 @@
    (((1+ most-negative-fixnum)) nil)
    (((1- (expt 2 (1- sb-vm:n-word-bits)))) nil)
    ((-1) nil)))
+
+(with-test (:name :check-bound-zero-safety-notes)
+  (checked-compile-and-assert
+      (:allow-notes nil
+       :optimize '(:speed 3 :safety 0))
+      `(lambda (a x y z)
+         (declare (fixnum x y z)
+                  ((simple-array t (*)) a)
+                  (optimize (speed 3) (safety 0)))
+         (aref a (+ x (- y z))))
+    ((#(1 2 3) 1 0 0) 2)))
