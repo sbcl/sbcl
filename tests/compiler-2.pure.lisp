@@ -1931,7 +1931,7 @@
    ((-1) nil)))
 
 (with-test (:name :check-bound-zero-safety-notes
-            :fails-on (not (or :x86-64 :x86)))
+            :fails-on (not (or :x86-64 :x86 :arm64)))
   (checked-compile-and-assert
       (:allow-notes nil
        :optimize '(:speed 3 :safety 0))
