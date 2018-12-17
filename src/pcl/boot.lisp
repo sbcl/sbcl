@@ -984,7 +984,7 @@ bootstrapping.
 
 (defun real-make-specializer-form-using-class/t
     (proto-generic-function proto-method specializer-name environment)
-  (declare (ignore proto-generic-function proto-method environment))
+  (declare (ignore proto-method environment))
   (specializer-name-syntax-error specializer-name proto-generic-function))
 
 (defun real-make-specializer-form-using-class/specializer
