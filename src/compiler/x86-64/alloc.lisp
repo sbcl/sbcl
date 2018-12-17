@@ -624,12 +624,12 @@
        (allocation result bytes node nil lowtag)
        (storew header result 0 lowtag))))
 
-#!+immobile-space
 (macrolet ((c-call (name)
              `(let ((c-fun (make-fixup ,name :foreign)))
                 (inst call (cond ((sb-c::code-immobile-p node) c-fun)
                                  (t (progn (inst mov temp-reg-tn c-fun)
                                            temp-reg-tn)))))))
+#!+immobile-space
 (define-vop (alloc-immobile-fixedobj)
   (:info lowtag size header)
   (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
@@ -647,6 +647,8 @@
    (pseudo-atomic ()
      (c-call "alloc_fixedobj")
      (inst lea result (ea lowtag c-result)))))
+
+#!+immobile-space
 (define-vop (alloc-immobile-layout)
   (:args (slots :scs (descriptor-reg) :target c-arg1))
   (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset)
@@ -662,5 +664,21 @@
    (inst and rsp-tn -16)
    (pseudo-atomic () (c-call "alloc_layout"))
    (move result c-result)))
-) ; end MACROLET
 
+(define-vop (alloc-dynamic-space-code)
+  (:args (total-words :scs (signed-reg) :target c-arg1))
+  (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset) c-arg1)
+  (:temporary (:sc unsigned-reg :from :eval :to (:result 0) :offset rax-offset)
+              c-result)
+  (:results (result :scs (descriptor-reg)))
+  (:node-var node)
+  (:generator 50
+   (inst mov c-arg1 total-words)
+   ;; RSP needn't be restored because the allocators all return immediately
+   ;; which has that effect
+   (inst and rsp-tn -16)
+   (pseudo-atomic () (c-call "alloc_code_object"))
+   ;; C-RESULT is a tagged ptr. MOV doesn't need to be pseudo-atomic.
+   (inst mov result c-result)))
+
+) ; end MACROLET

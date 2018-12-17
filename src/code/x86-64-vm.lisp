@@ -316,6 +316,10 @@
          (not (fun-requires-simplifying-trampoline-p fun))
          (singly-occurs-p fun code-header-funs))))
 
+;;; Allocate a code object.
+(defun alloc-dynamic-space-code (total-words)
+  (values (%primitive alloc-dynamic-space-code (the fixnum total-words))))
+
 ;;; Remove calls via fdefns from CODE when compiling into memory.
 (defun statically-link-code-obj (code fixups)
   (declare (ignorable fixups))

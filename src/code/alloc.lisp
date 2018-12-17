@@ -432,12 +432,6 @@
             (* 3 n-word-bytes))) ; boxed size in bytes, untagged
     obj))
 
-;;; Test whether there is room to allocate NBYTES.
-;;; This only looks at the space in the frontier, not the free space list.
-(defun immobile-code-free-space-check (nbytes)
-  (let ((avail (- (+ varyobj-space-start varyobj-space-size)
-                  (sap-int *varyobj-space-free-pointer*))))
-    (>= avail nbytes)))
 ) ; end PROGN
 ) ; end PROGN
 
@@ -456,7 +450,11 @@
 ;;; Enforce limit on boxed words based on maximum total number of words
 ;;; that can be indicated in the header for 32-bit words.
 ;;; 22 bits = 4MiB, quite generous for one code object.
-(declaim (ftype (sfunction (t (unsigned-byte 22) unsigned-byte) code-component)
+;;; 25 bits is the maximum unboxed size expressed in bytes,
+;;; if n-word-bytes = 8 and almost the entire code object is unboxed
+;;; which is, practically speaking, not really possible.
+(declaim (ftype (sfunction (t (unsigned-byte 22) (unsigned-byte 25))
+                           code-component)
                 allocate-code-object))
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
@@ -480,9 +478,14 @@
                                        (ash 2 n-fixnum-tag-bits)
                                        other-pointer-lowtag
                                        (eq space :immobile)))
-              ;; This case could use pseudo-atomic instead of without-gcing, but
-              ;; we will need a different lisp trampoline which calls a different
-              ;; C function so that it allocates to a code region.
+              ;;; x86-64 has a vop which is nothing more than wrapping
+              ;; pseudo-atomic around a call to alloc_code_object() in the C runtime.
+              ;; The vop is defined in such a way that it can't be inserted into
+              ;; this fuction, but instead needs an out-of-line call to a helper function
+              ;; (because it clobbers all registers and doesn't indicate that)
+              #!+(and x86-64 (not win32))
+              (alloc-dynamic-space-code total-words)
+              #!-(and x86-64 (not win32))
               (without-gcing
                (%make-lisp-obj
                 (alien-funcall (extern-alien "alloc_code_object"
@@ -509,5 +512,11 @@
                    #!+64-bit
                    (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
                            most-positive-word))))
+    ;; Is this slot assignment necessary?  Both the C and Lisp backtrace logic
+    ;; check whether debug-info is an INSTANCE before operating with the value,
+    ;; and GC doesn't care what it is. Since stores to the code go through an
+    ;; assembly routine if soft marking is enabled, it's a spurious call
+    ;; to write a value that needn't add this object to a remembered set.
+    ;; FIXME: find out what breaks if this is removed.
     (setf (%code-debug-info code) nil)
     code))
