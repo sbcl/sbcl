@@ -1930,7 +1930,8 @@
    (((1- (expt 2 (1- sb-vm:n-word-bits)))) nil)
    ((-1) nil)))
 
-(with-test (:name :check-bound-zero-safety-notes)
+(with-test (:name :check-bound-zero-safety-notes
+            :fails-on (not (or :x86-64 :x86)))
   (checked-compile-and-assert
       (:allow-notes nil
        :optimize '(:speed 3 :safety 0))

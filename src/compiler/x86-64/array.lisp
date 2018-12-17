@@ -142,13 +142,15 @@
                              (t
                               value)))
                      bound))
-          (index (if (and (sc-is index immediate)
-                          (sc-is bound any-reg descriptor-reg))
-                     (fixnumize (tn-value index))
+          (index (if (sc-is index immediate)
+                     (let ((value (tn-value index)))
+                       (if (sc-is bound any-reg descriptor-reg)
+                           (fixnumize value)
+                           value))
                      index)))
       (cond ((typep bound '(integer * -1))
              ;; Power of two bound, can be checked for fixnumness at
-             ;; the same time as it always occupies a consequetive bit
+             ;; the same time as it always occupies a consecutive bit
              ;; range, everything else, including the tag, has to be
              ;; zero.
              (inst test index bound)
