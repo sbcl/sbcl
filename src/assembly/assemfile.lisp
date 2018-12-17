@@ -49,20 +49,14 @@
             ;; You might think one Lispword is aligned enough, but it isn't,
             ;; because to created a tagged pointer to an asm routine,
             ;; the base address must have all 0s in the tag bits.
-            ;; Note that for ordinary code components, alignment is ensured
-            ;; by SIMPLE-FUN-HEADER-WORD.
+            ;; Note that for code components that contain simple-funs,
+            ;; alignment is ensured by SIMPLE-FUN-HEADER-WORD.
             (emit (asmstream-data-section asmstream)
                   `(.align ,sb-vm:n-lowtag-bits)))
-          (let ((segment
-                 (assemble-sections
-                  (make-segment :inst-hook (default-segment-inst-hook)
-                                :run-scheduler nil)
-                  (asmstream-data-section asmstream)
-                  (asmstream-code-section asmstream)
-                  (asmstream-elsewhere-section asmstream)
-                  ;; append a simple-fun table with 0 functions
-                  (sb-assem:emit (sb-assem::make-section)
-                                 `(.skip ,(* 2 sb-vm:n-word-bytes))))))
+          (let ((segment (assemble-sections
+                          asmstream nil
+                          (make-segment :inst-hook (default-segment-inst-hook)
+                                        :run-scheduler nil))))
             (dump-assembler-routines segment
                                      (segment-buffer segment)
                                      (sb-assem::segment-fixup-notes segment)

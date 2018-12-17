@@ -263,11 +263,7 @@
 
 (defun !loader-cold-init ()
   (let* ((code *assembler-routines*)
-         ;; Neither CODE-SIZE nor TEXT-SIZE delimits the final asm routine.
-         ;; CODE-SIZE minus 2 includes the trailing NOP filler but excludes
-         ;; the two trailer words, so it's the most consistent choice.
-         ;; (all routines are padded to a multiple of 2 words)
-         (size (- (%code-code-size code) (* 2 sb-vm:n-word-bytes)))
+         (size (%code-text-size code))
          (vector (the simple-vector *!initial-assembler-routines*))
          (count (length vector))
          (ht (make-hash-table :test 'eq)))

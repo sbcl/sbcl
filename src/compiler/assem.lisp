@@ -1303,7 +1303,7 @@
                (awhen (rest sections) (combine-sections it)))))
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
-(defun assemble-sections (segment &rest inputs)
+(defun %assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
         (sections (combine-sections inputs))
         (in-without-scheduling)
@@ -1370,9 +1370,78 @@
                (instruction-hooks segment)
                (apply mnemonic segment (perform-operand-lowering operands)))))
           (label (%emit-label segment **current-vop** operation))
-          (function (%emit-postit segment operation)))))
-    (finalize-segment segment)
-    segment))
+          (function (%emit-postit segment operation))))))
+  (finalize-segment segment))
+
+;;; The interface to %ASSEMBLE-SECTIONS
+(defun assemble-sections (asmstream simple-fun-labels segment)
+  (let* ((n-entries (length simple-fun-labels))
+         (trailer-len (* (+ n-entries 1) 4))
+         (end-text (gen-label))
+         (octets
+          (segment-buffer
+           (%assemble-sections
+            segment
+            (asmstream-data-section asmstream)
+            (asmstream-code-section asmstream)
+            (asmstream-elsewhere-section asmstream)
+            (emit (make-section)
+                  end-text
+                  `(.align 2)
+                  `(.skip ,trailer-len)
+                  `(.align ,sb-vm:n-lowtag-bits))))))
+    (flet ((store-ub16 (index val)
+             (multiple-value-bind (b0 b1)
+                 #!+little-endian
+                 (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
+                 #!+big-endian
+                 (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
+               (setf (aref octets (+ index 0)) b0
+                     (aref octets (+ index 1)) b1)))
+           (store-ub32 (index val)
+             (multiple-value-bind (b0 b1 b2 b3)
+                 #!+little-endian
+                 (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
+                         (ldb (byte 8 16) val) (ldb (byte 8 24) val))
+                 #!+big-endian
+                 (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
+                         (ldb (byte 8  8) val) (ldb (byte 8  0) val))
+               (setf (aref octets (+ index 0)) b0
+                     (aref octets (+ index 1)) b1
+                     (aref octets (+ index 2)) b2
+                     (aref octets (+ index 3)) b3))))
+      (let ((index (length octets))
+            (fun-offsets))
+        ;; Total size of the code object must be multiple of 2 lispwords
+        (aver (not (logtest (+ (segment-header-skew segment) index)
+                            sb-vm:lowtag-mask)))
+        (let ((padding (if (eql n-entries 0)
+                           0
+                           (- index trailer-len (label-position end-text)))))
+          (unless (and (typep trailer-len '(unsigned-byte 16))
+                       (typep n-entries '(unsigned-byte 12))
+                       (typep padding '(unsigned-byte 4)))
+            (bug "Oversized code component?"))
+          (store-ub16 (- index 2) trailer-len)
+          (store-ub16 (- index 4) (logior (ash n-entries 4) padding)))
+        (decf index trailer-len)
+        ;; Iteration over label positions occurs from numerically highest
+        ;; to lowest, which is right because the 0th indexed simple-fun
+        ;; has the lowest entry offset, and is the last one written
+        ;; into the trailer table. The trailer table is indexed backwards:
+        ;;  ... simple-fun-2 | simple-fun-1 | simple-fun-0
+        ;; And because we use PUSH, we collect them in forward order
+        ;; which is the correct thing to return.
+        (dolist (label simple-fun-labels)
+          (let ((val (label-position label)))
+            (push val fun-offsets)
+            (store-ub32 index val)
+            (incf index 4)))
+        (aver (= index (- (length octets) 4)))
+        (values segment
+                (label-position end-text)
+                (segment-fixup-notes segment)
+                fun-offsets)))))
 
 ;;; Most backends do not convert register TNs into a different type of
 ;;; internal object prior to handing the operands off to the emitter.
@@ -1515,7 +1584,8 @@
         (when (label-p note)
           (decf (label-index note) skew)
           (decf (label-posn note) skew)))))
-  (compact-segment-buffer segment))
+  (compact-segment-buffer segment)
+  segment)
 
 ;;; Return the contents of SEGMENT as a vector. We assume SEGMENT has
 ;;; been finalized so that we can simply return its buffer.

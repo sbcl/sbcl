@@ -287,73 +287,23 @@
     (coverage-mark-lowering-pass component asmstream)
 
     (emit-inline-constants)
-    (let* ((fun-table)
-           (end-text (gen-label))
-           (info (component-info component))
-           (n-entries (length (ir2-component-entries info)))
+    (let* ((info (component-info component))
+           (simple-fun-labels
+            (mapcar #'entry-info-offset (ir2-component-entries info)))
            (n-boxed (length (ir2-component-constants info)))
            ;; Skew is either 0 or N-WORD-BYTES depending on whether the boxed
            ;; header length is even or odd
            (skew (if (and (= code-boxed-words-align 1) (oddp n-boxed))
                      sb-vm:n-word-bytes
-                     0))
-           (segment
-            (assemble-sections
-               (make-segment :header-skew skew
-                             :run-scheduler (default-segment-run-scheduler)
-                             :inst-hook (default-segment-inst-hook))
-               (asmstream-data-section asmstream)
-               (asmstream-code-section asmstream)
-               (asmstream-elsewhere-section asmstream)
-               ;; Create space for the simple-fun offset table:
-               ;;  1 uint32 * N simple-funs
-               ;;  1 uint16 reserved for future use
-               ;;  1 uint16 for the number of simple-funs
-               (emit (sb-assem::make-section)
-                     end-text `(.align 2) `(.skip ,(* (1+ n-entries) 4))
-                     `(.align ,sb-vm:n-lowtag-bits))))
-           (octets
-            (segment-buffer segment)))
-      (flet ((store-ub16 (index val)
-                 (multiple-value-bind (b0 b1)
-                     #!+little-endian
-                     (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
-                     #!+big-endian
-                     (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
-                   (setf (aref octets (+ index 0)) b0
-                         (aref octets (+ index 1)) b1)))
-             (store-ub32 (index val)
-                 (multiple-value-bind (b0 b1 b2 b3)
-                     #!+little-endian
-                     (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
-                             (ldb (byte 8 16) val) (ldb (byte 8 24) val))
-                     #!+big-endian
-                     (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
-                             (ldb (byte 8  8) val) (ldb (byte 8  0) val))
-                   (setf (aref octets (+ index 0)) b0
-                         (aref octets (+ index 1)) b1
-                         (aref octets (+ index 2)) b2
-                         (aref octets (+ index 3)) b3))))
-        (let ((index (length octets)))
-          ;; Total size of the code object must be multiple of 2 lispwords
-          (aver (not (logtest (+ skew index) sb-vm:lowtag-mask)))
-          (let* ((trailer-len (* (1+ n-entries) 4))
-                 (padding (- index trailer-len (label-position end-text))))
-            (unless (and (typep trailer-len '(unsigned-byte 16))
-                         (typep n-entries '(unsigned-byte 12))
-                         (typep padding '(unsigned-byte 4)))
-              (bug "Oversized code component?"))
-            (store-ub16 (- index 2) trailer-len)
-            (store-ub16 (- index 4) (logior (ash n-entries 4) padding))
-            (decf index trailer-len))
-          (dolist (entry (ir2-component-entries info))
-            (let ((val (label-position (entry-info-offset entry))))
-              (push val fun-table)
-              (store-ub32 index val)
-              (incf index 4)))))
-      (values segment (label-position end-text) fun-table
-              (asmstream-elsewhere-label asmstream)
-              (sb-assem::segment-fixup-notes segment)))))
+                     0)))
+      (multiple-value-bind (segment text-length fixup-notes fun-table)
+          (assemble-sections asmstream
+                             simple-fun-labels
+                             (make-segment :header-skew skew
+                                           :run-scheduler (default-segment-run-scheduler)
+                                           :inst-hook (default-segment-inst-hook)))
+        (values segment text-length fun-table
+                (asmstream-elsewhere-label asmstream) fixup-notes)))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))
