@@ -363,3 +363,17 @@
 #+gencgc
 (with-test (:name :traceroot-ignore-immediate)
   (gc-and-search-roots (make-weak-pointer 48)))
+
+#+sb-thread
+(with-test (:name :concurrently-alloc-code)
+  (let ((gc-thread
+         (sb-thread:make-thread
+          (let ((stop (+ (get-internal-real-time)
+                         internal-time-units-per-second)))
+            (lambda ()
+              (loop while (<= (get-internal-real-time) stop)
+                    do (gc) (sleep 0)))))))
+    (loop (compile nil `(lambda () (print 20)))
+          (unless (sb-thread:thread-alive-p gc-thread)
+            (return)))
+    (sb-thread:join-thread gc-thread)))

@@ -472,10 +472,12 @@
           (or #!+immobile-code
               (when (member space '(:immobile :auto))
                 ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
+                ;; Indicate that there are initially 2 boxed words, otherwise
+                ;; immobile space GC thinks this object is freeable.
                 (allocate-immobile-obj (ash total-words word-shift)
                                        (logior (ash total-words code-header-size-shift)
                                                code-header-widetag)
-                                       0
+                                       (ash 2 n-fixnum-tag-bits)
                                        other-pointer-lowtag
                                        (eq space :immobile)))
               ;; This case could use pseudo-atomic instead of without-gcing, but
