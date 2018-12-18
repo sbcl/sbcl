@@ -406,7 +406,7 @@
                                             (loop until stop
                                                   do
                                                   (sleep 0)
-                                                  (gc))))
+                                                  (gc :full t))))
                    (loop repeat 3
                          collect
                          (sb-thread:make-thread
@@ -414,7 +414,7 @@
                             (loop until stop
                                   do (malloc))))))))
     (loop for time = (get-internal-real-time)
-          for end = (+ time (* internal-time-units-per-second 2)) then end
+          for end = (+ time (* internal-time-units-per-second 4)) then end
           while (> end time)
           do
           (when (zerop (mod (- time end) (truncate internal-time-units-per-second 10)))
