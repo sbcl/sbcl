@@ -289,10 +289,10 @@ Examples:
                                        (the index ,size-expr)))
                        ',(make-alien-pointer-type :to alien-type)))))))
 
-(defun malloc-error (bytes errno)
+(defun malloc-error (bytes)
   (error 'simple-storage-condition
          :format-control "~A: malloc() of ~S bytes failed."
-         :format-arguments (list (strerror errno) bytes)))
+         :format-arguments (list (strerror (get-errno)) bytes)))
 
 ;;; Allocate a block of memory at least BYTES bytes long and return a
 ;;; system area pointer to it.
@@ -303,8 +303,8 @@ Examples:
   (let ((sap (alien-funcall (extern-alien "malloc"
                                           (function system-area-pointer size-t))
                             bytes)))
-    (if (and (not (eql 0 bytes)) (eql 0 (sap-int sap)))
-        (malloc-error bytes (get-errno))
+    (if (and (eql 0 (sap-int sap)) (not (eql 0 bytes)))
+        (malloc-error bytes)
         sap)))
 
 #!+c-stack-is-control-stack
