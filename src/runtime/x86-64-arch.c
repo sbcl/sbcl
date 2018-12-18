@@ -44,7 +44,7 @@
 #define BREAKPOINT_WIDTH 1
 #endif
 unsigned int cpuid_fn1_ecx;
-unsigned int avx_supported = 0;
+int avx_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
                   unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
