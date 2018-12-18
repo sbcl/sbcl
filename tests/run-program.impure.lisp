@@ -399,7 +399,7 @@
     1))
 
 (with-test (:name (run-program :malloc-deadlock)
-            :skipped-on (or (not :sb-thread) :win32))
+            :skipped-on (or :sbcl (not :sb-thread) :win32))
   (let* (stop
          (threads (list*
                    (sb-thread:make-thread (lambda ()
