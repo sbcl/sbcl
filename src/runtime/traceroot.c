@@ -885,7 +885,8 @@ static int trace_paths(void (*context_scanner)(),
                 fprintf(stderr, "Target=%p (%s)\n", (void*)value, classify_obj(value));
             hopscotch_reset(&visited);
             hopscotch_reset(&targets);
-            n_found += trace1(value, &targets, &visited,
+            n_found += trace1(canonical_obj(value),
+                              &targets, &visited,
                               &inverted_heap, &scratchpad,
                               n_pins, pins, context_scanner, criterion);
         }

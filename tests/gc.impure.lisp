@@ -360,6 +360,13 @@
            (setf (aref a serial) 1))))
      :all)))
 
+(defvar *foo*)
+#+gencgc
+(with-test (:name :traceroot-simple-fun)
+  (setq *foo* (compile nil '(lambda () 42)))
+  (let ((wp (sb-ext:make-weak-pointer *foo*)))
+    (assert (eql (sb-ext:search-roots wp) 1))))
+
 #+gencgc
 (with-test (:name :traceroot-ignore-immediate)
   (gc-and-search-roots (make-weak-pointer 48)))
