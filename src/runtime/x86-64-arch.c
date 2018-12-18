@@ -44,7 +44,7 @@
 #define BREAKPOINT_WIDTH 1
 #endif
 unsigned int cpuid_fn1_ecx;
-int avx_supported = 0;
+int avx_supported = 0, avx2_supported = 0;
 
 static void cpuid(unsigned info, unsigned subinfo,
                   unsigned *eax, unsigned *ebx, unsigned *ecx, unsigned *edx)
@@ -68,26 +68,31 @@ static void cpuid(unsigned info, unsigned subinfo,
 
 static void xgetbv(unsigned *eax, unsigned *edx)
 {
-  __asm__("xgetbv;"
-          :"=a" (*eax), "=d" (*edx)
-          : "c" (0));
+    __asm__("xgetbv;"
+            :"=a" (*eax), "=d" (*edx)
+            : "c" (0));
 }
 
 void arch_init(void)
 {
-  unsigned int eax, ebx, ecx, edx;
+    unsigned int eax, ebx, ecx, edx;
 
-  cpuid(0, 0, &eax, &ebx, &ecx, &edx);
-  if (eax >= 1) { // see if we can execute basic id function 1
-      unsigned avx_mask = 0x18000000; // OXSAVE and AVX
-      cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-      cpuid_fn1_ecx = ecx;
-      if ((ecx & avx_mask) == avx_mask) {
-          xgetbv(&eax, &edx);
-          if ((eax & 0x06) == 0x06) // YMM and XMM
-              avx_supported = 1;
-      }
-  }
+    cpuid(0, 0, &eax, &ebx, &ecx, &edx);
+    if (eax >= 1) { // see if we can execute basic id function 1
+        unsigned avx_mask = 0x18000000; // OXSAVE and AVX
+        cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+        cpuid_fn1_ecx = ecx;
+        if ((ecx & avx_mask) == avx_mask) {
+            xgetbv(&eax, &edx);
+            if ((eax & 0x06) == 0x06) { // YMM and XMM
+                avx_supported = 1;
+                cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+                if  (ebx & 0x20)  {
+                    avx2_supported = 1;
+                }
+            }
+        }
+    }
 }
 
 #define VECTOR_FILL_T "VECTOR-FILL/T"
