@@ -181,7 +181,9 @@
   plist                                 ; a place for clients to stash things
   (cookie nil :type cons :read-only t)  ; list of the number of pipes from the subproc
   #+win32 copiers ; list of sb-win32::io-copier
-  #+win32 (handle nil :type (or null (signed-byte 32))))
+  #+win32 (handle nil :type (or null (signed-byte 32)))
+  #-win32
+  serve-event-pipe)
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
@@ -228,6 +230,26 @@ The function is called with PROCESS as its only argument."
       "T if OBJECT is a PROCESS, NIL otherwise."
       (documentation 'process-pid 'function) "The pid of the child process.")
 
+#-win32
+(defun setup-serve-event-pipe (process)
+  (unless (process-serve-event-pipe process)
+    (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
+      (setf (process-serve-event-pipe process) (cons read-fd write-fd))
+      (let (handler)
+        (setf handler
+              (add-fd-handler read-fd :input
+                              (lambda (fd)
+                                (setf (process-serve-event-pipe process) nil)
+                                (sb-unix:unix-close fd)
+                                (remove-fd-handler handler))))))))
+
+(defun wake-serve-event (process)
+  #+win32 (declare (ignorable process))
+  #-win32
+  (let ((pipe (process-serve-event-pipe process)))
+    (when pipe
+      (sb-unix:unix-close (cdr pipe)))))
+
 (defun process-wait (process &optional check-for-stopped)
   "Wait for PROCESS to quit running for some reason. When
 CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
@@ -236,16 +258,18 @@ PROCESS."
   #+win32
   (sb-win32::win32-process-wait process)
   #-win32
-  (loop
-      (case (process-status process)
-        (:running)
-        (:stopped
-         (when check-for-stopped
-           (return)))
-        (t
-         (when (zerop (car (process-cookie process)))
-           (return))))
-      (serve-all-events 1))
+  (progn
+    (setup-serve-event-pipe process)
+    (loop
+     (case (process-status process)
+       (:running)
+       (:stopped
+        (when check-for-stopped
+          (return)))
+       (t
+        (when (zerop (car (process-cookie process)))
+          (return))))
+     (serve-all-events 10)))
   process)
 
 #-win32
@@ -331,6 +355,7 @@ status slot."
                          (multiple-value-bind (status code core)
                              (waitpid (process-pid proc))
                            (when status
+                             (wake-serve-event proc)
                              (setf (process-%status proc) status)
                              (setf (process-%exit-code proc) code)
                              (when (process-status-hook proc)
