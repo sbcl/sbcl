@@ -392,3 +392,38 @@
       (kill-and-check-status sb-posix:sigkill :signaled)
       (process-wait process)
       (assert (not (process-alive-p process))))))
+
+(defun malloc ()
+  (let ((x (sb-alien:make-alien int 10000)))
+    (sb-alien:free-alien x)
+    1))
+
+(with-test (:name (run-program :malloc-deadlock)
+            :skipped-on (or (not :sb-thread) :win32))
+  (let* (stop
+         (threads (list*
+                   (sb-thread:make-thread (lambda ()
+                                            (loop until stop
+                                                  do
+                                                  (sleep 0)
+                                                  (gc))))
+                   (loop repeat 3
+                         collect
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (loop until stop
+                                  do (malloc))))))))
+    (loop for time = (get-internal-real-time)
+          for end = (+ time (* internal-time-units-per-second 2)) then end
+          while (> end time)
+          do
+          (when (zerop (mod (- time end) (truncate internal-time-units-per-second 10)))
+            (write-char #\.)
+            (finish-output))
+          (with-output-to-string (str)
+            (run-program "uname" ()
+                         :output str
+                         :search t
+                         :wait t)))
+    (setf stop t)
+    (mapc #'sb-thread:join-thread threads)))

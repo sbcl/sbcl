@@ -830,12 +830,11 @@ Users Manual for details about the PROCESS structure.
                                 search environment-vec directory)
                                #-win32
                                (with-args (args-vec args)
-                                 (without-gcing
-                                   (spawn progname args-vec
-                                          stdin stdout stderr
-                                          (if search 1 0)
-                                          environment-vec pty-name
-                                          (if wait 1 0) directory))))
+                                 (spawn progname args-vec
+                                        stdin stdout stderr
+                                        (if search 1 0)
+                                        environment-vec pty-name
+                                        (if wait 1 0) directory)))
                          (unless (minusp child)
                            (setf proc
                                  (make-process
