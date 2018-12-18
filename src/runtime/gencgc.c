@@ -1999,8 +1999,9 @@ update_page_write_prot(page_index_t page)
 
     if (!ENABLE_PAGE_PROTECTION) return 0;
 
-    /* Skip if it's unboxed or already write-protected */
-    if (page_table[page].write_protected || !page_boxed_p(page))
+    /* Skip if it's unboxed, already write-protected, or pinned */
+    if (page_table[page].write_protected || !page_boxed_p(page) ||
+        page_table[page].pinned)
         return (0);
 
     /* Scan the page for pointers to younger generations or the
