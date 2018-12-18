@@ -8,7 +8,7 @@
 #define ARCH_HAS_STACK_POINTER
 #define ALIEN_STACK_GROWS_DOWNWARD
 
-extern unsigned int avx_supported;
+extern int avx_supported;
 extern unsigned int cpuid_fn1_ecx;
 /* When single stepping, single_stepping holds the original instruction
  * PC location. */
