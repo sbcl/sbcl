@@ -234,21 +234,30 @@ The function is called with PROCESS as its only argument."
 (defun setup-serve-event-pipe (process)
   (unless (process-serve-event-pipe process)
     (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
-      (setf (process-serve-event-pipe process) (cons read-fd write-fd))
       (let (handler)
         (setf handler
               (add-fd-handler read-fd :input
                               (lambda (fd)
                                 (setf (process-serve-event-pipe process) nil)
                                 (sb-unix:unix-close fd)
-                                (remove-fd-handler handler))))))))
+                                (remove-fd-handler handler))))
+        (setf (process-serve-event-pipe process) (list* read-fd write-fd handler))))))
+
+#-win32
+(defun close-serve-event-pipe (process)
+  (let ((pipe (process-serve-event-pipe process)))
+    (when pipe
+      (setf (process-serve-event-pipe process) nil)
+      (remove-fd-handler (cddr pipe))
+      (sb-unix:unix-close (car pipe))
+      (sb-unix:unix-close (cadr pipe)))))
 
 (defun wake-serve-event (process)
   #+win32 (declare (ignorable process))
   #-win32
   (let ((pipe (process-serve-event-pipe process)))
     (when pipe
-      (sb-unix:unix-close (cdr pipe)))))
+      (sb-unix:unix-close (cadr pipe)))))
 
 (defun process-wait (process &optional check-for-stopped)
   "Wait for PROCESS to quit running for some reason. When
@@ -269,7 +278,8 @@ PROCESS."
        (t
         (when (zerop (car (process-cookie process)))
           (return))))
-     (serve-all-events 10)))
+     (serve-all-events 10))
+    (close-serve-event-pipe process))
   process)
 
 #-win32
