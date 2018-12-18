@@ -13,7 +13,7 @@
 
 #-sb-simd-pack-256 (exit :code 104)
 
-(unless (sb-alien:extern-alien "avx_supported" int)
+(when (zerop (sb-alien:extern-alien "avx_supported" int))
   (exit :code 104))
 
 (defun make-constant-packs ()
