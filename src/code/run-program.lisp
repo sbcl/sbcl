@@ -158,6 +158,11 @@
 (define-load-time-global *active-processes-lock*
   (sb-thread:make-mutex :name "Lock for active processes."))
 
+(define-load-time-global *spawn-lock*
+  (sb-thread:make-mutex :name "Around spawn()."))
+
+(defglobal *sigchld-delayed* nil)
+
 ;;; *ACTIVE-PROCESSES* can be accessed from multiple threads so a
 ;;; mutex is needed. More importantly the sigchld signal handler also
 ;;; accesses it, that's why we need without-interrupts.
@@ -351,6 +356,16 @@ status slot."
           (sb-win32::win32-error 'process-close))))
   process)
 
+(defun get-processes-status-changes-sigchld ()
+  (cond
+    ;; Avoid waiting on *active-processes-lock* as we may be
+    ;; interrupting a lock on which fork() is waiting.
+    ((sb-thread:with-recursive-lock (*spawn-lock* :wait-p nil)
+       (setf *sigchld-delayed* nil)
+       (get-processes-status-changes)))
+    (t
+     (setf *sigchld-delayed* t))))
+
 (defun get-processes-status-changes ()
   (let (changed)
     (with-active-processes-lock ()
@@ -391,7 +406,7 @@ status slot."
                        *active-processes*)))
     ;; Can't call the hooks before all the processes have been deal
     ;; with, as calling a hook may cause re-entry to
-    ;; GET-PROCESS-STATUS-CHANGES. That may be OK when using waitpid,
+    ;; GET-PROCESSES-STATUS-CHANGES. That may be OK when using waitpid,
     ;; but in the Windows implementation it would be deeply bad.
     (dolist (proc changed)
       (let ((hook (process-status-hook proc)))
@@ -853,37 +868,38 @@ Users Manual for details about the PROCESS structure.
                    ;; death before we have installed the PROCESS
                    ;; structure in *ACTIVE-PROCESSES*.
                    (let (child #+win32 handle)
-                     (with-active-processes-lock ()
-                       (with-environment (environment-vec environment
-                                          :null (not (or environment environment-p)))
-                         (setf (values child #+win32 handle)
-                               #+win32
-                               (sb-win32::mswin-spawn
-                                progname
-                                args
-                                stdin stdout stderr
-                                search environment-vec directory)
-                               #-win32
-                               (with-args (args-vec args)
-                                 (spawn progname args-vec
-                                        stdin stdout stderr
-                                        (if search 1 0)
-                                        environment-vec pty-name
-                                        (if wait 1 0) directory)))
-                         (unless (minusp child)
-                           (setf proc
-                                 (make-process
-                                  :input input-stream
-                                  :output output-stream
-                                  :error error-stream
-                                  :status-hook status-hook
-                                  :cookie cookie
-                                  #-win32 :pty #-win32 pty-stream
-                                  :%status :running
-                                  :pid child
-                                  #+win32 :copiers #+win32 *handlers-installed*
-                                  #+win32 :handle #+win32 handle))
-                           (push proc *active-processes*))))
+                     (sb-thread:with-mutex (*spawn-lock*)
+                       (with-active-processes-lock ()
+                         (with-environment (environment-vec environment
+                                            :null (not (or environment environment-p)))
+                           (setf (values child #+win32 handle)
+                                 #+win32
+                                 (sb-win32::mswin-spawn
+                                  progname
+                                  args
+                                  stdin stdout stderr
+                                  search environment-vec directory)
+                                 #-win32
+                                 (with-args (args-vec args)
+                                   (spawn progname args-vec
+                                          stdin stdout stderr
+                                          (if search 1 0)
+                                          environment-vec pty-name
+                                          (if wait 1 0) directory)))
+                           (unless (minusp child)
+                             (setf proc
+                                   (make-process
+                                    :input input-stream
+                                    :output output-stream
+                                    :error error-stream
+                                    :status-hook status-hook
+                                    :cookie cookie
+                                    #-win32 :pty #-win32 pty-stream
+                                    :%status :running
+                                    :pid child
+                                    #+win32 :copiers #+win32 *handlers-installed*
+                                    #+win32 :handle #+win32 handle))
+                             (push proc *active-processes*)))))
                      ;; Report the error outside the lock.
                      (case child
                        (-1
@@ -895,6 +911,8 @@ Users Manual for details about the PROCESS structure.
                        (-3
                         (error "Couldn't change directory to ~S: ~A"
                                directory (strerror))))))))))
+      (when *sigchld-delayed*
+        (get-processes-status-changes))
       (dolist (fd *close-in-parent*)
         (sb-unix:unix-close fd))
       (unless proc
