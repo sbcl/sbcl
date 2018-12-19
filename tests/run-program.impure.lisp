@@ -399,6 +399,7 @@
     1))
 
 (with-test (:name (run-program :malloc-deadlock)
+            :broken-on :sb-safepoint
             :skipped-on (or (not :sb-thread) :win32))
   (let* (stop
          (threads (list*
