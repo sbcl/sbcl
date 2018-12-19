@@ -5,6 +5,8 @@ changes relative to sbcl-1.4.14:
     SB-SIMD-PACK.
   * enhancement: specializer name parsing is less lenient and signals a
     specific condition in case of syntax errors. (lp#1808681)
+  * bug fix: RUN-PROGRAM is more responsive and less likely to deadlock
+    (lp#1702178, lp#1808641)
 
 changes in sbcl-1.4.14 relative to sbcl-1.4.13:
   * enhancement: attempting to build on openbsd 6.0 or newer without
