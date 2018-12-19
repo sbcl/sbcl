@@ -232,7 +232,7 @@
           '(sb-debug::find-interrupted-name-and-frame
             sb-impl::encapsulate-generic-function
             sb-impl::encapsulated-generic-function-p
-            sb-impl::get-processes-status-changes
+            sb-impl::get-processes-status-changes-sigchld
             sb-impl::step-form
             sb-impl::step-values
             sb-impl::stringify-package-designator
