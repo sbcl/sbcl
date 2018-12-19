@@ -82,15 +82,6 @@
     (awhen *descriptor-handlers*
       (copy-list (pollfds-list it)))))
 
-;; With the poll() interface it requires more care to maintain
-;; a correspondence betwen the Lisp and C representations.
-#!-os-provides-poll
-(defun select-descriptor-handlers (function)
-  (declare (function function))
-  (with-descriptor-handlers
-    (awhen *descriptor-handlers*
-      (remove-if-not function (pollfds-list it)))))
-
 (defun map-descriptor-handlers (function)
   (declare (function function))
   (with-descriptor-handlers
@@ -162,6 +153,12 @@
          (when ,handler
            (remove-fd-handler ,handler))))))
 
+  (defun invoke-handler (handler)
+    (with-simple-restart (remove-fd-handler "Remove ~S" handler)
+      (funcall (handler-function handler)
+               (handler-descriptor handler))
+      (return-from invoke-handler))
+    (remove-fd-handler handler))
 ;;; First, get a list and mark bad file descriptors. Then signal an error
 ;;; offering a few restarts.
 (defun handler-descriptors-error
@@ -364,19 +361,13 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                ;; Got something. Call file descriptor handlers
                ;; according to the readable and writable masks
                ;; returned by select.
-               (dolist (handler
-                        (select-descriptor-handlers
-                         (lambda (handler)
-                           (let ((fd (handler-descriptor handler)))
-                             (ecase (handler-direction handler)
-                               (:input (sb-unix:fd-isset fd read-fds))
-                               (:output (sb-unix:fd-isset fd write-fds)))))))
-                 (with-simple-restart (remove-fd-handler "Remove ~S" handler)
-                   (funcall (handler-function handler)
-                            (handler-descriptor handler))
-                   (go :next))
-                 (remove-fd-handler handler)
-                 :next)
+               (map-descriptor-handlers
+                (lambda (handler)
+                  (let ((fd (handler-descriptor handler)))
+                    (when (ecase (handler-direction handler)
+                            (:input (sb-unix:fd-isset fd read-fds))
+                            (:output (sb-unix:fd-isset fd write-fds)))
+                      (invoke-handler handler)))))
                t))))))
 
 ;; Return an pointer to an array of (struct pollfd).
@@ -529,9 +520,4 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                     (if bad
                         (handler-descriptors-error bad)
                         (dolist (handler good t)
-                          (with-simple-restart (remove-fd-handler "Remove ~S" handler)
-                            (funcall (handler-function handler)
-                                     (handler-descriptor handler))
-                            (go :next))
-                          (remove-fd-handler handler)
-                          :next))))))))))
+                          (invoke-handler handler)))))))))))
