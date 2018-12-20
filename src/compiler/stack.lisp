@@ -96,6 +96,7 @@
   ;; solution (which we're going with for now) is a depth-first search
   ;; over an arbitrarily complex chunk of flow graph that is known to
   ;; have a single entry block.
+  (clear-flags (block-component block))
   (let* ((use-blocks (mapcar #'node-block (find-uses dx-lvar)))
          ;; We have to back-propagate not just the DX-LVAR, but every
          ;; UVL or DX LVAR that is live wherever DX-LVAR is USEd
@@ -111,16 +112,18 @@
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
     (labels ((mark-lvar-live-on-path (arc-list)
-               (dolist (arc arc-list)
-                 (let ((2block (block-info (car arc))))
-                   (setf (ir2-block-end-stack 2block)
-                         (merge-uvl-live-sets
-                          preserve-lvars
-                          (ir2-block-end-stack 2block)))
-                   (setf (ir2-block-start-stack 2block)
-                         (merge-uvl-live-sets
-                          preserve-lvars
-                          (ir2-block-start-stack 2block))))))
+               (loop for (block) in arc-list
+                     for 2block = (block-info block)
+                     do
+                     (setf (block-flag block) t)
+                     (setf (ir2-block-end-stack 2block)
+                           (merge-uvl-live-sets
+                            preserve-lvars
+                            (ir2-block-end-stack 2block)))
+                     (setf (ir2-block-start-stack 2block)
+                           (merge-uvl-live-sets
+                            preserve-lvars
+                            (ir2-block-start-stack 2block)))))
              (back-propagate-pathwise (current-block path)
                (cond
                  ((member current-block use-blocks)
@@ -139,13 +142,20 @@
                                                   current-block)
                                                  (block-pred current-block))
                                           (block-pred current-block)))
-                    (let ((new-arc (cons current-block pred-block)))
-                      (declare (dynamic-extent new-arc))
+                    (let* ((new-arc (cons current-block pred-block))
+                           (visited (member new-arc path :test #'equal)))
                       ;; Never follow the same path segment twice.
-                      (unless (member new-arc path :test #'equal)
-                        (let ((new-path (list* new-arc path)))
-                          (declare (dynamic-extent new-path))
-                          (back-propagate-pathwise pred-block new-path)))))))))
+                      (if visited
+                          (let ((diff (ldiff path visited)))
+                            (if (block-flag pred-block)
+                                ;; Mark the path if it reaches an already marked block
+                                (mark-lvar-live-on-path diff)
+                                ;; Or tack it onto the path to be marked later.
+                                (psetf (cdr visited) diff
+                                       (cdr (last diff)) (cdr visited))))
+                          (let ((new-path (list* new-arc path)))
+                            (declare (dynamic-extent new-path))
+                            (back-propagate-pathwise pred-block new-path)))))))))
       (back-propagate-pathwise block nil))))
 
 (defun back-propagate-dx-lvars (block dx-lvars)

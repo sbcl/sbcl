@@ -1489,3 +1489,15 @@
     (setq blah nil) ; be safe, don't look at other stacks
     (sb-thread:signal-semaphore sem2)
     (sb-thread:join-thread thread)))
+
+(with-test (:name :back-propagation-losing-blocks)
+  (checked-compile-and-assert ()
+   `(lambda ()
+      (let ((v (list (list :good)
+                     (labels ((r (v)
+                                (or v
+                                    (r (not v)))))
+                       (r nil)))))
+        (declare (dynamic-extent v))
+        (caar v)))
+   (() :good)))
