@@ -376,7 +376,7 @@ catch_exception_raise(mach_port_t exception_port,
     int signal = 0;
     void (*handler)(int, siginfo_t *, os_context_t *) = NULL;
     siginfo_t siginfo;
-    kern_return_t ret, dealloc_ret;
+    kern_return_t ret = KERN_SUCCESS, dealloc_ret;
 
     struct thread *th;
 
@@ -403,6 +403,14 @@ catch_exception_raise(mach_port_t exception_port,
             break;
         }
         addr = (void*)code_vector[1];
+        /* Just need to unprotect the page and do some bookkeeping, no need
+         * to run it from the faulting thread. 
+         * And because the GC uses signals to stop the world it might
+         * interfere with that bookkeeping, because there's a window
+         * before block_blockable_signals is performed. */
+        if (gencgc_handle_wp_violation(addr))
+            goto do_not_handle;
+        
         /* Undefined alien */
         if (os_trunc_to_page(addr) == undefined_alien_address) {
             handler = undefined_alien_handler;
@@ -492,6 +500,7 @@ catch_exception_raise(mach_port_t exception_port,
       call_handler_on_thread(thread, &thread_state, signal, &siginfo, handler);
     }
 
+  do_not_handle:
     dealloc_ret = mach_port_deallocate (mach_task_self(), thread);
     if (dealloc_ret) {
       lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);

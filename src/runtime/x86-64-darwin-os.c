@@ -273,7 +273,10 @@ catch_exception_raise(mach_port_t exception_port,
     }
 
     /* Just need to unprotect the page and do some bookkeeping, no need
-     * to run it from the faulting thread. */
+     * to run it from the faulting thread. 
+     * And because the GC uses signals to stop the world it might
+     * interfere with that bookkeeping, because there's a window
+     * before block_blockable_signals is performed. */
     if (exception == EXC_BAD_ACCESS && gencgc_handle_wp_violation(addr)) {
         goto do_not_handle;
     }
