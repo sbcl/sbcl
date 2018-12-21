@@ -404,13 +404,13 @@ catch_exception_raise(mach_port_t exception_port,
         }
         addr = (void*)code_vector[1];
         /* Just need to unprotect the page and do some bookkeeping, no need
-         * to run it from the faulting thread. 
+         * to run it from the faulting thread.
          * And because the GC uses signals to stop the world it might
          * interfere with that bookkeeping, because there's a window
          * before block_blockable_signals is performed. */
         if (gencgc_handle_wp_violation(addr))
             goto do_not_handle;
-        
+
         /* Undefined alien */
         if (os_trunc_to_page(addr) == undefined_alien_address) {
             handler = undefined_alien_handler;

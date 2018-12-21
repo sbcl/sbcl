@@ -154,8 +154,10 @@
                                ;; Mark the path if it reaches an already marked block
                                (mark-lvar-live-on-path diff)
                                ;; Or tack it onto the path to be marked later.
-                               (psetf (cdr visited) diff
-                                      (cdr (last diff)) (cdr visited))))
+                               (let ((left (nset-difference diff visited :test #'equal)))
+                                 (when left
+                                   (psetf (cdr visited) left
+                                          (cdr (last left)) (cdr visited))))))
                           (let ((new-path (list* new-arc path)))
                             (declare (dynamic-extent new-path))
                             (back-propagate-pathwise pred-block new-path)))))))))
