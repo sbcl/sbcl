@@ -96,8 +96,8 @@
   ;; solution (which we're going with for now) is a depth-first search
   ;; over an arbitrarily complex chunk of flow graph that is known to
   ;; have a single entry block.
-  (clear-flags (block-component block))
   (let* ((use-blocks (mapcar #'node-block (find-uses dx-lvar)))
+         (flag use-blocks) ;; for block-flag, no need to clear-flags, as it's fresh
          ;; We have to back-propagate not just the DX-LVAR, but every
          ;; UVL or DX LVAR that is live wherever DX-LVAR is USEd
          ;; (allocated) because we can't move live DX-LVARs to release
@@ -114,8 +114,9 @@
     (labels ((mark-lvar-live-on-path (arc-list)
                (loop for (block) in arc-list
                      for 2block = (block-info block)
+                     unless (eq (block-flag block) flag)
                      do
-                     (setf (block-flag block) t)
+                     (setf (block-flag block) flag)
                      (setf (ir2-block-end-stack 2block)
                            (merge-uvl-live-sets
                             preserve-lvars
@@ -132,6 +133,8 @@
                   (pushnew dx-lvar (ir2-block-end-stack
                                     (block-info current-block)))
                   (mark-lvar-live-on-path path))
+                 ((eq (block-flag current-block) flag)
+                  (mark-lvar-live-on-path path))
                  ;; Don't go back past START-BLOCK.
                  ((not (eq current-block start-block))
                   (dolist (pred-block (if (nle-block-p current-block)
@@ -146,13 +149,13 @@
                            (visited (member new-arc path :test #'equal)))
                       ;; Never follow the same path segment twice.
                       (if visited
-                          (let ((diff (ldiff path visited)))
-                            (if (block-flag pred-block)
-                                ;; Mark the path if it reaches an already marked block
-                                (mark-lvar-live-on-path diff)
-                                ;; Or tack it onto the path to be marked later.
-                                (psetf (cdr visited) diff
-                                       (cdr (last diff)) (cdr visited))))
+                          (let ((diff (ldiff path new-arc)))
+                            (if (eq (block-flag pred-block) flag)
+                               ;; Mark the path if it reaches an already marked block
+                               (mark-lvar-live-on-path diff)
+                               ;; Or tack it onto the path to be marked later.
+                               (psetf (cdr visited) diff
+                                      (cdr (last diff)) (cdr visited))))
                           (let ((new-path (list* new-arc path)))
                             (declare (dynamic-extent new-path))
                             (back-propagate-pathwise pred-block new-path)))))))))
