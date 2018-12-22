@@ -1827,6 +1827,7 @@ the restart does not exist."))
 
 (define-condition file-exists (simple-file-error) ())
 (define-condition file-does-not-exist (simple-file-error) ())
+(define-condition delete-file-error (simple-file-error) ())
 
 (define-condition simple-stream-error  (simple-condition stream-error)  ())
 (define-condition simple-parse-error   (simple-condition parse-error)   ())

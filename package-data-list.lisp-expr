@@ -747,6 +747,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
 
                "FILE-EXISTS"
                "FILE-DOES-NOT-EXIST"
+               "DELETE-FILE-ERROR"
                "SUPERSEDE"
                "OVERWRITE"
                "RENAME"

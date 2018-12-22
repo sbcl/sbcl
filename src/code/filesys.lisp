@@ -540,7 +540,8 @@ per standard Unix unlink() behaviour."
         #!+win32 (or (sb-win32::native-delete-file namestring)
                      (values nil (sb-win32:get-last-error)))
         (unless res
-          (simple-file-perror "couldn't delete ~A" namestring err))))
+          (with-simple-restart (continue "Return T")
+            (file-perror 'delete-file-error "Couldn't delete ~A" namestring err)))))
   t)
 
 (defun directorize-pathname (pathname)
