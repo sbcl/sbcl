@@ -318,15 +318,24 @@
 ;;; logical pathnames, too (but never returns LPNs).  For internal
 ;;; use.
 (defun query-file-system (pathspec query-for &optional (errorp t))
-  (let ((pathname (translate-logical-pathname
-                   (merge-pathnames
-                    (pathname pathspec)
-                    (sane-default-pathname-defaults)))))
-    (when (wild-pathname-p pathname)
-      (simple-file-perror
-       "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
-       pathname nil query-for pathspec))
-    (%query-file-system pathname query-for errorp)))
+  (block nil
+    (tagbody
+     retry
+       (restart-case
+           (let ((pathname (translate-logical-pathname
+                            (merge-pathnames
+                             (pathname pathspec)
+                             (sane-default-pathname-defaults)))))
+             (when (wild-pathname-p pathname)
+               (simple-file-perror
+                "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
+                pathname nil query-for pathspec))
+             (return (%query-file-system pathname query-for errorp)))
+         (use-value (value)
+           :report "Specify a different path."
+           :interactive read-evaluated-form
+           (setf pathspec value)
+           (go retry))))))
 
 #!+win32
 (defun %query-file-system (pathname query-for errorp)
