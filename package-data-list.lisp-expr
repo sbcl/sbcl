@@ -745,6 +745,13 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "DEFINE-LOAD-TIME-GLOBAL"
                "SYMBOL-GLOBAL-VALUE"
 
+               "FILE-EXISTS"
+               "FILE-DOES-NOT-EXIST"
+               "SUPERSEDE"
+               "OVERWRITE"
+               "RENAME"
+               "CREATE"
+
                ;; package extensions
                ;;
                ;; locks
