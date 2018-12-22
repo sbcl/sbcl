@@ -125,6 +125,10 @@
                            (merge-uvl-live-sets
                             preserve-lvars
                             (ir2-block-start-stack 2block)))))
+             (last-member (item list)
+               (loop for prev = list then next
+                     for next = (member item (cdr prev) :test #'equal)
+                     unless next return prev))
              (back-propagate-pathwise (current-block path)
                (cond
                  ((member current-block use-blocks)
@@ -151,13 +155,14 @@
                       (if visited
                           (let ((diff (ldiff path new-arc)))
                             (if (eq (block-flag pred-block) flag)
-                               ;; Mark the path if it reaches an already marked block
-                               (mark-lvar-live-on-path diff)
-                               ;; Or tack it onto the path to be marked later.
-                               (let ((left (nset-difference diff visited :test #'equal)))
-                                 (when left
-                                   (psetf (cdr visited) left
-                                          (cdr (last left)) (cdr visited))))))
+                                ;; Mark the path if it reaches an already marked block
+                                (mark-lvar-live-on-path diff)
+                                ;; Or tack it onto the path to be marked later.
+                                (let* ((first-encounter (last-member new-arc visited))
+                                       (left (nset-difference diff first-encounter :test #'equal)))
+                                  (when left
+                                    (psetf (cdr first-encounter) left
+                                           (cdr (last left)) (cdr first-encounter))))))
                           (let ((new-path (list* new-arc path)))
                             (declare (dynamic-extent new-path))
                             (back-propagate-pathwise pred-block new-path)))))))))

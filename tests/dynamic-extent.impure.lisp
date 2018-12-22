@@ -1501,3 +1501,43 @@
         (declare (dynamic-extent v))
         (caar v)))
    (() :good)))
+
+(with-test (:name :back-propagation-losing-blocks.2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (let ((v
+              (vector
+               (list 10)
+               (BLOCK NIL
+                 (let ((loop-repeat-550 1)
+                       (loop-sum-551 0))
+                   (tagbody
+                    next-loop
+                      (if (<= loop-repeat-550 0)
+                          (go end-loop)
+                          (decf loop-repeat-550))
+                      (setq loop-sum-551
+                            (if (not c)
+                                (return-from nil 0)
+                                (block nil
+                                  (let ((loop-repeat-552 1)
+                                        (loop-sum-553 0))
+                                    (tagbody
+                                     next-loop
+                                       (if (<= loop-repeat-552 0)
+                                           (go end-loop)
+                                           (decf loop-repeat-552))
+                                       (setq loop-sum-553
+                                             (if b
+                                                 1
+                                                 2))
+                                       (go next-loop)
+                                     end-loop
+                                       (return-from nil loop-sum-553))))))
+                      (go next-loop)
+                    end-loop)
+                   loop-sum-551)))))
+        (declare (dynamic-extent v))
+        (car (elt v 0))))
+   ((t t) 10)))
