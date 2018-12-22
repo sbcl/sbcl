@@ -2476,7 +2476,7 @@
                                          #!+win32 :overlapped #!+win32 overlapped)
                       (values nil #!-win32 sb-unix:enoent
                                   #!+win32 sb-win32::error_file_not_found))
-                (flet ((vanilla-open-error (&optional (condition 'simple-file-perror))
+                (flet ((vanilla-open-error (&optional (condition 'simple-file-error))
                          (file-perror condition "Error opening ~S" pathname errno condition)))
                   (when (numberp fd)
                     (return (case direction
@@ -2542,8 +2542,10 @@
                                            if-exists :rename)))))
                             (t
                              (vanilla-open-error)))
+                    (continue ()
+                      :report "Retry opening.")
                     (use-value (value)
-                      :report "Try opening a different file"
+                      :report "Try opening a different file."
                       :interactive read-evaluated-form
                       (setf filename value)))
                   (go retry))))))))))
