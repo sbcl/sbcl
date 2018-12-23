@@ -120,7 +120,9 @@
                (when (eq (block-out block) nlx)
                  (map-block-nlxes
                   (lambda (nlx)
-                    (mark (nlx-info-target nlx)))
+                    (let ((target (nlx-info-target nlx)))
+                      (when (eq (block-flag target) cycle)
+                        (mark target))))
                   block)))
              (mark (block)
                (let ((2block (block-info block)))

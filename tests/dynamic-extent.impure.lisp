@@ -1541,3 +1541,13 @@
         (declare (dynamic-extent v))
         (car (elt v 0))))
    ((t t) 10)))
+
+(with-test (:name :back-propagate-one-dx-lvar-nlx)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (catch 'c
+        (let ((v (list (vector 0 c 0 0) (catch 'ct5 (throw 'ct5 0)) 0)))
+          (declare (dynamic-extent v))
+          (elt (elt v 0) 1))))
+   ((33) 33)))
