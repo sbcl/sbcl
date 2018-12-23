@@ -1956,14 +1956,14 @@
   (checked-compile-and-assert
    ()
    `(lambda (s)
-      (eq (%instance-ref-eq-n s)
-          most-positive-fixnum))
+      (eql (%instance-ref-eq-n s)
+           most-positive-fixnum))
    (((make-%instance-ref-eq :n most-positive-fixnum)) t)
    (((make-%instance-ref-eq :n -1)) nil))
   (checked-compile-and-assert
    ()
    `(lambda (s)
-      (eq (%instance-ref-eq-n s)
-          (1- (expt 2 31))))
+      (eql (%instance-ref-eq-n s)
+           (1- (expt 2 31))))
    (((make-%instance-ref-eq :n (1- (expt 2 31)))) t)
    (((make-%instance-ref-eq :n -1)) nil)))
