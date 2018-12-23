@@ -1941,13 +1941,29 @@
          (aref a (+ x (- y z))))
     ((#(1 2 3) 1 0 0) 2)))
 
-(defstruct %instance-ref-immediately-used (n 0))
+(defstruct %instance-ref-eq (n 0))
 
-(with-test (:name :%instance-ref-immediately-used)
+(with-test (:name :%instance-ref-eq-immediately-used)
   (checked-compile-and-assert
    ()
    `(lambda (s)
-      (let ((n (%instance-ref-immediately-used-n s)))
-        (incf (%instance-ref-immediately-used-n s))
+      (let ((n (%instance-ref-eq-n s)))
+        (incf (%instance-ref-eq-n s))
         (eql n 0)))
-   (((make-%instance-ref-immediately-used)) t)))
+   (((make-%instance-ref-eq)) t)))
+
+(with-test (:name :%instance-ref-eq-load-immediate)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (eq (%instance-ref-eq-n s)
+          most-positive-fixnum))
+   (((make-%instance-ref-eq :n most-positive-fixnum)) t)
+   (((make-%instance-ref-eq :n -1)) nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (eq (%instance-ref-eq-n s)
+          (1- (expt 2 31))))
+   (((make-%instance-ref-eq :n (1- (expt 2 31)))) t)
+   (((make-%instance-ref-eq :n -1)) nil)))

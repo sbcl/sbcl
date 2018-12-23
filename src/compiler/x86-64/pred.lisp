@@ -245,7 +245,11 @@
 
 (define-vop (%instance-ref-eq)
   (:args (instance :scs (descriptor-reg))
-         (x :scs (descriptor-reg any-reg immediate)))
+         (x :scs (descriptor-reg any-reg)
+            :load-if (or (not (sc-is x immediate))
+                         (typep (tn-value x)
+                                '(and integer
+                                  (not (signed-byte #.(- 32 n-fixnum-tag-bits))))))))
   (:arg-types * (:constant (unsigned-byte 16)) *)
   (:info slot)
   (:translate %instance-ref-eq)
