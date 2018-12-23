@@ -1940,3 +1940,14 @@
                   (optimize (speed 3) (safety 0)))
          (aref a (+ x (- y z))))
     ((#(1 2 3) 1 0 0) 2)))
+
+(defstruct %instance-ref-immediately-used (n 0))
+
+(with-test (:name :%instance-ref-immediately-used)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (let ((n (%instance-ref-immediately-used-n s)))
+        (incf (%instance-ref-immediately-used-n s))
+        (eql n 0)))
+   (((make-%instance-ref-immediately-used)) t)))

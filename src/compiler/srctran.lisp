@@ -3706,6 +3706,7 @@
       ;; effectful. For now, just handle constant Y.
       ((and (constant-lvar-p y)
             (combination-p use)
+            (almost-immediately-used-p x use)
             (eql '%instance-ref (lvar-fun-name (combination-fun use)))
             (constant-lvar-p (setf arg (second (combination-args use))))
             (typep (lvar-value arg) '(unsigned-byte 16)))
