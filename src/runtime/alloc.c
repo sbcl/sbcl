@@ -36,8 +36,11 @@ pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 lispobj alloc_code_object (unsigned total_words)
 {
     struct thread *th = arch_os_get_current_thread();
-#define REQUIRE_GC_INHIBIT \
-  !(defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32))
+#if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
+#  define REQUIRE_GC_INHIBIT 0
+#else
+#  define REQUIRE_GC_INHIBIT 1
+#endif
 #if REQUIRE_GC_INHIBIT
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
