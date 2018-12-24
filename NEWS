@@ -6,6 +6,8 @@ changes relative to sbcl-1.4.14:
   * enhancement: specializer name parsing is less lenient and signals a
     specific condition in case of syntax errors. (lp#1808681)
   * enhancement: provide interactive restarts for some file-system errors.
+  * enhancement: COMPILE no longer acquires the world lock.
+    (fixes most occurrences of lp#308959)
   * bug fix: RUN-PROGRAM is more responsive and less likely to deadlock
     (lp#1702178, lp#1808641)
 
