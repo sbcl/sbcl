@@ -28,7 +28,7 @@
     (:import-from "<package-name> {symbol-name}*")
     (:shadow "{symbol-name}*")
     (:shadowing-import-from "<package-name> {symbol-name}*")
-    (:local-nicknames "{local-nickname actual-package-name}*")
+    (:local-nicknames "{(local-nickname actual-package-name)}*")
     (:lock "boolean")
     (:implement "{package-name}*")
     (:documentation "doc-string")
