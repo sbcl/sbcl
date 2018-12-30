@@ -4,6 +4,7 @@
 @documentencoding UTF-8
 @c %**end of header
 @afourwide
+@fonttextsize 10
 @include texinfo-macros.texinfo
 @include variables.texinfo
 @set EDITION 0.1
@@ -17,8 +18,9 @@
 
 @copying
 @quotation
-This manual is part of the SBCL software system. See the
-@file{README} file for more information.
+This manual@inlinefmtifelse{info, @comma{} for SBCL version
+@value{VERSION}@comma{}@ , @ }is part of the SBCL software system. See
+the @file{README} file for more information.
 
 This manual is largely derived from the manual for the CMUCL system,
 which was produced at Carnegie Mellon University and later released
