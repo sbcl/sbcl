@@ -10,6 +10,7 @@
 #include "interrupt.h"
 #include "x86-darwin-os.h"
 #include "genesis/fdefn.h"
+#include "gc-internal.h" // for gencgc_handle_wp_violation
 
 #include <mach/mach.h>
 #include <mach/mach_error.h>
