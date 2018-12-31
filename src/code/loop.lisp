@@ -735,22 +735,22 @@ code to be loaded.
 
 (defun loop-typed-init (data-type &optional step-var-p)
   ;; FIXME: can't tell if unsupplied or NIL, but it has to be rare.
-  (when data-type
-   (let ((ctype (specifier-type data-type)))
-     ;; FIXME: use the ctype for the rest of the type operations, now
-     ;; that it's parsed.
-     (cond ((eql ctype *empty-type*)
-            (values nil t))
-           ((sb-xc:subtypep data-type 'number)
+  ;; FIXME: returns either 2 values or 1 value, which is poor style.
+  (unless data-type
+    (return-from loop-typed-init (values nil nil)))
+  (let ((ctype (specifier-type data-type)))
+    (when (eq ctype *empty-type*)
+      (return-from loop-typed-init (values nil t)))
+    (cond ((csubtypep ctype (specifier-type 'number))
             (let ((init (if step-var-p 1 0)))
               (flet ((like (&rest types)
-                       (coerce init (find-if (lambda (type)
-                                               (sb-xc:subtypep data-type type))
+                       (coerce init (find-if (lambda (spec)
+                                               (csubtypep ctype (specifier-type spec)))
                                              types))))
-                (cond ((sb-xc:subtypep data-type 'float)
+                (cond ((csubtypep ctype (specifier-type 'float))
                        (like 'single-float 'double-float
                              'short-float 'long-float 'float))
-                      ((sb-xc:subtypep data-type '(complex float))
+                      ((csubtypep ctype (specifier-type '(complex float)))
                        (like '(complex single-float)
                              '(complex double-float)
                              '(complex short-float)
@@ -758,18 +758,18 @@ code to be loaded.
                              '(complex float)))
                       (t
                        init)))))
-           ((sb-xc:subtypep data-type 'vector)
+           ((csubtypep ctype (specifier-type 'vector))
             (when (array-type-p ctype)
               (let ((etype (type-*-to-t
                             (array-type-specialized-element-type ctype))))
                 (make-array 0 :element-type (type-specifier etype)))))
            #!+sb-unicode
-           ((sb-xc:subtypep data-type 'extended-char)
+           ((csubtypep ctype (specifier-type 'extended-char))
             (code-char base-char-code-limit))
-           ((sb-xc:subtypep data-type 'character)
+           ((csubtypep ctype (specifier-type 'character))
             #\x)
            (t
-            nil)))))
+            nil))))
 
 (defun loop-optional-type (&optional variable &aux (loop *loop*))
   ;; No variable specified implies that no destructuring is permissible.
