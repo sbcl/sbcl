@@ -355,3 +355,56 @@
   (let ((where (info :variable :wired-tls symbol)))
     (or (fixnump where) ; thread slots
         (eq where :always-thread-local)))) ; everything else
+
+(sb-xc:deftype load/store-index (scale lowtag min-offset
+                                 &optional (max-offset min-offset))
+  `(integer ,(- (truncate (+ (ash 1 16)
+                             (* min-offset sb-vm:n-word-bytes)
+                             (- lowtag))
+                          scale))
+            ,(truncate (- (+ (1- (ash 1 16)) lowtag)
+                          (* max-offset sb-vm:n-word-bytes))
+                       scale)))
+
+#!+(or x86 x86-64)
+(defun sb-vm::displacement-bounds (lowtag element-size data-offset)
+  (let* (;; The minimum immediate offset in a memory-referencing instruction.
+         (minimum-immediate-offset (- (expt 2 31)))
+         ;; The maximum immediate offset in a memory-referencing instruction.
+         (maximum-immediate-offset (1- (expt 2 31)))
+         (adjustment (- (* data-offset sb-vm:n-word-bytes) lowtag))
+         (bytes-per-element (ceiling element-size sb-vm:n-byte-bits))
+         (min (truncate (+ minimum-immediate-offset adjustment)
+                        bytes-per-element))
+         (max (truncate (+ maximum-immediate-offset adjustment)
+                        bytes-per-element)))
+    (values min max)))
+
+#!+(or x86 x86-64)
+(sb-xc:deftype constant-displacement (lowtag element-size data-offset)
+  (flet ((integerify (x)
+           (etypecase x
+             (integer x)
+             (symbol (symbol-value x)))))
+    (let ((lowtag (integerify lowtag))
+          (element-size (integerify element-size))
+          (data-offset (integerify data-offset)))
+      (multiple-value-bind (min max)
+          (sb-vm::displacement-bounds lowtag element-size data-offset)
+        `(integer ,min ,max)))))
+
+;;; A couple of VM-related types that are currently used only on the
+;;; alpha and mips platforms. -- CSR, 2002-06-24
+(sb-xc:deftype unsigned-byte-with-a-bite-out (size bite)
+  (unless (typep size '(integer 1))
+    (error "Bad size for the ~S type specifier: ~S."
+           'unsigned-byte-with-a-bite-out size))
+  (let ((bound (ash 1 size)))
+    `(integer 0 ,(- bound bite 1))))
+
+(sb-xc:deftype signed-byte-with-a-bite-out (size bite)
+  (unless (typep size '(integer 2))
+    (error "Bad size for ~S type specifier: ~S."
+            'signed-byte-with-a-bite-out size))
+  (let ((bound (ash 1 (1- size))))
+    `(integer ,(- bound) ,(- bound bite 1))))

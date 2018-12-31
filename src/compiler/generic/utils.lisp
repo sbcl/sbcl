@@ -24,7 +24,7 @@
   (if (< element-size n-byte-bits)
       nil
       (multiple-value-bind (min max)
-          (sb-impl::displacement-bounds lowtag element-size data-offset)
+          (displacement-bounds lowtag element-size data-offset)
         (<= min offset max))))
 
 

@@ -14,6 +14,10 @@
 
 ;;;; utilities
 
+;;; like INDEX, but only up to half the maximum. Used by hash-table
+;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
+(deftype index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
+
 ;;; T if and only if table has non-null weakness kind.
 (declaim (inline hash-table-weak-p))
 (defun hash-table-weak-p (ht) (logbitp 0 (hash-table-flags ht)))

@@ -14,7 +14,7 @@
 
 ;; For use in constant indexing; we can't use INDEX since the displacement
 ;; field of an EA can't contain 64 bit values.
-(def!type low-index () '(signed-byte 29))
+(sb-xc:deftype low-index () '(signed-byte 29))
 
 ;;;; allocator for the array header
 

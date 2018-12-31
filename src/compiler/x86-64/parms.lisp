@@ -64,12 +64,6 @@
 ;;; address space)
 (defconstant n-machine-word-bits 64)
 
-;;; The minimum immediate offset in a memory-referencing instruction.
-(defconstant minimum-immediate-offset (- (expt 2 31)))
-
-;;; The maximum immediate offset in a memory-referencing instruction.
-(defconstant maximum-immediate-offset (1- (expt 2 31)))
-
 (defconstant float-sign-shift 31)
 
 ;;; comment from CMU CL:

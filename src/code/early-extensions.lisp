@@ -49,31 +49,11 @@
 ;;; represent the result.
 (def!type index () `(integer 0 (,sb-xc:array-dimension-limit)))
 
-;;; like INDEX, but only up to half the maximum. Used by hash-table
-;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
-(def!type index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
-
 ;;; like INDEX, but augmented with -1 (useful when using the index
 ;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
 ;;; an implementation which terminates the loop by testing for the
 ;;; index leaving the loop range)
 (def!type index-or-minus-1 () `(integer -1 (,sb-xc:array-dimension-limit)))
-
-;;; A couple of VM-related types that are currently used only on the
-;;; alpha and mips platforms. -- CSR, 2002-06-24
-(def!type unsigned-byte-with-a-bite-out (size bite)
-  (unless (typep size '(integer 1))
-    (error "Bad size for the ~S type specifier: ~S."
-           'unsigned-byte-with-a-bite-out size))
-  (let ((bound (ash 1 size)))
-    `(integer 0 ,(- bound bite 1))))
-
-(def!type signed-byte-with-a-bite-out (size bite)
-  (unless (typep size '(integer 2))
-    (error "Bad size for ~S type specifier: ~S."
-            'signed-byte-with-a-bite-out size))
-  (let ((bound (ash 1 (1- size))))
-    `(integer ,(- bound) ,(- bound bite 1))))
 
 ;;; The smallest power of two that is equal to or greater than X.
 (declaim (inline power-of-two-ceiling))
@@ -81,43 +61,9 @@
   (declare (type index x))
   (ash 1 (integer-length (1- x))))
 
-(def!type load/store-index (scale lowtag min-offset
-                                 &optional (max-offset min-offset))
-  `(integer ,(- (truncate (+ (ash 1 16)
-                             (* min-offset sb-vm:n-word-bytes)
-                             (- lowtag))
-                          scale))
-            ,(truncate (- (+ (1- (ash 1 16)) lowtag)
-                          (* max-offset sb-vm:n-word-bytes))
-                       scale)))
-
 (declaim (inline align-up))
 (defun align-up (value granularity &aux (mask (1- granularity)))
   (logandc2 (+ value mask) mask))
-
-#!+(or x86 x86-64)
-(defun displacement-bounds (lowtag element-size data-offset)
-  (let* ((adjustment (- (* data-offset sb-vm:n-word-bytes) lowtag))
-         (bytes-per-element (ceiling element-size sb-vm:n-byte-bits))
-         (min (truncate (+ sb-vm::minimum-immediate-offset adjustment)
-                        bytes-per-element))
-         (max (truncate (+ sb-vm::maximum-immediate-offset adjustment)
-                        bytes-per-element)))
-    (values min max)))
-
-#!+(or x86 x86-64)
-(def!type constant-displacement (lowtag element-size data-offset)
-  (flet ((integerify (x)
-           (etypecase x
-             (integer x)
-             (symbol (symbol-value x)))))
-    (let ((lowtag (integerify lowtag))
-          (element-size (integerify element-size))
-          (data-offset (integerify data-offset)))
-      (multiple-value-bind (min max) (displacement-bounds lowtag
-                                                          element-size
-                                                          data-offset)
-        `(integer ,min ,max)))))
 
 ;;; CHAR-CODE values for ASCII characters which we care about but
 ;;; which aren't defined in section "2.1.3 Standard Characters" of the

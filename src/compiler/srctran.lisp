@@ -3522,7 +3522,7 @@
       ((csubtypep x (specifier-type 'double-float))
        (csubtypep y (specifier-type 'double-float))))))
 
-(def!type exact-number ()
+(sb-xc:deftype exact-number ()
   '(or rational (complex rational)))
 
 ;;; Fold (+ x 0).
