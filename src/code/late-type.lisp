@@ -58,29 +58,30 @@
         (hierarchical-intersection2 type1 type2))))
 
 (defun map-type (function ctype)
-  (labels ((%map (type)
-             (typecase type
-               (compound-type
-                (mapc #'%map (compound-type-types type)))
-               (negation-type (%map (negation-type-type type)))
-               (cons-type
-                (%map (cons-type-car-type type))
-                (%map (cons-type-cdr-type type)))
-               (array-type
-                (%map (array-type-element-type type)))
-               (args-type
-                (mapc #'%map (args-type-required type))
-                (mapc #'%map (args-type-optional type))
-                (when (args-type-rest type)
-                  (%map (args-type-rest type)))
-                (mapc (lambda (x) (%map (key-info-type x)))
-                      (args-type-keywords type))
-                (when (fun-type-p type)
-                  (%map (fun-type-returns type))))
-               (t
-                (funcall function type)))))
-    (%map ctype)
-    nil))
+  (declare (type (or ctype null) ctype)
+           (dynamic-extent function))
+  (named-let %map ((type ctype))
+    (typecase type
+      (compound-type
+       (mapc #'%map (compound-type-types type)))
+      (negation-type (%map (negation-type-type type)))
+      (cons-type
+       (%map (cons-type-car-type type))
+       (%map (cons-type-cdr-type type)))
+      (array-type
+       (%map (array-type-element-type type)))
+      (args-type
+       (mapc #'%map (args-type-required type))
+       (mapc #'%map (args-type-optional type))
+       (when (args-type-rest type)
+         (%map (args-type-rest type)))
+       (mapc (lambda (x) (%map (key-info-type x)))
+             (args-type-keywords type))
+       (when (fun-type-p type)
+         (%map (fun-type-returns type))))
+      (t
+       (funcall function type))))
+  nil)
 
 (defun contains-unknown-type-p (ctype)
   (map-type (lambda (type)

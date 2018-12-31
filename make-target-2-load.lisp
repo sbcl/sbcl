@@ -196,6 +196,7 @@ Please check that all strings which were not recognizable to the compiler
                (multiple-value-bind (type present)
                    (sb-int:info kind :type s)
                  (when (and present
+                            (sb-kernel:ctype-p type)
                             (sb-kernel:contains-unknown-type-p type))
                    (setf (sb-int:info kind :type s)
                          (sb-kernel:specifier-type (sb-kernel:type-specifier type)))
