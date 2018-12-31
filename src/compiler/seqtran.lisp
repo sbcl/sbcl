@@ -403,7 +403,7 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
-(def!type eq-comparable-type ()
+(sb-xc:deftype eq-comparable-type ()
   '(or fixnum #!+64-bit single-float (not number)))
 
 ;;; True if EQL comparisons involving type can be simplified to EQ.
@@ -2136,7 +2136,7 @@
                   (when (and (eq effective-test 'eql)
                              const-seq
                              (or (vectorp const-seq) (proper-list-p const-seq))
-                             (every (lambda (x) (typep x 'eq-comparable-type))
+                             (every (lambda (x) (sb-xc:typep x 'eq-comparable-type))
                                     const-seq))
                     (setq test-form '#'eq))
                   `(nth-value ,',values-index
