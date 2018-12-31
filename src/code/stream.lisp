@@ -102,6 +102,19 @@
   (symbol nil :type symbol :read-only t))
 (declaim (freeze-type synonym-stream))
 
+(defstruct (broadcast-stream (:include ansi-stream
+                                       (out #'broadcast-out)
+                                       (bout #'broadcast-bout)
+                                       (sout #'broadcast-sout)
+                                       (misc #'broadcast-misc))
+                             (:constructor %make-broadcast-stream
+                                           (streams))
+                             (:copier nil)
+                             (:predicate nil))
+  ;; a list of all the streams we broadcast to
+  (streams () :type list :read-only t))
+(declaim (freeze-type broadcast-stream))
+
 (defun maybe-resolve-synonym-stream (stream)
   (labels ((recur (stream)
              (if (synonym-stream-p stream)
@@ -824,20 +837,6 @@
       (stream-element-type stream)))))
 
 ;;;; broadcast streams
-
-(defstruct (broadcast-stream (:include ansi-stream
-                                       (out #'broadcast-out)
-                                       (bout #'broadcast-bout)
-                                       (sout #'broadcast-sout)
-                                       (misc #'broadcast-misc))
-                             (:constructor %make-broadcast-stream
-                                           (streams))
-                             (:copier nil)
-                             (:predicate nil))
-  ;; a list of all the streams we broadcast to
-  (streams () :type list :read-only t))
-
-(declaim (freeze-type broadcast-stream))
 
 (defun make-broadcast-stream (&rest streams)
   (unless streams
