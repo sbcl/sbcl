@@ -935,10 +935,19 @@ code to be loaded.
            ((sb-xc:typep init type)
             type)
            ((sb-xc:typep init '(simple-array * (*)))
+            ;; The cross-compiler must not inquire of the host
+            ;; for an array's element type.
+            #+sb-xc-host (bug "Can't get here")
             ;; type-of lets the size in
             `(or (simple-array ,(array-element-type init) (*)) ,type))
            (t
-            `(or ,(sb-xc:type-of init) ,type)))
+            (let ((disjunct
+                   #+sb-xc-host (if (null init)
+                                    'null
+                                    (error "Unexpected need for (TYPE-OF ~S) in xc"
+                                           init))
+                   #-sb-xc-host (type-of init)))
+              `(or ,disjunct ,type))))
      init)))
 
 (defun loop-declare-var (name dtype &key step-var-p initialization

@@ -54,32 +54,6 @@
             (subtypep 'double-float 'single-float))
     (warn "possible floating point information loss in ~S" call)))
 
-(defun sb-xc:type-of (object)
-  (let ((raw-result (type-of object)))
-    (cond ((or (subtypep raw-result 'float)
-               (subtypep raw-result 'complex))
-           (warn-possible-cross-type-float-info-loss
-            `(sb-xc:type-of ,object))
-           raw-result)
-          ((subtypep raw-result 'integer)
-           (cond ((<= 0 object 1)
-                  'bit)
-                 (;; We can't rely on the host's opinion of whether
-                  ;; it's a FIXNUM, but instead test against target
-                  ;; MOST-fooITIVE-FIXNUM limits.
-                  (fixnump object)
-                  'fixnum)
-                 (t
-                  'integer)))
-          ((subtypep raw-result 'simple-string)
-           `(simple-base-string ,(length object)))
-          ((subtypep raw-result 'string) 'base-string)
-          ((some (lambda (type) (subtypep raw-result type))
-                 '(array character list symbol))
-           raw-result)
-          (t
-           (error "can't handle TYPE-OF ~S in cross-compilation" object)))))
-
 ;;; Is SYMBOL in the CL package? Note that we're testing this on the
 ;;; cross-compilation host, which could do things any old way. In
 ;;; particular, it might be in the CL package even though
