@@ -1681,7 +1681,12 @@ function to be removed without further warning."
               bit-array-1 result-bit-array))
      result-bit-array)))
 
-(defmacro def-bit-array-op (name function)
+;;; This used to be a DEFMACRO, but depending on the target's support for Unicode,
+;;; it got a constant-folding-error in the FORMAT call when producing the load-time
+;;; macro. CONCATENATE-FORMAT-P returns true, so then we want to know whether the
+;;; result is a base-string which entails calling SB-KERNEL:SIMPLE-BASE-STRING-P
+;;; which has no definition in the cross-compiler. (We could add one of course)
+(macrolet ((def-bit-array-op (name function)
   `(defun ,name (bit-array-1 bit-array-2 &optional result-bit-array)
      ,(format nil
               "Perform a bit-wise ~A on the elements of BIT-ARRAY-1 and ~
@@ -1721,7 +1726,7 @@ function to be removed without further warning."
                              (logand (,function (sbit data1 index-1)
                                                 (sbit data2 index-2))
                                      1))))
-                 result-bit-array)))))))
+                 result-bit-array))))))))
 
 (def-bit-array-op bit-and logand)
 (def-bit-array-op bit-ior logior)
@@ -1733,6 +1738,7 @@ function to be removed without further warning."
 (def-bit-array-op bit-andc2 logandc2)
 (def-bit-array-op bit-orc1 logorc1)
 (def-bit-array-op bit-orc2 logorc2)
+) ; end MACROLET
 
 (defun bit-not (bit-array &optional result-bit-array)
   "Performs a bit-wise logical NOT on the elements of BIT-ARRAY,

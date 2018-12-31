@@ -467,23 +467,28 @@
         ((union-type-p ctype)
          (any/type #'ctypep obj (union-type-types ctype)))
         ((array-type-p ctype)
+         ;; Asking whether an array is definitely non-simple is a nonsensical
+         ;; operation for the cross-compiler. The host can disagree with us,
+         ;; reporting that all arrays are simple. So ensure we don't ask.
+         ;; Otherwise the specialized array registry will need to track
+         ;; our idea of whether the array is non-simple.
+         (when (and (arrayp obj) (eq (array-type-complexp ctype) t))
+           (bug "Should not call ctypep with definitely-non-simple array type"))
          ;; This is essentially just the ARRAY-TYPE case of %%TYPEP
-         ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE.
+         ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE
+         ;; and disregarding simple-ness
          (if (and (arrayp obj)
-                  (case (array-type-complexp ctype)
-                    ((t) (not (typep obj 'simple-array)))
-                    ((nil) (typep obj 'simple-array)))
                   (or (eq (array-type-element-type ctype) *wild-type*)
                       (type= (specifier-type
                               (!specialized-array-element-type obj))
                              (array-type-specialized-element-type ctype)))
                   (or (eq (array-type-dimensions ctype) '*)
                       (and (= (length (array-type-dimensions ctype))
-                              (array-rank obj)))
-                      (every (lambda (required actual)
-                               (or (eq required '*) (eql required actual)))
-                             (array-type-dimensions ctype)
-                             (array-dimensions obj))))
+                              (array-rank obj))
+                           (every (lambda (required actual)
+                                    (or (eq required '*) (eql required actual)))
+                                  (array-type-dimensions ctype)
+                                  (array-dimensions obj)))))
                (values t t)
                (values nil t)))
         ((and (structure-classoid-p ctype) (symbolp obj))
