@@ -39,6 +39,37 @@
   (:default-initargs
    :specifier (missing-arg)))
 
+;;; For-effect-only variant of CHECK-DEPRECATED-THING for
+;;; type-specifiers that descends into compound type-specifiers.
+(defun sb-impl::%check-deprecated-type (type-specifier)
+  (let ((seen '()))
+    ;; KLUDGE: we have to use SPECIFIER-TYPE to sanely traverse
+    ;; TYPE-SPECIFIER and detect references to deprecated types. But
+    ;; then we may have to drop its cache to get the
+    ;; PARSE-DEPRECATED-TYPE condition when TYPE-SPECIFIER is parsed
+    ;; again later.
+    ;;
+    ;; Proper fix would be a
+    ;;
+    ;;   walk-type function type-specifier
+    ;;
+    ;; mechanism that could drive VALUES-SPECIFIER-TYPE but also
+    ;; things like this function.
+    (block nil
+      (handler-bind
+          ((parse-deprecated-type
+             (lambda (condition)
+               (let ((type-specifier (parse-deprecated-type-specifier condition)))
+                 (aver (symbolp type-specifier))
+                 (unless (memq type-specifier seen)
+                   (push type-specifier seen)
+                   (check-deprecated-thing 'type type-specifier)))))
+           ((or error parse-unknown-type)
+             (lambda (condition)
+               (declare (ignore condition))
+               (return))))
+        (specifier-type type-specifier)))))
+
 ;;; These functions are used as method for types which need a complex
 ;;; subtypep method to handle some superclasses, but cover a subtree
 ;;; of the type graph (i.e. there is no simple way for any other type

@@ -1272,38 +1272,6 @@ NOTE: This interface is experimental and subject to change."
        state (first since) (second since) namespace name replacements)
       (values state since replacements))))
 
-;;; For-effect-only variant of CHECK-DEPRECATED-THING for
-;;; type-specifiers that descends into compound type-specifiers.
-(defun %check-deprecated-type (type-specifier)
-  (let ((seen '()))
-    ;; KLUDGE: we have to use SPECIFIER-TYPE to sanely traverse
-    ;; TYPE-SPECIFIER and detect references to deprecated types. But
-    ;; then we may have to drop its cache to get the
-    ;; PARSE-DEPRECATED-TYPE condition when TYPE-SPECIFIER is parsed
-    ;; again later.
-    ;;
-    ;; Proper fix would be a
-    ;;
-    ;;   walk-type function type-specifier
-    ;;
-    ;; mechanism that could drive VALUES-SPECIFIER-TYPE but also
-    ;; things like this function.
-    (block nil
-      (handler-bind
-          ((sb-kernel::parse-deprecated-type
-             (lambda (condition)
-               (let ((type-specifier (sb-kernel::parse-deprecated-type-specifier
-                                      condition)))
-                 (aver (symbolp type-specifier))
-                 (unless (memq type-specifier seen)
-                   (push type-specifier seen)
-                   (check-deprecated-thing 'type type-specifier)))))
-           ((or error sb-kernel:parse-unknown-type)
-             (lambda (condition)
-               (declare (ignore condition))
-               (return))))
-        (specifier-type type-specifier)))))
-
 (defun check-deprecated-type (type-specifier)
   (typecase type-specifier
     ((or symbol cons)
