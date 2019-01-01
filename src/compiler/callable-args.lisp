@@ -42,7 +42,7 @@
      (length (fun-type-optional fun-type))))
 
 (defun callable-dependant-lvars (caller lvars args results)
-  (let ((fun-type (info :function :type caller)))
+  (let ((fun-type (proclaimed-ftype caller)))
     (collect ((lvars))
       (let ((arg-position -1)
             (positional-count (fun-type-positional-count fun-type)))
@@ -127,7 +127,7 @@
 ;;; (lvar args results &key (unknown-keys boolean) (no-function-conversion boolean) (arg-lvars list-of-lvars))
 (defun map-callable-arguments (function combination)
   (let* ((combination-name (lvar-fun-name (combination-fun combination) t))
-         (type (info :function :type combination-name))
+         (type (proclaimed-ftype combination-name))
          (info (info :function :info combination-name))
          (annotation (fun-info-annotation info)))
     (when annotation
@@ -261,7 +261,7 @@
                                     (eq key :test-not))
                            (setf test-not value)))
                        (combination-args combination)
-                       (info :function :type combination-name))
+                       (proclaimed-ftype combination-name))
         (when (and test
                    test-not
                    (eq (type-intersection null-type (lvar-type test))

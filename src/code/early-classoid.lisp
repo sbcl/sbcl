@@ -424,12 +424,16 @@
           (specifier-type (sb-impl::%fun-type fun)))
         (specifier-type 'function)))))
 
-;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION
-;;; or the symbol :GENERIC-FUNTION.
+;;; The type specifier or parsed type specifier for this function,
+;;; or a DEFSTRUCT-DESCRIPTION or the symbol :GENERIC-FUNCTION.
+;;; Ordinarily a parsed type is stored. Only if the parsed type contains
+;;; an unknown type will the original specifier be stored; we attempt to reparse
+;;; on each lookup, in the hope that the type becomes known at some point.
 ;;; If a DD, it must contain a constructor whose name is
 ;;; the one being sought in globaldb, which is used to derive the type.
 ;;; If :GENERIC-FUNCTION, the info is recomputed from existing methods
 ;;; and stored back into globaldb.
 (define-info-type (:function :type)
-  :type-spec (or ctype defstruct-description (member :generic-function))
+  :type-spec (or ctype defstruct-description (member :generic-function)
+                 (cons (eql function)))
   :default #'ftype-from-fdefn)

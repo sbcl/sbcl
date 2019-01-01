@@ -887,7 +887,9 @@ unless :NAMED is also specified.")))
   ;; In the negative case (which is most often), doing 1 SUBTYPEP test
   ;; beats doing 5 or 6.
   ;; During self-build, first test whether the type can hold NIL,
-  ;; as it avoid a bootstrapping problem.
+  ;; as it avoid a bootstrapping problem. But before testing that,
+  ;; check that the type is fully defined, as otherwise it requires
+  ;; extra complexity in CROSS-TYPEP.
   ;; Skip it normally, since SUBTYPEP NUMBER is sufficient.
   (when (and #+sb-xc-host (not (sb-xc:typep nil type))
              (sb-xc:subtypep type 'number)
@@ -1681,13 +1683,24 @@ or they must be declared locally notinline at each call site.~@:>"
     (aver ctor)
     (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
 
-(defun proclaimed-ftype (name)
+(defun proclaimed-ftype (name &optional (convert-dd t))
   (multiple-value-bind (info foundp) (info :function :type name)
-    (values (cond ((defstruct-description-p info)
-                   (specifier-type (struct-ctor-ftype info name)))
-                  #-sb-xc-host ; PCL doesn't exist
-                  ((eq info :generic-function) (sb-pcl::compute-gf-ftype name))
-                  (t info))
+    (values (typecase info
+              (defstruct-description
+               (if convert-dd (specifier-type (struct-ctor-ftype info name)) info))
+              #-sb-xc-host ; PCL doesn't exist
+              ((eql :generic-function) (sb-pcl::compute-gf-ftype name))
+              (cons
+               ;; This case is used only for DEFKNOWN. It allows some out-of-order
+               ;; definitions during bootstrap while avoiding the "uncertainty in typep"
+               ;; error. It would work for user code as well, but users shouldn't write
+               ;; out-of-order type definitions. In any case, it's not wrong to leave
+               ;; this case in.
+               (let ((ctype (specifier-type info)))
+                 (unless (contains-unknown-type-p ctype)
+                   (setf (info :function :type name) ctype))
+                 ctype))
+              (t info))
             foundp)))
 
 ;;; Given a DD and a constructor spec (a cons of name and pre-parsed

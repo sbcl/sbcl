@@ -33,7 +33,9 @@
 ;;; (:FUNCTION :TYPE) information is extracted through a wrapper.
 ;;; The globaldb representation is not necessarily literally a CTYPE.
 #-sb-xc-host
-(declaim (ftype (sfunction (t) (values ctype boolean)) proclaimed-ftype))
+(declaim (ftype (sfunction (t &optional boolean)
+                           (values (or ctype defstruct-description) boolean))
+                proclaimed-ftype))
 
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]

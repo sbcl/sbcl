@@ -160,8 +160,12 @@
               and i from 1
               do (check-arg-type arg *wild-type* i)))
     (awhen (lvar-fun-name (combination-fun call) t)
-      (let ((type (info :function :type it)))
+      (let ((type (proclaimed-ftype it nil)))
         (validate-test-and-test-not call)
+        ;; FIXME: is there a reason this case can't simply receive the "actual"
+        ;; ctype from PROCLAIMED-FTYPE, or must we have the DD in hand to perform
+        ;; CHECK-STRUCTURE-CONSTRUCTOR-CALL?
+        ;; Maybe at least some better commentary would be nice.
         ;; One more check for structure constructors:
         (when (typep type 'defstruct-description)
           (awhen (assq it (dd-constructors type))

@@ -76,7 +76,11 @@
                        overwrite-fndb-silently
                        call-type-deriver
                        annotation)
-  (let ((ctype (specifier-type type)))
+  (let* ((ctype (specifier-type type))
+         (type-to-store (if (contains-unknown-type-p ctype)
+                            ;; unparse it, so SFUNCTION -> FUNCTION
+                            (type-specifier ctype)
+                            ctype)))
     (dolist (name names)
       (unless overwrite-fndb-silently
         (let ((old-fun-info (info :function :info name)))
@@ -93,7 +97,7 @@
             (cerror "Go ahead, overwrite it."
                     "~@<overwriting old FUN-INFO ~2I~_~S ~I~_for ~S~:>"
                     old-fun-info name))))
-      (setf (info :function :type name) ctype)
+      (setf (info :function :type name) type-to-store)
       (setf (info :function :where-from name) :declared)
       (setf (info :function :kind name) :function)
       (setf (info :function :info name)
