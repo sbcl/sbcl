@@ -126,9 +126,9 @@
 ;;; The function should accept
 ;;; (lvar args results &key (unknown-keys boolean) (no-function-conversion boolean) (arg-lvars list-of-lvars))
 (defun map-callable-arguments (function combination)
-  (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
-         (type (info :function :type comination-name))
-         (info (info :function :info comination-name))
+  (let* ((combination-name (lvar-fun-name (combination-fun combination) t))
+         (type (info :function :type combination-name))
+         (info (info :function :info combination-name))
          (annotation (fun-info-annotation info)))
     (when annotation
       (multiple-value-bind (arg-lvars unknown) (resolve-key-args (combination-args combination) type)
@@ -246,8 +246,8 @@
       hard))
 
 (defun validate-test-and-test-not (combination)
-  (let* ((comination-name (lvar-fun-name (combination-fun combination) t))
-         (info (info :function :info comination-name)))
+  (let* ((combination-name (lvar-fun-name (combination-fun combination) t))
+         (info (info :function :info combination-name)))
     (when (and info
                (ir1-attributep (fun-info-attributes info) call))
       (let (test
@@ -261,7 +261,7 @@
                                     (eq key :test-not))
                            (setf test-not value)))
                        (combination-args combination)
-                       (info :function :type comination-name))
+                       (info :function :type combination-name))
         (when (and test
                    test-not
                    (eq (type-intersection null-type (lvar-type test))
@@ -269,7 +269,7 @@
                    (eq (type-intersection null-type (lvar-type test-not))
                        *empty-type*))
           (note-lossage "~s: can't specify both :TEST and :TEST-NOT"
-                        comination-name))))))
+                        combination-name))))))
 
 (defun function-designator-lvar-types (annotation)
   (labels ((arg-type (arg)

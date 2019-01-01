@@ -200,7 +200,7 @@
     (do-nodes (node nil block)
       (when (and (combination-p node)
                  (eq (combination-kind node) :known))
-        (let ((comination-name (lvar-fun-name (combination-fun node) t)))
+        (let ((combination-name (lvar-fun-name (combination-fun node) t)))
           (map-callable-arguments
            (lambda (lvar args results &key no-function-conversion &allow-other-keys)
              (declare (ignore results))
@@ -209,7 +209,7 @@
                      (arg-count (length args)))
                  (labels ((translate-two-args (name)
                             (and (eql arg-count 2)
-                                 (neq comination-name 'reduce)
+                                 (neq combination-name 'reduce)
                                  (cadr (assoc name *two-arg-functions*))))
                           (translate (ref)
                             (let* ((leaf (ref-leaf ref))
@@ -242,9 +242,9 @@
            node))))))
 
 (defun rewrite-full-call (combination)
-  (let ((comination-name (lvar-fun-name (combination-fun combination) t))
+  (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
-    (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
+    (let ((two-arg (cadr (assoc combination-name *two-arg-functions*)))
           (ref (lvar-uses (combination-fun combination))))
       (when (and two-arg
                  (ref-p ref)
