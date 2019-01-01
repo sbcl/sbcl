@@ -99,7 +99,12 @@
  )
 (defun immediate-constant-sc (value)
   (typecase value
-    ((integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum) immediate-sc-number)))
+    ((integer 0 0)
+     zero-sc-number)
+    (null
+     null-sc-number)
+    ((integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+     immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
   (or (eql sc zero-sc-number)
