@@ -44,6 +44,7 @@
   (defreg nl2 15)
   (defreg a3 16)
   (defreg nl3 17)
+  (defreg null 29)
   (defreg lip 30)
   (defreg nargs 31)
 
@@ -67,6 +68,7 @@
  (constant constant)
  (immediate immediate-constant)
  (zero immediate-constant)
+ (null immediate-constant)
 
  (control-stack control-stack)
  (any-reg registers :locations #.(append non-descriptor-regs descriptor-regs)
@@ -97,6 +99,32 @@
  (catch-block control-stack :element-size catch-block-size)
  (unwind-block control-stack :element-size unwind-block-size)
  )
+
+;;;; Random TNs for interesting registers
+
+(macrolet ((defregtn (name sc)
+               (let ((offset-sym (symbolicate name "-OFFSET"))
+                     (tn-sym (symbolicate name "-TN")))
+                 `(defparameter ,tn-sym
+                   (make-random-tn :kind :normal
+                    :sc (sc-or-lose ',sc)
+                    :offset ,offset-sym)))))
+  (defregtn zero any-reg)
+  (defregtn nargs any-reg)
+
+  (defregtn nfp any-reg)
+  (defregtn ocfp any-reg)
+
+  (defregtn null descriptor-reg)
+
+  (defregtn cfp any-reg)
+  (defregtn csp any-reg)
+  (defregtn nsp any-reg)
+
+  (defregtn lip interior-reg))
+
+;;; If VALUE can be represented as an immediate constant, then return the
+;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
     ((integer 0 0)
@@ -108,11 +136,17 @@
 
 (defun boxed-immediate-sc-p (sc)
   (or (eql sc zero-sc-number)
+      (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
 
+;;;; Function Call Parameters
+
+;;; The SC numbers for register and stack arguments/return values.
+;;;
 (defconstant immediate-arg-scn any-reg-sc-number)
 (defconstant control-stack-arg-scn control-stack-sc-number)
 
+;;; Offsets of special stack frame locations
 (defconstant ocfp-save-offset 0)
 (defconstant lra-save-offset 1)
 (defconstant nfp-save-offset 2)
