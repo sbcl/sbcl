@@ -19,16 +19,6 @@
   "Return a string describing the supporting software."
   (values "HPUX"))
 
-(defun software-version ()
-  "Return a string describing version of the supporting software, or NIL
-  if not available."
-  (or *software-version*
-      (setf *software-version*
-            (string-trim '(#\newline)
-                         (sb-kernel:with-simple-output-to-string (stream)
-                           (run-program "/bin/uname" `("-r")
-                                        :output stream))))))
-
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
   (multiple-value-bind

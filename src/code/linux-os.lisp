@@ -19,18 +19,6 @@
   "Return a string describing the supporting software."
   "Linux")
 
-;;; FIXME: More duplicated logic here vrt. other oses. Abstract into
-;;; uname-software-version?
-(defun software-version ()
-  "Return a string describing version of the supporting software, or NIL
-  if not available."
-  (or *software-version*
-      (setf *software-version*
-            (string-trim '(#\newline)
-                         (sb-kernel:with-simple-output-to-string (stream)
-                           (run-program "/bin/uname" `("-r")
-                                        :output stream))))))
-
 ;;; Return user time, system time, and number of page faults.
 (defun get-system-info ()
   (multiple-value-bind

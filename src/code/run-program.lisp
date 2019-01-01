@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-IMPL") ;(SB-IMPL, not SB-IMPL, since we're built in warm load.)
+(in-package "SB-IMPL")
 
 ;;;; hacking the Unix environment
 ;;;;
@@ -1272,3 +1272,14 @@ Users Manual for details about the PROCESS structure.
                   (return (values write-fd nil)))))))
           (t
            (fail "invalid option: ~S" object))))))
+
+#+(or linux sunos hpux)
+(defun software-version ()
+  "Return a string describing version of the supporting software, or NIL
+  if not available."
+  (or sb-sys::*software-version*
+      (setf sb-sys::*software-version*
+            (string-trim '(#\newline)
+                         (sb-kernel:with-simple-output-to-string (stream)
+                           (run-program "/bin/uname" `("-r")
+                                        :output stream))))))

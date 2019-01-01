@@ -126,7 +126,6 @@
             compute-applicable-methods
             slot-makunbound
             make-load-form-saving-slots
-            sb-ext:run-program
             sb-vm::remove-static-links)
           ;; CLOS implementation
           '(sb-mop:class-finalized-p
