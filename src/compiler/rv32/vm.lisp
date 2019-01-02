@@ -71,8 +71,10 @@
  (null immediate-constant)
 
  (control-stack control-stack)
- (any-reg registers :locations #.(append non-descriptor-regs descriptor-regs)
-          :alternate-scs (control-stack) :constant-scs (immediate))
+ (any-reg registers
+          :locations #.(append non-descriptor-regs descriptor-regs)
+          :alternate-scs (control-stack)
+          :constant-scs (immediate zero constant))
  (descriptor-reg registers :locations #.descriptor-regs :alternate-scs (control-stack))
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
  (interior-reg registers :locations (#.lip-offset))
@@ -82,9 +84,13 @@
  (sap-stack non-descriptor-stack)
  (sap-reg registers :alternate-scs (sap-stack))
  (signed-stack non-descriptor-stack)
- (signed-reg registers :alternate-scs (signed-stack))
+ (signed-reg registers
+             :locations #.non-descriptor-regs
+             :alternate-scs (signed-stack))
  (unsigned-stack non-descriptor-stack)
- (unsigned-reg registers :alternate-scs (unsigned-stack))
+ (unsigned-reg registers
+               :locations #.non-descriptor-regs
+               :alternate-scs (unsigned-stack))
 
  (single-stack non-descriptor-stack)
  (single-reg float-registers :alternate-scs (single-stack))
