@@ -11,6 +11,21 @@
 
 (in-package "SB-KERNEL")
 
+(let ((class-name 'class))
+  (setf (find-classoid class-name)
+        (let* ((classoid (make-standard-classoid :name class-name))
+               (layout (make-layout :classoid classoid)))
+          (setf (classoid-layout classoid) layout
+                (layout-invalid layout) nil
+                (layout-classoid layout) classoid)))
+  (setf (info :type :kind class-name) :instance))
+
+(eval-when (:compile-toplevel :load-toplevel)
+  (dolist (sym '(cerror error signal warn))
+    (let ((info (info :function :type sym)))
+      (when (consp info)
+        (setf (info :function :type sym) (proclaimed-ftype sym))))))
+
 ;;; Moved from 'cold-error' to this file because of (at least) these reasons:
 ;;;  - the LOAD-TIME-VALUE forms need to run after 'condition.lisp'
 ;;;    has created the WARNING and STYLE-WARNING classoids
