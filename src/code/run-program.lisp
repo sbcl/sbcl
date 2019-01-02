@@ -244,8 +244,8 @@ The function is called with PROCESS as its only argument."
               (add-fd-handler read-fd :input
                               (lambda (fd)
                                 (setf (process-serve-event-pipe process) nil)
-                                (sb-unix:unix-close fd)
-                                (remove-fd-handler handler))))
+                                (remove-fd-handler handler)
+                                (sb-unix:unix-close fd))))
         (setf (process-serve-event-pipe process) (list* read-fd write-fd handler))))))
 
 #-win32
@@ -253,16 +253,18 @@ The function is called with PROCESS as its only argument."
   (let ((pipe (process-serve-event-pipe process)))
     (when pipe
       (setf (process-serve-event-pipe process) nil)
-      (remove-fd-handler (cddr pipe))
-      (sb-unix:unix-close (car pipe))
-      (sb-unix:unix-close (cadr pipe)))))
+      (destructuring-bind (read write . handler) pipe
+        (remove-fd-handler handler)
+        (sb-unix:unix-close read)
+        (when write
+          (sb-unix:unix-close write))))))
 
 (defun wake-serve-event (process)
   #+win32 (declare (ignorable process))
   #-win32
   (let ((pipe (process-serve-event-pipe process)))
     (when pipe
-      (sb-unix:unix-close (cadr pipe)))))
+      (sb-unix:unix-close (shiftf (cadr pipe) nil)))))
 
 (defun process-wait (process &optional check-for-stopped)
   "Wait for PROCESS to quit running for some reason. When
