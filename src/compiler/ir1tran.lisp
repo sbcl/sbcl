@@ -319,7 +319,7 @@
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((xset (alloc-xset)))
     (labels ((trivialp (value)
-               (cl:typep value
+               (sb-xc:typep value
                       '(or
                         #-sb-xc-host
                         (or unboxed-array #!+sb-simd-pack simd-pack

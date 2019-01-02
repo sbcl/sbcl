@@ -175,9 +175,6 @@
 ;; forth in this package is that they run in the host and affect the
 ;; compilation of the target.
 ;;
-;; FIXME: this package should have only one name, not two,
-;; and its one name should be SBCL, but changing it to that
-;; would entail touching about 900 lines.
 (let ((package-name "SB-XC"))
   (dolist (name '(;; the constants (except for T and NIL which have
                   ;; a specially hacked correspondence between
@@ -305,7 +302,7 @@
       (incf n))))
 
 ;;; Build a new package that exports a not-necessarily-strict subset of
-;;; whatt the host CL exports. This deals with hosts that have too many
+;;; what the host CL exports. This deals with hosts that have too many
 ;;; symbols exported froM CL.
 (let ((cl-model-package (make-package "XC-STRICT-CL" :use nil)))
   (flet ((export-new (x)
