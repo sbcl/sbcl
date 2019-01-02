@@ -47,10 +47,21 @@
 ;;; CL:STREAM.
 (deftype ansi-stream () 'stream)
 
+;;; In the target SBCL, the INSTANCE type refers to a base
+;;; implementation for compound types with lowtag
+;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
+;;; concept portably, but we can get essentially the same effect by
+;;; testing for any of the standard types which would, in the target
+;;; SBCL, be derived from INSTANCE:
 (deftype instance ()
   '(or condition structure-object standard-object))
+(defun %instancep (x)
+  (typep x 'instance))
+
 (deftype funcallable-instance ()
   (error "not clear how to represent FUNCALLABLE-INSTANCE type"))
+(defun funcallable-instance-p (x)
+  (error "Called FUNCALLABLE-INSTANCE-P ~s" x))
 
 ;; The definition of TYPE-SPECIFIER for the target appears in the file
 ;; 'deftypes-for-target' - it allows CLASSes and CLASOIDs as specifiers.
@@ -58,28 +69,6 @@
 ;; handily avoiding a problem in figuring out an order in which to
 ;; define the types CLASS, CLASSOID, and TYPE-SPECIFIER.
 (deftype type-specifier () '(or list symbol))
-
-;;; In the target SBCL, the INSTANCE type refers to a base
-;;; implementation for compound types with lowtag
-;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
-;;; concept portably, but we can get essentially the same effect by
-;;; testing for any of the standard types which would, in the target
-;;; SBCL, be derived from INSTANCE:
-(defun %instancep (x)
-  (typep x '(or condition structure-object standard-object)))
-
-;;; There aren't any FUNCALLABLE-INSTANCEs in the cross-compilation
-;;; host Common Lisp.
-(defun funcallable-instance-p (x)
-  (if (typep x 'generic-function)
-    ;; In the target SBCL, FUNCALLABLE-INSTANCEs are used to implement
-    ;; generic functions, so any case which tests for this might in
-    ;; fact be trying to test for generic functions. My (WHN 19990313)
-    ;; expectation is that this case won't arise in the
-    ;; cross-compiler, but if it does, it deserves a little thought,
-    ;; rather than reflexively returning NIL.
-    (error "not clear how to handle GENERIC-FUNCTION")
-    nil))
 
 ;;; This seems to be the portable Common Lisp type test which
 ;;; corresponds to the effect of the target SBCL implementation test...
@@ -125,16 +114,6 @@
 (defun %with-array-data/fp (array start end)
   (assert (typep array '(simple-array * (*))))
   (values array start end 0))
-
-(defun signed-byte-32-p (number)
-  (typep number '(signed-byte 32)))
-
-;; This has an obvious portable implementation
-;; as (typep number 'ratio), but apparently we
-;; expect never to need it.
-(defun ratiop (number)
-  (declare (ignore number))
-  (error "Should not call RATIOP"))
 
 (defun make-value-cell (value)
   (declare (ignore value))

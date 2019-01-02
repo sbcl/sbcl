@@ -4219,7 +4219,7 @@
     (setf y (rational y))
     (if (and (csubtypep (lvar-type x)
                         (specifier-type 'integer))
-             (ratiop y))
+             (sb-xc:typep y 'ratio))
         nil
         `(= x ,y))))
 
