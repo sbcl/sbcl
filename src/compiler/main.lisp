@@ -233,14 +233,14 @@ Examples:
   #-sb-xc-host ; always return NIL in the cross-compiler
   (ecase kind
     (:function
-     (eq (symbol-package (fun-name-block-name name))
+     (eq (sb-xc:symbol-package (fun-name-block-name name))
          *cl-package*))
     (:type
      (let ((symbol (typecase name
                      (symbol name)
                      ((cons symbol) (car name))
                      (t (return-from name-reserved-by-ansi-p nil)))))
-       (eq (symbol-package symbol) *cl-package*)))))
+       (eq (sb-xc:symbol-package symbol) *cl-package*)))))
 
 ;;; This is to be called at the end of a compilation unit. It signals
 ;;; any residual warnings about unknown stuff, then prints the total

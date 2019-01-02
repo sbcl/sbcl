@@ -556,7 +556,7 @@ NOTE: This interface is experimental and subject to change."
                  ;; it is inconsequential to performance.
                  (if *profile-hash-cache*
                      `(let ((statistics
-                             (let ((*package* (symbol-package symbol)))
+                             (let ((*package* (sb-xc:symbol-package symbol)))
                                (symbolicate symbol "STATISTICS"))))
                         (unless (boundp statistics)
                           (set! statistics
@@ -872,7 +872,7 @@ NOTE: This interface is experimental and subject to change."
 
 (defun looks-like-name-of-special-var-p (x)
   (and (symbolp x)
-       (symbol-package x)
+       (sb-xc:symbol-package x)
        (let ((name (symbol-name x)))
          (and (> (length name) 2) ; to exclude '* and '**
               (char= #\* (aref name 0))
@@ -1544,7 +1544,7 @@ to :INTERPRET, an interpreter will be used.")
 '(defun show-hash-cache-statistics ()
   (flet ((cache-stats (symbol)
            (let* ((name (string symbol))
-                  (statistics (let ((*package* (symbol-package symbol)))
+                  (statistics (let ((*package* (sb-xc:symbol-package symbol)))
                                 (symbolicate symbol "STATISTICS")))
                   (prefix
                    (subseq name 0 (- (length name) (length "VECTOR**")))))
@@ -1657,7 +1657,9 @@ to :INTERPRET, an interpreter will be used.")
 (defun self-evaluating-p (x)
   (typecase x
     (null t)
-    (symbol (or (eq x t) (eq (symbol-package x) *keyword-package*)))
+    ;; This looks slighly broken if you intern a random non-constant symbol
+    ;; into the keyword package after uninterning it from its orginal home.
+    (symbol (or (eq x t) (eq (cl:symbol-package x) *keyword-package*)))
     (cons nil)
     (t t)))
 

@@ -65,10 +65,10 @@
        inside? (make-hash-table)))
   (defun uncross (form)
     (labels ((uncross-symbol (symbol)
-               (let ((old-symbol-package (symbol-package symbol)))
+               (let ((old-symbol-package (cl:symbol-package symbol)))
                  (if (and old-symbol-package
                           (string= (package-name old-symbol-package) "SB-XC"))
-                     (values (intern (symbol-name symbol) "COMMON-LISP"))
+                     (values (intern (symbol-name symbol) *cl-package*))
                      symbol)))
              (rcr (form) ; recursive part
                (cond ((symbolp form)

@@ -1211,7 +1211,7 @@
     (declare (type (or symbol cons) fname))
 
     (when (and (symbolp fname)
-               (eq (symbol-package fname) *cl-package*))
+               (eq (sb-xc:symbol-package fname) *cl-package*))
       ;; Never produce a warning from (DECLARE (INLINE LENGTH)) etc
       (return-from ponder-full-call))
 
@@ -2156,7 +2156,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (let* ((symbol (lvar-value symbol))
            (kind (info :variable :kind symbol)))
       (when (and (eq kind :unknown)
-                 (sb-impl::package-lock-violation-p (symbol-package symbol) symbol))
+                 (sb-impl::package-lock-violation-p (sb-xc:symbol-package symbol) symbol))
         (let ((*compiler-error-context* node))
           (compiler-warn "violating package lock on ~/sb-ext:print-symbol-with-prefix/"
                          symbol))))))

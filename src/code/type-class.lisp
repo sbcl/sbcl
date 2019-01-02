@@ -277,7 +277,7 @@
          ;; whereas classoids with no name should get a pseudo-random hash
          (if (or symbol (eq metatype 'named))
              ;; symbol hashes don't use the package so  mix that in too
-             (let* ((pkg-hash (acond ((symbol-package symbol)
+             (let* ((pkg-hash (acond ((sb-xc:symbol-package symbol)
                                       (sxhash (sb-impl::package-%name it)))
                                      (t 0)))
                     (mixed (logxor pkg-hash (sxhash (symbol-name symbol)))))

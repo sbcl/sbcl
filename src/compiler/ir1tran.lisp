@@ -319,7 +319,7 @@
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((xset (alloc-xset)))
     (labels ((trivialp (value)
-               (typep value
+               (cl:typep value
                       '(or
                         #-sb-xc-host
                         (or unboxed-array #!+sb-simd-pack simd-pack
@@ -1017,7 +1017,7 @@
            ;; if the value is unused.
            (if (member symbol '(symeval sym-global-val))
                (not (constantp (second form)))
-               (not (member (symbol-package symbol)
+               (not (member (sb-xc:symbol-package symbol)
                             (load-time-value
                               ;; KLUDGE: packages we're not interested in
                               ;; stepping.

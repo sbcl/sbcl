@@ -291,7 +291,7 @@ variable: an unreadable object representing the error is printed instead.")
   (or (numberp x)
       (characterp x)
       (and (symbolp x)
-           (symbol-package x))))
+           (sb-xc:symbol-package x))))
 
 (defvar *in-print-error* nil)
 
@@ -386,7 +386,7 @@ variable: an unreadable object representing the error is printed instead.")
 (defmethod print-object ((object symbol) stream)
   (if (or *print-escape* *print-readably*)
       ;; Write so that reading back works
-      (output-symbol object (symbol-package object) stream)
+      (output-symbol object (sb-xc:symbol-package object) stream)
       ;; Write only the characters of the name, never the package
       (let ((rt *readtable*))
         (funcall (truly-the function
@@ -1542,10 +1542,10 @@ variable: an unreadable object representing the error is printed instead.")
                                     'double-float-positive-infinity)))))
     (cond (*read-eval*
            (write-string "#." stream)
-           (output-symbol symbol (symbol-package symbol) stream))
+           (output-symbol symbol (sb-xc:symbol-package symbol) stream))
           (t
            (print-unreadable-object (x stream)
-             (output-symbol symbol (symbol-package symbol) stream))))))
+             (output-symbol symbol (sb-xc:symbol-package symbol) stream))))))
 
 (defun output-float-nan (x stream)
   (print-unreadable-object (x stream)

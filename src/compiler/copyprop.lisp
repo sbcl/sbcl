@@ -97,7 +97,7 @@
                               ;; Do we not care about preserving this this
                               ;; TN for debugging?
                               (or
-                               (not (symbol-package (leaf-debug-name leaf)))
+                               (not (cl:symbol-package (leaf-debug-name leaf)))
                                (policy (vop-node vop)
                                        (or (= speed 3) (< debug 2))))
                               ;; arguments of local functions have hidden write

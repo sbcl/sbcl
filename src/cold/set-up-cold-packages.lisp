@@ -62,7 +62,7 @@
    (dolist (pkg (list-all-packages))
      (let ((name (package-name pkg)))
        (unless (or (member name '("KEYWORD" "COMMON-LISP"  "COMMON-LISP-USER"
-                                  "SB-COLD" "SB-XC")
+                                  "XC-STRICT-CL" "SB-COLD" "SB-XC")
                            :test #'string=)
                    #+swank
                    (search "SWANK" name))
@@ -245,6 +245,7 @@
 
                   ;; everything else which needs a separate
                   ;; existence in xc and target
+                  "SYMBOL-PACKAGE"
                   "BYTE" "BYTE-POSITION" "BYTE-SIZE"
                   "CHAR-CODE"
                   "CODE-CHAR"
@@ -279,12 +280,62 @@
                   "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
 
-;; Symbols that we want never to accidentally see the host's definition of.
-(defparameter *shadowing-imports*
+;;; When playing such tricky package games, it's best to have the symbols that
+;;; are visible by default, i.e. XC-STRICT-CL:NAME, have no definition,
+;;; and the expressly qualified (with SB-XC:) symbols have definitions.
+;;; This idiom makes you pick one or the other of CL:THING or SB-XC:THING,
+;;; and not ever just get one at random.
+;;; In fact I especially don't like the magic byte specifier hacks. It would be
+;;; safer and clearer to have no definition associated with the symbols that you
+;;; see by default, so that using them by accident fails.
+(defparameter *undefineds*
+  '("SYMBOL-PACKAGE"))
+;;; Symbols that we want never to accidentally see the host's definition of.
+;;; these aren't actually implemented as shadowing symbols,
+;;; but they logically obscure the corresponding CL: symbols
+(defparameter *shadows*
   (mapcar (lambda (name) (find-symbol name "SB-XC"))
           '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
             "DPB" "LDB" "LDB-TEST"
             "DEPOSIT-FIELD" "MASK-FIELD")))
+
+(defun count-symbols (pkg)
+  (let ((n 0))
+    (do-external-symbols (s pkg n)
+      (incf n))))
+
+;;; Build a new package that exports a not-necessarily-strict subset of
+;;; whatt the host CL exports. This deals with hosts that have too many
+;;; symbols exported froM CL.
+(let ((cl-model-package (make-package "XC-STRICT-CL" :use nil)))
+  (flet ((export-new (x)
+           (export (intern x cl-model-package) cl-model-package))
+         (reexport (x)
+           (import x cl-model-package)
+           (export x cl-model-package)))
+    (reexport (list nil))
+    (dolist (string (read-from-file "common-lisp-exports.lisp-expr"))
+      (unless (string= string "NIL") ; already done
+        (if (member string *undefineds* :test #'string=)
+            (export-new string)
+            (let ((symbol
+                   (or (find string *shadows* :key #'symbol-name :test #'string=)
+                       (find-symbol string "CL"))))
+              (cond (symbol
+                     (reexport symbol))
+                    (t
+                     (warn "No symbol named ~S in host CL package!" string)
+                     (export-new string)))))))))
+
+;;; Snapshot so that we can ascertain in genesis that nothing new got interned
+;;; in the standardized packages.
+(defun compute-cl-package-symbol-counts ()
+  (mapcar (lambda (x) (cons x (count-symbols x)))
+          '("XC-STRICT-CL" "SB-XC")))
+
+(defvar *package-symbol-counts* (compute-cl-package-symbol-counts))
+(defun check-no-new-cl-symbols ()
+  (assert (equal *package-symbol-counts* (compute-cl-package-symbol-counts))))
 
 (let ((package-data-list (read-from-file "package-data-list.lisp-expr")))
   (labels ((flatten (tree)
@@ -298,7 +349,6 @@
     (dolist (package-data package-data-list)
       (let* ((name (package-data-name package-data))
              (package (make-package name :use nil)))
-        (shadowing-import *shadowing-imports* package)
         ;; Walk the tree of exported names, exporting each name.
         (dolist (string (flatten (package-data-export package-data)))
           (export (intern string package) package))))
@@ -306,7 +356,9 @@
     ;; Now that all packages exist, we can set up package-package
     ;; references.
     (dolist (package-data package-data-list)
-      (use-package (package-data-use package-data)
+      (use-package (substitute "XC-STRICT-CL" "CL"
+                               (package-data-use package-data)
+                               :test 'string=)
                    (package-data-name package-data))
       (dolist (sublist (package-data-import-from package-data))
         (let ((from-package (first sublist)))
@@ -353,19 +405,19 @@
           (reexport x))
         (assert (= (length done) (length package-data-list)))))))
 
+(defvar *asm-package-use-list*
+  '("SB-ASSEM" "SB-DISASSEM"
+    "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
+    "SB-SYS" ; for SAP accessors
+    ;; Dependence of the assembler on the compiler feels a bit backwards,
+    ;; but assembly needs TN-SC, TN-OFFSET, etc. because the compiler
+    ;; doesn't speak the assembler's language. Rather vice-versa.
+    "SB-C"))
 (defun make-assembler-package (pkg-name)
   (when (find-package pkg-name)
     (delete-package pkg-name))
   (let ((pkg (make-package pkg-name
-                           :use '("CL" "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
-                                  "SB-SYS" ; for SAP accessors
-                                  ;; Dependence of the assembler on the compiler
-                                  ;; feels a bit backwards, but assembly needs
-                                  ;; TN-SC, TN-OFFSET, etc. because the compiler
-                                  ;; doesn't speak the assembler's language.
-                                  ;; Rather vice-versa.
-                                  "SB-C"))))
-    (shadowing-import *shadowing-imports* pkg)
+                           :use (cons "XC-STRICT-CL" (cddr *asm-package-use-list*)))))
     ;; Both SB-ASSEM and SB-DISASSEM export these two symbols.
     ;; Neither is shadowing-imported. If you need one, package-qualify it.
     (shadow '("SEGMENT" "MAKE-SEGMENT") pkg)
@@ -379,8 +431,6 @@
 (defun package-list-for-genesis ()
   (append (read-from-file "package-data-list.lisp-expr")
           (let ((asm-package (backend-asm-package-name)))
-            (list (make-package-data
-                   :name asm-package
-                   :use (mapcar 'package-name
-                                (package-use-list asm-package))
-                   :doc nil)))))
+            (list (make-package-data :name asm-package
+                                     :use (list* "CL" *asm-package-use-list*)
+                                     :doc nil)))))

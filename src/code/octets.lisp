@@ -122,7 +122,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-od-name (sym1 sym2)
-    (package-symbolicate (symbol-package sym1) sym1 "-" sym2)))
+    (package-symbolicate (cl:symbol-package sym1) sym1 "-" sym2)))
 
 ;;;; to-octets conversions
 

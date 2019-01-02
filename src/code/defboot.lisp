@@ -230,7 +230,7 @@ evaluated as a PROGN."
 (sb-xc:defmacro defun (&environment env name lambda-list &body body)
   "Define a function at top level."
   #+sb-xc-host
-  (unless (symbol-package (fun-name-block-name name))
+  (unless (cl:symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.

@@ -87,7 +87,7 @@
 ;;; All the primitive type predicate wrappers share a parallel form..
 (macrolet ((def-type-predicate-wrapper (pred)
              (let* ((name (symbol-name pred))
-                    (package (package-name (symbol-package pred)))
+                    (package (package-name (cl:symbol-package pred)))
                     (stem (string-left-trim "%" (string-right-trim "P-" name)))
                     (article (if (position (schar name 0) "AEIOU") "an" "a")))
                (aver (not (string= package "SB-XC")))
@@ -247,7 +247,7 @@
     (symbol
      (cond ((eq object t) 'boolean)
            ((eq object nil) 'null)
-           ((eq (symbol-package object) *keyword-package*) 'keyword)
+           ((eq (sb-xc:symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
     ((or array complex #!+sb-simd-pack simd-pack #!+sb-simd-pack-256 simd-pack-256)
      (let ((sb-kernel::*unparse-allow-negation* nil))
@@ -382,8 +382,8 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
           ((consp x) (and (consp y)
                           (recurse (car x) (car y))
                           (recurse (cdr x) (cdr y))))
-          ((and (symbolp x) (not (symbol-package x)))
-           (and (symbolp y) (not (symbol-package y)) (string= x y)))
+          ((and (symbolp x) (not (sb-xc:symbol-package x)))
+           (and (symbolp y) (not (sb-xc:symbol-package y)) (string= x y)))
           (t
            (equal x y)))))
 

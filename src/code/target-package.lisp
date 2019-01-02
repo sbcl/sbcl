@@ -373,7 +373,7 @@ error if any of PACKAGES is not a valid package designator."
                    (list
                     (return-from assert-symbol-home-package-unlocked
                       name))))
-         (package (symbol-package symbol)))
+         (package (sb-xc:symbol-package symbol)))
     (when (package-lock-violation-p package symbol)
       (package-lock-violation package
                               :symbol symbol
@@ -1275,7 +1275,7 @@ implementation it is ~S." *!default-package-use-list*)
                  (if presentp
                      (if (eq package-symbol chosen-symbol)
                          (shadow (list package-symbol) package) ; CLHS 11.1.1.2.5
-                         (if (eq (symbol-package package-symbol) package)
+                         (if (eq (sb-xc:symbol-package package-symbol) package)
                              (unintern package-symbol package) ; CLHS 11.1.1.2.5
                              (shadowing-import (list chosen-symbol) package)))
                      (shadowing-import (list chosen-symbol) package)))
@@ -1320,7 +1320,7 @@ uninterned."
                                   (package-internal-symbols package)
                                   (package-external-symbols package))
                               symbol)
-                 (if (eq (symbol-package symbol) package)
+                 (if (eq (sb-xc:symbol-package symbol) package)
                      (%set-symbol-package symbol nil))
                  t)
                 (t nil)))))))
@@ -1431,7 +1431,7 @@ the importation, then a correctable error is signalled."
   (with-package-graph ()
     (let* ((package (find-undeleted-package-or-lose package))
            (symbols (symbol-listify symbols))
-           (homeless (remove-if #'symbol-package symbols))
+           (homeless (remove-if #'sb-xc:symbol-package symbols))
            (syms ()))
       (with-single-package-locked-error ()
         (dolist (sym symbols)
@@ -1629,7 +1629,7 @@ PACKAGE."
             (result nil))
         (do-symbols (symbol package)
           (when (and (or (not external-only)
-                         (and (eq (symbol-package symbol) package)
+                         (and (eq (sb-xc:symbol-package symbol) package)
                               (eq (nth-value 1 (find-symbol (symbol-name symbol)
                                                             package))
                                   :external)))

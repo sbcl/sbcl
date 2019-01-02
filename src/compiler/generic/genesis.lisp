@@ -1435,7 +1435,6 @@ core and return a descriptor to it."
                                 (t
                                  ;; 'package-data-list' contains no nicknames.
                                  ;; (See comment in 'set-up-cold-packages')
-                                 #+nil
                                  (aver (null (package-nicknames
                                               (find-package pkg-name))))
                                  nil)))))
@@ -1469,66 +1468,6 @@ core and return a descriptor to it."
       ;; tautologically true if it wanted to.
       (cold-set '*package* (find-cold-package "COMMON-LISP-USER")))))
 
-;;; sanity check for a symbol we're about to create on the target
-;;;
-;;; Make sure that the symbol has an appropriate package. In
-;;; particular, catch the so-easy-to-make error of typing something
-;;; like SB-KERNEL:%BYTE-BLT in cold sources when what you really
-;;; need is SB-KERNEL:%BYTE-BLT.
-(defun package-ok-for-target-symbol-p (package)
-  (let ((package-name (package-name package)))
-    (or
-     ;; Cold interning things in these standard packages is OK. (Cold
-     ;; interning things in the other standard package, CL-USER, isn't
-     ;; OK. We just use CL-USER to expose symbols whose homes are in
-     ;; other packages. Thus, trying to cold intern a symbol whose
-     ;; home package is CL-USER probably means that a coding error has
-     ;; been made somewhere.)
-     (find package-name '("COMMON-LISP" "KEYWORD") :test #'string=)
-     ;; Cold interning something in one of our target-code packages,
-     ;; which are ever-so-rigorously-and-elegantly distinguished by
-     ;; this prefix on their names, is OK too.
-     (string= package-name "SB-" :end1 3 :end2 3)
-     ;; This one is OK too, since it ends up being COMMON-LISP on the
-     ;; target.
-     (string= package-name "SB-XC")
-     ;; Anything else looks bad. (maybe COMMON-LISP-USER? maybe an extension
-     ;; package in the xc host? something we can't think of
-     ;; a valid reason to cold intern, anyway...)
-     )))
-
-;;; like SYMBOL-PACKAGE, but safe for symbols which end up on the target
-;;;
-;;; Most host symbols we dump onto the target are created by SBCL
-;;; itself, so that as long as we avoid gratuitously
-;;; cross-compilation-unfriendly hacks, it just happens that their
-;;; SYMBOL-PACKAGE in the host system corresponds to their
-;;; SYMBOL-PACKAGE in the target system. However, that's not the case
-;;; in the COMMON-LISP package, where we don't get to create the
-;;; symbols but instead have to use the ones that the xc host created.
-;;; In particular, while ANSI specifies which symbols are exported
-;;; from COMMON-LISP, it doesn't specify that their home packages are
-;;; COMMON-LISP, so the xc host can keep them in random packages which
-;;; don't exist on the target (e.g. CLISP keeping some CL-exported
-;;; symbols in the CLOS package).
-(defun symbol-package-for-target-symbol (symbol)
-  ;; We want to catch weird symbols like CLISP's
-  ;; CL:FIND-METHOD=CLOS::FIND-METHOD, but we don't want to get
-  ;; sidetracked by ordinary symbols like :CHARACTER which happen to
-  ;; have the same SYMBOL-NAME as exports from COMMON-LISP.
-  (multiple-value-bind (cl-symbol cl-status)
-      (find-symbol (symbol-name symbol) *cl-package*)
-    (if (and (eq symbol cl-symbol)
-             (eq cl-status :external))
-        ;; special case, to work around possible xc host weirdness
-        ;; in COMMON-LISP package
-        *cl-package*
-        ;; ordinary case
-        (let ((result (symbol-package symbol)))
-          (unless (package-ok-for-target-symbol-p result)
-            (bug "~A in bad package for target: ~A" symbol result))
-          result))))
-
 (defvar *uninterned-symbol-table* (make-hash-table :test #'equal))
 ;; This coalesces references to uninterned symbols, which is allowed because
 ;; "similar-as-constant" is defined by string comparison, and since we only have
@@ -1554,7 +1493,7 @@ core and return a descriptor to it."
       (setf (gethash value visited)
             (typecase value
               (descriptor value)
-              (symbol (if (symbol-package value)
+              (symbol (if (cl:symbol-package value)
                           (cold-intern value)
                           (get-uninterned-symbol (string value))))
               (number (number-to-core value))
@@ -1580,18 +1519,18 @@ core and return a descriptor to it."
 (defun cold-intern (symbol
                     &key (access nil)
                          (gspace (symbol-value *cold-symbol-gspace*))
-                    &aux (package (symbol-package-for-target-symbol symbol)))
+                    &aux (package (sb-xc:symbol-package symbol)))
 
   (declare (symbol symbol))
-  ;; Anything on the cross-compilation host which refers to the target
-  ;; machinery through the host SB-XC package should be translated to
-  ;; something on the target which refers to the same machinery
-  ;; through the target COMMON-LISP package.
-  (let ((p (find-package "SB-XC")))
-    (when (eq package p)
-      (setf package *cl-package*))
-    (when (eq (symbol-package symbol) p)
-      (setf symbol (intern (symbol-name symbol) *cl-package*))))
+
+  ;; Symbols that are logically in COMMON-LISP but accessed through the SB-XC package
+  ;; need to be re-interned since the cold-intern-info must be associated with
+  ;; exactly one of the possible lookalikes, not both.
+  (cond ((eq package *cl-package*)
+         (setf symbol (intern (symbol-name symbol) *cl-package*)))
+        ((not (or (eq package *keyword-package*)
+                  (= (mismatch (package-name package) "SB-") 3)))
+         (bug "~S in bad package for target: ~A" symbol package)))
 
   (or (get symbol 'cold-intern-info)
       ;; KLUDGE: there is no way to automatically know which macros are handled
@@ -1798,7 +1737,7 @@ core and return a descriptor to it."
          (multiple-value-bind (foundp sym accessibility package) (iter)
            (declare (ignore accessibility))
            (cond ((not foundp) (return))
-                 ((eq (symbol-package sym) package) (push sym syms))))))
+                 ((eq (cl:symbol-package sym) package) (push sym syms))))))
     (setf syms (stable-sort syms #'string<))
     (dolist (sym syms)
       (cold-intern sym)))
@@ -1815,7 +1754,8 @@ core and return a descriptor to it."
                  ;; Be insensitive to the host's ordering.
                  (sort (remove (find-package "SB-XC")
                                (package-shadowing-symbols (find-package pkg-name))
-                               :key #'symbol-package) #'string<))))
+                               :key #'cl:symbol-package)
+                       #'string<))))
           (write-slots (cdr pkg-info) ; package
                        (find-layout 'package)
                        :%shadowing-symbols (list-to-core
@@ -1830,8 +1770,8 @@ core and return a descriptor to it."
             (with-package-iterator (iter host-pkg :internal :external)
               (loop (multiple-value-bind (foundp sym accessibility) (iter)
                       (unless foundp (return))
-                      (unless (or (eq (symbol-package sym) host-pkg)
-                                  (eq (symbol-package sym) sb-xc-pkg))
+                      (unless (or (eq (cl:symbol-package sym) host-pkg)
+                                  (eq (cl:symbol-package sym) sb-xc-pkg))
                         (push (cons sym accessibility) syms)))))
             (dolist (symcons (sort syms #'string< :key #'car))
               (destructuring-bind (sym . accessibility) symcons
@@ -1900,7 +1840,7 @@ core and return a descriptor to it."
          (if (symbolp des)
              ;; This parallels the logic at the start of COLD-INTERN
              ;; which re-homes symbols in SB-XC to COMMON-LISP.
-             (if (eq (symbol-package des) (find-package "SB-XC"))
+             (if (eq (cl:symbol-package des) (find-package "SB-XC"))
                  (intern (symbol-name des) *cl-package*)
                  des)
              (ecase (descriptor-lowtag des)
@@ -3424,8 +3364,8 @@ III. initially undefined function references (alphabetically):
      FDEFN  NAME
 ==========  ====~:{~%~10,'0X  ~S~}~%"
               (sort undefs
-                    (lambda (a b &aux (pkg-a (package-name (symbol-package a)))
-                                      (pkg-b (package-name (symbol-package b))))
+                    (lambda (a b &aux (pkg-a (package-name (sb-xc:symbol-package a)))
+                                      (pkg-b (package-name (sb-xc:symbol-package b))))
                       (cond ((string< pkg-a pkg-b) t)
                             ((string> pkg-a pkg-b) nil)
                             (t (string< a b))))
@@ -3748,6 +3688,8 @@ III. initially undefined function references (alphabetically):
       ;; Cold load.
       (dolist (file-name object-file-names)
         (cold-load file-name verbose))
+
+      (sb-cold::check-no-new-cl-symbols)
 
       (when *known-structure-classoids*
         (let ((dd-layout (find-layout 'defstruct-description)))

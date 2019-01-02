@@ -76,17 +76,21 @@
 ;;; Lots of code wants to get to the KEYWORD package or the
 ;;; COMMON-LISP package without a lot of fuss, so we cache them in
 ;;; variables on the host, or use L-T-V forms on the target.
-(macrolet ((def-it (sym expr)
+(macrolet ((def-it (sym name)
              #+sb-xc-host
              `(progn (declaim (type package ,sym))
-                     (defvar ,sym ,expr))
+                     (defvar ,sym (find-package ,name)))
              #-sb-xc-host
              ;; We don't need to declaim the type. FIND-PACKAGE
              ;; returns a package, and L-T-V propagates types.
              ;; It's ugly how it achieves that, but it's a separate concern.
-             `(define-symbol-macro ,sym (load-time-value ,expr t))))
-  (def-it *cl-package* (find-package "COMMON-LISP"))
-  (def-it *keyword-package* (find-package "KEYWORD")))
+             `(define-symbol-macro ,sym
+                  (load-time-value (find-package ,name) t))))
+  ;; *CL-PACKAGE* is always COMMON-LISP, not XC-STRICT-CL on the host, because the latter
+  ;; is just a means to avoid inheriting symbols that are not supposed to be in the CL:
+  ;; package but might be due to non-ansi-compliance of the host.
+  (def-it *cl-package* "COMMON-LISP")
+  (def-it *keyword-package* "KEYWORD"))
 
 (declaim (inline singleton-p))
 (defun singleton-p (list)

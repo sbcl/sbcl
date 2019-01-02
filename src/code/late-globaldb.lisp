@@ -26,8 +26,8 @@
                         ;; Try to process each symbol at most once by associating it with
                         ;; a single package. If a symbol is apparently uninterned,
                         ;; always keep it since we can't know if it has been seen once.
-                        (when (or (not (symbol-package symbol))
-                                  (eq package (symbol-package symbol)))
+                        (when (or (not (sb-xc:symbol-package symbol))
+                                  (eq package (sb-xc:symbol-package symbol)))
                           (dolist (name (info-vector-name-list symbol))
                             (funcall function name))))))
               ,@(unless (equal situations '(:compile-toplevel))

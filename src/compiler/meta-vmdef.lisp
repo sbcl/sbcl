@@ -780,11 +780,11 @@
 (defun make-operand-parse-temp ()
   (without-package-locks
    (intern (format nil "OPERAND-PARSE-TEMP-~D" *parse-vop-operand-count*)
-           (symbol-package '*parse-vop-operand-count*))))
+           (sb-xc:symbol-package '*parse-vop-operand-count*))))
 (defun make-operand-parse-load-tn ()
   (without-package-locks
    (intern (format nil "OPERAND-PARSE-LOAD-TN-~D" *parse-vop-operand-count*)
-           (symbol-package '*parse-vop-operand-count*))))
+           (sb-xc:symbol-package '*parse-vop-operand-count*))))
 
 ;;; Given a list of operand specifications as given to DEFINE-VOP,
 ;;; return a list of OPERAND-PARSE structures describing the fixed
@@ -1583,7 +1583,7 @@
               ((quotify-slots ()
                  (collect ((forms))
                    (dolist (x vop-parse-slot-names (cons 'list (forms)))
-                     (let ((reader (package-symbolicate (symbol-package 'vop-parse)
+                     (let ((reader (package-symbolicate (sb-xc:symbol-package 'vop-parse)
                                                         "VOP-PARSE-" x)))
                        (forms
                         (case x

@@ -55,15 +55,6 @@
     (warn "possible floating point information loss in ~S"
           (list caller host-object ctype))))
 
-;;; Is SYMBOL in the CL package? Note that we're testing this on the
-;;; cross-compilation host, which could do things any old way. In
-;;; particular, it might be in the CL package even though
-;;; SYMBOL-PACKAGE is not (FIND-PACKAGE :CL). So we test things
-;;; another way.
-(defun in-cl-package-p (symbol)
-  (eql (find-symbol (symbol-name symbol) :cl)
-       symbol))
-
 ;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
 ;; specifier. We assume that anything in CL: is allowed.
 (defvar *seen-xtypep-preds* nil)
@@ -79,7 +70,7 @@
   ;; For USAGE = CTYPEP, call it only if it is a foldable function.
   ;; The major case in which we don't call something for CTYPEP is KEYWORDP
   ;; which we consider not to be foldable.
-  (and (in-cl-package-p symbol)
+  (and (eq (sb-xc:symbol-package symbol) *cl-package*)
        (or (eq usage 'sb-xc:typep)
            (awhen (info :function :info symbol)
              (sb-c::ir1-attributep (sb-c::fun-info-attributes it) sb-c:foldable)))))

@@ -172,6 +172,20 @@
 ;; But portably we have to just fallback to PACKAGE-NAME.
 (defun package-%name (x) (package-name x))
 
+;;; This definition collapses SB-XC back into COMMON-LISP.
+;;; Use CL:SYMBOL-PACKAGE if that's not the behavior you want.
+;;; Notice that to determine whether a package is really supposed to be CL,
+;;; we look for the symbol in the restricted lisp package, not the real
+;;; host CL package. This works around situations where the host has *more*
+;;; symbols exported from CL than should be.
+(defun sb-xc:symbol-package (symbol)
+  (let ((p (cl:symbol-package symbol)))
+    (if (and p
+             (or (eq (find-symbol (string symbol) "XC-STRICT-CL") symbol)
+                 (eq (find-symbol (string symbol) "SB-XC") symbol)))
+        *cl-package*
+        p)))
+
 ;;; printing structures
 
 (defun default-structure-print (structure stream depth)

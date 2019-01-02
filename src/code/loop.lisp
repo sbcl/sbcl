@@ -276,9 +276,7 @@ code to be loaded.
   ;; most atoms. The real test is whether type = :PRIMITIVE, as there are CL
   ;; symbols naming types which are not standard builtin type specifiers, e.g.
   ;; ARRAY-RANK, CHAR-CODE. (One almost wonders if that is technically wrong).
-  ;; At any rate, in the cross-compiler, we must not rely on the host's idea
-  ;; of SYMBOL-PACKAGE as it does not accurately model the target per se.
-  (and #-sb-xc-host (eq (symbol-package symbol) *cl-package*)
+  (and (eq (sb-xc:symbol-package symbol) *cl-package*)
        (or (eq (info :type :kind symbol) :primitive)
            ;; allow certain :instance types, but not all of them
            (member symbol '(hash-table package pathname random-state readtable)))
@@ -955,7 +953,7 @@ code to be loaded.
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
          (unless (or (sb-xc:subtypep t dtype)
-                     (and (eq (find-package :cl) (symbol-package name))
+                     (and (eq (sb-xc:symbol-package name) *cl-package*)
                           (eq :special (info :variable :kind name))))
            (let ((dtype `(type ,(if initialization
                                     dtype

@@ -292,9 +292,9 @@ distinct from the global value. Can also be SETF."
   "Return SYMBOL's name as a string."
   (symbol-name symbol))
 
-(defun symbol-package (symbol)
+(defun sb-xc:symbol-package (symbol)
   "Return the package SYMBOL was interned in, or NIL if none."
-  (symbol-package symbol))
+  (sb-xc:symbol-package symbol))
 
 (defun %set-symbol-package (symbol package)
   (declare (type symbol symbol))
@@ -448,7 +448,7 @@ distinct from the global value. Can also be SETF."
 (defun keywordp (object)
   "Return true if Object is a symbol in the \"KEYWORD\" package."
   (and (symbolp object)
-       (eq (symbol-package object) *keyword-package*)))
+       (eq (sb-xc:symbol-package object) *keyword-package*)))
 
 ;;;; GENSYM and friends
 

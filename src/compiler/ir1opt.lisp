@@ -841,7 +841,7 @@
     (when #+sb-xc-host t ; always trust our own code
           #-sb-xc-host
           (or (package-locked-p ; callee "probably" won't get redefined
-               (symbol-package (fun-name-block-name fun-name)))
+               (sb-xc:symbol-package (fun-name-block-name fun-name)))
               (policy node (= safety 0)))
       (dolist (arg-spec dxable-args)
         (when (symbolp arg-spec)
@@ -1801,8 +1801,7 @@
        (case (global-var-kind leaf)
          (:global-function
           (let ((name (leaf-source-name leaf)))
-            (or #-sb-xc-host
-                (eq (symbol-package (fun-name-block-name name))
+            (or (eq (sb-xc:symbol-package (fun-name-block-name name))
                     *cl-package*)
                 (info :function :info name)))))))))
 

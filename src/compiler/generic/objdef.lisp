@@ -378,7 +378,7 @@ during backtrace.
         :type (or simple-vector list)
         :init :null)
   (name :ref-trans symbol-name :init :arg)
-  (package :ref-trans symbol-package
+  (package :ref-trans sb-xc:symbol-package
            :set-trans %set-symbol-package
            :init :null)
   ;; 0 tls-index means no tls-index is allocated

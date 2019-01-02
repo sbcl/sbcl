@@ -409,7 +409,7 @@
                                ,@gensyms))
            ,@more-decls ,@forms))
        ,@(when (consp what)
-           `((setf (,(let ((*package* (symbol-package 'fun-info)))
+           `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
                           (symbolicate "FUN-INFO-" (second what)))
                        (fun-info-or-lose ',(first what)))
                       #',name))))))
@@ -607,7 +607,7 @@
 ;;; :TEST keyword may be used to determine the name equality
 ;;; predicate.
 (defmacro lexenv-find (name slot &key test)
-  (once-only ((n-res `(assoc ,name (,(let ((*package* (symbol-package 'lexenv-funs)))
+  (once-only ((n-res `(assoc ,name (,(let ((*package* (sb-xc:symbol-package 'lexenv-funs)))
                                           (symbolicate "LEXENV-" slot))
                                      *lexenv*)
                              :test ,(or test '#'eq))))

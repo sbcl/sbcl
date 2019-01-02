@@ -918,17 +918,7 @@
          (base-string-p (and #-sb-xc-host (typep pname 'base-string)))
          (length+flag (logior (ash pname-length 1) (if base-string-p 1 0)))
          (dumped-as-copy nil)
-         (pkg (symbol-package s)))
-    ;; see comment in genesis: we need this here for repeatable fasls
-    #+sb-xc-host
-    (multiple-value-bind (cl-symbol cl-status)
-        (find-symbol (symbol-name s) *cl-package*)
-      (when (and (eq s cl-symbol)
-                 (eq cl-status :external))
-        ;; special case, to work around possible xc host "design
-        ;; choice" weirdness in COMMON-LISP package
-        (setq pkg *cl-package*)))
-
+         (pkg (sb-xc:symbol-package s)))
     (cond ((null pkg)
            (let ((this-base-p base-string-p))
              (dolist (lookalike (gethash pname (fasl-output-string=-table file))

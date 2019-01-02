@@ -452,7 +452,7 @@
       ;; and PARSE-COMPILED-DEBUG-VARS can create the interned symbol.
       ;; This reduces core size by omitting zillions of symbols whose names
       ;; are spelled the same.
-      (vector-push-extend (if (symbol-package name) name (string name)) buffer))
+      (vector-push-extend (if (cl:symbol-package name) name (string name)) buffer))
 
     (cond (indirect
            ;; Indirect variables live in the parent frame, and are
@@ -497,7 +497,7 @@
     (labels ((frob-leaf (leaf tn gensym-p)
                (let ((name (leaf-principal-name leaf)))
                  (when (and name (leaf-refs leaf) (tn-offset tn)
-                            (or gensym-p (symbol-package name)))
+                            (or gensym-p (cl:symbol-package name)))
                    (vars (list* name leaf tn)))))
              (frob-lambda (x gensym-p)
                (dolist (leaf (lambda-vars x))

@@ -630,7 +630,7 @@ be a lambda expression."
              (leaf-has-source-name-p (setf leaf (ref-leaf uses)))
              (symbolp (setf name (leaf-source-name leaf)))
              ;; assume users don't hand-write gensyms
-             (symbol-package name)
+             (cl:symbol-package name)
              name)
         fallback)))
 
@@ -880,7 +880,8 @@ lexically apparent function definition in the enclosing environment."
                                  :source-name name
                                  :maybe-add-debug-catch t
                                  :debug-name
-                                 (let ((n (if (and (symbolp name) (not (symbol-package name)))
+                                 (let ((n (if (and (symbolp name)
+                                                   (not (cl:symbol-package name)))
                                               (string name)
                                               name)))
                                    (debug-name 'flet n t)))))
