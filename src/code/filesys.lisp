@@ -1274,11 +1274,7 @@ Experimental: interface subject to change."
                         :report "Retry directory creation."
                         (ensure-directories-exist
                          pathspec
-                         :verbose verbose :mode mode))
-                      (continue ()
-                        :report
-                        "Continue as if directory creation was successful."
-                        nil)))
+                         :verbose verbose :mode mode))))
                   (setf created-p t)))))
       (values pathspec created-p))))
 

@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.4.15:
+  * minor incompatible change: ENSURE-DIRECTORIES-EXIST no longer establishes
+    a CONTINUE restart in case of an error.
   * enhancement: the unexported restart names SB-{ALIEN,FASL,IMPL,PCL}::RETRY
     have been replaced by SB-EXT:RETRY.
 
