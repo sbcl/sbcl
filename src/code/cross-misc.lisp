@@ -241,3 +241,8 @@
   (eval form))
 
 (defmacro sb-format:tokens (string) string)
+
+;;; Used by our lockfree memoization functions (define-hash-cache)
+(defmacro sb-thread:barrier ((kind) &body body)
+  (declare (ignore kind))
+  `(progn ,@body))

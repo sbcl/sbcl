@@ -88,7 +88,6 @@
  ("src/code/cross-char"  :c-headers :not-target)
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
- ("src/code/cross-thread" :c-headers :not-target)
  ("src/code/cross-condition" :not-target)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

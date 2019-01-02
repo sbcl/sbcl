@@ -147,8 +147,8 @@ the stack without triggering overflow protection.")
     (sb-thread:make-mutex :name "static linker"))
 
 (defmacro with-world-lock (() &body body)
-  `(sb-thread:with-recursive-lock (**world-lock**)
-     ,@body))
+  #+sb-xc-host `(progn ,@body)
+  #-sb-xc-host `(sb-thread:with-recursive-lock (**world-lock**) ,@body))
 
 ;;; unique ID for the next object created (to let us track object
 ;;; identity even across GC, useful for understanding weird compiler
