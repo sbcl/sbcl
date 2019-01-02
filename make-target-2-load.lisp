@@ -361,6 +361,8 @@ Please check that all strings which were not recognizable to the compiler
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
 
+#+sb-devel
+(sb-impl::%enter-new-nicknames (find-package :cl) '("SB-XC" "CL"))
 "done with warm.lisp, about to SAVE-LISP-AND-DIE"
 
 #|
