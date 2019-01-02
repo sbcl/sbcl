@@ -752,6 +752,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "OVERWRITE"
                "RENAME"
                "CREATE"
+               "RETRY"
 
                ;; package extensions
                ;;
