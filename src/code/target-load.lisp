@@ -128,6 +128,41 @@
                   (*load-depth* (1+ *load-depth*)))
              (funcall function)))
 
+;;; Returns T if the stream is a binary input stream with a FASL header.
+(defun fasl-header-p (stream &key errorp)
+  (unless (and (member (stream-element-type stream) '(character base-char))
+               ;; give up if it's not a file stream, or it's an
+               ;; fd-stream but it's either not bivalent or not
+               ;; seekable (doesn't really have a file)
+               (or (not (typep stream 'file-stream))
+                   (and (typep stream 'fd-stream)
+                        (or (not (sb-impl::fd-stream-bivalent-p stream))
+                            (not (sb-impl::fd-stream-file stream))))))
+    (let ((p (file-position stream)))
+      (unwind-protect
+           (let* ((header *fasl-header-string-start-string*)
+                  (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
+                  (n 0))
+             (flet ((scan ()
+                      (maybe-skip-shebang-line stream)
+                      (setf n (read-sequence buffer stream))))
+               (if errorp
+                   (scan)
+                   (or (ignore-errors (scan))
+                       ;; no a binary input stream
+                       (return-from fasl-header-p nil))))
+             (cond ((not (mismatch buffer header
+                                   :test #'(lambda (code char) (= code (char-code char))))))
+                   ((zerop n)
+                    ;; Immediate EOF is valid -- we want to match what
+                    ;; CHECK-FASL-HEADER does...
+                    nil)
+                   (errorp
+                    (error 'fasl-header-missing
+                           :stream stream
+                           :fhsss buffer
+                           :expected header))))
+        (file-position stream p)))))
 (defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
              (if-does-not-exist t) (external-format :default))
   "Load the file given by FILESPEC into the Lisp environment, returning
