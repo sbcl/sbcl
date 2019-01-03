@@ -147,3 +147,7 @@
     (clrhash tbl)
     ;; The need-to-rehash bit is not set
     (assert (eql 0 (svref (sb-impl::hash-table-table tbl) 1)))))
+
+(with-test (:name :sxhash-signed-floating-point-zeros)
+  (assert (not (eql (sxhash -0f0) (sxhash 0f0))))
+  (assert (not (eql (sxhash -0d0) (sxhash 0d0)))))
