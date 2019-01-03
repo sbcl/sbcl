@@ -302,11 +302,12 @@ any non-negative real number."
            ;; Scripts don't need to be stylish or fast, but silence is usually a
            ;; desirable quality...
            (handler-bind (((or style-warning compiler-note) #'muffle-warning)
-                          (stream-error (lambda (e)
-                                          ;; Shell-style.
-                                          (when (member (stream-error-stream e)
-                                                        (list *stdout* *stdin* *stderr*))
-                                            (exit)))))
+                          ((or broken-pipe end-of-file)
+                            (lambda (e)
+                              ;; Shell-style.
+                              (when (member (stream-error-stream e)
+                                            (list *stdout* *stdin* *stderr*))
+                                (exit)))))
              ;; Let's not use the *TTY* for scripts, ok? Also, normally we use
              ;; synonym streams, but in order to have the broken pipe/eof error
              ;; handling right we want to bind them for scripts.

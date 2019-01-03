@@ -79,11 +79,14 @@
                   (sb-c::find-source-paths form current-index)
                   (eval-form form current-index))))
             (let ((sb-c::*source-info* nil))
-              (do ((form (read stream nil *eof-object*)
-                         (read stream nil *eof-object*)))
-                  ((eq form *eof-object*))
-                (sb-c::with-source-paths
-                  (eval-form form nil))))))))
+              (loop for form =
+                    (handler-case (read stream nil *eof-object*)
+                      ((or reader-error end-of-file) (c)
+                        (error 'sb-c::input-error-in-load :stream stream
+                                                          :condition c)))
+                    until (eq form *eof-object*)
+                    do (sb-c::with-source-paths
+                         (eval-form form nil))))))))
   t)
 
 ;;;; LOAD itself
