@@ -443,10 +443,15 @@
   element-type output, the kind of buffering, the function name, and the number
   of bytes per element.")
 
+(defun stream-errno-to-condition (errno)
+  (case errno
+    (#.sb-unix:epipe 'broken-pipe)
+    (t 'simple-stream-error)))
+
 ;;; common idioms for reporting low-level stream and file problems
 (defun simple-stream-perror (format-control stream &optional errno &rest format-arguments)
   (declare (optimize allow-non-returning-tail-call))
-  (error 'simple-stream-error
+  (error (stream-errno-to-condition errno)
          :stream stream
          :format-control "~@<~?~@[: ~2I~_~A~]~:>"
          :format-arguments (list format-control

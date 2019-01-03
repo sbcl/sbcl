@@ -1141,6 +1141,8 @@ possibly temporarily, because it might be used internally."
                "STREAM-ERROR-POSITION-INFO"
                "TRY-RESTART"
 
+               "BROKEN-PIPE"
+
                ;; error-signalling facilities
                "STANDARD-READTABLE-MODIFIED-ERROR"
                "STANDARD-PPRINT-DISPATCH-TABLE-MODIFIED-ERROR"
@@ -3030,7 +3032,8 @@ no guarantees of interface stability."
                "ENOTCONN" "ENOTEMPTY" "ENOTSOCK" "ENOTTY" "ENXIO"
                "EOPNOTSUPP" "EPERM" "EPFNOSUPPORT" "EPIPE" "EPROCLIM"
                "EPROTONOSUPPORT" "EPROTOTYPE" "ERANGE" "EREMOTE"
-               "ERESTART" "EROFS" "ESHUTDOWN" "ESOCKTNOSUPPORT" "ESPIPE"
+               "ERESTART" "EROFS" "ESHUTDOWN" "ESOCKTNOSUPPORT"
+               "EPIPE" "ESPIPE"
                "ESRCH" "ESUCCESS" "ETIMEDOUT" "ETOOMANYREFS" "ETXTBSY"
                "EUSERS" "EVICEERR" "EVICEOP" "EWOULDBLOCK" "EXDEV"
 
