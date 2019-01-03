@@ -80,6 +80,7 @@
 (defconstant eexist 17) ; #x11
 (defconstant eloop 62) ; #x3e
 (defconstant espipe 29) ; #x1d
+(defconstant epipe 32) ; #x20
 (defconstant ewouldblock 35) ; #x23
 
 ;;; for wait3(2) in run-program.lisp
