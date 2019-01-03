@@ -445,7 +445,9 @@
 
 (defun stream-errno-to-condition (errno)
   (case errno
-    (#.sb-unix:epipe 'broken-pipe)
+    (#!-win32 #.sb-unix:epipe
+     #!+win32 #.sb-win32::error-no-data
+     'broken-pipe)
     (t 'simple-stream-error)))
 
 ;;; common idioms for reporting low-level stream and file problems

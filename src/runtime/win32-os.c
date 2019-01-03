@@ -1945,7 +1945,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
             return -1;
         }
         if (errorCode!=ERROR_IO_PENDING) {
-            errno = EIO;
+            errno = errorCode;
             return -1;
         } else {
             if(WaitForMultipleObjects(2,self->private_events.events,
@@ -1956,10 +1956,10 @@ win32_unix_write(HANDLE handle, void * buf, int count)
                 waitInGOR = FALSE;
             }
             if (!GetOverlappedResult(handle,&overlapped,&written_bytes,waitInGOR)) {
-                if (GetLastError()==ERROR_OPERATION_ABORTED) {
+                if ((errorCode = GetLastError())==ERROR_OPERATION_ABORTED) {
                     errno = EINTR;
                 } else {
-                    errno = EIO;
+                    errno = errorCode;
                 }
                 return -1;
             } else {
