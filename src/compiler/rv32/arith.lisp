@@ -382,135 +382,72 @@
 
 ;;;; Binary conditional VOPs.
 
+;;; Unlike other backends, it is not worth defining vops which
+;;; specialize on a constant second argument in RISC-V. No branch
+;;; instruction encodes an immediate operand.
 (define-vop (fast-conditional)
   (:conditional)
+  (:variant-vars condition)
   (:info target not-p)
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg))
          (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
-  (:note "inline fixnum comparison"))
-
-(define-vop (fast-conditional-c/fixnum fast-conditional)
-  (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (signed-byte #.(- 12 n-fixnum-tag-bits))))
-  (:info target not-p y))
+  (:note "inline fixnum comparison")
+  (:generator 3
+    (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/signed fast-conditional)
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
-  (:note "inline (signed-byte 32) comparison"))
-
-(define-vop (fast-conditional-c/signed fast-conditional)
-  (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (signed-byte 12)))
-  (:info target not-p y))
+  (:note "inline (signed-byte 32) comparison")
+  (:generator 3
+    (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:note "inline (unsigned-byte 32) comparison"))
+  (:note "inline (unsigned-byte 32) comparison")
+  (:generator 3
+    (three-way-comparison x y condition :unsigned not-p target)))
 
-(define-vop (fast-conditional-c/unsigned fast-conditional)
-  (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (unsigned-byte 12)))
-  (:info target not-p y))
-
-(defmacro define-conditional-vop (translate &rest generator)
+(defmacro define-conditional-vop (translate op)
   `(progn
-     ,@(mapcar #'(lambda (suffix cost signed)
-                   (unless (and (member suffix '(/fixnum -c/fixnum))
-                                (eq translate 'eql))
-                     `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
-                                                    translate suffix))
-                                   ,(intern
-                                     (format nil "~:@(FAST-CONDITIONAL~A~)"
-                                             suffix)))
-                        (:translate ,translate)
-                        (:generator ,cost
-                          (let* ((signed ,signed)
-                                 (-c/fixnum ,(eq suffix '-c/fixnum))
-                                 (y (if -c/fixnum (fixnumize y) y)))
-                            (declare (ignorable signed -c/fixnum y))
-                            ,@generator)))))
-               '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
-               '(3 2 5 4 5 4)
-               '(t t t t nil nil))))
+     ,@(mapcar (lambda (suffix)
+                 (unless (and (eq suffix '/fixnum)
+                              (eq translate 'eql))
+                   `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
+                                                  translate suffix))
+                                 ,(intern
+                                   (format nil "~:@(FAST-CONDITIONAL~A~)"
+                                           suffix)))
+                      (:translate ,translate)
+                      (:variant ,op))))
+               '(/fixnum /signed /unsigned))))
 
-(define-conditional-vop <
-  (cond ((and signed (eql y 0))
-         (if not-p
-             (inst bge x zero-tn target)
-             (inst blt x zero-tn target)))
-        ((integerp y)
-         (if signed
-             (inst slti temp x y)
-             (inst sltiu temp x y))
-         (if not-p
-             (inst beq temp zero-tn target)
-             (inst bne temp zero-tn target)))
-        (t
-         (if not-p
-             (if signed
-                 (inst blt x y target)
-                 (inst bltu x y target))
-             (if signed
-                 (inst bge x y target)
-                 (inst bgeu x y target))))))
-
-(define-conditional-vop >
-  (cond ((and signed (eql y 0))
-         (if not-p
-             (inst bge zero-tn x target)
-             (inst blt zero-tn x target)))
-        ((integerp y)
-         (let ((y (+ y (if -c/fixnum (fixnumize 1) 1))))
-           (if signed
-               (inst slti temp x y)
-               (inst sltiu temp x y))
-           (if not-p
-               (inst bne temp zero-tn target)
-               (inst beq temp zero-tn target))))
-        (t
-         (if not-p
-             (if signed
-                 (inst blt y x target)
-                 (inst bltu y x target))
-             (if signed
-                 (inst bge y x target)
-                 (inst bgeu y x target))))))
+(define-conditional-vop < :lt)
+(define-conditional-vop > :gt)
+(define-conditional-vop eql :eq)
 
 ;;; EQL/FIXNUM is funny because the first arg can be of any type, not just a
 ;;; known fixnum.
 
-(define-conditional-vop eql
-  (declare (ignore signed))
-  (when (integerp y)
-    (inst li temp y)
-    (setf y temp))
-  (if not-p
-      (inst bne x y target)
-      (inst beq x y target)))
-
-;;; These versions specify a fixnum restriction on their first arg.  We have
-;;; also generic-eql/fixnum VOPs which are the same, but have no restriction on
-;;; the first arg and a higher cost.  The reason for doing this is to prevent
-;;; fixnum specific operations from being used on word integers, spuriously
-;;; consing the argument.
-;;;
+;;; These versions specify a fixnum restriction on their first arg.
+;;; We have also generic-eql/fixnum VOPs which are the same, but have
+;;; no restriction on the first arg and a higher cost.  The reason for
+;;; doing this is to prevent fixnum specific operations from being
+;;; used on word integers, spuriously consing the argument.
 (define-vop (fast-eql/fixnum fast-conditional)
   (:args (x :scs (any-reg))
          (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)
-  (:ignore temp)
-  (:generator 1
+  (:generator 3
     (if not-p
         (inst bne x y target)
         (inst beq x y target))))
@@ -520,25 +457,6 @@
          (y :scs (any-reg)))
   (:arg-types * tagged-num)
   (:variant-cost 7))
-
-(define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (signed-byte #.(- 12 n-fixnum-tag-bits))))
-  (:info target not-p y)
-  (:translate eql)
-  (:generator 2
-    (let ((y (cond ((eql y 0) zero-tn)
-                   (t
-                    (inst li temp (fixnumize y))
-                    temp))))
-      (if not-p
-          (inst bne x y target)
-          (inst beq x y target)))))
-
-(define-vop (generic-eql-c/fixnum fast-eql-c/fixnum)
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:arg-types * (:constant (signed-byte #.(- 12 n-fixnum-tag-bits))))
-  (:variant-cost 6))
 
 
 ;;;; 32-bit logical operations

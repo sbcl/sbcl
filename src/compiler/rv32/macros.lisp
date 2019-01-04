@@ -29,6 +29,24 @@
 (def-mem-op storew sw word-shift nil)
 
 
+;;;; Three Way Comparison
+(defun three-way-comparison (x y condition flavor not-p target)
+  (ecase condition
+    (:eq (if not-p
+             (inst bne x y target)
+             (inst beq x y target)))
+    ((:lt :gt)
+     (when (eq flavor :gt)
+       (rotatef x y))
+     (ecase flavor
+       (:unsigned (if not-p
+                      (inst bltu x y target)
+                      (inst bgeu x y target)))
+       (:signed (if not-p
+                    (inst blt x y target)
+                    (inst bge x y target)))))))
+
+
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop (note-this-location vop :internal-error))
