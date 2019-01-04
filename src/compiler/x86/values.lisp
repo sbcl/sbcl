@@ -54,7 +54,8 @@
 ;;; bogus SC that reflects the costs of the memory-to-memory moves for each
 ;;; operand, but this seems unworthwhile.
 (define-vop (push-values)
-  (:args (vals :more t))
+  (:args (vals :more t
+               :scs (descriptor-reg)))
   (:results (start :from :load) (count))
   (:info nvals)
   (:generator 20
