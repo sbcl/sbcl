@@ -11,13 +11,24 @@
 
 (in-package "SB-VM")
 
+;;;; The Branch VOP.
+
+;;; The unconditional branch, emitted when we can't drop through to the desired
+;;; destination.  Dest is the continuation we transfer control to.
 (define-vop (branch)
   (:info dest)
-  (:generator 0))
+  (:generator 3
+    (inst j dest)))
 
+
+;;;; Generic conditional VOPs
+
+;;; The generic conditional branch, emitted immediately after test
+;;; VOPs that only set flags.
 (define-vop (branch-if)
   (:info dest flags not-p)
-  (:generator 0))
+  (:generator 0
+    (error "BRANCH-IF should not be needed on RISC-V.")))
 
 ;;;; Conditional VOPs:
 
@@ -28,4 +39,7 @@
   (:info target not-p)
   (:policy :fast-safe)
   (:translate eq)
-  (:generator 3))
+  (:generator 3
+    (if not-p
+        (inst bne x y target)
+        (inst beq x y target))))
