@@ -1998,6 +1998,40 @@
 (defun numeric-types-adjacent (low high)
   (let ((low-bound (numeric-type-high low))
         (high-bound (numeric-type-low high)))
+
+    ;; KLUDGE: the code below is not truly portable despite superficial use
+    ;; of (LOAD-TIME-VALUE (MAKE-UNPORTABLE-FLOAT)) because the cross-compiler
+    ;; implementation of that form depends on the host actually supporting
+    ;; negative zeros as literal values.
+    ;; MAKE-UNPORTABLE-FLOAT just calls MAKE-SINGLE-FLOAT (resp MAKE-DOUBLE-FLOAT)
+    ;; from known bit patterns. The cross-compiler definitions of those
+    ;; appear in src/code/cross-float. Each tests for the bits for a negative zero,
+    ;; possibly returning the relevant floating-point constant.
+    ;; So the L-T-V form is merely a long-winded spelling of negative zero.
+    ;; If the host doesn't have negative zeros, the form may return the
+    ;; correspoding positive zero. Using CLISP 2.49.92 we get:
+    ;;  (eql 0.0d0 -0.0d0) => T and (eql 0.0d0 (- 0.0d0)) => T
+    ;; Therefore, if our code actually relied on being able to test for
+    ;; adjacency of intervals involving negative zeros while cross-compiling,
+    ;; it can't be right.
+    ;;
+    ;; When running genesis, we actually do benefit from the circuitous spellings
+    ;; of -0.0 because the code that is emitted for this function correctly
+    ;; refers to signed zeros after the constructors execute in the target.
+    ;;
+    ;; So let's be paranoid and assert that broken-ness doesn't happen
+    ;; if we know that the host has signed zeros.
+    ;; I suppose if this is compiled under an extremely broken (or old) SBCL,
+    ;; the test itself is wrong. Worst case it can be commented out.
+    #!+(and (host-feature sb-xc-host) (host-feature sbcl))
+    (flet ((assert-not-negative-zero (bound)
+             (let ((val (if (listp bound) (car bound) bound)))
+               ;; We know that we support negative zero, so these dump OK.
+               (if (or (eql val -0.0f0) (eql val -0.0d0))
+                   (error "Should not happen")))))
+      (assert-not-negative-zero low-bound)
+      (assert-not-negative-zero high-bound))
+
     (cond ((not (and low-bound high-bound)) nil)
           ((and (consp low-bound) (consp high-bound)) nil)
           ((consp low-bound)
