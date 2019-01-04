@@ -262,16 +262,16 @@
 ;;; Skips past the shebang line on stream, if any.
 (defun maybe-skip-shebang-line (stream)
   (let ((p (file-position stream)))
-    (flet ((next () (read-byte stream nil)))
-      (unwind-protect
-           (when (and (eq (next) (char-code #\#))
-                      (eq (next) (char-code #\!)))
-             (setf p nil)
-             (loop for x = (next)
-                   until (or (not x) (eq x (char-code #\newline)))))
-        (when p
-          (file-position stream p))))
-    t))
+    (when p
+      (flet ((next () (read-byte stream nil)))
+        (unwind-protect
+             (when (and (eq (next) (char-code #\#))
+                        (eq (next) (char-code #\!)))
+               (setf p nil)
+               (loop for x = (next)
+                     until (or (not x) (eq x (char-code #\newline)))))
+          (when p
+            (file-position stream p)))))))
 
 ;;;; LOAD-AS-FASL
 ;;;;

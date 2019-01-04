@@ -137,34 +137,37 @@
                (or (not (typep stream 'file-stream))
                    (and (typep stream 'fd-stream)
                         (or (not (sb-impl::fd-stream-bivalent-p stream))
-                            (not (sb-impl::fd-stream-file stream))))))
+                            (not (sb-impl::fd-stream-file stream))
+                            (neq (sb-impl::fd-stream-fd-type stream) :regular)))))
     (let ((p (file-position stream)))
-      (unwind-protect
-           (let* ((header *fasl-header-string-start-string*)
-                  (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
-                  (n 0))
-             (flet ((scan ()
-                      (maybe-skip-shebang-line stream)
-                      (setf n (read-sequence buffer stream))))
-               (if errorp
-                   (scan)
-                   (or (ignore-errors (scan))
-                       ;; no a binary input stream
-                       (return-from fasl-header-p nil))))
-             (cond ((not (mismatch buffer header
-                                   :test #'(lambda (code char) (= code (char-code char))))))
-                   ((zerop n)
-                    ;; Immediate EOF is valid -- we want to match what
-                    ;; CHECK-FASL-HEADER does...
-                    nil)
-                   (errorp
-                    (error 'fasl-header-missing
-                           :stream stream
-                           :fhsss buffer
-                           :expected header))))
-        (file-position stream p)))))
+      (when p ; Can't do it non-destructively on non-seekable streams.
+        (unwind-protect
+             (let* ((header *fasl-header-string-start-string*)
+                    (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
+                    (n 0))
+               (flet ((scan ()
+                        (maybe-skip-shebang-line stream)
+                        (setf n (read-sequence buffer stream))))
+                 (if errorp
+                     (scan)
+                     (or (ignore-errors (scan))
+                         ;; no a binary input stream
+                         (return-from fasl-header-p nil))))
+               (cond ((not (mismatch buffer header
+                                     :test #'(lambda (code char) (= code (char-code char))))))
+                     ((zerop n)
+                      ;; Immediate EOF is valid -- we want to match what
+                      ;; CHECK-FASL-HEADER does...
+                      nil)
+                     (errorp
+                      (error 'fasl-header-missing
+                             :stream stream
+                             :fhsss buffer
+                             :expected header))))
+          (file-position stream p))))))
+
 (defun load (pathspec &key (verbose *load-verbose*) (print *load-print*)
-             (if-does-not-exist t) (external-format :default))
+                           (if-does-not-exist t) (external-format :default))
   "Load the file given by FILESPEC into the Lisp environment, returning
    T on success."
   (flet ((load-stream (stream faslp)
@@ -176,23 +179,23 @@
                     "Can't LOAD a directory: ~s."
                     :format-arguments (list (pathname stream))))
            (dx-flet ((thunk ()
-                       (let ( ;; Bindings required by ANSI.
-                             (*readtable* *readtable*)
-                             (*package* (sane-package))
-                             ;; KLUDGE: I can't find in the ANSI spec where it says
-                             ;; that DECLAIM/PROCLAIM of optimization policy should
-                             ;; have file scope. CMU CL did this, and it seems
-                             ;; reasonable, but it might not be right; after all,
-                             ;; things like (PROCLAIM '(TYPE ..)) don't have file
-                             ;; scope, and I can't find anything under PROCLAIM or
-                             ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
-                             ;; behavior. Hmm. -- WHN 2001-04-06
-                             (sb-c::*policy* sb-c::*policy*))
-                         (if faslp
-                             (load-as-fasl stream verbose print)
-                             (sb-c:with-compiler-error-resignalling
-                                 (load-as-source stream :verbose verbose
-                                                        :print print))))))
+                            (let (;; Bindings required by ANSI.
+                                  (*readtable* *readtable*)
+                                  (*package* (sane-package))
+                                  ;; KLUDGE: I can't find in the ANSI spec where it says
+                                  ;; that DECLAIM/PROCLAIM of optimization policy should
+                                  ;; have file scope. CMU CL did this, and it seems
+                                  ;; reasonable, but it might not be right; after all,
+                                  ;; things like (PROCLAIM '(TYPE ..)) don't have file
+                                  ;; scope, and I can't find anything under PROCLAIM or
+                                  ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
+                                  ;; behavior. Hmm. -- WHN 2001-04-06
+                                  (sb-c::*policy* sb-c::*policy*))
+                              (if faslp
+                                  (load-as-fasl stream verbose print)
+                                  (sb-c:with-compiler-error-resignalling
+                                    (load-as-source stream :verbose verbose
+                                                           :print print))))))
              (call-with-load-bindings #'thunk stream))))
 
     ;; Case 1: stream.
@@ -222,17 +225,17 @@
                           (return-from load nil))))
         (let* ((real (probe-file stream))
                (should-be-fasl-p
-                (and real (string-equal (pathname-type real) *fasl-file-type*))))
+                 (and real (string-equal (pathname-type real) *fasl-file-type*))))
           ;; Don't allow empty .fasls, and assume other empty files
           ;; are source files.
-          (when (and (or should-be-fasl-p (not (eql 0 (file-length stream))))
+          (cond ((or (and should-be-fasl-p (eql 0 (file-length stream)))
                      (fasl-header-p stream :errorp should-be-fasl-p))
-            (return-from load (load-stream stream t)))))
-
-      ;; Case 3: Open using the given external format, process as source.
-      (with-open-file (stream pathname :external-format external-format
-                              :class 'form-tracking-stream)
-        (load-stream stream nil)))))
+                 (load-stream stream t))
+                (t
+                 ;; Case 3: Open using the given external format, process as source.
+                 (with-open-file (stream pathname :external-format external-format
+                                                  :class 'form-tracking-stream)
+                   (load-stream stream nil)))))))))
 
 ;; This implements the defaulting SBCL seems to have inherited from
 ;; CMU.  This routine does not try to perform any loading; all it does
