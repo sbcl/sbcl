@@ -74,15 +74,13 @@
  (any-reg registers
           :locations #.(append non-descriptor-regs descriptor-regs)
           :alternate-scs (control-stack)
-          :constant-scs (immediate constant)
-          :save-p t)
+          :constant-scs (immediate constant))
 
  ;; Pointer descriptor objects.  Must be seen by GC.
  (descriptor-reg registers
                  :locations #.descriptor-regs
                  :alternate-scs (control-stack)
-                 :constant-scs (immediate constant)
-                 :save-p t)
+                 :constant-scs (immediate constant))
 
  ;; Random objects that must not be seen by GC.  Used only as temporaries.
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
@@ -96,23 +94,23 @@
  (character-reg registers
                 :locations #.non-descriptor-regs
                 :alternate-scs (character-stack)
-                :constant-scs (immediate)
-                :save-p t)
+                :constant-scs (immediate))
 
  (sap-stack non-descriptor-stack)
- (sap-reg registers :alternate-scs (sap-stack) :save-p t)
+ (sap-reg registers
+          :locations #.non-descriptor-regs
+          :constant-scs (immediate)
+          :alternate-scs (sap-stack))
  (signed-stack non-descriptor-stack)
  (signed-reg registers
              :locations #.non-descriptor-regs
              :alternate-scs (signed-stack)
-             :constant-scs (immediate)
-             :save-p t)
+             :constant-scs (immediate))
  (unsigned-stack non-descriptor-stack)
  (unsigned-reg registers
                :locations #.non-descriptor-regs
                :alternate-scs (unsigned-stack)
-               :constant-scs (immediate)
-               :save-p t)
+               :constant-scs (immediate))
 
  (single-stack non-descriptor-stack)
  (single-reg float-registers :alternate-scs (single-stack))
@@ -156,7 +154,8 @@
 ;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
-    (null (values descriptor-reg-sc-number null-offset))
+    (null
+     (values descriptor-reg-sc-number null-offset))
     ((integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
      immediate-sc-number)))
 
@@ -187,8 +186,14 @@
     (ecase sb
       (registers (or (svref *register-names* offset)
                      (format nil "x~D" offset)))
+      (control-stack (format nil "CS~D" offset))
       (float-registers (format nil "f~D" offset))
-      (constant (format nil "Const~D" offset)))))
+      (constant (format nil "Const~D" offset))
+      (immediate-constant "Immed"))))
 
 (defun combination-implementation-style (node)
   (values :default nil))
+
+(defun primitive-type-indirect-cell-type (ptype)
+  (declare (ignore ptype))
+  nil)
