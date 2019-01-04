@@ -780,11 +780,11 @@
 (defun make-operand-parse-temp ()
   (without-package-locks
    (intern (format nil "OPERAND-PARSE-TEMP-~D" *parse-vop-operand-count*)
-           (sb-xc:symbol-package '*parse-vop-operand-count*))))
+           #.(find-package "SB-C"))))
 (defun make-operand-parse-load-tn ()
   (without-package-locks
    (intern (format nil "OPERAND-PARSE-LOAD-TN-~D" *parse-vop-operand-count*)
-           (sb-xc:symbol-package '*parse-vop-operand-count*))))
+           #.(find-package "SB-C"))))
 
 ;;; Given a list of operand specifications as given to DEFINE-VOP,
 ;;; return a list of OPERAND-PARSE structures describing the fixed

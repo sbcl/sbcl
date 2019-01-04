@@ -74,18 +74,12 @@
 ;;;; miscellany
 
 ;;; Lots of code wants to get to the KEYWORD package or the
-;;; COMMON-LISP package without a lot of fuss, so we cache them in
-;;; variables on the host, or use L-T-V forms on the target.
-(macrolet ((def-it (sym name)
-             #+sb-xc-host
-             `(progn (declaim (type package ,sym))
-                     (defvar ,sym (find-package ,name)))
-             #-sb-xc-host
-             ;; We don't need to declaim the type. FIND-PACKAGE
-             ;; returns a package, and L-T-V propagates types.
-             ;; It's ugly how it achieves that, but it's a separate concern.
-             `(define-symbol-macro ,sym
-                  (load-time-value (find-package ,name) t))))
+;;; COMMON-LISP package without going through FIND-PACKAGE, so we refer to them
+;;; as constants which is ever so slightly more efficient than a defglobal.
+;;; DEFINE-SYMBOL-MACRO should be ok in any host lisp. We used to distrust it,
+;;; but it is specified by CLHS, as are package constants, so there should
+;;; be no need to fear this idiom.
+(macrolet ((def-it (sym name) `(define-symbol-macro ,sym ,(find-package name))))
   ;; *CL-PACKAGE* is always COMMON-LISP, not XC-STRICT-CL on the host, because the latter
   ;; is just a means to avoid inheriting symbols that are not supposed to be in the CL:
   ;; package but might be due to non-ansi-compliance of the host.
@@ -183,8 +177,7 @@
           (t
            ;; We're in the undefined behavior zone. First, munge the
            ;; system back into a defined state.
-           (let ((really-package
-                  (load-time-value (find-package :cl-user) t)))
+           (let ((really-package #.(find-package :cl-user)))
              (setf *package* really-package)
              ;; Then complain.
              (error 'simple-type-error

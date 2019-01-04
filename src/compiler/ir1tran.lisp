@@ -357,7 +357,10 @@
                    ((array t)
                     (dotimes (i (array-total-size value))
                       (grovel (row-major-aref value i))))
-                   (#+sb-xc-host structure!object
+                   ;; We use ordinary host packages to model the target packages.
+                   ;; Those objects are not in "our" type system, but we can check
+                   ;; for them and make them legal to dump out.
+                   (#+sb-xc-host (or structure!object package)
                     #-sb-xc-host instance
                     ;; In the target SBCL, we can dump any instance, but
                     ;; in the cross-compilation host, %INSTANCE-FOO

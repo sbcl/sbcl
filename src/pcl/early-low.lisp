@@ -33,7 +33,7 @@
 ;;; The PCL package is internal and is used by code in potential
 ;;; bottlenecks. And since it's internal, no one should be
 ;;; doing things like deleting and recreating it in a running target Lisp.
-(define-symbol-macro *pcl-package* (load-time-value (find-package "SB-PCL") t))
+(define-symbol-macro *pcl-package* #.(find-package "SB-PCL"))
 
 (declaim (inline class-classoid))
 (defun class-classoid (class)

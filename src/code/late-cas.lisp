@@ -43,9 +43,7 @@
 ;; of +-MODFX, --MODFX were defined generically.
 (macrolet ((modular (fun a b)
              #!+(or x86 x86-64)
-             `(,(let ((*package* (find-package "SB-VM")))
-                  (symbolicate fun "-MODFX"))
-                ,a ,b)
+             `(,(package-symbolicate "SB-VM" fun "-MODFX") ,a ,b)
              #!-(or x86 x86-64)
              ;; algorithm of https://graphics.stanford.edu/~seander/bithacks
              `(let ((res (logand (,fun ,a ,b)

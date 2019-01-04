@@ -92,3 +92,8 @@
   ;; Local package nicknames.
   (%local-nicknames nil :type list)
   (%locally-nicknamed-by nil :type list))
+(!set-load-form-method package (:xc)
+  (lambda (obj env)
+    (declare (ignore env))
+    ;; the target code will use FIND-UNDELETED-PACKAGE-OR-LOSE
+    `(find-package ,(package-name obj))))

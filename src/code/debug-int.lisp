@@ -1820,13 +1820,7 @@ register."
       (without-package-locks
         (setf (compiled-debug-var-symbol (svref vars i))
               (intern (format nil "ARG-~V,'0D" width i)
-                      ;; The cross-compiler won't dump literal package
-                      ;; references because the target package objects
-                      ;; aren't created until partway through
-                      ;; cold-init. In lieu of adding smarts to the
-                      ;; build framework to handle this, we use an
-                      ;; explicit load-time-value form.
-                      (load-time-value (find-package "SB-DEBUG"))))))))
+                      #.(find-package "SB-DEBUG")))))))
 
 ;;; Parse the packed representation of DEBUG-VARs from
 ;;; DEBUG-FUN's SB-C::COMPILED-DEBUG-FUN, returning a vector
