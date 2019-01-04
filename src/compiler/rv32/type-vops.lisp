@@ -11,6 +11,10 @@
 
 (in-package "SB-VM")
 
+;;; Test generation utilities.
+(defun %test-fixnum (value temp target not-p))
+
 (defun %test-headers (value temp target not-p function-p headers
                       &key (drop-through)))
 
+(defun %test-lowtag (value temp target not-p lowtag))

@@ -18,3 +18,14 @@
 (define-vop (branch-if)
   (:info dest flags not-p)
   (:generator 0))
+
+;;;; Conditional VOPs:
+
+(define-vop (if-eq)
+  (:args (x :scs (any-reg descriptor-reg zero null))
+         (y :scs (any-reg descriptor-reg zero null)))
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe)
+  (:translate eq)
+  (:generator 3))
