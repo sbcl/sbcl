@@ -503,7 +503,10 @@
 
 (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
              fast-ash-c/unsigned=>unsigned)
-  (:translate ash-left-mod32))
+    (:translate ash-left-mod32))
+
+(define-vop (fast-ash-left-mod32/unsigned=>unsigned
+             fast-ash-left/unsigned=>unsigned))
 
 (deftransform ash-left-mod32 ((integer count)
                               ((unsigned-byte 32) (unsigned-byte 5)))
