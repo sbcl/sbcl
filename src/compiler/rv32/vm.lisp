@@ -188,6 +188,7 @@
                      (format nil "x~D" offset)))
       (control-stack (format nil "CS~D" offset))
       (float-registers (format nil "f~D" offset))
+      (non-descriptor-stack (format nil "NS~D" offset))
       (constant (format nil "Const~D" offset))
       (immediate-constant "Immed"))))
 
