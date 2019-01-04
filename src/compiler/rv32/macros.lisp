@@ -10,12 +10,39 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
+
+;;; Instruction-like macros.
+
+(defmacro move (dst src &optional (always-emit-code-p nil))
+  "Move SRC into DST (unless they are location=."
+  (once-only ((n-dst dst)
+              (n-src src))
+    `(unless (location= ,n-dst ,n-src)
+       ;; annoying hack with the null-tn, but it has to be done.
+       (inst addi ,n-dst ,n-src 0))))
+
+(defmacro def-mem-op (op inst shift load)
+  `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
+     `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag))))
+;;;
+(def-mem-op loadw lw word-shift t)
+(def-mem-op storew sw word-shift nil)
+
 
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop (note-this-location vop :internal-error))
     (emit-internal-error kind code values)
     (emit-alignment word-shift)))
+
+(defun generate-error-code (vop error-code &rest values)
+  "Generate-Error-Code Error-code Value*
+  Emit code for an error with the specified Error-Code and context Values."
+  (assemble (:elsewhere)
+    (let ((start-lab (gen-label)))
+      (emit-label start-lab)
+      (emit-error-break vop error-trap (error-number-or-lose error-code) values)
+      start-lab)))
 
 #|
 If we are doing [reg+offset*n-word-bytes-lowtag+index*scale]
@@ -44,7 +71,7 @@ and
        (:result-types ,eltype)
        (:generator 5
          (inst add lip object index)
-         (inst lw value lip (- (ash ,offset word-shift) ,lowtag))))
+         (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
@@ -56,7 +83,7 @@ and
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 4
-         (inst lw value object (- (ash (+ ,offset index) word-shift) ,lowtag))))))
+         (loadw value object (+ ,offset index) ,lowtag)))))
 
 (defmacro define-full-setter (name type offset lowtag scs eltype &optional translate)
   `(progn
@@ -87,3 +114,35 @@ and
        (:results (result :scs ,scs))
        (:result-types ,eltype)
        (:generator 5))))
+
+
+;;;; Stack TN's
+
+;;; Move a stack TN to a register and vice-versa.
+(defmacro load-stack-tn (reg stack)
+  `(let ((reg ,reg)
+         (stack ,stack))
+     (let ((offset (tn-offset stack)))
+       (sc-case stack
+         ((control-stack)
+          (loadw reg cfp-tn offset))))))
+
+(defmacro store-stack-tn (stack reg)
+  `(let ((stack ,stack)
+         (reg ,reg))
+     (let ((offset (tn-offset stack)))
+       (sc-case stack
+         ((control-stack)
+          (storew reg cfp-tn offset))))))
+
+(defmacro maybe-load-stack-tn (reg reg-or-stack)
+  "Move the TN Reg-Or-Stack into Reg if it isn't already there."
+  (once-only ((n-reg reg)
+              (n-stack reg-or-stack))
+    `(sc-case ,n-reg
+       ((any-reg descriptor-reg)
+        (sc-case ,n-stack
+          ((any-reg descriptor-reg)
+           (move ,n-reg ,n-stack))
+          ((control-stack)
+           (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
