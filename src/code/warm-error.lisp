@@ -11,20 +11,18 @@
 
 (in-package "SB-KERNEL")
 
-(let ((class-name 'class))
-  (setf (find-classoid class-name)
-        (let* ((classoid (make-standard-classoid :name class-name))
-               (layout (make-layout :classoid classoid)))
-          (setf (classoid-layout classoid) layout
-                (layout-invalid layout) nil
-                (layout-classoid layout) classoid)))
-  (setf (info :type :kind class-name) :instance))
-
-(eval-when (:compile-toplevel :load-toplevel)
-  (dolist (sym '(cerror error signal warn))
-    (let ((info (info :function :type sym)))
+(eval-when (:compile-toplevel)
+  ;; Any globaldb value that references either the type named CLASS or CONDITION-CLASS
+  ;; would have been stored as its specifier instead of the parse of the specifier.
+  ;; Parse them now because "reasons" which will store unknown types, but is preferable
+  ;; to the alternative of warning each time we compile a function (such as WARN)
+  ;; that needs to know what the unknown type is, and tries to re-parse.
+  ;; Also, there are some unknowns in there already. How on earth did that happen???
+  (do-all-symbols (s)
+    (let ((info (sb-int:info :function :type s)))
       (when (consp info)
-        (setf (info :function :type sym) (proclaimed-ftype sym))))))
+        (let ((parsed (specifier-type info)))
+          (setf (sb-int:info :function :type s) parsed))))))
 
 ;;; Moved from 'cold-error' to this file because of (at least) these reasons:
 ;;;  - the LOAD-TIME-VALUE forms need to run after 'condition.lisp'
