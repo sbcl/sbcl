@@ -69,20 +69,20 @@
 (!define-storage-classes
  (constant constant)
  (immediate immediate-constant)
- (zero immediate-constant)
- (null immediate-constant)
 
  (control-stack control-stack)
  (any-reg registers
           :locations #.(append non-descriptor-regs descriptor-regs)
           :alternate-scs (control-stack)
-          :constant-scs (immediate zero constant))
+          :constant-scs (immediate constant)
+          :save-p t)
 
  ;; Pointer descriptor objects.  Must be seen by GC.
  (descriptor-reg registers
                  :locations #.descriptor-regs
                  :alternate-scs (control-stack)
-                 :constant-scs (constant null immediate))
+                 :constant-scs (immediate constant)
+                 :save-p t)
 
  ;; Random objects that must not be seen by GC.  Used only as temporaries.
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
@@ -91,19 +91,28 @@
  (interior-reg registers :locations (#.lip-offset))
 
  (character-stack non-descriptor-stack)
- (character-reg registers :alternate-scs (character-stack))
+
+ ;; Non-Descriptor characters
+ (character-reg registers
+                :locations #.non-descriptor-regs
+                :alternate-scs (character-stack)
+                :constant-scs (immediate)
+                :save-p t)
+
  (sap-stack non-descriptor-stack)
- (sap-reg registers :alternate-scs (sap-stack))
+ (sap-reg registers :alternate-scs (sap-stack) :save-p t)
  (signed-stack non-descriptor-stack)
  (signed-reg registers
              :locations #.non-descriptor-regs
              :alternate-scs (signed-stack)
-             :constant-scs (zero immediate))
+             :constant-scs (immediate)
+             :save-p t)
  (unsigned-stack non-descriptor-stack)
  (unsigned-reg registers
                :locations #.non-descriptor-regs
                :alternate-scs (unsigned-stack)
-               :constant-scs (zero immediate))
+               :constant-scs (immediate)
+               :save-p t)
 
  (single-stack non-descriptor-stack)
  (single-reg float-registers :alternate-scs (single-stack))
@@ -147,17 +156,12 @@
 ;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
-    ((integer 0 0)
-     zero-sc-number)
-    (null
-     null-sc-number)
+    (null (values descriptor-reg-sc-number null-offset))
     ((integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
      immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)
-  (or (eql sc zero-sc-number)
-      (eql sc null-sc-number)
-      (eql sc immediate-sc-number)))
+  (eql sc immediate-sc-number))
 
 ;;;; Function Call Parameters
 

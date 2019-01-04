@@ -49,7 +49,7 @@
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-         (data :scs (any-reg immediate zero)))
+         (data :scs (any-reg immediate)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:generator 6))
