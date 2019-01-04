@@ -226,8 +226,8 @@
   (:generator 1
     (cond
       ((< count -31) (move result zero-tn))
-      ((< count 0) (inst srl result number (min (- count) 31)))
-      ((> count 0) (inst sll result number (min count 31)))
+      ((< count 0) (inst srli result number (min (- count) 31)))
+      ((> count 0) (inst slli result number (min count 31)))
       (t (bug "identity ASH not transformed away")))))
 
 (define-vop (fast-ash-c/signed=>signed)
@@ -241,8 +241,8 @@
   (:result-types signed-num)
   (:generator 1
     (cond
-      ((< count 0) (inst sra result number (min (- count) 31)))
-      ((> count 0) (inst sll result number (min count 31)))
+      ((< count 0) (inst srai result number (min (- count) 31)))
+      ((> count 0) (inst slli result number (min count 31)))
       (t (bug "identity ASH not transformed away")))))
 
 (macrolet ((def (name sc-type type result-type cost)
@@ -277,7 +277,21 @@
   (:result-types positive-fixnum)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) shift)
   (:generator 30
-    (error "signed-byte 32 integer-length needs to be implemented.")))
+    (let ((loop (gen-label))
+          (test (gen-label)))
+      (move shift arg)
+      (move res zero-tn)
+      (inst bge shift zero-tn test)
+
+      (inst xori shift shift -1)
+      (inst j test)
+
+      (emit-label loop)
+      (inst addi res res (fixnumize 1))
+
+      (emit-label test)
+      (inst srli shift shift 1)
+      (inst bne shift zero-tn loop))))
 
 (define-vop (unsigned-byte-32-count)
   (:translate logcount)
@@ -351,7 +365,7 @@
     ;; documentation recommendation.
     (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst beq y zero-tn zero))
-    (inst sll q temp n-fixnum-tag-bits)))
+    (inst slli q temp n-fixnum-tag-bits)))
 
 (define-vop (fast-truncate/unsigned fast-unsigned-binop)
   (:translate truncate)
