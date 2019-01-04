@@ -285,8 +285,7 @@
                                      sb-assem::label
                                      ;; in addition to the above, these occur in make-host-2
                                      #!+sb-fasteval sb-interpreter:interpreted-function
-                                     #!-sb-fasteval sb-eval:interpreted-function
-                                     )))
+                                     #!+sb-eval sb-eval:interpreted-function)))
                  (values nil t))
                 (t
                  (uncertain)))))
