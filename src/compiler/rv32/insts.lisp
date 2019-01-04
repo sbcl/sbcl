@@ -11,10 +11,18 @@
 ;;;; files for more information.
 
 (in-package "SB-RV32-ASM")
+
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; Imports from SB-VM into this package
+  (import '(sb-vm::lip-tn sb-vm::zero-tn sb-vm::null-tn)))
+
 
 (define-instruction byte (segment byte)
   (:emitter
    (emit-byte segment byte)))
+
+(define-bitfield-emitter emit-machine-word n-machine-word-bits
+  (byte n-machine-word-bits 0))
 
 (define-instruction-format (r 32)
   (funct7 :field (byte 7 25))
@@ -77,7 +85,7 @@
   (byte 20 12) (byte 5 7) (byte 7 0))
 (defun emit-u-inst (segment imm rd opcode)
   (aver (= 0 (ldb (byte 12 0) imm)))
-  (%emit-u-inst segment imm (tn-offset rd) opcode))
+  (%emit-u-inst segment (ldb (byte 20 12) imm) (tn-offset rd) opcode))
 
 (define-instruction-format (j 32)
   (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)))
@@ -102,21 +110,90 @@
   (:emitter
    (emit-u-inst segment ui rd #b0010111)))
 
-(define-instruction jal (segment lr offset)
+;;;; Branch and Jump instructions.
+
+(defun jalr-offset (target number-of-instructions posn &optional delta-if-after)
+  (- (label-position target (and delta-if-after posn) delta-if-after)
+     (+ posn (* 4 number-of-instructions))))
+
+(defun branch/jal-offset (target number-of-instructions posn &optional delta-if-after)
+  (ash (jalr-offset target number-of-instructions posn delta-if-after) -1))
+
+(defun emit-short-jump-at (segment lr target posn)
+  (declare (ignore posn))
+  (emit-back-patch
+   segment 4
+   (lambda (segment posn)
+     (emit-j-inst segment (branch/jal-offset target 1 posn) lr #b1101111))))
+
+(defun emit-long-jump-at-fun (lr target)
+  (lambda (segment posn)
+    (declare (ignore posn))
+    (emit-back-patch
+     segment 8
+     (lambda (segment posn)
+       ;; We emit auipc + jalr
+       (let ((disp (jalr-offset target 2 posn)))
+         (emit-u-inst segment (dpb 0 (byte 12 0) disp) lip-tn #b0010111)
+         (emit-i-inst segment (ldb (byte 12 0) disp) lip-tn #b000 lr #b1100111))))))
+
+;;; For unconditional jumos, we either emit a one instruction or two
+;;; instruction sequence.
+(define-instruction jal (segment lr target)
   (:printer j ((opcode #b1101111)))
   (:emitter
-   (emit-j-inst segment offset lr #b1101111)))
+   (emit-chooser
+    segment 8 2
+    (lambda (segment chooser posn delta-if-after)
+      (declare (ignore chooser))
+      (when (typep (branch/jal-offset target 1 posn delta-if-after)
+                   '(signed-byte 20))
+        (emit-short-jump-at segment lr target posn)
+        t))
+    (emit-long-jump-at-fun lr target))))
 
-(define-instruction jalr (segment lr rs offset)
+(define-instruction jalr (segment lr rs target)
   (:printer i ((funct3 #b000) (opcode #b1100111)))
   (:emitter
-   (emit-i-inst segment offset rs #b000 lr opcode)))
+   (emit-back-patch
+    segment 4
+    (lambda (segment posn)
+      (let ((disp (jalr-offset target 1 posn)))
+        (unless (typep disp '(signed-byte 12))
+          (error "JALR long jump not supported"))
+        (emit-i-inst segment disp rs #b000 lr #b1100111))))))
+
+(define-instruction-macro j (target)
+  `(inst jal zero-tn ,target))
+
+(defun emit-relative-branch (segment opcode funct3 rs1 rs2 target)
+  (emit-chooser
+   segment 12 2
+   (lambda (segment chooser posn delta-if-after)
+     (declare (ignore chooser))
+     (typecase (branch/jal-offset target 1 posn delta-if-after)
+       ((signed-byte 12)
+        (emit-back-patch
+         segment 4
+         (lambda (segment posn)
+           (emit-b-inst segment (branch/jal-offset target 1 posn) rs2 rs1 funct3 opcode)))
+        t)
+       ((signed-byte 20)
+        ;; Emit the sequence:
+        ;; b(invert(funct3)) rs1 rs2 2
+        ;; jal x0 target
+        (emit-b-inst segment 2 rs2 rs1 (xor funct3 1) opcode)
+        (emit-short-jump-at segment zero-tn target posn)
+        t)))
+   (lambda (segment posn)
+     (emit-b-inst segment 4 rs2 rs1 (xor funct3 1) opcode)
+     (funcall (emit-long-jump-at-fun zero-tn target) segment posn))))
 
 (macrolet ((define-branch-instruction (name funct3)
              `(define-instruction ,name (segment rs1 rs2 offset)
                 (:printer b ((funct3 ,funct3) (opcode #b1100011)))
                 (:emitter
-                 (emit-b-inst segment offset rs2 rs1 ,funct3 #b1100011)))))
+                 (emit-relative-branch segment #b1100011 ,funct3 rs1 rs2 offset)))))
   (define-branch-instruction beq #b000)
   (define-branch-instruction bne #b001)
   (define-branch-instruction blt #b100)
@@ -139,7 +216,7 @@
              `(define-instruction ,name (segment rs2 rs1 offset)
                 (:printer s ((funct3 ,funct3) (opcode #b0100011)))
                 (:emitter
-                 (emit-s-inst segment offset rs2 rs1 ,funct3 opcode)))))
+                 (emit-s-inst segment offset rs2 rs1 ,funct3 #b0100011)))))
   (define-store-instruction sb #b000)
   (define-store-instruction sh #b001)
   (define-store-instruction sw #b010))
@@ -190,6 +267,17 @@
   (funct3 (byte 3 12))
   (rd (byte 5 7) :value #b00000)
   (opcode (byte 7 0) :value #b0001111))
+
+(defun %li (reg value)
+  (etypecase value
+    ((signed-byte 12)
+     (inst addi reg zero-tn value))
+    ((or (signed-byte 32) (unsigned-byte 32) fixup)
+     (inst lui reg (dpb 0 (byte 12 0) value))
+     (inst addi reg reg (ldb (byte 12 0) value)))))
+
+(define-instruction-macro li (reg value)
+  `(%li ,reg ,value))
 
 (defun fence-encoding (ops)
   (let ((vals '(:i 8 :o 4 :r 2 :w 1)))
