@@ -44,7 +44,9 @@
   (defreg nl2 15)
   (defreg a3 16)
   (defreg nl3 17)
-  (defreg null 29)
+
+  (defreg null 28)
+  (defreg code 29)
   (defreg lip 30)
   (defreg nargs 31)
 
@@ -75,8 +77,17 @@
           :locations #.(append non-descriptor-regs descriptor-regs)
           :alternate-scs (control-stack)
           :constant-scs (immediate zero constant))
- (descriptor-reg registers :locations #.descriptor-regs :alternate-scs (control-stack))
+
+ ;; Pointer descriptor objects.  Must be seen by GC.
+ (descriptor-reg registers
+                 :locations #.descriptor-regs
+                 :alternate-scs (control-stack)
+                 :constant-scs (constant null immediate))
+
+ ;; Random objects that must not be seen by GC.  Used only as temporaries.
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
+
+ ;; Pointers to the interior of objects.  Used only as an temporary.
  (interior-reg registers :locations (#.lip-offset))
 
  (character-stack non-descriptor-stack)
@@ -86,11 +97,13 @@
  (signed-stack non-descriptor-stack)
  (signed-reg registers
              :locations #.non-descriptor-regs
-             :alternate-scs (signed-stack))
+             :alternate-scs (signed-stack)
+             :constant-scs (zero immediate))
  (unsigned-stack non-descriptor-stack)
  (unsigned-reg registers
                :locations #.non-descriptor-regs
-               :alternate-scs (unsigned-stack))
+               :alternate-scs (unsigned-stack)
+               :constant-scs (zero immediate))
 
  (single-stack non-descriptor-stack)
  (single-reg float-registers :alternate-scs (single-stack))
@@ -127,6 +140,7 @@
   (defregtn csp any-reg)
   (defregtn nsp any-reg)
 
+  (defregtn code descriptor-reg)
   (defregtn lip interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
