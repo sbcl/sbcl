@@ -108,9 +108,6 @@
   ;; Non-immediate contstants in the constant pool
   (constant constant)
 
-  ;; NULL is in a register.
-  (null immediate-constant)
-
   ;; Anything else that can be an immediate.
   (immediate immediate-constant)
 
@@ -137,7 +134,7 @@
   ;; Pointer descriptor objects.  Must be seen by GC.
   (descriptor-reg registers
                   :locations #.descriptor-regs
-                  :constant-scs (constant null immediate)
+                  :constant-scs (constant immediate)
                   :save-p t
                   :alternate-scs (control-stack))
 
@@ -251,7 +248,7 @@
 (defun immediate-constant-sc (value)
   (typecase value
     (null
-     null-sc-number)
+     (values descriptor-reg-sc-number null-offset))
     ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          character)
      immediate-sc-number)
@@ -261,8 +258,7 @@
          nil))))
 
 (defun boxed-immediate-sc-p (sc)
-  (or (eql sc null-sc-number)
-      (eql sc immediate-sc-number)))
+  (eql sc immediate-sc-number))
 
 ;;;; function call parameters
 

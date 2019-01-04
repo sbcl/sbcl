@@ -962,19 +962,12 @@
   (imm :field (byte 16 5) :type 'unsigned-immediate)
   (rd :field (byte 5 0) :type 'reg))
 
-(defmacro process-null-sc (reg)
-  `(setf ,reg (if (and (tn-p ,reg)
-                       (eq 'null (sc-name (tn-sc ,reg))))
-                  sb-vm::null-tn
-                  ,reg)))
-
 (define-instruction-macro mov-sp (rd rm)
   `(inst add ,rd ,rm 0))
 
 (define-instruction-macro mov (rd rm)
   `(let ((rd ,rd)
          (rm ,rm))
-     (process-null-sc rm)
      (if (integerp rm)
          (sb-vm::load-immediate-word rd rm)
          (inst orr rd zr-tn rm))))
@@ -1303,7 +1296,6 @@
              (typep qout '(unsigned-byte 12))))))
 
 (defun emit-load-store (size opc segment dst address)
-  (process-null-sc dst)
   (let* ((base (memory-operand-base address))
          (offset (memory-operand-offset address))
          (mode (memory-operand-mode address))

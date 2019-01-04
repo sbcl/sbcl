@@ -174,7 +174,7 @@
   `(progn
      (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
        vector-data-offset other-pointer-lowtag
-       ,(remove-if #'(lambda (x) (member x '(null))) scs)
+       ,scs
        ,element-type
        data-vector-ref)
      (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
@@ -191,7 +191,7 @@
        ,element-type data-vector-set))))
 
   (def-full-data-vector-frobs simple-vector *
-    descriptor-reg any-reg null)
+    descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character
     :byte nil character-reg)

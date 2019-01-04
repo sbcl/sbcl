@@ -25,7 +25,7 @@
 
 (define-vop (cell-set)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg null)))
+         (value :scs (descriptor-reg any-reg)))
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4

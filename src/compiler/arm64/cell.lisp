@@ -24,7 +24,7 @@
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
-         (value :scs (descriptor-reg any-reg null)))
+         (value :scs (descriptor-reg any-reg)))
   (:info name offset lowtag)
   (:ignore name)
   (:results)
@@ -80,7 +80,7 @@
 (progn
   (define-vop (set)
     (:args (object :scs (descriptor-reg))
-           (value :scs (descriptor-reg any-reg null)))
+           (value :scs (descriptor-reg any-reg)))
     (:temporary (:sc any-reg) tls-index)
     (:generator 4
       (inst ldr (32-bit-reg tls-index) (tls-index-of object))
@@ -404,7 +404,7 @@
 
 (define-full-setter set-funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag
-  (descriptor-reg any-reg null) * %set-funcallable-instance-info)
+  (descriptor-reg any-reg) * %set-funcallable-instance-info)
 
 (define-full-reffer funcallable-instance-info *
   funcallable-instance-info-offset fun-pointer-lowtag
@@ -456,7 +456,7 @@
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)
 
 (define-full-setter instance-index-set * instance-slots-offset
-  instance-pointer-lowtag (descriptor-reg any-reg null) * %instance-set)
+  instance-pointer-lowtag (descriptor-reg any-reg) * %instance-set)
 
 (define-vop (%instance-cas word-index-cas)
   (:policy :fast-safe)
@@ -470,7 +470,7 @@
   (descriptor-reg any-reg) * code-header-ref)
 
 (define-full-setter code-header-set * 0 other-pointer-lowtag
-  (descriptor-reg any-reg null) * code-header-set)
+  (descriptor-reg any-reg) * code-header-set)
 
 ;;;; raw instance slot accessors
 

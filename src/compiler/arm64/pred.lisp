@@ -48,10 +48,10 @@
 ;;;; Conditional VOPs:
 
 (define-vop (if-eq)
-  (:args (x :scs (any-reg descriptor-reg null))
-         (y :scs (any-reg descriptor-reg null)
+  (:args (x :scs (any-reg descriptor-reg))
+         (y :scs (any-reg descriptor-reg)
             :load-if (sc-case y
-                       ((any-reg descriptor-reg null))
+                       ((any-reg descriptor-reg))
                        (immediate
                         (not (fixnum-add-sub-immediate-p (tn-value y))))
                        (t t))))
@@ -62,12 +62,8 @@
   (:generator 6
     (cond ((not (and (sc-is y immediate)
                      (eql 0 (tn-value y))))
-           (inst cmp
-                 (sc-case x
-                   (null null-tn) ;; FIXME: should it really be like that?
-                   (t x))
+           (inst cmp x
                  (sc-case y
-                   (null null-tn)
                    (immediate
                     (fixnumize (tn-value y)))
                    (t y)))
