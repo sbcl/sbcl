@@ -802,7 +802,8 @@
 ;;;; combination IR1 optimization
 
 ;;; Report as we try each transform?
-#!+sb-show
+;;; Bind to T to see the ones that didn't abort,
+;;; or :ALL if you want to see each attempted transform.
 (defvar *show-transforms-p* nil)
 
 (defun check-important-result (node info)
@@ -1018,13 +1019,13 @@
                     ;; Are type checks getting in the way?
                     (dolist (x (fun-info-transforms info))
                       #!+sb-show
-                      (when *show-transforms-p*
+                      (when (eq *show-transforms-p* :all)
                         (let* ((lvar (basic-combination-fun node))
                                (fname (lvar-fun-name lvar t)))
                           (/show "trying transform" x (transform-function x) "for" fname)))
                       (unless (ir1-transform node x)
                         #!+sb-show
-                        (when *show-transforms-p*
+                        (when (eq *show-transforms-p* :all)
                           (/show "quitting because IR1-TRANSFORM result was NIL"))
                         (return)))))))))))))
   (values))
@@ -1318,7 +1319,12 @@
            (multiple-value-bind (severity args)
                (catch 'give-up-ir1-transform
                  (transform-call node
-                                 (funcall fun node)
+                                 (let ((new-form (funcall fun node)))
+                                   (when *show-transforms-p*
+                                     (format t "~&~S ->~%~S~%"
+                                             (combination-fun-source-name node)
+                                             new-form))
+                                   new-form)
                                  (combination-fun-source-name node))
                  (values :none nil))
              (ecase severity
