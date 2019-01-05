@@ -1269,7 +1269,7 @@ necessary, since type inference may take arbitrarily long to converge.")
             result))))))
 
 (defun note-top-level-form (form &optional finalp)
-  (when *compile-print*
+  (when sb-xc:*compile-print*
     (cond ((not *top-level-form-noted*)
            (let ((*print-length* 2)
                  (*print-level* 2)
@@ -1281,7 +1281,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   *block-compile* form)))
              form)
           ((and finalp
-                (eq :top-level-forms *compile-print*)
+                (eq :top-level-forms sb-xc:*compile-print*)
                 (neq form *top-level-form-noted*))
            (let ((*print-length* 1)
                  (*print-level* 1)
@@ -1615,7 +1615,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; compilation.
 (defun finish-block-compilation ()
   (when *block-compile*
-    (when *compile-print*
+    (when sb-xc:*compile-print*
       (compiler-mumble "~&; block compiling converted top level forms..."))
     (when *toplevel-lambdas*
       (compile-toplevel (nreverse *toplevel-lambdas*) nil)
