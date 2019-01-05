@@ -11,6 +11,20 @@
 
 (in-package "SB-VM")
 
+;;; Make a TN for the argument count passing location for a
+;;; non-local entry.
+(defun make-nlx-entry-arg-start-location ()
+  (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
+
+;;; Save and restore dynamic environment.
+;;;
+;;; These VOPs are used in the reentered function to restore the appropriate
+;;; dynamic environment.  Currently we only save the Current-Catch and binding
+;;; stack pointer.  We don't need to save/restore the current unwind-protect,
+;;; since unwind-protects are implicitly processed during unwinding.  If there
+;;; were any additional stacks, then this would be the place to restore the top
+;;; pointers.
+
 (define-vop (save-dynamic-state)
   (:results (catch :scs (descriptor-reg)))
   (:generator 13))

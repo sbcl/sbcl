@@ -21,8 +21,10 @@
             (define-full-setter ,setname ,type
               vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-set))))
      (def-partial-data-vector-frobs (type element-type size signed &rest scs)
-       (let ((setname (symbolicate "DATA-VECTOR-SET/" type)))
+       (let ((refname (symbolicate "DATA-VECTOR-REF/" type))
+             (setname (symbolicate "DATA-VECTOR-SET/" type)))
          `(progn
+            (define-partial-reffer ,refname ,type ,size ,signed vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-ref)
             (define-partial-setter ,setname ,type
               ,size vector-data-offset other-pointer-lowtag ,scs
               ,element-type data-vector-set)))))
@@ -49,6 +51,7 @@
          `(progn
             (define-vop (,setname)
               (:translate data-vector-set)
+              (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
                      (index :scs (unsigned-reg))
                      (value :scs (unsigned-reg)))
@@ -65,6 +68,7 @@
                `(progn
                   (define-vop (,setname)
                     (:translate data-vector-set)
+                    (:policy :fast-safe)
                     (:args (object :scs (descriptor-reg))
                            (index :scs (unsigned-reg))
                            (value :scs (,sc)))

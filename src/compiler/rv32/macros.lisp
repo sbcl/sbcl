@@ -96,8 +96,8 @@ and
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
-                   (:constant
-                    (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
+         (:constant
+         (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 4
@@ -107,31 +107,77 @@ and
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)) (value :scs ,scs))
        (:arg-types ,type tagged-num ,eltype)
+       (:temporary (:scs (interior-reg)) lip)
        (:results (result :scs ,scs))
        (:result-types ,eltype)
-       (:generator 5))))
+       (:generator 3
+         (inst add lip object index)
+         (storew value lip ,offset ,lowtag)
+         (move result value)))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (value :scs ,scs))
+       (:info index)
+       (:arg-types ,type
+         (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
+         ,eltype)
+       (:results (result :scs ,scs))
+       (:result-types ,eltype)
+       (:generator 1
+         (storew value object (+ ,offset index) ,lowtag)
+         (move result value)))))
 
 (defmacro define-partial-reffer (name type size signed offset lowtag scs eltype &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
-       (:arg-types ,type tagged-num)
+       (:arg-types ,type positive-fixnum)
        (:results (value :scs ,scs))
        (:result-types ,eltype)
-       (:generator 5))))
+       (:generator 5))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg)))
+       (:info index)
+       (:arg-types ,type
+         (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
+       (:results (value :scs ,scs))
+       (:result-types ,eltype)
+       (:generator 4))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs eltype &optional translate)
   `(progn
      (define-vop (,name)
        ,@(when translate `((:translate ,translate)))
+       (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)) (value :scs ,scs))
-       (:arg-types ,type tagged-num ,eltype)
+       (:arg-types ,type positive-fixnum ,eltype)
        (:results (result :scs ,scs))
        (:result-types ,eltype)
-       (:generator 5))))
+       (:generator 5))
+     (define-vop (,(symbolicate name "-C"))
+       ,@(when translate
+           `((:translate ,translate)))
+       (:policy :fast-safe)
+       (:args (object :scs (descriptor-reg))
+              (value :scs ,scs :target result))
+       (:info index)
+       (:arg-types ,type
+         (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
+         ,eltype)
+       (:results (result :scs ,scs))
+       (:result-types ,eltype)
+       (:generator 4))))
 
 
 ;;;; Stack TN's
