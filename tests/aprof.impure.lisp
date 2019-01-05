@@ -15,13 +15,13 @@
             ;; reverse-engineering the allocation instructions fails but should not
             :fails-on (or (not :immobile-space) :sb-safepoint))
   (let ((nbytes
-         (let ((*standard-output* (make-broadcast-stream)))
-           (sb-aprof:aprof-run
+         (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" ()
                 (declare (inline sb-thread:make-mutex)
                          (optimize sb-c::instrument-consing))
-                (loop repeat 50 collect (sb-thread:make-mutex))))))))
+                (loop repeat 50 collect (sb-thread:make-mutex))))
+            :stream nil)))
     (assert (= nbytes
                 (+ (* 51 2 sb-vm:n-word-bytes) ; list (extra for dummy head)
                    (* 50 (sb-vm::primitive-object-size
@@ -30,12 +30,12 @@
 (with-test (:name :aprof-smoketest-non-constant-size-vector
             :broken-on :win32)
   (let ((nbytes
-         (let ((*standard-output* (make-broadcast-stream)))
-           (sb-aprof:aprof-run
+         (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" (&optional (n 10))
                 (declare (optimize sb-c::instrument-consing))
-                (make-array (the (mod 64) n))))))))
+                (make-array (the (mod 64) n))))
+            :stream nil)))
     (assert (= nbytes (* 12 sb-vm:n-word-bytes)))))
 
 ;;; The profiler's disassembler expected to see a store at alloc-ptr
@@ -44,24 +44,24 @@
 (with-test (:name :aprof-smoketest-bit-vector
             :fails-on :win32)
   (let ((nbytes
-         (let ((*standard-output* (make-broadcast-stream)))
-           (sb-aprof:aprof-run
+         (sb-aprof:aprof-run
             (checked-compile
              '(sb-int:named-lambda "test" ()
                 (declare (optimize sb-c::instrument-consing))
-                (make-array (* 128 16) :element-type 'bit)))))))
+                (make-array (* 128 16) :element-type 'bit)))
+            :stream nil)))
     (assert (= nbytes (sb-vm::primitive-object-size
                        (make-array (* 128 16) :element-type 'bit))))))
 
 (with-test (:name :aprof-smoketest-large-vector
             :fails-on :win32)
   (let ((nbytes
-          (let ((*standard-output* (make-broadcast-stream)))
-            (sb-aprof:aprof-run
+         (sb-aprof:aprof-run
              (checked-compile
               '(sb-int:named-lambda "test" ()
                 (declare (optimize sb-c::instrument-consing))
-                (make-array 45000)))))))
+                (make-array 45000)))
+             :stream nil)))
     (assert (= nbytes (* (+ 45000 sb-vm:vector-data-offset)
                          8)))))
 sb-vm::
@@ -82,11 +82,24 @@ sb-vm::
 (with-test (:name :aprof-smoketest-large-vector-to-upper-register
             :fails-on :win32)
   (let ((nbytes
-          (let ((*standard-output* (make-broadcast-stream)))
-            (sb-aprof:aprof-run
+         (sb-aprof:aprof-run
              (checked-compile
               '(sb-int:named-lambda "test" ()
                 (declare (optimize sb-c::instrument-consing))
                 (sb-sys:%primitive cl-user::alloc-to-r8)
-                nil))))))
+                nil))
+             :stream nil)))
     (assert (= nbytes sb-vm:large-object-size))))
+
+;; this moves an immediate-to-memory, then a load + store, then a store
+(defun f1 (&optional x)
+  (declare (optimize sb-c::instrument-consing))
+  (list* :if-exists (load-time-value(gensym)) x))
+;; this reverses the first two operations relative to the preceding
+(defun f2 (&optional x)
+  (declare (optimize sb-c::instrument-consing))
+  (list* (load-time-value(gensym)) :if-exists x))
+
+(with-test (:name :aprof-list-length-2 :fails-on :win32)
+  (assert (= (sb-aprof:aprof-run #'f1 :stream nil) 32))
+  (assert (= (sb-aprof:aprof-run #'f2 :stream nil) 32)))
