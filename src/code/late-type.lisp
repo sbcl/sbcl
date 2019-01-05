@@ -1998,85 +1998,33 @@
 (defun numeric-types-adjacent (low high)
   (let ((low-bound (numeric-type-high low))
         (high-bound (numeric-type-low high)))
-
-    ;; KLUDGE: the code below is not truly portable despite superficial use
-    ;; of (LOAD-TIME-VALUE (MAKE-UNPORTABLE-FLOAT)) because the cross-compiler
-    ;; implementation of that form depends on the host actually supporting
-    ;; negative zeros as literal values.
-    ;; MAKE-UNPORTABLE-FLOAT just calls MAKE-SINGLE-FLOAT (resp MAKE-DOUBLE-FLOAT)
-    ;; from known bit patterns. The cross-compiler definitions of those
-    ;; appear in src/code/cross-float. Each tests for the bits for a negative zero,
-    ;; possibly returning the relevant floating-point constant.
-    ;; So the L-T-V form is merely a long-winded spelling of negative zero.
-    ;; If the host doesn't have negative zeros, the form may return the
-    ;; correspoding positive zero. Using CLISP 2.49.92 we get:
-    ;;  (eql 0.0d0 -0.0d0) => T and (eql 0.0d0 (- 0.0d0)) => T
-    ;; Therefore, if our code actually relied on being able to test for
-    ;; adjacency of intervals involving negative zeros while cross-compiling,
-    ;; it can't be right.
-    ;;
-    ;; When running genesis, we actually do benefit from the circuitous spellings
-    ;; of -0.0 because the code that is emitted for this function correctly
-    ;; refers to signed zeros after the constructors execute in the target.
-    ;;
-    ;; So let's be paranoid and assert that broken-ness doesn't happen
-    ;; if we know that the host has signed zeros.
-    ;; I suppose if this is compiled under an extremely broken (or old) SBCL,
-    ;; the test itself is wrong. Worst case it can be commented out.
-    #!+(and (host-feature sb-xc-host) (host-feature sbcl))
-    (flet ((assert-not-negative-zero (bound)
-             (let ((val (if (listp bound) (car bound) bound)))
-               ;; We know that we support negative zero, so these dump OK.
-               (if (or (eql val -0.0f0) (eql val -0.0d0))
-                   (error "Should not happen")))))
-      (assert-not-negative-zero low-bound)
-      (assert-not-negative-zero high-bound))
-
-    (cond ((not (and low-bound high-bound)) nil)
-          ((and (consp low-bound) (consp high-bound)) nil)
-          ((consp low-bound)
-           (let ((low-value (car low-bound)))
-             (or (eql low-value high-bound)
-                 (and (eql low-value
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t))
-                      (eql high-bound 0f0))
-                 (and (eql low-value 0f0)
-                      (eql high-bound
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t)))
-                 (and (eql low-value
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))
-                      (eql high-bound 0d0))
-                 (and (eql low-value 0d0)
-                      (eql high-bound
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))))))
-          ((consp high-bound)
-           (let ((high-value (car high-bound)))
-             (or (eql high-value low-bound)
-                 (and (eql high-value
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t))
-                      (eql low-bound 0f0))
-                 (and (eql high-value 0f0)
-                      (eql low-bound
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t)))
-                 (and (eql high-value
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))
-                      (eql low-bound 0d0))
-                 (and (eql high-value 0d0)
-                      (eql low-bound
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))))))
-          ((and (eq (numeric-type-class low) 'integer)
-                (eq (numeric-type-class high) 'integer))
-           (eql (1+ low-bound) high-bound))
-          (t
-           nil))))
+    ;; Return T if and only if X is EQL to Y, or X = 0 and -X is EQL to Y.
+    ;; If both intervals have the same sign of zero at the adjacency point,
+    ;; then they intersect (as per NUMERIC-TYPES-INTESECT)
+    ;; so it doesn't matter much what we say here.
+    (flet ((oppositely-signed-zeros-or-eql (x y)
+             (or (eql x y)
+                 ;; Calling (EQL (- X) Y) might cons. Using = would be almost the same
+                 ;; but not cons, however I prefer not to assume that the caller has
+                 ;; already checked for matching float formats. EQL enforces that.
+                 (let ((answer (and (fp-zero-p x) (fp-zero-p y) (eql (- x) y))))
+                   ;; KLUDGE: if the host does not support floating-point negative-zero,
+                   ;; then this function can never return T, which is fine unless T would
+                   ;; be the right answer. Let's assert that it isn't, which works on
+                   ;; a self-hosted build because we do support signed zeros.
+                   #+sb-xc-host (aver (eq answer nil))
+                   answer))))
+      (cond ((not (and low-bound high-bound)) nil)
+            ((and (consp low-bound) (consp high-bound)) nil)
+            ((consp low-bound)
+             (oppositely-signed-zeros-or-eql (car low-bound) high-bound))
+            ((consp high-bound)
+             (oppositely-signed-zeros-or-eql low-bound (car high-bound)))
+            ((and (eq (numeric-type-class low) 'integer)
+                  (eq (numeric-type-class high) 'integer))
+             (eql (1+ low-bound) high-bound))
+            (t
+             nil)))))
 
 ;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
 ;;;
@@ -2456,6 +2404,7 @@ used for a COMPLEX component.~:@>"
            (let ((res
                    (cond
                      ((and format (subtypep format 'double-float))
+                      ;; FIXME: referring to host constants. (They had better match ours)
                       (if (<= most-negative-double-float cx most-positive-double-float)
                           (coerce cx format)
                           nil))

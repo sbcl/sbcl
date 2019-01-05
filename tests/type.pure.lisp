@@ -633,6 +633,21 @@
   (assert (equal (type-specifier (specifier-type '(simple-string 10)))
                  '(simple-string 10))))
 
+(test-util:with-test (:name :numeric-types-adjacent)
+  (dolist (x '(-0s0 0s0))
+    (dolist (y '(-0s0 0s0))
+      (let ((a (specifier-type `(single-float -10s0 ,x)))
+            (b (specifier-type `(single-float ,y 20s0))))
+        (assert (numeric-types-intersect a b)))
+      (let ((a (specifier-type `(single-float -10s0 (,x))))
+            (b (specifier-type `(single-float ,y 20s0))))
+        (assert (not (numeric-types-intersect a b)))
+        (assert (numeric-types-adjacent a b)))
+      (let ((a (specifier-type `(single-float -10s0 ,x)))
+            (b (specifier-type `(single-float (,y) 20s0))))
+        (assert (not (numeric-types-intersect a b)))
+        (assert (numeric-types-adjacent a b))))))
+
 (in-package "CL-USER")
 
 (with-test (:name (typep :complex-integer))
