@@ -16,7 +16,11 @@
 
 (defun %test-fixnum-and-headers (value temp target not-p headers &key value-tn-ref))
 
+
+(defun %test-immediate (value temp target not-p immediate))
+
+(defun %test-lowtag (value temp target not-p lowtag))
+
 (defun %test-headers (value temp target not-p function-p headers
                       &key (drop-through (gen-label)) value-tn-ref))
 
-(defun %test-lowtag (value temp target not-p lowtag))
