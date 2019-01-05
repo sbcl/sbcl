@@ -43,6 +43,18 @@
   ;; the old contents.
   (vector          nil                  :type simple-vector)
   (index           0                    :type sb-int:index)
+  ;; Only used while recording a trace. Stores a cell that is
+  ;;
+  ;;   (start-trace . nil)   (start-trace is the marker symbol
+  ;;                          SB-SPROF:START-TRACE)
+  ;;
+  ;; when starting to record a trace and
+  ;;
+  ;;   (start-trace . END-INDEX-OF-THE-TRACE)
+  ;;
+  ;; after finishing recording the trace. This allows MAP-TRACES to
+  ;; jump from one trace to the next in O(1) instead of O(N) time.
+  (trace-start     '(nil . nil)         :type cons)
   (trace-count     0                    :type sb-int:index)
 
   (sampled-threads nil                  :type list)
@@ -89,10 +101,15 @@
 (defun record-trace-start (samples)
   ;; Mark the start of the trace.
   (multiple-value-bind (vector index) (ensure-samples-vector samples)
-    (setf (aref vector index) 'trace-start
-          (aref vector (+ index 1)) sb-thread:*current-thread*
-          (aref vector (+ index 2)) (get-internal-real-time))
-    (setf (samples-index samples) (+ index +elements-per-trace-start+))))
+    (let ((trace-start (cons 'trace-start nil)))
+      (setf (aref vector index)       trace-start
+            (aref vector (+ index 1)) sb-thread:*current-thread*
+            (aref vector (+ index 2)) (get-internal-real-time))
+      (setf (samples-index samples)       (+ index +elements-per-trace-start+)
+            (samples-trace-start samples) trace-start))))
+
+(defun record-trace-end (samples)
+  (setf (cdr (samples-trace-start samples)) (samples-index samples)))
 
 (declaim (inline record-sample))
 (defun record-sample (samples info pc-or-offset)
@@ -124,15 +141,13 @@ EXPERIMENTAL: Interface subject to change."
         (index (samples-index samples))
         (start-time (samples-start-time samples)))
     (when (plusp index)
-      (sb-int:aver (eq (aref vector 0) 'trace-start))
+      (sb-int:aver (typep (aref vector 0) '(cons (eql trace-start) index)))
       (loop for start = 0 then end
             while (< start index)
+            for end = (cdr (aref vector start))
             for thread = (aref vector (+ start 1))
             for time = (/ (- (aref vector (+ start 2)) start-time)
                           internal-time-units-per-second)
-            for end = (or (position 'trace-start vector
-                                    :start (+ start +elements-per-trace-start+))
-                          index)
             do (let ((trace (list vector start end)))
                  (funcall function thread time trace))))))
 
@@ -406,7 +421,8 @@ EXPERIMENTAL: Interface subject to change."
                           (decf (samples-index samples)
                                 (+ +elements-per-trace-start+
                                    (* +elements-per-sample+ (1+ i)))))
-                        (return))))))
+                        (return)))
+                    (record-trace-end samples))))
               ;; Reset thread-local allocation counter before interrupts
               ;; are enabled.
               (when (eq t sb-vm::*alloc-signal*)
