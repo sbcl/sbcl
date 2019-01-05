@@ -988,7 +988,7 @@ The result is not guaranteed to have the same length as the input."
   (def map-graphemes map-grapheme-boundaries))
 
 (defun graphemes (string)
-  "Breaks STRING into graphemes acording to the default
+  "Breaks STRING into graphemes according to the default
 grapheme breaking rules specified in UAX #29, returning a list of strings."
   (let (result)
     (map-graphemes (lambda (a) (push (subseq a 0) result)) string)
@@ -1047,7 +1047,7 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
            (push ,%thing ,list)))))
 
 (defun words (string)
-  "Breaks STRING into words acording to the default
+  "Breaks STRING into words according to the default
 word breaking rules specified in UAX #29. Returns a list of strings"
   (let ((chars (mapcar
                  #'(lambda (s)
@@ -1167,7 +1167,7 @@ Specifically,
     (flush) (nreverse clusters))))
 
 (defun sentences (string)
-  "Breaks STRING into sentences acording to the default
+  "Breaks STRING into sentences according to the default
 sentence breaking rules specified in UAX #29"
   (let ((special-handling '(:close :sp :sep :cr :lf :scontinue :sterm :aterm))
         (chars (sentence-prebreak string))
