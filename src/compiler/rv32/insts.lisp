@@ -213,7 +213,7 @@
   (define-load-instruction lhu #b101))
 
 (macrolet ((define-store-instruction (name funct3)
-             `(define-instruction ,name (segment rs2 rs1 offset)
+             `(define-instruction ,name (segment rs1 rs2 offset)
                 (:printer s ((funct3 ,funct3) (opcode #b0100011)))
                 (:emitter
                  (emit-s-inst segment offset rs2 rs1 ,funct3 #b0100011)))))
@@ -331,3 +331,118 @@
   (define-rv32m-arith-instruction divu #b101)
   (define-rv32m-arith-instruction rem #b110)
   (define-rv32m-arith-instruction remu #b111))
+
+;;; Floating point
+(define-instruction-format (r-float 32)
+  (rs3/funct5 :field (byte 5 27))
+  (fmt :field (byte 2 25))
+  (rs2 :field (byte 5 20))
+  (rs1 :field (byte 5 15))
+  (rm :field (byte 3 12))
+  (rd :field (byte 5 7))
+  (opcode (byte 7 0)))
+
+(defun ensure-tn-offset (imm/tn)
+  (etypecase imm/tn
+    ((integer 0 31) imm/tn)
+    (tn (tn-offset imm/tn))))
+
+(defun emit-r-float-inst (segment rs3/funct5 fmt rs2 rs1 rm rd opcode)
+  (%emit-r-inst segment
+                (dpb (ensure-tn-offset rs3/funct5)
+                     (byte 5 2)
+                     (ecase fmt
+                       (:single #b00)
+                       (:double #b01)
+                       (:quad #b10)))
+                (ensure-tn-offset rs2)
+                (tn-offset rs1)
+                rm
+                (tn-offset rd)
+                opcode))
+
+(defun rm-encoding (rm)
+  (or (position rm #(:rne :rtz :rdn :rup :rmm :unused1 :unused2 :dynamic))
+      (error "Invalid rounding mode mnemonic ~a." rm)))
+
+(macrolet ((define-rv32-float-arith-instruction
+               (name funct5 &key rm rs2)
+             `(define-instruction ,name
+                  (segment fmt rd rs1
+                           ,@(unless rs2 '(rs2))
+                           ,@(unless rm '(&optional (rm :rne))) )
+                (:printer r-float ((rs3/funct5 ,funct5)
+                                   ,@(when rs2 `((rs2 ,rs2)))
+                                   ,@(when rm `((rm ,rm)))
+                                   (opcode #b1010011)))
+                (:emitter
+                 (emit-r-float-inst segment ,funct5 fmt
+                                    ,(if rs2 rs2 'rs2) rs1
+                                    ,(if rm rm '(rm-encoding rm))
+                                    rd #b1010011)))))
+  (define-rv32-float-arith-instruction fadd     #b00000)
+  (define-rv32-float-arith-instruction fsub     #b00001)
+  (define-rv32-float-arith-instruction fmul     #b00010)
+  (define-rv32-float-arith-instruction fdiv     #b00011)
+  (define-rv32-float-arith-instruction fsqrt    #b01011 :rs2 #b00000)
+  (define-rv32-float-arith-instruction fsgnj    #b00100 :rm  #b000)
+  (define-rv32-float-arith-instruction fsgnjn   #b00100 :rm  #b001)
+  (define-rv32-float-arith-instruction fsgnjx   #b00100 :rm  #b010)
+  (define-rv32-float-arith-instruction fmin     #b00101 :rm  #b000)
+  (define-rv32-float-arith-instruction fmax     #b00101 :rm  #b001)
+  (define-rv32-float-arith-instruction fcvtw<-  #b11000 :rs2 #b00000)
+  (define-rv32-float-arith-instruction fcvtwu<- #b11000 :rs2 #b00001)
+  (define-rv32-float-arith-instruction fmvx<-   #b11100 :rs2 #b00000 :rm #b000)
+  (define-rv32-float-arith-instruction feq      #b10100 :rm  #b010)
+  (define-rv32-float-arith-instruction flt      #b10100 :rm  #b001)
+  (define-rv32-float-arith-instruction fle      #b10100 :rm  #b000)
+  (define-rv32-float-arith-instruction fclass   #b11100 :rs2 #b00000 :rm #b001)
+  (define-rv32-float-arith-instruction fcvtw->  #b11010 :rs2 #b00000)
+  (define-rv32-float-arith-instruction fcvtwu-> #b11010 :rs2 #b00001)
+  (define-rv32-float-arith-instruction fmvx->   #b11110 :rs2 #b00000 :rm #b000)
+  (define-rv32-float-arith-instruction fcvtd->  #b01000 :rs2 #b00001)
+  (define-rv32-float-arith-instruction fcvts->  #b01000 :rs2 #b00000))
+
+(macrolet ((define-3-arg-float-arith-instruction (name opcode)
+             `(define-instruction ,name (segment fmt rd rs1 rs2 rs3 &optional (rm :rne))
+                (:printer r ((opcode ,opcode)))
+                (:emitter
+                 (emit-r-float-inst segment rs3 fmt rs2 rs1 (rm-encoding rm) rd ,opcode)))))
+  (define-3-arg-float-arith-instruction fmadd #b1000011)
+  (define-3-arg-float-arith-instruction fmsub #b1000111)
+  (define-3-arg-float-arith-instruction fnmsub #b1001011)
+  (define-3-arg-float-arith-instruction fnmadd #b1001111))
+
+(macrolet ((def (name op)
+             `(define-instruction-macro ,name (format dst src)
+                `(inst ,',op ,format ,dst ,src ,src))))
+  (def fmv fsgnj)
+  (def fneg fsgnjn)
+  (def fabs fsgnjx))
+
+(define-instruction-macro fcvt (to-format from-format dst src &optional (rm :rne))
+  (case to-format
+    (:word `(inst fcvtw<- ,from-format ,dst ,src ,rm))
+    (:unsigned-word `(inst fcvtwu<- ,from-format ,dst ,src ,rm))
+    (otherwise
+     `(inst ,(ecase from-format
+               (:double 'fcvtd->)
+               (:single 'fcvts->)
+               (:word 'fcvtw->)
+               (:unsigned-word 'fcvtwu->))
+            ,to-format ,dst ,src ,rm))))
+
+(flet ((fmt-funct3 (fmt)
+         (ecase fmt
+           (:single #b010)
+           (:double #b011))))
+  (define-instruction fload (segment fmt rd rs offset)
+    (:printer i ((opcode #b0000111)))
+    (:emitter
+     (emit-i-inst segment offset rs (fmt-funct3 fmt) rd #b0000111)))
+
+  (define-instruction fstore (segment fmt rs1 rs2 offset
+    (:printer s ((opcode #b0100111))
+    (:emitter
+     (emit-s-inst segment offset rs2 rs1 (fmt-funct3 fmt) #b0100111))))))
+
