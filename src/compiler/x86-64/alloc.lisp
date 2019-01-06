@@ -214,7 +214,7 @@
                              temp)
                             (t
                              (encode-value-if-immediate ,tn)))))
-                     (storew reg ,list ,slot ,lowtag))))
+                     (storew* reg ,list ,slot ,lowtag (not stack-allocate-p)))))
              (let* ((cons-cells (if star (1- num) num))
                     (stack-allocate-p (node-stack-allocate-p node))
                     (size (* (pad-data-block cons-size) cons-cells)))
@@ -269,27 +269,32 @@
 
 ;;; Special variant of 'storew' which might have a shorter encoding
 ;;; when storing to the heap (which starts out zero-filled).
+;;; This will always write 8 bytes if WORD is a negative number.
 (defun storew* (word object slot lowtag zeroed)
-  (if (or (not zeroed) (not (typep word '(signed-byte 32))))
-      (storew word object slot lowtag) ; Possibly use temp-reg-tn
-      (let ((size
-             (cond ((typep word '(unsigned-byte 8)) :byte)
-                           ((and (not (logtest word #xff))
-                                 (typep (ash word -8) '(unsigned-byte 8)))
-                            ;; Array lengths 128 to 16384 which are multiples of 128
-                            (setq word (ash word -8))
-                            (decf lowtag 1) ; increment address by 1
-                            :byte)
-                           ((and (not (logtest word #xffff))
-                                 (typep (ash word -16) '(unsigned-byte 8)))
-                            ;; etc
-                            (setq word (ash word -16))
-                            (decf lowtag 2) ; increment address by 2
-                            :byte)
-                           ((typep word '(unsigned-byte 16)) :word)
-                           ;; Definitely a (signed-byte 32) due to pre-test.
-                           (t :dword))))
-        (inst mov size (ea (- (* slot n-word-bytes) lowtag) object) word))))
+  (cond
+   ((or (not zeroed) (not (typep word '(unsigned-byte 31))))
+    (storew word object slot lowtag)) ; Possibly use temp-reg-tn
+   ((/= word 0)
+    (let ((size
+           (cond ((typep word '(unsigned-byte 8))
+                  :byte)
+                 ((and (not (logtest word #xff))
+                       (typep (ash word -8) '(unsigned-byte 8)))
+                  ;; Array lengths 128 to 16384 which are multiples of 128
+                  (setq word (ash word -8))
+                  (decf lowtag 1) ; increment address by 1
+                  :byte)
+                 ((and (not (logtest word #xffff))
+                       (typep (ash word -16) '(unsigned-byte 8)))
+                  ;; etc
+                  (setq word (ash word -16))
+                  (decf lowtag 2) ; increment address by 2
+                  :byte)
+                 ((typep word '(unsigned-byte 16))
+                  :word)
+                 (t ; must be an (unsigned-byte 31)
+                  :dword))))
+      (inst mov size (ea (- (* slot n-word-bytes) lowtag) object) word)))))
 
 ;;; ALLOCATE-VECTOR
 (macrolet ((calc-size-in-bytes (n-words result-tn)

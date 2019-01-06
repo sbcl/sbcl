@@ -675,6 +675,8 @@
    (:translate %funcallable-instance-layout)
    (:variant fun-pointer-lowtag))
  (define-vop (%set-funcallable-instance-layout %set-instance-layout)
+   ;; BUG: if this FIN has been moved into varyobj space by 'editcore',
+   ;; then assigning a layout will need to touch the GC page written bit.
    (:translate %set-funcallable-instance-layout)
    (:variant fun-pointer-lowtag)))
 

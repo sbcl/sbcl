@@ -198,14 +198,11 @@
     (declare (type (or null (unsigned-byte 4)) target-reg))
     (setf (sb-disassem::seg-object seg) component
           (sb-disassem:seg-virtual-location seg) pc
-          (sb-disassem:seg-length seg) 64 ; arb
+          (sb-disassem:seg-length seg) 100 ; arb
           (sb-disassem:seg-sap-maker seg)
           (let ((sap (int-sap pc))) (lambda () sap)))
     (macrolet ((fail ()
-                `(progn
-                   (cerror "" "fail ~x: ~x '~s' ~s"
-                           pc (logand dchunk #xFF) opcode component)
-                   (return-from fail)))
+                `(return-from fail))
                (advance (newstate)
                  `(setq allocator-state ,newstate))
                (advance-if (condition newstate)
@@ -217,7 +214,7 @@
                    (eq (machine-ea-disp rm)
                        (ash sb-vm::thread-pseudo-atomic-bits-slot
                             sb-vm:word-shift))))
-               (infer-layout (opcode ea dchunk)
+               (infer-layout (opcode ea)
                  (cond ((and (eql lowtag sb-vm:instance-pointer-lowtag)
                              (eq opcode 'mov)
                              (eq (inst-operand-size dstate) :dword)
@@ -323,14 +320,21 @@
                     ;; lowtag/widetag can be assigned in either order
                     (case opcode
                       (lea ; convert to descriptor before writing widetag
-                       (advance-if (and (eql (machine-ea-base ea) orig-free-ptr-reg)
-                                        (not (machine-ea-index ea))
-                                        (<= 0 (machine-ea-disp ea) sb-vm:lowtag-mask))
-                                   +state-lowtag-only+)
-                       (setq target-reg (reg-num (regrm-inst-reg dchunk dstate))
-                             lowtag (machine-ea-disp ea))
-                       (when (= lowtag sb-vm:list-pointer-lowtag)
-                         (return-from infer-type (values 'list size))))
+                       (cond ((and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                   (not (machine-ea-index ea))
+                                   (<= 0 (machine-ea-disp ea) sb-vm:lowtag-mask))
+                              (advance +state-lowtag-only+)
+                              (setq target-reg (reg-num (regrm-inst-reg dchunk dstate))
+                                    lowtag (machine-ea-disp ea))
+                              (when (= lowtag sb-vm:list-pointer-lowtag)
+                                (return-from infer-type (values 'list size))))
+                             ((and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                   (> (machine-ea-disp ea) (* 2 sb-vm:n-word-bytes))
+                                   (not (machine-ea-index ea)))
+                              ;; do nothing, this is probably a cons, we're computing
+                              ;; the next cell address, and the car was 0 so wasn't stored
+                              )
+                             (t (fail))))
                       (mov
                        ;; Some moves ares ignorable, those which either load from
                        ;; the constant pool or store to the newly allocated memory.
@@ -346,15 +350,23 @@
                            ;; widetag stored before ORing in lowtag
                            (unless target-reg
                              (setq target-reg orig-free-ptr-reg))
-                           (advance-if (and (eql (machine-ea-base ea) target-reg)
-                                            (not (machine-ea-disp ea))
-                                            (not (machine-ea-index ea)))
-                                       +state-widetag-only+)
-                           (setq widetag (if (eq (inst-operand-size dstate) :qword)
-                                             :variable
-                                             (logand (reg/mem-imm-data 0 dstate) #xFF)))))))
-                      (t
-                       (fail))))
+                           (cond ((and (eql (machine-ea-base ea) target-reg)
+                                       (not (machine-ea-disp ea))
+                                       (not (machine-ea-index ea)))
+                                  (advance +state-widetag-only+)
+                                  (setq widetag (if (eq (inst-operand-size dstate) :qword)
+                                                    :variable
+                                                    (logand (reg/mem-imm-data 0 dstate) #xFF))))
+                                 ((and (eql (machine-ea-base ea) target-reg)
+                                       (not (machine-ea-index ea))
+                                       (machine-ea-disp ea))) ; ignore
+                                 (t (fail)))))))
+                      (|or|
+                       (cond ((and (not lowtag)
+                                   (eq (reg/mem-imm-data 0 dstate) sb-vm:list-pointer-lowtag))
+                              (return-from infer-type (values 'list size)))
+                             (t (fail))))
+                      (t (fail))))
                    (#.+state-lowtag-only+
                     (unless (eq opcode 'mov)
                       (fail))
@@ -397,7 +409,7 @@
                       (t
                        (fail))))
                    (#.+state-low-then-widetag+
-                    (infer-layout opcode ea dchunk))
+                    (infer-layout opcode ea))
                    (#.+state-widetag-only+
                     (cond
                      ((eq opcode 'mov)
@@ -410,10 +422,15 @@
                               (t
                                (fail)))))
                      ((eq opcode 'lea)
-                      ;; computing the CDR of the first cons in a list of 2, presumably
-                      (unless (and (eql (machine-ea-base ea) target-reg)
-                                   (null (machine-ea-index ea)))
-                        (fail)))
+                      (cond ((and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                  (null (machine-ea-index ea))
+                                  (eql (machine-ea-disp ea) sb-vm:list-pointer-lowtag))
+                             (return-from infer-type (values 'list size)))
+                            ;; computing the CDR of the first cons in a list of 2, presumably
+                            ((and (eql (machine-ea-base ea) target-reg)
+                                  (null (machine-ea-index ea))))
+                            (t
+                             (fail))))
                      (t
                       (advance-if (and (eq opcode '|or|)
                                        ;; TODO: AVER correct register as well
@@ -440,7 +457,7 @@
                    (#.+state-test-interrupted+
                     (advance-if (eq opcode '|break|) +state-pa-trap+))
                    (#.+state-pa-trap+
-                    (infer-layout opcode ea dchunk))
+                    (infer-layout opcode ea))
                    (#.+state-trampoline-arg+
                     (advance-if (eq opcode '|call|) +state-called+))
                    (#.+state-called+
@@ -469,8 +486,11 @@
                            (advance +state-lowtag-only+))
                       (t
                        (fail))))))))
-           seg dstate)))))
-  (values nil nil))
+           seg dstate))))
+    (cerror "" "fail @ ~x in ~x state ~d from=~x"
+            (sb-disassem:dstate-cur-addr dstate)
+            component allocator-state pc)
+    (values nil nil)))
 
 ;;; Return a name for PC-OFFS in CODE. PC-OFFSET is relative
 ;;; to CODE-INSTRUCTIONS.
