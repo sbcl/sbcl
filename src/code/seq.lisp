@@ -842,7 +842,7 @@
   (vector-replace-from-vector))
 
 (define-sequence-traverser replace
-    (source-sequence1 target-sequence2 &rest args &key start1 end1 start2 end2)
+    (target-sequence1 source-sequence2 &rest args &key start1 end1 start2 end2)
   "Destructively modifies SEQUENCE1 by copying successive elements
 into it from the SEQUENCE2.
 
@@ -851,13 +851,13 @@ from the subsequence bounded by START2 and END2. If these subsequences
 are not of the same length, then the shorter length determines how
 many elements are copied."
   (declare (truly-dynamic-extent args))
-  (declare (explicit-check source-sequence1 target-sequence2 :result))
+  (declare (explicit-check target-sequence1 source-sequence2 :result))
   (let* (;; KLUDGE: absent either rewriting FOO-REPLACE-FROM-BAR, or
          ;; excessively polluting DEFINE-SEQUENCE-TRAVERSER, we rebind
          ;; these things here so that legacy code gets the names it's
          ;; expecting.  We could use &AUX instead :-/.
-         (target-sequence source-sequence1)
-         (source-sequence target-sequence2)
+         (target-sequence target-sequence1)
+         (source-sequence source-sequence2)
          (target-start start1)
          (source-start start2)
          (target-end (or end1 length1))
@@ -876,8 +876,8 @@ many elements are copied."
     ;; If sequence1 was a list or vector, then sequence2 is an extended-sequence
     ;; or not a sequence. Either way, check it.
     (the sequence
-      (values (apply #'sb-sequence:replace source-sequence1
-                     (the sequence target-sequence2) args)))))
+      (values (apply #'sb-sequence:replace target-sequence1
+                     (the sequence source-sequence2) args)))))
 
 ;;;; REVERSE
 (defun reverse (sequence)
