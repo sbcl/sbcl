@@ -101,5 +101,7 @@ sb-vm::
   (list* (load-time-value(gensym)) :if-exists x))
 
 (with-test (:name :aprof-list-length-2 :fails-on :win32)
+  (compile 'f1)
+  (compile 'f2)
   (assert (= (sb-aprof:aprof-run #'f1 :stream nil) 32))
   (assert (= (sb-aprof:aprof-run #'f2 :stream nil) 32)))
