@@ -174,7 +174,7 @@
 
 (defconstant-eqx float-decoding-error "Can't decode NaN or infinity: ~S."
   #'string=)
-    
+
 #!-sb-fluid
 (declaim (maybe-inline integer-decode-single-float
                        integer-decode-double-float))

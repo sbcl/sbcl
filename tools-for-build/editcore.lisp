@@ -907,20 +907,24 @@
                          (cadr (nth i name->addr)))))))
         (terpri output)
         ;; Loop over the embedded routines
-        (dolist (entry name->addr)
-          (destructuring-bind (name start-offs . end-offs) entry
-            (let ((nbytes (- (1+ end-offs) start-offs)))
+        (let ((list name->addr)
+              (obj-size (code-object-size code-component)))
+          (loop
+            (destructuring-bind (name start-offs . end-offs) (pop list)
+              (let ((nbytes (- (if (endp list)
+                                   (- obj-size (* header-len n-word-bytes))
+                                   (1+ end-offs))
+                               start-offs)))
               (format output " lasmsym ~(\"~a\"~), ~d~%" name nbytes)
               (emit-lisp-function (+ (sap-int (code-instructions code-component))
                                      start-offs)
                                   (+ code-addr
                                      (ash (code-header-words code-component) word-shift)
                                      start-offs)
-                                  nbytes output nil core)))))
-      (format output " .quad 0, 0~%") ; trailer with SIMPLE-FUN count of 0
-      (let ((size (code-object-size code-component))) ; No need to pin
-        (incf code-addr size)
-        (setf total-code-size size)))
+                                  nbytes output nil core)))
+            (when (endp list) (return)))
+          (incf code-addr obj-size)
+          (setf total-code-size obj-size))))
     (format output "~%# end of lisp asm routines~2%")
 
     (loop
@@ -933,7 +937,7 @@
                 (objsize (code-object-size code)))
            (incf total-code-size objsize)
            (cond
-             ((< (code-header-words code) 4) ; filler object
+             ((< (code-header-words code) 3) ; filler object
               (let ((sap (int-sap (- (get-lisp-obj-address code) other-pointer-lowtag))))
                 (format output " .quad 0x~x, 0x~x~% .fill 0x~x~%# ~x:~%"
                         (sap-ref-word sap 0)
