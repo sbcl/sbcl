@@ -197,22 +197,21 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (y :scs (any-reg descriptor-reg)))
   (:vop-var vop)
-  (:variant-vars unit)
+  (:variant-vars constant)
   (:generator 4
     (inst srai temp x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
     (inst beq temp zero-tn done)
     (inst xori temp temp -1)
     (inst beq temp zero-tn done)
-    (load-constant vop (emit-constant (+ sb-xc:most-positive-fixnum unit))
-                   y)
+    (load-constant vop (emit-constant constant) y)
     DONE))
 
 (define-vop (move-from-fixnum+1 move-from-fixnum+/-1)
-  (:variant 1))
+  (:variant (1+ sb-xc:most-positive-fixnum)))
 
 (define-vop (move-from-fixnum-1 move-from-fixnum+1)
-  (:variant -1))
+  (:variant (1- sb-xc:most-negative-fixnum)))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may

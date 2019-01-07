@@ -155,8 +155,6 @@
 (define-instruction jalr (segment lr rs offset)
   (:printer i ((funct3 #b000) (opcode #b1100111)))
   (:emitter
-   (unless (typep offset '(signed-byte 12))
-     (error "JALR offset must be (signed-byte 12)"))
    (emit-i-inst segment offset rs #b000 lr #b1100111)))
 
 (define-instruction-macro j (target)
