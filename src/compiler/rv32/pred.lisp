@@ -30,6 +30,11 @@
   (:generator 0
     (error "BRANCH-IF should not be needed on RISC-V.")))
 
+(defun convert-conditional-move-p (node dst-tn x-tn y-tn)
+  (declare (ignore node dst-tn x-tn y-tn))
+  nil)
+
+
 ;;;; Conditional VOPs:
 
 (define-vop (if-eq)

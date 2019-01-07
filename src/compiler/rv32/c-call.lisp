@@ -27,3 +27,5 @@
 (define-vop (dealloc-number-stack-space)
   (:info amount)
   (:generator 0))
+
+(defun make-call-out-tns (type))
