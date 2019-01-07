@@ -176,11 +176,11 @@
         ;; Emit the sequence:
         ;; b(invert(funct3)) rs1 rs2 2
         ;; jal x0 target
-        (emit-b-inst segment 2 rs2 rs1 (xor funct3 1) opcode)
+        (emit-b-inst segment 2 rs2 rs1 (logxor funct3 1) opcode)
         (emit-short-jump-at segment zero-tn target posn)
         t)))
    (lambda (segment posn)
-     (emit-b-inst segment 4 rs2 rs1 (xor funct3 1) opcode)
+     (emit-b-inst segment 4 rs2 rs1 (logxor funct3 1) opcode)
      (funcall (emit-long-jump-at-fun zero-tn target) segment posn))))
 
 (macrolet ((define-branch-instruction (name funct3)
