@@ -178,19 +178,19 @@
 ;;;; DECODE-FLOAT, INTEGER-DECODE-FLOAT, and SCALE-FLOAT
 
 (defknown decode-single-float (single-float)
-  (values single-float single-float-exponent (single-float -1f0 1f0))
+  (values single-float single-float-exponent (member -1f0 1f0))
   (movable foldable flushable))
 
 (defknown decode-double-float (double-float)
-  (values double-float double-float-exponent (double-float -1d0 1d0))
+  (values double-float double-float-exponent (member -1d0 1d0))
   (movable foldable flushable))
 
 (defknown integer-decode-single-float (single-float)
-  (values single-float-significand single-float-int-exponent (integer -1 1))
+  (values single-float-significand single-float-int-exponent (member -1 1))
   (movable foldable flushable))
 
 (defknown integer-decode-double-float (double-float)
-  (values double-float-significand double-float-int-exponent (integer -1 1))
+  (values double-float-significand double-float-int-exponent (member -1 1))
   (movable foldable flushable))
 
 (defknown scale-single-float (single-float integer) single-float

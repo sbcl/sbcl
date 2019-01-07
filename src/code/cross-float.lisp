@@ -48,6 +48,7 @@
   (declare (type single-float x))
   (assert (= (float-radix x) 2))
   (if (zerop x)
+      ;; FIXME: bogus test if the host does not support -0.0f0
       (if (eql x 0.0f0) 0 #x-80000000)
       (multiple-value-bind (lisp-significand lisp-exponent lisp-sign)
           (integer-decode-float x)
@@ -110,6 +111,7 @@
   (declare (type double-float x))
   (assert (= (float-radix x) 2))
   (if (zerop x)
+      ;; FIXME: bogus test if the host does not support -0.0d0
       (if (eql x 0.0d0) 0 #x-8000000000000000)
       ;; KLUDGE: As per comments in SINGLE-FLOAT-BITS, above.
       (multiple-value-bind (lisp-significand lisp-exponent lisp-sign)
@@ -160,16 +162,12 @@
   (declare (type double-float x))
   (if (zerop x)
       0
-      ;; FIXME: Unlike DOUBLE-FLOAT-HIGH-BITS or SINGLE-FLOAT-BITS,
-      ;; the CMU CL DOUBLE-FLOAT-LOW-BITS seemed to return a unsigned
-      ;; value, not a signed value, so we've done the same. But it
-      ;; would be nice to make the family of functions have a more
-      ;; consistent return convention.
       (logand #xffffffff (double-float-bits x))))
 
 (defun double-float-high-bits (x)
   (declare (type double-float x))
   (if (zerop x)
+      ;; FIXME: bogus test if the host does not support -0.0d0
       (if (eql x 0.0d0) 0 #x-80000000)
       (mask-and-sign-extend (ash (double-float-bits x) -32) 32)))
 

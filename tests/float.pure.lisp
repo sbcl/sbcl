@@ -456,3 +456,71 @@
     (test sin rational)
     (test cos rational)
     (test tan rational)))
+
+(defun exercise-float-decoder (type exponent-bits mantissa-bits &optional print)
+  (let* ((exp-max (1- (ash 1 (1- exponent-bits))))
+         (exp-min (- (1- exp-max)))
+         (exp-bias exp-max)
+         ;; mantissa-bits excludes the hidden bit
+         (total-bits (+ mantissa-bits exponent-bits 1)))
+    (labels ((try (sign-bit exponent mantissa)
+               (let* ((bit-pattern
+                       (logior (ash sign-bit (+ exponent-bits mantissa-bits))
+                               (ash (+ exp-bias exponent) mantissa-bits)
+                               mantissa))
+                      (signed-bits
+                       (sb-disassem:sign-extend bit-pattern total-bits))
+                      (x (ecase type
+                          (single-float
+                           (sb-kernel:make-single-float signed-bits))
+                          (double-float
+                           (sb-kernel:make-double-float (ash signed-bits -32)
+                                                        (ldb (byte 32 0) signed-bits))))))
+                 (when print
+                   (format t "~v,'0b -> ~f~%" total-bits bit-pattern x))
+                 (multiple-value-bind (significand exponent sign) (decode-float x)
+                   (let ((reconstructed (* significand (expt 2 exponent) sign)))
+                     (unless (= reconstructed x)
+                       (error "DF -> ~s ~s ~s -> ~f~%" significand exponent sign
+                              reconstructed))))
+                 (multiple-value-bind (significand exponent sign) (integer-decode-float x)
+                   (let ((reconstructed (* significand (expt 2 exponent) sign)))
+                     (unless (= reconstructed x)
+                       (error "IDF -> ~s ~s ~s -> ~f~%" significand exponent sign
+                              reconstructed)))))))
+      ;; walking 1 bit
+      (loop for exp from exp-min to (1- exp-max)
+            do (let ((bit (ash 1 mantissa-bits)))
+                 (loop while (/= bit 0)
+                       do (try 0 exp (ldb (byte mantissa-bits 0) bit))
+                          (setq bit (ash bit -1))))))))
+
+(with-test (:name :test-float-decoders)
+  (flet ((test-df (input expect-sig expect-exp expect-sign)
+           (multiple-value-bind (significand exponent sign)
+               (decode-float input)
+             (assert (and (= significand expect-sig)
+                          (= exponent expect-exp)
+                          (= sign expect-sign)))))
+         (test-idf (input expect-sig expect-exp expect-sign)
+           (multiple-value-bind (significand exponent sign)
+               (integer-decode-float input)
+             (assert (and (= significand expect-sig)
+                          (= exponent expect-exp)
+                          (= sign expect-sign))))))
+    (test-df +0s0 0.0s0 0 1.0)
+    (test-df -0s0 0.0s0 0 -1.0)
+    (test-df +0d0 0.0d0 0 1.0d0)
+    (test-df -0d0 0.0d0 0 -1.0d0)
+    (test-idf +0s0 0 0 1)
+    (test-idf -0s0 0 0 -1)
+    (test-idf +0d0 0 0 1)
+    (test-idf -0d0 0 0 -1)
+    (test-idf least-positive-normalized-single-float 8388608 -149 1)
+    (test-idf least-negative-normalized-single-float 8388608 -149 -1)
+    (test-idf least-positive-normalized-double-float 4503599627370496 -1074 1)
+    (test-idf least-negative-normalized-double-float 4503599627370496 -1074 -1))
+  (exercise-float-decoder 'single-float  8 23)
+  (exercise-float-decoder 'double-float 11 52)
+  ;; TODO: test denormals
+  )
