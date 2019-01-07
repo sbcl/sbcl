@@ -45,13 +45,14 @@
   (defreg a3 16)
   (defreg nl3 17)
 
+  (defreg lexenv 27)
   (defreg null 28)
   (defreg code 29)
   (defreg lip 30)
   (defreg nargs 31)
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nargs nfp)
-  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra)
+  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra lexenv)
 
   (define-argument-register-set a0 a1 a2 a3))
 
@@ -131,7 +132,7 @@
 (macrolet ((defregtn (name sc)
                (let ((offset-sym (symbolicate name "-OFFSET"))
                      (tn-sym (symbolicate name "-TN")))
-                 `(defparameter ,tn-sym
+                 `(defglobal ,tn-sym
                    (make-random-tn :kind :normal
                     :sc (sc-or-lose ',sc)
                     :offset ,offset-sym)))))
@@ -142,6 +143,7 @@
   (defregtn ocfp any-reg)
 
   (defregtn null descriptor-reg)
+  (defregtn lexenv descriptor-reg)
 
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
@@ -156,8 +158,13 @@
   (typecase value
     (null
      (values descriptor-reg-sc-number null-offset))
-    ((integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
-     immediate-sc-number)))
+    ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
+         character)
+     immediate-sc-number)
+    (symbol
+     (if (static-symbol-p value)
+         immediate-sc-number
+         nil))))
 
 (defun boxed-immediate-sc-p (sc)
   (eql sc immediate-sc-number))
