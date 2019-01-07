@@ -210,3 +210,8 @@ and
            (move ,n-reg ,n-stack))
           ((control-stack)
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
+
+(defmacro load-type (target source &optional (offset 0))
+  "Loads the type bits of a pointer into target independent of
+byte-ordering issues."
+  `(inst lbu ,target ,source ,offset))

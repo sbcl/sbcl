@@ -240,6 +240,9 @@
   (define-immediate-arith-instruction srai #b101
     (progn (aver (< imm n-word-bits)) (dpb 1 (byte 1 10) imm))))
 
+(define-instruction-macro subi (rd rs imm)
+  `(inst addi ,rd ,rs (- ,imm)))
+
 (defmacro define-register-arith-instruction (name funct7 funct3 opcode)
   `(define-instruction ,name (segment rd rs1 rs2)
      (:printer r ((funct7 ,funct7) (funct3 ,funct3) (opcode ,opcode)))
@@ -446,3 +449,47 @@
     (:emitter
      (emit-s-inst segment offset rs2 rs1 (fmt-funct3 fmt) #b0100111))))))
 
+;;;; Boxed-object computation instructions (for LRA and CODE)
+
+;;; Compute the address of a CODE object by parsing the header of a
+;;; nearby LRA or SIMPLE-FUN.
+(define-instruction compute-code (segment code lip object-label temp)
+  (:vop-var vop)
+  (:emitter
+   (emit-back-patch
+    segment 20
+    (lambda (segment position)
+      (assemble (segment vop)
+        ;; Calculate the address of the code component.  This is an
+        ;; exercise in excess cleverness.  First, we calculate (from
+        ;; our program counter only) the address of OBJECT-LABEL plus
+        ;; OTHER-POINTER-LOWTAG.
+        (inst auipc temp 0)
+        (inst addi lip temp (- ;; The 4 below is the displacement
+                             ;; from reading the program counter.
+                             ;; XXX may or may not be correct
+                             (+ (label-position object-label)
+                                other-pointer-lowtag)
+                             (+ position 4)))
+        ;; Next, we read the function header.
+        (inst lw temp lip (- other-pointer-lowtag))
+        ;; And finally we use the header value (a count in words),
+        ;; plus the fact that the top two bits of the widetag are
+        ;; clear (SIMPLE-FUN-WIDETAG is #x2A and
+        ;; RETURN-PC-WIDETAG is #x36) to compute the boxed
+        ;; address of the code component.
+        (inst srli temp temp (- 8 word-shift))
+        (inst sub code lip temp))))))
+
+(defun emit-header-data (segment type)
+  (emit-back-patch
+   segment 4
+   #'(lambda (segment posn)
+       (emit-machine-word segment
+                          (logior type
+                                  (ash (+ posn (component-header-length))
+                                       (- n-widetag-bits word-shift)))))))
+
+(define-instruction simple-fun-header-word (segment)
+  (:emitter
+   (emit-header-data segment simple-fun-widetag)))
