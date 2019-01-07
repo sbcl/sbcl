@@ -152,16 +152,12 @@
         t))
     (emit-long-jump-at-fun lr target))))
 
-(define-instruction jalr (segment lr rs target)
+(define-instruction jalr (segment lr rs offset)
   (:printer i ((funct3 #b000) (opcode #b1100111)))
   (:emitter
-   (emit-back-patch
-    segment 4
-    (lambda (segment posn)
-      (let ((disp (jalr-offset target 1 posn)))
-        (unless (typep disp '(signed-byte 12))
-          (error "JALR long jump not supported"))
-        (emit-i-inst segment disp rs #b000 lr #b1100111))))))
+   (unless (typep offset '(signed-byte 12))
+     (error "JALR offset must be (signed-byte 12)"))
+   (emit-i-inst segment offset rs #b000 lr #b1100111)))
 
 (define-instruction-macro j (target)
   `(inst jal zero-tn ,target))
