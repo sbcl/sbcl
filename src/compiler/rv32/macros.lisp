@@ -28,6 +28,26 @@
 (def-mem-op loadw lw word-shift t)
 (def-mem-op storew sw word-shift nil)
 
+(defmacro load-symbol (reg symbol)
+  `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
+
+(defmacro load-symbol-value (reg symbol)
+  `(inst lw ,reg null-tn
+         (+ (static-symbol-offset ',symbol)
+              (ash symbol-value-slot word-shift)
+              (- other-pointer-lowtag))))
+
+(defmacro store-symbol-value (reg symbol)
+  `(inst sw ,reg null-tn
+         (+ (static-symbol-offset ',symbol)
+            (ash symbol-value-slot word-shift)
+            (- other-pointer-lowtag))))
+
+(defmacro load-type (target source &optional (offset 0))
+  "Loads the type bits of a pointer into target independent of
+byte-ordering issues."
+  `(inst lbu ,target ,source ,offset))
+
 
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target)
@@ -62,6 +82,25 @@
       (emit-error-break vop error-trap (error-number-or-lose error-code) values)
       start-lab)))
 
+;;;; PSEUDO-ATOMIC
+
+;;; handy macro for making sequences look atomic
+(defmacro pseudo-atomic ((flag-tn) &body forms)
+  `(progn
+     (without-scheduling ()
+       (store-symbol-value csp-tn *pseudo-atomic-atomic*))
+     (assemble ()
+       ,@forms)
+     (without-scheduling ()
+       (store-symbol-value null-tn *pseudo-atomic-atomic*)
+       (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+       ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
+       ;; do_pending_interrupt
+       (let ((label gen-label))
+         (inst beq ,flag-tn zero-tn label)
+         (inst jalr zero-tn ,flag-tn zero-tn)
+         (emit-label label)))))
+
 #|
 If we are doing [reg+offset*n-word-bytes-lowtag+index*scale]
 and
@@ -211,7 +250,37 @@ and
           ((control-stack)
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
-(defmacro load-type (target source &optional (offset 0))
-  "Loads the type bits of a pointer into target independent of
-byte-ordering issues."
-  `(inst lbu ,target ,source ,offset))
+
+;;;; Storage allocation:
+(defun allocation (result-tn size lowtag &key flag-tn
+                                              (temp-tn (missing-arg)))
+  ;; Normal allocation to the heap.
+  (load-symbol-value flag-tn *allocation-pointer*)
+  (inst addi result-tn flag-tn lowtag)
+  (cond ((integerp size)
+         (inst li temp-tn size)
+         (inst add flag-tn flag-tn temp-tn))
+        (t
+         (inst add flag-tn flag-tn size)))
+  (store-symbol-value flag-tn *allocation-pointer*))
+
+(defmacro with-fixed-allocation ((result-tn flagtn temp-tn type-code size
+                                  &key (lowtag other-pointer-low-tag))
+                                 &body body)
+  "Do stuff to allocate an other-pointer object of fixed Size with a single
+  word header having the specified Type-Code.  The result is placed in
+  Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
+  by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
+  initializes the object."
+  (once-only ((result-tn result-tn) (flag-tn flag-tn) (temp-tn temp-tn)
+              (type-code type-code) (size size)
+              (lowtag lowtag))
+    `(pseudo-atomic (,flag-tn)
+       (allocation ,result-tn (pad-data-block ,size)
+                   :flag-tn ,flag-tn
+                   :temp-tn ,temp-tn)
+       (when ,type-code
+         (inst li ,flag-tn (ash (1- ,size) n-widetag-bits))
+         (inst ori ,flag-tn ,flag-tn ,type-code)
+         (storew ,flag-tn ,result-tn 0 ,lowtag))
+       ,@body)))
