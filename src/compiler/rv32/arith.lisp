@@ -710,7 +710,7 @@
     (move rem-low num-low)
     (flet ((maybe-subtract (&optional (guess temp))
              (inst addi temp guess -1)
-             (inst and temp denom)
+             (inst and temp temp denom)
              (inst sub rem rem temp)))
       (inst sltu quo rem denom)
       (maybe-subtract quo)
@@ -723,7 +723,7 @@
         (inst slli quo quo 1)
         (inst or quo quo temp)
         (maybe-subtract)))
-    (inst xori quo -1)))
+    (inst xori quo quo -1)))
 
 (define-vop (signify-digit)
   (:translate sb-bignum:%fixnum-digit-with-correct-sign)
