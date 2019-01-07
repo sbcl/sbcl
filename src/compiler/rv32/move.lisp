@@ -93,11 +93,11 @@
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
   (:generator 0
-    (cond ((location= x y))
-          ((sc-is y control-stack)
-           (storew x fp (tn-offset y)))
-          (t
-           (move y x)))))
+    (sc-case y
+      ((any-reg descriptor-reg)
+       (move y x))
+      (control-stack
+       (storew x fp (tn-offset y))))))
 ;;;
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
@@ -175,19 +175,44 @@
 (define-vop (move-from-signed)
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:generator 18))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:generator 18
+    (inst srai temp x n-positive-fixnum-bits)
+    (inst slli y x n-fixnum-tag-bits)
+    (inst beq temp zero-tn done)
+    (inst xori temp temp -1)
+    (inst beq temp zero-tn done)
+
+    (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    
+    DONE))
 
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
-(define-vop (move-from-fixnum+1)
-  (:args (x :scs (signed-reg unsigned-reg)))
+(define-vop (move-from-fixnum+/-1)
+  (:args (x :scs (signed-reg unsigned-reg) :target y))
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (y :scs (any-reg descriptor-reg)))
   (:vop-var vop)
-  (:generator 4))
+  (:variant-vars unit)
+  (:generator 4
+    (inst srai temp x n-positive-fixnum-bits)
+    (inst slli y x n-fixnum-tag-bits)
+    (inst beq temp zero-tn done)
+    (inst xori temp temp -1)
+    (inst beq temp zero-tn done)
+    (load-constant vop (emit-constant (+ sb-xc:most-positive-fixnum unit))
+                   y)
+    DONE))
+
+(define-vop (move-from-fixnum+1 move-from-fixnum+/-1)
+  (:variant 1))
 
 (define-vop (move-from-fixnum-1 move-from-fixnum+1)
-  (:generator 4))
+  (:variant -1))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may
@@ -195,10 +220,23 @@
 (define-vop (move-from-unsigned)
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:generator 20))
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
+  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:generator 20
+    (inst srli temp temp n-positive-fixnum-bits)
+    (inst slli y x n-fixnum-tag-bits)
+    (inst beq temp zero-tn done)
+    (with-fixed-allocation (y pa-flag temp bignum-widetag (+ bignum-digits-offset 2))
+      (inst slt temp x zero-tn)
+      (inst slli temp temp n-widetag-bits)
+      (inst addi temp temp (logior (ash 1 n-widetag-bits) bignum-widetag))
+      (storew temp y 0 other-pointer-lowtag))
+    (storew x y bignum-digits-offset other-pointer-lowtag)
+    DONE))
+
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
-
+
 
 ;;; Move untagged numbers.
 (define-vop (word-move)

@@ -96,9 +96,9 @@ byte-ordering issues."
        (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
        ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
        ;; do_pending_interrupt
-       (let ((label gen-label))
+       (let ((label (gen-label)))
          (inst beq ,flag-tn zero-tn label)
-         (inst jalr zero-tn ,flag-tn zero-tn)
+         (inst jalr zero-tn ,flag-tn 0)
          (emit-label label)))))
 
 #|
@@ -264,8 +264,8 @@ and
          (inst add flag-tn flag-tn size)))
   (store-symbol-value flag-tn *allocation-pointer*))
 
-(defmacro with-fixed-allocation ((result-tn flagtn temp-tn type-code size
-                                  &key (lowtag other-pointer-low-tag))
+(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
+                                  &key (lowtag other-pointer-lowtag))
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -276,7 +276,7 @@ and
               (type-code type-code) (size size)
               (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
-       (allocation ,result-tn (pad-data-block ,size)
+       (allocation ,result-tn (pad-data-block ,size) ,lowtag
                    :flag-tn ,flag-tn
                    :temp-tn ,temp-tn)
        (when ,type-code
