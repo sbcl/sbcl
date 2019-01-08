@@ -57,6 +57,23 @@
 (defconstant double-float-digits
   (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
+(defconstant float-inexact-trap-bit (ash 1 0))
+(defconstant float-underflow-trap-bit (ash 1 1))
+(defconstant float-overflow-trap-bit (ash 1 2))
+(defconstant float-divide-by-zero-trap-bit (ash 1 3))
+(defconstant float-invalid-trap-bit (ash 1 4))
+
+(defconstant float-round-to-nearest 0)
+(defconstant float-round-to-zero 1)
+(defconstant float-round-to-negative 2)
+(defconstant float-round-to-positive 3)
+
+(defconstant-eqx float-rounding-mode (byte 2 5) #'equalp)
+(defconstant-eqx float-sticky-bits (byte 5 0) #'equalp)
+;;;; RISC-V has no explicit floating point traps.
+(defconstant-eqx float-traps-byte (byte 5 0) #'equalp)
+(defconstant-eqx float-exceptions-byte (byte 5 0) #'equalp)
+
 
 ;;;; Where to put the different spaces.
 
