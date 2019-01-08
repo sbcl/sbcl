@@ -203,7 +203,7 @@
     (inst bge amount zero-tn positive)
     (inst sub ndesc zero-tn amount)
     (inst addi temp zero-tn 31)
-    (inst sra result number 31)
+    (inst srai result number 31)
     (inst blt temp ndesc done)
     (inst sra result number ndesc)
     (inst j done)
@@ -337,7 +337,7 @@
   (:translate *)
   (:temporary (:scs (non-descriptor-reg) :to :eval) temp)
   (:generator 4
-    (inst sra temp y n-fixnum-tag-bits)
+    (inst srai temp y n-fixnum-tag-bits)
     (inst mul r x temp)))
 
 (define-vop (fast-*/signed=>signed fast-signed-binop)
