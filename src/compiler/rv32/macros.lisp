@@ -57,8 +57,15 @@ byte-ordering issues."
   "Return to RETURN-PC."
   (ecase return-style
     (:single-value (inst li nl0 0))
-    (:multiple-values (inst li nl0 1)))
+    (:multiple-values (inst li nl0 1))
+    (:known))
   (inst jalr zero-tn return-pc (- other-pointer-lowtag)))
+
+(defun emit-return-pc (label)
+  "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
+  (emit-alignment n-lowtag-bits)
+  (emit-label label)
+  (inst lra-header-word))
 
 
 ;;;; Three Way Comparison
