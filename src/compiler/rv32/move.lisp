@@ -176,7 +176,7 @@
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
   (:generator 18
     (inst srai temp x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
@@ -220,7 +220,7 @@
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:temporary (:sc non-descriptor-reg :offset ocfp-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
   (:generator 20
     (inst srli temp temp n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
