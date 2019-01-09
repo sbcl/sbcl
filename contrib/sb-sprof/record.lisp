@@ -16,7 +16,7 @@
 ;;;   absolute address
 (defconstant +elements-per-sample+ 2)
 
-;;; 0 the symbol TRACE-START
+;;; 0 the trace start marker (trace-start . END-INDEX)
 ;;; 1 the current thread, an SB-THREAD:THREAD instance
 ;;; 2 the current internal real time
 (defconstant +elements-per-trace-start+ 3)
@@ -450,7 +450,8 @@ EXPERIMENTAL: Interface subject to change."
                 (unless (eq (record samples pc-ptr) :foreign)
                   (record samples (sap-ref-sap
                                    (int-sap fp)
-                                   (* sb-vm::lra-save-offset sb-vm::n-word-bytes))))))))))))
+                                   (* sb-vm::lra-save-offset sb-vm::n-word-bytes)))))
+              (record-trace-end samples))))))))
 
 ;;; Return the start address of CODE.
 (defun code-start (code)
