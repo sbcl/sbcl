@@ -460,10 +460,30 @@
 (define-full-reffer more-arg * 0 0 (descriptor-reg any-reg) * %more-arg)
 
 (define-vop (verify-arg-count)
+  (:policy :fast-safe)
   (:args (nargs :scs (any-reg)))
+  (:temporary (:scs (unsigned-reg)) temp)
   (:info min max)
+  (:vop-var vop)
   (:arg-types positive-fixnum (:constant t) (:constant t))
-  (:generator 3))
+  (:generator 3
+    (let ((err-lab
+            (generate-error-code vop 'invalid-arg-count-error nargs)))
+      (cond ((not min)
+             (cond ((zerop max)
+                    (inst bne nargs zero-tn err-lab))
+                   (t
+                    (inst li temp (fixnumize max))
+                    (inst bne nargs temp err-lab))))
+            (max
+             (when (plusp min)
+               (inst li temp (fixnumize min))
+               (inst bltu nargs temp err-lab))
+             (inst li temp (fixnumize max))
+             (inst bltu temp nargs err-lab))
+            ((plusp min)
+             (inst li temp (fixnumize min))
+             (inst bltu nargs temp err-lab))))))
 
 (define-vop (step-instrument-before-vop)
   (:generator 3))
