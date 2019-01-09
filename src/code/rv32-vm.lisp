@@ -9,11 +9,27 @@
 
 ;;; FIXUP-CODE-OBJECT
 
-(defconstant-eqx +fixup-kinds+ #(:dummy) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:lui :jalr) #'equalp)
 
 (!with-bigvec-or-sap
- (defun fixup-code-object (code offset fixup kind flavor)
-   (declare (ignore code offset fixup kind flavor))
+  (defun fixup-code-object (code offset fixup kind flavor)
+    (declare (type index offset))
+    (declare (ignore flavor))
+    (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
+      (error "Unaligned instruction?  offset=#x~X." offset))
+    (let ((sap (code-instructions code)))
+      (ecase kind
+        (:absolute
+         (setf (sap-ref-32 sap offset) fixup))
+        (:jalr
+         (setf (ldb (byte 12 20) (sap-ref-32 sap offset))
+               (ldb (byte 12 0) fixup)))
+        (:lui
+         (setf (ldb (byte 20 12) (sap-ref-32 sap offset))
+               (ldb (byte 20 12) fixup)))
+        (:auipc
+         (setf (ldb (byte 20 12) (sap-ref-32 sap offset))
+               (ldb (byte 20 12) fixup)))))
    nil))
 
 ;;; CONTEXT-FLOAT-REGISTER
