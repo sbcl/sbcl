@@ -76,13 +76,15 @@
  (any-reg registers
           :locations #.(append non-descriptor-regs descriptor-regs)
           :alternate-scs (control-stack)
-          :constant-scs (immediate constant))
+          :constant-scs (immediate constant)
+          :save-p t)
 
  ;; Pointer descriptor objects.  Must be seen by GC.
  (descriptor-reg registers
                  :locations #.descriptor-regs
                  :alternate-scs (control-stack)
-                 :constant-scs (immediate constant))
+                 :constant-scs (immediate constant)
+                 :save-p t)
 
  ;; Random objects that must not be seen by GC.  Used only as temporaries.
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
@@ -96,33 +98,52 @@
  (character-reg registers
                 :locations #.non-descriptor-regs
                 :alternate-scs (character-stack)
-                :constant-scs (immediate))
+                :constant-scs (immediate)
+                :save-p t)
 
  (sap-stack non-descriptor-stack)
  (sap-reg registers
           :locations #.non-descriptor-regs
           :constant-scs (immediate)
-          :alternate-scs (sap-stack))
+          :alternate-scs (sap-stack)
+          :save-p t)
  (signed-stack non-descriptor-stack)
  (signed-reg registers
              :locations #.non-descriptor-regs
              :alternate-scs (signed-stack)
-             :constant-scs (immediate))
+             :constant-scs (immediate)
+             :save-p t)
  (unsigned-stack non-descriptor-stack)
  (unsigned-reg registers
                :locations #.non-descriptor-regs
                :alternate-scs (unsigned-stack)
-               :constant-scs (immediate))
+               :constant-scs (immediate)
+               :save-p t)
 
+ ;; Non-descriptor floating point.
  (single-stack non-descriptor-stack)
- (single-reg float-registers :alternate-scs (single-stack))
+ (single-reg float-registers
+             :locations #.(loop for i below 32 collect i)
+             :alternate-scs (single-stack)
+             :save-p t)
  (double-stack non-descriptor-stack :element-size 2)
- (double-reg float-registers :alternate-scs (double-stack))
+ (double-reg float-registers
+             :locations #.(loop for i below 32 collect i)
+             :alternate-scs (double-stack)
+             :save-p t)
 
  (complex-single-stack non-descriptor-stack :element-size 2)
- (complex-single-reg float-registers :alternate-scs (complex-single-stack))
+ (complex-single-reg float-registers
+                     :locations #.(loop for i below 32 by 2 collect i)
+                     :element-size 2
+                     :alternate-scs (complex-single-stack)
+                     :save-p t)
  (complex-double-stack non-descriptor-stack :element-size 4)
- (complex-double-reg float-registers :alternate-scs (complex-double-stack))
+ (complex-double-reg float-registers
+                     :locations #.(loop for i below 32 by 4 collect i)
+                     :element-size 4
+                     :save-p t
+                     :alternate-scs (complex-double-stack))
 
  (catch-block control-stack :element-size catch-block-size)
  (unwind-block control-stack :element-size unwind-block-size)
