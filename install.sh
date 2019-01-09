@@ -22,10 +22,10 @@ else
     RUNTIME=sbcl
     OLD_RUNTIME=sbcl.old
 fi
-INSTALL_ROOT=${INSTALL_ROOT-$DEFAULT_INSTALL_ROOT}
-MAN_DIR=${MAN_DIR-"$INSTALL_ROOT"/share/man}
-INFO_DIR=${INFO_DIR-"$INSTALL_ROOT"/share/info}
-DOC_DIR=${DOC_DIR-"$INSTALL_ROOT"/share/doc/sbcl}
+INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
+MAN_DIR=${MAN_DIR:-"$INSTALL_ROOT"/share/man}
+INFO_DIR=${INFO_DIR:-"$INSTALL_ROOT"/share/info}
+DOC_DIR=${DOC_DIR:-"$INSTALL_ROOT"/share/doc/sbcl}
 
 # Does the environment look sane?
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
