@@ -10,6 +10,137 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
+
+;;;; Return-multiple with other than one value
+#+sb-assembling ;; we don't want a vop for this one.
+(macrolet ((frob ()
+             (let ((a (loop repeat register-arg-count
+                            collect (gensym)))
+                   (defaulting-labels (loop repeat (1- register-arg-count)
+                                             collect (gensym))))
+               `(define-assembly-routine
+                    (return-multiple
+                     (:return-style :none))
+                    ;; These four are really arguments.
+                    ((:temp nvals any-reg nargs-offset)
+                     (:temp vals any-reg nl0-offset)
+                     (:temp ocfp any-reg nl1-offset)
+                     (:temp lra descriptor-reg lra-offset)
+
+                     ;; These are just needed to facilitate the transfer
+                     (:temp lip interior-reg lip-offset)
+                     (:temp count any-reg nl2-offset)
+                     (:temp dst any-reg nl3-offset)
+                     (:temp temp descriptor-reg l0-offset)
+
+                     ;; These are needed so we can get at the register args.
+                     ,@(loop for an-offset in *register-arg-offsets*
+                             for an in a
+                             collect `(:temp ,an descriptor-reg ,an-offset)))
+                  ;; Note, because of the way the return-multiple vop is
+                  ;; written, we can assume that we are never called
+                  ;; with nvals == 1 and that a0 has already been
+                  ;; loaded.
+                  (inst bge zero-tn nvals DEFAULT-A0-AND-ON)
+                  (inst subi count nvals (fixnumize 2))
+                  ,@(loop for label in defaulting-labels
+                          for an in (rest a)
+                          for i from 1
+                          collect `(progn
+                                     ,@(unless (= i 1)
+                                         `((inst subi count (fixnumize 1))))
+                                     (inst bge zero-tn count ,label)
+                                     (loadw ,an vals ,i)))
+
+                  ;; Copy the remaining args to the top of the stack.
+                  (inst addi vals vals (fixnumize register-arg-count))
+                  (inst addi dst cfp-tn (fixnumize register-argcount))
+
+                  LOOP
+                  (loadw temp vals)
+                  (inst addi vals vals n-word-bytes)
+                  (inst subi count (fixnumize 1))
+                  (storew temp dst)
+                  (inst bne count zero-tn LOOP)
+
+                  (inst j ,(first (last defaulting-labels)))
+
+                  DEFAULT-A0-AND-ON
+                  (move a0 null-tn)
+                  (move a1 null-tn)
+                  `@(loop for defaulting-label in defaulting-labels
+                          for an in (rest a)
+                          append `(,defaulting-label
+                                   (move ,an null-tn)))
+
+                  ;; Clear the stack.
+                  (move ocfp-tn cfp-tn)
+                  (move cfp-tn ocfp)
+                  (inst addi csp-tn ocfp-tn nvals)
+
+                  ;; Return.
+                  (lisp-return lra vals :multiple-values)))))
+  (frob))
+
+#+sb-assembling ;; no vop for this one either.
+(macrolet ((frob ()
+             (let ((a (loop repeat register-arg-count
+                            collect (gensym))))
+               `(define-assembly-routine
+                    (tail-call-variable
+                     (:return-style :none))
+
+                    ;; These are really args.
+                    ((:temp args any-reg nl0-offset)
+                     (:temp lexenv descriptor-reg lexenv-offset)
+
+                     ;; We need to compute this
+                     (:temp nargs any-reg nargs-offset)
+
+                     ;; These are needed by the blitting code.
+                     (:temp src any-reg nl1-offset)
+                     (:temp dst any-reg nl2-offset)
+                     (:temp count any-reg nl3-offset)
+                     (:temp temp descriptor-reg l0-offset)
+
+                     ;; Needed for the jump
+                     (:temp lip interior-reg lip-offset)
+
+                     ;; These are needed so we can get at the register args.
+                     ,@(loop for an-offset in *register-arg-offsets*
+                             for an in a
+                             collect `(:temp ,an descriptor-reg ,an-offset)))
+
+
+                  ;; Calculate NARGS (as a fixnum)
+                  (inst sub nargs csp-tn args)
+
+                  ;; Load the argument regs (must do this now, 'cause the blt might
+                  ;; trash these locations)
+                  ,@(loop for an in a
+                          for i from 0
+                          collect `(loadw a0 args i))
+
+                  ;; Calc SRC, DST, and COUNT
+                  (inst subi count nargs (fixnumize register-arg-count))
+                  (inst bge zero-tn count done)
+                  (inst addi src args (fixnumize register-arg-count))
+                  (inst addi dst cfp-tn (fixnumize register-arg-count))
+
+                  LOOP
+                  ;; Copy one arg.
+                  (loadw temp src)
+                  (inst addi src src n-word-bytes)
+                  (inst subi count count (fixnumize 1))
+                  (storew temp dst)
+                  (inst blt zero-tn count LOOP)
+                  (inst addi dst dst n-word-bytes)
+
+                  DONE
+                  ;; We are done.  Do the jump.
+                  (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
+                  (lisp-jump temp)))))
+  (frob))
 
 (define-assembly-routine (throw (:return-style :none))
   ((:arg target (descriptor-reg any-reg) a0-offset)

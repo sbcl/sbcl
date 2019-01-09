@@ -44,6 +44,7 @@
   (defreg nl2 15)
   (defreg a3 16)
   (defreg nl3 17)
+  (defreg l0 18)
 
   (defreg lexenv 27)
   (defreg null 28)
@@ -52,7 +53,7 @@
   (defreg nargs 31)
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nargs nfp)
-  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra lexenv)
+  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra lexenv l0)
 
   (define-argument-register-set a0 a1 a2 a3))
 

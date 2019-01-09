@@ -48,6 +48,18 @@
 byte-ordering issues."
   `(inst lbu ,target ,source ,offset))
 
+(defun lisp-jump (function)
+  "Jump to the lisp function FUNCTION."
+  (inst jalr zero-tn function (- (ash simple-fun-code-offset word-shift)
+                                 fun-pointer-lowtag)))
+
+(defun lisp-return (return-pc nl0 return-style)
+  "Return to RETURN-PC."
+  (ecase return-style
+    (:single-value (inst li nl0 0))
+    (:multiple-values (inst li nl0 1)))
+  (inst jalr zero-tn return-pc (- other-pointer-lowtag)))
+
 
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target)

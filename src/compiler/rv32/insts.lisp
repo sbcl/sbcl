@@ -103,12 +103,20 @@
 (define-instruction lui (segment rd ui)
   (:printer u ((opcode #b0110111)))
   (:emitter
-   (emit-u-inst segment ui rd #b0110111)))
+   (etypecase ui
+     (fixup
+      (note-fixup segment :lui ui)
+      (emit-u-inst segment 0 rd #b0110111))
+     (integer (emit-u-inst segment ui rd #b0110111)))))
 
 (define-instruction auipc (segment rd ui)
   (:printer u ((opcode #b0010111)))
   (:emitter
-   (emit-u-inst segment ui rd #b0010111)))
+   (etypecase ui
+     (fixup
+      (note-fixup segment :auipc ui)
+      (emit-u-inst segment 0 rd #b0010111))
+     (integer (emit-u-inst segment ui rd #b0010111)))))
 
 ;;;; Branch and Jump instructions.
 
@@ -155,10 +163,18 @@
 (define-instruction jalr (segment lr rs offset)
   (:printer i ((funct3 #b000) (opcode #b1100111)))
   (:emitter
-   (emit-i-inst segment offset rs #b000 lr #b1100111)))
+   (etypecase offset
+     (fixup
+      (note-fixup segment :jalr offset)
+      (emit-i-inst segment 0 rs #b000 lr #b1100111))
+     (integer (emit-i-inst segment offset rs #b000 lr #b1100111)))))
 
-(define-instruction-macro j (target)
-  `(inst jal zero-tn ,target))
+(define-instruction-macro j (target &optional (type :relative))
+  (ecase type
+    (:relative `(inst jal zero-tn ,target))
+    (:fixup `(progn
+               (inst lui lip-tn ,target)
+               (inst jalr zero-tn lip-tn ,target)))))
 
 (defun emit-relative-branch (segment opcode funct3 rs1 rs2 target)
   (emit-chooser
