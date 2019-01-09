@@ -9,7 +9,7 @@
 
 ;;; FIXUP-CODE-OBJECT
 
-(defconstant-eqx +fixup-kinds+ #(:lui :jalr) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:absolute :i-type :u-type) #'equalp)
 
 (!with-bigvec-or-sap
   (defun fixup-code-object (code offset fixup kind flavor)
@@ -21,13 +21,10 @@
       (ecase kind
         (:absolute
          (setf (sap-ref-32 sap offset) fixup))
-        (:jalr
+        (:i-type
          (setf (ldb (byte 12 20) (sap-ref-32 sap offset))
                (ldb (byte 12 0) fixup)))
-        (:lui
-         (setf (ldb (byte 20 12) (sap-ref-32 sap offset))
-               (ldb (byte 20 12) fixup)))
-        (:auipc
+        (:u-type
          (setf (ldb (byte 20 12) (sap-ref-32 sap offset))
                (ldb (byte 20 12) fixup)))))
    nil))

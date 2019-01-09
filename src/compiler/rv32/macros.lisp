@@ -276,7 +276,9 @@ and
   ;; Normal allocation to the heap.
   (load-symbol-value flag-tn *allocation-pointer*)
   (inst addi result-tn flag-tn lowtag)
-  (cond ((integerp size)
+  (cond ((encodable-immediate-p size)
+         (inst addi flag-tn flag-tn size))
+        ((integerp size)
          (inst li temp-tn size)
          (inst add flag-tn flag-tn temp-tn))
         (t

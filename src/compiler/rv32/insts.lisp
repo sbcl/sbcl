@@ -16,6 +16,9 @@
   ;; Imports from SB-VM into this package
   (import '(sb-vm::lip-tn sb-vm::zero-tn sb-vm::null-tn)))
 
+(defun encodable-immediate-p (x)
+  (typep x '(signed-byte 12)))
+
 
 (define-instruction byte (segment byte)
   (:emitter
@@ -47,7 +50,12 @@
 (define-bitfield-emitter %emit-i-inst 32
   (byte 12 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
 (defun emit-i-inst (segment imm rs1 funct3 rd opcode)
-  (%emit-i-inst segment imm (tn-offset rs1) funct3 (tn-offset rd) opcode))
+  (etypecase imm
+    ((signed-byte 12)
+     (%emit-i-inst segment imm (tn-offset rs1) funct3 (tn-offset rd) opcode))
+    (fixup
+     (note-fixup segment :i-type imm)
+     (%emit-i-inst segment 0 (tn-offset rs1) funct3 (tn-offset rd) opcode))))
 
 (define-instruction-format (s 32)
   (imm :fields (list (byte 7 25) (byte 5 7)))
@@ -85,7 +93,12 @@
   (byte 20 12) (byte 5 7) (byte 7 0))
 (defun emit-u-inst (segment imm rd opcode)
   (aver (= 0 (ldb (byte 12 0) imm)))
-  (%emit-u-inst segment (ldb (byte 20 12) imm) (tn-offset rd) opcode))
+  (ecase imm
+    (integer
+     (%emit-u-inst segment (ldb (byte 20 12) imm) (tn-offset rd) opcode))
+    (fixup
+     (note-fixup segment :u-type ui)
+     (%emit-u-inst segment 9 (tn-offset rd) opcode))))
 
 (define-instruction-format (j 32)
   (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)))
@@ -103,20 +116,12 @@
 (define-instruction lui (segment rd ui)
   (:printer u ((opcode #b0110111)))
   (:emitter
-   (etypecase ui
-     (fixup
-      (note-fixup segment :lui ui)
-      (emit-u-inst segment 0 rd #b0110111))
-     (integer (emit-u-inst segment ui rd #b0110111)))))
+   (emit-u-inst segment ui rd #b0110111)))
 
 (define-instruction auipc (segment rd ui)
   (:printer u ((opcode #b0010111)))
   (:emitter
-   (etypecase ui
-     (fixup
-      (note-fixup segment :auipc ui)
-      (emit-u-inst segment 0 rd #b0010111))
-     (integer (emit-u-inst segment ui rd #b0010111)))))
+   (emit-u-inst segment ui rd #b0010111)))
 
 ;;;; Branch and Jump instructions.
 
@@ -163,11 +168,7 @@
 (define-instruction jalr (segment lr rs offset)
   (:printer i ((funct3 #b000) (opcode #b1100111)))
   (:emitter
-   (etypecase offset
-     (fixup
-      (note-fixup segment :jalr offset)
-      (emit-i-inst segment 0 rs #b000 lr #b1100111))
-     (integer (emit-i-inst segment offset rs #b000 lr #b1100111)))))
+   (emit-i-inst segment offset rs #b000 lr #b1100111)))
 
 (define-instruction-macro j (target &optional (type :relative))
   (ecase type
@@ -285,9 +286,12 @@
   (etypecase value
     ((signed-byte 12)
      (inst addi reg zero-tn value))
-    ((or (signed-byte 32) (unsigned-byte 32) fixup)
+    ((or (signed-byte 32) (unsigned-byte 32))
      (inst lui reg (dpb 0 (byte 12 0) value))
-     (inst addi reg reg (ldb (byte 12 0) value)))))
+     (inst addi reg reg (ldb (byte 12 0) value)))
+    (fixup
+     (inst lui reg value)
+     (inst addi reg value))))
 
 (define-instruction-macro li (reg value)
   `(%li ,reg ,value))
