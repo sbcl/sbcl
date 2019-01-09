@@ -181,14 +181,6 @@
   (declare (ignore args))
   (error "Can't call SPLIT-SECONDS-FOR-SLEEP"))
 
-;;; Avoid an unknown type reference from globaldb.
-(deftype fdefn () '(satisfies fdefn-p))
-
-;;; Avoid an unknown function reference from globaldb on some build
-;;; hosts.  It doesn't really matter what this function does: we don't
-;;; have FDEFN objects on the host anyway.
-(defun fdefn-p (x) (declare (ignore x)) nil)
-
 ;;; Needed for constant-folding
 (defun system-area-pointer-p (x) x nil) ; nothing is a SAP
 ;;; Needed for DEFINE-MOVE-FUN LOAD-SYSTEM-AREA-POINTER

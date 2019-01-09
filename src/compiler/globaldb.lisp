@@ -266,7 +266,7 @@
 
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 
-(define-info-type (:function :definition) :type-spec (or fdefn null))
+(define-info-type (:function :definition) :type-spec (or #-sb-xc-host fdefn null))
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
@@ -328,7 +328,7 @@
 ;;; expression, e.g. '(LAMBDA (X) (+ X 1)) or a lambda-with-lexenv.
 ;;; (B) List of arguments which could be dynamic-extent closures, and which
 ;;; we could, under suitable compilation policy, DXify in the caller
-;;; especially when compiling a NOTINLINE call to this function.
+;;; especially when open-coding a call to this function.
 ;;; If only (A) is stored, then this value is a list (the lambda expression).
 ;;; If only (B) is stored, then this is a DXABLE-ARGS.
 ;;; If both, this is an INLINING-DATA.

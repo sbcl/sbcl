@@ -21,6 +21,11 @@
 (declaim (type index *current-form-number*))
 (defvar *current-form-number*)
 
+;;; Report as we try each transform? (either source or IR)
+;;; Bind to T to see the ones that didn't abort,
+;;; or :ALL if you want to see each attempted transform.
+(defvar *show-transforms-p* nil)
+
 (declaim (inline source-form-has-path-p))
 (defun source-form-has-path-p (form)
   (not (typep form '(or symbol fixnum character))))
@@ -1090,6 +1095,10 @@
         (setf (combination-args node) (arg-lvars))))
     node))
 
+(defun show-transform (kind name new-form)
+  (let ((*print-right-margin* 100))
+    (format *trace-output* "~&xform (~a) ~S~% -> ~S~%"
+            kind name new-form)))
 ;;; Convert a call to a global function. If not :NOTINLINE, then we do
 ;;; source transforms and try out any inline expansion. If there is no
 ;;; expansion, but is :INLINE, then give an efficiency note (unless a
@@ -1123,6 +1132,8 @@
                       (t
                        (unless (policy *lexenv* (zerop store-xref-data))
                          (record-call name (ctran-block start) *current-path*))
+                       (when *show-transforms-p*
+                         (show-transform "src" name transformed))
                        (ir1-convert start next result transformed))))
               (ir1-convert-maybe-predicate start next result form var))))))
 

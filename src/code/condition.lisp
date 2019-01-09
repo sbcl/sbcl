@@ -1678,9 +1678,7 @@ conditions."))
                             (deprecation-condition-software condition)
                             (deprecation-condition-name condition)))))))
 
-  ;; PRINT-SYMBOL-WITH-PREFIX is spelled using its target package name,
-  ;; not its cold package name, because these methods aren't unsable until
-  ;; warm load. (!CALL-A-METHOD does not understand method qualifiers)
+  ;; These conditions must not occur in self-build!
   (define-deprecation-warning early-deprecation-warning style-warning nil
      "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-ext:print-symbol-with-prefix/ will signal a full warning ~

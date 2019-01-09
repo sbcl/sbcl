@@ -801,11 +801,6 @@
 
 ;;;; combination IR1 optimization
 
-;;; Report as we try each transform?
-;;; Bind to T to see the ones that didn't abort,
-;;; or :ALL if you want to see each attempted transform.
-(defvar *show-transforms-p* nil)
-
 (defun check-important-result (node info)
   (when (and (null (node-lvar node))
              (ir1-attributep (fun-info-attributes info) important-result)
@@ -1018,15 +1013,16 @@
                     ;; (pretty much any CL: function). This is just sad.
                     ;; Are type checks getting in the way?
                     (dolist (x (fun-info-transforms info))
-                      #!+sb-show
                       (when (eq *show-transforms-p* :all)
                         (let* ((lvar (basic-combination-fun node))
                                (fname (lvar-fun-name lvar t)))
-                          (/show "trying transform" x (transform-function x) "for" fname)))
+                          (format *trace-output*
+                                  "~&trying transform ~s for ~s"
+                                  (transform-function x) fname)))
                       (unless (ir1-transform node x)
-                        #!+sb-show
                         (when (eq *show-transforms-p* :all)
-                          (/show "quitting because IR1-TRANSFORM result was NIL"))
+                          (format *trace-output*
+                                  "~&quitting because IR1-TRANSFORM result was NIL"))
                         (return)))))))))))))
   (values))
 
@@ -1321,9 +1317,9 @@
                  (transform-call node
                                  (let ((new-form (funcall fun node)))
                                    (when *show-transforms-p*
-                                     (format t "~&~S ->~%~S~%"
-                                             (combination-fun-source-name node)
-                                             new-form))
+                                     (show-transform "ir"
+                                                     (combination-fun-source-name node)
+                                                     new-form))
                                    new-form)
                                  (combination-fun-source-name node))
                  (values :none nil))

@@ -293,9 +293,10 @@ Examples:
                              reserved by ANSI CL, so code defining a type with ~
                              that name would not be portable.~:@>" name
                              name))))
-                    (if (eq kind :variable)
-                        (compiler-warn "undefined ~(~A~): ~S" kind name)
-                        (compiler-style-warn "undefined ~(~A~): ~S" kind name))))
+                    (funcall
+                     (if (eq kind :variable) #'compiler-warn #'compiler-style-warn)
+                     (sb-format:tokens "undefined ~(~A~): ~/sb-ext:print-symbol-with-prefix/")
+                     kind name)))
               (let ((warn-count (length warnings)))
                 (when (and warnings (> undefined-warning-count warn-count))
                   (let ((more (- undefined-warning-count warn-count)))
@@ -1367,7 +1368,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                           ;; like SB-XC:DEFCONSTANT and SB-XC:DEFTYPE
                           ;; should be equivalent to their CL: counterparts
                           ;; when being compiled as target code. We leave
-                          ;; the rest of the form uncrossed because macros
+                          ;; the rest of the form intact because macros
                           ;; might yet expand into EVAL-WHEN stuff, and
                           ;; things inside EVAL-WHEN can't be uncrossed
                           ;; until after we've EVALed them in the
