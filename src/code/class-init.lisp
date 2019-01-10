@@ -17,7 +17,7 @@
 
 ;;; built-in classes
 (/show0 "beginning class-init.lisp")
-(dolist (x *!built-in-classes*)
+(dolist (x +!built-in-classes+)
   (destructuring-bind (name &key (translation nil trans-p) &allow-other-keys)
       x
     (/show0 "doing class with NAME=..")
