@@ -11,6 +11,10 @@
 
 (defconstant-eqx +fixup-kinds+ #(:absolute :i-type :u-type) #'equalp)
 
+(defun u-and-i-inst-immediate (value)
+  (let ((hi (ash (+ value (expt 2 11)) -12)))
+    (values hi (- value (ash hi 12)))))
+
 (!with-bigvec-or-sap
   (defun fixup-code-object (code offset fixup kind flavor)
     (declare (type index offset))
@@ -23,10 +27,10 @@
          (setf (sap-ref-32 sap offset) fixup))
         (:i-type
          (setf (ldb (byte 12 20) (sap-ref-32 sap offset))
-               (ldb (byte 12 0) fixup)))
+               (nth-value 1 (u-and-i-inst-immediate fixup))))
         (:u-type
          (setf (ldb (byte 20 12) (sap-ref-32 sap offset))
-               (ldb (byte 20 12) fixup)))))
+               (u-and-i-inst-immediate fixup)))))
    nil))
 
 ;;; CONTEXT-FLOAT-REGISTER

@@ -14,10 +14,10 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from SB-VM into this package
-  (import '(sb-vm::lip-tn sb-vm::zero-tn sb-vm::null-tn)))
-
-(defun encodable-immediate-p (x)
-  (typep x '(signed-byte 12)))
+  (import '(sb-vm::u-and-i-inst-immediate
+            sb-vm::lip-tn
+            sb-vm::zero-tn
+            sb-vm::null-tn)))
 
 
 (define-instruction byte (segment byte)
@@ -92,13 +92,12 @@
 (define-bitfield-emitter %emit-u-inst 32
   (byte 20 12) (byte 5 7) (byte 7 0))
 (defun emit-u-inst (segment imm rd opcode)
-  (aver (= 0 (ldb (byte 12 0) imm)))
-  (ecase imm
+  (etypecase imm
     (integer
-     (%emit-u-inst segment (ldb (byte 20 12) imm) (tn-offset rd) opcode))
+     (%emit-u-inst segment imm (tn-offset rd) opcode))
     (fixup
-     (note-fixup segment :u-type ui)
-     (%emit-u-inst segment 9 (tn-offset rd) opcode))))
+     (note-fixup segment :u-type imm)
+     (%emit-u-inst segment 0 (tn-offset rd) opcode))))
 
 (define-instruction-format (j 32)
   (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)))
@@ -287,8 +286,9 @@
     ((signed-byte 12)
      (inst addi reg zero-tn value))
     ((or (signed-byte 32) (unsigned-byte 32))
-     (inst lui reg (dpb 0 (byte 12 0) value))
-     (inst addi reg reg (ldb (byte 12 0) value)))
+     (multiple-value-bind (hi lo) (u-and-i-inst-immediate value)
+       (inst lui reg hi)
+       (inst addi reg reg lo)))
     (fixup
      (inst lui reg value)
      (inst addi reg value))))
@@ -478,13 +478,16 @@
         ;; exercise in excess cleverness.  First, we calculate (from
         ;; our program counter only) the address of OBJECT-LABEL plus
         ;; OTHER-POINTER-LOWTAG.
-        (inst auipc temp 0)
-        (inst addi lip temp (- ;; The 4 below is the displacement
-                             ;; from reading the program counter.
-                             ;; XXX may or may not be correct
-                             (+ (label-position object-label)
-                                other-pointer-lowtag)
-                             (+ position 4)))
+        (let ((offset (- ;; The 4 below is the displacement
+                       ;; from reading the program counter.
+                       ;; XXX may or may not be correct
+                       (+ (label-position object-label)
+                          other-pointer-lowtag)
+                       (+ position 4))))
+          (multiple-value-bind (hi lo)
+              (u-and-i-inst-immediate offset)
+            (inst auipc temp hi)
+            (inst addi lip temp lo)))
         ;; Next, we read the function header.
         (inst lw temp lip (- other-pointer-lowtag))
         ;; And finally we use the header value (a count in words),

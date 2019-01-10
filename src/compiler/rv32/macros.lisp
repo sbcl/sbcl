@@ -21,6 +21,9 @@
        ;; annoying hack with the null-tn, but it has to be done.
        (inst addi ,n-dst ,n-src 0))))
 
+(defun encodable-immediate-p (x)
+  (typep x '(signed-byte 12)))
+
 (defmacro def-mem-op (op inst shift load)
   `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
      `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag))))
