@@ -16,7 +16,6 @@
 (defvar *load-source-default-type* "lisp"
   "The source file types which LOAD looks for by default.")
 
-(declaim (type (or pathname null) *load-truename* *load-pathname*))
 (defvar *load-truename* nil
   "the TRUENAME of the file that LOAD is currently loading")
 (defvar *load-pathname* nil

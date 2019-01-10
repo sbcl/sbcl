@@ -17,11 +17,8 @@
 ;;; floating-point number that has no exponent marker or that has e or
 ;;; E for an exponent marker"
 (!defvar *read-default-float-format* 'single-float)
-(declaim (type (member short-float single-float double-float long-float)
-               *read-default-float-format*))
 
 (defvar *readtable*)
-(declaim (type readtable *readtable*))
 
 (setf (documentation '*readtable* 'variable)
       "Variable bound to current readtable.")
@@ -171,7 +168,8 @@
 
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
-
+;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
+;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
 (defconstant +constituent-trait-table+
   #.(let ((a (!make-specialized-array base-char-code-limit '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
@@ -1097,7 +1095,6 @@ standard Lisp readtable when NIL."
 
 (defvar *read-base* 10
   "the radix that Lisp reads numbers in")
-(declaim (type (integer 2 36) *read-base*))
 
 ;;; Normalize TOKEN-BUF to NFKC, returning a new TOKEN-BUF and the
 ;;; COLON value
