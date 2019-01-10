@@ -11,7 +11,7 @@
 
 (in-package "SB-KERNEL")
 
-(!defvar *break-on-signals* nil
+(defparameter *break-on-signals* nil ; initialized by genesis
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will
    enter the debugger prior to signalling that condition.")
 
@@ -112,7 +112,7 @@
 
 ;;; counts of nested errors (with internal errors double-counted)
 (defvar *maximum-error-depth*) ; this gets set to 10 in !COLD-INIT
-(!defvar *current-error-depth* 0)
+(defparameter *current-error-depth* 0) ; initialized by genesis
 
 ;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
 ;;; of hyperspace.

@@ -13,38 +13,39 @@
 
 ;;;; exported printer control variables
 
-(!defvar *print-readably* nil
+;; NB: all of the following are initialized during genesis
+(defparameter *print-readably* nil
   "If true, all objects will be printed readably. If readable printing
   is impossible, an error will be signalled. This overrides the value of
   *PRINT-ESCAPE*.")
-(!defvar *print-escape* t
+(defparameter *print-escape* t
   "Should we print in a reasonably machine-readable way? (possibly
   overridden by *PRINT-READABLY*)")
-(!defvar *print-pretty* nil ; (set later when pretty-printer is initialized)
+(defparameter *print-pretty* nil ; (set later when pretty-printer is initialized)
   "Should pretty printing be used?")
-(!defvar *print-base* 10.
+(defparameter *print-base* 10.
   "The output base for RATIONALs (including integers).")
-(!defvar *print-radix* nil
+(defparameter *print-radix* nil
   "Should base be verified when printing RATIONALs?")
-(!defvar *print-level* nil
+(defparameter *print-level* nil
   "How many levels should be printed before abbreviating with \"#\"?")
-(!defvar *print-length* nil
+(defparameter *print-length* nil
   "How many elements at any level should be printed before abbreviating
   with \"...\"?")
-(!defvar *print-circle* nil
+(defparameter *print-circle* nil
   "Should we use #n= and #n# notation to preserve uniqueness in general (and
   circularity in particular) when printing?")
-(!defvar *print-case* :upcase
+(defparameter *print-case* :upcase
   "What case should the printer should use default?")
-(!defvar *print-array* t
+(defparameter *print-array* t
   "Should the contents of arrays be printed?")
-(!defvar *print-gensym* t
+(defparameter *print-gensym* t
   "Should #: prefixes be used when printing symbols with null SYMBOL-PACKAGE?")
-(!defvar *print-lines* nil
+(defparameter *print-lines* nil
   "The maximum number of lines to print per object.")
-(!defvar *print-right-margin* nil
+(defparameter *print-right-margin* nil
   "The position of the right margin in ems (for pretty-printing).")
-(!defvar *print-miser-width* nil
+(defparameter *print-miser-width* nil
   "If the remaining space between the current column and the right margin
    is less than this, then print using ``miser-style'' output. Miser
    style conditional newlines are turned on, and all indentations are
@@ -52,7 +53,7 @@
 (defvar *print-pprint-dispatch*
   (sb-pretty::make-pprint-dispatch-table) ; for type-correctness
   "The pprint-dispatch-table that controls how to pretty-print objects.")
-(!defvar *suppress-print-errors* nil
+(defparameter *suppress-print-errors* nil
   "Suppress printer errors when the condition is of the type designated by this
 variable: an unreadable object representing the error is printed instead.")
 

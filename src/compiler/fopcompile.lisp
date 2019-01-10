@@ -182,23 +182,19 @@
   (and expand
        (or (and (self-evaluating-p form)
                 (constant-fopcompilable-p form))
+           (and (typep form '(cons (eql quote) (cons t null)))
+                (constant-fopcompilable-p (constant-form-value form)))
            (and (listp form)
                 (let ((function (car form)))
-                  ;; It is assumed that uses of recognized functions are
-                  ;; carefully controlled, and recursion on fopcompilable-p
-                  ;; would say "yes".
+                  ;; It is assumed that uses of these three recognized functions
+                  ;; are carefully controlled, and recursion on fopcompilable-p
+                  ;; would say "yes" for each argument.
                   (or (member function '(sb-impl::%defun
                                          sb-pcl::!trivial-defmethod
                                          sb-kernel::%defstruct))
-                      (and (eq function 'sb-c::%defconstant)
-                           ;; %DEFCONSTANT is fopcompilable only if the value
-                           ;; is trivially a compile-time constant,
-                           ;; and not, e.g. (COMPLICATED-FOLDABLE-EXPR),
-                           ;; because we can't compute that with fasl ops.
-                           (let ((val (third form)))
-                             (and (typep val '(or rational (cons (eql quote))))
-                                  (constant-fopcompilable-p
-                                   (constant-form-value val)))))
+                      ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
+                      (and (member function '(%defconstant sb-impl::%defparameter))
+                           (fopcompilable-p (third form)))
                       (and (symbolp function) ; no ((lambda ...) ...)
                            (get-properties (symbol-plist function)
                                            '(:sb-cold-funcall-handler/for-effect
@@ -213,9 +209,8 @@
                                   (typep value '(cons (member lambda function
                                                        named-lambda))))))
                       (and (eq function 'setq)
-                           (setq-fopcompilable-p (cdr form)))
-
-                      (eq function 'sb-fasl::setq-no-questions-asked))))))))
+                           (setq-fopcompilable-p (cdr form)))))))))
+) ; end FLET
 
 (defun let-fopcompilable-p (operator args)
   (when (>= (length args) 1)

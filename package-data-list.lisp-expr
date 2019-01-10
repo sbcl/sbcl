@@ -611,7 +611,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "FASL-VALIDATE-STRUCTURE"
                "*!LOAD-TIME-VALUES*"
                "OPEN-FASL-OUTPUT"
-               "*!COLD-DEFCONSTANTS*" "*!COLD-DEFUNS*"
+               "*!COLD-DEFSYMBOLS*" "*!COLD-DEFUNS*"
                "*!COLD-SETF-MACROS*"  "*!COLD-TOPLEVELS*"
                "COLD-CONS" "COLD-INTERN" "COLD-PUSH" "COLD-TARGET-PUSH"))
 
@@ -1171,7 +1171,6 @@ possibly temporarily, because it might be used internally."
                ;; bootstrapping magic of a different kind, wherein things happen
                ;; as they ordinarily do, plus during second genesis.
                "!DEFINE-LOAD-TIME-GLOBAL"
-               "!DEFPARAMETER" "!DEFVAR"
                "!DEFINE-THREAD-LOCAL"
                "*!REMOVABLE-SYMBOLS*"
 

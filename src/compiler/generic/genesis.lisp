@@ -558,7 +558,7 @@
 ;;;
 ;;; Each TOPLEVEL-THING can be a function to be executed or a fixup or
 ;;; loadtime value, represented by (CONS KEYWORD ..).
-(declaim (special *!cold-toplevels* *!cold-defconstants*
+(declaim (special *!cold-toplevels* *!cold-defsymbols*
                   *!cold-defuns* *cold-methods*))
 
 
@@ -2611,11 +2611,11 @@ core and return a descriptor to it."
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
-            (sb-c::%defconstant
+            ((sb-c::%defconstant sb-impl::%defparameter)
              (destructuring-bind (name val . rest) args
                (cold-set name (if (symbolp val) (cold-intern val) val))
-               (push (cold-cons (cold-intern name) (list-to-core rest))
-                     *!cold-defconstants*)))
+               (push (apply #'cold-list (cold-intern fun) (cold-intern name) rest)
+                     *!cold-defsymbols*)))
             (set
              (aver (= (length args) 2))
              (cold-set (first args)
@@ -3633,7 +3633,7 @@ III. initially undefined function references (alphabetically):
            (*ctype-cache* (make-hash-table :test 'equal))
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
            (*cold-layout-names* (make-hash-table :test 'eql)) ; addr -> symbol
-           (*!cold-defconstants* nil)
+           (*!cold-defsymbols* nil)
            (*!cold-defuns* nil)
            ;; '*COLD-METHODS* is never seen in the target, so does not need
            ;; to adhere to the #\! convention for automatic uninterning.
@@ -3702,14 +3702,14 @@ III. initially undefined function references (alphabetically):
               (aver layout)
               (write-slots layout *host-layout-of-layout* :info dd))))
         (when verbose
-          (format t "~&; SB-Loader: (~D~@{+~D~}) structs/consts/funs/methods/other~%"
+          (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/funs/methods/other~%"
                   (length *known-structure-classoids*)
-                  (length *!cold-defconstants*)
+                  (length *!cold-defsymbols*)
                   (length *!cold-defuns*)
                   (reduce #'+ *cold-methods* :key (lambda (x) (length (cdr x))))
                   (length *!cold-toplevels*))))
 
-      (dolist (symbol '(*!cold-defconstants* *!cold-defuns* *!cold-toplevels*))
+      (dolist (symbol '(*!cold-defsymbols* *!cold-defuns* *!cold-toplevels*))
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 

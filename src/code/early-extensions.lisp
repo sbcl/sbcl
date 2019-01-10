@@ -1496,7 +1496,7 @@ NOTE: This interface is experimental and subject to change."
 (defmacro with-sane-io-syntax (&body forms)
   `(call-with-sane-io-syntax (lambda () ,@forms)))
 
-(!defvar *print-vector-length* nil
+(defparameter *print-vector-length* nil ; initialized by genesis
   "Like *PRINT-LENGTH* but works on strings and bit-vectors.
 Does not affect the cases that are already controlled by *PRINT-LENGTH*")
 (declaim (always-bound *print-vector-length*))
@@ -1530,7 +1530,7 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
 
 (declaim (type (member :compile #!+(or sb-eval sb-fasteval) :interpret)
                *evaluator-mode*))
-(!defparameter *evaluator-mode* :compile
+(defparameter *evaluator-mode* :compile ; initialized by genesis
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")

@@ -48,24 +48,16 @@
                (makunbound '*!cold-init-forms*)))
   #-sb-xc (declare (ignore name)))
 
-;;; !DEFINE-LOAD-TIME-GLOBAL, !DEFPARAMETER and !DEFVAR are named by analogy
-;;; with !COLD-INIT-FORMS and (not DEF!FOO) because they are
-;;; basically additional cold-init-helpers to avoid the tedious sequence:
+;;; !DEFINE-LOAD-TIME-GLOBAL avoids this anti-pattern:
 ;;;    (!begin-collecting-cold-init-forms)
-;;;    (defvar *foo*)
+;;;    (define-load-time-global *foo* nil)
 ;;;    (!cold-init-forms (setq *foo* nil))
 ;;;    (!defun-from-cold-init-forms !some-cold-init-fun)
-;;; or the less respectable (defvar *foo*) and a random SETQ in !COLD-INIT.
-;;; Each is like its namesake, but also arranges so that genesis knows
-;;; the initialization form, on which it calls EVAL and dumps as a constant
-;;; when writing out the cold core image.
-(macrolet ((def (wrapper real-name)
-             `(defmacro ,wrapper (sym value &optional (doc nil doc-p))
-                `(progn (,',real-name ,sym ,value ,@(if doc-p (list doc)))
-                        #-sb-xc-host (sb-fasl::setq-no-questions-asked ,sym ,value)))))
-  (def !define-load-time-global define-load-time-global)
-  (def !defparameter defparameter)
-  (def !defvar defvar))
+(defmacro !define-load-time-global (sym value &optional (doc nil doc-p))
+  `(progn (define-load-time-global ,sym ,value ,@(if doc-p (list doc)))
+          ;; The expansion of the DEFINE-L-T-G is too hairy to fopcompile,
+          ;; but SETQ is ok provided that the value form is ok.
+          #-sb-xc-host (setq ,sym ,value)))
 
 (defmacro !set-load-form-method (class-name usable-by &optional method)
   ;; If USABLE-BY is:
@@ -111,8 +103,10 @@
   #!-sb-thread `(progn
                   (eval-when (:compile-toplevel :load-toplevel :execute)
                     (setf (info :variable :always-bound ',name) :always-bound))
-                  (!defvar ,name ,initform ,docstring))
+                  ;; DEFPARAMETER, not DEFVAR, because genesis can do it
+                  (defparameter ,name ,initform ,docstring))
   #!+sb-thread `(progn
+                  ;; Genesis can handle !%DEFINE-THREAD-LOCAL
                   #-sb-xc-host (!%define-thread-local ',name ',initform)
                   (eval-when (:compile-toplevel :load-toplevel :execute)
                     (setf (info :variable :wired-tls ',name) :always-thread-local)

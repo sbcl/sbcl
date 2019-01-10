@@ -16,7 +16,7 @@
 ;;; The current level we are printing at, to be compared against
 ;;; *PRINT-LEVEL*. See the macro DESCEND-INTO for a handy interface to
 ;;; depth abbreviation.
-(!defvar *current-level-in-print* 0)
+(defparameter *current-level-in-print* 0) ; initialized by genesis
 (declaim (index *current-level-in-print*)
          (always-bound *current-level-in-print*))
 

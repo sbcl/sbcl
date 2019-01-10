@@ -32,10 +32,10 @@
 ;;;; !COLD-INIT
 
 ;;; a list of toplevel things set by GENESIS
-(defvar *!cold-toplevels*)                 ; except for DEFUNs and SETF macros
-(defvar *!cold-setf-macros*)               ; just SETF macros
-(defvar *!cold-defconstants*)              ; just DEFCONSTANT-EQXs
-(defvar *!cold-defuns*)                    ; just DEFUNs
+(defvar *!cold-toplevels*)   ; except for DEFUNs and SETF macros
+(defvar *!cold-setf-macros*) ; just SETF macros
+(defvar *!cold-defuns*)      ; just DEFUNs
+(defvar *!cold-defsymbols*)  ; "easy" DEFCONSTANTs and DEFPARAMETERs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
@@ -158,11 +158,22 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb-kernel::!set-up-structure-object-class)
 
-  (dolist (x *!cold-defconstants*)
-    (destructuring-bind (name source-loc &optional docstring) x
-      (setf (info :variable :kind name) :constant)
-      (when source-loc (setf (info :source-location :constant name) source-loc))
-      (when docstring (setf (documentation name 'variable) docstring))))
+  ;; Genesis is able to perform some of the work of DEFCONSTANT and
+  ;; DEFPARAMETER, but not all of it. It assigns symbol values, but can not
+  ;; manipulate globaldb. Therefore, a subtlety of these macros for bootstrap
+  ;; is that we see each DEFthing twice: once during cold-load and again here.
+  ;; Now it being the case that DEFPARAMETER implies variable assignment
+  ;; unconditionally, you may think it should assign. No! This was logically
+  ;; ONE use of the defining macro, but split into pieces as a consequence
+  ;; of the implementation.
+  (dolist (x *!cold-defsymbols*)
+    (destructuring-bind (fun name source-loc . docstring) x
+      (aver (boundp name)) ; it's a bug if genesis didn't initialize
+      (ecase fun
+        (sb-c::%defconstant
+         (apply #'sb-c::%defconstant name (symbol-value name) source-loc docstring))
+        (sb-impl::%defparameter ; use %DEFVAR which will not clobber
+         (apply #'%defvar name source-loc nil docstring)))))
   (!with-init-wrappers
    (dolist (x *!cold-defuns*)
      (destructuring-bind (name inline-expansion dxable-args) x
@@ -204,7 +215,7 @@
   ;; Precise GC seems to think these symbols are live during the final GC
   ;; which in turn enlivens a bunch of other "*!foo*" symbols.
   ;; Setting them to NIL helps a little bit.
-  (setq *!cold-defuns* nil *!cold-defconstants* nil *!cold-toplevels* nil)
+  (setq *!cold-defuns* nil *!cold-defsymbols* nil *!cold-toplevels* nil)
 
   ;; Now that L-T-V forms have executed, the symbol output chooser works.
   (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)

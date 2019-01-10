@@ -220,7 +220,7 @@
 ;;; If non-nil, *GLOBALDB-OBSERVER*'s CAR is a bitmask over info numbers
 ;;; for which you'd like to call the function in the CDR whenever info
 ;;; of that number is queried.
-(!defvar *globaldb-observer* nil)
+(defparameter *globaldb-observer* nil)
 (declaim (type (or (cons (unsigned-byte #.(ash 1 info-number-bits)) function)
                    null) *globaldb-observer*))
 #-sb-xc-host (declaim (always-bound *globaldb-observer*))

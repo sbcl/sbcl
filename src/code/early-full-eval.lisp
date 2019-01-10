@@ -11,8 +11,8 @@
 
 (in-package "SB-EVAL")
 
-(!defparameter *eval-level* -1)
-(!defparameter *eval-verbose* nil)
+(defparameter *eval-level* -1) ; initialized by genesis
+(defparameter *eval-verbose* nil) ; initialized by genesis
 
 ;; !defstruct-with-alternate-metaclass is unslammable and the
 ;; RECOMPILE restart doesn't work on it.  This is the main reason why

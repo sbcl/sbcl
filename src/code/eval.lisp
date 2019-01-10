@@ -11,7 +11,7 @@
 
 (in-package "SB-IMPL")
 
-(!defparameter *eval-calls* 0)
+(defparameter *eval-calls* 0) ; initialized by genesis
 
 (defvar *eval-source-context* nil)
 

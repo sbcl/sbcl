@@ -14,7 +14,7 @@
 
 ;;; various environment inquiries
 
-(!defvar *features*
+(defparameter *features*
    ;; GCC_TLS is not a Lisp feature- it's just freeloading off the means
    ;; by which additional #defines get into "genesis/config.h".
    ;; Literally nothing except C code tests for it.
@@ -247,7 +247,7 @@ version 1[.0.0...] or greater."
               (lisp-implementation-version)
               subversions))))
 
-(!defvar sb-pcl::*!docstrings* nil)
+(defparameter sb-pcl::*!docstrings* nil)
 (defun (setf documentation) (string name doc-type)
   (declare (type (or null string) string))
   (push (list string name doc-type) sb-pcl::*!docstrings*)

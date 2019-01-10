@@ -76,7 +76,11 @@
       (enable-package-locks
        (set-difference old names :test #'equal)))))
 
-(!defvar *queued-proclaims* nil) ; should this be !*QUEUED-PROCLAIMS* ?
+;;; This variable really wants to be a DEFVAR, but the "if (boundp)" expression
+;;; is too tricky for genesis. Let's ensure proper behavior by not clobbering
+;;; it in the host, but doing the only thing that genesis can do in the target.
+(#+sb-xc-host defvar #-sb-xc-host defparameter
+ *queued-proclaims* nil) ; should this be !*QUEUED-PROCLAIMS* ?
 
 (defun process-variable-declaration (name kind info-value)
   (unless (symbolp name)

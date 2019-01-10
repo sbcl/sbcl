@@ -289,10 +289,10 @@
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
-(!defvar *unparse-fun-type-simplify* nil)
+(defparameter *unparse-fun-type-simplify* nil) ; initialized by genesis
 ;;; A flag to prevent TYPE-OF calls by user applications from returning
 ;;; (NOT x). TYPE-SPECIFIER usually allows it to preserve information.
-(!defvar *unparse-allow-negation* t)
+(defparameter *unparse-allow-negation* t) ; initialized by genesis
 
 (!define-type-method (function :negate) (type) (make-negation-type type))
 

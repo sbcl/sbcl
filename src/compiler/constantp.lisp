@@ -11,7 +11,7 @@
 
 (in-package "SB-C")
 
-(!defvar *special-constant-variables* nil)
+(defparameter *special-constant-variables* nil)
 
 (defun %constantp (form environment envp)
   ;; Pick off quasiquote prior to macroexpansion.
