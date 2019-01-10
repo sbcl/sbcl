@@ -256,14 +256,73 @@
   (:info save callee target)
   (:generator 5))
 
+
+;;; Return from known values call.  We receive the return locations as
+;;; arguments to terminate their lifetimes in the returning function.
+;;; We restore FP and CSP and jump to the Return-PC.
+;;;
+;;; Note: we can't use normal load-tn allocation for the fixed args,
+;;; since all registers may be tied up by the more operand.  Instead,
+;;; we use MAYBE-LOAD-STACK-TN.
 (define-vop (known-return)
   (:args (old-fp :scs (any-reg))
          (return-pc :scs (descriptor-reg))
          (values :more t))
+  (:temporary (:sc any-reg :from (:argument 0)) old-fp-temp)
+  (:temporary (:sc descriptor-reg :from (:argument 1)) return-pc-temp)
+  (:temporary (:sc non-descriptor-reg :offset nl0-offset) nl0)
   (:info val-locs)
   (:ignore val-locs vals)
-  (:generator 6))
+  (:move-args :known-return)
+  (:vop-var vop)
+  (:generator 6
+    (maybe-load-stack-tn old-fp-temp old-fp)
+    (maybe-load-stack-tn return-pc-temp return-pc)
+    (move csp-tn cfp-tn)
+    (clear-number-stack vop)
+    (move cfp-tn old-fp-temp)
+    (lisp-return return-pc-temp nl0 :known)))
 
+
+;;;; Full call:
+;;;
+;;; There is something of a cross-product effect with full calls.
+;;; Different versions are used depending on whether we know the
+;;; number of arguments or the name of the called function, and
+;;; whether we want fixed values, unknown values, or a tail call.
+;;;
+;;; In full call, the arguments are passed creating a partial frame on
+;;; the stack top and storing stack arguments into that frame.  On
+;;; entry to the callee, this partial frame is pointed to by FP.  If
+;;; there are no stack arguments, we don't bother allocating a partial
+;;; frame, and instead set FP to SP just before the call.
+
+;;; This macro helps in the definition of full call VOPs by avoiding code
+;;; replication in defining the cross-product VOPs.
+;;;
+;;; Name is the name of the VOP to define.
+;;;
+;;; Named is true if the first argument is a symbol whose global function
+;;; definition is to be called.
+;;;
+;;; Return is either :Fixed, :Unknown or :Tail:
+;;; -- If :Fixed, then the call is for a fixed number of values, returned in
+;;;    the standard passing locations (passed as result operands).
+;;; -- If :Unknown, then the result values are pushed on the stack, and the
+;;;    result values are specified by the Start and Count as in the
+;;;    unknown-values continuation representation.
+;;; -- If :Tail, then do a tail-recursive call.  No values are returned.
+;;;    The Old-Fp and Return-PC are passed as the second and third arguments.
+;;;
+;;; In non-tail calls, the pointer to the stack arguments is passed as the last
+;;; fixed argument.  If Variable is false, then the passing locations are
+;;; passed as a more arg.  Variable is true if there are a variable number of
+;;; arguments passed on the stack.  Variable cannot be specified with :Tail
+;;; return.  TR variable argument call is implemented separately.
+;;;
+;;; In tail call with fixed arguments, the passing locations are passed as a
+;;; more arg, but there is no new-FP, since the arguments have been set up in
+;;; the current frame.
 (defmacro define-full-call (name named return variable)
   (aver (not (and variable (eq return :tail))))
   `(define-vop (,name ,@(when (eql return :unknown) '(unknown-values-receiver)))
