@@ -335,7 +335,7 @@
 
 (defun sb-xc:proclaim (raw-form)
   #!+(and sb-show (host-feature sb-xc))
-  (progn (write-string "* ") (write `(declaim ,raw-form) :level nil) (terpri))
+  (when */show* (write-string "* ") (write `(declaim ,raw-form) :level nil) (terpri))
   (%proclaim raw-form nil)
   (values))
 

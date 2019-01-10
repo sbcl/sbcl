@@ -1072,7 +1072,6 @@ must be held by this thread during this call."
   (error "Not supported in unithread builds.")
   #!+sb-thread
   (declare (type (and fixnum (integer 1)) n))
-  (/show0 "Entering CONDITION-NOTIFY")
   #!+sb-thread
   (progn
     #!-sb-futex

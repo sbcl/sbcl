@@ -30,6 +30,10 @@
 ;;;; actually does the work of the program. -- WHN 2001-05-07)
 
 ;;; Set this to NIL to suppress output from /SHOW-related forms.
+;;; In the target we need it initialized during cold-load (i.e. prior
+;;; to cold-init), knowledge of which is hacked into genesis.
+;;; Perhaps cold-init-helper-macros could be compiled sooner
+;;; so that the !macro works?
 #!+sb-show (defvar */show* t)
 
 #!+sb-show

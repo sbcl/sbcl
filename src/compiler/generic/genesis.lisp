@@ -1711,6 +1711,8 @@ core and return a descriptor to it."
     (cold-set 'sb-vm::*free-tls-index*
               (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift))))
 
+  #!+sb-show (cold-set '*/show* t)
+
   #!+64-bit
   (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
 

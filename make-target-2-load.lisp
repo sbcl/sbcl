@@ -262,10 +262,6 @@ Please check that all strings which were not recognizable to the compiler
                             :key #'dsd-name)))
   (funcall #'(setf slot-value) 'character dsd 'sb-kernel::default))
 
-;;; Even if /SHOW output was wanted during build, it's probably
-;;; not wanted by default after build is complete. (And if it's
-;;; wanted, it can easily be turned back on.)
-#+sb-show (setf sb-int:*/show* nil)
 ;;; The system is complete now, all standard functions are
 ;;; defined.
 ;;; The call to CTYPE-OF-CACHE-CLEAR is probably redundant.
