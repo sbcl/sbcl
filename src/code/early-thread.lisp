@@ -9,13 +9,11 @@
 
 (in-package "SB-THREAD")
 
-(def!type thread-name () 'simple-string)
-
 (defstruct (thread (:constructor %make-thread)
                    (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
-  (name          nil :type (or thread-name null))
+  (name          nil :type (or null simple-string)) ; some C code reads this
   (%alive-p      nil :type boolean)
   (%ephemeral-p  nil :type boolean)
   #-sb-xc-host
@@ -46,7 +44,8 @@ any time."
 (def!struct (mutex (:constructor make-mutex (&key name))
                    (:copier nil))
   "Mutex type."
-  (name   nil :type (or null thread-name))
+  ;; C code could (but doesn't currently) access the name
+  (name   nil :type (or null simple-string))
   (%owner nil :type (or null thread))
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))

@@ -450,14 +450,14 @@ HOLDING-MUTEX-P."
 #!+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
-  (name nil :type (or null thread-name))
+  (name nil :type (or null string))
   #!+(and sb-thread sb-futex)
   (token nil))
 
 #!+(and sb-thread (not sb-futex))
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
-  (name nil :type (or null thread-name))
+  (name nil :type (or null string))
   ;; For WITH-CAS-LOCK: because CONDITION-WAIT must be able to call
   ;; %WAITQUEUE-WAKEUP without re-aquiring the mutex, we need a separate
   ;; lock. In most cases this should be uncontested thanks to the mutex --
@@ -1111,7 +1111,7 @@ must be held by this thread during this call."
   "Semaphore type. The fact that a SEMAPHORE is a STRUCTURE-OBJECT
 should be considered an implementation detail, and may change in the
 future."
-  (name    nil :type (or null thread-name) :read-only t)
+  (name    nil :type (or null string) :read-only t)
   (%count    0 :type (integer 0))
   (waitcount 0 :type sb-vm:word)
   (mutex (make-mutex :name "semaphore lock") :read-only t)
