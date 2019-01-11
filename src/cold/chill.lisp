@@ -35,15 +35,10 @@
 ;;; backend-subfeatures
 (setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
 
-;; Reinstate the pre-cold-init variable-defining macros.
-(let ((*package* (find-package "SB-INT")))
-  (flet ((def (real-name)
-           (let ((alias (sb-int:symbolicate "!" real-name)))
-             (export alias)
-             (setf (macro-function alias) (macro-function real-name)))))
-    (def 'sb-ext:defglobal)
-    (def 'defparameter)
-    (def 'defvar)))
+;; Restore !DEFINE-LOAD-TIME-GLOBAL macro
+(export 'sb-int::!define-load-time-global 'sb-int)
+(setf (macro-function 'sb-int::!define-load-time-global)
+      (macro-function 'sb-ext:define-load-time-global))
 
 (export '(sb-int::!cold-init-forms
           sb-int::!coerce-to-specialized

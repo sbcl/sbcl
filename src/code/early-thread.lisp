@@ -49,6 +49,7 @@ any time."
   (%owner nil :type (or null thread))
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))
+(!set-load-form-method mutex (:xc))
 
 ;; The host has a stub for this macro. The cross-compiler doesn't use
 ;; it until it's seen. So no SB-XC:DEFMACRO needed

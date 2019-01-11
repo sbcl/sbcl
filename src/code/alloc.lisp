@@ -52,8 +52,8 @@
 (define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)
   system-area-pointer)
 
-(define-load-time-global *immobile-space-mutex*
-    (sb-thread:make-mutex :name "Immobile space"))
+(!define-load-time-global *immobile-space-mutex*
+    #.(sb-thread:make-mutex :name "Immobile space"))
 
 (eval-when (:compile-toplevel)
   (assert (eql code-boxed-size-slot 1))

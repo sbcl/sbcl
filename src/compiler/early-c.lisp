@@ -133,14 +133,12 @@ possible. Potentially long (over one page in size) vectors are, however, not
 stack allocated except in zero SAFETY code, as such a vector could overflow
 the stack without triggering overflow protection.")
 
-(!begin-collecting-cold-init-forms)
 ;;; This lock is seized in the compiler, and related areas -- like the
 ;;; classoid/layout/class system.
-(defglobal **world-lock** nil)
+;;; Assigning a literal object enables genesis to dump and load it
+;;; without need of a cold-init function.
 #-sb-xc-host
-(!cold-init-forms
- (setf **world-lock** (sb-thread:make-mutex :name "World Lock")))
-(!defun-from-collected-cold-init-forms !world-lock-cold-init)
+(!define-load-time-global **world-lock** #.(sb-thread:make-mutex :name "World Lock"))
 
 #-sb-xc-host
 (define-load-time-global *static-linker-lock*
