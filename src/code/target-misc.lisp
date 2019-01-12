@@ -135,8 +135,9 @@ the file system."
 
 ;;; DEFmumble helpers
 
-(defun %defglobal (name value boundp doc docp source-location)
-  (%compiler-defglobal name :always-bound value (not boundp))
+(defun %defglobal (name value source-location &optional (doc nil docp))
+  (%compiler-defglobal name :always-bound
+                       (not (unbound-marker-p value)) value)
   (when docp
     (setf (documentation name 'variable) doc))
   (when source-location

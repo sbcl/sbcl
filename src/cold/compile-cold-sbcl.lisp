@@ -279,4 +279,5 @@
         (do-stems-and-flags (stem flags)
           (unless (position :not-target flags)
             (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))
-            (target-compile-stem stem flags))))))
+            (target-compile-stem stem flags)
+            (terpri))))))

@@ -305,7 +305,7 @@ evaluated as a PROGN."
                     ,@(and docp
                            `(',doc)))))
 
-(defun %compiler-defglobal (name always-boundp value assign-it-p)
+(defun %compiler-defglobal (name always-boundp assign-it-p value)
   (sb-xc:proclaim `(global ,name))
   (when assign-it-p
     (set-symbol-global-value name value))

@@ -174,7 +174,7 @@
   ;; function calls) while executing other FOPs. SKIP-UNTIL will
   ;; either contain the position where the skipping will stop, or
   ;; NIL if we're executing normally.
-  (skip-until nil))
+  (skip-until nil :type (or null fixnum)))
 (declaim (freeze-type fasl-input))
 
 ;;; Unique number assigned into high 4 bytes of 64-bit code size slot

@@ -157,10 +157,11 @@ See also the declarations SB-EXT:GLOBAL and SB-EXT:ALWAYS-BOUND."
        (eval-when (:compile-toplevel)
          (let ((,boundp (boundp ',name)))
            (%compiler-defglobal ',name :always-bound
-                                (unless ,boundp ,value) (not ,boundp))))
-       (let ((,boundp (%boundp ',name)))
-         (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
-                     (sb-c:source-location))))))
+                                (not ,boundp) (unless ,boundp ,value))))
+       (%defglobal ',name
+                   (if (%boundp ',name) (make-unbound-marker) ,value)
+                   (sb-c:source-location)
+                   ,@(and docp `(',doc))))))
 
 (defmacro define-load-time-global (name value &optional (doc nil docp))
   "Defines NAME as a global variable that is always bound. VALUE is evaluated
@@ -170,10 +171,10 @@ Attempts to read NAME at compile-time will signal an UNBOUND-VARIABLE error
 unless it has otherwise been assigned a value.
 
 See also DEFGLOBAL which assigns the VALUE at compile-time too."
-  (let ((boundp (make-symbol "BOUNDP")))
-    `(progn
-       (eval-when (:compile-toplevel)
-         (%compiler-defglobal ',name :eventually nil nil))
-       (let ((,boundp (%boundp ',name)))
-         (%defglobal ',name (unless ,boundp ,value) ,boundp ',doc ,docp
-                     (sb-c:source-location))))))
+  `(progn
+     (eval-when (:compile-toplevel)
+       (%compiler-defglobal ',name :eventually nil nil))
+     (%defglobal ',name
+                 (if (%boundp ',name) (make-unbound-marker) ,value)
+                 (sb-c:source-location)
+                 ,@(and docp `(',doc)))))
