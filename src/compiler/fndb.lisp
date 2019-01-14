@@ -1979,6 +1979,21 @@
   (values)
   ())
 (defknown style-warn (t &rest t) null ())
+;;; The following defknowns are essentially a workaround for a deficiency in
+;;; at least some versions of CCL which do not agree that NIL is legal here:
+;;; * (declaim (ftype (function () nil) missing-arg))
+;;; * (defun call-it (a) (if a 'ok (missing-arg)))
+;;; Compiler warnings :
+;;;   In CALL-IT: Conflicting type declarations for BUG
+;;;
+;;; Unfortunately it prints that noise at each call site.
+;;; Using DEFKNOWN we can make the proclamation effective when
+;;; running the cross-compiler but not when building it.
+;;; Alternatively we could use SB-XC:PROCLAIM, except that that
+;;; doesn't exist soon enough, and would need conditionals guarding
+;;; it, which is sort of the very thing this is trying to avoid.
+(defknown missing-arg () nil)
+(defknown give-up-ir1-transform (&rest t) nil)
 
 (defknown coerce-to-condition ((or condition symbol string function)
                                type-specifier symbol &rest t)

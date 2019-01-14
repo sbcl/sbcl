@@ -914,8 +914,6 @@ NOTE: This interface is experimental and subject to change."
 ;;; error indicating that a required &KEY argument was not supplied.
 ;;; This function is also useful for DEFSTRUCT slot defaults
 ;;; corresponding to required arguments.
-(declaim (ftype (function () #+(and sb-xc-host ccl) *
-                             #-(and sb-xc-host ccl) nil) missing-arg))
 (defun missing-arg ()
   (/show0 "entering MISSING-ARG")
   (error "A required &KEY or &OPTIONAL argument was not supplied."))

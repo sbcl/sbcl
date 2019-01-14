@@ -86,8 +86,6 @@
 
 ;;; Signal the appropriate condition. COMPILER-ERROR calls the bailout
 ;;; function so that it never returns (but compilation continues).
-(declaim (ftype (function (t &rest t) #+(and sb-xc-host ccl) *
-                                      #-(and sb-xc-host ccl) nil) compiler-error))
 (defun compiler-error (datum &rest arguments)
   (let ((condition (apply #'coerce-to-condition datum
                           'simple-program-error 'compiler-error arguments)))
