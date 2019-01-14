@@ -13,12 +13,6 @@
 
 (in-package "SB-IMPL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant max-hash sb-xc:most-positive-fixnum))
-
-(def!type hash ()
-  `(integer 0 ,max-hash))
-
 ;;; A number that can represent an index into a vector, including
 ;;; one-past-the-end
 (deftype array-range ()

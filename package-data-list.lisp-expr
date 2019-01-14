@@ -1292,7 +1292,7 @@ possibly temporarily, because it might be used internally."
                "STRUCTURE-INITARG-NOT-KEYWORD" "CONSTANT-MODIFIED"
 
                ;; ..and DEFTYPEs..
-               "MAX-HASH" "HASH"
+               "HASH"
                "INDEX" "LOAD/STORE-INDEX"
                "SIGNED-BYTE-WITH-A-BITE-OUT"
                "UNSIGNED-BYTE-WITH-A-BITE-OUT"

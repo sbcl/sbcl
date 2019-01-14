@@ -158,6 +158,9 @@
 (sb-xc:deftype array-total-size ()
   `(integer 0 (,sb-xc:array-total-size-limit)))
 
+;;; The range returned by SXHASH and PSXHASH
+(sb-xc:deftype hash () `(integer 0 ,sb-xc:most-positive-fixnum))
+
 ;;; something legal in an evaluated context
 ;;; FIXME: could probably go away
 (sb-xc:deftype form () t)
