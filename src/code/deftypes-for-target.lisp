@@ -169,7 +169,7 @@
 
 ;;; legal args to pathname functions
 (sb-xc:deftype pathname-designator ()
-  '(or string pathname #+sb-xc-host stream #-sb-xc-host synonym-stream #-sb-xc-host file-stream))
+  '(or string pathname synonym-stream file-stream))
 (sb-xc:deftype logical-host-designator ()
   '(or host string))
 (sb-xc:deftype pathname-component-case ()

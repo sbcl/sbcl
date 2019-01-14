@@ -87,21 +87,6 @@
 
 ;;; stream manipulation functions
 
-;;; SYNONYM-STREAM type is needed by ANSI-STREAM-{INPUT,OUTPUT}-STREAM-P
-(defstruct (synonym-stream (:include ansi-stream
-                                     (in #'synonym-in)
-                                     (bin #'synonym-bin)
-                                     (n-bin #'synonym-n-bin)
-                                     (out #'synonym-out)
-                                     (bout #'synonym-bout)
-                                     (sout #'synonym-sout)
-                                     (misc #'synonym-misc))
-                           (:constructor make-synonym-stream (symbol))
-                           (:copier nil))
-  ;; This is the symbol, the value of which is the stream we are synonym to.
-  (symbol nil :type symbol :read-only t))
-(declaim (freeze-type synonym-stream))
-
 (defstruct (broadcast-stream (:include ansi-stream
                                        (out #'broadcast-out)
                                        (bout #'broadcast-bout)
