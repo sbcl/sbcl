@@ -271,8 +271,16 @@
 (defun !expander-for-defstruct (null-env-p name-and-options slot-descriptions
                                 expanding-into-code-for)
   (binding*
-        (((dd classoid inherits)
-          (parse-defstruct null-env-p name-and-options slot-descriptions))
+        (((name options)
+          (if (listp name-and-options)
+              (values (car name-and-options) (cdr name-and-options))
+              (values name-and-options nil)))
+         ((nil) (unless (symbolp name)
+                  ;; Rather than hit MAKE-DEFSTRUCT-DESCRIPTION's type-check
+                  ;; on the NAME slot, we can be a little more clear.
+                  (error "DEFSTRUCT: ~S is not a symbol." name)))
+         (dd (make-defstruct-description null-env-p name))
+         ((classoid inherits) (parse-defstruct dd options slot-descriptions))
          (boa-constructors (member-if #'listp (dd-constructors dd) :key #'cdr))
          (keyword-constructors (ldiff (dd-constructors dd) boa-constructors))
          (constructor-definitions
@@ -291,7 +299,6 @@
                      `(defun ,(car ctor)
                              ,@(structure-ctor-lambda-parts dd (cdr ctor))))
                    boa-constructors)))
-         (name (dd-name dd))
          (print-method
           (when (dd-print-option dd)
             (let* ((x (make-symbol "OBJECT"))
@@ -311,9 +318,8 @@
               `((defmethod print-object ((,x ,name) ,s)
                   (funcall #',fname ,x ,s
                            ,@(if depthp `(*current-level-in-print*)))))))))
-    ;; Return a list of forms and the DD-NAME.
-    (values
-     (if (dd-class-p dd)
+    ;; Return a list of forms
+    (if (dd-class-p dd)
          `(,@(when (eq expanding-into-code-for :target)
                ;; Note we intentionally enforce package locks, calling
                ;; %DEFSTRUCT first. %DEFSTRUCT has the tests (and resulting
@@ -341,7 +347,8 @@
                  ,@constructor-definitions
                  ,@print-method
                  ;; Various other operations only make sense on the target SBCL.
-                 (%target-defstruct ',dd))))
+                 (%target-defstruct ',dd)))
+           ',name)
          ;; Not DD-CLASS-P
          ;; FIXME: missing package lock checks
          `((eval-when (:compile-toplevel :load-toplevel :execute)
@@ -356,8 +363,8 @@
                  ,@constructor-definitions
                  ,@(when (dd-doc dd)
                      `((setf (documentation ',(dd-name dd) 'structure)
-                             ',(dd-doc dd))))))))
-     name)))
+                             ',(dd-doc dd))))))
+           ',name))))
 
 #+sb-xc-host
 (defmacro sb-xc:defstruct (name-and-options &rest slot-descriptions)
@@ -395,16 +402,15 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-  (multiple-value-bind (forms name)
-      (!expander-for-defstruct
-       (etypecase env
-         (sb-kernel:lexenv (sb-c::null-lexenv-p env))
-         ;; a LOCALLY environment would be fine,
-         ;; but is not an important case to handle.
-         #!+sb-fasteval (sb-interpreter:basic-env nil)
-         (null t))
-       name-and-options slot-descriptions :target)
-    `(progn ,@forms ',name)))
+  `(progn
+     ,@(!expander-for-defstruct
+        (etypecase env
+          (sb-kernel:lexenv (sb-c::null-lexenv-p env))
+          ;; a LOCALLY environment would be fine,
+          ;; but is not an important case to handle.
+          #!+sb-fasteval (sb-interpreter:basic-env nil)
+          (null t))
+        name-and-options slot-descriptions :target)))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
@@ -680,13 +686,9 @@ unless :NAMED is also specified.")))
 ;;; Given name and options and slot descriptions (and possibly doc
 ;;; string at the head of slot descriptions) return a DD holding that
 ;;; info.
-(defun parse-defstruct (null-env-p name-and-options slot-descriptions)
-  (binding* (((name options)
-              (if (listp name-and-options)
-                  (values (car name-and-options) (cdr name-and-options))
-                  (values name-and-options nil)))
-             (dd (make-defstruct-description null-env-p name))
-             (option-bits (parse-defstruct-options options dd)))
+(defun parse-defstruct (dd options slot-descriptions)
+  (declare (type defstruct-description dd))
+  (let ((option-bits (parse-defstruct-options options dd)))
     (when (dd-include dd)
       (frob-dd-inclusion-stuff dd option-bits))
     (when (stringp (car slot-descriptions))
@@ -717,14 +719,14 @@ unless :NAMED is also specified.")))
                  (parse-1-dsd dd slot-description))))
         (if (dd-class-p dd)
             (progn
-              (when (info :type :kind name)
+              (when (info :type :kind (dd-name dd))
                 ;; It could be buried anywhere in a complicated type expression.
                 ;; There's no way to clear selectively, so just flush the cache.
                 (values-specifier-type-cache-clear))
               (let ((*pending-defstruct-type* proto-classoid))
                 (parse-slots)))
             (parse-slots)))
-      (values dd proto-classoid inherits))))
+      (values proto-classoid inherits))))
 
 ;;;; stuff to parse slot descriptions
 

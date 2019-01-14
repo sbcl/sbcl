@@ -268,11 +268,13 @@
   compiled into code. If the variable already has a value, and this is not
   EQL to the new value, the code is not portable (undefined behavior). The
   third argument is an optional documentation string for the variable."
+  (check-designator name defconstant)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (sb-c::%defconstant ',name ,value (sb-c:source-location)
                          ,@(and docp `(',doc)))))
 
 (defvar *!removable-symbols* nil)
+(push '("SB-INT" check-designator) *!removable-symbols*)
 
 (defun %defconstant-eqx-value (symbol expr eqx)
   (declare (type function eqx))

@@ -13,8 +13,7 @@
 
 (let ()
   (defmacro sb-xc:defmacro (name lambda-list &body body)
-    (unless (symbolp name)
-      (error "The macro name ~S is not a symbol." name))
+    (check-designator name defmacro)
     ;; When we are building the cross-compiler, we could be in a host
     ;; lisp which implements CL macros (e.g. CL:AND) as special
     ;; operators (while still providing a macroexpansion for

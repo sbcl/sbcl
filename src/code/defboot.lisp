@@ -229,6 +229,7 @@ evaluated as a PROGN."
 
 (sb-xc:defmacro defun (&environment env name lambda-list &body body)
   "Define a function at top level."
+  (check-designator name defun)
   #+sb-xc-host
   (unless (cl:symbol-package (fun-name-block-name name))
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
@@ -278,6 +279,7 @@ evaluated as a PROGN."
   SPECIAL and, optionally, initialize it. If the variable already has a
   value, the old value is not clobbered. The third argument is an optional
   documentation string for the variable."
+  (check-designator var defvar)
   ;; Maybe kill docstring, but only under the cross-compiler.
   #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
   `(progn
@@ -296,6 +298,7 @@ evaluated as a PROGN."
   variable special and sets its value to VAL, overwriting any
   previous value. The third argument is an optional documentation
   string for the parameter."
+  (check-designator var defparameter)
   ;; Maybe kill docstring, but only under the cross-compiler.
   #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
   `(progn

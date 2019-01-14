@@ -27,26 +27,10 @@
      t
      `(type-expander ,name))))
 
-;; Can't have a function called SIMPLE-TYPE-ERROR or TYPE-ERROR...
-;; FUNCTION returning NIL is as good as SFUNCTION returning NIL,
-;; so we don't care that this can't use (FTYPE (SFUNCTION ...)).
-;; But do we really need this? It's not highly useful.
-(declaim (ftype (function (t t t &rest t) #+(and sb-xc-host ccl) *
-                                          #-(and sb-xc-host ccl) nil) bad-type))
-(defun bad-type (datum type control &rest arguments)
-  (error 'simple-type-error
-         :datum datum
-         :expected-type type
-         :format-control control
-         :format-arguments arguments))
-
-(defmacro sb-xc:deftype (&whole form name lambda-list &body body
-                         &environment env)
+(defmacro sb-xc:deftype (name lambda-list &body body &environment env)
   "Define a new type, with syntax like DEFMACRO."
   (declare (ignore env))
-  (unless (symbolp name)
-    (bad-type name 'symbol "Type name is not a symbol:~%  ~S"
-              form))
+  (check-designator name deftype)
   (multiple-value-bind (expander-form doc source-location-form)
       (multiple-value-bind (forms decls doc) (parse-body body t)
         (acond ((and (not lambda-list) (not decls)

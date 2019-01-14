@@ -399,6 +399,7 @@
 
 (sb-xc:defmacro sb-xc:define-modify-macro (name lambda-list function &optional doc-string)
   "Creates a new read-modify-write macro like PUSH or INCF."
+  (check-designator name define-modify-macro)
   (binding* (((nil required optional rest)
               (parse-lambda-list
                lambda-list
@@ -460,9 +461,7 @@
 (sb-xc:defmacro sb-xc:defsetf (access-fn &rest rest)
   "Associates a SETF update function or macro with the specified access
   function or macro. The format is complex. See the manual for details."
-  (unless (symbolp access-fn)
-    (error "~S access-function name ~S is not a symbol."
-           'sb-xc:defsetf access-fn))
+  (check-designator access-fn defsetf "access-function")
   (typecase rest
     ((cons (and symbol (not null)) (or null (cons string null)))
      `(eval-when (:load-toplevel :compile-toplevel :execute)
@@ -579,9 +578,7 @@
 (sb-xc:defmacro sb-xc:define-setf-expander (access-fn lambda-list &body body)
   "Syntax like DEFMACRO, but creates a setf expander function. The body
   of the definition must be a form that returns five appropriate values."
-  (unless (symbolp access-fn)
-    (error "~S access-function name ~S is not a symbol."
-           'sb-xc:define-setf-expander access-fn))
+  (check-designator access-fn define-setf-expander "access-function")
   (multiple-value-bind (def doc)
       ;; Perhaps it would be more elegant to keep the docstring attached
       ;; to the expander function, as for CAS?

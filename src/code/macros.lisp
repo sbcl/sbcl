@@ -178,7 +178,7 @@ invoked. In that case it will store into PLACE and start over."
 
 (sb-xc:defmacro define-compiler-macro (name lambda-list &body body)
   "Define a compiler-macro for NAME."
-  (legal-fun-name-or-type-error name)
+  (check-designator name define-compiler-macro)
   (when (and (symbolp name) (special-operator-p name))
     (%program-error "cannot define a compiler-macro for a special operator: ~S"
                     name))

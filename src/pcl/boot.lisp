@@ -250,8 +250,7 @@ bootstrapping.
 
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
-  (unless (legal-fun-name-p fun-name)
-    (%program-error "illegal generic function name ~S" fun-name))
+  (check-designator fun-name defgeneric)
   (with-current-source-form (lambda-list)
     (check-gf-lambda-list lambda-list))
   (let ((initargs ())
@@ -426,10 +425,11 @@ bootstrapping.
   (fmakunbound 'defmethod))
 ;;; As per CLHS -
 ;;; "defmethod is not required to perform any compile-time side effects."
-;;; and we don't do much other than to make the function be defined,
+;;; and we don't do much other than to make the function known to be defined,
 ;;; which means that checking of callers' arglists can only occur after called
 ;;; methods are actually loaded.
 (defmacro defmethod (name &rest args)
+  (check-designator name defmethod)
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     `(progn
