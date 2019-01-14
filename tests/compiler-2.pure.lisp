@@ -1967,3 +1967,29 @@
            (1- (expt 2 31))))
    (((make-%instance-ref-eq :n (1- (expt 2 31)))) t)
    (((make-%instance-ref-eq :n -1)) nil)))
+
+(with-test (:name :convert-mv-bind-to-let-multiple-uses)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f)
+      (let* ((a (eval 1))
+             (b (eval 2)))
+        (multiple-value-bind (x y) (if f
+                                       (values a 1)
+                                       (values b 2))
+          (values x y))))
+   ((t) (values 1 1))
+   ((nil) (values 2 2))))
+
+(with-test (:name :substitute-single-use-lvar-multiple-uses)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f)
+      (let* ((a (eval 1))
+             (b (eval 2))
+             (m (if f
+                    (values a)
+                    (values b))))
+        m))
+   ((t) 1)
+   ((nil) 2)))

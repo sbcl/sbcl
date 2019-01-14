@@ -1830,10 +1830,12 @@
                ;; Handle a trivial exception when the REF is executed
                ;; at the very beginning, this helps with optimizing
                ;; nested IFs.
-               (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
-                      (next-node (and next-ctran
-                                      (ctran-next next-ctran))))
-                 (eq next-node ref)))
+               ;;; Broken for now, see compiler-2.pure/substitute-single-use-lvar-multiple-uses
+               ;; (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
+               ;;        (next-node (and next-ctran
+               ;;                        (ctran-next next-ctran))))
+               ;;   (eq next-node ref))
+               )
            (not (block-delete-p (node-block ref)))
            ;; If the destinatation is dynamic extent, don't substitute unless
            ;; the source is as well.
@@ -2172,13 +2174,15 @@
 ;;;      ...)
 ;;; Convert to:
 ;;;    (let ((x xx)
-;;;       (y yy))
+;;;          (y yy))
 ;;;      ...)
 (defun convert-mv-bind-to-let (call)
   (declare (type mv-combination call))
   (let* ((args (basic-combination-args call))
          (uses (ensure-list (lvar-uses (first args)))))
     (when (and (singleton-p args)
+               ;; Broken for now, see compiler-2.pure/convert-mv-bind-to-let-multiple-uses
+               (singleton-p uses)
                (loop for use in uses
                      always (and (combination-p use)
                                  (eq (lvar-fun-name (combination-fun use))
