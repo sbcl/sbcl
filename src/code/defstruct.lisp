@@ -360,13 +360,12 @@
      name)))
 
 #+sb-xc-host
-(sb-xc:defmacro defstruct (name-and-options &rest slot-descriptions)
-  ;; All defstructs are toplevel in SBCL's own source code,
-  ;; so pass T for null-lexenv.
+(defmacro sb-xc:defstruct (name-and-options &rest slot-descriptions)
+  "Cause information about a target structure to be built into the
+  cross-compiler."
   `(progn ,@(!expander-for-defstruct
-             t name-and-options slot-descriptions :target)))
+             t name-and-options slot-descriptions :host)))
 
-#+sb-xc
 (sb-xc:defmacro defstruct (name-and-options &rest slot-descriptions
                            &environment env)
   "DEFSTRUCT {Name | (Name Option*)} [Documentation] {Slot | (Slot [Default] {Key Value}*)}
@@ -406,13 +405,6 @@
          (null t))
        name-and-options slot-descriptions :target)
     `(progn ,@forms ',name)))
-
-#+sb-xc-host
-(defmacro sb-xc:defstruct (name-and-options &rest slot-descriptions)
-  "Cause information about a target structure to be built into the
-  cross-compiler."
-  `(progn ,@(!expander-for-defstruct
-             t name-and-options slot-descriptions :host)))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 

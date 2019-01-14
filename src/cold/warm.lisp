@@ -21,6 +21,19 @@
 (assert (zerop (deref (extern-alien "lowtag_for_widetag" (array char 64))
                       (ash sb-vm:character-widetag -2))))
 
+;;; Verify that all defstructs except for one were compiled in a null lexical
+;;; environment. Compiling any call to a structure constructor would like to
+;;; know whether some slots get their default value especially if the default
+;;; is incompatible with the slot type (consider MISSING-ARG, e.g).
+;;; If some initform was compiled in a non-null environment, it might not refer
+;;; to a global function. We'd rather ignore it than incorrectly style-warn.
+(let (result)
+  (do-all-symbols (s)
+    (let ((dd (sb-kernel:find-defstruct-description s nil)))
+      (when (and dd (not (sb-kernel::dd-null-lexenv-p dd)))
+        (push (sb-kernel:dd-name dd) result))))
+  (assert (equal result '(sb-c::conset))))
+
 (proclaim '(optimize (compilation-speed 1)
                      (debug #+sb-show 2 #-sb-show 1)
                      (safety 2)
