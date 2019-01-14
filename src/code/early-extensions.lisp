@@ -13,12 +13,6 @@
 
 (in-package "SB-IMPL")
 
-(defglobal *core-pathname* nil
-  "The absolute pathname of the running SBCL core.")
-
-(defglobal *runtime-pathname* nil
-  "The absolute pathname of the running SBCL runtime.")
-
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant max-hash sb-xc:most-positive-fixnum))
 
