@@ -305,10 +305,6 @@ error if any of PACKAGES is not a valid package designator."
        (unlock-package package)))))
 
 (defun package-lock-violation-p (package &optional (symbol nil symbolp))
-  ;; KLUDGE: (package-lock package) needs to be before
-  ;; comparison to *package*, since during cold init this gets
-  ;; called before *package* is bound -- but no package should
-  ;; be locked at that point.
   (and package
        (package-lock package)
        ;; In package or implementation package
@@ -1690,8 +1686,7 @@ PACKAGE."
               (info-gethash (package-%name pkg) names) pkg)
         (dolist (nick (package-%nicknames pkg))
           (setf (info-gethash nick names) (list pkg)))
-        (setf (package-lock pkg) nil
-              (package-%implementation-packages pkg) nil))))
+        (setf (package-%implementation-packages pkg) nil))))
 
   ;; pass 2 - set the 'tables' slots only after all tables have been made
   (dolist (spec *!initial-symbols*)

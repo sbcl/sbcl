@@ -20,6 +20,14 @@
   (%primitive print "too early in cold init to recover from errors")
   (%halt))
 
+(defun !cold-failed-aver (expr)
+  ;; output the message and invoke ldb monitor
+  (terpri)
+  (write-line "failed AVER:")
+  (write expr)
+  (terpri)
+  (%halt))
+
 ;;; last-ditch error reporting for things which should never happen
 ;;; and which, if they do happen, are sufficiently likely to torpedo
 ;;; the normal error-handling system that we want to bypass it
@@ -48,35 +56,17 @@
        (/primitive-print ,(symbol-name name))
        (,name)))
 
-(defun !encapsulate-stuff-for-cold-init (&aux names)
-  (flet ((encapsulate-1 (name handler)
-           (encapsulate name '!cold-init handler)
-           (push name names)))
-    (encapsulate-1 '%failed-aver
-                   (lambda (f expr)
-                     ;; output the message before signaling error,
-                     ;; as it may be this is too early in the cold init.
-                     (fresh-line)
-                     (write-line "failed AVER:")
-                     (write expr)
-                     (terpri)
-                     (funcall f expr))))
-  names)
-
-(defmacro !with-init-wrappers (&rest forms)
-  `(let ((wrapped-functions (!encapsulate-stuff-for-cold-init)))
-     ,@forms
-     (dolist (f wrapped-functions) (unencapsulate f '!cold-init))))
-
 (defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
 
 ;;; called when a cold system starts up
-(defun !cold-init (&aux real-choose-symbol-out-fun)
+(defun !cold-init (&aux (real-choose-symbol-out-fun #'choose-symbol-out-fun)
+                        (real-failed-aver-fun #'%failed-aver))
   "Give the world a shove and hope it spins."
 
   #!+sb-show
   (sb-int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
   (/show0 "entering !COLD-INIT")
+  (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
   (setq *readtable* (make-readtable)
         *print-length* 6 *print-level* 3)
   (setq *error-output* (!make-cold-stderr-stream)
@@ -112,7 +102,6 @@
   ;; that would be nice, and would tidy up some other things too.
   (show-and-call !printer-cold-init)
   ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
-  (setf real-choose-symbol-out-fun #'choose-symbol-out-fun)
   (setf (symbol-function 'choose-symbol-out-fun)
         (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))
 
@@ -135,7 +124,7 @@
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
   (show-and-call !type-class-cold-init)
-  (!with-init-wrappers (show-and-call sb-kernel::!primordial-type-cold-init))
+  (show-and-call sb-kernel::!primordial-type-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)
@@ -169,10 +158,9 @@
          (apply #'sb-c::%defconstant name (symbol-value name) source-loc docstring))
         (sb-impl::%defparameter ; use %DEFVAR which will not clobber
          (apply #'%defvar name source-loc nil docstring)))))
-  (!with-init-wrappers
-   (dolist (x *!cold-defuns*)
-     (destructuring-bind (name inline-expansion dxable-args) x
-       (%defun name (fdefinition name) inline-expansion dxable-args))))
+  (dolist (x *!cold-defuns*)
+    (destructuring-bind (name inline-expansion dxable-args) x
+      (%defun name (fdefinition name) inline-expansion dxable-args)))
 
   (unless (!c-runtime-noinform-p)
     (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
@@ -180,10 +168,9 @@
   ;; only the basic external formats are present at this point.
   (setq sb-impl::*default-external-format* :latin-1)
 
-  (!with-init-wrappers
-    (loop with *package* = *package* ; rebind to self, as if by LOAD
-          for index-in-cold-toplevels from 0
-          for toplevel-thing in (prog1 *!cold-toplevels*
+  (loop with *package* = *package* ; rebind to self, as if by LOAD
+        for index-in-cold-toplevels from 0
+        for toplevel-thing in (prog1 *!cold-toplevels*
                                  (makunbound '*!cold-toplevels*))
         do
       #!+sb-show
@@ -204,7 +191,7 @@
         ((cons (eql defstruct))
          (apply 'sb-kernel::%defstruct (cdr toplevel-thing)))
         (t
-         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
+         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*"))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Precise GC seems to think these symbols are live during the final GC
@@ -272,6 +259,7 @@
   (setf sb-kernel::*maximum-error-depth* 10)
   (/show0 "enabling internal errors")
   (setf (extern-alien "internal_errors_enabled" int) 1)
+  (setf (symbol-function '%failed-aver) real-failed-aver-fun)
 
   (show-and-call sb-disassem::!compile-inst-printers)
 

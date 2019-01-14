@@ -529,22 +529,6 @@
 
 ;;;; miscellaneous variables and other noise
 
-;;; a numeric value to be returned for undefined foreign symbols, or NIL if
-;;; undefined foreign symbols are to be treated as an error.
-;;; (In the first pass of GENESIS, needed to create a header file before
-;;; the C runtime can be built, various foreign symbols will necessarily
-;;; be undefined, but we don't need actual values for them anyway, and
-;;; we can just use 0 or some other placeholder. In the second pass of
-;;; GENESIS, all foreign symbols should be defined, so any undefined
-;;; foreign symbol is a problem.)
-;;;
-;;; KLUDGE: It would probably be cleaner to rewrite GENESIS so that it
-;;; never tries to look up foreign symbols in the first place unless
-;;; it's actually creating a core file (as in the second pass) instead
-;;; of using this hack to allow it to go through the motions without
-;;; causing an error. -- WHN 20000825
-(defvar *foreign-symbol-placeholder-value*)
-
 ;;; a handle on the trap object
 (defvar *unbound-marker*
   (make-other-immediate-descriptor 0 sb-vm:unbound-marker-widetag))
@@ -1412,6 +1396,7 @@ core and return a descriptor to it."
                               :%name (set-readonly
                                       (base-string-to-core name))
                               :%nicknames (chill-nicknames name)
+                              :lock *nil-descriptor*
                               :doc-string (if docstring
                                               (set-readonly
                                                (base-string-to-core docstring))
@@ -2080,7 +2065,6 @@ core and return a descriptor to it."
   #!+crossbuild-test #xf00fa8 ; any random 4-octet-aligned value should do
   #!-crossbuild-test
   (or (find-foreign-symbol-in-table name *cold-foreign-symbol-table*)
-      *foreign-symbol-placeholder-value*
       (progn
         (format *error-output* "~&The foreign symbol table is:~%")
         (maphash (lambda (k v)
@@ -3602,8 +3586,7 @@ III. initially undefined function references (alphabetically):
 
     (check-spaces)
 
-    (let  ((*foreign-symbol-placeholder-value* (if core-file-name nil 0))
-           (*load-time-value-counter* 0)
+    (let  ((*load-time-value-counter* 0)
            (*cold-fdefn-objects* (make-hash-table :test 'equal))
            (*cold-symbols* (make-hash-table :test 'eql)) ; integer keys
            (*cold-package-symbols* (make-hash-table :test 'equal)) ; string keys
