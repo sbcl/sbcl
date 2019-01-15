@@ -240,6 +240,7 @@
               (when sc
                 (setf (leaf-info constant) res))
               (push-in tn-next res (ir2-component-constant-tns component))
+              (setf (tn-type res) (leaf-type constant))
               (setf (tn-leaf res) constant)
               res)))))
 
@@ -303,8 +304,23 @@
   (declare (type tn tn) (type boolean write-p))
   (let ((res (make-tn-ref tn write-p)))
     (unless (eql (tn-kind tn) :unused)
-      (setf (tn-ref-type res)
-            (tn-type tn))
+      (let ((type (tn-type tn)))
+        (setf (tn-ref-type res) type)
+        (when write-p
+          ;; Update all references as the type may have changed due to
+          ;; multiple writes.
+          (do ((tn-ref (tn-writes tn) (tn-ref-next tn-ref)))
+              ((null tn-ref))
+            (setf (tn-ref-type tn-ref)
+                  (and (tn-ref-type tn-ref)
+                       type
+                       (type-union (tn-ref-type tn-ref) type))))
+          (do ((tn-ref (tn-reads tn) (tn-ref-next tn-ref)))
+              ((null tn-ref))
+            (setf (tn-ref-type tn-ref)
+                  (and (tn-ref-type tn-ref)
+                       type
+                       (type-union (tn-ref-type tn-ref) type))))))
       (if write-p
           (push-in tn-ref-next res (tn-writes tn))
           (push-in tn-ref-next res (tn-reads tn))))

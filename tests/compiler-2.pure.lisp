@@ -1993,3 +1993,19 @@
         m))
    ((t) 1)
    ((nil) 2)))
+
+(with-test (:name :tn-ref-type-multiple-moves)
+  (checked-compile-and-assert
+   ()
+   `(lambda  (a c)
+      (declare (type (integer 546181490258163 937632934000433) c))
+      (let ((v8 c))
+        (multiple-value-bind (v9 v6)
+            (if (/= a v8)
+                (values 0 10983313414045189807)
+                (values 0 c))
+          (declare (ignore v9))
+          (loop repeat 2
+                do (eval v6))
+          v6)))
+   ((0 571816791704489) 10983313414045189807)))
