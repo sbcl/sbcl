@@ -668,15 +668,20 @@
    (:results (res :scs (any-reg descriptor-reg)))
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
-   (:generator 2
-    (inst mov :dword (ea (- 4 lowtag) object) value)
+   (:vop-var vop)
+   (:generator 2 ; underestimates cost, but irrelevant as there's no choice
+    (cond ((= lowtag fun-pointer-lowtag)
+           (pseudo-atomic ()
+             (inst push object)
+             (invoke-asm-routine 'call 'touch-gc-card vop)
+             (inst mov :dword (ea (- 4 lowtag) object) value)))
+          (t
+           (inst mov :dword (ea (- 4 lowtag) object) value)))
     (move res value)))
  (define-vop (%funcallable-instance-layout %instance-layout)
    (:translate %funcallable-instance-layout)
    (:variant fun-pointer-lowtag))
  (define-vop (%set-funcallable-instance-layout %set-instance-layout)
-   ;; BUG: if this FIN has been moved into varyobj space by 'editcore',
-   ;; then assigning a layout will need to touch the GC page written bit.
    (:translate %set-funcallable-instance-layout)
    (:variant fun-pointer-lowtag)))
 

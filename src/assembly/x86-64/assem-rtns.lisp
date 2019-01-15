@@ -409,7 +409,7 @@
       (inst cmp temp-reg-tn (thread-slot-ea thread-varyobj-card-count-slot))
       (inst jmp :ae try-dynamic-space)
       (inst mov rdi-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-      (inst bts (ea rdi-tn) temp-reg-tn :lock)
+      (inst bts :dword (ea rdi-tn) temp-reg-tn :lock)
       (inst jmp store)
 
       TRY-DYNAMIC-SPACE
@@ -467,7 +467,7 @@
 
   (inst push rax-tn)
   (inst mov rax-tn (thread-slot-ea thread-varyobj-card-marks-slot))
-  (inst bts (ea rax-tn) temp-reg-tn :lock)
+  (inst bts :dword (ea rax-tn) temp-reg-tn :lock)
   (inst pop rax-tn)
 
   DONE
