@@ -231,15 +231,6 @@
 ;;;; the legendary DEFSTRUCT macro itself (both CL:DEFSTRUCT and its
 ;;;; close personal friend SB-XC:DEFSTRUCT)
 
-(sb-xc:defmacro delay-defstruct-functions (name &rest forms)
-  ;; KLUDGE: If DEFSTRUCT is not at the top-level,
-  ;; (typep x 'name) and similar forms can't get optimized
-  ;; and produce style-warnings for unknown types.
-  (let ((forms (cons 'progn forms)))
-    (if (compiler-layout-ready-p name)
-        forms
-        `(eval ',forms))))
-
 (defun %defstruct-package-locks (dd)
   (let ((name (dd-name dd)))
     #+sb-xc-host (declare (ignore name))
@@ -267,9 +258,38 @@
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
 ;;; This monster has exactly one inline use in the final image,
 ;;; and we can drop the definition.
+;;;
+;;; The DELAYP argument deserves some explanation - Because :COMPILE-TOPLEVEL effects
+;;; of non-toplevel DEFSTRUCT forms don't happen, the compiler is unable to produce
+;;; good accessor code. By delaying compilation until the DEFSTRUCT happens, whenever
+;;; or if ever that may be, we can produce better code. DELAY, if true, says to defer
+;;; compilation, ignoring the original lexical environment. This approach produces a
+;;; nicer expansion in general, versus macroexpanding to yet another macro whose sole
+;;; purpose is to sense that earlier compile-time effects have happened.
+;;;
+;;; Some caveats: (1) a non-toplevel defstruct compiled after already seeing
+;;; the same, due to repeated compilation of a file perhaps, will use the known
+;;; definition, since technically structures must not be incompatibly redefined.
+;;; (2) delayed DEFUNS don't get the right TLF index in their debug info.
+;;; We could expand into the internal expansion of DEFUN with an extra argument
+;;; for the source location, which would get whatever "here" is instead of random.
+;;; In other words: `(progn (sb-impl::%defun struct-slot (...) ... ,(source-location))
+;;; and then use that to stuff in the correct info at delayed-compile time.
+;;;
+;;; Note also that sb-fasteval has some hairy logic to JIT-compile slot accessors.
+;;; It might be a lot nicer to pull out that junk, and have this expander know that
+;;; it is producing code for fasteval, and explicitly compile much the same way
+;;; that delayed accessor compilation happens. Here's a REPL session:
+;;; * (defstruct foo val) => FOO
+;;; * #'foo-val => #<INTERPRETED-FUNCTION FOO-VAL>
+;;; * (defun foovalx (afoo) (* (foo-val afoo) 2)) => FOOVALX
+;;; * (foovalx (make-foo :val 9)) => 18
+;;; * #'foo-val => #<FUNCTION FOO-VAL>
+;;; So FOO-VAL got compiled on demand.
+;;;
 (declaim (inline !expander-for-defstruct))
-(defun !expander-for-defstruct (null-env-p name-and-options slot-descriptions
-                                expanding-into-code-for)
+(defun !expander-for-defstruct (null-env-p delayp name-and-options
+                                slot-descriptions expanding-into-code-for)
   (binding*
         (((name options)
           (if (listp name-and-options)
@@ -334,21 +354,23 @@
            (eval-when (:compile-toplevel :load-toplevel :execute)
              (%compiler-defstruct ',dd ',inherits))
            ,@(when (eq expanding-into-code-for :target)
-               `((delay-defstruct-functions
-                  ,name
-                  ,@(awhen (dd-copier-name dd)
-                      `((defun ,(dd-copier-name dd) (instance)
-                          (copy-structure (the ,(dd-name dd) instance)))))
-                  ,@(awhen (dd-predicate-name dd)
-                      `((defun ,(dd-predicate-name dd) (object)
-                          (typep object ',(dd-name dd)))))
-                  ,@(accessor-definitions dd classoid))
+               `(,@(let ((defuns
+                          `(,@(awhen (dd-copier-name dd)
+                                `((defun ,(dd-copier-name dd) (instance)
+                                    (copy-structure (the ,(dd-name dd) instance)))))
+                            ,@(awhen (dd-predicate-name dd)
+                                `((defun ,(dd-predicate-name dd) (object)
+                                    (typep object ',(dd-name dd)))))
+                            ,@(accessor-definitions dd classoid))))
+                     (if (and delayp (not (compiler-layout-ready-p name)))
+                         `((sb-impl::%simple-eval ',(cons 'progn defuns)
+                                                  (make-null-lexenv)))
+                         defuns))
                  ;; This must be in the same lexical environment
                  ,@constructor-definitions
                  ,@print-method
                  ;; Various other operations only make sense on the target SBCL.
-                 (%target-defstruct ',dd)))
-           ',name)
+                 (%target-defstruct ',dd)))) ; returns NAME
          ;; Not DD-CLASS-P
          ;; FIXME: missing package lock checks
          `((eval-when (:compile-toplevel :load-toplevel :execute)
@@ -371,7 +393,7 @@
   "Cause information about a target structure to be built into the
   cross-compiler."
   `(progn ,@(!expander-for-defstruct
-             t name-and-options slot-descriptions :host)))
+             t nil name-and-options slot-descriptions :host)))
 
 (sb-xc:defmacro defstruct (name-and-options &rest slot-descriptions
                            &environment env)
@@ -402,15 +424,23 @@
 
    :READ-ONLY {T | NIL}
        If true, no setter function is defined for this slot."
-  `(progn
-     ,@(!expander-for-defstruct
-        (etypecase env
-          (sb-kernel:lexenv (sb-c::null-lexenv-p env))
-          ;; a LOCALLY environment would be fine,
-          ;; but is not an important case to handle.
-          #!+sb-fasteval (sb-interpreter:basic-env nil)
-          (null t))
-        name-and-options slot-descriptions :target)))
+  (let* ((null-env-p
+          (etypecase env
+           (sb-kernel:lexenv (sb-c::null-lexenv-p env))
+           ;; a LOCALLY environment would be fine,
+           ;; but is not an important case to handle.
+           #!+sb-fasteval (sb-interpreter:basic-env nil)
+           (null t)))
+         ;; Decide whether the expansion should delay reference
+         ;; to this structure type. (See explanation up above).
+         ;; This is about performance, not semantics. Non-toplevel
+         ;; effects happen when they should even if this were to
+         ;; produce the preferred expansion for toplevel.
+         (delayp (not (or *top-level-form-p* null-env-p))))
+    `(progn
+       ,@(!expander-for-defstruct
+          null-env-p delayp name-and-options slot-descriptions
+          :target))))
 
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 

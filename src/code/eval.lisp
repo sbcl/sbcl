@@ -35,7 +35,10 @@
            (values `(lambda ()
                  ;; why PROGN? So that attempts to eval free declarations
                  ;; signal errors rather than return NIL. -- CSR, 2007-05-01
-                      (progn ,expr))
+                 ;; If EXPR is already a PROGN form, leave it alone.
+                      ,(if (typep expr '(cons (eql progn)))
+                           expr
+                           `(progn ,expr)))
                    t)))))
 
 ;;; FIXME: what does "except in that it can't handle toplevel ..." mean?

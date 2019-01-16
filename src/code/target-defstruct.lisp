@@ -102,7 +102,7 @@
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))
 
-  (values))
+  (dd-name dd))
 
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
