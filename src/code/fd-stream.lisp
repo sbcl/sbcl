@@ -2727,6 +2727,7 @@
      (fd-stream-misc-routine stream operation arg1 arg2))))
 
 (!define-load-time-global *!cold-stderr-buf* " ")
+(declaim (type (simple-base-string 1) *!cold-stderr-buf*))
 
 (defun !make-cold-stderr-stream ()
   (let ((stderr
@@ -2735,12 +2736,14 @@
     (%make-fd-stream
      :out (lambda (stream ch)
             (declare (ignore stream))
-            (let ((b (truly-the (simple-base-string 1) *!cold-stderr-buf*)))
+            (let ((b *!cold-stderr-buf*))
               (setf (char b 0) ch)
               (sb-unix:unix-write stderr b 0 1)))
      :sout (lambda (stream string start end)
              (declare (ignore stream))
              (flet ((out (s start len)
+                      (when (plusp len)
+                        (setf (char *!cold-stderr-buf* 0) (char s (+ start len -1))))
                       (sb-unix:unix-write stderr s start len)))
                (if (typep string 'simple-base-string)
                    (out string start (- end start))
@@ -2748,4 +2751,8 @@
                      ;; will croak if there is any non-BASE-CHAR in the string
                      (out (replace (make-array n :element-type 'base-char)
                                    string :start2 start) 0 n)))))
-     :misc (constantly nil))))
+     :misc (lambda (stream operation &optional arg1 arg2)
+             (declare (ignore stream arg1 arg2))
+             (case operation
+               (:charpos ; impart just enough smarts to make FRESH-LINE dtrt
+                (if (eql (char *!cold-stderr-buf* 0) #\newline) 0 1)))))))

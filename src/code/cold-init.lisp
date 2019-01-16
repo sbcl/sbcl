@@ -63,8 +63,6 @@
                         (real-failed-aver-fun #'%failed-aver))
   "Give the world a shove and hope it spins."
 
-  #!+sb-show
-  (sb-int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
   (/show0 "entering !COLD-INIT")
   (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
   (setq *readtable* (make-readtable)
@@ -72,6 +70,7 @@
   (setq *error-output* (!make-cold-stderr-stream)
                       *standard-output* *error-output*
                       *trace-output* *error-output*)
+  (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   (unless (!c-runtime-noinform-p)
     (write-string "COLD-INIT... "))
 
@@ -222,6 +221,7 @@
   (show-and-call !pathname-cold-init)
 
   (show-and-call stream-cold-init-or-reset)
+  (/show "Enabled buffered streams")
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
   #!-(and win32 (not sb-thread))
@@ -429,6 +429,6 @@ process to continue normally."
     defenum defun-cached with-globaldb-name def!type def!struct
     .
     #!+sb-show ()
-    #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
-                /primitive-print /show /show0 /xhow))
+    #!-sb-show (/hexstr /nohexstr /noshow /noshow0
+                /primitive-print /show /show0))
   *!removable-symbols*)

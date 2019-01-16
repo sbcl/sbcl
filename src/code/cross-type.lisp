@@ -287,8 +287,7 @@
                                      #!+sb-fasteval sb-interpreter:interpreted-function
                                      #!+sb-eval sb-eval:interpreted-function
                                      synonym-stream
-                                     ;; if building with #+sb-show, one more unknown occurs
-                                     #!+sb-show sb-impl::string-output-stream)))
+                                     )))
                  (values nil t))
                 (t
                  (uncertain)))))

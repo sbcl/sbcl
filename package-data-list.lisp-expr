@@ -1349,7 +1349,6 @@ possibly temporarily, because it might be used internally."
                #!+sb-show("*/SHOW*"
                           "HEXSTR")
                "/SHOW"  "/NOSHOW"
-               "/XHOW"  "/NOXHOW"
                "/SHOW0" "/NOSHOW0"
                "/HEXSTR" "/NOHEXSTR"
                "/PRIMITIVE-PRINT"

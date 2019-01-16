@@ -338,8 +338,7 @@
            (compiler-warn "unrecognized declaration ~S" raw-form)))))))
 
 (defun sb-xc:proclaim (raw-form)
-  #!+(and sb-show (host-feature sb-xc))
-  (when */show* (write-string "* ") (write `(declaim ,raw-form) :level nil) (terpri))
+  (/show "PROCLAIM" raw-form)
   (%proclaim raw-form nil)
   (values))
 

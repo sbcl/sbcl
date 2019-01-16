@@ -30,82 +30,44 @@
 ;;;; actually does the work of the program. -- WHN 2001-05-07)
 
 ;;; Set this to NIL to suppress output from /SHOW-related forms.
-;;; In the target we need it initialized during cold-load (i.e. prior
-;;; to cold-init), knowledge of which is hacked into genesis.
-;;; Perhaps cold-init-helper-macros could be compiled sooner
-;;; so that the !macro works?
-#!+sb-show (defvar */show* t)
-
-#!+sb-show
-(defmacro cannot-/show (string)
-  (declare (type simple-string string))
-  (declare (notinline concatenate))
-  #+sb-xc-host `(error "can't /SHOW: ~A" ,string)
-  ;; We end up in this situation when we execute /SHOW too early in
-  ;; cold init. That happens to me often enough that it's really
-  ;; annoying for it to cause a hard failure -- which at that point is
-  ;; hard to recover from -- instead of just diagnostic output.
-  #-sb-xc-host
-  `(progn (%primitive print
-           ,(concatenate 'simple-base-string "/can't /SHOW:" string))
-          t))
-
-;;; Should /SHOW output be suppressed at this point?
-;;;
-;;; Note that despite the connoting-no-side-effects-pure-predicate
-;;; name, we emit some error output if we're called at a point where
-;;; /SHOW is inherently invalid.
-#!+sb-show
-(defun suppress-/show-p ()
-         ;; protection against /SHOW too early in cold init for
-         ;; (FORMAT *TRACE-OUTPUT* ..) to work, part I: Obviously
-         ;; we need *TRACE-OUTPUT* bound.
-  (if (not (boundp '*trace-output*))
-      (cannot-/show "*TRACE-OUTPUT* isn't bound. (Try /SHOW0.)")
-         ;; ordinary, healthy reason to suppress /SHOW, no error
-         ;; output needed. Assume by default _not_ to suppress.
-      (and (boundp '*/show*) (not */show*))))
-
-
-#!+(and sb-show (host-feature sb-xc))
-(declaim (special *print-pretty*))
+(defparameter */show* t)
 
 ;;; shorthand for a common idiom in output statements used in
-;;; debugging: (/SHOW "Case 2:" X Y) becomes a pretty-printed version
+;;; debugging: (/SHOW "Case 2:" X Y) becomes something to the effect
 ;;; of (FORMAT .. "~&/Case 2: X=~S Y=~S~%" X Y), conditional on */SHOW*.
+;;; We eschew FORMAT though because the directive interpreters
+;;; might not have been set up yet.
 (defmacro /show (&rest xlist)
-  #!-sb-show (declare (ignore xlist))
+  (declare (ignorable xlist))
+  ;; CONCATENATE transformer causes CTYPEP ambiguity.
+  ;; WRITE transformer bind *PRINT-PRETTY* which isn't defined yet.
+  (declare (notinline concatenate write-to-string))
   #!+sb-show
-  (flet (;; Is X something we want to just show literally by itself?
-         ;; (instead of showing it as NAME=VALUE)
-         (literal-p (x) (or (stringp x) (numberp x))))
-    ;; We build a FORMAT statement out of what we find in XLIST.
-    (let ((format-stream (make-string-output-stream)) ; string arg to FORMAT
-          (format-reverse-rest)  ; reversed &REST argument to FORMAT
-          (first-p t))            ; first pass through loop?
-      (write-string "~&~<~;/" format-stream)
-      (dolist (x xlist)
-        (if first-p
-            (setq first-p nil)
-            (write-string #+ansi-cl " ~_"
-                          #-ansi-cl " " ; for CLISP (CLTL1-ish)
-                          format-stream))
-        (if (literal-p x)
-            (princ x format-stream)
-            (progn (let ((*print-pretty* nil))
-                     (format format-stream "~S=~~S" x))
-                   (push x format-reverse-rest))))
-      (write-string "~;~:>~%" format-stream)
-      (let ((format-string (get-output-stream-string format-stream))
-            (format-rest (reverse format-reverse-rest)))
-        `(locally
-           (declare (optimize (speed 1) (space 2) (safety 3)))
-           (unless (suppress-/show-p)
-             (format *trace-output*
-                     ,format-string
-                     #+ansi-cl (list ,@format-rest)
-                     #-ansi-cl ,@format-rest)) ; for CLISP (CLTL1-ish)
-           (values))))))
+  `(when */show*
+     (let ((.stream. *trace-output*))
+       (fresh-line .stream.)
+       ;; *trace-output* is initially unbuffered, so try to combine syscalls
+       ;; by squishing the first few writes into one string, as opposed to
+       ;; writing #\/, string, #\space, "expr=" as four separate operations.
+       ,@(let ((preamble (if (and (stringp (car xlist)) (cdr xlist))
+                             (concatenate 'string "/" (pop xlist) " ")
+                             "/")))
+           (mapcan
+            (lambda (x)
+              (prog1
+                  (if (stringp x)
+                      (list `(write-string ,(concatenate 'string preamble x)
+                                           .stream.))
+                      (list `(write-string
+                              ,(concatenate 'string
+                                            preamble
+                                            (write-to-string x :pretty nil)
+                                            "=")
+                              .stream.)
+                            `(write ,x :stream .stream.)))
+                (setq preamble " ")))
+            xlist))
+       (terpri .stream.))))
 
 ;;; a disabled-at-compile-time /SHOW, implemented as a macro instead
 ;;; of a function so that leaving occasionally-useful /SHOWs in place
@@ -113,13 +75,6 @@
 ;;; arguments can't be evaluated (e.g. because they're only meaningful
 ;;; in a debugging version of the system, or just due to bit rot..)
 (defmacro /noshow (&rest rest)
-  (declare (ignore rest)))
-
-;;; like /SHOW, except displaying values in hexadecimal
-(defmacro /xhow (&rest rest)
-  `(let ((*print-base* 16))
-     (/show ,@rest)))
-(defmacro /noxhow (&rest rest)
   (declare (ignore rest)))
 
 ;;; a trivial version of /SHOW which only prints a constant string,
