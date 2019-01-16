@@ -33,8 +33,7 @@
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar
-                                (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (res (first locs)))
     (vop slot node block (lvar-tn node block object)
          name offset lowtag res)
@@ -58,7 +57,7 @@
 (defoptimizer ir2-convert-casser
     ((object old new) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (res (first locs)))
     (vop compare-and-swap-slot node block
          (lvar-tn node block object)
@@ -165,7 +164,7 @@
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
     (emit-inits node block name result lowtag inits args)
@@ -174,7 +173,7 @@
 (defoptimizer ir2-convert-variable-allocation
               ((extra &rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
@@ -188,7 +187,7 @@
     ((dd slot-specs &rest args) node block name words type lowtag inits)
   (declare (ignore inits))
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (aver (and (constant-lvar-p dd) (constant-lvar-p slot-specs) (= words 1)))
     (let* ((c-dd (lvar-value dd))
@@ -211,7 +210,7 @@
                              'initialize-vector)))
          (saetp (find-saetp-by-ctype elt-ctype))
          (lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list (primitive-type vector-ctype))))
+         (locs (lvar-result-tns lvar (list vector-ctype)))
          (result (first locs))
          (elt-ptype (primitive-type elt-ctype))
          (tmp (make-normal-tn elt-ptype)))

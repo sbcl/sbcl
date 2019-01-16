@@ -109,21 +109,24 @@
 ;;; Create a packed TN of the specified primitive-type in the
 ;;; *COMPONENT-BEING-COMPILED*. We use the SCs from the primitive type
 ;;; to determine which SCs it can be packed in.
-(defun make-normal-tn (type)
-  (declare (type primitive-type type))
+(defun make-normal-tn (primitive-type &optional (type *universal-type*))
+  (declare (type primitive-type primitive-type)
+           (type ctype type))
   (let* ((component (component-info *component-being-compiled*))
          (res (make-tn (incf (ir2-component-global-tn-counter component))
-                       :normal type nil)))
+                       :normal primitive-type nil)))
+    (setf (tn-type res) (single-value-type type))
     (push-in tn-next res (ir2-component-normal-tns component))
     res))
 
 ;;; Create a normal packed TN with representation indicated by SCN.
-(defun make-representation-tn (ptype scn)
+(defun make-representation-tn (ptype scn &optional (type *universal-type*))
   (declare (type primitive-type ptype) (type sc-number scn))
   (let* ((component (component-info *component-being-compiled*))
          (res (make-tn (incf (ir2-component-global-tn-counter component))
                        :normal ptype
                        (svref *backend-sc-numbers* scn))))
+    (setf (tn-type res) (single-value-type type))
     (push-in tn-next res (ir2-component-normal-tns component))
     res))
 
@@ -131,7 +134,7 @@
 ;;; and FSC to record where it goes, and then put it on the current component's
 ;;; Wired-TNs list. Ptype is the TN's primitive-type, which may be NIL in VOP
 ;;; temporaries.
-(defun make-wired-tn (ptype scn offset)
+(defun make-wired-tn (ptype scn offset &optional (type *universal-type*))
   (declare (type (or primitive-type null) ptype)
            (type sc-number scn) (type unsigned-byte offset))
   (let* ((component (component-info *component-being-compiled*))
@@ -139,6 +142,10 @@
                        :normal ptype
                        (svref *backend-sc-numbers* scn))))
     (setf (tn-offset res) offset)
+    (when ptype
+      (setf (tn-type res) (if type
+                              (single-value-type type)
+                              *universal-type*)))
     (push-in tn-next res (ir2-component-wired-tns component))
     res))
 (defun sb-vm::make-wired-tn* (prim-type-name scn offset)
@@ -146,12 +153,16 @@
 
 ;;; Create a packed TN restricted to the SC with number SCN. Ptype is as
 ;;; for MAKE-WIRED-TN.
-(defun make-restricted-tn (ptype scn)
+(defun make-restricted-tn (ptype scn &optional (type *universal-type*))
   (declare (type (or primitive-type null) ptype) (type sc-number scn))
   (let* ((component (component-info *component-being-compiled*))
          (res (make-tn (incf (ir2-component-global-tn-counter component))
                        :normal ptype
                        (svref *backend-sc-numbers* scn))))
+    (when ptype
+      (setf (tn-type res) (if type
+                              (single-value-type type)
+                              *universal-type*)))
     (push-in tn-next res (ir2-component-restricted-tns component))
     res))
 
@@ -250,7 +261,8 @@
                     sb-vm:constant-sc-number))
          (res (make-tn 0 :constant (primitive-type type) sc))
          (constants (ir2-component-constants component)))
-    (setf (tn-offset res) (fill-pointer constants))
+    (setf (tn-offset res) (fill-pointer constants)
+          (tn-type res) type)
     (vector-push-extend (cons :load-time-value handle) constants)
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
@@ -261,7 +273,8 @@
   (let* ((component (component-info *component-being-compiled*))
          (res (make-tn (incf (ir2-component-global-tn-counter component))
                        :alias (tn-primitive-type tn) nil)))
-    (setf (tn-save-tn res) tn)
+    (setf (tn-save-tn res) tn
+          (tn-type res) (tn-type tn))
     (push-in tn-next res
              (ir2-component-alias-tns component))
     res))
@@ -277,7 +290,7 @@
                        *backend-t-primitive-type*
                        (svref *backend-sc-numbers* sb-vm:constant-sc-number)))
          (constants (ir2-component-constants component)))
-
+    (setf (tn-type res) *universal-type*)
     (do ((i 0 (1+ i)))
         ((= i (length constants))
          (setf (tn-offset res) i)
@@ -304,23 +317,8 @@
   (declare (type tn tn) (type boolean write-p))
   (let ((res (make-tn-ref tn write-p)))
     (unless (eql (tn-kind tn) :unused)
-      (let ((type (tn-type tn)))
-        (setf (tn-ref-type res) type)
-        (when write-p
-          ;; Update all references as the type may have changed due to
-          ;; multiple writes.
-          (do ((tn-ref (tn-writes tn) (tn-ref-next tn-ref)))
-              ((null tn-ref))
-            (setf (tn-ref-type tn-ref)
-                  (and (tn-ref-type tn-ref)
-                       type
-                       (type-union (tn-ref-type tn-ref) type))))
-          (do ((tn-ref (tn-reads tn) (tn-ref-next tn-ref)))
-              ((null tn-ref))
-            (setf (tn-ref-type tn-ref)
-                  (and (tn-ref-type tn-ref)
-                       type
-                       (type-union (tn-ref-type tn-ref) type))))))
+      (when (tn-primitive-type tn)
+        (aver (setf (tn-ref-type res) (tn-type tn))))
       (if write-p
           (push-in tn-ref-next res (tn-writes tn))
           (push-in tn-ref-next res (tn-reads tn))))

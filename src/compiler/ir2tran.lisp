@@ -19,11 +19,6 @@
   (declare (type node node) (type ir2-block block) (type tn x y))
   (aver (neq (tn-kind x) :unused))
   (aver (neq (tn-kind y) :unused))
-  (setf (tn-type y)
-        (if (tn-type y)
-            (and (tn-type x)
-                 (type-union (tn-type y) (tn-type x)))
-            (tn-type x)))
   (unless (eq x y)
     (vop move node block x y))
   (values))
@@ -96,8 +91,7 @@
   (declare (type ref node) (type ir2-block block))
   (let* ((lvar (node-lvar node))
          (leaf (ref-leaf node))
-         (locs (lvar-result-tns
-                lvar (list (primitive-type (leaf-type leaf)))))
+         (locs (lvar-result-tns lvar (list (leaf-type leaf))))
          (res (first locs)))
     (etypecase leaf
       (lambda-var
@@ -341,8 +335,7 @@
          (leaf (set-var node))
          (val (lvar-tn node block (set-value node)))
          (locs (if lvar
-                   (lvar-result-tns
-                    lvar (list (primitive-type (leaf-type leaf))))
+                   (lvar-result-tns lvar (list (leaf-type leaf)))
                    nil)))
     (etypecase leaf
       (lambda-var
@@ -404,6 +397,7 @@
     (cond ((eq (tn-primitive-type lvar-tn) ptype) lvar-tn)
           (t
            (let ((temp (make-normal-tn ptype)))
+             (setf (tn-type temp) (single-value-type (lvar-derived-type lvar)))
              (emit-move node block lvar-tn temp)
              temp)))))
 
@@ -449,35 +443,33 @@
 ;;; IR2-LVAR-LOCS. Otherwise we make a new list padded as necessary by
 ;;; discarded TNs. We always return a TN of the specified type, using
 ;;; the lvar locs only when they are of the correct type.
-(defun lvar-result-tns (lvar types)
-  (declare (type (or lvar null) lvar) (type list types))
-  (if (not lvar)
-      (mapcar #'make-normal-tn types)
-      (let ((2lvar (lvar-info lvar)))
-        (ecase (ir2-lvar-kind 2lvar)
-          (:fixed
-           (let* ((locs (ir2-lvar-locs 2lvar))
-                  (nlocs (length locs))
-                  (ntypes (length types)))
-             (if (and (= nlocs ntypes)
-                      (do ((loc locs (cdr loc))
-                           (type types (cdr type)))
-                          ((null loc) t)
-                        (unless (eq (tn-primitive-type (car loc)) (car type))
-                          (return nil))))
-                 locs
-                 (mapcar (lambda (loc type)
-                           (if (eq (tn-primitive-type loc) type)
-                               loc
-                               (make-normal-tn type)))
-                         (if (< nlocs ntypes)
-                             (append locs
-                                     (mapcar #'make-normal-tn
-                                             (subseq types nlocs)))
-                             locs)
-                         types))))
-          (:unknown
-           (mapcar #'make-normal-tn types))))))
+(defun lvar-result-tns (lvar types &optional primitive-types)
+  (declare (type (or lvar null) lvar)
+           (type list primitive-types types))
+  (let ((primitive-types (or primitive-types
+                             (mapcar #'primitive-type types))))
+    (if lvar
+        (let ((2lvar (lvar-info lvar)))
+          (ecase (ir2-lvar-kind 2lvar)
+            (:fixed
+             (let* ((locs (ir2-lvar-locs 2lvar))
+                    (nlocs (length locs))
+                    (ntypes (length primitive-types)))
+               (if (and (= nlocs ntypes)
+                        (loop for loc in locs
+                              for prim-type in primitive-types
+                              always (eq (tn-primitive-type loc) prim-type)))
+                   locs
+                   (loop for prim-type in primitive-types
+                         for type in types
+                         for loc = (pop locs)
+                         collect (if (and loc
+                                          (eq (tn-primitive-type loc) prim-type))
+                                     loc
+                                     (make-normal-tn prim-type type))))))
+            (:unknown
+             (mapcar #'make-normal-tn primitive-types types))))
+        (mapcar #'make-normal-tn primitive-types types))))
 
 ;;; Make the first N standard value TNs, returning them in a list.
 (defun make-standard-value-tns (n)
@@ -675,22 +667,21 @@
     (ir2-convert-conditional node block (template-or-lose 'if-eq)
                              test-ref () node t)))
 
-;;; Return a list of primitive-types that we can pass to LVAR-RESULT-TNS
+;;; Return a list of types that we can pass to LVAR-RESULT-TNS
 ;;; describing the result types we want for a template call. We are really
 ;;; only interested in the number of results required: in normal case
 ;;; TEMPLATE-RESULTS-OK has already checked them.
 (defun find-template-result-types (call rtypes)
   (let* ((type (node-derived-type call))
          (types
-          (mapcar #'primitive-type
-                  (if (args-type-p type)
-                      (append (args-type-required type)
-                              (args-type-optional type))
-                      (list type))))
-         (primitive-t *backend-t-primitive-type*))
+           (if (args-type-p type)
+               (append (args-type-required type)
+                       (args-type-optional type))
+               (list type))))
     (mapcar (lambda (rtype)
               (declare (ignore rtype))
-              (or (pop types) primitive-t)) rtypes)))
+              (or (pop types) *universal-type*))
+            rtypes)))
 
 ;;; Return a list of TNs usable in a CALL to TEMPLATE delivering values to
 ;;; LVAR. As an efficiency hack, we pick off the common case where the LVAR is
@@ -699,26 +690,24 @@
 (defun make-template-result-tns (call lvar rtypes)
   (declare (type combination call) (type (or lvar null) lvar)
            (list rtypes))
-  (let ((2lvar (when lvar (lvar-info lvar))))
-    (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :fixed))
-        (let ((locs (ir2-lvar-locs 2lvar)))
-          (if (and (= (length rtypes) (length locs))
-                   (do ((loc locs (cdr loc))
-                        (rtypes rtypes (cdr rtypes)))
-                       ((null loc) t)
-                     (unless (and (neq (tn-kind (car loc)) :unused)
-                                  (operand-restriction-ok
-                                   (car rtypes)
-                                   (tn-primitive-type (car loc))
-                                   :t-ok nil))
-                       (return nil))))
-              locs
-              (lvar-result-tns
-               lvar
-               (find-template-result-types call rtypes))))
-        (lvar-result-tns
-         lvar
-         (find-template-result-types call rtypes)))))
+  (let* ((2lvar (and lvar (lvar-info lvar)))
+         (locs (and 2lvar
+                    (ir2-lvar-locs 2lvar))))
+    (if (and 2lvar
+             (eq (ir2-lvar-kind 2lvar) :fixed)
+             (= (length rtypes) (length locs))
+             (do ((loc locs (cdr loc))
+                  (rtypes rtypes (cdr rtypes)))
+                 ((null loc) t)
+               (unless (and (neq (tn-kind (car loc)) :unused)
+                            (operand-restriction-ok
+                             (car rtypes)
+                             (tn-primitive-type (car loc))
+                             :t-ok nil))
+                 (return nil))))
+        locs
+        (lvar-result-tns lvar
+                         (find-template-result-types call rtypes)))))
 
 ;;; Get the operands into TNs, make TN-REFs for them, and then call
 ;;; the template emit function.
@@ -2091,8 +2080,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                                      nil))
                               (lvar (node-lvar node))
                               (res (lvar-result-tns
-                                    lvar
-                                    (list (primitive-type (specifier-type 'list))))))
+                                    lvar (list (specifier-type 'list)))))
                          (when (and lvar (lvar-dynamic-extent lvar))
                            (vop current-stack-pointer node block
                                 (ir2-lvar-stack-pointer (lvar-info lvar))))
@@ -2121,7 +2109,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                               (- (ash most-positive-word -1))))))
                   (results (lvar-result-tns
                             lvar
-                            (list (primitive-type-or-lose 'fixnum)))))
+                            (list (specifier-type 'fixnum)))))
              (emit-move node block (lvar-tn node block x) temp)
              (vop sb-vm::move-from-word/fixnum node block
                   temp (first results))
@@ -2134,8 +2122,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                          (primitive-type-of most-positive-word)))
                   (results (lvar-result-tns
                             lvar
-                            (list (primitive-type
-                                   (specifier-type 'sb-vm:signed-word))))))
+                            (list (specifier-type 'sb-vm:signed-word)))))
              (emit-move node block (lvar-tn node block x) temp)
              (vop sb-vm::word-move node block
                   temp (first results))
@@ -2148,7 +2135,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 ;;; An identity to avoid complaints about constant modification
 (defoptimizer (ltv-wrapper ir2-convert) ((x) node block)
   (let* ((lvar (node-lvar node))
-         (results (lvar-result-tns lvar (list (primitive-type-or-lose t)))))
+         (results (lvar-result-tns lvar (list *universal-type*))))
     (emit-move node block (lvar-tn node block x) (first results))
     (move-lvar-result node block results lvar)))
 
