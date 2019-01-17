@@ -2009,3 +2009,25 @@
                 do (eval v6))
           v6)))
    ((0 571816791704489) 10983313414045189807)))
+
+(with-test (:name :substitute-single-use-lvar-cast-chains)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f a b)
+      (labels ((fun (z)
+                 (let ((m z))
+                   ;; delays type derivation of FUN as FIXNUM until constraint propagation
+                   ;; making sure SUBSTITUTE-SINGLE-USE-LVAR runs first.
+                   (if (typep m 'fixnum)
+                       m
+                       0))))
+        (declare (inline fun))
+        (let* ((a (fun a))
+               (b (fun b)))
+          (let ((m
+                  (if f
+                      (the fixnum (the integer a))
+                      (the fixnum (the integer b)))))
+            m))))
+   ((t 1 2) 1)
+   ((nil 1 2) 2)))

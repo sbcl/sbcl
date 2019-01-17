@@ -1849,11 +1849,15 @@
                      (declare (ignore pdest))
                      (lvar-single-value-p pprev))
                    ;; CASTs can disappear, don't substitute if
-                   ;; DEST-LVAR has other uses (this will be
-                   ;; insufficient if we have a CAST-CAST chain, but
-                   ;; works well for a single CAST)
-                   (or (null dest-lvar)
-                       (atom (lvar-uses dest-lvar)))))
+                   ;; DEST-LVAR has other uses
+                   (block nil
+                     (map-lvar-dest-casts
+                      (lambda (cast)
+                        (when (and (node-lvar cast)
+                                   (consp (lvar-uses (node-lvar cast))))
+                          (return)))
+                      lvar)
+                     t)))
              (mv-combination
               (or (eq (basic-combination-fun dest) lvar)
                   (and (eq (basic-combination-kind dest) :local)

@@ -126,6 +126,15 @@
                         (values dest lvar))))))
     (pld lvar)))
 
+(defun map-lvar-dest-casts (fun lvar)
+  (labels ((pld (lvar)
+             (and lvar
+                  (let ((dest (lvar-dest lvar)))
+                    (when (cast-p dest)
+                      (funcall fun dest)
+                      (pld (cast-lvar dest)))))))
+    (pld lvar)))
+
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
 ;;;
