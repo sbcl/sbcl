@@ -156,6 +156,10 @@ extern void globals_init(void);
 #  define POINTERSIZE 4
 # endif
 
+# if defined(LISP_FEATURE_RV32)
+#   define EXTERN(name,bytes) .globl name
+# endif
+
 #ifndef LISP_FEATURE_SB_THREAD
 EXTERN(foreign_function_call_active, 4)
 #endif
