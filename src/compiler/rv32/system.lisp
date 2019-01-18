@@ -102,3 +102,10 @@
   (:arg-types * positive-fixnum)
   (:results (func :scs (descriptor-reg)))
   (:generator 10))
+
+
+;;;; Other random VOPs.
+
+(define-vop (halt)
+  (:generator 1
+    (style-warn "halt is undefined")))
