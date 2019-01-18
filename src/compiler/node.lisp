@@ -1099,7 +1099,7 @@
                      (:constructor make-lambda)
                      (:copier nil))
   ;; list of LAMBDA-VAR descriptors for arguments
-  (vars nil :type list :read-only t)
+  (vars nil :type list)
   ;; If this function was ever a :OPTIONAL function (an entry-point
   ;; for an OPTIONAL-DISPATCH), then this is that OPTIONAL-DISPATCH.
   ;; The optional dispatch will be :DELETED if this function is no

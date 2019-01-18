@@ -2031,3 +2031,46 @@
             m))))
    ((t 1 2) 1)
    ((nil 1 2) 2)))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.1)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (declare (optimize (debug 1)))
+              (multiple-value-bind (a b)
+                  (if z
+                      10
+                      (values (sxhash m) m))
+                (declare (ignore a))
+                b)))))
+    (assert (eql (funcall f t 33) nil))
+    (assert (eql (funcall f nil 33) 33))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.2)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (declare (optimize (debug 1)))
+              (multiple-value-bind (a b c)
+                  (if z
+                      (values 10)
+                      (values (sxhash m) m))
+                (declare (ignore a))
+                (list b c))))))
+    (assert (equal (funcall f t 33) '(nil nil)))
+    (assert (equal (funcall f nil 33) '(33 nil)))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.3)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (declare (optimize (debug 1)))
+              (multiple-value-bind (a b)
+                  (if z
+                      10
+                      (values m (sxhash m)))
+                (declare (ignore b))
+                a)))))
+    (assert (eql (funcall f t 33) 10))
+    (assert (eql (funcall f nil 33) 33))
+    (assert (not (ctu:find-named-callees f)))))
+

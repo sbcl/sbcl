@@ -30,7 +30,12 @@
   `(typep (nth-value 1 (ignore-errors ,form)) ',error-subtype-spec))
 
 (defmacro assert-error (form &optional (error-subtype-spec 'error))
-  `(assert (typep (nth-value 1 (ignore-errors ,form)) ',error-subtype-spec)))
+  `(let ((result (multiple-value-list (ignore-errors ,form))))
+     (assert (typep (second result) ',error-subtype-spec)
+             ()  "~s returned ~s without signalling ~s"
+             ',form
+             result
+             ',error-subtype-spec)))
 
 (defun %assert-signal (thunk condition-type
                        expected-min-count expected-max-count)

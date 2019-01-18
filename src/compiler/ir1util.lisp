@@ -1536,17 +1536,19 @@
         (when (and (basic-combination-p dest)
                    (eq (basic-combination-fun dest) lvar)
                    (eq (basic-combination-kind dest) :local))
-          (if (mv-combination-p dest)
-              ;; Let FLUSH-DEAD-CODE deal with it
-              ;; since it's a bit tricky to delete multiple-valued
-              ;; args and existing code doesn't expect to see NIL in
-              ;; mv-combination-args.
-              (setf (block-flush-p (node-block dest)) t)
-              (let* ((args (basic-combination-args dest))
-                     (arg (elt args n)))
-                (reoptimize-lvar arg)
-                (flush-dest arg)
-                (setf (elt args n) nil)))))))
+          (cond ((mv-combination-p dest)
+                 ;; Let FLUSH-DEAD-CODE deal with it
+                 ;; since it's a bit tricky to delete multiple-valued
+                 ;; args and existing code doesn't expect to see NIL in
+                 ;; mv-combination-args.
+                 (reoptimize-node dest)
+                 (setf (block-flush-p (node-block dest)) t))
+                (t
+                 (let* ((args (basic-combination-args dest))
+                        (arg (elt args n)))
+                   (reoptimize-lvar arg)
+                   (flush-dest arg)
+                   (setf (elt args n) nil))))))))
 
   ;; The LAMBDA-VAR may still have some SETs, but this doesn't cause
   ;; too much difficulty, since we can efficiently implement
