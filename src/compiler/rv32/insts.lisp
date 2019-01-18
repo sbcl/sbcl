@@ -291,7 +291,7 @@
        (inst addi reg reg lo)))
     (fixup
      (inst lui reg value)
-     (inst addi reg value))))
+     (inst addi reg reg value))))
 
 (define-instruction-macro li (reg value)
   `(%li ,reg ,value))
