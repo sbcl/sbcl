@@ -1825,15 +1825,16 @@
            ;; If both substituted X and Y will write to the same LVAR
            ;; before C is checked.
            (or (eq (lvar-uses lvar) ref)
-               ;; Handle a trivial exception when the REF is executed
-               ;; at the very beginning, this helps with optimizing
-               ;; nested IFs.
-               ;;; Broken for now, see compiler-2.pure/substitute-single-use-lvar-multiple-uses
-               ;; (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
-               ;;        (next-node (and next-ctran
-               ;;                        (ctran-next next-ctran))))
-               ;;   (eq next-node ref))
-               )
+               ;; But if ARG is used just before the LET
+               ;; and then VAR is used immediately,
+               ;; the lvar can be substituted.
+               (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
+                      (next-node (and next-ctran
+                                      (ctran-next next-ctran))))
+                 (and (eq next-node ref)
+                      (do-uses (use arg t)
+                        (unless (almost-immediately-used-p arg use)
+                          (return))))))
            (not (block-delete-p (node-block ref)))
            ;; If the destinatation is dynamic extent, don't substitute unless
            ;; the source is as well.
@@ -1866,8 +1867,7 @@
               ;; This use has to produce a single value,
               ;; because binding a variable is how multiple values are
               ;; turned into a single value.
-              (and (eql (nth-value 1 (values-types (lvar-derived-type arg)))
-                        1)
+              (and (type-single-value-p (lvar-derived-type arg))
                    ;; Intervening nodes may produces non local exits with the same destination,
                    ;; generating unknown values or otherwise complicating stack-analyze
                    ;; Due to inlining and other substitutions
