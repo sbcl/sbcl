@@ -26,50 +26,204 @@
 ;;; pointers.
 
 (define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg)))
-  (:generator 13))
+  (:results (catch :scs (descriptor-reg))
+            (nfp :scs (descriptor-reg))
+            (nsp :scs (descriptor-reg)))
+  (:vop-var vop)
+  (:generator 13
+    (load-symbol-value catch *current-catch-block*)
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (move nfp cur-nfp)))
+    (move nsp nsp-tn)))
 
 (define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg)))
-  (:generator 10))
+  (:args (catch :scs (descriptor-reg))
+         (nfp :scs (descriptor-reg))
+         (nsp :scs (descriptor-reg)))
+  (:vop-var vop)
+  (:generator 10
+    (store-symbol-value catch *current-catch-block*)
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (move cur-nfp nfp)))
+    (move nsp-tn nsp)))
 
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
-  (:generator 1))
+  (:generator 1
+    (move res csp-tn)))
 
 (define-vop (current-binding-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
-  (:generator 1))
+  (:generator 1
+    (load-binding-stack-pointer res)))
+
+(define-vop (current-nsp)
+  (:results (res :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (move res nsp-tn)))
+
+(define-vop (set-nsp)
+  (:args (nsp :scs (any-reg descriptor-reg)))
+  (:generator 1
+    (move nsp-tn nsp)))
 
+;;;; Unwind block hackery:
+
+;;; Compute the address of the catch block from its TN, then store into the
+;;; block the current Fp, Env, Unwind-Protect, and the entry PC.
+;;;
 (define-vop (make-unwind-block)
   (:args (tn))
   (:info entry-label)
   (:results (block :scs (any-reg)))
-  (:generator 22))
+  (:generator 22
+    (style-warn "implement make-unwind-block")))
 
+;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
+;;; link the block into the Current-Catch list.
+;;;
 (define-vop (make-catch-block)
   (:args (tn) (tag :scs (any-reg descriptor-reg)))
   (:info entry-label)
   (:results (block :scs (any-reg)))
-  (:generator 44))
+  (:generator 44
+    (style-warn "implement make-catch-block")))
 
+;;; Just set the current unwind-protect to UWP.  This
+;;; instantiates an unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
-  (:args (tn))
-  (:generator 7))
+  (:args (uwp :scs (any-reg)))
+  (:generator 7
+    (store-symbol-value uwp *current-unwind-protect-block*)))
+
+(define-vop (unlink-catch-block)
+  (:temporary (:scs (any-reg)) block)
+  (:policy :fast-safe)
+  (:translate %catch-breakup)
+  (:generator 17
+    (load-symbol-value block *current-catch-block*)
+    (loadw block block catch-block-previous-catch-slot)
+    (store-symbol-value block *current-catch-block*)))
+
+(define-vop (unlink-unwind-protect)
+  (:temporary (:scs (any-reg)) block)
+  (:policy :fast-safe)
+  (:translate %unwind-protect-breakup)
+  (:generator 17
+    (load-symbol-value block *current-unwind-protect-block*)
+    (loadw block block unwind-block-uwp-slot)
+    (store-symbol-value block *current-unwind-protect-block*)))
 
+;;;; NLX entry VOPs:
+
 (define-vop (nlx-entry)
-  (:args (sp) (start) (count))
+  (:args (sp) ; Note: we can't list an sc-restriction, 'cause any load vops
+              ; would be inserted before the LRA.
+         (start)
+         (count))
   (:results (values :more t))
+  (:temporary (:scs (descriptor-reg)) move-temp)
   (:info label nvals)
-  (:generator 0))
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+    (cond ((zerop nvals))
+          ((= nvals 1)
+           (let ((no-values (gen-label)))
+             (move (tn-ref-tn values) null-tn)
+             (inst beq count zero-tn no-values)
+             (loadw (tn-ref-tn values) start)
+             (emit-label no-values)))
+          (t
+           (collect ((defaults))
+             (do ((i 0 (1+ i))
+                  (tn-ref values (tn-ref-across tn-ref)))
+                 ((null tn-ref))
+               (let ((default-lab (gen-label))
+                     (tn (tn-ref-tn tn-ref)))
+                 (defaults (cons default-lab tn))
+                 (inst subi count count (fixnumize 1))
+                 (inst beq count zero-tn default-lab)
+                 (sc-case tn
+                          ((descriptor-reg any-reg)
+                           (loadw tn start i))
+                          (control-stack
+                           (loadw move-temp start i)
+                           (store-stack-tn tn move-temp)))))
+
+             (let ((defaulting-done (gen-label)))
+
+               (emit-label defaulting-done)
+
+               (assemble (:elsewhere)
+                 (dolist (def (defaults))
+                   (emit-label (car def))
+                   (let ((tn (cdr def)))
+                     (sc-case tn
+                              ((descriptor-reg any-reg)
+                               (move tn null-tn))
+                              (control-stack
+                               (store-stack-tn tn null-tn)))))
+                 (inst b defaulting-done))))))
+    (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
   (:args (top) (start) (count))
+  ;; Again, no SC restrictions for the args, 'cause the loading would
+  ;; happen before the entry label.
   (:info label)
-  (:generator 0))
+  (:temporary (:scs (any-reg) :from (:argument 0)) dst)
+  (:temporary (:scs (any-reg) :from (:argument 1)) src)
+  (:temporary (:scs (any-reg) :from (:argument 2)) num)
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:results (new-start) (new-count))
+  (:save-p :force-to-stack)
+  (:vop-var vop)
+  (:generator 30
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)
+
+    (let ((loop (gen-label))
+          (done (gen-label)))
+
+      ;; Copy args.
+      (load-stack-tn dst top)
+      (move src start)
+      (move num count)
+
+      ;; Establish results.
+      (sc-case new-start
+        (any-reg (move new-start dst))
+        (control-stack (store-stack-tn new-start dst)))
+      (inst beq num zero-tn done)
+      (sc-case new-count
+        (any-reg (move new-count num))
+        (control-stack (store-stack-tn new-count num)))
+
+      ;; Copy stuff on stack.
+      (emit-label loop)
+      (loadw temp src)
+      (inst addi src src n-word-bytes)
+      (inst addi num num (fixnumize -1))
+      (storew temp dst)
+      (inst bne num zero-tn loop)
+      (inst addi dst dst n-word-bytes)
+
+      (emit-label done)
+      (move csp-tn dst))))
 
+;;; This VOP is just to force the TNs used in the cleanup onto the stack.
+;;;
 (define-vop (uwp-entry)
   (:info label)
+  (:save-p :force-to-stack)
   (:results (block) (start) (count))
   (:ignore block start count)
-  (:generator 0))
+  (:vop-var vop)
+  (:generator 0
+    (emit-return-pc label)
+    (note-this-location vop :non-local-entry)))

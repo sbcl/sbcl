@@ -308,3 +308,6 @@ and
          (inst ori ,flag-tn ,flag-tn ,type-code)
          (storew ,flag-tn ,result-tn 0 ,lowtag))
        ,@body)))
+
+(defun load-binding-stack-pointer (reg)
+  (store-symbol-value reg *binding-stack-pointer*))
