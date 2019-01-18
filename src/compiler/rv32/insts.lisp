@@ -281,14 +281,22 @@
   (rd (byte 5 7) :value #b00000)
   (opcode (byte 7 0) :value #b0001111))
 
+(defun coerce-signed (unsigned-value width)
+  (if (logbitp (1- width) unsigned-value)
+      (dpb unsigned-value (byte (1- width) 0) -1)
+      unsigned-value))
+
 (defun %li (reg value)
   (etypecase value
-    ((signed-byte 12)
-     (inst addi reg zero-tn value))
     ((or (signed-byte 32) (unsigned-byte 32))
-     (multiple-value-bind (hi lo) (u-and-i-inst-immediate value)
-       (inst lui reg hi)
-       (inst addi reg reg lo)))
+     (let ((value (coerce-signed value 32)))
+       (etypecase value
+         ((signed-byte 12)
+          (inst addi reg zero-tn value))
+         ((signed-byte 32)
+          (multiple-value-bind (hi lo) (u-and-i-inst-immediate value)
+            (inst lui reg hi)
+            (inst addi reg reg lo))))))
     (fixup
      (inst lui reg value)
      (inst addi reg reg value))))
