@@ -592,7 +592,7 @@
       (inst addi res res 1)
       (inst xori temp a -1)
       (inst sltu carry b temp)
-      (inst xor carry carry 1)
+      (inst xori carry carry 1)
 
       (emit-label done)
       (move result res))))
@@ -613,7 +613,7 @@
           (done (gen-label)))
 
       (inst sub res a b)
-      (inst bne c no-borrow-in)
+      (inst bne c zero-tn no-borrow-in)
 
       (inst addi res res -1)
       (inst sltu borrow b a)
@@ -621,7 +621,7 @@
 
       (emit-label no-borrow-in)
       (inst sltu borrow a b)
-      (inst xor borrow borrow 1)
+      (inst xori borrow borrow 1)
 
       (emit-label done)
       (move result res))))

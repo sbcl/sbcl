@@ -13,14 +13,16 @@
 (in-package "SB-RV32-ASM")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
+  (import '(short-immediate
+            short-immediate-fixnum) "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(sb-vm::u-and-i-inst-immediate
             sb-vm::lip-tn
             sb-vm::zero-tn
             sb-vm::null-tn)))
 
-(deftype short-immediate () `(signed-byte 12))
-(deftype short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
+(def!type short-immediate () `(signed-byte 12))
+(def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
 
 
 (define-instruction byte (segment byte)

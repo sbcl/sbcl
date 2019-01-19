@@ -67,6 +67,9 @@
       (sap-stack
        (storew x fp (tn-offset y))))))
 
+(define-move-vop move-sap-arg :move-arg
+  (descriptor-reg sap-reg) (sap-reg))
+
 ;;; Use standard MOVE-ARG + coercion to move an untagged SAP to a
 ;;; descriptor passing location.
 (define-move-vop move-arg :move-arg
