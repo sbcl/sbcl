@@ -2035,7 +2035,6 @@
 (with-test (:name :m-v-bind-multi-use-unused-values.1)
   (let ((f (checked-compile
             '(lambda (z m)
-              (declare (optimize (debug 1)))
               (multiple-value-bind (a b)
                   (if z
                       10
@@ -2049,7 +2048,6 @@
 (with-test (:name :m-v-bind-multi-use-unused-values.2)
   (let ((f (checked-compile
             '(lambda (z m)
-              (declare (optimize (debug 1)))
               (multiple-value-bind (a b c)
                   (if z
                       (values 10)
@@ -2063,7 +2061,6 @@
 (with-test (:name :m-v-bind-multi-use-unused-values.3)
   (let ((f (checked-compile
             '(lambda (z m)
-              (declare (optimize (debug 1)))
               (multiple-value-bind (a b)
                   (if z
                       10
@@ -2074,3 +2071,24 @@
     (assert (eql (funcall f nil 33) 33))
     (assert (not (ctu:find-named-callees f)))))
 
+(with-test (:name :m-v-bind-multi-use-unused-values.4)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (nth-value 1
+               (if z
+                   (funcall z)
+                   (values (sxhash m) m)))))))
+    (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
+    (assert (eql (funcall f nil 34) 34))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.5)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (nth-value 1
+               (if z
+                   (funcall z)
+                   (sxhash m)))))))
+    (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
+    (assert (eql (funcall f nil 34) nil))
+    (assert (not (ctu:find-named-callees f)))))

@@ -2173,7 +2173,11 @@
 ;;; converted to LET in general, see SUBSTITUTE-SINGLE-USE-LVAR for an
 ;;; example why.
 ;;; But removing unused variables allows some optimizations to proceed.
-(defun remove-unused-vars-in-mv-bind (uses fun)
+;;;
+;;; UNKNOWN-VALUES means some of the uses produce something other
+;;; than a single value. Don't remove any values from the VALUES
+;;; calls, but replace them with NILs in that case.
+(defun remove-unused-vars-in-mv-bind (uses fun &optional unknown-values)
   (let ((vars (lambda-vars fun)))
     (loop for use in uses
           do
@@ -2203,13 +2207,18 @@
                                            arg)
                                           (t
                                            (flush-dest arg)
-                                           nil)))
+                                           (if unknown-values
+                                               (make-nil)
+                                               nil))))
                                   collect it)))
                      (setf (combination-args use) new-args)
                      (derive-node-type use
                                        (make-values-type :required (mapcar #'lvar-type new-args))
                                        :from-scratch t)
                      (reoptimize-node use)))
+                  ;; Doesn't return a single value, nothing can be done about that
+                  ((and unknown-values
+                        (not (type-single-value-p (node-derived-type use)))))
                   ;; single-value returning forms
                   ((leaf-refs (car vars))) ;; the first value is used, nothing to do
                   (t
@@ -2217,8 +2226,9 @@
                    (let ((lvar (node-lvar use)))
                      (delete-lvar-use use)
                      (make-nil lvar))))))
-    (setf (lambda-vars fun)
-          (remove-if-not #'leaf-refs (lambda-vars fun)))))
+    (unless unknown-values
+      (setf (lambda-vars fun)
+            (remove-if-not #'leaf-refs (lambda-vars fun))))))
 
 ;;; If we see:
 ;;;    (multiple-value-bind
@@ -2229,11 +2239,16 @@
 ;;;    (let ((x xx)
 ;;;          (y yy))
 ;;;      ...)
-;;; Or (multiple-value-bind (unused y) (if (values 1 2) (values 3 4)))
-;;; to (let ((y (if (values 2) (values 4)))))
+;;; (multiple-value-bind (unused y) (if c (values 1 2) (values 3 4)))
+;;; to (let ((y (if c (values 2) (values 4)))))
 ;;;
-;;; Or if there are more than one used variable, remove the unused
-;;; ones and leave it as a mv-combination.
+;;; (multiple-value-bind (unused y z) (if c (values 1 2 3) (values 4 5)))
+;;; to
+;;; (multiple-value-bind (y z) (if c (values 2 3) (values 5 nil)))
+;;;
+;;; (multiple-value-bind (unused y) (if c unknown (values 3 4)))
+;;; to
+;;; (multiple-value-bind (unused y) (if c unknown (values nil 4)))
 (defun convert-mv-bind-to-let (call)
   (declare (type mv-combination call))
   (let* ((args (basic-combination-args call))
@@ -2243,19 +2258,31 @@
          (vars (lambda-vars fun))
          (n-used-vars (count-if #'leaf-refs vars))
          (nvars (length vars))
-         (multiple-uses (cdr uses)))
+         (multiple-uses (cdr uses))
+         unknown-values)
     (cond ((or (cdr args)
                (not
-                (loop for use in uses
-                      always (or (and (combination-p use)
+                (if multiple-uses
+                    (loop with known-values
+                          for use in uses
+                          do (if (or (and (combination-p use)
+                                          (eq (lvar-fun-name (combination-fun use))
+                                              'values))
+                                     (type-single-value-p (node-derived-type use)))
+                                 (setf known-values t)
+                                 (setf unknown-values t))
+                             ;; At least some values have to be known,
+                             ;; otherwise there's nothing to remove.
+                          finally (return known-values))
+                    (loop for use in uses
+                          always (and (combination-p use)
                                       (eq (lvar-fun-name (combination-fun use))
-                                          'values))
-                                 (and multiple-uses
-                                      (type-single-value-p (node-derived-type use)))))))
+                                          'values))))))
            nil)
           ((and multiple-uses
-                (/= nvars n-used-vars 1))
-           (remove-unused-vars-in-mv-bind uses fun))
+                (or unknown-values
+                    (/= nvars n-used-vars 1)))
+           (remove-unused-vars-in-mv-bind uses fun unknown-values))
           ((or (not multiple-uses)
                (= n-used-vars 1))
            (with-ir1-environment-from-node call
