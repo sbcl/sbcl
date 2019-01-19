@@ -19,6 +19,9 @@
             sb-vm::zero-tn
             sb-vm::null-tn)))
 
+(deftype short-immediate () `(signed-byte 12))
+(deftype short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
+
 
 (define-instruction byte (segment byte)
   (:emitter
@@ -51,7 +54,7 @@
   (byte 12 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
 (defun emit-i-inst (segment imm rs1 funct3 rd opcode)
   (etypecase imm
-    ((signed-byte 12)
+    (short-immediate
      (%emit-i-inst segment imm (tn-offset rs1) funct3 (tn-offset rd) opcode))
     (fixup
      (note-fixup segment :i-type imm)
@@ -182,7 +185,7 @@
    (lambda (segment chooser posn delta-if-after)
      (declare (ignore chooser))
      (typecase (branch/jal-offset target 1 posn delta-if-after)
-       ((signed-byte 12)
+       (short-immediate
         (emit-back-patch
          segment 4
          (lambda (segment posn)
@@ -291,7 +294,7 @@
     ((or (signed-byte 32) (unsigned-byte 32))
      (let ((value (coerce-signed value 32)))
        (etypecase value
-         ((signed-byte 12)
+         (short-immediate
           (inst addi reg zero-tn value))
          ((signed-byte 32)
           (multiple-value-bind (hi lo) (u-and-i-inst-immediate value)

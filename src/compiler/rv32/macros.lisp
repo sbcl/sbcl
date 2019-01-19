@@ -21,9 +21,6 @@
        ;; annoying hack with the null-tn, but it has to be done.
        (inst addi ,n-dst ,n-src 0))))
 
-(defun encodable-immediate-p (x)
-  (typep x '(signed-byte 12)))
-
 (defmacro def-mem-op (op inst shift load)
   `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
      `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag))))
@@ -279,13 +276,14 @@ and
   ;; Normal allocation to the heap.
   (load-symbol-value flag-tn *allocation-pointer*)
   (inst addi result-tn flag-tn lowtag)
-  (cond ((encodable-immediate-p size)
-         (inst addi flag-tn flag-tn size))
-        ((integerp size)
-         (inst li temp-tn size)
-         (inst add flag-tn flag-tn temp-tn))
-        (t
-         (inst add flag-tn flag-tn size)))
+  (etypecase size
+    (short-immediate
+     (inst addi flag-tn flag-tn size))
+    (integer
+     (inst li temp-tn size)
+     (inst add flag-tn flag-tn temp-tn))
+    (tn
+     (inst add flag-tn flag-tn size)))
   (store-symbol-value flag-tn *allocation-pointer*))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size

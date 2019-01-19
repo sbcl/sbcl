@@ -116,7 +116,7 @@
   (:translate sap+)
   (:args (ptr :scs (sap-reg)))
   (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 12)))
+  (:arg-types system-area-pointer (:constant short-immediate))
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:policy :fast-safe)
