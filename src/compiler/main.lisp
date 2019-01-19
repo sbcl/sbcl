@@ -705,6 +705,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                       (leaf-refs fun))
          (return))))))
 
+(defvar *compile-component-hook* nil)
+
 (defun compile-component (component)
 
   ;; miscellaneous sanity checks
@@ -764,10 +766,11 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (unless (eq (block-next (component-head component))
                 (component-tail component))
-      (%compile-component component)))
+      (%compile-component component))
+    (when *compile-component-hook*
+      (funcall *compile-component-hook* component)))
 
   (clear-constant-info)
-
   (values))
 
 ;;;; clearing global data structures
