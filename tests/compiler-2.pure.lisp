@@ -2125,3 +2125,10 @@
    (((make-array 2 :element-type '(unsigned-byte 32)))
     '(unsigned-byte 32) :test (lambda (x y)
                                 (equal (array-element-type (car x)) (car y))))))
+
+(with-test (:name :about-to-modify-symbol-value-relax-fun-type)
+  (let* ((compiled-lambda (compile nil '(lambda (&rest x) x 'hi)))
+         (sb-c::*compiler-error-bailout*
+          (lambda (&optional c) (error c))))
+    (declare (notinline set))
+    (set 'sb-c::*compiler-error-bailout* compiled-lambda)))

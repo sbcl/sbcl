@@ -551,7 +551,7 @@ distinct from the global value. Can also be SETF."
           (multiple-value-bind (type declaredp) (info :variable :type symbol)
             ;; If globaldb returned the default of *UNIVERSAL-TYPE*,
             ;; don't bother with a type test.
-            (when (and declaredp (not (%%typep new-value type nil)))
+            (when (and declaredp (not (%%typep new-value type 'functionp)))
               (let ((spec (type-specifier type)))
                 (error 'simple-type-error
                        :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"
