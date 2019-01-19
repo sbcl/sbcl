@@ -442,7 +442,9 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "+CODE-COVERAGE-UNMARKED+"
                ;; for SB-INTROSPECT
                "MAP-PACKED-XREF-DATA" "MAP-SIMPLE-FUNS"
-               ))
+
+               "DO-BLOCKS" "DO-BLOCKS-BACKWARDS"
+               "DO-NODES" "DO-NODES-BACKWARDS"))
 
    #s(sb-cold:package-data
       :name "SB-DEBUG"
