@@ -2076,7 +2076,7 @@
             '(lambda (z m)
               (nth-value 1
                (if z
-                   (funcall z)
+                   (funcall (the function z))
                    (values (sxhash m) m)))))))
     (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
     (assert (eql (funcall f nil 34) 34))
@@ -2087,7 +2087,7 @@
             '(lambda (z m)
               (nth-value 1
                (if z
-                   (funcall z)
+                   (funcall (the function z))
                    (sxhash m)))))))
     (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
     (assert (eql (funcall f nil 34) nil))
