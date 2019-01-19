@@ -227,8 +227,8 @@ initializes the object."
 
 ;;;; indexed references
 
-(deftype load/store-index (scale lowtag min-offset
-                                 &optional (max-offset min-offset))
+(def!type load/store-index (scale lowtag min-offset
+                                  &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 14)
                              (* min-offset n-word-bytes)
                              (- lowtag))

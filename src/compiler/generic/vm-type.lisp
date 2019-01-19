@@ -351,16 +351,6 @@
     (or (fixnump where) ; thread slots
         (eq where :always-thread-local)))) ; everything else
 
-(sb-xc:deftype load/store-index (scale lowtag min-offset
-                                 &optional (max-offset min-offset))
-  `(integer ,(- (truncate (+ (ash 1 16)
-                             (* min-offset sb-vm:n-word-bytes)
-                             (- lowtag))
-                          scale))
-            ,(truncate (- (+ (1- (ash 1 16)) lowtag)
-                          (* max-offset sb-vm:n-word-bytes))
-                       scale)))
-
 #+(or x86 x86-64)
 (defun sb-vm::displacement-bounds (lowtag element-size data-offset)
   (let* (;; The minimum immediate offset in a memory-referencing instruction.

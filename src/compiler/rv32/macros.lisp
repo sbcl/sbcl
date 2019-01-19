@@ -128,7 +128,7 @@ and
 -2^11 ≤ offset*n-word-bytes - lowtag + index*scale ≤ 2^11-1
 -2^11 + lowtag -offset*n-word-bytes ≤ index*scale ≤ 2^11-1 + lowtag - offset*n-word-bytes
 |#
-(deftype load/store-index (scale lowtag offset)
+(def!type load/store-index (scale lowtag offset)
   (let* ((encodable (list (- (ash 1 11)) (1- (ash 1 11))))
          (add-lowtag (mapcar (lambda (x) (+ x lowtag)) encodable))
          (sub-offset (mapcar (lambda (x) (- x (* offset n-word-bytes))) add-lowtag))

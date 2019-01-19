@@ -162,7 +162,7 @@
           (t
            (inst addi header header (+ (ash -2 n-widetag-bits) type))
            (inst srli bytes bytes n-lowtag-bits)
-           (inst sll bytes bytes n-lowtag-bits)))
+           (inst slli bytes bytes n-lowtag-bits)))
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag
                   :flag-tn pa-flag
