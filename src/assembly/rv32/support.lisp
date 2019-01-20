@@ -12,6 +12,7 @@
 (in-package "SB-VM")
 
 (defun invoke-asm-routine (routine tailp)
+  (declare (ignore tailp))
   (inst j (make-fixup routine :assembly-routine) :fixup))
 
 (defun generate-call-sequence (name style vop options)

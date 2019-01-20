@@ -13,20 +13,18 @@
 
 ;;; Instruction-like macros.
 
-(defmacro move (dst src &optional (always-emit-code-p nil))
+(defmacro move (dst src)
   "Move SRC into DST (unless they are location=."
   (once-only ((n-dst dst)
               (n-src src))
     `(unless (location= ,n-dst ,n-src)
-       ;; annoying hack with the null-tn, but it has to be done.
        (inst addi ,n-dst ,n-src 0))))
 
-(defmacro def-mem-op (op inst shift load)
-  `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
-     `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag))))
-;;;
-(def-mem-op loadw lw word-shift t)
-(def-mem-op storew sw word-shift nil)
+(macrolet ((def-mem-op (op inst shift)
+             `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
+                `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
+  (def-mem-op loadw lw word-shift)
+  (def-mem-op storew sw word-shift))
 
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
