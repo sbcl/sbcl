@@ -100,8 +100,12 @@
 ;;; and 4-bit vectors.
 (macrolet
     ((def-small-data-vector-frobs (type bits)
-       (let* ((refname (symbolicate "DATA-VECTOR-REF/" type))
-              (setname (symbolicate "DATA-VECTOR-SET/" type)))
+       (let* ((elements-per-word (floor n-word-bits bits))
+              (bit-shift (1- (integer-length elements-per-word)))
+              (refname (symbolicate "DATA-VECTOR-REF/" type))
+              (refnamec (symbolicate refname "-C"))
+              (setname (symbolicate "DATA-VECTOR-SET/" type))
+              (setnamec (symbolicate setname "-C")))
          `(progn
             (define-vop (,refname)
               (:note "inline array access")
@@ -112,18 +116,99 @@
               (:arg-types ,type positive-fixnum)
               (:results (value :scs (any-reg)))
               (:result-types positive-fixnum)
-              (:generator 20))
+              (:temporary (:scs (interior-reg)) lip)
+              (:temporary (:scs (non-descriptor-reg) :to (:result 0)) temp result)
+              (:generator 20
+                ;; Compute the offset for the word we're interested in.
+                (inst srli temp index ,bit-shift)
+                ;; Load the word in question.
+                (inst slli temp temp n-fixnum-tag-bits)
+                (inst add lip object temp)
+                (inst lw result lip
+                      (- (* vector-data-offset n-word-bytes)
+                         other-pointer-lowtag))
+                ;; Compute the position of the bitfield we need.
+                (inst andi temp index ,(1- elements-per-word))
+                ,@(unless (= bits 1)
+                    `((inst slli temp temp ,(1- (integer-length bits)))))
+                ;; Shift the field we need to the low bits of RESULT.
+                (inst srl result result temp)
+                ;; Mask out the field we're interested in.
+                (inst andi result result ,(1- (ash 1 bits)))
+                ;; And fixnum-tag the result.
+                (inst slli value result n-fixnum-tag-bits)))
+            (define-vop (,(symbolicate "DATA-VECTOR-REF-C/" type))
+              (:translate data-vector-ref)
+              (:policy :fast-safe)
+              (:args (object :scs (descriptor-reg)))
+              (:arg-types ,type
+                          (:constant
+                           (integer 0
+                                    ,(1- (* (1+ (- (floor (+ #x7fff
+                                                             other-pointer-lowtag)
+                                                          n-word-bytes)
+                                                   vector-data-offset))
+                                            elements-per-word)))))
+              (:info index)
+              (:results (result :scs (unsigned-reg)))
+              (:result-types positive-fixnum)
+              (:generator 15
+                (multiple-value-bind (word extra) (floor index ,elements-per-word)
+                  (loadw result object (+ word vector-data-offset)
+                         other-pointer-lowtag)
+                  (unless (zerop extra)
+                    (inst srli result result (* extra ,bits)))
+                  (unless (= extra ,(1- elements-per-word))
+                    (inst andi result result ,(1- (ash 1 bits)))))))
             (define-vop (,setname)
               (:note "inline array store")
               (:translate data-vector-set)
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg))
-                     (index :scs (unsigned-reg))
-                     (value :scs (unsigned-reg)))
+                     (index :scs (unsigned-reg) :target shift)
+                     (value :scs (unsigned-reg immediate) :target result))
               (:arg-types ,type positive-fixnum positive-fixnum)
               (:results (result :scs (unsigned-reg)))
               (:result-types positive-fixnum)
-              (:generator 25))))))
+              (:temporary (:scs (interior-reg)) lip)
+              (:temporary (:scs (non-descriptor-reg)) temp old)
+              (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) shift)
+              (:generator 25
+                ;; Compute the offset for the word we're interested in.
+                (inst srli temp index ,bit-shift)
+                ;; Load the word in question.
+                (inst add lip object temp)
+                (inst lw old lip
+                      (- (* vector-data-offset n-word-bytes)
+                         other-pointer-lowtag))
+                ;; Compute the position of the bitfield we need.
+                (inst andi shift index ,(1- elements-per-word))
+                ,@(unless (= bits 1)
+                    `((inst slli shift shift ,(1- (integer-length bits)))))
+                ;; Clear the target bitfield.
+                (unless (and (sc-is value immediate)
+                             (= (tn-value value) ,(1- (ash 1 bits))))
+                  (inst li temp ,(1- (ash 1 bits)))
+                  (inst sll temp temp shift)
+                  (inst xori temp temp -1)
+                  (inst and old old temp))
+                ;; LOGIOR in the new value (shifted appropriatly).
+                (sc-case value
+                  (immediate
+                   (inst li temp (logand (tn-value value) ,(1- (ash 1 bits)))))
+                  (unsigned-reg
+                   (inst andi temp value ,(1- (ash 1 bits)))))
+                (inst sll temp temp shift)
+                (inst or old old temp)
+                ;; Write the altered word back to the array.
+                (inst sw old lip
+                      (- (* vector-data-offset n-word-bytes)
+                         other-pointer-lowtag))
+                (sc-case value
+                  (immediate
+                   (inst li result (tn-value value)))
+                  (unsigned-reg
+                   (move result value)))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))

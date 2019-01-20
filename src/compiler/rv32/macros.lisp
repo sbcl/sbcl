@@ -198,9 +198,17 @@ and
        (:policy :fast-safe)
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)))
        (:arg-types ,type positive-fixnum)
+       (:temporary (:scs (interior-reg)) lip)
        (:results (value :scs ,scs))
        (:result-types ,eltype)
-       (:generator 5))
+       (:generator 5
+         (inst add lip object index)
+         ,@(when (= size 1)
+             '((inst add lip lip index)))
+         (inst ,(ecase size
+                  (1 (if signed 'lb 'lbu))
+                  (2 (if signed 'lh 'lhu)))
+               value lip (- (* ,offset n-word-bytes) ,lowtag))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -211,7 +219,12 @@ and
          (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
-       (:generator 4))))
+       (:generator 4
+         (inst ,(ecase size
+                  (1 (if signed 'lb 'lbu))
+                  (2 (if signed 'lh 'lhu)))
+               value object
+               (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))))))
 
 (defmacro define-partial-setter (name type size offset lowtag scs eltype &optional translate)
   `(progn
@@ -221,8 +234,15 @@ and
        (:args (object :scs (descriptor-reg)) (index :scs (any-reg)) (value :scs ,scs))
        (:arg-types ,type positive-fixnum ,eltype)
        (:results (result :scs ,scs))
+       (:temporary (:scs (interior-reg)) lip)
        (:result-types ,eltype)
-       (:generator 5))
+       (:generator 5
+         (inst add lip object index)
+         ,@(when (= size 1)
+             '((inst add lip lip index)))
+         (inst ,(ecase size (1 'sb) (2 'sh))
+               value lip (- (* ,offset n-word-bytes) ,lowtag))
+         (move result value)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
            `((:translate ,translate)))
@@ -235,7 +255,11 @@ and
          ,eltype)
        (:results (result :scs ,scs))
        (:result-types ,eltype)
-       (:generator 4))))
+       (:generator 4
+         (inst ,(ecase size (1 'sb) (2 'sh))
+               value object
+               (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))
+         (move result value)))))
 
 
 ;;;; Stack TN's
