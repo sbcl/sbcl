@@ -168,7 +168,7 @@
                                (move tn null-tn))
                               (control-stack
                                (store-stack-tn tn null-tn)))))
-                 (inst b defaulting-done))))))
+                 (inst j defaulting-done))))))
     (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
