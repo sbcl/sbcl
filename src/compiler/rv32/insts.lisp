@@ -38,7 +38,7 @@
   (rs1 :field (byte 5 15))
   (funct3 :field (byte 3 12))
   (rd :field (byte 5 7))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-r-inst 32
   (byte 7 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
@@ -50,7 +50,7 @@
   (rs1 :field (byte 5 15))
   (funct3 :field (byte 3 12))
   (rd :field (byte 5 7))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-i-inst 32
   (byte 12 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
@@ -67,7 +67,7 @@
   (rs2 :field (byte 5 20))
   (rs1 :field (byte 5 15))
   (funct3 :field (byte 3 12))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-s-inst 32
   (byte 7 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
@@ -79,7 +79,7 @@
   (rs2 :field (byte 5 20))
   (rs1 :field (byte 5 15))
   (funct3 :field (byte 3 12))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-b-inst 32
   (byte 1 31) (byte 6 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 4 8) (byte 1 7) (byte 7 0))
@@ -92,7 +92,7 @@
 (define-instruction-format (u 32)
   (imm :field (byte 20 12))
   (rd :field (byte 5 7))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-u-inst 32
   (byte 20 12) (byte 5 7) (byte 7 0))
@@ -107,7 +107,7 @@
 (define-instruction-format (j 32)
   (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)))
   (rd :field (byte 5 7))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-j-inst 32
   (byte 1 31) (byte 10 21) (byte 1 20) (byte 8 12) (byte 5 7) (byte 7 0))
@@ -262,6 +262,8 @@
   `(define-instruction ,name (segment rd rs1 rs2)
      (:printer r ((funct7 ,funct7) (funct3 ,funct3) (opcode ,opcode)))
      (:emitter
+      (when (integerp rs2)
+        (error "~a" ',name))
       (emit-r-inst segment ,funct7 rs2 rs1 ,funct3 rd ,opcode))))
 
 (macrolet ((define-rv32i-arith-instruction (name funct7 funct3)
@@ -278,13 +280,13 @@
   (define-rv32i-arith-instruction and #b0000000 #b111))
 
 (define-instruction-format (fence 32)
-  (funct4 (byte 4 28) :value #b0000)
-  (pred (byte 4 24))
-  (succ (byte 4 20))
-  (rs1 (byte 5 15) :value #b00000)
-  (funct3 (byte 3 12))
-  (rd (byte 5 7) :value #b00000)
-  (opcode (byte 7 0) :value #b0001111))
+  (funct4 :field (byte 4 28) :value #b0000)
+  (pred :field (byte 4 24))
+  (succ :field (byte 4 20))
+  (rs1 :field (byte 5 15) :value #b00000)
+  (funct3 :field (byte 3 12))
+  (rd :field (byte 5 7) :value #b00000)
+  (opcode :field (byte 7 0) :value #b0001111))
 
 (defun coerce-signed (unsigned-value width)
   (if (logbitp (1- width) unsigned-value)
@@ -370,7 +372,7 @@
   (rs1 :field (byte 5 15))
   (rm :field (byte 3 12))
   (rd :field (byte 5 7))
-  (opcode (byte 7 0)))
+  (opcode :field (byte 7 0)))
 
 (defun ensure-tn-offset (imm/tn)
   (etypecase imm/tn
