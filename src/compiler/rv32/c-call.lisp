@@ -11,21 +11,182 @@
 
 (in-package "SB-VM")
 
+
+(defconstant-eqx +foreign-register-arg-offsets+
+    '(#.nl0-offset #.nl1-offset #.nl2-offset #.nl3-offset)
+  #'equal)
+
+(defconstant +number-stack-alignment-mask+ (1- (* n-word-bytes 2)))
+(defconstant +max-register-args+ (length +foreign-register-arg-offsets+))
+
+(defstruct arg-state
+  (num-register-args 0)
+  (stack-frame-size 0)
+  (fp-registers 0))
+
+(defstruct (result-state (:copier nil))
+  (num-results 0))
+
+(defun result-reg-offset (slot)
+  (ecase slot
+    (0 nl0-offset)
+    (1 nl1-offset)))
+
+(defun register-args-offset (index)
+  (elt +foreign-register-arg-offsets+ index))
+
+(defun int-arg (state prim-type reg-sc stack-sc)
+  (let ((reg-args (arg-state-num-register-args state)))
+    (cond ((< reg-args +max-register-args+)
+           (setf (arg-state-num-register-args state) (1+ reg-args))
+           (make-wired-tn* prim-type reg-sc (register-args-offset reg-args)))
+          (t
+           (let ((frame-size (arg-state-stack-frame-size state)))
+             (setf (arg-state-stack-frame-size state) (1+ frame-size))
+             (make-wired-tn* prim-type stack-sc frame-size))))))
+
+(defun float-arg (state prim-type reg-sc stack-sc)
+  (let ((reg-args (arg-state-fp-registers state)))
+    (cond ((< reg-args +max-register-args+)
+           (setf (arg-state-fp-registers state) (1+ reg-args))
+           (make-wired-tn* prim-type reg-sc reg-args))
+          (t
+           (let ((frame-size (arg-state-stack-frame-size state)))
+             (setf (arg-state-stack-frame-size state) (1+ frame-size))
+             (make-wired-tn* prim-type stack-sc frame-size))))))
+
+(define-alien-type-method (integer :arg-tn) (type state)
+  (if (alien-integer-type-signed type)
+      (int-arg state 'signed-byte-32 signed-reg-sc-number signed-stack-sc-number)
+      (int-arg state 'unsigned-byte-32 unsigned-reg-sc-number unsigned-stack-sc-number)))
+
+(define-alien-type-method (system-area-pointer :arg-tn) (type state)
+  (declare (ignore type))
+  (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number))
+
+(define-alien-type-method (single-float :arg-tn) (type state)
+  (declare (ignore type))
+  (float-arg state 'single-float single-reg-sc-number single-stack-sc-number))
+
+(define-alien-type-method (double-float :arg-tn) (type state)
+  (declare (ignore type))
+  (float-arg state 'double-float double-reg-sc-number double-stack-sc-number))
+
+(define-alien-type-method (integer :result-tn) (type state)
+  (let ((num-results (result-state-num-results state)))
+    (setf (result-state-num-results state) (1+ num-results))
+    (multiple-value-bind (ptype reg-sc)
+        (if (alien-integer-type-signed type)
+            (values 'signed-byte-32 signed-reg-sc-number)
+            (values 'unsigned-byte-32 unsigned-reg-sc-number))
+      (make-wired-tn* ptype reg-sc
+                      (result-reg-offset num-results)))))
+
+(define-alien-type-method (system-area-pointer :result-tn) (type state)
+  (declare (ignore type state))
+  (make-wired-tn* 'system-area-pointer sap-reg-sc-number (result-reg-offset 0)))
+
+(define-alien-type-method (single-float :result-tn) (type state)
+  (declare (ignore type state))
+  (make-wired-tn* 'single-float single-reg-sc-number 0))
+
+(define-alien-type-method (double-float :result-tn) (type state)
+  (declare (ignore type state))
+  (make-wired-tn* 'double-float double-reg-sc-number 0))
+
+(define-alien-type-method (values :result-tn) (type state)
+  (let ((values (alien-values-type-values type)))
+    (when (> (length values) 2)
+      (error "Too many result values from c-call."))
+    (mapcar (lambda (type)
+              (invoke-alien-type-method :result-tn type state))
+            values)))
+
+(defun make-call-out-tns (type)
+  (let ((arg-state (make-arg-state)))
+    (collect ((arg-tns))
+      (dolist (arg-type (alien-fun-type-arg-types type))
+        (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
+      (values (make-wired-tn* 'positive-fixnum any-reg-sc-number nsp-offset)
+              (* (max (arg-state-stack-frame-size arg-state) 4) n-word-bytes)
+              (arg-tns)
+              (invoke-alien-type-method :result-tn
+                                        (alien-fun-type-result-type type)
+                                        (make-result-state))))))
+
+(define-vop (foreign-symbol-sap)
+  (:translate foreign-symbol-sap)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:generator 2
+    (inst li res (make-fixup foreign-symbol :foreign))))
+
+#+linkage-table
+(define-vop (foreign-symbol-dataref-sap)
+  (:translate foreign-symbol-dataref-sap)
+  (:policy :fast-safe)
+  (:args)
+  (:arg-types (:constant simple-string))
+  (:info foreign-symbol)
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:temporary (:scs (non-descriptor-reg)) addr)
+  (:generator 2
+    (inst li addr (make-fixup foreign-symbol :foreign-dataref))
+    (loadw res addr)))
+
 (define-vop (call-out)
-  (:args (function :scs (sap-reg)) (args :more t))
+  (:args (function :scs (sap-reg))
+         (args :more t))
   (:results (results :more t))
   (:ignore args results)
   (:save-p t)
-  (:generator 0))
+  (:temporary (:sc any-reg :offset cfunc-offset
+                   :from (:argument 0) :to (:result 0)) cfunc)
+  (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+  (:vop-var vop)
+  (:generator 0
+    (let ((cur-nfp (current-nfp-tn vop)))
+      (when cur-nfp
+        (store-stack-tn nfp-save cur-nfp))
+      (inst j (make-fixup "call_into_c" :foreign) :fixup)
+      (move cfunc function)
+      (when cur-nfp
+        (load-stack-tn cur-nfp nfp-save)))))
 
 (define-vop (alloc-number-stack-space)
   (:info amount)
   (:result-types system-area-pointer)
   (:results (result :scs (sap-reg any-reg)))
-  (:generator 0))
+  (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
+  (:generator 0
+    (unless (zerop amount)
+      (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
+                             +number-stack-alignment-mask+)))
+        (cond ((< delta (expt 2 12))
+               (inst subi nsp-tn nsp-tn delta))
+              (t
+               (inst li temp delta)
+               (inst sub nsp-tn nsp-tn delta)))))
+    (move result nsp-tn)))
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
-  (:generator 0))
+  (:policy :fast-safe)
+  (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
+  (:generator 0
+    (unless (zerop amount)
+      (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
+                             +number-stack-alignment-mask+)))
+        (typecase delta
+          (short-immediate
+           (inst addi nsp-tn nsp-tn delta))
+          (t
+           (inst li temp delta)
+           (inst add nsp-tn nsp-tn temp)))))))
 
-(defun make-call-out-tns (type))
+;;; Callback
