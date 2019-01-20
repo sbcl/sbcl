@@ -448,7 +448,7 @@
 (macrolet ((def (name op)
              `(define-instruction-macro ,name (format dst src)
                 `(inst ,',op ,format ,dst ,src ,src))))
-  (def fmv fsgnj)
+  (def fmove fsgnj)
   (def fneg fsgnjn)
   (def fabs fsgnjx))
 

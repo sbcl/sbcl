@@ -142,8 +142,8 @@
                      :save-p t)
  (complex-double-stack non-descriptor-stack :element-size 4)
  (complex-double-reg float-registers
-                     :locations #.(loop for i below 32 by 4 collect i)
-                     :element-size 4
+                     :locations #.(loop for i below 32 by 2 collect i)
+                     :element-size 2
                      :save-p t
                      :alternate-scs (complex-double-stack))
 
