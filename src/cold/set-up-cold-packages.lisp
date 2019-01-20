@@ -122,9 +122,9 @@
               (when (string= (car entry) 'print-type)
                 (let ((symbol (intern name (cddr entry))))
                   ;; The parallelized build performs this twice: once from
-                  ;;interpreted load, again from compilation.
+                  ;; interpreted load, again from compilation.
                   ;; So don't wrap more than once.
-                  (unless (sb-kernel:closurep (fdefinition symbol))
+                  (unless (sb-impl::closurep (fdefinition symbol))
                     (setf (fdefinition symbol) combined))))))
           (dolist (entry *host-format-functions*)
             (when (string= (car entry) name)
