@@ -323,8 +323,7 @@
       (cast (setf (cast-value dest) new)))
 
     (setf (lvar-dest old) nil)
-    (setf (lvar-dest new) dest)
-    (flush-lvar-externally-checkable-type new))
+    (setf (lvar-dest new) dest))
   (values))
 
 ;;; Replace all uses of OLD with uses of NEW, where NEW has an
@@ -1844,7 +1843,6 @@
     (when (lvar-dynamic-extent lvar)
       (note-no-stack-allocation lvar :flush t))
     (setf (lvar-dest lvar) nil)
-    (flush-lvar-externally-checkable-type lvar)
     (do-uses (use lvar)
       (flush-node use))
     (setf (lvar-uses lvar) nil))
@@ -2227,8 +2225,7 @@ is :ANY, the function name is not checked."
                (before-args (subseq outside-args 0 arg-position))
                (after-args (subseq outside-args (1+ arg-position))))
           (dolist (arg inside-args)
-            (setf (lvar-dest arg) outside)
-            (flush-lvar-externally-checkable-type arg))
+            (setf (lvar-dest arg) outside))
           (setf (combination-args inside) nil)
           (setf (combination-args outside)
                 (append before-args inside-args after-args))

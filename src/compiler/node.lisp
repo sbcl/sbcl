@@ -87,9 +87,6 @@
   ;; the optimizer for this node type doesn't care, it can elect not
   ;; to clear this flag.
   (reoptimize t :type boolean)
-  ;; Cached type which is checked by DEST. If NIL, then this must be
-  ;; recomputed: see LVAR-EXTERNALLY-CHECKABLE-TYPE.
-  (%externally-checkable-type nil :type (or null ctype))
   ;; if the LVAR value is DYNAMIC-EXTENT, CLEANUP protecting it.
   (dynamic-extent nil :type (or null cleanup))
   ;; something or other that the back end annotates this lvar with
@@ -170,11 +167,6 @@
   (or (lvar-%derived-type lvar)
       (setf (lvar-%derived-type lvar)
             (%lvar-derived-type lvar))))
-
-#!-sb-fluid(declaim (inline flush-lvar-externally-checkable-type))
-(defun flush-lvar-externally-checkable-type (lvar)
-  (declare (type lvar lvar))
-  (setf (lvar-%externally-checkable-type lvar) nil))
 
 (def!struct (node (:constructor nil)
                   (:include sset-element

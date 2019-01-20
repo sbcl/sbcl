@@ -224,38 +224,25 @@
 
 ;;; If LVAR is an argument of a function, return a type which the
 ;;; function checks LVAR for.
-#!-sb-fluid (declaim (inline lvar-externally-checkable-type))
 (defun lvar-externally-checkable-type (lvar)
-  (or (lvar-%externally-checkable-type lvar)
-      (%lvar-%externally-checkable-type lvar)))
-(defun %lvar-%externally-checkable-type (lvar)
   (declare (type lvar lvar))
   (let ((dest (lvar-dest lvar)))
-    (if (not (and dest (combination-p dest)))
-        ;; TODO: MV-COMBINATION
-        (setf (lvar-%externally-checkable-type lvar) *wild-type*)
-        (let* ((fun (combination-fun dest))
-               (args (combination-args dest))
-               (fun-type (lvar-type fun)))
-          (setf (lvar-%externally-checkable-type fun) *wild-type*)
-          (if (or (not (call-full-like-p dest))
-                  (not (fun-type-p fun-type))
-                  ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
-                  (fun-type-wild-args fun-type))
-              (dolist (arg args)
-                (when arg
-                  (setf (lvar-%externally-checkable-type arg)
-                        *wild-type*)))
-              (map-combination-args-and-types
-               (lambda (arg type &rest args)
-                 (declare (ignore args))
-                 (setf (lvar-%externally-checkable-type arg)
-                       (acond ((lvar-%externally-checkable-type arg)
-                               (values-type-intersection
-                                it (coerce-to-values type)))
-                              (t (coerce-to-values type)))))
-               dest)))))
-  (or (lvar-%externally-checkable-type lvar) *wild-type*))
+    (when (combination-p dest)
+      ;; TODO: MV-COMBINATION
+      (let* ((fun (combination-fun dest))
+             (fun-type (lvar-type fun)))
+        (when (and (call-full-like-p dest)
+                   (fun-type-p fun-type)
+                   ;; FUN-TYPE might be (AND FUNCTION (SATISFIES ...)).
+                   (not (fun-type-wild-args fun-type)))
+          (map-combination-args-and-types
+           (lambda (arg type &rest args)
+             (declare (ignore args))
+             (when (eq arg lvar)
+               (return-from lvar-externally-checkable-type
+                 (coerce-to-values type))))
+           dest))))
+    *wild-type*))
 
 ;;;; interface routines used by optimizers
 
@@ -2365,8 +2352,7 @@
       (setf (combination-kind node) :full)
       (let ((args (combination-args use)))
         (dolist (arg args)
-          (setf (lvar-dest arg) node)
-          (flush-lvar-externally-checkable-type arg))
+          (setf (lvar-dest arg) node))
         (setf (combination-args use) nil)
         (flush-dest list)
         (flush-combination use)
