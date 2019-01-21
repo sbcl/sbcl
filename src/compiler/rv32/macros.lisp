@@ -330,4 +330,4 @@ and
        ,@body)))
 
 (defun load-binding-stack-pointer (reg)
-  (store-symbol-value reg *binding-stack-pointer*))
+  (load-symbol-value reg *binding-stack-pointer*))
