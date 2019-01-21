@@ -138,30 +138,102 @@
     (inst sub res ptr1 ptr2)))
 
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
+(defun sap-ref (result sap offset signed size)
+  (ecase size
+    (:byte
+     (if signed
+         (inst lb result sap offset)
+         (inst lbu result sap offset)))
+    (:short
+     (if signed
+         (inst lh result sap offset)
+         (inst lhu result sap offset)))
+    (:word
+     (inst lw result sap offset))
+    #+64-bit
+    (:dword
+     (inst ld result sap offset))
+    (:single
+     (inst fload :single result sap offset))
+    (:double
+     (inst fload :double result sap offset))))
+
+(defun sap-set (result value sap offset size)
+  (ecase size
+    (:byte
+     (inst sb value sap offset)
+     (move result value))
+    (:short
+     (inst sh value sap offset)
+     (move result value))
+    (:word
+     (inst sw value sap offset)
+     (move result value))
+    #+64-bit
+    (:dword
+     (inst sd value sap offset)
+     (move result value))
+    (:single
+     (inst fstore :single result sap offset)
+     (inst fmove :single result value))
+    (:double
+     (inst fstore :double result sap offset)
+     (inst fmove :double result value))))
+
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &key signed)
-             `(progn
-                (define-vop (,ref-name)
-                  (:translate ,ref-name)
-                  (:policy :fast-safe)
-                  (:args (sap :scs (sap-reg))
-                         (offset :scs (signed-reg)))
-                  (:arg-types system-area-pointer signed-num)
-                  (:results (result :scs (,sc)))
-                  (:result-types ,type)
-                  (:generator 5
-                    (style-warn "~a unimplemented" ',ref-name)))
-                (define-vop (,set-name)
-                  (:translate ,set-name)
-                  (:policy :fast-safe)
-                  (:args (sap :scs (sap-reg))
-                         (offset :scs (signed-reg))
-                         (value :scs (,sc) :target result))
-                  (:arg-types system-area-pointer signed-num ,type)
-                  (:results (result :scs (,sc)))
-                  (:result-types ,type)
-                  (:generator 5
-                    (style-warn "~a unimplemented" ',set-name))))))
+             (let ((ref-name-c (symbolicate ref-name "-C"))
+                   (set-name-c (symbolicate set-name "-C")))
+               `(progn
+                  (define-vop (,ref-name)
+                    (:translate ,ref-name)
+                    (:policy :fast-safe)
+                    (:args (object :scs (sap-reg) :target sap)
+                           (offset :scs (signed-reg)))
+                    (:arg-types system-area-pointer signed-num)
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:temporary (:scs (sap-reg) :from (:argument 0)) sap)
+                    (:generator 5
+                      (inst add sap object offset)
+                      (sap-ref result sap 0 ,signed ,size)))
+                  (define-vop (,ref-name-c)
+                    (:translate ,ref-name)
+                    (:policy :fast-safe)
+                    (:args (sap :scs (sap-reg)))
+                    (:arg-types system-area-pointer
+                                (:constant short-immediate))
+                    (:info offset)
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:generator 4
+                      (sap-ref result sap offset ,signed ,size)))
+                  (define-vop (,set-name)
+                    (:translate ,set-name)
+                    (:policy :fast-safe)
+                    (:args (object :scs (sap-reg) :target sap)
+                           (offset :scs (signed-reg))
+                           (value :scs (,sc) :target result))
+                    (:arg-types system-area-pointer signed-num ,type)
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:temporary (:scs (sap-reg) :from (:argument 0)) sap)
+                    (:generator 5
+                      (inst add sap object offset)
+                      (sap-set result value sap 0 ,size)))
+                  (define-vop (,set-name-c)
+                    (:translate ,set-name)
+                    (:policy :fast-safe)
+                    (:args (sap :scs (sap-reg))
+                           (value :scs (,sc) :target result))
+                    (:arg-types system-area-pointer
+                                (:constant short-immediate)
+                                ,type)
+                    (:info offset)
+                    (:results (result :scs (,sc)))
+                    (:result-types ,type)
+                    (:generator 4
+                      (sap-set result value sap offset ,size)))))))
   (def-system-ref-and-set sap-ref-8 %set-sap-ref-8
     unsigned-reg positive-fixnum :byte :signed nil)
   (def-system-ref-and-set signed-sap-ref-8 %set-signed-sap-ref-8
@@ -174,14 +246,16 @@
     unsigned-reg unsigned-num :word :signed nil)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
     signed-reg signed-num :word :signed t)
+  #+64-bit
   (def-system-ref-and-set sap-ref-64 %set-sap-ref-64
     unsigned-reg unsigned-num :long :signed nil)
+  #+64-bit
   (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64
     signed-reg signed-num :long :signed t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
-    sap-reg system-area-pointer :long)
+    sap-reg system-area-pointer #-64-bit :word #+64-bit :dword)
   (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj
-    descriptor-reg * :long)
+    descriptor-reg * #-64-bit :word #+64-bit :dword)
   (def-system-ref-and-set sap-ref-single %set-sap-ref-single
     single-reg single-float :single)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
