@@ -27,6 +27,7 @@
 ;;; VOPs that only set flags.
 (define-vop (branch-if)
   (:info dest flags not-p)
+  (:ignore dest not-p flags)
   (:generator 0
     (error "BRANCH-IF should not be needed on RISC-V.")))
 
