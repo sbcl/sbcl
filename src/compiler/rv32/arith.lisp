@@ -463,7 +463,7 @@
   (:translate eql)
   (:ignore condition)
   (:generator 1
-    (three-way-compatison x y :eq nil not-p target)))
+    (three-way-comparison x y :eq nil not-p target)))
 
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg))

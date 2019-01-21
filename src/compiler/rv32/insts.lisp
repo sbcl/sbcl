@@ -14,7 +14,8 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (import '(short-immediate
-            short-immediate-fixnum) "SB-VM")
+            short-immediate-fixnum
+            bic-mask) "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(sb-vm::u-and-i-inst-immediate
             sb-vm::lip-tn
@@ -23,6 +24,8 @@
 
 (def!type short-immediate () `(signed-byte 12))
 (def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
+
+(defun bic-mask (x) (1- (- x)))
 
 
 (define-instruction byte (segment byte)
