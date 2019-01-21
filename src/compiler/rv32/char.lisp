@@ -104,7 +104,7 @@
   (:policy :fast-safe)
   (:note "inline comparison")
   (:variant-vars condition)
-  (:generator 3
+  (:generator 1
     (three-way-comparison x y condition :unsigned not-p target)))
 
 (define-vop (fast-char=/character character-compare)

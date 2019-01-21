@@ -410,7 +410,7 @@
          (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
-  (:generator 3
+  (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/signed fast-conditional)
@@ -418,7 +418,7 @@
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:note "inline (signed-byte 32) comparison")
-  (:generator 3
+  (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
@@ -426,7 +426,7 @@
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 32) comparison")
-  (:generator 3
+  (:generator 1
     (three-way-comparison x y condition :unsigned not-p target)))
 
 (defmacro define-conditional-vop (translate op)
@@ -461,10 +461,9 @@
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)
-  (:generator 3
-    (if not-p
-        (inst bne x y target)
-        (inst beq x y target))))
+  (:ignore condition)
+  (:generator 1
+    (three-way-compatison x y :eq nil not-p target)))
 
 (define-vop (generic-eql/fixnum fast-eql/fixnum)
   (:args (x :scs (any-reg descriptor-reg))
