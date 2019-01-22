@@ -331,3 +331,6 @@ and
 
 (defun load-binding-stack-pointer (reg)
   (load-symbol-value reg *binding-stack-pointer*))
+
+(defun store-binding-stack-pointer (reg)
+  (store-symbol-value reg *binding-stack-pointer*))

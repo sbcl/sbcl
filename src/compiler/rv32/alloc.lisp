@@ -161,7 +161,7 @@
            (inst addi header header type))
           (t
            (inst addi header header (+ (ash -2 n-widetag-bits) type))
-           (inst and bytes bytes (bic-mask lowtag-mask))))
+           (inst andi bytes bytes (bic-mask lowtag-mask))))
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag
                   :flag-tn pa-flag
