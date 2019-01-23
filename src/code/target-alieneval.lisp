@@ -312,8 +312,7 @@ Examples:
 ;;; On :c-stack-is-control-stack platforms, this DEFUN must appear prior to the
 ;;; first cross-compile-time use of ALIEN-FUNCALL, the transform of which is
 ;;; an invocation of INVOKE-WITH-SAVED-FP, which should be inlined.
-;;; Makes no sense when compiling for the host.
-#!+(and c-stack-is-control-stack (host-feature sb-xc))
+#!+c-stack-is-control-stack
 (defun invoke-with-saved-fp (fn)
   (declare #-sb-xc-host (muffle-conditions compiler-note)
            (optimize (speed 3)))

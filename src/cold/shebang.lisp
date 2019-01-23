@@ -84,7 +84,7 @@
 (defun feature-in-list-p (feature list)
   (labels ((sane-expr-p (x)
              (typecase x
-               (symbol (and (string/= x "SB-XC") (string/= x "SB-XC-HOST")))
+               (symbol (and (string/= x "SB-XC")))
                ;; This allows you to write #!+(host-feature sbcl) <stuff>
                ;; to muffle conditions, bypassing the "probable XC bug" check.
                ;; Using the escape hatch is assumed never to be a mistake.
@@ -146,7 +146,7 @@
 (defun checked-feature-in-features-list-p (feature list)
   (etypecase feature
     (symbol (unless (member feature '(:ansi-cl :common-lisp :ieee-floating-point
-                                      :sb-assembling))
+                                      :sb-assembling :sb-xc-host))
               (when (member feature sb-xc:*features* :test #'eq)
                 (error "probable XC bug in host read-time conditional: ~S" feature)))
             (member feature list :test #'eq))

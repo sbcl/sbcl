@@ -100,8 +100,7 @@
 ;;; about a wrongly ordered VM definition in make-host-1.
 ;;; The #!+/- reader can't see that a VOP-TRANSLATES term is not for the
 ;;; host compiler unless the whole thing is one expression.
-#!-(or (host-feature sb-xc-host)
-       (vop-translates sb-kernel:symbol-info-vector))
+#!-(or sb-xc-host (vop-translates sb-kernel:symbol-info-vector))
 (declaim (inline symbol-info-vector))
 #-sb-xc-host
 (defun symbol-info-vector (symbol)

@@ -478,7 +478,7 @@
            (error "unknown option: ~S" (first option)))))
 
       ;; Maybe kill docstring, but only under the cross-compiler.
-      #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq documentation nil)
+      #!+(and (not sb-doc) sb-xc-host) (setq documentation nil)
       `(progn
          ,@(when *top-level-form-p*
              ;; Avoid dumping uninitialized layouts, for sb-fasl::dump-layout

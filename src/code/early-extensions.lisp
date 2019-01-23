@@ -1634,7 +1634,7 @@ to :INTERPRET, an interpreter will be used.")
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
   (declare (string s))
-  (cond #!+(and sb-unicode (host-feature sb-xc))
+  (cond #!+(and sb-unicode (not sb-xc-host))
         ((and (typep s '(array character (*))) (every #'base-char-p s))
          (coerce s 'base-string))
         (t

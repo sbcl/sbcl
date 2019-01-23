@@ -572,7 +572,8 @@
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
-  (let ((*features* (cons :sb-xc-host *features*)))
+  (let ((*features* (cons :sb-xc-host *features*))
+        (sb-xc:*features* (cons :sb-xc-host sb-xc:*features*)))
     (funcall fn)))
 (compile 'in-host-compilation-mode)
 

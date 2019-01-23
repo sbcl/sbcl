@@ -1158,7 +1158,7 @@
                                (car tail))))
           (append whole env (ds-lambda-list-variables parse nil)))
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq docstring nil)
+    #!+(and (not sb-doc) sb-xc-host) (setq docstring nil)
     ;; Note that we *NEVER* declare macro lambdas as a toplevel named lambda.
     ;; Code such as:
     ;;  `(setf (symbol-function ',myfun) ,(make-macro-lambda whatever))

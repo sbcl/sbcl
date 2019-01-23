@@ -586,6 +586,6 @@
                          'sb-xc:define-setf-expander access-fn
                          :doc-string-allowed :external)
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
+    #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (%defsetf ',access-fn ,def ,@(and doc `(,doc))))))

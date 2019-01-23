@@ -235,7 +235,7 @@ evaluated as a PROGN."
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
+    #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
            (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
            (lambda `(lambda ,lambda-list ,@lambda-guts))
@@ -281,7 +281,7 @@ evaluated as a PROGN."
   documentation string for the variable."
   (check-designator var defvar)
   ;; Maybe kill docstring, but only under the cross-compiler.
-  #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
+  #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
@@ -300,7 +300,7 @@ evaluated as a PROGN."
   string for the parameter."
   (check-designator var defparameter)
   ;; Maybe kill docstring, but only under the cross-compiler.
-  #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
+  #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))

@@ -105,7 +105,7 @@
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space. Computed for genesis/constants.h, not used in Lisp.
-#!+(and gencgc (host-feature sb-xc-host))
+#!+(and gencgc sb-xc-host)
 (defconstant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
           (start dynamic-space-start))

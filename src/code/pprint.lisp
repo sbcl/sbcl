@@ -841,7 +841,6 @@ line break."
            (type real priority)
            (type pprint-dispatch-table table))
   (declare (explicit-check))
-  #!+(and sb-show (host-feature sb-xc)) (format t "* SET-PP-DISPATCH ~S~%" type)
   (assert-not-standard-pprint-dispatch-table table 'set-pprint-dispatch)
   (let* ((ctype (or (handler-bind
                         ((parse-unknown-type

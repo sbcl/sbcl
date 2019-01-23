@@ -2489,7 +2489,7 @@
   (:emitter
    (emit-header-data segment
                      (logior simple-fun-widetag
-                             #!+(and compact-instance-header (host-feature sb-xc-host))
+                             #!+(and compact-instance-header sb-xc-host)
                              (ash function-layout 32)))))
 
 

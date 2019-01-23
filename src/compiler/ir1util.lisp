@@ -725,7 +725,7 @@
   ;; It's just a distraction otherwise.
   (declare (ignorable lvar flush))
 
-  #!+(and (host-feature sb-xc-host)
+  #!+(and sb-xc-host
           (not (and stack-allocatable-closures
                     stack-allocatable-vectors
                     stack-allocatable-lists

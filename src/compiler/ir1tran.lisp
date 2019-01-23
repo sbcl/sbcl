@@ -99,7 +99,7 @@
   (let ((answer
          (typecase env
            (null nil)
-           #!+(and sb-fasteval (host-feature sb-xc))
+           #!+(and sb-fasteval (not sb-xc-host))
            (sb-interpreter:basic-env
             (sb-interpreter::fun-lexically-notinline-p name env))
            (t

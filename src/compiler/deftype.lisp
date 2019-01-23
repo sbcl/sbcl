@@ -52,7 +52,7 @@
                                    :doc-string-allowed :external
                                    :environment :ignore))))
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
+    #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (%compiler-deftype ',name ,expander-form ,source-location-form

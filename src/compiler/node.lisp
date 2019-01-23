@@ -428,7 +428,7 @@
   ;; the INFO slot as :type (or (satisfies ir2-component-p) ...)
   ;; During make-host-2, the solution to this is the same hack
   ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
-  #!+(and (host-feature sb-xc-host) (host-feature sbcl))
+  #!+(and sb-xc-host (host-feature sbcl))
   (declare (host-sb-ext:muffle-conditions style-warning))
 (def!struct (component (:copier nil)
                        (:constructor
@@ -832,7 +832,7 @@
 (defun fun-locally-defined-p (name env)
   (typecase env
     (null nil)
-    #!+(and sb-fasteval (host-feature sb-xc))
+    #!+(and sb-fasteval (not sb-xc-host))
     (sb-interpreter:basic-env
      (values (sb-interpreter:find-lexical-fun env name)))
     (t
@@ -1627,7 +1627,7 @@
 (defun %coerce-to-policy (thing)
   (typecase thing
     (policy thing)
-    #!+(and sb-fasteval (host-feature sb-xc))
+    #!+(and sb-fasteval (not sb-xc-host))
     (sb-interpreter:basic-env (sb-interpreter:env-policy thing))
     (null **baseline-policy**)
     (t (lexenv-policy (etypecase thing
