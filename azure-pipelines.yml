@@ -1,0 +1,64 @@
+trigger:
+- master
+
+jobs:
+
+- job: Linux
+  strategy:
+    matrix:
+      threads:
+        options: "--with-sb-thread"
+      no-threads:
+        options: "--without-sb-thread"
+  pool:
+    vmImage: 'Ubuntu-16.04'
+
+  steps:
+  - script: |
+     sudo apt-get -qq -y install sbcl
+    displayName: 'install host sbcl'
+
+  - script: |
+      ./make.sh $(options)
+    displayName: 'make'
+  - script: |
+      cd tests; ./run-tests.sh
+    displayName: 'tests'
+
+- job: macOS
+
+  pool:
+    vmImage: 'macOS-10.13'
+  steps:
+  - script: |
+      brew install sbcl
+    displayName: 'install host sbcl'
+
+  - script: |
+      ./make.sh
+    displayName: 'make'
+  - script: |
+      cd tests; ./run-tests.sh
+    displayName: 'tests'
+
+- job: Windows
+
+  pool:
+    vmImage: 'vs2017-win2016'
+  steps:
+  - script: |
+      choco install --no-progress msys2 --params "/NoUpdate"
+    displayName: 'install host msys2'
+  - script: |
+      C:\tools\msys64\usr\bin\bash -c '/usr/bin/pacman -S --noconfirm --needed mingw-w64-x86_64-gcc diffutils'
+    displayName: 'install gcc'
+  - script: |
+      cinst sbcl -source tools-for-build
+    displayName: 'install host sbcl'
+
+  - script: |
+      C:\tools\msys64\usr\bin\bash -c 'CC=x86_64-w64-mingw32-gcc SBCL_HOME="/c/Program Files/Steel Bank Common Lisp/1.4.14" PATH="/usr/bin:/c/Program Files/Steel Bank Common Lisp/1.4.14:$PATH" ./make.sh'
+    displayName: 'make'
+  - script: |
+        C:\tools\msys64\usr\bin\bash -c 'cd tests; CC=x86_64-w64-mingw32-gcc  PATH=/usr/bin:$PATH ./run-tests.sh'
+    displayName: 'tests'
