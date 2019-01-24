@@ -26,9 +26,12 @@
 ;;; EQUALP checking, to name a few) have to be able to determine for each
 ;;; slot whether it is a Lisp descriptor or just bits. This is done
 ;;; with the LAYOUT-BITMAP of an object's layout.
-;;; The bitmap stores a '1' for each bit representing a raw word,
-;;; and could be a BIGNUM given a spectacularly huge structure.
-
+;;;
+;;; The bitmap stores a 1 in each bit index corresponding to a tagged slot
+;;; index. If tagged slots follow raw slots and the the number of slots is
+;;; large, the bitmap could be a bignum.  As a special case, -1 represents
+;;; that all slots are tagged regardless of instance length.
+;;;
 ;;; Also note that there are possibly some alignment concerns which must
 ;;; be accounted for when DEFSTRUCT lays out slots,
 ;;; by injecting padding words appropriately.
@@ -40,7 +43,6 @@
 ;; writing (myslot :type (unsigned-byte #.sb-vm:n-word-bits)), or even
 ;; worse (:type #+sb-xc-host <sometype> #-sb-xc-host <othertype>),
 ;; these abstractions are provided as soon as the raw slots defs are.
-;; 'signed-word' is here for companionship - slots of that type are not raw.
 (def!type sb-vm:word () `(unsigned-byte ,sb-vm:n-word-bits))
 (def!type sb-vm:signed-word () `(signed-byte ,sb-vm:n-word-bits))
 (defconstant +layout-all-tagged+ -1)
