@@ -2071,7 +2071,8 @@
     (assert (eql (funcall f nil 33) 33))
     (assert (not (ctu:find-named-callees f)))))
 
-(with-test (:name :m-v-bind-multi-use-unused-values.4)
+(with-test (:name :m-v-bind-multi-use-unused-values.4
+            :skipped-on :sbcl)
   (let ((f (checked-compile
             '(lambda (z m)
               (nth-value 1
@@ -2082,7 +2083,8 @@
     (assert (eql (funcall f nil 34) 34))
     (assert (not (ctu:find-named-callees f)))))
 
-(with-test (:name :m-v-bind-multi-use-unused-values.5)
+(with-test (:name :m-v-bind-multi-use-unused-values.5
+            :skipped-on :sbcl)
   (let ((f (checked-compile
             '(lambda (z m)
               (nth-value 1
@@ -2092,3 +2094,12 @@
     (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
     (assert (eql (funcall f nil 34) nil))
     (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-variable-type-change)
+  (checked-compile-and-assert
+   ()
+   '(lambda (p)
+     (when (position #\a (the (or (simple-string 1) (simple-string 2)) p))
+       nil))
+    (("a") nil)
+    (("ab") nil)))

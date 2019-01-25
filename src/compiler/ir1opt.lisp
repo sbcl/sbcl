@@ -2264,7 +2264,11 @@
                     (loop for use in uses
                           always (and (combination-p use)
                                       (eq (lvar-fun-name (combination-fun use))
-                                          'values))))))
+                                          'values)))))
+               ;; TODO: make mv-combination functions handle replacing
+               ;; unused variables with NIL and then this can work
+               ;; properly.
+               unknown-values)
            nil)
           ((and multiple-uses
                 (or unknown-values
