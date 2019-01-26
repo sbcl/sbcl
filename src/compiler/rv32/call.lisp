@@ -95,7 +95,6 @@
 
 (define-vop (xep-allocate-frame)
   (:info start-lab)
-  (:temporary (:scs (non-descriptor-reg) :offset nl3-offset) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 1
     ;; Make sure the function is aligned, and drop a label pointing to this
@@ -105,7 +104,7 @@
     ;; Allocate function header.
     (inst simple-fun-header-word)
     (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
-    (inst compute-code code-tn lip start-lab temp)))
+    (inst compute-code code-tn lip start-lab)))
 
 (define-vop (xep-setup-sp)
   (:vop-var vop)

@@ -483,38 +483,36 @@
 
 ;;;; Boxed-object computation instructions (for LRA and CODE)
 
-;;; Compute the address of a CODE object by parsing the header of a
-;;; nearby LRA or SIMPLE-FUN.
-(define-instruction compute-code (segment code lip object-label temp)
+(defun emit-compute (segment vop dest lip compute-delta)
+  (emit-back-patch segment 8
+                   (lambda (segment position)
+                     (multiple-value-bind (u i)
+                         (u-and-i-inst-immediate (funcall compute-delta position))
+                       (assemble (segment vop)
+                         (inst auipc lip u)
+                         (inst addi dest lip i))))))
+
+(define-instruction compute-code (segment code lip object-label)
+  (:vop-var vop)
+  (:declare (ignore object-label))
+  (:emitter
+   (emit-compute segment vop code lip
+                 (lambda (position &optional magic-value)
+                   (declare (ignore magic-value))
+                   (- other-pointer-lowtag
+                      position
+                      (component-header-length))))))
+
+(define-instruction compute-lra (segment dest lip lra-label)
   (:vop-var vop)
   (:emitter
-   (emit-back-patch
-    segment 20
-    (lambda (segment position)
-      (assemble (segment vop)
-        ;; Calculate the address of the code component.  This is an
-        ;; exercise in excess cleverness.  First, we calculate (from
-        ;; our program counter only) the address of OBJECT-LABEL plus
-        ;; OTHER-POINTER-LOWTAG.
-        (let ((offset (- ;; The 4 below is the displacement
-                       ;; from reading the program counter.
-                       ;; XXX may or may not be correct
-                       (+ (label-position object-label)
-                          other-pointer-lowtag)
-                       (+ position 4))))
-          (multiple-value-bind (hi lo)
-              (u-and-i-inst-immediate offset)
-            (inst auipc temp hi)
-            (inst addi lip temp lo)))
-        ;; Next, we read the function header.
-        (inst lw temp lip (- other-pointer-lowtag))
-        ;; And finally we use the header value (a count in words),
-        ;; plus the fact that the top two bits of the widetag are
-        ;; clear (SIMPLE-FUN-WIDETAG is #x2A and
-        ;; RETURN-PC-WIDETAG is #x36) to compute the boxed
-        ;; address of the code component.
-        (inst srli temp temp (- 8 word-shift))
-        (inst sub code lip temp))))))
+   (emit-compute segment vop dest lip
+                 (lambda (position &optional magic-value)
+                   (- (+ (label-position lra-label
+                                         (when magic-value position)
+                                         magic-value)
+                         other-pointer-lowtag)
+                      position)))))
 
 (defun emit-header-data (segment type)
   (emit-back-patch
