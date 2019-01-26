@@ -78,8 +78,16 @@
   (:args (tn))
   (:info entry-label)
   (:results (block :scs (any-reg)))
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (interior-reg)) lip)
   (:generator 22
-    (style-warn "implement make-unwind-block")))
+    (inst addi block cfp-tn (* (tn-offset tn) n-word-bytes))
+    (load-symbol-value temp *current-unwind-protect-block*)
+    (storew temp block unwind-block-uwp-slot)
+    (storew cfp-tn block unwind-block-cfp-slot)
+    (storew code-tn block unwind-block-code-slot)
+    (inst compute-lra temp lip entry-label)
+    (storew temp block catch-block-entry-pc-slot)))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
@@ -88,8 +96,24 @@
   (:args (tn) (tag :scs (any-reg descriptor-reg)))
   (:info entry-label)
   (:results (block :scs (any-reg)))
+  (:temporary (:scs (descriptor-reg)) temp)
+  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
+  (:temporary (:scs (interior-reg)) lip)
   (:generator 44
-    (style-warn "implement make-catch-block")))
+    (inst addi result cfp-tn (* (tn-offset tn) n-word-bytes))
+    (load-symbol-value temp *current-unwind-protect-block*)
+    (storew temp result catch-block-uwp-slot)
+    (storew cfp-tn result catch-block-cfp-slot)
+    (storew code-tn result catch-block-code-slot)
+    (inst compute-lra temp lip entry-label)
+    (storew temp result catch-block-entry-pc-slot)
+
+    (storew tag result catch-block-tag-slot)
+    (load-symbol-value temp *current-catch-block*)
+    (storew temp result catch-block-previous-catch-slot)
+    (store-symbol-value result *current-catch-block*)
+
+    (move block result)))
 
 ;;; Just set the current unwind-protect to UWP.  This
 ;;; instantiates an unwind block as an unwind-protect.
