@@ -41,7 +41,10 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
-    (style-warn "unimmplemented array-rank-vop")))
+    (loadw temp x 0 other-pointer-lowtag)
+    (inst srai temp temp n-widetag-bits)
+    (inst subi temp temp (1- array-dimensions-offset))
+    (inst slli res temp n-fixnum-tag-bits)))
 
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
