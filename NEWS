@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.15:
+changes in sbcl-1.4.16 relative to sbcl-1.4.15:
   * minor incompatible change: ENSURE-DIRECTORIES-EXIST no longer establishes
     a CONTINUE restart in case of an error.
   * minor incompatible change: Defining macros (DEFVAR, etc) which require a
