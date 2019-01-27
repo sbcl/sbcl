@@ -231,17 +231,15 @@
     (inst vinserti128 dst dst tmp 1)))
 
 #-sb-xc-host
-(declaim (inline %make-simd-pack-256-ub32))
-#-sb-xc-host
-(defun %make-simd-pack-256-ub32 (p0 p1 p2 p3 p4 p5 p6 p7)
-  (declare (type (unsigned-byte 32) p0 p1 p2 p3 p4 p5 p6 p7))
-  (%make-simd-pack-256-ub64 (logior p0 (ash p1 32))
-                            (logior p2 (ash p3 32))
-                            (logior p4 (ash p5 32))
-                            (logior p6 (ash p7 32))))
-
-#-sb-xc-host
 (progn
+  (declaim (inline %make-simd-pack-256-ub32))
+  (defun %make-simd-pack-256-ub32 (p0 p1 p2 p3 p4 p5 p6 p7)
+    (declare (type (unsigned-byte 32) p0 p1 p2 p3 p4 p5 p6 p7))
+    (%make-simd-pack-256-ub64 (logior p0 (ash p1 32))
+                              (logior p2 (ash p3 32))
+                              (logior p4 (ash p5 32))
+                              (logior p6 (ash p7 32))))
+
   (declaim (inline %simd-pack-256-ub32s %simd-pack-256-ub64s))
   (defun %simd-pack-256-ub32s (pack)
     (declare (type simd-pack-256 pack))
@@ -327,8 +325,8 @@
     (inst movss dst tmp)))
 
 #-sb-xc-host
+(progn
 (declaim (inline %simd-pack-256-singles))
-#-sb-xc-host
 (defun %simd-pack-256-singles (pack)
   (declare (type simd-pack-256 pack))
   (values (%simd-pack-256-single-item pack 0)
@@ -338,7 +336,7 @@
           (%simd-pack-256-single-item pack 4)
           (%simd-pack-256-single-item pack 5)
           (%simd-pack-256-single-item pack 6)
-          (%simd-pack-256-single-item pack 7)))
+          (%simd-pack-256-single-item pack 7))))
 
 (defknown %simd-pack-256-double-item
   (simd-pack-256 (integer 0 3)) double-float (flushable))
@@ -365,11 +363,11 @@
     (inst movsd dst tmp)))
 
 #-sb-xc-host
+(progn
 (declaim (inline %simd-pack-256-doubles))
-#-sb-xc-host
 (defun %simd-pack-256-doubles (pack)
   (declare (type simd-pack-256 pack))
   (values (%simd-pack-256-double-item pack 0)
           (%simd-pack-256-double-item pack 1)
           (%simd-pack-256-double-item pack 2)
-          (%simd-pack-256-double-item pack 3)))
+          (%simd-pack-256-double-item pack 3))))
