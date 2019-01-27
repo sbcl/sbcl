@@ -239,7 +239,7 @@
 (with-test (:name (run-program :pty-stream) :fails-on :win32)
   (assert (equal "OK"
                  (handler-case
-                  (with-timeout 1
+                  (with-timeout 2
                     (subseq
                      (with-output-to-string (s)
                        (assert (= 42 (process-exit-code
