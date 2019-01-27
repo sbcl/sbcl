@@ -60,9 +60,6 @@
 (defun %target-defstruct (dd)
   (declare (type defstruct-description dd))
 
-  #!+(and sb-show (host-feature sb-xc))
-  (progn (write `(%target-defstruct ,(dd-name dd))) (terpri))
-
   (when (dd-doc dd)
     (setf (documentation (dd-name dd) 'structure)
           (dd-doc dd)))
@@ -247,6 +244,25 @@
              ,(+ (- sb-vm:instance-pointer-lowtag)
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))
+
+#!+immobile-space
+(macrolet ((def-layout-maker ()
+             (let ((slots (dd-slots (find-defstruct-description 'layout))))
+               `(defun make-layout
+                    (&key ,@(mapcar (lambda (s) `(,(dsd-name s) ,(dsd-default s)))
+                                    slots))
+                  (declare ,@(mapcar (lambda (s) `(type ,(dsd-type s) ,(dsd-name s)))
+                                     slots))
+                  ;; After calling into C, registers are trashed,
+                  ;; so we pass everything as a single vector,
+                  ;; and don't rely on Lisp to write the slots of the layout.
+                  (dx-let ((data (vector ,@(mapcar #'dsd-name slots))))
+                    (truly-the layout
+                     (values (%primitive sb-vm::alloc-immobile-layout data))))))))
+   (assert (<= (* sb-vm:n-word-bytes
+                 (1+ (dd-length (find-defstruct-description 'layout))))
+              sb-vm::layout-align))
+  (def-layout-maker))
 
 
 (/show0 "target-defstruct.lisp end of file")

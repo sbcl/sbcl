@@ -186,25 +186,6 @@
 (defun layout-for-std-class-p (x)
   (logtest (layout-%flags x) +pcl-object-layout-flag+))
 
-#!+(and immobile-space (host-feature sb-xc))
-(macrolet ((def-layout-maker ()
-             (let ((slots (dd-slots (find-defstruct-description 'layout))))
-               `(defun make-layout
-                    (&key ,@(mapcar (lambda (s) `(,(dsd-name s) ,(dsd-default s)))
-                                    slots))
-                  (declare ,@(mapcar (lambda (s) `(type ,(dsd-type s) ,(dsd-name s)))
-                                     slots))
-                  ;; After calling into C, registers are trashed,
-                  ;; so we pass everything as a single vector,
-                  ;; and don't rely on Lisp to write the slots of the layout.
-                  (dx-let ((data (vector ,@(mapcar #'dsd-name slots))))
-                    (truly-the layout
-                     (values (%primitive sb-vm::alloc-immobile-layout data))))))))
-   (assert (<= (* sb-vm:n-word-bytes
-                 (1+ (dd-length (find-defstruct-description 'layout))))
-              sb-vm::layout-align))
-  (def-layout-maker))
-
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type
 ;;; system.  (FIXME: It's also a type specifier, though this might go
