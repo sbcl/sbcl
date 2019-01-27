@@ -16,10 +16,8 @@ in future versions."
   (name          nil :type (or null simple-string)) ; some C code reads this
   (%alive-p      nil :type boolean)
   (%ephemeral-p  nil :type boolean)
-  #-sb-xc-host
   ;; 0 is used on thread-less builds
   (os-thread  (ldb (byte sb-vm:n-word-bits 0) -1) :type sb-vm:word)
-  #-sb-xc-host
   ;; Points to the SB-VM::THREAD primitive object.
   ;; Yes, there are three different thread structures.
   (primitive-thread 0 :type sb-vm:word)
