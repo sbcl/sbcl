@@ -79,7 +79,6 @@
                        (:constructor %make-hairy-type (specifier))
                        (:constructor !make-interned-hairy-type
                            (specifier &aux (hash-value (interned-type-hash))))
-                       (:copier nil)
-                       #!+cmu (:pure nil))
+                       (:copier nil))
   ;; the Common Lisp type-specifier of the type we represent
   (specifier nil :type t :read-only t))

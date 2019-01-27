@@ -110,8 +110,7 @@
 (defstruct (negation-type (:include ctype
                                     (class-info (type-class-or-lose 'negation)))
                           (:copier nil)
-                          (:constructor make-negation-type (type))
-                          #!+cmu (:pure nil))
+                          (:constructor make-negation-type (type)))
   (type (missing-arg) :type ctype :read-only t))
 
 ;; Former comment was:
