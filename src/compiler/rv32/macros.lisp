@@ -87,7 +87,10 @@ byte-ordering issues."
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop (note-this-location vop :internal-error))
-    (emit-internal-error kind code values)
+    ;; Encode both kind and code as an argument to BRK
+    (emit-internal-error kind code values
+                         :trap-emitter (lambda (tramp-number)
+                                         (inst ebreak (dpb tramp-number (byte 8 8) kind))))
     (emit-alignment word-shift)))
 
 (defun generate-error-code (vop error-code &rest values)
@@ -111,12 +114,10 @@ byte-ordering issues."
      (without-scheduling ()
        (store-symbol-value null-tn *pseudo-atomic-atomic*)
        (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
-       ;; When *pseudo-atomic-interrupted* is not 0 it contains the address of
-       ;; do_pending_interrupt
-       (let ((label (gen-label)))
-         (inst beq ,flag-tn zero-tn label)
-         (inst jalr zero-tn ,flag-tn 0)
-         (emit-label label)))))
+       (let ((not-interrupted (gen-label)))
+         (inst beq ,flag-tn zero-tn not-interrupted)
+         (inst ebreak pending-interrupt-trap)
+         (emit-label not-interrupted)))))
 
 #|
 If we are doing [reg+offset*n-word-bytes-lowtag+index*scale]

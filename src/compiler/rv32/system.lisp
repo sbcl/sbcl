@@ -245,11 +245,11 @@
   (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
-    (style-warn "receive-pending-interrupt is undefined")))
+    (inst ebreak pending-interrupt-trap)))
 
 (define-vop (halt)
   (:generator 1
-    (style-warn "halt is undefined")))
+    (inst ebreak halt-trap)))
 
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop (spin-loop-hint)

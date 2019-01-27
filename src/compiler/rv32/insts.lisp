@@ -32,6 +32,9 @@
   (:emitter
    (emit-byte segment byte)))
 
+(define-bitfield-emitter emit-word 32
+  (byte 32 0))
+
 (define-bitfield-emitter emit-machine-word n-machine-word-bits
   (byte n-machine-word-bits 0))
 
@@ -348,11 +351,12 @@
                (rd #b00000) (opcode #b1110011)))
   (:emitter
    (%emit-i-inst segment #b000000000000 #b00000 #b000 #b00000 #b1110011)))
-(define-instruction ebreak (segment)
+(define-instruction ebreak (segment &optional (code nil codep))
   (:printer i ((imm #b000000000001) (rs1 #b00000) (funct3 #b000)
                (rd #b00000) (opcode #b1110011)))
   (:emitter
-   (%emit-i-inst segment #b000000000001 #b00000 #b000 #b00000 #b1110011)))
+   (%emit-i-inst segment #b000000000001 #b00000 #b000 #b00000 #b1110011)
+   (when codep (emit-word segment code))))
 
 ;;; save CSR instructions for later - CSR
 
