@@ -4890,6 +4890,34 @@
                          *universal-type*))))
         (recurse array-type)))))
 
+(deftransform array-element-type ((array))
+  (let ((type (lvar-type array)))
+    (flet ((element-type (type)
+             (and (array-type-p type)
+                  (neq (array-type-specialized-element-type type) *wild-type*)
+                  (type-specifier (array-type-specialized-element-type type)))))
+      (cond ((let ((type (element-type type)))
+               (and type
+                    `',type)))
+            ((union-type-p type)
+             (let (result)
+               (loop for type in (union-type-types type)
+                     for et = (element-type type)
+                     unless (and et
+                                 (if result
+                                     (equal result et)
+                                     (setf result et)))
+                     do (give-up-ir1-transform))
+               `',result))
+            ((intersection-type-p type)
+             (loop for type in (intersection-type-types type)
+                   for et = (element-type type)
+                   when et
+                   return `',et
+                   finally (give-up-ir1-transform)))
+            (t
+             (give-up-ir1-transform))))))
+
 (define-source-transform sb-impl::sort-vector (vector start end predicate key)
   ;; Like CMU CL, we use HEAPSORT. However, other than that, this code
   ;; isn't really related to the CMU CL code, since instead of trying
