@@ -408,12 +408,3 @@ EXPERIMENTAL: Interface subject to change."
   sb-vm:n-word-bits most-positive-word
   sb-xc:most-negative-fixnum sb-xc:most-positive-fixnum)
   (expand-atomic-frob 'atomic-decf place diff env))
-
-;; Interpreter stubs for ATOMIC-INCF.
-#!+(and compare-and-swap-vops (host-feature sb-xc))
-(progn
-  ;; argument types are declared in vm-fndb
-  (defun %array-atomic-incf/word (array index diff)
-    (%array-atomic-incf/word array index diff))
-  (defun %raw-instance-atomic-incf/word (instance index diff)
-    (%raw-instance-atomic-incf/word instance index diff)))

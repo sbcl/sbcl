@@ -104,6 +104,10 @@
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
 
+  #+compare-and-swap-vops
+  (def* (%array-atomic-incf/word (array index diff))
+        (%raw-instance-atomic-incf/word (instance index diff)))
+
   #+sb-simd-pack
   (def* (%make-simd-pack (tag low high))
         (%make-simd-pack-single (x y z w))
