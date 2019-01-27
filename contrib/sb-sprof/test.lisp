@@ -44,8 +44,9 @@
           do (consalot))))
 
 (defun run-tests ()
-  (test)
-  (consing-test))
+  (let ((*standard-output* (make-broadcast-stream)))
+    (test)
+    (consing-test)))
 
 ;; For debugging purposes, print output for visual inspection to see if
 ;; the allocation sequence gets hit in the right places (i.e. not at all
