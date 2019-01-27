@@ -15,14 +15,15 @@
 (define-vop (list-or-list*)
   (:args (things :more t))
   (:temporary (:scs (descriptor-reg)) ptr)
-  (:temporary (:scs (any-reg)) temp)
   (:temporary (:scs (descriptor-reg) :to (:result 0) :target result)
               res)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:scs (any-reg)) temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:info num)
   (:results (result :scs (descriptor-reg)))
   (:policy :fast-safe)
   (:variant-vars star)
+  (:node-var node)
   (:generator 0
     (cond ((zerop num)
            (move result null-tn))
@@ -40,15 +41,17 @@
                  (pseudo-atomic (pa-flag)
                    (allocation res alloc list-pointer-lowtag
                                :flag-tn pa-flag
-                               :temp-tn temp)
+                               :stack-allocate-p (node-stack-allocate-p node))
                    (move ptr res)
                    (dotimes (i (1- cons-cells))
                      (storew (maybe-load (tn-ref-tn things)) ptr
-                         cons-car-slot list-pointer-lowtag))
-                   (setf things (tn-ref-across things))
-                   (inst addi ptr ptr (pad-data-block cons-size))
-                   (storew ptr ptr (- cons-cdr-slot cons-size)
-                       list-pointer-lowtag)
+                             cons-car-slot list-pointer-lowtag)
+                     (setf things (tn-ref-across things))
+                     (inst addi ptr ptr (pad-data-block cons-size))
+                     (storew ptr ptr (- cons-cdr-slot cons-size)
+                             list-pointer-lowtag))
+                   (storew (maybe-load (tn-ref-tn things)) ptr
+                     cons-car-slot list-pointer-lowtag)
                    (storew (if star
                                (maybe-load (tn-ref-tn (tn-ref-across things)))
                                null-tn)
@@ -71,19 +74,14 @@
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
-  (:temporary (:sc non-descriptor-reg) bytes)
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) bytes pa-flag)
   (:results (result :scs (descriptor-reg) :from :load))
   (:policy :fast-safe)
   (:generator 100
     (inst addi bytes words (+ lowtag-mask (* vector-data-offset n-word-bytes)))
-    (inst srli bytes bytes n-lowtag-bits)
-    (inst slli bytes bytes n-lowtag-bits)
+    (inst andi bytes bytes (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation result bytes other-pointer-lowtag
-                  :flag-tn pa-flag
-                  :temp-tn temp)
+      (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
       (storew length result vector-length-slot other-pointer-lowtag))))
 
@@ -91,8 +89,7 @@
   (:args (function :to :save :scs (descriptor-reg)))
   (:info label length stack-allocate-p)
   (:ignore label)
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:generator 10
     (let* ((size (+ length closure-info-offset))
@@ -100,22 +97,21 @@
       (pseudo-atomic (pa-flag)
         (allocation result alloc-size fun-pointer-lowtag
                     :flag-tn pa-flag
-                    :temp-tn temp)
-        (inst li temp (logior (ash (1- size) n-widetag-bits)
-                              closure-widetag))
-        (storew temp result 0 fun-pointer-lowtag)
+                    :stack-allocate-p stack-allocate-p)
+        (inst li pa-flag (logior (ash (1- size) n-widetag-bits)
+                                 closure-widetag))
+        (storew pa-flag result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
   (:args (value :scs (descriptor-reg any-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:info stack-allocate-p)
   (:generator 10
-    (with-fixed-allocation (result pa-flag temp value-cell-widetag
-                            value-cell-size)
+    (with-fixed-allocation (result pa-flag value-cell-widetag value-cell-size
+                            :stack-allocate-p stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
 
 ;;;; Automatic allocators for primitive objects.
@@ -137,19 +133,18 @@
   (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 4
-    (with-fixed-allocation (result pa-flag temp type words
-                            :lowtag lowtag))))
+    (with-fixed-allocation (result pa-flag type words :lowtag lowtag
+                            :stack-allocate-p stack-allocate-p))))
 
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
   (:info name words type lowtag)
   (:ignore name)
-  (:temporary (:scs (any-reg)) temp bytes)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:scs (any-reg)) bytes)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:sc non-descriptor-reg) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 6
@@ -163,7 +158,5 @@
            (inst addi header header (+ (ash -2 n-widetag-bits) type))
            (inst andi bytes bytes (bic-mask lowtag-mask))))
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag
-                  :flag-tn pa-flag
-                  :temp-tn temp)
+      (allocation result bytes lowtag :flag-tn pa-flag)
       (storew header result 0 lowtag))))

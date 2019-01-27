@@ -31,11 +31,14 @@
   (defreg zero 0)
   (defreg lr 1)
   (defreg nsp 2)
+  (defreg global 3)
+  (defreg thread 4)
   (defreg lra 5) ; alternate link register
   (defreg cfp 6)
   (defreg ocfp 7)
   (defreg nfp 8)
   (defreg csp 9)
+
   (defreg a0 10)
   (defreg nl0 11)
   (defreg a1 12)
@@ -45,17 +48,23 @@
   (defreg a3 16)
   (defreg nl3 17)
   (defreg l0 18)
-  (defreg pa-flag 19)
-  (defreg cfunc 20)
+  (defreg nl4 19)
+  (defreg l1 20)
+  (defreg nl5 21)
+  (defreg l2 22)
+  (defreg nl6 23)
+  (defreg l3 24)
+  (defreg nl7 25)
 
+  (defreg cfunc 26)
   (defreg lexenv 27)
   (defreg null 28)
   (defreg code 29)
   (defreg lip 30)
   (defreg nargs 31)
 
-  (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nargs nfp pa-flag cfunc)
-  (defregset descriptor-regs a0 a1 a2 a3 ocfp lra lexenv l0)
+  (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
+  (defregset descriptor-regs a0 a1 a2 a3 l1 l2 l3 ocfp lra lexenv)
 
   (define-argument-register-set a0 a1 a2 a3))
 

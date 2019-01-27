@@ -294,38 +294,39 @@ and
 
 ;;;; Storage allocation:
 (defun allocation (result-tn size lowtag &key flag-tn
-                                              (temp-tn (missing-arg)))
+                                              stack-allocate-p)
+  (declare (ignore stack-allocate-p))
   ;; Normal allocation to the heap.
   (load-symbol-value flag-tn *allocation-pointer*)
   (inst addi result-tn flag-tn lowtag)
   (etypecase size
     (short-immediate
      (inst addi flag-tn flag-tn size))
-    (integer
-     (inst li temp-tn size)
-     (inst add flag-tn flag-tn temp-tn))
+    ((signed-byte 32)
+     (inst li flag-tn (- size lowtag))
+     (inst add flag-tn flag-tn result-tn))
     (tn
      (inst add flag-tn flag-tn size)))
   (store-symbol-value flag-tn *allocation-pointer*))
 
-(defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
-                                  &key (lowtag other-pointer-lowtag))
+(defmacro with-fixed-allocation ((result-tn flag-tn type-code size
+                                  &key (lowtag other-pointer-lowtag)
+                                       stack-allocate-p)
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
   Result-TN, and Temp-TN is a non-descriptor temp (which may be randomly used
   by the body.)  The body is placed inside the PSEUDO-ATOMIC, and presumably
   initializes the object."
-  (once-only ((result-tn result-tn) (flag-tn flag-tn) (temp-tn temp-tn)
+  (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size)
               (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
                    :flag-tn ,flag-tn
-                   :temp-tn ,temp-tn)
+                   :stack-allocate-p ,stack-allocate-p)
        (when ,type-code
-         (inst li ,flag-tn (ash (1- ,size) n-widetag-bits))
-         (inst ori ,flag-tn ,flag-tn ,type-code)
+         (inst li ,flag-tn (+ (ash (1- ,size) n-widetag-bits) ,type-code))
          (storew ,flag-tn ,result-tn 0 ,lowtag))
        ,@body)))
 

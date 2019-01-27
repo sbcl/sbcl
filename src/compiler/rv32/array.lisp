@@ -19,10 +19,24 @@
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:temporary (:scs (non-descriptor-reg)) bytes header)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
-    (style-warn "unimplemented make-array-header")))
+    ;; Compute the allocation size.
+    (inst addi bytes rank (+ (* array-dimensions-offset n-word-bytes)
+                             lowtag-mask))
+    (inst andi bytes bytes (bic-mask lowtag-mask))
+    (pseudo-atomic (pa-flag)
+      (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
+      ;; Now that we have the space allocated, compute the header
+      ;; value.
+      (inst addi header rank (fixnumize (1- array-dimensions-offset)))
+      (inst slli header header n-widetag-bits)
+      (inst add header header type)
+      ;; Remove the extraneous fixnum tag bits because TYPE and RANK
+      ;; were fixnums.
+      (inst srli header header n-fixnum-tag-bits)
+      (storew header result 0 other-pointer-lowtag))))
 
 
 ;;;; Additional accessors and setters for the array header.

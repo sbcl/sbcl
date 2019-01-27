@@ -176,7 +176,7 @@
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 18
     (inst srai temp x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
@@ -184,7 +184,7 @@
     (inst xori temp temp -1)
     (inst beq temp zero-tn done)
 
-    (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
+    (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
     
     DONE))
@@ -220,12 +220,12 @@
   (:args (x :scs (signed-reg unsigned-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
-  (:temporary (:sc non-descriptor-reg :offset pa-flag-offset) pa-flag)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
   (:generator 20
     (inst srli temp temp n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
     (inst beq temp zero-tn done)
-    (with-fixed-allocation (y pa-flag temp bignum-widetag (+ bignum-digits-offset 2))
+    (with-fixed-allocation (y pa-flag bignum-widetag (+ bignum-digits-offset 2))
       (inst slt temp x zero-tn)
       (inst slli temp temp n-widetag-bits)
       (inst addi temp temp (logior (ash 1 n-widetag-bits) bignum-widetag))
