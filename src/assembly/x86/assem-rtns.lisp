@@ -359,8 +359,8 @@
 ;;;; Win32 UWP block SEH interface.
 
 ;; We want no VOP for this one and for it to only happen on Win32
-;; targets.  Hence the following disaster.
-#!+#.(cl:if (cl:member sb-assembling cl:*features*) win32 '(or))
+;; targets.
+#!+(and sb-assembling win32)
 (define-assembly-routine
     (uwp-seh-handler (:return-style :none))
     ((:temp block unsigned-reg eax-offset))

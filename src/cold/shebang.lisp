@@ -145,7 +145,8 @@
 ;;; would not be easy.
 (defun checked-feature-in-features-list-p (feature list)
   (etypecase feature
-    (symbol (unless (member feature '(:ansi-cl :common-lisp :ieee-floating-point))
+    (symbol (unless (member feature '(:ansi-cl :common-lisp :ieee-floating-point
+                                      :sb-assembling))
               (when (member feature sb-xc:*features* :test #'eq)
                 (error "probable XC bug in host read-time conditional: ~S" feature)))
             (member feature list :test #'eq))
