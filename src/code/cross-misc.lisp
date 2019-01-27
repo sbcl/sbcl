@@ -126,18 +126,14 @@
 
 (defmacro with-single-package-locked-error ((&optional kind thing &rest format)
                                             &body body)
-  ;; FIXME: perhaps this should touch THING to make it used?
-  (declare (ignore kind thing format))
-  `(progn ,@body))
+  (declare (ignore kind format))
+  `(let ((.dummy. ,thing))
+     (declare (ignore .dummy.))
+     ,@body))
 
 (defun program-assert-symbol-home-package-unlocked (context symbol control)
   (declare (ignore context control))
   symbol)
-
-(defun assert-package-unlocked (package &optional format-control
-                                &rest format-arguments)
-  (declare (ignore format-control format-arguments))
-  package)
 
 (defun assert-symbol-home-package-unlocked (name &optional format-control
                                             &rest format-arguments)

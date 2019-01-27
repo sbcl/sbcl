@@ -232,8 +232,9 @@
 ;;;; close personal friend SB-XC:DEFSTRUCT)
 
 (defun %defstruct-package-locks (dd)
+  (declare (ignorable dd))
+  #-sb-xc-host
   (let ((name (dd-name dd)))
-    #+sb-xc-host (declare (ignore name))
     (with-single-package-locked-error
         (:symbol name "defining ~S as a structure"))
     (awhen (dd-predicate-name dd)
@@ -242,7 +243,6 @@
     (awhen (dd-copier-name dd)
       (with-single-package-locked-error
           (:symbol it "defining ~s as a copier for ~s structure" name)))
-    #-sb-xc-host ; does nothing anyway except warn about non-use of CTOR
     (dolist (ctor (dd-constructors dd))
       (with-single-package-locked-error
           (:symbol (car ctor) "defining ~s as a constructor for ~s structure" name)))
