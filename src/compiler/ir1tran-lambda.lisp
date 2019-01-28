@@ -1286,7 +1286,7 @@
                    inline-lambda name))
            (setq inline-lambda nil))) ; will be cleared below
         (t
-         ;; Warn if stomping on a structure predicate or accessor
+         ;; Warn if stomping on a structure copier, predicate, or accessor
          ;; whether or not we are about to install an inline-lambda.
          (let ((info (info :function :source-transform name)))
            (when (consp info)

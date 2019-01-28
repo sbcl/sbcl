@@ -1927,7 +1927,8 @@ core and return a descriptor to it."
     fdefn))
 
 ;;; Handle a DEFMETHOD in cold-load. "Very easily done". Right.
-(defun cold-defmethod (name &rest stuff)
+(defun cold-defmethod (method-class name &rest stuff)
+  (declare (ignore method-class))
   (let ((gf (assoc name *cold-methods*)))
     (unless gf
       (setq gf (cons name nil))

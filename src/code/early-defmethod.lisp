@@ -34,7 +34,9 @@
              (unspecialized-ll `(,(caar lambda-list) ,@(cdr lambda-list)))
              ((forms decls) (parse-body body nil))) ; Note: disallowing docstring
     `(!trivial-defmethod
-      ',name ',specializer ,qualifier ',unspecialized-ll
+      ;; An extra NIL in front puts the GF name is the same position it would be in
+      ;; for a normal LOAD-DEFMETHOD.
+      nil ',name ',specializer ,qualifier ',unspecialized-ll
       ;; OAOO problem: compute the same lambda name as real DEFMETHOD would
       (named-lambda (fast-method ,name
                      (,specializer ,@(if (eq name 'print-object) '(t))))
@@ -58,7 +60,8 @@
 
 (defvar *!trivial-methods* '()) ; necessary methods for system startup
 (defvar *!documentation-methods* nil) ; saved up for after PCL bootstrap
-(defun !trivial-defmethod (name specializer qualifier lambda-list lambda source-loc)
+(defun !trivial-defmethod (dummy name specializer qualifier lambda-list lambda source-loc)
+  (declare (ignore dummy)) ; this would be the method class in LOAD-DEFMETHOD
   (let ((gf (assoc name *!trivial-methods*)))
     ;; Append the method but don't bother finding a predicate for it.
     ;; Methods occurring in early warm load (notably from SB-FASTEVAL)

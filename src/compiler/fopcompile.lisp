@@ -179,37 +179,37 @@
  ;; this is probably where you need to make it happen.
  #+sb-xc-host
  (defun fopcompilable-p (form &optional (expand t))
-  (and expand
-       (or (and (self-evaluating-p form)
-                (constant-fopcompilable-p form))
-           (and (typep form '(cons (eql quote) (cons t null)))
-                (constant-fopcompilable-p (constant-form-value form)))
-           (and (listp form)
-                (let ((function (car form)))
-                  ;; It is assumed that uses of these three recognized functions
-                  ;; are carefully controlled, and recursion on fopcompilable-p
-                  ;; would say "yes" for each argument.
-                  (or (member function '(sb-impl::%defun
-                                         sb-pcl::!trivial-defmethod
-                                         sb-kernel::%defstruct))
-                      ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
-                      (and (member function '(%defconstant sb-impl::%defparameter))
-                           (fopcompilable-p (third form)))
-                      (and (symbolp function) ; no ((lambda ...) ...)
-                           (get-properties (symbol-plist function)
-                                           '(:sb-cold-funcall-handler/for-effect
-                                             :sb-cold-funcall-handler/for-value)))
-                      (and (eq function 'setf)
-                           (fopcompilable-p (%macroexpand form *lexenv*)))
-                      (and (eq function 'sb-kernel:%svset)
-                           (destructuring-bind (thing index value) (cdr form)
-                             (and (symbolp thing)
-                                  (integerp index)
-                                  (eq (info :variable :kind thing) :global)
-                                  (typep value '(cons (member lambda function
-                                                       named-lambda))))))
-                      (and (eq function 'setq)
-                           (setq-fopcompilable-p (cdr form)))))))))
+   (declare (ignore expand))
+   (or (and (self-evaluating-p form)
+            (constant-fopcompilable-p form))
+       (and (typep form '(cons (eql quote) (cons t null)))
+            (constant-fopcompilable-p (constant-form-value form)))
+       (and (listp form)
+            (let ((function (car form)))
+              ;; It is assumed that uses of these three recognized functions
+              ;; are carefully controlled, and recursion on fopcompilable-p
+              ;; would say "yes" for each argument.
+              (or (member function '(sb-impl::%defun
+                                     sb-pcl::!trivial-defmethod
+                                     sb-kernel::%defstruct))
+                  ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
+                  (and (member function '(%defconstant sb-impl::%defparameter))
+                       (fopcompilable-p (third form)))
+                  (and (symbolp function) ; no ((lambda ...) ...)
+                       (get-properties (symbol-plist function)
+                                       '(:sb-cold-funcall-handler/for-effect
+                                         :sb-cold-funcall-handler/for-value)))
+                  (and (eq function 'setf)
+                       (fopcompilable-p (%macroexpand form *lexenv*)))
+                  (and (eq function 'sb-kernel:%svset)
+                       (destructuring-bind (thing index value) (cdr form)
+                         (and (symbolp thing)
+                              (integerp index)
+                              (eq (info :variable :kind thing) :global)
+                              (typep value
+                                     '(cons (member lambda function named-lambda))))))
+                  (and (eq function 'setq)
+                       (setq-fopcompilable-p (cdr form))))))))
 ) ; end FLET
 
 (defun let-fopcompilable-p (operator args)
