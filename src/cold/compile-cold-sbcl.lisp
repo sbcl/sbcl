@@ -29,11 +29,14 @@
          . muffle-warning)))
 
 (defun proclaim-target-optimization ()
+  ;; The difference between init'ing the XC policy vs just proclaiming
+  ;; is that INIT makes the settings stick in the baseline policy,
+  ;; which affects POLICY-COLD-INIT-OR-RESANIFY.
   (sb-c::init-xc-policy #+cons-profiling '((sb-c::instrument-consing 2)))
-  (let ((debug (if (position :sb-show sb-xc:*features*) 2 1)))
-    (sb-xc:proclaim
+  (sb-xc:proclaim
      `(optimize
-       (compilation-speed 1) (debug ,debug)
+       (compilation-speed 1)
+       (debug ,(if (find :sb-show sb-xc:*features*) 2 1))
        ;; CLISP's pretty-printer is fragile and tends to cause stack
        ;; corruption or fail internal assertions, as of 2003-04-20; we
        ;; therefore turn off as many notes as possible.
@@ -46,7 +49,8 @@
        ;; never insert stepper conditions
        (sb-c:insert-step-conditions 0)
        ;; save FP and PC for alien calls -- or not
-       (sb-c:alien-funcall-saves-fp-and-pc #!+x86 3 #!-x86 0)))))
+       (sb-c:alien-funcall-saves-fp-and-pc
+        ,(if (find :x86 sb-xc:*features*) 3 0)))))
 
 ;;; A note about CLISP compatibility:
 ;;; CLISP uses *READTABLE* when loading '.fas' files, and so we shouldn't put
@@ -83,32 +87,24 @@
         ;; optimizations. (ANSI says users aren't supposed to
         ;; redefine our functions anyway; and developers can
         ;; fend for themselves.)
-        #!-sb-fluid
-        (sb-ext:*derive-function-types* t)
+        (sb-ext:*derive-function-types*
+         (if (find :sb-fluid sb-xc:*features*) nil t))
         ;; Let the target know that we're the cross-compiler.
-        (*features* (cons :sb-xc *features*))
-        ;; We need to tweak the readtable..
-        (*readtable* (copy-readtable)))
-    ;; ..in order to make backquotes expand into target code
-    ;; instead of host code.
-    (set-macro-character #\` #'sb-impl::backquote-charmacro)
-    (set-macro-character #\, #'sb-impl::comma-charmacro)
-
-    ;; Warn about presence of #\Tab or #\Page in our quoted strings.
-    ;; This is done here and not more broadly, per the comment above.
-    (set-macro-character #\" (make-quote-reader (get-macro-character #\" nil)))
-
-    (set-dispatch-macro-character #\# #\+ #'she-reader)
-    (set-dispatch-macro-character #\# #\- #'she-reader)
+        (sb-xc:*features* (cons :sb-xc sb-xc:*features*))
+        (*readtable* sb-cold:*xc-readtable*))
     ;; Control optimization policy.
     (proclaim-target-optimization)
-    (progn
-      (funcall fun))))
+    (funcall fun)))
 
 (setf *target-compile-file* #'sb-xc:compile-file)
 (setf *target-assemble-file* #'sb-c:assemble-file)
 (setf *in-target-compilation-mode-fn* #'in-target-cross-compilation-mode)
 
+;; Update the xc-readtable
+(set-macro-character #\` #'sb-impl::backquote-charmacro nil *xc-readtable*)
+(set-macro-character #\, #'sb-impl::comma-charmacro nil *xc-readtable*)
+(set-macro-character #\" (make-quote-reader (get-macro-character #\" nil))
+                     nil *xc-readtable*)
 ;; ... and since the cross-compiler hasn't seen a DEFMACRO for QUASIQUOTE,
 ;; make it think it has, otherwise it fails more-or-less immediately.
 (setf (sb-xc:macro-function 'sb-int:quasiquote)
@@ -127,7 +123,7 @@
                (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
                (setq subprocess-list (delete pid subprocess-list)))
              (decf subprocess-count)))
-      (do-stems-and-flags (stem flags)
+      (do-stems-and-flags (stem flags 2)
         (unless (position :not-target flags)
           (when (>= subprocess-count max-jobs)
             (wait))
@@ -151,10 +147,10 @@
       (parallel-make-host-2 (make-host-2-parallelism))
       (let ((total
              (count-if (lambda (x) (not (find :not-target (cdr x))))
-                       (get-stems-and-flags)))
+                       (get-stems-and-flags 2)))
             (n 0)
             (sb-xc:*compile-verbose* nil))
-        (do-stems-and-flags (stem flags)
+        (do-stems-and-flags (stem flags 2)
           (unless (position :not-target flags)
             (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))
             (target-compile-stem stem flags)

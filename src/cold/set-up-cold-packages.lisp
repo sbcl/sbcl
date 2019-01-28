@@ -408,8 +408,8 @@
        (with-open-file (data (prepend-genfile-path "package-data-list.lisp-expr"))
          ;; There's no need to use the precautionary READ-FROM-FILE function
          ;; with package-data-list because it is not a customization file.
-         (create-target-packages (read data))
-         (read data))))
+         (create-target-packages (let ((*readtable* *xc-readtable*)) (read data)))
+         (let ((*readtable* *xc-readtable*)) (read data)))))
   (dolist (name (apply #'append list))
     (setf (gethash name *undefined-fun-whitelist*) t)))
 
@@ -437,7 +437,8 @@
 (make-assembler-package (backend-asm-package-name))
 
 (defun package-list-for-genesis ()
-  (append (read-from-file "package-data-list.lisp-expr" nil)
+  (append (let ((*readtable* *xc-readtable*))
+            (read-from-file "package-data-list.lisp-expr" nil))
           (let ((asm-package (backend-asm-package-name)))
             (list (make-package-data :name asm-package
                                      :use (list* "CL" *asm-package-use-list*)

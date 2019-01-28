@@ -21,7 +21,9 @@
 ;;;; have only one string on the first line. Silly, but there you go.
 
 ;;;; NOTE:
-;;;; It is generally not necessary to use reader conditionals
+;;;; All uses of #+ and #- reader macros within this file refer to
+;;;; the chosen target features, and not CL:*FEATURES*, but
+;;;; it is generally not necessary to use reader conditionals
 ;;;; within this file. If A-NICE-FUNCTION is external in SB-KERNEL
 ;;;; but not defined for a particular backend, it will not get
 ;;;; interned during cold load, and hence will not exist in the target.
@@ -3580,7 +3582,7 @@ SBCL itself"
   sb-sequence:substitute-if
   sb-sequence:substitute-if-not)
  ;; Fast interpreter
- #!+sb-fasteval
+ #+sb-fasteval
  (sb-interpreter:%fun-type
   sb-interpreter:env-policy
   sb-interpreter:eval-in-environment

@@ -18,7 +18,7 @@
 ;;; The target function is never called, but if omitted via #-sb-xc-host,
 ;;; compilation of !GENCGC-SPACE-SETUP would issue an "undefined" warning.
 (defun !read-dynamic-space-size ()
-  (unless (member :sb-xc-host *features*)
+  (unless (member :sb-xc-host sb-xc:*features*)
     (return-from !read-dynamic-space-size (symbol-value 'default-dynamic-space-size)))
   (with-open-file (f "output/dynamic-space-size.txt" :if-does-not-exist nil)
     (unless f

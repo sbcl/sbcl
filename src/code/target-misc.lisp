@@ -15,11 +15,12 @@
 ;;; various environment inquiries
 
 (defparameter *features*
+   ;; The :SB-XC keyword indicates the build phase and is not intended
+   ;; to persist into the target.
    ;; GCC_TLS is not a Lisp feature- it's just freeloading off the means
    ;; by which additional #defines get into "genesis/config.h".
    ;; Literally nothing except C code tests for it.
-   '#.(remove-if (lambda (x)
-                   (member x '(:gcc-tls)))
+   '#.(remove-if (lambda (x) (member x '(:sb-xc :gcc-tls)))
                  sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")

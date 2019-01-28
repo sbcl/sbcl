@@ -81,101 +81,63 @@
     (check 1 (with-open-file (f *feature-eval-results-file*) (read f)))
     (check 2 *feature-evaluation-results*)))
 
-(defun feature-in-list-p (feature list)
-  (labels ((sane-expr-p (x)
-             (typecase x
-               (symbol (and (string/= x "SB-XC")))
-               ;; This allows you to write #!+(host-feature sbcl) <stuff>
-               ;; to muffle conditions, bypassing the "probable XC bug" check.
-               ;; Using the escape hatch is assumed never to be a mistake.
-               ((cons (member :host-feature :vop-named :vop-translates)) t)
-               (cons (every #'sane-expr-p (cdr x))))))
-    (unless (sane-expr-p feature)
-      (error "Target feature expression ~S looks screwy" feature)))
+(defun feature-in-list-p (feature selector
+                          &aux (list (ecase selector
+                                       (:host cl:*features*)
+                                       (:target sb-xc:*features*))))
   (etypecase feature
-    (symbol (member feature list :test #'eq))
+    (symbol
+     (if (and (string= feature "SBCL") (eq selector :target))
+         (error "Testing SBCL as a target feature is obviously bogus")
+         (member feature list :test #'eq)))
     (cons (flet ((subfeature-in-list-p (subfeature)
-                   (feature-in-list-p subfeature list)))
+                   (feature-in-list-p subfeature selector)))
             (ecase (first feature)
               (:or  (some  #'subfeature-in-list-p (rest feature)))
               (:and (every #'subfeature-in-list-p (rest feature)))
-              ((:host-feature :not :vop-named :vop-translates)
+              (:not (destructuring-bind (subexpr) (cdr feature)
+                      (not (subfeature-in-list-p subexpr))))
+              ((:host-feature :vop-named :vop-translates)
+               (when (eq selector :host)
+                 (error "Invalid host feature test: ~S" feature))
                (destructuring-bind (subexpr) (cdr feature)
                  (case (first feature)
                    (:host-feature
-                        ;; (:HOST-FEATURE :sym) looks in *FEATURES* for :SYM
-                    (check-type subexpr symbol)
-                    (member subexpr *features* :test #'eq))
+                    (feature-in-list-p subexpr :host))
                    (:vop-named
                     (recording-feature-eval feature
                                       (any-vop-named-p subexpr)))
                    (:vop-translates
-                    (recording-feature-eval feature
-                                            (any-vop-translates-p subexpr)))
-                   (t
-                    (not (subfeature-in-list-p subexpr)))))))))))
+                    (recording-feature-eval
+                     feature (any-vop-translates-p subexpr)))))))))))
 (compile 'feature-in-list-p)
 
-(defun shebang-reader (stream sub-character infix-parameter)
-  (declare (ignore sub-character))
+(defun read-targ-feature-expr (stream sub-character infix-parameter)
   (when infix-parameter
     (error "illegal read syntax: #~D!" infix-parameter))
-  (let ((next-char (read-char stream)))
-    (unless (find next-char "+-")
-      (error "illegal read syntax: #!~C" next-char))
-    (if (char= (if (let* ((*package* (find-package "KEYWORD"))
-                          (*read-suppress* nil)
-                          (feature (read stream)))
-                     (feature-in-list-p feature sb-xc:*features*))
-                   #\+ #\-) next-char)
+  (when (eq sub-character #\!)
+    (let ((next-char (read-char stream t nil t)))
+      (unless (find next-char "+-")
+        (error "illegal read syntax: #!~C" next-char))
+      (setq sub-character next-char)))
+  (if (char= (if (let* ((*package* (find-package "KEYWORD"))
+                        (*read-suppress* nil)
+                        (feature (read stream t nil t)))
+                   (feature-in-list-p feature :target))
+                 #\+ #\-)
+             sub-character)
+      (read stream t nil t)
+      ;; Read (and discard) a form from input.
+      (let ((*read-suppress* t))
         (read stream t nil t)
-        ;; Read (and discard) a form from input.
-        (let ((*read-suppress* t))
-          (read stream t nil t)
-          (values)))))
-(compile 'shebang-reader)
+        (values))))
+(compile 'read-targ-feature-expr)
 
-(set-dispatch-macro-character #\# #\! #'shebang-reader)
-;;; while we are at it, let us write something which helps us sanity
-;;; check our own code; it is too easy to write #+ when meaning #!+,
-;;; and such mistakes can go undetected for a while.
-;;;
-;;; ideally we wouldn't use SB-XC:*FEATURES* but something like
-;;; *ALL-POSSIBLE-TARGET-FEATURES*, but maintaining that variable
-;;; would not be easy.
-(defun checked-feature-in-features-list-p (feature list)
-  (etypecase feature
-    (symbol (unless (member feature '(:ansi-cl :common-lisp :ieee-floating-point
-                                      :sb-assembling :sb-xc-host))
-              (when (member feature sb-xc:*features* :test #'eq)
-                (error "probable XC bug in host read-time conditional: ~S" feature)))
-            (member feature list :test #'eq))
-    (cons (flet ((subfeature-in-list-p (subfeature)
-                   (checked-feature-in-features-list-p subfeature list)))
-            (ecase (first feature)
-              (:or  (some  #'subfeature-in-list-p (rest feature)))
-              (:and (every #'subfeature-in-list-p (rest feature)))
-              (:not (let ((rest (cdr feature)))
-                      (if (or (null (car rest)) (cdr rest))
-                        (error "wrong number of terms in compound feature ~S"
-                               feature)
-                        (not (subfeature-in-list-p (second feature)))))))))))
-(compile 'checked-feature-in-features-list-p)
-
-(defun she-reader (stream sub-character infix-parameter)
-  (when infix-parameter
-    (error "illegal read syntax: #~D~C" infix-parameter sub-character))
-  (when (let* ((*package* (find-package "KEYWORD"))
-               (*read-suppress* nil)
-               (notp (eql sub-character #\-))
-               (feature (read stream)))
-          (if (checked-feature-in-features-list-p feature *features*)
-              notp
-              (not notp)))
-    (let ((*read-suppress* t))
-      (read stream t nil t)))
-  (values))
-(compile 'she-reader)
+(export '*xc-readtable*)
+(defvar *xc-readtable* (copy-readtable))
+(set-dispatch-macro-character #\# #\! #'read-targ-feature-expr *xc-readtable*)
+(set-dispatch-macro-character #\# #\+ #'read-targ-feature-expr *xc-readtable*)
+(set-dispatch-macro-character #\# #\- #'read-targ-feature-expr *xc-readtable*)
 
 ;;;; variables like SB-XC:*FEATURES* but different
 

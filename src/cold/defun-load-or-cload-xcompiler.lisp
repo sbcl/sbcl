@@ -18,7 +18,7 @@
                (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
                (setq subprocess-list (delete pid subprocess-list)))
              (decf subprocess-count)))
-      (do-stems-and-flags (stem flags)
+      (do-stems-and-flags (stem flags 1)
         (unless (position :not-host flags)
           (when (>= subprocess-count max-jobs)
             (wait))
@@ -60,7 +60,7 @@
   (in-host-compilation-mode
    (lambda ()
      (handler-bind ((host-sb-kernel:redefinition-warning #'muffle-warning))
-       (do-stems-and-flags (stem flags)
+       (do-stems-and-flags (stem flags 1)
          (unless (position :not-host flags)
            (load (stem-object-path stem flags :host-compile)
                  :verbose t :print nil))))))
@@ -83,10 +83,11 @@
            (eq load-or-cload-stem #'host-cload-stem))
       (funcall (intern "PARALLEL-MAKE-HOST-1" 'sb-cold)
                (make-host-1-parallelism))
-      (do-stems-and-flags (stem flags)
+      (do-stems-and-flags (stem flags 1)
         (unless (find :not-host flags)
           (funcall load-or-cload-stem stem flags)
-          #!+sb-show (warn-when-cl-snapshot-diff *cl-snapshot*))))
+          (when (member :sb-show sb-xc:*features*)
+            (warn-when-cl-snapshot-diff *cl-snapshot*)))))
 
   ;; If the cross-compilation host is SBCL itself, we can use the
   ;; PURIFY extension to freeze everything in place, reducing the

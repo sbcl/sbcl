@@ -73,8 +73,8 @@
 ;;;
 (let ((sources (with-open-file (f (merge-pathnames "../../build-order.lisp-expr"
                                                    *load-pathname*))
-                 (let ((*features* (cons :warm-build-phase *features*)))
-                   (read f))))
+                 (read f) ; skip over the make-host-{1,2} input files
+                 (read f)))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions compiler-note))

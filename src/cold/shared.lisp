@@ -312,10 +312,10 @@
 ;;; machinery to warn us when/if we change it.
 ;;;
 ;;; All code depending on this is itself dependent on #!+SB-SHOW.
-#!+sb-show
-(progn
+(defvar *cl-snapshot*)
+(when (member :sb-show sb-xc:*features*)
   (load "src/cold/snapshot.lisp")
-  (defvar *cl-snapshot* (take-snapshot "COMMON-LISP")))
+  (setq *cl-snapshot* (take-snapshot "COMMON-LISP")))
 
 ;;;; master list of source files and their properties
 
@@ -352,13 +352,28 @@
     ;; never figured out but which were apparently acceptable in CMU
     ;; CL. Eventually, it would be great to just get rid of all
     ;; warnings and remove support for this flag. -- WHN 19990323)
-    :ignore-failure-p))
+    :ignore-failure-p
+    ;; meaning: ignore this flag.
+    ;; This works around nonstandard behavior of "#." in certain hosts.
+    ;; When the evaluated form yields 0 values, ECL and CLISP treat it
+    ;; as though if yielded NIL:
+    ;; * (read-from-string "#(#.(cl:if (cl:eql 1 2) x (values)))")
+    ;;   => #(NIL)
+    ;; The correct value for the above expression - as obtained in SBCL,
+    ;; CCL, and ABCL - is #() because _any_ reader macro is permitted
+    ;; to produce 0 values. In fact you can demonstrate this by actually
+    ;; implementing your own "#." which conditionally returns 0 values,
+    ;; and seeing that it works in any lisp including the suspect ones.
+    ;; The oft-used idiom of "#+#.(cl:if (test) '(and) '(or)) X"
+    ;; is sufficiently unclear that its worth allowing a spurious NIL
+    ;; just to avoid that ugly mess.
+    nil))
 
 (defvar *array-to-specialization* (make-hash-table :test #'eq))
 
-(defmacro do-stems-and-flags ((stem flags) &body body)
+(defmacro do-stems-and-flags ((stem flags build-phase) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
-    `(dolist (,stem-and-flags (get-stems-and-flags))
+    `(dolist (,stem-and-flags (get-stems-and-flags ,build-phase))
        (let ((,stem (first ,stem-and-flags))
              (,flags (rest ,stem-and-flags)))
          ,@body
@@ -408,13 +423,26 @@
 (compile 'stem-object-path)
 
 (defvar *stems-and-flags* nil)
-;;; Check for stupid typos in FLAGS list keywords.
-(defun get-stems-and-flags ()
- (when *stems-and-flags*
-   (return-from get-stems-and-flags *stems-and-flags*))
- (setf *stems-and-flags* (read-from-file "build-order.lisp-expr" nil))
- (let ((stems (make-hash-table :test 'equal)))
-  (do-stems-and-flags (stem flags)
+;;; Read the set of files to compile with respect to a build phase, 1 or 2.
+(defun get-stems-and-flags (build-phase)
+  (when (and *stems-and-flags* (eql (car *stems-and-flags*) build-phase))
+    (return-from get-stems-and-flags (cdr *stems-and-flags*)))
+  (let* ((feature (aref #(:sb-xc-host :sb-xc) (1- build-phase)))
+         (list
+          ;; The build phase feature goes into CL:*FEATURES*, not SB-XC:*FEATURES*
+          ;; because firstly we don't use feature expressions to control the set of
+          ;; files pertinent to the build phase - that is governed by :NOT-{HOST,TARGET}
+          ;; flags, and secondly we can not assume existence of the SB-XC package in
+          ;; warm build. The sole reason for this hack is to allow testing for CMU
+          ;; as the build host in make-host-1 which apparently needs to be allowed
+          ;; to produce warnings as a bug workaround.
+          (let ((cl:*features* (cons feature cl:*features*))
+                (*readtable* *xc-readtable*))
+            (read-from-file "build-order.lisp-expr" nil))))
+    (setf *stems-and-flags* (cons build-phase list)))
+  ;; Now check for duplicate stems and bogus flags.
+  (let ((stems (make-hash-table :test 'equal)))
+    (do-stems-and-flags (stem flags build-phase)
     ;; We do duplicate stem comparison based on the object path in
     ;; order to cover the case of stems with an :assem flag, which
     ;; have two entries but separate object paths for each.  KLUDGE:
@@ -422,18 +450,19 @@
     ;; set up later in the build process and we don't actually care
     ;; what it is so long as it doesn't change while we're checking
     ;; for duplicate stems.
-    (let* ((*target-obj-prefix* "")
-           (object-path (stem-object-path stem flags :target-compile)))
-      (if (gethash object-path stems)
-          (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
-          (setf (gethash object-path stems) t)))
+      (let* ((*target-obj-prefix* "")
+             (object-path (stem-object-path stem flags :target-compile)))
+        (if (gethash object-path stems)
+            (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
+            (setf (gethash object-path stems) t)))
+    ;; Check for stupid typos in FLAGS list keywords.
     ;; FIXME: We should make sure that the :assem flag is only used
     ;; when paired with :not-host.
-    (let ((set-difference (set-difference flags *expected-stem-flags*)))
-      (when set-difference
-        (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
-               set-difference)))))
-  *stems-and-flags*)
+      (let ((set-difference (set-difference flags *expected-stem-flags*)))
+        (when set-difference
+          (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
+                 set-difference)))))
+  (cdr *stems-and-flags*))
 
 ;;;; tools to compile SBCL sources to create the cross-compiler
 
@@ -568,8 +597,14 @@
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
-  (let ((*features* (cons :sb-xc-host *features*))
-        (sb-xc:*features* (cons :sb-xc-host sb-xc:*features*)))
+  (let ((sb-xc:*features*
+         ;; Copy the quite-probably-obsolete :NO-ANSI-PRINT-OBJECT feature
+         ;; into the target features (it was potentially added by 'ansify')
+         ;; into the host features.
+         (if (member :no-ansi-print-object cl:*features*)
+             (list* :no-ansi-print-object :sb-xc-host sb-xc:*features*)
+             (cons :sb-xc-host sb-xc:*features*)))
+        (*readtable* *xc-readtable*))
     (funcall fn)))
 (compile 'in-host-compilation-mode)
 

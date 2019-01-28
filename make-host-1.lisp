@@ -1,6 +1,5 @@
 (progn
   (load "src/cold/shared.lisp")
-  (load "tools-for-build/ldso-stubs.lisp")
   (let ((*print-pretty* nil)
         (*print-length* nil))
     (dolist (thing '(("SB-XC" "*FEATURES*")
@@ -11,6 +10,7 @@
           (format t "~&target ~S = ~S~%" sym  val))))))
 (in-package "SB-COLD")
 (progn
+  (let ((*readtable* *xc-readtable*)) (load "tools-for-build/ldso-stubs.lisp"))
   (setf *host-obj-prefix* "obj/from-host/")
   (load "src/cold/set-up-cold-packages.lisp")
   (load "src/cold/defun-load-or-cload-xcompiler.lisp")
@@ -38,12 +38,15 @@
                                       (or (search "not allowed by the operand type" fc)
                                           (search "ignoring FAILURE-P return" fc)))
                            (setq fail 'warning))))
-                      ;; Prevent regressions on a couple platforms
+                      ;; Prevent regressions on a few platforms
                       ;; that are known to build cleanly.
-                      #!+(or x86 x86-64 arm64)
                       (sb-int:simple-style-warning
                        (lambda (c &aux (fc (simple-condition-format-control c)))
-                         (when (and in-summary (stringp fc) (search "undefined" fc))
+                         (when (and (feature-in-list-p '(:or :x86 :x86-64 :arm64)
+                                                       :target)
+                                    in-summary
+                                    (stringp fc)
+                                    (search "undefined" fc))
                            (unless (eq fail 'warning)
                              (setq fail 'style-warning))))))
          (with-compilation-unit ()
@@ -52,12 +55,7 @@
          (cerror "Proceed anyway"
                  "make-host-1 stopped due to unexpected ~A." fail)))
 
-    #-(or clisp sbcl) `(with-compilation-unit () ,@forms))
-
-  ;; Now we can set the #[+-] readers to our precautionary
-  ;; readers that prohibit use of ":sbcl" as the condition.
-  (set-dispatch-macro-character #\# #\+ #'she-reader)
-  (set-dispatch-macro-character #\# #\- #'she-reader))
+    #-(or clisp sbcl) `(with-compilation-unit () ,@forms)))
 
 ;;; Build the unicode database now. It depends on nothing in the cross-compiler
 ;;; (and let's keep it that way). This code is slow to run, so compile it.
@@ -75,9 +73,10 @@
  ;; Let's check that the type system, and various other things, are
  ;; reasonably sane. (It's easy to spend a long time wandering around
  ;; confused trying to debug cross-compilation if it isn't.)
- (load "tests/type.before-xc.lisp")
- (load "tests/info.before-xc.lisp")
- (load "tests/vm.before-xc.lisp")
+ (let ((*readtable* *xc-readtable*))
+   (load "tests/type.before-xc.lisp")
+   (load "tests/info.before-xc.lisp")
+   (load "tests/vm.before-xc.lisp"))
 
  ;; propagate structure offset and other information to the C runtime
  ;; support code.

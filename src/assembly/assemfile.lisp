@@ -35,8 +35,8 @@
          (*asmstream* asmstream)
          (*adjustable-vectors* nil))
     (unwind-protect
-         (let ((*features* (cons :sb-assembling *features*))
-               (sb-xc:*features* (cons :sb-assembling sb-xc:*features*)))
+        (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
+              (*readtable* sb-cold:*xc-readtable*))
           (load (merge-pathnames name (make-pathname :type "lisp")))
           ;; Leave room for the indirect call table. relocate_heap() in
           ;; 'coreparse' finds the end with a 0 word so add 1 extra word.
