@@ -1119,19 +1119,51 @@
                     (error "~a is not a subtype of VECTOR." type)))))
     (simplify type)))
 
+
+(defun check-coerce (value-type to-type type-specifier node)
+  (flet ((fail ()
+           (compiler-warn "Cannot coerce ~s to ~s"
+                          (type-specifier value-type)
+                          (type-specifier to-type))
+           (setf (combination-kind node) :error)
+           (give-up-ir1-transform)))
+    (cond ((eq to-type *empty-type*)
+           (fail))
+          ((types-equal-or-intersect value-type to-type))
+          ((csubtypep to-type (specifier-type 'sequence))
+           (unless (csubtypep to-type (specifier-type 'sequence))
+             (fail)))
+          ((eql type-specifier 'character)
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type 'string))
+             (fail)))
+          ((csubtypep to-type (specifier-type 'complex))
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type 'number))
+             (fail)))
+
+          ((csubtypep to-type (specifier-type 'float))
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type 'real))
+             (fail)))
+          ((eq type-specifier 'function)
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type '(or symbol cons)))
+             (fail)))
+          (t
+           (fail)))))
+
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform))
   (let* ((tval (lvar-value type))
-         (tspec (ir1-transform-specifier-type tval)))
+         (tspec (ir1-transform-specifier-type tval))
+         (value-type (lvar-type x)))
+    (check-coerce value-type tspec tval node)
     ;; Note: The THE forms we use to wrap the results make sure that
     ;; specifiers like (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
     (cond
-      ((eq tspec *empty-type*)
-       (compiler-warn "Can't coerce to NIL.")
-       (setf (combination-kind node) :error)
-       (give-up-ir1-transform))
-      ((csubtypep (lvar-type x) tspec)
+      ((csubtypep value-type tspec)
        'x)
       ((csubtypep tspec (specifier-type 'double-float))
        `(the ,tval (%double-float x)))
@@ -1156,9 +1188,15 @@
               ((typep x ',tval)
                x)
               (t         ; X is COMPLEX, but not of the requested type
-               (the ,result-type
-                    (complex (coerce (realpart x) ',part-type)
-                             (coerce (imagpart x) ',part-type))))))))
+               ,(if (eq part-type 'rational)
+                    ;; Can't coerce non-rational to a rational and
+                    ;; CHECK-COERCE will warn, so just full call
+                    ;; COERCE and let it signal an error.
+                    `(locally (declare (notinline coerce))
+                       (coerce x ',tval))
+                    `(the ,result-type
+                          (complex (coerce (realpart x) ',part-type)
+                                   (coerce (imagpart x) ',part-type)))))))))
       ;; Special case STRING and SIMPLE-STRING as they are union types
       ;; in SBCL.
       ((member tval '(string simple-string))
