@@ -144,12 +144,12 @@
                            :init-vop 'sb-vm::raw-instance-init/complex-double
                            :alignment double-float-alignment
                            :n-words (/ 16 sb-vm:n-word-bytes))
-       #!+long-float
+       #+long-float
        (make-raw-slot-data :raw-type long-float
                            :accessor-name '%raw-instance-ref/long
                            :init-vop 'sb-vm::raw-instance-init/long
                            :n-words #!+x86 3 #!+sparc 4)
-       #!+long-float
+       #+long-float
        (make-raw-slot-data :raw-type complex-long-float
                            :accessor-name '%raw-instance-ref/complex-long
                            :init-vop 'sb-vm::raw-instance-init/complex-long

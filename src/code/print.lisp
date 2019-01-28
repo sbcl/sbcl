@@ -1264,7 +1264,7 @@ variable: an unreadable object representing the error is printed instead.")
   (- 2 sb-vm:single-float-bias sb-vm:single-float-digits))
 (defconstant double-float-min-e
   (- 2 sb-vm:double-float-bias sb-vm:double-float-digits))
-#!+long-float
+#+long-float
 (defconstant long-float-min-e
   (nth-value 1 (decode-float least-positive-long-float)))
 
@@ -1283,7 +1283,7 @@ variable: an unreadable object representing the error is printed instead.")
           (etypecase float
             (single-float single-float-min-e)
             (double-float double-float-min-e)
-            #!+long-float
+            #+long-float
             (long-float long-float-min-e))))
     (multiple-value-bind (f e)
         (integer-decode-float float)
@@ -1442,7 +1442,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format*
-        #!+long-float 'long-float #!-long-float 'double-float))
+        #+long-float 'long-float #-long-float 'double-float))
 (defun scale-exponent (original-x)
   (let* ((x (coerce original-x 'long-float)))
     (multiple-value-bind (sig exponent) (decode-float x)
@@ -1461,15 +1461,15 @@ variable: an unreadable object representing the error is printed instead.")
                                    ;; ulp in this value, which is a
                                    ;; little unfortunate.)
                                    (load-time-value
-                                    #!-long-float
+                                    #-long-float
                                     (make-double-float 1070810131 1352628735)
-                                    #!+long-float
+                                    #+long-float
                                     (error "(log 2 10) not computed")))))))
                  (x (if (minusp ex)
                         (if (float-denormalized-p x)
-                            #!-long-float
+                            #-long-float
                             (* x 1.0e16 (expt 10.0e0 (- (- ex) 16)))
-                            #!+long-float
+                            #+long-float
                             (* x 1.0e18 (expt 10.0e0 (- (- ex) 18)))
                             (* x 10.0e0 (expt 10.0e0 (- (- ex) 1))))
                         (/ x 10.0e0 (expt 10.0e0 (1- ex))))))
@@ -1517,9 +1517,9 @@ variable: an unreadable object representing the error is printed instead.")
   (cond ((case *read-default-float-format*
            ((short-float single-float)
             (typep x 'single-float))
-           ((double-float #!-long-float long-float)
+           ((double-float #-long-float long-float)
             (typep x 'double-float))
-           #!+long-float
+           #+long-float
            (long-float
             (typep x 'long-float)))
          (unless (eql exp 0)

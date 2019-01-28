@@ -18,7 +18,7 @@
 (defknown (fixnump bignump ratiop
            short-float-p single-float-p double-float-p long-float-p
            complex-rational-p complex-float-p complex-single-float-p
-           complex-double-float-p #!+long-float complex-long-float-p
+           complex-double-float-p #+long-float complex-long-float-p
            complex-vector-p
            #!+sb-unicode base-char-p
            %standard-char-p %instancep
@@ -50,10 +50,10 @@
            #!+64-bit
            simple-array-signed-byte-64-p
            simple-array-single-float-p simple-array-double-float-p
-           #!+long-float simple-array-long-float-p
+           #+long-float simple-array-long-float-p
            simple-array-complex-single-float-p
            simple-array-complex-double-float-p
-           #!+long-float simple-array-complex-long-float-p
+           #+long-float simple-array-complex-long-float-p
            simple-rank-1-array-*-p
            system-area-pointer-p realp
            ;; #!-64-bit

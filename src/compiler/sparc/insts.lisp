@@ -71,7 +71,7 @@ Otherwise, use the Sparc register names")
            (let ((offset (tn-offset loc)))
              (aver (zerop (mod offset 2)))
              (values (+ offset 32) 2)))
-          #!+long-float
+          #+long-float
           (long-reg
            (let ((offset (tn-offset loc)))
              (aver (zerop (mod offset 4)))

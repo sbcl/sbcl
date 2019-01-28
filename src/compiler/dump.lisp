@@ -533,7 +533,7 @@
        (declare (double-float x))
        (dump-integer-as-n-bytes (double-float-low-bits x) 4 file)
        (dump-integer-as-n-bytes (double-float-high-bits x) 4 file)))
-    #!+long-float
+    #+long-float
     (long-float
      (dump-fop 'fop-long-float file)
      (dump-long-float x file))))
@@ -580,7 +580,7 @@
      (dump-complex-single-float (realpart x) (imagpart x) file))
     ((complex double-float)
      (dump-complex-double-float (realpart x) (imagpart x) file))
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (dump-fop 'fop-complex-long-float file)
      (dump-long-float (realpart x) file)

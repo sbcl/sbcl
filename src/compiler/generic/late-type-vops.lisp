@@ -94,13 +94,13 @@
 
 (!define-type-vop complexp
   (complex-widetag complex-single-float-widetag complex-double-float-widetag
-                   #!+long-float complex-long-float-widetag))
+                   #+long-float complex-long-float-widetag))
 
 (!define-type-vop complex-rational-p (complex-widetag))
 
 (!define-type-vop complex-float-p
   (complex-single-float-widetag complex-double-float-widetag
-                                #!+long-float complex-long-float-widetag))
+                                #+long-float complex-long-float-widetag))
 
 (!define-type-vop complex-single-float-p (complex-single-float-widetag))
 
@@ -226,11 +226,11 @@
    ratio-widetag
    single-float-widetag
    double-float-widetag
-   #!+long-float long-float-widetag
+   #+long-float long-float-widetag
    complex-widetag
    complex-single-float-widetag
    complex-double-float-widetag
-   #!+long-float complex-long-float-widetag
+   #+long-float complex-long-float-widetag
    . #.fixnum-lowtags))
 
 (!define-type-vop rationalp
@@ -240,14 +240,14 @@
   (bignum-widetag . #.fixnum-lowtags))
 
 (!define-type-vop floatp
-  (single-float-widetag double-float-widetag #!+long-float long-float-widetag))
+  (single-float-widetag double-float-widetag #+long-float long-float-widetag))
 
 (!define-type-vop realp
   (ratio-widetag
    bignum-widetag
    single-float-widetag
    double-float-widetag
-   #!+long-float long-float-widetag
+   #+long-float long-float-widetag
    . #.fixnum-lowtags))
 
 #!+sb-simd-pack

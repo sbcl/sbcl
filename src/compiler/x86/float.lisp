@@ -17,7 +17,7 @@
     (ea-for-xf-desc tn single-float-value-slot))
   (defun ea-for-df-desc (tn)
     (ea-for-xf-desc tn double-float-value-slot))
-  #!+long-float
+  #+long-float
   (defun ea-for-lf-desc (tn)
     (ea-for-xf-desc tn long-float-value-slot))
   ;; complex floats
@@ -29,10 +29,10 @@
     (ea-for-xf-desc tn complex-double-float-real-slot))
   (defun ea-for-cdf-imag-desc (tn)
     (ea-for-xf-desc tn complex-double-float-imag-slot))
-  #!+long-float
+  #+long-float
   (defun ea-for-clf-real-desc (tn)
     (ea-for-xf-desc tn complex-long-float-real-slot))
-  #!+long-float
+  #+long-float
   (defun ea-for-clf-imag-desc (tn)
     (ea-for-xf-desc tn complex-long-float-imag-slot)))
 
@@ -46,7 +46,7 @@
     (ea-for-xf-stack tn :single))
   (defun ea-for-df-stack (tn)
     (ea-for-xf-stack tn :double))
-  #!+long-float
+  #+long-float
   (defun ea-for-lf-stack (tn)
     (ea-for-xf-stack tn :long)))
 
@@ -92,10 +92,10 @@
     (ea-for-cxf-stack tn :double :real base))
   (defun ea-for-cdf-imag-stack (tn &optional (base ebp-tn))
     (ea-for-cxf-stack tn :double :imag base))
-  #!+long-float
+  #+long-float
   (defun ea-for-clf-real-stack (tn &optional (base ebp-tn))
     (ea-for-cxf-stack tn :long :real base))
-  #!+long-float
+  #+long-float
   (defun ea-for-clf-imag-stack (tn &optional (base ebp-tn))
     (ea-for-cxf-stack tn :long :imag base)))
 
@@ -121,7 +121,7 @@
 ;;; The x86 can't store a long-float to memory without popping the
 ;;; stack and marking a register as empty, so it is necessary to
 ;;; restore the register from memory.
-#!+long-float
+#+long-float
 (defun store-long-float (ea)
    (inst fstpl ea)
    (inst fldl ea))
@@ -159,13 +159,13 @@
          ;; This may not be necessary as ST0 is likely invalid now.
          (inst fxch x))))
 
-#!+long-float
+#+long-float
 (define-move-fun (load-long 2) (vop x y)
   ((long-stack) (long-reg))
   (with-empty-tn@fp-top(y)
      (inst fldl (ea-for-lf-stack x))))
 
-#!+long-float
+#+long-float
 (define-move-fun (store-long 2) (vop x y)
   ((long-reg) (long-stack))
   (cond ((zerop (tn-offset x))
@@ -184,28 +184,28 @@
 ;;; "immediate-constant-sc" in vm.lisp.
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format*
-        #!+long-float 'long-float #!-long-float 'double-float))
+        #+long-float 'long-float #-long-float 'double-float))
 (define-move-fun (load-fp-constant 2) (vop x y)
-  ((fp-constant) (single-reg double-reg #!+long-float long-reg))
+  ((fp-constant) (single-reg double-reg #+long-float long-reg))
   (let ((value (tn-value x)))
     (with-empty-tn@fp-top(y)
-      (cond ((or (eql value 0f0) (eql value 0d0) #!+long-float (eql value 0l0))
+      (cond ((or (eql value 0f0) (eql value 0d0) #+long-float (eql value 0l0))
              (inst fldz))
             ((= value 1e0)
              (inst fld1))
-            #!+long-float
+            #+long-float
             ((= value (coerce pi *read-default-float-format*))
              (inst fldpi))
-            #!+long-float
+            #+long-float
             ((= value (log 10e0 2e0))
              (inst fldl2t))
-            #!+long-float
+            #+long-float
             ((= value (log 2.718281828459045235360287471352662e0 2e0))
              (inst fldl2e))
-            #!+long-float
+            #+long-float
             ((= value (log 2e0 10e0))
              (inst fldlg2))
-            #!+long-float
+            #+long-float
             ((= value (log 2e0 2.718281828459045235360287471352662e0))
              (inst fldln2))
             (t (warn "ignoring bogus i387 constant ~A" value))))))
@@ -239,11 +239,11 @@
   (make-random-tn :kind :normal :sc (sc-or-lose 'double-reg)
                   :offset (1+ (tn-offset x))))
 
-#!+long-float
+#+long-float
 (defun complex-long-reg-real-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'long-reg)
                   :offset (tn-offset x)))
-#!+long-float
+#+long-float
 (defun complex-long-reg-imag-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'long-reg)
                   :offset (1+ (tn-offset x))))
@@ -295,7 +295,7 @@
     (inst fstd (ea-for-cdf-imag-stack y))
     (inst fxch imag-tn)))
 
-#!+long-float
+#+long-float
 (define-move-fun (load-complex-long 2) (vop x y)
   ((complex-long-stack) (complex-long-reg))
   (let ((real-tn (complex-long-reg-real-tn y)))
@@ -305,7 +305,7 @@
     (with-empty-tn@fp-top(imag-tn)
       (inst fldl (ea-for-clf-imag-stack x)))))
 
-#!+long-float
+#+long-float
 (define-move-fun (store-complex-long 2) (vop x y)
   ((complex-long-reg) (complex-long-stack))
   (let ((real-tn (complex-long-reg-real-tn x)))
@@ -349,11 +349,11 @@
   (:results (y :scs (double-reg) :load-if (not (location= x y)))))
 (define-move-vop double-move :move (double-reg) (double-reg))
 
-#!+long-float
+#+long-float
 (define-vop (long-move float-move)
   (:args (x :scs (long-reg) :target y :load-if (not (location= x y))))
   (:results (y :scs (long-reg) :load-if (not (location= x y)))))
-#!+long-float
+#+long-float
 (define-move-vop long-move :move (long-reg) (long-reg))
 
 ;;; complex float register to register moves
@@ -395,12 +395,12 @@
 (define-move-vop complex-double-move :move
   (complex-double-reg) (complex-double-reg))
 
-#!+long-float
+#+long-float
 (define-vop (complex-long-move complex-float-move)
   (:args (x :scs (complex-long-reg)
             :target y :load-if (not (location= x y))))
   (:results (y :scs (complex-long-reg) :load-if (not (location= x y)))))
-#!+long-float
+#+long-float
 (define-move-vop complex-long-move :move
   (complex-long-reg) (complex-long-reg))
 
@@ -430,7 +430,7 @@
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
 
-#!+long-float
+#+long-float
 (define-vop (move-from-long)
   (:args (x :scs (long-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
@@ -440,7 +440,7 @@
      (fixed-alloc y long-float-widetag long-float-size node)
      (with-tn@fp-top(x)
        (store-long-float (ea-for-lf-desc y)))))
-#!+long-float
+#+long-float
 (define-move-vop move-from-long :move
   (long-reg) (descriptor-reg))
 
@@ -453,20 +453,20 @@
        (1f0 (load-symbol-value y *fp-constant-1f0*))
        (0d0 (load-symbol-value y *fp-constant-0d0*))
        (1d0 (load-symbol-value y *fp-constant-1d0*))
-       #!+long-float
+       #+long-float
        (0l0 (load-symbol-value y *fp-constant-0l0*))
-       #!+long-float
+       #+long-float
        (1l0 (load-symbol-value y *fp-constant-1l0*))
-       #!+long-float
+       #+long-float
        (#.pi (load-symbol-value y *fp-constant-pi*))
-       #!+long-float
+       #+long-float
        (#.(log 10l0 2l0) (load-symbol-value y *fp-constant-l2t*))
-       #!+long-float
+       #+long-float
        (#.(log 2.718281828459045235360287471352662L0 2l0)
           (load-symbol-value y *fp-constant-l2e*))
-       #!+long-float
+       #+long-float
        (#.(log 2l0 10l0) (load-symbol-value y *fp-constant-lg2*))
-       #!+long-float
+       #+long-float
        (#.(log 2l0 2.718281828459045235360287471352662L0)
           (load-symbol-value y *fp-constant-ln2*)))))
 (define-move-vop move-from-fp-constant :move
@@ -491,7 +491,7 @@
        (inst fldd (ea-for-df-desc x)))))
 (define-move-vop move-to-double :move (descriptor-reg) (double-reg))
 
-#!+long-float
+#+long-float
 (define-vop (move-to-long)
   (:args (x :scs (descriptor-reg)))
   (:results (y :scs (long-reg)))
@@ -499,7 +499,7 @@
   (:generator 2
      (with-empty-tn@fp-top(y)
        (inst fldl (ea-for-lf-desc x)))))
-#!+long-float
+#+long-float
 (define-move-vop move-to-long :move (descriptor-reg) (long-reg))
 
 ;;; Move from complex float to a descriptor reg. allocating a new
@@ -536,7 +536,7 @@
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
 
-#!+long-float
+#+long-float
 (define-vop (move-from-complex-long)
   (:args (x :scs (complex-long-reg) :to :save))
   (:results (y :scs (descriptor-reg)))
@@ -550,7 +550,7 @@
      (let ((imag-tn (complex-long-reg-imag-tn x)))
        (with-tn@fp-top(imag-tn)
          (store-long-float (ea-for-clf-imag-desc y))))))
-#!+long-float
+#+long-float
 (define-move-vop move-from-complex-long :move
   (complex-long-reg) (descriptor-reg))
 
@@ -567,19 +567,19 @@
                         ,@(ecase format
                            (:single '((inst fld (ea-for-csf-real-desc x))))
                            (:double '((inst fldd (ea-for-cdf-real-desc x))))
-                           #!+long-float
+                           #+long-float
                            (:long '((inst fldl (ea-for-clf-real-desc x)))))))
                     (let ((imag-tn (complex-double-reg-imag-tn y)))
                       (with-empty-tn@fp-top(imag-tn)
                         ,@(ecase format
                            (:single '((inst fld (ea-for-csf-imag-desc x))))
                            (:double '((inst fldd (ea-for-cdf-imag-desc x))))
-                           #!+long-float
+                           #+long-float
                            (:long '((inst fldl (ea-for-clf-imag-desc x)))))))))
                 (define-move-vop ,name :move (descriptor-reg) (,sc)))))
           (frob move-to-complex-single complex-single-reg :single)
           (frob move-to-complex-double complex-double-reg :double)
-          #!+long-float
+          #+long-float
           (frob move-to-complex-double complex-long-reg :long))
 
 ;;;; the move argument vops
@@ -617,7 +617,7 @@
                                 ,@(ecase format
                                          (:single '((inst fst ea)))
                                          (:double '((inst fstd ea)))
-                                         #!+long-float
+                                         #+long-float
                                          (:long '((store-long-float ea))))))
                            ;; Lisp stack
                            (let ((ea (make-ea
@@ -632,13 +632,13 @@
                                ,@(ecase format
                                     (:single '((inst fst  ea)))
                                     (:double '((inst fstd ea)))
-                                    #!+long-float
+                                    #+long-float
                                     (:long '((store-long-float ea)))))))))))
                 (define-move-vop ,name :move-arg
                   (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack :single)
   (frob move-double-float-arg double-reg double-stack :double)
-  #!+long-float
+  #+long-float
   (frob move-long-float-arg long-reg long-stack :long))
 
 ;;;; complex float MOVE-ARG VOP
@@ -679,7 +679,7 @@
                                     (:double
                                      '((inst fstd
                                         (ea-for-cdf-real-stack y fp))))
-                                    #!+long-float
+                                    #+long-float
                                     (:long
                                      '((store-long-float
                                         (ea-for-clf-real-stack y fp))))))
@@ -692,7 +692,7 @@
                                     (:double
                                      '((inst fstd
                                         (ea-for-cdf-real-stack y fp))))
-                                    #!+long-float
+                                    #+long-float
                                     (:long
                                      '((store-long-float
                                         (ea-for-clf-real-stack y fp)))))
@@ -704,7 +704,7 @@
                               '((inst fst (ea-for-csf-imag-stack y fp))))
                              (:double
                               '((inst fstd (ea-for-cdf-imag-stack y fp))))
-                             #!+long-float
+                             #+long-float
                              (:long
                               '((store-long-float
                                  (ea-for-clf-imag-stack y fp)))))
@@ -715,13 +715,13 @@
         complex-single-reg complex-single-stack :single)
   (frob move-complex-double-float-arg
         complex-double-reg complex-double-stack :double)
-  #!+long-float
+  #+long-float
   (frob move-complex-long-float-arg
         complex-long-reg complex-long-stack :long))
 
 (define-move-vop move-arg :move-arg
-  (single-reg double-reg #!+long-float long-reg
-   complex-single-reg complex-double-reg #!+long-float complex-long-reg)
+  (single-reg double-reg #+long-float long-reg
+   complex-single-reg complex-double-reg #+long-float complex-long-reg)
   (descriptor-reg))
 
 
@@ -760,7 +760,7 @@
                fop fopr sname scost
                fopd foprd dname dcost
                lname lcost)
-       #!-long-float (declare (ignore lcost lname))
+       #-long-float (declare (ignore lcost lname))
        `(progn
          (define-vop (,sname)
            (:translate ,op)
@@ -1044,7 +1044,7 @@
                  (double-stack
                   (inst fstd (ea-for-df-stack r))))))))
 
-         #!+long-float
+         #+long-float
          (define-vop (,lname)
            (:translate ,op)
            (:args (x :scs (long-reg) :to :eval)
@@ -1169,11 +1169,11 @@
 
   (frob abs/single-float fabs abs single-reg single-float)
   (frob abs/double-float fabs abs double-reg double-float)
-  #!+long-float
+  #+long-float
   (frob abs/long-float fabs abs long-reg long-float)
   (frob %negate/single-float fchs %negate single-reg single-float)
   (frob %negate/double-float fchs %negate double-reg double-float)
-  #!+long-float
+  #+long-float
   (frob %negate/long-float fchs %negate long-reg long-float))
 
 ;;;; comparison
@@ -1222,7 +1222,7 @@
          (y :scs (double-reg)))
   (:arg-types double-float double-float))
 
-#!+long-float
+#+long-float
 (define-vop (=/long-float =/float)
   (:translate =)
   (:args (x :scs (long-reg))
@@ -1327,7 +1327,7 @@
       (inst and ah-tn #x45)             ; C3 C2 C0
       (inst cmp ah-tn #x01)))))
 
-#!+long-float
+#+long-float
 (define-vop (<long-float)
   (:translate <)
   (:args (x :scs (long-reg))
@@ -1459,7 +1459,7 @@
       (inst fnstsw)                     ; status word to ax
       (inst and ah-tn #x45)))))
 
-#!+long-float
+#+long-float
 (define-vop (>long-float)
   (:translate >)
   (:args (x :scs (long-reg))
@@ -1531,7 +1531,7 @@
   (:args (x :scs (double-reg)))
   (:arg-types double-float (:constant (double-float 0d0 0d0)))
   (:variant #x40))
-#!+long-float
+#+long-float
 (define-vop (=0/long-float float-test)
   (:translate =)
   (:args (x :scs (long-reg)))
@@ -1548,7 +1548,7 @@
   (:args (x :scs (double-reg)))
   (:arg-types double-float (:constant (double-float 0d0 0d0)))
   (:variant #x01))
-#!+long-float
+#+long-float
 (define-vop (<0/long-float float-test)
   (:translate <)
   (:args (x :scs (long-reg)))
@@ -1565,14 +1565,14 @@
   (:args (x :scs (double-reg)))
   (:arg-types double-float (:constant (double-float 0d0 0d0)))
   (:variant #x00))
-#!+long-float
+#+long-float
 (define-vop (>0/long-float float-test)
   (:translate >)
   (:args (x :scs (long-reg)))
   (:arg-types long-float (:constant (long-float 0l0 0l0)))
   (:variant #x00))
 
-#!+long-float
+#+long-float
 (deftransform eql ((x y) (long-float long-float))
   `(and (= (long-float-low-bits x) (long-float-low-bits y))
         (= (long-float-high-bits x) (long-float-high-bits y))
@@ -1605,7 +1605,7 @@
                        (inst fild x))))))))
   (frob %single-float/signed %single-float single-reg single-float)
   (frob %double-float/signed %double-float double-reg double-float)
-  #!+long-float
+  #+long-float
   (frob %long-float/signed %long-float long-reg long-float))
 
 (macrolet ((frob (name translate to-sc to-type)
@@ -1628,7 +1628,7 @@
                  (inst add esp-tn 8)))))
   (frob %single-float/unsigned %single-float single-reg single-float)
   (frob %double-float/unsigned %double-float double-reg double-float)
-  #!+long-float
+  #+long-float
   (frob %long-float/unsigned %long-float long-reg long-float))
 
 (macrolet ((frob (name translate from-sc from-type to-sc to-type
@@ -1671,20 +1671,20 @@
   (frob %single-float/double-float %single-float double-reg double-float
         single-reg single-float
         single-stack fst fld)
-  #!+long-float
+  #+long-float
   (frob %single-float/long-float %single-float long-reg
         long-float single-reg single-float
         single-stack fst fld)
   (frob %double-float/single-float %double-float single-reg single-float
         double-reg double-float)
-  #!+long-float
+  #+long-float
   (frob %double-float/long-float %double-float long-reg long-float
         double-reg double-float
         double-stack fstd fldd)
-  #!+long-float
+  #+long-float
   (frob %long-float/single-float %long-float single-reg single-float
         long-reg long-float)
-  #!+long-float
+  #+long-float
   (frob %long-float/double-float %long-float double-reg double-float
         long-reg long-float))
 
@@ -1727,11 +1727,11 @@
                       '((inst fldcw scw)))))))))
   (frob %unary-truncate/single-float single-reg single-float nil)
   (frob %unary-truncate/double-float double-reg double-float nil)
-  #!+long-float
+  #+long-float
   (frob %unary-truncate/long-float long-reg long-float nil)
   (frob %unary-round single-reg single-float t)
   (frob %unary-round double-reg double-float t)
-  #!+long-float
+  #+long-float
   (frob %unary-round long-reg long-float t))
 
 (macrolet ((frob (trans from-sc from-type round-p)
@@ -1774,11 +1774,11 @@
                    '((inst fldcw scw)))))))
   (frob %unary-truncate/single-float single-reg single-float nil)
   (frob %unary-truncate/double-float double-reg double-float nil)
-  #!+long-float
+  #+long-float
   (frob %unary-truncate/long-float long-reg long-float nil)
   (frob %unary-round single-reg single-float t)
   (frob %unary-round double-reg double-float t)
-  #!+long-float
+  #+long-float
   (frob %unary-round long-reg long-float t))
 
 (define-vop (make-single-float)
@@ -1861,7 +1861,7 @@
       (inst fldd (register-inline-constant
                   :double-float-bits (logior (ash hi 32) lo))))))
 
-#!+long-float
+#+long-float
 (define-vop (make-long-float)
   (:args (exp-bits :scs (signed-reg))
          (hi-bits :scs (unsigned-reg))
@@ -1960,7 +1960,7 @@
         (loadw lo-bits float double-float-value-slot
                other-pointer-lowtag)))))
 
-#!+long-float
+#+long-float
 (define-vop (long-float-exp-bits)
   (:args (float :scs (long-reg descriptor-reg)
                 :load-if (not (sc-is float long-stack))))
@@ -1990,7 +1990,7 @@
               (make-ea-for-object-slot float (+ 2 long-float-value-slot)
                                        other-pointer-lowtag :word))))))
 
-#!+long-float
+#+long-float
 (define-vop (long-float-high-bits)
   (:args (float :scs (long-reg descriptor-reg)
                 :load-if (not (sc-is float long-stack))))
@@ -2015,7 +2015,7 @@
         (loadw hi-bits float (1+ long-float-value-slot)
                other-pointer-lowtag)))))
 
-#!+long-float
+#+long-float
 (define-vop (long-float-low-bits)
   (:args (float :scs (long-reg descriptor-reg)
                 :load-if (not (sc-is float long-stack))))
@@ -2093,7 +2093,7 @@
    (inst add esp-tn npx-env-size)       ; Pop stack.
    (move res new)))
 
-#!-long-float
+#-long-float
 (progn
 
 ;;; Let's use some of the 80387 special functions.
@@ -3101,7 +3101,7 @@
        (t (inst fstd r)))))
 ) ; PROGN #!-LONG-FLOAT
 
-#!+long-float
+#+long-float
 (progn
 
 ;;; Lets use some of the 80387 special functions.
@@ -4167,7 +4167,7 @@
        (inst fstd (ea-for-cdf-imag-stack r))
        (inst fxch imag)))))
 
-#!+long-float
+#+long-float
 (define-vop (make-complex-long-float)
   (:translate complex)
   (:args (real :scs (long-reg) :target r
@@ -4220,7 +4220,7 @@
   (:policy :fast-safe)
   (:generator 3
     (cond ((sc-is x complex-single-reg complex-double-reg
-                  #!+long-float complex-long-reg)
+                  #+long-float complex-long-reg)
            (let ((value-tn
                   (make-random-tn :kind :normal
                                   :sc (sc-or-lose 'double-reg)
@@ -4258,7 +4258,7 @@
                           (1 (ea-for-cdf-imag-desc x)))))))
              (with-empty-tn@fp-top(r)
                (inst fldd ea))))
-          #!+long-float
+          #+long-float
           ((sc-is r long-reg)
            (let ((ea (sc-case x
                        (complex-long-stack
@@ -4293,7 +4293,7 @@
   (:note "complex float realpart")
   (:variant 0))
 
-#!+long-float
+#+long-float
 (define-vop (realpart/complex-long-float complex-float-value)
   (:translate realpart)
   (:args (x :scs (complex-long-reg complex-long-stack descriptor-reg)
@@ -4324,7 +4324,7 @@
   (:note "complex float imagpart")
   (:variant 1))
 
-#!+long-float
+#+long-float
 (define-vop (imagpart/complex-long-float complex-float-value)
   (:translate imagpart)
   (:args (x :scs (complex-long-reg complex-long-stack descriptor-reg)

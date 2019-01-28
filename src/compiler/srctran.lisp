@@ -1740,14 +1740,14 @@
                   (values 'integer nil))
                  (rational
                   (values 'rational nil))
-                 ((or single-float double-float #!+long-float long-float)
+                 ((or single-float double-float #+long-float long-float)
                   (values 'float rem-type))
                  (float
                   (values 'float nil))
                  (real
                   (values nil nil)))
              (when (member rem-type '(float single-float double-float
-                                            #!+long-float long-float))
+                                            #+long-float long-float))
                (setf rem (interval-func #'(lambda (x)
                                             (coerce-for-bound x rem-type))
                                         rem)))
@@ -1886,14 +1886,14 @@
                       (values 'integer nil))
                      (rational
                       (values 'rational nil))
-                     ((or single-float double-float #!+long-float long-float)
+                     ((or single-float double-float #+long-float long-float)
                       (values 'float result-type))
                      (float
                       (values 'float nil))
                      (real
                       (values nil nil)))
                  (when (member result-type '(float single-float double-float
-                                             #!+long-float long-float))
+                                             #+long-float long-float))
                    ;; Make sure that the limits on the interval have
                    ;; the right type.
                    (setf rem (interval-func (lambda (x)
@@ -4832,7 +4832,7 @@
                              (specifier-type '(complex single-float)))
                   (csubtypep result-typeoid
                              (specifier-type '(complex double-float)))
-                  #!+long-float
+                  #+long-float
                   (csubtypep result-typeoid
                              (specifier-type '(complex long-float))))
               ;; float complex types are never canonicalized.

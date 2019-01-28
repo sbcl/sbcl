@@ -405,7 +405,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 (defun random (arg &optional (state *random-state*))
   #!-sb-fluid (declare (inline %random-fixnum
                                %random-single-float %random-double-float
-                               #!+long-float %random-long-float))
+                               #+long-float %random-long-float))
   (declare (explicit-check))
   (cond
     ((and (fixnump arg) (> arg 0))
@@ -414,7 +414,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
      (%random-single-float arg state))
     ((and (typep arg 'double-float) (> arg 0.0d0))
      (%random-double-float arg state))
-    #!+long-float
+    #+long-float
     ((and (typep arg 'long-float) (> arg 0.0l0))
      (%random-long-float arg state))
     ((and (bignump arg) (> arg 0))

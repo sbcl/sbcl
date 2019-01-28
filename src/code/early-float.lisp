@@ -55,12 +55,12 @@
 (defconstant least-negative-single-float (single-from-bits 1 0 1))
 (defconstant least-negative-short-float (single-from-bits 1 0 1))
 (defconstant least-positive-double-float (double-from-bits 0 0 1))
-#!-long-float
+#-long-float
 (defconstant least-positive-long-float (double-from-bits 0 0 1))
 #!+(and long-float x86)
 (defconstant least-positive-long-float (long-from-bits 0 0 1))
 (defconstant least-negative-double-float (double-from-bits 1 0 1))
-#!-long-float
+#-long-float
 (defconstant least-negative-long-float (double-from-bits 1 0 1))
 #!+(and long-float x86)
 (defconstant least-negative-long-float (long-from-bits 1 0 1))
@@ -75,7 +75,7 @@
   least-negative-normalized-single-float)
 (defconstant least-positive-normalized-double-float
   (double-from-bits 0 sb-vm:double-float-normal-exponent-min 0))
-#!-long-float
+#-long-float
 (defconstant least-positive-normalized-long-float
   least-positive-normalized-double-float)
 #!+(and long-float x86)
@@ -84,7 +84,7 @@
                   (ash sb-vm:long-float-hidden-bit 32)))
 (defconstant least-negative-normalized-double-float
   (double-from-bits 1 sb-vm:double-float-normal-exponent-min 0))
-#!-long-float
+#-long-float
 (defconstant least-negative-normalized-long-float
   least-negative-normalized-double-float)
 #!+(and long-float x86)
@@ -159,7 +159,7 @@
 (defconstant double-float-epsilon
   (double-from-bits 0 (- sb-vm:double-float-bias
                          (1- sb-vm:double-float-digits)) 1))
-#!-long-float
+#-long-float
 (defconstant long-float-epsilon double-float-epsilon)
 #!+(and long-float x86)
 (defconstant long-float-epsilon
@@ -167,7 +167,7 @@
                   (+ 1 (ash sb-vm:long-float-hidden-bit 32))))
 (defconstant double-float-negative-epsilon
   (double-from-bits 0 (- sb-vm:double-float-bias sb-vm:double-float-digits) 1))
-#!-long-float
+#-long-float
 (defconstant long-float-negative-epsilon double-float-negative-epsilon)
 #!+(and long-float x86)
 (defconstant long-float-negative-epsilon

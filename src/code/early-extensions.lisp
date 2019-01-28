@@ -1564,7 +1564,7 @@ to :INTERPRET, an interpreter will be used.")
   (typecase x
     (single-float (zerop x))
     (double-float (zerop x))
-    #!+long-float
+    #+long-float
     (long-float (zerop x))
     (t nil)))
 
@@ -1578,7 +1578,7 @@ to :INTERPRET, an interpreter will be used.")
      (if (eql x 0.0d0)
          (make-unportable-float :double-float-negative-zero)
          0.0d0))
-    #!+long-float
+    #+long-float
     (long-float
      (if (eql x 0.0l0)
          (make-unportable-float :long-float-negative-zero)

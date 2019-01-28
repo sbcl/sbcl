@@ -117,7 +117,7 @@
 ;;; * BIGNUM + RATIO (+ FIXNUM) = RATIONAL
 ;;;
 ;;; * SINGLE-FLOAT + DOUBLE-FLOAT + LONG-FLOAT = FLOAT
-;;;   But: There's not a snowball's chance that #!+long-float works.
+;;;   But: There's not a snowball's chance that #+long-float works.
 ;;;        changeset 7646ae obliterated LONG-FLOAT-WIDETAG.
 ;;;
 ;;; * RATIONAL + FLOAT = REAL

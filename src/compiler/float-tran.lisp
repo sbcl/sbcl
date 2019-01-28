@@ -662,7 +662,7 @@
   ;; the host does not have long floats, then setting *R-D-F-F* to
   ;; LONG-FLOAT doesn't actually buy us anything.  FIXME.
   (setf *read-default-float-format*
-        #!+long-float 'long-float #!-long-float 'double-float))
+        #+long-float 'long-float #-long-float 'double-float))
 ;;; Test whether the numeric-type ARG is within the domain specified by
 ;;; DOMAIN-LOW and DOMAIN-HIGH, consider negative and positive zero to
 ;;; be distinct.
@@ -681,7 +681,7 @@
             (typecase arg-lo-val
               (single-float 0f0)
               (double-float 0d0)
-              #!+long-float
+              #+long-float
               (long-float 0l0))
             arg-lo-val arg-lo))
     (when (and arg-hi (zerop arg-hi-val) (floatp arg-hi-val) (consp arg-hi)
@@ -690,7 +690,7 @@
             (typecase arg-lo-val
               (single-float (load-time-value (make-unportable-float :single-float-negative-zero)))
               (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
-              #!+long-float
+              #+long-float
               (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))
             arg-hi-val arg-hi))
     (flet ((fp-neg-zero-p (f)           ; Is F -0.0?

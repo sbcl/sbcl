@@ -48,7 +48,7 @@
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
 (defconstant-eqx +type-test-ordering+
-  '(fixnum single-float double-float integer #!+long-float long-float
+  '(fixnum single-float double-float integer #+long-float long-float
     sb-vm:signed-word word bignum
     complex ratio)
   #'equal)
@@ -179,15 +179,15 @@
 (defun float-contagion (op x y &optional (rat-types '(fixnum bignum ratio)))
   `(((single-float single-float) (,op ,x ,y))
     (((foreach ,@rat-types)
-      (foreach single-float double-float #!+long-float long-float))
+      (foreach single-float double-float #+long-float long-float))
      (,op (coerce ,x '(dispatch-type ,y)) ,y))
-    (((foreach single-float double-float #!+long-float long-float)
+    (((foreach single-float double-float #+long-float long-float)
       (foreach ,@rat-types))
      (,op ,x (coerce ,y '(dispatch-type ,x))))
-    #!+long-float
+    #+long-float
     (((foreach single-float double-float long-float) long-float)
      (,op (coerce ,x 'long-float) ,y))
-    #!+long-float
+    #+long-float
     ((long-float (foreach single-float double-float))
      (,op ,x (coerce ,y 'long-float)))
     (((foreach single-float double-float) double-float)
@@ -216,7 +216,7 @@
 (defun canonical-complex (realpart imagpart)
   (if (eql imagpart 0)
       realpart
-      (cond #!+long-float
+      (cond #+long-float
             ((and (typep realpart 'long-float)
                   (typep imagpart 'long-float))
              (truly-the (complex long-float) (complex realpart imagpart)))
@@ -259,7 +259,7 @@
   "Return a complex number with the specified real and imaginary components."
   (declare (explicit-check))
   (flet ((%%make-complex (realpart imagpart)
-           (cond #!+long-float
+           (cond #+long-float
                  ((and (typep realpart 'long-float)
                        (typep imagpart 'long-float))
                   (truly-the (complex long-float)
@@ -282,7 +282,7 @@
 (defun realpart (number)
   "Extract the real part of a number."
   (etypecase number
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (truly-the long-float (realpart number)))
     ((complex double-float)
@@ -297,7 +297,7 @@
 (defun imagpart (number)
   "Extract the imaginary part of a number."
   (etypecase number
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (truly-the long-float (imagpart number)))
     ((complex double-float)
@@ -406,7 +406,7 @@
         (canonical-complex (,op (realpart x) (realpart y))
                            (,op (imagpart x) (imagpart y))))
        (((foreach bignum fixnum ratio single-float double-float
-                  #!+long-float long-float) complex)
+                  #+long-float long-float) complex)
         (complex (,op x (realpart y)) (,op 0 (imagpart y))))
        ((complex (or rational float))
         (complex (,op (realpart x) y) (,op (imagpart x) 0)))
@@ -471,7 +471,7 @@
               (iy (imagpart y)))
          (canonical-complex (- (* rx ry) (* ix iy)) (+ (* rx iy) (* ix ry)))))
       (((foreach bignum fixnum ratio single-float double-float
-                 #!+long-float long-float)
+                 #+long-float long-float)
         complex)
        (complex*real y x))
       ((complex (or rational float))
@@ -575,7 +575,7 @@
 (defun %negate (n)
   (declare (explicit-check))
   (number-dispatch ((n number))
-    (((foreach fixnum single-float double-float #!+long-float long-float))
+    (((foreach fixnum single-float double-float #+long-float long-float))
      (%negate n))
     ((bignum)
      (negate-bignum n))
@@ -616,16 +616,16 @@
       ((bignum bignum)
        (bignum-truncate number divisor))
 
-      (((foreach single-float double-float #!+long-float long-float)
+      (((foreach single-float double-float #+long-float long-float)
         (or rational single-float))
        (if (eql divisor 1)
            (let ((res (%unary-truncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
            (truncate-float (dispatch-type number))))
-      #!+long-float
+      #+long-float
       ((long-float (or single-float double-float long-float))
        (truncate-float long-float))
-      #!+long-float
+      #+long-float
       (((foreach double-float single-float) long-float)
        (truncate-float long-float))
       ((double-float (or single-float double-float))
@@ -633,7 +633,7 @@
       ((single-float double-float)
        (truncate-float double-float))
       (((foreach fixnum bignum ratio)
-        (foreach single-float double-float #!+long-float long-float))
+        (foreach single-float double-float #+long-float long-float))
        (truncate-float (dispatch-type divisor))))))
 
 (defun %multiply-high (x y)
@@ -710,16 +710,16 @@
        (multiple-value-bind (q r)
            (truncate number divisor)
          (values (float q) r)))
-      (((foreach single-float double-float #!+long-float long-float)
+      (((foreach single-float double-float #+long-float long-float)
         (or rational single-float))
        (if (eql divisor 1)
            (let ((res (%unary-ftruncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
            (ftruncate-float (dispatch-type number))))
-      #!+long-float
+      #+long-float
       ((long-float (or single-float double-float long-float))
        (ftruncate-float long-float))
-      #!+long-float
+      #+long-float
       (((foreach double-float single-float) long-float)
        (ftruncate-float long-float))
       ((double-float (or single-float double-float))
@@ -727,7 +727,7 @@
       ((single-float double-float)
        (ftruncate-float double-float))
       (((foreach fixnum bignum ratio)
-        (foreach single-float double-float #!+long-float long-float))
+        (foreach single-float double-float #+long-float long-float))
        (ftruncate-float (dispatch-type divisor))))))
 
 (defun ffloor (number &optional (divisor 1))
@@ -865,10 +865,10 @@ the first."
   (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
     `(((fixnum fixnum) (,op x y))
       ((single-float single-float) (,op x y))
-      #!+long-float
+      #+long-float
       (((foreach single-float double-float long-float) long-float)
        (,op (coerce x 'long-float) y))
-      #!+long-float
+      #+long-float
       ((long-float (foreach single-float double-float))
        (,op x (coerce y 'long-float)))
       ((fixnum (foreach single-float double-float))
@@ -890,7 +890,7 @@ the first."
        (,op (coerce x 'double-float) y))
       ((double-float single-float)
        (,op x (coerce y 'double-float)))
-      (((foreach single-float double-float #!+long-float long-float) rational)
+      (((foreach single-float double-float #+long-float long-float) rational)
        (if (eql y 0)
            (,op x (coerce 0 '(dispatch-type x)))
            (if (float-infinity-p x)
@@ -961,7 +961,7 @@ the first."
      (and (= (realpart x) (realpart y))
           (= (imagpart x) (imagpart y))))
     (((foreach fixnum bignum ratio single-float double-float
-               #!+long-float long-float) complex)
+               #+long-float long-float) complex)
      (and (= x (realpart y))
           (zerop (imagpart y))))
     ((complex (or float rational))

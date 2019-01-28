@@ -118,7 +118,7 @@
   ratio
   single-float
   double-float
-  #!+long-float long-float
+  #+long-float long-float
   simple-string
   fixnum
   vector
@@ -150,7 +150,7 @@
   ((complex float) object-not-complex-float)
   ((complex single-float) object-not-complex-single-float)
   ((complex double-float) object-not-complex-double-float)
-  #!+long-float ((complex long-float) object-not-complex-long-float)
+  #+long-float ((complex long-float) object-not-complex-long-float)
   #!+sb-simd-pack simd-pack
   #!+sb-simd-pack-256 simd-pack-256
   weak-pointer

@@ -73,7 +73,7 @@
   #!-64-bit (filler)
   (value :c-type "double" :length #.(/ 64 n-word-bits)))
 
-#!+long-float
+#+long-float
 (!define-primitive-object (long-float :lowtag other-pointer-lowtag
                                      :widetag long-float-widetag)
   #!+sparc (filler)

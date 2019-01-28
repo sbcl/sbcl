@@ -179,7 +179,7 @@
 (defsetf sap-ref-lispobj %set-sap-ref-lispobj)
 (defsetf sap-ref-single %set-sap-ref-single)
 (defsetf sap-ref-double %set-sap-ref-double)
-#!+long-float (defsetf sap-ref-long %set-sap-ref-long)
+#+long-float (defsetf sap-ref-long %set-sap-ref-long)
 (defsetf subseq (sequence start &optional end) (v)
   `(progn (replace ,sequence ,v :start1 ,start :end1 ,end) ,v))
 

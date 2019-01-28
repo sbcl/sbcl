@@ -1167,7 +1167,7 @@
        'x)
       ((csubtypep tspec (specifier-type 'double-float))
        `(the ,tval (%double-float x)))
-      ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
+      ;; FIXME: #+long-float (t ,(error "LONG-FLOAT case needed"))
       ((csubtypep tspec (specifier-type 'float))
        `(the ,tval (%single-float x)))
       ((csubtypep tspec (specifier-type 'complex))

@@ -15,8 +15,8 @@
 ;;;; miscellaneous constants, utility functions, and macros
 
 (defconstant pi
-  #!+long-float 3.14159265358979323846264338327950288419716939937511l0
-  #!-long-float 3.14159265358979323846264338327950288419716939937511d0)
+  #+long-float 3.14159265358979323846264338327950288419716939937511l0
+  #-long-float 3.14159265358979323846264338327950288419716939937511d0)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun handle-reals (function var)
@@ -778,7 +778,7 @@
 ;;;   Create complex number with real part X and imaginary part Y
 ;;;   such that has the same type as Z.  If Z has type (complex
 ;;;   rational), the X and Y are coerced to single-float.
-#!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
+#+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
                 (error "needs work for long float support"))
 (declaim (inline coerce-to-complex-type))
 (defun coerce-to-complex-type (x y z)
@@ -794,7 +794,7 @@
 
 ;;; Compute |(x+i*y)/2^k|^2 scaled to avoid over/underflow. The
 ;;; result is r + i*k, where k is an integer.
-#!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
+#+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
                 (error "needs work for long float support"))
 (defun cssqs (z)
   (declare (muffle-conditions compiler-note))
@@ -818,9 +818,9 @@
             ((let ((threshold
                     ;; (/ least-positive-double-float double-float-epsilon)
                     (load-time-value
-                     #!-long-float
+                     #-long-float
                      (make-double-float #x1fffff #xfffffffe)
-                     #!+long-float
+                     #+long-float
                      (error "(/ least-positive-long-float long-float-epsilon)")))
                    (traps (ldb sb-vm:float-sticky-bits
                                (sb-vm:floating-point-modes))))
@@ -896,9 +896,9 @@
   ;; choose them.  We'll just assume his choices matches our
   ;; implementation of log1p.
   (let ((t0 (load-time-value
-             #!-long-float
+             #-long-float
              (make-double-float #x3fe6a09e #x667f3bcd)
-             #!+long-float
+             #+long-float
              (error "(/ (sqrt 2l0))")))
         ;; KLUDGE: if repeatable fasls start failing under some weird
         ;; xc host, this 1.2d0 might be a good place to examine: while
@@ -907,9 +907,9 @@
         (t1 1.2d0)
         (t2 3d0)
         (ln2 (load-time-value
-              #!-long-float
+              #-long-float
               (make-double-float #x3fe62e42 #xfefa39ef)
-              #!+long-float
+              #+long-float
               (error "(log 2l0)")))
         (x (float (realpart z) 1.0d0))
         (y (float (imagpart z) 1.0d0)))
@@ -1004,9 +1004,9 @@
       (declare (optimize (speed 3) (space 0)))
     (cond ((> (abs x)
               (load-time-value
-               #!-long-float
+               #-long-float
                (make-double-float #x406633ce #x8fb9f87e)
-               #!+long-float
+               #+long-float
                (error "(/ (+ (log 2l0) (log most-positive-long-float)) 4l0)")))
            (coerce-to-complex-type (float-sign x)
                                    (float-sign y) z))

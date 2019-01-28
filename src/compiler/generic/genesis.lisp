@@ -848,7 +848,7 @@ core and return a descriptor to it."
                                 sb-vm:ratio-widetag))
     ((complex single-float) (complex-single-float-to-core number))
     ((complex double-float) (complex-double-float-to-core number))
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (error "~S isn't a cold-loadable number at all!" number))
     (complex (number-pair-to-core (number-to-core (realpart number))

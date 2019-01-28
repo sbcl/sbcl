@@ -22,7 +22,7 @@
 #!+sb-unicode (define-type-predicate character-string-p (vector character))
 (define-type-predicate complex-double-float-p (complex double-float))
 (define-type-predicate complex-single-float-p (complex single-float))
-#!+long-float
+#+long-float
 (define-type-predicate complex-long-float-p (complex long-float))
 ;;; (COMPLEX-VECTOR-P isn't here because it's not so much a Lisp-level
 ;;; type predicate as just a hack to get at the type code so that we
@@ -82,14 +82,14 @@
                        (simple-array single-float (*)))
 (define-type-predicate simple-array-double-float-p
                        (simple-array double-float (*)))
-#!+long-float
+#+long-float
 (define-type-predicate simple-array-long-float-p
                        (simple-array long-float (*)))
 (define-type-predicate simple-array-complex-single-float-p
                        (simple-array (complex single-float) (*)))
 (define-type-predicate simple-array-complex-double-float-p
                        (simple-array (complex double-float) (*)))
-#!+long-float
+#+long-float
 (define-type-predicate simple-array-complex-long-float-p
                        (simple-array (complex long-float) (*)))
 (define-type-predicate simple-base-string-p simple-base-string)

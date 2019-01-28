@@ -117,7 +117,7 @@
   (def-type-predicate-wrapper complexp)
   (def-type-predicate-wrapper complex-double-float-p)
   (def-type-predicate-wrapper complex-float-p)
-  #!+long-float (def-type-predicate-wrapper complex-long-float-p)
+  #+long-float (def-type-predicate-wrapper complex-long-float-p)
   (def-type-predicate-wrapper complex-rational-p)
   (def-type-predicate-wrapper complex-single-float-p)
   ;; (COMPLEX-VECTOR-P is not included here since it's awkward to express
@@ -304,7 +304,7 @@
             (foo
              (single-float eql)
              (double-float eql)
-             #!+long-float
+             #+long-float
              (long-float eql)
              (bignum
               #!-integer-eql-vop (lambda (x y) (zerop (bignum-compare x y)))

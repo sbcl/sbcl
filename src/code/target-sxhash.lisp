@@ -295,13 +295,13 @@
                  (integer (sb-bignum:sxhash-bignum x))
                  (single-float (sxhash x)) ; through DEFTRANSFORM
                  (double-float (sxhash x)) ; through DEFTRANSFORM
-                 #!+long-float (long-float (error "stub: no LONG-FLOAT"))
+                 #+long-float (long-float (error "stub: no LONG-FLOAT"))
                  (ratio (let ((result 127810327))
                           (declare (type fixnum result))
                           (mixf result (sxhash-number (numerator x)))
                           (mixf result (sxhash-number (denominator x)))
                           result))
-                 #!+long-float
+                 #+long-float
                  ((complex long-float)
                   (hash-complex-float))
                  ((complex double-float)
@@ -582,7 +582,7 @@
                 (etypecase key
                   (single-float (hash-float single-float key))
                   (double-float (hash-float double-float key))
-                  #!+long-float
+                  #+long-float
                   (long-float (error "LONG-FLOAT not currently supported")))))
        (rational (if (and (<= most-negative-double-float
                               key

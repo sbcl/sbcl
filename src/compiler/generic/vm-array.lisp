@@ -129,7 +129,7 @@
           simple-array-complex-single-float)
          ((complex double-float) #C(0.0d0 0.0d0) 128
           simple-array-complex-double-float)
-         #!+long-float
+         #+long-float
          ((complex long-float) #C(0.0l0 0.0l0) #!+x86 192 #!+sparc 256
           simple-array-complex-long-float)
          (t 0 #.n-word-bits simple-vector))))

@@ -1672,7 +1672,7 @@ extended <package-name>::<form-in-package> syntax."
   ;; Use the least positive float, because denormalized exponent
   ;; can be larger than normalized.
   (let* ((max-exponent
-          #!-long-float
+          #-long-float
           (+ sb-vm:double-float-digits sb-vm:double-float-bias))
          (number-magnitude (integer-length number))
          (divisor-magnitude (1- (integer-length divisor)))

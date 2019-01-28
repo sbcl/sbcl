@@ -408,8 +408,8 @@
   (:args (sap :scs (sap-reg))
          (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
-  (:results (result :scs (#!+long-float long-reg #!-long-float double-reg)))
-  (:result-types #!+long-float long-float #!-long-float double-float)
+  (:results (result :scs (#+long-float long-reg #-long-float double-reg)))
+  (:result-types #+long-float long-float #-long-float double-float)
   (:generator 5
      (with-empty-tn@fp-top(result)
         (inst fldl (make-ea :dword :base sap :index offset)))))
@@ -420,13 +420,13 @@
   (:args (sap :scs (sap-reg)))
   (:arg-types system-area-pointer (:constant (signed-byte 32)))
   (:info offset)
-  (:results (result :scs (#!+long-float long-reg #!-long-float double-reg)))
-  (:result-types #!+long-float long-float #!-long-float double-float)
+  (:results (result :scs (#+long-float long-reg #-long-float double-reg)))
+  (:result-types #+long-float long-float #-long-float double-float)
   (:generator 4
      (with-empty-tn@fp-top(result)
         (inst fldl (make-ea :dword :base sap :disp offset)))))
 
-#!+long-float
+#+long-float
 (define-vop (%set-sap-ref-long)
   (:translate %set-sap-ref-long)
   (:policy :fast-safe)

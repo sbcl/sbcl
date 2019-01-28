@@ -256,7 +256,7 @@
     single-reg single-float :single)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
     double-reg double-float :double)
-  #!+long-float
+  #+long-float
   (def-system-ref-and-set sap-ref-long %set-sap-ref-long
     long-reg long-float :long-float)
 ) ; MACROLET

@@ -37,7 +37,7 @@
                       sap-stack-sc-number
                       stack-frame-size)))
 
-#!+long-float
+#+long-float
 (define-alien-type-method (long-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
@@ -87,7 +87,7 @@
     (make-wired-tn* 'system-area-pointer sap-reg-sc-number
                       (result-reg-offset num-results))))
 
-#!+long-float
+#+long-float
 (define-alien-type-method (long-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
@@ -258,7 +258,7 @@
      (let ((ea (ea-for-df-stack fp-temp)))
        (inst fstpd ea)
        (inst fldd ea)))
-    #!+long-float
+    #+long-float
     (long-reg  ; nothing to do!
      )))
 

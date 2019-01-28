@@ -928,7 +928,7 @@ between the ~A definition and the ~A definition"
       :inherits (complex number)
       :codes (,sb-vm:complex-double-float-widetag)
       :prototype-form (complex 42d0 42d0))
-     #!+long-float
+     #+long-float
      (complex-long-float
       :translation (complex long-float)
       :inherits (complex number)
@@ -961,7 +961,7 @@ between the ~A definition and the ~A definition"
       :inherits (float real number)
       :codes (,sb-vm:double-float-widetag)
       :prototype-form 42d0)
-     #!+long-float
+     #+long-float
      (long-float
       :translation long-float
       :inherits (float real number)

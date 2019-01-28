@@ -356,7 +356,7 @@
       (return-from make-numeric-type
         (if (bounds-unbounded-p low high)
             (specifier-type 'float)
-            (unionize (single-float double-float #!+long-float (error "long-float"))
+            (unionize (single-float double-float #+long-float (error "long-float"))
                       (:class 'float :format thing))))))
   (multiple-value-bind (low high)
       (case class
@@ -624,7 +624,7 @@
                   (etypecase z
                     (single-float 0)
                     (double-float 2
-                    #!+long-float (long-float 4)))))
+                    #+long-float (long-float 4)))))
             (if (= pass 0)
                 (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
                 (if (= (ldb (byte 2 pair-idx) presence) #b11)

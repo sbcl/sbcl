@@ -129,7 +129,7 @@
       ((double-float)
        (frob sb-vm:double-float-digits sb-vm:double-float-bias
          integer-decode-double-denorm))
-      #!+long-float
+      #+long-float
       ((long-float)
        (frob sb-vm:long-float-digits sb-vm:long-float-bias
          integer-decode-long-denorm)))))
@@ -142,7 +142,7 @@
   (* (if (etypecase float1
            (single-float (minusp (single-float-bits float1)))
            (double-float (minusp (double-float-high-bits float1)))
-           #!+long-float
+           #+long-float
            (long-float (minusp (long-float-exp-bits float1))))
          (float -1 float1)
          (float 1 float1))
@@ -151,8 +151,8 @@
 (defun float-format-digits (format)
   (ecase format
     ((short-float single-float) sb-vm:single-float-digits)
-    ((double-float #!-long-float long-float) sb-vm:double-float-digits)
-    #!+long-float
+    ((double-float #-long-float long-float) sb-vm:double-float-digits)
+    #+long-float
     (long-float sb-vm:long-float-digits)))
 
 #!-sb-fluid (declaim (inline float-digits float-radix))
@@ -162,7 +162,7 @@
   (number-dispatch ((f float))
     ((single-float) sb-vm:single-float-digits)
     ((double-float) sb-vm:double-float-digits)
-    #!+long-float
+    #+long-float
     ((long-float) sb-vm:long-float-digits)))
 
 (defun float-radix (x)
@@ -357,7 +357,7 @@
      (integer-decode-single-float x))
     ((double-float)
      (integer-decode-double-float x))
-    #!+long-float
+    #+long-float
     ((long-float)
      (integer-decode-long-float x))))
 
@@ -477,7 +477,7 @@
      (decode-single-float f))
     ((double-float)
      (decode-double-float f))
-    #!+long-float
+    #+long-float
     ((long-float)
      (decode-long-float f))))
 
@@ -609,7 +609,7 @@
      (scale-single-float f ex))
     ((double-float)
      (scale-double-float f ex))
-    #!+long-float
+    #+long-float
     ((long-float)
      (scale-long-float f ex))))
 
@@ -622,8 +622,8 @@
   (declare (explicit-check))
   (if otherp
       (number-dispatch ((number real) (other float))
-        (((foreach rational single-float double-float #!+long-float long-float)
-          (foreach single-float double-float #!+long-float long-float))
+        (((foreach rational single-float double-float #+long-float long-float)
+          (foreach single-float double-float #+long-float long-float))
          (coerce number '(dispatch-type other))))
       (if (floatp number)
           number
@@ -632,7 +632,7 @@
 (macrolet ((frob (name type)
              `(defun ,name (x)
                 (number-dispatch ((x real))
-                  (((foreach single-float double-float #!+long-float long-float
+                  (((foreach single-float double-float #+long-float long-float
                      sb-vm:signed-word
                      ,@(and (sb-c::template-translates-arg-p '%double-float 0 'word)
                             '(word))))
@@ -643,7 +643,7 @@
                    (bignum-to-float x ',type))))))
   (frob %single-float single-float)
   (frob %double-float double-float)
-  #!+long-float
+  #+long-float
   (frob %long-float long-float))
 
 ;;; Convert a ratio to a float. We avoid any rounding error by doing an
@@ -689,7 +689,7 @@
                       (single-from-bits sign sb-vm:single-float-bias bits))
                      (double-float
                       (double-from-bits sign sb-vm:double-float-bias bits))
-                     #!+long-float
+                     #+long-float
                      (long-float
                       (long-from-bits sign sb-vm:long-float-bias bits))))))
         (loop
@@ -781,7 +781,7 @@
   (number-dispatch ((number real))
     ((integer) number)
     ((ratio) (values (truncate (numerator number) (denominator number))))
-    (((foreach single-float double-float #!+long-float long-float))
+    (((foreach single-float double-float #+long-float long-float))
      (if (and (<= (float most-negative-fixnum number) number)
               (< number (float most-positive-fixnum number)))
          (truly-the fixnum (%unary-truncate number))
@@ -805,7 +805,7 @@
                             res)))))))
   (def single-float %unary-truncate/single-float)
   (def double-float %unary-truncate/double-float)
-  #!+long-float
+  #+long-float
   (def double-float %unary-truncate/long-float))
 
 ;;; Similar to %UNARY-TRUNCATE, but rounds to the nearest integer. If we
@@ -818,7 +818,7 @@
   (number-dispatch ((number real))
     ((integer) number)
     ((ratio) (values (round (numerator number) (denominator number))))
-    (((foreach single-float double-float #!+long-float long-float))
+    (((foreach single-float double-float #+long-float long-float))
      (if (< (float most-negative-fixnum number)
             number
             (float most-positive-fixnum number))
@@ -841,7 +841,7 @@
   (number-dispatch ((number real))
     ((integer) (float number))
     ((ratio) (float (truncate (numerator number) (denominator number))))
-    (((foreach single-float double-float #!+long-float long-float))
+    (((foreach single-float double-float #+long-float long-float))
      (%unary-ftruncate number))))
 
 (defun rational (x)
@@ -850,7 +850,7 @@
   completely accurate, giving a result that isn't as pretty."
   (declare (explicit-check))
   (number-dispatch ((x real))
-    (((foreach single-float double-float #!+long-float long-float))
+    (((foreach single-float double-float #+long-float long-float))
      (multiple-value-bind (bits exp) (integer-decode-float x)
        (if (eql bits 0)
            0
@@ -929,7 +929,7 @@
       (= x (float (rationalize x) x))"
   (declare (explicit-check))
   (number-dispatch ((x real))
-    (((foreach single-float double-float #!+long-float long-float))
+    (((foreach single-float double-float #+long-float long-float))
      ;; This is a fairly straigtforward implementation of the
      ;; iterative algorithm above.
      (multiple-value-bind (frac expo sign)

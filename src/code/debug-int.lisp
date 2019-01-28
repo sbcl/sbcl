@@ -2386,14 +2386,14 @@ register."
        (escaped-float-value single-float))
       (#.sb-vm:double-reg-sc-number
        (escaped-float-value double-float))
-      #!+long-float
+      #+long-float
       (#.sb-vm:long-reg-sc-number
        (escaped-float-value long-float))
       (#.sb-vm:complex-single-reg-sc-number
        (escaped-float-value complex-single-float))
       (#.sb-vm:complex-double-reg-sc-number
        (escaped-float-value complex-double-float))
-      #!+long-float
+      #+long-float
       (#.sb-vm:complex-long-reg-sc-number
        (escaped-float-value sb-kernel::complex-long-float))
       (#.sb-vm:single-stack-sc-number
@@ -2402,7 +2402,7 @@ register."
       (#.sb-vm:double-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-double nfp (number-stack-offset))))
-      #!+long-float
+      #+long-float
       (#.sb-vm:long-stack-sc-number
        (with-nfp (nfp)
          (sap-ref-long nfp (number-stack-offset))))
@@ -2416,7 +2416,7 @@ register."
          (complex
           (sap-ref-double nfp (number-stack-offset))
           (sap-ref-double nfp (number-stack-offset 8)))))
-      #!+long-float
+      #+long-float
       (#.sb-vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (complex
@@ -2564,14 +2564,14 @@ register."
        (set-escaped-float-value single-float value))
       (#.sb-vm:double-reg-sc-number
        (set-escaped-float-value double-float value))
-      #!+long-float
+      #+long-float
       (#.sb-vm:long-reg-sc-number
        (set-escaped-float-value long-float value))
       (#.sb-vm:complex-single-reg-sc-number
        (set-escaped-float-value complex-single-float value))
       (#.sb-vm:complex-double-reg-sc-number
        (set-escaped-float-value complex-double-float value))
-      #!+long-float
+      #+long-float
       (#.sb-vm:complex-long-reg-sc-number
        (set-escaped-float-value complex-long-float))
       (#.sb-vm:single-stack-sc-number
@@ -2582,7 +2582,7 @@ register."
        (with-nfp (nfp)
          (setf (sap-ref-double nfp (number-stack-offset))
                (the double-float value))))
-      #!+long-float
+      #+long-float
       (#.sb-vm:long-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-long nfp (number-stack-offset))
@@ -2611,7 +2611,7 @@ register."
                (imagpart (the (complex double-float) value))
                #!-(or x86 x86-64)
                (the double-float (realpart value)))))
-      #!+long-float
+      #+long-float
       (#.sb-vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-long

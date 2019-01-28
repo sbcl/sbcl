@@ -218,7 +218,7 @@
                       (%integer-vector-widetag-and-n-bits-shift
                        nil (integer-length (1- (cadr type))))
                       (ill-type)))
-                 #!+long-float
+                 #+long-float
                  (long-float
                   (with-parameters (long-float :intervals t) (low high)
                     (if (and (not (eq low '*))
@@ -257,7 +257,7 @@
                                        ((csubtypep ctype (specifier-type '(complex single-float)))
                                         (result
                                          simple-array-complex-single-float-widetag))
-                                       #!+long-float
+                                       #+long-float
                                        ((csubtypep ctype (specifier-type '(complex long-float)))
                                         (result
                                          simple-array-complex-long-float-widetag))
@@ -271,7 +271,7 @@
                                    (single-float
                                     (result
                                      simple-array-complex-single-float-widetag))
-                                   #!+long-float
+                                   #+long-float
                                    (long-float
                                     (result
                                      simple-array-complex-long-float-widetag))
@@ -309,7 +309,7 @@
                     (result simple-array-double-float-widetag))
                    ((csubtypep ctype (specifier-type 'single-float))
                     (result simple-array-single-float-widetag))
-                   #!+long-float
+                   #+long-float
                    ((csubtypep ctype (specifier-type 'long-float))
                     (result simple-array-long-float-widetag))
                    ((csubtypep ctype (specifier-type 'complex-double-float))

@@ -1234,7 +1234,7 @@
                    (check-exponent len sb-vm:double-float-bias
                                    sb-vm:double-float-normal-exponent-max)
                    plusp))
-                 #!+long-float
+                 #+long-float
                  (long-float
                   (long-float-from-bits
                    bits

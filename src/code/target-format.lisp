@@ -642,9 +642,9 @@
   (if (case *read-default-float-format*
         ((short-float single-float)
          (typep number 'single-float))
-        ((double-float #!-long-float long-float)
+        ((double-float #-long-float long-float)
          (typep number 'double-float))
-        #!+long-float
+        #+long-float
         (long-float
          (typep number 'long-float)))
       #\e

@@ -175,8 +175,8 @@
   (def %set-sap-ref-single t single-float)
   (def sap-ref-double)
   (def %set-sap-ref-double t double-float)
-  #!+long-float (def sap-ref-long)
-  #!+long-float (def %set-sap-ref-long t long-float))
+  #+long-float (def sap-ref-long)
+  #+long-float (def %set-sap-ref-long t long-float))
 
 (macrolet ((def (fun args 32-bit 64-bit)
                `(deftransform ,fun (,args)

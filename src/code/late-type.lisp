@@ -2324,7 +2324,7 @@ used for a COMPLEX component.~:@>"
                       ,(coerced-float-bound high 'single-float t))
         (double-float ,(coerced-float-bound  low 'double-float nil)
                       ,(coerced-float-bound high 'double-float t))
-        #!+long-float ,(error "stub: no long float support yet"))))
+        #+long-float ,(error "stub: no long float support yet"))))
 
 (macrolet ((define-float-format (f) `(!def-bounded-type ,f float ,f)))
   (define-float-format single-float)
@@ -2503,13 +2503,13 @@ used for a COMPLEX component.~:@>"
                           ((nil)
                            ;; A double-float with any real number is a
                            ;; double-float.
-                           #!-long-float
+                           #-long-float
                            (if (eq format1 'double-float)
                              'double-float
                              nil)
                            ;; A long-float with any real number is a
                            ;; long-float.
-                           #!+long-float
+                           #+long-float
                            (if (eq format1 'long-float)
                              'long-float
                              nil)))

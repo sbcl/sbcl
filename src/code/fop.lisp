@@ -347,11 +347,11 @@
                       (,reader))))))
     (define-complex-fop 72 fop-complex-single-float single-float)
     (define-complex-fop 73 fop-complex-double-float double-float)
-    #!+long-float
+    #+long-float
     (define-complex-fop 67 fop-complex-long-float long-float)
     (define-float-fop 46 fop-single-float single-float)
     (define-float-fop 47 fop-double-float double-float)
-    #!+long-float
+    #+long-float
     (define-float-fop 52 fop-long-float long-float)))
 
 #!+sb-simd-pack
