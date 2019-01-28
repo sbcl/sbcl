@@ -1410,6 +1410,9 @@
   (frob single-float (or rational single-float))
   (frob double-float (or rational single-float double-float)))
 
+(deftransform complex ((realpart &optional imagpart) (rational &optional (or null (integer 0 0))))
+  'realpart)
+
 ;;; Here are simple optimizers for SIN, COS, and TAN. They do not
 ;;; produce a minimal range for the result; the result is the widest
 ;;; possible answer. This gets around the problem of doing range
