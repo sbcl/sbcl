@@ -716,7 +716,7 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     # 2.3.1, so define our constant for that)
     echo '#define GLIBC231_STYLE_UCONTEXT 1' > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "rv32" ]; then
-    printf ' :cheneygc' >> $ltf
+    printf ' :cheneygc :stack-allocatable-closures' >> $ltf
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate
