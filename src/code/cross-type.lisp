@@ -14,7 +14,7 @@
 (define-condition cross-type-warning (warning)
   ((call :initarg :call :reader cross-type-warning-call)
    (message :reader cross-type-warning-message
-            #+cmu :initarg #+cmu :message ; (to stop bogus non-STYLE WARNING)
+            #!+(host-feature cmu) :initarg #!+(host-feature cmu) :message ; (to stop bogus non-STYLE WARNING)
             ))
   (:report (lambda (c s)
              (format
@@ -27,7 +27,7 @@
 ;;; during cross-compilation.
 (define-condition cross-type-giving-up (cross-type-warning)
   ((message :initform "giving up conservatively"
-            #+cmu :reader #+cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
+            #!+(host-feature cmu) :reader #!+(host-feature cmu) #.(gensym) ; (to stop bogus non-STYLE WARNING)
             )))
 
 ;;; This warning refers to the flexibility in the ANSI spec with

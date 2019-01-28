@@ -148,15 +148,11 @@
 ;;; Return an expression read from the file named NAMESTRING.
 ;;; For user-supplied inputs, protect against more than one expression
 ;;; appearing in the file. With trusted inputs we needn't bother.
-(defun read-from-file (namestring)
+(defun read-from-file (namestring &optional (enforce-single-expr t))
   (with-open-file (s (prepend-genfile-path namestring))
     (let* ((result (read s))
            (eof-result (cons nil nil)))
-      (when (string= (pathname-name namestring) "build-order")
-        ;; build-order uses both host and target conditionals.
-        ;; Our sanity checks during make-host-1 would complain
-        ;; about #+feature when reading the second expression in the file
-        ;; whenever such feature is also a possible target feature.
+      (unless enforce-single-expr
         (return-from read-from-file result))
       (unless (eq (read s nil eof-result) eof-result)
         (error "more than one expression in file ~S" namestring))
@@ -416,7 +412,7 @@
 (defun get-stems-and-flags ()
  (when *stems-and-flags*
    (return-from get-stems-and-flags *stems-and-flags*))
- (setf *stems-and-flags* (read-from-file "build-order.lisp-expr"))
+ (setf *stems-and-flags* (read-from-file "build-order.lisp-expr" nil))
  (let ((stems (make-hash-table :test 'equal)))
   (do-stems-and-flags (stem flags)
     ;; We do duplicate stem comparison based on the object path in

@@ -44,7 +44,7 @@
 ;;; before.  In order for this to work, we need to reload the stems
 ;;; and flags from build-order.lisp-expr, the user needs to have added
 ;;; :trace-file as a flag.
-(setf *stems-and-flags* (read-from-file "build-order.lisp-expr"))
+(setf *stems-and-flags* (read-from-file "build-order.lisp-expr" nil))
 
 (do-stems-and-flags (stem flags)
   (unless (position :not-target flags)

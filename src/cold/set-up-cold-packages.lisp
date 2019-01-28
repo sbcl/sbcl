@@ -334,7 +334,7 @@
 (defun check-no-new-cl-symbols ()
   (assert (equal *package-symbol-counts* (compute-cl-package-symbol-counts))))
 
-(let ((package-data-list (read-from-file "package-data-list.lisp-expr")))
+(defun create-target-packages (package-data-list)
   (labels ((flatten (tree)
              (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
                      tree)))
@@ -402,6 +402,17 @@
           (reexport x))
         (assert (= (length done) (length package-data-list)))))))
 
+(export '*undefined-fun-whitelist*)
+(defvar *undefined-fun-whitelist* (make-hash-table :test 'equal))
+(let ((list
+       (with-open-file (data (prepend-genfile-path "package-data-list.lisp-expr"))
+         ;; There's no need to use the precautionary READ-FROM-FILE function
+         ;; with package-data-list because it is not a customization file.
+         (create-target-packages (read data))
+         (read data))))
+  (dolist (name (apply #'append list))
+    (setf (gethash name *undefined-fun-whitelist*) t)))
+
 (defvar *asm-package-use-list*
   '("SB-ASSEM" "SB-DISASSEM"
     "SB-INT" "SB-EXT" "SB-KERNEL" "SB-VM"
@@ -426,7 +437,7 @@
 (make-assembler-package (backend-asm-package-name))
 
 (defun package-list-for-genesis ()
-  (append (read-from-file "package-data-list.lisp-expr")
+  (append (read-from-file "package-data-list.lisp-expr" nil)
           (let ((asm-package (backend-asm-package-name)))
             (list (make-package-data :name asm-package
                                      :use (list* "CL" *asm-package-use-list*)

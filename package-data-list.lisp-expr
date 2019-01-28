@@ -3483,3 +3483,124 @@ SBCL itself"
                "WAIT-OBJECT-OR-SIGNAL"
                "WRITE-FILE"
                "WITH-PROCESS-TIMES")))
+
+;;; The following symbols may be referenced without seeing a definition
+;;; during make-host-2. No warning will result.
+;;; This list is read after packages are created from the data above.
+((;; CL, EXT, KERNEL
+  allocate-instance
+  compute-applicable-methods
+  slot-makunbound
+  make-load-form-saving-slots
+  sb-vm::remove-static-links)
+ ;; CLOS implementation
+ (sb-mop:class-finalized-p
+  sb-mop:class-prototype
+  sb-mop:class-slots
+  sb-mop:eql-specializer-object
+  sb-mop:finalize-inheritance
+  sb-mop:generic-function-name
+  (setf sb-mop:generic-function-name)
+  sb-mop:slot-definition-allocation
+  sb-mop:slot-definition-name
+  sb-pcl::%force-cache-flushes
+  sb-pcl::check-wrapper-validity
+  sb-pcl::class-has-a-forward-referenced-superclass-p
+  sb-pcl::class-wrapper
+  sb-pcl::compute-gf-ftype
+  sb-pcl::definition-source
+  sb-pcl::ensure-accessor
+  sb-pcl:ensure-class-finalized)
+ ;; CLOS-based packages
+ (sb-gray:stream-clear-input
+  sb-gray:stream-clear-output
+  sb-gray:stream-file-position
+  sb-gray:stream-finish-output
+  sb-gray:stream-force-output
+  sb-gray:stream-fresh-line
+  sb-gray:stream-line-column
+  sb-gray:stream-line-length
+  sb-gray:stream-listen
+  sb-gray:stream-peek-char
+  sb-gray:stream-read-byte
+  sb-gray:stream-read-char
+  sb-gray:stream-read-char-no-hang
+  sb-gray:stream-read-line
+  sb-gray:stream-read-sequence
+  sb-gray:stream-terpri
+  sb-gray:stream-unread-char
+  sb-gray:stream-write-byte
+  sb-gray:stream-write-char
+  sb-gray:stream-write-sequence
+  sb-gray:stream-write-string
+  sb-sequence:concatenate
+  sb-sequence:copy-seq
+  sb-sequence:count
+  sb-sequence:count-if
+  sb-sequence:count-if-not
+  sb-sequence:delete
+  sb-sequence:delete-duplicates
+  sb-sequence:delete-if
+  sb-sequence:delete-if-not
+  (setf sb-sequence:elt)
+  sb-sequence:elt
+  sb-sequence:emptyp
+  sb-sequence:fill
+  sb-sequence:find
+  sb-sequence:find-if
+  sb-sequence:find-if-not
+  (setf sb-sequence:iterator-element)
+  sb-sequence:iterator-endp
+  sb-sequence:iterator-step
+  sb-sequence:length
+  sb-sequence:make-sequence-iterator
+  sb-sequence:make-sequence-like
+  sb-sequence:map
+  sb-sequence:merge
+  sb-sequence:mismatch
+  sb-sequence:nreverse
+  sb-sequence:nsubstitute
+  sb-sequence:nsubstitute-if
+  sb-sequence:nsubstitute-if-not
+  sb-sequence:position
+  sb-sequence:position-if
+  sb-sequence:position-if-not
+  sb-sequence:reduce
+  sb-sequence:remove
+  sb-sequence:remove-duplicates
+  sb-sequence:remove-if
+  sb-sequence:remove-if-not
+  sb-sequence:replace
+  sb-sequence:reverse
+  sb-sequence:search
+  sb-sequence:sort
+  sb-sequence:stable-sort
+  sb-sequence:subseq
+  sb-sequence:substitute
+  sb-sequence:substitute-if
+  sb-sequence:substitute-if-not)
+ ;; Fast interpreter
+ #!+sb-fasteval
+ (sb-interpreter:%fun-type
+  sb-interpreter:env-policy
+  sb-interpreter:eval-in-environment
+  sb-interpreter:find-lexical-fun
+  sb-interpreter:find-lexical-var
+  sb-interpreter::flush-everything
+  sb-interpreter::fun-lexically-notinline-p
+  sb-interpreter:lexenv-from-env
+  sb-interpreter::lexically-unlocked-symbol-p
+  sb-interpreter:list-locals
+  sb-interpreter:prepare-for-compile
+  sb-interpreter::reconstruct-syntactic-closure-env)
+ ;; Other
+ (sb-debug::find-interrupted-name-and-frame
+  sb-impl::encapsulate-generic-function
+  sb-impl::encapsulated-generic-function-p
+  sb-impl::get-processes-status-changes-sigchld
+  sb-impl::step-form
+  sb-impl::step-values
+  sb-impl::stringify-package-designator
+  sb-impl::stringify-string-designator
+  sb-impl::stringify-string-designators
+  sb-impl::unencapsulate-generic-function))

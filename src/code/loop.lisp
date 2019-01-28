@@ -1598,8 +1598,8 @@ code to be loaded.
          (limit-given nil) ; T when prep phrase has specified end
          (limit-constantp nil)
          (limit-value nil))
-     ;; Work around some "Unused" (rather, assigned-but-never-set) warnings
-     #+(or ccl clisp) (declare (ignorable start-constantp start-value))
+     ;; Silence the assigned-but-never-set warnings that CCL and CLISP emit
+     (declare (ignorable start-constantp start-value))
      (flet ((assert-index-for-arithmetic (index)
               (unless (atom index)
                 (loop-error "Arithmetic index must be an atom."))))
