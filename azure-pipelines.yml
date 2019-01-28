@@ -24,6 +24,9 @@ jobs:
   - script: |
       cd tests; ./run-tests.sh
     displayName: 'tests'
+  - script: |
+      cd tests; ./ansi-tests.sh
+    displayName: 'ansi-tests'
 
 - job: macOS
 
@@ -40,6 +43,9 @@ jobs:
   - script: |
       cd tests; ./run-tests.sh
     displayName: 'tests'
+  - script: |
+      cd tests; ./ansi-tests.sh
+    displayName: 'ansi-tests'
 
 - job: Windows
 
@@ -62,3 +68,7 @@ jobs:
   - script: |
         C:\tools\msys64\usr\bin\bash -c 'cd tests; CC=x86_64-w64-mingw32-gcc  PATH=/usr/bin:$PATH ./run-tests.sh'
     displayName: 'tests'
+
+  - script: |
+        C:\tools\msys64\usr\bin\bash -c 'cd tests; PATH=/usr/bin:$PATH ./ansi-tests.sh'
+    displayName: 'ansi-tests'
