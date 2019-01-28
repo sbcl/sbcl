@@ -1352,6 +1352,8 @@ redefinition."
                (assert win)))))
     (assert-that "redefinition of X-Y clobbers structure accessor"
                  '(defun x-y (z) (list :x-y z)))
+    (assert-that "redefinition of COPY-X clobbers structure copier"
+                 '(defun copy-x (a b) (list a b)))
     (assert-that "redefinition of X-P clobbers structure predicate"
                  '(defun x-p (z) (list 'bork z))))
   (assert (equalp

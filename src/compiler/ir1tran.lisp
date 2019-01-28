@@ -1117,16 +1117,8 @@
               (multiple-value-bind (transformed pass)
                   (if (functionp transform)
                       (funcall transform form *lexenv*)
-                      (let ((result
-                             (if (eq (cdr transform) :predicate)
-                                 (and (singleton-p (cdr form))
-                                      `(%instance-typep
-                                        ,(cadr form)
-                                        ',(dd-name (car transform))))
-                                 (slot-access-transform
-                                  (if (consp name) :write :read)
-                                  (cdr form) transform))))
-                        (values result (null result))))
+                      (struct-fun-transform transform form name))
+                ;; Note that "pass" means fail. Gotta love it.
                 (cond (pass
                        (ir1-convert-maybe-predicate start next result form var))
                       (t

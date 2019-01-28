@@ -359,6 +359,9 @@
                                 `((defun ,(dd-copier-name dd) (instance)
                                     (copy-structure (the ,(dd-name dd) instance)))))
                             ,@(awhen (dd-predicate-name dd)
+                                ;; FIXME: probably should use %INSTANCE-TYPEP which is
+                                ;; what TYPEP will turn into. If so, be sure to change
+                                ;; DEFSTRUCT-GENERATED-DEFN-P.
                                 `((defun ,(dd-predicate-name dd) (object)
                                     (typep object ',(dd-name dd)))))
                             ,@(accessor-definitions dd classoid))))
@@ -1135,6 +1138,22 @@ unless :NAMED is also specified.")))
                    (once-only ((new (first args)))
                      `(,inverse ,@(cdr place) ,(check new))))))))))))
 
+;;; Apply TRANSFORM - a special indicator stored in :SOURCE-TRANSFORM
+;;; for a DEFSTRUCT copier, accessor, or predicate - to SEXPR.
+;;; NAME is needed to select between the reader and writer transform.
+(defun sb-c::struct-fun-transform (transform sexpr name)
+  (let ((result
+         (if (symbolp (cdr transform))
+             (when (singleton-p (cdr sexpr)) ; exactly 1 arg
+               (let ((type (dd-name (car transform)))
+                     (arg (cadr sexpr)))
+                 (ecase (cdr transform)
+                   (:predicate `(sb-c::%instance-typep ,arg ',type))
+                   (:copier `(copy-structure (the ,type ,arg))))))
+             (slot-access-transform (if (consp name) :write :read)
+                                    (cdr sexpr) transform))))
+    (values result (not result))))
+
 ;;; Return a LAMBDA form which can be used to set a slot
 (defun slot-setter-lambda-form (dd dsd)
   `(lambda (newval instance)
@@ -1258,15 +1277,11 @@ unless :NAMED is also specified.")))
     (%proclaim-defstruct-ctors dd)
 
     (awhen (dd-copier-name dd)
-      (let ((dtype (dd-name dd)))
-        (sb-xc:proclaim `(ftype (sfunction (,dtype) ,dtype) ,it))))
-
-    (let ((predicate-name (dd-predicate-name dd)))
-      (when predicate-name
-        (when check-inlining
-          (push predicate-name fnames))
-        (setf (info :function :source-transform predicate-name)
-              (cons dd :predicate))))
+      (when check-inlining (push it fnames))
+      (setf (info :function :source-transform it) (cons dd :copier)))
+    (awhen (dd-predicate-name dd)
+      (when check-inlining (push it fnames))
+      (setf (info :function :source-transform it) (cons dd :predicate)))
 
     (dolist (dsd (dd-slots dd))
       (let ((accessor-name (dsd-accessor-name dsd)))
@@ -2074,7 +2089,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (error "Can not use %INSTANCE-SET on cross-compilation host.")))
 
 ;;; If LAMBDA-LIST and BODY constitute an auto-generated structure function
-;;; (accessor or predicate) for NAME, return the kind of thing it is.
+;;; (accessor, predicate, or copier) for NAME, return the kind of thing it is.
 (defun defstruct-generated-defn-p (name lambda-list body)
   (unless (singleton-p body)
     (return-from defstruct-generated-defn-p nil))
@@ -2091,6 +2106,15 @@ or they must be declared locally notinline at each call site.~@:>"
                  ;; extract dd-name from `(TYPEP OBJECT ',THING)
                  (eq (second (third form)) (dd-name (car info))))
         (return-from defstruct-generated-defn-p :predicate))
+      (when (and (eq (cdr info) :copier)
+                 (equal lambda-list '(instance))
+                 (typep form '(cons (eql copy-structure)
+                                    (cons (cons (eql the)
+                                                (cons symbol (cons (eql instance) null)))
+                                          null)))
+                 ;; extract dd-name from (THE <type> INSTANCE)
+                 (eq (second (second form)) (dd-name (car info))))
+        (return-from defstruct-generated-defn-p :copier))
       (when (defstruct-slot-description-p (cdr info))
         (multiple-value-bind (mode expected-lambda-list xform-args)
             (if (consp name)

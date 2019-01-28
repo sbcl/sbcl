@@ -1268,8 +1268,12 @@
     fun))
 
 ;;; Store INLINE-LAMBDA as the inline expansion of NAME.
+;;; As special cases, INLINE-LAMBDA can be a keyword which denotes
+;;; an auto-generated defstruct function of some kind.
+;;; The transform for those is stored in :SOURCE-TRANSFORM,
+;;; and not stored as an inline expansion.
 (defun %set-inline-expansion (name defined-fun inline-lambda dxable-args)
-  (cond ((member inline-lambda '(:accessor :predicate))
+  (cond ((member inline-lambda '(:accessor :copier :predicate))
          ;; This special case implies a structure-related source transform.
          ;; Warn if blowing away a previously existing inline expansion that
          ;; came from an ordinary DEFUN that recorded an expansion.
@@ -1290,8 +1294,8 @@
              ;; This is serious enough that you can get two warnings:
              ;; - one because you redefined a function at all,
              ;; - and one because the source-transform is erased.
-             (warn "redefinition of ~S clobbers structure ~:[accessor~;predicate~]"
-                   name (eq (cdr info) :predicate))))))
+             (warn "redefinition of ~S clobbers structure ~:[accessor~;~(~a~)~]"
+                   name (symbolp (cdr info)) (cdr info))))))
   ;; says CLHS: "Only an implementation that was willing to be responsible
   ;; for recompiling f if the definition of g changed incompatibly could
   ;; legitimately stack allocate the list argument to g in f."
