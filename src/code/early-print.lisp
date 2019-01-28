@@ -17,8 +17,7 @@
 ;;; *PRINT-LEVEL*. See the macro DESCEND-INTO for a handy interface to
 ;;; depth abbreviation.
 (defparameter *current-level-in-print* 0) ; initialized by genesis
-(declaim (index *current-level-in-print*)
-         (always-bound *current-level-in-print*))
+(declaim (index *current-level-in-print*))
 
 ;;; Automatically handle *PRINT-LEVEL* abbreviation. If we are too
 ;;; deep, then a #\# is printed to STREAM and BODY is ignored.

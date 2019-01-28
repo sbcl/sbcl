@@ -32,6 +32,9 @@
 (defparameter *print-length* nil
   "How many elements at any level should be printed before abbreviating
   with \"...\"?")
+(defparameter *print-vector-length* nil
+  "Like *PRINT-LENGTH* but works on strings and bit-vectors.
+Does not affect the cases that are already controlled by *PRINT-LENGTH*")
 (defparameter *print-circle* nil
   "Should we use #n= and #n# notation to preserve uniqueness in general (and
   circularity in particular) when printing?")

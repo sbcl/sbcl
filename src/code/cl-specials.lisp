@@ -65,7 +65,11 @@
                 cl:-
                 cl:/
                 cl://
-                cl:///)))
+                cl:///
+                ;; extension/internal specials are also proclaimed early
+                ;; to benefit from always-bound and precomputed TLS index.
+                sb-kernel:*current-level-in-print*
+                sb-ext:*print-vector-length*)))
     `(progn
        (declaim (special ,@list)
                 (sb-ext:always-bound ,@list))
@@ -123,6 +127,7 @@
 
 (declaim (type (or unsigned-byte null)
                        cl:*print-length*
+                       sb-ext:*print-vector-length*
                        cl:*print-level*
                        cl:*print-lines*
                        cl:*print-miser-width*

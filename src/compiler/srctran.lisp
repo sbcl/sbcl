@@ -5145,7 +5145,7 @@
         symbol
         (give-up-ir1-transform))))
 
-(deftransform boundp ((symbol) ((constant-arg symbol)))
+(deftransform boundp ((symbol) ((constant-arg symbol)) * :policy (< safety 3))
   (if (always-boundp (lvar-value symbol))
       t
       (give-up-ir1-transform)))

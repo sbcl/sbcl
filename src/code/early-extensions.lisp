@@ -1482,20 +1482,18 @@ NOTE: This interface is experimental and subject to change."
 (defmacro with-sane-io-syntax (&body forms)
   `(call-with-sane-io-syntax (lambda () ,@forms)))
 
-(defparameter *print-vector-length* nil ; initialized by genesis
-  "Like *PRINT-LENGTH* but works on strings and bit-vectors.
-Does not affect the cases that are already controlled by *PRINT-LENGTH*")
-(declaim (always-bound *print-vector-length*))
-
 (defun call-with-sane-io-syntax (function)
   (declare (type function function))
   #-sb-xc-host (declare (dynamic-extent function)) ; "unable"
+  ;; force BOUNDP to be tested by declaring maximal safety
+  ;; in case unsafe code really screwed things up.
+  (declare (optimize (safety 3)))
   (macrolet ((true (sym)
                `(and (boundp ',sym) ,sym)))
     (let ((*print-readably* nil)
           (*print-level* (or (true *print-level*) 6))
           (*print-length* (or (true *print-length*) 12))
-          (*print-vector-length* (or (true *print-vector-length*) 200)))
+          #-sb-xc-host (*print-vector-length* (or (true *print-vector-length*) 200)))
       (funcall function))))
 
 ;;; Returns a list of members of LIST. Useful for dealing with circular lists.
