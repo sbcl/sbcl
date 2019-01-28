@@ -383,8 +383,8 @@
       0
       (let ((word (code-trailer-ref code-obj -4)))
         ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
-        #!+little-endian (ldb (byte 16 16) word)
-        #!+big-endian    (ldb (byte 16  0) word))))
+        #+little-endian (ldb (byte 16 16) word)
+        #+big-endian    (ldb (byte 16  0) word))))
 
 ;;; The fun-table-count is a uint16_t immediately preceding the trailer length
 ;;; containing two subfields:
@@ -396,8 +396,8 @@
       0
       (let ((word (code-trailer-ref code-obj -4)))
         ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
-        #!+little-endian (ldb (byte 16  0) word)
-        #!+big-endian    (ldb (byte 16 16) word))))
+        #+little-endian (ldb (byte 16  0) word)
+        #+big-endian    (ldb (byte 16 16) word))))
 
 ;;; Return the number of simple-funs in CODE-OBJ
 ;;; Keep in sync with C function code_n_funs()
@@ -552,7 +552,7 @@
           fun-name)))
     ;; For immobile-code, do something slightly different: fmakunbound,
     ;; then assign the fdefn-fun slot to avoid consing a new closure trampoline.
-    #!+immobile-code
+    #+immobile-code
     (progn (fdefn-makunbound fdefn)
            ;; There is no :SET-TRANS for the primitive object's fdefn-fun slot,
            ;; nor do we desire the full effect of %SET-FDEFN-FUN.
@@ -562,7 +562,7 @@
                  closure))
     ;; The above would work, but there's no overhead when installing a closure
     ;; the regular way, so just do that.
-    #!-immobile-code
+    #-immobile-code
     (setf (fdefn-fun fdefn) closure)))
 
 ;;;; Iterating over closure values

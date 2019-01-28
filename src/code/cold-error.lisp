@@ -119,10 +119,10 @@
 (defmacro infinite-error-protect (&rest forms)
   `(let ((*current-error-depth* (infinite-error-protector)))
      (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
-     ;; This is almost totally unhelpful. Running with #!+sb-show does not mean
+     ;; This is almost totally unhelpful. Running with #+sb-show does not mean
      ;; that you care to see an additional 16K characters of output
      ;; each time this macro is used when no error is actually happening.
-     #| #!+sb-show (sb-debug:print-backtrace :count 8) ; arbitrary truncation |#
+     #| #+sb-show (sb-debug:print-backtrace :count 8) ; arbitrary truncation |#
      ,@forms))
 ;;; This symbol isn't removed automatically because it's exported,
 ;;; but nothing can use it after the build is complete.
@@ -158,7 +158,7 @@
   (/hexstr arguments)
 
   (/show0 "cold-printing ERROR arguments one by one..")
-  #!+sb-show (dolist (argument arguments)
+  #+sb-show (dolist (argument arguments)
                (sb-impl::cold-print argument))
   (/show0 "done cold-printing ERROR arguments")
 

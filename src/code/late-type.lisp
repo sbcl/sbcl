@@ -584,7 +584,7 @@
 
 ;;; Return the type of the first value indicated by TYPE. This is used
 ;;; by people who don't want to have to deal with VALUES types.
-#!-sb-fluid (declaim (freeze-type values-type))
+#-sb-fluid (declaim (freeze-type values-type))
 ; (inline single-value-type))
 (defun single-value-type (type)
   (declare (type ctype type))
@@ -2186,7 +2186,7 @@ used for a COMPLEX component.~:@>"
 ;;; member of TYPE or a one-element list of a member of TYPE.
 ;;; This is not necessarily the canonical bound. An integer bound
 ;;; should always be an atom, which we'll enforce later if needed.
-#!-sb-fluid (declaim (inline valid-bound))
+#-sb-fluid (declaim (inline valid-bound))
 (defun valid-bound (bound type)
   (cond ((eq bound '*) nil)
         ((sb-xc:typep (if (singleton-p bound) (car bound) bound) type) bound)
@@ -2602,12 +2602,12 @@ used for a COMPLEX component.~:@>"
                       (if (eq (car dims) '*)
                           (case eltype
                             (bit 'bit-vector)
-                            ((base-char #!-sb-unicode character) 'base-string)
+                            ((base-char #-sb-unicode character) 'base-string)
                             (* 'vector)
                             (t `(vector ,eltype)))
                           (case eltype
                             (bit `(bit-vector ,(car dims)))
-                            ((base-char #!-sb-unicode character)
+                            ((base-char #-sb-unicode character)
                              `(base-string ,(car dims)))
                             (t `(vector ,eltype ,(car dims)))))))
                  (if (eql complexp :maybe)
@@ -2616,12 +2616,12 @@ used for a COMPLEX component.~:@>"
                (if (eq (car dims) '*)
                    (case eltype
                      (bit 'simple-bit-vector)
-                     ((base-char #!-sb-unicode character) 'simple-base-string)
+                     ((base-char #-sb-unicode character) 'simple-base-string)
                      ((t) 'simple-vector)
                      (t `(simple-array ,eltype (*))))
                    (case eltype
                      (bit `(simple-bit-vector ,(car dims)))
-                     ((base-char #!-sb-unicode character)
+                     ((base-char #-sb-unicode character)
                       `(simple-base-string ,(car dims)))
                      ((t) `(simple-vector ,(car dims)))
                      (t `(simple-array ,eltype ,dims))))))
@@ -3775,7 +3775,7 @@ used for a COMPLEX component.~:@>"
                                                eltype))))
 
 ;;;; SIMD-PACK types
-#!+sb-simd-pack
+#+sb-simd-pack
 (progn
   (!define-type-class simd-pack :enumerable nil
                       :might-contain-other-types nil)
@@ -3833,7 +3833,7 @@ used for a COMPLEX component.~:@>"
 
   (!define-superclasses simd-pack ((simd-pack)) !cold-init-forms))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (progn
   (!define-type-class simd-pack-256 :enumerable nil
                       :might-contain-other-types nil)

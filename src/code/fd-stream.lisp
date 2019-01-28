@@ -115,7 +115,7 @@
   ;; STREAM-ELEMENT-MODE type.
   (element-mode :bivalent :type stream-element-mode)
   ;; the Unix file descriptor
-  (fd -1 :type #!-win32 fixnum #!+win32 sb-vm:signed-word)
+  (fd -1 :type #-win32 fixnum #+win32 sb-vm:signed-word)
   ;; What do we know about the FD?
   (fd-type :unknown :type keyword)
   ;; controls when the output buffer is flushed
@@ -128,7 +128,7 @@
   ;; character position if known -- this may run into bignums, but
   ;; we probably should flip it into null then for efficiency's sake...
   (output-column nil :type (or (and unsigned-byte
-                                    #!+64-bit index)
+                                    #+64-bit index)
                                null))
   ;; T if input is waiting on FD. :EOF if we hit EOF.
   (listen nil :type (member nil t :eof))
@@ -315,12 +315,12 @@
                                (incf head count)
                                (setf (buffer-head obuf) head)
                                (queue-or-wait))
-                              #!-win32
+                              #-win32
                               ((eql errno sb-unix:ewouldblock)
                                ;; Blocking, queue or wair.
                                (queue-or-wait))
                               ;; if interrupted on win32, just try again
-                              #!+win32 ((eql errno sb-unix:eintr))
+                              #+win32 ((eql errno sb-unix:eintr))
                               (t
                                (simple-stream-perror +write-failed+
                                                      stream errno)))))))))))))
@@ -389,9 +389,9 @@
                   (push buffer (fd-stream-output-queue stream)))
                  (t
                   ;; Could not write on the first try at all!
-                  #!+win32
+                  #+win32
                   (simple-stream-perror +write-failed+ stream errno)
-                  #!-win32
+                  #-win32
                   (if (= errno sb-unix:ewouldblock)
                       (bug "Unexpected blocking in WRITE-OUTPUT-FROM-QUEUE.")
                       (simple-stream-perror +write-failed+
@@ -420,9 +420,9 @@
                     (buffer-output stream thing (+ start count) end))
                    (t
                     ;; Could not write -- buffer or error.
-                    #!+win32
+                    #+win32
                     (simple-stream-perror +write-failed+ stream errno)
-                    #!-win32
+                    #-win32
                     (if (= errno sb-unix:ewouldblock)
                         (buffer-output stream thing start end)
                         (simple-stream-perror +write-failed+ stream errno)))))))))
@@ -445,8 +445,8 @@
 
 (defun stream-errno-to-condition (errno)
   (case errno
-    (#!-win32 #.sb-unix:epipe
-     #!+win32 #.sb-win32::error-no-data
+    (#-win32 #.sb-unix:epipe
+     #+win32 #.sb-win32::error-no-data
      'broken-pipe)
     (t 'simple-stream-error)))
 
@@ -732,7 +732,7 @@
   (setf (signed-sap-ref-32 (buffer-sap obuf) tail)
         byte))
 
-#!+64-bit
+#+64-bit
 (progn
   (def-output-routines ("OUTPUT-UNSIGNED-LONG-LONG-~A-BUFFERED"
                         8
@@ -760,7 +760,7 @@
     (declare (fixnum start end))
     (let ((last-newline
            (string-dispatch (simple-base-string
-                             #!+sb-unicode
+                             #+sb-unicode
                              (simple-array character (*))
                              string)
                thing
@@ -962,10 +962,10 @@
 ;;; correct on win32.  However, none of the places that use it require
 ;;; further assurance than "may" versus "will definitely not".
 (defun sysread-may-block-p (stream)
-  #!+win32
+  #+win32
   ;; This answers T at EOF on win32, I think.
   (not (sb-win32:handle-listen (fd-stream-fd stream)))
-  #!-win32
+  #-win32
   (not (sb-unix:unix-simple-poll (fd-stream-fd stream) :input 0)))
 
 ;;; If the read would block wait (using SERVE-EVENT) till input is available,
@@ -976,7 +976,7 @@
         (errno 0)
         (count 0))
     (tagbody
-       #!+win32
+       #+win32
        (go :main)
 
        ;; Check for blocking input before touching the stream if we are to
@@ -1011,7 +1011,7 @@
        ((lambda (return-reason)
           (ecase return-reason
             ((nil))                     ; fast path normal cases
-            ((:wait-for-input) (go #!-win32 :wait-for-input #!+win32 :main))
+            ((:wait-for-input) (go #-win32 :wait-for-input #+win32 :main))
             ((:closed-flame)   (go :closed-flame))
             ((:read-error)     (go :read-error))))
         (without-interrupts
@@ -1048,8 +1048,8 @@
                       (sb-unix:unix-read fd (sap+ sap tail) (- length tail)))
                 (cond ((null count)
                        (if (eql errno
-                                #!+win32 sb-unix:eintr
-                                #!-win32 sb-unix:ewouldblock)
+                                #+win32 sb-unix:eintr
+                                #-win32 sb-unix:ewouldblock)
                            (return :wait-for-input)
                            (return :read-error)))
                       ((zerop count)
@@ -1218,7 +1218,7 @@
                    ((signed-byte 32) 4 sap head)
   (signed-sap-ref-32 sap head))
 
-#!+64-bit
+#+64-bit
 (progn
   (def-input-routine input-unsigned-64bit-byte
       ((unsigned-byte 64) 8 sap head)
@@ -1449,7 +1449,7 @@
               ((= end start))
             (let ((obuf (fd-stream-obuf stream)))
               (string-dispatch (simple-base-string
-                                #!+sb-unicode (simple-array character (*))
+                                #+sb-unicode (simple-array character (*))
                                 string)
                   string
                 (let ((len (buffer-length obuf))
@@ -1930,11 +1930,11 @@
 
 (defun fd-stream-clear-input (stream)
   (flush-input-buffer stream)
-  #!+win32
+  #+win32
   (progn
     (sb-win32:handle-clear-input (fd-stream-fd stream))
     (setf (fd-stream-listen stream) nil))
-  #!-win32
+  #-win32
   (catch 'eof-input-catcher
     (loop until (sysread-may-block-p stream)
           do
@@ -1951,9 +1951,9 @@
                 (let ((ibuf (fd-stream-ibuf fd-stream)))
                   (or (not (eql (buffer-head ibuf) (buffer-tail ibuf)))
                       (fd-stream-listen fd-stream)
-                      #!+win32
+                      #+win32
                       (sb-win32:handle-listen (fd-stream-fd fd-stream))
-                      #!-win32
+                      #-win32
                       ;; If the read can block, LISTEN will certainly return NIL.
                       (if (sysread-may-block-p fd-stream)
                           nil
@@ -2082,7 +2082,7 @@
               :expected-type 'fd-stream
               :format-control "~S is not a stream associated with a file."
               :format-arguments (list fd-stream)))
-     #!-win32
+     #-win32
      (multiple-value-bind (okay dev ino mode nlink uid gid rdev size
                                 atime mtime ctime blksize blocks)
          (sb-unix:unix-fstat (fd-stream-fd fd-stream))
@@ -2093,7 +2093,7 @@
        (if (zerop mode)
            nil
            (truncate size (fd-stream-element-size fd-stream))))
-     #!+win32
+     #+win32
      (let* ((handle (fd-stream-fd fd-stream))
             (element-size (fd-stream-element-size fd-stream)))
        (multiple-value-bind (got native-size)
@@ -2271,9 +2271,9 @@
          (stream (funcall constructor
                           :fd fd
                           :fd-type
-                          #!-win32 (sb-unix:fd-type fd)
+                          #-win32 (sb-unix:fd-type fd)
                           ;; KLUDGE.
-                          #!+win32 (if serve-events
+                          #+win32 (if serve-events
                                        :unknown
                                        :regular)
                           :name name
@@ -2295,7 +2295,7 @@
       (finalize stream
                 (lambda ()
                   (sb-unix:unix-close fd)
-                  #!+sb-show
+                  #+sb-show
                   (format *terminal-io* "** closed file descriptor ~W **~%"
                           fd))
                 :dont-save t))
@@ -2331,7 +2331,7 @@
                (external-format :default)
                ;; private options - use at your own risk
                (class 'fd-stream)
-               #!+win32
+               #+win32
                (overlapped t)
                &aux                     ; Squelch assignment warning.
                (filename filename)
@@ -2481,9 +2481,9 @@
                (multiple-value-bind (fd errno)
                    (if namestring
                        (sb-unix:unix-open namestring mask mode
-                                          #!+win32 :overlapped #!+win32 overlapped)
-                       (values nil #!-win32 sb-unix:enoent
-                                   #!+win32 sb-win32::error_file_not_found))
+                                          #+win32 :overlapped #+win32 overlapped)
+                       (values nil #-win32 sb-unix:enoent
+                                   #+win32 sb-win32::error_file_not_found))
                  (flet ((vanilla-open-error (&optional (condition 'simple-file-error))
                           (file-perror condition "Error opening ~S" pathname errno condition)))
                    (when (numberp fd)
@@ -2516,8 +2516,8 @@
                                   (close stream)
                                   stream)))))
                    (restart-case
-                       (cond ((eql errno #!-win32 sb-unix:enoent
-                                         #!+win32 sb-win32::error_file_not_found)
+                       (cond ((eql errno #-win32 sb-unix:enoent
+                                         #+win32 sb-win32::error_file_not_found)
                               (case if-does-not-exist
                                 (:error
                                  (restart-case
@@ -2530,8 +2530,8 @@
                                  (open-error "~@<The path ~2I~_~S ~I~_does not exist.~:>"
                                              pathname))
                                 (t (return nil))))
-                             ((eql errno #!-win32 sb-unix:eexist
-                                         #!+win32 sb-win32::error_file_exists)
+                             ((eql errno #-win32 sb-unix:eexist
+                                         #+win32 sb-win32::error_file_exists)
                               (if (null if-exists)
                                   (return nil)
                                   (restart-case
@@ -2594,7 +2594,7 @@
   (%makunbound '*available-buffers*))
 
 (defun stdstream-external-format (fd)
-  #!-win32 (declare (ignore fd))
+  #-win32 (declare (ignore fd))
   (let* ((keyword (cond #!+(and win32 sb-unicode)
                         ((sb-win32::console-handle-p fd)
                          :ucs-2)
@@ -2613,9 +2613,9 @@
     (setf *available-buffers* nil))
   (with-simple-output-to-string (*error-output*)
     (multiple-value-bind (in out err)
-        #!-win32 (values 0 1 2)
-        #!+win32 (sb-win32::get-std-handles)
-      (labels (#!+win32
+        #-win32 (values 0 1 2)
+        #+win32 (sb-win32::get-std-handles)
+      (labels (#+win32
                (nul-stream (name inputp outputp)
                  (let* ((nul-name #.(coerce "NUL" 'simple-base-string))
                         (nul-handle
@@ -2641,7 +2641,7 @@
                     :external-format (stdstream-external-format nul-handle))))
                (stdio-stream (handle name inputp outputp)
                  (cond
-                   #!+win32
+                   #+win32
                    ((null handle)
                     ;; If no actual handle was present, create a stream to NUL
                     (nul-stream name inputp outputp))
@@ -2658,9 +2658,9 @@
         (setf *stdin*  (stdio-stream in  "standard input"  t   nil)
               *stdout* (stdio-stream out "standard output" nil t)
               *stderr* (stdio-stream err "standard error"  nil t))))
-    #!+win32
+    #+win32
     (setf *tty* (make-two-way-stream *stdin* *stdout*))
-    #!-win32
+    #-win32
     ;; FIXME: what is this call to COERCE doing? XC can't dump non-base-strings.
     (let* ((ttyname #.(coerce "/dev/tty" 'simple-base-string))
            (tty (sb-unix:unix-open ttyname sb-unix:o_rdwr #o666)))
@@ -2731,8 +2731,8 @@
 
 (defun !make-cold-stderr-stream ()
   (let ((stderr
-          #!-win32 2
-          #!+win32 (sb-win32::get-std-handle-or-null sb-win32::+std-error-handle+)))
+          #-win32 2
+          #+win32 (sb-win32::get-std-handle-or-null sb-win32::+std-error-handle+)))
     (%make-fd-stream
      :out (lambda (stream ch)
             (declare (ignore stream))

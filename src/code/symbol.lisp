@@ -305,7 +305,7 @@ distinct from the global value. Can also be SETF."
   (declare (type string string))
   (%make-symbol 0 (if (simple-string-p string) string (subseq string 0))))
 
-;;; All symbols go into immobile space if #!+immobile-symbols is enabled,
+;;; All symbols go into immobile space if #+immobile-symbols is enabled,
 ;;; but not if disabled. The win with immobile space that is that all symbols
 ;;; can be considered static from an addressing viewpoint, but GC'able.
 ;;; (After codegen learns how, provided that defrag becomes smart enough
@@ -326,17 +326,17 @@ distinct from the global value. Can also be SETF."
 ;;; It's kinda useless to do that, though not technically forbidden.
 ;;; (It can produce a not-necessarily-self-evaluating keyword)
 
-#!+immobile-space
+#+immobile-space
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
   (set-header-data name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
-  (if #!-immobile-symbols
+  (if #-immobile-symbols
       (or (eql kind 1) ; keyword
           (and (eql kind 2) ; random interned symbol
                (plusp (length name))
                (char= (char name 0) #\*)
                (char= (char name (1- (length name))) #\*)))
-      #!+immobile-symbols t ; always place them there
+      #+immobile-symbols t ; always place them there
       (truly-the (values symbol) (sb-vm::make-immobile-symbol name))
       (sb-vm::%%make-symbol name)))
 
@@ -465,7 +465,7 @@ distinct from the global value. Can also be SETF."
                      (if (plusp q)
                          (recurse (1+ depth) q)
                          (let ((et (if (or (base-string-p prefix)
-                                           #!+sb-unicode ; no #'base-char-p
+                                           #+sb-unicode ; no #'base-char-p
                                            (every #'base-char-p prefix))
                                        'base-char 'character)))
                            (setq s (make-string (+ (length prefix) depth)

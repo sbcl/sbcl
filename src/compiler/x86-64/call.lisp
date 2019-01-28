@@ -604,7 +604,7 @@
 ;;; have been set up in the current frame.
 (macrolet ((define-full-call (vop-name named return variable)
             (aver (not (and variable (eq return :tail))))
-            #!+immobile-code (when named (setq named :direct))
+            #+immobile-code (when named (setq named :direct))
             `(define-vop (,vop-name ,@(when (eq return :unknown)
                                         '(unknown-values-receiver)))
                (:args
@@ -797,7 +797,7 @@
 
                (when (and step-instrumenting
                           ,@(and (eq named :direct)
-                                 `((not (and #!+immobile-code
+                                 `((not (and #+immobile-code
                                              ;; handle-single-step-around-trap can't handle it
                                              (static-fdefn-offset fun))))))
                  (emit-single-step-test)
@@ -806,7 +806,7 @@
                DONE
                (note-this-location vop :call-site)
                ,(cond ((eq named :direct)
-                       #!+immobile-code
+                       #+immobile-code
                        `(let* ((fixup (make-fixup
                                        fun
                                        (if (static-fdefn-offset fun)
@@ -826,10 +826,10 @@
                                        (inst mov rax-tn fixup)
                                        rax-tn))))
                           (inst ,(if (eq return :tail) 'jmp 'call) target))
-                       #!-immobile-code
+                       #-immobile-code
                        `(inst ,(if (eq return :tail) 'jmp 'call)
                               (ea (+ nil-value (static-fun-offset fun)))))
-                      #!-immobile-code
+                      #-immobile-code
                       (named
                        `(inst ,(if (eq return :tail) 'jmp 'call)
                               (ea (- (* fdefn-raw-addr-slot n-word-bytes)
@@ -849,15 +849,15 @@
 
   (define-full-call call nil :fixed nil)
   (define-full-call call-named t :fixed nil)
-  #!-immobile-code
+  #-immobile-code
   (define-full-call static-call-named :direct :fixed nil)
   (define-full-call multiple-call nil :unknown nil)
   (define-full-call multiple-call-named t :unknown nil)
-  #!-immobile-code
+  #-immobile-code
   (define-full-call static-multiple-call-named :direct :unknown nil)
   (define-full-call tail-call nil :tail nil)
   (define-full-call tail-call-named t :tail nil)
-  #!-immobile-code
+  #-immobile-code
   (define-full-call static-tail-call-named :direct :tail nil)
 
   (define-full-call call-variable nil :fixed t)
@@ -1396,8 +1396,8 @@
   ;; and reading a slot from a thread structure would require an extra
   ;; register on -SB-THREAD. While this isn't critical for x86-64,
   ;; it's more serious for x86.
-  #!+sb-thread (inst cmp :byte (thread-slot-ea thread-stepping-slot) 0)
-  #!-sb-thread (inst cmp :byte (static-symbol-value-ea 'sb-impl::*stepping*) 0))
+  #+sb-thread (inst cmp :byte (thread-slot-ea thread-stepping-slot) 0)
+  #-sb-thread (inst cmp :byte (static-symbol-value-ea 'sb-impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)
   (:policy :fast-safe)

@@ -926,9 +926,9 @@
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     (assemble ()
-                      #!-sb-thread
+                      #-sb-thread
                       (load-symbol-value tmp-tn sb-impl::*stepping*)
-                      #!+sb-thread
+                      #+sb-thread
                       (loadw tmp-tn thread-tn thread-stepping-slot)
                       (inst cbz tmp-tn step-done-label)
                       ;; CONTEXT-PC will be pointing here when the
@@ -1169,9 +1169,9 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    #!-sb-thread
+    #-sb-thread
     (load-symbol-value tmp-tn sb-impl::*stepping*)
-    #!+sb-thread
+    #+sb-thread
     (loadw tmp-tn thread-tn thread-stepping-slot)
     (inst cbz tmp-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,

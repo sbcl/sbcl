@@ -49,7 +49,7 @@
     ;; We can't use both register and immediate offsets in the same
     ;; load/store instruction, so we need to bias our register offset
     ;; on big-endian systems.
-    #!+big-endian
+    #+big-endian
     (inst sub result result (1- n-word-bytes))
 
     ;; And, finally, pick out the widetag from the header.
@@ -238,7 +238,7 @@
 
 ;;;
 
-#!+sb-thread
+#+sb-thread
 (progn
   (defun ldr-str-word-offset-encodable (x)
     (ldr-str-offset-encodable (ash x word-shift)))

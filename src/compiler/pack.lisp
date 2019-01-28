@@ -1184,7 +1184,7 @@
 ;;; the restriction, we pack a Load-TN and load the operand into it.
 ;;; If a load-tn has already been allocated, we can assume that the
 ;;; restriction is satisfied.
-#!-sb-fluid (declaim (inline check-operand-restrictions))
+#-sb-fluid (declaim (inline check-operand-restrictions))
 (defun check-operand-restrictions (scs ops)
   (declare (list scs) (type (or tn-ref null) ops))
 

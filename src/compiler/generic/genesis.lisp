@@ -145,8 +145,8 @@
                   (le-octet-indices
                    (loop with n-octets = (/ n 8)
                          for i from 0 below n-octets
-                         collect `(+ byte-index #!+big-endian ,(- n-octets i 1)
-                                                #!-big-endian ,i))))
+                         collect `(+ byte-index #+big-endian ,(- n-octets i 1)
+                                                #-big-endian ,i))))
               `(progn
                  (defun ,name (bigvec byte-index)
                    (logior ,@(loop for index in le-octet-indices
@@ -168,7 +168,7 @@
 
 ;; lispobj-sized word, whatever that may be
 ;; hopefully nobody ever wants a 128-bit SBCL...
-(macrolet ((acc (bv index) `(#!+64-bit bvref-64 #!-64-bit bvref-32 ,bv ,index)))
+(macrolet ((acc (bv index) `(#+64-bit bvref-64 #-64-bit bvref-32 ,bv ,index)))
   (defun (setf bvref-word) (new-val bytes index) (setf (acc bytes index) new-val))
   (defun bvref-word (bytes index) (acc bytes index)))
 
@@ -181,13 +181,13 @@
 (defvar *static*)
 (defvar *read-only*)
 
-#!+immobile-space
+#+immobile-space
 (progn
   (defvar *immobile-fixedobj*)
   (defvar *immobile-varyobj*)
   (defvar *immobile-space-map* nil))
 
-(defconstant max-core-space-id (+ 3 #!+immobile-space 2))
+(defconstant max-core-space-id (+ 3 #+immobile-space 2))
 
 (defstruct page
   (type nil :type (member nil :code :mixed))
@@ -320,7 +320,7 @@
     old-free-word-index))
 
 ;; Special case for dynamic space code/data segregation
-#!+gencgc
+#+gencgc
 (defun dynamic-space-claim-n-words (gspace n-words page-type)
   (let* ((words-per-page (/ sb-vm:gencgc-card-bytes sb-vm:n-word-bytes))
          (holder (ecase page-type
@@ -421,7 +421,7 @@
   (let* ((n-bytes (round-up specified-n-bytes (ash 1 sb-vm:n-lowtag-bits)))
          (n-words (ash n-bytes (- sb-vm:word-shift))))
     (aver (evenp n-words))
-    (cond #!+immobile-space
+    (cond #+immobile-space
           ((eq gspace *immobile-fixedobj*)
            (aver page-attributes)
            ;; An immobile fixedobj page can only have one value of object-spacing
@@ -446,7 +446,7 @@
                            (delete key *immobile-space-map* :key 'car :test 'equal))
                      (setf (car found) next-word)))
                (+ page-word-index page-base-index))))
-          #!+gencgc
+          #+gencgc
           ((eq gspace *dynamic*)
            (dynamic-space-claim-n-words
             gspace n-words (if (eq page-attributes :code) :code :mixed)))
@@ -497,8 +497,8 @@
           (error "don't even know how to look for a GSPACE for ~S" des))
 
         (dolist (gspace (list *dynamic* *static* *read-only*
-                              #!+immobile-space *immobile-fixedobj*
-                              #!+immobile-space *immobile-varyobj*)
+                              #+immobile-space *immobile-fixedobj*
+                              #+immobile-space *immobile-varyobj*)
                  (error "couldn't find a GSPACE for ~S" des))
           ;; Bounds-check the descriptor against the allocated area
           ;; within each gspace.
@@ -600,17 +600,17 @@
 
 (defun write-header-word (des header-word)
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
-  (let ((gen #!+gencgc (if (or #!+immobile-space
+  (let ((gen #+gencgc (if (or #+immobile-space
                                (let ((gspace (descriptor-gspace des)))
                                  (or (eq gspace *immobile-fixedobj*)
                                      (eq gspace *immobile-varyobj*))))
                            sb-vm:+pseudo-static-generation+
                            0)
-             #!-gencgc 0))
+             #-gencgc 0))
     (write-wordindexed/raw des 0 (logior (ash gen 24) header-word))))
 
 (defun write-code-header-words (descriptor boxed unboxed serialno)
-  #!-64-bit (setq serialno 0)
+  #-64-bit (setq serialno 0)
   (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
     (write-header-word descriptor
                        (logior (ash total-words sb-vm::code-header-size-shift)
@@ -794,10 +794,10 @@ core and return a descriptor to it."
   (etypecase x
     (single-float
      ;; 64-bit platforms have immediate single-floats.
-     #!+64-bit
+     #+64-bit
      (make-random-descriptor (logior (ash (single-float-bits x) 32)
                                      sb-vm:single-float-widetag))
-     #!-64-bit
+     #-64-bit
      (let ((des (allocate-header+object *dynamic*
                                          (1- sb-vm:single-float-size)
                                          sb-vm:single-float-widetag)))
@@ -815,13 +815,13 @@ core and return a descriptor to it."
   (let ((des (allocate-header+object *dynamic*
                                       (1- sb-vm:complex-single-float-size)
                                       sb-vm:complex-single-float-widetag)))
-    #!-64-bit
+    #-64-bit
     (progn
       (write-wordindexed/raw des sb-vm:complex-single-float-real-slot
                              (single-float-bits (realpart num)))
       (write-wordindexed/raw des sb-vm:complex-single-float-imag-slot
                              (single-float-bits (imagpart num))))
-    #!+64-bit
+    #+64-bit
     (write-wordindexed/raw
      des sb-vm:complex-single-float-data-slot
      (logior (ldb (byte 32 0) (single-float-bits (realpart num)))
@@ -922,16 +922,16 @@ core and return a descriptor to it."
 ;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
 (defvar *genesis-tls-counter* sb-thread::tls-index-start)
 
-#!+sb-thread
+#+sb-thread
 (progn
   ;; Assign SYMBOL the tls-index INDEX. SYMBOL must be a descriptor.
   ;; This is a backend support routine, but the style within this file
   ;; is to conditionalize by the target features.
   (defun cold-assign-tls-index (symbol index)
-    #!+64-bit
+    #+64-bit
     (write-wordindexed/raw
      symbol 0 (logior (ash index 32) (read-bits-wordindexed symbol 0)))
-    #!-64-bit
+    #-64-bit
     (write-wordindexed/raw symbol sb-vm:symbol-tls-index-slot index))
 
   ;; Return SYMBOL's tls-index,
@@ -939,9 +939,9 @@ core and return a descriptor to it."
   (defun ensure-symbol-tls-index (symbol)
     (let* ((cold-sym (cold-intern symbol))
            (tls-index
-            #!+64-bit
+            #+64-bit
             (ldb (byte 32 32) (read-bits-wordindexed cold-sym 0))
-            #!-64-bit
+            #-64-bit
             (read-bits-wordindexed cold-sym sb-vm:symbol-tls-index-slot)))
       (unless (plusp tls-index)
         (let ((next (prog1 *genesis-tls-counter* (incf *genesis-tls-counter*))))
@@ -949,7 +949,7 @@ core and return a descriptor to it."
           (cold-assign-tls-index cold-sym tls-index)))
       tls-index)))
 
-(defvar *cold-symbol-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
+(defvar *cold-symbol-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
 
 ;;; Allocate (and initialize) a symbol.
 (defun allocate-symbol (size name &key (gspace (symbol-value *cold-symbol-gspace*)))
@@ -1126,7 +1126,7 @@ core and return a descriptor to it."
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
-(defvar *cold-layout-gspace* (or #!+immobile-space '*immobile-fixedobj* '*dynamic*))
+(defvar *cold-layout-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
 (declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
                           descriptor)
                 make-cold-layout))
@@ -1539,7 +1539,7 @@ core and return a descriptor to it."
           (record-accessibility
            (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
            pkg-info handle package symbol))
-        #!+sb-thread
+        #+sb-thread
         (let ((index (info :variable :wired-tls symbol)))
           (when (integerp index) ; thread slot
             (cold-assign-tls-index handle index)))
@@ -1611,7 +1611,7 @@ core and return a descriptor to it."
               offset-wanted))))
 
   ;; Assign TLS indices of C interface symbols
-  #!+sb-thread
+  #+sb-thread
   (dolist (binding sb-vm::!per-thread-c-interface-symbols)
     (ensure-symbol-tls-index (car (ensure-list binding))))
 
@@ -1633,20 +1633,20 @@ core and return a descriptor to it."
   ;; That fails if static fdefns are wired to an address below 4GB
   ;; and code resides above 4GB. But as the Fundamental Theorem says:
   ;;   any problem can be solved by adding another indirection.
-  #!+immobile-code
+  #+immobile-code
   (setf *c-callable-fdefn-vector*
         (vector-in-core (make-list (length sb-vm::+c-callable-fdefns+)
                                    :initial-element *nil-descriptor*)
                         *static*))
 
-  #!-immobile-code
+  #-immobile-code
   (dolist (sym sb-vm::+c-callable-fdefns+)
     (cold-fdefinition-object (cold-intern sym) nil *static*))
 
   ;; With immobile-code, static-fdefns as a concept are useful -
   ;; the implication is that the function's definition will not change.
   ;; But the fdefn per se is not useful - callers refer to callees directly.
-  #!-immobile-code
+  #-immobile-code
   (dovector (sym sb-vm:+static-fdefns+)
     (let* ((fdefn (cold-fdefinition-object (cold-intern sym) nil *static*))
            (offset (- (+ (- (descriptor-bits fdefn)
@@ -1672,7 +1672,7 @@ core and return a descriptor to it."
                        (cold-cons (cold-intern (car layout)) (cdr layout)))
                      (sort-cold-layouts))))
 
-  #!+sb-thread
+  #+sb-thread
   (let ((bindings sb-kernel::*!thread-initial-bindings*))
     ;; Assign the initialization vector for create_thread_struct()
     (cold-set 'sb-thread::*thread-initial-bindings*
@@ -1696,14 +1696,14 @@ core and return a descriptor to it."
     (cold-set 'sb-vm::*free-tls-index*
               (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift))))
 
-  #!+64-bit
+  #+64-bit
   (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
 
   (dolist (symbol sb-impl::*cache-vector-symbols*)
     (cold-set symbol *nil-descriptor*))
 
-  ;; Put the C-callable fdefns into the static-fdefn vector if #!+immobile-code.
-  #!+immobile-code
+  ;; Put the C-callable fdefns into the static-fdefn vector if #+immobile-code.
+  #+immobile-code
   (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
         do (cold-svset *c-callable-fdefn-vector* i
                        (cold-fdefinition-object sym)))
@@ -1863,8 +1863,8 @@ core and return a descriptor to it."
                 0))))
 
 (defun cold-fdefinition-object (cold-name &optional leave-fn-raw
-                                          (gspace #!+immobile-space *immobile-fixedobj*
-                                                  #!-immobile-space *dynamic*))
+                                          (gspace #+immobile-space *immobile-fixedobj*
+                                                  #-immobile-space *dynamic*))
   (declare (type (or symbol descriptor) cold-name))
   (declare (special core-file-name))
   (let ((warm-name (warm-fun-name cold-name)))
@@ -1885,7 +1885,7 @@ core and return a descriptor to it."
               (write-wordindexed/raw fdefn sb-vm:fdefn-raw-addr-slot
                                      #!+(and immobile-code x86-64)
                                      (encode-fdefn-raw-addr fdefn nil tramp #xE8)
-                                     #!-immobile-code tramp)))
+                                     #-immobile-code tramp)))
           fdefn))))
 
 (defun cold-fun-entry-addr (fun)
@@ -1992,7 +1992,7 @@ core and return a descriptor to it."
 
 ;; Read the sbcl.nm file to find the addresses for foreign-symbols in
 ;; the C runtime.
-#!-sb-dynamic-core
+#-sb-dynamic-core
 (defun load-cold-foreign-symbol-table (filename)
   (with-open-file (file filename)
     (loop for line = (read-line file nil nil)
@@ -2034,7 +2034,7 @@ core and return a descriptor to it."
                   ;; _function but dlsym expects us to look up
                   ;; function, without the leading _ . Therefore, we
                   ;; strip it off here.
-                  #!+darwin
+                  #+darwin
                   (when (equal (char name 0) #\_)
                     (setf name (subseq name 1)))
                   (multiple-value-bind (old-value found)
@@ -2044,7 +2044,7 @@ core and return a descriptor to it."
                       (warn "redefining ~S from #X~X to #X~X"
                             name old-value value)))
                   (setf (gethash name *cold-foreign-symbol-table*) value)
-                  #!+win32
+                  #+win32
                   (let ((at-position (position #\@ name)))
                     (when at-position
                       (let ((name (subseq name 0 at-position)))
@@ -2058,7 +2058,7 @@ core and return a descriptor to it."
                               value)))))))))
   (values))     ;; PROGN
 
-#!-sb-dynamic-core
+#-sb-dynamic-core
 (defun cold-foreign-symbol-address (name)
   (declare (ignorable name))
   #!+crossbuild-test #xf00fa8 ; any random 4-octet-aligned value should do
@@ -2077,7 +2077,7 @@ core and return a descriptor to it."
 
 ;;: See picture in 'objdef'
 (defun code-total-size (code-object) ; Return total size in bytes
-  (* (ash (get-header-data code-object) (+ #!+64-bit -24))
+  (* (ash (get-header-data code-object) (+ #+64-bit -24))
      sb-vm:n-word-bytes))
 
 ;; Boxed header length is stored directly in bytes, not words
@@ -2189,7 +2189,7 @@ core and return a descriptor to it."
         (:absolute (absolute (cdr item)))))
     (number-to-core (sb-c::pack-code-fixup-locs (absolute) (relative)))))
 
-#!+sb-dynamic-core
+#+sb-dynamic-core
 (defun dyncore-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
   (+ sb-vm:linkage-table-space-start
@@ -2205,14 +2205,14 @@ core and return a descriptor to it."
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)
            (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
-    #!-sb-dynamic-core
+    #-sb-dynamic-core
     ;; Sort by name
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'string< :key #'car)
              (lambda (symbol)
                (cold-cons (set-readonly (base-string-to-core (car symbol)))
                           (number-to-core (cdr symbol))))
              '*!initial-foreign-symbols*)
-    #!+sb-dynamic-core
+    #+sb-dynamic-core
     ;; Sort by index into linkage table
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
              (lambda (pair &aux (key (car pair))
@@ -2459,7 +2459,7 @@ core and return a descriptor to it."
     (read-string-as-bytes (fasl-input-stream) string)
     (set-readonly (base-string-to-core string))))
 
-#!+sb-unicode
+#+sb-unicode
 (define-cold-fop (fop-character-string (len))
   (bug "CHARACTER-STRING[~D] dumped by cross-compiler." len))
 
@@ -2676,7 +2676,7 @@ core and return a descriptor to it."
             (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
             (debug-info (pop-stack))
             (des (allocate-cold-descriptor
-                  (or #!+immobile-code (and (eql immobile-p 1) *immobile-varyobj*)
+                  (or #+immobile-code (and (eql immobile-p 1) *immobile-varyobj*)
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
@@ -2764,7 +2764,7 @@ core and return a descriptor to it."
           ;; Note: we round the number of constants up to ensure that
           ;; the code vector will be properly aligned.
           (round-up sb-vm:code-constants-offset 2))
-         (space (or #!+immobile-space *immobile-varyobj* *read-only*))
+         (space (or #+immobile-space *immobile-varyobj* *read-only*))
          (asm-code
           (allocate-cold-descriptor
                   space
@@ -2800,18 +2800,18 @@ core and return a descriptor to it."
              (:assembly-routine* (lookup-assembler-reference sym :indirect))
              (:foreign
               (let ((sym (base-string-from-core sym)))
-                #!+sb-dynamic-core (dyncore-note-symbol sym nil)
-                #!-sb-dynamic-core (cold-foreign-symbol-address sym)))
+                #+sb-dynamic-core (dyncore-note-symbol sym nil)
+                #-sb-dynamic-core (cold-foreign-symbol-address sym)))
              (:foreign-dataref
               (let ((sym (base-string-from-core sym)))
-                #!+sb-dynamic-core (dyncore-note-symbol sym t)
-                #!-sb-dynamic-core
+                #+sb-dynamic-core (dyncore-note-symbol sym t)
+                #-sb-dynamic-core
                 (progn (maphash (lambda (k v)
                                   (format *error-output* "~&~S = #X~8X~%" k v))
                                 *cold-foreign-symbol-table*)
                        (error "shared foreign symbol in cold load: ~S (~S)" sym kind))))
              (:code-object (descriptor-bits code-obj))
-             #!+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
+             #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index sym))
              (:layout (descriptor-bits (or (gethash sym *cold-layouts*)
                                            (error "No cold-layout for ~S~%" sym))))
@@ -2846,16 +2846,16 @@ core and return a descriptor to it."
                (push (cons space type) types))))
       (check sb-vm:read-only-space-start sb-vm:read-only-space-end :read-only)
       (check sb-vm:static-space-start sb-vm:static-space-end :static)
-      #!+gencgc
+      #+gencgc
       (check sb-vm:dynamic-space-start
              (+ sb-vm:dynamic-space-start sb-vm::default-dynamic-space-size)
              :dynamic)
-      #!+immobile-space
+      #+immobile-space
       ;; Must be a multiple of 32 because it makes the math a nicer
       ;; when computing word and bit index into the 'touched' bitmap.
       (assert (zerop (rem sb-vm:fixedobj-space-size
                           (* 32 sb-vm:immobile-card-bytes))))
-      #!-gencgc
+      #-gencgc
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
       #!+linkage-table
       (check sb-vm:linkage-table-space-start sb-vm:linkage-table-space-end :linkage-table))))
@@ -3004,7 +3004,7 @@ core and return a descriptor to it."
       (push (list (c-symbol-name c) 9 (symbol-value c) +c-literal-64bit+ nil)
             constants))
     ;; And still one more
-    #!+64-bit
+    #+64-bit
     (let ((c 'sb-vm::immediate-widetags-mask))
       (push (list (c-symbol-name c)
                   1
@@ -3034,12 +3034,12 @@ core and return a descriptor to it."
     (terpri))
 
   (format t "#define BACKEND_PAGE_BYTES ~D~%" sb-c:+backend-page-bytes+)
-  #!+gencgc ; value never needed in Lisp, so therefore not a defconstant
+  #+gencgc ; value never needed in Lisp, so therefore not a defconstant
   (format t "#define GENCGC_CARD_SHIFT ~D~%"
             (1- (integer-length sb-vm:gencgc-card-bytes)))
 
-  (let ((size #!+cheneygc (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)
-              #!+gencgc sb-vm::default-dynamic-space-size))
+  (let ((size #+cheneygc (- sb-vm:dynamic-0-space-end sb-vm:dynamic-0-space-start)
+              #+gencgc sb-vm::default-dynamic-space-size))
   ;; "-DDEFAULT_DYNAMIC_SPACE_SIZE=n" in CFLAGS will override this.
     (format t "#ifndef DEFAULT_DYNAMIC_SPACE_SIZE
 #define DEFAULT_DYNAMIC_SPACE_SIZE ~D /* ~:*0x~X */
@@ -3234,7 +3234,7 @@ core and return a descriptor to it."
                  sb-vm:n-word-bytes
                  sb-vm:other-pointer-lowtag
                  (if symbol (sb-vm:static-symbol-offset symbol) 0)))))
-  #!+sb-thread
+  #+sb-thread
   (dolist (binding sb-vm::!per-thread-c-interface-symbols)
     (let* ((symbol (car (ensure-list binding)))
            (c-symbol (c-symbol-name symbol "*")))
@@ -3246,7 +3246,7 @@ core and return a descriptor to it."
 
   ;; For immobile code, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
-  #!+immobile-code
+  #+immobile-code
   (progn
     (format stream "#define STATIC_FDEFNS LISPOBJ(0x~X)~%"
             (descriptor-bits *c-callable-fdefn-vector*))
@@ -3256,7 +3256,7 @@ core and return a descriptor to it."
 #define ~A_FDEFN (VECTOR(STATIC_FDEFNS)->data[~d])~%"
                      (c-symbol-name symbol) index)))
   ;; Everybody else can address each fdefn directly.
-  #!-immobile-code
+  #-immobile-code
   (loop for symbol in sb-vm::+c-callable-fdefns+
         for index from 0
         do
@@ -3416,7 +3416,7 @@ III. initially undefined function references (alphabetically):
 
     (+ data-page pages)))
 
-#!+gencgc
+#+gencgc
 (defun output-page-table (gspace data-page core-file write-word verbose)
   (declare (ignore verbose))
   ;; Write as many PTEs as there are pages used.
@@ -3495,7 +3495,7 @@ III. initially undefined function references (alphabetically):
       ;; Write the Directory entry header.
       (write-word directory-core-entry-type-code)
       (let ((spaces (nconc (list *read-only* *static*)
-                           #!+immobile-space
+                           #+immobile-space
                            (list *immobile-fixedobj* *immobile-varyobj*)
                            (list *dynamic*))))
         ;; length = (5 words/space) * N spaces + 2 for header.
@@ -3503,7 +3503,7 @@ III. initially undefined function references (alphabetically):
         (dolist (space spaces)
           (setq data-page (output-gspace space data-page
                                          core-file #'write-word verbose))))
-      #!+gencgc (output-page-table *dynamic* data-page
+      #+gencgc (output-page-table *dynamic* data-page
                                    core-file #'write-word verbose)
 
       ;; Write the initial function.
@@ -3595,18 +3595,18 @@ III. initially undefined function references (alphabetically):
            (*static*    (make-gspace :static
                                      static-core-space-id
                                      sb-vm:static-space-start))
-           #!+immobile-space
+           #+immobile-space
            (*immobile-fixedobj* (make-gspace :immobile-fixedobj
                                              immobile-fixedobj-core-space-id
                                              sb-vm:fixedobj-space-start))
-           #!+immobile-space
+           #+immobile-space
            (*immobile-varyobj* (make-gspace :immobile-varyobj
                                             immobile-varyobj-core-space-id
                                             sb-vm:varyobj-space-start))
            (*dynamic*   (make-gspace :dynamic
                                      dynamic-core-space-id
-                                     #!+gencgc sb-vm:dynamic-space-start
-                                     #!-gencgc sb-vm:dynamic-0-space-start))
+                                     #+gencgc sb-vm:dynamic-space-start
+                                     #-gencgc sb-vm:dynamic-0-space-start))
            (*nil-descriptor*)
            (*simple-vector-0-descriptor*)
            (*c-callable-fdefn-vector*)

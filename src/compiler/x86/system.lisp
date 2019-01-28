@@ -245,7 +245,7 @@
   (:generator 1
     (inst break pending-interrupt-trap)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -255,14 +255,14 @@
   (:arg-types tagged-num)
   (:policy :fast-safe)
   (:generator 2
-    #!+win32
+    #+win32
     (inst mov sap (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
     ;; Using the FS segment, memory can be accessed only at the segment
     ;; base specified by the descriptor (as segment-relative address 0)
     ;; up through the segment limit. Negative indices are no good.
     ;; Instead of accessing via FS, load thread->this into SAP,
     ;; and then the index can be signed.
-    #!-win32 (inst mov sap (make-ea :dword :disp (ash thread-this-slot 2)) :fs)
+    #-win32 (inst mov sap (make-ea :dword :disp (ash thread-this-slot 2)) :fs)
     (inst mov sap (make-ea :dword :base sap :index n))))
 ;; ADDRESS-BASED-COUNTER-VAL uses the thread's alloc region free pointer
 ;; as a quasi-random value, so that's a relatively useful case to handle

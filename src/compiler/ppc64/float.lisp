@@ -899,7 +899,7 @@
 ;; float to an integer arg location (register or stack) for C callout.
 ;; See %alien-funcall ir2convert in aliencomp.lisp.
 
-#!+darwin
+#+darwin
 (define-vop (move-double-to-int-arg)
   (:args (float :scs (double-reg)))
   (:results (hi-bits :scs (signed-reg signed-stack))
@@ -934,7 +934,7 @@
           (inst stw temp nsp-tn
                 (* (tn-offset lo-bits) n-word-bytes))))))))
 
-#!+darwin
+#+darwin
 (define-vop (move-single-to-int-arg)
   (:args (float :scs (single-reg)))
   (:results (bits :scs (signed-reg signed-stack)))

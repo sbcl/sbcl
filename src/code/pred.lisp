@@ -13,7 +13,7 @@
 
 ;;;; miscellaneous non-primitive predicates
 
-#!-sb-fluid (declaim (inline streamp))
+#-sb-fluid (declaim (inline streamp))
 (defun streamp (stream)
   (typep stream 'stream))
 
@@ -105,9 +105,9 @@
   ;; Testing for BASE-CHAR-P is usually redundant on #-sb-unicode,
   ;; remove it there completely so that #-sb-unicode build will
   ;; break when it's used.
-  #!+sb-unicode (def-type-predicate-wrapper base-char-p)
+  #+sb-unicode (def-type-predicate-wrapper base-char-p)
   (def-type-predicate-wrapper base-string-p)
-  #!+sb-unicode (def-type-predicate-wrapper character-string-p)
+  #+sb-unicode (def-type-predicate-wrapper character-string-p)
   (def-type-predicate-wrapper bignump)
   (def-type-predicate-wrapper bit-vector-p)
   (def-type-predicate-wrapper characterp)
@@ -140,8 +140,8 @@
   (def-type-predicate-wrapper realp)
   (def-type-predicate-wrapper short-float-p)
   (def-type-predicate-wrapper single-float-p)
-  #!+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
-  #!+sb-simd-pack-256 (def-type-predicate-wrapper simd-pack-256-p)
+  #+sb-simd-pack (def-type-predicate-wrapper simd-pack-p)
+  #+sb-simd-pack-256 (def-type-predicate-wrapper simd-pack-256-p)
   (def-type-predicate-wrapper %instancep)
   (def-type-predicate-wrapper funcallable-instance-p)
   (def-type-predicate-wrapper symbolp)
@@ -152,11 +152,11 @@
   (def-type-predicate-wrapper system-area-pointer-p)
   (def-type-predicate-wrapper unbound-marker-p)
   (def-type-predicate-wrapper weak-pointer-p)
-  #!-64-bit
+  #-64-bit
   (progn
     (def-type-predicate-wrapper unsigned-byte-32-p)
     (def-type-predicate-wrapper signed-byte-32-p))
-  #!+64-bit
+  #+64-bit
   (progn
     (def-type-predicate-wrapper unsigned-byte-64-p)
     (def-type-predicate-wrapper signed-byte-64-p))
@@ -248,7 +248,7 @@
            ((eq object nil) 'null)
            ((eq (sb-xc:symbol-package object) *keyword-package*) 'keyword)
            (t 'symbol)))
-    ((or array complex #!+sb-simd-pack simd-pack #!+sb-simd-pack-256 simd-pack-256)
+    ((or array complex #+sb-simd-pack simd-pack #+sb-simd-pack-256 simd-pack-256)
      (let ((sb-kernel::*unparse-allow-negation* nil))
        (declare (special sb-kernel::*unparse-allow-negation*)) ; forward ref
        (type-specifier (ctype-of object))))

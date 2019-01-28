@@ -17,7 +17,7 @@
 
 ;;;; float predicates and environment query
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (maybe-inline float-denormalized-p float-infinity-p float-nan-p
                        float-trapping-nan-p))
 
@@ -108,7 +108,7 @@
 ;;; If denormalized, use a subfunction from INTEGER-DECODE-FLOAT to find the
 ;;; actual exponent (and hence how denormalized it is), otherwise we just
 ;;; return the number of digits or 0.
-#!-sb-fluid (declaim (maybe-inline float-precision))
+#-sb-fluid (declaim (maybe-inline float-precision))
 (defun float-precision (f)
   "Return a non-negative number of significant digits in its float argument.
   Will be less than FLOAT-DIGITS if denormalized or zero."
@@ -155,7 +155,7 @@
     #+long-float
     (long-float sb-vm:long-float-digits)))
 
-#!-sb-fluid (declaim (inline float-digits float-radix))
+#-sb-fluid (declaim (inline float-digits float-radix))
 
 (defun float-digits (f)
   (declare (explicit-check))
@@ -175,7 +175,7 @@
 (defconstant-eqx float-decoding-error "Can't decode NaN or infinity: ~S."
   #'string=)
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (maybe-inline integer-decode-single-float
                        integer-decode-double-float))
 
@@ -251,7 +251,7 @@
 ;;; like INTEGER-DECODE-SINGLE-FLOAT, only doubly so
 (defun integer-decode-double-float (x)
   (declare (double-float x))
-  #!-64-bit ; treat high and low bits separately until the end
+  #-64-bit ; treat high and low bits separately until the end
   (let* ((hi (double-float-high-bits x))
          (lo (double-float-low-bits x))
          (exp (ldb sb-vm:double-float-exponent-byte hi)))
@@ -268,7 +268,7 @@
                            lo)
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
                    (if (minusp hi) -1 1)))))
-  #!+64-bit ; don't split the high and low bits
+  #+64-bit ; don't split the high and low bits
   (let* ((bits (double-float-bits x))
          ;; It's unfortunate that the implied meaning of EXPONENT-BYTE and
          ;; SIGNIFICAND-BYTE for double-floats assumes refererence to the high half
@@ -361,7 +361,7 @@
     ((long-float)
      (integer-decode-long-float x))))
 
-#!-sb-fluid (declaim (maybe-inline decode-single-float decode-double-float))
+#-sb-fluid (declaim (maybe-inline decode-single-float decode-double-float))
 
 ;;; Handle the denormalized case of DECODE-SINGLE-FLOAT. We call
 ;;; INTEGER-DECODE-SINGLE-DENORM and then make the result into a float.
@@ -483,7 +483,7 @@
 
 ;;;; SCALE-FLOAT
 
-#!-sb-fluid (declaim (maybe-inline scale-single-float scale-double-float))
+#-sb-fluid (declaim (maybe-inline scale-single-float scale-double-float))
 
 ;;; Handle float scaling where the X is denormalized or the result is
 ;;; denormalized or underflows to 0.

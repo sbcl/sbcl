@@ -495,11 +495,11 @@
                  (cond ((eql low 0)
                         (range 0 #.(1- sb-xc:char-code-limit)
                                (sb-vm::saetp-index-or-lose 'character)))
-                       #!+sb-unicode
+                       #+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
                                #.(1- sb-xc:char-code-limit)))))
-                #!+sb-unicode
+                #+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)
                         (sb-vm::saetp-index-or-lose 'base-char)))))))
@@ -561,7 +561,7 @@
                                :complexp :complex))
            ((eql character)
             (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
-           #!+sb-unicode
+           #+sb-unicode
            ((eql base-char)
             (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
            ((eql t) *universal-type*)
@@ -720,7 +720,7 @@
          (%make-cons-type car-type cdr-type))))
 
 ;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
-#!+sb-simd-pack
+#+sb-simd-pack
 (defstruct (simd-pack-type
             (:include ctype (class-info (type-class-or-lose 'simd-pack)))
             (:constructor %make-simd-pack-type (element-type))
@@ -729,7 +729,7 @@
    :type (cons #||(member #.*simd-pack-element-types*) ||#)
    :read-only t))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defstruct (simd-pack-256-type
             (:include ctype (class-info (type-class-or-lose 'simd-pack-256)))
             (:constructor %make-simd-pack-256-type (element-type))
@@ -738,7 +738,7 @@
    :type (cons #||(member #.*simd-pack-element-types*) ||#)
    :read-only t))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (defun make-simd-pack-type (element-type)
   (aver (neq element-type *wild-type*))
   (if (eq element-type *empty-type*)
@@ -752,7 +752,7 @@
          (when (csubtypep element-type (specifier-type pack-type))
            (return (list pack-type)))))))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defun make-simd-pack-256-type (element-type)
   (aver (neq element-type *wild-type*))
   (if (eq element-type *empty-type*)
@@ -1047,8 +1047,8 @@ expansion happened."
       (built-in-classoid t)
       (classoid nil)
       ;; HAIRY is just an s-expression, so it's dumpable. Same for simd-pack
-      ((or named-type character-set-type hairy-type #!+sb-simd-pack simd-pack-type
-                                                    #!+sb-simd-pack-256 simd-pack-256-type)
+      ((or named-type character-set-type hairy-type #+sb-simd-pack simd-pack-type
+                                                    #+sb-simd-pack-256 simd-pack-256-type)
        t))))
 
 (setf (get '!specifier-type :sb-cold-funcall-handler/for-value)

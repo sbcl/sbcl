@@ -11,7 +11,7 @@
 (in-package "SB-VM")
 
 (defconstant-eqx +immediate-types+
-  `(,unbound-marker-widetag ,character-widetag #!+64-bit ,single-float-widetag)
+  `(,unbound-marker-widetag ,character-widetag #+64-bit ,single-float-widetag)
   #'equal)
 
 ;; Given a list of widetags in HEADERS, compress into a minimal list of ranges

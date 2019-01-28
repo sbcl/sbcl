@@ -761,7 +761,7 @@ code to be loaded.
               (let ((etype (type-*-to-t
                             (array-type-specialized-element-type ctype))))
                 (make-array 0 :element-type (type-specifier etype)))))
-           #!+sb-unicode
+           #+sb-unicode
            ((csubtypep ctype (specifier-type 'extended-char))
             (code-char base-char-code-limit))
            ((csubtypep ctype (specifier-type 'character))

@@ -362,10 +362,10 @@
 
 (define-vop (alloc-alien-stack-space)
   (:info amount)
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
+  #+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:results (result :scs (sap-reg any-reg)))
   (:result-types system-area-pointer)
-  #!+sb-thread
+  #+sb-thread
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
@@ -375,7 +375,7 @@
                          :disp (make-ea-for-symbol-tls-index *alien-stack-pointer*))
           (inst sub EA delta :maybe-fs))))
     (load-tl-symbol-value result *alien-stack-pointer*))
-  #!-sb-thread
+  #-sb-thread
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
@@ -422,12 +422,12 @@ pointer to the arguments."
               (inst push eax)                       ; arg1
               (inst push (ash index 2))             ; arg0
 
-              #!+sb-thread
+              #+sb-thread
               (progn
                 (inst mov eax (foreign-symbol-address "callback_wrapper_trampoline"))
                 (inst call eax))
 
-              #!-sb-thread
+              #-sb-thread
               (progn
                 (inst push (make-ea :dword ; function
                                     :disp (static-fdefn-fun-addr 'enter-alien-callback)))

@@ -43,7 +43,7 @@
 
 ;;;; utilities for reading from fasl files
 
-#!-sb-fluid (declaim (inline read-byte))
+#-sb-fluid (declaim (inline read-byte))
 
 ;;; This expands into code to read an N-byte unsigned integer using
 ;;; FAST-READ-BYTE.
@@ -167,10 +167,10 @@
 
 (defun nuke-fop-vector (vector)
   (declare (simple-vector vector)
-           #!-gencgc (ignore vector)
+           #-gencgc (ignore vector)
            (optimize speed))
   ;; Make sure we don't keep any garbage.
-  #!+gencgc
+  #+gencgc
   (fill vector 0))
 
 
@@ -352,7 +352,7 @@
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.
-#!+sb-show
+#+sb-show
 (defvar *show-fops-p* nil)
 
 ;;;
@@ -373,7 +373,7 @@
   ;;
   (declare (ignorable print))
   (let ((stream (%fasl-input-stream fasl-input))
-        (trace #!+sb-show *show-fops-p*))
+        (trace #+sb-show *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))
     (catch 'fasl-group-end

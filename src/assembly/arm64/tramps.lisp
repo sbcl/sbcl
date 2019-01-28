@@ -49,11 +49,11 @@
                                 (incf offset ,delta)))))
         (map-pairs stp nsp-tn 0 nl-registers :pre-index -80)
         (inst mov nl0 tmp-tn) ;; size
-        #!+sb-thread
+        #+sb-thread
         (progn
           (inst stp cfp-tn csp-tn (@ thread-tn (* thread-control-frame-pointer-slot n-word-bytes)))
           (inst str csp-tn (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes))))
-        #!-sb-thread
+        #-sb-thread
         (progn
           (load-inline-constant nl1 '(:fixup "current_control_frame_pointer" :foreign))
           (inst str cfp-tn (@ nl1))
@@ -79,10 +79,10 @@
         (inst ldr lr-tn (@ csp-tn -88))
 
         (inst sub csp-tn csp-tn (+ 32 80)) ;; deallocate the frame
-        #!+sb-thread
-        (inst str zr-tn #!+sb-thread
+        #+sb-thread
+        (inst str zr-tn #+sb-thread
                         (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes))
-                        #!-sb-thread
+                        #-sb-thread
                         (@ tmp-tn))
 
         (inst mov tmp-tn nl0) ;; result

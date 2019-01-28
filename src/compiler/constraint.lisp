@@ -545,7 +545,7 @@
 
 ;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
 ;;; analysis on it), then return the LAMBDA-VAR, otherwise NIL.
-#!-sb-fluid (declaim (inline ok-ref-lambda-var))
+#-sb-fluid (declaim (inline ok-ref-lambda-var))
 (defun ok-ref-lambda-var (ref)
   (declare (type ref ref))
   (let ((leaf (ref-leaf ref)))

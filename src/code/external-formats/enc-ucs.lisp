@@ -235,7 +235,7 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) t
+(define-external-format/variable-width (:ucs-2le :ucs2le #+win32 :ucs2 #+win32 :ucs-2) t
   (code-char #xfffd)
   2
   (if (< bits #x10000)

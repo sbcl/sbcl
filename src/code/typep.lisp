@@ -145,13 +145,13 @@
      (and (consp object)
           (recurse (car object) (cons-type-car-type type))
           (recurse (cdr object) (cons-type-cdr-type type))))
-    #!+sb-simd-pack
+    #+sb-simd-pack
     (simd-pack-type
      (and (simd-pack-p object)
           (let* ((tag (%simd-pack-tag object))
                  (name (nth tag *simd-pack-element-types*)))
             (not (not (member name (simd-pack-type-element-type type)))))))
-    #!+sb-simd-pack-256
+    #+sb-simd-pack-256
     (simd-pack-256-type
      (and (simd-pack-256-p object)
           (let* ((tag (%simd-pack-256-tag object))

@@ -22,14 +22,14 @@
 
 (defconstant extended-symbol-size (1+ symbol-size))
 
-#!+sb-thread
+#+sb-thread
 (dolist (slot (primitive-object-slots
                (find 'thread *primitive-objects* :key #'primitive-object-name)))
   (when (slot-special slot)
     (setf (info :variable :wired-tls (slot-special slot))
           (ash (slot-offset slot) word-shift))))
 
-#!+gencgc
+#+gencgc
 (defconstant large-object-size
   (* 4 (max +backend-page-bytes+ gencgc-card-bytes
             gencgc-alloc-granularity)))
@@ -44,7 +44,7 @@
           (cdr entry)))
   `((bignum "unboxed" "bignum" "bignum")
     (ratio "boxed" "ratio_or_complex" "boxed")
-    (single-float ,(or #!+64-bit "immediate" "unboxed"))
+    (single-float ,(or #+64-bit "immediate" "unboxed"))
     (double-float "unboxed")
     (complex "boxed" "ratio_or_complex" "boxed")
     (complex-single-float "unboxed")
@@ -81,8 +81,8 @@
 
     (no-tls-value-marker "immediate")
 
-    #!+sb-simd-pack (simd-pack "unboxed")
-    #!+sb-simd-pack-256 (simd-pack-256 "unboxed")
+    #+sb-simd-pack (simd-pack "unboxed")
+    #+sb-simd-pack-256 (simd-pack-256 "unboxed")
     (filler "unboxed")
 
     (simple-array "boxed")
@@ -92,19 +92,19 @@
     (simple-array-unsigned-byte-8 "vector_unsigned_byte_8")
     (simple-array-unsigned-byte-15 "vector_unsigned_byte_16")
     (simple-array-unsigned-byte-16 "vector_unsigned_byte_16")
-    (simple-array-unsigned-fixnum #!-64-bit "vector_unsigned_byte_32"
-                                  #!+64-bit "vector_unsigned_byte_64")
+    (simple-array-unsigned-fixnum #-64-bit "vector_unsigned_byte_32"
+                                  #+64-bit "vector_unsigned_byte_64")
     (simple-array-unsigned-byte-31 "vector_unsigned_byte_32")
     (simple-array-unsigned-byte-32 "vector_unsigned_byte_32")
-    #!+64-bit (simple-array-unsigned-byte-63 "vector_unsigned_byte_64")
-    #!+64-bit (simple-array-unsigned-byte-64 "vector_unsigned_byte_64")
+    #+64-bit (simple-array-unsigned-byte-63 "vector_unsigned_byte_64")
+    #+64-bit (simple-array-unsigned-byte-64 "vector_unsigned_byte_64")
 
     (simple-array-signed-byte-8 "vector_unsigned_byte_8")
     (simple-array-signed-byte-16 "vector_unsigned_byte_16")
     (simple-array-signed-byte-32 "vector_unsigned_byte_32")
-    (simple-array-fixnum #!-64-bit "vector_unsigned_byte_32"
-                         #!+64-bit "vector_unsigned_byte_64")
-    #!+64-bit (simple-array-signed-byte-64 "vector_unsigned_byte_64")
+    (simple-array-fixnum #-64-bit "vector_unsigned_byte_32"
+                         #+64-bit "vector_unsigned_byte_64")
+    #+64-bit (simple-array-signed-byte-64 "vector_unsigned_byte_64")
 
     (simple-array-single-float "vector_unsigned_byte_32")
     (simple-array-double-float "vector_unsigned_byte_64")
@@ -116,8 +116,8 @@
 
     (simple-array-nil "vector_nil")
     (simple-base-string "base_string")
-    #!+sb-unicode (simple-character-string "character_string")
-    #!+sb-unicode (complex-character-string "boxed")
+    #+sb-unicode (simple-character-string "character_string")
+    #+sb-unicode (complex-character-string "boxed")
     (complex-base-string "boxed")
     (complex-vector-nil "boxed")
 
@@ -143,8 +143,8 @@
       (when (string= (second entry) "unboxed")
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
     (format stream "static inline boolean unboxed_obj_widetag_p(unsigned char widetag) {~%")
-    #!+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
-    #!-64-bit (format stream "  int bit = widetag>>2;
+    #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
+    #-64-bit (format stream "  int bit = widetag>>2;
   return (bit<32 ? 0x~XU >> bit : 0x~XU >> (bit-32)) & 1;"
                       (ldb (byte 32 0) bits) (ldb (byte 32 32) bits))
     (format stream "~%}~%"))

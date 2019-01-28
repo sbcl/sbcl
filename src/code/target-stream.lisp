@@ -68,7 +68,7 @@
 ;;; unread-char, read-byte, listen here that was removed because these
 ;;; functions are redefined when simple-streams are loaded.
 
-#!-sb-fluid (declaim (inline ansi-stream-peek-char))
+#-sb-fluid (declaim (inline ansi-stream-peek-char))
 (defun ansi-stream-peek-char (peek-type stream eof-error-p eof-value
                               recursive-p)
   (cond ((typep stream 'echo-stream)

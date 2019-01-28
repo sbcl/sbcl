@@ -327,8 +327,8 @@
                (sb-xc:typep value
                       '(or
                         #-sb-xc-host
-                        (or unboxed-array #!+sb-simd-pack simd-pack
-                                          #!+sb-simd-pack-256 simd-pack-256)
+                        (or unboxed-array #+sb-simd-pack simd-pack
+                                          #+sb-simd-pack-256 simd-pack-256)
                         #+sb-xc-host
                         (and array (not (array t)))
                         symbol
@@ -414,7 +414,7 @@
 ;;; determine what is evaluated next. If the ctran has no block, then
 ;;; we make it be in the block that the node is in. If the ctran heads
 ;;; its block, we end our block and link it to that block.
-#!-sb-fluid (declaim (inline use-ctran))
+#-sb-fluid (declaim (inline use-ctran))
 (defun use-ctran (node ctran)
   (declare (type node node) (type ctran ctran))
   (if (eq (ctran-kind ctran) :unused)
@@ -467,7 +467,7 @@
            (setf (lvar-uses lvar) (list node (lvar-uses lvar)))))
     (reoptimize-lvar lvar)))
 
-#!-sb-fluid(declaim (inline use-continuation))
+#-sb-fluid(declaim (inline use-continuation))
 (defun use-continuation (node ctran lvar)
   (use-ctran node ctran)
   (use-lvar node lvar))

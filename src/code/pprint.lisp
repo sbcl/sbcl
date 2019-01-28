@@ -11,7 +11,7 @@
 
 (in-package "SB-PRETTY")
 
-#!-sb-fluid (declaim (inline index-posn posn-index posn-column))
+#-sb-fluid (declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
   (declare (type index index) (type pretty-stream stream)
            (values posn))
@@ -56,7 +56,7 @@
   (let* ((end (or end (length string))))
     (unless (= start end)
       (sb-impl::string-dispatch (simple-base-string
-                                 #!+sb-unicode
+                                 #+sb-unicode
                                  (simple-array character (*)))
           string
         ;; For POSITION transform

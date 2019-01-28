@@ -344,7 +344,7 @@ triggers."
 
 #!+sb-wtimer
 (define-alien-type wtimer
-    #!+win32 system-area-pointer ;HANDLE, but that's not defined yet
+    #+win32 system-area-pointer ;HANDLE, but that's not defined yet
     #!+sunos system-area-pointer ;struct os_wtimer *
     #!+(or android linux bsd) int)
 

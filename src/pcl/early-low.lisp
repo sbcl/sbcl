@@ -81,7 +81,7 @@
   :metaclass-constructor make-static-classoid
   :dd-type structure)
 
-;;; Note: for x8-64 with #!+immobile-code there are 2 additional raw slots which
+;;; Note: for x8-64 with #+immobile-code there are 2 additional raw slots which
 ;;; hold machine instructions to load the funcallable-instance-fun and jump to
 ;;; it, so that funcallable-instances can act like simple-funs, in as much as
 ;;; there's an address you can jump to without loading a register.

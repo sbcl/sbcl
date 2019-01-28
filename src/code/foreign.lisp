@@ -14,7 +14,7 @@
 (defun find-foreign-symbol-address (name)
   "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
 symbol in the linkage table, and never returns an address in the linkage-table."
-  (or #!-sb-dynamic-core
+  (or #-sb-dynamic-core
       (find-foreign-symbol-in-table name *static-foreign-symbols*)
       (find-dynamic-foreign-symbol-address name)))
 
@@ -29,9 +29,9 @@ Dynamic symbols are entered into the linkage-table if they aren't there already.
 
 On non-linkage-table ports signals an error if the symbol isn't found."
   (declare (ignorable datap))
-  #!+sb-dynamic-core
+  #+sb-dynamic-core
   (values (ensure-foreign-symbol-linkage name datap) t)
-  #!-sb-dynamic-core
+  #-sb-dynamic-core
   (let ((static (find-foreign-symbol-in-table name *static-foreign-symbols*)))
     (if static
         (values static nil)
@@ -124,10 +124,10 @@ if the symbol isn't found."
 
 (defun !foreign-cold-init ()
   (declare (special *runtime-dlhandle* *shared-objects*))
-  #!-sb-dynamic-core
+  #-sb-dynamic-core
   (dovector (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
-  #!+sb-dynamic-core
+  #+sb-dynamic-core
   (loop for table-offset from 0 by sb-vm::linkage-table-entry-size
         and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
         do (setf (gethash reference *linkage-info*) table-offset))

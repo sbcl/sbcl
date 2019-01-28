@@ -63,14 +63,14 @@
                :ref-trans %denominator
                :init :arg))
 
-#!-64-bit
+#-64-bit
 (!define-primitive-object (single-float :lowtag other-pointer-lowtag
                                        :widetag single-float-widetag)
   (value :c-type "float"))
 
 (!define-primitive-object (double-float :lowtag other-pointer-lowtag
                                        :widetag double-float-widetag)
-  #!-64-bit (filler)
+  #-64-bit (filler)
   (value :c-type "double" :length #.(/ 64 n-word-bits)))
 
 #+long-float
@@ -389,11 +389,11 @@ during backtrace.
 (!define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
                           :widetag complex-single-float-widetag)
-  #!+64-bit
+  #+64-bit
   (data :c-type "struct { float data[2]; } ")
-  #!-64-bit
+  #-64-bit
   (real :c-type "float")
-  #!-64-bit
+  #-64-bit
   (imag :c-type "float"))
 
 (!define-primitive-object (complex-double-float
@@ -403,7 +403,7 @@ during backtrace.
   (real :c-type "double" :length #.(/ 64 n-word-bits))
   (imag :c-type "double" :length #.(/ 64 n-word-bits)))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (!define-primitive-object (simd-pack
                           :lowtag other-pointer-lowtag
                           :widetag simd-pack-widetag)
@@ -413,7 +413,7 @@ during backtrace.
   (lo-value :c-type "long" :type (unsigned-byte 64))
   (hi-value :c-type "long" :type (unsigned-byte 64)))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (!define-primitive-object (simd-pack-256
                           :lowtag other-pointer-lowtag
                           :widetag simd-pack-256-widetag)
@@ -451,8 +451,8 @@ during backtrace.
   ;;
   ;; Information for constructing deterministic consing profile.
   (profile-data :c-type "uword_t *" :pointer t)
-  #!+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
-  #!+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
+  #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
+  #+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
   ;; next two not used in C, but this wires the TLS offsets to small values
   #!+(and x86-64 sb-thread)
   (current-catch-block :special *current-catch-block*)
@@ -496,7 +496,7 @@ during backtrace.
   (control-stack-end :c-type "lispobj *" :pointer t
                      :special *control-stack-end*)
   (control-stack-guard-page-protected)
-  #!+win32 (private-events :c-type "struct private_events" :length 2)
+  #+win32 (private-events :c-type "struct private_events" :length 2)
   (this :c-type "struct thread *" :pointer t)
   (prev :c-type "struct thread *" :pointer t)
   (next :c-type "struct thread *" :pointer t)
@@ -510,7 +510,7 @@ during backtrace.
   ;; handling, we need to know if the machine context is in Lisp code
   ;; or not.  On non-threaded targets, this is a global variable in
   ;; the runtime, but it's clearly a per-thread value.
-  #!+sb-thread
+  #+sb-thread
   (foreign-function-call-active :c-type "boolean")
   ;; Same as above for the location of the current control stack frame.
   #!+(and sb-thread (not (or x86 x86-64)))
@@ -518,7 +518,7 @@ during backtrace.
   ;; Same as above for the location of the current control stack
   ;; pointer.  This is also used on threaded x86oids to allow LDB to
   ;; print an approximation of the CSP as needed.
-  #!+sb-thread
+  #+sb-thread
   (control-stack-pointer :c-type "lispobj *")
   #!+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
@@ -526,9 +526,9 @@ during backtrace.
   ;; -fomit-frame-pointer.  Currently truly required and implemented only
   ;; for (and win32 x86-64), but could be generalized to other platforms if
   ;; needed:
-  #!+win32 (carried-base-pointer :c-type "os_context_register_t")
+  #+win32 (carried-base-pointer :c-type "os_context_register_t")
   #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
-  #!+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
+  #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #!+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 4)
   ;; The following slot's existence must NOT be conditional on #+msan
@@ -543,14 +543,14 @@ during backtrace.
 ;;; This constant is the index prior to scaling.
 (defconstant sb-thread::tls-index-start primitive-thread-object-length)
 
-(defconstant code-header-size-shift #!+64-bit 32 #!-64-bit n-widetag-bits)
+(defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
 (declaim (inline code-object-size code-header-words %code-code-size))
 #-sb-xc-host
 (progn
   (defun code-object-size (code)
     (declare (code-component code))
-    #!-64-bit (ash (logand (get-header-data code) #x3FFFFF) word-shift)
-    #!+64-bit (ash (ash (get-header-data code) -24) word-shift))
+    #-64-bit (ash (logand (get-header-data code) #x3FFFFF) word-shift)
+    #+64-bit (ash (ash (get-header-data code) -24) word-shift))
 
   (defun code-header-words (code)
     (declare (code-component code))
@@ -567,7 +567,7 @@ during backtrace.
 
   (defun %code-serialno (code)
     (declare (code-component code) (ignorable code))
-    #!+64-bit ; extract high 4 bytes of boxed-size slot
+    #+64-bit ; extract high 4 bytes of boxed-size slot
     (ash (%code-boxed-size code) (- n-fixnum-tag-bits 32)))
 
 ) ; end PROGN

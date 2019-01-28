@@ -113,12 +113,12 @@
         (in-elsewhere (sb-assem::assembling-to-elsewhere-p))
         ;; thread->alloc_region.free_pointer
         (free-pointer
-         #!+sb-thread (thread-slot-ea thread-alloc-region-slot)
-         #!-sb-thread (ea (make-fixup "gc_alloc_region" :foreign)))
+         #+sb-thread (thread-slot-ea thread-alloc-region-slot)
+         #-sb-thread (ea (make-fixup "gc_alloc_region" :foreign)))
         ;; thread->alloc_region.end_addr
         (end-addr
-         #!+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
-         #!-sb-thread (ea (make-fixup "gc_alloc_region" :foreign 8))))
+         #+sb-thread (thread-slot-ea (1+ thread-alloc-region-slot))
+         #-sb-thread (ea (make-fixup "gc_alloc_region" :foreign 8))))
 
     (cond ((or in-elsewhere
                ;; large objects will never be made in a per-thread region
@@ -361,7 +361,7 @@
         (when sb-c::*msan-unpoison*
           ;; Unpoison all DX vectors regardless of widetag.
           ;; Mark the header and length as valid, not just the payload.
-          #!+linux ; unimplemented for others
+          #+linux ; unimplemented for others
           (let ((words-savep
                  ;; 'words' might be co-located with any of the temps
                  (or (location= words rdi) (location= words rcx) (location= words rax))))
@@ -496,7 +496,7 @@
         (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
       done)))
 
-#!-immobile-space
+#-immobile-space
 (define-vop (make-fdefn)
   (:policy :fast-safe)
   (:translate make-fdefn)
@@ -524,11 +524,11 @@
        (instrument-alloc bytes node))
      (pseudo-atomic (:elide-if stack-allocate-p)
        (allocation result bytes node stack-allocate-p fun-pointer-lowtag)
-       (storew* #!-immobile-space header ; write the widetag and size
-                #!+immobile-space        ; ... plus the layout pointer
+       (storew* #-immobile-space header ; write the widetag and size
+                #+immobile-space        ; ... plus the layout pointer
                 (progn (inst mov temp header)
-                       (inst or temp #!-sb-thread (static-symbol-value-ea 'function-layout)
-                                     #!+sb-thread
+                       (inst or temp #-sb-thread (static-symbol-value-ea 'function-layout)
+                                     #+sb-thread
                                      (thread-slot-ea thread-function-layout-slot))
                        temp)
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
@@ -634,7 +634,7 @@
                 (inst call (cond ((sb-c::code-immobile-p node) c-fun)
                                  (t (progn (inst mov temp-reg-tn c-fun)
                                            temp-reg-tn)))))))
-#!+immobile-space
+#+immobile-space
 (define-vop (alloc-immobile-fixedobj)
   (:info lowtag size header)
   (:temporary (:sc unsigned-reg :to :eval :offset rdi-offset) c-arg1)
@@ -653,7 +653,7 @@
      (c-call "alloc_fixedobj")
      (inst lea result (ea lowtag c-result)))))
 
-#!+immobile-space
+#+immobile-space
 (define-vop (alloc-immobile-layout)
   (:args (slots :scs (descriptor-reg) :target c-arg1))
   (:temporary (:sc unsigned-reg :from (:argument 0) :to :eval :offset rdi-offset)

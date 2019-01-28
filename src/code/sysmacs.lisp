@@ -22,7 +22,7 @@
 ;;; out what it should be yet.
 (defvar *gc-pending*)
 
-#!+sb-thread
+#+sb-thread
 (defvar *stop-for-gc-pending*)
 
 ;;; This one is initialized by the runtime, at thread creation.  On
@@ -68,7 +68,7 @@ maintained."
                ;; is a pending gc or stop-for-gc.
                (when (or *interrupt-pending*
                          *gc-pending*
-                         #!+sb-thread *stop-for-gc-pending*)
+                         #+sb-thread *stop-for-gc-pending*)
                  (sb-unix::receive-pending-interrupt))))))))
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.

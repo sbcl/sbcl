@@ -25,11 +25,11 @@
 (define-alien-type lispbool (boolean 32))
 
 (define-alien-type system-string
-                   #!-sb-unicode c-string
-                   #!+sb-unicode (c-string :external-format :ucs-2))
+                   #-sb-unicode c-string
+                   #+sb-unicode (c-string :external-format :ucs-2))
 
-(define-alien-type tchar #!-sb-unicode char
-                         #!+sb-unicode (unsigned 16))
+(define-alien-type tchar #-sb-unicode char
+                         #+sb-unicode (unsigned 16))
 
 (defconstant default-environment-length 1024)
 
@@ -169,11 +169,11 @@
 
 ;;;; System Functions
 
-#!-sb-thread
+#-sb-thread
 (define-alien-routine ("Sleep" millisleep) void
   (milliseconds dword))
 
-#!+sb-thread
+#+sb-thread
 (defun sb-unix:nanosleep (sec nsec)
   (let ((*allow-with-interrupts* *interrupts-enabled*))
     (without-interrupts
@@ -188,13 +188,13 @@
     dword
   (handle handle))
 
-#!+sb-unicode
+#+sb-unicode
 (progn
   (defvar *ansi-codepage* nil)
   (defvar *oem-codepage* nil)
   (defvar *codepage-to-external-format* (make-hash-table)))
 
-#!+sb-unicode
+#+sb-unicode
 (dolist
     (cp '(;;037       IBM EBCDIC - U.S./Canada
           (437 :CP437) ;; OEM - United States
@@ -348,7 +348,7 @@
           (65001 :UTF8))) ;; Unicode UTF-8
   (setf (gethash (car cp) *codepage-to-external-format*) (cadr cp)))
 
-#!+sb-unicode
+#+sb-unicode
 ;; FIXME: Something odd here: why are these two #+SB-UNICODE, whereas
 ;; the console just behave differently?
 (progn
@@ -371,7 +371,7 @@
 ;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsolecp.asp
 (declaim (ftype (function () keyword) console-input-codepage))
 (defun console-input-codepage ()
-  (or #!+sb-unicode
+  (or #+sb-unicode
       (gethash (alien-funcall (extern-alien "GetConsoleCP" (function UINT)))
                *codepage-to-external-format*)
       :latin-1))
@@ -379,7 +379,7 @@
 ;; http://msdn.microsoft.com/library/en-us/dllproc/base/getconsoleoutputcp.asp
 (declaim (ftype (function () keyword) console-output-codepage))
 (defun console-output-codepage ()
-  (or #!+sb-unicode
+  (or #+sb-unicode
       (gethash (alien-funcall
                 (extern-alien "GetConsoleOutputCP" (function UINT)))
                *codepage-to-external-format*)
@@ -400,11 +400,11 @@
                (string ,description)
                (cons (destructuring-bind (s &optional c) ,description
                        (format nil "~A~A" s
-                               (if c #!-sb-unicode "A" #!+sb-unicode "W" "")))))))
+                               (if c #-sb-unicode "A" #+sb-unicode "W" "")))))))
      ,@body)))
 
 (defmacro make-system-buffer (x)
- `(make-alien char #!+sb-unicode (ash ,x 1) #!-sb-unicode ,x))
+ `(make-alien char #+sb-unicode (ash ,x 1) #-sb-unicode ,x))
 
 (defmacro with-handle ((var initform
                             &key (close-operator 'close-handle))
@@ -418,11 +418,11 @@
              (,close-operator ,var))))))
 
 (define-alien-type pathname-buffer
-    (array char #.(ash (1+ max_path) #!+sb-unicode 1 #!-sb-unicode 0)))
+    (array char #.(ash (1+ max_path) #+sb-unicode 1 #-sb-unicode 0)))
 
 (define-alien-type long-pathname-buffer
-    #!+sb-unicode (array char 65536)
-    #!-sb-unicode pathname-buffer)
+    #+sb-unicode (array char 65536)
+    #-sb-unicode pathname-buffer)
 
 (defmacro decode-system-string (alien)
   `(cast (cast ,alien (* char)) system-string))
@@ -634,7 +634,7 @@
                                 internal-time-units-per-second))
 (defconstant +common-lisp-epoch-filetime-seconds+ 9435484800)
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (inline get-time-of-day))
 (defun get-time-of-day ()
   "Return the number of seconds and microseconds since the beginning of the
@@ -795,7 +795,7 @@ absense."
     (dwMinorVersion dword)
     (dwBuildNumber dword)
     (dwPlatformId dword)
-    (szCSDVersion (array char #!-sb-unicode 128 #!+sb-unicode 256))))
+    (szCSDVersion (array char #-sb-unicode 128 #+sb-unicode 256))))
 
 (defun get-version-ex ()
   (with-alien ((info (struct OSVERSIONINFO)))
@@ -846,8 +846,8 @@ absense."
         (values -1 0))))
 
 ;; File mapping support routines
-(define-alien-routine (#!+sb-unicode "CreateFileMappingW"
-                       #!-sb-unicode "CreateFileMappingA"
+(define-alien-routine (#+sb-unicode "CreateFileMappingW"
+                       #-sb-unicode "CreateFileMappingA"
                        create-file-mapping)
     handle
   (handle handle)
@@ -893,11 +893,11 @@ absense."
 (defconstant file-share-write #x02)
 
 ;; CreateFile (the real file-opening workhorse).
-(define-alien-routine (#!+sb-unicode "CreateFileW"
-                       #!-sb-unicode "CreateFileA"
+(define-alien-routine (#+sb-unicode "CreateFileW"
+                       #-sb-unicode "CreateFileA"
                        create-file)
     handle
-  (name (c-string #!+sb-unicode #!+sb-unicode :external-format :ucs-2))
+  (name (c-string #+sb-unicode #+sb-unicode :external-format :ucs-2))
   (desired-access dword)
   (share-mode dword)
   (security-attributes (* t))
@@ -912,11 +912,11 @@ absense."
 
 ;; GetFileAttribute is like a tiny subset of fstat(),
 ;; enough to distinguish directories from anything else.
-(define-alien-routine (#!+sb-unicode "GetFileAttributesW"
-                       #!-sb-unicode "GetFileAttributesA"
+(define-alien-routine (#+sb-unicode "GetFileAttributesW"
+                       #-sb-unicode "GetFileAttributesA"
                        get-file-attributes)
     dword
-  (name (c-string #!+sb-unicode #!+sb-unicode :external-format :ucs-2)))
+  (name (c-string #+sb-unicode #+sb-unicode :external-format :ucs-2)))
 
 (define-alien-routine ("CloseHandle" close-handle) bool
   (handle handle))
@@ -1142,8 +1142,8 @@ absense."
   (length dword)
   (buffer (* t)))
 
-(define-alien-routine (#!-sb-unicode "CryptAcquireContextA"
-                       #!+sb-unicode "CryptAcquireContextW"
+(define-alien-routine (#-sb-unicode "CryptAcquireContextA"
+                       #+sb-unicode "CryptAcquireContextW"
                        %crypt-acquire-context) lispbool
   (handle handle :out)
   (container system-string)

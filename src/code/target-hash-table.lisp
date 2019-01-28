@@ -101,13 +101,13 @@
                    (setf (,thread-slot-accessor ,hash-table) nil)))
                (body-fun)))))))
 
-#!-sb-fluid (declaim (inline eq-hash))
+#-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values hash (member t nil)))
   (values (pointer-hash key)
           (oddp (get-lisp-obj-address key))))
 
-#!-sb-fluid (declaim (inline equal-hash))
+#-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values hash (member t nil)))
   (typecase key
@@ -121,7 +121,7 @@
     (t
      (eq-hash key))))
 
-#!-sb-fluid (declaim (inline eql-hash))
+#-sb-fluid (declaim (inline eql-hash))
 (defun eql-hash (key)
   (declare (values hash (member t nil)))
   (if (%other-pointer-subtype-p

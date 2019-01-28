@@ -14,7 +14,7 @@
 ;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
-#!+sb-unicode
+#+sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg descriptor-reg) :target y
             :load-if (not (location= x y))))
@@ -24,7 +24,7 @@
   (:generator 1
     (move y x)
     (inst shr y n-widetag-bits)))
-#!-sb-unicode
+#-sb-unicode
 (define-vop (move-to-character)
   (:args (x :scs (any-reg control-stack) :target al))
   (:temporary (:sc byte-reg :offset al-offset
@@ -38,11 +38,11 @@
     (move eax-tn x)
     (move y ah)))
 (define-move-vop move-to-character :move
-  (any-reg #!-sb-unicode control-stack)
-  (character-reg #!-sb-unicode character-stack))
+  (any-reg #-sb-unicode control-stack)
+  (character-reg #-sb-unicode character-stack))
 
 ;;; Move an untagged char to a tagged representation.
-#!+sb-unicode
+#+sb-unicode
 (define-vop (move-from-character)
   (:args (x :scs (character-reg) :target y))
   (:results (y :scs (any-reg descriptor-reg)))
@@ -51,7 +51,7 @@
     (move y x)
     (inst shl y n-widetag-bits)
     (inst or y character-widetag)))
-#!-sb-unicode
+#-sb-unicode
 (define-vop (move-from-character)
   (:args (x :scs (character-reg character-stack) :target ah))
   (:temporary (:sc byte-reg :offset al-offset :target y
@@ -66,8 +66,8 @@
     (inst and eax-tn #xffff)            ; Remove any junk bits.
     (move y eax-tn)))
 (define-move-vop move-from-character :move
-  (character-reg #!-sb-unicode character-stack)
-  (any-reg descriptor-reg #!-sb-unicode control-stack))
+  (character-reg #-sb-unicode character-stack)
+  (any-reg descriptor-reg #-sb-unicode control-stack))
 
 ;;; Move untagged character values.
 (define-vop (character-move)
@@ -95,13 +95,13 @@
       (character-reg
        (move y x))
       (character-stack
-       #!-sb-unicode
+       #-sb-unicode
        (inst mov
              ;; XXX: If the sb-unicode case needs to handle c-call,
              ;; why does the non-unicode case not need to?
              (make-ea :byte :base fp :disp (frame-byte-offset (tn-offset y)))
              x)
-       #!+sb-unicode
+       #+sb-unicode
        (if (= (tn-offset fp) esp-offset)
            (storew x fp (tn-offset y))  ; c-call
            (storew x fp (frame-word-offset (tn-offset y))))))))
@@ -118,18 +118,18 @@
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args #!-sb-unicode (ch :scs (character-reg character-stack))
-         #!+sb-unicode (ch :scs (character-reg character-stack) :target res))
+  (:args #-sb-unicode (ch :scs (character-reg character-stack))
+         #+sb-unicode (ch :scs (character-reg character-stack) :target res))
   (:arg-types character)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 1
-    #!-sb-unicode
+    #-sb-unicode
     (inst movzx res ch)
-    #!+sb-unicode
+    #+sb-unicode
     (move res ch)))
 
-#!+sb-unicode
+#+sb-unicode
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
@@ -139,7 +139,7 @@
   (:result-types character)
   (:generator 1
     (move res code)))
-#!-sb-unicode
+#-sb-unicode
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)

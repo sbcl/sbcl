@@ -42,7 +42,7 @@
   ;; CONCATENATE transformer causes CTYPEP ambiguity.
   ;; WRITE transformer bind *PRINT-PRETTY* which isn't defined yet.
   (declare (notinline concatenate write-to-string))
-  #!+sb-show
+  #+sb-show
   `(when */show*
      (let ((.stream. *trace-output*))
        (fresh-line .stream.)
@@ -95,7 +95,7 @@
     (declare (ignorable s)) ; (for when #!-SB-SHOW)
     #+sb-xc-host `(/show ,s)
     #-sb-xc-host `(progn
-                    #!+sb-show
+                    #+sb-show
                     (%primitive print
                                 ,(concatenate 'simple-string "/" s)))))
 (defmacro /noshow0 (&rest rest)
@@ -104,7 +104,7 @@
 ;;; low-level display of a string, works even early in cold init
 (defmacro /primitive-print (thing)
   (declare (ignorable thing)) ; (for when #!-SB-SHOW)
-  #!+sb-show
+  #+sb-show
   (progn
     #+sb-xc-host `(/show "(/primitive-print)" ,thing)
     #-sb-xc-host `(%primitive print (the simple-string ,thing))))
@@ -112,7 +112,7 @@
 ;;; low-level display of a system word, works even early in cold init
 (defmacro /hexstr (thing)
   (declare (ignorable thing)) ; (for when #!-SB-SHOW)
-  #!+sb-show
+  #+sb-show
   (progn
     #+sb-xc-host `(/show "(/hexstr)" ,thing)
     #-sb-xc-host `(%primitive print (hexstr ,thing))))

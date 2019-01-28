@@ -1163,7 +1163,7 @@ about function addresses and register values.")
   (:declare (type branch-condition condition)
             ;; KLUDGE: see comments in vm.lisp regarding
             ;; pseudo-atomic-trap.
-            #!-linux
+            #-linux
             (type (integer 16 31) target))
   (:printer format-3-immed ((op #b10)
                             (rd nil :type 'branch-condition)
@@ -1197,7 +1197,7 @@ about function addresses and register values.")
 (define-instruction tcc (segment condition target &optional (cc #!-sparc-64 :icc #!+sparc-64 :xcc))
   (:declare (type branch-condition condition)
             ;; KLUDGE: see above.
-            #!-linux
+            #-linux
             (type (integer 16 31) target)
             (type integer-condition-register cc))
   (:printer format-4-trap ((op #b10)

@@ -19,14 +19,14 @@
 ;;; In the target system's compiler, uncrossing is just identity.
 #-sb-xc-host
 (progn
-  #!-sb-fluid (declaim (inline uncross))
+  #-sb-fluid (declaim (inline uncross))
   (defun uncross (x) x))
 ;;; In the cross-compiler, uncrossing is slightly less trivial.
 
 ;;; This condition is only a STYLE-WARNING because generally it isn't important
 ;;; in practice to recurse through anything except CONSes anyway.
 #|
-#!+sb-show
+#+sb-show
 (define-condition uncross-rcr-failure (style-warning)
   ((form :initarg :form :reader uncross-rcr-failure-form))
   (:report (lambda (c s)

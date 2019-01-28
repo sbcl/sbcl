@@ -152,16 +152,16 @@
     (when (boundp '*compiler-ir-obj-map*)
       (format stream "~D" (cont-num x)))))
 
-#!-sb-fluid (declaim (inline lvar-has-single-use-p))
+#-sb-fluid (declaim (inline lvar-has-single-use-p))
 (defun lvar-has-single-use-p (lvar)
   (typep (lvar-uses lvar) '(not list)))
 
 ;;; Return the unique node, delivering a value to LVAR.
-#!-sb-fluid (declaim (inline lvar-use))
+#-sb-fluid (declaim (inline lvar-use))
 (defun lvar-use (lvar)
   (the (not list) (lvar-uses lvar)))
 
-#!-sb-fluid (declaim (inline lvar-derived-type))
+#-sb-fluid (declaim (inline lvar-derived-type))
 (defun lvar-derived-type (lvar)
   (declare (type lvar lvar))
   (or (lvar-%derived-type lvar)
@@ -174,7 +174,7 @@
                                       (incf *compiler-sset-counter*))))
                   (:copier nil))
   ;; unique ID for debugging
-  #!+sb-show (id (new-object-id) :read-only t)
+  #+sb-show (id (new-object-id) :read-only t)
   ;; True if this node needs to be optimized. This is set to true
   ;; whenever something changes about the value of an lvar whose DEST
   ;; is this node.
@@ -222,7 +222,7 @@
   ;; can null out this slot.
   (tail-p nil :type boolean))
 
-#!-sb-fluid (declaim (inline node-block))
+#-sb-fluid (declaim (inline node-block))
 (defun node-block (node)
   (ctran-block (node-prev node)))
 
@@ -245,7 +245,7 @@
   ;; the value is unused.
   (lvar nil :type (or lvar null)))
 
-#!-sb-fluid (declaim (inline node-dest))
+#-sb-fluid (declaim (inline node-dest))
 (defun node-dest (node)
   (awhen (node-lvar node) (lvar-dest it)))
 
@@ -438,7 +438,7 @@
                          (last-block tail)
                          (outer-loop (make-loop :kind :outer :head head)))))
   ;; unique ID for debugging
-  #!+sb-show (id (new-object-id) :read-only t)
+  #+sb-show (id (new-object-id) :read-only t)
   ;; space where this component will be allocated in
   ;; :auto won't make any codegen optimizations pertinent to immobile space,
   ;; but will place the code there given sufficient available space.
@@ -547,7 +547,7 @@
   (sset-number 0 :type fixnum)))
 (defprinter (component :identity t)
   name
-  #!+sb-show id
+  #+sb-show id
   (reanalyze :test reanalyze))
 
 (declaim (inline reoptimize-component))
@@ -734,7 +734,7 @@
                   (:copier nil)
                   (:constructor nil))
   ;; unique ID for debugging
-  #!+sb-show (id (new-object-id) :read-only t)
+  #+sb-show (id (new-object-id) :read-only t)
   ;; (For public access to this slot, use LEAF-SOURCE-NAME.)
   ;;
   ;; the name of LEAF as it appears in the source, e.g. 'FOO or '(SETF
@@ -823,7 +823,7 @@
              :pretty-ir-printer
              (pretty-print-global-var structure stream))
   %source-name
-  #!+sb-show id
+  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (defined-type :test (not (eq defined-type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -860,7 +860,7 @@
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
-  #!+sb-show id
+  #+sb-show id
   inlinep
   (functionals :test functionals))
 
@@ -1034,7 +1034,7 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #!+sb-show id)
+  #+sb-show id)
 
 (defun leaf-debug-name (leaf)
   (if (functional-p leaf)
@@ -1155,7 +1155,7 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #!+sb-show id
+  #+sb-show id
   kind
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -1237,7 +1237,7 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #!+sb-show id
+  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   arglist
@@ -1345,7 +1345,7 @@
   (fop-value nil))
 (defprinter (lambda-var :identity t)
   %source-name
-  #!+sb-show id
+  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (flags :test (not (zerop flags))
@@ -1384,7 +1384,7 @@
   ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
   constraints)
 (defprinter (ref :identity t)
-  #!+sb-show id
+  #+sb-show id
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
 
@@ -1462,7 +1462,7 @@
                          (:constructor make-combination (fun))
                          (:copier nil)))
 (defprinter (combination :identity t)
-  #!+sb-show id
+  #+sb-show id
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)
                          (if x
@@ -1586,7 +1586,7 @@
   ;; The cleanup for this entry. NULL only temporarily.
   (cleanup nil :type (or cleanup null)))
 (defprinter (entry :identity t)
-  #!+sb-show id)
+  #+sb-show id)
 
 ;;; The EXIT node marks the place at which exit code would be emitted,
 ;;; if necessary. This is interposed between the uses of the exit
@@ -1607,7 +1607,7 @@
   (value nil :type (or lvar null))
   (nlx-info nil :type (or nlx-info null)))
 (defprinter (exit :identity t)
-  #!+sb-show id
+  #+sb-show id
   (entry :test entry)
   (value :test value))
 
@@ -1641,6 +1641,6 @@
 ;; until this file is compiled by the cross-compiler.
 ;; Anything compiled prior to then uses the non-frozen classoid as existed
 ;; at load-time of the cross-compiler. SB-XC:PROCLAIM would likely work here.
-#!-sb-fluid
+#-sb-fluid
 (declaim (freeze-type node lexenv ctran lvar cblock component cleanup
                       physenv tail-set nlx-info))

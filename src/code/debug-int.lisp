@@ -489,7 +489,7 @@
   #!-x86 sb-vm:code-constants-offset
   #!+x86 (1+ sb-vm:code-constants-offset))
 
-#!-sb-fluid (declaim (inline control-stack-pointer-valid-p))
+#-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
   (declare (type system-area-pointer x))
   (let* (#!-stack-grows-downward-not-upward
@@ -619,7 +619,7 @@
 ;;; address.
 ;;;
 ;;; XXX Could be a little smarter.
-#!-sb-fluid (declaim (inline ra-pointer-valid-p))
+#-sb-fluid (declaim (inline ra-pointer-valid-p))
 (defun ra-pointer-valid-p (ra)
   (declare (type system-area-pointer ra))
   (and
@@ -679,13 +679,13 @@
       (compute-calling-frame saved-fp saved-pc up-frame t))))
 
 (defun walk-binding-stack (symbol function)
-  (let* (#!+sb-thread
-         (tls-index #!+sb-thread
+  (let* (#+sb-thread
+         (tls-index #+sb-thread
                     (get-lisp-obj-address (symbol-tls-index symbol)))
          (current-value
-           #!+sb-thread
+           #+sb-thread
            (sap-ref-lispobj (sb-thread::current-thread-sap) tls-index)
-           #!-sb-thread
+           #-sb-thread
            (symbol-value symbol)))
     (unless (eq (get-lisp-obj-address current-value)
                 no-tls-value-marker-widetag)
@@ -695,9 +695,9 @@
             then (sap+ pointer (* n-word-bytes -2))
             while (sap> pointer start)
             when
-            #!+sb-thread (eq (sap-ref-word pointer (* n-word-bytes -1)) tls-index)
-            #!-sb-thread (eq (sap-ref-lispobj pointer (* n-word-bytes -1)) symbol)
-            do (unless (or #!+sb-thread
+            #+sb-thread (eq (sap-ref-word pointer (* n-word-bytes -1)) tls-index)
+            #-sb-thread (eq (sap-ref-lispobj pointer (* n-word-bytes -1)) symbol)
+            do (unless (or #+sb-thread
                            (= (sap-ref-word pointer (* n-word-bytes -2))
                               no-tls-value-marker-widetag))
                  (funcall function
@@ -943,9 +943,9 @@
 ;;; an indirection table, but the debugger needs to know the actual
 ;;; address.
 (defun static-foreign-symbol-address (name)
-  #!+sb-dynamic-core
+  #+sb-dynamic-core
   (find-dynamic-foreign-symbol-address name)
-  #!-sb-dynamic-core
+  #-sb-dynamic-core
   (foreign-symbol-address name))
 
 ;;;; See above.
@@ -1862,11 +1862,11 @@ register."
                                 prev-name)
                                (t (geti))))
                  (sc+offset (if deleted 0
-                                #!-64-bit (geti)
-                                #!+64-bit (ldb (byte 27 8) flags)))
+                                #-64-bit (geti)
+                                #+64-bit (ldb (byte 27 8) flags)))
                  (save-sc+offset (and save
-                                      #!-64-bit (geti)
-                                      #!+64-bit (ldb (byte 27 35) flags)))
+                                      #-64-bit (geti)
+                                      #+64-bit (ldb (byte 27 35) flags)))
                  (indirect-sc+offset (and indirect-p
                                           (geti))))
             (aver (not (and args-minimal (not minimal))))
@@ -2277,7 +2277,7 @@ register."
        ;; fixnum
        (zerop (logand val sb-vm:fixnum-tag-mask))
        ;; immediate single float, 64-bit only
-       #!+64-bit
+       #+64-bit
        (= (logand val #xff) sb-vm:single-float-widetag)
        ;; character
        (and (zerop (logandc2 val #x1fffffff)) ; Top bits zero
@@ -3570,7 +3570,7 @@ register."
   (let* ((callee
            ;; FIXME: this could handle static calls, but needs some
            ;; help from the backends
-           (cond #!+immobile-space
+           (cond #+immobile-space
                  ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
                   ;; FIXME: this ought to go in {target}-vm.lisp as
                   ;; something like GET-FDEFN-FOR-SINGLE-STEP
@@ -3632,7 +3632,7 @@ register."
         ;; CONTEXT, which is registered in thread->interrupt_contexts,
         ;; it will properly point to NEW-CALLEE.
         (cond
-         #!+immobile-code
+         #+immobile-code
          ((fdefn-p callee) ; as above, should be in {target}-vm.lisp
           ;; Don't store the FDEFN in RAX, but the address of the raw_addr slot.
           (setf (context-register context callee-register-offset)

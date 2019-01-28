@@ -178,7 +178,7 @@
     signed-reg)
   (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num
     unsigned-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (def-full-data-vector-frobs simple-character-string character character-reg))
 
 (define-full-compare-and-swap %compare-and-swap-svref simple-vector
@@ -695,8 +695,8 @@
   (define-data-vector-frobs simple-array-signed-byte-8 tagged-num
     movsx nil signed-reg)
   (define-data-vector-frobs simple-base-string character
-                            #!+sb-unicode movzx #!-sb-unicode mov
-                            #!+sb-unicode nil #!-sb-unicode t character-reg))
+                            #+sb-unicode movzx #-sb-unicode mov
+                            #+sb-unicode nil #-sb-unicode t character-reg))
 
 ;;; {un,}signed-byte-16
 (macrolet ((define-data-vector-frobs (ptype element-type ref-inst &rest scs)

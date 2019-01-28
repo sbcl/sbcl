@@ -193,8 +193,8 @@
               (if result
                   (recurse (cdr obj) (cons-type-cdr-type type))
                   (values nil certain)))))
-       ((or #!+sb-simd-pack simd-pack-type
-            #!+sb-simd-pack-256 simd-pack-256-type)
+       ((or #+sb-simd-pack simd-pack-type
+            #+sb-simd-pack-256 simd-pack-256-type)
         (values nil t))
        (character-set-type
         (cond ((not (characterp obj)) (values nil t)) ; certainly no

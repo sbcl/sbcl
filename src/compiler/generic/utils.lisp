@@ -171,7 +171,7 @@
        (not (types-equal-or-intersect
              (tn-ref-type tn-ref)
              (specifier-type '(or fixnum
-                               #!+64-bit single-float
+                               #+64-bit single-float
                                function
                                list
                                instance

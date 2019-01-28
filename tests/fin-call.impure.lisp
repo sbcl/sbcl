@@ -114,7 +114,7 @@ index d66b5c90c..d33c26556 100644
 +(defvar *clobber-rsi* nil)
  (macrolet ((define-full-call (vop-name named return variable)
              (aver (not (and variable (eq return :tail))))
-             #!+immobile-code (when named (setq named :direct))
+             #+immobile-code (when named (setq named :direct))
 @@ -785,6 +786,10 @@
                     '((if (zerop nargs)
                           (zeroize rcx)

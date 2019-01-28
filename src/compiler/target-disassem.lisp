@@ -106,7 +106,7 @@
 
 ;;;; choosing an instruction
 
-#!-sb-fluid (declaim (inline inst-matches-p choose-inst-specialization))
+#-sb-fluid (declaim (inline inst-matches-p choose-inst-specialization))
 
 ;;; Return non-NIL if all constant-bits in INST match CHUNK.
 (defun inst-matches-p (inst chunk)
@@ -287,7 +287,7 @@
 ;;; LRA layout (dual word aligned):
 ;;;     header-word
 
-#!-sb-fluid (declaim (inline words-to-bytes))
+#-sb-fluid (declaim (inline words-to-bytes))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;;; Convert a word-offset NUM to a byte-offset.
@@ -545,18 +545,18 @@
    ;; Otherwise, operating on huge memory regions could exhaust the heap.
    ;; gencgc can do better though: pin SEG-OBJECT once only outside the loop.
    (macrolet ((with-pinned-segment (&body body)
-                #!-gencgc `(without-gcing
+                #-gencgc `(without-gcing
                             (setf (dstate-segment-sap dstate)
                                   (funcall (seg-sap-maker segment)))
                             ,@body)
-                #!+gencgc `(progn ,@body)))
+                #+gencgc `(progn ,@body)))
 
     (rewind-current-segment dstate segment)
 
-    (#!-gencgc progn
-     #!+gencgc with-pinned-objects #!+gencgc ((seg-object (dstate-segment dstate))
+    (#-gencgc progn
+     #+gencgc with-pinned-objects #+gencgc ((seg-object (dstate-segment dstate))
                                               (dstate-scratch-buf dstate))
-     #!+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
+     #+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
      ;; Now commence disssembly of instructions
      (loop
@@ -1862,12 +1862,12 @@
       (let ((code sb-fasl::*assembler-routines*))
         (invert (car (%code-debug-info code))
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
-    #!-sb-dynamic-core
+    #-sb-dynamic-core
        (invert *static-foreign-symbols* #'identity))
     (loop for name across sb-vm::+all-static-fdefns+
           for address =
-          #!+immobile-code (sb-vm::function-raw-address name)
-          #!-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
+          #+immobile-code (sb-vm::function-raw-address name)
+          #-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #!+sb-safepoint
@@ -1905,7 +1905,7 @@
            (type (member 1 2 4 8) length)
            (type (member :little-endian :big-endian) byte-order))
   (if (or (eq length 1)
-          (and (eq byte-order #!+big-endian :big-endian #!+little-endian :little-endian)
+          (and (eq byte-order #+big-endian :big-endian #+little-endian :little-endian)
                #!-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
                (not (logtest (1- length) (sap-int (sap+ sap offset))))))
       (case length
@@ -2098,7 +2098,7 @@
            ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
            ;; used in an unboxed context, such as an ADD instruction,
            ;; might be wrongly construed as an address.
-           #!+immobile-space
+           #+immobile-space
            (let ((code (seg-code (dstate-segment dstate))))
              (when code
                (loop for i downfrom (1- (code-header-words code))

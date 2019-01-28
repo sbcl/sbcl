@@ -108,7 +108,7 @@ types for the Common Lisp expression reader."
   ;; as being less relevant. If you expect (copy-seq (string asymbol))
   ;; to produce a certain type of string, your code is unportable anyway.
   (%readtable-symbol-preference 'base-char :type (member character base-char))
-  (%readtable-normalization #!+sb-unicode t #!-sb-unicode nil :type boolean))
+  (%readtable-normalization #+sb-unicode t #-sb-unicode nil :type boolean))
 
 (defconstant +readtable-upcase+ 0)
 (defconstant +readtable-downcase+ 1)

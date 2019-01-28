@@ -761,7 +761,7 @@
          (string-save-object x file)))
       #-sb-xc-host
       ((simple-array character (*))
-       #!-sb-unicode (bug "how did we get here?")
+       #-sb-unicode (bug "how did we get here?")
        (unless (string-check-table x file)
          (dump-fop 'fop-character-string file (length simple-version))
          (dump-chars simple-version file nil)
@@ -850,14 +850,14 @@
                  (8  sb-vm:simple-array-signed-byte-8-widetag)
                  (16 sb-vm:simple-array-signed-byte-16-widetag)
                  (32 sb-vm:simple-array-signed-byte-32-widetag)
-                 #!+64-bit
+                 #+64-bit
                  (64 sb-vm:simple-array-signed-byte-64-widetag)))
               (unsigned-byte
                (ecase bits
                  (8  sb-vm:simple-array-unsigned-byte-8-widetag)
                  (16 sb-vm:simple-array-unsigned-byte-16-widetag)
                  (32 sb-vm:simple-array-unsigned-byte-32-widetag)
-                 #!+64-bit
+                 #+64-bit
                  (64 sb-vm:simple-array-unsigned-byte-64-widetag))))
             (/ bits sb-vm:n-byte-bits)
             bits)))
@@ -900,7 +900,7 @@
 ;;; Dump a SIMPLE-STRING.
 (defun dump-chars (s fasl-output base-string-p)
   (declare (type simple-string s))
-  (if (or base-string-p #!-sb-unicode t) ; if non-unicode, every char is 1 byte
+  (if (or base-string-p #-sb-unicode t) ; if non-unicode, every char is 1 byte
       (dovector (c s)
         (dump-byte (sb-xc:char-code c) fasl-output))
       (dovector (c s) ; varint (a/k/a LEB128) is better for this than UTF-8.
@@ -1015,9 +1015,9 @@
                (the symbol name))
               ((:foreign #!+linkage-table :foreign-dataref) (the string name))
               (:code-object (the null name))
-              #!+immobile-space (:layout (classoid-name (layout-classoid name)))
-              #!+immobile-space (:immobile-object (the symbol name))
-              #!+immobile-code  ((:named-call :static-call) name))))
+              #+immobile-space (:layout (classoid-name (layout-classoid name)))
+              #+immobile-space (:immobile-object (the symbol name))
+              #+immobile-code  ((:named-call :static-call) name))))
       (dump-object operand fasl-output)
       (dump-integer info fasl-output))
     (incf n))

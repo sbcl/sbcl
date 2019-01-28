@@ -106,7 +106,7 @@
 
   (def-data-vector-frobs simple-base-string byte-index
     character character-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (def-data-vector-frobs simple-character-string word-index
     character character-reg)
   (def-data-vector-frobs simple-vector word-index

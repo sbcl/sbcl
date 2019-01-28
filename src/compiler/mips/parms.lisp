@@ -88,7 +88,7 @@
   (defparameter dynamic-0-space-start #x08000000)
   (defparameter dynamic-0-space-end   #x0c000000))
 
-#!+linux
+#+linux
 (progn
   ;; Where to put the address spaces on Linux.
   ;;

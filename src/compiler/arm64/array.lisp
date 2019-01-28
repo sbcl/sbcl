@@ -195,7 +195,7 @@
 
   (def-partial-data-vector-frobs simple-base-string character
     :byte nil character-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (def-partial-data-vector-frobs simple-character-string character
     :word nil character-reg)
 

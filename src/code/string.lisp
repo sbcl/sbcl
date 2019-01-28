@@ -103,7 +103,7 @@
         (return-from string=* nil))
       ;; Optimizing the non-unicode builds is not terribly important
       ;; because no per-character test for base/UCS4 is needed.
-      #!+sb-unicode
+      #+sb-unicode
       (let* ((widetag1 (%other-pointer-widetag string1))
              (widetag2 (%other-pointer-widetag string2))
              (char-shift

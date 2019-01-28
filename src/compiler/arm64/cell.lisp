@@ -76,7 +76,7 @@
 
 ;;; With Symbol-Value, we check that the value isn't the trap object.  So
 ;;; Symbol-Value of NIL is NIL.
-#!+sb-thread
+#+sb-thread
 (progn
   (define-vop (set)
     (:args (object :scs (descriptor-reg))
@@ -128,7 +128,7 @@
       (inst cmp value unbound-marker-widetag)
       (inst b (if not-p :eq :ne) target))))
 
-#!-sb-thread
+#-sb-thread
 (progn
   (define-vop (set cell-set)
     (:variant symbol-value-slot other-pointer-lowtag))
@@ -193,14 +193,14 @@
          (old :scs (descriptor-reg any-reg))
          (new :scs (descriptor-reg any-reg)))
   (:results (result :scs (descriptor-reg any-reg) :from :load))
-  #!+sb-thread
+  #+sb-thread
   (:temporary (:sc any-reg) tls-index)
   (:temporary (:sc interior-reg) lip)
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 15
     (inst dsb)
-    #!+sb-thread
+    #+sb-thread
     (assemble ()
       (inst ldr (32-bit-reg tls-index) (tls-index-of symbol))
       ;; Thread-local area, no synchronization needed.
@@ -289,7 +289,7 @@
 ;;; BIND -- Establish VAL as a binding for SYMBOL.  Save the old value and
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
-#!+sb-thread
+#+sb-thread
 (progn
   (define-vop (dynbind)
     (:args (value :scs (any-reg descriptor-reg) :to :save)
@@ -352,9 +352,9 @@
     (inst ldp value symbol (@ bsp (* (- binding-value-slot binding-size)
                                      n-word-bytes)))
     (inst cbz symbol ZERO)
-    #!-sb-thread
+    #-sb-thread
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    #!+sb-thread
+    #+sb-thread
     (inst str value (@ thread-tn symbol))
     ZERO
     (inst stp zr-tn zr-tn (@ bsp (* (- binding-value-slot binding-size)
@@ -366,7 +366,7 @@
 
     DONE
     (store-binding-stack-pointer bsp)))
-#!-sb-thread
+#-sb-thread
 (progn
   (define-vop (dynbind)
     (:args (val :scs (any-reg descriptor-reg))

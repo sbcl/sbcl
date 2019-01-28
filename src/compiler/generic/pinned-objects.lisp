@@ -17,10 +17,10 @@
 OBJECTS will not be moved in memory for the duration of BODY.
 Useful for e.g. foreign calls where another thread may trigger
 garbage collection."
-     #!-gencgc "  This is currently implemented by disabling GC")
-  #!-gencgc
+     #-gencgc "  This is currently implemented by disabling GC")
+  #-gencgc
   (declare (ignore objects))            ; should we eval these for side-effect?
-  #!-gencgc
+  #-gencgc
   `(without-gcing
     ,@body)
   #!+(and gencgc (not (or x86 x86-64)))

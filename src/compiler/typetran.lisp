@@ -583,7 +583,7 @@
                            collect
                            `(<= ,(car pair) ,n-code ,(cdr pair))))))))))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (defun source-transform-simd-pack-typep (object type)
   (if (type= type (specifier-type 'simd-pack))
       `(simd-pack-p ,object)
@@ -596,7 +596,7 @@
                     for index = (position type *simd-pack-element-types*)
                     collect `(eql ,n-tag ,index))))))))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defun source-transform-simd-pack-256-typep (object type)
   (if (type= type (specifier-type 'simd-pack-256))
       `(simd-pack-256-p ,object)
@@ -1013,10 +1013,10 @@
             (source-transform-cons-typep object ctype))
            (character-set-type
             (source-transform-character-set-typep object ctype))
-           #!+sb-simd-pack
+           #+sb-simd-pack
            (simd-pack-type
             (source-transform-simd-pack-typep object ctype))
-           #!+sb-simd-pack-256
+           #+sb-simd-pack-256
            (simd-pack-256-type
             (source-transform-simd-pack-256-typep object ctype))
            (t nil))
@@ -1255,14 +1255,14 @@
         "~@<open coding coercion to ~S not implemented.~:@>"
         tval)))))
 
-(deftransform #!+64-bit unsigned-byte-64-p #!-64-bit unsigned-byte-32-p
+(deftransform #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p
   ((value) (fixnum))
   `(>= value 0))
 
 (deftransform %other-pointer-p ((object))
   (let ((this-type
           (specifier-type '(or fixnum
-                            #!+64-bit single-float
+                            #+64-bit single-float
                             function
                             list
                             instance

@@ -354,11 +354,11 @@
     #+long-float
     (define-float-fop 52 fop-long-float long-float)))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (!define-fop 88 :not-host (fop-simd-pack)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (let ((tag (fast-read-s-integer 8)))
-      (cond #!+sb-simd-pack-256
+      (cond #+sb-simd-pack-256
             ((logbitp 2 tag)
              (%make-simd-pack-256 (logand tag #b11)
                                   (fast-read-u-integer 8)

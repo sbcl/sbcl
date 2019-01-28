@@ -586,7 +586,7 @@
 (defun node-physenv (node)
   (lambda-physenv (node-home-lambda node)))
 
-#!-sb-fluid (declaim (inline node-stack-allocate-p))
+#-sb-fluid (declaim (inline node-stack-allocate-p))
 (defun node-stack-allocate-p (node)
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
@@ -1079,7 +1079,7 @@
 (defun cast-single-value-p (cast)
   (not (values-type-p (cast-asserted-type cast))))
 
-#!-sb-fluid (declaim (inline lvar-single-value-p))
+#-sb-fluid (declaim (inline lvar-single-value-p))
 (defun lvar-single-value-p (lvar)
   (or (not lvar) (%lvar-single-value-p lvar)))
 (defun %lvar-single-value-p (lvar)

@@ -106,7 +106,7 @@
                              (l (length s)))
                         (setf (svref strings index) s)
                         (incf length l)
-                        #!+sb-unicode
+                        #+sb-unicode
                         (when (and (typep s '(array character (*)))
                                    ;; BASE-CHAR-p isn't a standard predicate.
                                    ;; and host ignores ELT-TYPE anyway.

@@ -189,11 +189,11 @@
 
   ;; non-descriptor characters
   (character-reg registers
-                 :locations #!-sb-unicode #.*byte-regs*
-                            #!+sb-unicode #.*dword-regs*
-                 #!+sb-unicode #!+sb-unicode
+                 :locations #-sb-unicode #.*byte-regs*
+                            #+sb-unicode #.*dword-regs*
+                 #+sb-unicode #+sb-unicode
                  :element-size 2
-                 #!-sb-unicode #!-sb-unicode
+                 #-sb-unicode #-sb-unicode
                  :reserve-locations (#.ah-offset #.al-offset)
                  :constant-scs (immediate)
                  :save-p t
@@ -286,12 +286,12 @@
   (unwind-block stack :element-size unwind-block-size)))
 
 (defparameter *byte-sc-names*
-  '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
+  '(#-sb-unicode character-reg byte-reg #-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
 (defparameter *dword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
     signed-stack unsigned-stack sap-stack single-stack
-    #!+sb-unicode character-reg #!+sb-unicode character-stack constant))
+    #+sb-unicode character-reg #+sb-unicode character-stack constant))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;

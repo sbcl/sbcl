@@ -19,7 +19,7 @@
 (defconstant +backend-fasl-file-implementation+ :arm)
 
   ;; Minumum observed value, not authoritative.
-(defconstant +backend-page-bytes+ #!+linux 4096 #!+netbsd 8192)
+(defconstant +backend-page-bytes+ #+linux 4096 #!+netbsd 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
@@ -101,7 +101,7 @@
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#!-gencgc
+#-gencgc
 (progn
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
@@ -111,14 +111,14 @@
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000))
 
-#!+gencgc
+#+gencgc
 (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
 (defconstant linkage-table-entry-size 16)
 
 #!+(or linux netbsd)
 (progn
-  #!-gencgc
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))

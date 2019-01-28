@@ -68,7 +68,7 @@
                                       (or (not (tn-p size))
                                           (not (location= size my-tn))))
                             collect my-tn))
-         (tls-prefix #!+sb-thread :fs)
+         (tls-prefix #+sb-thread :fs)
          #!+(and sb-thread win32) (scratch-tn (pop scratch-tns))
          #!+(and sb-thread win32) (swap-tn (pop scratch-tns))
          (free-pointer
@@ -77,16 +77,16 @@
                     :base (or #!+(and sb-thread win32)
                               scratch-tn)
                     :disp
-                    #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-                    #!-sb-thread (make-fixup "gc_alloc_region" :foreign)))
+                    #+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                    #-sb-thread (make-fixup "gc_alloc_region" :foreign)))
          (end-addr
             ;; thread->alloc_region.end_addr
            (make-ea :dword
                     :base (or #!+(and sb-thread win32)
                               scratch-tn)
                     :disp
-                    #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-                    #!-sb-thread (make-fixup "gc_alloc_region" :foreign 4))))
+                    #+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+                    #-sb-thread (make-fixup "gc_alloc_region" :foreign 4))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
     #!+(and sb-thread win32)

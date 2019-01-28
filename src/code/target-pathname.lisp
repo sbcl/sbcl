@@ -71,7 +71,7 @@
 ;;; Unobvious order of execution of TLFs in cold-init is one potential problem,
 ;;; but there could be other issues as well, like maybe we're unsealing classes
 ;;; because the FREEZE-TYPE was wrong to begin with. (So why no warnings then?)
-#!-sb-fluid (declaim (freeze-type logical-pathname logical-host))
+#-sb-fluid (declaim (freeze-type logical-pathname logical-host))
 
 (defmethod make-load-form ((logical-host logical-host) &optional env)
   (declare (ignore env))

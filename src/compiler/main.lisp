@@ -541,11 +541,11 @@ necessary, since type inference may take arbitrarily long to converge.")
   (ir1-finalize component)
   (values))
 
-#!-immobile-code
+#-immobile-code
 (defun component-mem-space (component)
   (component-%mem-space component))
 
-#!+immobile-code
+#+immobile-code
 (progn
   (declaim (type (member :immobile :dynamic :auto) *compile-to-memory-space*)
            (type (member :immobile :dynamic) *compile-file-to-memory-space*))

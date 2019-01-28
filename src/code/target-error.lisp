@@ -33,8 +33,8 @@
 ;;;
 ;;; Lists to which *HANDLER-CLUSTERS* is bound generally have dynamic
 ;;; extent.
-#!+sb-thread (!define-thread-local *handler-clusters* **initial-handler-clusters**)
-#!-sb-thread (defvar *handler-clusters* **initial-handler-clusters**)
+#+sb-thread (!define-thread-local *handler-clusters* **initial-handler-clusters**)
+#-sb-thread (defvar *handler-clusters* **initial-handler-clusters**)
 
 ;;; a list of lists of currently active RESTART instances. maintained
 ;;; by RESTART-BIND.

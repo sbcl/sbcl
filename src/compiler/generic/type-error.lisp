@@ -85,7 +85,7 @@
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
 
-#!+immobile-space
+#+immobile-space
 (defun type-err-type-tn-loadp (thing)
   (cond ((sc-is thing immediate)
          (let ((obj (tn-value thing)))
@@ -109,7 +109,7 @@
                                                 unsigned-reg signed-reg constant
                                                 single-reg double-reg
                                                 complex-single-reg complex-double-reg)
-                                          #!+immobile-space
+                                          #+immobile-space
                                           ,@(if (eq name 'type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
                                  args))

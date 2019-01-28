@@ -34,8 +34,8 @@
          member-type
          character-set-type
          built-in-classoid
-         #!+sb-simd-pack simd-pack-type
-         #!+sb-simd-pack-256 simd-pack-256-type)
+         #+sb-simd-pack simd-pack-type
+         #+sb-simd-pack-256 simd-pack-256-type)
      (values (%%typep obj type)
              t))
     (array-type
@@ -163,7 +163,7 @@
          ;; because the compiler is too naive to see that
          ;; the last 2 cases partition CHARACTER.
          (t (specifier-type 'extended-char))))
-      #!+sb-simd-pack
+      #+sb-simd-pack
       (simd-pack
        (let ((tag (%simd-pack-tag x)))
          (svref (load-time-value
@@ -175,7 +175,7 @@
                 (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
                     (1+ tag)
                     0))))
-      #!+sb-simd-pack-256
+      #+sb-simd-pack-256
       (simd-pack-256
        (let ((tag (%simd-pack-256-tag x)))
          (svref (load-time-value

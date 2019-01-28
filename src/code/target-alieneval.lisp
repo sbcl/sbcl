@@ -198,7 +198,7 @@ This is SETFable."
             :sap (sap-int (alien-value-sap value))
             :type (unparse-alien-type (alien-value-type value)))))
 
-#!-sb-fluid (declaim (inline null-alien))
+#-sb-fluid (declaim (inline null-alien))
 (defun null-alien (x)
   "Return true if X (which must be an ALIEN pointer) is null, false otherwise."
   (zerop (sap-int (alien-sap x))))
@@ -296,7 +296,7 @@ Examples:
 
 ;;; Allocate a block of memory at least BYTES bytes long and return a
 ;;; system area pointer to it.
-#!-sb-fluid (declaim (inline %make-alien))
+#-sb-fluid (declaim (inline %make-alien))
 (defun %make-alien (bytes)
   (declare (type index bytes)
            (optimize (sb-c:alien-funcall-saves-fp-and-pc 0)))
@@ -320,7 +320,7 @@ Examples:
   (let ((*saved-fp* (sb-c::current-fp-fixnum)))
     (funcall fn)))
 
-#!-sb-fluid (declaim (inline free-alien))
+#-sb-fluid (declaim (inline free-alien))
 (defun free-alien (alien)
   "Dispose of the storage pointed to by ALIEN. The ALIEN must have been
 allocated by MAKE-ALIEN, MAKE-ALIEN-STRING or malloc(3)."

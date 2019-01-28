@@ -187,7 +187,7 @@
   (coerce :type (or symbol null))
   |#
   )
-#!-sb-fluid (declaim (freeze-type type-class))
+#-sb-fluid (declaim (freeze-type type-class))
 
 #+sb-xc-host
 (defun ctype-random (mask)
@@ -541,13 +541,13 @@
 ;;; FIXME: This was a macro in CMU CL, and is now an INLINE function. Is
 ;;; it important for it to be INLINE, or could be become an ordinary
 ;;; function without significant loss? -- WHN 19990413
-#!-sb-fluid (declaim (inline type-cache-hash))
+#-sb-fluid (declaim (inline type-cache-hash))
 (declaim (ftype (function (ctype ctype) (signed-byte #.sb-vm:n-fixnum-bits))
                 type-cache-hash))
 (defun type-cache-hash (type1 type2)
   (logxor (ash (type-hash-value type1) -3) (type-hash-value type2)))
 
-#!-sb-fluid (declaim (inline type-list-cache-hash))
+#-sb-fluid (declaim (inline type-list-cache-hash))
 (declaim (ftype (function (list) (signed-byte #.sb-vm:n-fixnum-bits))
                 type-list-cache-hash))
 (defun type-list-cache-hash (types)

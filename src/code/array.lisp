@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (inline adjustable-array-p
                  array-displacement))
 
@@ -165,11 +165,11 @@
                   (when consp
                     (ill-type))
                   (result simple-vector-widetag))
-                 ((base-char standard-char #!-sb-unicode character)
+                 ((base-char standard-char #-sb-unicode character)
                   (when consp
                     (ill-type))
                   (result simple-base-string-widetag))
-                 #!+sb-unicode
+                 #+sb-unicode
                  ((character extended-char)
                   (when consp
                     (ill-type))
@@ -324,8 +324,8 @@
                    unless (hairy-type-p type)
                    return (%vector-widetag-and-n-bits-shift (type-specifier type)))))
           (character-set-type
-           #!-sb-unicode (result simple-base-string-widetag)
-           #!+sb-unicode
+           #-sb-unicode (result simple-base-string-widetag)
+           #+sb-unicode
            (if (loop for (start . end)
                      in (character-set-type-pairs ctype)
                      always (and (< start base-char-code-limit)
@@ -374,7 +374,7 @@
   (let* ((n-bits-shift (or n-bits-shift
                            (aref %%simple-array-n-bits-shifts%% widetag)))
          (full-length (if (or (= widetag simple-base-string-widetag)
-                              #!+sb-unicode
+                              #+sb-unicode
                               (= widetag
                                  simple-character-string-widetag))
                           (1+ length)
@@ -587,7 +587,7 @@ of specialized arrays is supported."
       (%vector-widetag-and-n-bits-shift element-type)
     (let* ((full-length
              (if (or (= type simple-base-string-widetag)
-                     #!+sb-unicode
+                     #+sb-unicode
                      (= type
                         simple-character-string-widetag))
                  (1+ length)
@@ -805,7 +805,7 @@ of specialized arrays is supported."
                 ,@(loop for widetag in '(complex-vector-widetag
                                          complex-vector-nil-widetag
                                          complex-bit-vector-widetag
-                                         #!+sb-unicode complex-character-string-widetag
+                                         #+sb-unicode complex-character-string-widetag
                                          complex-base-string-widetag
                                          simple-array-widetag
                                          complex-array-widetag)
@@ -1434,7 +1434,7 @@ of specialized arrays is supported."
                  (lambda (saetp)
                    `((simple-array ,(saetp-specifier saetp) (*))
                      ,(if (or (eq (saetp-specifier saetp) 'character)
-                              #!+sb-unicode
+                              #+sb-unicode
                               (eq (saetp-specifier saetp) 'base-char))
                           '(code-char 0)
                           (saetp-initial-element-default saetp))))

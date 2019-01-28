@@ -24,7 +24,7 @@
   ;; find out whether using exact multiples of the page size actually
   ;; matters in the few places where that's done, or whether we could
   ;; just use 4k everywhere.
-(defconstant +backend-page-bytes+ #!+linux 65536 #!-linux 4096)
+(defconstant +backend-page-bytes+ #+linux 65536 #-linux 4096)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
@@ -110,7 +110,7 @@
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#!-gencgc
+#-gencgc
 (progn
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
@@ -121,26 +121,26 @@
   (defconstant linkage-table-space-end   #x0b000000))
 
 ;;; While on gencgc we don't.
-#!+gencgc
+#+gencgc
 (!gencgc-space-setup #x04000000
                      :dynamic-space-start
-                     #!+linux   #x4f000000
+                     #+linux   #x4f000000
                      #!+netbsd  #x4f000000
                      #!+openbsd #x4f000000
-                     #!+darwin  #x10000000)
+                     #+darwin  #x10000000)
 
 (defconstant linkage-table-entry-size 16)
 
-#!+linux
+#+linux
 (progn
-  #!-gencgc
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
 
 #!+netbsd
 (progn
-  #!-gencgc
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
@@ -154,14 +154,14 @@
 ;;; as rare as it might or might not be.
 #!+openbsd
 (progn
-  #!-gencgc
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x5cfff000)))
 
-#!+darwin
+#+darwin
 (progn
-  #!-gencgc
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x10000000)
     (defparameter dynamic-0-space-end   #x3ffff000)))

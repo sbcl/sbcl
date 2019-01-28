@@ -125,7 +125,7 @@
   string
   base-string
   ((vector nil) object-not-vector-nil)
-  #!+sb-unicode ((vector character) object-not-character-string)
+  #+sb-unicode ((vector character) object-not-character-string)
   bit-vector
   array
   number
@@ -151,11 +151,11 @@
   ((complex single-float) object-not-complex-single-float)
   ((complex double-float) object-not-complex-double-float)
   #+long-float ((complex long-float) object-not-complex-long-float)
-  #!+sb-simd-pack simd-pack
-  #!+sb-simd-pack-256 simd-pack-256
+  #+sb-simd-pack simd-pack
+  #+sb-simd-pack-256 simd-pack-256
   weak-pointer
   instance
-  #!+sb-unicode
+  #+sb-unicode
   character
   base-char
   ((and vector (not simple-array)) object-not-complex-vector)

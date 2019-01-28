@@ -96,7 +96,7 @@
 (defmacro store-symbol-value (reg symbol)
   `(inst mov (make-ea-for-symbol-value ,symbol) ,reg))
 
-#!+sb-thread
+#+sb-thread
 (progn
 (defmacro tls-index-of (symbol)
   `(make-ea-for-object-slot ,symbol ,sb-vm:symbol-tls-index-slot
@@ -121,7 +121,7 @@
                     :disp (make-ea-for-symbol-tls-index ,symbol))
      (inst mov EA ,reg :maybe-fs))))
 
-#!-sb-thread
+#-sb-thread
 (progn
 (defmacro load-tl-symbol-value (reg symbol) `(load-symbol-value ,reg ,symbol))
 (defmacro store-tl-symbol-value (reg symbol temp)
@@ -129,18 +129,18 @@
   `(store-symbol-value ,reg ,symbol)))
 
 (defmacro load-binding-stack-pointer (reg)
-  #!+sb-thread
+  #+sb-thread
   `(with-tls-ea (EA :base ,reg
                     :disp-type :constant
                     :disp (* 4 thread-binding-stack-pointer-slot))
      (inst mov ,reg EA :maybe-fs))
-  #!-sb-thread
+  #-sb-thread
   `(load-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
-  #!+sb-thread
+  #+sb-thread
   `(progn
-     #!+win32
+     #+win32
      (progn
        (inst push eax-tn)
        (inst push ,reg)
@@ -149,11 +149,11 @@
                         :disp (* 4 thread-binding-stack-pointer-slot))
          (inst pop EA))
        (inst pop eax-tn))
-     #!-win32
+     #-win32
      (with-tls-ea (EA :disp-type :constant
                       :disp (* 4 thread-binding-stack-pointer-slot))
        (inst mov EA ,reg :maybe-fs)))
-  #!-sb-thread
+  #-sb-thread
   `(store-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro load-type (target source &optional (offset 0))
@@ -190,11 +190,11 @@
 
 ;;; Unsafely clear pa flags so that the image can properly lose in a
 ;;; pa section.
-#!+sb-thread
+#+sb-thread
 (defmacro %clear-pseudo-atomic ()
-  #!+win32
+  #+win32
   `(progn)
-  #!-win32
+  #-win32
   '(inst mov (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot)) 0 :fs))
 
 #!+sb-safepoint
@@ -210,15 +210,15 @@
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
-            #!+sb-thread
+            #+sb-thread
             (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot))
-            #!-sb-thread
+            #-sb-thread
             (make-ea-for-symbol-value *pseudo-atomic-bits* :dword)))
        (unless ,elide-if
-         (inst mov ,pa-bits-ea ebp-tn #!+sb-thread :fs))
+         (inst mov ,pa-bits-ea ebp-tn #+sb-thread :fs))
        ,@forms
        (unless ,elide-if
-         (inst xor ,pa-bits-ea ebp-tn #!+sb-thread :fs)
+         (inst xor ,pa-bits-ea ebp-tn #+sb-thread :fs)
          (inst jmp :z ,label)
          ;; if PAI was set, interrupts were disabled at the same time
          ;; using the process signal mask.

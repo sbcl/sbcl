@@ -5032,7 +5032,7 @@
 ;;;         `(integer ,(- bound) ,(1- bound)))))
 ;;; (The DEFTRANSFORM doesn't do anything but report at compile time,
 ;;; and the function doesn't do anything at all.)
-#!+sb-show
+#+sb-show
 (progn
   (defknown /report-lvar (t t) null)
   (deftransform /report-lvar ((x message) (t t))

@@ -20,11 +20,11 @@
            complex-rational-p complex-float-p complex-single-float-p
            complex-double-float-p #+long-float complex-long-float-p
            complex-vector-p
-           #!+sb-unicode base-char-p
+           #+sb-unicode base-char-p
            %standard-char-p %instancep
            base-string-p simple-base-string-p
-           #!+sb-unicode character-string-p
-           #!+sb-unicode simple-character-string-p
+           #+sb-unicode character-string-p
+           #+sb-unicode simple-character-string-p
            array-header-p
            simple-array-header-p
            sequencep extended-sequence-p
@@ -38,16 +38,16 @@
 
            simple-array-unsigned-byte-31-p
            simple-array-unsigned-byte-32-p
-           #!+64-bit
+           #+64-bit
            simple-array-unsigned-byte-63-p
-           #!+64-bit
+           #+64-bit
            simple-array-unsigned-byte-64-p
            simple-array-signed-byte-8-p simple-array-signed-byte-16-p
 
            simple-array-fixnum-p
 
            simple-array-signed-byte-32-p
-           #!+64-bit
+           #+64-bit
            simple-array-signed-byte-64-p
            simple-array-single-float-p simple-array-double-float-p
            #+long-float simple-array-long-float-p
@@ -56,13 +56,13 @@
            #+long-float simple-array-complex-long-float-p
            simple-rank-1-array-*-p
            system-area-pointer-p realp
-           ;; #!-64-bit
+           ;; #-64-bit
            unsigned-byte-32-p
-           ;; #!-64-bit
+           ;; #-64-bit
            signed-byte-32-p
-           #!+64-bit
+           #+64-bit
            unsigned-byte-64-p
-           #!+64-bit
+           #+64-bit
            signed-byte-64-p
            weak-pointer-p code-component-p lra-p
            sb-vm::unbound-marker-p
@@ -130,7 +130,7 @@
 (defknown vector-sap ((simple-unboxed-array (*))) system-area-pointer
   (flushable))
 
-#!+gencgc
+#+gencgc
 (defknown generation-of (t) (or (signed-byte 8) null) (flushable))
 
 ;;; WIDETAG-OF needs extra code to handle LIST and FUNCTION lowtags.
@@ -149,7 +149,7 @@
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
     (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) t)
-#!+64-bit
+#+64-bit
 (progn
 (defknown sb-vm::get-header-data-high (t) (unsigned-byte 32) (flushable))
 (defknown sb-vm::cas-header-data-high
@@ -268,7 +268,7 @@
 (defknown make-value-cell (t) t
   (flushable movable))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (progn
   (defknown simd-pack-p (t) boolean (foldable movable flushable))
   (defknown %simd-pack-tag (simd-pack) fixnum (movable flushable))
@@ -306,7 +306,7 @@
       (values double-float double-float)
       (flushable movable foldable)))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (progn
   (defknown simd-pack-256-p (t) boolean (foldable movable flushable))
   (defknown %simd-pack-256-tag (simd-pack-256) fixnum (movable flushable))
@@ -551,7 +551,7 @@
 (defknown single-float-bits (single-float) (signed-byte 32)
   (movable foldable flushable))
 
-#!+64-bit
+#+64-bit
 (defknown double-float-bits (double-float) (signed-byte 64)
   (movable foldable flushable))
 

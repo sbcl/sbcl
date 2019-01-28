@@ -130,7 +130,7 @@
 
 ;;; predicates for testing character attributes
 
-#!-sb-fluid
+#-sb-fluid
 (progn
   (declaim (inline whitespace[1]p whitespace[2]p))
   (declaim (inline constituentp terminating-macrop))
@@ -925,7 +925,7 @@ standard Lisp readtable when NIL."
                                   buf (make-array lim :element-type 'character)))
                           (setq ptr 0))
                         (setf (schar buf ptr) (truly-the character char))
-                        #!+sb-unicode ; BASE-CHAR-P does not exist if not
+                        #+sb-unicode ; BASE-CHAR-P does not exist if not
                         (unless (base-char-p char) (setq only-base-chars nil))
                         (incf ptr)))))
     (let* ((token-buf *read-buffer*)

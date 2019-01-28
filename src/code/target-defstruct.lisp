@@ -245,7 +245,7 @@
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))
 
-#!+immobile-space
+#+immobile-space
 (macrolet ((def-layout-maker ()
              (let ((slots (dd-slots (find-defstruct-description 'layout))))
                `(defun make-layout

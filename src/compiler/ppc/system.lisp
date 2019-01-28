@@ -206,7 +206,7 @@
   (:generator 1
     (inst unimp pending-interrupt-trap)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

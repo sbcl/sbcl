@@ -29,7 +29,7 @@
 ;;; useless in SBCL, since it's possible for otherwise binary
 ;;; compatible systems to return different values for getpagesize().
 ;;; -- JES, 2007-01-06
-(defconstant +backend-page-bytes+ #!+win32 65536 #!-win32 32768)
+(defconstant +backend-page-bytes+ #+win32 65536 #-win32 32768)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
@@ -126,7 +126,7 @@
 ;;; would be possible, but probably not worth the time and code bloat
 ;;; it would cause. -- JES, 2005-12-11
 
-#!+linux
+#+linux
 (!gencgc-space-setup #x50000000
                      :fixedobj-space-size #.(* 30 1024 1024)
                      :varyobj-space-size #.(* 130 1024 1024)
@@ -135,7 +135,7 @@
 ;;; The default dynamic space size is lower on OpenBSD to allow SBCL to
 ;;; run under the default 512M data size limit.
 
-#!-linux
+#-linux
 (!gencgc-space-setup #x20000000
                      :dynamic-space-start #x1000000000
                      #!+openbsd :dynamic-space-size #!+openbsd #x1bcf0000)
@@ -175,14 +175,14 @@
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
     #!+(and immobile-space (not sb-thread)) function-layout
-    #!-sb-thread *alien-stack-pointer*    ; a thread slot if #!+sb-thread
+    #-sb-thread *alien-stack-pointer*    ; a thread slot if #+sb-thread
      ;; interrupt handling
-    #!-sb-thread *pseudo-atomic-bits*     ; ditto
-    #!-sb-thread *binding-stack-pointer* ; ditto
+    #-sb-thread *pseudo-atomic-bits*     ; ditto
+    #-sb-thread *binding-stack-pointer* ; ditto
     *cpuid-fn1-ecx*)
   #'equalp)
 
-;;; FIXME: with #!+immobile-space, this should be the empty list,
+;;; FIXME: with #+immobile-space, this should be the empty list,
 ;;; because *all* fdefns are permanently placed.
 (defconstant-eqx +static-fdefns+
   #(length
@@ -203,5 +203,5 @@
     %coerce-callable-to-fun)
   #'equalp)
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (defglobal *simd-pack-element-types* '(integer single-float double-float))

@@ -934,12 +934,12 @@ between the ~A definition and the ~A definition"
       :inherits (complex number)
       :codes (,sb-vm:complex-long-float-widetag)
       :prototype-form (complex 42l0 42l0))
-     #!+sb-simd-pack
+     #+sb-simd-pack
      (simd-pack
       :translation simd-pack
       :codes (,sb-vm:simd-pack-widetag)
       :prototype-form (%make-simd-pack-ub64 42 42))
-     #!+sb-simd-pack-256
+     #+sb-simd-pack-256
      (simd-pack-256
       :translation simd-pack-256
       :codes (,sb-vm:simd-pack-256-widetag)
@@ -1053,14 +1053,14 @@ between the ~A definition and the ~A definition"
       :inherits (base-string simple-string string vector simple-array
                  array sequence)
       :prototype-form (make-array 0 :element-type 'base-char))
-     #!+sb-unicode
+     #+sb-unicode
      (character-string
       :translation (vector character)
       :codes (,sb-vm:complex-character-string-widetag)
       :direct-superclasses (string)
       :inherits (string vector array sequence)
       :prototype-form (make-array 0 :element-type 'character :fill-pointer t))
-     #!+sb-unicode
+     #+sb-unicode
      (simple-character-string
       :translation (simple-array character (*))
       :codes (,sb-vm:simple-character-string-widetag)

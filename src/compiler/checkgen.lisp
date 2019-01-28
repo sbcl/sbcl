@@ -138,7 +138,7 @@
          ;; weakening, so for integer types we simply collapse all
          ;; ranges into one.
          (weaken-integer-type type))
-        #!+sb-unicode
+        #+sb-unicode
         ((csubtypep type (specifier-type 'base-char))
          ;; Don't want to be putting CHARACTERs into BASE-STRINGs.
          (specifier-type 'base-char))

@@ -44,19 +44,19 @@
       ((double-reg complex-double-reg)
        (aver (xmm-tn-p src))
        (inst movapd dst src))
-      #!+sb-simd-pack
+      #+sb-simd-pack
       ((int-sse-reg sse-reg)
        (aver (xmm-tn-p src))
        (inst movdqa dst src))
-      #!+sb-simd-pack
+      #+sb-simd-pack
       ((single-sse-reg double-sse-reg)
        (aver (xmm-tn-p src))
        (inst movaps dst src))
-      #!+sb-simd-pack-256
+      #+sb-simd-pack-256
       ((int-avx2-reg avx2-reg)
        (aver (xmm-tn-p src))
        (inst vmovdqa dst src))
-      #!+sb-simd-pack-256
+      #+sb-simd-pack-256
       ((single-avx2-reg double-avx2-reg)
        (aver (xmm-tn-p src))
        (inst vmovaps dst src))
@@ -117,7 +117,7 @@
 (defun thread-slot-ea (slot-index)
   (ea (ash slot-index word-shift) thread-base-tn))
 
-#!+sb-thread
+#+sb-thread
 (progn
   ;; Return an EA for the TLS of SYMBOL, or die.
   (defun symbol-known-tls-cell (symbol)
@@ -133,7 +133,7 @@
   (defmacro store-tl-symbol-value (reg symbol)
     `(inst mov (symbol-known-tls-cell ',symbol) ,reg)))
 
-#!-sb-thread
+#-sb-thread
 (progn
   (defmacro load-tl-symbol-value (reg symbol)
     `(inst mov ,reg (static-symbol-value-ea ',symbol)))
@@ -187,7 +187,7 @@
 
 ;;; Unsafely clear pa flags so that the image can properly lose in a
 ;;; pa section.
-#!+sb-thread
+#+sb-thread
 (defmacro %clear-pseudo-atomic ()
   '(inst mov :qword (thread-slot-ea thread-pseudo-atomic-bits-slot) 0))
 
@@ -203,8 +203,8 @@
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
-            #!+sb-thread (thread-slot-ea thread-pseudo-atomic-bits-slot)
-            #!-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
+            #+sb-thread (thread-slot-ea thread-pseudo-atomic-bits-slot)
+            #-sb-thread (static-symbol-value-ea '*pseudo-atomic-bits*)))
        (unless ,elide-if
          (inst mov ,pa-bits-ea rbp-tn))
        ,@forms

@@ -175,13 +175,13 @@
 ;;; Alternatively, the value might be an immediate operand to MOV,
 ;;; which in general decodes as a signed integer. So ignore it
 ;;; unless it looks like an address.
-#!+immobile-space
+#+immobile-space
 (defun maybe-note-lisp-callee (value dstate)
   (awhen (and (typep value 'word) (sb-vm::find-called-object value))
     (note (lambda (stream) (princ it stream)) dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)
-  (if (or #!+immobile-space (maybe-note-lisp-callee value dstate)
+  (if (or #+immobile-space (maybe-note-lisp-callee value dstate)
           (maybe-note-assembler-routine value nil dstate)
           (maybe-note-static-symbol value dstate))
       (princ16 value stream)
@@ -236,7 +236,7 @@
 (defun prefilter-xmmreg/mem (dstate mod r/m)
   (decode-mod-r/m dstate mod r/m 'fpr))
 
-#!+sb-thread
+#+sb-thread
 (defun static-symbol-from-tls-index (index)
   (dovector (sym +static-symbols+)
     (when (= (symbol-tls-index sym) index)
@@ -342,7 +342,7 @@
                               (:qword
                                (unboxed-constant-ref dstate addr disp))))
                     dstate)))))
-    #!+sb-thread
+    #+sb-thread
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)
                         (header-n-words (code-header-words code-header)))
@@ -552,7 +552,7 @@
 ;;; Perform ICF on instructions of CODE
 (defun sb-vm::machine-code-icf (code mapper replacements print)
   (declare (ignorable code mapper replacements print))
-  #!+immobile-space
+  #+immobile-space
   (flet ((scan (sap length dstate segment)
            (scan-relative-operands
             code (sap-int sap) length dstate segment

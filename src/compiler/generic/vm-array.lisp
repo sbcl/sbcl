@@ -61,21 +61,21 @@
          ;; for an initial element for (ARRAY NIL). -- CSR, 2002-03-07
          (nil #:mu 0 simple-array-nil
               :complex-typecode #.complex-vector-nil-widetag)
-         #!-sb-unicode
+         #-sb-unicode
          (character ,(code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra
                     ;; trailing #\NULL for convenience in calling out
                     ;; to C.)
                     :n-pad-elements 1
                     :complex-typecode #.complex-base-string-widetag)
-         #!+sb-unicode
+         #+sb-unicode
          (base-char ,(code-char 0) 8 simple-base-string
                     ;; (SIMPLE-BASE-STRINGs are stored with an extra
                     ;; trailing #\NULL for convenience in calling out
                     ;; to C.)
                     :n-pad-elements 1
                     :complex-typecode #.complex-base-string-widetag)
-         #!+sb-unicode
+         #+sb-unicode
          (character ,(code-char 0) 32 simple-character-string
                     :n-pad-elements 1
                     :complex-typecode #.complex-character-string-widetag)
@@ -98,32 +98,32 @@
          ((unsigned-byte 8) 0 8 simple-array-unsigned-byte-8)
          ((unsigned-byte 15) 0 16 simple-array-unsigned-byte-15)
          ((unsigned-byte 16) 0 16 simple-array-unsigned-byte-16)
-         #!-64-bit
+         #-64-bit
          ((unsigned-byte #.n-positive-fixnum-bits)
           0 32 simple-array-unsigned-fixnum
           :fixnum-p t)
          ((unsigned-byte 31) 0 32 simple-array-unsigned-byte-31)
          ((unsigned-byte 32) 0 32 simple-array-unsigned-byte-32)
-         #!+64-bit
+         #+64-bit
          ((unsigned-byte #.n-positive-fixnum-bits)
           0 64 simple-array-unsigned-fixnum
           :fixnum-p t)
-         #!+64-bit
+         #+64-bit
          ((unsigned-byte 63) 0 64 simple-array-unsigned-byte-63)
-         #!+64-bit
+         #+64-bit
          ((unsigned-byte 64) 0 64 simple-array-unsigned-byte-64)
          ((signed-byte 8) 0 8 simple-array-signed-byte-8)
          ((signed-byte 16) 0 16 simple-array-signed-byte-16)
          ;; KLUDGE: See the comment in PRIMITIVE-TYPE-AUX,
          ;; compiler/generic/primtype.lisp, for why this is FIXNUM and
          ;; not (SIGNED-BYTE 30)
-         #!-64-bit
+         #-64-bit
          (fixnum 0 32 simple-array-fixnum :fixnum-p t)
          ((signed-byte 32) 0 32 simple-array-signed-byte-32)
          ;; KLUDGE: see above KLUDGE for the 32-bit case
-         #!+64-bit
+         #+64-bit
          (fixnum 0 64 simple-array-fixnum :fixnum-p t)
-         #!+64-bit
+         #+64-bit
          ((signed-byte 64) 0 64 simple-array-signed-byte-64)
          ((complex single-float) #C(0.0f0 0.0f0) 64
           simple-array-complex-single-float)

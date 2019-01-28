@@ -12,7 +12,7 @@
 (in-package "SB-IMPL")
 
 ;;; We compile some trivial character operations via inline expansion.
-#!-sb-fluid
+#-sb-fluid
 (declaim (inline standard-char-p graphic-char-p alpha-char-p
                  alphanumericp))
 (declaim (maybe-inline upper-case-p lower-case-p both-case-p
@@ -151,7 +151,7 @@
                                   do
                                   (setf (aref unicode-table i) (cons upper lower))
                                   when
-                                  (flet (#!+sb-unicode
+                                  (flet (#+sb-unicode
                                          (both-case-p (code)
                                            (logbitp 7 (aref **character-misc-database**
                                                             (+ 5 (misc-index (code-char code)))))))
@@ -159,9 +159,9 @@
                                          (atom lower)
                                          ;; Some characters are only equal under unicode rules,
                                          ;; e.g. #\MICRO_SIGN and #\GREEK_CAPITAL_LETTER_MU
-                                         #!+sb-unicode
+                                         #+sb-unicode
                                          (both-case-p lower)
-                                         #!+sb-unicode
+                                         #+sb-unicode
                                          (both-case-p upper)))
                                   do
                                   (setf (aref table (* i 2)) lower
@@ -675,17 +675,17 @@ is either numeric or alphabetic."
                      (and (< 463 sum 477))))))))
     (declare (inline base-char-equal-p))
     (cond ((eq c1 c2))
-          #!-sb-unicode
+          #-sb-unicode
           (t
            (base-char-equal-p))
-          #!+sb-unicode
+          #+sb-unicode
           ((base-char-p c1)
            (and (base-char-p c2)
                 (base-char-equal-p)))
-          #!+sb-unicode
+          #+sb-unicode
           ((base-char-p c2)
            nil)
-          #!+sb-unicode
+          #+sb-unicode
           (t
            (with-case-info (c1 index cases)
              (or (= (aref cases index) (char-code c2)) ;; lower case

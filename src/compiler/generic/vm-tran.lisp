@@ -33,7 +33,7 @@
 (deftransform make-symbol ((string) (simple-string))
   `(%make-symbol 0 string))
 
-#!-immobile-space
+#-immobile-space
 (define-source-transform %make-symbol (kind string)
   (declare (ignore kind))
   ;; Set "logically read-only" bit in pname.
@@ -108,7 +108,7 @@
         `(etypecase string
           ((simple-array character (*))
            (data-vector-ref string index))
-          #!+sb-unicode
+          #+sb-unicode
           ((simple-array base-char (*))
            (data-vector-ref string index))
           ((simple-array nil (*))
@@ -198,7 +198,7 @@
         `(typecase string
            ((simple-array character (*))
             (data-vector-set string index (the* (character :context :aref) new-value)))
-           #!+sb-unicode
+           #+sb-unicode
            ((simple-array base-char (*))
             (data-vector-set string index (the* (base-char :context :aref
                                                            :silent-conflict t)
@@ -612,7 +612,7 @@
       ;; Prevent failure caused by memmove() hitting a write-protected page
       ;; and the fault handler losing, since it thinks you're not in Lisp.
       ;; This is wasteful, but better than being randomly broken (lp#1366263).
-      #!+cheneygc
+      #+cheneygc
       (let ((dst (sapify dst)))
         (setf (sap-ref-8 dst dst-start) (sap-ref-8 dst dst-start)
               (sap-ref-8 dst (1- dst-end)) (sap-ref-8 dst (1- dst-end))))
@@ -628,9 +628,9 @@
 
 #!-(vop-named sb-vm::eql/double-float)
 (deftransform eql ((x y) (double-float double-float))
-  #!-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
+  #-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
                   (= (double-float-high-bits x) (double-float-high-bits y)))
-  #!+64-bit '(= (double-float-bits x) (double-float-bits y)))
+  #+64-bit '(= (double-float-bits x) (double-float-bits y)))
 
 
 ;;;; modular functions

@@ -56,7 +56,7 @@
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
   ;; defined in the first DEFENUM. -- AL 20000216
-  #!+64-bit
+  #+64-bit
   (defenum ()
     even-fixnum-lowtag
     other-immediate-0-lowtag
@@ -74,7 +74,7 @@
     other-immediate-3-lowtag
     pad5-lowtag
     other-pointer-lowtag)
-  #!-64-bit
+  #-64-bit
   (defenum ()
     even-fixnum-lowtag
     instance-pointer-lowtag
@@ -204,22 +204,22 @@
   fdefn-widetag                             ;  56   5D  56   5D
 
   no-tls-value-marker-widetag               ;  5A   61  5A   61
-  #!-sb-simd-pack
+  #-sb-simd-pack
   unused01-widetag                          ;  5E       5E
-  #!+sb-simd-pack
+  #+sb-simd-pack
   simd-pack-widetag                         ;       65       65
-  #!-sb-simd-pack-256
+  #-sb-simd-pack-256
   unused03-widetag                          ;  62   69  62   69
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   simd-pack-256-widetag                     ;  62   69  62   69
   filler-widetag                            ;  66   6D  66   6D
   unused04-widetag                          ;  6A   71  6A   71
   unused05-widetag                          ;  6E   75  6E   75
   unused06-widetag                          ;  72   79  72   79
   unused07-widetag                          ;  76   7D  76   7D
-  #!-64-bit
+  #-64-bit
   unused08-widetag                          ;  7A       7A
-  #!-64-bit
+  #-64-bit
   unused09-widetag                          ;  7E       7E
 
   simple-array-widetag                      ;  82   81  82   81
@@ -230,24 +230,24 @@
   simple-array-unsigned-byte-15-widetag     ;  96   95  96   95
   simple-array-unsigned-byte-16-widetag     ;  9A   99  9A   99
 
-  #!-64-bit
+  #-64-bit
   simple-array-unsigned-fixnum-widetag      ;  9E   A5  9E   A5
   simple-array-unsigned-byte-31-widetag     ;  A2   9D  A2   9D
   simple-array-unsigned-byte-32-widetag     ;  A6   A1  A6   A1
-  #!+64-bit
+  #+64-bit
   simple-array-unsigned-fixnum-widetag      ;  9E   A5  9E   A5
-  #!+64-bit
+  #+64-bit
   simple-array-unsigned-byte-63-widetag     ;       A9       A9
-  #!+64-bit
+  #+64-bit
   simple-array-unsigned-byte-64-widetag     ;       AD       AD
   simple-array-signed-byte-8-widetag        ;  AA   B1  AA   B1
   simple-array-signed-byte-16-widetag       ;  AE   B5  AE   B5
-  #!-64-bit
+  #-64-bit
   simple-array-fixnum-widetag               ;  B2   BD  B2   BD
   simple-array-signed-byte-32-widetag       ;  B6   B9  B6   B9
-  #!+64-bit
+  #+64-bit
   simple-array-fixnum-widetag               ;  B2   BD  B2   BD
-  #!+64-bit
+  #+64-bit
   simple-array-signed-byte-64-widetag       ;       C1       C1
   simple-array-single-float-widetag         ;  BA   C5  BA   C5
   simple-array-double-float-widetag         ;  BE   C9  BE   C9
@@ -259,9 +259,9 @@
   ;; Strings
   simple-array-nil-widetag                  ;  D2   DD  D2   DD
   simple-base-string-widetag                ;  D6   E1  D6   E1
-  #!+sb-unicode
+  #+sb-unicode
   simple-character-string-widetag           ;  DA   E5
-  #!+sb-unicode
+  #+sb-unicode
   complex-character-string-widetag          ;  DE   E9
   complex-base-string-widetag               ;  E2   ED  DA   E5
   complex-vector-nil-widetag                ;  E6   F1  DE   E9
@@ -310,10 +310,10 @@
 #!+(and immobile-space (not immobile-symbols))
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 
-#!+immobile-space
+#+immobile-space
 (progn
   ;; See 'doc/internal-notes/compact-instance' for rationale
-  (defconstant layout-align #!+64-bit 128 #!-64-bit 256) ; in bytes
+  (defconstant layout-align #+64-bit 128 #-64-bit 256) ; in bytes
 
   ;; FUNCTION-LAYOUT is a fixnum whose bits are ORed in "as-is" with the
   ;; low half of a closure header to form the full header word.

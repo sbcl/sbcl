@@ -94,7 +94,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
              ;; KLUDGE: purify on cheneygc moves everything in code
              ;; constants into read-only space, value-cell breaks the
              ;; chain.
-             (cond #!-gencgc
+             (cond #-gencgc
                    ((not read-only-p)
                     `(make-value-cell ,form))
                    (t
@@ -102,7 +102,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
           (unless (csubtypep type source-type)
             (setf type source-type))
           (let ((value-form
-                  (cond #!-gencgc
+                  (cond #-gencgc
                         ((not read-only-p)
                          `(value-cell-ref (%load-time-value ',handle)))
                         (t
@@ -121,12 +121,12 @@ guaranteed to never be modified, so it can be put in read-only storage."
                       (eval-it 'funcall (compile nil `(lambda () ,form)))))))
           (if read-only-p
               (ir1-convert start next result `',value)
-              #!-gencgc
+              #-gencgc
               (the-in-policy (ctype-of value)
                              `(value-cell-ref ,(make-value-cell value))
                              **zero-typecheck-policy**
                              start next result)
-              #!+gencgc
+              #+gencgc
               ;; Avoid complaints about constant modification
               (ir1-convert start next result `(ltv-wrapper ',value)))))))
 

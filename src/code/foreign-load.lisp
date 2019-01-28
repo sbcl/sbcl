@@ -81,9 +81,9 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
         ;; always designate _exactly the same library image_; Unix
         ;; tricks like deleting an open library and replacing it with
         ;; another version just don't work here.
-        #!-win32
+        #-win32
         (dlopen-or-lose obj)
-        #!+win32
+        #+win32
         (unless old
           (dlopen-or-lose obj))
         (setf *shared-objects* (append (remove obj *shared-objects*)

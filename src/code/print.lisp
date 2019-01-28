@@ -1654,7 +1654,7 @@ variable: an unreadable object representing the error is printed instead.")
     (let ((*print-length* 20)) ; arbitrary
       (prin1 (fdefn-name fdefn) stream))))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (defmethod print-object ((pack simd-pack) stream)
   (cond ((and *print-readably* *read-eval*)
          (multiple-value-bind (format maker extractor)
@@ -1704,7 +1704,7 @@ variable: an unreadable object representing the error is printed instead.")
                           (split-num low 0) (split-num low 32)
                           (split-num high 0) (split-num high 32))))))))))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defmethod print-object ((pack simd-pack-256) stream)
   (cond ((and *print-readably* *read-eval*)
          (multiple-value-bind (format maker extractor)

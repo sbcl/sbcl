@@ -370,7 +370,7 @@ ldso_stub__ ## fct: ;                  \\
                    "dlsym")
                  #!+bsd
                  '("sysctl")
-                 #!+darwin
+                 #+darwin
                  '("sysctlbyname")
                  #!+os-provides-dladdr
                  '("dladdr")

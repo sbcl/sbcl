@@ -40,9 +40,9 @@
         (:relative
          ;; Fixup is the actual address wanted.
          ;; Replace word with value to add to that loc to get there.
-         ;; In the #!-immobile-code case, there's nothing to assert.
+         ;; In the #-immobile-code case, there's nothing to assert.
          ;; Relative fixups pretty much can't happen.
-         #!+immobile-code
+         #+immobile-code
          (unless (immobile-space-obj-p code)
            (error "Can't compute fixup relative to movable object ~S" code))
          (setf (signed-sap-ref-32 sap offset)
@@ -58,7 +58,7 @@
   ;;  (1) Call fixups occur in both :RELATIVE and :ABSOLUTE kinds.
   ;;      We can ignore the :RELATIVE kind, except for foreign call.
   ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
-  #!+immobile-space
+  #+immobile-space
   (return-from fixup-code-object
     (case flavor
       ((:named-call :layout :immobile-object ; -> fixedobj subspace
@@ -125,12 +125,12 @@
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
-#!-linux
+#-linux
 (defun context-floating-point-modes (context)
   (declare (ignore context)) ; stub!
   (warn "stub CONTEXT-FLOATING-POINT-MODES")
   0)
-#!+linux
+#+linux
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 32)
   (context (* os-context-t)))
@@ -159,7 +159,7 @@
         (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number))))
 
 
-#!+immobile-code
+#+immobile-code
 (progn
 (defconstant trampoline-entry-offset n-word-bytes)
 (defun fun-immobilize (fun)
@@ -249,7 +249,7 @@
 ) ; end PROGN
 
 ;;; Find an immobile FDEFN or FUNCTION given an interior pointer to it.
-#!+immobile-space
+#+immobile-space
 (defun find-called-object (address)
   (let ((obj (alien-funcall (extern-alien "search_all_gc_spaces"
                                           (function unsigned unsigned))
@@ -266,7 +266,7 @@
          (make-lisp-obj (logior obj fun-pointer-lowtag)))))))
 
 ;;; Compute the PC that FDEFN will jump to when called.
-#!+immobile-code
+#+immobile-code
 (defun fdefn-call-target (fdefn)
   (let ((pc (+ (get-lisp-obj-address fdefn)
                (- other-pointer-lowtag)
@@ -301,8 +301,8 @@
 ;;; by recording ay ambiguous fdefns, or just recording all replacements.
 ;;; Perhaps we could remove the static linker mutex as well?
 (defun call-direct-p (fun code-header-funs)
-  #!-immobile-code (declare (ignore fun code-header-funs))
-  #!+immobile-code
+  #-immobile-code (declare (ignore fun code-header-funs))
+  #+immobile-code
   (flet ((singly-occurs-p (thing things &aux (len (length things)))
            ;; Return T if THING occurs exactly once in vector THINGS.
            (declare (simple-vector things))
@@ -326,7 +326,7 @@
   (unless (and (immobile-space-obj-p code)
                (fboundp 'sb-vm::remove-static-links))
     (return-from statically-link-code-obj))
-  #!+immobile-code
+  #+immobile-code
   (let ((insts (code-instructions code))
         (fdefns)) ; group by fdefn
     (loop for (offset . name) in fixups

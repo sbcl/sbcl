@@ -15,9 +15,9 @@
                 (,name ,@lambda-list old new)
                 #!-compare-and-swap-vops
                 (progn
-                  #!+sb-thread
+                  #+sb-thread
                   ,(error "No COMPARE-AND-SWAP-VOPS on a threaded build?")
-                  #!-sb-thread
+                  #-sb-thread
                   (let ((current (,ref ,@lambda-list)))
                     ;; Shouldn't this be inside a WITHOUT-INTERRUPTS ?
                     (when (eq current old)

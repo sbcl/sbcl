@@ -815,7 +815,7 @@
     positive-fixnum unsigned-reg signed-reg)
   (define-data-vector-frobs simple-array-signed-byte-32 movsx :dword
     tagged-num signed-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (define-data-vector-frobs simple-character-string movzx :dword
     character character-reg))
 

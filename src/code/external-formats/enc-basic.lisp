@@ -198,7 +198,7 @@
                                         (unless (zerop null-padding)
                                           (vector-push-extend 0 new-array))
                                         (copy-seq new-array)))))))))))
-      #!+sb-unicode
+      #+sb-unicode
       ((simple-array base-char (*))
        ;; On unicode builds BASE-STRINGs are limited to ASCII range,
        ;; so we can take a fast path -- and get benefit of the element
@@ -220,7 +220,7 @@
       (let ((lexically-max
              (string->utf8 (string (code-char ,(1- sb-xc:char-code-limit)))
                            0 1 0)))
-        (declare (type (simple-array (unsigned-byte 8) (#!+sb-unicode 4 #!-sb-unicode 2)) lexically-max))
+        (declare (type (simple-array (unsigned-byte 8) (#+sb-unicode 4 #-sb-unicode 2)) lexically-max))
         (defun ,name (array pos end)
           (declare (optimize speed (safety 0))
                    (type ,type array)
@@ -288,16 +288,16 @@
                                         t)
                                        ((< (aref lexically-max 1) (,accessor array (+ pos 1)))
                                         nil)
-                                       #!+sb-unicode
+                                       #+sb-unicode
                                        ((> (aref lexically-max 1) (,accessor array (+ pos 1)))
                                         t)
-                                       #!+sb-unicode
+                                       #+sb-unicode
                                        ((< (aref lexically-max 2) (,accessor array (+ pos 2)))
                                         nil)
-                                       #!+sb-unicode
+                                       #+sb-unicode
                                        ((> (aref lexically-max 2) (,accessor array (+ pos 2)))
                                         t)
-                                       #!+sb-unicode
+                                       #+sb-unicode
                                        ((< (aref lexically-max 3) (,accessor array (+ pos 3)))
                                         nil)
                                        (t t))))
@@ -312,13 +312,13 @@
                 (cond ((eql maybe-len 1)
                        (values 1 nil))
                       ((and (preliminary-ok-for-length maybe-len 2)
-                            #!-sb-unicode (character-below-char-code-limit-p))
+                            #-sb-unicode (character-below-char-code-limit-p))
                        (values 2 nil))
                       ((and (preliminary-ok-for-length maybe-len 3)
-                            #!-sb-unicode (not (setf reject-reason 'character-out-of-range)))
+                            #-sb-unicode (not (setf reject-reason 'character-out-of-range)))
                        (values 3 nil))
                       ((and (preliminary-ok-for-length maybe-len 4)
-                            #!-sb-unicode (not (setf reject-reason 'character-out-of-range))
+                            #-sb-unicode (not (setf reject-reason 'character-out-of-range))
                             (character-below-char-code-limit-p))
                        (values 4 nil))
                       (t
@@ -383,7 +383,7 @@
 (instantiate-octets-definition define-utf8->string)
 
 (define-external-format/variable-width (:utf-8 :utf8) t
-  #!+sb-unicode (code-char #xfffd) #!-sb-unicode #\?
+  #+sb-unicode (code-char #xfffd) #-sb-unicode #\?
   (let ((bits (char-code byte)))
     (cond ((< bits #x80) 1)
           ((< bits #x800) 2)
@@ -435,4 +435,4 @@
                               (dpb byte3 (byte 6 6) byte4)))))))
   utf8->string-aref
   string->utf8
-  #!+sb-unicode :base-string-direct-mapping #!+sb-unicode t)
+  #+sb-unicode :base-string-direct-mapping #+sb-unicode t)

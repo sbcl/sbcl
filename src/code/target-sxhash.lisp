@@ -84,7 +84,7 @@
   (ash (extern-alien "gc_alloc_region" unsigned-long)
        (- (1+ sb-vm:word-shift)))
   ;; threads imply gencgc. use the per-thread alloc region pointer
-  #!+sb-thread
+  #+sb-thread
   (ash (sap-int (sb-vm::current-thread-offset-sap
                  #.sb-vm::thread-alloc-region-slot))
        (- (1+ sb-vm:word-shift))))

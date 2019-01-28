@@ -111,7 +111,7 @@
 ;;; Where to put the different spaces.
 ;;;
 
-#!+linux
+#+linux
 (progn
   (defconstant read-only-space-start #x20000000)
   (defconstant read-only-space-end   #x24000000))

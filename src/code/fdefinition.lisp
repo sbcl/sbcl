@@ -22,8 +22,8 @@
 ;;;; fdefinition (fdefn) objects
 
 (defun make-fdefn (name)
-  #!-immobile-space (make-fdefn name)
-  #!+immobile-space
+  #-immobile-space (make-fdefn name)
+  #+immobile-space
   (let ((fdefn (truly-the (values fdefn &optional)
                           (sb-vm::alloc-immobile-fdefn))))
     (sb-vm::%set-fdefn-name fdefn name)
@@ -36,10 +36,10 @@
   (declare (type function fun)
            (type fdefn fdefn)
            (values function))
-  #!+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
-  #!-immobile-code (setf (fdefn-fun fdefn) fun))
+  #+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
+  #-immobile-code (setf (fdefn-fun fdefn) fun))
 
-#!-sb-fluid (declaim (inline symbol-fdefn))
+#-sb-fluid (declaim (inline symbol-fdefn))
 ;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
 ;; have been verified to be a symbol by the caller.
 (defun symbol-fdefn (symbol)
@@ -402,7 +402,7 @@
     (and fdefn (fdefn-fun fdefn) t)))
 
 ;; Byte index 2 of the fdefn's header is the statically-linked flag
-#!+immobile-code
+#+immobile-code
 (defmacro sb-vm::fdefn-has-static-callers (fdefn)
   `(sap-ref-8 (int-sap (get-lisp-obj-address ,fdefn))
               (- 2 sb-vm::other-pointer-lowtag)))
@@ -414,7 +414,7 @@
       (:symbol name "removing the function or macro definition of ~A")
     (let ((fdefn (find-fdefn name)))
       (when fdefn
-        #!+immobile-code
+        #+immobile-code
         (unless (eql (sb-vm::fdefn-has-static-callers fdefn) 0)
           (sb-vm::remove-static-links fdefn))
         (fdefn-makunbound fdefn)))

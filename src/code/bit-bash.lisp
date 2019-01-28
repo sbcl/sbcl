@@ -69,7 +69,7 @@
             (:little-endian
                (ash (ldb (byte (- sb-vm:n-word-bits count) 0) number) count)))))))
 
-#!-sb-fluid (declaim (inline start-mask end-mask))
+#-sb-fluid (declaim (inline start-mask end-mask))
 
 ;;; Produce a mask that contains 1's for the COUNT "start" bits and
 ;;; 0's for the remaining "end" bits. Only the lower 5 bits of COUNT
@@ -87,7 +87,7 @@
   (declare (fixnum count))
   (shift-towards-end (1- (ash 1 sb-vm:n-word-bits)) (- count)))
 
-#!-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
+#-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)
   (declare (type system-area-pointer sap)
            (type index offset)
@@ -619,27 +619,27 @@
                          (first-word (ash start (- +bit-position-base-shift+)))
                          (first-bits (logand start +bit-position-base-mask+))
                          ;; These mask out everything but the interesting parts.
-                         (end-mask #!+little-endian (lognot (ash -1 last-bits))
-                                   #!+big-endian (ash -1 (- sb-vm:n-word-bits last-bits)))
-                         (start-mask #!+little-endian (ash -1 first-bits)
-                                     #!+big-endian (lognot (ash -1 (- sb-vm:n-word-bits first-bits)))))
+                         (end-mask #+little-endian (lognot (ash -1 last-bits))
+                                   #+big-endian (ash -1 (- sb-vm:n-word-bits last-bits)))
+                         (start-mask #+little-endian (ash -1 first-bits)
+                                     #+big-endian (lognot (ash -1 (- sb-vm:n-word-bits first-bits)))))
                     (declare (index last-word first-word))
-                    (flet ((#!+little-endian start-bit
-                            #!+big-endian end-bit (x)
+                    (flet ((#+little-endian start-bit
+                            #+big-endian end-bit (x)
                              (declare (word x))
                              #!+(or x86-64 x86)
                              (truly-the (mod #.n-word-bits)
                                  (%primitive unsigned-word-find-first-bit x))
                              #!-(or x86-64 x86)
-                             (- #!+big-endian sb-vm:n-word-bits
+                             (- #+big-endian sb-vm:n-word-bits
                                 (integer-length (logand x (- x)))
-                                #!+little-endian 1))
-                           (#!+little-endian end-bit
-                            #!+big-endian start-bit (x)
+                                #+little-endian 1))
+                           (#+little-endian end-bit
+                            #+big-endian start-bit (x)
                              (declare (word x))
-                             (- #!+big-endian sb-vm:n-word-bits
+                             (- #+big-endian sb-vm:n-word-bits
                                 (integer-length x)
-                                #!+little-endian 1))
+                                #+little-endian 1))
                            (found (i word-offset)
                              (declare (index i word-offset))
                              (return-from ,name

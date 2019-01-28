@@ -81,7 +81,7 @@
   ;; PURIFY).
   ;; This is only meaningful if DD-CLASS-P = T.
   (pure nil :type (member t nil)))
-#!-sb-fluid (declaim (freeze-type defstruct-description))
+#-sb-fluid (declaim (freeze-type defstruct-description))
 (!set-load-form-method defstruct-description (:host :xc :target))
 
 ;;;; basic LAYOUT stuff
@@ -115,7 +115,7 @@
 ;;; well, since the initialization of layout slots is hardcoded there.
 ;;;
 ;;; FIXME: ...it would be better to automate this, of course...
-(def!struct (layout #-sb-xc-host (:constructor #!+immobile-space nil)
+(def!struct (layout #-sb-xc-host (:constructor #+immobile-space nil)
                     (:copier nil))
   ;; one +something-LAYOUT-FLAG+ bit or none of them
   (%flags 0 :type fixnum :read-only nil)

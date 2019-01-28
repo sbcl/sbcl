@@ -1069,7 +1069,7 @@
                    nargs (emit-step-p node)
                    #!+call-symbol
                    (fun-tn-type fun-lvar fun-tn)))
-            #!-immobile-code
+            #-immobile-code
             ((eq fun-tn named)
              (vop* static-tail-call-named node block
                    (old-fp return-pc pass-refs) ; args
@@ -1077,9 +1077,9 @@
                    nargs named (emit-step-p node)))
             (t
              (vop* tail-call-named node block
-                   (#!-immobile-code fun-tn old-fp return-pc pass-refs) ; args
+                   (#-immobile-code fun-tn old-fp return-pc pass-refs) ; args
                    (nil)                ; results
-                   nargs #!+immobile-code named (emit-step-p node)))))) ; info
+                   nargs #+immobile-code named (emit-step-p node)))))) ; info
   (values))
 
 ;;; like IR2-CONVERT-LOCAL-CALL-ARGS, only different
@@ -1131,7 +1131,7 @@
                      arg-locs nargs nvals (emit-step-p node)
                      #!+call-symbol
                      (fun-tn-type fun-lvar fun-tn)))
-              #!-immobile-code
+              #-immobile-code
               ((eq fun-tn named)
                (vop* static-call-named node block
                      (fp args)
@@ -1140,9 +1140,9 @@
                      (emit-step-p node)))
               (t
                (vop* call-named node block
-                     (fp #!-immobile-code fun-tn args) ; args
+                     (fp #-immobile-code fun-tn args) ; args
                      (loc-refs)                        ; results
-                     arg-locs nargs #!+immobile-code named nvals ; info
+                     arg-locs nargs #+immobile-code named nvals ; info
                      (emit-step-p node))))
         (move-lvar-result node block locs lvar))))
   (values))
@@ -1163,7 +1163,7 @@
                      arg-locs nargs (emit-step-p node)
                      #!+call-symbol
                      (fun-tn-type fun-lvar fun-tn)))
-              #!-immobile-code
+              #-immobile-code
               ((eq fun-tn named)
                (vop* static-multiple-call-named node block
                   (fp args)
@@ -1172,9 +1172,9 @@
                   (emit-step-p node)))
               (t
                (vop* multiple-call-named node block
-                  (fp #!-immobile-code fun-tn args)     ; args
+                  (fp #-immobile-code fun-tn args)     ; args
                   (loc-refs)                            ; results
-                  arg-locs nargs #!+immobile-code named ; info
+                  arg-locs nargs #+immobile-code named ; info
                   (emit-step-p node)))))))
   (values))
 
@@ -1245,7 +1245,7 @@
 
     ;; Special mode, usually only for the cross-compiler
     ;; and only with the feature enabled.
-    #!+sb-show (when (eq *track-full-called-fnames* :maximal)
+    #+sb-show (when (eq *track-full-called-fnames* :maximal)
                  (/show "converting full call to named function" fname)
                  (/show (basic-combination-args node))
                  (/show (policy node speed) (policy node safety))
@@ -2044,7 +2044,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 
 (macrolet ((def (name)
              `(defoptimizer (,name ir2-convert) ((&rest args) node block)
-                (cond #!+gencgc
+                (cond #+gencgc
                       ((>= (length args)
                            (/ sb-vm:large-object-size
                               (* sb-vm:n-word-bytes 2)))

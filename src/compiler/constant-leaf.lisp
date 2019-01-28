@@ -33,5 +33,5 @@
 (defprinter (constant :identity t)
   value)
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (freeze-type leaf))

@@ -254,7 +254,7 @@
 
 ;;;; non-local exit noise
 
-#!-win32
+#-win32
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:translate %continue-unwind)
@@ -301,7 +301,7 @@
 
 ;;;; Win32 non-local exit noise
 
-#!+win32
+#+win32
 (define-assembly-routine (unwind
                           (:return-style :none)
                           (:policy :fast-safe))
@@ -439,7 +439,7 @@
   (loadw ebp-tn block unwind-block-cfp-slot)
   (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
 
-#!+win32
+#+win32
 (define-assembly-routine (continue-unwind
                           (:return-style :none)
                           (:translate %continue-unwind)
@@ -492,16 +492,16 @@
              (make-ea :dword
                       #!+(or (not sb-thread) win32) :base #!+(or (not sb-thread) win32) edi-tn
                       :disp (ash slot-index word-shift))))
-      #!-sb-thread
+      #-sb-thread
       (progn
         ;; Load 'all_threads' into EDI (which was already spilled)
         ;; as the register with which to access thread slots.
-        #!+sb-dynamic-core
+        #+sb-dynamic-core
         (progn
           (inst mov edi-tn
                 (make-ea :dword :disp (make-fixup "all_threads" :foreign-dataref)))
           (inst mov edi-tn (make-ea :dword :base edi-tn)))
-        #!-sb-dynamic-core
+        #-sb-dynamic-core
         (inst mov edi-tn (make-ea :dword :disp (make-fixup "all_threads" :foreign))))
       #!+(and win32 sb-thread)
       (inst mov edi-tn (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)

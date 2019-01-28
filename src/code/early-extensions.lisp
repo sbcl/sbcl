@@ -1622,7 +1622,7 @@ to :INTERPRET, an interpreter will be used.")
            ,@forms)
         `(let ((,var #+sb-xc-host (make-string-output-stream)
                      #-sb-xc-host (sb-impl::%make-string-output-stream
-                                   (or #!-sb-unicode 'character :default)
+                                   (or #-sb-unicode 'character :default)
                                    #'sb-impl::string-ouch)))
 
            ,@decls

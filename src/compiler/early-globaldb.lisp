@@ -347,6 +347,6 @@
   `(the attributes
         (logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
 (declaim (ftype (function (attributes attributes) boolean) attributes=))
-#!-sb-fluid (declaim (inline attributes=))
+#-sb-fluid (declaim (inline attributes=))
 (defun attributes= (attr1 attr2)
   (eql attr1 attr2))

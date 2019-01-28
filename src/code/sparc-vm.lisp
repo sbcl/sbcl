@@ -74,7 +74,7 @@
   (context (* os-context-t)))
 
 ;;; Under Linux, we have to contend with utterly broken signal handling.
-#!+linux
+#+linux
 (defun context-floating-point-modes (context)
   (declare (ignore context))
   (warn "stub CONTEXT-FLOATING-POINT-MODES")

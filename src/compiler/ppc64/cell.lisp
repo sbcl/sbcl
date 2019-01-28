@@ -69,7 +69,7 @@
   (:vop-var vop)
   (:generator 15
     (inst sync)
-    #!+sb-thread
+    #+sb-thread
     (assemble ()
       (loadw temp symbol symbol-tls-index-slot other-pointer-lowtag)
       ;; Thread-local area, no synchronization needed.
@@ -125,7 +125,7 @@
   (:policy :fast)
   (:translate sym-global-val))
 
-#!+sb-thread
+#+sb-thread
 (progn
   (define-vop (set)
     (:args (symbol :scs (descriptor-reg))
@@ -178,7 +178,7 @@
       DONE)))
 
 ;;; On unithreaded builds these are just copies of the global versions.
-#!-sb-thread
+#-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
     (:translate symeval))
@@ -195,7 +195,7 @@
   (:policy :fast-safe)
   (:temporary (:scs (descriptor-reg)) value))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (boundp boundp-frob)
   (:translate boundp)
   (:generator 9
@@ -208,7 +208,7 @@
     (inst cmpwi value unbound-marker-widetag)
     (inst b? (if not-p :eq :ne) target)))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (boundp boundp-frob)
   (:translate boundp)
   (:generator 9
@@ -292,7 +292,7 @@
 ;;; the symbol on the binding stack and stuff the new value into the
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
-#!+sb-thread
+#+sb-thread
 (define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -349,7 +349,7 @@
      (storew tls-index bsp-tn (- binding-symbol-slot binding-size))
      (inst stwx val thread-base-tn tls-index)))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -361,7 +361,7 @@
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) tls-index value)
   (:generator 0
@@ -372,7 +372,7 @@
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
     (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
@@ -401,9 +401,9 @@
       (inst cmpwi symbol 0)
       (inst beq skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
-      #!+sb-thread
+      #+sb-thread
       (inst stwx value thread-base-tn symbol)
-      #!-sb-thread
+      #-sb-thread
       (storew value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 

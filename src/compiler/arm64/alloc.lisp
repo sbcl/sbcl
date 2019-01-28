@@ -159,7 +159,7 @@
   (:temporary (:sc non-descriptor-reg) pa-flag header)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 6
-    #!+cheneygc (bug "cheneygc not working for arm64")
+    #+cheneygc (bug "cheneygc not working for arm64")
     ;; Build the object header, assuming that the header was in WORDS
     ;; but should not be in the header
     (inst lsl bytes extra (- word-shift n-fixnum-tag-bits))

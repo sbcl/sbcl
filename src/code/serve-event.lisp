@@ -254,14 +254,14 @@ waiting."
              (loop for to-msec = (if (and to-sec to-usec)
                                      (+ (* 1000 to-sec) (truncate to-usec 1000))
                                      -1)
-                   when (or #!+win32 (eq direction :output)
-                            #!+win32 (sb-win32:handle-listen fd)
-                            #!-win32
+                   when (or #+win32 (eq direction :output)
+                            #+win32 (sb-win32:handle-listen fd)
+                            #-win32
                             (sb-unix:unix-simple-poll fd direction to-msec))
                    do (return-from wait-until-fd-usable t)
                    else
                    do (when to-sec (maybe-update-timeout))
-                   #!+win32 (sb-thread:thread-yield)))))))
+                   #+win32 (sb-thread:thread-yield)))))))
 
 ;;; Wait for up to timeout seconds for an event to happen. Make sure all
 ;;; pending events are processed before returning.
@@ -338,14 +338,14 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                                     (addr read-fds)
                                     (addr write-fds)
                                     nil to-sec to-usec)
-        #!+win32
+        #+win32
         (declare (ignore err))
         ;; Now see what it was (if anything)
         (cond ((not value)
                ;; Interrupted or one of the file descriptors is bad.
                ;; FIXME: Check for other errnos. Why do we return true
                ;; when interrupted?
-               #!-win32
+               #-win32
                (case err
                  (#.sb-unix:ebadf
                   (handler-descriptors-error))
@@ -355,7 +355,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                   (with-simple-restart (continue "Ignore failure and continue.")
                     (simple-perror "Unix system call select() failed"
                                    :errno err))))
-               #!+win32
+               #+win32
                (handler-descriptors-error))
               ((plusp value)
                ;; Got something. Call file descriptor handlers

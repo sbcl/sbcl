@@ -236,7 +236,7 @@ created and old ones may exit at any time."
 
 ;;; used by debug-int.lisp to access interrupt contexts
 
-#!-sb-thread
+#-sb-thread
 (progn
   (declaim (inline sb-vm::current-thread-offset-sap))
   (defun sb-vm::current-thread-offset-sap (n)
@@ -245,16 +245,16 @@ created and old ones may exit at any time."
 
 (declaim (inline current-thread-sap))
 (defun current-thread-sap ()
-  #!+sb-thread
+  #+sb-thread
   (sb-vm::current-thread-offset-sap sb-vm::thread-this-slot)
-  #!-sb-thread
+  #-sb-thread
   (int-sap 0))
 
 (declaim (inline current-thread-os-thread))
 (defun current-thread-os-thread ()
-  #!+sb-thread
+  #+sb-thread
   (sap-int (sb-vm::current-thread-offset-sap sb-vm::thread-os-thread-slot))
-  #!-sb-thread
+  #-sb-thread
   0)
 
 (sb-ext:define-load-time-global *initial-thread* nil)
@@ -355,7 +355,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     int
   (os-thread unsigned))
 
-#!+sb-thread
+#+sb-thread
 (progn
   ;; FIXME it would be good to define what a thread id is or isn't
   ;; (our current assumption is that it's a fixnum).  It so happens
@@ -641,7 +641,7 @@ returns NIL each time."
   (let ((old (mutex-%owner mutex)))
     (when (eq new-owner old)
       (error "Recursive lock attempt ~S." mutex))
-    #!-sb-thread
+    #-sb-thread
     (when old
       (error "Strange deadlock on ~S in an unithreaded build?" mutex))
     #!-(and sb-thread sb-futex)
@@ -658,7 +658,7 @@ returns NIL each time."
           (bug "Old owner in free mutex: ~S" prev))
         t))))
 
-#!+sb-thread
+#+sb-thread
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
@@ -720,7 +720,7 @@ returns NIL each time."
        ;; Spin.
        (go :retry))))
 
-#!+sb-thread
+#+sb-thread
 (defun %wait-for-mutex (mutex self timeout to-sec to-usec stop-sec stop-usec deadlinep)
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (with-deadlocks (self mutex timeout)
@@ -741,7 +741,7 @@ returns NIL each time."
   (declare (ignorable waitp timeout))
   (let ((new-owner (or new-owner *current-thread*)))
     (or (%try-mutex mutex new-owner)
-        #!+sb-thread
+        #+sb-thread
         (when waitp
           (multiple-value-call #'%wait-for-mutex
             mutex new-owner timeout (decode-timeout timeout))))))
@@ -784,7 +784,7 @@ Notes:
   (declare (ignorable waitp timeout))
   (let ((self *current-thread*))
     (or (%try-mutex mutex self)
-        #!+sb-thread
+        #+sb-thread
         (when waitp
           (multiple-value-call #'%wait-for-mutex
             mutex self timeout (decode-timeout timeout))))))
@@ -899,11 +899,11 @@ IF-NOT-OWNER is :FORCE)."
 (declaim (inline %condition-wait))
 (defun %condition-wait (queue mutex
                         timeout to-sec to-usec stop-sec stop-usec deadlinep)
-  #!-sb-thread
+  #-sb-thread
   (declare (ignore queue mutex to-sec to-usec stop-sec stop-usec deadlinep))
-  #!-sb-thread
+  #-sb-thread
   (sb-ext:wait-for nil :timeout timeout) ; Yeah...
-  #!+sb-thread
+  #+sb-thread
   (let ((me *current-thread*))
     (barrier (:read))
     (unless (eq me (mutex-%owner mutex))
@@ -1059,13 +1059,13 @@ associated data:
 
 IMPORTANT: The same mutex that is used in the corresponding CONDITION-WAIT
 must be held by this thread during this call."
-  #!-sb-thread
+  #-sb-thread
   (declare (ignore queue n))
-  #!-sb-thread
+  #-sb-thread
   (error "Not supported in unithread builds.")
-  #!+sb-thread
+  #+sb-thread
   (declare (type (and fixnum (integer 1)) n))
-  #!+sb-thread
+  #+sb-thread
   (progn
     #!-sb-futex
     (with-cas-lock ((waitqueue-%owner queue))
@@ -1320,7 +1320,7 @@ on this semaphore, then N of them is woken up."
       (call-with-new-session (function ,fb-name)))))
 
 ;;; Remove thread from its session, if it has one.
-#!+sb-thread
+#+sb-thread
 (defun handle-thread-exit (thread control-stack-start)
   (/show0 "HANDLING THREAD EXIT")
   (when *exit-in-process*
@@ -1414,8 +1414,8 @@ thread is not the foreground thread."
   "Returns T if thread had been running in background, NIL if it was
 interactive."
   (declare (ignore stream))
-  #!-sb-thread nil
-  #!+sb-thread
+  #-sb-thread nil
+  #+sb-thread
   (prog1
       (with-session-lock (*session*)
         (not (member *current-thread*
@@ -1423,8 +1423,8 @@ interactive."
     (get-foreground)))
 
 (defun get-foreground ()
-  #!-sb-thread t
-  #!+sb-thread
+  #-sb-thread t
+  #+sb-thread
   (let ((session *session*)
         (was-foreground t))
     (loop
@@ -1452,9 +1452,9 @@ interactive."
 (defun release-foreground (&optional next)
   "Background this thread.  If NEXT is supplied, arrange for it to
 have the foreground next."
-  #!-sb-thread (declare (ignore next))
-  #!-sb-thread nil
-  #!+sb-thread
+  #-sb-thread (declare (ignore next))
+  #-sb-thread nil
+  #+sb-thread
   (let ((session *session*))
     (with-session-lock (session)
       (symbol-macrolet
@@ -1512,7 +1512,7 @@ session."
 ;;; All threads other than the initial thread DO start via this function.
 ;;; The initial thread has its own way of doing things, which ends up calling
 ;;; INIT-INITIAL-THREAD.  It might be nice to come up with some better naming.
-#!+sb-thread
+#+sb-thread
 (defun initial-thread-function-trampoline (thread setup-sem real-function arguments)
   ;; Can't initiate GC before *current-thread* is set, otherwise the
   ;; locks grabbed by SUB-GC wouldn't function.
@@ -1600,14 +1600,14 @@ Invoking the initial ABORT restart established by MAKE-THREAD
 terminates the thread.
 
 See also: RETURN-FROM-THREAD, ABORT-THREAD."
-  #!-sb-thread (declare (ignore function name arguments ephemeral))
-  #!-sb-thread (error "Not supported in unithread builds.")
-  #!+sb-thread (assert (or (atom arguments)
+  #-sb-thread (declare (ignore function name arguments ephemeral))
+  #-sb-thread (error "Not supported in unithread builds.")
+  #+sb-thread (assert (or (atom arguments)
                            (null (cdr (last arguments))))
                        (arguments)
                        "Argument passed to ~S, ~S, is an improper list."
                        'make-thread arguments)
-  #!+sb-thread
+  #+sb-thread
   (let ((thread (%make-thread :name name :%ephemeral-p ephemeral)))
     (declare (inline make-semaphore
                      make-waitqueue
@@ -1874,7 +1874,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 ;;; are an SBCL developer, are doing something that you should discuss
 ;;; with an SBCL developer first, or are doing something that you
 ;;; should probably discuss with a professional psychiatrist first
-#!+sb-thread
+#+sb-thread
 (progn
 
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
@@ -1947,7 +1947,7 @@ Can also be used with SETF to change the thread-local value of SYMBOL.
 SYMBOL-VALUE-IN-THREAD is primarily intended as a debugging tool, and not as a
 mechanism for inter-thread communication."
   (declare (symbol symbol) (thread thread))
-  #!+sb-thread
+  #+sb-thread
   (multiple-value-bind (res status) (%symbol-value-in-thread symbol thread)
     (if (eq :ok status)
         (values res t)
@@ -1957,7 +1957,7 @@ mechanism for inter-thread communication."
                    :thread thread
                    :info (list :read status))
             (values nil nil))))
-  #!-sb-thread
+  #-sb-thread
   (if (boundp symbol)
       (values (symbol-value symbol) t)
       (if errorp
@@ -1969,7 +1969,7 @@ mechanism for inter-thread communication."
 
 (defun (setf symbol-value-in-thread) (value symbol thread &optional (errorp t))
   (declare (symbol symbol) (thread thread))
-  #!+sb-thread
+  #+sb-thread
   (multiple-value-bind (res status) (%set-symbol-value-in-thread symbol thread value)
     (if (eq :ok status)
         (values res t)
@@ -1979,7 +1979,7 @@ mechanism for inter-thread communication."
                    :thread thread
                    :info (list :write status))
             (values nil nil))))
-  #!-sb-thread
+  #-sb-thread
   (if (boundp symbol)
       (values (setf (symbol-value symbol) value) t)
       (if errorp

@@ -12,7 +12,7 @@
 
 (in-package "SB-C")
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (inline clear-bit-vector set-bit-vector bit-vector-replace
                  bit-vector-copy))
 

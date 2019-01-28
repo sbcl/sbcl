@@ -51,9 +51,9 @@
   (defreg r8 18)
   (defreg r9 19)
 
-  #!+sb-thread
+  #+sb-thread
   (defreg thread 20)
-  #!-sb-thread
+  #-sb-thread
   (defreg r10 20)
 
   (defreg lexenv 21)
@@ -74,7 +74,7 @@
       null cfp nsp lr code)
 
   (defregset descriptor-regs
-      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #!-sb-thread r10 lexenv)
+      r0 r1 r2 r3 r4 r5 r6 r7 r8 r9 #-sb-thread r10 lexenv)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
@@ -82,7 +82,7 @@
   ;; OAOOM: Same as runtime/arm64-lispregs.h
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
-      r7 r8 r9 #!-sb-thread r10 #!+sb-thread thread lexenv code)
+      r7 r8 r9 #-sb-thread r10 #+sb-thread thread lexenv code)
 
   ;; registers used to pass arguments
   ;;
@@ -240,7 +240,7 @@
   (defregtn cfp any-reg)
   (defregtn csp any-reg)
   (defregtn lr interior-reg)
-  #!+sb-thread
+  #+sb-thread
   (defregtn thread interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the
@@ -367,9 +367,9 @@
                   :offset (tn-offset tn)))
 
 ;;; null-tn will be used for setting it, just check the lowtag
-#!+sb-thread
+#+sb-thread
 (defconstant pseudo-atomic-flag
-    (ash list-pointer-lowtag #!+little-endian 0 #!+big-endian 32))
-#!+sb-thread
+    (ash list-pointer-lowtag #+little-endian 0 #+big-endian 32))
+#+sb-thread
 (defconstant pseudo-atomic-interrupted-flag
-    (ash list-pointer-lowtag #!+little-endian 32 #!+big-endian 0))
+    (ash list-pointer-lowtag #+little-endian 32 #+big-endian 0))

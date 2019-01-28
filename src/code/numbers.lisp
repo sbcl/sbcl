@@ -212,7 +212,7 @@
 ;;; If IMAGPART is 0, return REALPART, otherwise make a complex. This is
 ;;; used when we know that REALPART and IMAGPART are the same type, but
 ;;; rational canonicalization might still need to be done.
-#!-sb-fluid (declaim (inline canonical-complex))
+#-sb-fluid (declaim (inline canonical-complex))
 (defun canonical-complex (realpart imagpart)
   (if (eql imagpart 0)
       realpart
@@ -232,7 +232,7 @@
 ;;; Given a numerator and denominator with the GCD already divided
 ;;; out, make a canonical rational. We make the denominator positive,
 ;;; and check whether it is 1.
-#!-sb-fluid (declaim (inline build-ratio))
+#-sb-fluid (declaim (inline build-ratio))
 (defun build-ratio (num den)
   (multiple-value-bind (num den)
       (if (minusp den)
@@ -247,7 +247,7 @@
       (t (%make-ratio num den)))))
 
 ;;; Truncate X and Y, but bum the case where Y is 1.
-#!-sb-fluid (declaim (inline maybe-truncate))
+#-sb-fluid (declaim (inline maybe-truncate))
 (defun maybe-truncate (x y)
   (if (eql y 1)
       x
@@ -695,7 +695,7 @@
 ;;; ROUND and FROUND are not declared inline since they seem too
 ;;; obscure and too big to inline-expand by default. Also, this gives
 ;;; the compiler a chance to pick off the unary float case.
-#!-sb-fluid (declaim (inline fceiling ffloor ftruncate))
+#-sb-fluid (declaim (inline fceiling ffloor ftruncate))
 (defun ftruncate (number &optional (divisor 1))
   "Same as TRUNCATE, but returns first value as a float."
   (declare (explicit-check))
@@ -1439,13 +1439,13 @@ and the number of 0 bits if INTEGER is negative."
 ;;; arithmetic, as that is only (currently) defined for constant
 ;;; shifts.  See also the comment in (LOGAND OPTIMIZER) for more
 ;;; discussion of this hack.  -- CSR, 2003-10-09
-#!-64-bit-registers
+#-64-bit-registers
 (defun sb-vm::ash-left-mod32 (integer amount)
   (etypecase integer
     ((unsigned-byte 32) (ldb (byte 32 0) (ash integer amount)))
     (fixnum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))
     (bignum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))))
-#!+64-bit-registers
+#+64-bit-registers
 (defun sb-vm::ash-left-mod64 (integer amount)
   (etypecase integer
     ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))

@@ -34,4 +34,4 @@
   ;; extent.
   (associated-conditions '() :type list))
 
-#!-sb-fluid (declaim (freeze-type restart))
+#-sb-fluid (declaim (freeze-type restart))

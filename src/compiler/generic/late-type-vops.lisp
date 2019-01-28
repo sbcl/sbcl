@@ -111,7 +111,7 @@
 (!define-type-vop double-float-p (double-float-widetag))
 
 (!define-type-vop simple-string-p
-  (#!+sb-unicode simple-character-string-widetag
+  (#+sb-unicode simple-character-string-widetag
    simple-base-string-widetag simple-array-nil-widetag))
 
 (macrolet
@@ -153,7 +153,7 @@
 
 (!define-type-vop array-header-p
   (simple-array-widetag
-   #!+sb-unicode complex-character-string-widetag
+   #+sb-unicode complex-character-string-widetag
    complex-base-string-widetag complex-bit-vector-widetag
    complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
@@ -161,8 +161,8 @@
   (simple-array-widetag))
 
 (!define-type-vop stringp
-  (#!+sb-unicode simple-character-string-widetag
-   #!+sb-unicode complex-character-string-widetag
+  (#+sb-unicode simple-character-string-widetag
+   #+sb-unicode complex-character-string-widetag
    simple-base-string-widetag complex-base-string-widetag
    simple-array-nil-widetag complex-vector-nil-widetag))
 
@@ -175,7 +175,7 @@
 (!define-type-vop vector-nil-p
   (simple-array-nil-widetag complex-vector-nil-widetag))
 
-#!+sb-unicode
+#+sb-unicode
 (!define-type-vop character-string-p
   (simple-character-string-widetag complex-character-string-widetag))
 
@@ -250,9 +250,9 @@
    #+long-float long-float-widetag
    . #.fixnum-lowtags))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (!define-type-vop simd-pack-p (simd-pack-widetag))
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (!define-type-vop simd-pack-256-p (simd-pack-256-widetag))
 
 (!define-type-vop unbound-marker-p (unbound-marker-widetag))

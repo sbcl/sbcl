@@ -13,7 +13,7 @@
 
 ;;; Check that target machine features are set up consistently with
 ;;; this file.
-#!-win32 (error "missing :WIN32 feature")
+#-win32 (error "missing :WIN32 feature")
 
 (defun software-type ()
   "Return a string describing the supporting software."

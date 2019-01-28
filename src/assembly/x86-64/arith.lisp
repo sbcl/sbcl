@@ -24,8 +24,8 @@
   (inst test :byte temp fixnum-tag-mask))
 
 (defun !static-fun-addr (name)
-  #!+immobile-code (make-fixup name :static-call)
-  #!-immobile-code (ea (+ nil-value (static-fun-offset name))))
+  #+immobile-code (make-fixup name :static-call)
+  #-immobile-code (ea (+ nil-value (static-fun-offset name))))
 
 (defun !call-static-fun (fun arg-count)
   (inst push rbp-tn)

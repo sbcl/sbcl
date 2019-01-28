@@ -112,7 +112,7 @@
 
 ;;;; Description of the target address space.
 
-#!+gencgc ; sensibly small read-only and static spaces
+#+gencgc ; sensibly small read-only and static spaces
 (!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
 
 ;;; Where to put the different spaces.  Must match the C code!
@@ -172,7 +172,7 @@
   after-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
-  #!+gencgc allocation-trap
+  #+gencgc allocation-trap
   error-trap)
 
 ;;;; static symbols.
@@ -209,7 +209,7 @@
 ;;; allowing other architectures (which don't necessarily use traps
 ;;; for pseudo-atomic) to propagate a magic number to C land via
 ;;; sbcl.h.
-#!-linux
+#-linux
 (defconstant pseudo-atomic-trap #x10)
-#!+linux
+#+linux
 (defconstant pseudo-atomic-trap #x40)

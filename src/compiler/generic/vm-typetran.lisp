@@ -19,7 +19,7 @@
 ;;; They shouldn't be used explicitly.
 (define-type-predicate base-string-p base-string)
 (define-type-predicate bignump bignum)
-#!+sb-unicode (define-type-predicate character-string-p (vector character))
+#+sb-unicode (define-type-predicate character-string-p (vector character))
 (define-type-predicate complex-double-float-p (complex double-float))
 (define-type-predicate complex-single-float-p (complex single-float))
 #+long-float
@@ -57,10 +57,10 @@
 (define-type-predicate simple-array-unsigned-byte-32-p
                        (simple-array (unsigned-byte 32) (*)))
 
-#!+64-bit
+#+64-bit
 (define-type-predicate simple-array-unsigned-byte-63-p
                        (simple-array (unsigned-byte 63) (*)))
-#!+64-bit
+#+64-bit
 (define-type-predicate simple-array-unsigned-byte-64-p
                        (simple-array (unsigned-byte 64) (*)))
 (define-type-predicate simple-array-signed-byte-8-p
@@ -75,7 +75,7 @@
 (define-type-predicate simple-array-signed-byte-32-p
     (simple-array (signed-byte 32) (*)))
 
-#!+64-bit
+#+64-bit
 (define-type-predicate simple-array-signed-byte-64-p
                        (simple-array (signed-byte 64) (*)))
 (define-type-predicate simple-array-single-float-p
@@ -93,20 +93,20 @@
 (define-type-predicate simple-array-complex-long-float-p
                        (simple-array (complex long-float) (*)))
 (define-type-predicate simple-base-string-p simple-base-string)
-#!+sb-unicode (define-type-predicate simple-character-string-p
+#+sb-unicode (define-type-predicate simple-character-string-p
                   (simple-array character (*)))
 (define-type-predicate system-area-pointer-p system-area-pointer)
-#!-64-bit
+#-64-bit
 (define-type-predicate unsigned-byte-32-p (unsigned-byte 32))
-#!-64-bit
+#-64-bit
 (define-type-predicate signed-byte-32-p (signed-byte 32))
-#!+64-bit
+#+64-bit
 (define-type-predicate unsigned-byte-64-p (unsigned-byte 64))
-#!+64-bit
+#+64-bit
 (define-type-predicate signed-byte-64-p (signed-byte 64))
-#!+sb-simd-pack
+#+sb-simd-pack
 (define-type-predicate simd-pack-p simd-pack)
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (define-type-predicate simd-pack-256-p simd-pack-256)
 (define-type-predicate vector-nil-p (vector nil))
 (define-type-predicate weak-pointer-p weak-pointer)

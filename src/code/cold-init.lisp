@@ -172,7 +172,7 @@
         for toplevel-thing in (prog1 *!cold-toplevels*
                                  (makunbound '*!cold-toplevels*))
         do
-      #!+sb-show
+      #+sb-show
       (when (zerop (mod index-in-cold-toplevels 1024))
         (/show0 "INDEX-IN-COLD-TOPLEVELS=..")
         (/hexstr index-in-cold-toplevels))
@@ -349,7 +349,7 @@ process to continue normally."
   (sb-thread::get-foreground))
 
 (defun reinit ()
-  #!+win32
+  #+win32
   (setf sb-win32::*ansi-codepage* nil)
   (setf *default-external-format* nil)
   (setf sb-alien::*default-c-string-external-format* nil)
@@ -382,7 +382,7 @@ process to continue normally."
 
 ;;; Decode THING into hexadecimal notation using only machinery
 ;;; available early in cold init.
-#!+sb-show
+#+sb-show
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
   (let* ((addr (get-lisp-obj-address thing))
@@ -404,7 +404,7 @@ process to continue normally."
     str))
 
 ;; But: you almost never need this. Just use WRITE in all its glory.
-#!+sb-show
+#+sb-show
 (defun cold-print (x)
   (labels ((%cold-print (obj depthoid)
              (if (> depthoid 4)
@@ -428,7 +428,7 @@ process to continue normally."
   '("SB-INT"
     defenum defun-cached with-globaldb-name def!type def!struct
     .
-    #!+sb-show ()
-    #!-sb-show (/hexstr /nohexstr /noshow /noshow0
+    #+sb-show ()
+    #-sb-show (/hexstr /nohexstr /noshow /noshow0
                 /primitive-print /show /show0))
   *!removable-symbols*)

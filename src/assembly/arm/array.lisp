@@ -47,9 +47,9 @@
     ;; passed to C do not cause a WP violation in foreign code.
     ;; Do that before storing length, since nil-arrays don't have any
     ;; space, but may have non-zero length.
-    #!-gencgc
+    #-gencgc
     (inst mov ndescr 0)
-    #!-gencgc
+    #-gencgc
     (storew ndescr pa-flag -1)
     (storew length vector vector-length-slot other-pointer-lowtag)
     (move result vector)))

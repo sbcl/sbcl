@@ -19,7 +19,7 @@
             ea-p ea-base ea-index size-nbyte
             ea make-ea ea-disp rip-relative-ea) "SB-VM")
   ;; Imports from SB-VM into this package
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
@@ -148,7 +148,7 @@
   :sign-extend t
   :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
   :printer (lambda (value stream dstate)
-             (or #!+immobile-space
+             (or #+immobile-space
                  (and (integerp value) (maybe-note-lisp-callee value dstate))
                  (maybe-note-assembler-routine value nil dstate))
              (print-label value stream dstate)))
@@ -1382,7 +1382,7 @@
     (emit-byte segment #x66))
   (ecase lock
     ((nil))
-    (:lock (emit-byte segment #xf0))) ; even if #!-sb-thread
+    (:lock (emit-byte segment #xf0))) ; even if #-sb-thread
   (let ((ea-p (ea-p thing)))
     (emit-rex-if-needed segment
                         (eq operand-size :qword) ; REX.W
@@ -3380,12 +3380,12 @@
         (setf constant (list :complex-single-float first)))
        ((complex double-float)
         (setf constant (list :complex-double-float first)))
-       #!+sb-simd-pack
+       #+sb-simd-pack
        (simd-pack
         (setq constant
               (list :sse (logior (%simd-pack-low first)
                                  (ash (%simd-pack-high first) 64)))))
-       #!+sb-simd-pack-256
+       #+sb-simd-pack-256
        (simd-pack-256
         (setq constant
               (list :avx2 (logior (%simd-pack-256-0 first)
@@ -3398,7 +3398,7 @@
        (aver (integerp value))
        (cons type value))
       ((:base-char)
-       #!+sb-unicode (aver (typep value 'base-char))
+       #+sb-unicode (aver (typep value 'base-char))
        (cons :byte (char-code value)))
       ((:character)
        (aver (characterp value))

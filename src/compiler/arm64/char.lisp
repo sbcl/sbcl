@@ -135,7 +135,7 @@
   (:translate char<)
   (:conditional :lt))
 
-#!+sb-unicode
+#+sb-unicode
 (define-vop (base-char-p)
   (:args (value :scs (any-reg descriptor-reg)))
   (:arg-types *)
@@ -147,7 +147,7 @@
     (inst and temp value (lognot #x7F00))
     (inst cmp temp character-widetag)))
 
-#!+sb-unicode
+#+sb-unicode
 (define-vop (base-char-p-character)
   (:args (value :scs (any-reg)))
   (:arg-types character)
@@ -157,7 +157,7 @@
   (:generator 3
     (inst tst value (lognot #x7FFF))))
 
-#!+sb-unicode
+#+sb-unicode
 (define-vop (base-char-p-character-reg)
   (:args (value :scs (character-reg)))
   (:arg-types character)

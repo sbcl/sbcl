@@ -19,11 +19,11 @@
   (or (let ((sbcl-homedir (sbcl-homedir-pathname)))
         (when sbcl-homedir
           (probe-file (merge-pathnames "sbclrc" sbcl-homedir))))
-      #!+win32
+      #+win32
       (merge-pathnames "sbcl\\sbclrc"
                        (sb-win32::get-folder-pathname
                         sb-win32::csidl_common_appdata))
-      #!-win32
+      #-win32
       "/etc/sbclrc"))
 
 (defun userinit-pathname ()
@@ -141,7 +141,7 @@ means to wait indefinitely.")
   (sb-unix:nanosleep sec nsec))
 
 (declaim (inline %sleep))
-#!-win32
+#-win32
 (defun %sleep (seconds)
   (typecase seconds
     (double-float
@@ -595,7 +595,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
                    ;; In the event of a control-stack-exhausted-error, we
                    ;; should have unwound enough stack by the time we get
                    ;; here that this is now possible.
-                   #!-win32
+                   #-win32
                    (sb-kernel::reset-control-stack-guard-page)
                    (funcall repl-fun noprint)
                    (critically-unreachable "after REPL")))))))))

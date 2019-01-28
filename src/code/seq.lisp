@@ -620,8 +620,8 @@
            else do
            ;; vector-fill* depends on this assertion
            (assert (member et '(t (complex double-float)
-                                #!-64-bit (complex single-float)
-                                #!-64-bit double-float)
+                                #-64-bit (complex single-float)
+                                #-64-bit double-float)
                            :test #'equal))))
 
 (defun vector-fill* (vector item start end)
@@ -653,10 +653,10 @@
                    (funcall (truly-the function (car (truly-the cons bashers)))
                             (funcall (truly-the function (cdr bashers)) item)
                             vector start (- end start)))
-                  #!-64-bit
+                  #-64-bit
                   ((eq widetag sb-vm:simple-array-double-float-widetag)
                    (fill-float double-float))
-                  #!-64-bit
+                  #-64-bit
                   ((eq widetag sb-vm:simple-array-complex-single-float-widetag)
                    (fill-float (complex single-float)))
                   (t
@@ -673,7 +673,7 @@
     ;; DEFTRANSFORM for FILL will turn these into
     ;; calls to UB*-BASH-FILL.
     (etypecase data
-      #!+sb-unicode
+      #+sb-unicode
       ((simple-array character (*))
        (let ((item (locally (declare (optimize (safety 3)))
                      (the character item))))
@@ -832,7 +832,7 @@
   (when (null source-end) (setq source-end (length source-sequence)))
   (vector-replace-from-vector))
 
-#!+sb-unicode
+#+sb-unicode
 (defun simple-character-string-replace-from-simple-character-string*
     (target-sequence source-sequence
      target-start target-end source-start source-end)
@@ -1063,10 +1063,10 @@ many elements are copied."
        (apply #'%concatenate-to-list sequences))
       ((vector simple-vector)
        (apply #'%concatenate-to-simple-vector sequences))
-      #!+sb-unicode
+      #+sb-unicode
       ((string simple-string)
        (apply #'%concatenate-to-string sequences))
-      ((simple-base-string #!-sb-unicode string #!-sb-unicode simple-string)
+      ((simple-base-string #-sb-unicode string #-sb-unicode simple-string)
        (apply #'%concatenate-to-base-string sequences))
       (t
        (let ((type (specifier-type result-type)))
@@ -1124,11 +1124,11 @@ many elements are copied."
                           (replace result seq :start1 start)
                           (incf start length))))
                     result)))))
-  #!+sb-unicode
+  #+sb-unicode
   (def %concatenate-to-string character
     (simple-array character (*)) (simple-array base-char (*)))
   (def %concatenate-to-base-string base-char
-    (simple-array base-char (*)) #!+sb-unicode (simple-array character (*)))
+    (simple-array base-char (*)) #+sb-unicode (simple-array character (*)))
   (def %concatenate-to-simple-vector t simple-vector))
 
 (defun %concatenate-to-list (&rest sequences)
@@ -2506,7 +2506,7 @@ many elements are copied."
                                                (frob sequence t)
                                                (frob sequence nil))))
                        (typecase sequence
-                         #!+sb-unicode
+                         #+sb-unicode
                          ((simple-array character (*)) (frob2))
                          ((simple-array base-char (*)) (frob2))
                          ,@(when bit-frob

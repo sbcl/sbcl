@@ -152,7 +152,7 @@ the stack without triggering overflow protection.")
 ;;; identity even across GC, useful for understanding weird compiler
 ;;; bugs where something is supposed to be unique but is instead
 ;;; exists as duplicate objects)
-#!+sb-show
+#+sb-show
 (progn
   (defvar *object-id-counter* 0)
   (defun new-object-id ()
@@ -292,7 +292,7 @@ the stack without triggering overflow protection.")
 (defvar *compile-time-eval* nil)
 (declaim (always-bound *compile-time-eval*))
 
-#!-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
+#-immobile-code (defmacro code-immobile-p (thing) `(progn ,thing nil))
 
 ;;; Various error-code generating helpers
 (defvar *adjustable-vectors*)
@@ -357,5 +357,5 @@ the stack without triggering overflow protection.")
 
 ;; from 'llvm/projects/compiler-rt/lib/msan/msan.h':
 ;;  "#define MEM_TO_SHADOW(mem) (((uptr)(mem)) ^ 0x500000000000ULL)"
-#!+linux ; shadow space differs by OS
+#+linux ; shadow space differs by OS
 (defconstant sb-vm::msan-mem-to-shadow-xor-const #x500000000000)

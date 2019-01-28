@@ -96,7 +96,7 @@
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#!-gencgc
+#-gencgc
 (progn
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
@@ -105,12 +105,12 @@
 
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000)
-  #!+linux
+  #+linux
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
 
-#!+gencgc
+#+gencgc
 (!gencgc-space-setup #xF0000000 :dynamic-space-start #x1000000000)
 
 (defconstant linkage-table-entry-size 16)
@@ -139,7 +139,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
- `#(#!-sb-thread
+ `#(#-sb-thread
     ,@'(*binding-stack-pointer*
         *pseudo-atomic-atomic*
         *pseudo-atomic-interrupted*)

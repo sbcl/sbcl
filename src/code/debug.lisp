@@ -913,8 +913,8 @@ the current thread are replaced with dummy objects which can safely escape."
     (format stream
             "debugger invoked on a ~S~@[ in thread ~_~A~]: ~2I~_~A"
             (type-of condition)
-            #!+sb-thread sb-thread:*current-thread*
-            #!-sb-thread nil
+            #+sb-thread sb-thread:*current-thread*
+            #-sb-thread nil
             condition))
   (terpri stream))
 
@@ -1028,16 +1028,16 @@ the current thread are replaced with dummy objects which can safely escape."
            (format *error-output*
                    "~&~@<Unhandled ~S~@[ in thread ~S~]: ~2I~_~A~:>~2%"
                    (type-of condition)
-                   #!+sb-thread sb-thread:*current-thread*
-                   #!-sb-thread nil
+                   #+sb-thread sb-thread:*current-thread*
+                   #-sb-thread nil
                    condition)
            (finish-output *error-output*))
          (describe-condition ()
            (format *error-output*
                    "~&Unhandled ~S~@[ in thread ~S~]:~%"
                    (type-of condition)
-                   #!+sb-thread sb-thread:*current-thread*
-                   #!-sb-thread nil)
+                   #+sb-thread sb-thread:*current-thread*
+                   #-sb-thread nil)
            (describe condition *error-output*)
            (finish-output *error-output*))
          (display-backtrace ()

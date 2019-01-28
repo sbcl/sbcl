@@ -104,7 +104,7 @@
                           (logand most-positive-fixnum
                                   (logxor bits
                                           (ash bits -7))))))))
-#!-64-bit
+#-64-bit
 (deftransform sxhash ((x) (double-float))
   '(let* ((hi (logand (double-float-high-bits x) #.(1- (ash 1 32))))
           (lo (double-float-low-bits x))
@@ -123,7 +123,7 @@
     `(logand (logxor (ash x 4) (ash x -1) ,c) sb-xc:most-positive-fixnum)))
 
 ;;; Treat double-float essentially the same as a fixnum if words are 64 bits.
-#!+64-bit
+#+64-bit
 (deftransform sxhash ((x) (double-float))
   ;; logical negation of magic constant ensures that 0.0d0 hashes to something
   ;; other than what the fixnum 0 hashes to (as tested in hash.impure.lisp)

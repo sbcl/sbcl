@@ -241,7 +241,7 @@
               ;; because liveness depends on pointer tracing without looking at code-fixups.
               (when (and sc
                          (or (not immed)
-                             #!+immobile-space
+                             #+immobile-space
                              (let ((val (constant-value constant)))
                                (or (and (symbolp val) (not (sb-vm:static-symbol-p val)))
                                    (typep val 'layout)))))

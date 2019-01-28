@@ -74,7 +74,7 @@
        (defun raw-slot-data-accessor-name (rsd)
          (%simple-fun-name (raw-slot-data-accessor-fun rsd))))
 
-#!-sb-fluid (declaim (freeze-type raw-slot-data))
+#-sb-fluid (declaim (freeze-type raw-slot-data))
 
 ;; Simulate DEFINE-LOAD-TIME-GLOBAL - always bound in the image
 ;; but not eval'd in the compiler.

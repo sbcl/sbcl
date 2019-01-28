@@ -28,7 +28,7 @@
 (defun sb-vm::statically-link-code-obj (code fixups)
   (declare (ignore code fixups))))
 
-#!+immobile-code
+#+immobile-code
 (progn
   ;; Use FDEFINITION because it strips encapsulations - whether that's
   ;; the right behavior for it or not is a separate concern.
@@ -74,12 +74,12 @@
                    (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address (funcall layout-finder sym)))
                    (:immobile-object (get-lisp-obj-address sym))
-                   #!+immobile-code
+                   #+immobile-code
                    (:named-call
                     (when statically-link-p
                       (push (cons offset sym) (elt preserved-lists 3)))
                     (sb-vm::fdefn-entry-address sym))
-                   #!+immobile-code (:static-call (sb-vm::function-raw-address sym)))
+                   #+immobile-code (:static-call (sb-vm::function-raw-address sym)))
                  kind flavor)
            (ecase kind
              (:relative (push offset (elt preserved-lists 0)))

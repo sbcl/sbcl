@@ -37,7 +37,7 @@
                                 (error "Invalid --dynamic-space-size=~A" line)))))
               (* number mult)))))))
 
-#!+gencgc
+#+gencgc
 ;; Define START/END constants for GENCGC spaces.
 ;; Assumptions:
 ;;     We only need very small read-only and static spaces, because
@@ -82,7 +82,7 @@
                            (static ,small-space-size))
                          #!+linkage-table
                          `((linkage-table ,small-space-size))
-                         #!+immobile-space
+                         #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
                            (varyobj ,varyobj-space-size*))))
          (ptr small-spaces-start)
@@ -142,10 +142,10 @@
     #!-(or arm arm64 x86-64) undefined-alien-fun-error
     sb-di::handle-breakpoint
     sb-di::handle-single-step-trap
-    #!+win32 sb-kernel::handle-win32-exception
+    #+win32 sb-kernel::handle-win32-exception
     #!+sb-thruption sb-thread::run-interruption
     enter-alien-callback
-    #!+sb-thread sb-thread::enter-foreign-callback
+    #+sb-thread sb-thread::enter-foreign-callback
     #!+(and sb-safepoint-strictly (not win32))
     sb-unix::signal-handler-callback)
   #'equal)
@@ -166,7 +166,7 @@
     *gc-inhibit*
     *gc-pending*
     #!+sb-safepoint sb-impl::*in-safepoint*
-    #!+sb-thread *stop-for-gc-pending*
+    #+sb-thread *stop-for-gc-pending*
     ;; non-x86oid gencgc object pinning
     #!+(and gencgc (not (or x86 x86-64))) *pinned-objects*
     ;; things needed for non-local-exit
@@ -179,7 +179,7 @@
   `(t
     ;; These symbols are accessed from C only through TLS,
     ;; never the symbol-value slot
-    #!-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
+    #-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
                            !per-thread-c-interface-symbols)
     ;; NLX variables are thread slots on x86-64.  A static sym is needed
     ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
@@ -191,25 +191,25 @@
     ;; uses the symbol itself as a value. Kinda weird.
     #!+(and sb-safepoint sb-thread) *in-without-gcing*
 
-    #!+immobile-space *immobile-freelist* ; not per-thread (yet...)
+    #+immobile-space *immobile-freelist* ; not per-thread (yet...)
 
     #!+hpux *c-lra*
 
     ;; stack pointers
-    #!-sb-thread *binding-stack-start* ; a thread slot if #!+sb-thread
-    #!-sb-thread *control-stack-start* ; ditto
-    #!-sb-thread *control-stack-end*   ; ditto
+    #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread
+    #-sb-thread *control-stack-start* ; ditto
+    #-sb-thread *control-stack-end*   ; ditto
 
-    #!-sb-thread *stepping*
+    #-sb-thread *stepping*
 
     ;; threading support
-    #!+sb-thread *free-tls-index*
+    #+sb-thread *free-tls-index*
     ;; Keep in sync with 'compiler/early-backend.lisp':
     ;;  "only PPC uses a separate symbol for the TLS index lock"
     #!+(and sb-thread ppc) *tls-index-lock*
 
     ;; dynamic runtime linking support
-    #!+sb-dynamic-core +required-foreign-symbols+
+    #+sb-dynamic-core +required-foreign-symbols+
 
     ;; List of Lisp specials bindings made by create_thread_struct()
     ;; excluding the names in !PER-THREAD-C-INTERFACE-SYMBOLS.
@@ -218,8 +218,8 @@
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.
-    ;;; However there is no efficiency gain if we have #!+immobile-space.
-    #!-immobile-space ,@'(
+    ;;; However there is no efficiency gain if we have #+immobile-space.
+    #-immobile-space ,@'(
      ;; arbitrary object that changes after each GC
      sb-kernel::*gc-epoch*
      ;; Dispatch tables for generic array access
@@ -237,7 +237,7 @@
 ;;; of the comment, please see that file before adjusting this.
 (defconstant max-interrupts 1024)
 
-#!+gencgc
+#+gencgc
 (progn
   (defconstant +highest-normal-generation+ 5)
   (defconstant +pseudo-static-generation+ 6))

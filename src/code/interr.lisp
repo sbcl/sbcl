@@ -494,7 +494,7 @@
   (declare (optimize allow-non-returning-tail-call))
   (error 'undefined-alien-variable-error))
 
-#!-win32
+#-win32
 (defun memory-fault-error (context-sap address-sap)
   (declare (ignore context-sap))
   (let ((sb-debug:*stack-top-hint* (find-interrupted-frame)))

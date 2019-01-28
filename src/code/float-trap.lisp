@@ -178,7 +178,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
                        (floating-point-modes)))))
 
 ;;; SIGFPE code to floating-point error
-#!-win32
+#-win32
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant-eqx +sigfpe-code-error-alist+
     `((,sb-unix::fpe-intovf . floating-point-overflow)
@@ -192,7 +192,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
     #'equal))
 
 ;;; Signal the appropriate condition when we get a floating-point error.
-#!-win32
+#-win32
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal))
   (declare (type system-area-pointer info))

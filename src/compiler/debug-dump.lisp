@@ -79,7 +79,7 @@
                          (- posn (segment-header-skew segment))))))
   (values))
 
-#!-sb-fluid (declaim (inline ir2-block-physenv))
+#-sb-fluid (declaim (inline ir2-block-physenv))
 (defun ir2-block-physenv (2block)
   (declare (type ir2-block 2block))
   (block-physenv (ir2-block-block 2block)))
@@ -430,7 +430,7 @@
     (when (and same-name-p
                (not (or more minimal)))
       (setf flags (logior flags compiled-debug-var-same-name-p)))
-    #!+64-bit ; FIXME: fails if SB-VM:N-FIXNUM-TAG-BITS is 3
+    #+64-bit ; FIXME: fails if SB-VM:N-FIXNUM-TAG-BITS is 3
               ; which early-vm.lisp claims to work
     (cond (indirect
            (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
@@ -459,13 +459,13 @@
            ;; accessed through a saved frame pointer.
            ;; The first one/two sc-offsets are for the frame pointer,
            ;; the third is for the stack offset.
-           #!-64-bit
+           #-64-bit
            (vector-push-extend (tn-sc+offset tn) buffer)
-           #!-64-bit
+           #-64-bit
            (when save-tn
              (vector-push-extend (tn-sc+offset save-tn) buffer))
            (vector-push-extend (tn-sc+offset (leaf-info var)) buffer))
-          #!-64-bit
+          #-64-bit
           (t
            (if (and tn (tn-offset tn))
                (vector-push-extend (tn-sc+offset tn) buffer)

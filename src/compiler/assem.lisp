@@ -238,15 +238,15 @@
   (write-dependents (make-sset) :type sset)
   ;; instructions which read what we write
   (read-dependents (make-sset) :type sset))
-#!+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
-#!+sb-show-assem (defvar *next-inst-id* 0)
+#+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
+#+sb-show-assem (defvar *next-inst-id* 0)
 (defmethod print-object ((inst instruction) stream)
   (print-unreadable-object (inst stream :type t :identity t)
-    #!+sb-show-assem
+    #+sb-show-assem
     (princ (ensure-gethash inst *inst-ids* (incf *next-inst-id*))
            stream)
     (format stream
-            #!+sb-show-assem " emitter=~S" #!-sb-show-assem "emitter=~S"
+            #+sb-show-assem " emitter=~S" #-sb-show-assem "emitter=~S"
             (let ((emitter (inst-emitter inst)))
               (if emitter
                   (multiple-value-bind (lambda lexenv-p name)
@@ -257,7 +257,7 @@
     (when (inst-depth inst)
       (format stream ", depth=~W" (inst-depth inst)))))
 
-#!+sb-show-assem
+#+sb-show-assem
 (defun reset-inst-ids ()
   (clrhash *inst-ids*)
   (setf *next-inst-id* 0))
@@ -405,7 +405,7 @@
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb-c:location-number read)
-    #!+sb-show-assem (format *trace-output*
+    #+sb-show-assem (format *trace-output*
                              "~&~S reads ~S[~W for ~W]~%"
                              inst read loc-num size)
     (when loc-num
@@ -442,7 +442,7 @@
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
       (sb-c:location-number write)
-    #!+sb-show-assem (format *trace-output*
+    #+sb-show-assem (format *trace-output*
                              "~&~S writes ~S[~W for ~W]~%"
                              inst write loc-num size)
     (when loc-num
@@ -474,8 +474,8 @@
 ;;; already been computed, so we just have to check to see whether the
 ;;; basic block is terminated.
 (defun queue-inst (segment inst)
-  #!+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
+  #+sb-show-assem (format *trace-output*
                            "  reads ~S~%  writes ~S~%"
                            (collect ((reads))
                              (do-sset-elements (read
@@ -520,7 +520,7 @@
     (return-from schedule-pending-instructions
                  (values)))
 
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "~&scheduling pending instructions..~%")
 
   ;; Note that any values live at the end of the block have to be
@@ -559,7 +559,7 @@
                (cond ((and (sset-empty (inst-read-dependents inst))
                            (instruction-attributep (inst-attributes inst)
                                                    flushable))
-                      #!+sb-show-assem (format *trace-output*
+                      #+sb-show-assem (format *trace-output*
                                                "flushing ~S~%"
                                                inst)
                       (setf (inst-emitter inst) nil)
@@ -579,13 +579,13 @@
       (setf (segment-delayed segment) delayed))
     (dolist (branch (segment-queued-branches segment))
       (grovel-inst (cdr branch))))
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "queued branches: ~S~%"
                            (segment-queued-branches segment))
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "initially emittable: ~S~%"
                            (segment-emittable-insts-queue segment))
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "initially delayed: ~S~%"
                            (segment-delayed segment))
 
@@ -645,7 +645,7 @@
                                (inst-write-dependents inst))
                               (schedule-one-inst segment t)
                               :nop)))
-                #!+sb-show-assem (format *trace-output*
+                #+sb-show-assem (format *trace-output*
                                          "filling branch delay slot with ~S~%"
                                          fill)
                 (push fill results)))
@@ -653,7 +653,7 @@
             (incf insts-from-end))
           (note-resolved-dependencies segment inst)
           (push inst results)
-          #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
+          #+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
           (advance-one-inst segment))))
 
     ;; Keep scheduling stuff until we run out.
@@ -708,7 +708,7 @@
                    (instruction-attributep (inst-attributes inst)
                                            variable-length))
         ;; We've got us a live one here. Go for it.
-        #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
+        #+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
         ;; Delete it from the list of insts.
         (if prev
             (setf (cdr prev) (cdr remaining))
@@ -730,7 +730,7 @@
   (cond ((segment-delayed segment)
          ;; No emittable instructions, but we have more work to do. Emit
          ;; a NOP to fill in a delay slot.
-         #!+sb-show-assem (format *trace-output* "emitting a NOP~%")
+         #+sb-show-assem (format *trace-output* "emitting a NOP~%")
          :nop)
         (t
          ;; All done.
@@ -791,7 +791,7 @@
 ;;; emitting code in SCHEDULE-PENDING-INSTRUCTIONS.
 (defun insert-emittable-inst (segment inst)
   (unless (instruction-attributep (inst-attributes inst) branch)
-    #!+sb-show-assem (format *trace-output* "now emittable: ~S~%" inst)
+    #+sb-show-assem (format *trace-output* "now emittable: ~S~%" inst)
     (do ((my-depth (inst-depth inst))
          (remaining (segment-emittable-insts-queue segment) (cdr remaining))
          (prev nil remaining))
@@ -1392,18 +1392,18 @@
                   `(.align ,sb-vm:n-lowtag-bits))))))
     (flet ((store-ub16 (index val)
              (multiple-value-bind (b0 b1)
-                 #!+little-endian
+                 #+little-endian
                  (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
-                 #!+big-endian
+                 #+big-endian
                  (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
                (setf (aref octets (+ index 0)) b0
                      (aref octets (+ index 1)) b1)))
            (store-ub32 (index val)
              (multiple-value-bind (b0 b1 b2 b3)
-                 #!+little-endian
+                 #+little-endian
                  (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
                          (ldb (byte 8 16) val) (ldb (byte 8 24) val))
-                 #!+big-endian
+                 #+big-endian
                  (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
                          (ldb (byte 8  8) val) (ldb (byte 8  0) val))
                (setf (aref octets (+ index 0)) b0

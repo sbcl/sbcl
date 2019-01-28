@@ -258,11 +258,11 @@
   (let ((fdefn-raw-addr
           (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag)
               fun)))
-    #!+immobile-code
+    #+immobile-code
     (progn
       (inst lea vector fdefn-raw-addr)
       (inst jmp vector))
-    #!-immobile-code
+    #-immobile-code
     (inst jmp fdefn-raw-addr))
   UNDEFINED
   (inst jmp (make-fixup 'undefined-tramp :assembly-routine))
@@ -388,17 +388,17 @@
   (inst push rdi-tn)
   ;; stack: spill[2], ret-pc, object, index, value-to-store
 
-  #!-sb-thread
+  #-sb-thread
   (progn
     ;; Load THREAD-BASE-TN from the all_threads. Does not need to be spilled
     ;; to stack, because we do do not give the register allocator access to it.
     ;; And call_into_lisp saves it as per convention, not that it matters,
     ;; because there's no way to get back into C code anyhow.
-    #!+sb-dynamic-core
+    #+sb-dynamic-core
     (progn
       (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign-dataref)))
       (inst mov thread-base-tn (ea thread-base-tn)))
-    #!-sb-dynamic-core
+    #-sb-dynamic-core
     (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign))))
 
   (inst mov temp-reg-tn (ea 24 rsp-tn))
@@ -451,13 +451,13 @@
 #+sb-assembling
 (define-assembly-routine (touch-gc-card (:return-style :none)) ()
   ;; stack: ret-pc, object
-  #!-sb-thread
+  #-sb-thread
   (progn
-    #!+sb-dynamic-core
+    #+sb-dynamic-core
     (progn
       (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign-dataref)))
       (inst mov thread-base-tn (ea thread-base-tn)))
-    #!-sb-dynamic-core
+    #-sb-dynamic-core
     (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign))))
   (inst mov temp-reg-tn (ea 8 rsp-tn))
   (inst sub temp-reg-tn (thread-slot-ea thread-varyobj-space-addr-slot))

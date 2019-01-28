@@ -96,9 +96,9 @@
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defparameter *register-arg-names* '(rdx rdi rsi)))
   (defregset    *register-arg-offsets* rdx rdi rsi)
-  #!-win32
+  #-win32
   (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9)
-  #!+win32
+  #+win32
   (defregset    *c-call-register-arg-offsets* rcx rdx r8 r9))
 
 ;;;; SB definitions
@@ -132,12 +132,12 @@
   (fp-complex-single-immediate immediate-constant)
   (fp-complex-double-immediate immediate-constant)
 
-  #!+sb-simd-pack (int-sse-immediate immediate-constant)
-  #!+sb-simd-pack (double-sse-immediate immediate-constant)
-  #!+sb-simd-pack (single-sse-immediate immediate-constant)
-  #!+sb-simd-pack-256 (int-avx2-immediate immediate-constant)
-  #!+sb-simd-pack-256 (double-avx2-immediate immediate-constant)
-  #!+sb-simd-pack-256 (single-avx2-immediate immediate-constant)
+  #+sb-simd-pack (int-sse-immediate immediate-constant)
+  #+sb-simd-pack (double-sse-immediate immediate-constant)
+  #+sb-simd-pack (single-sse-immediate immediate-constant)
+  #+sb-simd-pack-256 (int-avx2-immediate immediate-constant)
+  #+sb-simd-pack-256 (double-avx2-immediate immediate-constant)
+  #+sb-simd-pack-256 (single-avx2-immediate immediate-constant)
   (immediate immediate-constant)
 
   ;;
@@ -156,17 +156,17 @@
   (double-stack stack)
   (complex-single-stack stack)  ; complex-single-floats
   (complex-double-stack stack :element-size 2)  ; complex-double-floats
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (int-sse-stack stack :element-size 2)
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (double-sse-stack stack :element-size 2)
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (single-sse-stack stack :element-size 2)
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (int-avx2-stack stack :element-size 4)
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (double-avx2-stack stack :element-size 4)
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (single-avx2-stack stack :element-size 4)
 
   ;;
@@ -252,23 +252,23 @@
                       :alternate-scs (complex-double-stack))
 
   ;; temporary only
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (sse-reg float-registers
            :locations #.*float-regs*)
   ;; regular values
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (int-sse-reg float-registers
                :locations #.*float-regs*
                :constant-scs (int-sse-immediate)
                :save-p t
                :alternate-scs (int-sse-stack))
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (double-sse-reg float-registers
                   :locations #.*float-regs*
                   :constant-scs (double-sse-immediate)
                   :save-p t
                   :alternate-scs (double-sse-stack))
-  #!+sb-simd-pack
+  #+sb-simd-pack
   (single-sse-reg float-registers
                   :locations #.*float-regs*
                   :constant-scs (single-sse-immediate)
@@ -277,19 +277,19 @@
   #!+avx2
   (avx2-reg float-registers
    :locations #.*float-regs*)
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (int-avx2-reg float-registers
                :locations #.*float-regs*
                :constant-scs (int-avx2-immediate)
                :save-p t
                :alternate-scs (int-avx2-stack))
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (double-avx2-reg float-registers
                   :locations #.*float-regs*
                   :constant-scs (double-avx2-immediate)
                   :save-p t
                   :alternate-scs (double-avx2-stack))
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (single-avx2-reg float-registers
                   :locations #.*float-regs*
                   :constant-scs (single-avx2-immediate)
@@ -311,10 +311,10 @@
 (defparameter *double-sc-names* '(double-reg double-stack))
 (defparameter *complex-sc-names* '(complex-single-reg complex-single-stack
                                    complex-double-reg complex-double-stack))
-#!+sb-simd-pack
+#+sb-simd-pack
 (defparameter *oword-sc-names* '(sse-reg int-sse-reg single-sse-reg double-sse-reg
                                  int-sse-stack single-sse-stack double-sse-stack))
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defparameter *hword-sc-names* '(avx2-reg int-avx2-reg single-avx2-reg double-avx2-reg
                                    int-avx2-stack single-avx2-stack double-avx2-stack))
 ) ; EVAL-WHEN
@@ -322,9 +322,9 @@
   . #.(mapcar (lambda (class-spec)
                 (let ((size
                         (case (car class-spec)
-                          #!+sb-simd-pack
+                          #+sb-simd-pack
                           (#.*oword-sc-names*   :oword)
-                          #!+sb-simd-pack-256
+                          #+sb-simd-pack-256
                           (#.*hword-sc-names*   :hword)
                           (#.*qword-sc-names*   :qword)
                           (#.*float-sc-names*   :float)
@@ -401,11 +401,11 @@
          character)
      immediate-sc-number)
     (symbol ; Symbols in static and immobile space are immediate
-     (when (or ;; With #!+immobile-symbols, all symbols are in immobile-space.
+     (when (or ;; With #+immobile-symbols, all symbols are in immobile-space.
                ;; And the cross-compiler always uses immobile-space if enabled.
                #!+(or immobile-symbols (and immobile-space sb-xc-host)) t
 
-               ;; Otherwise, if #!-immobile-symbols, and the symbol was present
+               ;; Otherwise, if #-immobile-symbols, and the symbol was present
                ;; in the initial core image as indicated by the symbol header, then
                ;; it's in immobile-space. There is a way in which the bit can be wrong,
                ;; but it's highly unlikely - the symbol would have to be uninterned from
@@ -420,7 +420,7 @@
 
                (static-symbol-p value))
        immediate-sc-number))
-    #!+immobile-space
+    #+immobile-space
     (layout
        immediate-sc-number)
     (single-float
@@ -459,7 +459,7 @@
           (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
                         (make-fixup val :immobile-object)))
-          #!+immobile-space
+          #+immobile-space
           (layout
            (make-fixup val :layout))
           (character (if tag

@@ -109,7 +109,7 @@
 ;;; On Unicode builds, SIMPLE-CHARACTER-STRING is a builtin type.
 ;;; For non-Unicode it is convenient to be able to use the type name
 ;;; as an alias of SIMPLE-BASE-STRING.
-#!-sb-unicode
+#-sb-unicode
 (sb-xc:deftype simple-character-string (&optional size)
   `(simple-base-string ,size))
 

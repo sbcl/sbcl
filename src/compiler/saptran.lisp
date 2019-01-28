@@ -17,10 +17,10 @@
 (deftransform foreign-symbol-address ((symbol &optional datap)
                                       ((constant-arg simple-string)
                                        &optional (constant-arg boolean)))
-  (if (and #!+sb-dynamic-core
+  (if (and #+sb-dynamic-core
            (not (and datap (lvar-value datap))))
       `(values (sap-int (foreign-symbol-sap symbol datap))
-               (or #!+sb-dynamic-core t))
+               (or #+sb-dynamic-core t))
       (give-up-ir1-transform)))
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
@@ -31,15 +31,15 @@
       `(foreign-symbol-sap symbol))
   #!+linkage-table
   (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
-      (let (#!-sb-dynamic-core (name (lvar-value symbol))
+      (let (#-sb-dynamic-core (name (lvar-value symbol))
             (datap (lvar-value datap)))
-        #!-sb-dynamic-core
+        #-sb-dynamic-core
         (if (or #+sb-xc-host t          ; only static symbols on host
                 (not datap)
                 (find-foreign-symbol-in-table name *static-foreign-symbols*))
             `(foreign-symbol-sap ,name)            ; VOP
             `(foreign-symbol-dataref-sap ,name))   ; VOP
-        #!+sb-dynamic-core
+        #+sb-dynamic-core
         (if datap
             `(foreign-symbol-dataref-sap symbol)
             `(foreign-symbol-sap symbol)))
@@ -192,7 +192,7 @@
 
 ;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
 
-#!-64-bit-registers
+#-64-bit-registers
 (progn
 #!+#.(cl:if (cl:eq :little-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn

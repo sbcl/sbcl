@@ -109,7 +109,7 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
   (+ (get-internal-real-time)
      (ash (sb-unix:unix-getpid) 32)))
 
-#!-win32
+#-win32
 (defun os-random-seed ()
   (or
    ;; On unices, we try to read from /dev/urandom and pass the results
@@ -125,7 +125,7 @@ See SB-EXT:SEED-RANDOM-STATE for a SBCL extension to this functionality."
         a)))
    (fallback-random-seed)))
 
-#!+win32
+#+win32
 (defun os-random-seed ()
   (/show0 "Getting randomness from CryptGenRandom")
   (or (sb-win32:crypt-gen-random 32)
@@ -245,7 +245,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 
 ;;; This function generates a 32bit integer between 0 and #xffffffff
 ;;; inclusive.
-#!-sb-fluid (declaim (inline random-chunk))
+#-sb-fluid (declaim (inline random-chunk))
 ;;; portable implementation
 #!-x86
 (defun random-mt19937-update (state)
@@ -302,7 +302,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (declare (type random-state state))
   (sb-vm::random-mt19937 (random-state-state state)))
 
-#!-sb-fluid (declaim (inline big-random-chunk))
+#-sb-fluid (declaim (inline big-random-chunk))
 (defun big-random-chunk (state)
   (declare (type random-state state))
   (logior (ash (random-chunk state) 32)
@@ -312,7 +312,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; float between 0.0 and 1.0 by clobbering the significand of 1.0
 ;;; with random bits, then subtracting 1.0. This hides the fact that
 ;;; we have a hidden bit.
-#!-sb-fluid (declaim (inline %random-single-float %random-double-float))
+#-sb-fluid (declaim (inline %random-single-float %random-double-float))
 (declaim (ftype (function ((single-float (0f0)) random-state)
                           (single-float 0f0))
                 %random-single-float))
@@ -384,7 +384,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; as the speed gains due to needing fewer loop iterations are by far
 ;;; outweighted by the cost of the two divisions required (one to find
 ;;; the multiplier and one to bring the result into the correct range).
-#!-sb-fluid (declaim (inline %random-fixnum))
+#-sb-fluid (declaim (inline %random-fixnum))
 (defun %random-fixnum (arg state)
   (declare (type (integer 1 #.sb-xc:most-positive-fixnum) arg)
            (type random-state state))
@@ -403,7 +403,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
               (accept-reject-loop big-random-chunk))))))
 
 (defun random (arg &optional (state *random-state*))
-  #!-sb-fluid (declare (inline %random-fixnum
+  #-sb-fluid (declare (inline %random-fixnum
                                %random-single-float %random-double-float
                                #+long-float %random-long-float))
   (declare (explicit-check))

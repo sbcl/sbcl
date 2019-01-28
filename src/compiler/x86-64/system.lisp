@@ -311,7 +311,7 @@
   (:generator 1
     (inst break pending-interrupt-trap)))
 
-#!+sb-thread
+#+sb-thread
 (progn
 (define-vop (current-thread-offset-sap/c)
   (:results (sap :scs (sap-reg)))
