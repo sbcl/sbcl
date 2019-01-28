@@ -132,7 +132,7 @@
  ("src/code/early-fasl" :c-headers)
 
  ("src/code/defbangstruct" :c-headers)
- ("src/code/early-thread")
+ ("src/code/early-thread" :c-headers)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
@@ -633,7 +633,7 @@
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
  ("src/code/gc"                :not-host)
- ("src/code/target-bst"        :not-host)
+ ("src/code/avltree"           :not-host)
  ("src/code/target-thread"     :not-host)
  ("src/code/timer" :not-host)
 

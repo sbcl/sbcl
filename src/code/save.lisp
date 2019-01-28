@@ -302,7 +302,6 @@ sufficiently motivated to do lengthy fixes."
   ;; Must clear this cache if asm routines are movable.
   (setq sb-disassem::*assembler-routines-by-addr* nil)
   (os-deinit)
-  (setq sb-thread::*stack-addr-table* nil)
   ;; Perform static linkage. Functions become un-statically-linked
   ;; on demand, for TRACE, redefinition, etc.
   #+immobile-code (sb-vm::statically-link-core)

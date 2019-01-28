@@ -346,7 +346,9 @@ not supported."
          #+sb-thread
          (sb-impl::finalizer-thread-stop)
          (sb-thread::with-all-threads-lock
-           (when (cdr sb-thread::*all-threads*)
+           (when (let ((avltree sb-thread::*all-threads*))
+                   (or (sb-thread::avlnode-left avltree)
+                       (sb-thread::avlnode-right avltree)))
              (go :error))
            (let ((pid (posix-fork)))
              #+darwin

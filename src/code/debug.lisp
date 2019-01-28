@@ -466,13 +466,10 @@ information."
                 sb-thread:*current-thread*)
                (all-threads
                 ;; find a stack whose base is nearest and below A.
-                ;; this is likely to return a wrong answer during thread creation/deletion
-                ;; due to the 'rotate' operations which are incrementally performed
-                ;; on the binary search tree.
-                (binding* ((node (bst-find<= a sb-thread::*stack-addr-table*) :exit-if-null)
-                           (data (bst-node-data node)))
-                  (when (< a (car data))
-                    (cdr data))))))))
+                (awhen (sb-thread::avl-find<= a sb-thread::*all-threads*)
+                  (let ((thread (sb-thread::avlnode-data it)))
+                    (when (< a (sb-thread::thread-stack-end thread))
+                      thread))))))))
 
 ;;;; frame printing
 

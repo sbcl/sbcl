@@ -3200,7 +3200,7 @@ core and return a descriptor to it."
       (dolist (slot (dd-slots dd))
         (let ((cell (aref names (- (dsd-index slot) sb-vm:instance-data-start)))
               (name (cstring (dsd-name slot))))
-          (if (eq (dsd-raw-type slot) t)
+          (if (member (dsd-raw-type slot) '(t sb-vm:word))
               (rplaca cell name)
               (rplacd cell name))))
       (loop for slot across names
@@ -3767,6 +3767,7 @@ III. initially undefined function references (alphabetically):
               (format stream "~&#include \"~A.h\"~%"
                       (string-downcase (sb-vm:primitive-object-name obj))))))
         (dolist (class '(classoid defstruct-description hash-table layout package
+                         sb-thread::avlnode
                          sb-c::compiled-debug-info sb-c::compiled-debug-fun))
           (out-to (string-downcase class)
             (write-structure-object (layout-info (find-layout class)) stream)))

@@ -145,13 +145,16 @@
 
 (with-test (:name (:threads :more-trivia))
   (let ((old-threads (list-all-threads))
-        (thread (make-thread (lambda ()
-                               (assert (find *current-thread*
-                                             sb-thread::*all-threads*))
-                               (sleep 2))))
+        (thread (make-thread
+                 (lambda ()
+                   (assert (sb-thread::avl-find
+                            (sb-kernel:get-lisp-obj-address sb-vm:*control-stack-start*)
+                            sb-thread::*all-threads*))
+                   (sleep 2))))
         (new-threads (list-all-threads)))
     (assert (thread-alive-p thread))
-    (assert (eq thread (first new-threads)))
+    ;; there is no order guarantee
+    ;;(assert (eq thread (first new-threads)))
     (assert (= (1+ (length old-threads)) (length new-threads)))
     (sleep 3)
     (assert (not (thread-alive-p thread)))))

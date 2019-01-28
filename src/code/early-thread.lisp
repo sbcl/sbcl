@@ -18,6 +18,11 @@ in future versions."
   (%ephemeral-p  nil :type boolean)
   ;; 0 is used on thread-less builds
   (os-thread  (ldb (byte sb-vm:n-word-bits 0) -1) :type sb-vm:word)
+  ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread (C memory).
+  ;; Reading that memory for any thread except *CURRENT-THREAD* is not safe
+  ;; due to possible unmapping on thread death. Technically this is a fixed amount
+  ;; below PRIMITIVE-THREAD, but the exact offset varies by build configuration.
+  (stack-end 0 :type sb-vm:word)
   ;; Points to the SB-VM::THREAD primitive object.
   ;; Yes, there are three different thread structures.
   (primitive-thread 0 :type sb-vm:word)
@@ -48,6 +53,12 @@ any time."
   #!+(and sb-thread sb-futex)
   (state    0 :type fixnum))
 (!set-load-form-method mutex (:xc))
+
+(def!struct (avlnode (:constructor avlnode (key data left right)))
+  (left  nil :read-only t)
+  (right nil :read-only t)
+  (key   0   :read-only t :type sb-vm:word)
+  data)
 
 ;; The host has a stub for this macro. The cross-compiler doesn't use
 ;; it until it's seen. So no SB-XC:DEFMACRO needed

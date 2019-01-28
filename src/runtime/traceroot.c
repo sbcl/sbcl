@@ -17,6 +17,7 @@
 #include "genesis/vector.h"
 #include "pseudo-atomic.h" // for get_alloc_pointer()
 #include "search.h"
+#include "genesis/avlnode.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -959,16 +960,31 @@ int prove_liveness(lispobj objects, int criterion)
 #define LISP_THREAD_NAME_SLOT INSTANCE_DATA_START+0
 #define LISP_THREAD_OS_THREAD_SLOT INSTANCE_DATA_START+3
 
+/* Perform exhaustive search on *ALL-THREADS* looking for a specific thread.
+ * Efficiency is not a concern.
+ */
+static struct instance* find_thread(os_thread_t os_thread, lispobj tree)
+{
+    if (tree == NIL) return 0;
+    struct avlnode* node = (struct avlnode*)native_pointer(tree);
+    struct instance* lisp_thread = (struct instance*)native_pointer(node->data);
+    if ((os_thread_t)lisp_thread->slots[LISP_THREAD_OS_THREAD_SLOT] == os_thread)
+        return lisp_thread;
+    if ((lisp_thread = find_thread(os_thread, node->left)) != NULL)
+        return lisp_thread;
+    if ((lisp_thread = find_thread(os_thread, node->right)) != NULL)
+        return lisp_thread;
+    return 0;
+}
+
 struct vector* lisp_thread_name(os_thread_t os_thread)
 {
     static unsigned int hint;
     lispobj* sym = find_symbol("*ALL-THREADS*", "SB-THREAD", &hint);
-    lispobj list = sym ? ((struct symbol*)sym)->value : NIL;
-    while (list != NIL) {
-        struct instance* lisp_thread = (struct instance*)native_pointer(CONS(list)->car);
-        list = CONS(list)->cdr;
-        if ((os_thread_t)lisp_thread->slots[LISP_THREAD_OS_THREAD_SLOT]
-            == os_thread)
+    if (sym) {
+        struct instance* lisp_thread =
+            find_thread(os_thread, ((struct symbol*)sym)->value);
+        if (lisp_thread)
             return VECTOR(lisp_thread->slots[LISP_THREAD_NAME_SLOT]);
     }
     return 0;
