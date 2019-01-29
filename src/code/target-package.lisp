@@ -1420,6 +1420,22 @@ uninterned."
 
 ;;; Check for name conflict caused by the import and let the user
 ;;; shadowing-import if there is.
+;;;
+;;; FIXME: we _might_ be wrong about importing into the KEYWORD package.
+;;; """
+;;; 11.1.2.3.1: Interning a Symbol in the KEYWORD Package
+;;; The KEYWORD package is treated differently than other packages in that special actions are taken
+;;; when a symbol is interned in it. In particular, when a symbol is interned in the KEYWORD package,
+;;; it is automatically made to be an external symbol and is automatically made to be a constant
+;;; variable with itself as a value.
+;;; """
+;;; It could be claimed that this use of the term "Interning" is specifically in
+;;; reference to the function INTERN, and not the general concept of interning.
+;;; Obviously we do make new keyword symbols external and constant.
+;;; But if it means interning in the sense of making a symbol accessible at all
+;;; in the keyword package, then IMPORT should share that characteristic of INTERN.
+;;; As noted at SB-INT:SELF-EVALUATING-P, there is precedent for it.
+;;;
 (defun import (symbols &optional (package (sane-package)))
   "Make SYMBOLS accessible as internal symbols in PACKAGE. If a symbol is
 already accessible then it has no effect. If a name conflict would result from
