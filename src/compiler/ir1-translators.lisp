@@ -658,7 +658,8 @@ be a lambda expression."
 (def-ir1-translator %funcall ((function &rest args) start next result)
   ;; MACROEXPAND so that (LAMBDA ...) forms arriving here don't get an
   ;; extra cast inserted for them.
-  (let ((function (%macroexpand function *lexenv*)))
+  (let ((function (handler-case (%macroexpand function *lexenv*)
+                    (error () function))))
     (if (typep function '(cons (member function global-function) (cons t null)))
         (with-fun-name-leaf (leaf (cadr function) start
                                   :global-function (eq (car function)
