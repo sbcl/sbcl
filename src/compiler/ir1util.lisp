@@ -251,6 +251,15 @@
                 (when (eq (block-start (first (block-succ (node-block node))))
                           (node-prev dest))
                   (return-from almost-immediately-used-p t))))))))
+
+;;; Check that all the uses are almost immediately used and look through CASTs,
+;;; as they can be freely deleted removing the immediateness
+(defun lvar-almost-immediately-used-p (lvar)
+  (do-uses (use lvar t)
+    (unless (and (almost-immediately-used-p lvar use)
+                 (or (not (cast-p use))
+                     (lvar-almost-immediately-used-p (cast-value use))))
+      (return))))
 
 ;;;; BLOCK UTILS
 

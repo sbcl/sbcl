@@ -1819,9 +1819,7 @@
                       (next-node (and next-ctran
                                       (ctran-next next-ctran))))
                  (and (eq next-node ref)
-                      (do-uses (use arg t)
-                        (unless (almost-immediately-used-p arg use)
-                          (return))))))
+                      (lvar-almost-immediately-used-p arg))))
            (not (block-delete-p (node-block ref)))
            ;; If the destinatation is dynamic extent, don't substitute unless
            ;; the source is as well.
@@ -1855,17 +1853,15 @@
               ;; because binding a variable is how multiple values are
               ;; turned into a single value.
               (and (type-single-value-p (lvar-derived-type arg))
-                   ;; Intervening nodes may produces non local exits with the same destination,
-                   ;; generating unknown values or otherwise complicating stack-analyze
+                   ;; Intervening nodes may produce non local exits with the same destination,
+                   ;; generating unknown values or otherwise complicating stack-analyze.
                    ;; Due to inlining and other substitutions
                    ;; only (let ((x non-inlinable-call)) x) can be transformed
                    (almost-immediately-used-p lvar (lambda-bind (lambda-var-home var)))
                    ;; Nothing else exits from here
                    (singleton-p (block-pred (node-block dest)))
                    ;; Nothing happens between the call and the return
-                   (do-uses (use arg t)
-                     (unless (almost-immediately-used-p arg use)
-                       (return)))))
+                   (lvar-almost-immediately-used-p arg)))
              (t
               (aver (lvar-single-value-p lvar))
               t))

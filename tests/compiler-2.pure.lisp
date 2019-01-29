@@ -1824,6 +1824,22 @@
                 (let ((x o)) x)))))))
    ((10 20) 10)))
 
+(with-test (:name :substitute-single-use-lvar-unknown-exits.6)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (block b
+        (return-from b
+          (let ((lv3 (random 10))
+                *)
+            (boole boole-1 lv3
+                   (the integer
+                        (catch 'ct4
+                          (let ((x (list '*)))
+                            (declare (dynamic-extent x))
+                            (return-from b (eval x))))))))))
+   (() 1)))
+
 (with-test (:name :lambda-let-inline)
   (let ((fun (checked-compile
               `(lambda ()
