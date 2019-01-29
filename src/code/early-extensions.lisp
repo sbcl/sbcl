@@ -1638,12 +1638,21 @@ to :INTERPRET, an interpreter will be used.")
         (t
          (coerce s 'simple-string))))
 
+;;; Return T if X is an object that always evaluates to itself. Guard against:
+;;;  (LET ((S 'XXX)) (SET S 9) (UNINTERN S) (IMPORT S 'KEYWORD) (SYMBOL-VALUE S)) => 9
+;;; whereby :XXX satisfies KEWORDP and has value 9, or maybe even has no value
+;;; if not assigned anything previously.
+;;; Interestingly, CLISP and CCL cause the symbol-value to become itself
+;;; (and MAKUNBOUND to be illegal). That's an interesting choice which closes
+;;; a weird loophole, but is not universal in all implementations.
 (defun self-evaluating-p (x)
   (typecase x
     (null t)
-    ;; This looks slighly broken if you intern a random non-constant symbol
-    ;; into the keyword package after uninterning it from its orginal home.
-    (symbol (or (eq x t) (eq (cl:symbol-package x) *keyword-package*)))
+    (symbol
+     (or (eq x t)
+         (and (eq (cl:symbol-package x) *keyword-package*)
+              (boundp x)
+              (eq (symbol-value x) x))))
     (cons nil)
     (t t)))
 

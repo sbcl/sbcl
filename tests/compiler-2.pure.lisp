@@ -2148,3 +2148,10 @@
           (lambda (&optional c) (error c))))
     (declare (notinline set))
     (set 'sb-c::*compiler-error-bailout* compiled-lambda)))
+
+(with-test (:name :self-evaluating-p-not)
+  (let ((s (gensym)))
+    (set s 9)
+    (unintern s)
+    (import s 'keyword)
+    (assert (not (sb-int:self-evaluating-p s)))))
