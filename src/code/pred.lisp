@@ -132,7 +132,7 @@
   (def-type-predicate-wrapper integerp)
   (def-type-predicate-wrapper listp)
   (def-type-predicate-wrapper long-float-p)
-  #!-(or x86 x86-64) (def-type-predicate-wrapper lra-p)
+  #-(or x86 x86-64) (def-type-predicate-wrapper lra-p)
   (def-type-predicate-wrapper null)
   (def-type-predicate-wrapper numberp)
   (def-type-predicate-wrapper rationalp)
@@ -177,7 +177,7 @@
   (def-type-predicate-wrapper vectorp)
   (def-type-predicate-wrapper vector-nil-p))
 
-#!+(or x86 x86-64 arm arm64)
+#+(or x86 x86-64 arm arm64)
 (defun fixnum-mod-p (x limit)
   (and (fixnump x)
        (<= 0 x limit)))
@@ -192,10 +192,10 @@
 #-sb-xc-host
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
-  #!+(and compact-instance-header x86-64)
+  #+(and compact-instance-header x86-64)
   (values (%primitive layout-of x
                       (load-time-value sb-kernel::**built-in-class-codes** t)))
-  #!-(and compact-instance-header x86-64)
+  #-(and compact-instance-header x86-64)
   (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
         ;; Compiler can dump literal layouts, which handily sidesteps
@@ -276,7 +276,7 @@
   (eq obj1 obj2))
 ;;; and this too, but it's only needed for backends on which
 ;;; IR1 might potentially transform EQL into %EQL/INTEGER.
-#!+integer-eql-vop
+#+integer-eql-vop
 (defun %eql/integer (obj1 obj2)
   ;; This is just for constant folding, no need to transform into the %EQL/INTEGER VOP
   (eql obj1 obj2))
@@ -307,8 +307,8 @@
              #+long-float
              (long-float eql)
              (bignum
-              #!-integer-eql-vop (lambda (x y) (zerop (bignum-compare x y)))
-              #!+integer-eql-vop eql) ; will become %eql/integer
+              #-integer-eql-vop (lambda (x y) (zerop (bignum-compare x y)))
+              #+integer-eql-vop eql) ; will become %eql/integer
              (ratio
               (lambda (x y)
                 (and (eql (numerator x) (numerator y))

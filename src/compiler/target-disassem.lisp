@@ -358,7 +358,7 @@
            (type alignment size))
   (zerop (logand (1- size) address)))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (progn
 (defconstant lra-size (words-to-bytes 1))
 (defun lra-hook (chunk stream dstate)
@@ -1003,7 +1003,7 @@
       (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
 (defvar *default-dstate-hooks*
-  (list* #!-(or x86 x86-64) #'lra-hook nil))
+  (list* #-(or x86 x86-64) #'lra-hook nil))
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
@@ -1629,8 +1629,8 @@
          ;; FIXME: interpreted methods need to be compiled as above.
          (list thing (sb-pcl::%method-function-fast-function thing)))
     ((or (cons (eql lambda))
-         #!+sb-fasteval sb-interpreter:interpreted-function
-         #!+sb-eval sb-eval:interpreted-function)
+         #+sb-fasteval sb-interpreter:interpreted-function
+         #+sb-eval sb-eval:interpreted-function)
      (compile nil thing))
     (function thing)
     (t nil)))
@@ -1870,7 +1870,7 @@
           #-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
-    #!+sb-safepoint
+    #+sb-safepoint
     (setf (gethash (+ sb-vm:gc-safepoint-page-addr
                       sb-c:+backend-page-bytes+
                       (- sb-vm:gc-safepoint-trap-offset)) addr->name)
@@ -1892,7 +1892,7 @@
                    (when (<= (car locs) offset (cadr locs))
                      (return-from find-assembler-routine
                       (values name (- address (+ start (car locs))))))
-                   #!+(or x86 x86-64)
+                   #+(or x86 x86-64)
                    (when (eql index (cddr locs))
                      (return-from find-assembler-routine
                       (values name 0)))))))
@@ -1906,7 +1906,7 @@
            (type (member :little-endian :big-endian) byte-order))
   (if (or (eq length 1)
           (and (eq byte-order #+big-endian :big-endian #+little-endian :little-endian)
-               #!-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
+               #-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
                (not (logtest (1- length) (sap-int (sap+ sap offset))))))
       (case length
         (8 (sap-ref-64 sap offset))
@@ -2021,7 +2021,7 @@
   (unless (typep address 'address)
     (return-from maybe-note-assembler-routine nil))
   (multiple-value-bind (name offs) (find-assembler-routine address)
-    #!+linkage-table
+    #+linkage-table
     (unless name
       (setq name (sap-foreign-symbol (int-sap address))))
     (when name
@@ -2177,7 +2177,7 @@
 ;;; arm64 stores an error-number in the instruction bytes,
 ;;; so can't easily share this code.
 ;;; But probably we should just add the conditionalization in here.
-#!-arm64
+#-arm64
 (defun snarf-error-junk (sap offset trap-number &optional length-only (compact-error-trap t))
   (let* ((index offset)
          (error-byte t)
@@ -2242,7 +2242,7 @@
   ;; initial instruction space is built, so it can all be removed.
   ;; But if you need all these macros to exist for some reason,
   ;; then define one of the two following features to keep them:
-  #!-(or sb-fluid sb-retain-assembler-macros)
+  #-(or sb-fluid sb-retain-assembler-macros)
   (do-symbols (symbol sb-assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format)))

@@ -431,7 +431,7 @@
            (sb-kernel:lexenv (sb-c::null-lexenv-p env))
            ;; a LOCALLY environment would be fine,
            ;; but is not an important case to handle.
-           #!+sb-fasteval (sb-interpreter:basic-env nil)
+           #+sb-fasteval (sb-interpreter:basic-env nil)
            (null t)))
          ;; Decide whether the expansion should delay reference
          ;; to this structure type. (See explanation up above).
@@ -653,7 +653,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
       (structure
        (when (dd-offset dd)
          (error ":OFFSET can't be specified unless :TYPE is specified."))
-       #!-compact-instance-header
+       #-compact-instance-header
        (unless (dd-include dd)
          ;; FIXME: It'd be cleaner to treat no-:INCLUDE as defaulting
          ;; to :INCLUDE STRUCTURE-OBJECT, and then let the general-case
@@ -1584,7 +1584,7 @@ or they must be declared locally notinline at each call site.~@:>"
    ;; Until someone does that, this means that instances with raw slots can be
    ;; DX allocated only on platforms with those additional VOPs.
   (aver (= (length dd-slots) (length values)))
-  (if (or #!+(or ppc ppc64 x86 x86-64) t)
+  (if (or #+(or ppc ppc64 x86 x86-64) t)
     ;; Have raw-instance-init vops
     (collect ((slot-specs) (slot-values))
       (mapc (lambda (dsd value &aux (raw-type (dsd-raw-type dsd))

@@ -527,14 +527,14 @@
                           (policy *lexenv* (zerop safety))))
               (found-allow-p nil))
 
-          (temps #!-stack-grows-downward-not-upward
+          (temps #-stack-grows-downward-not-upward
                  `(,n-index (1- ,n-count))
-                 #!+stack-grows-downward-not-upward
+                 #+stack-grows-downward-not-upward
                  `(,n-index (- (1- ,n-count)))
-                 #!-stack-grows-downward-not-upward n-value-temp
-                 #!-stack-grows-downward-not-upward n-key)
+                 #-stack-grows-downward-not-upward n-value-temp
+                 #-stack-grows-downward-not-upward n-key)
           (body `(declare (fixnum ,n-index)
-                          #!-stack-grows-downward-not-upward
+                          #-stack-grows-downward-not-upward
                           (ignorable ,n-value-temp ,n-key)))
 
           (collect ((tests))
@@ -585,7 +585,7 @@
                 (%odd-key-args-error)))
 
             (body
-             #!-stack-grows-downward-not-upward
+             #-stack-grows-downward-not-upward
              `(locally
                 (declare (optimize (safety 0)))
                 (loop
@@ -595,7 +595,7 @@
                   (setq ,n-key (%more-arg ,n-context ,n-index))
                   (decf ,n-index)
                   (cond ,@(tests))))
-             #!+stack-grows-downward-not-upward
+             #+stack-grows-downward-not-upward
              `(locally (declare (optimize (safety 0)))
                 (loop
                   (when (plusp ,n-index) (return))
@@ -974,14 +974,14 @@
         res))))
 
 (defun wrap-forms-in-debug-catch (forms)
-  #!+unwind-to-frame-and-call-vop
+  #+unwind-to-frame-and-call-vop
   `((multiple-value-prog1
       (progn
         ,@forms)
       ;; Just ensure that there won't be any tail-calls, IR2 magic will
       ;; handle the rest.
       (values)))
-  #!-unwind-to-frame-and-call-vop
+  #-unwind-to-frame-and-call-vop
   `( ;; Normally, we'll return from this block with the below RETURN-FROM.
     (block
         return-value-tag

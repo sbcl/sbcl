@@ -197,16 +197,16 @@
   #-win32
   '(inst mov (make-ea :dword :disp (* 4 thread-pseudo-atomic-bits-slot)) 0 :fs))
 
-#!+sb-safepoint
+#+sb-safepoint
 (defun emit-safepoint ()
   (inst test eax-tn (make-ea :dword :disp
                              (- nil-value n-word-bytes other-pointer-lowtag
                                 gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic ((&key elide-if) &rest forms)
-  #!+sb-safepoint-strictly
+  #+sb-safepoint-strictly
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
-  #!-sb-safepoint-strictly
+  #-sb-safepoint-strictly
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
@@ -224,7 +224,7 @@
          ;; using the process signal mask.
          (inst break pending-interrupt-trap)
          (emit-label ,label)
-         #!+sb-safepoint
+         #+sb-safepoint
          ;; In this case, when allocation thinks a GC should be done, it
          ;; does not mark PA as interrupted, but schedules a safepoint
          ;; trap instead.  Let's take the opportunity to trigger that
@@ -416,7 +416,7 @@
    The value of the BASE register is undefined following the macro invocation."
   (check-type base-already-live-p boolean)
   (check-type disp-type (member :index :constant))
-  #!-(and win32 sb-thread)
+  #-(and win32 sb-thread)
   (let ((body (subst :fs :maybe-fs body)))
     (ecase disp-type
       (:constant
@@ -435,7 +435,7 @@
           ,@(subst `(make-ea :dword :base ,base)
                    ea-var
                    body)))))
-  #!+(and win32 sb-thread)
+  #+(and win32 sb-thread)
   ;; goes through a temporary register to add the thread address into it
   (multiple-value-bind (constant-disp ea-disp)
       (ecase disp-type

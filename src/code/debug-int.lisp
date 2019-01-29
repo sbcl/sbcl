@@ -486,24 +486,24 @@
   ;; FIXME: this isn't really right, because the 'fixups' slot
   ;; is already accounted for in the fixed part of the code header.
   ;; X86 stores a fixup vector at the first constant slot
-  #!-x86 sb-vm:code-constants-offset
-  #!+x86 (1+ sb-vm:code-constants-offset))
+  #-x86 sb-vm:code-constants-offset
+  #+x86 (1+ sb-vm:code-constants-offset))
 
 #-sb-fluid (declaim (inline control-stack-pointer-valid-p))
 (defun control-stack-pointer-valid-p (x &optional (aligned t))
   (declare (type system-area-pointer x))
-  (let* (#!-stack-grows-downward-not-upward
+  (let* (#-stack-grows-downward-not-upward
          (control-stack-start
           (descriptor-sap *control-stack-start*))
-         #!+stack-grows-downward-not-upward
+         #+stack-grows-downward-not-upward
          (control-stack-end
           (descriptor-sap *control-stack-end*)))
-    #!-stack-grows-downward-not-upward
+    #-stack-grows-downward-not-upward
     (and (sap< x (current-sp))
          (sap<= control-stack-start x)
          (or (not aligned) (zerop (logand (sap-int x)
                                           (1- (ash 1 sb-vm:word-shift))))))
-    #!+stack-grows-downward-not-upward
+    #+stack-grows-downward-not-upward
     (and (sap>= x (current-sp))
          (sap> control-stack-end x)
          (or (not aligned) (zerop (logand (sap-int x)
@@ -600,7 +600,7 @@
 
 ;;;; (OR X86 X86-64) support
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (progn
 
 (defun compute-lra-data-from-pc (pc)
@@ -671,7 +671,7 @@
       ((not (frame-p frame)))
     (setf (frame-number frame) number)))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun find-saved-frame-down (fp up-frame)
   (multiple-value-bind (saved-fp saved-pc)
       (find-saved-fp-and-pc fp)
@@ -704,7 +704,7 @@
                           (sap-ref-lispobj pointer
                                            (* n-word-bytes -2))))))))
 
-#!+c-stack-is-control-stack
+#+c-stack-is-control-stack
 (defun find-saved-fp-and-pc (fp)
   (block nil
     (walk-binding-stack
@@ -715,9 +715,9 @@
                 (caller-fp (sap-ref-sap saved-fp
                                         (sb-vm::frame-byte-offset
                                          ocfp-save-offset))))
-           (when (#!+stack-grows-downward-not-upward
+           (when (#+stack-grows-downward-not-upward
                   sap>
-                  #!-stack-grows-downward-not-upward
+                  #-stack-grows-downward-not-upward
                   sap<
                   caller-fp fp)
              (return (values caller-fp
@@ -727,9 +727,9 @@
 
 (defun return-pc-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))
-  #!+fp-and-pc-standard-save
+  #+fp-and-pc-standard-save
   sb-c:return-pc-passing-offset
-  #!-fp-and-pc-standard-save
+  #-fp-and-pc-standard-save
   (etypecase debug-fun
     (compiled-debug-fun
      (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
@@ -744,9 +744,9 @@
 
 (defun old-fp-offset-for-location (debug-fun location)
   (declare (ignorable debug-fun location))
-  #!+fp-and-pc-standard-save
+  #+fp-and-pc-standard-save
   sb-c:old-fp-passing-offset
-  #!-fp-and-pc-standard-save
+  #-fp-and-pc-standard-save
   (etypecase debug-fun
     (compiled-debug-fun
      (let ((c-d-f (compiled-debug-fun-compiler-debug-fun debug-fun))
@@ -792,12 +792,12 @@
           (setf (frame-%down frame)
                 (etypecase debug-fun
                   ((or compiled-debug-fun
-                       #!-(or x86 x86-64) bogus-debug-fun)
+                       #-(or x86 x86-64) bogus-debug-fun)
                    (compute-calling-frame
                     (descriptor-sap (frame-saved-cfp frame debug-fun))
                     (frame-saved-lra frame debug-fun)
                     frame))
-                  #!+(or x86 x86-64)
+                  #+(or x86 x86-64)
                   (bogus-debug-fun
                    (let ((fp (frame-pointer frame)))
                      (when (control-stack-pointer-valid-p fp)
@@ -827,7 +827,7 @@
 ;;; Note: Sometimes LRA is actually a fixnum. This happens when lisp
 ;;; calls into C. In this case, the code object is stored on the stack
 ;;; after the LRA, and the LRA is the word offset.
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (defun compute-calling-frame (caller lra up-frame &optional savedp)
   (declare (type system-area-pointer caller)
            (ignore savedp))
@@ -876,7 +876,7 @@
                                  (if up-frame (1+ (frame-number up-frame)) 0)
                                  escaped))))))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun compute-calling-frame (caller ra up-frame &optional savedp)
   (declare (type system-area-pointer caller ra))
   (/noshow0 "entering COMPUTE-CALLING-FRAME")
@@ -929,14 +929,14 @@
   (declare (type (mod #.sb-vm::max-interrupts) n)
            (optimize (speed 3) (safety 0)))
   (let* ((n (- -1 n
-               #!+sb-safepoint
+               #+sb-safepoint
                ;; the C safepoint page
                (/ sb-c:+backend-page-bytes+ n-word-bytes)))
          (context-pointer
            ;; The Alpha code is quite possibly wrong; I have no idea.
            (sb-vm::current-thread-offset-sap
-            #!-alpha n
-            #!+alpha (* 2 n))))
+            #-alpha n
+            #+alpha (* 2 n))))
     (sb-alien:sap-alien context-pointer (* os-context-t))))
 
 ;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
@@ -954,7 +954,7 @@
 
 (defun catch-runaway-unwind (block)
   (declare (ignorable block))
-  #!-(and win32 x86) ;; uses SEH
+  #-(and win32 x86) ;; uses SEH
   (let ((target (sap-ref-sap (descriptor-sap block)
                              (* unwind-block-uwp-slot n-word-bytes))))
     (loop for uwp = (descriptor-sap sb-vm::*current-unwind-protect-block*)
@@ -1003,7 +1003,7 @@
     (let* ((context (nth-interrupt-context index))
            (cfp (int-sap (context-register context sb-vm::cfp-offset))))
       (/noshow0 "got CONTEXT")
-      #!+(or x86 x86-64)
+      #+(or x86 x86-64)
       (unless (control-stack-pointer-valid-p cfp)
         (return (values nil nil nil t)))
       (when (sap= frame-pointer cfp)
@@ -1011,7 +1011,7 @@
           (/noshow0 "in WITHOUT-GCING")
           (return (escaped-frame-from-context context)))))))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
@@ -1036,7 +1036,7 @@
         (return
           (values code pc-offset context))))))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (defun escaped-frame-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (block nil
@@ -1065,9 +1065,9 @@
                      (sap-int (context-pc context))
                      code
                      (%code-entry-point code 0)
-                     #!-(or arm arm64)
+                     #-(or arm arm64)
                      (context-register context sb-vm::lra-offset)
-                     #!+(or arm arm64)
+                     #+(or arm arm64)
                      (stack-ref (int-sap (context-register context
                                                            sb-vm::cfp-offset))
                                 lra-save-offset)
@@ -1086,7 +1086,7 @@
                         nil))
               (values code pc-offset context)))))))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (defun find-pc-from-assembly-fun (code scp)
   "Finds the PC for the return from an assembly routine properly.
 For some architectures (such as PPC) this will not be the $LRA
@@ -1103,12 +1103,12 @@ register."
 ;;; Find the code object corresponding to the object represented by
 ;;; bits and return it. We assume bogus functions correspond to the
 ;;; undefined-function.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun code-object-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   (code-header-from-pc (context-pc context)))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (defun code-object-from-context (context)
   (declare (type (sb-alien:alien (* os-context-t)) context))
   ;; The GC constraint on the program counter on precisely-scavenged
@@ -1249,14 +1249,14 @@ register."
         (fp (frame-pointer frame)))
     (labels ((catch-ref (slot)
                (sap-ref-lispobj catch (* slot n-word-bytes)))
-             #!-(or x86 x86-64)
+             #-(or x86 x86-64)
              (catch-entry-offset ()
                (let ((lra (catch-ref catch-block-entry-pc-slot))
                      (component (catch-ref catch-block-code-slot)))
                  (* (- (1+ (get-header-data lra))
                        (code-header-words component))
                     n-word-bytes)))
-             #!+(or x86 x86-64)
+             #+(or x86 x86-64)
              (catch-entry-offset ()
                (let* ((ra (sap-ref-sap
                            catch (* catch-block-entry-pc-slot
@@ -1380,7 +1380,7 @@ register."
        ;; Frames named (.EVAL. special-operator) should show the operator name
        ;; in backtraces, but if the debugger needs to detect that the frame is
        ;; interpreted for other purposes, it can specify PRETTY = NIL.
-       (cond #!+sb-fasteval
+       (cond #+sb-fasteval
              ((and (typep name '(cons (eql sb-interpreter::.eval.)))
                    pretty)
               (if (singleton-p (cdr name)) (cadr name) (cdr name)))
@@ -1414,7 +1414,7 @@ register."
     (acond
        ;; Frames named (.APPLY. something) are interpreted function applicators.
        ;; Show them as the name of the interpreted function being applied.
-       #!+sb-fasteval
+       #+sb-fasteval
        ((let ((name (sb-c::compiled-debug-fun-name compiler-debug-fun)))
           (when (typep name '(cons (eql sb-interpreter::.apply.)))
             ;; Find a variable named FUN.
@@ -2290,9 +2290,9 @@ register."
       ;; non-object which is harmless on the conservative backends
       ;; but harmful on precise GC.
       (macrolet ((possibly-pin (form)
-                   #!+(or x86 x86-64)
+                   #+(or x86 x86-64)
                    `(with-pinned-objects ((%make-lisp-obj val)) ,form)
-                   #!-(or x86 x86-64) form))
+                   #-(or x86 x86-64) form))
         (let ((obj (if (and (typep val 'word) (is-lisp-pointer val))
                        (possibly-pin
                         (if (= (valid-lisp-pointer-p (int-sap val)) 0)
@@ -2335,27 +2335,27 @@ register."
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
                ;; up for them.
-               #!+c-stack-is-control-stack
+               #+c-stack-is-control-stack
                `(let ((,var fp))
                   ,@body)
-               #!-c-stack-is-control-stack
+               #-c-stack-is-control-stack
                `(let ((,var (if escaped
                                 (int-sap
                                  (sb-vm:context-register escaped
                                                          sb-vm::nfp-offset))
-                                #!-alpha
+                                #-alpha
                                 (sap-ref-sap fp (* nfp-save-offset
                                                    sb-vm:n-word-bytes))
-                                #!+alpha
+                                #+alpha
                                 (sb-vm::make-number-stack-pointer
                                  (sap-ref-32 fp (* nfp-save-offset
                                                    sb-vm:n-word-bytes))))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                `(+ (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
                    ,offset)
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                `(+ (* (sb-c:sc+offset-offset sc+offset) sb-vm:n-word-bytes)
                    ,offset)))
     (ecase (sb-c:sc+offset-scn sc+offset)
@@ -2376,10 +2376,10 @@ register."
       (#.sb-vm:unsigned-reg-sc-number
        (with-escaped-value (val)
          val))
-      #!-(or x86 x86-64)
+      #-(or x86 x86-64)
       (#.sb-vm:non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
-      #!-(or x86 x86-64)
+      #-(or x86 x86-64)
       (#.sb-vm:interior-reg-sc-number
        (error "Local interior register access?"))
       (#.sb-vm:single-reg-sc-number
@@ -2422,8 +2422,8 @@ register."
          (complex
           (sap-ref-long nfp (number-stack-offset))
           (sap-ref-long nfp
-                        (number-stack-offset #!+sparc 4
-                                             #!+(or x86 x86-64) 3)))))
+                        (number-stack-offset #+sparc 4
+                                             #+(or x86 x86-64) 3)))))
       (#.sb-vm:control-stack-sc-number
        (stack-ref fp (sb-c:sc+offset-offset sc+offset)))
       (#.sb-vm:character-stack-sc-number
@@ -2516,29 +2516,29 @@ register."
              (with-nfp ((var) &body body)
                ;; x86oids have no separate number stack, so dummy it
                ;; up for them.
-               #!+c-stack-is-control-stack
+               #+c-stack-is-control-stack
                `(let ((,var fp))
                   ,@body)
-               #!-c-stack-is-control-stack
+               #-c-stack-is-control-stack
                `(let ((,var (if escaped
                                 (int-sap
                                  (sb-vm:context-register escaped
                                                          sb-vm::nfp-offset))
-                                #!-alpha
+                                #-alpha
                                 (sap-ref-sap fp
                                              (* nfp-save-offset
                                                 sb-vm:n-word-bytes))
-                                #!+alpha
+                                #+alpha
                                 (sb-vm::make-number-stack-pointer
                                  (sap-ref-32 fp
                                              (* nfp-save-offset
                                                 sb-vm:n-word-bytes))))))
                   ,@body))
              (number-stack-offset (&optional (offset 0))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                `(+ (sb-vm::frame-byte-offset (sb-c:sc+offset-offset sc+offset))
                    ,offset)
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                `(+ (* (sb-c:sc+offset-offset sc+offset) sb-vm:n-word-bytes)
                    ,offset)))
     (ecase (sb-c:sc+offset-scn sc+offset)
@@ -2553,14 +2553,14 @@ register."
        (set-escaped-value (logand value (1- (ash 1 sb-vm:n-word-bits)))))
       (#.sb-vm:unsigned-reg-sc-number
        (set-escaped-value value))
-      #!-(or x86 x86-64)
+      #-(or x86 x86-64)
       (#.sb-vm:non-descriptor-reg-sc-number
        (error "Local non-descriptor register access?"))
-      #!-(or x86 x86-64)
+      #-(or x86 x86-64)
       (#.sb-vm:interior-reg-sc-number
        (error "Local interior register access?"))
       (#.sb-vm:single-reg-sc-number
-       #!-(or x86 x86-64) ;; don't have escaped floats.
+       #-(or x86 x86-64) ;; don't have escaped floats.
        (set-escaped-float-value single-float value))
       (#.sb-vm:double-reg-sc-number
        (set-escaped-float-value double-float value))
@@ -2590,42 +2590,42 @@ register."
       (#.sb-vm:complex-single-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-single nfp (number-stack-offset))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                (realpart (the (complex single-float) value))
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                (the single-float (realpart value)))
          (setf (sap-ref-single nfp (number-stack-offset 4))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                (imagpart (the (complex single-float) value))
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                (the single-float (realpart value)))))
       (#.sb-vm:complex-double-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-double nfp (number-stack-offset))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                (realpart (the (complex double-float) value))
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                (the double-float (realpart value)))
          (setf (sap-ref-double nfp (number-stack-offset 8))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                (imagpart (the (complex double-float) value))
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                (the double-float (realpart value)))))
       #+long-float
       (#.sb-vm:complex-long-stack-sc-number
        (with-nfp (nfp)
          (setf (sap-ref-long
                 nfp (number-stack-offset))
-               #!+(or x86 x86-64)
+               #+(or x86 x86-64)
                (realpart (the (complex long-float) value))
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                (the long-float (realpart value)))
          (setf (sap-ref-long
-                nfp (number-stack-offset #!+sparc 4
-                                        #!+(or x86 x86-64) 3))
-               #!+(or x86 x86-64)
+                nfp (number-stack-offset #+sparc 4
+                                        #+(or x86 x86-64) 3))
+               #+(or x86 x86-64)
                (imagpart (the (complex long-float) value))
-               #!-(or x86 x86-64)
+               #-(or x86 x86-64)
                (the long-float (realpart value)))))
       (#.sb-vm:control-stack-sc-number
        (setf (stack-ref fp (sb-c:sc+offset-offset sc+offset)) value))
@@ -3094,7 +3094,7 @@ register."
     (do ((frame frame (frame-down frame)))
         ((not frame) nil)
       (when (and (compiled-frame-p frame)
-                 (#!-(or x86 x86-64) eq #!+(or x86 x86-64) sap=
+                 (#-(or x86 x86-64) eq #+(or x86 x86-64) sap=
                   lra
                   (frame-saved-lra frame (frame-debug-fun frame))))
         (return t)))))
@@ -3377,7 +3377,7 @@ register."
     ;; Some platforms have no usable sigreturn() call.  If your
     ;; implementation of arch_do_displaced_inst() _does_ sigreturn(),
     ;; it's polite to warn here
-    #!+(and sparc solaris)
+    #+(and sparc solaris)
     (error "BREAKPOINT-DO-DISPLACED-INST returned?")))
 
 (defun invoke-breakpoint-hooks (breakpoints signal-context)
@@ -3400,8 +3400,8 @@ register."
                            ;; KLUDGE: This argument is ignored on
                            ;; x86oids in this scenario, but is
                            ;; declared to be a SAP.
-                           #!+(or x86 x86-64) (sb-vm:context-pc scp)
-                           #!-(or x86 x86-64) nil
+                           #+(or x86 x86-64) (sb-vm:context-pc scp)
+                           #-(or x86 x86-64) nil
                            nil)))
 
 (defun handle-fun-end-breakpoint (offset component context)
@@ -3436,8 +3436,8 @@ register."
 (defun get-fun-end-breakpoint-values (scp)
   (let ((ocfp (int-sap (sb-vm:context-register
                         scp
-                        #!-(or x86 x86-64) sb-vm::ocfp-offset
-                        #!+(or x86 x86-64) sb-vm::ebx-offset)))
+                        #-(or x86 x86-64) sb-vm::ocfp-offset
+                        #+(or x86 x86-64) sb-vm::ebx-offset)))
         (nargs (boxed-context-register scp sb-vm::nargs-offset))
         (reg-arg-offsets '#.sb-vm::*register-arg-offsets*)
         (results nil))
@@ -3445,7 +3445,7 @@ register."
       (push (if reg-arg-offsets
                 (boxed-context-register scp (pop reg-arg-offsets))
                 (stack-ref ocfp (+ arg-num
-                                   #!+(or x86 x86-64) sb-vm::sp->fp-offset)))
+                                   #+(or x86 x86-64) sb-vm::sp->fp-offset)))
             results))
     (nreverse results)))
 
@@ -3453,12 +3453,12 @@ register."
 
 (defconstant bogus-lra-constants
   (+ sb-vm:code-constants-offset
-     #!-(or x86-64 x86) 1
+     #-(or x86-64 x86) 1
      ;; Wtf???
-     #!+x86-64 2
+     #+x86-64 2
      ;; FIXME: 'fixups' already accounted for in header.
      ;; One more for a fixup vector
-     #!+x86 3))
+     #+x86 3))
 
 ;;; Make a bogus LRA object that signals a breakpoint trap when
 ;;; returned to. If the breakpoint trap handler returns, REAL-LRA is
@@ -3482,12 +3482,12 @@ register."
                (type index length))
       (setf (%code-debug-info code-object) :bogus-lra)
       (system-area-ub8-copy src-start 0 dst-start 0 length)
-      #!+(or x86 x86-64)
+      #+(or x86 x86-64)
       (multiple-value-bind (offset code) (compute-lra-data-from-pc real-lra)
         (setf (code-header-ref code-object real-lra-slot) code)
         (setf (code-header-ref code-object (1+ real-lra-slot)) offset)
         (values dst-start code-object (sap- trap-loc src-start)))
-      #!-(or x86 x86-64)
+      #-(or x86 x86-64)
       (let ((new-lra (make-lisp-obj (+ (sap-int dst-start)
                                        sb-vm:other-pointer-lowtag))))
         (setf (code-header-ref code-object real-lra-slot) real-lra)

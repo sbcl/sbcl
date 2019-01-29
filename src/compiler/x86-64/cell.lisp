@@ -65,7 +65,7 @@
   (:info name dx-p offset lowtag)
   (:generator 1
     (progn name dx-p)
-    (cond #!+compact-instance-header
+    (cond #+compact-instance-header
           ((and (eq name '%make-structure-instance) (eql offset :layout))
         ;; The layout is in the upper half of the header word.
            (inst mov :dword (ea (- 4 instance-pointer-lowtag) object)
@@ -649,7 +649,7 @@
     (inst and :dword res short-header-max-words) ; clear special GC bit
     (inst shl :dword res n-fixnum-tag-bits)))
 
-#!+compact-instance-header
+#+compact-instance-header
 (progn
  (define-vop (%instance-layout)
    (:translate %instance-layout)

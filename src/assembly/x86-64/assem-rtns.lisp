@@ -137,7 +137,7 @@
     ;; Calculate NARGS (as a fixnum)
     (move nargs rsi)
     (inst sub nargs rsp-tn)
-    #!-#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
+    #-#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
     (inst shr nargs (- word-shift n-fixnum-tag-bits))
 
     ;; Check for all the args fitting the registers.

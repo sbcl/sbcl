@@ -396,7 +396,7 @@
 
 ;;; TRANSFORM-INSTANCE-TYPEP checks for this vop by name and will try to use it,
 ;;; so don't define it if inapplicable.
-#!+compact-instance-header
+#+compact-instance-header
 (progn
 (defknown layout-eq (instance t) boolean (flushable))
 (define-vop (layout-eq)

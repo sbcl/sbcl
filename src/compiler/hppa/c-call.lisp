@@ -237,7 +237,7 @@
   (:generator 2
     (inst li (make-fixup foreign-symbol :foreign) res)))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)

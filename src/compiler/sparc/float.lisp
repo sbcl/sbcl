@@ -1569,7 +1569,7 @@
 
 ;;;; Complex float arithmetic
 
-#!+complex-fp-vops
+#+complex-fp-vops
 (progn
 
 ;; Negate a complex
@@ -2241,7 +2241,7 @@
               (:vop-var vop)
               (:save-p :compute-only)
               (:temporary (:sc ,real-reg) fp-zero)
-              (:guard #!-:sparc-v9 nil #!+:sparc-v9 t)
+              (:guard #-:sparc-v9 nil #+:sparc-v9 t)
               (:generator 6
                (note-this-location vop :internal-error)
                (let ((yr (,real-part y))
@@ -2250,10 +2250,10 @@
                  (inst ,fsub fp-zero fp-zero fp-zero)
                  (inst ,fcmp x yr)
                  (inst nop)
-                 (inst fb (if not-p :ne :eq) target #!+sparc-v9 :fcc0 #!+sparc-v9 :pn)
+                 (inst fb (if not-p :ne :eq) target #+sparc-v9 :fcc0 #+sparc-v9 :pn)
                  (inst ,fcmp yi fp-zero)
                  (inst nop)
-                 (inst fb (if not-p :ne :eq) target #!+sparc-v9 :fcc0 #!+sparc-v9 :pn)
+                 (inst fb (if not-p :ne :eq) target #+sparc-v9 :fcc0 #+sparc-v9 :pn)
                  (inst nop))))
             ;; (= complex float)
             (define-vop (,vop-name-r)
@@ -2268,7 +2268,7 @@
               (:vop-var vop)
               (:save-p :compute-only)
               (:temporary (:sc ,real-reg) fp-zero)
-              (:guard #!-:sparc-v9 t #!+:sparc-v9 nil)
+              (:guard #-:sparc-v9 t #+:sparc-v9 nil)
               (:generator 6
                (note-this-location vop :internal-error)
                (let ((yr (,real-part y))
@@ -2277,10 +2277,10 @@
                  (inst ,fsub fp-zero fp-zero fp-zero)
                  (inst ,fcmp x yr)
                  (inst nop)
-                 (inst fb (if not-p :ne :eq) target #!+sparc-v9 :fcc0 #!+sparc-v9 :pn)
+                 (inst fb (if not-p :ne :eq) target #+sparc-v9 :fcc0 #+sparc-v9 :pn)
                  (inst ,fcmp yi fp-zero)
                  (inst nop)
-                 (inst fb (if not-p :ne :eq) target #!+sparc-v9 :fcc0 #!+sparc-v9 :pn)
+                 (inst fb (if not-p :ne :eq) target #+sparc-v9 :fcc0 #+sparc-v9 :pn)
                  (inst nop))))))))
   (frob %compare-complex-single-single %compare-single-complex-single
         single fcmps fsubs)
@@ -2315,10 +2315,10 @@
                     (yi (,imag-part y)))
                 (inst ,fcmp xr yr)
                 (inst nop)
-                (inst fb (if not-p :ne :eq) target #!+sparc-v9 :fcc0 #!+sparc-v9 :pn)
+                (inst fb (if not-p :ne :eq) target #+sparc-v9 :fcc0 #+sparc-v9 :pn)
                 (inst ,fcmp xi yi)
                 (inst nop)
-                (inst fb (if not-p :ne :eq) target #!+sparc-v9 :fcc0 #!+sparc-v9 :pn)
+                (inst fb (if not-p :ne :eq) target #+sparc-v9 :fcc0 #+sparc-v9 :pn)
                 (inst nop)))))))
   (frob single fcmps)
   (frob double fcmpd))
@@ -2477,7 +2477,7 @@
   (:translate %max-double-float)
   (:temporary (:scs (double-reg)) xval)
   (:temporary (:scs (double-reg)) yval)
-  (:guard #!+:sparc-v9 t #!-:sparc-v9 nil)
+  (:guard #+:sparc-v9 t #-:sparc-v9 nil)
   (:vop-var vop)
   (:generator 3
     (let ((offset (- (* double-float-value-slot n-word-bytes)

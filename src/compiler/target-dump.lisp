@@ -42,7 +42,7 @@
     (dump-word rank file)
     (eq-save-object array file)))
 
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun dump-long-float (float file)
   (declare (long-float float))
   (let ((exp-bits (long-float-exp-bits float))
@@ -55,7 +55,7 @@
     (dump-integer-as-n-bytes high-bits 4 file)
     (dump-integer-as-n-bytes exp-bits 2 file)))
 
-#!+(and long-float sparc)
+#+(and long-float sparc)
 (defun dump-long-float (float file)
   (declare (long-float float))
   (let ((exp-bits (long-float-exp-bits float))

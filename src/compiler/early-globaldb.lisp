@@ -98,9 +98,9 @@
 ;;; so that it does not get tested when building the cross-compiler.
 ;;; This was the best way I could see to work around a spurious warning
 ;;; about a wrongly ordered VM definition in make-host-1.
-;;; The #!+/- reader can't see that a VOP-TRANSLATES term is not for the
+;;; The #+/- reader can't see that a VOP-TRANSLATES term is not for the
 ;;; host compiler unless the whole thing is one expression.
-#!-(or sb-xc-host (vop-translates sb-kernel:symbol-info-vector))
+#-(or sb-xc-host (vop-translates sb-kernel:symbol-info-vector))
 (declaim (inline symbol-info-vector))
 #-sb-xc-host
 (defun symbol-info-vector (symbol)

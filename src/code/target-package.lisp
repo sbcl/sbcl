@@ -322,7 +322,7 @@ error if any of PACKAGES is not a valid package designator."
           (if (boundp 'sb-c::*lexenv*)
               (let ((list (sb-c::lexenv-disabled-package-locks sb-c::*lexenv*)))
                 ;; The so-called LIST might be an interpreter env.
-                #!+sb-fasteval
+                #+sb-fasteval
                 (unless (listp list)
                   (return-from lexically-unlocked-symbol-p
                     (sb-interpreter::lexically-unlocked-symbol-p

@@ -19,7 +19,7 @@
       (error "~W is too big for a fixnum." num)))
 
 ;;; Determining whether a constant offset fits in an addressing mode.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun foldable-constant-offset-p (element-size lowtag data-offset offset)
   (if (< element-size n-byte-bits)
       nil
@@ -105,9 +105,9 @@
 ;;; Make a TN to hold the number-stack frame pointer.  This is allocated
 ;;; once per component, and is component-live.
 (defun make-nfp-tn ()
-  #!+c-stack-is-control-stack
+  #+c-stack-is-control-stack
   (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number)
-  #!-c-stack-is-control-stack
+  #-c-stack-is-control-stack
   (component-live-tn
    (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nfp-offset)))
 
@@ -117,15 +117,15 @@
    (make-representation-tn *fixnum-primitive-type* any-reg-sc-number)
    env))
 
-#!-x86-64
+#-x86-64
 (defun make-stack-pointer-tn (&optional nargs)
   (declare (ignore nargs))
   (make-normal-tn *fixnum-primitive-type*))
 
 (defun make-number-stack-pointer-tn ()
-  #!+c-stack-is-control-stack
+  #+c-stack-is-control-stack
   (make-restricted-tn *fixnum-primitive-type* ignore-me-sc-number)
-  #!-c-stack-is-control-stack
+  #-c-stack-is-control-stack
   (make-normal-tn *fixnum-primitive-type*))
 
 ;;; Return a list of TNs that can be used to represent an unknown-values
@@ -133,7 +133,7 @@
 (defun make-unknown-values-locations (&optional unused-count)
   (declare (ignorable unused-count))
   (list (make-stack-pointer-tn)
-        (cond #!+x86-64 ;; needs support from receive-unknown-values
+        (cond #+x86-64 ;; needs support from receive-unknown-values
               (unused-count
                (sb-c::make-unused-tn))
               (t
@@ -158,7 +158,7 @@
   "Cause a continuable error.  ERROR-CODE is the error to cause."
   (emit-error-break vop cerror-trap (error-number-or-lose error-code) values))
 
-#!+sb-safepoint
+#+sb-safepoint
 (define-vop (insert-safepoint)
   (:policy :fast-safe)
   (:translate sb-kernel::gc-safepoint)

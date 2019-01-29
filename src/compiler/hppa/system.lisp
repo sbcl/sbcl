@@ -194,7 +194,7 @@
   (:generator 1
     (inst break halt-trap)))
 
-#!+hpux
+#+hpux
 (define-vop (setup-return-from-lisp-stub)
   (:results)
   (:save-p t)

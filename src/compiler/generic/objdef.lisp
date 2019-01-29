@@ -48,7 +48,7 @@
 (!define-primitive-object (bignum :lowtag other-pointer-lowtag
                                  :widetag bignum-widetag
                                  :alloc-trans sb-bignum::%allocate-bignum)
-  (digits :rest-p t :c-type #!-alpha "sword_t" #!+alpha "u32"))
+  (digits :rest-p t :c-type #-alpha "sword_t" #+alpha "u32"))
 
 (!define-primitive-object (ratio :type ratio
                                 :lowtag other-pointer-lowtag
@@ -76,8 +76,8 @@
 #+long-float
 (!define-primitive-object (long-float :lowtag other-pointer-lowtag
                                      :widetag long-float-widetag)
-  #!+sparc (filler)
-  (value :c-type "long double" :length #!+x86 3 #!+sparc 4))
+  #+sparc (filler)
+  (value :c-type "long double" :length #+x86 3 #+sparc 4))
 
 (!define-primitive-object (complex :type complex
                                   :lowtag other-pointer-lowtag
@@ -140,7 +140,7 @@
   ;; VECTOR -- see SHRINK-VECTOR.
   (length :ref-trans sb-c::vector-length
           :type index)
-  (data :rest-p t :c-type #!-alpha "uword_t" #!+alpha "u32"))
+  (data :rest-p t :c-type #-alpha "uword_t" #+alpha "u32"))
 
 #|
 Code header representation:
@@ -198,7 +198,7 @@ during backtrace.
               :ref-trans %code-debug-info
               :set-known ()
               :set-trans (setf %code-debug-info))
-  #!+(or x86 immobile-space)
+  #+(or x86 immobile-space)
   (fixups :type t
           :ref-known (flushable)
           :ref-trans %code-fixups
@@ -222,7 +222,7 @@ during backtrace.
   ;;   pertain to undefined functions, FINs, and closures.
   ;; - all others store a native pointer to the function entry address
   ;;   or closure tramp
-  (raw-addr :c-type #!-alpha "char *" #!+alpha "u32"))
+  (raw-addr :c-type #-alpha "char *" #+alpha "u32"))
 
 ;;; a simple function (as opposed to hairier things like closures
 ;;; which are also subtypes of Common Lisp's FUNCTION type)
@@ -264,7 +264,7 @@ during backtrace.
   ;; This will be quite disastrous to clean up and not make mistakes about it.
   (code :rest-p t :c-type "unsigned char"))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (!define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)
   (return-point :c-type "unsigned char" :rest-p t))
 
@@ -275,8 +275,8 @@ during backtrace.
                                    ;; its own way of making closures, which requires
                                    ;; that the length be a compile-time constant.
                                    :alloc-trans %copy-closure)
-  (fun :init :arg :ref-trans #!+(or x86 x86-64) %closure-callee
-                             #!-(or x86 x86-64) %closure-fun)
+  (fun :init :arg :ref-trans #+(or x86 x86-64) %closure-callee
+                             #-(or x86 x86-64) %closure-fun)
   (info :rest-p t))
 
 (!define-primitive-object (funcallable-instance
@@ -317,7 +317,7 @@ during backtrace.
                                        :alloc-trans make-weak-pointer)
   (value :ref-trans %weak-pointer-value :ref-known (flushable)
          :init :arg)
-  (next :c-type #!-alpha "struct weak_pointer *" #!+alpha "u32"))
+  (next :c-type #-alpha "struct weak_pointer *" #+alpha "u32"))
 
 ;;;; other non-heap data blocks
 
@@ -326,25 +326,25 @@ during backtrace.
   symbol) ;; on sb-thread, this is actually a tls-index
 
 (!define-primitive-object (unwind-block)
-  (uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
-  (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-(or x86 x86-64) code
+  (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
+  (cfp :c-type #-alpha "lispobj *" #+alpha "u32")
+  #-(or x86 x86-64) code
   entry-pc
-  #!+(and win32 x86) next-seh-frame
-  #!+(and win32 x86) seh-frame-handler
-  #!+x86-64 bsp
-  #!+x86-64
+  #+(and win32 x86) next-seh-frame
+  #+(and win32 x86) seh-frame-handler
+  #+x86-64 bsp
+  #+x86-64
   current-catch)
 
 (!define-primitive-object (catch-block)
-  (uwp :c-type #!-alpha "struct unwind_block *" #!+alpha "u32")
-  (cfp :c-type #!-alpha "lispobj *" #!+alpha "u32")
-  #!-(or x86 x86-64) code
+  (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
+  (cfp :c-type #-alpha "lispobj *" #+alpha "u32")
+  #-(or x86 x86-64) code
   entry-pc
-  #!+(and win32 x86) next-seh-frame
-  #!+(and win32 x86) seh-frame-handler
-  #!+x86-64 bsp
-  (previous-catch :c-type #!-alpha "struct catch_block *" #!+alpha "u32")
+  #+(and win32 x86) next-seh-frame
+  #+(and win32 x86) seh-frame-handler
+  #+x86-64 bsp
+  (previous-catch :c-type #-alpha "struct catch_block *" #+alpha "u32")
   tag)
 
 ;;;; symbols
@@ -383,7 +383,7 @@ during backtrace.
            :init :null)
   ;; 0 tls-index means no tls-index is allocated
   ;; 64-bit put the tls-index in the header word.
-  #!+(and sb-thread (not 64-bit))
+  #+(and sb-thread (not 64-bit))
   (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
 
 (!define-primitive-object (complex-single-float
@@ -452,11 +452,11 @@ during backtrace.
   ;; Information for constructing deterministic consing profile.
   (profile-data :c-type "uword_t *" :pointer t)
   #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
-  #+sb-thread (pseudo-atomic-bits #!+(or x86 x86-64) :special #!+(or x86 x86-64) *pseudo-atomic-bits*)
+  #+sb-thread (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*)
   ;; next two not used in C, but this wires the TLS offsets to small values
-  #!+(and x86-64 sb-thread)
+  #+(and x86-64 sb-thread)
   (current-catch-block :special *current-catch-block*)
-  #!+(and x86-64 sb-thread)
+  #+(and x86-64 sb-thread)
   (current-unwind-protect-block :special *current-unwind-protect-block*)
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
@@ -481,15 +481,15 @@ during backtrace.
   (binding-stack-start :c-type "lispobj *" :pointer t
                        :special *binding-stack-start*)
 
-  #!+(and sb-thread (not sb-safepoint))
+  #+(and sb-thread (not sb-safepoint))
   (state-sem :c-type "os_sem_t *" :pointer t)
-  #!+(and sb-thread (not sb-safepoint))
+  #+(and sb-thread (not sb-safepoint))
   (state-not-running-sem :c-type "os_sem_t *" :pointer t)
-  #!+(and sb-thread (not sb-safepoint))
+  #+(and sb-thread (not sb-safepoint))
   (state-not-running-waitcount :c-type "int" :length 1)
-  #!+(and sb-thread (not sb-safepoint))
+  #+(and sb-thread (not sb-safepoint))
   (state-not-stopped-sem :c-type "os_sem_t *" :pointer t)
-  #!+(and sb-thread (not sb-safepoint))
+  #+(and sb-thread (not sb-safepoint))
   (state-not-stopped-waitcount :c-type "int" :length 1)
   (control-stack-start :c-type "lispobj *" :pointer t
                        :special *control-stack-start*)
@@ -503,7 +503,7 @@ during backtrace.
   ;; starting, running, suspended, dead
   (state :c-type "lispobj")
 
-  #!+x86 (tls-cookie)                          ;  LDT index
+  #+x86 (tls-cookie)                          ;  LDT index
   (interrupt-data :c-type "struct interrupt_data *"
                   :pointer t)
   ;; For various reasons related to pseudo-atomic and interrupt
@@ -513,29 +513,29 @@ during backtrace.
   #+sb-thread
   (foreign-function-call-active :c-type "boolean")
   ;; Same as above for the location of the current control stack frame.
-  #!+(and sb-thread (not (or x86 x86-64)))
+  #+(and sb-thread (not (or x86 x86-64)))
   (control-frame-pointer :c-type "lispobj *")
   ;; Same as above for the location of the current control stack
   ;; pointer.  This is also used on threaded x86oids to allow LDB to
   ;; print an approximation of the CSP as needed.
   #+sb-thread
   (control-stack-pointer :c-type "lispobj *")
-  #!+mach-exception-handler
+  #+mach-exception-handler
   (mach-port-name :c-type "mach_port_name_t")
   ;; Context base pointer for running on top of system libraries built using
   ;; -fomit-frame-pointer.  Currently truly required and implemented only
   ;; for (and win32 x86-64), but could be generalized to other platforms if
   ;; needed:
   #+win32 (carried-base-pointer :c-type "os_context_register_t")
-  #!+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
+  #+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
-  #!+(and sb-safepoint-strictly (not win32))
+  #+(and sb-safepoint-strictly (not win32))
   (sprof-alloc-region :c-type "struct alloc_region" :length 4)
   ;; The following slot's existence must NOT be conditional on #+msan
-  #!+x86-64 (msan-param-tls) ; = &__msan_param_tls
+  #+x86-64 (msan-param-tls) ; = &__msan_param_tls
   ;; function-layout is needed for closure creation. it's constant,
   ;; but we need somewhere to read it from.
-  #!+(and immobile-space 64-bit sb-thread) (function-layout))
+  #+(and immobile-space 64-bit sb-thread) (function-layout))
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable
 ;;; that does not map onto a thread slot.

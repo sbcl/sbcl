@@ -478,7 +478,7 @@
            (error "unknown option: ~S" (first option)))))
 
       ;; Maybe kill docstring, but only under the cross-compiler.
-      #!+(and (not sb-doc) sb-xc-host) (setq documentation nil)
+      #+(and (not sb-doc) sb-xc-host) (setq documentation nil)
       `(progn
          ,@(when *top-level-form-p*
              ;; Avoid dumping uninitialized layouts, for sb-fasl::dump-layout
@@ -1377,12 +1377,12 @@ handled by any other handler, it will be muffled.")
 ;;;; Deciding which redefinitions are "interesting".
 
 (defun function-file-namestring (function)
-  #!+sb-eval
+  #+sb-eval
   (when (typep function 'sb-eval:interpreted-function)
     (return-from function-file-namestring
       (sb-c:definition-source-location-namestring
           (sb-eval:interpreted-function-source-location function))))
-  #!+sb-fasteval
+  #+sb-fasteval
   (when (typep function 'sb-interpreter:interpreted-function)
     (return-from function-file-namestring
       (awhen (sb-interpreter:fun-source-location function)
@@ -1405,8 +1405,8 @@ handled by any other handler, it will be muffled.")
      ;; fin->regular is interesting except for interpreted->compiled.
      (and (typep new '(not funcallable-instance))
           (typep old '(and funcallable-instance
-                       #!+sb-fasteval (not sb-interpreter:interpreted-function)
-                       #!+sb-eval (not sb-eval:interpreted-function))))
+                       #+sb-fasteval (not sb-interpreter:interpreted-function)
+                       #+sb-eval (not sb-eval:interpreted-function))))
      ;; different file or unknown location is interesting.
      (let* ((old-namestring (function-file-namestring old))
             (new-namestring (function-file-namestring new)))
@@ -1511,7 +1511,7 @@ the usual naming convention (names like *FOO*) for special variables"
              (format stream "Undefined alien: ~S"
                      (undefined-alien-symbol warning)))))
 
-#!+(or sb-eval sb-fasteval)
+#+(or sb-eval sb-fasteval)
 (define-condition lexical-environment-too-complex (style-warning)
   ((form :initarg :form :reader lexical-environment-too-complex-form)
    (lexenv :initarg :lexenv :reader lexical-environment-too-complex-lexenv))

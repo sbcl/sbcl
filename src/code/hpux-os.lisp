@@ -13,7 +13,7 @@
 
 ;;; Check that target machine features are set up consistently with
 ;;; this file.
-#!-hpux (error "missing :HPUX feature")
+#-hpux (error "missing :HPUX feature")
 
 (defun software-type ()
   "Return a string describing the supporting software."

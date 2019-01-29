@@ -235,7 +235,7 @@ evaluated as a PROGN."
     (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
+    #+(and (not sb-doc) sb-xc-host) (setq doc nil)
     (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
            (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
            (lambda `(lambda ,lambda-list ,@lambda-guts))
@@ -281,7 +281,7 @@ evaluated as a PROGN."
   documentation string for the variable."
   (check-designator var defvar)
   ;; Maybe kill docstring, but only under the cross-compiler.
-  #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
+  #+(and (not sb-doc) sb-xc-host) (setq doc nil)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
@@ -300,7 +300,7 @@ evaluated as a PROGN."
   string for the parameter."
   (check-designator var defparameter)
   ;; Maybe kill docstring, but only under the cross-compiler.
-  #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
+  #+(and (not sb-doc) sb-xc-host) (setq doc nil)
   `(progn
      (eval-when (:compile-toplevel)
        (%compiler-defvar ',var))
@@ -805,9 +805,9 @@ condition."
   ;; or a symbol naming a condition class at compile time,
   ;; and HANDLER must be a global function specified as either 'F or #'F.
   `(%handler-bind ,bindings
-                  #!-x86 (progn ,@forms)
+                  #-x86 (progn ,@forms)
                   ;; Need to catch FP errors here!
-                  #!+x86 (multiple-value-prog1 (progn ,@forms) (float-wait))))
+                  #+x86 (multiple-value-prog1 (progn ,@forms) (float-wait))))
 
 (sb-xc:defmacro handler-case (form &rest cases)
   "(HANDLER-CASE form { (type ([var]) body) }* )
@@ -845,9 +845,9 @@ specification."
                          cases)))
           (with-unique-names (block cell form-fun)
             `(dx-flet ((,form-fun ()
-                         #!-x86 (progn ,form) ;; no declarations are accepted
+                         #-x86 (progn ,form) ;; no declarations are accepted
                          ;; Need to catch FP errors here!
-                         #!+x86 (multiple-value-prog1 ,form (float-wait)))
+                         #+x86 (multiple-value-prog1 ,form (float-wait)))
                        ,@(reverse local-funs))
                (declare (optimize (sb-c::check-tag-existence 0)))
                (block ,block

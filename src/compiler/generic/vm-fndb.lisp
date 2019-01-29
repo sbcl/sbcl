@@ -162,7 +162,7 @@
 (defknown %array-rank (array) array-rank
   (flushable))
 
-#!+x86-64
+#+x86-64
 (defknown (%array-rank= widetag=) (t t) boolean
   (flushable))
 
@@ -195,7 +195,7 @@
   :derive-type #'result-type-last-arg)
 (defknown %layout-invalid-error (t layout) nil)
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defknown %raw-instance-cas/word (instance index sb-vm:word sb-vm:word)
   sb-vm:word ())
 #.`(progn
@@ -219,10 +219,10 @@
                             (,writer instance index new-value))))))
             sb-kernel::*raw-slot-data*))
 
-#!+compare-and-swap-vops
+#+compare-and-swap-vops
 (defknown %raw-instance-atomic-incf/word (instance index sb-vm:word) sb-vm:word
     (always-translatable))
-#!+compare-and-swap-vops
+#+compare-and-swap-vops
 (defknown %array-atomic-incf/word (t index sb-vm:word) sb-vm:word
   (always-translatable))
 
@@ -399,7 +399,7 @@
 
 (defknown %bignum-ref (bignum bignum-index) bignum-element-type
   (flushable))
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defknown %bignum-ref-with-offset (bignum fixnum (signed-byte 24))
   bignum-element-type (flushable always-translatable))
 
@@ -493,7 +493,7 @@
 ;;; Extract a 4-byte element relative to the end of CODE-OBJ.
 ;;; The index should be strictly negative and a multiple of 4.
 (defknown code-trailer-ref (t fixnum) (unsigned-byte 32)
-  (flushable #!-(or sparc alpha hppa ppc64) always-translatable))
+  (flushable #-(or sparc alpha hppa ppc64) always-translatable))
 
 (defknown fun-subtype (function) (member . #.sb-vm::+function-widetags+)
   (flushable))
@@ -509,7 +509,7 @@
 
 (defknown %simple-fun-type (function) t (flushable))
 
-#!+(or x86 x86-64) (defknown sb-vm::%closure-callee (function) fixnum (flushable))
+#+(or x86 x86-64) (defknown sb-vm::%closure-callee (function) fixnum (flushable))
 (defknown %closure-fun (function) function (flushable))
 
 (defknown %closure-index-ref (function index) t
@@ -526,7 +526,7 @@
 (defknown %funcallable-instance-info (function index) t (flushable))
 (defknown %set-funcallable-instance-info (function index t) t ())
 
-#!+sb-fasteval
+#+sb-fasteval
 (defknown sb-interpreter:fun-proto-fn (sb-interpreter:interpreted-function)
   sb-interpreter::interpreted-fun-prototype (flushable))
 
@@ -642,7 +642,7 @@
   ;; don't have a true Alpha64 port yet, we'll have to stick to
   ;; SB-VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
   #.`(progn
-       #!+(or x86 x86-64 arm arm64)
+       #+(or x86 x86-64 arm arm64)
        (def sb-vm::ash-left-modfx
            :tagged ,(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) t)
        (def ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)

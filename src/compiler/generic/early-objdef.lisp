@@ -190,8 +190,8 @@
   funcallable-instance-widetag              ;  32   39  32   39
 
   ;; x86[-64] does not have objects with this widetag,
-  #!+(or x86 x86-64) unused00-widetag
-  #!-(or x86 x86-64)
+  #+(or x86 x86-64) unused00-widetag
+  #-(or x86 x86-64)
   return-pc-widetag                         ;  36   3D  36   3D
 
   value-cell-widetag                        ;  3A   41  3A   41
@@ -307,7 +307,7 @@
 ;;; This is so that COMPILE-FILE knows that things like :ALLOW-OTHER-KEYS
 ;;; can be immediate constants.
 ;;; Note also that sb-fasteval uses 2 bits of the symbol header.
-#!+(and immobile-space (not immobile-symbols))
+#+(and immobile-space (not immobile-symbols))
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 
 #+immobile-space
@@ -317,7 +317,7 @@
 
   ;; FUNCTION-LAYOUT is a fixnum whose bits are ORed in "as-is" with the
   ;; low half of a closure header to form the full header word.
-  #!+(and (not sb-xc-host) (not sb-thread))
+  #+(and (not sb-xc-host) (not sb-thread))
   (defglobal function-layout 0)         ; set by genesis
 
   ;; The cross-compiler stores FUNCTION-LAYOUT in a more obvious way.

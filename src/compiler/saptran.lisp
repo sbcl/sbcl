@@ -13,7 +13,7 @@
 
 ;;;; DEFKNOWNs
 
-#!+linkage-table
+#+linkage-table
 (deftransform foreign-symbol-address ((symbol &optional datap)
                                       ((constant-arg simple-string)
                                        &optional (constant-arg boolean)))
@@ -25,11 +25,11 @@
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
                                   (simple-string &optional boolean))
-  #!-linkage-table
+  #-linkage-table
   (if (null datap)
       (give-up-ir1-transform)
       `(foreign-symbol-sap symbol))
-  #!+linkage-table
+  #+linkage-table
   (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
       (let (#-sb-dynamic-core (name (lvar-value symbol))
             (datap (lvar-value datap)))
@@ -63,20 +63,20 @@
   system-area-pointer (movable))
 
 (macrolet ((defsapref (fun value-type)
-             (let (#!+x86
+             (let (#+x86
                    (with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun)))
                    (set-fun (intern (format nil "%SET-~A" fun)))
-                   #!+x86
+                   #+x86
                    (set-with-offset-fun (intern (format nil "%SET-~A-WITH-OFFSET" fun))))
                `(progn
                   (defknown ,fun (system-area-pointer fixnum) ,value-type
                     (flushable))
-                  #!+x86
+                  #+x86
                   (defknown ,with-offset-fun (system-area-pointer fixnum fixnum) ,value-type
                     (flushable always-translatable))
                   (defknown ,set-fun (system-area-pointer fixnum ,value-type) ,value-type
                     ())
-                  #!+x86
+                  #+x86
                   (defknown ,set-with-offset-fun (system-area-pointer fixnum fixnum ,value-type) ,value-type
                     (always-translatable))))))
   (defsapref sap-ref-8 (unsigned-byte 8))
@@ -133,7 +133,7 @@
                               (or (eq (first value-type) 'unsigned-byte)
                                   (eq (first value-type) 'signed-byte))
                               (> (second value-type) sb-vm:n-word-bits))
-                   #!+x86
+                   #+x86
                    (let ((with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun))))
                      `(progn
                         ,(cond
@@ -194,7 +194,7 @@
 
 #-64-bit-registers
 (progn
-#!+#.(cl:if (cl:eq :little-endian sb-c:*backend-byte-order*) '(and) '(or))
+#+#.(cl:if (cl:eq :little-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (sap-ref-32 sap offset)
@@ -214,7 +214,7 @@
        (%set-sap-ref-32 sap offset (logand value #xffffffff))
        (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32)))))
 
-#!+#.(cl:if (cl:eq :big-endian sb-c:*backend-byte-order*) '(and) '(or))
+#+#.(cl:if (cl:eq :big-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (ash (sap-ref-32 sap offset) 32)

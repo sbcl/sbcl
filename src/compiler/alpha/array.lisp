@@ -43,7 +43,7 @@
 
 (define-full-setter %set-array-dimension *
   array-dimensions-offset other-pointer-lowtag
-  (any-reg) positive-fixnum %set-array-dimension #!+gengc nil)
+  (any-reg) positive-fixnum %set-array-dimension #+gengc nil)
 
 (define-vop (array-rank-vop)
   (:translate %array-rank)
@@ -251,7 +251,7 @@
                                   (unless (and (sc-is value immediate)
                                                (= (tn-value value)
                                                   ,(1- (ash 1 bits))))
-                                    (cond #!+#.(cl:if
+                                    (cond #+#.(cl:if
                                                 (cl:= sb-vm:n-word-bits sb-vm:n-machine-word-bits)
                                                 '(and) '(or))
                                           ((= extra ,(1- elements-per-word))

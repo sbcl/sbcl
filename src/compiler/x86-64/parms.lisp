@@ -138,7 +138,7 @@
 #-linux
 (!gencgc-space-setup #x20000000
                      :dynamic-space-start #x1000000000
-                     #!+openbsd :dynamic-space-size #!+openbsd #x1bcf0000)
+                     #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
 
 (defconstant linkage-table-entry-size 16)
 
@@ -153,8 +153,8 @@
   single-step-before-trap
   invalid-arg-count-trap
   memory-fault-emulation-trap
-  #!+sb-safepoint global-safepoint-trap
-  #!+sb-safepoint csp-safepoint-trap
+  #+sb-safepoint global-safepoint-trap
+  #+sb-safepoint csp-safepoint-trap
   error-trap)
 
 ;;;; static symbols
@@ -174,7 +174,7 @@
 
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
-    #!+(and immobile-space (not sb-thread)) function-layout
+    #+(and immobile-space (not sb-thread)) function-layout
     #-sb-thread *alien-stack-pointer*    ; a thread slot if #+sb-thread
      ;; interrupt handling
     #-sb-thread *pseudo-atomic-bits*     ; ditto

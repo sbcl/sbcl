@@ -43,7 +43,7 @@
     (append '(:sb-thread :sb-package-locks :sb-unicode :cheneygc
               :gencgc :msan :sb-safepoint :sb-safepoint-strictly
               :sb-dynamic-core)
-            #!+(or x86 x86-64) '(:int4-breakpoints :ud2-breakpoints)))
+            #+(or x86 x86-64) '(:int4-breakpoints :ud2-breakpoints)))
 
 ;;; Return a string representing symbols in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
 ;;; which are present in a particular compilation.

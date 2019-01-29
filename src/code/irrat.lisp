@@ -48,7 +48,7 @@
            ,@args))))))
 
 
-#!+x86 ;; for constant folding
+#+x86 ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %atan2 (x y))
@@ -63,7 +63,7 @@
   (def %log (x))
   (def %exp (x)))
 
-#!+(or x86-64 arm-vfp arm64) ;; for constant folding
+#+(or x86-64 arm-vfp arm64) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %sqrt (x)))
@@ -74,11 +74,11 @@
 ;;;; into the FPU.
 
 ;;; trigonometric
-#!-x86 (def-math-rtn "sin" 1)
-#!-x86 (def-math-rtn "cos" 1)
-#!-x86 (def-math-rtn "tan" 1)
-#!-x86 (def-math-rtn "atan" 1)
-#!-x86 (def-math-rtn "atan2" 2)
+#-x86 (def-math-rtn "sin" 1)
+#-x86 (def-math-rtn "cos" 1)
+#-x86 (def-math-rtn "tan" 1)
+#-x86 (def-math-rtn "atan" 1)
+#-x86 (def-math-rtn "atan2" 2)
 
 (def-math-rtn "acos" 1 #+win32 t)
 (def-math-rtn "asin" 1 #+win32 t)
@@ -91,12 +91,12 @@
 
 ;;; exponential and logarithmic
 (def-math-rtn "hypot" 2 #+win32 t)
-#!-x86 (def-math-rtn "exp" 1)
-#!-x86 (def-math-rtn "log" 1)
-#!-x86 (def-math-rtn "log10" 1)
+#-x86 (def-math-rtn "exp" 1)
+#-x86 (def-math-rtn "log" 1)
+#-x86 (def-math-rtn "log10" 1)
 (def-math-rtn "pow" 2)
-#!-(or x86 x86-64 arm-vfp arm64) (def-math-rtn "sqrt" 1)
-#!-x86 (def-math-rtn "log1p" 1)
+#-(or x86 x86-64 arm-vfp arm64) (def-math-rtn "sqrt" 1)
+#-x86 (def-math-rtn "log1p" 1)
 
 
 ;;;; power functions

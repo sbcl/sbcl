@@ -23,7 +23,7 @@
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
-            #!+avx2 sb-vm::avx2-reg
+            #+avx2 sb-vm::avx2-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 ;;; a REG object discards all information about a TN except its storage base
@@ -1143,7 +1143,7 @@
                                   sb-vm::+byte-register-names+)
                           t)
                          (gpr-id-size-class id)))
-                 #!+avx2
+                 #+avx2
                  ((is-avx2-id-p id)
                   #.(coerce (loop for i below 16 collect (format nil "YMM~D" i))
                             'vector))
@@ -1224,7 +1224,7 @@
                    operand)
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
-                  #!+avx2
+                  #+avx2
                   ((memq (sc-name (tn-sc operand))
                          '(avx2-reg
                            int-avx2-reg
@@ -2399,17 +2399,17 @@
 ;;;; interrupt instructions
 
 (define-instruction break (segment &optional (code nil codep))
-  #!-ud2-breakpoints (:printer byte-imm ((op (or #!+int4-breakpoints #xCE #xCC)))
+  #-ud2-breakpoints (:printer byte-imm ((op (or #+int4-breakpoints #xCE #xCC)))
                                '(:name :tab code) :control #'break-control)
-  #!+ud2-breakpoints (:printer word-imm ((op #x0B0F))
+  #+ud2-breakpoints (:printer word-imm ((op #x0B0F))
                                '(:name :tab code) :control #'break-control)
   (:emitter
-   #!-ud2-breakpoints (emit-byte segment (or #!+int4-breakpoints #xCE #xCC))
+   #-ud2-breakpoints (emit-byte segment (or #+int4-breakpoints #xCE #xCC))
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
    ;; throw a sigill with 0x0b0f instead and check for this in the
    ;; SIGILL handler and pass it on to the sigtrap handler if
    ;; appropriate
-   #!+ud2-breakpoints (emit-word segment #x0B0F)
+   #+ud2-breakpoints (emit-word segment #x0B0F)
    (when codep (emit-byte segment (the (unsigned-byte 8) code)))))
 
 (define-instruction int (segment number)
@@ -2489,7 +2489,7 @@
   (:emitter
    (emit-header-data segment
                      (logior simple-fun-widetag
-                             #!+(and compact-instance-header sb-xc-host)
+                             #+(and compact-instance-header sb-xc-host)
                              (ash function-layout 32)))))
 
 

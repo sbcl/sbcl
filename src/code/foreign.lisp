@@ -35,13 +35,13 @@ On non-linkage-table ports signals an error if the symbol isn't found."
   (let ((static (find-foreign-symbol-in-table name *static-foreign-symbols*)))
     (if static
         (values static nil)
-        #!+os-provides-dlopen
-        (values #!-linkage-table
+        #+os-provides-dlopen
+        (values #-linkage-table
                 (ensure-dynamic-foreign-symbol-address name)
-                #!+linkage-table
+                #+linkage-table
                 (ensure-foreign-symbol-linkage name datap)
                 t)
-        #!-os-provides-dlopen
+        #-os-provides-dlopen
         (error 'undefined-alien-error :name name))))
 
 (defun foreign-symbol-sap (symbol &optional datap)
@@ -50,9 +50,9 @@ symbol designates a variable (used only on linkage-table platforms). May enter
 the symbol into the linkage-table. On non-linkage-table ports signals an error
 if the symbol isn't found."
   (declare (ignorable datap))
-  #!-linkage-table
+  #-linkage-table
   (int-sap (foreign-symbol-address symbol))
-  #!+linkage-table
+  #+linkage-table
   (multiple-value-bind (addr sharedp)
       (foreign-symbol-address symbol datap)
     ;; If the address is from linkage-table and refers to data
@@ -63,9 +63,9 @@ if the symbol isn't found."
         (int-sap addr))))
 
 (defun foreign-reinit ()
-  #!+os-provides-dlopen
+  #+os-provides-dlopen
   (reopen-shared-objects)
-  #!+linkage-table
+  #+linkage-table
   ;; Don't warn about undefined aliens on startup. The same core can
   ;; reasonably be expected to work with different versions of the
   ;; same library.
@@ -74,7 +74,7 @@ if the symbol isn't found."
 
 ;;; Cleanups before saving a core
 (defun foreign-deinit ()
-  #!+(and os-provides-dlopen (not linkage-table))
+  #+(and os-provides-dlopen (not linkage-table))
   (when (dynamic-foreign-symbols-p)
     (warn "~@<Saving cores with alien definitions referring to non-static ~
            foreign symbols is unsupported on this platform: references to ~
@@ -83,7 +83,7 @@ if the symbol isn't found."
            foreign definitions and code using them in the restarted core, ~
            but no guarantees.~%~%Dynamic foreign symbols in this core: ~
            ~{~A~^, ~}~:@>" (list-dynamic-foreign-symbols)))
-  #!+os-provides-dlopen
+  #+os-provides-dlopen
   (close-shared-objects))
 
 (declaim (maybe-inline sap-foreign-symbol))
@@ -91,7 +91,7 @@ if the symbol isn't found."
   (declare (ignorable sap))
   (let ((addr (sap-int sap)))
     (declare (ignorable addr))
-    #!+linkage-table
+    #+linkage-table
     (when (<= sb-vm:linkage-table-space-start
               addr
               sb-vm:linkage-table-space-end)
@@ -100,7 +100,7 @@ if the symbol isn't found."
               (datap (listp key)))
           (when (<= table-addr addr (+ table-addr (1- sb-vm:linkage-table-entry-size)))
             (return-from sap-foreign-symbol (if datap (car key) key))))))
-    #!+os-provides-dladdr
+    #+os-provides-dladdr
     (with-alien ((info (struct dl-info
                                (filename c-string)
                                (base unsigned)
@@ -131,9 +131,9 @@ if the symbol isn't found."
   (loop for table-offset from 0 by sb-vm::linkage-table-entry-size
         and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
         do (setf (gethash reference *linkage-info*) table-offset))
-  #!+os-provides-dlopen
+  #+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))
-  #!+os-provides-dlopen
+  #+os-provides-dlopen
   (setf *shared-objects* nil))
 
 ;;; Helpers for defining error-signalling NOP's for "not supported
@@ -152,5 +152,5 @@ if the symbol isn't found."
             :format-control ,control
             :format-arguments (if ,controlp ',arguments (list ',name)))))
 
-#!-os-provides-dlopen
+#-os-provides-dlopen
 (define-unsupported-fun load-shared-object)

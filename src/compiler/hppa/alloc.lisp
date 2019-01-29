@@ -87,7 +87,7 @@
               positive-fixnum)
   (:temporary (:sc non-descriptor-reg) bytes)
   (:results (result :scs (descriptor-reg) :from :load))
-  #!-stack-allocatable-vectors
+  #-stack-allocatable-vectors
   (:translate allocate-vector)
   (:policy :fast-safe)
   (:generator 100

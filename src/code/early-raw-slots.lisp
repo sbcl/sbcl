@@ -100,9 +100,9 @@
                    ,@args :allow-other-keys t))))
     (let ((double-float-alignment
             ;; white list of architectures that can load unaligned doubles:
-            #!+(or x86 x86-64 ppc arm64) 1
+            #+(or x86 x86-64 ppc arm64) 1
             ;; at least sparc, mips and alpha can't:
-            #!-(or x86 x86-64 ppc arm64) 2))
+            #-(or x86 x86-64 ppc arm64) 2))
      (setq *raw-slot-data*
       (vector
        (make-raw-slot-data :raw-type 'sb-vm:word
@@ -111,7 +111,7 @@
                            :n-words 1)
        ;; If this list of architectures is changed, then also change the test
        ;; for :DEFINE-STRUCTURE-SLOT-ADDRESSOR in raw-slots-interleaved.impure
-       #!+(or arm64 x86 x86-64)
+       #+(or arm64 x86 x86-64)
        (make-raw-slot-data :raw-type 'sb-vm:signed-word
                            :accessor-name '%raw-instance-ref/signed-word
                            :init-vop 'sb-vm::raw-instance-init/signed-word
@@ -148,12 +148,12 @@
        (make-raw-slot-data :raw-type long-float
                            :accessor-name '%raw-instance-ref/long
                            :init-vop 'sb-vm::raw-instance-init/long
-                           :n-words #!+x86 3 #!+sparc 4)
+                           :n-words #+x86 3 #+sparc 4)
        #+long-float
        (make-raw-slot-data :raw-type complex-long-float
                            :accessor-name '%raw-instance-ref/complex-long
                            :init-vop 'sb-vm::raw-instance-init/complex-long
-                           :n-words #!+x86 6 #!+sparc 8))))))
+                           :n-words #+x86 6 #+sparc 8))))))
 
 #+sb-xc-host (!raw-slot-data-init)
 #+sb-xc

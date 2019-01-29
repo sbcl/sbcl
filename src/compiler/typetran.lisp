@@ -86,7 +86,7 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
-                   #!+(vop-translates sb-int:fixnump-instance-ref)
+                   #+(vop-translates sb-int:fixnump-instance-ref)
                    ((and (type= type (specifier-type 'fixnum))
                          (let ((use (lvar-uses object)) index)
                            (and (combination-p use)
@@ -236,7 +236,7 @@
 (define-source-transform atom (x)
   `(not (consp ,x)))
 
-#!+(and sb-unicode (not (or x86-64 arm64)))
+#+(and sb-unicode (not (or x86-64 arm64)))
 (define-source-transform base-char-p (x)
   `(typep ,x 'base-char))
 ;; CONS is implemented as (and list (not (eql nil))) where the 'and' is
@@ -297,7 +297,7 @@
                  ((nil) 'real))))
     (ecase (numeric-type-complexp type)
       (:real
-       (cond #!+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
+       (cond #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
              ((and
                (eql (numeric-type-class type) 'integer)
                (or (eql (numeric-type-low type) 0)
@@ -570,7 +570,7 @@
     (or (and (= (length pairs) 1)
              (= (caar pairs) 0)
              (cond
-               #!+(and sb-unicode (or x86-64 arm64))
+               #+(and sb-unicode (or x86-64 arm64))
                ((= (cdar pairs) (1- base-char-code-limit))
                 `(base-char-p ,object))
                ((= (cdar pairs) (1- sb-xc:char-code-limit))
@@ -643,9 +643,9 @@
       (cond ((cdr dims)
              (values `(,header-test
                        ,@(when (eq (array-type-dimensions stype) '*)
-                           #!+x86-64
+                           #+x86-64
                            `((%array-rank= ,obj ,(length dims)))
-                           #!-x86-64
+                           #-x86-64
                            `((= (%array-rank ,obj) ,(length dims))))
                        ,@(loop for d in dims
                                for i from 0
@@ -689,9 +689,9 @@
              ;; If we know OBJ is an array header, and that the array is
              ;; simple, we also know there is exactly one indirection to
              ;; follow.
-             `(#!-x86-64
+             `(#-x86-64
                (eq (%other-pointer-widetag (%array-data ,obj)) ,typecode)
-               #!+x86-64
+               #+x86-64
                (widetag= (%array-data ,obj) ,typecode))
              `((do ((,data ,(if headerp `(%array-data ,obj) obj)
                            (%array-data ,data)))
@@ -850,7 +850,7 @@
                                      (eq object-layout ',other-layout))))
                              ;; FIXME: not defined in time for make-host-1,
                              ;; so the cross-compiler isn't getting this branch.
-                             #!+(vop-named sb-vm::layout-eq)
+                             #+(vop-named sb-vm::layout-eq)
                              ((equal layout-getter '(%instance-layout object))
                               `(sb-vm::layout-eq object ',layout))
                              (t
@@ -887,10 +887,10 @@
                      ;; (eq (data-vector-ref ...) k) has a single instruction form,
                      ;; but lacking that, force it into a single call
                      ;; that a vop can translate.
-                     #!+(and immobile-space x86-64)
+                     #+(and immobile-space x86-64)
                      `(sb-vm::layout-inherits-ref-eq ; only implemented on x86-64
                        (layout-inherits ,n-layout) ,depthoid ,layout)
-                     #!-(and immobile-space x86-64)
+                     #-(and immobile-space x86-64)
                      `(eq ,get-ancestor ,layout))
                    (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))

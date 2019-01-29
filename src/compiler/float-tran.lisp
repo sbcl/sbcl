@@ -152,11 +152,11 @@
 ;;; when given a signaling NaN.
 (deftransform float-sign ((float &optional float2)
                           (single-float &optional single-float) *)
-  #!+(vop-translates sb-kernel:single-float-copysign)
+  #+(vop-translates sb-kernel:single-float-copysign)
   (if float2
       `(single-float-copysign float float2)
       `(single-float-sign float))
-  #!-(vop-translates sb-kernel:single-float-copysign)
+  #-(vop-translates sb-kernel:single-float-copysign)
   (if float2
       (let ((temp (gensym)))
         `(let ((,temp (abs float2)))
@@ -212,7 +212,7 @@
   '(integer-decode-double-float x))
 
 (deftransform scale-float ((f ex) (single-float *) *)
-  (cond #!+x86
+  (cond #+x86
         ((csubtypep (lvar-type ex)
                     (specifier-type '(signed-byte 32)))
          '(coerce (%scalbn (coerce f 'double-float) ex) 'single-float))
@@ -220,7 +220,7 @@
          '(scale-single-float f ex))))
 
 (deftransform scale-float ((f ex) (double-float *) *)
-  (cond #!+x86
+  (cond #+x86
         ((csubtypep (lvar-type ex)
                     (specifier-type '(signed-byte 32)))
          '(%scalbn f ex))
@@ -359,10 +359,10 @@
   ;; problem, but in the context of evaluated and compiled (+ <int> <single>)
   ;; giving different result if we fail to check for this.
   (or (not (csubtypep x (specifier-type 'integer)))
-      #!+x86
+      #+x86
       (csubtypep x (specifier-type `(integer ,most-negative-exactly-single-float-fixnum
                                              ,most-positive-exactly-single-float-fixnum)))
-      #!-x86
+      #-x86
       (csubtypep x (specifier-type 'fixnum))))
 
 ;;; Do some stuff to recognize when the loser is doing mixed float and
@@ -544,7 +544,7 @@
              (declare (ignorable prim-quick))
              `(progn
                 (deftransform ,name ((x) (single-float) *)
-                  #!+x86 (cond ((csubtypep (lvar-type x)
+                  #+x86 (cond ((csubtypep (lvar-type x)
                                            (specifier-type '(single-float
                                                              (#.(- (expt 2f0 63)))
                                                              (#.(expt 2f0 63)))))
@@ -556,9 +556,9 @@
                                   because the argument range (~S) was not within 2^63"
                                  (type-specifier (lvar-type x)))
                                 `(coerce (,',prim (coerce x 'double-float)) 'single-float)))
-                  #!-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
+                  #-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
                (deftransform ,name ((x) (double-float) *)
-                 #!+x86 (cond ((csubtypep (lvar-type x)
+                 #+x86 (cond ((csubtypep (lvar-type x)
                                           (specifier-type '(double-float
                                                             (#.(- (expt 2d0 63)))
                                                             (#.(expt 2d0 63)))))
@@ -569,7 +569,7 @@
                                  because the argument range (~S) was not within 2^63"
                                 (type-specifier (lvar-type x)))
                                `(,',prim x)))
-                 #!-x86 `(,',prim x)))))
+                 #-x86 `(,',prim x)))))
   (def sin %sin %sin-quick)
   (def cos %cos %cos-quick)
   (def tan %tan %tan-quick))
@@ -1297,7 +1297,7 @@
                 ;; of whether all the operations below are translated by vops.
                 ;; We could be more fine-grained, but it seems reasonable that
                 ;; they be implemented on an all-or-none basis.
-                #!-(vop-named sb-vm::%negate/complex-double-float)
+                #-(vop-named sb-vm::%negate/complex-double-float)
                 (progn
                 ;; negation
                 (deftransform %negate ((z) ((complex ,type)) *)
@@ -1354,7 +1354,7 @@
 
                 ;; Divide two complex numbers.
                 (deftransform / ((x y) ((complex ,type) (complex ,type)) *)
-                  #!-(vop-translates sb-vm::swap-complex)
+                  #-(vop-translates sb-vm::swap-complex)
                   '(let* ((rx (realpart x))
                           (ix (imagpart x))
                           (ry (realpart y))
@@ -1368,7 +1368,7 @@
                                (dn (+ iy (* r ry))))
                           (complex (/ (+ (* rx r) ix) dn)
                                    (/ (- (* ix r) rx) dn)))))
-                  #!+(vop-translates sb-vm::swap-complex)
+                  #+(vop-translates sb-vm::swap-complex)
                   `(let* ((cs (conjugate (sb-vm::swap-complex x)))
                           (ry (realpart y))
                           (iy (imagpart y)))
@@ -1381,7 +1381,7 @@
                            (/ (+ (* x r) cs) dn)))))
                 ;; Divide a real by a complex.
                 (deftransform / ((x y) (,type (complex ,type)) *)
-                  #!-(vop-translates sb-vm::swap-complex)
+                  #-(vop-translates sb-vm::swap-complex)
                   '(let* ((ry (realpart y))
                           (iy (imagpart y)))
                     (if (> (abs ry) (abs iy))
@@ -1393,7 +1393,7 @@
                                (dn (+ iy (* r ry))))
                           (complex (/ (* x r) dn)
                                    (/ (- x) dn)))))
-                  #!+(vop-translates sb-vm::swap-complex)
+                  #+(vop-translates sb-vm::swap-complex)
                   '(let* ((ry (realpart y))
                           (iy (imagpart y)))
                     (if (> (abs ry) (abs iy))

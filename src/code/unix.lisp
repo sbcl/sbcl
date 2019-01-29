@@ -167,7 +167,7 @@ corresponds to NAME, or NIL if there is none."
   (with-restarted-syscall (value errno)
     (int-syscall ("open" c-string int int)
                  path
-                 (logior #!+largefile o_largefile
+                 (logior #+largefile o_largefile
                          flags)
                  mode)))
 
@@ -284,8 +284,8 @@ corresponds to NAME, or NIL if there is none."
            (type (integer 0 2) whence))
   (let ((result
          #-win32
-          (alien-funcall (extern-alien #!-largefile "lseek"
-                                             #!+largefile "lseek_largefile"
+          (alien-funcall (extern-alien #-largefile "lseek"
+                                             #+largefile "lseek_largefile"
                                              (function off-t int off-t int))
                         fd offset whence)
           #+win32 (sb-win32:lseeki64 fd offset whence)))
@@ -388,18 +388,18 @@ corresponds to NAME, or NIL if there is none."
   ;;
   ;; Signal an error at compile-time, since it's needed for the
   ;; runtime to start up
-  #!-(or android linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
+  #-(or android linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
   #.(error "POSIX-GETCWD is not implemented.")
   (or
-   #!+(or linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
+   #+(or linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
    (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                     (function (* char)
                                                               (* char)
                                                               size-t))
                                       nil
-                                      #!+(or linux openbsd freebsd netbsd darwin win32 dragonfly) 0
-                                      #!+(or sunos hpux) 1025))
-   #!+android
+                                      #+(or linux openbsd freebsd netbsd darwin win32 dragonfly) 0
+                                      #+(or sunos hpux) 1025))
+   #+android
    (with-alien ((ptr (array char #.path-max)))
      ;; Older bionic versions do not have the above feature.
      (alien-funcall
@@ -612,7 +612,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
     nil))
 
 ;;;; poll.h
-#!+os-provides-poll
+#+os-provides-poll
 (progn
   (define-alien-type nil
       (struct pollfd
@@ -777,7 +777,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (loop for index below (/ fd-setsize sb-vm:n-machine-word-bits)
         do (setf (deref (slot fd-set 'fds-bits) index) 0)))
 
-#!-os-provides-poll
+#-os-provides-poll
 (defun unix-simple-poll (fd direction to-msec)
   (multiple-value-bind (to-sec to-usec)
       (if (minusp to-msec)
@@ -1055,7 +1055,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
-    #!+(or darwin netbsd)
+    #+(or darwin netbsd)
     (with-alien ((tv (struct timeval)))
       ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
       ;; gettimeofday occasionally fails. passing in a null pointer for the
@@ -1068,7 +1068,7 @@ the UNIX epoch (January 1st 1970.)"
                         (slot tv 'tv-usec))
                 (addr tv)
                 nil))
-    #!-(or darwin netbsd)
+    #-(or darwin netbsd)
     (with-alien ((tv (struct timeval))
                  (tz (struct timezone)))
       (syscall* ("sb_gettimeofday" (* (struct timeval))

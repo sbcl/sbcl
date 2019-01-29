@@ -133,7 +133,7 @@ char * sb_realpath (char *path)
 }
 
 /* readdir, closedir, and dirent name accessor. The first three are not strictly
- * necessary, but should save us some #!+netbsd in the build, and this also allows
+ * necessary, but should save us some #+netbsd in the build, and this also allows
  * building Windows versions using the non-ANSI variants of FindFirstFile &co
  * under the same API. (Use a structure that appends the handle to the WIN32_FIND_DATA
  * as the return value from sb_opendir, on sb_readdir grab the name from the previous
@@ -579,7 +579,7 @@ void sb_nanosleep(time_t sec, int nsec)
            ;; probably due to the request being rounded up to the
            ;; nearest HZ. This would cause the sleep to return way
            ;; too early.
-           #!+darwin
+           #+darwin
            (let ((rem-sec (slot rem 'tv-sec))
            (rem-nsec (slot rem 'tv-nsec)))
            (when (or (> secs rem-sec)

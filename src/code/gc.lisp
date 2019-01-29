@@ -13,7 +13,7 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-#!+(and relocatable-heap gencgc)
+#+(and relocatable-heap gencgc)
 (define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) unsigned-long)
 #-sb-fluid
 (declaim (inline current-dynamic-space-start))
@@ -21,7 +21,7 @@
   #+gencgc sb-vm:dynamic-space-start
   #-gencgc (extern-alien "current_dynamic_space" unsigned-long))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (progn
   (declaim (inline dynamic-space-free-pointer))
   (defun dynamic-space-free-pointer ()
@@ -50,9 +50,9 @@
 (defun descriptor-sap (x) (int-sap (get-lisp-obj-address x)))
 
 (defun control-stack-usage ()
-  #!-stack-grows-downward-not-upward
+  #-stack-grows-downward-not-upward
   (sap- (control-stack-pointer-sap) (descriptor-sap sb-vm:*control-stack-start*))
-  #!+stack-grows-downward-not-upward
+  #+stack-grows-downward-not-upward
   (sap- (descriptor-sap sb-vm:*control-stack-end*) (control-stack-pointer-sap)))
 
 (defun binding-stack-usage ()
@@ -98,11 +98,11 @@ run in any thread.")
 (define-alien-routine collect-garbage int
   (#+gencgc last-gen #-gencgc ignore int))
 
-#!+(or sb-thread sb-safepoint)
+#+(or sb-thread sb-safepoint)
 (progn
   (define-alien-routine gc-stop-the-world void)
   (define-alien-routine gc-start-the-world void))
-#!-(or sb-thread sb-safepoint)
+#-(or sb-thread sb-safepoint)
 (progn
   (defun gc-stop-the-world ())
   (defun gc-start-the-world ()))
@@ -177,7 +177,7 @@ statistics are appended to it."
                       ;; turn is a type-error.
                       (when (plusp run-time)
                         (incf *gc-run-time* run-time)))
-                    #!+(and sb-thread sb-safepoint)
+                    #+(and sb-thread sb-safepoint)
                     (setf *stop-for-gc-pending* nil)
                     (setf *gc-pending* nil
                           new-usage (dynamic-usage))

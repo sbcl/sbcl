@@ -196,11 +196,11 @@
 
 #+win32     (!gencgc-space-setup #x22000000)
 #+linux     (!gencgc-space-setup #x01000000 :dynamic-space-start #x09000000)
-#!+sunos     (!gencgc-space-setup #x20000000 :dynamic-space-start #x48000000)
-#!+freebsd   (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
-#!+dragonfly (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
-#!+openbsd   (!gencgc-space-setup #x3d000000 :dynamic-space-start #x8d000000)
-#!+netbsd    (!gencgc-space-setup #x20000000 :dynamic-space-start #x60000000)
+#+sunos     (!gencgc-space-setup #x20000000 :dynamic-space-start #x48000000)
+#+freebsd   (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
+#+dragonfly (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
+#+openbsd   (!gencgc-space-setup #x3d000000 :dynamic-space-start #x8d000000)
+#+netbsd    (!gencgc-space-setup #x20000000 :dynamic-space-start #x60000000)
 #+darwin    (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000)
 
 ;;; Size of one linkage-table entry in bytes.
@@ -216,8 +216,8 @@
   single-step-around-trap
   single-step-before-trap
   memory-fault-emulation-trap
-  #!+sb-safepoint global-safepoint-trap
-  #!+sb-safepoint csp-safepoint-trap
+  #+sb-safepoint global-safepoint-trap
+  #+sb-safepoint csp-safepoint-trap
   error-trap)
 
 ;;;; static symbols

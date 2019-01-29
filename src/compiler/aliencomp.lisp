@@ -351,11 +351,11 @@
     (/noshow (local-alien-info-force-to-memory-p info))
     (/noshow alien-type (unparse-alien-type alien-type) (alien-type-bits alien-type))
     (if (local-alien-info-force-to-memory-p info)
-        #!+(or x86 x86-64)
+        #+(or x86 x86-64)
         `(%primitive alloc-alien-stack-space
                      ,(ceiling (alien-type-bits alien-type)
                                sb-vm:n-byte-bits))
-        #!-(or x86 x86-64)
+        #-(or x86 x86-64)
         `(%primitive alloc-number-stack-space
                      ,(ceiling (alien-type-bits alien-type)
                                sb-vm:n-byte-bits))
@@ -666,7 +666,7 @@
             ;; Remember this frame to make sure that we can get back
             ;; to it later regardless of how the foreign stack looks
             ;; like.
-            #!+c-stack-is-control-stack
+            #+c-stack-is-control-stack
             (when (policy node (= 3 alien-funcall-saves-fp-and-pc))
               (setf body `(invoke-with-saved-fp (lambda () ,body))))
             (/noshow "returning from DEFTRANSFORM ALIEN-FUNCALL" (params) body)
@@ -715,24 +715,24 @@
         ;; in reverse order here doesn't change the semantics, but we
         ;; deal with all of the stack arguments before the wired
         ;; register arguments become live.
-        (args #!-arm args #!+arm (reverse args))
-        #!+c-stack-is-control-stack
+        (args #-arm args #+arm (reverse args))
+        #+c-stack-is-control-stack
         (stack-pointer (make-stack-pointer-tn)))
     (multiple-value-bind (nsp stack-frame-size arg-tns result-tns)
         (make-call-out-tns type)
-      #!+x86
+      #+x86
       (vop set-fpu-word-for-c call block)
       ;; Save the stack pointer, it will get aligned and subtracting
       ;; the size will not restore the original value, and some
       ;; things, like SB-C::CALL-VARIABLE, use the stack pointer to
       ;; calculate the number of saved values.
       ;; See alien.impure.lisp/:stack-misalignment
-      #!+c-stack-is-control-stack
+      #+c-stack-is-control-stack
       (vop current-stack-pointer call block stack-pointer)
       (vop alloc-number-stack-space call block stack-frame-size nsp)
       ;; KLUDGE: This is where the second half of the ARM
       ;; register-pressure change lives (see above).
-      (dolist (tn #!-arm arg-tns #!+arm (reverse arg-tns))
+      (dolist (tn #-arm arg-tns #+arm (reverse arg-tns))
         ;; On PPC, TN might be a list. This is used to indicate
         ;; something special needs to happen. See below.
         ;;
@@ -745,15 +745,15 @@
           (aver arg)
           (unless (= (length move-arg-vops) 1)
             (error "no unique move-arg-vop for moves in SC ~S" (sc-name sc)))
-          #!+(or x86 x86-64) (emit-move-arg-template call
+          #+(or x86 x86-64) (emit-move-arg-template call
                                                      block
                                                      (first move-arg-vops)
                                                      (lvar-tn call block arg)
                                                      nsp
                                                      first-tn)
-          #!-(or x86 x86-64)
+          #-(or x86 x86-64)
           (cond
-            #!+arm-softfp
+            #+arm-softfp
             ((and (proper-list-of-length-p tn 3)
                   (symbolp (third tn)))
              (emit-template call block
@@ -773,7 +773,7 @@
                                        temp-tn
                                        nsp
                                        first-tn))))
-          #!+(and ppc darwin)
+          #+(and ppc darwin)
           (when (listp tn)
             ;; This means that we have a float arg that we need to
             ;; also copy to some int regs. The list contains the TN
@@ -792,7 +792,7 @@
               (reference-tn-list (remove-if-not #'tn-p (flatten-list arg-tns)) nil))
              (result-operands
               (reference-tn-list (remove-if-not #'tn-p result-tns) t)))
-        (cond #!+(vop-named sb-vm::call-out-named)
+        (cond #+(vop-named sb-vm::call-out-named)
               ((and (constant-lvar-p function) (stringp (lvar-value function)))
                (vop* call-out-named call block (arg-operands) (result-operands)
                      (lvar-value function)
@@ -801,14 +801,14 @@
                (vop* call-out call block
                      ((lvar-tn call block function) arg-operands)
                      (result-operands))))
-        #!-c-stack-is-control-stack
+        #-c-stack-is-control-stack
         (vop dealloc-number-stack-space call block stack-frame-size)
-        #!+c-stack-is-control-stack
+        #+c-stack-is-control-stack
         (vop reset-stack-pointer call block stack-pointer)
-        #!+x86
+        #+x86
         (vop set-fpu-word-for-lisp call block)
         (cond
-          #!+arm-softfp
+          #+arm-softfp
           ((and lvar
                 (proper-list-of-length-p result-tns 3)
                 (symbolp (third result-tns)))

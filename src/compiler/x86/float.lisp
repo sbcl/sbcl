@@ -3099,7 +3099,7 @@
      (case (tn-offset r)
        ((0 1))
        (t (inst fstd r)))))
-) ; PROGN #!-LONG-FLOAT
+) ; PROGN #-LONG-FLOAT
 
 #+long-float
 (progn
@@ -3784,7 +3784,7 @@
   (:result-types long-float)
   (:policy :fast-safe)
   ;; FIXME 1: This appears to be the second DEFINE-VOP of FLOG1P.
-  ;;   Perhaps this is OK because of the #!+LONG-FLOAT wrapped around
+  ;;   Perhaps this is OK because of the #+LONG-FLOAT wrapped around
   ;;   an enormous PROGN above. Still, it would be probably be good to
   ;;   add some code to warn about redefining VOPs.
   (:note "inline log1p function")
@@ -4075,7 +4075,7 @@
        ((0 1))
        (t (inst fstd r)))))
 
-) ; PROGN #!+LONG-FLOAT
+) ; PROGN #+LONG-FLOAT
 
 ;;;; complex float VOPs
 

@@ -1188,7 +1188,7 @@
                            hi
                            (logior hi (ash -1 sb-vm:float-sign-shift)))
                        lo)))
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   (make-long-float

@@ -8,7 +8,7 @@
 
 ;;;; Check that target machine features are set up consistently with
 ;;;; this file.
-#!-bsd
+#-bsd
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (error "The :BSD feature is missing, we shouldn't be doing this code."))
 
@@ -73,8 +73,8 @@
 
 (defun software-type ()
   "Return a string describing the supporting software."
-  #!-gnu-kfreebsd (sysctl :str ctl-kern kern-ostype)
-  #!+gnu-kfreebsd "GNU/kFreeBSD")
+  #-gnu-kfreebsd (sysctl :str ctl-kern kern-ostype)
+  #+gnu-kfreebsd "GNU/kFreeBSD")
 
 (defun software-version ()
   "Return a string describing version of the supporting software, or NIL

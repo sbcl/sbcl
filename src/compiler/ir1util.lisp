@@ -734,7 +734,7 @@
   ;; It's just a distraction otherwise.
   (declare (ignorable lvar flush))
 
-  #!+(and sb-xc-host
+  #+(and sb-xc-host
           (not (and stack-allocatable-closures
                     stack-allocatable-vectors
                     stack-allocatable-lists
@@ -1169,7 +1169,7 @@
                ;; The evaluator will mark lexicals with :BOGUS when it
                ;; translates an interpreter lexenv to a compiler
                ;; lexenv.
-               ((or leaf #!+sb-eval (member :bogus)) nil)
+               ((or leaf #+sb-eval (member :bogus)) nil)
                (cons (aver (eq (car thing) 'macro))
                      t)
                (heap-alien-info nil)))))
@@ -1899,7 +1899,7 @@
   (unless (block-component block)
     ;; Already deleted
     (return-from delete-block))
-  #!+high-security (aver (not (memq block (component-delete-blocks (block-component block)))))
+  #+high-security (aver (not (memq block (component-delete-blocks (block-component block)))))
   (unless silent
     (note-block-deletion block))
   (setf (block-delete-p block) t)

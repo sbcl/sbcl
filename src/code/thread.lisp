@@ -21,7 +21,7 @@
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
 
-#!+(and sb-safepoint-strictly (not win32))
+#+(and sb-safepoint-strictly (not win32))
 (defstruct (signal-handling-thread
              (:copier nil)
              (:include foreign-thread)

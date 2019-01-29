@@ -850,7 +850,7 @@
   (:arg-types unsigned-num)
   (:results (result :scs (descriptor-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:guard #!+:sparc-v9 t #!-:sparc-v9 nil)
+  (:guard #+:sparc-v9 t #-:sparc-v9 nil)
   (:generator 2
     (load-symbol temp t)
     (inst movr result null-tn digit :lz)

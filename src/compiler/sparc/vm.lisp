@@ -214,7 +214,7 @@
 
   ;; Non-Descriptor double-floats.
   (double-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 2 collect i)
    :element-size 2 :alignment 2
    :reserve-locations (28 30)
@@ -225,7 +225,7 @@
   ;; Non-Descriptor double-floats.
   #+long-float
   (long-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 4 collect i)
    :element-size 4 :alignment 4
    :reserve-locations (28)
@@ -242,7 +242,7 @@
    :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 4 collect i)
    :element-size 4 :alignment 4
    :reserve-locations (28)
@@ -252,7 +252,7 @@
 
   #+long-float
   (complex-long-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 8 collect i)
    :element-size 8 :alignment 8
    :constant-scs ()

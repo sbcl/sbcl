@@ -55,9 +55,9 @@
 (defmacro with-concurrent-access-check (hash-table operation &body body)
   (declare (ignorable hash-table operation)
            (type (member :read :write) operation))
-  #!-sb-hash-table-debug
+  #-sb-hash-table-debug
   `(progn ,@body)
-  #!+sb-hash-table-debug
+  #+sb-hash-table-debug
   (let ((thread-slot-accessor (if (eq operation :read)
                                   'hash-table-reading-thread
                                   'hash-table-writing-thread)))

@@ -150,7 +150,7 @@
   (doc (error "missing PACKAGE-DOC datum"))
   ;; a tree containing names for exported symbols which'll be set up at package
   ;; creation time, and NILs, which are ignored. (This is a tree in order to
-  ;; allow constructs like '("ENOSPC" #!+LINUX ("EDQUOT" "EISNAM" "ENAVAIL"
+  ;; allow constructs like '("ENOSPC" #+LINUX ("EDQUOT" "EISNAM" "ENAVAIL"
   ;; "EREMOTEIO")) to be used in initialization. NIL entries in the tree are
   ;; ignored for the same reason of notational convenience.)
   export

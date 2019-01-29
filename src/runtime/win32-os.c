@@ -401,13 +401,13 @@ void unmap_gc_page()
  * to leave old-style linking code in place for the sake of
  * _non-linkage-table_ platforms (they probably don't have -ldl or its
  * equivalent, like LL/GPA, at all) -- but i did it usually by moving
- * the entire `old style' code under #!-sb-dynamic-core and
+ * the entire `old style' code under #-sb-dynamic-core and
  * refactoring the `new style' branch, instead of cutting the tail
- * piecemeal and increasing #!+-ifdeffery amount & the world enthropy.
+ * piecemeal and increasing #+-ifdeffery amount & the world enthropy.
  *
  * If we look at the majority of the ``new style'' code units, it's a
- * common thing to observe how #!+-ifdeffery _vanishes_ instead of
- * multiplying: #!-sb-xc, #!+sb-xc-host and #!-sb-xc-host end up
+ * common thing to observe how #+-ifdeffery _vanishes_ instead of
+ * multiplying: #-sb-xc, #+sb-xc-host and #-sb-xc-host end up
  * needing the same code. Runtime checks of static v. dynamic symbol
  * disappear even faster. STDCALL mangling and leading underscores go
  * out of scope (and GCed, hopefully) instead of surfacing here and

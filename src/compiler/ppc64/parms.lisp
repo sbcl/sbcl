@@ -125,8 +125,8 @@
 (!gencgc-space-setup #x04000000
                      :dynamic-space-start
                      #+linux   #x4f000000
-                     #!+netbsd  #x4f000000
-                     #!+openbsd #x4f000000
+                     #+netbsd  #x4f000000
+                     #+openbsd #x4f000000
                      #+darwin  #x10000000)
 
 (defconstant linkage-table-entry-size 16)
@@ -138,7 +138,7 @@
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
 
-#!+netbsd
+#+netbsd
 (progn
   #-gencgc
   (progn
@@ -152,7 +152,7 @@
 ;;; FIXME: MAXDSIZ is a kernel parameter, and can vary as high as 1GB.
 ;;; These parameters should probably be tested under such a configuration,
 ;;; as rare as it might or might not be.
-#!+openbsd
+#+openbsd
 (progn
   #-gencgc
   (progn

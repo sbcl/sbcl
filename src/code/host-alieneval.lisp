@@ -22,7 +22,7 @@
 
 (defun guess-alignment (bits)
   (cond ((null bits) nil)
-        #!-(or (and x86 (not win32)) (and ppc darwin)) ((> bits 32) 64)
+        #-(or (and x86 (not win32)) (and ppc darwin)) ((> bits 32) 64)
         ((> bits 16) 32)
         ((> bits 8) 16)
         ((> bits 1) 8)
@@ -464,10 +464,10 @@
   ;; of return values and override the naturalize method to perform
   ;; the sign extension (in compiler/target/c-call.lisp).
   (ecase context
-    ((:normal #!-(or alpha x86 x86-64) :result)
+    ((:normal #-(or alpha x86 x86-64) :result)
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
            (alien-integer-type-bits type)))
-    #!+(or alpha x86 x86-64)
+    #+(or alpha x86 x86-64)
     (:result
      (list (if (alien-integer-type-signed type) 'signed-byte 'unsigned-byte)
            (max (alien-integer-type-bits type)
@@ -475,7 +475,7 @@
 
 ;;; As per the comment in the :ALIEN-REP method above, this is defined
 ;;; elsewhere for alpha and x86oids.
-#!-(or alpha x86 x86-64)
+#-(or alpha x86 x86-64)
 (define-alien-type-method (integer :naturalize-gen) (type alien)
   (declare (ignore type))
   alien)

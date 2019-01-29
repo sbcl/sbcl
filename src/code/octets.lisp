@@ -349,7 +349,7 @@
       ;; doesn't seem very sensible.
       #-sb-unicode
       (setf *default-external-format* :latin-1)
-      (let ((external-format #-win32 (intern (or #!-android
+      (let ((external-format #-win32 (intern (or #-android
                                                   (alien-funcall
                                                    (extern-alien
                                                     "nl_langinfo"

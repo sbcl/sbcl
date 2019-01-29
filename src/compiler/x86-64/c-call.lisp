@@ -234,7 +234,7 @@
   (:generator 2
    (inst mov res (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -246,7 +246,7 @@
   (:generator 2
    (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
 
-#!+sb-safepoint
+#+sb-safepoint
 (defconstant thread-saved-csp-offset -1)
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -273,7 +273,7 @@
   ;; determine which alien was accessed in case it's undefined.
   (:temporary (:sc sap-reg :offset rbx-offset :from (:argument 0)) rbx)
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
-  #!+sb-safepoint
+  #+sb-safepoint
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
   (:ignore results)
   (:vop-var vop)
@@ -281,7 +281,7 @@
     (move rbx function)
     (emit-c-call vop rax rbx args
                  sb-alien::*alien-fun-type-varargs-default*
-                 #!+sb-safepoint pc-save))
+                 #+sb-safepoint pc-save))
   . #.(destroyed-c-registers))
 
 ;;; Calls to C can generally be made without loading a register
@@ -292,19 +292,19 @@
   (:results (results :more t))
   (:info c-symbol varargsp)
   (:temporary (:sc unsigned-reg :offset rax-offset :to :result) rax)
-  #!+sb-safepoint
+  #+sb-safepoint
   (:temporary (:sc unsigned-stack :from :eval :to :result) pc-save)
   (:ignore results)
   (:vop-var vop)
   (:generator 0
-    (emit-c-call vop rax c-symbol args varargsp #!+sb-safepoint pc-save))
+    (emit-c-call vop rax c-symbol args varargsp #+sb-safepoint pc-save))
   . #.(destroyed-c-registers))
 
-(defun emit-c-call (vop rax fun args varargsp #!+sb-safepoint pc-save)
+(defun emit-c-call (vop rax fun args varargsp #+sb-safepoint pc-save)
   (declare (ignorable varargsp))
   ;; Current PC - don't rely on function to keep it in a form that
   ;; GC understands
-  #!+sb-safepoint
+  #+sb-safepoint
   (let ((label (gen-label)))
     (inst lea rax (rip-relative-ea label))
     (emit-label label)
@@ -326,7 +326,7 @@
                         while tn-ref
                         count (eq (sb-name (sc-sb (tn-sc (tn-ref-tn tn-ref))))
                                   'float-registers))))
-  #!+sb-safepoint
+  #+sb-safepoint
   ;; Store SP in thread struct
   (storew rsp-tn thread-base-tn thread-saved-csp-offset)
   #+win32 (inst sub rsp-tn #x20)       ;MS_ABI: shadow zone
@@ -342,7 +342,7 @@
   ;; For the undefined alien error
   (note-this-location vop :internal-error)
   #+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
-  #!+sb-safepoint
+  #+sb-safepoint
   ;; Zero the saved CSP
   (inst xor (make-ea-for-object-slot thread-base-tn thread-saved-csp-offset 0)
         rsp-tn))
@@ -401,12 +401,12 @@
     (let* ((segment (make-segment))
            (rax rax-tn)
            #+win32 (rcx rcx-tn)
-           #!-(and win32 sb-thread) (rdi rdi-tn)
-           #!-(and win32 sb-thread) (rsi rsi-tn)
+           #-(and win32 sb-thread) (rdi rdi-tn)
+           #-(and win32 sb-thread) (rsi rsi-tn)
            (rdx rdx-tn)
            (rbp rbp-tn)
            (rsp rsp-tn)
-           #!+(and win32 sb-thread) (r8 r8-tn)
+           #+(and win32 sb-thread) (r8 r8-tn)
            (xmm0 float0-tn)
            ([rsp] (ea rsp))
            ;; How many arguments have been copied

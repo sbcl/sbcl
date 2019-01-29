@@ -235,7 +235,7 @@
   (:generator 2
    (inst lea res (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -269,9 +269,9 @@
   (:temporary (:sc unsigned-reg :offset eax-offset
                :from :eval :to :result) eax)
   (:temporary (:sc double-stack) fp-temp)
-  #!+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
-  #!-sb-safepoint (:node-var node)
-  #!+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
+  #+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
+  #-sb-safepoint (:node-var node)
+  #+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
   (:vop-var vop)
   (:save-p t)
   (:ignore args)
@@ -284,11 +284,11 @@
             ;; calling routine irrespectively of SPACE and SPEED policy.
             ;; An inline version of said changes is left to the
             ;; sufficiently motivated maintainer.
-            #!-sb-safepoint (policy node (> space speed)))
+            #-sb-safepoint (policy node (> space speed)))
            ;; On safepoint builds, we need to stash the return address
            ;; on the "protected" part of the control stack so that it
            ;; doesn't move on us.  Pass the address of pc-save in EDI.
-           #!+sb-safepoint
+           #+sb-safepoint
            (inst lea edi (make-ea :dword :base ebp-tn
                                   :disp (frame-byte-offset (tn-offset pc-save))))
            (move eax function)

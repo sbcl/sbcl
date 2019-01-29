@@ -284,7 +284,7 @@
 
 ;;; The deferred mode processor for fasteval special operators.
 ;;; Immediate processors are hung directly off symbols in a dedicated slot.
-#!+sb-fasteval
+#+sb-fasteval
 (define-info-type (:function :interpreter) :type-spec (or function null))
 
 ;;; Indicates whether the function is deprecated.

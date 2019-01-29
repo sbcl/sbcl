@@ -45,8 +45,8 @@
 (def!type layout-depthoid () '(or index (integer -1 -1)))
 (def!type layout-bitmap ()
   ;; FIXME: Probably should exclude negative bignum
-  #!+compact-instance-header 'integer
-  #!-compact-instance-header '(and integer (not (eql 0))))
+  #+compact-instance-header 'integer
+  #-compact-instance-header '(and integer (not (eql 0))))
 
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:
@@ -99,7 +99,7 @@
 (defvar *allow-instrumenting*)
 
 ;;; miscellaneous forward declarations
-#!+sb-dyncount (defvar *collect-dynamic-statistics*)
+#+sb-dyncount (defvar *collect-dynamic-statistics*)
 (defvar *component-being-compiled*)
 (defvar *compiler-error-context*)
 (defvar *compiler-error-count*)
@@ -111,7 +111,7 @@
 (defvar *current-path*)
 (defvar *current-component*)
 (defvar *delayed-ir1-transforms*)
-#!+sb-dyncount
+#+sb-dyncount
 (defvar *dynamic-counts-tn*)
 (defvar *elsewhere-label*)
 (defvar *event-note-threshold*)
@@ -320,7 +320,7 @@ the stack without triggering overflow protection.")
 
 ;;; The allocation quantum for boxed code header words.
 ;;; 2 implies an even length boxed header; 1 implies no restriction.
-(defconstant code-boxed-words-align (+ 2 #!+(or x86 x86-64) -1))
+(defconstant code-boxed-words-align (+ 2 #+(or x86 x86-64) -1))
 
 ;;; Used as the CDR of the code coverage instrumentation records
 ;;; (instead of NIL) to ensure that any well-behaving user code will

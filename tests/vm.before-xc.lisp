@@ -35,7 +35,7 @@
 ;; and x86-64-specific not because of broken-ness, but because it uses
 ;; known random TNs to play with.
 (in-package "SB-C")
-#!+x86-64
+#+x86-64
 (dotimes (i (ash 1 6))
   (labels ((make-tns (n)
              (mapcar 'copy-structure

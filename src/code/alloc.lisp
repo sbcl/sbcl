@@ -483,9 +483,9 @@
               ;; The vop is defined in such a way that it can't be inserted into
               ;; this fuction, but instead needs an out-of-line call to a helper function
               ;; (because it clobbers all registers and doesn't indicate that)
-              #!+(and x86-64 (not win32))
+              #+(and x86-64 (not win32))
               (alloc-dynamic-space-code total-words)
-              #!-(and x86-64 (not win32))
+              #-(and x86-64 (not win32))
               (without-gcing
                (%make-lisp-obj
                 (alien-funcall (extern-alien "alloc_code_object"

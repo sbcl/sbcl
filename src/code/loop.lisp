@@ -9,7 +9,7 @@
 ;;;; bootstrap issues, SBCLification (e.g. DECLARE used to check
 ;;;; argument types), and other maintenance. Whether or not it then
 ;;;; supported all the environments implied by the reader conditionals
-;;;; in the source code (e.g. #!+CLOE-RUNTIME) before that
+;;;; in the source code (e.g. #+CLOE-RUNTIME) before that
 ;;;; modification, it sure doesn't now. It might perhaps, by blind
 ;;;; luck, be appropriate for some other CMU-CL-derived system, but
 ;;;; really it only attempts to be appropriate for SBCL.

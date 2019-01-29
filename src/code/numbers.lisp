@@ -1034,7 +1034,7 @@ and the number of 0 bits if INTEGER is negative."
   (declare (explicit-check))
   (etypecase integer
     (fixnum
-     (logcount #!-x86-64
+     (logcount #-x86-64
                (truly-the (integer 0
                                    #.(max sb-xc:most-positive-fixnum
                                           (lognot sb-xc:most-negative-fixnum)))
@@ -1042,7 +1042,7 @@ and the number of 0 bits if INTEGER is negative."
                               (lognot (truly-the fixnum integer))
                               integer))
                ;; The VOP handles that case better
-               #!+x86-64 integer))
+               #+x86-64 integer))
     (bignum
      (bignum-logcount integer))))
 
@@ -1453,7 +1453,7 @@ and the number of 0 bits if INTEGER is negative."
     (bignum (ldb (byte 64 0)
                  (ash (logand integer #xffffffffffffffff) amount)))))
 
-#!+(or x86 x86-64 arm arm64)
+#+(or x86 x86-64 arm arm64)
 (defun sb-vm::ash-left-modfx (integer amount)
   (let ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)))
     (etypecase integer

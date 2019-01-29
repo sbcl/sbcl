@@ -903,7 +903,7 @@
                       :kind "special operator" :name name
                       :args input :lambda-list lambda-list
                       :minimum min :maximum max))
-     #!+sb-eval
+     #+sb-eval
      (:eval
       (error 'sb-eval::arg-count-program-error
              ;; This is stupid. Maybe we should just say
@@ -1158,7 +1158,7 @@
                                (car tail))))
           (append whole env (ds-lambda-list-variables parse nil)))
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) sb-xc-host) (setq docstring nil)
+    #+(and (not sb-doc) sb-xc-host) (setq docstring nil)
     ;; Note that we *NEVER* declare macro lambdas as a toplevel named lambda.
     ;; Code such as:
     ;;  `(setf (symbol-function ',myfun) ,(make-macro-lambda whatever))

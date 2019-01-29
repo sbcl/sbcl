@@ -1645,7 +1645,7 @@ forms that explicitly control this kind of evaluation.")
 
 (!def-debug-command "LIST-LOCALS" ()
   (let ((d-fun (frame-debug-fun *current-frame*)))
-    #!+sb-fasteval
+    #+sb-fasteval
     (when (typep (debug-fun-name d-fun nil)
                  '(cons (eql sb-interpreter::.eval.)))
       (let ((env (arg 1)))
@@ -1771,7 +1771,7 @@ forms that explicitly control this kind of evaluation.")
 ;;; RETURN-FROM-FRAME and RESTART-FRAME
 
 (defun unwind-to-frame-and-call (frame thunk)
-  #!+unwind-to-frame-and-call-vop
+  #+unwind-to-frame-and-call-vop
   (flet ((sap-int/fixnum (sap)
            ;; On unithreaded X86 *BINDING-STACK-POINTER* and
            ;; *CURRENT-CATCH-BLOCK* are negative, so we need to jump through
@@ -1791,7 +1791,7 @@ forms that explicitly control this kind of evaluation.")
       (sb-vm::%primitive sb-vm::unwind-to-frame-and-call
                          (sb-di::frame-pointer frame)
                          (find-enclosing-uwp frame)
-                         #!-x86-64
+                         #-x86-64
                          (lambda ()
                            ;; Before calling the user-specified
                            ;; function, we need to restore the binding
@@ -1801,17 +1801,17 @@ forms that explicitly control this kind of evaluation.")
                                               unbind-to)
                            (setf sb-vm::*current-catch-block* catch-block)
                            (funcall thunk))
-                         #!+x86-64 thunk
-                         #!+x86-64 unbind-to
-                         #!+x86-64 catch-block)))
-  #!-unwind-to-frame-and-call-vop
+                         #+x86-64 thunk
+                         #+x86-64 unbind-to
+                         #+x86-64 catch-block)))
+  #-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (replace-frame-catch-tag frame
                                    'sb-c:debug-catch-tag
                                    tag)
     (throw tag thunk)))
 
-#!+unwind-to-frame-and-call-vop
+#+unwind-to-frame-and-call-vop
 (defun find-binding-stack-pointer (frame)
   (let ((debug-fun (frame-debug-fun frame)))
     (if (eq (debug-fun-kind debug-fun) :external)
@@ -1840,9 +1840,9 @@ forms that explicitly control this kind of evaluation.")
                                                   (* sb-vm:catch-block-previous-catch-slot
                                                      sb-vm::n-word-bytes))
                                 when (or (zerop (sap-int block))
-                                         #!+stack-grows-downward-not-upward
+                                         #+stack-grows-downward-not-upward
                                          (sap> block frame-pointer)
-                                         #!-stack-grows-downward-not-upward
+                                         #-stack-grows-downward-not-upward
                                          (sap< block frame-pointer))
                                 return block)))
     enclosing-block))
@@ -1858,9 +1858,9 @@ forms that explicitly control this kind of evaluation.")
                               then (sap-ref-sap uwp-block
                                                 sb-vm:unwind-block-uwp-slot)
                               when (or (zerop (sap-int uwp-block))
-                                       #!+stack-grows-downward-not-upward
+                                       #+stack-grows-downward-not-upward
                                        (sap> uwp-block frame-pointer)
-                                       #!-stack-grows-downward-not-upward
+                                       #-stack-grows-downward-not-upward
                                        (sap< uwp-block frame-pointer))
                               return uwp-block)))
     enclosing-uwp))
@@ -1911,10 +1911,10 @@ forms that explicitly control this kind of evaluation.")
               *current-frame*)))
 
 (defun frame-has-debug-tag-p (frame)
-  #!+unwind-to-frame-and-call-vop
+  #+unwind-to-frame-and-call-vop
   ;; XEPs do not bind anything, nothing to restore
   (find-binding-stack-pointer frame)
-  #!-unwind-to-frame-and-call-vop
+  #-unwind-to-frame-and-call-vop
   (find 'sb-c:debug-catch-tag (sb-di::frame-catches frame) :key #'car))
 
 (defun frame-has-debug-vars-p (frame)

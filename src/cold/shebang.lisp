@@ -11,7 +11,7 @@
 
 (in-package "SB-COLD")
 
-;;;; definition of #!+ and #!- as a mechanism analogous to #+/#-, but
+;;;; definition of #+ and #- as a mechanism analogous to #+/#-, but
 ;;;; for SB-XC:*FEATURES* instead of CL:*FEATURES*. (This is handy
 ;;;; when cross-compiling, so that we can make a distinction between
 ;;;; features of the host Common Lisp and features of the target

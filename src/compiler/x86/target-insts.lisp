@@ -218,8 +218,8 @@
 (defun break-control (chunk inst stream dstate)
   (declare (ignore inst))
   (flet ((nt (x) (if stream (note x dstate))))
-    (let ((trap #!-ud2-breakpoints (byte-imm-code chunk dstate)
-                #!+ud2-breakpoints (word-imm-code chunk dstate)))
+    (let ((trap #-ud2-breakpoints (byte-imm-code chunk dstate)
+                #+ud2-breakpoints (word-imm-code chunk dstate)))
      (case trap
        (#.cerror-trap
         (nt "cerror trap")

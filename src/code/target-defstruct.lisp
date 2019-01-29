@@ -22,7 +22,7 @@
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.
-#!+(or sb-eval sb-fasteval)
+#+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
   (let ((instance (%make-instance (dd-length dd))) ; length = sans header word
         (value-index 0))

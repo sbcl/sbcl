@@ -274,7 +274,7 @@
                   :constant-scs (single-sse-immediate)
                   :save-p t
                   :alternate-scs (single-sse-stack))
-  #!+avx2
+  #+avx2
   (avx2-reg float-registers
    :locations #.*float-regs*)
   #+sb-simd-pack-256
@@ -403,7 +403,7 @@
     (symbol ; Symbols in static and immobile space are immediate
      (when (or ;; With #+immobile-symbols, all symbols are in immobile-space.
                ;; And the cross-compiler always uses immobile-space if enabled.
-               #!+(or immobile-symbols (and immobile-space sb-xc-host)) t
+               #+(or immobile-symbols (and immobile-space sb-xc-host)) t
 
                ;; Otherwise, if #-immobile-symbols, and the symbol was present
                ;; in the initial core image as indicated by the symbol header, then
@@ -413,7 +413,7 @@
                ;; initial package. All without breaking anything. Hence, unlikely.
                ;; Also note that if compiling to memory, the symbol's current address
                ;; is used to determine whether it's immediate.
-               #!+(and (not sb-xc-host) immobile-space (not immobile-symbols))
+               #+(and (not sb-xc-host) immobile-space (not immobile-symbols))
                (or (logbitp +initial-core-symbol-bit+ (get-header-data value))
                    (and (sb-c::core-object-p sb-c::*compile-object*)
                         (immobile-space-obj-p value)))
@@ -435,17 +435,17 @@
        (if (eql value #c(0d0 0d0))
             fp-complex-double-zero-sc-number
             fp-complex-double-immediate-sc-number))
-    #!+(and sb-simd-pack (not sb-xc-host))
+    #+(and sb-simd-pack (not sb-xc-host))
     ((simd-pack double-float) double-sse-immediate-sc-number)
-    #!+(and sb-simd-pack (not sb-xc-host))
+    #+(and sb-simd-pack (not sb-xc-host))
     ((simd-pack single-float) single-sse-immediate-sc-number)
-    #!+(and sb-simd-pack (not sb-xc-host))
+    #+(and sb-simd-pack (not sb-xc-host))
     (simd-pack int-sse-immediate-sc-number)
-    #!+(and sb-simd-pack-256 (not sb-xc-host))
+    #+(and sb-simd-pack-256 (not sb-xc-host))
     ((simd-pack-256 double-float) double-avx2-immediate-sc-number)
-    #!+(and sb-simd-pack-256 (not sb-xc-host))
+    #+(and sb-simd-pack-256 (not sb-xc-host))
     ((simd-pack-256 single-float) single-avx2-immediate-sc-number)
-    #!+(and sb-simd-pack-256 (not sb-xc-host))
+    #+(and sb-simd-pack-256 (not sb-xc-host))
     (simd-pack-256 int-avx2-immediate-sc-number)))
 
 (defun boxed-immediate-sc-p (sc)

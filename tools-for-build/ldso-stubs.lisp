@@ -27,7 +27,7 @@
 ;;; And an attempt to work around the Sun toolchain... --ns
 (defun ldso-stubify (index fct stream)
   (declare (ignorable index))
-  #!+sparc
+  #+sparc
   (apply #'format stream "
 .globl ldso_stub__~A ;                          \\
         FUNCDEF(ldso_stub__~A) ;                \\
@@ -39,7 +39,7 @@ ldso_stub__~A: ;                                \\
         .size    ldso_stub__~A,.L~Ae1-ldso_stub__~A ;~%"
           (make-list 9 :initial-element fct))
 
-  #!+hppa
+  #+hppa
   (let ((stub (format nil "ldso_stub__~a" fct)))
     (apply #'format stream (list
 "    .export ~A
@@ -50,7 +50,7 @@ ldso_stub__~A: ;                                \\
     .procend
     .import ~a,code~%" stub stub fct fct)))
 
-  #!+ppc64
+  #+ppc64
   ;; The ABI requires that we leave a 'nop' where the linker can insert a load
   ;; of r2 after the callee returns. Naively making the obvious change to the
   ;; 32-bit stub - adding a nop after the 'b' - does not work; it gets the same
@@ -87,7 +87,7 @@ ldso_stub__~A: ;                                \\
           (format nil "ldso_stub__~a" fct)
           index fct)
 
-  #!-(or sparc hppa ppc64)
+  #-(or sparc hppa ppc64)
   (format stream "LDSO_STUBIFY(~A)~%" fct))
 
 (defvar *preludes* '("
@@ -99,7 +99,7 @@ ldso_stub__~A: ;                                \\
 #endif
 #include \"sbcl.h\""
 
-#!+arm "
+#+arm "
 #define LDSO_STUBIFY(fct)               \\
   .align                              ; \\
   .global ldso_stub__ ## fct          ; \\
@@ -108,7 +108,7 @@ ldso_stub__ ## fct:                   ; \\
   ldr r8, =fct                        ; \\
   bx r8                               ; \\
   .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
-#!+arm64"
+#+arm64"
 #define LDSO_STUBIFY(fct)               \\
   .align                              ; \\
   .global ldso_stub__ ## fct          ; \\
@@ -118,13 +118,13 @@ ldso_stub__ ## fct:                   ; \\
   br x8                               ; \\
   .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
 
-#!+sparc "
+#+sparc "
 #ifdef LISP_FEATURE_SPARC
 #include \"sparc-funcdef.h\"
 #endif
         .text"
 
-#!+(and (or x86 x86-64) (not darwin)) "
+#+(and (or x86 x86-64) (not darwin)) "
 #define LDSO_STUBIFY(fct)                       \\
         .align 16 ;                             \\
 .globl ldso_stub__ ## fct ;                     \\
@@ -134,7 +134,7 @@ ldso_stub__ ## fct: ;                           \\
 .L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
-#!+(and linux alpha) "
+#+(and linux alpha) "
 #define LDSO_STUBIFY(fct)                       \\
 .globl ldso_stub__ ## fct ;                     \\
         .type    ldso_stub__ ## fct,@function ; \\
@@ -143,11 +143,11 @@ ldso_stub__ ## fct: ;                           \\
 .L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
-#!+hppa "
+#+hppa "
         .level  2.0
         .text"
 
-#!+(and (not darwin) ppc) "
+#+(and (not darwin) ppc) "
 #define LDSO_STUBIFY(fct)                       \\
 .globl ldso_stub__ ## fct ;                     \\
         .type    ldso_stub__ ## fct,@function ; \\
@@ -156,7 +156,7 @@ ldso_stub__ ## fct: ;                           \\
 .L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
 
-#!+(and darwin ppc) "
+#+(and darwin ppc) "
 #define LDSO_STUBIFY(fct)                       @\\
 .text                                           @\\
 .globl  _ldso_stub__ ## fct                      @\\
@@ -174,10 +174,10 @@ _ldso_stub__ ## fct ## $lazy_ptr:                @\\
         .indirect_symbol _ ## fct               @\\
         .long dyld_stub_binding_helper"
 
-#!+ppc64 ""
+#+ppc64 ""
 
 ;;; darwin x86 assembler is weird and follows the ppc assembler syntax
-#!+(and darwin x86) "
+#+(and darwin x86) "
 #define LDSO_STUBIFY(fct)                       \\
 .text                           ;               \\
         .align 4 ;                              \\
@@ -195,7 +195,7 @@ L ## fct ## $stub: ;                    \\
         .subsections_via_symbols  ;    "
 
 ;;; darwin x86-64
-#!+(and darwin x86-64) "
+#+(and darwin x86-64) "
 #define LDSO_STUBIFY(fct)                       \\
         .align 4 ;                              \\
 .globl _ldso_stub__ ## fct ;                    \\
@@ -210,7 +210,7 @@ _ldso_stub__ ## fct: ;                          \\
 ;;; and we apparently don't ever need to pass six arguments to a
 ;;; libc function.  -- CSR, 2003-10-29
 ;;; Expanded to 8 arguments regardless.  -- ths, 2005-03-24
-#!+mips "
+#+mips "
 #define LDSO_STUBIFY(fct)                      \\
         .globl  ldso_stub__ ## fct ;           \\
         .type   ldso_stub__ ## fct,@function ; \\
@@ -265,7 +265,7 @@ ldso_stub__ ## fct: ;                  \\
                    "fork"
                    "free"
                    "fstat"
-                   #!+inode64 "fstat$INODE64"
+                   #+inode64 "fstat$INODE64"
                    "fsync"
                    "ftruncate"
                    "getcwd"
@@ -295,9 +295,9 @@ ldso_stub__ ## fct: ;                  \\
                    "log1p"
                    "lseek"
                    "lstat"
-                   #!+inode64 "lstat$INODE64"
+                   #+inode64 "lstat$INODE64"
                    "malloc"
-                   #!+(or x86 x86-64) "memcmp"
+                   #+(or x86 x86-64) "memcmp"
                    "memmove"
                    "mkdir"
                    "nanosleep"
@@ -321,7 +321,7 @@ ldso_stub__ ## fct: ;                  \\
                    "sinh"
                    "socket"
                    "stat"
-                   #!+inode64 "stat$INODE64"
+                   #+inode64 "stat$INODE64"
                    "strerror"
                    "strlen"
                    "symlink"
@@ -329,7 +329,7 @@ ldso_stub__ ## fct: ;                  \\
                    "tanh"
                    "truncate"
                    "ttyname"
-                   #!-hpux "tzname"
+                   #-hpux "tzname"
                    "unlink"
                    "utimes"
                    "wait3"
@@ -341,7 +341,7 @@ ldso_stub__ ## fct: ;                  \\
                  ;;
                  ;; Note: There might be some other functions in this category as well.
                  ;; E.g. I notice tanh() and acos() in the list above.. -- WHN 2001-06-07
-                 #!-x86
+                 #-x86
                  '("sin"
                    "cos"
                    "tan"
@@ -351,30 +351,30 @@ ldso_stub__ ## fct: ;                  \\
                    "log"
                    "log10"
                    "sqrt")
-                 #!+alpha
+                 #+alpha
                  '("ieee_get_fp_control"
                    "ieee_set_fp_control")
                  ;; FIXME: After 1.0 this should be made
-                 ;; #!-linkage-table, as we only need these stubs if
+                 ;; #-linkage-table, as we only need these stubs if
                  ;; we don't have linkage-table. Done this way now to
                  ;; cut down on the number of ports affected.
-                 #!-(or win32 darwin freebsd netbsd openbsd)
+                 #-(or win32 darwin freebsd netbsd openbsd)
                  '("ptsname"
-                   #!-android "grantpt"
+                   #-android "grantpt"
                    "unlockpt")
-                 #!+(or openbsd freebsd dragonfly)
+                 #+(or openbsd freebsd dragonfly)
                  '("openpty")
                  '("dlclose"
                    "dlerror"
                    "dlopen"
                    "dlsym")
-                 #!+bsd
+                 #+bsd
                  '("sysctl")
                  #+darwin
                  '("sysctlbyname")
-                 #!+os-provides-dladdr
+                 #+os-provides-dladdr
                  '("dladdr")
-                 #!-android
+                 #-android
                    '("nl_langinfo"
                      "getpagesize"
                      "cfgetispeed"

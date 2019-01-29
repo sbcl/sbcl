@@ -57,16 +57,16 @@
     ;; but it's only defined on non-x86 platforms for some reason.
     ;; The sizer is "lose" because it's an error if a function is encountered
     ;; in a heap scan.
-    (simple-fun ,(or #!+(or x86 x86-64) "lose" "fun_header") "lose" "lose")
+    (simple-fun ,(or #+(or x86 x86-64) "lose" "fun_header") "lose" "lose")
     ;; The closure scavenge function needs to know if the "self" slot
     ;; has pointer nature though it be fixnum tagged, as on x86.
     ;; The sizer is short_boxed.
-    (closure ,(or #!+(or x86 x86-64) "closure" "short_boxed") "lose" "short_boxed")
+    (closure ,(or #+(or x86 x86-64) "closure" "short_boxed") "lose" "short_boxed")
     ;; Like closure, but these can also have a layout pointer in the high header bytes.
-    (funcallable-instance ,(or #!+compact-instance-header "funinstance" "short_boxed")
+    (funcallable-instance ,(or #+compact-instance-header "funinstance" "short_boxed")
                           "lose" "short_boxed")
     ;; These have a scav and trans function, but no size function.
-    #!-(or x86 x86-64) (return-pc "return_pc_header" "return_pc_header" "lose")
+    #-(or x86 x86-64) (return-pc "return_pc_header" "return_pc_header" "lose")
 
     (value-cell "boxed")
     (symbol "tiny_boxed")
@@ -77,7 +77,7 @@
     (unbound-marker "immediate")
     (weak-pointer "lose" "weak_pointer" "boxed")
     (instance "instance" "lose" "short_boxed")
-    (fdefn ,(or #!+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
+    (fdefn ,(or #+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
 
     (no-tls-value-marker "immediate")
 

@@ -105,12 +105,12 @@
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space. Computed for genesis/constants.h, not used in Lisp.
-#!+(and gencgc sb-xc-host)
+#+(and gencgc sb-xc-host)
 (defconstant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
           (start dynamic-space-start))
       (dolist (other-start (list read-only-space-start static-space-start
-                                 #!+linkage-table
+                                 #+linkage-table
                                  linkage-table-space-start))
         (declare (notinline <)) ; avoid dead code note
         (when (< start other-start)
@@ -120,7 +120,7 @@
 ;; The lowest index that you can pass to %INSTANCE-REF accessing
 ;; a slot of data that is not the instance-layout.
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
-(defconstant instance-data-start (+ #!-compact-instance-header 1))
+(defconstant instance-data-start (+ #-compact-instance-header 1))
 
 ;; The largest number that may appear in the header-data for an instance,
 ;; and some other mostly-boxed objects, such as FDEFNs.
@@ -162,7 +162,7 @@
               (sap-ref-word (sap offset) `(sb-fasl::bvref-word ,sap ,offset)))
      ,@body))
 
-#!+sb-safepoint
+#+sb-safepoint
 ;;; The offset from the fault address reported to the runtime to the
 ;;; END of the global safepoint page.
 (defconstant gc-safepoint-trap-offset n-word-bytes)

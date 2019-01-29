@@ -21,8 +21,8 @@
 (define-source-transform compiled-function-p (x)
   (once-only ((x x))
     `(and (functionp ,x)
-          #!+sb-fasteval (not (sb-interpreter:interpreted-function-p ,x))
-          #!+sb-eval (not (sb-eval:interpreted-function-p ,x)))))
+          #+sb-fasteval (not (sb-interpreter:interpreted-function-p ,x))
+          #+sb-eval (not (sb-eval:interpreted-function-p ,x)))))
 
 (define-source-transform char-int (x)
   `(char-code ,x))
@@ -40,7 +40,7 @@
   `(sb-vm::%%make-symbol (set-header-data ,string ,sb-vm:+vector-shareable+)))
 
 ;;; We don't want to clutter the bignum code.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (define-source-transform sb-bignum:%bignum-ref (bignum index)
   ;; KLUDGE: We use TRULY-THE here because even though the bignum code
   ;; is (currently) compiled with (SAFETY 0), the compiler insists on
@@ -52,7 +52,7 @@
   `(sb-bignum:%bignum-ref-with-offset ,bignum
                                       (truly-the bignum-index ,index) 0))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun fold-index-addressing (fun-name element-size lowtag data-offset
                               index offset &optional setter-p)
   (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
@@ -76,7 +76,7 @@
            (,fun-name thing index ',new-offset ,@(when setter-p
                                                    '(value))))))))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (deftransform sb-bignum:%bignum-ref-with-offset
     ((bignum index offset) * * :node node)
   (fold-index-addressing 'sb-bignum:%bignum-ref-with-offset
@@ -87,7 +87,7 @@
 ;;; The layout is stored in slot 0.
 ;;; *** These next two transforms should be the only code, aside from
 ;;;     some parts of the C runtime, with knowledge of the layout index.
-#!-compact-instance-header
+#-compact-instance-header
 (progn
   (define-source-transform %instance-layout (x)
     `(truly-the layout (%instance-ref ,x 0)))
@@ -165,11 +165,11 @@
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities. On platforms that support DATA-VECTOR-REF-WITH-OFFSET
 ;;; DATA-VECTOR-REF is not supported at all.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (define-source-transform data-vector-ref (array index)
   `(data-vector-ref-with-offset ,array ,index 0))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (deftransform data-vector-ref-with-offset ((array index offset))
   (let ((array-type (lvar-type array)))
     (when (or (not (array-type-p array-type))
@@ -255,11 +255,11 @@
 
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (define-source-transform data-vector-set (array index new-value)
   `(data-vector-set-with-offset ,array ,index 0 ,new-value))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (deftransform data-vector-set-with-offset ((array index offset new-value))
   (let ((array-type (lvar-type array)))
     (when (or (not (array-type-p array-type))
@@ -622,11 +622,11 @@
      (values)))
 
 ;;;; transforms for EQL of floating point values
-#!-(vop-named sb-vm::eql/single-float)
+#-(vop-named sb-vm::eql/single-float)
 (deftransform eql ((x y) (single-float single-float))
   '(= (single-float-bits x) (single-float-bits y)))
 
-#!-(vop-named sb-vm::eql/double-float)
+#-(vop-named sb-vm::eql/double-float)
 (deftransform eql ((x y) (double-float double-float))
   #-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
                   (= (double-float-high-bits x) (double-float-high-bits y)))

@@ -139,7 +139,7 @@
      (every #'internal-name-p what))
     (symbol
      (or (eq '.anonymous. what)
-         #!-sb-xref-for-internals
+         #-sb-xref-for-internals
          (member (sb-xc:symbol-package what)
                  (load-time-value
                   (cons *cl-package*

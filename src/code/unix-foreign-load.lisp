@@ -20,8 +20,8 @@
 (define-alien-routine dlerror c-string)
 
 (define-alien-routine
-    #!-openbsd dlsym
-    #!+openbsd ("os_dlsym" dlsym)
+    #-openbsd dlsym
+    #+openbsd ("os_dlsym" dlsym)
     system-area-pointer
   (handle system-area-pointer)
   (symbol c-string))

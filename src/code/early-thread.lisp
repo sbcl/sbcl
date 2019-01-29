@@ -50,7 +50,7 @@ any time."
   ;; C code could (but doesn't currently) access the name
   (name   nil :type (or null simple-string))
   (%owner nil :type (or null thread))
-  #!+(and sb-thread sb-futex)
+  #+(and sb-thread sb-futex)
   (state    0 :type fixnum))
 (!set-load-form-method mutex (:xc))
 

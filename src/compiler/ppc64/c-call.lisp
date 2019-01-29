@@ -153,7 +153,7 @@
     (0 nl0-offset)
     (1 nl1-offset)))
 
-;;; FIXME: These #!-DARWIN methods should be adjusted to take a state
+;;; FIXME: These #-DARWIN methods should be adjusted to take a state
 ;;; argument, firstly because that's our "official" API (see
 ;;; src/code/host-alieneval) and secondly because that way we can
 ;;; probably have less duplication of code.  -- CSR, 2003-07-29
@@ -376,7 +376,7 @@
   (:generator 2
     (inst lr res  (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)

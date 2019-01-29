@@ -760,7 +760,7 @@
                ;; Force bounds-checks to 0 even if local policy had it >0.
                (declare (optimize (safety 0) (speed 3)
                                   (insert-array-bounds-checks 0)))
-               ,(cond #!+x86-64
+               ,(cond #+x86-64
                       ((type= element-ctype *universal-type*)
                        '(vector-fill/t data item start end))
                       (t

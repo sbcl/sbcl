@@ -182,8 +182,7 @@
 ;;; When cross-compiling, the *FEATURES* set for the target Lisp is
 ;;; not in general the same as the *FEATURES* set for the host Lisp.
 ;;; In order to refer to target features specifically, we refer to
-;;; SB-XC:*FEATURES* instead of CL:*FEATURES*, and use the #!+ and #!-
-;;; readmacros instead of the ordinary #+ and #- readmacros.
+;;; SB-XC:*FEATURES* instead of CL:*FEATURES*.
 ;;;
 ;;; To support building in a read-only filesystem, the 'local-target-features'
 ;;; file might not be directly located here, since it's a generated file.
@@ -311,7 +310,7 @@
 ;;; values of special variables such as *** and +, anyway). Set up
 ;;; machinery to warn us when/if we change it.
 ;;;
-;;; All code depending on this is itself dependent on #!+SB-SHOW.
+;;; All code depending on this is itself dependent on #+SB-SHOW.
 (defvar *cl-snapshot*)
 (when (member :sb-show sb-xc:*features*)
   (load "src/cold/snapshot.lisp")

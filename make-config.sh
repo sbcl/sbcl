@@ -642,7 +642,7 @@ cd "$original_dir"
 # *derived-target-features* or equivalent, so that there was a nicer
 # way to specify them then sprinkling them in this file. They should
 # still be tweakable by advanced users, though, but probably not
-# appear in *features* of target. #!+/- should be adjusted to take
+# appear in *features* of target. #+/- should be adjusted to take
 # them in account as well. At minimum the nicer specification stuff,
 # though:
 #

@@ -632,7 +632,7 @@
   (unsigned-reg) unsigned-num sb-bignum:%bignum-ref)
 
 (define-full-setter bignum-set * bignum-digits-offset other-pointer-lowtag
-  (unsigned-reg) unsigned-num sb-bignum:%bignum-set #!+gengc nil)
+  (unsigned-reg) unsigned-num sb-bignum:%bignum-set #+gengc nil)
 
 (define-vop (digit-0-or-plus)
   (:translate sb-bignum:%digit-0-or-plusp)

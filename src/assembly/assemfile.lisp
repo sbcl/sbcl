@@ -40,7 +40,7 @@
           (load (merge-pathnames name (make-pathname :type "lisp")))
           ;; Leave room for the indirect call table. relocate_heap() in
           ;; 'coreparse' finds the end with a 0 word so add 1 extra word.
-          #!+(or x86 x86-64)
+          #+(or x86 x86-64)
           (emit (asmstream-data-section asmstream)
                 `(.skip ,(* (align-up (1+ (length *entry-points*)) 2)
                             sb-vm:n-word-bytes)))
@@ -143,13 +143,13 @@
          ;; ARM. See the comment in arm/assem-rtns that says it expects THROW to
          ;; drop through into UNWIND. That wouldn't work if the code emitted
          ;; by GENERATE-ERROR-CODE were interposed between those.
-         #!-arm
+         #-arm
          (let ((asmstream *asmstream*))
            (join-sections (asmstream-code-section asmstream)
                           (asmstream-elsewhere-section asmstream)))
          (emit-alignment sb-vm:n-lowtag-bits
                          ;; EMIT-LONG-NOP does not exist for (not x86-64)
-                         #!+x86-64 :long-nop))
+                         #+x86-64 :long-nop))
        (when *compile-print*
          (format *error-output* "~S assembled~%" ',name)))))
 
@@ -215,15 +215,15 @@
                       :key #'car)
          (:generator ,cost
            ,@(mapcar (lambda (arg)
-                       #!+(or hppa alpha) `(move ,(reg-spec-name arg)
+                       #+(or hppa alpha) `(move ,(reg-spec-name arg)
                                                  ,(reg-spec-temp arg))
-                       #!-(or hppa alpha) `(move ,(reg-spec-temp arg)
+                       #-(or hppa alpha) `(move ,(reg-spec-temp arg)
                                                  ,(reg-spec-name arg)))
                      args)
            ,@call-sequence
            ,@(mapcar (lambda (res)
-                       #!+(or hppa alpha) `(move ,(reg-spec-temp res)
+                       #+(or hppa alpha) `(move ,(reg-spec-temp res)
                                                  ,(reg-spec-name res))
-                       #!-(or hppa alpha) `(move ,(reg-spec-name res)
+                       #-(or hppa alpha) `(move ,(reg-spec-name res)
                                                  ,(reg-spec-temp res)))
                      results))))))

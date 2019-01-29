@@ -100,7 +100,7 @@
   ;; TODO: reimplement for x86-64. Not so hard.
   (let* ((image-base (extern-alien "runtime_module_handle" system-area-pointer))
          (pe-base (sap+ image-base (sap-ref-32 image-base 60)))
-         (export-directory (sap+ pe-base (- #!+x86 248 #!+x86-64 264 (* 16 8))))
+         (export-directory (sap+ pe-base (- #+x86 248 #+x86-64 264 (* 16 8))))
          (export-data (sap+ image-base (sap-ref-32 export-directory 0)))
          (n-functions (sap-ref-32 export-data 20))
          (n-names (sap-ref-32 export-data 24))

@@ -76,11 +76,11 @@
 ;; The result is guaranteed to be a positive fixnum.
 (declaim (inline address-based-counter-val))
 (defun address-based-counter-val ()
-  #!+(and (not sb-thread) cheneygc)
+  #+(and (not sb-thread) cheneygc)
   (ash (sap-int (dynamic-space-free-pointer)) (- (1+ sb-vm:word-shift)))
   ;; dynamic-space-free-pointer increments only when a page is full.
   ;; Using boxed_region directly is finer-grained.
-  #!+(and (not sb-thread) gencgc)
+  #+(and (not sb-thread) gencgc)
   (ash (extern-alien "gc_alloc_region" unsigned-long)
        (- (1+ sb-vm:word-shift)))
   ;; threads imply gencgc. use the per-thread alloc region pointer
@@ -207,7 +207,7 @@
           (let ((old (cas (sb-kernel::condition-hash instance) 0 new)))
             (if (eql old 0) new old))))))
 
-#!+(and compact-instance-header x86-64)
+#+(and compact-instance-header x86-64)
 (progn
   (declaim (inline %std-instance-hash))
   (defun %std-instance-hash (slots) ; return or compute the 32-bit hash
@@ -222,7 +222,7 @@
   ;; Apparently we care that the object is of primitive type INSTANCE, but not
   ;; whether it is STANDARD-INSTANCE. It had better be, or we're in trouble.
   (declare (instance instance))
-  #!+(and compact-instance-header x86-64)
+  #+(and compact-instance-header x86-64)
   ;; The one logical slot (excluding layout) in the primitive object is index 0.
   ;; That holds a vector of the clos slots, and its header holds the hash.
   (let* ((slots (%instance-ref instance 0))
@@ -231,7 +231,7 @@
     ;; in case people use the high order bits.
     ;; (There are only 32 bits of actual randomness, if even that)
     (logxor (ash hash (- sb-vm:n-positive-fixnum-bits 32)) hash))
-  #!-(and compact-instance-header x86-64)
+  #-(and compact-instance-header x86-64)
   (locally
    (declare (optimize (sb-c::type-check 0)))
    (let ((hash (sb-pcl::standard-instance-hash-code instance)))
@@ -250,10 +250,10 @@
   (declare (function fin))
   (locally
    (declare (optimize (sb-c::type-check 0)))
-   #!+compact-instance-header
+   #+compact-instance-header
    (sb-vm::get-header-data-high
     (sb-pcl::standard-funcallable-instance-clos-slots fin))
-   #!-compact-instance-header
+   #-compact-instance-header
    (sb-pcl::standard-funcallable-instance-hash-code fin)))
 
 (defun sxhash (x)

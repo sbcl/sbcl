@@ -364,7 +364,7 @@
                   (float (dump-float x file))
                   (integer (dump-integer x file)))
                 (equal-save-object x file)))
-             #!+(and (not sb-xc-host) sb-simd-pack)
+             #+(and (not sb-xc-host) sb-simd-pack)
              (simd-pack
               (unless (equal-check-table x file)
                 (dump-fop 'fop-simd-pack file)
@@ -372,7 +372,7 @@
                 (dump-integer-as-n-bytes (%simd-pack-low  x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-high x) 8 file))
               (equal-save-object x file))
-             #!+(and (not sb-xc-host) sb-simd-pack-256)
+             #+(and (not sb-xc-host) sb-simd-pack-256)
              (simd-pack-256
               (unless (equal-check-table x file)
                 (dump-fop 'fop-simd-pack file)
@@ -979,7 +979,7 @@
 (declaim (inline !pack-fixup-info))
 (defun !pack-fixup-info (offset kind flavor)
   ;; ARM gets "error during constant folding"
-  #!+arm (declare (notinline position))
+  #+arm (declare (notinline position))
   (logior (ash (the (mod 16) (or (position flavor +fixup-flavors+)
                                  (error "Bad fixup flavor ~s" flavor)))
                3)
@@ -991,7 +991,7 @@
 (declaim (inline !unpack-fixup-info))
 (defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor)
   ;; ARM gets "error during constant folding"
-  #!+arm (declare (notinline aref))
+  #+arm (declare (notinline aref))
   (values (ash packed-info -7)
           (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
           (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))))
@@ -1013,7 +1013,7 @@
             (ecase flavor
               ((:assembly-routine :assembly-routine* :symbol-tls-index)
                (the symbol name))
-              ((:foreign #!+linkage-table :foreign-dataref) (the string name))
+              ((:foreign #+linkage-table :foreign-dataref) (the string name))
               (:code-object (the null name))
               #+immobile-space (:layout (classoid-name (layout-classoid name)))
               #+immobile-space (:immobile-object (the symbol name))
@@ -1140,7 +1140,7 @@
   (dump-fop 'fop-verify-table-size file)
   (dump-word (fasl-output-table-free file) file)
 
-  #!+sb-dyncount
+  #+sb-dyncount
   (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))
     (when info
       (fasl-validate-structure info file)))

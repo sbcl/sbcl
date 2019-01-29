@@ -13,7 +13,7 @@
 
 ;;; FIXME: backend-specific junk doesn't belong in compiler/generic.
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (progn
 (define-vop (type-predicate)
   (:args (value :scs (any-reg descriptor-reg)))
@@ -21,7 +21,7 @@
   ;; since they can't be accessed as an 8-bit byte.
   ;; x86-64 being more regular, any reg can serve as the temp.
   ;; In all likelihood, it'll get rax anyway just because.
-  (:temporary (:sc unsigned-reg #!+x86 :offset #!+x86 eax-offset) temp)
+  (:temporary (:sc unsigned-reg #+x86 :offset #+x86 eax-offset) temp)
   (:conditional)
   (:info target not-p)
   (:args-var args)
@@ -42,7 +42,7 @@
       (%test-headers value temp target not-p nil headers :except except
                                                          :value-tn-ref args)))))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (progn
 (define-vop (type-predicate)
   (:args (value :scs (any-reg descriptor-reg)))
@@ -76,7 +76,7 @@
 
 (!define-type-vop fixnump
   #.fixnum-lowtags
-  #!+(or x86-64 x86) simple-type-predicate) ;; save a register
+  #+(or x86-64 x86) simple-type-predicate) ;; save a register
 
 (!define-type-vop functionp (fun-pointer-lowtag))
 
@@ -141,7 +141,7 @@
 
 (!define-type-vop code-component-p (code-header-widetag))
 
-#!-(or x86 x86-64) (!define-type-vop lra-p (return-pc-widetag))
+#-(or x86 x86-64) (!define-type-vop lra-p (return-pc-widetag))
 
 (!define-type-vop fdefn-p (fdefn-widetag))
 

@@ -68,9 +68,9 @@
         ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
         ;; the fact that we actually want to create 1 additional slot.
         ;; So in effect, asking for PAYLOAD-LEN does exactly the right thing.
-        (let ((copy #!-(or x86 x86-64)
+        (let ((copy #-(or x86 x86-64)
                     (sb-vm::%copy-closure payload-len (%closure-fun closure))
-                    #!+(or x86 x86-64)
+                    #+(or x86 x86-64)
                     (with-pinned-objects ((%closure-fun closure))
                       ;; %CLOSURE-CALLEE manifests as a fixnum which remains
                       ;; valid across GC due to %CLOSURE-FUN being pinned
@@ -85,10 +85,10 @@
                   do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
             (setf (closure-header-word copy) ; Update the header
                   ;; Closure copy lost its high header bits, so OR them in again.
-                  (logior #!+(and immobile-space 64-bit sb-thread)
+                  (logior #+(and immobile-space 64-bit sb-thread)
                           (sap-int (sb-vm::current-thread-offset-sap
                                     sb-vm::thread-function-layout-slot))
-                          #!+(and immobile-space 64-bit (not sb-thread))
+                          #+(and immobile-space 64-bit (not sb-thread))
                           (get-lisp-obj-address sb-vm:function-layout)
                           (extendedp-bit)
                           (closure-header-word copy)))
@@ -194,10 +194,10 @@
        (generic-function
         (return-from %fun-name
           (sb-mop:generic-function-name function)))
-       #!+sb-eval
+       #+sb-eval
        (sb-eval:interpreted-function
         (return-from %fun-name (sb-eval:interpreted-function-debug-name function)))
-       #!+sb-fasteval
+       #+sb-fasteval
        (sb-interpreter:interpreted-function
         (return-from %fun-name
           (let ((name (sb-interpreter:proto-fn-name (sb-interpreter:fun-proto-fn function))))
@@ -215,10 +215,10 @@
      (typecase (truly-the funcallable-instance function)
        (generic-function
         (setf (sb-mop:generic-function-name function) new-value))
-       #!+sb-eval
+       #+sb-eval
        (sb-eval:interpreted-function
         (setf (sb-eval:interpreted-function-debug-name function) new-value))
-       #!+sb-fasteval
+       #+sb-fasteval
        (sb-interpreter:interpreted-function
         (setf (sb-interpreter:proto-fn-name (sb-interpreter:fun-proto-fn function))
               new-value)))))
@@ -226,11 +226,11 @@
 
 (defun %fun-lambda-list (function)
   (typecase function
-    #!+sb-fasteval
+    #+sb-fasteval
     (sb-interpreter:interpreted-function
      (sb-interpreter:proto-fn-pretty-arglist
       (sb-interpreter:fun-proto-fn function)))
-    #!+sb-eval
+    #+sb-eval
     (sb-eval:interpreted-function
      (sb-eval:interpreted-function-debug-lambda-list function))
     (t
@@ -238,11 +238,11 @@
 
 (defun (setf %fun-lambda-list) (new-value function)
   (typecase function
-    #!+sb-fasteval
+    #+sb-fasteval
     (sb-interpreter:interpreted-function
      (setf (sb-interpreter:proto-fn-pretty-arglist
             (sb-interpreter:fun-proto-fn function)) new-value))
-    #!+sb-eval
+    #+sb-eval
     (sb-eval:interpreted-function
      (setf (sb-eval:interpreted-function-debug-lambda-list function) new-value))
     ;; FIXME: Eliding general funcallable-instances for now.
@@ -260,7 +260,7 @@
 
 (defun %fun-type (function)
   (typecase function
-    #!+sb-fasteval
+    #+sb-fasteval
     ;; Obtain a list of the right shape, usually with T for each
     ;; arg type, but respecting local declarations if any.
     (sb-interpreter:interpreted-function (sb-interpreter:%fun-type function))
@@ -369,7 +369,7 @@
   ;; and filler_obj_p() in the C code
   (eql (sb-vm::%code-boxed-size code-obj) 0))
 
-#!+(or sparc alpha hppa ppc64)
+#+(or sparc alpha hppa ppc64)
 (defun code-trailer-ref (code offset)
   (with-pinned-objects (code)
     (sap-ref-32 (int-sap (get-lisp-obj-address code))
@@ -467,7 +467,7 @@
 ;;; FUN must be pinned.
 (declaim (inline sb-vm:simple-fun-entry-sap))
 (defun sb-vm:simple-fun-entry-sap (fun)
-  #!-(or x86 x86-64)
+  #-(or x86 x86-64)
   (int-sap (+ (get-lisp-obj-address fun)
               (- sb-vm:fun-pointer-lowtag)
               (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))
@@ -477,7 +477,7 @@
   ;; If that change is done, then you must indirect through the SELF pointer
   ;; in order to get the correct starting address.
   ;; (Such change would probably be confined to x86[-64])
-  #!+(or x86 x86-64)
+  #+(or x86 x86-64)
   (sap-ref-sap (int-sap (- (get-lisp-obj-address fun) sb-vm:fun-pointer-lowtag))
                (ash sb-vm:simple-fun-self-slot sb-vm:word-shift)))
 

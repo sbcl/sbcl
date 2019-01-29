@@ -247,7 +247,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; inclusive.
 #-sb-fluid (declaim (inline random-chunk))
 ;;; portable implementation
-#!-x86
+#-x86
 (defun random-mt19937-update (state)
   (declare (type random-state-state state)
            (optimize (speed 3) (safety 0)))
@@ -274,7 +274,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
           (logxor (aref state (+ 3 (1- mt19937-m)))
                   (ash y -1) (aref state (logand y 1)))))
   (values))
-#!-x86
+#-x86
 (defun random-chunk (state)
   (declare (type random-state state))
   (let* ((state (random-state-state state))
@@ -297,7 +297,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; FIXME: It would be nice to have some benchmark numbers on this.
 ;;; My inclination is to get rid of the nonportable implementation
 ;;; unless the performance difference is just enormous.
-#!+x86
+#+x86
 (defun random-chunk (state)
   (declare (type random-state state))
   (sb-vm::random-mt19937 (random-state-state state)))
@@ -331,14 +331,14 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                 %random-double-float))
 
 ;;; 32-bit version
-#!+nil
+#+nil
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
            (type random-state state))
   (* (float (random-chunk state) 1d0) (/ 1d0 (expt 2 32))))
 
 ;;; 53-bit version
-#!-x86
+#-x86
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
            (type random-state state))
@@ -352,7 +352,7 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
         1d0)))
 
 ;;; using a faster inline VOP
-#!+x86
+#+x86
 (defun %random-double-float (arg state)
   (declare (type (double-float (0d0)) arg)
            (type random-state state))

@@ -395,9 +395,9 @@
               register-arg-count)
       (inst cmp nargs (fixnumize register-arg-count))
       (inst jmp :g stack-values)
-      #!+#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
+      #+#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
       (inst sub rsp-tn nargs)
-      #!-#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
+      #-#.(cl:if (cl:= sb-vm:word-shift sb-vm:n-fixnum-tag-bits) '(and) '(or))
       (progn
         ;; FIXME: This can't be efficient, but LEA (my first choice)
         ;; doesn't do subtraction.

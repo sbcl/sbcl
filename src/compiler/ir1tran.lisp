@@ -99,7 +99,7 @@
   (let ((answer
          (typecase env
            (null nil)
-           #!+(and sb-fasteval (not sb-xc-host))
+           #+(and sb-fasteval (not sb-xc-host))
            (sb-interpreter:basic-env
             (sb-interpreter::fun-lexically-notinline-p name env))
            (t
@@ -892,7 +892,7 @@
                    ;; system to work through them, and this code does so, by
                    ;; crudely suppressing all warnings in cross-compilation
                    ;; macroexpansion. -- WHN 19990412
-                   #!+(and sb-xc-host (host-feature cmu))
+                   #+(and sb-xc-host (host-feature cmu))
                    (warning (lambda (c)
                               (compiler-notify
                                "~@<~A~:@_~
@@ -979,13 +979,13 @@
                                    (cons path +code-coverage-unmarked+)))
                   (next (make-ctran))
                   (*allow-instrumenting* nil))
-              #!+(or x86-64 x86) (declare (ignore store)) ; eval'd for side-effect only
+              #+(or x86-64 x86) (declare (ignore store)) ; eval'd for side-effect only
               (push (ctran-block start)
                     (gethash path (code-coverage-blocks metadata)))
               (ir1-convert start next nil
-                           #!+(or x86-64 x86)
+                           #+(or x86-64 x86)
                            `(%primitive mark-covered ',path)
-                           #!-(or x86-64 x86)
+                           #-(or x86-64 x86)
                            `(locally
                                 (declare (optimize speed
                                                    (safety 0)
@@ -1553,9 +1553,9 @@
                (etypecase fun
                  (leaf
                   (if bound-fun
-                      #!+stack-allocatable-closures
+                      #+stack-allocatable-closures
                       (setf (leaf-extent bound-fun) extent)
-                      #!-stack-allocatable-closures
+                      #-stack-allocatable-closures
                       (compiler-notify
                        "Ignoring DYNAMIC-EXTENT declaration on function ~S ~
                         (not supported on this platform)." fname)

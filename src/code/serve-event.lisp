@@ -17,8 +17,8 @@
   ;; Reading or writing...
   (direction nil :type (member :input :output))
   ;; File descriptor this handler is tied to.
-  (descriptor 0 :type #!-os-provides-poll (mod #.sb-unix:fd-setsize)
-                      #!+os-provides-poll (and fixnum unsigned-byte))
+  (descriptor 0 :type #-os-provides-poll (mod #.sb-unix:fd-setsize)
+                      #+os-provides-poll (and fixnum unsigned-byte))
   ;; T iff this handler is running.
   ;;
   ;; FIXME: unused. At some point this used to be set to T
@@ -38,12 +38,12 @@
   ;; The C array is created only when SUB-SUB-SERVE-EVENT needs it,
   ;; not on each call to ADD/REMOVE-FD-HANDLER.
   ;; If using select(), the C array is not used.
-  #!+os-provides-poll (fds) ;
+  #+os-provides-poll (fds) ;
   ;; N-FDS is less than or equal to the length of the C array,
   ;; which is created potentially oversized.
-  #!+os-provides-poll (n-fds)
+  #+os-provides-poll (n-fds)
   ;; map from index in LIST to index into alien FDS
-  #!+os-provides-poll (map))
+  #+os-provides-poll (map))
 
 (defmethod print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)
@@ -64,12 +64,12 @@
   `(without-interrupts ,@forms))
 
 ;; Deallocating the pollfds is a no-op if not using poll()
-#!-os-provides-poll (declaim (inline deallocate-pollfds))
+#-os-provides-poll (declaim (inline deallocate-pollfds))
 
 ;; Free the cached C structures, if allocated.
 ;; Must be called within the extent of WITH-DESCRIPTOR-HANDLERS.
 (defun deallocate-pollfds ()
-  #!+os-provides-poll
+  #+os-provides-poll
   (awhen *descriptor-handlers*
     (when (pollfds-fds it)
       (free-alien (pollfds-fds it)))
@@ -98,7 +98,7 @@
     ;; FIXME: should be TYPE-ERROR?
     (error "Invalid direction ~S, must be either :INPUT or :OUTPUT" direction))
   ;; lp#316068 - generate a more specific error than "X is not (MOD n)"
-  #!-os-provides-poll
+  #-os-provides-poll
   (unless (<= 0 fd (1- sb-unix:fd-setsize))
     (error "Cannot add an FD handler for ~D: not under FD_SETSIZE limit." fd))
   (let ((handler (make-handler direction fd function)))
@@ -162,8 +162,8 @@
 ;;; First, get a list and mark bad file descriptors. Then signal an error
 ;;; offering a few restarts.
 (defun handler-descriptors-error
-  #!+os-provides-poll (&optional (bogus-handlers nil handlers-supplied-p))
-  #!-os-provides-poll (&aux bogus-handlers handlers-supplied-p)
+  #+os-provides-poll (&optional (bogus-handlers nil handlers-supplied-p))
+  #-os-provides-poll (&aux bogus-handlers handlers-supplied-p)
   (if handlers-supplied-p
       (dolist (handler bogus-handlers)
         ;; no fstat() - the kernel deemed them bogus already
@@ -308,7 +308,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
 
 ;;; Handles the work of the above, except for periodic polling. Returns
 ;;; true if something of interest happened.
-#!-os-provides-poll
+#-os-provides-poll
 (defun sub-sub-serve-event (to-sec to-usec)
   (with-alien ((read-fds (struct sb-unix:fd-set))
                (write-fds (struct sb-unix:fd-set)))
@@ -377,7 +377,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
 ;; Making USE-SCRATCHPAD-P an optional argument is a KLUDGE, but it allows
 ;; picking which method of file descriptor de-duplication is used,
 ;; so that both can be exercised by tests.
-#!+os-provides-poll
+#+os-provides-poll
 (defun compute-pollfds (handlers &optional
                                  (n-handlers (length handlers))
                                  (use-scratchpad-p (>= n-handlers 15)))
@@ -442,7 +442,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
 
 ;;; Handles the work of the above, except for periodic polling. Returns
 ;;; true if something of interest happened.
-#!+os-provides-poll
+#+os-provides-poll
 (defun sub-sub-serve-event (to-sec to-usec)
   (let (list fds count map)
     (with-descriptor-handlers
@@ -471,7 +471,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
               (with-alien ((a (struct sb-unix:pollfd)))
                 (sb-unix:unix-poll a 0 to-millisec)))
         ;; From here down is mostly the same as the code
-        ;; for #!-os-provides-poll.
+        ;; for #-os-provides-poll.
         ;;
         ;; Now see what it was (if anything)
         (cond ((not value)
@@ -492,7 +492,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
               ((plusp value)
                ;; Got something. Scan the 'revents' fields of the pollfds
                ;; to decide what to call.
-               ;; The #!-os-provides-poll code looks at *DESCRIPTOR-HANDLERS*
+               ;; The #-os-provides-poll code looks at *DESCRIPTOR-HANDLERS*
                ;; again at this point, which seems wrong, but not terribly wrong
                ;; because at worst there will be a a zero bit for a handler's
                ;; descriptor. But I can't see how it would make sense here to

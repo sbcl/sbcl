@@ -19,7 +19,7 @@
 (defconstant +backend-fasl-file-implementation+ :arm)
 
   ;; Minumum observed value, not authoritative.
-(defconstant +backend-page-bytes+ #+linux 4096 #!+netbsd 8192)
+(defconstant +backend-page-bytes+ #+linux 4096 #+netbsd 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
@@ -71,7 +71,7 @@
 (defconstant double-float-digits
   (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
-#!+arm-vfp
+#+arm-vfp
 (progn
   (defconstant float-invalid-trap-bit (ash 1 0))
   (defconstant float-divide-by-zero-trap-bit (ash 1 1))
@@ -95,7 +95,7 @@
 ;; NOTE: As with the FLOAT-REGISTERS SB in vm.lisp, if you define this
 ;; for non-VFP systems, please use a specific positive feature
 ;; conditional.
-#!-arm-vfp
+#-arm-vfp
 (error "Don't know how to set the FPU control word layout on non-VFP systems")
 
 ;;;; Where to put the different spaces.
@@ -116,7 +116,7 @@
 
 (defconstant linkage-table-entry-size 16)
 
-#!+(or linux netbsd)
+#+(or linux netbsd)
 (progn
   #-gencgc
   (progn

@@ -46,7 +46,7 @@
     (inst movzx '(:byte :dword) result object)
     DONE))
 
-#!+compact-instance-header
+#+compact-instance-header
 ;; ~20 instructions vs. 35
 (define-vop (layout-of) ; no translation
     (:policy :fast-safe)
@@ -401,7 +401,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
                  (+ (ash (- ,hi1 ,hi0) 32)
                     (- ,lo1 ,lo0)))))))
 
-#!+sb-dyncount
+#+sb-dyncount
 (define-vop (count-me)
   (:args (count-vector :scs (descriptor-reg)))
   (:info index)

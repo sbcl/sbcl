@@ -107,10 +107,10 @@
 (defun compile-in-lexenv (definition lexenv &optional name source-info tlf errorp)
   (multiple-value-bind (sexpr lexenv)
       (typecase definition
-        #!+sb-fasteval
+        #+sb-fasteval
         (sb-interpreter:interpreted-function
          (sb-interpreter:prepare-for-compile definition))
-        #!+sb-eval
+        #+sb-eval
         (sb-eval:interpreted-function
          (sb-eval:prepare-for-compile definition))
         (t

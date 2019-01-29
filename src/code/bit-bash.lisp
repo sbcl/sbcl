@@ -133,7 +133,7 @@
                  (values system-area-pointer index))
         (let ((address (sap-int sap))
               (word-mask (1- (ash 1 word-shift))))
-          (values (int-sap #!-alpha (word-logical-andc2 address word-mask)
+          (values (int-sap #-alpha (word-logical-andc2 address word-mask)
                            ;; KLUDGE: WORD-LOGICAL-ANDC2 is defined in
                            ;; terms of n-word-bits.  On all systems
                            ;; where n-word-bits is not equal to
@@ -141,7 +141,7 @@
                            ;; another way.  At this time, these
                            ;; systems are alphas, though there was
                            ;; some talk about an x86-64 build option.
-                           #!+alpha (ash (ash address (- word-shift)) word-shift))
+                           #+alpha (ash (ash address (- word-shift)) word-shift))
                   (+ ,(ecase bitsize
                        ((1 2 4) `(* (logand address word-mask)
                                     (/ n-byte-bits ,bitsize)))
@@ -627,10 +627,10 @@
                     (flet ((#+little-endian start-bit
                             #+big-endian end-bit (x)
                              (declare (word x))
-                             #!+(or x86-64 x86)
+                             #+(or x86-64 x86)
                              (truly-the (mod #.n-word-bits)
                                  (%primitive unsigned-word-find-first-bit x))
-                             #!-(or x86-64 x86)
+                             #-(or x86-64 x86)
                              (- #+big-endian sb-vm:n-word-bits
                                 (integer-length (logand x (- x)))
                                 #+little-endian 1))

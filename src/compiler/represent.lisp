@@ -185,7 +185,7 @@
 ;;;; We do some checking of the consistency of the VM definition at
 ;;;; load time.
 
-;;; FIXME: should probably be conditional on #!+SB-SHOW
+;;; FIXME: should probably be conditional on #+SB-SHOW
 (defun check-move-fun-consistency ()
   (dotimes (i sb-vm:sc-number-limit)
     (let ((sc (svref *backend-sc-numbers* i)))

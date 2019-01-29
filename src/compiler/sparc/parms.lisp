@@ -116,7 +116,7 @@
 (!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
 
 ;;; Where to put the different spaces.  Must match the C code!
-#!+(and linux cheneygc)
+#+(and linux cheneygc)
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)
@@ -130,7 +130,7 @@
   (defparameter dynamic-0-space-start #x30000000)
   (defparameter dynamic-0-space-end   #x38000000))
 
-#!+(and sunos cheneygc) ; might as well start by trying the same numbers
+#+(and sunos cheneygc) ; might as well start by trying the same numbers
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)
@@ -144,7 +144,7 @@
   (defparameter dynamic-0-space-start    #x30000000)
   (defparameter dynamic-0-space-end      #x38000000))
 
-#!+(and netbsd cheneygc) ; Need a gap at 0x4000000 for shared libraries
+#+(and netbsd cheneygc) ; Need a gap at 0x4000000 for shared libraries
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)

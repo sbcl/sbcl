@@ -114,7 +114,7 @@
 ;;; to get handles (as returned by sb-vm:inline-constant-value) from constant
 ;;; descriptors.
 ;;;
-#!+(or x86 x86-64 arm64)
+#+(or x86 x86-64 arm64)
 (defun register-inline-constant (&rest constant-descriptor)
   (declare (dynamic-extent constant-descriptor))
   (let ((asmstream *asmstream*)
@@ -126,7 +126,7 @@
        (vector-push-extend (cons constant label)
                            (asmstream-constant-vector asmstream))
        value))))
-#!-(or x86 x86-64 arm64)
+#-(or x86 x86-64 arm64)
 (progn (defun sb-vm:sort-inline-constants (constants) constants)
        (defun sb-vm:emit-inline-constant (&rest args)
          (error "EMIT-INLINE-CONSTANT called with ~S" args)))
@@ -271,7 +271,7 @@
                    (format t
                            "missing generator for ~S~%"
                            (template-name (vop-info vop))))
-                  #!+arm64
+                  #+arm64
                   ((and (vop-next vop)
                         (eq (vop-name vop)
                             (vop-name (vop-next vop)))
@@ -325,7 +325,7 @@
 ;;; FIXME: this pass runs even if no coverage instrumentation was generated.
 (defun coverage-mark-lowering-pass (component asmstream)
   (declare (ignorable component asmstream))
-  #!+(or x86-64 x86)
+  #+(or x86-64 x86)
   (let ((label (gen-label))
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))

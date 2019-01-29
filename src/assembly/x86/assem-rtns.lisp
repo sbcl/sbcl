@@ -360,7 +360,7 @@
 
 ;; We want no VOP for this one and for it to only happen on Win32
 ;; targets.
-#!+(and sb-assembling win32)
+#+(and sb-assembling win32)
 (define-assembly-routine
     (uwp-seh-handler (:return-style :none))
     ((:temp block unsigned-reg eax-offset))
@@ -486,11 +486,11 @@
   (symbol-macrolet ((object (make-ea :dword :base esp-tn :disp 16))
                     (word-index (make-ea :dword :base esp-tn :disp 20))
                     (newval (make-ea :dword :base esp-tn :disp 24))
-                    (prefix #!+(and sb-thread (not win32)) :fs
-                            #!-(and sb-thread (not win32)) nil))
+                    (prefix #+(and sb-thread (not win32)) :fs
+                            #-(and sb-thread (not win32)) nil))
     (flet ((thread-slot-ea (slot-index)
              (make-ea :dword
-                      #!+(or (not sb-thread) win32) :base #!+(or (not sb-thread) win32) edi-tn
+                      #+(or (not sb-thread) win32) :base #+(or (not sb-thread) win32) edi-tn
                       :disp (ash slot-index word-shift))))
       #-sb-thread
       (progn
@@ -503,7 +503,7 @@
           (inst mov edi-tn (make-ea :dword :base edi-tn)))
         #-sb-dynamic-core
         (inst mov edi-tn (make-ea :dword :disp (make-fixup "all_threads" :foreign))))
-      #!+(and win32 sb-thread)
+      #+(and win32 sb-thread)
       (inst mov edi-tn (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
 
       (inst mov eax-tn object) ; object

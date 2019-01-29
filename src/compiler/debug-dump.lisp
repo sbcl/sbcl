@@ -636,24 +636,24 @@
                    name)))
     (funcall (compiled-debug-fun-ctor kind)
              :name name
-             #!-fp-and-pc-standard-save :return-pc
-             #!-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc 2env))
-             #!-fp-and-pc-standard-save :return-pc-pass
-             #!-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc-pass 2env))
-             #!-fp-and-pc-standard-save :old-fp
-             #!-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-old-fp 2env))
+             #-fp-and-pc-standard-save :return-pc
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc 2env))
+             #-fp-and-pc-standard-save :return-pc-pass
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-return-pc-pass 2env))
+             #-fp-and-pc-standard-save :old-fp
+             #-fp-and-pc-standard-save (tn-sc+offset (ir2-physenv-old-fp 2env))
              :encoded-locs
              (cdf-encode-locs
               (label-position (ir2-physenv-environment-start 2env))
               (label-position (ir2-physenv-elsewhere-start 2env))
               (when (ir2-physenv-closure-save-tn 2env)
                 (tn-sc+offset (ir2-physenv-closure-save-tn 2env)))
-              #!+unwind-to-frame-and-call-vop
+              #+unwind-to-frame-and-call-vop
               (when (ir2-physenv-bsp-save-tn 2env)
                 (tn-sc+offset (ir2-physenv-bsp-save-tn 2env)))
-              #!-fp-and-pc-standard-save
+              #-fp-and-pc-standard-save
               (label-position (ir2-physenv-lra-saved-pc 2env))
-              #!-fp-and-pc-standard-save
+              #-fp-and-pc-standard-save
               (label-position (ir2-physenv-cfp-saved-pc 2env))))))
 
 ;;; Return a complete C-D-F structure for FUN. This involves
@@ -663,7 +663,7 @@
   (declare (type clambda fun) (type hash-table var-locs))
   (let* ((dfun (dfun-from-fun fun))
          (actual-level (policy (lambda-bind fun) compute-debug-fun))
-         (level (cond #!+sb-dyncount
+         (level (cond #+sb-dyncount
                       (*collect-dynamic-statistics*
                        (max actual-level 2))
                       (actual-level))))

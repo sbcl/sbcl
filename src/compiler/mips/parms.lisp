@@ -74,7 +74,7 @@
 
 ;;;; Description of the target address space.
 
-#!+irix
+#+irix
 (progn
   ;; Where to put the different spaces.
   ;; Old definitions, might be still relevant for an IRIX port.

@@ -87,7 +87,7 @@
   (movable foldable flushable commutative))
 (defknown (equal equalp) (t t) boolean (foldable flushable recursive))
 
-#!+(or x86 x86-64 arm arm64)
+#+(or x86 x86-64 arm arm64)
 (defknown fixnum-mod-p (t fixnum) boolean
   (movable foldable flushable always-translatable))
 
@@ -1769,7 +1769,7 @@
 (defknown %listify-rest-args (t index) list (flushable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t)
-#!+stack-grows-downward-not-upward
+#+stack-grows-downward-not-upward
 ;;; FIXME: The second argument here should really be NEGATIVE-INDEX, but doing that
 ;;; breaks the build, and I cannot seem to figure out why. --NS 2006-06-29
 (defknown %more-kw-arg (t fixnum) (values t t))
@@ -1946,11 +1946,11 @@
 (defknown %alien-funcall ((or string system-area-pointer) alien-type &rest *) *)
 
 ;; Used by WITH-PINNED-OBJECTS
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
-#!+linkage-table
+#+linkage-table
 (defknown foreign-symbol-dataref-sap (simple-string)
   system-area-pointer
   (movable flushable))
@@ -2018,7 +2018,7 @@
 (defknown sb-vm:%write-barrier () (values) ())
 (defknown sb-vm:%data-dependency-barrier () (values) ())
 
-#!+sb-safepoint
+#+sb-safepoint
 ;;; Note: This known function does not have an out-of-line definition;
 ;;; and if such a definition were needed, it would not need to "call"
 ;;; itself inline, but could be a no-op, because the compiler inserts a
@@ -2029,7 +2029,7 @@
 (defknown %compare-and-swap-svref (simple-vector index t t) t
     ())
 (defknown (%compare-and-swap-symbol-value
-           #!+x86-64 %cas-symbol-global-value)
+           #+x86-64 %cas-symbol-global-value)
     (symbol t t) t
     (unwind))
 (defknown (%atomic-dec-symbol-global-value %atomic-inc-symbol-global-value)

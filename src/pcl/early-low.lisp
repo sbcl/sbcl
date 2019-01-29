@@ -74,7 +74,7 @@
 
 (sb-kernel::!defstruct-with-alternate-metaclass standard-instance
   ;; KLUDGE: arm64 needs to have CAS-HEADER-DATA-HIGH implemented
-  :slot-names (slots #!-(and compact-instance-header x86-64) hash-code)
+  :slot-names (slots #-(and compact-instance-header x86-64) hash-code)
   :constructor %make-standard-instance
   :superclass-name t
   :metaclass-name static-classoid
@@ -86,7 +86,7 @@
 ;;; it, so that funcallable-instances can act like simple-funs, in as much as
 ;;; there's an address you can jump to without loading a register.
 (sb-kernel::!defstruct-with-alternate-metaclass standard-funcallable-instance
-  :slot-names (clos-slots #!-compact-instance-header hash-code)
+  :slot-names (clos-slots #-compact-instance-header hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid

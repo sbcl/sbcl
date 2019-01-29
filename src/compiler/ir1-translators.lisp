@@ -520,7 +520,7 @@ Return VALUE without evaluating it."
                                 (and name
                                      ;; KLUDGE: High debug adds this block on
                                      ;; some platforms.
-                                     #!-unwind-to-frame-and-call-vop
+                                     #-unwind-to-frame-and-call-vop
                                      (neq 'return-value-tag name)
                                      ;; KLUDGE: CATCH produces blocks whose
                                      ;; cleanup is :CATCH.
@@ -749,7 +749,7 @@ have been evaluated."
          (ir1-translate-locally body start next result))
         ;; This is just to avoid leaking non-standard special forms
         ;; into macroexpanded code
-        #!-c-stack-is-control-stack
+        #-c-stack-is-control-stack
         ((and (equal bindings '((*alien-stack-pointer* *alien-stack-pointer*))))
          (ir1-convert start next result
                       (let ((nsp (gensym "NSP")))
@@ -1256,7 +1256,7 @@ the thrown values will be returned."
 ;;; The LET is needed because the cleanup can be emitted multiple
 ;;; times, but there's no reference to NSP before EMIT-CLEANUPS.
 ;;; Passing NSP to the dummy %CLEANUP-FUN keeps it alive.
-#!-c-stack-is-control-stack
+#-c-stack-is-control-stack
 (def-ir1-translator restoring-nsp
     ((nsp &body body) start next result)
   (let ((cleanup (make-cleanup :kind :restore-nsp))

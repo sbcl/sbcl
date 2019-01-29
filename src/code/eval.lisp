@@ -65,7 +65,7 @@
           fun))))
 
 ;;; Handle PROGN and implicit PROGN.
-#!-sb-fasteval
+#-sb-fasteval
 (progn
 (defun list-with-length-p (x)
   ;; Is X a list for which LENGTH is meaningful, i.e. a list which is
@@ -131,7 +131,7 @@
   (signal 'eval-error :condition condition)
   (bug "Unhandled EVAL-ERROR"))
 
-#!-sb-fasteval
+#-sb-fasteval
 (progn
 ;; See comment in 'full-eval' at its definition of INTERPRETED-PROGRAM-ERROR
 ;; which is not the same as this one. Since neither is more globally used
@@ -291,7 +291,7 @@
 
 ;;; This definition will be replaced after the interpreter is compiled.
 ;;; Until then we just always compile.
-#!+sb-fasteval
+#+sb-fasteval
 (defun sb-interpreter:eval-in-environment (exp lexenv)
   (let ((exp (macroexpand exp lexenv)))
     (if (symbolp exp)
@@ -299,15 +299,15 @@
         (%simple-eval exp (or lexenv (make-null-lexenv))))))
 
 (defun eval-in-lexenv (exp lexenv)
-  #!+sb-eval
+  #+sb-eval
   (let ((lexenv (or lexenv (make-null-lexenv))))
     (if (eq *evaluator-mode* :compile)
         (simple-eval-in-lexenv exp lexenv)
         (sb-eval:eval-in-native-environment exp lexenv)))
-  #!+sb-fasteval
+  #+sb-fasteval
   (sb-c:with-compiler-error-resignalling
    (sb-interpreter:eval-in-environment exp lexenv))
-  #!-(or sb-eval sb-fasteval)
+  #-(or sb-eval sb-fasteval)
   (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv))))
 
 (defun eval (original-exp)

@@ -366,7 +366,7 @@
                           (* max-offset sb-vm:n-word-bytes))
                        scale)))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun sb-vm::displacement-bounds (lowtag element-size data-offset)
   (let* (;; The minimum immediate offset in a memory-referencing instruction.
          (minimum-immediate-offset (- (expt 2 31)))
@@ -380,7 +380,7 @@
                         bytes-per-element)))
     (values min max)))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (sb-xc:deftype constant-displacement (lowtag element-size data-offset)
   (flet ((integerify (x)
            (etypecase x

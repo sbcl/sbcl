@@ -13,7 +13,7 @@
 
 ;;; Check that target machine features are set up consistently with
 ;;; this file.
-#!-sunos (error "missing :SUNOS feature")
+#-sunos (error "missing :SUNOS feature")
 
 (defun software-type ()
   "Return a string describing the supporting software."

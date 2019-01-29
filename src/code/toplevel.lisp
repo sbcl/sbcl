@@ -153,13 +153,13 @@ means to wait indefinitely.")
     (t
      (multiple-value-call #'%nanosleep (split-ratio-for-sleep seconds)))))
 
-#!+(and win32 sb-thread)
+#+(and win32 sb-thread)
 (defun %sleep (seconds)
   (if (integerp seconds)
       (%nanosleep seconds 0)
       (multiple-value-call #'%nanosleep (split-seconds-for-sleep seconds))))
 
-#!+(and win32 (not sb-thread))
+#+(and win32 (not sb-thread))
 (defun %sleep (seconds)
   (sb-win32:millisleep (truncate (* seconds 1000))))
 

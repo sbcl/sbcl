@@ -1,5 +1,5 @@
 ;;;; some stuff for displaying information for debugging/experimenting
-;;;; with the system, mostly conditionalized with #!+SB-SHOW
+;;;; with the system, mostly conditionalized with #+SB-SHOW
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -92,7 +92,7 @@
   (let ((s (apply #'concatenate
                   'simple-string
                   (mapcar #'string string-designators))))
-    (declare (ignorable s)) ; (for when #!-SB-SHOW)
+    (declare (ignorable s)) ; (for when #-SB-SHOW)
     #+sb-xc-host `(/show ,s)
     #-sb-xc-host `(progn
                     #+sb-show
@@ -103,7 +103,7 @@
 
 ;;; low-level display of a string, works even early in cold init
 (defmacro /primitive-print (thing)
-  (declare (ignorable thing)) ; (for when #!-SB-SHOW)
+  (declare (ignorable thing)) ; (for when #-SB-SHOW)
   #+sb-show
   (progn
     #+sb-xc-host `(/show "(/primitive-print)" ,thing)
@@ -111,7 +111,7 @@
 
 ;;; low-level display of a system word, works even early in cold init
 (defmacro /hexstr (thing)
-  (declare (ignorable thing)) ; (for when #!-SB-SHOW)
+  (declare (ignorable thing)) ; (for when #-SB-SHOW)
   #+sb-show
   (progn
     #+sb-xc-host `(/show "(/hexstr)" ,thing)

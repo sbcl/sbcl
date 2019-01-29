@@ -29,7 +29,7 @@
 ;;; non-x86oid gencgc targets, this is a per-thread list of objects
 ;;; which must not be moved during GC.  It is frobbed by the code for
 ;;; with-pinned-objects in src/compiler/target/macros.lisp.
-#!+(and gencgc (not (or x86 x86-64)))
+#+(and gencgc (not (or x86 x86-64)))
 (defvar sb-vm::*pinned-objects*)
 
 (defmacro without-gcing (&body body)
@@ -90,7 +90,7 @@ maintained."
        (cond ((null ,svar) *standard-input*)
              ((eq ,svar t) *terminal-io*)
              (t
-                #!+high-security
+                #+high-security
                 (unless (input-stream-p ,svar)
                   (error 'simple-type-error
                          :datum ,svar
@@ -115,7 +115,7 @@ maintained."
        (cond ((null ,svar) *standard-output*)
              ((eq ,svar t) *terminal-io*)
              (t
-                #!+high-security
+                #+high-security
                 (unless (output-stream-p ,svar)
                   (error 'simple-type-error
                          :datum ,svar

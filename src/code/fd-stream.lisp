@@ -2595,7 +2595,7 @@
 
 (defun stdstream-external-format (fd)
   #-win32 (declare (ignore fd))
-  (let* ((keyword (cond #!+(and win32 sb-unicode)
+  (let* ((keyword (cond #+(and win32 sb-unicode)
                         ((sb-win32::console-handle-p fd)
                          :ucs-2)
                         (t

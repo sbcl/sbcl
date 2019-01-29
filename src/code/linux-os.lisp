@@ -32,9 +32,9 @@
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
   (or
-   #!+(and mips little-endian)
+   #+(and mips little-endian)
    "little-endian"
-   #!+(and mips big-endian)
+   #+(and mips big-endian)
    "big-endian"
    (let ((marker
           ;; hoping "cpu" exists and gives something useful in
@@ -48,15 +48,15 @@
           ;;   seemed to do the same thing as far as the
           ;;   "cpu" field is concerned, i.e. it always
           ;;   starts with the (C-syntax) string "cpu\t\t: ".
-          #!+ppc "cpu"
+          #+ppc "cpu"
           ;; The field "model name" exists on kernel 2.4.21-rc6-ac1
           ;; anyway, with values e.g.
           ;;   "AMD Athlon(TM) XP 2000+"
           ;;   "Intel(R) Pentium(R) M processor 1300MHz"
           ;; which seem comparable to the information in the example
           ;; in the MACHINE-VERSION page of the ANSI spec.
-          #!+(or x86 x86-64) "model name"
-          #!+(or arm arm64) "Processor"))
+          #+(or x86 x86-64) "model name"
+          #+(or arm arm64) "Processor"))
      (when marker
        (with-open-file (stream "/proc/cpuinfo"
                                ;; Even on Linux it's an option to build

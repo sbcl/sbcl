@@ -24,7 +24,7 @@
           (declare (ignore form env))
           (make-definition-source-location)))) |#
 
-#!+sb-source-locations
+#+sb-source-locations
 (progn
   #-sb-xc-host
   (define-compiler-macro source-location ()
@@ -34,7 +34,7 @@
   (defun source-location ()
     #-sb-xc-host (make-definition-source-location)))
 
-#!-sb-source-locations
+#-sb-source-locations
 (defun source-location () nil)
 
 #-sb-xc-host

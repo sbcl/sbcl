@@ -59,7 +59,7 @@ more reliable bactracing across foreign calls.")
   (cond ((and (= debug 3)
               (> debug speed))
          3)
-        #!+unwind-to-frame-and-call-vop
+        #+unwind-to-frame-and-call-vop
         ((and (> debug 0)
               (>= debug speed))
          1)
@@ -142,7 +142,7 @@ debugger.")
     1
   ("no" "no" "yes" "yes"))
 
-#!+sb-safepoint
+#+sb-safepoint
 (define-optimization-quality inhibit-safepoints
     0
   ("no" "no" "yes" "yes")

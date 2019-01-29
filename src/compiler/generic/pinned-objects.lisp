@@ -23,11 +23,11 @@ garbage collection."
   #-gencgc
   `(without-gcing
     ,@body)
-  #!+(and gencgc (not (or x86 x86-64)))
+  #+(and gencgc (not (or x86 x86-64)))
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
      (declare (truly-dynamic-extent *pinned-objects*))
      ,@body)
-  #!+(and gencgc (or x86 x86-64))
+  #+(and gencgc (or x86 x86-64))
   (if objects
       (let ((pins (make-gensym-list (length objects)))
             (wpo (sb-xc:gensym "WITH-PINNED-OBJECTS-THUNK")))

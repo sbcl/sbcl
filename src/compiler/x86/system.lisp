@@ -267,7 +267,7 @@
 ;; ADDRESS-BASED-COUNTER-VAL uses the thread's alloc region free pointer
 ;; as a quasi-random value, so that's a relatively useful case to handle
 ;; without the extra instruction. Win32 needs an extra instruction always.
-#!+(and sb-thread (not win32))
+#+(and sb-thread (not win32))
 (define-vop (current-thread-offset-sap/c)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
@@ -354,7 +354,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
                  (+ (ash (- ,hi1 ,hi0) 32)
                     (- ,lo1 ,lo0)))))))
 
-#!+sb-dyncount
+#+sb-dyncount
 (define-vop (count-me)
   (:args (count-vector :scs (descriptor-reg)))
   (:info index)

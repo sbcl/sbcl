@@ -31,13 +31,13 @@
      (and (zerop (ldb sb-vm:double-float-exponent-byte
                       (double-float-high-bits x)))
           (not (zerop x))))
-    #!+(and long-float x86)
+    #+(and long-float x86)
     ((long-float)
      (and (zerop (ldb sb-vm:long-float-exponent-byte (long-float-exp-bits x)))
           (not (zerop x))))))
 
 (defmacro !define-float-dispatching-function
-    (name doc single double #!+(and long-float x86) long)
+    (name doc single double #+(and long-float x86) long)
   `(defun ,name (x)
      ,doc
      (number-dispatch ((x float))
@@ -53,7 +53,7 @@
           (and (> (ldb sb-vm:double-float-exponent-byte hi)
                   sb-vm:double-float-normal-exponent-max)
                ,double)))
-       #!+(and long-float x86)
+       #+(and long-float x86)
        ((long-float)
         (let ((exp (long-float-exp-bits x))
               (hi (long-float-high-bits x))
@@ -68,7 +68,7 @@
   (zerop (ldb sb-vm:single-float-significand-byte bits))
   (and (zerop (ldb sb-vm:double-float-significand-byte hi))
        (zerop lo))
-  #!+(and long-float x86)
+  #+(and long-float x86)
   (and (zerop (ldb sb-vm:long-float-significand-byte hi))
        (zerop lo)))
 
@@ -77,7 +77,7 @@
   (not (zerop (ldb sb-vm:single-float-significand-byte bits)))
   (or (not (zerop (ldb sb-vm:double-float-significand-byte hi)))
       (not (zerop lo)))
-  #!+(and long-float x86)
+  #+(and long-float x86)
   (or (not (zerop (ldb sb-vm:long-float-significand-byte hi)))
       (not (zerop lo))))
 
@@ -89,19 +89,19 @@
   ;; trapping-nan-bit CLEAR.  Note that the given implementation
   ;; considers infinities to be FLOAT-TRAPPING-NAN-P on most
   ;; architectures.
-  #!-(or mips hppa)
+  #-(or mips hppa)
   (zerop (logand (ldb sb-vm:single-float-significand-byte bits)
                  sb-vm:single-float-trapping-nan-bit))
-  #!+(or mips hppa)
+  #+(or mips hppa)
   (not (zerop (logand (ldb sb-vm:single-float-significand-byte bits)
                       sb-vm:single-float-trapping-nan-bit)))
-  #!-(or mips hppa)
+  #-(or mips hppa)
   (zerop (logand (ldb sb-vm:double-float-significand-byte hi)
                  sb-vm:double-float-trapping-nan-bit))
-  #!+(or mips hppa)
+  #+(or mips hppa)
   (not (zerop (logand (ldb sb-vm:double-float-significand-byte hi)
                       sb-vm:double-float-trapping-nan-bit)))
-  #!+(and long-float x86)
+  #+(and long-float x86)
   (zerop (logand (ldb sb-vm:long-float-significand-byte hi)
                  sb-vm:long-float-trapping-nan-bit)))
 
@@ -291,7 +291,7 @@
                    (- exp sb-vm:double-float-bias sb-vm:double-float-digits)
                    (if (minusp bits) -1 1))))))
 
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun integer-decode-long-denorm (x)
   (declare (type long-float x))
   (let* ((high-bits (long-float-high-bits (abs x)))
@@ -323,7 +323,7 @@
                   (truly-the fixnum (- biased extra-bias))
                   sign)))))
 
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun integer-decode-long-float (x)
   (declare (long-float x))
   (let* ((hi (long-float-high-bits x))
@@ -431,7 +431,7 @@
                    (truly-the double-float-exponent (- exp sb-vm:double-float-bias))
                    sign)))))
 
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun decode-long-denorm (x)
   (declare (long-float x))
   (multiple-value-bind (sig exp sign) (integer-decode-long-denorm x)
@@ -440,7 +440,7 @@
             (truly-the fixnum (+ exp sb-vm:long-float-digits))
             (float sign x))))
 
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun decode-long-float (x)
   (declare (long-float x))
   (let* ((hi (long-float-high-bits x))
@@ -594,7 +594,7 @@
     (unsigned-byte (scale-float-maybe-overflow x exp))
     ((integer * 0) (scale-float-maybe-underflow x exp))))
 
-#!+(and x86 long-float)
+#+(and x86 long-float)
 (defun scale-long-float (x exp)
   (declare (long-float x) (integer exp))
   (scale-float x exp))

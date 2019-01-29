@@ -99,13 +99,13 @@
   (aver (and (not (location= alloc-tn temp-reg-tn))
              (or (integerp size) (not (location= size temp-reg-tn)))))
 
-  #!+(and (not sb-thread) sb-dynamic-core)
+  #+(and (not sb-thread) sb-dynamic-core)
   ;; We'd need a spare reg in which to load boxed_region from the linkage table.
   ;; Could push/pop any random register on the stack and own it temporarily,
   ;; but seeing as nobody cared about this, just punt.
   (%alloc-tramp node alloc-tn size lowtag)
 
-  #!-(and (not sb-thread) sb-dynamic-core)
+  #-(and (not sb-thread) sb-dynamic-core)
   ;; Otherwise do the normal inline allocation thing
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
@@ -581,7 +581,7 @@
      (when type
        (let* ((widetag (if (typep type 'layout) instance-widetag type))
               (header (logior (ash (1- words) n-widetag-bits) widetag)))
-         (if (or #!+compact-instance-header
+         (if (or #+compact-instance-header
                  (and (eq name '%make-structure-instance) stack-allocate-p))
              ;; Write a :DWORD, not a :QWORD, because the high half will be
              ;; filled in when the layout is stored. Can't use STOREW* though,

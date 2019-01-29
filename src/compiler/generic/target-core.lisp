@@ -21,7 +21,7 @@
 (define-load-time-global *allocation-point-fixups*
   (make-hash-table :test 'eq :weakness :key :synchronized t))
 
-#!-x86-64
+#-x86-64
 (progn
 (defun convert-alloc-point-fixups (dummy1 dummy2)
   (declare (ignore dummy1 dummy2)))
@@ -91,7 +91,7 @@
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
-         #!+(or immobile-space x86)
+         #+(or immobile-space x86)
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
            (when (or abs-fixups rel-fixups)
@@ -107,21 +107,21 @@
            (let ((fun (%code-entry-point code-obj i)))
              (setf (%simple-fun-self fun)
                    ;; x86 backends store the address of the entrypoint in 'self'
-                   #!+(or x86 x86-64)
+                   #+(or x86 x86-64)
                    (%make-lisp-obj
                     (truly-the word (+ (get-lisp-obj-address fun)
                                        (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)
                                        (- sb-vm:fun-pointer-lowtag))))
                    ;; non-x86 backends store the function itself (what else?) in 'self'
-                   #!-(or x86 x86-64) fun)
+                   #-(or x86 x86-64) fun)
              ;; And maybe store the layout in the high half of the header
-             #!+(and compact-instance-header x86-64)
+             #+(and compact-instance-header x86-64)
              (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
                                (- 4 sb-vm:fun-pointer-lowtag))
                    (truly-the (unsigned-byte 32)
                      (get-lisp-obj-address #.(find-layout 'function))))))
          ;; And finally, make the memory range executable
-         #!-(or x86 x86-64)
+         #-(or x86 x86-64)
          (sb-vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))

@@ -110,7 +110,7 @@
   (fixup-notes)
   ;; Whether or not to collect dynamic statistics. This is just the same as
   ;; *COLLECT-DYNAMIC-STATISTICS* but is faster to reference.
-  #!+sb-dyncount
+  #+sb-dyncount
   (collect-dynamic-statistics nil))
 (defprinter (segment :identity t))
 
@@ -303,7 +303,7 @@
       (setf (aref vector index) thing)
       (setf (section-buf-index section) (1+ index)))))
 
-#!-(or x86-64 x86)
+#-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
   (declare (ignore operand)))
 
@@ -886,7 +886,7 @@
        (emit-byte segment pattern)))
     ;; EMIT-LONG-NOP does not exist for most backends.
     ;; Better to get an ECASE error than undefined-function.
-    #!+x86-64
+    #+x86-64
     ((eql :long-nop)
      (sb-vm:emit-long-nop segment amount)))
   (values))
@@ -1323,7 +1323,7 @@
     (when (plusp (segment-header-skew segment))
       (%emit-skip segment (segment-header-skew segment)))
     (%emit-label segment nil (segment-origin segment))
-    #!+sb-dyncount
+    #+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
     (dolist (buffer sections)
       (dovector (operation buffer)
@@ -1447,7 +1447,7 @@
 ;;; internal object prior to handing the operands off to the emitter.
 ;;; x86-64 does have a different representation, which makes some of
 ;;; the emitter logic easier to understand.
-#!-x86-64
+#-x86-64
 (defun perform-operand-lowering (operands) operands)
 
 (defun truncate-section-to-length (section)
@@ -1747,7 +1747,7 @@
            (error "unknown option: ~S" option)))))
     (when emitter
       (unless cost (setf cost 1))
-      #!+sb-dyncount
+      #+sb-dyncount
       (push `(when (segment-collect-dynamic-statistics ,segment-name)
                (let* ((info (sb-c:ir2-component-dyncount-info
                              (sb-c:component-info

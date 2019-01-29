@@ -35,7 +35,7 @@
                                  :wrap-block nil)))
     (declare (ignorable doc)) ; unused on host
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) sb-xc-host) (setq doc nil)
+    #+(and (not sb-doc) sb-xc-host) (setq doc nil)
     `(progn
       (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
                       ,fn-name))

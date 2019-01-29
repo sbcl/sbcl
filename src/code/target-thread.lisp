@@ -348,7 +348,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 
 (define-alien-routine "kill_safely"
     int
-  (os-thread #!-alpha unsigned #!+alpha unsigned-int)
+  (os-thread #-alpha unsigned #+alpha unsigned-int)
   (signal int))
 
 (define-alien-routine "wake_thread"
@@ -373,7 +373,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
   (defun block-deferrable-signals ()
     (%block-deferrable-signals 0 0))
 
-  #!+sb-futex
+  #+sb-futex
   (progn
     (declaim (inline futex-wait %futex-wait futex-wake))
 
@@ -417,7 +417,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 (setf (documentation 'make-mutex 'function) "Create a mutex."
       (documentation 'mutex-name 'function) "The name of the mutex. Setfable.")
 
-#!+(and sb-thread sb-futex)
+#+(and sb-thread sb-futex)
 (progn
   (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
     (define-structure-slot-addressor mutex-state-address
@@ -440,14 +440,14 @@ HOLDING-MUTEX-P."
 
 (sb-ext:define-load-time-global **deadlock-lock** nil)
 
-#!+(or (not sb-thread) sb-futex)
+#+(or (not sb-thread) sb-futex)
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
   (name nil :type (or null string))
-  #!+(and sb-thread sb-futex)
+  #+(and sb-thread sb-futex)
   (token nil))
 
-#!+(and sb-thread (not sb-futex))
+#+(and sb-thread (not sb-futex))
 (defstruct (waitqueue (:copier nil) (:constructor make-waitqueue (&key name)))
   "Waitqueue type."
   (name nil :type (or null string))
@@ -644,11 +644,11 @@ returns NIL each time."
     #-sb-thread
     (when old
       (error "Strange deadlock on ~S in an unithreaded build?" mutex))
-    #!-(and sb-thread sb-futex)
+    #-(and sb-thread sb-futex)
     (and (not old)
          ;; Don't even bother to try to CAS if it looks bad.
          (not (sb-ext:compare-and-swap (mutex-%owner mutex) nil new-owner)))
-    #!+(and sb-thread sb-futex)
+    #+(and sb-thread sb-futex)
     ;; From the Mutex 2 algorithm from "Futexes are Tricky" by Ulrich Drepper.
     (when (eql +lock-free+ (sb-ext:compare-and-swap (mutex-state mutex)
                                                     +lock-free+
@@ -662,9 +662,9 @@ returns NIL each time."
 (defun %%wait-for-mutex (mutex new-owner to-sec to-usec stop-sec stop-usec)
   (declare (type mutex mutex) (optimize (speed 3)))
   (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
-  #!-sb-futex
+  #-sb-futex
   (declare (ignore to-sec to-usec))
-  #!-sb-futex
+  #-sb-futex
   (flet ((cas ()
            (loop repeat 100
                  when (and (progn
@@ -680,7 +680,7 @@ returns NIL each time."
            (with-interrupts nil)))
     (declare (dynamic-extent #'cas))
     (%%wait-for #'cas stop-sec stop-usec))
-  #!+sb-futex
+  #+sb-futex
   ;; This is a fairly direct translation of the Mutex 2 algorithm from
   ;; "Futexes are Tricky" by Ulrich Drepper.
   (flet ((maybe (old)
@@ -814,7 +814,7 @@ IF-NOT-OWNER is :FORCE)."
       ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
       ;; barrier instead?
       (barrier (:memory)))
-    #!+(and sb-thread sb-futex)
+    #+(and sb-thread sb-futex)
     (when old-owner
       ;; FIXME: once ATOMIC-INCF supports struct slots with word sized
       ;; unsigned-byte type this can be used:
@@ -836,7 +836,7 @@ IF-NOT-OWNER is :FORCE)."
 
 ;;;; Waitqueues/condition variables
 
-#!+(and sb-thread (not sb-futex))
+#+(and sb-thread (not sb-futex))
 (progn
   (defun %waitqueue-enqueue (thread queue)
     (setf (thread-waiting-for thread) queue)
@@ -890,7 +890,7 @@ IF-NOT-OWNER is :FORCE)."
 (setf (documentation 'waitqueue-name 'function) "The name of the waitqueue. Setfable."
       (documentation 'make-waitqueue 'function) "Create a waitqueue.")
 
-#!+(and sb-thread sb-futex)
+#+(and sb-thread sb-futex)
 (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
   (define-structure-slot-addressor waitqueue-token-address
       :structure waitqueue
@@ -914,7 +914,7 @@ IF-NOT-OWNER is :FORCE)."
       (without-interrupts
         (unwind-protect
              (progn
-               #!-sb-futex
+               #-sb-futex
                (progn
                  (%with-cas-lock ((waitqueue-%owner queue))
                    (%waitqueue-enqueue me queue))
@@ -928,7 +928,7 @@ IF-NOT-OWNER is :FORCE)."
                              (allow-with-interrupts
                                (%%wait-for #'wakeup stop-sec stop-usec)))
                            :timeout)))
-               #!+sb-futex
+               #+sb-futex
                (with-pinned-objects (queue me)
                  (setf (waitqueue-token queue) me)
                  (release-mutex mutex)
@@ -953,7 +953,7 @@ IF-NOT-OWNER is :FORCE)."
                           ;;  0 = normal wakeup
                           ;;  2 = EINTR, a spurious wakeup
                           :ok)))))
-          #!-sb-futex
+          #-sb-futex
           (%with-cas-lock ((waitqueue-%owner queue))
             (if (eq queue (thread-waiting-for me))
                 (%waitqueue-drop me queue)
@@ -1067,10 +1067,10 @@ must be held by this thread during this call."
   (declare (type (and fixnum (integer 1)) n))
   #+sb-thread
   (progn
-    #!-sb-futex
+    #-sb-futex
     (with-cas-lock ((waitqueue-%owner queue))
       (%waitqueue-wakeup queue n))
-    #!+sb-futex
+    #+sb-futex
     (progn
     ;; No problem if >1 thread notifies during the comment in condition-wait:
     ;; as long as the value in queue-data isn't the waiting thread's id, it
@@ -1572,7 +1572,7 @@ session."
                                         #'sb-di::catch-runaway-unwind))
                                   (when *exit-in-process*
                                     (sb-impl::call-exit-hooks))))
-                             #!+sb-safepoint
+                             #+sb-safepoint
                              (sb-kernel::gc-safepoint))))
                 ;; we're going down, can't handle interrupts
                 ;; sanely anymore. gc remains enabled.
@@ -1583,7 +1583,7 @@ session."
                 ;; interupts to be lost: sigint comes to
                 ;; mind.
                 (setq *interrupt-pending* nil)
-                #!+sb-thruption
+                #+sb-thruption
                 (setq *thruption-pending* nil)
                 (handle-thread-exit thread
                                     (get-lisp-obj-address
@@ -1615,13 +1615,13 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
     (let* ((setup-sem (make-semaphore :name "Thread setup semaphore"))
            (real-function (coerce function 'function))
            (arguments     (ensure-list arguments))
-           #!+(or win32 darwin)
+           #+(or win32 darwin)
            (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
                           (sb-vm:floating-point-modes))))
       (declare (dynamic-extent setup-sem))
       (dx-flet ((initial-thread-function ()
                   ;; Inherit parent thread's FP modes
-                  #!+(or win32 darwin)
+                  #+(or win32 darwin)
                   (setf (sb-vm:floating-point-modes) fp-modes)
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be careful.
@@ -1703,7 +1703,7 @@ subject to change."
      ,@body))
 
 ;;; Called from the signal handler.
-#!-(or sb-thruption win32)
+#-(or sb-thruption win32)
 (defun run-interruption ()
   (let ((interruption (with-interruptions-lock (*current-thread*)
                         (pop (thread-interruptions *current-thread*)))))
@@ -1716,7 +1716,7 @@ subject to change."
     (when interruption
       (funcall interruption))))
 
-#!+sb-thruption
+#+sb-thruption
 (defun run-interruption (*current-internal-error-context*)
   (in-interruption () ;the non-thruption code does this in the signal handler
     (let ((interruption (with-interruptions-lock (*current-thread*)
@@ -1795,12 +1795,12 @@ the state of a thread:
   (interrupt-thread thread #'break)
 
 Short version: be careful out there."
-  #!+(and (not sb-thread) win32)
-  #!+(and (not sb-thread) win32)
+  #+(and (not sb-thread) win32)
+  #+(and (not sb-thread) win32)
   (declare (ignore thread))
   (with-interrupt-bindings
     (with-interrupts (funcall function)))
-  #!-(and (not sb-thread) win32)
+  #-(and (not sb-thread) win32)
   (let ((os-thread (thread-os-thread thread)))
     (cond ((= os-thread (ldb (byte sb-vm:n-word-bits 0) -1))
            (error 'interrupt-thread-error :thread thread))
@@ -1879,7 +1879,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
   ;; Keep in sync with 'compiler/generic/parms.lisp'
-  #!+ppc ; only PPC uses a separate symbol for the TLS index lock
+  #+ppc ; only PPC uses a separate symbol for the TLS index lock
   (!define-load-time-global sb-vm::*tls-index-lock* 0)
 
   (defun %symbol-value-in-thread (symbol thread)

@@ -238,7 +238,7 @@
   (define hairy-data-vector-ref/check-bounds)
   (define data-vector-ref))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defoptimizer (data-vector-ref-with-offset derive-type) ((array index offset))
   (declare (ignore index offset))
   (derive-aref-type array))
@@ -254,7 +254,7 @@
   (define hairy-data-vector-set/check-bounds)
   (define data-vector-set))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defoptimizer (data-vector-set-with-offset derive-type) ((array index offset new-value))
   (declare (ignore index offset))
   (assert-new-value-type new-value array))

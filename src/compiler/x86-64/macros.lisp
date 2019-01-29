@@ -191,15 +191,15 @@
 (defmacro %clear-pseudo-atomic ()
   '(inst mov :qword (thread-slot-ea thread-pseudo-atomic-bits-slot) 0))
 
-#!+sb-safepoint
+#+sb-safepoint
 (defun emit-safepoint ()
   (inst test :byte rax-tn (ea (- nil-value n-word-bytes other-pointer-lowtag
                                  gc-safepoint-trap-offset))))
 
 (defmacro pseudo-atomic ((&key elide-if) &rest forms)
-  #!+sb-safepoint-strictly
+  #+sb-safepoint-strictly
   `(progn ,@forms (unless ,elide-if (emit-safepoint)))
-  #!-sb-safepoint-strictly
+  #-sb-safepoint-strictly
   (with-unique-names (label pa-bits-ea)
     `(let ((,label (gen-label))
            (,pa-bits-ea
@@ -215,7 +215,7 @@
          ;; using the process signal mask.
          (inst break pending-interrupt-trap)
          (emit-label ,label)
-         #!+sb-safepoint
+         #+sb-safepoint
          ;; In this case, when allocation thinks a GC should be done, it
          ;; does not mark PA as interrupted, but schedules a safepoint
          ;; trap instead.  Let's take the opportunity to trigger that

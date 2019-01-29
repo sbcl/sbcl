@@ -307,12 +307,12 @@ Examples:
         (malloc-error bytes)
         sap)))
 
-#!+c-stack-is-control-stack
+#+c-stack-is-control-stack
 (declaim (inline invoke-with-saved-fp))
 ;;; On :c-stack-is-control-stack platforms, this DEFUN must appear prior to the
 ;;; first cross-compile-time use of ALIEN-FUNCALL, the transform of which is
 ;;; an invocation of INVOKE-WITH-SAVED-FP, which should be inlined.
-#!+c-stack-is-control-stack
+#+c-stack-is-control-stack
 (defun invoke-with-saved-fp (fn)
   (declare #-sb-xc-host (muffle-conditions compiler-note)
            (optimize (speed 3)))
@@ -626,7 +626,7 @@ null byte."
 (defun-cached (coerce-to-interpreted-function
                :hash-bits 8 :hash-function #'globaldb-sxhashoid)
     ((lambda-form equal))
-  (let (#!+(or sb-eval sb-fasteval)
+  (let (#+(or sb-eval sb-fasteval)
         (*evaluator-mode* :interpret))
     (coerce lambda-form 'function)))
 

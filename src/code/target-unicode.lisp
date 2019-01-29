@@ -762,9 +762,9 @@ only characters for which it returns T are collected."
 (declaim (type function sb-unix::posix-getenv))
 (defun get-user-locale ()
   (let ((raw-locale
-         #!+(or win32 unix) (or (sb-unix::posix-getenv "LC_ALL")
+         #+(or win32 unix) (or (sb-unix::posix-getenv "LC_ALL")
                                 (sb-unix::posix-getenv "LANG"))
-         #!-(or win32 unix) nil))
+         #-(or win32 unix) nil))
     (when raw-locale
       (let ((lang-code (string-upcase
                         (subseq raw-locale 0 (position #\_ raw-locale)))))

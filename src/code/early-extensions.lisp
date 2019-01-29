@@ -1512,7 +1512,7 @@ NOTE: This interface is experimental and subject to change."
 
 ;;; Default evaluator mode (interpeter / compiler)
 
-(declaim (type (member :compile #!+(or sb-eval sb-fasteval) :interpret)
+(declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
                *evaluator-mode*))
 (defparameter *evaluator-mode* :compile ; initialized by genesis
   "Toggle between different evaluator implementations. If set to :COMPILE,
@@ -1632,7 +1632,7 @@ to :INTERPRET, an interpreter will be used.")
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
   (declare (string s))
-  (cond #!+(and sb-unicode (not sb-xc-host))
+  (cond #+(and sb-unicode (not sb-xc-host))
         ((and (typep s '(array character (*))) (every #'base-char-p s))
          (coerce s 'base-string))
         (t

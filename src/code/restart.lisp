@@ -9,7 +9,7 @@
 
 (in-package "SB-KERNEL")
 
-#!+stack-allocatable-fixed-objects
+#+stack-allocatable-fixed-objects
 (declaim (inline make-restart)) ;; to allow DX-allocation
 
 ;;;; This defstruct should appear before any use of WITH-CONDITION-RESTARTS

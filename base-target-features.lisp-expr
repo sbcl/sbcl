@@ -407,7 +407,7 @@
  ;;   stack coincides with the C stack, meaning that on the X86 there's
  ;;   stuff on the control stack that the Lisp-level debugger doesn't
  ;;   understand very well. As of sbcl-0.7.1.40 things like that are
- ;;   just parameterized by #!+X86, but it'd probably be better to
+ ;;   just parameterized by #+X86, but it'd probably be better to
  ;;   use new flags like :CONTROL-STACK-CONTAINS-C-STACK.
  ;;
  ;;   :stack-allocatable-closures

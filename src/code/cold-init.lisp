@@ -224,7 +224,7 @@
   (/show "Enabled buffered streams")
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
-  #!-(and win32 (not sb-thread))
+  #-(and win32 (not sb-thread))
   (show-and-call signal-cold-init-or-reinit)
 
   (show-and-call float-cold-init-or-reinit)
@@ -272,7 +272,7 @@
       (logically-readonlyize (sb-c::sc-move-costs sc))))
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
-  #!+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
+  #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
@@ -364,7 +364,7 @@ process to continue normally."
     (stream-reinit t)
     (os-cold-init-or-reinit)
     (thread-init-or-reinit)
-    #!-(and win32 (not sb-thread))
+    #-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
     (setf (extern-alien "internal_errors_enabled" int) 1)
     (float-cold-init-or-reinit))
