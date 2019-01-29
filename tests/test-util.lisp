@@ -186,7 +186,10 @@
      `(progn
         (start-test)
         (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features")))
-    ((and (boundp '*deferred-test-forms*) (not fails-on) (not serial))
+    ((and (boundp '*deferred-test-forms*)
+          (not serial)
+          (or (not fails-on)
+              (not (expected-failure-p fails-on))))
      ;; To effectively parallelize calls to COMPILE, we must defer compilation
      ;; until a worker thread has picked off the test from shared worklist.
      ;; Thus we push only the form to be compiled, not a lambda.
