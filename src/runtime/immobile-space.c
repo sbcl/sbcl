@@ -1478,33 +1478,13 @@ lispobj* AMD64_SYSV_ABI alloc_fixedobj(int nwords, uword_t header)
                               header);
 }
 
-#include "genesis/vector.h"
-#include "genesis/instance.h"
-lispobj AMD64_SYSV_ABI alloc_layout(lispobj slots)
+lispobj AMD64_SYSV_ABI alloc_layout()
 {
-    struct vector* v = VECTOR(slots);
-    // If INSTANCE_DATA_START is 0, subtract 1 word for the header.
-    // If 1, subtract 2 words: 1 for the header and 1 for the layout.
-    if (v->length != make_fixnum(LAYOUT_SIZE - INSTANCE_DATA_START - 1))
-        lose("bad arguments to alloc_layout");
-    struct instance* l = (struct instance*)
-      alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,
-                                   ALIGN_UP(LAYOUT_SIZE,2),
-                                   0),
-#ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-                         (LAYOUT_OF_LAYOUT << 32) |
-#endif
-                         (LAYOUT_SIZE-1)<<N_WIDETAG_BITS | INSTANCE_WIDETAG);
-#ifndef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-    l->slots[0] = LAYOUT_OF_LAYOUT;
-#endif
-    memcpy(&l->slots[INSTANCE_DATA_START], v->data,
-           (LAYOUT_SIZE - INSTANCE_DATA_START - 1)*N_WORD_BYTES);
-
-    // Possible efficiency win: make the "wasted" bytes after the layout into a
-    // simple unboxed array so that heap-walking can skip in one step.
-    // Probably only a performance issue for MAP-ALLOCATED-OBJECTS,
-    // since scavenging know to skip by the object alignment anyway.
+    lispobj* l =
+        alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,
+                                     ALIGN_UP(LAYOUT_SIZE,2),
+                                     0),
+                           (LAYOUT_SIZE-1)<<N_WIDETAG_BITS | INSTANCE_WIDETAG);
     return make_lispobj(l, INSTANCE_POINTER_LOWTAG);
 }
 

@@ -66,6 +66,11 @@
     ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
     ((inst mov r11-tn rax-tn))) ; result
 
+  #+immobile-space
+  (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
+    () ; no arg
+    ((inst mov r11-tn rax-tn))) ; result
+
   ;; These routines are for the deterministic allocation profiler.
   ;; The C support routine's argument is the return PC
   (def (enable-alloc-counter "allocation_tracker_counted" t)
