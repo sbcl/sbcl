@@ -3605,4 +3605,21 @@ SBCL itself"
   sb-impl::stringify-package-designator
   sb-impl::stringify-string-designator
   sb-impl::stringify-string-designators
-  sb-impl::unencapsulate-generic-function))
+  sb-impl::unencapsulate-generic-function)
+ ;; The following functions are in fact defined during make-host-2
+ ;; but they are non-toplevel so they appear to be undefined.
+ (sb-int:gensymify*
+  sb-int:keywordicate
+  sb-int:package-symbolicate
+  sb-int:symbolicate
+  sb-kernel::preinform-compiler-about-accessors
+  sb-kernel::preinform-compiler-about-slot-functions
+  sb-impl::bytes-per-utf8-character-aref
+  sb-impl::bytes-per-utf8-character-sap-ref-8
+  sb-impl::user-homedir-namestring
+  sb-c::apply-core-fixups
+  sb-c::compiled-debug-info-char-offset
+  sb-c::compiled-debug-info-tlf-number
+  sb-c::fopcompilable-p
+  sb-c::pack-xref-data
+  sb-sys:reinit-internal-real-time))
