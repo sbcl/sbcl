@@ -701,5 +701,17 @@
   (defstruct nil-slot-name nil)
   (let ((fun (compile nil '(lambda (x) (slot-value x 'nil)))))
     (assert (= 3 (funcall fun (make-nil-slot-name :nil 3))))))
+
+;;; Duplicated initargs in effective slot definition
+
+(defclass duplicated-intiargs.a () ((a :initarg :a)))
+(defclass duplicated-intiargs.b () ((a :initarg :a)))
+(defclass duplicated-intiargs.c (duplicated-intiargs.a duplicated-intiargs.b) ())
+
+(with-test (:name (compute-effective-slot-definition :duplicated-intiargs))
+  (let* ((class (sb-pcl:ensure-class-finalized (find-class 'duplicated-intiargs.c)))
+         (slot (first (class-slots class))))
+    (assert (equal (slot-definition-initargs slot) '(:a)))))
+
 
 ;;;; success
