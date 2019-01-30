@@ -1,5 +1,3 @@
-#define LANGUAGE_ASSEMBLY
-
 #include "globals.h"
 #include "lispregs.h"
 #include "sbcl.h"

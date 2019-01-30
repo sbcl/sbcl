@@ -3,8 +3,6 @@
 .section .note.GNU-stack,"",%progbits
 #endif
 
-#define LANGUAGE_ASSEMBLY
-
 #include "sbcl.h"
 #include "lispregs.h"
 #include "globals.h"

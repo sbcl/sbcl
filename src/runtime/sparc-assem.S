@@ -7,7 +7,6 @@
 
 #include "sparc-funcdef.h"
 
-#define LANGUAGE_ASSEMBLY
 #include "lispregs.h"
 #include "globals.h"
 #include "sbcl.h"

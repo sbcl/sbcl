@@ -35,7 +35,7 @@ __LDFLAGS__ =
 include ../../output/prefix.def
 
 CFLAGS += -g -Wall -Wundef -Wsign-compare -Wpointer-arith -O3
-ASFLAGS += $(CFLAGS)
+ASFLAGS += $(CFLAGS) -DLANGUAGE_ASSEMBLY
 CPPFLAGS += -I. -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
 
 # Give make access to the target Lisp features.

@@ -18,7 +18,6 @@
 .section .note.GNU-stack,"",%progbits
 #endif
 
-#define LANGUAGE_ASSEMBLY
 #include "genesis/config.h"
 #include "validate.h"
 #include "sbcl.h"
