@@ -1332,11 +1332,13 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
       (with-single-package-locked-error
           (:symbol name "defining ~S as a function")
         (setf defined-fun
-              (if (consp inline-lambda)
-                  ;; FIFTH as an accessor - how informative!
-                  ;; Obfuscation aside, I doubt this is even right.
-                  (get-defined-fun name (fifth inline-lambda))
-                  (get-defined-fun name))))
+              ;; Try to pass the lambda-list to GET-DEFINED-FUN if we can.
+              (etypecase inline-lambda
+                (atom (get-defined-fun name))
+                ((cons (eql lambda))
+                 (get-defined-fun name (second inline-lambda)))
+                ((cons (eql lambda-with-lexenv))
+                 (get-defined-fun name (third inline-lambda))))))
       (when (boundp '*lexenv*)
         (aver (producing-fasl-file))
         (if (member name *fun-names-in-this-file* :test #'equal)
