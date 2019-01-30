@@ -164,13 +164,6 @@ hacks which refer to particular package names, like the one in
 %PRIMITIVE which wants to reintern the symbols in its arguments into
 the "C"/"SB-C"/"SB!C" package.
 
-Incidentally, because of the #! readmacros and the "SB!FOO" package
-names, the system sources are unreadable to the running system. (The
-undefined readmacros and package names cause READ-ERRORs.) I'd like
-to make a little hack to fix this for use when experimenting with 
-and maintaining the system, but I haven't gotten around to it,
-despite several false starts. Real Soon Now..
-
 In order to keep track of layouts and other type and structure
 information set up under the cross-compiler, we use a system built
 around the DEF!STRUCT macro. (The #\! character is used to name a lot

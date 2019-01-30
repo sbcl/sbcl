@@ -115,11 +115,6 @@
 (defun read-targ-feature-expr (stream sub-character infix-parameter)
   (when infix-parameter
     (error "illegal read syntax: #~D!" infix-parameter))
-  (when (eq sub-character #\!)
-    (let ((next-char (read-char stream t nil t)))
-      (unless (find next-char "+-")
-        (error "illegal read syntax: #!~C" next-char))
-      (setq sub-character next-char)))
   (if (char= (if (let* ((*package* (find-package "KEYWORD"))
                         (*read-suppress* nil)
                         (feature (read stream t nil t)))
@@ -135,7 +130,6 @@
 
 (export '*xc-readtable*)
 (defvar *xc-readtable* (copy-readtable))
-(set-dispatch-macro-character #\# #\! #'read-targ-feature-expr *xc-readtable*)
 (set-dispatch-macro-character #\# #\+ #'read-targ-feature-expr *xc-readtable*)
 (set-dispatch-macro-character #\# #\- #'read-targ-feature-expr *xc-readtable*)
 
@@ -153,8 +147,34 @@
 (defvar *shebang-backend-subfeatures*)
 
 ;;;; string checker, for catching non-portability early
-;;;; This is defined here, but not installed here.
-;;;; See IN-TARGET-CROSS-COMPILATION-MODE for the gory details.
+
+;;; A note about CLISP compatibility:
+;;; CLISP uses *READTABLE* when loading '.fas' files, and so we shouldn't put
+;;; too much of our junk in the readtable. I'm not sure of the full extent
+;;; to which it uses our macros, but it definitely was using our #\" reader.
+;;; As such, it would signal warnings about strings that it wrote by its own
+;;; choice, where we specifically avoided using non-standard char literals.
+;;; This would happen when building + loading the cross-compiler, and CLISP
+;;; compiled a format call such as this one from 'src/compiler/codegen':
+;;;   (FORMAT *COMPILER-TRACE-OUTPUT* "~|~%assembly code for ~S~2%" ...))
+;;; which placed into its '.fas' a quoted string containing a byte for the
+;;; the literal #\Page character (and literal #\Newline, which is fine).
+;;; We should not print a warning for that. We should, however, warn
+;;; if we see those characters in strings as read directly from source.
+;;;
+;;; In case there is doubt as to the veracity of this observation, a simple
+;;; experiment proves that the warnings were not exactly our fault:
+;;; Given file "foo.lisp" containing (DEFUN F (S) (FORMAT S "x~|y"))
+;;; Then:
+;;; * (set-macro-character #\"
+;;;    (let ((f (get-macro-character #\")))
+;;;     (lambda (strm ch &aux (string (funcall f strm ch)))
+;;;       (format t "Read ~S from ~S~%" string strm)
+;;;       string)))
+;;; * (load "foo.fas") shows:
+;;;   ;; Loading file foo.fas ...
+;;;   Read "x^Ly" from #<INPUT BUFFERED FILE-STREAM CHARACTER #P"/tmp/foo.fas" @11>
+;;;
 (defun make-quote-reader (standard-quote-reader)
   (lambda (stream char)
     (let ((result (funcall standard-quote-reader stream char)))
@@ -162,3 +182,5 @@
         (warn "Found non-STANDARD-CHAR in ~S" result))
       result)))
 (compile 'make-quote-reader)
+(set-macro-character #\" (make-quote-reader (get-macro-character #\" nil))
+                     nil *xc-readtable*)
