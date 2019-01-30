@@ -19,13 +19,6 @@ set -e
 
 print_help="no"
 
-# The classic form here was to use --userinit $DEVNULL --sysinit
-# $DEVNULL, but that doesn't work on Win32 because SBCL doesn't handle
-# device names properly. We still need $DEVNULL to be NUL on Win32
-# because it's used elsewhere (such as canonicalize-whitespace), so we
-# need an alternate solution for the init file overrides. --no-foos
-# have now been available long enough that this should not stop anyone
-# from building.
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ]
 then
     SBCL_PREFIX="$PROGRAMFILES/sbcl"
@@ -250,13 +243,6 @@ echo "$SBCL_DYNAMIC_SPACE_SIZE" > output/dynamic-space-size.txt
 # whether the cross-compilation host returns suitable values from
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
 
-if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
-    DEVNULL=NUL
-else
-    DEVNULL=/dev/null
-fi
-export DEVNULL
-
 . ./find-gnumake.sh
 find_gnumake
 
@@ -266,7 +252,6 @@ find_gnumake
 # dependencies, write them out to a file to be sourced by other
 # scripts.
 
-echo "DEVNULL=\"$DEVNULL\"; export DEVNULL" > output/build-config
 echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
 echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
 echo "legacy_xc_spec=\"$legacy_xc_spec\"; export legacy_xc_spec" >> output/build-config
