@@ -12,7 +12,7 @@
              (return-from load-sbcl-file)))
     (restart-case
         (load file)
-      (abort ()
+      (abort-build ()
         :report "Abort building SBCL."
         (exit-sbcl 1)))
     (when exit (exit-sbcl 0))))
