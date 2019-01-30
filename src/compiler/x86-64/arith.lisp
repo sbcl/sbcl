@@ -2102,7 +2102,7 @@ constant shift greater than word length")))
 
 (in-package "SB-C")
 
-(defun *-transformer (y node)
+(defun *-transformer (y node fun)
   (cond
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
@@ -2110,7 +2110,7 @@ constant shift greater than word length")))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
      (delay-ir1-transform node :constraint)
-     `(%lea x x ,(1- y) 0))
+     `(,fun x x ,(1- y) 0))
     (t
      ;; A normal 64-bit multiplication takes 4 cycles on Athlon 64/Opteron.
      ;; Optimizing multiplications (other than the above cases) to
@@ -2128,14 +2128,14 @@ constant shift greater than word length")))
                  :important nil
                  :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node '%lea))
 (deftransform sb-vm::*-mod64
     ((x y) ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
      (unsigned-byte 64)
      :important nil
      :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node 'sb-vm::%lea-mod64))
 
 (deftransform * ((x y)
                  (fixnum (constant-arg (unsigned-byte 64)))
@@ -2143,11 +2143,11 @@ constant shift greater than word length")))
                  :important nil
                  :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node '%lea))
 (deftransform sb-vm::*-modfx
     ((x y) (fixnum (constant-arg (unsigned-byte 64)))
      fixnum
      :important nil
      :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node 'sb-vm::%lea-modfx))

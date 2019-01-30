@@ -1991,14 +1991,14 @@ constant shift greater than word length")))
               (t (incf count)))))
     (decompose-multiplication class width arg x n-bits condensed)))
 
-(defun *-transformer (class width y)
+(defun *-transformer (class width y &optional (fun '%lea))
   (cond
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
      (give-up-ir1-transform))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
-     `(%lea x x ,(1- y) 0))
+     `(,fun x x ,(1- y) 0))
     ((member :pentium4 *backend-subfeatures*)
      ;; the pentium4's multiply unit is reportedly very good
      (give-up-ir1-transform))
@@ -2020,7 +2020,7 @@ constant shift greater than word length")))
      (unsigned-byte 32))
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :unsigned 32 y)))
+    (*-transformer :unsigned 32 y 'sb-vm::%lea-mod32)))
 
 (deftransform * ((x y)
                  (fixnum (constant-arg (unsigned-byte 32)))
@@ -2033,7 +2033,8 @@ constant shift greater than word length")))
      fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :signed (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) y)))
+    (*-transformer :signed (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) y
+                   'sb-vm::%lea-modfx)))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.

@@ -2155,3 +2155,23 @@
     (unintern s)
     (import s 'keyword)
     (assert (not (sb-int:self-evaluating-p s)))))
+
+(with-test (:name :lea-modfx-constant-folding)
+  (checked-compile-and-assert
+      ()
+      '(lambda (c)
+        (if (if c
+                c
+                (if 444
+                    nil
+                    99))
+            11
+            (logand 3
+                    (logxor
+                     (* 5
+                        (if c
+                            0
+                            (ash most-positive-fixnum -2)))
+                     3))))
+    ((t) 11)
+    ((nil) 0)))
