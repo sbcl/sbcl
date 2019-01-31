@@ -2175,3 +2175,47 @@
                      3))))
     ((t) 11)
     ((nil) 0)))
+
+(with-test (:name :setup-environment-tn-conflicts)
+  (checked-compile-and-assert
+      ()
+      '(lambda (z)
+        (let ((c 0))
+          (flet ((bar ()
+                   (let ((m (eval :bad)))
+                     (eval m)
+                     (and m c))))
+            (declare (notinline bar))
+            (cond (z
+                   (setf c 10)
+                   (bar))
+                  (44)))))
+    ((t) 10)
+    ((nil) 44)))
+
+(with-test (:name :setup-environment-tn-conflicts.2)
+  (checked-compile-and-assert
+      ()
+      '(lambda (z)
+        (let ((c 0)
+              (b 0)
+              (a 0)
+              (d 0))
+          (labels ((bar ()
+                     (let ((m (eval :bad)))
+                       (eval m)
+                       (if m
+                           (values a b c d))))
+                   (jam ()
+                     (multiple-value-list (bar))))
+            (declare (notinline bar
+                                jam))
+            (cond (z
+                   (setf a 10
+                         c 10
+                         b 10
+                         d 10)
+                   (jam))
+                  (44)))))
+    ((t) '(10 10 10 10) :test #'equal)
+    ((nil) 44)))
