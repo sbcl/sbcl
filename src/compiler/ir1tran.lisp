@@ -892,7 +892,7 @@
                    ;; system to work through them, and this code does so, by
                    ;; crudely suppressing all warnings in cross-compilation
                    ;; macroexpansion. -- WHN 19990412
-                   #+(and sb-xc-host (host-feature cmu))
+                   #+host-quirks-cmu
                    (warning (lambda (c)
                               (compiler-notify
                                "~@<~A~:@_~

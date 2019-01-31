@@ -372,7 +372,7 @@
   ;; that function says that it can't be inlined due to reasons.
   ;; In make-host-2 everything is fine, because of DEF!STRUCT magic.
   ;; And finally, we are prevented from writing "#+sbcl" here, for reasons.
-  #+(host-feature sbcl) (declare (notinline dd-slots)) ; forward reference
+  #+host-quirks-sbcl (declare (notinline dd-slots)) ; forward reference
   (dsd-index (find slot-name
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))

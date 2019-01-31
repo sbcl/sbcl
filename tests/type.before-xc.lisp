@@ -376,7 +376,7 @@
 ;; but it should also be EQ to (MEMBER NIL T)
 (assert (eq (specifier-type '(member nil t)) (specifier-type 'boolean)))
 
-#+(and x86-64 (host-feature ecl))
+#+x86-64
 (progn
   (assert (= (sb-vm::immediate-constant-sc #c(0.0f0 0.0f0))
              sb-vm::fp-complex-single-zero-sc-number))

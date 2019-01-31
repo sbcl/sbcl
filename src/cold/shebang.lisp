@@ -81,6 +81,8 @@
     (check 1 (with-open-file (f *feature-eval-results-file*) (read f)))
     (check 2 *feature-evaluation-results*)))
 
+;;; We should never call this with a selector of :HOST any more,
+;;; but I'm keeping it in case of emergency.
 (defun feature-in-list-p (feature selector
                           &aux (list (ecase selector
                                        (:host cl:*features*)
@@ -97,13 +99,11 @@
               (:and (every #'subfeature-in-list-p (rest feature)))
               (:not (destructuring-bind (subexpr) (cdr feature)
                       (not (subfeature-in-list-p subexpr))))
-              ((:host-feature :vop-named :vop-translates)
+              ((:vop-named :vop-translates)
                (when (eq selector :host)
                  (error "Invalid host feature test: ~S" feature))
                (destructuring-bind (subexpr) (cdr feature)
                  (case (first feature)
-                   (:host-feature
-                    (feature-in-list-p subexpr :host))
                    (:vop-named
                     (recording-feature-eval feature
                                       (any-vop-named-p subexpr)))

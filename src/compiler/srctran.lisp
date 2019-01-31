@@ -1511,7 +1511,7 @@
   ;; CMU CL blows up on (ASH 1000000000 -100000000000) (i.e. ASH of
   ;; two bignums yielding zero) and it's hard to avoid that
   ;; calculation in here.
-  #+(and sb-xc-host (host-feature cmu))
+  #+host-quirks-cmu
   (when (and (or (typep (numeric-type-low n-type) 'bignum)
                  (typep (numeric-type-high n-type) 'bignum))
              (or (typep (numeric-type-low shift) 'bignum)

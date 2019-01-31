@@ -428,8 +428,7 @@
   ;; the INFO slot as :type (or (satisfies ir2-component-p) ...)
   ;; During make-host-2, the solution to this is the same hack
   ;; as for everything else: use DEF!STRUCT for IR2-COMPONENT.
-  #+(and sb-xc-host (host-feature sbcl))
-  (declare (host-sb-ext:muffle-conditions style-warning))
+  #+host-quirks-sbcl (declare (host-sb-ext:muffle-conditions style-warning))
 (def!struct (component (:copier nil)
                        (:constructor
                         make-component

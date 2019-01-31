@@ -592,17 +592,16 @@
     (pathname obj)))
 (compile 'compile-stem)
 
+(defparameter *host-quirks*
+  (or #+cmu  '(:host-quirks-cmu :no-ansi-print-object)
+      #+ecl  '(:host-quirks-ecl)
+      #+sbcl '(:host-quirks-sbcl))) ; not so much a "quirk", but consistent anyway
+
 ;;; Execute function FN in an environment appropriate for compiling the
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
-  (let ((sb-xc:*features*
-         ;; Copy the quite-probably-obsolete :NO-ANSI-PRINT-OBJECT feature
-         ;; into the target features (it was potentially added by 'ansify')
-         ;; into the host features.
-         (if (member :no-ansi-print-object cl:*features*)
-             (list* :no-ansi-print-object :sb-xc-host sb-xc:*features*)
-             (cons :sb-xc-host sb-xc:*features*)))
+  (let ((sb-xc:*features* (append '(:sb-xc-host) *host-quirks* sb-xc:*features*))
         (*readtable* *xc-readtable*))
     (funcall fn)))
 (compile 'in-host-compilation-mode)

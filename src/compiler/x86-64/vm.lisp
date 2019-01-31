@@ -397,7 +397,7 @@
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   ;; compiled TYPEP on ECL is wrong. See example in cross-typep.
-  #+(and sb-xc-host (host-feature ecl)) (declare (notinline typep))
+  #+host-quirks-ecl (declare (notinline typep))
   (typecase value
     ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          character)

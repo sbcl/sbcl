@@ -14,7 +14,7 @@
 (define-condition cross-type-warning (warning)
   ((call :initarg :call :reader cross-type-warning-call)
    (message :reader cross-type-warning-message
-            #+(host-feature cmu) :initarg #+(host-feature cmu) :message ; (to stop bogus non-STYLE WARNING)
+            #+host-quirks-cmu :initarg #+host-quirks-cmu :message ; (to stop bogus non-STYLE WARNING)
             ))
   (:report (lambda (c s)
              (format
@@ -27,7 +27,7 @@
 ;;; during cross-compilation.
 (define-condition cross-type-giving-up (cross-type-warning)
   ((message :initform "giving up conservatively"
-            #+(host-feature cmu) :reader #+(host-feature cmu) #.(gensym) ; (to stop bogus non-STYLE WARNING)
+            #+host-quirks-cmu :reader #+host-quirks-cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
             )))
 
 ;;; This warning refers to the flexibility in the ANSI spec with
@@ -79,7 +79,7 @@
   ;; compiled TYPEP on ECL is wrong. See example at bottom of this file.
   ;; Of course, it's abstraction-breaking to suppose that TYPECASE
   ;; directly utilizes TYPEP, but naturally it does.
-  #+(and sb-xc-host (host-feature ecl)) (declare (notinline typep))
+  #+host-quirks-ecl (declare (notinline typep))
   (aver (memq fmt '(single-float double-float rational)))
   (and (complexp num)
        (let ((yesp (eq (etypecase (realpart num)

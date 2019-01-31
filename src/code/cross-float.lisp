@@ -96,8 +96,7 @@
                   (-1 (cl:dpb unsigned-result (cl:byte 31 0) -1)))))
 
           ;; Check SIGNED-RESULT against the authoritative answer if we can
-          #+(host-feature sbcl)
-          (assert (= (host-sb-kernel:single-float-bits x) signed-result))
+          #+host-quirks-sbcl (assert (= (host-sb-kernel:single-float-bits x) signed-result))
 
           signed-result))))
 
@@ -154,7 +153,7 @@
                   (-1 (cl:dpb unsigned-result (cl:byte 63 0) -1)))))
 
           ;; Check SIGNED-RESULT against the authoritative answer if we can
-          #+(host-feature sbcl)
+          #+host-quirks-sbcl
           (assert (= (logior (ash (host-sb-kernel:double-float-high-bits x) 32)
                              (host-sb-kernel:double-float-low-bits x))
                      signed-result))
