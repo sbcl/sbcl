@@ -396,6 +396,8 @@
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
+  ;; compiled TYPEP on ECL is wrong. See example in cross-typep.
+  #+(and sb-xc-host (host-feature ecl)) (declare (notinline typep))
   (typecase value
     ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          character)

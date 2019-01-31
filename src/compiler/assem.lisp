@@ -1552,6 +1552,8 @@
     (trace-inst s :align bits)
     (emit s `(.align ,bits ,pattern))))
 
+;; ECL bug workaround: it miscompiles LABEL-POSITION with this decl
+#-(and (host-feature ecl) sb-xc-host)
 (declaim (ftype (sfunction (label &optional t index) (or null index))
                 label-position))
 (defun label-position (label &optional if-after delta)

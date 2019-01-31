@@ -424,9 +424,17 @@
         (let* ((binding (cdr rendering))
                (vars (car binding))
                (vals (cdr binding)))
-          (if (listp vars)
-              (mapc (lambda (var val) (push `(,var ,val) bindings)) vars vals)
-              (push `(,vars ,vals) bindings)))))))
+          ;; We can end up here with VARS = NIL, and VALS = an atom.
+          ;; As the spec says, MAPC "should be prepared to signal an error
+          ;; ... if any list is not a proper list"
+          ;; We don't err in that situation because we check for ENDP of the
+          ;; lists from left to right. However, at least one implementation
+          ;; does rigorously use ENDP on both lists on each iteration.
+          (cond ((not vars))
+                ((listp vars)
+                 (mapc (lambda (var val) (push `(,var ,val) bindings)) vars vals))
+                (t
+                 (push `(,vars ,vals) bindings))))))))
 
 ;;; Return the form(s) that should be evaluated to render ARG in the chosen
 ;;; RENDERING style, which is one of :RAW, :SIGN-EXTENDED,

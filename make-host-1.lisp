@@ -65,6 +65,12 @@
 (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
   (funcall s))
 
+;;; I don't know the best combination of OPTIMIZE qualities to produce a correct
+;;; and reasonably fast cross-compiler in ECL. At over half an hour to complete
+;;; each test run, I don't really want to waste any more time finding out.
+;;; These settings work, while the defaults do not.
+#+ecl (proclaim '(optimize (safety 2) (debug 2)))
+
 (maybe-with-compilation-unit
  (let ((*feature-evaluation-results* nil))
   (load-or-cload-xcompiler #'host-cload-stem)

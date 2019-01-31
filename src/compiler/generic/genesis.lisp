@@ -840,6 +840,8 @@ core and return a descriptor to it."
 
 ;;; Copy the given number to the core.
 (defun number-to-core (number)
+  ;; compiled TYPEP on ECL is wrong. See example in cross-typep.
+  #+(and sb-xc-host (host-feature ecl)) (declare (notinline typep))
   (typecase number
     (integer (or (%fixnum-descriptor-if-possible number)
                  (bignum-to-core number)))
@@ -1745,7 +1747,8 @@ core and return a descriptor to it."
                        (find-layout 'package)
                        :%shadowing-symbols (list-to-core
                                             (mapcar 'cold-intern shadow))))
-        (unless (member pkg-name '("COMMON-LISP" "KEYWORD") :test 'string=)
+        (unless (member pkg-name '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
+                        :test 'string=)
           (let ((host-pkg (find-package pkg-name))
                 (sb-xc-pkg (find-package "SB-XC"))
                 syms)

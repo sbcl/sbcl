@@ -76,6 +76,10 @@
              (sb-c::ir1-attributep (sb-c::fun-info-attributes it) sb-c:foldable)))))
 
 (defun complex-num-fmt-match-p (num fmt)
+  ;; compiled TYPEP on ECL is wrong. See example at bottom of this file.
+  ;; Of course, it's abstraction-breaking to suppose that TYPECASE
+  ;; directly utilizes TYPEP, but naturally it does.
+  #+(and sb-xc-host (host-feature ecl)) (declare (notinline typep))
   (aver (memq fmt '(single-float double-float rational)))
   (and (complexp num)
        (let ((yesp (eq (etypecase (realpart num)
@@ -399,3 +403,27 @@
 
 (defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
   (bug "CLASS-HAS-A-FORWARD-REFERENCED-SUPERCLASS-P reached: ~S" x))
+
+#|
+ECL compiler strangeness:
+
+(defun foo-sd (x) ; test for single- then double-float
+  (typecase x
+    ((complex single-float) 'csf)
+    ((complex double-float) 'cdf)))
+
+(defun foo-ds (x) ; test for double- then single-float
+  (typecase x
+    ((complex double-float) 'cdf)
+    ((complex single-float) 'csf)))
+
+(defun try-both ()
+  ;; This test proves that whatever complex type is tried first wins when compiled,
+  ;; but when interpreted it gives what we would call the right answer.
+  (list (foo-sd #c(0.0s0 0.0s0)) (foo-sd #c(0.0d0 0.0d0))
+        (foo-ds #c(0.0s0 0.0s0)) (foo-ds #c(0.0d0 0.0d0))))
+
+(try-both) => (CSF CDF CSF CDF)
+(progn (compile 'foo-sd) (compile 'foo-ds))
+(try-both) => (CSF CSF CDF CDF)
+|#
