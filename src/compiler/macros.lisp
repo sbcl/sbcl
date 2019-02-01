@@ -699,13 +699,14 @@
 ;;; event happens.
 (defmacro defevent (name description &optional (level 0))
   (let ((var-name (symbolicate "*" name "-EVENT-INFO*")))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (define-load-time-global ,var-name
+    `(progn
+       (defglobal ,var-name
          (make-event-info :name ',name
                           :description ',description
                           :var ',var-name
                           :level ,level))
-       (setf (gethash ',name *event-info*) ,var-name)
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (setf (gethash ',name *event-info*) ,var-name))
        ',name)))
 
 ;;; the lowest level of event that will print a note when it occurs

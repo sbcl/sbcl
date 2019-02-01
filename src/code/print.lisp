@@ -480,18 +480,15 @@ variable: an unreadable object representing the error is printed instead.")
 (defconstant slash-attribute            (ash 1 7)) ; /
 (defconstant funny-attribute            (ash 1 8)) ; Anything illegal.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-
 ;;; LETTER-ATTRIBUTE is a local of SYMBOL-QUOTEP. It matches letters
 ;;; that don't need to be escaped (according to READTABLE-CASE.)
-(defglobal *attribute-names*
-  `((number . number-attribute) (lowercase . lowercase-attribute)
+(defconstant-eqx +attribute-names+
+  '((number . number-attribute) (lowercase . lowercase-attribute)
     (uppercase . uppercase-attribute) (letter . letter-attribute)
     (sign . sign-attribute) (extension . extension-attribute)
     (dot . dot-attribute) (slash . slash-attribute)
-    (other . other-attribute) (funny . funny-attribute)))
-
-) ; EVAL-WHEN
+    (other . other-attribute) (funny . funny-attribute))
+  #'equal)
 
 ;;; For each character, the value of the corresponding element is the
 ;;; lowest base in which that character is a digit.
@@ -571,7 +568,7 @@ variable: an unreadable object representing the error is printed instead.")
                              (logior ,@(mapcar
                                         (lambda (x)
                                           (or (cdr (assoc x
-                                                          *attribute-names*))
+                                                          +attribute-names+))
                                               (error "Blast!")))
                                         attributes))
                              bits)))))

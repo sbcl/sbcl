@@ -31,7 +31,6 @@
 (in-package "SB-DI")
 (defsetf stack-ref %set-stack-ref)
 (defsetf debug-var-value %set-debug-var-value)
-(defsetf debug-var-value %set-debug-var-value)
 (defsetf breakpoint-info %set-breakpoint-info)
 
 ;;; from bignum.lisp

@@ -619,7 +619,7 @@
                                        :l ,l
                                        ,@(and nds
                                               `(:vvvv src))))))
-                (define-instruction ,name (segment dst src &optional ,@(if nds '(src2)))
+                (define-instruction ,name (segment dst src ,@(if nds '(&optional src2)))
                   ,@(when opcode-from
                       (avx2-inst-printer-list 'ymm-ymm/mem prefix opcode-from
                                               :opcode-prefix opcode-prefix
