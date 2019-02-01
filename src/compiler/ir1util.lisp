@@ -3007,6 +3007,16 @@ is :ANY, the function name is not checked."
                 (pop turtle))))
       (null x)))
 
+(defun map-lambda-callers (function lambda)
+  (dolist (ref (leaf-refs lambda))
+    (let* ((lvar (node-lvar ref))
+           (combination (and lvar
+                             (lvar-dest lvar))))
+      (when (and (combination-p combination)
+                 (eq (combination-kind combination) :local)
+                 (eq (combination-fun combination) lvar))
+        (funcall function (node-home-lambda combination))))))
+
 (defun map-lambda-var-refs-from-calls (function lambda-var)
   (when (not (lambda-var-sets lambda-var))
     (let* ((home (lambda-var-home lambda-var))
