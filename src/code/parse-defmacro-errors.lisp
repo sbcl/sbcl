@@ -35,7 +35,7 @@
   (declare (type stream stream) (type function fun))
   (pprint-logical-block (stream nil)
     (format stream
-            "error while parsing arguments to ~A~@[ ~S~]:~2I~:@_"
+            "Error while parsing arguments to~@[ ~A~]~@[ ~S~]:~2I~:@_"
             (defmacro-lambda-list-bind-error-kind condition)
             (defmacro-lambda-list-bind-error-name condition))
     (pprint-logical-block (stream nil)
