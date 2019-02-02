@@ -85,6 +85,6 @@ echo //checking for leftover cold-init symbols
                    "STRING-LESS-GREATER-EQUAL-TESTS")))
          (format t "~&Leftover from [disabled?] tree-shaker:~%~S~%" sb-int:it))
         (format t "Found ~D fdefns named by uninterned symbols:~%~S~%" (length l2) l2))
-    (abort ()
+    (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1)))' --quit

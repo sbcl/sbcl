@@ -319,7 +319,7 @@
   (restart-case (let ((sb-c::*source-namestring*
                        (format nil "SYS:~A" (substitute #\; #\/ file))))
                   (load file))
-    (abort ()
+    (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1))))
 
