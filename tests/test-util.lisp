@@ -48,7 +48,7 @@
         r))
   #+win32
   (let ((r (sb-alien:alien-funcall
-            (sb-alien:extern-alien "putenv" (function sb-alien:int (sb-alien:c-string :not-null t)))
+            (sb-alien:extern-alien "_putenv" (function sb-alien:int (sb-alien:c-string :not-null t)))
                           (format nil "~A=~A" name value))))
     (if (minusp r)
         (error "putenv: ~a" (sb-int:strerror)) 
