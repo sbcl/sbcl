@@ -101,6 +101,7 @@
          (position t b))
     ((#*101010) nil)))
 
+#-win32 (require :sb-posix)
 ;;; BIT-POSITION would access 1 word beyond a bit-vector's final word
 ;;; which could crash if the next page of memory was not readable. To
 ;;; produce such a sitution, mmap two pages the second one read

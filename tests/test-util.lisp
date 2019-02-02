@@ -36,11 +36,26 @@
 (defvar *threads-to-kill*)
 (defvar *threads-to-join*)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (require :sb-posix))
+(defun setenv (name value)
+  #-win32
+  (let ((r (sb-alien:alien-funcall
+            (sb-alien:extern-alien
+             "setenv" (function sb-alien:int (sb-alien:c-string :not-null t)
+                                (sb-alien:c-string :not-null t) sb-alien:int))
+                          name value 1)))
+    (if (minusp r)
+        (error "setenv: ~a" (sb-int:strerror))
+        r))
+  #+win32
+  (let ((r (sb-alien:alien-funcall
+            (sb-alien:extern-alien "putenv" (function sb-alien:int (sb-alien:c-string :not-null t)))
+                          (format nil "~A=~A" name value))))
+    (if (minusp r)
+        (error "putenv: ~a" (sb-int:strerror)) 
+        r)))
 
-(sb-posix:putenv (format nil "SBCL_MACHINE_TYPE=~A" (machine-type)))
-(sb-posix:putenv (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type)))
+(setenv "SBCL_MACHINE_TYPE" (machine-type))
+(setenv "SBCL_SOFTWARE_TYPE" (software-type))
 
 
 ;;; Type tools

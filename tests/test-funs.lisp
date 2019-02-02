@@ -48,9 +48,8 @@
 (defun sh-test (file)
   (clear-test-status)
   (progn
-    (sb-posix:setenv "TEST_SBCL_EVALUATOR_MODE"
-                     (string-downcase *test-evaluator-mode*)
-                     1)
+    (test-util::setenv "TEST_SBCL_EVALUATOR_MODE"
+                        (string-downcase *test-evaluator-mode*))
     (let ((process (sb-ext:run-program "/bin/sh"
                                        (list (native-namestring file))
                                        :output *error-output*)))
