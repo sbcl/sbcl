@@ -67,7 +67,7 @@
 
 ;;; I don't know the best combination of OPTIMIZE qualities to produce a correct
 ;;; and reasonably fast cross-compiler in ECL. At over half an hour to complete
-;;; each test run, I don't really want to waste any more time finding out.
+;;; make-host-{1,2}, I don't really want to waste any more time finding out.
 ;;; These settings work, while the defaults do not.
 #+ecl (proclaim '(optimize (safety 2) (debug 2)))
 

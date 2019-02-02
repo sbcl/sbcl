@@ -40,7 +40,7 @@
                      ~:@_  (\"alien_name\" LISP-NAME)~
                      ~:@_  FOO-BAR                - equivalent to (\"foo_bar\" FOO-BAR)~
                      ~:@_  \"foo_bar\"              - equivalent to (\"foo_bar\" FOO-BAR)~:@>")))
-      (etypecase name
+      (typecase name
        (string
         (values (guess-lisp-name-from-alien-name name)
                 (coerce name 'simple-string)))
