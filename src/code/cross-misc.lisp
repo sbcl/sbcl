@@ -219,9 +219,59 @@
   (assert (null rest))
   (compile nil lambda))
 
+(defun sb-impl::%defun (name lambda &optional inline-expansion)
+  (declare (ignore inline-expansion))
+  (proclaim `(ftype function ,name))
+  (setf (fdefinition name) (eval lambda)))
+
+(defun %svset (vector index val) ; stemming from toplevel (SETF SVREF)
+  (setf (aref vector index) val))
+(defun %puthash (key table val) ; stemming from toplevel (SETF GETHASH)
+  (setf (gethash key table) val))
+
+;;; The compiler calls this with forms in EVAL-WHEN (:COMPILE-TOPLEVEL) situations.
+;;; Since we've already performed macroexpansion using our macros, we can either
+;;; implement target-compatible functions for all things into which we might expand,
+;;; or we can un-macro-expand the form.  This does a little of both,
+;;; mainly for the sake of showing that it's quite easily done.
+;;; Truth be told I'd have preferred to use the anti-expansion technique consistently,
+;;; however occasionally we see things like (LET ((V FROB)) (%SVSET *THING* X V))
+;;; which means that the host is going to do the LET and the call %SVSET.
 (defun eval-tlf (form index &optional lexenv)
   (declare (ignore index lexenv))
-  (eval form))
+  (flet ((matchp (template form &aux results)
+           (if (named-let recurse ((form form) (template template))
+                 (typecase template
+                   (null (null form))
+                   ((eql ?) (push form results) t) ; match and store anything
+                   ((eql :ignore) t) ; match anything and disregard
+                   (cons (and (consp form)
+                              (and (recurse (car form) (car template))
+                                   (recurse (cdr form) (cdr template)))))
+                   (t (eql template form)))) ; match template exactly
+               (nreverse results)
+               (error "Pattern match failure: ~S~% ~S~%" template form))))
+    (named-let recurse ((form form))
+      (case (car form)
+       (progn (mapc #'recurse (cdr form))) ; compiler doesn't care about return value
+       (t
+        (eval
+         (case (car form)
+           (sb-impl::%defglobal
+            (destructuring-bind (symbol value)
+                (matchp '((quote ?) (if (%boundp :ignore) :ignore ?)) (cdr form))
+              `(defvar ,symbol ,value)))
+           (sb-impl::%defparameter
+            (destructuring-bind (symbol value)
+                (matchp '((quote ?) ? :ignore) (cdr form))
+              `(defparameter ,symbol ,value)))
+           (sb-impl::%defvar
+            (destructuring-bind (symbol value) ; always occurs with a value
+                (matchp '((quote ?) (source-location) (unless (%boundp :ignore) ?))
+                        (cdr form))
+              `(defvar ,symbol ,value)))
+           (t
+            form))))))))
 
 (defmacro sb-format:tokens (string) string)
 

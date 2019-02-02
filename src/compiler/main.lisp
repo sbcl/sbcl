@@ -1483,7 +1483,13 @@ necessary, since type inference may take arbitrarily long to converge.")
         ((progn)
          (process-toplevel-progn (rest form) path compile-time-too))
         (t
-         (flet ((process-nonmacro (form)
+         (let ((*top-level-form-noted* (note-top-level-form form))
+               (expanded (preprocessor-macroexpand-1 form)))
+           (cond ((neq expanded form) ; macro -> take it from the top
+                  (process-toplevel-form expanded path compile-time-too))
+                 (t
+                  (when compile-time-too
+                    (eval-compile-toplevel (list form) path))
                   (cond ((deferrable-tlf-p form)
                          (push (vector *source-paths* *policy* *handled-conditions*
                                        *disabled-package-locks* *lexenv* form path)
@@ -1493,74 +1499,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                                     (not (whitelisted-load-time-form-p form)))
                            (process-queued-tlfs))
                          (let (*top-level-form-p*)
-                           (convert-and-maybe-compile form path))))))
-           (let ((*top-level-form-noted* (note-top-level-form form)))
-             #+sb-xc-host
-             (cond
-               ((atom form)
-                ;; assert that we don't, in our own code, use a DEFINE-SYMBOL-MACRO
-                ;; expanding into (PROGN (EVAL-WHEN (:COMPILE-TOPLEVEL ...) ...))
-                ;; or something equally whacky, if not more so, than that.
-                (aver (self-evaluating-p form)))
-               (t
-                ;; When we're cross-compiling, consider: what should we
-                ;; do when we hit e.g.
-                ;;   (EVAL-WHEN (:COMPILE-TOPLEVEL)
-                ;;     (DEFUN FOO (X) (+ 7 X)))?
-                ;; DEFUN has a macro definition in the cross/target-compiler,
-                ;; and a different macro definition in the host compiler.
-                ;; The only sensible thing is to use the host's macro, since the
-                ;; cross-compiler's macro is in general into target functions
-                ;; which can't meaningfully be executed by the host.
-                ;; So make sure we do the EVAL here, before we macroexpand.
-                ;;
-                ;; Then things get even dicier with something like
-                ;;   (DEFCONSTANT-EQX SB-XC:LAMBDA-LIST-KEYWORDS ..)
-                ;; where we have to make sure that we don't uncross
-                ;; the SB-XC: prefix before we do EVAL, because otherwise
-                ;; we'd be trying to redefine the cross-compilation host's
-                ;; constants.
-                ;;
-                ;; (Isn't it fun to cross-compile Common Lisp?:-)
-                (when compile-time-too
-                  (when (and (queued-tlfs)
-                             (not (whitelisted-compile-time-form-p form)))
-                    (process-queued-tlfs))
-                  (let ((*compile-time-eval* t))
-                    (eval form))) ; letting xc host EVAL do its own macroexpansion
-                (let* (;; (We uncross the operator name because things
-                       ;; like SB-XC:DEFCONSTANT and SB-XC:DEFTYPE
-                       ;; should be equivalent to their CL: counterparts
-                       ;; when being compiled as target code. We leave
-                       ;; the rest of the form intact because macros
-                       ;; might yet expand into EVAL-WHEN stuff, and
-                       ;; things inside EVAL-WHEN can't be uncrossed
-                       ;; until after we've EVALed them in the
-                       ;; cross-compilation host.)
-                       (slightly-uncrossed
-                        (cons (uncross (first form)) (rest form)))
-                       (expanded
-                        (preprocessor-macroexpand-1 slightly-uncrossed)))
-                  (if (neq expanded slightly-uncrossed) ; macro
-                      ;; (We have to demote COMPILE-TIME-TOO to NIL
-                      ;; here, no matter what it was before, since
-                      ;; otherwise we'd tend to EVAL subforms more than
-                      ;; once, because of WHEN COMPILE-TIME-TOO form
-                      ;; above.)
-                      (process-toplevel-form expanded path nil)
-                      (process-nonmacro slightly-uncrossed)))))
-             ;; When we're not cross-compiling, we only need to
-             ;; macroexpand once, so we can follow the 1-thru-6
-             ;; sequence of steps in ANSI's "3.2.3.1 Processing of
-             ;; Top Level Forms".
-             #-sb-xc-host
-             (let ((expanded (preprocessor-macroexpand-1 form)))
-               (cond ((neq expanded form) ; macro -> take it from the top
-                      (process-toplevel-form expanded path compile-time-too))
-                     (t
-                      (when compile-time-too
-                        (eval-compile-toplevel (list form) path))
-                      (process-nonmacro form))))))))))
+                           (convert-and-maybe-compile form path)))))))))))
 
   (values))
 

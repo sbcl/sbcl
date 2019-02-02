@@ -13,8 +13,15 @@
 
 ;;;; types
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (deftype bit-offset () '(integer 0 (#.sb-vm:n-word-bits))))
+(eval-when (:compile-toplevel)
+  ;; This DEFTYPE must be macroexpanded directly by the host, as it is referenced by
+  ;; a defun that is also within an eval-when. Writing the eval-when situations as
+  ;; (:COMPILE-TOPLEVEL :LOAD-TOPLEVEL) isn't good enough, because that expands only
+  ;; by the cross-compiler. In reality this type isn't technically helpful to have,
+  ;; because both its uses are in an LDB expression whose type is trivially derivable.
+  ;; However I'm keeping it as a minimal example of a tricky cross-compilation issue.
+  (deftype bit-offset () `(integer 0 (,sb-vm:n-word-bits))))
+(deftype bit-offset () `(integer 0 (,sb-vm:n-word-bits)))
 
 ;;;; support routines
 
