@@ -101,7 +101,7 @@
   '(let ((bits (logand (single-float-bits x) #.(1- (ash 1 32)))))
      (logxor 66194023
              (sxhash (the fixnum
-                          (logand most-positive-fixnum
+                          (logand sb-xc:most-positive-fixnum
                                   (logxor bits
                                           (ash bits -7))))))))
 #-64-bit
@@ -111,7 +111,7 @@
           (hilo (logxor hi lo)))
      (logxor 475038542
              (sxhash (the fixnum
-                          (logand most-positive-fixnum
+                          (logand sb-xc:most-positive-fixnum
                                   (logxor hilo
                                           (ash hilo -7))))))))
 
@@ -152,7 +152,7 @@
                   (mixf result
                         ,(ecase sb-c:*backend-byte-order*
                                 (:little-endian
-                                 '(logand num most-positive-fixnum))
+                                 '(logand num sb-xc:most-positive-fixnum))
                                 ;; FIXME: I'm not certain that
                                 ;; N-LOWTAG-BITS is the clearest way of
                                 ;; expressing this: it's essentially the

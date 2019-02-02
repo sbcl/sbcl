@@ -584,7 +584,7 @@
                                               (lvar-value bound))
                                              ((and (integer-type-p bound-type)
                                                    (nth-value 1 (integer-type-numeric-bounds bound-type))))
-                                             (array-dimension-limit))))))
+                                             (sb-xc:array-dimension-limit))))))
          (index-type (lvar-type index)))
     (when (eq (type-intersection bound-type index-type)
               *empty-type*)

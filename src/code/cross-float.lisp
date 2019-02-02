@@ -237,3 +237,17 @@
 (defun float-nan-p (x)
   (declare (ignore x))
   (error "Can't call FLOAT-NAN-P"))
+
+;;; These constants are a temporary compromise among several goals.
+;;; We have always used the host's floating-point constants either by design
+;;; or out laziness. At the same time, we have kludges that attempt to selectively
+;;; prevent inadvertent use of CL: symbols, while allowing these. At a bare minimum,
+;;; we need to strengthen the test for mistaken CL: symbol usage, and NEVER allow it.
+;;; We can nonetheless borrow the host's values, which is bad, but less bad.
+;;; At some point I plan to change the compiler to model target floating-point numbers
+;;; using defstruct. That code may or may not lean on the host for actual computation.
+;;; i.e. If nothing else, we can fix the problem of using reflection.
+(defconstant sb-xc:most-negative-single-float cl:most-negative-single-float)
+(defconstant sb-xc:most-positive-single-float cl:most-positive-single-float)
+(defconstant sb-xc:most-negative-double-float cl:most-negative-double-float)
+(defconstant sb-xc:most-positive-double-float cl:most-positive-double-float)

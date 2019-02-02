@@ -181,7 +181,7 @@
     (prin1 name stream)
     (do ((index 0 (1+ index))
          (limit (or (and (not *print-readably*) *print-length*)
-                    most-positive-fixnum))
+                    sb-xc:most-positive-fixnum))
          (remaining-slots (dd-slots dd) (cdr remaining-slots)))
         ((or (null remaining-slots) (>= index limit))
          (write-string (if remaining-slots " ...)" ")") stream))

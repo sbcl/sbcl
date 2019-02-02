@@ -507,7 +507,7 @@
      (case (let ((name (lvar-fun-name (combination-fun thing))))
              (or (modular-version-info name :untagged nil) name))
        ((+ -)
-        (let ((min most-positive-fixnum)
+        (let ((min sb-xc:most-positive-fixnum)
               (itype (specifier-type 'integer)))
           (dolist (arg (combination-args thing) min)
             (if (csubtypep (lvar-type arg) itype)
@@ -534,7 +534,7 @@
         0)))
     (integer
      (if (zerop thing)
-         most-positive-fixnum
+         sb-xc:most-positive-fixnum
          (do ((result 0 (1+ result))
               (num thing (ash num -1)))
              ((logbitp 0 num) result))))

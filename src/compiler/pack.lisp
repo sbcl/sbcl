@@ -1570,7 +1570,7 @@
       (walk-tn-refs (tn-reads tn))
       (walk-tn-refs (tn-writes tn))
       (if (eql path t)
-          most-positive-fixnum
+          sb-xc:most-positive-fixnum
           (length path)))))
 
 (declaim (type (member :iterative :greedy :adaptive)

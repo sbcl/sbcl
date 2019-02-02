@@ -1186,7 +1186,7 @@ of specialized arrays is supported."
   (let* ((old-length (length vector))
          (min-extension (or min-extension
                             (min old-length
-                                 (- array-dimension-limit old-length))))
+                                 (- sb-xc:array-dimension-limit old-length))))
          (new-length (the index (+ old-length
                                    (max 1 min-extension))))
          (fill-pointer (1+ old-length)))

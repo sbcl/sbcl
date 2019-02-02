@@ -456,7 +456,7 @@
 
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)
-      (<= most-negative-double-float x most-positive-double-float)))
+      (<= sb-xc:most-negative-double-float x sb-xc:most-positive-double-float)))
 
 (defun safe-single-coercion-p (x)
   (or (typep x 'single-float)
@@ -490,7 +490,7 @@
        #+x86
        (not (typep x `(or (integer * (,most-negative-exactly-single-float-fixnum))
                           (integer (,most-positive-exactly-single-float-fixnum) *))))
-       (<= most-negative-single-float x most-positive-single-float))))
+       (<= sb-xc:most-negative-single-float x sb-xc:most-positive-single-float))))
 
 ;;; Apply a binary operator OP to two bounds X and Y. The result is
 ;;; NIL if either is NIL. Otherwise bound is computed and the result
@@ -571,11 +571,11 @@
            xbound
            (list xbound))))
     ((subtypep type 'double-float)
-     (if (<= most-negative-double-float val most-positive-double-float)
+     (if (<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
          (coerce val type)))
     ((or (subtypep type 'single-float) (subtypep type 'float))
      ;; coerce to float returns a single-float
-     (if (<= most-negative-single-float val most-positive-single-float)
+     (if (<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
          (coerce val type)))
     (t (coerce val type))))
 
@@ -588,16 +588,16 @@
               (list xbound)))
         (cond
           ((subtypep type 'double-float)
-           (if (<= most-negative-double-float val most-positive-double-float)
+           (if (<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
                (coerce val type)
-               (if (< val most-negative-double-float)
-                   most-negative-double-float most-positive-double-float)))
+               (if (< val sb-xc:most-negative-double-float)
+                   sb-xc:most-negative-double-float sb-xc:most-positive-double-float)))
           ((or (subtypep type 'single-float) (subtypep type 'float))
            ;; coerce to float returns a single-float
-           (if (<= most-negative-single-float val most-positive-single-float)
+           (if (<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
                (coerce val type)
-               (if (< val most-negative-single-float)
-                   most-negative-single-float most-positive-single-float)))
+               (if (< val sb-xc:most-negative-single-float)
+                   sb-xc:most-negative-single-float sb-xc:most-positive-single-float)))
           (t (coerce val type))))))
 
 ;;; Convert a numeric-type object to an interval object.

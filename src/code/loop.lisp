@@ -177,7 +177,7 @@ constructed.
 (defconstant-eqx +loop-minimax-type-infinities-alist+
   ;; FIXME: Now that SBCL supports floating point infinities again, we
   ;; should have floating point infinities here, as cmucl-2.4.8 did.
-  '((fixnum most-positive-fixnum most-negative-fixnum))
+  '((fixnum sb-xc:most-positive-fixnum sb-xc:most-negative-fixnum))
   #'equal)
 
 (defun make-loop-minimax (answer-variable type)

@@ -642,7 +642,7 @@
                  n2 n1
                  d2 d1))
     (values n2 (if (>= d2 (expt 2 (1- digit-size)))
-                   (lognot (logand most-positive-fixnum (lognot d2)))
+                   (lognot (logand sb-xc:most-positive-fixnum (lognot d2)))
                    (logand lower-ones-digit d2)))))
 
 
@@ -1950,7 +1950,7 @@
       (declare (type index i))
       (let ((xi (%bignum-ref x i)))
         (mixf result
-              (logand most-positive-fixnum
+              (logand sb-xc:most-positive-fixnum
                       (logxor xi
                               (ash xi -7))))))
     result))

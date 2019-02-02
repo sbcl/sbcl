@@ -561,9 +561,9 @@ HOLDING-MUTEX-P."
       (loop with max-ticks = (max 100000 (min (* 2 try-ticks)
                                               (expt 10 7)))
             for scale of-type fixnum = 1
-            then (let ((x (logand most-positive-fixnum (* 2 scale))))
+            then (let ((x (logand sb-xc:most-positive-fixnum (* 2 scale))))
                    (if (> scale x)
-                       most-positive-fixnum
+                       sb-xc:most-positive-fixnum
                        x))
             do (try)
                (let* ((now (get-tick))
@@ -625,13 +625,13 @@ returns NIL each time."
             (,deadline
               (when ,sec
                 (+ (get-internal-real-time)
-                   (round (* ,seconds internal-time-units-per-second))))))
+                   (round (* ,seconds sb-xc:internal-time-units-per-second))))))
        (flet ((,name ()
                 (when ,deadline
                   (let ((,time-left (- ,deadline (get-internal-real-time))))
                     (if (plusp ,time-left)
                         (* (coerce ,time-left 'single-float)
-                           (load-time-value (/ 1.0f0 internal-time-units-per-second) t))
+                           (load-time-value (/ 1.0f0 sb-xc:internal-time-units-per-second) t))
                         0)))))
          ,@body))))
 
@@ -1093,7 +1093,7 @@ must be held by this thread during this call."
                     ;; On a 64-bit platform truncating M-P-F to an int
                     ;; results in -1, which wakes up only one thread.
                     (ldb (byte 29 0)
-                         most-positive-fixnum)))
+                         sb-xc:most-positive-fixnum)))
 
 
 ;;;; Semaphores
@@ -1919,7 +1919,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     ;; (raw value) manifesting in Lisp as a fixnum.
     ;; The sign bit of sb-vm::*free-tls-index* is a semaphore,
     ;; except on PPC where it isn't, but masking is fine in any case.
-    (do ((index (- (ash (logand sb-vm::*free-tls-index* most-positive-fixnum)
+    (do ((index (- (ash (logand sb-vm::*free-tls-index* sb-xc:most-positive-fixnum)
                         sb-vm:n-fixnum-tag-bits)
                    sb-vm:n-word-bytes)
                 (- index sb-vm:n-word-bytes))

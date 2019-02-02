@@ -292,7 +292,7 @@
                             t)
 
 
-  (let ((min most-positive-fixnum)
+  (let ((min sb-xc:most-positive-fixnum)
         (min-scn nil)
         (unique nil))
     (dolist (scn scs)

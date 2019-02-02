@@ -562,11 +562,11 @@
   (etypecase type
     (named-type
      (ecase (named-type-name type)
-       ((t *) call-arguments-limit)
+       ((t *) sb-xc:call-arguments-limit)
        ((nil) 0)))
     (values-type
      (if (values-type-rest type)
-         call-arguments-limit
+         sb-xc:call-arguments-limit
          (+ (length (values-type-optional type))
             (length (values-type-required type)))))))
 
@@ -2404,12 +2404,11 @@ used for a COMPLEX component.~:@>"
            (let ((res
                    (cond
                      ((and format (subtypep format 'double-float))
-                      ;; FIXME: referring to host constants. (They had better match ours)
-                      (if (<= most-negative-double-float cx most-positive-double-float)
+                      (if (<= sb-xc:most-negative-double-float cx sb-xc:most-positive-double-float)
                           (coerce cx format)
                           nil))
                      (t
-                      (if (<= most-negative-single-float cx most-positive-single-float)
+                      (if (<= sb-xc:most-negative-single-float cx sb-xc:most-positive-single-float)
                           ;; FIXME: bug #389
                           (coerce cx (or format 'single-float))
                           nil)))))

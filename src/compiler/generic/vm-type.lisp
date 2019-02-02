@@ -288,8 +288,8 @@
   (let (widetags remainder)
     ;; A little optimization for (OR BIGNUM other). Without this, there would
     ;; be a two-sided GENERIC-{<,>} test plus whatever test(s) "other" entails.
-    (let ((neg-bignum (specifier-type `(integer * (,most-negative-fixnum))))
-          (pos-bignum (specifier-type `(integer (,most-positive-fixnum) *))))
+    (let ((neg-bignum (specifier-type `(integer * (,sb-xc:most-negative-fixnum))))
+          (pos-bignum (specifier-type `(integer (,sb-xc:most-positive-fixnum) *))))
       (when (and (member neg-bignum types :test #'type=)
                  (member pos-bignum types :test #'type=))
         (push sb-vm:bignum-widetag widetags)

@@ -181,11 +181,11 @@ any non-negative real number."
             ;; use the largest representable value in that case.
             (timeout (or (seconds-to-maybe-internal-time seconds)
                          (* safe-internal-seconds-limit
-                            internal-time-units-per-second))))
+                            sb-xc:internal-time-units-per-second))))
         (labels ((sleep-for-a-bit (remaining)
                    (multiple-value-bind
                          (timeout-sec timeout-usec stop-sec stop-usec deadlinep)
-                       (decode-timeout (/ remaining internal-time-units-per-second))
+                       (decode-timeout (/ remaining sb-xc:internal-time-units-per-second))
                      (declare (ignore stop-sec stop-usec))
                      ;; Sleep until either the timeout or the deadline
                      ;; expires.

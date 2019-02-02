@@ -347,9 +347,9 @@
                 (type-error ()
                   nil)))))))
   (frob %single-float single-float
-        most-negative-single-float most-positive-single-float)
+        sb-xc:most-negative-single-float sb-xc:most-positive-single-float)
   (frob %double-float double-float
-        most-negative-double-float most-positive-double-float))
+        sb-xc:most-negative-double-float sb-xc:most-positive-double-float))
 ) ; PROGN
 
 ;;;; float contagion
@@ -615,7 +615,7 @@
 
 (deftransform phase ((x) ((float)) float)
   '(if (minusp (float-sign x))
-       (float pi x)
+       (float sb-xc:pi x)
        (float 0 x)))
 
 ;;; The number is of type REAL.
@@ -806,10 +806,10 @@
 
   ;; These functions are only defined for part of the real line. The
   ;; condition selects the desired part of the line.
-  (frob asin -1d0 1d0 (- (/ pi 2)) (/ pi 2))
+  (frob asin -1d0 1d0 (- (/ sb-xc:pi 2)) (/ sb-xc:pi 2))
   ;; Acos is monotonic decreasing, so we need to swap the function
   ;; values at the lower and upper bounds of the input domain.
-  (frob acos -1d0 1d0 0 pi :increasingp nil)
+  (frob acos -1d0 1d0 0 sb-xc:pi :increasingp nil)
   (frob acosh 1d0 nil nil nil)
   (frob atanh -1d0 1d0 -1 1)
   ;; Kahan says that (sqrt -0.0) is -0.0, so use a specifier that
@@ -1076,7 +1076,7 @@
       (one-arg-derive-type x #'log-derive-type-aux-1 #'log)))
 
 (defun atan-derive-type-aux-1 (y)
-  (elfun-derive-type-simple y #'atan nil nil (- (/ pi 2)) (/ pi 2)))
+  (elfun-derive-type-simple y #'atan nil nil (- (/ sb-xc:pi 2)) (/ sb-xc:pi 2)))
 
 (defun atan-derive-type-aux-2 (y x same-arg)
   (declare (ignore same-arg))
@@ -1093,8 +1093,8 @@
              (make-numeric-type :class 'float
                                 :format format
                                 :complexp :real
-                                :low (coerce (- pi) bound-format)
-                                :high (coerce pi bound-format))))
+                                :low (coerce (- sb-xc:pi) bound-format)
+                                :high (coerce sb-xc:pi bound-format))))
           (t
            ;; The result is a float or a complex number
            (float-or-complex-float-type result-type)))))
@@ -1134,8 +1134,8 @@
               (make-numeric-type :class 'float
                                  :format format
                                  :complexp :real
-                                 :low (coerce pi bound-type)
-                                 :high (coerce pi bound-type)))
+                                 :low (coerce sb-xc:pi bound-type)
+                                 :high (coerce sb-xc:pi bound-type)))
              (t
               ;; We can't tell. The result is 0 or pi. Use a union
               ;; type for this.
@@ -1148,16 +1148,16 @@
                (make-numeric-type :class 'float
                                   :format format
                                   :complexp :real
-                                  :low (coerce pi bound-type)
-                                  :high (coerce pi bound-type))))))
+                                  :low (coerce sb-xc:pi bound-type)
+                                  :high (coerce sb-xc:pi bound-type))))))
           (t
            ;; We have a complex number. The answer is the range -pi
            ;; to pi. (-pi is included because we have -0.)
            (make-numeric-type :class 'float
                               :format format
                               :complexp :real
-                              :low (coerce (- pi) bound-type)
-                              :high (coerce pi bound-type))))))
+                              :low (coerce (- sb-xc:pi) bound-type)
+                              :high (coerce sb-xc:pi bound-type))))))
 
 (defoptimizer (phase derive-type) ((num))
   (one-arg-derive-type num #'phase-derive-type-aux #'phase))
@@ -1467,7 +1467,7 @@
      ;; Derive the bounds if the arg is in [-pi/2, pi/2].
      (trig-derive-type-aux
       arg
-      (specifier-type `(float ,(- (/ pi 2)) ,(/ pi 2)))
+      (specifier-type `(float ,(- (/ sb-xc:pi 2)) ,(/ sb-xc:pi 2)))
       #'sin
       -1 1))
    #'sin))
@@ -1478,7 +1478,7 @@
    (lambda (arg)
      ;; Derive the bounds if the arg is in [0, pi].
      (trig-derive-type-aux arg
-                           (specifier-type `(float 0d0 ,pi))
+                           (specifier-type `(float 0d0 ,sb-xc:pi))
                            #'cos
                            -1 1
                            nil))
@@ -1490,7 +1490,7 @@
    (lambda (arg)
      ;; Derive the bounds if the arg is in [-pi/2, pi/2].
      (trig-derive-type-aux arg
-                           (specifier-type `(float ,(- (/ pi 2)) ,(/ pi 2)))
+                           (specifier-type `(float ,(- (/ sb-xc:pi 2)) ,(/ sb-xc:pi 2)))
                            #'tan
                            nil nil))
    #'tan))

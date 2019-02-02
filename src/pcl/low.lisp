@@ -44,7 +44,7 @@
 
 (declaim (inline random-fixnum))
 (defun random-fixnum ()
-  (random (1+ most-positive-fixnum)))
+  (random (1+ sb-xc:most-positive-fixnum)))
 
 ;;; Lambda which executes its body (or not) randomly. Used to drop
 ;;; random cache entries.

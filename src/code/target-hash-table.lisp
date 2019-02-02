@@ -385,7 +385,7 @@ Examples:
                            ;; SIZE is just a hint, so if the user asks
                            ;; for a SIZE which'd be too big for us to
                            ;; easily implement, we bump it down.
-                           (floor array-dimension-limit 1024))))
+                           (floor sb-xc:array-dimension-limit 1024))))
            (rehash-size (if (integerp rehash-size)
                             rehash-size
                             (float rehash-size 1.0)))

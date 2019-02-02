@@ -139,7 +139,7 @@
       (set-result (+ result (ash result 3)))
       (set-result (logxor result (ash result -11)))
       (set-result (logxor result (ash result 15)))
-      (logand result most-positive-fixnum))))
+      (logand result sb-xc:most-positive-fixnum))))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)
@@ -192,7 +192,7 @@
            (quasi-random-address-based-hash
             (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte))
                              t)
-            most-positive-fixnum))))
+            sb-xc:most-positive-fixnum))))
      (when (plusp answer)
        ;; Make sure we never return 0 (almost no chance of that anyway).
        (return answer)))))
@@ -584,9 +584,9 @@
                   (double-float (hash-float double-float key))
                   #+long-float
                   (long-float (error "LONG-FLOAT not currently supported")))))
-       (rational (if (and (<= most-negative-double-float
+       (rational (if (and (<= sb-xc:most-negative-double-float
                               key
-                              most-positive-double-float)
+                              sb-xc:most-positive-double-float)
                           (= (coerce key 'double-float) key))
                      (sxhash-double-float (coerce key 'double-float))
                      (sxhash key)))

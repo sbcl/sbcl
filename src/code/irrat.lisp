@@ -14,7 +14,7 @@
 
 ;;;; miscellaneous constants, utility functions, and macros
 
-(defconstant pi
+(defconstant sb-xc:pi
   #+long-float 3.14159265358979323846264338327950288419716939937511l0
   #-long-float 3.14159265358979323846264338327950288419716939937511d0)
 
@@ -257,7 +257,7 @@
                            (when (< x-hi 0)
                              (cond ((and (= x-ihi #x3ff00000) (zerop yisint))
                                     ;; (-1)**non-int
-                                    (let ((y*pi (* y pi)))
+                                    (let ((y*pi (* y sb-xc:pi)))
                                       (declare (double-float y*pi))
                                       (return-from real-expt
                                         (complex
@@ -280,7 +280,7 @@
                                (2 ; even
                                 (coerce pow rtype))
                                (t ; non-integer
-                                (let ((y*pi (* y pi)))
+                                (let ((y*pi (* y sb-xc:pi)))
                                   (declare (double-float y*pi))
                                   (complex
                                    (coerce (* pow (%cos y*pi))
@@ -379,11 +379,11 @@
       (number-dispatch ((number number))
         (((foreach fixnum bignum))
          (if (minusp number)
-             (complex (log (- number)) (coerce pi 'single-float))
+             (complex (log (- number)) (coerce sb-xc:pi 'single-float))
              (coerce (/ (log2 number) (log (exp 1.0d0) 2.0d0)) 'single-float)))
         ((ratio)
          (if (minusp number)
-             (complex (log (- number)) (coerce pi 'single-float))
+             (complex (log (- number)) (coerce sb-xc:pi 'single-float))
              (let ((numerator (numerator number))
                    (denominator (denominator number)))
                (if (= (integer-length numerator)
@@ -399,7 +399,7 @@
          ;; I (pw) take the Kahan result.
          (if (< (float-sign number)
                 (coerce 0 '(dispatch-type number)))
-             (complex (log (- number)) (coerce pi '(dispatch-type number)))
+             (complex (log (- number)) (coerce sb-xc:pi '(dispatch-type number)))
              (coerce (%log (coerce number 'double-float))
                      '(dispatch-type number))))
         ((complex)
@@ -454,15 +454,15 @@
   (number-dispatch ((number number))
     ((rational)
      (if (minusp number)
-         (coerce pi 'single-float)
+         (coerce sb-xc:pi 'single-float)
          0.0f0))
     ((single-float)
      (if (minusp (float-sign number))
-         (coerce pi 'single-float)
+         (coerce sb-xc:pi 'single-float)
          0.0f0))
     ((double-float)
      (if (minusp (float-sign number))
-         (coerce pi 'double-float)
+         (coerce sb-xc:pi 'double-float)
          0.0d0))
     (handle-complex
      (atan (imagpart number) (realpart number)))))
@@ -553,8 +553,8 @@
                    (if (zerop y)
                        (if (plusp (float-sign x))
                            y
-                           (float-sign y pi))
-                       (float-sign y (/ pi 2)))
+                           (float-sign y sb-xc:pi))
+                       (float-sign y (/ sb-xc:pi 2)))
                    (%atan2 y x))))
         (number-dispatch ((y real) (x real))
           ((double-float
@@ -940,9 +940,9 @@
   (declare (muffle-conditions compiler-note))
   (declare (type (or rational complex) z))
   (let* (;; constants
-         (theta (/ (sqrt most-positive-double-float) 4.0d0))
-         (rho (/ 4.0d0 (sqrt most-positive-double-float)))
-         (half-pi (/ pi 2.0d0))
+         (theta (/ (sqrt sb-xc:most-positive-double-float) 4.0d0))
+         (rho (/ 4.0d0 (sqrt sb-xc:most-positive-double-float)))
+         (half-pi (/ sb-xc:pi 2.0d0))
          (rp (float (realpart z) 1.0d0))
          (beta (float-sign rp 1.0d0))
          (x (* beta rp))

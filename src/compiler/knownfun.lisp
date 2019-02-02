@@ -409,7 +409,7 @@
         (and (proper-sequence-p value)
              (let ((length (length value)))
                (values length length))))
-      (let ((max 0) (min array-total-size-limit))
+      (let ((max 0) (min sb-xc:array-total-size-limit))
         (block nil
           (labels ((max-dim (type)
                      ;; This can deal with just enough hair to handle type STRING,
