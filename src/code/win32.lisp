@@ -393,15 +393,14 @@
   `(prog1 (cast ,value ,type)
      (,free-function ,value)))
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
 (defmacro with-funcname ((name description) &body body)
   `(let
-     ((,name (etypecase ,description
-               (string ,description)
-               (cons (destructuring-bind (s &optional c) ,description
-                       (format nil "~A~A" s
-                               (if c #-sb-unicode "A" #+sb-unicode "W" "")))))))
-     ,@body)))
+       ((,name (etypecase ,description
+                 (string ,description)
+                 (cons (destructuring-bind (s &optional c) ,description
+                         (format nil "~A~A" s
+                                 (if c #-sb-unicode "A" #+sb-unicode "W" "")))))))
+     ,@body))
 
 (defmacro make-system-buffer (x)
  `(make-alien char #+sb-unicode (ash ,x 1) #-sb-unicode ,x))
