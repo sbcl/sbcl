@@ -630,7 +630,7 @@
                         (unless (eql fr (read-from-string (prin1-to-string fr)))
                           (push fr oops)
                           (return)))))
-    (loop for f = sb-xc:most-negative-double-float then (/ f 2d0)
+    (loop for f = most-negative-double-float then (/ f 2d0)
           while (< f -0d0)
           do (loop repeat 10
                    for fr = (- (random (- f)))
