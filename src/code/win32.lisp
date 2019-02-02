@@ -393,15 +393,6 @@
   `(prog1 (cast ,value ,type)
      (,free-function ,value)))
 
-(defmacro with-funcname ((name description) &body body)
-  `(let
-       ((,name (etypecase ,description
-                 (string ,description)
-                 (cons (destructuring-bind (s &optional c) ,description
-                         (format nil "~A~A" s
-                                 (if c #-sb-unicode "A" #+sb-unicode "W" "")))))))
-     ,@body))
-
 (defmacro make-system-buffer (x)
  `(make-alien char #+sb-unicode (ash ,x 1) #-sb-unicode ,x))
 
@@ -426,40 +417,42 @@
 (defmacro decode-system-string (alien)
   `(cast (cast ,alien (* char)) system-string))
 
-;;; FIXME: The various FOO-SYSCALL-BAR macros, and perhaps some other
-;;; macros in this file, are only used in this file, and could be
-;;; implemented using SB-XC:DEFMACRO wrapped in EVAL-WHEN.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defun win-funcname (description)
+    (etypecase description
+      (string description)
+      (cons (destructuring-bind (s &optional c) description
+              (format nil "~A~A" s
+                      (if c #-sb-unicode "A" #+sb-unicode "W" "")))))))
 
 (defmacro syscall ((name ret-type &rest arg-types) success-form &rest args)
-  (with-funcname (sname name)
-    `(locally
+  `(locally
        (declare (optimize (sb-c::float-accuracy 0)))
-       (let ((result (alien-funcall
-                       (extern-alien ,sname
-                                     (function ,ret-type ,@arg-types))
-                       ,@args)))
-         (declare (ignorable result))
-         ,success-form))))
+     (let ((result (alien-funcall
+                    (extern-alien ,(win-funcname name)
+                                  (function ,ret-type ,@arg-types))
+                    ,@args)))
+       (declare (ignorable result))
+       ,success-form)))
 
 ;;; This is like SYSCALL, but if it fails, signal an error instead of
 ;;; returning error codes. Should only be used for syscalls that will
 ;;; never really get an error.
 (defmacro syscall* ((name &rest arg-types) success-form &rest args)
-  (with-funcname (sname name)
+  (let ((sname (win-funcname name)))
     `(locally
-       (declare (optimize (sb-c::float-accuracy 0)))
+         (declare (optimize (sb-c::float-accuracy 0)))
        (let ((result (alien-funcall
-                       (extern-alien ,sname (function bool ,@arg-types))
-                       ,@args)))
+                      (extern-alien ,sname (function bool ,@arg-types))
+                      ,@args)))
          (when (zerop result)
            (win32-error ,sname))
          ,success-form))))
 
 (defmacro with-sysfun ((func name ret-type &rest arg-types) &body body)
-  (with-funcname (sname name)
-    `(with-alien ((,func (function ,ret-type ,@arg-types)
-                         :extern ,sname))
-       ,@body)))
+  `(with-alien ((,func (function ,ret-type ,@arg-types)
+                       :extern ,(win-funcname name)))
+     ,@body))
 
 (defmacro void-syscall* ((name &rest arg-types) &rest args)
   `(syscall* (,name ,@arg-types) (values t 0) ,@args))
