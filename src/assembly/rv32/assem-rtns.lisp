@@ -79,7 +79,7 @@
                   (inst addi csp-tn ocfp-tn nvals)
 
                   ;; Return.
-                  (lisp-return lra vals :multiple-values)))))
+                  (lisp-return lra :multiple-values)))))
   (frob))
 
 #+sb-assembling ;; no vop for this one either.

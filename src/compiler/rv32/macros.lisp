@@ -51,11 +51,11 @@ byte-ordering issues."
   (inst jalr zero-tn function (- (ash simple-fun-code-offset word-shift)
                                  fun-pointer-lowtag)))
 
-(defun lisp-return (return-pc nl0 return-style)
+(defun lisp-return (return-pc return-style)
   "Return to RETURN-PC."
   (ecase return-style
-    (:single-value (inst li nl0 0))
-    (:multiple-values (inst li nl0 1))
+    (:single-value (inst li nargs-tn -1))
+    (:multiple-values)
     (:known))
   (inst jalr zero-tn return-pc (- other-pointer-lowtag)))
 
