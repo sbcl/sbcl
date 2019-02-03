@@ -222,21 +222,15 @@
 
   (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
   (inst test :byte rbx-tn lowtag-mask)
-  (inst jmp :nz (make-fixup 'tail-call-symbol :assembly-routine))
+  (inst jmp :nz (make-fixup 'call-symbol :assembly-routine))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) fun)))
 
 #+sb-assembling
 (define-assembly-routine (call-symbol
-                          (:return-style :none)
-                          (:export tail-call-symbol))
+                          (:return-style :none))
     ((:temp fun (any-reg descriptor-reg) rax-offset)
      (:temp length (any-reg descriptor-reg) rax-offset)
      (:temp vector (any-reg descriptor-reg) rbx-offset))
-  ;; Jump over CALL QWORD PTR [RAX-3] in the caller
-  (inst add :qword (ea rsp-tn) 3)
-  (emit-alignment n-lowtag-bits :long-nop)
-
-  TAIL-CALL-SYMBOL
   (%lea-for-lowtag-test vector fun other-pointer-lowtag)
   (inst test :byte vector lowtag-mask)
   (inst jmp :nz not-callable)

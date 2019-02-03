@@ -497,8 +497,8 @@
                     (funcall function (+ (dstate-cur-offs dstate) 1)
                              operand inst))))
                ((eq inst cond-jmp-inst)
-                ;; TAIL-CALL-SYMBOL is invoked with a conditional jump
-                ;; (but not CALL-SYMBOL because only JMP can be conditional)
+                ;; jmp CALL-SYMBOL is invoked with a conditional jump
+                ;; (but not call CALL-SYMBOL because only JMP can be conditional)
                 (let ((operand (+ (near-cond-jump-displacement dchunk dstate)
                                   (dstate-next-addr dstate))))
                   (when (includep operand)

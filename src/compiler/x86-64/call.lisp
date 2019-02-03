@@ -874,33 +874,33 @@
          (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
          (inst test :byte rbx-tn lowtag-mask)
          (inst jmp :nz (if relative-call
-                           (make-fixup 'tail-call-symbol :assembly-routine)
+                           (make-fixup 'call-symbol :assembly-routine)
                            not-fun))
          (inst jmp fun-ea)
          not-fun
          (unless relative-call
-           (invoke-asm-routine 'jmp 'tail-call-symbol vop))))
+           (invoke-asm-routine 'jmp 'call-symbol vop))))
       (:symbol
-       (invoke-asm-routine 'jmp 'tail-call-symbol vop))
+       (invoke-asm-routine 'jmp 'call-symbol vop))
       (t
        (inst jmp fun-ea)))))
 
 (defun call-unnamed (fun type vop)
   (case type
     (:symbol
-     ;; CALL-SYMBOL returns past the CALL instruction that follows it,
-     ;; which is not needed here, hence TAIL-CALL-SYMBOL.
-     (invoke-asm-routine 'call 'tail-call-symbol vop))
+     (invoke-asm-routine 'call 'call-symbol vop))
     (t
      (assemble ()
        (when (eq type :designator)
          (%lea-for-lowtag-test rbx-tn fun fun-pointer-lowtag)
          (inst test :byte rbx-tn lowtag-mask)
          (inst jmp :z call)
-         (invoke-asm-routine 'call 'call-symbol vop))
+         (invoke-asm-routine 'call 'call-symbol vop)
+         (inst jmp ret))
        call
        (inst call (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag)
-                      fun))))))
+                      fun))
+       ret))))
 
 ;;; This is defined separately, since it needs special code that BLT's
 ;;; the arguments down. All the real work is done in the assembly
