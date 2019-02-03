@@ -299,8 +299,9 @@
                 (:constant
                  #+sb-xc-host ; check that we never reference host constants
                  (unless (member name '(nil t)) ; other than these 2
-                   (awhen (find-symbol (string name) "XC-STRICT-CL")
-                     (aver (neq it name))))
+                   (when (eq (find-symbol (string name) "XC-STRICT-CL")
+                             name)
+                     (error "Using a constant from the host ~s" name)))
                  (find-constant (symbol-value name) name))
                 (t
                  (make-global-var :kind kind
