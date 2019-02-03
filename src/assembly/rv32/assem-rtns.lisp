@@ -16,7 +16,7 @@
 (macrolet ((frob ()
              (let ((a (loop repeat register-arg-count
                             collect (gensym)))
-                   (defaulting-labels (loop repeat (1- register-arg-count)
+                   (defaulting-labels (loop repeat (- register-arg-count 2)
                                              collect (gensym))))
                `(define-assembly-routine
                     (return-multiple
@@ -28,7 +28,6 @@
                      (:temp lra descriptor-reg lra-offset)
 
                      ;; These are just needed to facilitate the transfer
-                     (:temp lip interior-reg lip-offset)
                      (:temp count any-reg nl2-offset)
                      (:temp dst any-reg nl3-offset)
                      (:temp temp descriptor-reg l0-offset)
@@ -48,35 +47,35 @@
                           for i from 1
                           collect `(progn
                                      ,@(unless (= i 1)
-                                         `((inst subi count (fixnumize 1))))
+                                         `((inst subi count count (fixnumize 1))))
                                      (inst bge zero-tn count ,label)
                                      (loadw ,an vals ,i)))
 
                   ;; Copy the remaining args to the top of the stack.
                   (inst addi vals vals (fixnumize register-arg-count))
-                  (inst addi dst cfp-tn (fixnumize register-argcount))
+                  (inst addi dst cfp-tn (fixnumize register-arg-count))
 
                   LOOP
                   (loadw temp vals)
                   (inst addi vals vals n-word-bytes)
-                  (inst subi count (fixnumize 1))
+                  (inst subi count count (fixnumize 1))
                   (storew temp dst)
                   (inst bne count zero-tn LOOP)
 
                   (inst j ,(first (last defaulting-labels)))
 
                   DEFAULT-A0-AND-ON
-                  (move a0 null-tn)
-                  (move a1 null-tn)
-                  `@(loop for defaulting-label in defaulting-labels
-                          for an in (rest a)
+                  (move ,(first a) null-tn)
+                  (move ,(second a) null-tn)
+                  ,@(loop for defaulting-label in defaulting-labels
+                          for an in (rest (rest a))
                           append `(,defaulting-label
                                    (move ,an null-tn)))
 
                   ;; Clear the stack.
                   (move ocfp-tn cfp-tn)
                   (move cfp-tn ocfp)
-                  (inst addi csp-tn ocfp-tn nvals)
+                  (inst add csp-tn ocfp-tn nvals)
 
                   ;; Return.
                   (lisp-return lra :multiple-values)))))
@@ -103,9 +102,6 @@
                      (:temp count any-reg nl3-offset)
                      (:temp temp descriptor-reg l0-offset)
 
-                     ;; Needed for the jump
-                     (:temp lip interior-reg lip-offset)
-
                      ;; These are needed so we can get at the register args.
                      ,@(loop for an-offset in *register-arg-offsets*
                              for an in a
@@ -119,7 +115,7 @@
                   ;; trash these locations)
                   ,@(loop for an in a
                           for i from 0
-                          collect `(loadw a0 args i))
+                          collect `(loadw ,an args ,i))
 
                   ;; Calc SRC, DST, and COUNT
                   (inst subi count nargs (fixnumize register-arg-count))
