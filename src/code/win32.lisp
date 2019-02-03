@@ -622,8 +622,7 @@
 ;;            (addr epoch)
 ;;            (addr filetime)))
 (defconstant +unix-epoch-filetime+ 116444736000000000)
-(defconstant +filetime-unit+ (* 100ns-per-internal-time-unit
-                                internal-time-units-per-second))
+(defconstant +filetime-unit+ 10000000)
 (defconstant +common-lisp-epoch-filetime-seconds+ 9435484800)
 
 #-sb-fluid
@@ -635,8 +634,7 @@ UNIX epoch: January 1st 1970."
     (syscall (("GetSystemTimeAsFileTime") void (* filetime))
              (multiple-value-bind (sec 100ns)
                  (floor (- system-time +unix-epoch-filetime+)
-                        (* 100ns-per-internal-time-unit
-                           internal-time-units-per-second))
+                        +filetime-unit+)
                (values sec (floor 100ns 10)))
              (addr system-time))))
 
