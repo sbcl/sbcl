@@ -64,6 +64,8 @@
   (:args (tn))
   (:info entry-label)
   (:temporary (:sc unsigned-reg) temp)
+  #+sb-thread
+  (:temporary (:sc complex-double-reg) xmm-temp)
   (:results (block :scs (any-reg)))
   (:generator 22
     (inst lea block (unwind-block-ea tn))
@@ -72,10 +74,19 @@
     (storew rbp-tn block unwind-block-cfp-slot)
     (inst lea temp (rip-relative-ea entry-label))
     (storew temp block unwind-block-entry-pc-slot)
-    (load-binding-stack-pointer temp)
-    (storew temp block unwind-block-bsp-slot)
-    (load-tl-symbol-value temp *current-catch-block*)
-    (storew temp block unwind-block-current-catch-slot)))
+    #+sb-thread
+    (progn
+      (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
+        #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
+                       (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
+        (inst movapd xmm-temp (thread-tls-ea bsp))
+        (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp)))
+    #-sb-thread
+    (progn
+      (load-binding-stack-pointer temp)
+      (storew temp block unwind-block-bsp-slot)
+      (load-tl-symbol-value temp *current-catch-block*)
+      (storew temp block unwind-block-current-catch-slot))))
 
 ;;; like MAKE-UNWIND-BLOCK, except that we also store in the specified
 ;;; tag, and link the block into the CURRENT-CATCH list
@@ -85,6 +96,8 @@
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:sc descriptor-reg) temp)
+  #+sb-thread
+  (:temporary (:sc complex-double-reg) xmm-temp)
   (:generator 44
     (inst lea block (catch-block-ea tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
@@ -93,11 +106,21 @@
     (inst lea temp (rip-relative-ea entry-label))
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
-    (load-tl-symbol-value temp *current-catch-block*)
-    (storew temp block catch-block-previous-catch-slot)
-    (store-tl-symbol-value block *current-catch-block*)
-    (load-binding-stack-pointer temp)
-    (storew temp block catch-block-bsp-slot)))
+    #+sb-thread
+    (progn
+      (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
+        #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
+                       (= (- catch-block-previous-catch-slot catch-block-bsp-slot) 1)))
+        (inst movapd xmm-temp (thread-tls-ea bsp))
+        (inst movupd (ea (* catch-block-bsp-slot n-word-bytes) block) xmm-temp)
+        (store-tl-symbol-value block *current-catch-block*)))
+    #-sb-thread
+    (progn
+      (load-tl-symbol-value temp *current-catch-block*)
+      (storew temp block catch-block-previous-catch-slot)
+      (store-tl-symbol-value block *current-catch-block*)
+      (load-binding-stack-pointer temp)
+      (storew temp block catch-block-bsp-slot))))
 
 ;;; Just set the current unwind-protect to UWP. This instantiates an
 ;;; unwind block as an unwind-protect.

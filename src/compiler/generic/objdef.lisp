@@ -452,16 +452,16 @@ during backtrace.
   ;; Information for constructing deterministic consing profile.
   (profile-data :c-type "uword_t *" :pointer t)
   #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
-  #+sb-thread (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*)
+  (binding-stack-pointer :c-type "lispobj *" :pointer t
+                         :special *binding-stack-pointer*)
   ;; next two not used in C, but this wires the TLS offsets to small values
   #+(and x86-64 sb-thread)
   (current-catch-block :special *current-catch-block*)
   #+(and x86-64 sb-thread)
   (current-unwind-protect-block :special *current-unwind-protect-block*)
+  #+sb-thread (pseudo-atomic-bits #+(or x86 x86-64) :special #+(or x86 x86-64) *pseudo-atomic-bits*)
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
-  (binding-stack-pointer :c-type "lispobj *" :pointer t
-                         :special *binding-stack-pointer*)
   (stepping)
   ;; END of slots to keep near the beginning.
 
