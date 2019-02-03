@@ -251,6 +251,8 @@
                    (t (eql template form)))) ; match template exactly
                (nreverse results)
                (error "Pattern match failure: ~S~% ~S~%" template form))))
+    ;; Note that in all cases below, the package lock on CL prevents
+    ;; accidental appearance of a CL symbol as a thing being defined.
     (named-let recurse ((form form))
       (case (car form)
        (progn (mapc #'recurse (cdr form))) ; compiler doesn't care about return value
@@ -270,6 +272,28 @@
                 (matchp '((quote ?) (source-location) (unless (%boundp :ignore) ?))
                         (cdr form))
               `(defvar ,symbol ,value)))
+           (sb-c::%defconstant
+            ;; There is genuinely ambiguity here - does :COMPILE-TOPLEVEL situation for
+            ;; DEFCONSTANT mean that we want the host compiler to know the constant?
+            ;; It must, because the standard specifies that defconstant need not be within
+            ;; EVAL-WHEN for the compiler to know it. But because of how our defconstant
+            ;; expands - calling %defconstant inside of an eval-when listing all 3
+            ;; situations - we can't discern whether this is our defconstant doing its
+            ;; normal thing, versus inside an explicity written eval-when with intent
+            ;; to convey the constant to the host - perhaps because of a DEFUN also inside
+            ;; an eval-when where we need the host to reference the constant.
+            ;; Therefore every constant has to be made known to the host under the
+            ;; assumption that it needs it, AND the cross-compiler under the assumption
+            ;; that this is our normal :compile-toplevel handling.
+            (destructuring-bind (symbol value) (matchp '((quote ?) ? . :ignore) (cdr form))
+              `(progn (defconstant ,symbol ,value)
+                      (sb-c::%defconstant ',symbol ,symbol nil))))
+           (sb-xc:defconstant ; we see this maro as well. The host expansion will not do,
+            ;; because it calls our %defconstant which does not assign the symbol a value.
+            ;; It might be possible to change that now that we don't use CL: symbols.
+            (destructuring-bind (symbol value) (cdr form)
+              `(progn (defconstant ,symbol ,value)
+                      (sb-c::%defconstant ',symbol ,symbol nil))))
            (t
             form))))))))
 
