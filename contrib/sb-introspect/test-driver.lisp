@@ -375,9 +375,8 @@
            :fails-on (or :win32 (and :sparc :gencgc)))
     #+gencgc
     (tai (make-list 1) :heap
-         `(:space :dynamic :generation 0 :write-protected nil
-           :boxed t :pinned nil :large nil)
-         :ignore (list :page))
+         `(:space :dynamic :boxed t :large nil)
+         :ignore (list :page :pinned :generation :write-protected))
     #-gencgc
     (tai :cons :heap
          ;; FIXME: Figure out what's the right cheney-result. SPARC at least
