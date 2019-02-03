@@ -181,7 +181,7 @@
   (:result-types unsigned-num)
   (:generator 10
     (loadw res code 0 other-pointer-lowtag)
-    (inst sll res res 2) ; shift out the GC bits
+    (inst slli res res 2) ; shift out the GC bits
     ;; Then shift right to clear the widetag, plus 2 more to the right since we just
     ;; left-shifted to zeroize bits. Then shift left 2 to convert words to bytes.
     ;; The '>>2' and '<<2' cancel out because we don't need to clear all 8 bits
