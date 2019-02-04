@@ -138,14 +138,60 @@
                   (lisp-jump temp)))))
   (frob))
 
+
+;;;; Non-local exit noise.
+
 (define-assembly-routine (throw (:return-style :none))
   ((:arg target (descriptor-reg any-reg) a0-offset)
    (:arg start (descriptor-reg any-reg) ocfp-offset)
-   (:arg count (descriptor-reg any-reg) nargs-offset))
-  (declare (ignore target start count)))
+   (:arg count (descriptor-reg any-reg) nargs-offset)
+   (:temp catch any-reg a1-offset)
+   (:temp tag descriptor-reg a2-offset))
+  (declare (ignore start count)) ; We only need them in the registers.
 
-(define-assembly-routine (unwind (:return-style :none))
+  (load-symbol-value catch *current-catch-block*)
+
+  LOOP
+  (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
+    (inst beq catch zero-tn error))
+
+  (loadw tag catch catch-block-tag-slot)
+  (inst beq tag target EXIT)
+  (loadw catch catch catch-block-previous-catch-slot)
+  (inst j loop)
+
+  EXIT
+  (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
+  (invoke-asm-routine 'unwind t))
+
+(define-assembly-routine (unwind
+                          (:return-style :none)
+                          (:translate %continue-unwind)
+                          (:policy :fast-safe))
   ((:arg block (descriptor-reg any-reg) a0-offset)
    (:arg start (descriptor-reg any-reg) ocfp-offset)
-   (:arg count (descriptor-reg any-reg) nargs-offset))
-  (declare (ignore block start count)))
+   (:arg count (descriptor-reg any-reg) nargs-offset)
+   (:temp lra descriptor-reg lra-offset)
+   (:temp cur-uwp any-reg nl0-offset)
+   (:temp target-uwp any-reg nl2-offset))
+  (declare (ignore start count))
+
+  (let ((error (generate-error-code nil 'invalid-unwind-error)))
+    (inst beq block zero-tn error))
+
+  (load-symbol-value cur-uwp *current-unwind-protect-block*)
+  (loadw target-uwp block unwind-block-uwp-slot)
+  (inst bne cur-uwp target-uwp DO-UWP)
+
+  (move cur-uwp block)
+
+  DO-EXIT
+  (loadw cfp-tn cur-uwp unwind-block-cfp-slot)
+  (loadw code-tn cur-uwp unwind-block-code-slot)
+  (loadw lra cur-uwp unwind-block-entry-pc-slot)
+  (lisp-return lra :known)
+
+  DO-UWP
+  (loadw target-uwp cur-uwp unwind-block-uwp-slot)
+  (store-symbol-value target-uwp *current-unwind-protect-blocK*)
+  (inst j DO-EXIT))
