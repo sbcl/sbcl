@@ -1779,6 +1779,14 @@ extended <package-name>::<form-in-package> syntax."
   (declare (optimize allow-non-returning-tail-call))
   (declare (ignore ignore))
   (if *read-suppress*
+      ;; This seems dubious. For comparison's sake, other implementations
+      ;; will signal an error if the character is not a defined macro.
+      ;; Test case: (read-from-string "#+nope (#!+(or feat) a) b") => B and 25
+      ;; CLISP:
+      ;; *** - READ from #<INPUT STRING-INPUT-STREAM>: After #\# is #\! an undefined dispatch macro character
+      ;; CCL:
+      ;; Error: Reader error on #<STRING-INPUT-STREAM  #x3020004913AD>, near position 10, within "#+nope (#!+(or feat)":
+      ;;        Undefined character #\! in a #\# dispatch macro.
       (values)
       (simple-reader-error stream
                            "no dispatch function defined for ~S"
