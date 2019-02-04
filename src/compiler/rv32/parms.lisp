@@ -73,6 +73,7 @@
 ;;;; RISC-V has no explicit floating point traps.
 (defconstant-eqx float-traps-byte (byte 5 0) #'equalp)
 (defconstant-eqx float-exceptions-byte (byte 5 0) #'equalp)
+(defconstant float-fast-bit (ash 1 24)) ;; Flush-to-zero mode
 
 
 ;;;; Where to put the different spaces.

@@ -104,14 +104,14 @@
   (frob move-double-float-arg double-reg double-stack :double))
 
 ;;;; Complex float move functions
-(flet ((format-sc (format)
-         (ecase format (:single 'single-reg) (:double 'double-reg))))
-  (defun complex-reg-real-tn (format x)
-    (make-random-tn :kind :normal :sc (sc-or-lose (format-sc format))
-                    :offset (tn-offset x)))
-  (defun complex-reg-imag-tn (format x)
-    (make-random-tn :kind :normal :sc (sc-or-lose (format-sc format))
-                    :offset (1+ (tn-offset x)))))
+(defun format-sc (format)
+  (ecase format (:single 'single-reg) (:double 'double-reg)))
+(defun complex-reg-real-tn (format x)
+  (make-random-tn :kind :normal :sc (sc-or-lose (format-sc format))
+                  :offset (tn-offset x)))
+(defun complex-reg-imag-tn (format x)
+  (make-random-tn :kind :normal :sc (sc-or-lose (format-sc format))
+                  :offset (1+ (tn-offset x))))
 
 (macrolet ((def (name cost stack-sc sc op format size)
              `(define-move-fun (,name ,cost) (vop x y)

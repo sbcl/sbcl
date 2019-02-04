@@ -65,6 +65,7 @@
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
   (defregset descriptor-regs a0 a1 a2 a3 l1 l2 l3 ocfp lra lexenv)
+  (defregset boxed-regs a0 a1 a2 a3 l1 l2 l3 ocfp lra lexenv code)
 
   (define-argument-register-set a0 a1 a2 a3))
 
@@ -219,6 +220,11 @@
   (let ((drsc (sc-or-lose 'descriptor-reg)))
     (flet ((make (n) (make-random-tn :kind :normal :sc drsc :offset n)))
       (mapcar #'make *register-arg-offsets*))))
+
+;;; This is used by the debugger.  Our calling convention for
+;;; unknown-values-return does not involve manipulating return
+;;; addresses.
+(defconstant single-value-return-byte-offset 0)
 
 (defun location-print-name (tn)
   (declare (type tn tn))
