@@ -87,11 +87,12 @@ byte-ordering issues."
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop (note-this-location vop :internal-error))
-    ;; Encode both kind and code as an argument to BRK
-    (emit-internal-error kind code values
-                         :trap-emitter (lambda (tramp-number)
-                                         (inst ebreak (dpb tramp-number (byte 8 8) kind))))
-    (emit-alignment word-shift)))
+    ;; Encode both kind and code as an argument to EBREAM
+    (inst ebreak (dpb code (byte 8 8) kind))
+    ;; NARGS is implicitely assumed for invalid-arg-count
+    (unless (= kind invalid-arg-count-trap)
+      (encode-internal-error-args values)
+      (emit-alignment 2))))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*

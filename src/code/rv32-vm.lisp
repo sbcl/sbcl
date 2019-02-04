@@ -71,13 +71,26 @@
                (sap-ref-double sap 8) (imagpart value))))))))
 
 ;;; INTERNAL-ERROR-ARGS
+
+;;; Given a (POSIX) signal context, extract the internal error
+;;; arguments from the instruction stream.
 #-sb-xc-host
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
-  (declare (ignore context))
-  nil)
+  (let* ((pc (context-pc context))
+         (instruction (sap-ref-32 pc 0))
+         (error-number (ldb (byte 8 8) instruction))
+         (trap-number (ldb (byte 8 0) instruction)))
+    (declare (type system-area-pointer pc))
+    (if (= trap-number invalid-arg-count-trap)
+        (values error-number '(#.arg-count-sc) trap-number)
+        (sb-kernel::decode-internal-error-args (sap+ pc 4) trap-number error-number))))
 
 ;;; CONTEXT-CALL-FUNCTION
+
+;;; Undo the effects of XEP-ALLOCATE-FRAME
+;;; and point PC to FUNCTION
 #-sb-xc-host
 (defun context-call-function (context function &optional arg-count)
-  (declare (ignore context function arg-count)))
+  (declare (ignore context function arg-count))
+  (style-warn "Unimplemented."))
