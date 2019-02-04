@@ -13,10 +13,26 @@
 
 (defun invoke-asm-routine (routine tailp)
   (declare (ignore tailp))
-  (inst j (make-fixup routine :assembly-routine) :fixup))
+  (inst j (make-fixup routine :assembly-routine)))
 
 (defun generate-call-sequence (name style vop options)
-  (declare (ignore name style vop options)))
+  (declare (ignore vop options))
+  (ecase style
+    (:none
+     (values
+      `((inst j (make-fixup ',name :assembly-routine)))
+      `()))
+    (:raw
+     (values
+      `((inst jal lr-tn (make-fixup ',name :assembly-routine)))
+      `()))))
 
 (defun generate-return-sequence (style)
-  (declare (ignore style)))
+  (ecase style
+    (:none)
+    (:raw
+     `((inst j lr-tn)))))
+
+#-sb-xc-host ; CONTEXT-REGISTER is not defined at xc-time
+(defun return-machine-address (scp)
+  (context-register scp lr-offset))

@@ -183,6 +183,7 @@
   (defregtn nsp any-reg)
 
   (defregtn code descriptor-reg)
+  (defregtn lr interior-reg)
   (defregtn lip interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the

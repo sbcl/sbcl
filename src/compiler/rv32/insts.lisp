@@ -165,27 +165,29 @@
 (define-instruction jal (segment lr target)
   (:printer j ((opcode #b1101111)))
   (:emitter
-   (emit-chooser
-    segment 8 2
-    (lambda (segment chooser posn delta-if-after)
-      (declare (ignore chooser))
-      (when (typep (branch/jal-offset target 1 posn delta-if-after)
-                   '(signed-byte 20))
-        (emit-short-jump-at segment lr target posn)
-        t))
-    (emit-long-jump-at-fun lr target))))
+   (typecase target
+     (fixup
+      (assemble (segment)
+        (inst lui lip-tn target)
+        (inst jalr lr lip-tn target)))
+     (t
+      (emit-chooser
+       segment 8 2
+       (lambda (segment chooser posn delta-if-after)
+         (declare (ignore chooser))
+         (when (typep (branch/jal-offset target 1 posn delta-if-after)
+                      '(signed-byte 20))
+           (emit-short-jump-at segment lr target posn)
+           t))
+       (emit-long-jump-at-fun lr target))))))
 
 (define-instruction jalr (segment lr rs offset)
   (:printer i ((funct3 #b000) (opcode #b1100111)))
   (:emitter
    (emit-i-inst segment offset rs #b000 lr #b1100111)))
 
-(define-instruction-macro j (target &optional (type :relative))
-  (ecase type
-    (:relative `(inst jal zero-tn ,target))
-    (:fixup `(progn
-               (inst lui lip-tn ,target)
-               (inst jalr zero-tn lip-tn ,target)))))
+(define-instruction-macro j (target)
+  `(inst jal zero-tn ,target))
 
 (defun emit-relative-branch (segment opcode funct3 rs1 rs2 target)
   (emit-chooser
@@ -247,6 +249,8 @@
                 (:printer i ((funct3 ,funct3) (opcode #b0010011)))
                 (:emitter
                  (let ((imm ,imm))
+                   (when (typep imm 'tn)
+                     (error "~a" ',name))
                    (emit-i-inst segment imm rs ,funct3 rd #b0010011))))))
   (define-immediate-arith-instruction addi #b000)
   (define-immediate-arith-instruction slti #b010)

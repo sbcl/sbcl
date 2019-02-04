@@ -26,7 +26,7 @@
         (store-stack-tn nfp-save cur-nfp))
       (move nl0 object)
       (inst li cfunc (make-fixup "debug_print" :foreign))
-      (inst j (make-fixup "call_into_c" :foreign) :fixup)
+      (inst j (make-fixup "call_into_c" :foreign))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
       (move result nl0))))
