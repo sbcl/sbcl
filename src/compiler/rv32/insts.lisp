@@ -29,14 +29,31 @@
 
 
 (define-instruction byte (segment byte)
-  (:emitter
-   (emit-byte segment byte)))
+  (:emitter (emit-byte segment byte)))
 
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
 
+(define-instruction word (segment word)
+  (:emitter
+   (etypecase word
+     (fixup
+      (note-fixup segment :absolute word)
+      (emit-word segment 0))
+     (integer
+      (emit-word segment word)))))
+
 (define-bitfield-emitter emit-machine-word n-machine-word-bits
   (byte n-machine-word-bits 0))
+
+(define-instruction machine-word (segment word)
+  (:emitter
+   (etypecase word
+     (fixup
+      (note-fixup segment :absolute word)
+      (emit-machine-word segment 0))
+     (integer
+      (emit-machine-word segment word)))))
 
 (define-instruction-format (r 32)
   (funct7 :field (byte 7 25))
