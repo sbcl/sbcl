@@ -127,7 +127,7 @@ pie-shrinkwrap-sbcl: pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o $(PIC_OBJS
 semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
 	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
 
-sbcl.mk:
+sbcl.mk: Config
 	( echo 'CC=$(CC)' ; \
 	  echo 'LD=$(LD)' ; \
 	  echo 'CFLAGS=$(CFLAGS)' ; \
