@@ -66,6 +66,19 @@
 
 ;;;; Special purpose inline allocators.
 
+(define-vop (make-fdefn)
+  (:args (name :scs (descriptor-reg) :to :eval))
+  (:temporary (:sc non-descriptor-reg) pa-flag temp)
+  (:results (result :scs (descriptor-reg) :from :argument))
+  (:policy :fast-safe)
+  (:translate make-fdefn)
+  (:generator 37
+    (with-fixed-allocation (result pa-flag fdefn-widetag fdefn-size)
+      (inst li temp (make-fixup 'undefined-tramp :assembly-routine))
+      (storew name result fdefn-name-slot other-pointer-lowtag)
+      (storew null-tn result fdefn-fun-slot other-pointer-lowtag)
+      (storew temp result fdefn-raw-addr-slot other-pointer-lowtag))))
+
 ;;; ALLOCATE-VECTOR
 (define-vop (allocate-vector-on-heap)
   (:args (type :scs (unsigned-reg))
@@ -84,6 +97,37 @@
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
       (storew length result vector-length-slot other-pointer-lowtag))))
+
+(define-vop (allocate-vector-on-stack)
+  (:args (type :scs (unsigned-reg))
+         (length :scs (any-reg))
+         (words :scs (any-reg)))
+  (:arg-types positive-fixnum
+              positive-fixnum
+              positive-fixnum)
+  (:temporary (:sc non-descriptor-reg) temp)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:results (result :scs (descriptor-reg) :from :load))
+  (:translate allocate-vector)
+  (:policy :fast-safe)
+  (:generator 100
+    (inst srli temp type n-fixnum-tag-bits)
+    (inst slli words words (- word-shift n-fixnum-tag-bits))
+    (inst addi words words (* (1+ vector-data-offset) n-word-bytes))
+    (inst andi words words (bic-mask lowtag-mask))
+    ;; FIXME: It would be good to check for stack overflow here.
+    (pseudo-atomic (pa-flag)
+      (allocation result words other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
+      (storew temp result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag)
+      (inst addi temp result (* n-word-bytes 2))
+      (inst add words result words)
+
+      (let ((loop (gen-label)))
+        (emit-label loop)
+        (storew zero-tn temp 0)
+        (inst blt temp words loop)
+        (inst addi temp temp n-word-bytes)))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
