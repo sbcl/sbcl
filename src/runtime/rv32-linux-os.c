@@ -85,7 +85,13 @@ os_context_sigmask_addr(os_context_t *context)
 void
 os_restore_fp_control(os_context_t *context)
 {
-    /* FIXME: Implement. */
+#warning "Implement correct fp control."
+}
+
+os_context_register_t   *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    return (os_context_register_t*)&context->uc_mcontext.__fpregs.__d.__f[offset];
 }
 
 void
