@@ -132,9 +132,9 @@
     (move dst start)
     (inst add csp-tn csp-tn count)
     LOOP
-    (inst lw temp src 0)
+    (loadw temp src 0)
     (inst addi src src n-word-bytes)
     (inst addi dst dst n-word-bytes)
-    (inst sw temp dst (- n-word-bytes))
+    (storew temp dst (- n-word-bytes))
     (inst bne dst csp-tn loop)
     DONE))

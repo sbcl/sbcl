@@ -57,17 +57,34 @@
     (with-fixed-allocation (y pa-flag type size)
       (inst fstore fmt x y (- (* data n-word-bytes) other-pointer-lowtag)))))
 
+#+64-bit
+(define-vop (move-from-single)
+  (:args (x :scs (single-reg) :to :save))
+  (:temporary (:sc non-descriptor-reg) tmp)
+  (:results (y :scs (descriptor-reg)))
+  (:note "float to pointer coercion")
+  (:generator 4
+    (inst fmove :single tmp x)
+    (inst slli tmp tmp 32)
+    (inst addi y tmp single-float-widetag)))
+
 (macrolet ((frob (name sc &rest args)
              `(progn
                 (define-vop (,name move-from-float)
                   (:args (x :scs (,sc) :to :save))
                   (:results (y :scs (descriptor-reg)))
-                  (:variant ,@args))
-                (define-move-vop ,name :move (,sc) (descriptor-reg)))))
+                  (:variant ,@args)))))
+  #-64-bit
   (frob move-from-single single-reg
     :single single-float-size single-float-widetag single-float-value-slot)
   (frob move-from-double double-reg
-    :double double-float-size double-float-widetag double-float-value-slot))
+        :double double-float-size double-float-widetag double-float-value-slot))
+
+(define-move-vop move-from-single :move
+  (single-reg) (descriptor-reg))
+
+(define-move-vop move-from-double :move
+  (double-reg) (descriptor-reg))
 
 (macrolet ((frob (name sc fmt value)
              `(progn
@@ -77,10 +94,23 @@
                   (:note "pointer to float coercion")
                   (:generator 2
                      (inst fload ,fmt y x (- (* ,value n-word-bytes)
-                                             other-pointer-lowtag))))
-                (define-move-vop ,name :move (descriptor-reg) (,sc)))))
+                                             other-pointer-lowtag))))                (define-move-vop ,name :move (descriptor-reg) (,sc)))))
+  #-64-bit
   (frob move-to-single single-reg :single single-float-value-slot)
   (frob move-to-double double-reg :double double-float-value-slot))
+
+#+64-bit
+(progn
+  (define-vop (move-to-single-reg)
+  (:args (x :scs (descriptor-reg) :target tmp))
+  (:temporary (:sc unsigned-reg :from :argument :to :result) tmp)
+  (:results (y :scs (single-reg)))
+  (:note "pointer to float coercion")
+  (:generator 2
+   (inst srli tmp x 32)
+   (inst fmvx-> :single y tmp)))
+
+  (define-move-vop move-to-single-reg :move (descriptor-reg) (single-reg)))
 
 (macrolet ((frob (name sc stack-sc format)
              `(progn
@@ -121,11 +151,11 @@
                   (let ((real-tn (complex-reg-real-tn ,format y)))
                     (inst ,op ,format real-tn nfp offset))
                   (let ((imag-tn (complex-reg-imag-tn ,format y)))
-                    (inst ,op ,format imag-tn nfp (+ offset (* #-64-bit ,size n-word-bytes))))))))
+                    (inst ,op ,format imag-tn nfp (+ offset (* ,size n-word-bytes))))))))
   (def load-complex-single 2 complex-single-stack complex-single-reg fload :single 1)
   (def store-complex-single 2 complex-single-reg complex-single-stack fstore :single 1)
-  (def load-complex-double 2 complex-double-stack complex-double-reg fload :double 2)
-  (def store-complex-double 2 complex-double-reg complex-double-stack fstore :double 2))
+  (def load-complex-double 2 complex-double-stack complex-double-reg fload :double #-64-bit 2 #+64-bit 1)
+  (def store-complex-double 2 complex-double-reg complex-double-stack fstore :double #-64-bit 2 #+64-bit 1))
 
 
 ;;;
@@ -185,11 +215,25 @@
         (inst fstore format imag-tn x (- (* imag-slot n-word-bytes)
                                          other-pointer-lowtag))))))
 
+#-64-bit
 (define-vop (move-from-complex-single move-from-complex-float)
   (:args (x :scs (complex-single-reg) :to :save))
   (:note "complex single float to pointer coercion")
   (:variant :single complex-single-float-real-slot complex-double-float-imag-slot
             complex-single-float-widetag complex-single-float-size))
+
+#+64-bit
+(define-vop (move-from-complex-single)
+  (:args (x :scs (complex-single-reg) :to :save))
+  (:results (y :scs (descriptor-reg)))
+  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:note "complex single float to pointer coercion")
+  (:generator 13
+     (with-fixed-allocation (y pa-flag complex-single-float-widetag
+                             complex-single-float-size)
+       (inst fstore :double x y (- (* complex-single-float-data-slot
+                                      n-word-bytes)
+                                   other-pointer-lowtag)))))
 
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
@@ -219,9 +263,20 @@
     (let ((imag-tn (complex-reg-imag-tn format y)))
       (inst fload format imag-tn x (- (* imag-slot n-word-bytes)
                                       other-pointer-lowtag)))))
+#-64-bit
 (define-vop (move-to-complex-single move-to-complex-float)
   (:results (y :scs (complex-single-reg)))
   (:variant :single complex-single-float-real-slot complex-single-float-imag-slot))
+
+#+64-bit
+(define-vop (move-to-complex-single)
+  (:args (x :scs (descriptor-reg)))
+  (:results (y :scs (complex-single-reg)))
+  (:note "pointer to complex float coercion")
+  (:generator 2
+    (inst fload :double y x (- (* complex-single-float-data-slot n-word-bytes)
+                               other-pointer-lowtag))))
+
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
 
@@ -473,8 +528,8 @@
   (:policy :fast-safe)
   (:generator 2
     (with-fixed-allocation (ptr pa-flag double-float-widetag 8)
-      (inst sw lo-bits ptr 0)
-      (inst sw hi-bits ptr 4)
+      (storew lo-bits ptr 0)
+      (storew hi-bits ptr 1)
       (inst fload :double res ptr 0))))
 
 #+64-bit
@@ -487,7 +542,9 @@
   (:translate make-double-float)
   (:policy :fast-safe)
   (:generator 2
-    (inst fmvx-> :double res bits)))
+    (inst slli hi-bits hi-bits 32)
+    (inst add hi-bits hi-bits lo-bits)          
+    (inst fmvx-> :double res hi-bits)))
 
 (define-vop (single-float-bits)
    (:args (float :scs (single-reg)))
@@ -508,7 +565,7 @@
   (:translate double-float-bits)
   (:policy :fast-safe)
   (:generator 1
-    (inst fmvx<- :double bits float)))
+    (inst fmvx<- :double res float)))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg)))
@@ -516,13 +573,18 @@
   (:arg-types double-float)
   (:result-types signed-num)
   (:temporary (:sc non-descriptor-reg) pa-flag)
+  #-64-bit
   (:temporary (:sc descriptor-reg) ptr)
   (:translate double-float-high-bits)
   (:policy :fast-safe)
   (:generator 2
+    #-64-bit
     (with-fixed-allocation (ptr pa-flag double-float-widetag 4)
       (inst fstore :double float ptr 0)
-      (inst lw hi-bits ptr 4))))
+      (loadw hi-bits ptr 1))
+    #+64-bit
+    (inst fmvx<- :double pa-flag float)
+    (inst srli hi-bits pa-flag 32)))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg)))

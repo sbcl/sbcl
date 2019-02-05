@@ -247,10 +247,10 @@
     signed-reg signed-num :word :signed t)
   #+64-bit
   (def-system-ref-and-set sap-ref-64 %set-sap-ref-64
-    unsigned-reg unsigned-num :long :signed nil)
+    unsigned-reg unsigned-num :dword :signed nil)
   #+64-bit
   (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64
-    signed-reg signed-num :long :signed t)
+    signed-reg signed-num :dword :signed t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
     sap-reg system-area-pointer #-64-bit :word #+64-bit :dword)
   (def-system-ref-and-set sap-ref-lispobj %set-sap-ref-lispobj

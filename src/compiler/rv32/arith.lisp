@@ -498,9 +498,9 @@
 ;;;; Modular arithmetic
 (macrolet
     ((define-modular-backend (fun &optional constantp)
-       (let ((mfun-name (symbolicate fun '-mod32))
-             (modvop (symbolicate 'fast- fun '-mod32/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun '-mod32-c/unsigned=>unsigned))
+       (let ((mfun-name (symbolicate fun #-64-bit '-mod32 #+64-bit '-mod64))
+             (modvop (symbolicate 'fast- fun #-64-bit '-mod32/unsigned=>unsigned #+64-bit '-mod64/unsigned=>unsigned))
+             (modcvop (symbolicate 'fast- fun #-64-bit '-mod32-c/unsigned=>unsigned #+64-bit '-mod64-c/unsigned=>unsigned))
              (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
              (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
          `(progn
@@ -514,22 +514,55 @@
   (define-modular-backend - t)
   (define-modular-backend *))
 
-(define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
-             fast-ash-c/unsigned=>unsigned)
+#-64-bit
+(progn
+  (define-vop (fast-ash-left-mod32-c/unsigned=>unsigned
+               fast-ash-c/unsigned=>unsigned)
     (:translate ash-left-mod32))
 
-(define-vop (fast-ash-left-mod32/unsigned=>unsigned
-             fast-ash-left/unsigned=>unsigned))
+  (define-vop (fast-ash-left-mod32/unsigned=>unsigned
+               fast-ash-left/unsigned=>unsigned))
 
-(deftransform ash-left-mod32 ((integer count)
-                              ((unsigned-byte 32) (unsigned-byte 5)))
-  (when (sb-c::constant-lvar-p count)
-    (sb-c::give-up-ir1-transform))
-  '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count))
+  (deftransform ash-left-mod32 ((integer count)
+                                ((unsigned-byte 32) (unsigned-byte 5)))
+    (when (sb-c::constant-lvar-p count)
+      (sb-c::give-up-ir1-transform))
+    '(%primitive fast-ash-left-mod32/unsigned=>unsigned integer count)))
 
+#+64-bit
+(progn
+  (define-vop (fast-ash-left-mod64-c/unsigned=>unsigned
+               fast-ash-c/unsigned=>unsigned)
+    (:translate ash-left-mod64))
+
+  (define-vop (fast-ash-left-mod64/unsigned=>unsigned
+               fast-ash-left/unsigned=>unsigned))
+
+  (deftransform ash-left-mod64 ((integer count)
+                                ((unsigned-byte 64) (unsigned-byte 6)))
+    (when (sb-c::constant-lvar-p count)
+      (sb-c::give-up-ir1-transform))
+    '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count)))
+
+#-64-bit
 (define-modular-fun lognot-mod32 (x) lognot :untagged nil 32)
+#+64-bit
+(define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
+
+#-64-bit
 (define-vop (lognot-mod32/unsigned=>unsigned)
   (:translate lognot-mod32)
+  (:args (x :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:results (r :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:policy :fast-safe)
+  (:generator 1
+    (inst xori r x -1)))
+
+#+64-bit
+(define-vop (lognot-mod64/unsigned=>unsigned)
+  (:translate lognot-mod64)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (r :scs (unsigned-reg)))
@@ -679,7 +712,8 @@
     (inst mulhu hi x y)
     (inst mul lo x y)))
 
-(define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
+(define-vop (bignum-lognot #-64-bit lognot-mod32/unsigned=>unsigned
+                           #+64-bit lognot-mod64/unsigned=>unsigned)
   (:translate sb-bignum:%lognot))
 
 (define-vop (fixnum-to-digit)

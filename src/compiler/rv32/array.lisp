@@ -109,9 +109,19 @@
   (def-partial-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum 2 nil unsigned-reg signed-reg)
   (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum any-reg)
   (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg)
-  (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num unsigned-reg)
-  (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num signed-reg)
-  (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num unsigned-reg))
+  #-64-bit
+  (progn
+    (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num unsigned-reg)
+    (def-full-data-vector-frobs simple-array-signed-byte-32 signed-num signed-reg)
+    (def-full-data-vector-frobs simple-array-unsigned-byte-32 unsigned-num unsigned-reg))
+  #+64-bit
+  (progn
+    (def-partial-data-vector-frobs simple-array-unsigned-byte-31 positive-fixnum 4 nil unsigned-reg signed-reg)
+    (def-partial-data-vector-frobs simple-array-signed-byte-32 tagged-num 4 t signed-reg)
+    (def-partial-data-vector-frobs simple-array-unsigned-byte-32 positive-fixnum 4 nil unsigned-reg signed-reg)
+    (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num unsigned-reg)
+    (def-full-data-vector-frobs simple-array-signed-byte-64 signed-num signed-reg)
+    (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num unsigned-reg)))
 
 ;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
@@ -139,9 +149,7 @@
                 ;; Load the word in question.
                 (inst slli temp temp n-fixnum-tag-bits)
                 (inst add lip object temp)
-                (inst lw result lip
-                      (- (* vector-data-offset n-word-bytes)
-                         other-pointer-lowtag))
+                (loadw result lip vector-data-offset other-pointer-lowtag)
                 ;; Compute the position of the bitfield we need.
                 (inst andi temp index ,(1- elements-per-word))
                 ,@(unless (= bits 1)
@@ -193,9 +201,7 @@
                 (inst srli temp index ,bit-shift)
                 ;; Load the word in question.
                 (inst add lip object temp)
-                (inst lw old lip
-                      (- (* vector-data-offset n-word-bytes)
-                         other-pointer-lowtag))
+                (loadw old lip vector-data-offset other-pointer-lowtag)
                 ;; Compute the position of the bitfield we need.
                 (inst andi shift index ,(1- elements-per-word))
                 ,@(unless (= bits 1)

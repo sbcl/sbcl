@@ -569,8 +569,10 @@
        (:temporary (:scs (descriptor-reg) :to :eval) stepping)
 
        ,@(unless (eq return :tail)
-           '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
-             (:temporary (:scs (interior-reg)) lip)))
+           '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
+       ,@(unless (and (eq return :tail)
+                      (not (eq named :direct)))
+           '((:temporary (:scs (interior-reg)) lip)))
        
        (:generator ,(+ (if named 5 0)
                        (if variable 19 1)
@@ -680,7 +682,13 @@
                     (do-next-filler)
                     (insert-step-instrumenting function)))
                  (:direct
-                  `((inst lw function null-tn (static-fun-offset fun)))))
+                  `((typecase (static-fun-offset fun)
+                      (short-immediate
+                       (inst #-64-bit lw #+64-bit ld function null-tn (static-fun-offset fun)))
+                      (t
+                       (inst li function (static-fun-offset fun))
+                       (inst add lip null-tn function)
+                       (inst #-64-bit lw #+64-bit ld function lip 0))))))
              (loop
                (if filler
                    (do-next-filler)

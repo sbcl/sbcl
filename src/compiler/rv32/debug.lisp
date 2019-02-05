@@ -38,7 +38,7 @@
   (:result-types *)
   (:generator 5
     (inst add sap object offset)
-    (inst lw result sap 0)))
+    (loadw result sap 0)))
 
 (define-vop (read-control-stack-c)
   (:translate stack-ref)
@@ -49,7 +49,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 4
-    (inst lw result object (* offset n-word-bytes))))
+    (loadw result object offset)))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -63,7 +63,7 @@
   (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
   (:generator 2
     (inst add sap object offset)
-    (inst sw value sap 0)
+    (storew value sap 0)
     (move result value)))
 
 (define-vop (write-control-stack-c)
@@ -76,7 +76,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 1
-    (inst sw value sap (* offset n-word-bytes))
+    (storew value sap (* offset n-word-bytes))
     (move result value)))
 
 (define-vop (code-from-mumble)

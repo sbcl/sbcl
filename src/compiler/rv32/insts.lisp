@@ -249,6 +249,10 @@
   (define-load-instruction lb #b000)
   (define-load-instruction lh #b001)
   (define-load-instruction lw #b010)
+  #+64-bit
+  (progn
+    (define-load-instruction lwu #b110)
+    (define-load-instruction ld #b011))
   (define-load-instruction lbu #b100)
   (define-load-instruction lhu #b101))
 
@@ -259,7 +263,9 @@
                  (emit-s-inst segment offset rs2 rs1 ,funct3 #b0100011)))))
   (define-store-instruction sb #b000)
   (define-store-instruction sh #b001)
-  (define-store-instruction sw #b010))
+  (define-store-instruction sw #b010)
+  #+64-bit
+  (define-store-instruction sd #b011))
 
 (macrolet ((define-immediate-arith-instruction (name funct3 &optional (imm 'imm))
              `(define-instruction ,name (segment rd rs imm)
@@ -331,6 +337,18 @@
           (multiple-value-bind (hi lo) (u-and-i-inst-immediate value)
             (inst lui reg hi)
             (inst addi reg reg lo))))))
+    ((or (signed-byte 64) (unsigned-byte 64))
+     ;; FIXME.
+     (let ((value (coerce-signed value 64)))
+       (inst addi reg reg (coerce-signed (ldb (byte 12 52) value) 12))
+       (inst slli reg reg 12)
+       (loop for i from 52 downto 19 by 11
+             do (unless (zerop (ldb (byte 11 i) value))
+                  (inst addi reg reg (ldb (byte 11 i) value))
+                  (inst slli reg reg 11)))
+       (inst addi reg reg (ldb (byte 11 8) value))
+       (inst slli reg reg 8)
+       (inst addi reg reg (ldb (byte 8 0) value))))
     (fixup
      (inst lui reg value)
      (inst addi reg reg value))))
@@ -541,7 +559,7 @@
 
 (defun emit-header-data (segment type)
   (emit-back-patch
-   segment 4
+   segment n-word-bytes
    #'(lambda (segment posn)
        (emit-machine-word segment
                           (logior type

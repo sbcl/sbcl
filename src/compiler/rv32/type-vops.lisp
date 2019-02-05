@@ -28,6 +28,17 @@
                    :drop-through drop-through
                    :value-tn-ref value-tn-ref)))
 
+#+64-bit
+(defun %test-fixnum-immediate-and-headers (value temp target not-p immediate
+                                           headers &key value-tn-ref)
+  (let ((drop-through (gen-label)))
+    (inst andi temp value fixnum-tag-mask)
+    (inst beq temp zero-tn (if not-p drop-through target))
+    (%test-immediate-and-headers value temp target not-p immediate headers
+                                 :drop-through drop-through
+                                 :value-tn-ref value-tn-ref)))
+
+
 (defun %test-immediate (value temp target not-p immediate)
   (assemble ()
     (inst andi temp value widetag-mask)
@@ -87,15 +98,24 @@
                           (inst bge zero-tn temp target))
                       (inst bge zero-tn temp when-true))))))))
         (emit-label drop-through)))))
+
+(defun %test-immediate-and-headers (value temp target not-p immediate headers
+                                    &key (drop-through (gen-label))
+                                         value-tn-ref)
+
+  (inst li temp immediate)
+  ;; should there be a (zero) extension here?
+  (inst beq temp value (if not-p drop-through target))
+  (%test-headers value temp target not-p nil headers
+                 :drop-through drop-through
+                 :value-tn-ref value-tn-ref))
+
 
 ;;;; Other integer ranges.
 
-;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
-;;; exactly one digit.
-
-;;; A (SIGNED-BYTE 32) can be represented with either fixnum or a
+;;; A (SIGNED-BYTE N-WORD-BITS) can be represented with either fixnum or a
 ;;; bignum with exactly one digit.
-(defun signed-byte-32-test (value temp not-p target not-target)
+(defun signed-byte-n-word-bits-test (value temp not-p target not-target)
   (multiple-value-bind (yep nope)
       (if not-p
           (values not-target target)
@@ -111,17 +131,17 @@
           (inst beq temp zero-tn target))))
   (values))
 
-(define-vop (signed-byte-32-p type-predicate)
-  (:translate signed-byte-32-p)
+(define-vop (#-64-bit signed-byte-32-p #+64-bit signed-byte-64-p type-predicate)
+  (:translate #-64-bit signed-byte-32-p #+64-bit signed-byte-64-p)
   (:generator 45
    (let ((not-target (gen-label)))
-     (signed-byte-32-test value temp not-p target not-target)
+     (signed-byte-n-word-bits-test value temp not-p target not-target)
      (emit-label not-target))))
 
-;;; An (UNSIGNED-BYTE 32) can be represented with either a positive
+;;; An (UNSIGNED-BYTE N-WORD-BITS) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
-(defun unsigned-byte-32-test (value temp not-p target not-target)
+(defun unsigned-byte-n-word-bits-test (value temp not-p target not-target)
   (multiple-value-bind (yep nope)
       (if not-p
           (values not-target target)
@@ -138,14 +158,14 @@
       ;; Is it one?
       (inst xori temp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst beq temp zero-tn single-word)
-      ;; If it's other than two, we can't be an (unsigned-byte 32)
+      ;; If it's other than two, we can't be an (unsigned-byte n-word-bits)
       (inst xori temp temp
             (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
                     (+ (ash 2 n-widetag-bits) bignum-widetag)))
       (inst bne temp zero-tn nope)
       ;; Get the second digit.
       (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-      ;; All zeros, its an (unsigned-byte 32).
+      ;; All zeros, its an (unsigned-byte n-word-bits).
       (inst beq temp zero-tn yep)
       (inst j nope)
 
@@ -153,18 +173,18 @@
       ;; Get the single digit.
       (loadw temp value bignum-digits-offset other-pointer-lowtag)
 
-      ;; positive implies (unsigned-byte 32).
+      ;; positive implies (unsigned-byte n-word-bits).
       FIXNUM
       (if not-p
           (inst blt temp zero-tn target)
           (inst bge temp zero-tn target))))
   (values))
 
-(define-vop (unsigned-byte-32-p type-predicate)
-  (:translate unsigned-byte-32-p)
+(define-vop (#-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p type-predicate)
+  (:translate #-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p)
   (:generator 45
    (let ((not-target (gen-label)))
-     (unsigned-byte-32-test value temp not-p target not-target)
+     (unsigned-byte-n-word-bits-test value temp not-p target not-target)
      (emit-label not-target))))
 
 ;;;; List/symbol types:

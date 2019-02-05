@@ -23,20 +23,20 @@
 (macrolet ((def-mem-op (op inst shift)
              `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
                 `(inst ,',inst ,object ,base (- (ash ,offset ,,shift) ,lowtag)))))
-  (def-mem-op loadw lw word-shift)
-  (def-mem-op storew sw word-shift))
+  (def-mem-op loadw #-64-bit lw #+64-bit ld word-shift)
+  (def-mem-op storew #-64-bit sw #+64-bit sd word-shift))
 
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
 
 (defmacro load-symbol-value (reg symbol)
-  `(inst lw ,reg null-tn
+  `(inst #-64-bit lw #+64-bit ld ,reg null-tn
          (+ (static-symbol-offset ',symbol)
-              (ash symbol-value-slot word-shift)
-              (- other-pointer-lowtag))))
+            (ash symbol-value-slot word-shift)
+            (- other-pointer-lowtag))))
 
 (defmacro store-symbol-value (reg symbol)
-  `(inst sw ,reg null-tn
+  `(inst #-64-bit sw #+64-bit sd ,reg null-tn
          (+ (static-symbol-offset ',symbol)
             (ash symbol-value-slot word-shift)
             (- other-pointer-lowtag))))
@@ -207,7 +207,8 @@ and
              '((inst add lip lip index)))
          (inst ,(ecase size
                   (1 (if signed 'lb 'lbu))
-                  (2 (if signed 'lh 'lhu)))
+                  (2 (if signed 'lh 'lhu))
+                  (4 (if signed 'lw 'lwu)))
                value lip (- (* ,offset n-word-bytes) ,lowtag))))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate
@@ -222,7 +223,8 @@ and
        (:generator 4
          (inst ,(ecase size
                   (1 (if signed 'lb 'lbu))
-                  (2 (if signed 'lh 'lhu)))
+                  (2 (if signed 'lh 'lhu))
+                  (4 (if signed 'lw 'lwu)))
                value object
                (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))))))
 
@@ -237,10 +239,14 @@ and
        (:temporary (:scs (interior-reg)) lip)
        (:result-types ,eltype)
        (:generator 5
+         ,@(let ((shift size))
+             (decf shift n-fixnum-tag-bits)
+             (unless (zerop shift)
+               (if (minusp shift)
+                   `((inst srai index index ,shift))
+                   `((inst slli index index ,shift)))))
          (inst add lip object index)
-         ,@(when (= size 1)
-             '((inst add lip lip index)))
-         (inst ,(ecase size (1 'sb) (2 'sh))
+         (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
                value lip (- (* ,offset n-word-bytes) ,lowtag))
          (move result value)))
      (define-vop (,(symbolicate name "-C"))
@@ -256,7 +262,7 @@ and
        (:results (result :scs ,scs))
        (:result-types ,eltype)
        (:generator 4
-         (inst ,(ecase size (1 'sb) (2 'sh))
+         (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))
                value object
                (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))
          (move result value)))))

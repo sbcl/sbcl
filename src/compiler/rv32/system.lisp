@@ -192,7 +192,7 @@
     (inst add res offset res)
     (inst subi res res other-pointer-lowtag)
     (inst add lip code res)
-    (inst lw res lip 0)))
+    (loadw res lip 0)))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
