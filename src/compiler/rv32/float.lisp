@@ -486,13 +486,13 @@
     single-reg single-float :single
     double-reg double-float :double))
 
-(macrolet ((frob (name from-sc from-type from-format rm)
+(macrolet ((frob (name trans from-sc from-type from-format rm)
              `(define-vop (,name)
                 (:args (x :scs (,from-sc)))
                 (:results (y :scs (signed-reg)))
                 (:arg-types ,from-type)
                 (:result-types signed-num)
-                (:translate %unary-round)
+                (:translate ,trans)
                 (:policy :fast-safe)
                 (:note "inline float round")
                 (:vop-var vop)
@@ -500,10 +500,10 @@
                 (:generator 2
                   (note-this-location vop :internal-error)
                   (inst fcvt :word ,from-format y x ,rm)))))
-  (frob %unary-round/single-float single-reg single-float :single :rne)
-  (frob %unary-round/double-float double-reg double-float :double :rne)
-  (frob %unary-truncate/single-float single-reg single-float :single :rtz)
-  (frob %unary-truncate/double-float double-reg double-float :double :rtz))
+  (frob %unary-round/single-float %unary-round single-reg single-float :single :rne)
+  (frob %unary-round/double-float %unary-round double-reg double-float :double :rne)
+  (frob %unary-truncate/single-float %unary-truncate/single-float single-reg single-float :single :rtz)
+  (frob %unary-truncate/double-float %unary-truncate/double-float double-reg double-float :double :rtz))
 
 (define-vop (make-single-float)
    (:args (bits :scs (signed-reg)))
