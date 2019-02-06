@@ -541,24 +541,28 @@ necessary, since type inference may take arbitrarily long to converge.")
   (ir1-finalize component)
   (values))
 
+;;; COMPILE-FILE usually puts all nontoplevel code in immobile space, but COMPILE
+;;; offers a choice. Because the immobile space GC does not run often enough (yet),
+;;; COMPILE usually places code in the dynamic space managed by our copying GC.
+;;; Change this variable if your application always demands immobile code.
+;;; In particular, ELF cores shrink the immobile code space down to just enough
+;;; to contain all code, plus about 1/2 MiB of spare, which means that you can't
+;;; subsequently compile a whole lot into immobile space.
+;;; The value is changed to :AUTO in make-target-2-load.lisp which supresses
+;;; codegen optimizations for immobile space, but nonetheless prefers to allocate
+;;; the code there, falling back to dynamic space if there is no room left.
+;;; These controls exist whether or not the immobile-space feature is present.
+(declaim (type (member :immobile :dynamic :auto) *compile-to-memory-space*)
+         (type (member :immobile :dynamic) *compile-file-to-memory-space*))
+(defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
+(defvar *compile-file-to-memory-space* :immobile) ; BUILD-TIME default
+
 #-immobile-code
 (defun component-mem-space (component)
   (component-%mem-space component))
 
 #+immobile-code
 (progn
-  (declaim (type (member :immobile :dynamic :auto) *compile-to-memory-space*)
-           (type (member :immobile :dynamic) *compile-file-to-memory-space*))
-  ;; COMPILE-FILE puts all nontoplevel code in immobile space, but COMPILE
-  ;; offers a choice. Because the collector does not run often enough (yet),
-  ;; COMPILE usually places code in the dynamic space managed by our copying GC.
-  ;; Change this variable if your application always demands immobile code.
-  ;; The value is changed to :AUTO in make-target-2-load.lisp
-  ;; which does not perform any codegen optimizations for immobile space,
-  ;; but nonetheless prefers to allocate the code there, falling back to
-  ;; dynamic space if there is no room left in immobile space.
-  (defvar *compile-to-memory-space* :immobile) ; BUILD-TIME default
-  (defvar *compile-file-to-memory-space* :immobile) ; BUILD-TIME default
   (defun component-mem-space (component)
     (or (component-%mem-space component)
         (setf (component-%mem-space component)
@@ -566,7 +570,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (and (eq *compile-file-to-memory-space* :immobile)
                        (neq (component-kind component) :toplevel)
                        :immobile)
-                      *compile-to-memory-space*))))
+                  *compile-to-memory-space*))))
   (defun code-immobile-p (thing)
     #+sb-xc-host (declare (ignore thing)) #+sb-xc-host t
     #-sb-xc-host

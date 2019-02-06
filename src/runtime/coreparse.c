@@ -86,10 +86,10 @@ open_binary(char *filename, int mode)
 #define ELFCORE 1
 extern __attribute__((weak)) lispobj
  __lisp_code_start, lisp_jit_code, __lisp_code_end, __lisp_linkage_values;
-static inline boolean code_in_elf() { return &__lisp_code_start != 0; }
+int lisp_code_in_elf() { return &__lisp_code_start != 0; }
 #else
 #define ELFCORE 0
-static inline boolean code_in_elf() { return 0; }
+int lisp_code_in_elf() { return 0; }
 #endif
 
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
@@ -687,7 +687,7 @@ static void relocate_heap(struct heap_adjust* adj)
         adjust_word_at(jump_table, adj);
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
-    if (code_in_elf())
+    if (lisp_code_in_elf())
         adj->range[2].delta = 0; // FIXME: isn't this this already the case?
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
@@ -762,8 +762,8 @@ process_directory(int count, struct ndir_entry *entry,
                (uword_t)&__lisp_code_start, (uword_t)&__lisp_code_end,
                varyobj_free_pointer);
 #endif
-        // Prefill the Lisp linkage table so that we can (pending some additional work)
-        // remove "-ldl" from the linker options when making a shrinkwrapped executable.
+        // Prefill the Lisp linkage table so that shrinkwrapped executables which link in
+        // all their C library dependencies can avoid linking with -ldl.
         // All data references are potentially needed because aliencomp doesn't emit
         // SAP-REF-n in a way that admits elision of the linkage entry. e.g.
         //     MOV RAX, [#x20200AA0] ; some_c_symbol
@@ -968,7 +968,7 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
 #  endif // LISP_FEATURE_GENCGC
     if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta) {
-        if (adj->range[1].delta && code_in_elf())
+        if (adj->range[1].delta && lisp_code_in_elf())
             lose("Relocation of fixedobj space not supported with ELF core.\n\
 Please report this as a bug");
         relocate_heap(adj);

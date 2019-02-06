@@ -142,6 +142,8 @@ Tertiary value is true if any conditions of type ERROR, or WARNING that are
 not STYLE-WARNINGs occur during compilation, and NIL otherwise.
 "
   (multiple-value-bind (compiled-definition warnings-p failure-p)
+      ;; TODO: generic functions with any interpreted methods
+      ;; should compile the methods and reinstall them.
       (if (compiled-function-p definition)
           (values definition nil nil)
           (compile-in-lexenv definition (make-null-lexenv) name))

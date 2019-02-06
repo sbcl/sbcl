@@ -23,23 +23,21 @@
 ;;;; to evaluate EXPR -- if EXPR is already a lambda form, there's
 ;;;; no need.
 (defun make-eval-lambda (expr)
-  (flet ((lexpr-p (x)
-           (typep x '(cons (member lambda named-lambda lambda-with-lexenv)))))
-    (cond ((lexpr-p expr)
-           (values expr nil))
-          (t
-           (when (typep expr '(cons (eql function) (cons t null)))
-             (let ((inner (second expr)))
-               (when (lexpr-p inner)
-                 (return-from make-eval-lambda (values inner nil)))))
-           (values `(lambda ()
+  (let ((lambda (if (typep expr '(cons (eql function) (cons t null)))
+                    (cadr expr)
+                    expr)))
+    (if (typep lambda '(cons (member lambda named-lambda lambda-with-lexenv)))
+        (values lambda nil)
+        (values `(lambda ()
                  ;; why PROGN? So that attempts to eval free declarations
                  ;; signal errors rather than return NIL. -- CSR, 2007-05-01
-                 ;; If EXPR is already a PROGN form, leave it alone.
-                      ,(if (typep expr '(cons (eql progn)))
-                           expr
-                           `(progn ,expr)))
-                   t)))))
+                 ;; But only force in a PROGN if it's actually needed to flag
+                 ;; that situation as an error. Macros can't expand into DECLARE,
+                 ;; so anything other than DECLARE can be left alone.
+                   ,(if (and (consp expr) (eq (car expr) 'declare))
+                        `(progn ,expr)
+                        expr))
+                t))))
 
 ;;; FIXME: what does "except in that it can't handle toplevel ..." mean?
 ;;; Is there anything wrong with the implementation, or is the comment obsolete?

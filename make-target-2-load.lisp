@@ -348,7 +348,7 @@ Please check that all strings which were not recognizable to the compiler
   (loop (multiple-value-bind (winp symbol) (iter)
           (if winp (unintern symbol "CL-USER") (return)))))
 
-#+immobile-code (setq sb-c::*compile-to-memory-space* :auto)
+(setq sb-c::*compile-to-memory-space* :auto)
 #+sb-fasteval (setq sb-ext:*evaluator-mode* :interpret)
 ;; folding doesn't actually do anything unless the backend supports it,
 ;; but the interface exists no matter what.

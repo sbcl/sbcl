@@ -856,6 +856,9 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
                widetag == FUNCALLABLE_INSTANCE_WIDETAG) {
         // both of these have non-descriptor bits in at least one word,
         // thus precluding a simple range scan.
+        // Due to ignored address bounds, in the rare case of a FIN or fdefn in varyobj
+        // subspace and spanning cards, we might say that neither card can be protected,
+        // when one or the other could be. Not a big deal.
         return fixedobj_points_to_younger_p(obj, sizetab[widetag](obj),
                                             gen, keep_gen, new_gen);
     } else if (widetag == SIMPLE_VECTOR_WIDETAG) {

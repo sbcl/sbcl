@@ -536,34 +536,35 @@
 (defun sb-c::install-guard-function (symbol fun-name)
   ;; (SETF SYMBOL-FUNCTION) goes out of its way to disallow this closure,
   ;; but we can trivially replicate its low-level effect.
-  (let ((fdefn (find-or-create-fdefn symbol))
-        (closure
+  (let ((closure
          (set-closure-name
           (lambda (&rest args)
            (declare (ignore args))
            ;; ANSI specification of FUNCALL says that this should be
            ;; an error of type UNDEFINED-FUNCTION, not just SIMPLE-ERROR.
            ;; SPECIAL-FORM-FUNCTION is a subtype of UNDEFINED-FUNCTION.
-           (error (if (eq (info :function :kind symbol) :special-form)
+           (error (if (special-operator-p symbol)
                       'special-form-function
                       'undefined-function)
                   :name symbol))
           t
           fun-name)))
-    ;; For immobile-code, do something slightly different: fmakunbound,
-    ;; then assign the fdefn-fun slot to avoid consing a new closure trampoline.
+    ;; In most cases, install the guard closure in the usual way.
+    #-immobile-code (setf (fdefn-fun (find-or-create-fdefn symbol)) closure)
+
+    ;; Do something slightly different for immobile code: fmakunbound, causing the FUN
+    ;; slot to become NIL, and RAW-ADDR to contain a call instruction; then overwrite
+    ;; NIL with the above closure. This is better than assigning a closure, because
+    ;; assigning a closure into an fdefn generally conses a new closure trampoline.
+    ;; (The CALL goes to undefined tramp which pops the stack to deduce the fdefn)
     #+immobile-code
-    (progn (fdefn-makunbound fdefn)
-           ;; There is no :SET-TRANS for the primitive object's fdefn-fun slot,
-           ;; nor do we desire the full effect of %SET-FDEFN-FUN.
-           (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address fdefn))
-                                  (- (ash sb-vm:fdefn-fun-slot sb-vm:word-shift)
-                                     sb-vm:other-pointer-lowtag))
-                 closure))
-    ;; The above would work, but there's no overhead when installing a closure
-    ;; the regular way, so just do that.
-    #-immobile-code
-    (setf (fdefn-fun fdefn) closure)))
+    (let ((fdefn (find-or-create-fdefn symbol)))
+      (fdefn-makunbound fdefn)
+      (%primitive sb-vm::set-fdefn-fun ; This invokes TOUCH-GC-CARD
+                  fdefn closure
+                  (sap-ref-word (int-sap (get-lisp-obj-address fdefn))
+                                (- (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)
+                                   sb-vm:other-pointer-lowtag))))))
 
 ;;;; Iterating over closure values
 

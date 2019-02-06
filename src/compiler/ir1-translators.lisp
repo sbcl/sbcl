@@ -327,6 +327,8 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
             (fail "The local macro argument list ~S is not a list."
                   arglist))
           `(,name macro .
+                  ;; FIXME: either: (1) never compile these,
+                  ;; or (2) compile just-in-time (on first use of the expander).
                   ,(compile-in-lexenv
                     (let (#-sb-xc-host
                           (*macro-policy*

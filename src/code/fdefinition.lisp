@@ -39,7 +39,6 @@
   #+immobile-code (sb-vm::%set-fdefn-fun fdefn fun)
   #-immobile-code (setf (fdefn-fun fdefn) fun))
 
-#-sb-fluid (declaim (inline symbol-fdefn))
 ;; Return SYMBOL's fdefinition, if any, or NIL. SYMBOL must already
 ;; have been verified to be a symbol by the caller.
 (defun symbol-fdefn (symbol)
