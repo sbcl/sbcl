@@ -13,10 +13,12 @@
 
 ;;;; general warm init compilation policy
 
-(let ((s (find-symbol "*/SHOW*" "SB-INT")))
+(locally
+    (declare (notinline find-symbol)) ; don't ask
+  (let ((s (find-symbol "*/SHOW*" "SB-INT")))
   ;; If you made it this far, chances are that you no longer wish to see
   ;; whatever it is that show would have shown. Comment this out if you need.
-  (when s (set s nil)))
+    (when s (set s nil))))
 
 (assert (zerop (deref (extern-alien "lowtag_for_widetag" (array char 64))
                       (ash sb-vm:character-widetag -2))))

@@ -836,6 +836,9 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *!default-package-use-list* nil))
 
+;;; This would have to be bumped ~ 2*most-positive-fixnum times to overflow.
+(define-load-time-global *package-names-cookie* sb-xc:most-negative-fixnum)
+
 (defun make-package (name &key
                           (use '#.*!default-package-use-list*)
                           nicknames
@@ -886,7 +889,8 @@ implementation it is ~S." *!default-package-use-list*)
          ;; other MAKE-PACKAGE operations, but we need the additional lock
          ;; so that it synchronizes with RENAME-PACKAGE.
          (with-package-names (table)
-           (%register-package table name package))
+           (%register-package table name package)
+           (incf *package-names-cookie*))
          (return package)))
      (bug "never")))
 
@@ -947,6 +951,8 @@ implementation it is ~S." *!default-package-use-list*)
            (setf (package-%name package) name
                  (package-%nicknames package) ()))
          (%enter-new-nicknames package nicks))
+       (with-package-names (table)
+         (incf *package-names-cookie*))
        (return package))))
 
 (defun delete-package (package-designator)
@@ -1009,7 +1015,8 @@ implementation it is ~S." *!default-package-use-list*)
                           ;; ANSI requires. Setting the other slots to NIL
                           ;; and blowing away the PACKAGE-HASHTABLES is just done
                           ;; for tidiness and to help the GC.
-                          (package-%nicknames package) nil))
+                          (package-%nicknames package) nil)
+                    (incf *package-names-cookie*))
                   (setf (package-%use-list package) nil
                         (package-tables package) #()
                         (package-%shadowing-symbols package) nil
@@ -1037,7 +1044,7 @@ implementation it is ~S." *!default-package-use-list*)
     (!do-packages (package) (push package result))
     result))
 
-(macrolet ((find/intern (function &rest more-args)
+(macrolet ((find/intern (function package-lookup &rest more-args)
              ;; Both %FIND-SYMBOL and %INTERN require a SIMPLE-STRING,
              ;; but accept a LENGTH. Given a non-simple string,
              ;; we need copy it only if the cumulative displacement
@@ -1063,21 +1070,56 @@ implementation it is ~S." *!default-package-use-list*)
                                     (- end start)))))
                 (truly-the
                  (values symbol (member :internal :external :inherited nil))
-                 (,function name length
-                            (find-undeleted-package-or-lose package)
-                            ,@more-args)))))
+                 (,function name length ,package-lookup ,@more-args)))))
 
   (defun intern (name &optional (package (sane-package)))
   "Return a symbol in PACKAGE having the specified NAME, creating it
   if necessary."
-    (find/intern %intern (if (base-string-p name) 'base-char 'character)))
+    (find/intern %intern
+                 ;; Avoid one function call if we have a known good package.
+                 (if (and (packagep package) (package-%name package))
+                     package
+                     (find-undeleted-package-or-lose package))
+                 (if (base-string-p name) 'base-char 'character)))
 
   (defun find-symbol (name &optional (package (sane-package)))
   "Return the symbol named STRING in PACKAGE. If such a symbol is found
   then the second value is :INTERNAL, :EXTERNAL or :INHERITED to indicate
   how the symbol is accessible. If no symbol is found then both values
   are NIL."
-    (find/intern %find-symbol)))
+    (find/intern %find-symbol
+                 ;; Avoid one function call if we have a known good package.
+                 (if (and (packagep package) (package-%name package))
+                     package
+                     (find-undeleted-package-or-lose package))))
+
+  (defun intern2 (name cell)
+    ;; INTERN2 will only receive a package object if it's one of the standard
+    ;; ones. Hence no check for PACKAGE-%NAME validity (i.e. non-deleted)
+    (find/intern %intern
+                 (if (packagep cell) cell (cached-find-package cell))
+                 (if (base-string-p name) 'base-char 'character)))
+
+  (defun find-symbol2 (name cell)
+    (find/intern %find-symbol ; likewise
+                 (if (packagep cell) cell (cached-find-package cell)))))
+
+(defun cached-find-package (cell)
+  (declare (type (simple-vector 4) cell))
+  ;; Cell is: (result cookie *package* string)
+  (when (and (eq (aref cell 1) *package-names-cookie*)
+             ;; find-package is affected by *PACKAGE* due to package-local nicknames,
+             ;; so only return a cached package if *PACKAGE* is unchanged from before.
+             (eq (weak-pointer-value (truly-the weak-pointer (aref cell 2)))
+                 *package*))
+    (let ((found (weak-pointer-value (truly-the weak-pointer (aref cell 0)))))
+      (when (and (packagep found) (package-%name found))
+        (return-from cached-find-package found))))
+  (let ((found (find-undeleted-package-or-lose (aref cell 3))))
+    (setf (aref cell 0) (make-weak-pointer found)
+          (aref cell 1) *package-names-cookie*
+          (aref cell 2) (make-weak-pointer *package*))
+    found))
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
@@ -1816,3 +1858,28 @@ PACKAGE."
   (package-doc-string x))
 (defmethod (setf documentation) (new-value (x package) (doc-type (eql 't)))
   (setf (package-doc-string x) new-value))
+
+;;; We don't benefit from these transforms because any time we have a constant
+;;; package in our code, we refer to it via #.(FIND-PACKAGE).
+;;; This is a necessity due to the fact that historically all packages got renamed
+;;; during warm build, and all INTERN / FIND-SYMBOL calls had to continue to work.
+;;; Now we rename packages for the _next_ build, but the principle remains.
+(in-package "SB-C")
+(defun find-package-xform (package)
+  (let* ((string (string (lvar-value package)))
+         (std-pkg (cond ((string= string "KEYWORD") "KEYWORD")
+                        ((or (string= string "COMMON-LISP") (string= string "CL"))
+                         "CL")
+                        ((or (string= string "COMMON-LISP-USER")
+                             (string= string "CL-USER"))
+                         "CL-USER"))))
+    (if std-pkg
+        `(load-time-value (find-package ,std-pkg) t)
+        `(load-time-value
+          (vector (make-weak-pointer nil) 0 (make-weak-pointer nil) ,string)))))
+
+(deftransform intern ((name package-name) (t (constant-arg string-designator)))
+  `(sb-impl::intern2 name ,(find-package-xform package-name)))
+
+(deftransform find-symbol ((name package-name) (t (constant-arg string-designator)))
+  `(sb-impl::find-symbol2 name ,(find-package-xform package-name)))
