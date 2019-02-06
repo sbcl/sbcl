@@ -227,12 +227,7 @@ evaluated as a PROGN."
               (examine var keyword))))
         (nreverse caller-dxable)))))
 
-(sb-xc:defmacro defun (&environment env name lambda-list &body body)
-  "Define a function at top level."
-  (check-designator name defun)
-  #+sb-xc-host
-  (unless (cl:symbol-package (fun-name-block-name name))
-    (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
+(flet ((defun-expander (env name lambda-list body snippet)
   (multiple-value-bind (forms decls doc) (parse-body body t)
     ;; Maybe kill docstring, but only under the cross-compiler.
     #+(and (not sb-doc) sb-xc-host) (setq doc nil)
@@ -242,25 +237,36 @@ evaluated as a PROGN."
            (named-lambda `(named-lambda ,name ,lambda-list
                            ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
                            ,@(when doc (list doc)) ,@lambda-guts))
-           (dxable-args (extract-dx-args lambda-list decls))
+           ;; DXABLE-ARGS and SNIPPET are mutually exclusive, so we can sleazily pass
+           ;; whichever exists (if either does) as one parameter to %DEFUN.
+           (extra-info (or snippet (extract-dx-args lambda-list decls)))
            (inline-thing
-            (or (sb-kernel::defstruct-generated-defn-p name lambda-list body)
-                (when (save-inline-expansion-p name)
+            (cond ((member snippet '(:predicate :copier :accessor)) nil)
+                  ;; If the defstruct snippet is :CONSTRUCTOR, we might have to store
+                  ;; a full inline expansion depending on the lexical environment.
+                  ((save-inline-expansion-p name)
                   ;; we want to attempt to inline, so complain if we can't
-                  (acond ((sb-c:maybe-inline-syntactic-closure lambda env)
-                          (list 'quote it))
+                   (cond ((sb-c:maybe-inline-syntactic-closure lambda env))
                          (t
                           (#+sb-xc-host warn
                            #-sb-xc-host sb-c:maybe-compiler-notify
                            "lexical environment too hairy, can't inline DEFUN ~S"
                            name)
                           nil))))))
+      (when (and (eq snippet :constructor)
+                 (not (typep inline-thing '(cons (eql sb-c:lambda-with-lexenv)))))
+        ;; constructor in null lexenv need not save the expansion
+        (setq inline-thing nil))
+      (when inline-thing
+        (setq inline-thing (list 'quote inline-thing)))
+      (when (and extra-info (not (keywordp extra-info)))
+        (setq extra-info (list 'quote extra-info)))
       `(progn
          (eval-when (:compile-toplevel)
-           (sb-c:%compiler-defun ',name t ,inline-thing ',dxable-args))
+           (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
          (%defun ',name ,named-lambda
-                 ,@(when (or inline-thing dxable-args) (list inline-thing))
-                 ,@(when dxable-args `(',dxable-args)))
+                 ,@(when (or inline-thing extra-info) `(,inline-thing))
+                 ,@(when extra-info `(,extra-info)))
          ;; This warning, if produced, comes after the DEFUN happens.
          ;; When compiling, there's no real difference, but when interpreting,
          ;; if there is a handler for style-warning that nonlocally exits,
@@ -269,8 +275,19 @@ evaluated as a PROGN."
          ,@(when (typep name '(cons (eql setf)))
              `((eval-when (:compile-toplevel :execute)
                  (sb-c::warn-if-setf-macro ',name))
-               ',name))))))
+               ',name)))))))
 
+  (sb-xc:defmacro defun (&environment env name lambda-list &body body)
+    "Define a function at top level."
+    (check-designator name defun)
+    #+sb-xc-host
+    (unless (cl:symbol-package (fun-name-block-name name))
+      (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
+    (defun-expander env name lambda-list body nil))
+
+  ;; extended defun as used by defstruct
+  (sb-xc:defmacro sb-c:xdefun (&environment env name snippet lambda-list &body body)
+    (defun-expander env name lambda-list body snippet)))
 
 ;;;; DEFVAR and DEFPARAMETER
 

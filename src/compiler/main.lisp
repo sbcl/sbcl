@@ -1021,10 +1021,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (return-from deferrable-tlf-p nil))
   (cond ((or (and (eq (car form) 'sb-impl::%defun)
                   (typep (second form) '(cons (eql quote) (cons t null)))
-                  (or (member (fourth form) '(:copier :predicate :accessor))
-                      ;; maybe a constructor
-                      (typep (info :function :type (second (second form)))
-                             'defstruct-description)))
+                  ;; (%DEFUN 'THING #<lambda> INLINE-LAMBDA EXTRA-INFO)
+                  (member (fifth form) '(:copier :predicate :accessor :constructor)))
              ;; Also defer %target-defstruct until after the readers/writers are made,
              ;; or else CLOS garbage hits sb-pcl::uninitialized-accessor-function.
              (and (eq (car form) 'sb-kernel::%target-defstruct)))

@@ -1268,27 +1268,35 @@
     fun))
 
 ;;; Store INLINE-LAMBDA as the inline expansion of NAME.
-;;; As special cases, INLINE-LAMBDA can be a keyword which denotes
-;;; an auto-generated defstruct function of some kind.
-;;; The transform for those is stored in :SOURCE-TRANSFORM,
-;;; and not stored as an inline expansion.
-(defun %set-inline-expansion (name defined-fun inline-lambda dxable-args)
-  (cond ((member inline-lambda '(:accessor :copier :predicate))
-         ;; This special case implies a structure-related source transform.
-         ;; Warn if blowing away a previously existing inline expansion that
-         ;; came from an ordinary DEFUN that recorded an expansion.
-         (let ((old (info :function :inlining-data name)))
+;;; EXTRA-INFO is either a keyword denoting that NAME pertains to
+;;; an auto-generated defstruct function, or else it is the list of
+;;; funargs that could be auto-dxified.
+(defun %set-inline-expansion (name defined-fun inline-lambda extra-info
+                                   &aux (defstruct-snippet
+                                          (when (keywordp extra-info)
+                                            extra-info))
+                                        (dxable-args
+                                          (unless (keywordp extra-info)
+                                            extra-info)))
+  (cond (defstruct-snippet
+         ;; In this case, NAME is a system-generated function. Warn if blowing away
+         ;; a previously existing inline expansion coming from an ordinary DEFUN.
+         ;; FIXME: It's tricky to correctly warn about stomping on a constructor
+         ;; because it might actually be the right inline lambda.
+         ;; Probably should compare with EQUALP.
+         ;; FIXME: what does the below KLUDGE mean ?
+         (unless (eq defstruct-snippet :constructor)
+           (let ((old (info :function :inlining-data name)))
            ;; KLUDGE: This is like (NTH-VALUE 1 (FUN-NAME-INLINE-EXPANSION))
            ;; but expressed in a way that doesn't crash in cold-init.
-           (when (or (typep old 'inlining-data) (consp old))
+             (when (or (typep old 'inlining-data) (consp old))
              ;; Any inline expansion that existed can't be useful.
-             (warn "structure ~(~A~) ~S clobbers inline function"
-                   inline-lambda name))
-           (setq inline-lambda nil))) ; will be cleared below
+               (warn "structure ~(~A~) ~S clobbers inline function"
+                     defstruct-snippet name)))))
         (t
-         ;; Warn if stomping on a structure copier, predicate, or accessor
-         ;; whether or not we are about to install an inline-lambda.
          (let ((info (info :function :source-transform name)))
+           ;; If NAME was a defstruct snippet, and now it isn't, then warn
+           ;; and remove the transform.
            (when (consp info)
              (clear-info :function :source-transform name)
              ;; This is serious enough that you can get two warnings:
@@ -1323,28 +1331,34 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 
 ;;; the even-at-compile-time part of DEFUN
 ;;;
-;;; The INLINE-LAMBDA is either a symbol in {:ACCESSOR, :PREDICATE, :COPIER}
-;;; if the function is a structure accessor, predicate, or copier respectively;
-;;; or a LAMBDA-WITH-LEXENV, or NIL if there is no inline expansion.
-(defun %compiler-defun (name compile-toplevel inline-lambda dxable-args)
+;;; INLINE-LAMBDA is either (LAMBDA (...) ...) or (LAMBDA-WITH-LEXENV ...)
+;;; EXTRA-INFO is one of:
+;;; * a symbol in {:ACCESSOR, :PREDICATE, :COPIER, :CONSTRUCTOR} if the function
+;;;   came from defstruct; or
+;;; * a possibly empty list of dynamic extent arguments.
+;;; The inline lambda will be NIL for a structure accessor, predicate, or copier
+;;; since those can always be reconstructed from a defstruct description.
+(defun %compiler-defun (name compile-toplevel inline-lambda extra-info)
   (let ((defined-fun nil)) ; will be set below if we're in the compiler
     (when compile-toplevel
       (with-single-package-locked-error
           (:symbol name "defining ~S as a function")
         (setf defined-fun
               ;; Try to pass the lambda-list to GET-DEFINED-FUN if we can.
-              (etypecase inline-lambda
-                (atom (get-defined-fun name))
-                ((cons (eql lambda))
-                 (get-defined-fun name (second inline-lambda)))
-                ((cons (eql lambda-with-lexenv))
-                 (get-defined-fun name (third inline-lambda))))))
+              (if (atom inline-lambda)
+                  (get-defined-fun name)
+                  (get-defined-fun
+                   name (ecase (car inline-lambda)
+                         (lambda-with-lexenv (third inline-lambda))
+                         (lambda (second inline-lambda)))))))
       (when (boundp '*lexenv*)
         (aver (producing-fasl-file))
         (if (member name *fun-names-in-this-file* :test #'equal)
             (warn 'duplicate-definition :name name)
             (push name *fun-names-in-this-file*)))
-      (%set-inline-expansion name defined-fun inline-lambda dxable-args))
+      ;; I don't know why this is guarded by (WHEN compile-toplevel),
+      ;; because regular old %DEFUN is going to call this anyway.
+      (%set-inline-expansion name defined-fun inline-lambda extra-info))
 
     (become-defined-fun-name name)
 

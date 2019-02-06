@@ -357,6 +357,8 @@
 ;;; We don't actually have anything like that any more though.
 ;;; For user-defined functions, the invariant is maintained that at most
 ;;; one of :source-transform and an inline-expansion exist.
+;;; However, there is one exception: a structure constructor can have an
+;;; inline expansion and also store (#<dd> . :constructor) here.
 (define-info-type (:function :source-transform)
   :type-spec (or function null (cons atom atom)))
 

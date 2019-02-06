@@ -611,7 +611,7 @@
        (and info
             (ir1-attributep attributes flushable)
             (not (ir1-attributep attributes call))
-            (let ((type (proclaimed-ftype name)))
+            (let ((type (global-ftype name)))
               (or
                (not (fun-type-p type)) ;; Functions that accept anything, e.g. VALUES
                (multiple-value-bind (min max) (fun-type-arg-limits type)

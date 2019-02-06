@@ -2245,7 +2245,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                                    (leaf-has-source-name-p (ref-leaf use))
                                    (leaf-source-name (ref-leaf use))))
                         (ftype (and (info :function :info name) ; only use the FTYPE if
-                                    (proclaimed-ftype name)))) ; NAME was DEFKNOWN
+                                    (global-ftype name)))) ; NAME was DEFKNOWN
                    (unless (or (node-tail-p last)
                                (policy last (zerop safety))
                                (and (fun-type-p ftype)

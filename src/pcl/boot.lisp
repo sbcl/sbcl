@@ -1952,7 +1952,7 @@ bootstrapping.
   (multiple-value-bind (llks nrequired noptional keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
-    (let* ((old (proclaimed-ftype name))
+    (let* ((old (global-ftype name))
            (old-ftype (if (fun-type-p old) old nil))
            (old-restp (and old-ftype (fun-type-rest old-ftype)))
            (old-keys (and old-ftype
@@ -2476,7 +2476,7 @@ bootstrapping.
     ;; is a subtype of the old one, though -- even though the type is not
     ;; trusted anymore, the warning is still not quite as interesting.
     (when (and (eq :declared (info :function :where-from fun-name))
-               (not (csubtypep gf-type (setf old-type (proclaimed-ftype fun-name)))))
+               (not (csubtypep gf-type (setf old-type (global-ftype fun-name)))))
       (style-warn "~@<Generic function ~
                    ~/sb-ext:print-symbol-with-prefix/ clobbers an ~
                    earlier ~S proclamation ~/sb-impl:print-type/ for ~

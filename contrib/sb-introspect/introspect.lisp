@@ -523,12 +523,8 @@ value."
 (defun function-type (function-designator)
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
   (flet ((ftype-of (function-designator)
-           (let ((xform (info :function :source-transform function-designator)))
-             (if (typep xform '(cons t (eql :copier)))
-                 (let ((type (dd-name (car xform))))
-                   `(function (,type) (values ,type &optional)))
-                 (type-specifier
-                  (proclaimed-ftype function-designator))))))
+           (type-specifier
+            (global-ftype function-designator))))
     (etypecase function-designator
       (symbol
        (when (and (fboundp function-designator)

@@ -633,15 +633,6 @@
                      (:copier copy-our-struct))
     (a 42 :type fixnum))
 
-  ;; This test doesn't work because the XEP for the out-of-line accessor
-  ;; does not include the type test, and the function gets a signature
-  ;; of (FUNCTION (T) (VALUES FIXNUM &OPTIONAL)). This can easily be fixed
-  ;; by deleting (THE <struct> INSTANCE) from the access form
-  ;; and correspondingly adding a declaration on the type of INSTANCE.
-  ;;
-  ;; Yes, it can be fixed, but it is done this way because it produces
-  ;; smaller code.
-  #+nil
   (deftest function-type+defstruct.1
       (values (type-equal (function-type 'struct-a)
                           (function-type #'struct-a))

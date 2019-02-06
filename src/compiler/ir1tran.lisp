@@ -140,7 +140,7 @@
                ;; complain about undefined functions.
                (not latep))
       (note-undefined-reference name :function))
-    (let ((ftype (proclaimed-ftype name))
+    (let ((ftype (global-ftype name))
           (notinline (fun-lexically-notinline-p name)))
       (make-global-var
        :kind :global-function
@@ -238,7 +238,7 @@
                           :type (if (and (eq inlinep :notinline)
                                          (neq where :declared))
                                     (specifier-type 'function)
-                                    (proclaimed-ftype name))))
+                                    (global-ftype name))))
                        (find-global-fun name nil)))))))))
 
 ;;; Return the LEAF structure for the lexically apparent function
@@ -1104,7 +1104,7 @@
                    (defined-fun-inlinep var))))
     (if (eq inlinep :notinline)
         (ir1-convert-combination start next result form var)
-        (let* ((transform (info :function :source-transform name)))
+        (let ((transform (info :function :source-transform name)))
           (if transform
               (multiple-value-bind (transformed pass)
                   (if (functionp transform)

@@ -576,7 +576,7 @@
             (when (or (eq :declared from) (and sure (eq :assumed from)))
               (describe-block (stream "~A names an undefined function" name)
                 (format stream "~@:_~:(~A~) type: ~/sb-impl:print-type/"
-                        from (proclaimed-ftype name))))))
+                        from (global-ftype name))))))
         ;; Defined.
         (multiple-value-bind (fun what lambda-list derived-type declared-type
                               inline methods argument-precedence-order)
@@ -594,7 +594,7 @@
                                              (%fun-type function)))
                           (legal-name-p (legal-fun-name-p name))
                           (ctype (and legal-name-p
-                                      (proclaimed-ftype name)))
+                                      (global-ftype name)))
                           (type (and ctype (type-specifier ctype)))
                           (from (and legal-name-p
                                      (info :function :where-from name)))

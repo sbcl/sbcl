@@ -84,7 +84,7 @@
                (setf (info :function :type source-name) defined-ftype))
              (setf (info :function :where-from source-name) :defined))
             ((:declared :defined-method)
-             (let ((declared-ftype (proclaimed-ftype source-name)))
+             (let ((declared-ftype (global-ftype source-name)))
                (unless (defined-ftype-matches-declared-ftype-p
                          defined-ftype declared-ftype)
                  (compiler-style-warn

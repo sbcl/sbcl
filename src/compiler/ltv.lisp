@@ -71,7 +71,7 @@ guaranteed to never be modified, so it can be put in read-only storage."
                                       (specifier-type 'function))
                                      ((and (legal-fun-name-p op)
                                            (eq :declared (info :function :where-from op)))
-                                      (let ((ftype (proclaimed-ftype op)))
+                                      (let ((ftype (global-ftype op)))
                                         (if (fun-type-p ftype)
                                             (fun-type-returns ftype)
                                             *wild-type*)))

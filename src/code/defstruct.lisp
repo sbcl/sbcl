@@ -300,24 +300,12 @@
                   (error "DEFSTRUCT: ~S is not a symbol." name)))
          (dd (make-defstruct-description null-env-p name))
          ((classoid inherits) (parse-defstruct dd options slot-descriptions))
-         (boa-constructors (member-if #'listp (dd-constructors dd) :key #'cdr))
-         (keyword-constructors (ldiff (dd-constructors dd) boa-constructors))
          (constructor-definitions
-          (nconc
-           (when keyword-constructors
-             (let ((primary (caar keyword-constructors)))
-               (cons
-                `(defun ,primary ,@(structure-ctor-lambda-parts dd :default))
-                ;; Quasi-bogus: not all the right effects on globaldb
-                ;; happen by defining functions this cheating way.
-                (mapcar (lambda (other)
-                          `(setf (fdefinition ',(car other))
-                                 (fdefinition ',primary)))
-                        (rest keyword-constructors)))))
-           (mapcar (lambda (ctor)
-                     `(defun ,(car ctor)
-                             ,@(structure-ctor-lambda-parts dd (cdr ctor))))
-                   boa-constructors)))
+          (mapcar (lambda (ctor)
+                    `(sb-c:xdefun ,(car ctor)
+                       :constructor
+                       ,@(structure-ctor-lambda-parts dd (cdr ctor))))
+                  (dd-constructors dd)))
          (print-method
           (when (dd-print-option dd)
             (let* ((x (make-symbol "OBJECT"))
@@ -355,13 +343,10 @@
            ,@(when (eq expanding-into-code-for :target)
                `(,@(let ((defuns
                           `(,@(awhen (dd-copier-name dd)
-                                `((defun ,(dd-copier-name dd) (instance)
+                                `((sb-c:xdefun ,(dd-copier-name dd) :copier (instance)
                                     (copy-structure (the ,(dd-name dd) instance)))))
                             ,@(awhen (dd-predicate-name dd)
-                                ;; FIXME: probably should use %INSTANCE-TYPEP which is
-                                ;; what TYPEP will turn into. If so, be sure to change
-                                ;; DEFSTRUCT-GENERATED-DEFN-P.
-                                `((defun ,(dd-predicate-name dd) (object)
+                                `((sb-c:xdefun ,(dd-predicate-name dd) :predicate (object)
                                     (typep object ',(dd-name dd)))))
                             ,@(accessor-definitions dd classoid))))
                      (if (and delayp (not (compiler-layout-ready-p name)))
@@ -1141,16 +1126,23 @@ unless :NAMED is also specified.")))
 ;;; for a DEFSTRUCT copier, accessor, or predicate - to SEXPR.
 ;;; NAME is needed to select between the reader and writer transform.
 (defun sb-c::struct-fun-transform (transform sexpr name)
-  (let ((result
-         (if (symbolp (cdr transform))
-             (when (singleton-p (cdr sexpr)) ; exactly 1 arg
-               (let ((type (dd-name (car transform)))
-                     (arg (cadr sexpr)))
-                 (ecase (cdr transform)
-                   (:predicate `(sb-c::%instance-typep ,arg ',type))
-                   (:copier `(copy-structure (the ,type ,arg))))))
-             (slot-access-transform (if (consp name) :write :read)
-                                    (cdr sexpr) transform))))
+  (let* ((snippet (cdr transform))
+         (result
+          (cond ((eq snippet :constructor)
+                 ;; All defstruct-defined things use the :source-transform as
+                 ;; an indicator of magic-ness, but actually doing the transform
+                 ;; for constructors could cause inadvertent variable capture.
+                 nil)
+                ((symbolp snippet) ; predicate or copier
+                 (when (singleton-p (cdr sexpr)) ; exactly 1 arg
+                   (let ((type (dd-name (car transform)))
+                         (arg (cadr sexpr)))
+                     (ecase snippet
+                      (:predicate `(sb-c::%instance-typep ,arg ',type))
+                      (:copier `(copy-structure (the ,type ,arg)))))))
+                (t
+                 (slot-access-transform (if (consp name) :write :read)
+                                        (cdr sexpr) transform)))))
     (values result (not result))))
 
 ;;; Return a LAMBDA form which can be used to set a slot
@@ -1249,9 +1241,10 @@ unless :NAMED is also specified.")))
   (values))
 
 (defun %proclaim-defstruct-ctors (dd)
-  (dolist (ctor (dd-constructors dd))
-    (let ((ftype (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
-      (sb-c:proclaim-ftype (car ctor) dd ftype :declared))))
+  (aver (not (dd-class-p dd)))
+  (let ((info `(,dd . :constructor)))
+    (dolist (ctor (dd-constructors dd))
+      (setf (info :function :source-transform (car ctor)) info))))
 
 ;;; Do (COMPILE LOAD EVAL)-time actions for the normal (not
 ;;; ALTERNATE-LAYOUT) DEFSTRUCT described by DD.
@@ -1273,8 +1266,10 @@ unless :NAMED is also specified.")))
          (null (nth-value 1 (info :type :compiler-layout (dd-name dd)))))
         (fnames))
     (%compiler-set-up-layout dd inherits)
-    (%proclaim-defstruct-ctors dd)
-
+    (let ((xform `(,dd . :constructor)))
+      (dolist (ctor (dd-constructors dd))
+        ;; Don't check-inlining because ctors aren't always inlined
+        (setf (info :function :source-transform (car ctor)) xform)))
     (awhen (dd-copier-name dd)
       (when check-inlining (push it fnames))
       (setf (info :function :source-transform it) (cons dd :copier)))
@@ -1716,30 +1711,47 @@ or they must be declared locally notinline at each call site.~@:>"
                      (t `(vector ,(dd-element-type dd) ,(dd-length dd))))
               &optional))))
 
-(defun struct-ctor-ftype (dd name)
-  (let ((ctor (assq name (dd-constructors dd))))
-    (aver ctor)
-    (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
-
-(defun proclaimed-ftype (name &optional (convert-dd t))
-  (multiple-value-bind (info foundp) (info :function :type name)
-    (values (typecase info
-              (defstruct-description
-               (if convert-dd (specifier-type (struct-ctor-ftype info name)) info))
-              #-sb-xc-host ; PCL doesn't exist
-              ((eql :generic-function) (sb-pcl::compute-gf-ftype name))
-              (cons
-               ;; This case is used only for DEFKNOWN. It allows some out-of-order
-               ;; definitions during bootstrap while avoiding the "uncertainty in typep"
-               ;; error. It would work for user code as well, but users shouldn't write
-               ;; out-of-order type definitions. In any case, it's not wrong to leave
-               ;; this case in.
-               (let ((ctype (specifier-type info)))
-                 (unless (contains-unknown-type-p ctype)
-                   (setf (info :function :type name) ctype))
-                 ctype))
-              (t info))
-            foundp)))
+;;; Return the ftype of global function NAME.
+(defun global-ftype (name &aux xform)
+  (multiple-value-bind (type foundp) (info :function :type name)
+    (cond
+     #-sb-xc-host ; PCL "doesn't exist" yet
+     ((eq type :generic-function) (sb-pcl::compute-gf-ftype name))
+     ((consp type) ; not parsed type
+      ;; This case is used only for DEFKNOWN. It allows some out-of-order
+      ;; definitions during bootstrap while avoiding the "uncertainty in typep"
+      ;; error. It would work for user code as well, but users shouldn't write
+      ;; out-of-order type definitions. In any case, it's not wrong to leave
+      ;; this case in.
+      (let ((ctype (specifier-type type)))
+        (unless (contains-unknown-type-p ctype)
+          (setf (info :function :type name) ctype))
+        ctype))
+     ;; In the absence of global info for a defstruct snippet, get the compiler's
+     ;; opinion based on the defstruct definition, rather than reflecting on the
+     ;; current function (as defined "now") which is what globaldb would get in
+     ;; effect by calling FTYPE-FROM-FDEFN, that being less precise.
+     ((and (not foundp)
+           (typep (setq xform (info :function :source-transform name))
+                  '(cons defstruct-description)))
+      (let* ((dd (car xform))
+             (snippet (cdr xform))
+             (dd-name (dd-name dd)))
+        (specifier-type
+         (case snippet
+          (:constructor
+           (let ((ctor (assq name (dd-constructors dd))))
+             (aver ctor)
+             (%struct-ctor-ftype dd (cdr ctor) (dd-element-type dd))))
+          (:predicate `(function (t) (values boolean &optional)))
+          (:copier    `(function (,dd-name) (values ,dd-name &optional)))
+          (t
+           (let ((type (dsd-type snippet)))
+             (if (consp name)
+                 `(function (,type ,dd-name) (values ,type &optional))  ; writer
+                 `(function (,dd-name) (values ,type &optional))))))))) ; reader
+     (t
+      type))))
 
 ;;; Given a DD and a constructor spec (a cons of name and pre-parsed
 ;;; BOA lambda list, or the symbol :DEFAULT), return the effective
@@ -1834,9 +1846,9 @@ or they must be declared locally notinline at each call site.~@:>"
         unless (accessor-inherited-data accessor-name dd)
         nconc (dx-let ((key (cons dd dsd)))
                 `(,@(unless (dsd-read-only dsd)
-                     `((defun (setf ,accessor-name) (value instance)
+                     `((sb-c:xdefun (setf ,accessor-name) :accessor (value instance)
                          ,(slot-access-transform :setf '(instance value) key))))
-                  (defun ,accessor-name (instance)
+                  (sb-c:xdefun ,accessor-name :accessor (instance)
                     ,(slot-access-transform :read '(instance) key))))))
 
 ;;;; instances with ALTERNATE-METACLASS
@@ -2086,42 +2098,6 @@ or they must be declared locally notinline at each call site.~@:>"
   (defun %instance-set (instance index new-value)
     (declare (ignore instance index new-value))
     (error "Can not use %INSTANCE-SET on cross-compilation host.")))
-
-;;; If LAMBDA-LIST and BODY constitute an auto-generated structure function
-;;; (accessor, predicate, or copier) for NAME, return the kind of thing it is.
-(defun defstruct-generated-defn-p (name lambda-list body)
-  (unless (singleton-p body)
-    (return-from defstruct-generated-defn-p nil))
-  (let ((info (info :function :source-transform name))
-        (form (car body)))
-    (when (consp info)
-      (when (and (eq (cdr info) :predicate)
-                 (equal lambda-list '(object))
-                 (typep form
-                        '(cons (eql typep)
-                               (cons (eql object)
-                                     (cons (cons (eql quote) (cons t null))
-                                           null))))
-                 ;; extract dd-name from `(TYPEP OBJECT ',THING)
-                 (eq (second (third form)) (dd-name (car info))))
-        (return-from defstruct-generated-defn-p :predicate))
-      (when (and (eq (cdr info) :copier)
-                 (equal lambda-list '(instance))
-                 (typep form '(cons (eql copy-structure)
-                                    (cons (cons (eql the)
-                                                (cons symbol (cons (eql instance) null)))
-                                          null)))
-                 ;; extract dd-name from (THE <type> INSTANCE)
-                 (eq (second (second form)) (dd-name (car info))))
-        (return-from defstruct-generated-defn-p :copier))
-      (when (defstruct-slot-description-p (cdr info))
-        (multiple-value-bind (mode expected-lambda-list xform-args)
-            (if (consp name)
-                (values :setf '(value instance) '(instance value))
-                (values :read '(instance) '(instance)))
-          (when (and (equal expected-lambda-list lambda-list)
-                     (equal (slot-access-transform mode xform-args info) form))
-            (return-from defstruct-generated-defn-p :accessor)))))))
 
 ;;; It's easier for the compiler to recognize the output of M-L-F-S-S
 ;;; without extraneous QUOTE forms, so we define some trivial wrapper macros.

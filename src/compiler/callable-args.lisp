@@ -42,7 +42,7 @@
      (length (fun-type-optional fun-type))))
 
 (defun callable-dependant-lvars (caller lvars args results)
-  (let ((fun-type (proclaimed-ftype caller)))
+  (let ((fun-type (global-ftype caller)))
     (collect ((lvars))
       (let ((arg-position -1)
             (positional-count (fun-type-positional-count fun-type)))
@@ -127,7 +127,7 @@
 ;;; (lvar args results &key (unknown-keys boolean) (no-function-conversion boolean) (arg-lvars list-of-lvars))
 (defun map-callable-arguments (function combination)
   (let* ((combination-name (lvar-fun-name (combination-fun combination) t))
-         (type (proclaimed-ftype combination-name))
+         (type (global-ftype combination-name))
          (info (info :function :info combination-name))
          (annotation (fun-info-annotation info)))
     (when annotation
@@ -177,7 +177,7 @@
                                        (fun-lexically-notinline-p (leaf-%source-name leaf)
                                                                   (node-lexenv (lvar-dest lvar))))
                                    lvar-type
-                                   (proclaimed-ftype (leaf-%source-name leaf))))
+                                   (global-ftype (leaf-%source-name leaf))))
                               (t
                                (global-var-defined-type leaf)))))
          (entry-fun (if (and (functional-p leaf)
@@ -223,7 +223,7 @@
                       (if (fun-lexically-notinline-p fun-name
                                                      (node-lexenv (lvar-dest lvar)))
                           lvar-type
-                          (proclaimed-ftype fun-name)))
+                          (global-ftype fun-name)))
                      ((functional-p leaf)
                       (let ((info (functional-info leaf)))
                         (if info
@@ -261,7 +261,7 @@
                                     (eq key :test-not))
                            (setf test-not value)))
                        (combination-args combination)
-                       (proclaimed-ftype combination-name))
+                       (global-ftype combination-name))
         (when (and test
                    test-not
                    (eq (type-intersection null-type (lvar-type test))
