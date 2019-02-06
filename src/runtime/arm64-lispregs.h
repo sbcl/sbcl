@@ -12,7 +12,7 @@
 
 #define NREGS (32)
 
-#ifdef LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLER__
 #    define REG(num) x##num
 #else
 #    define REG(num) (num)

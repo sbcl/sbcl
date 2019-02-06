@@ -2910,11 +2910,11 @@ core and return a descriptor to it."
   (format t "#define SBCL_VERSION_STRING ~S~%"
             (sb-xc:lisp-implementation-version))
   (format t "#define CORE_MAGIC 0x~X~%" core-magic)
-  (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
+  (format t "#ifndef __ASSEMBLER__~2%")
   (format t "#define LISPOBJ(x) ((lispobj)x)~2%")
-  (format t "#else /* LANGUAGE_ASSEMBLY */~2%")
+  (format t "#else /* __ASSEMBLER__ */~2%")
   (format t "#define LISPOBJ(thing) thing~2%")
-  (format t "#endif /* LANGUAGE_ASSEMBLY */~2%")
+  (format t "#endif /* __ASSEMBLER__ */~2%")
   (terpri))
 
 (defvar +c-literal-64bit+
@@ -3164,7 +3164,7 @@ core and return a descriptor to it."
          (slots (sb-vm:primitive-object-slots obj))
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
   ;; writing primitive object layouts
-    (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
+    (format t "#ifndef __ASSEMBLER__~2%")
     (format t "struct ~A {~%" c-name)
     (when (sb-vm:primitive-object-widetag obj)
       (format t "    lispobj header;~%"))
@@ -3176,7 +3176,7 @@ core and return a descriptor to it."
     (format t "};~%")
     (when (member name '(cons vector symbol fdefn))
       (write-cast-operator name c-name lowtag))
-    (format t "~%#else /* LANGUAGE_ASSEMBLY */~2%")
+    (format t "~%#else /* __ASSEMBLER__ */~2%")
     (format t "/* These offsets are SLOT-OFFSET * N-WORD-BYTES - LOWTAG~%")
     (format t " * so they work directly on tagged addresses. */~2%")
     (dolist (slot slots)
@@ -3184,11 +3184,11 @@ core and return a descriptor to it."
               (c-symbol-name name)
               (c-symbol-name (sb-vm:slot-name slot))
               (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag))))
-  (format t "~%#endif /* LANGUAGE_ASSEMBLY */~2%"))
+  (format t "~%#endif /* __ASSEMBLER__ */~2%"))
 
 (defun write-structure-object (dd *standard-output*)
   (flet ((cstring (designator) (c-name (string-downcase designator))))
-    (format t "#ifndef LANGUAGE_ASSEMBLY~2%")
+    (format t "#ifndef __ASSEMBLER__~2%")
     (format t "struct ~A {~%" (cstring (dd-name dd)))
     (format t "    lispobj header; // = word_0_~%")
     ;; "self layout" slots are named '_layout' instead of 'layout' so that
@@ -3213,7 +3213,7 @@ core and return a descriptor to it."
     (when (member (dd-name dd) '(layout))
       (write-cast-operator (dd-name dd) (cstring (dd-name dd))
                            sb-vm:instance-pointer-lowtag))
-    (format t "~%#endif /* LANGUAGE_ASSEMBLY */~2%")))
+    (format t "~%#endif /* __ASSEMBLER__ */~2%")))
 
 (defun write-thread-init (stream)
   (dolist (binding sb-vm::!per-thread-c-interface-symbols)

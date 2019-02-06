@@ -1,5 +1,5 @@
 #if defined LISP_FEATURE_DARWIN
-#if defined LANGUAGE_ASSEMBLY
+#if defined __ASSEMBLER__
 #define REG(num) r##num
 #define FREG(num) f##num
 #else

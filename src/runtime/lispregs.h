@@ -11,6 +11,6 @@
 
 #include "target-lispregs.h"
 
-#ifndef LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLER__
 extern char *lisp_register_names[];
 #endif

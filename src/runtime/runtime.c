@@ -727,7 +727,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
 #endif
 #ifdef LISP_FEATURE_HPUX
     /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are
-     * not in LANGUAGE_ASSEMBLY so we cant reach them. */
+     * not in __ASSEMBLER__ so we cant reach them. */
     return_from_lisp_stub = (void *) ((char *)*((unsigned long *)
                  ((char *)initial_function + -1)) + 23);
 #endif

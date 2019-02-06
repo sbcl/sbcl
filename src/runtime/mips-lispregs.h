@@ -1,4 +1,4 @@
-#ifdef LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLER__
 #define REG(num) $ ## num
 #else
 #define REG(num) num

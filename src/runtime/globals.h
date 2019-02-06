@@ -12,7 +12,7 @@
 #ifndef _INCLUDED_GLOBALS_H_
 #define _INCLUDED_GLOBALS_H_
 
-#ifndef LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLER__
 # include <sys/types.h>
 # include <unistd.h>
 # include "runtime.h"
@@ -21,7 +21,7 @@
 
 #include "sbcl.h"
 
-#ifndef LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLER__
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define foreign_function_call_active_p(thread) \
@@ -110,7 +110,7 @@ extern lispobj *current_dynamic_space;
 
 extern void globals_init(void);
 
-#else /* LANGUAGE_ASSEMBLY */
+#else /* __ASSEMBLER__ */
 
 # ifdef LISP_FEATURE_MIPS
 #  ifdef __linux__
@@ -171,6 +171,6 @@ EXTERN(current_binding_stack_pointer, POINTERSIZE)
 EXTERN(dynamic_space_free_pointer, POINTERSIZE)
 # endif
 
-#endif /* LANGUAGE_ASSEMBLY */
+#endif /* __ASSEMBLER__ */
 
 #endif /* _INCLUDED_GLOBALS_H_ */

@@ -94,8 +94,8 @@ ldso_stub__~A: ;                                \\
 /* This is an automatically generated file, please do not hand-edit it.
  * See the program tools-for-build/ldso-stubs.lisp. */
 
-#ifndef LANGUAGE_ASSEMBLY
-#define LANGUAGE_ASSEMBLY
+#ifndef __ASSEMBLER__
+#define __ASSEMBLER__
 #endif
 #include \"sbcl.h\""
 
