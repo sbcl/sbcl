@@ -1,3 +1,7 @@
+variables:
+  SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+  make.sh: ./make.sh --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+
 trigger:
 - master
 
@@ -19,7 +23,7 @@ jobs:
     displayName: 'install host sbcl'
 
   - script: |
-      ./make.sh $(options)
+       $(make.sh) $(options)
     displayName: 'make'
   - script: |
       cd tests; ./run-tests.sh
@@ -38,7 +42,7 @@ jobs:
     displayName: 'install host sbcl'
 
   - script: |
-      ./make.sh
+      $(make.sh)
     displayName: 'make'
   - script: |
       cd tests; ./run-tests.sh
@@ -48,27 +52,35 @@ jobs:
     displayName: 'ansi-tests'
 
 - job: Windows
-
+  variables:
+    mingw_path: C:\tools\msys64\usr\bin:/c/Program Files/Steel Bank Common Lisp/1.4.14
+    CC: x86_64-w64-mingw32-gcc
   pool:
     vmImage: 'vs2017-win2016'
+
   steps:
   - script: |
       choco install --no-progress msys2 --params "/NoUpdate"
     displayName: 'install host msys2'
+
   - script: |
-      C:\tools\msys64\usr\bin\bash -c '/usr/bin/pacman -S --noconfirm --needed mingw-w64-x86_64-gcc diffutils'
+      C:\tools\msys64\usr\bin\bash -c '/usr/bin/pacman -S --noconfirm --needed mingw-w64-x86_64-gcc make diffutils'
     displayName: 'install gcc'
+
   - script: |
       cinst sbcl -source tools-for-build
     displayName: 'install host sbcl'
 
   - script: |
-      C:\tools\msys64\usr\bin\bash -c 'CC=x86_64-w64-mingw32-gcc SBCL_HOME="/c/Program Files/Steel Bank Common Lisp/1.4.14" PATH="/usr/bin:/c/Program Files/Steel Bank Common Lisp/1.4.14:$PATH" ./make.sh'
+      C:\tools\msys64\usr\bin\bash -c "PATH=\"/usr/bin:/c/Program Files/Steel Bank Common Lisp/1.4.14:$PATH\" $(make.sh)"
     displayName: 'make'
+    env:
+      SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
+
   - script: |
-        C:\tools\msys64\usr\bin\bash -c 'cd tests; CC=x86_64-w64-mingw32-gcc  PATH=/usr/bin:$PATH ./run-tests.sh'
+        C:\tools\msys64\usr\bin\bash -c 'cd tests; PATH="/usr/bin:$PATH" ./run-tests.sh'
     displayName: 'tests'
 
   - script: |
-        C:\tools\msys64\usr\bin\bash -c 'cd tests; PATH=/usr/bin:$PATH ./ansi-tests.sh'
+        C:\tools\msys64\usr\bin\bash -c 'cd tests; PATH="/usr/bin:$PATH" ./ansi-tests.sh'
     displayName: 'ansi-tests'
