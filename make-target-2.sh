@@ -58,7 +58,7 @@ echo //doing warm init - load and dump phase
 
 echo //checking for leftover cold-init symbols
 ./src/runtime/sbcl --core output/sbcl.core \
- --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --noinform --no-sysinit --no-userinit --eval '
+ --lose-on-corruption --noinform $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit --eval '
     (restart-case
       (let (l1 l2)
         (sb-vm::map-allocated-objects
