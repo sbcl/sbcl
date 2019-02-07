@@ -54,7 +54,7 @@ echo //doing warm init - load and dump phase
  --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
  --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
  --eval '(progn #+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2))' \
- --eval '(sb-ext:save-lisp-and-die "output/sbcl.core")'
+ --eval '(sb-ext:save-lisp-and-die "output/sbcl.core" :save-runtime-options nil)'
 
 echo //checking for leftover cold-init symbols
 ./src/runtime/sbcl --core output/sbcl.core \
