@@ -4,6 +4,8 @@ changes relative to sbcl-1.4.16:
   * enhancement: SB-COVER emulates IN-PACKAGE when recording source maps;
     this makes it possible to generate coverage for forms that uses local
     package nicknames, or otherwise must be read in the correct package.
+  * enhancement: (FIND-SYMBOL x "P") for constant "P" executes faster, subject
+    to "P" not being a package-local nickname of any package. Similarly INTERN.
   * bug fix: initargs are now deduplicated when computing effective slots.
 
 changes in sbcl-1.4.16 relative to sbcl-1.4.15:

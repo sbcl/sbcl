@@ -48,7 +48,8 @@
 ;;;; sufficient, though interaction between parallel intern and use-package
 ;;;; needs to be considered with some care.
 
-(define-load-time-global *package-graph-lock* nil)
+(!define-load-time-global *package-graph-lock*
+    #.(sb-thread:make-mutex :name "Package Graph Lock"))
 
 (defmacro with-package-graph ((&key) &body forms)
   `(flet ((thunk () ,@forms))
@@ -63,7 +64,19 @@
 
 ;;; a map from package names to packages
 (define-load-time-global *package-names* nil)
-(declaim (type info-hashtable *package-names*))
+;;; a set of strings (the value in the hashtable is T for each present key)
+;;; where each present string is a local nickname of some package.
+;;; This can safely overestimate the set of nicknames. In fact it has to,
+;;; because we don't track, when deleting a key whether or not the name
+;;; is still a local nickname for anything else.
+(define-load-time-global *package-local-nicknames* nil)
+(declaim (type info-hashtable
+               *package-names*
+               *package-local-nicknames*))
+
+;;; This would have to be bumped ~ 2*most-positive-fixnum times to overflow.
+(define-load-time-global *package-names-cookie* sb-xc:most-negative-fixnum)
+(declaim (fixnum *package-names-cookie*))
 
 (defmacro with-package-names ((table-var &key) &body body)
   `(let ((,table-var *package-names*))
@@ -431,6 +444,12 @@ Experimental: interface subject to change."
           :format-control format-control
           :format-arguments format-args))
 
+;;; FIXME: this is messed up because of DEFPACKAGE. Check it out:
+;;;
+;;; * (dotimes (i 3) (defpackage "BOOGA" (:local-nicknames (:l :cl))))
+;;; * (SB-IMPL::PACKAGE-%LOCALLY-NICKNAMED-BY (find-package "CL"))
+;;;    => (#<PACKAGE "BOOGA"> #<PACKAGE "BOOGA"> #<PACKAGE "BOOGA">)
+;;;
 (defun package-locally-nicknamed-by-list (package-designator)
   "Returns a list of packages which have a local nickname for the designated
 package.
@@ -469,6 +488,15 @@ See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
+  (prog1 (%add-package-local-nickname local-nickname actual-package
+                                      package-designator)
+    (atomic-incf *package-names-cookie*)))
+
+;;; This is called repeatedly by defpackage's UPDATE-PACKAGE.
+;;; We only need to bump the name cookie once. Synchronization of package lookups
+;;; is pretty weak in the sense that concurrent FIND-PACKAGE and alteration
+;;; of the name -> package association does not really promise much.
+(defun %add-package-local-nickname (local-nickname actual-package package-designator)
   (let* ((nick (string local-nickname))
          (actual (find-package-using-package actual-package nil))
          (package (find-undeleted-package-or-lose package-designator))
@@ -507,6 +535,8 @@ Experimental: interface subject to change."
        "Attempt to use ~A as a package local nickname (for ~A) in ~
         package nicknamed globally ~A."
        nick (package-name actual) nick))
+    ;; Record that LOCAL-NICKNAME is a local nickname of something.
+    (setf (info-gethash local-nickname *package-local-nicknames*) t)
     (when (and cell (neq actual (cdr cell)))
       (restart-case
           (signal-package-error
@@ -529,7 +559,7 @@ Experimental: interface subject to change."
                     (delete package (package-%locally-nicknamed-by old)))
               (push package (package-%locally-nicknamed-by actual))
               (setf (cdr cell) actual)))))
-      (return-from add-package-local-nickname package))
+      (return-from %add-package-local-nickname package))
     (unless cell
       (with-package-graph ()
         (push (cons nick actual) (package-%local-nicknames package))
@@ -555,10 +585,14 @@ Experimental: interface subject to change."
           (:package package "removing local nickname ~A for ~A"
                     nick (cdr cell)))
       (with-package-graph ()
+        ;; TODO: we could try to figure out whether NICK still deserves
+        ;; to be present in *PACKAGE-LOCK-NICKNAMES* and if not, remove it.
+        ;; But really, does anyone add/remove stuff so dynamically?
         (let ((old (cdr cell)))
           (setf (package-%local-nicknames package) (delete cell existing))
           (setf (package-%locally-nicknamed-by old)
                 (delete package (package-%locally-nicknamed-by old)))))
+      (atomic-incf *package-names-cookie*)
       t)))
 
 (defun %package-hashtable-symbol-count (table)
@@ -836,9 +870,6 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *!default-package-use-list* nil))
 
-;;; This would have to be bumped ~ 2*most-positive-fixnum times to overflow.
-(define-load-time-global *package-names-cookie* sb-xc:most-negative-fixnum)
-
 (defun make-package (name &key
                           (use '#.*!default-package-use-list*)
                           nicknames
@@ -889,8 +920,8 @@ implementation it is ~S." *!default-package-use-list*)
          ;; other MAKE-PACKAGE operations, but we need the additional lock
          ;; so that it synchronizes with RENAME-PACKAGE.
          (with-package-names (table)
-           (%register-package table name package)
-           (incf *package-names-cookie*))
+           (%register-package table name package))
+         (atomic-incf *package-names-cookie*)
          (return package)))
      (bug "never")))
 
@@ -951,8 +982,7 @@ implementation it is ~S." *!default-package-use-list*)
            (setf (package-%name package) name
                  (package-%nicknames package) ()))
          (%enter-new-nicknames package nicks))
-       (with-package-names (table)
-         (incf *package-names-cookie*))
+       (atomic-incf *package-names-cookie*)
        (return package))))
 
 (defun delete-package (package-designator)
@@ -1015,8 +1045,8 @@ implementation it is ~S." *!default-package-use-list*)
                           ;; ANSI requires. Setting the other slots to NIL
                           ;; and blowing away the PACKAGE-HASHTABLES is just done
                           ;; for tidiness and to help the GC.
-                          (package-%nicknames package) nil)
-                    (incf *package-names-cookie*))
+                          (package-%nicknames package) nil))
+                  (atomic-incf *package-names-cookie*)
                   (setf (package-%use-list package) nil
                         (package-tables package) #()
                         (package-%shadowing-symbols package) nil
@@ -1103,23 +1133,6 @@ implementation it is ~S." *!default-package-use-list*)
   (defun find-symbol2 (name cell)
     (find/intern %find-symbol ; likewise
                  (if (packagep cell) cell (cached-find-package cell)))))
-
-(defun cached-find-package (cell)
-  (declare (type (simple-vector 4) cell))
-  ;; Cell is: (result cookie *package* string)
-  (when (and (eq (aref cell 1) *package-names-cookie*)
-             ;; find-package is affected by *PACKAGE* due to package-local nicknames,
-             ;; so only return a cached package if *PACKAGE* is unchanged from before.
-             (eq (weak-pointer-value (truly-the weak-pointer (aref cell 2)))
-                 *package*))
-    (let ((found (weak-pointer-value (truly-the weak-pointer (aref cell 0)))))
-      (when (and (packagep found) (package-%name found))
-        (return-from cached-find-package found))))
-  (let ((found (find-undeleted-package-or-lose (aref cell 3))))
-    (setf (aref cell 0) (make-weak-pointer found)
-          (aref cell 1) *package-names-cookie*
-          (aref cell 2) (make-weak-pointer *package*))
-    found))
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
@@ -1718,13 +1731,13 @@ PACKAGE."
 ;;;; The shape of this list is ((package . (externals . internals)) ...)
 (defvar *!initial-symbols*)
 
+(defun pkg-name= (a b) (and (not (eql a 0)) (string= a b)))
 (defun !package-cold-init ()
-  (setf *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock")
-        *package-names*
-        (make-info-hashtable
-         :comparator (named-lambda "PKG-NAME=" (a b)
-                       (and (not (eql a 0)) (string= a b)))
-         :hash-function #'sxhash))
+  (setf *package-names* (make-info-hashtable :comparator #'pkg-name=
+                                             :hash-function #'sxhash)
+        *package-local-nicknames*
+        (make-info-hashtable :comparator #'pkg-name=
+                             :hash-function #'sxhash))
   (with-package-names (names)
     (dolist (spec *!initial-symbols*)
       (let ((pkg (car spec)) (symbols (cdr spec)))
@@ -1859,6 +1872,41 @@ PACKAGE."
 (defmethod (setf documentation) (new-value (x package) (doc-type (eql 't)))
   (setf (package-doc-string x) new-value))
 
+;;; Given a cell containing memoization data for FIND-PACKAGE, perform that action
+;;; with as little work as possible. We could do even better in terms of ignoring
+;;; changes to *PACKAGES*. The trick would be to assign each package a small integer
+;;; starting from 1 (and trying to recycle when deleting). The memoization cell
+;;; would be extended with 1 more element to store a bitmask over those integers.
+;;; If, on lookup, we see that we DON'T care what *PACKAGE* is for a particular
+;;; value of *PACKAGE*, then we can set the bit for that package in the bitmask
+;;; and write the bitmask back in to the cell. Thereafter, repeated calls can check
+;;; the bitmask - which should reach a steady state if the package graph doesn't
+;;; change - so that *PACKAGE* is allowed to be changed with impunity to any
+;;; package whose 1 bit is in. As this is, we can only change *PACKAGE* if the NAME
+;;; is one for which we will _never_ care about *PACKAGE* (because the name is
+;;; not a local nickname for anything)
+(defun cached-find-package (cell)
+  (declare (type (simple-vector 4) cell))
+  ;; Cell is: (result cookie *package* string)
+  (when (and (eq (aref cell 1) *package-names-cookie*)
+             (let ((weak-ptr (aref cell 2)))
+               (or (eql weak-ptr 0) ; lookup is NOT affected by *PACKAGE*
+                   ;; else lookup MAY be affected by *PACKAGE*
+                   (eq (weak-pointer-value (truly-the weak-pointer weak-ptr))
+                       *package*))))
+    (let ((found (weak-pointer-value (truly-the weak-pointer (aref cell 0)))))
+      (when (and (packagep found) (package-%name found))
+        (return-from cached-find-package found))))
+  (let* ((string (aref cell 3))
+         (current-pkg (if (info-gethash string *package-local-nicknames*)
+                          (make-weak-pointer *package*) ; nickname are involved
+                          0)) ; no nicknames are involved
+         (found (find-undeleted-package-or-lose string)))
+    (setf (aref cell 0) (make-weak-pointer found)
+          (aref cell 1) *package-names-cookie*
+          (aref cell 2) current-pkg)
+    found))
+
 ;;; We don't benefit from these transforms because any time we have a constant
 ;;; package in our code, we refer to it via #.(FIND-PACKAGE).
 ;;; This is a necessity due to the fact that historically all packages got renamed
@@ -1866,6 +1914,10 @@ PACKAGE."
 ;;; Now we rename packages for the _next_ build, but the principle remains.
 (in-package "SB-C")
 (defun find-package-xform (package)
+  ;; If you make KEYWORD, CL, COMMON-LISP, CL-USER, or COMMON-LISP-USER
+  ;; a local nickname of something, I kinda think you deserve to lose,
+  ;; never mind that we permit it. You'll probably want to declare INTERN
+  ;; and FIND-SYMBOL as notinline.
   (let* ((string (string (lvar-value package)))
          (std-pkg (cond ((string= string "KEYWORD") "KEYWORD")
                         ((or (string= string "COMMON-LISP") (string= string "CL"))
@@ -1875,8 +1927,7 @@ PACKAGE."
                          "CL-USER"))))
     (if std-pkg
         `(load-time-value (find-package ,std-pkg) t)
-        `(load-time-value
-          (vector (make-weak-pointer nil) 0 (make-weak-pointer nil) ,string)))))
+        `(load-time-value (vector (make-weak-pointer nil) nil 0 ,string)))))
 
 (deftransform intern ((name package-name) (t (constant-arg string-designator)))
   `(sb-impl::intern2 name ,(find-package-xform package-name)))
