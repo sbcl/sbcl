@@ -3217,6 +3217,11 @@ core and return a descriptor to it."
                     (sb-vm:pad-data-block sb-vm:symbol-size))
                  (* index (sb-vm:pad-data-block sb-vm:fdefn-size)))))))
 
+(defun init-runtime-routines ()
+  (dolist (symbol sb-vm::+runtime-asm-routines+)
+    (let* ((des (cold-intern symbol :gspace *static*)))
+      (cold-set des (make-descriptor (lookup-assembler-reference symbol))))))
+
 (defun write-sc+offset-coding (stream)
   (flet ((write-array (name bytes)
            (format stream "static struct sc_and_offset_byte ~A[] = {~@
@@ -3594,7 +3599,8 @@ III. initially undefined function references (alphabetically):
            (cold-cons z z (ecase (gspace-name
                                   (descriptor-gspace *cold-assembler-obj*))
                             (:read-only *static*)
-                            (:immobile-varyobj *dynamic*))))))
+                            (:immobile-varyobj *dynamic*)))))
+        (init-runtime-routines))
 
       ;; Initialize the *COLD-SYMBOLS* system with the information
       ;; from common-lisp-exports.lisp-expr.

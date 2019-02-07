@@ -11,7 +11,7 @@
 
 NM = ./linux-nm
 
-ASSEM_SRC = rv32-assem.S ldso-stubs.S
+ASSEM_SRC = ldso-stubs.S
 ARCH_SRC = rv32-arch.c
 
 OS_SRC = linux-os.c linux-mman.c rv32-linux-os.c

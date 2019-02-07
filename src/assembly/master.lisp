@@ -4,6 +4,7 @@
                                (make-pathname :type "lisp"))
               :verbose nil :print nil))
       '("src/assembly/target/tramps"
+        "src/assembly/target/runtime-rtns"
         "src/assembly/target/assem-rtns"
         "src/assembly/target/array"
         "src/assembly/target/arith"
