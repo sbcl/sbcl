@@ -260,7 +260,7 @@
              `(define-instruction ,name (segment rs1 rs2 offset)
                 (:printer s ((funct3 ,funct3) (opcode #b0100011)))
                 (:emitter
-                 (emit-s-inst segment offset rs2 rs1 ,funct3 #b0100011)))))
+                 (emit-s-inst segment offset rs1 rs2 ,funct3 #b0100011)))))
   (define-store-instruction sb #b000)
   (define-store-instruction sh #b001)
   (define-store-instruction sw #b010)
