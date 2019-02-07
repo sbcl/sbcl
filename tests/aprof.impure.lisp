@@ -100,7 +100,8 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (list* (load-time-value(gensym)) :if-exists x))
 
-(with-test (:name :aprof-list-length-2 :fails-on :win32)
+#-win32
+(with-test (:name :aprof-list-length-2)
   ;; Rather than figuring out how to get some minimal piece of Lisp code to
   ;; compile into exactly these instruction encodings below which caused aprof
   ;; to fail, just check the assembled code directly.
