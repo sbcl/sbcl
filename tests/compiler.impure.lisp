@@ -2148,7 +2148,8 @@
       (two-values y x)
     (assert (and (eql a x) (eql b y)
                  (not (or c d e f g h i j k l m n o p q r s))))))
-(wants-many-values 1 42)
+(test-util:with-test (:name (multiple-value-bind :unknown values))
+  (wants-many-values 1 42))
 
 ;;; constant coalescing
 
@@ -2182,13 +2183,14 @@
 
 ;; named and unnamed
 (defconstant +born-to-coalesce+ '.born-to-coalesce.)
-(multiple-value-bind (file-fun core-fun)
-    (compile2 '(lambda ()
-                (let ((x (cons +born-to-coalesce+ nil))
-                      (y (cons '.born-to-coalesce. nil)))
-                  (list x y))))
-  (assert (= 1 (count-code-constants '.born-to-coalesce. file-fun)))
-  (assert (= 1 (count-code-constants '.born-to-coalesce. core-fun))))
+(test-util:with-test (:name (compile compile-file :coalescing symbol))
+  (multiple-value-bind (file-fun core-fun)
+      (compile2 '(lambda ()
+                  (let ((x (cons +born-to-coalesce+ nil))
+                        (y (cons '.born-to-coalesce. nil)))
+                    (list x y))))
+    (assert (= 1 (count-code-constants '.born-to-coalesce. file-fun)))
+    (assert (= 1 (count-code-constants '.born-to-coalesce. core-fun)))))
 
 ;; some things must retain identity under COMPILE, but we want to coalesce them under COMPILE-FILE
 (defun assert-coalescing (constant)
@@ -2214,13 +2216,16 @@
                      (not (eq a b))))))))
 
 (defconstant +born-to-coalesce2+ "maybe coalesce me!")
-(assert-coalescing '+born-to-coalesce2+)
+(test-util:with-test (:name (compile compile-file :coalescing string))
+  (assert-coalescing '+born-to-coalesce2+))
 
 (defconstant +born-to-coalesce3+ #*01101001011101110100011)
-(assert-coalescing '+born-to-coalesce3+)
+(test-util:with-test (:name (compile compile-file :coalescing bit-vector))
+  (assert-coalescing '+born-to-coalesce3+))
 
 (defconstant +born-to-coalesce4+ '(foo bar "zot" 123 (nested "quux") #*0101110010))
-(assert-coalescing '+born-to-coalesce4+)
+(test-util:with-test (:name (compile compile-file :coalescing :mixed))
+  (assert-coalescing '+born-to-coalesce4+))
 
 (defclass some-constant-thing () ())
 
