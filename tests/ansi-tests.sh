@@ -1,6 +1,8 @@
 #!/bin/sh -e
 
+git config --global core.autocrlf false
 git clone https://gitlab.common-lisp.net/ansi-test/ansi-test.git
+
 cd ansi-test
 ../../run-sbcl.sh --lose-on-corruption --disable-ldb \
                   --load gclload1.lsp --load gclload2.lsp \
