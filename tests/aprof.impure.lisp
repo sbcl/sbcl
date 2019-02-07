@@ -101,6 +101,31 @@ sb-vm::
   (list* (load-time-value(gensym)) :if-exists x))
 
 (with-test (:name :aprof-list-length-2 :fails-on :win32)
+  ;; Rather than figuring out how to get some minimal piece of Lisp code to
+  ;; compile into exactly these instruction encodings below which caused aprof
+  ;; to fail, just check the assembled code directly.
+  (let ((bytes
+         (coerce
+          `(#xF0 #x49 #xFF #x83 #x80 #x64 #x00 #x00
+            #x49 #x89 #x6D ,(* sb-vm::thread-pseudo-atomic-bits-slot 8)
+            #x4D #x8B #x55 #x20
+            #x4D #x8D #x5A #x20
+            #x4D #x3B #x5D #x28
+            #x0F #x87 #x9E #x02 #x00 #x00
+            #x4D #x89 #x5D #x20
+            #x4C #x8B #x4D #xC8
+            #x4D #x89 #x0A
+            #x4D #x8D #x4A #x17
+            #x4D #x89 #x4A #x08
+            #x49 #x89 #x72 #x10
+            #x41 #xC7 #x42 #x18 #x17 #x00 #x10 #x50
+            #x41 #x80 #xCA #x07)
+          '(simple-array (unsigned-byte 8) (*)))))
+    (sb-sys:with-pinned-objects (bytes)
+      (multiple-value-bind (type size)
+          (sb-aprof::infer-type (sb-sys:sap-int (sb-sys:vector-sap bytes)) bytes)
+        (assert (eq type 'list))
+        (assert (= size (* 2 sb-vm:cons-size sb-vm:n-word-bytes))))))
   (compile 'f1)
   (compile 'f2)
   (assert (= (sb-aprof:aprof-run #'f1 :stream nil) 32))

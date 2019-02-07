@@ -68,6 +68,7 @@
   (:export #:aprof-run #:aprof-show)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-disassem #:dstate-inst-properties)
+  (:import-from #:sb-vm #:rbp-offset)
   (:import-from #:sb-x86-64-asm
                 #:lock #:x66 #:rex #:+rex-b+
                 #:inst-operand-size
@@ -264,7 +265,7 @@
                             (eql (machine-ea-base ea) 11)
                             (null (machine-ea-index ea))
                             (eql (machine-ea-disp ea)
-                                (+ profiler-index sb-vm:n-word-bytes))))
+                                 (+ profiler-index sb-vm:n-word-bytes))))
                       (t
                        (advance-if (and (eq opcode 'mov) (pseudoatomic-flag-p))
                                    +state-begin-pa+))))
@@ -344,7 +345,9 @@
                        (let ((dir (infer-mov-direction dchunk)))
                          (ecase dir
                           (:load
-                           (cond ((eq (machine-ea-base ea) :rip)) ; ignore
+                           (cond ((or (eql (machine-ea-base ea) rbp-offset) ; load from frame
+                                      (eq (machine-ea-base ea) :rip)) ; load from constant pool
+                                  ) ; do nothing
                                  (t (fail))))
                           (:store
                            ;; widetag stored before ORing in lowtag
