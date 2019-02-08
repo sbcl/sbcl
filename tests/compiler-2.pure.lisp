@@ -2219,3 +2219,16 @@
                   (44)))))
     ((t) '(10 10 10 10) :test #'equal)
     ((nil) 44)))
+
+(with-test (:name :setup-environment-tn-conflicts.3)
+  (checked-compile-and-assert
+      ()
+      '(lambda (b)
+        (flet ((%f7 ()
+                 (flet ((%f10 ()
+                          (setf b b)))
+                   (declare (dynamic-extent #'%f10))
+                   (funcall (eval #'%f10)))))
+          (declare (notinline %f7))
+          (%f7)))
+    ((10) 10)))
