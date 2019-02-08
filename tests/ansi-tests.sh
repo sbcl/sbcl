@@ -8,7 +8,7 @@ cd ansi-test
                   --load gclload1.lsp --load gclload2.lsp \
                   --eval '(setf *default-pathname-defaults* (truename #P"sandbox/"))' \
                   --eval '(time (regression-test:do-tests))' \
-                  --eval '(let* ((expected (list "APROPOS-LIST.ERROR.2" "APROPOS.ERROR.2" "BOTH-CASE-P.2" "CHAR-DOWNCASE.2"
+                  --eval '(let* ((expected (list* "APROPOS-LIST.ERROR.2" "APROPOS.ERROR.2" "BOTH-CASE-P.2" "CHAR-DOWNCASE.2"
  "CHAR-UPCASE.2" "COMPILE-FILE.2"
  "DEFINE-COMPILER-MACRO.8" "DEFSETF.7A" "DESTRUCTURING-BIND.ERROR.10"
  "EXP.ERROR.10" "EXP.ERROR.11" "EXP.ERROR.8"
@@ -37,7 +37,11 @@ cd ansi-test
  "READTABLE-CASE.CASE-PRESERVE" "READTABLE-CASE.CASE-UPCASE" "SHIFTF.7"
  "SUBTYPEP-COMPLEX.8" "SUBTYPEP.CONS.38" "SUBTYPEP.CONS.41" "SUBTYPEP.CONS.43"
  "SUBTYPEP.EQL.1" "SUBTYPEP.EQL.2" "SUBTYPEP.MEMBER.17" "SUBTYPEP.MEMBER.18"
-  "SXHASH.17" "SXHASH.18" "SXHASH.19" "TYPE-OF.1"))
+ "SXHASH.17" "SXHASH.18" "SXHASH.19" "TYPE-OF.1" 
+#+win32 (list "ASINH.1" "ASINH.2" "ASINH.3" "ASINH.7" "ACOSH.3" "EXP.ERROR.7"
+         "EXPT.ERROR.4" "EXPT.ERROR.5" "EXPT.ERROR.6" "EXPT.ERROR.7"
+                   "PROBE-FILE.4" "OPEN.OUTPUT.23" "OPEN.IO.22" "OPEN.IO.23")
+ #-win32 nil))
                          (failing (mapcar (function string) regression-test:*failed-tests*))
                          (diff1 (set-difference failing  expected :test (function equal)))
                          (diff2 (set-difference expected failing :test (function equal))))
