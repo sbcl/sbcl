@@ -90,8 +90,7 @@
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location))
   ;; Local package nicknames.
-  (%local-nicknames nil :type list)
-  (%locally-nicknamed-by nil :type list))
+  (%local-nicknames nil :type list))
 (!set-load-form-method package (:xc)
   (lambda (obj env)
     (declare (ignore env))

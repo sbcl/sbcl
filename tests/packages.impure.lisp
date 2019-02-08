@@ -844,6 +844,15 @@ if a restart was invoked."
       (assert (equal (package-local-nicknames package2) `((,name3 . ,package1))))
       (assert (package-locked-p package2)))))
 
+(with-test (:name :locally-nicknamed-by-dedup)
+  (with-tmp-packages
+      ((p1 (make-package "LONGNAME.SAMPLE.FRED"))
+       (p2 (defpackage "BAZ"
+             (:local-nicknames (:fred "LONGNAME.SAMPLE.FRED")
+                               (:f "LONGNAME.SAMPLE.FRED")))))
+    (assert (equal (package-locally-nicknamed-by-list "LONGNAME.SAMPLE.FRED")
+                   (list (find-package "BAZ"))))))
+
 ;;; Now a possibly useless test on an essentially useless function.
 ;;; But we may as well get it right - assert that GENTEMP returns
 ;;; a symbol that definitely did not exist in the specified package

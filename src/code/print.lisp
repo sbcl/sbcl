@@ -444,12 +444,10 @@ variable: an unreadable object representing the error is printed instead.")
             ;; To preserve print-read consistency, use the local nickname if
             ;; one exists.
             (unless (and accessible (eq found symbol))
-              (let ((prefix (or (car (rassoc package (package-%local-nicknames current)))
-                                (package-name package))))
-                (output-token prefix))
-              (write-char #\: stream)
-              (when (eql (find-external-symbol name package) 0)
-                (write-char #\: stream))))))
+              (output-token (or (package-local-nickname package current)
+                                (package-name package)))
+              (write-string (if (eql (find-external-symbol name package) 0) "::" ":")
+                            stream)))))
         (output-token name)))))
 
 ;;;; escaping symbols
