@@ -167,11 +167,12 @@
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
-        (cond ((< delta (expt 2 12))
-               (inst subi nsp-tn nsp-tn delta))
-              (t
-               (inst li temp delta)
-               (inst sub nsp-tn nsp-tn delta)))))
+        (typecase delta
+          (short-immediate
+           (inst subi nsp-tn nsp-tn delta))
+          (t
+           (inst li temp delta)
+           (inst sub nsp-tn nsp-tn delta)))))
     (move result nsp-tn)))
 
 (define-vop (dealloc-number-stack-space)
