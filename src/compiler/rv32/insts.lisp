@@ -152,19 +152,15 @@
 
 ;;;; Branch and Jump instructions.
 
-(defun jalr-offset (target number-of-instructions posn &optional delta-if-after)
-  (- (label-position target (and delta-if-after posn) delta-if-after)
-     (+ posn (* 4 number-of-instructions))))
-
-(defun branch/jal-offset (target number-of-instructions posn &optional delta-if-after)
-  (ash (jalr-offset target number-of-instructions posn delta-if-after) -1))
+(defun relative-offset (target posn &optional delta-if-after)
+  (- (label-position target (and delta-if-after posn) delta-if-after) posn))
 
 (defun emit-short-jump-at (segment lr target posn)
   (declare (ignore posn))
   (emit-back-patch
    segment 4
    (lambda (segment posn)
-     (emit-j-inst segment (branch/jal-offset target 1 posn) lr #b1101111))))
+     (emit-j-inst segment (relative-offset target posn) lr #b1101111))))
 
 (defun emit-long-jump-at-fun (lr target)
   (lambda (segment posn)
@@ -173,11 +169,11 @@
      segment 8
      (lambda (segment posn)
        ;; We emit auipc + jalr
-       (let ((disp (jalr-offset target 2 posn)))
+       (let ((disp (relative-offset target posn)))
          (emit-u-inst segment (dpb 0 (byte 12 0) disp) lip-tn #b0010111)
          (emit-i-inst segment (ldb (byte 12 0) disp) lip-tn #b000 lr #b1100111))))))
 
-;;; For unconditional jumos, we either emit a one instruction or two
+;;; For unconditional jumps, we either emit a one instruction or two
 ;;; instruction sequence.
 (define-instruction jal (segment lr target)
   (:printer j ((opcode #b1101111)))
@@ -192,7 +188,7 @@
        segment 8 2
        (lambda (segment chooser posn delta-if-after)
          (declare (ignore chooser))
-         (when (typep (branch/jal-offset target 1 posn delta-if-after)
+         (when (typep (ash (relative-offset target posn delta-if-after) -1)
                       '(signed-byte 20))
            (emit-short-jump-at segment lr target posn)
            t))
@@ -211,12 +207,12 @@
    segment 12 2
    (lambda (segment chooser posn delta-if-after)
      (declare (ignore chooser))
-     (typecase (branch/jal-offset target 1 posn delta-if-after)
+     (typecase (ash (relative-offset target posn delta-if-after) -1)
        (short-immediate
         (emit-back-patch
          segment 4
          (lambda (segment posn)
-           (emit-b-inst segment (branch/jal-offset target 1 posn) rs2 rs1 funct3 opcode)))
+           (emit-b-inst segment (relative-offset target posn) rs2 rs1 funct3 opcode)))
         t)
        ((signed-byte 20)
         ;; Emit the sequence:
