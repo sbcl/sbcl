@@ -303,3 +303,8 @@
 (defmacro sb-thread:barrier ((kind) &body body)
   (declare (ignore kind))
   `(progn ,@body))
+
+;;; For (eval-when (:compile-toplevel) (/show)) forms that reach the host's EVAL.
+(defmacro %primitive (name arg)
+  (ecase name
+    (print `(format t "~A~%" ,arg))))

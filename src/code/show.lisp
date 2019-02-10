@@ -101,14 +101,6 @@
 (defmacro /noshow0 (&rest rest)
   (declare (ignore rest)))
 
-;;; low-level display of a string, works even early in cold init
-(defmacro /primitive-print (thing)
-  (declare (ignorable thing)) ; (for when #-SB-SHOW)
-  #+sb-show
-  (progn
-    #+sb-xc-host `(/show "(/primitive-print)" ,thing)
-    #-sb-xc-host `(%primitive print (the simple-string ,thing))))
-
 ;;; low-level display of a system word, works even early in cold init
 (defmacro /hexstr (thing)
   (declare (ignorable thing)) ; (for when #-SB-SHOW)

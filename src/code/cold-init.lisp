@@ -53,7 +53,7 @@
   ;; not to use it for the COLD-INIT-OR-REINIT functions.)
 (defmacro show-and-call (name)
     `(progn
-       (/primitive-print ,(symbol-name name))
+       (/show "Calling" ,(symbol-name name))
        (,name)))
 
 (defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
@@ -429,6 +429,5 @@ process to continue normally."
     defenum defun-cached with-globaldb-name def!type def!struct
     .
     #+sb-show ()
-    #-sb-show (/hexstr /nohexstr /noshow /noshow0
-                /primitive-print /show /show0))
+    #-sb-show (/hexstr /nohexstr /noshow /noshow0 /show /show0))
   *!removable-symbols*)

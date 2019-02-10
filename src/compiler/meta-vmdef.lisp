@@ -215,8 +215,7 @@
   (declare (type symbol name) (type list scs))
   (let ((scns (mapcar #'sc-number-or-lose scs)))
     `(progn
-       (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
-       (/primitive-print ,(symbol-name name))
+       (/show "doing !DEF-PRIMITIVE-TYPE" ,(string name))
        (assert (not (gethash ',name *backend-primitive-type-names*)))
        (setf (gethash ',name *backend-primitive-type-names*)
              (make-primitive-type :name ',name
