@@ -56,8 +56,10 @@
                          ,(uncross included-name)
                          ,@rest))
                    option)))
-          `((,(uncross name)
-             ,@(mapcar #'uncross-option options))
+          ;; Attempting to define a type named by a CL symbol is an error.
+          ;; Therefore NAME is wrong if it uncrosses to something other than itself.
+          (assert (eq (uncross name) name))
+          `((,name ,@(mapcar #'uncross-option options))
             ,@slots-and-doc))))))
 
 ;;; DEF!STRUCT defines a structure for both the host and target.
