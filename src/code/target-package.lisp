@@ -1019,12 +1019,26 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; Change the name if we can, blast any old nicknames and then
 ;;; add in any new ones.
 ;;;
-;;; FIXME: ANSI claims that NAME is a package designator (not just a
-;;; string designator -- weird). Thus, NAME could
-;;; be a package instead of a string. Presumably then we should not change
-;;; the package name if NAME is the same package that's referred to by PACKAGE.
-;;; If it's a *different* package, we should probably signal an error.
-;;; (perhaps (ERROR 'ANSI-WEIRDNESS ..):-)
+;;; The spec says that NAME is a package designator (not just a string designator)
+;;; which is weird, but potentially meaningful if assigning new global nicknames.
+;;; If not called for that purpose, then it's largely pointless, because you can't
+;;; rename to any package-designator other than itself without causing a conflict.
+;;; A survey of some other implementations suggests that we're in the minority
+;;; as to the legality of (RENAME-PACKAGE "A" (FIND-PACKAGE "A") '("A-NICK")).
+;;;
+;;; ABCL:
+;;;   The value #<PACKAGE A> is not of type (OR STRING SYMBOL CHARACTER).
+;;; CCL:
+;;;   Error: The value #<Package "A"> is not of the expected type (OR STRING SYMBOL CHARACTER).
+;;; CMUCL:
+;;;   #<The A package, 0/9 internal, 0/9 external> cannot be coerced to a string.
+;;; ECL:
+;;;   In function STRING, the value of the first argument is #<"A" package>
+;;;   which is not of the expected type STRING
+;;;
+;;; CLISP agrees with us that this usage is permitted. If the new "name" is a
+;;; different package, it is merely the same error as if any already-existing name
+;;; was given. I see no reason to be more strict than the spec would have it be.
 (defun rename-package (package-designator name &optional (nicknames ()))
   "Changes the name and nicknames for a package."
   (prog ((nicks (stringify-string-designators nicknames)))
