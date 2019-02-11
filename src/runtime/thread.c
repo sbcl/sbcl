@@ -76,8 +76,10 @@ static pthread_mutex_t create_thread_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifdef LISP_FEATURE_GCC_TLS
 __thread struct thread *current_thread;
-#endif
+__thread int is_lisp_thread;
+#else
 pthread_key_t lisp_thread = 0;
+#endif
 #endif
 
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
@@ -194,7 +196,11 @@ initial_thread_trampoline(struct thread *th)
     lispobj *args = NULL;
 #endif
 #ifdef LISP_FEATURE_SB_THREAD
+# ifdef LISP_FEATURE_GCC_TLS
+    is_lisp_thread = 1;
+# else
     pthread_setspecific(lisp_thread, (void *)1);
+# endif
 #endif
 #if defined(THREADS_USING_GCSIGNAL) && (defined(LISP_FEATURE_PPC) || defined(LISP_FEATURE_ARM64))
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
@@ -343,7 +349,11 @@ init_new_thread(struct thread *th,
 {
     int lock_ret;
 
+#ifdef LISP_FEATURE_GCC_TLS
+    is_lisp_thread = 1;
+#else
     pthread_setspecific(lisp_thread, (void *)1);
+#endif
     if(arch_os_thread_init(th)==0) {
         /* FIXME: handle error */
         lose("arch_os_thread_init failed\n");
@@ -568,7 +578,11 @@ detach_os_thread(init_thread_data *scribble)
     undo_init_new_thread(th, scribble);
 
     odxprint(misc, "deattach_os_thread: detached");
+#ifdef LISP_FEATURE_GCC_TLS
+    is_lisp_thread = 0;
+#else
     pthread_setspecific(lisp_thread, (void *)0);
+#endif
     thread_sigmask(SIG_SETMASK, &scribble->oldset, 0);
     free_thread_struct(th);
 }
@@ -866,7 +880,7 @@ create_thread_struct(lispobj initial_function) {
 
 void create_initial_thread(lispobj initial_function) {
     struct thread *th = create_thread_struct(initial_function);
-#ifdef LISP_FEATURE_SB_THREAD
+#if defined(LISP_FEATURE_SB_THREAD) && !defined(LISP_FEATURE_GCC_TLS)
     pthread_key_create(&lisp_thread, 0);
 #endif
     if(th) {
