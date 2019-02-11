@@ -201,6 +201,8 @@ print_entry_name (lispobj name, FILE *f)
         } else {
             fprintf(f, "<??? type %d>", widetag_of(object));
         }
+    } else if (fixnump(name)) {
+        fprintf(f, "%d", (int)fixnum_value(name));
     } else {
         fprintf(f, "<??? lowtag %d>", (int) lowtag_of(name));
     }
