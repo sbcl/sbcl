@@ -122,13 +122,13 @@
                  (setq name (make-array length :element-type elt-type)))
                (dotimes (index (length things)
                                (if package
-                                   (values (%intern name length package elt-type))
+                                   (values (%intern name length package elt-type nil))
                                    (make-symbol name)))
                  (let ((s (svref strings index)))
                    (replace name s :start1 start)
                    (incf start (length s)))))))
-         #+sb-xc-host (%intern (name length package elt-type)
-                        (declare (ignore length elt-type))
+         #+sb-xc-host (%intern (name length package elt-type dummy)
+                        (declare (ignore length elt-type dummy))
                         ;; Copy, in case the host respects the DX declaration,
                         ;; but does not copy, which makes our assumption wrong.
                         (intern (copy-seq name) package)))

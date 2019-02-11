@@ -1565,7 +1565,8 @@ extended <package-name>::<form-in-package> syntax."
                          pkg
                          (if (token-buf-only-base-chars buf)
                              (%readtable-symbol-preference rt)
-                             'character))))))))
+                             'character)
+                         nil)))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of

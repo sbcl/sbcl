@@ -70,7 +70,6 @@
 ;;; to small integers. For a constant string name, it is faster to search
 ;;; package local nicknames by the integer ID.
 ;;; Keys are never deleted from this table.
-;;; Insertions are synchronized by WITH-PACKAGE-NAMES.
 (define-load-time-global *package-nickname-ids* nil)
 (declaim (type (cons info-hashtable fixnum) *package-nickname-ids*))
 
@@ -1164,7 +1163,8 @@ implementation it is ~S." *!default-package-use-list*)
                  (if (and (packagep package) (package-%name package))
                      package
                      (find-undeleted-package-or-lose package))
-                 (if (base-string-p name) 'base-char 'character)))
+                 (if (base-string-p name) 'base-char 'character)
+                 nil))
 
   (defun find-symbol (name &optional (package (sane-package)))
   "Return the symbol named STRING in PACKAGE. If such a symbol is found
@@ -1182,7 +1182,8 @@ implementation it is ~S." *!default-package-use-list*)
     ;; ones. Hence no check for PACKAGE-%NAME validity (i.e. non-deleted)
     (find/intern %intern
                  (if (packagep cell) cell (cached-find-package cell))
-                 (if (base-string-p name) 'base-char 'character)))
+                 (if (base-string-p name) 'base-char 'character)
+                 nil))
 
   (defun find-symbol2 (name cell)
     (find/intern %find-symbol ; likewise
@@ -1194,40 +1195,39 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; The fasloader always supplies NAME as a (SIMPLE-ARRAY <ELT-TYPE> 1),
 ;;; but the reader uses a buffer of CHARACTER, which, based on a flag,
 ;;; can be demoted to an array of BASE-CHAR.
-(defun %intern (name length package elt-type)
+(defun %intern (name length package elt-type ignore-lock)
   (declare (simple-string name) (index length))
   (multiple-value-bind (symbol where) (%find-symbol name length package)
-    (cond (where
-           (values symbol where))
-          (t
-           ;; Let's try again with a lock: the common case has the
-           ;; symbol already interned, handled by the first leg of the
-           ;; COND, but in case another thread is interning in
-           ;; parallel we need to check after grabbing the lock.
-           (with-package-graph ()
-             (setf (values symbol where) (%find-symbol name length package))
-             (if where
-                 (values symbol where)
-                 (let* ((symbol-name
-                         (logically-readonlyize
-                          (replace (make-string length :element-type elt-type)
-                                   name))))
+    (if where
+        (values symbol where)
+        ;; Double-checked lock pattern: the common case has the symbol already interned,
+        ;; but in case another thread is interning in parallel we need to check after
+        ;; grabbing the lock.
+        (with-package-graph ()
+         (setf (values symbol where) (%find-symbol name length package))
+         (if where
+             (values symbol where)
+             (let* ((symbol-name
+                     (logically-readonlyize
+                      (replace (make-string length :element-type elt-type) name)))
+                    ;; optimistically create the symbol
+                    (symbol ; Symbol kind: 1=keyword, 2=other interned
+                     (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))
+                    (table (cond ((eq package *keyword-package*)
+                                  (%set-symbol-value symbol symbol)
+                                  (package-external-symbols package))
+                                 (t
+                                  (package-internal-symbols package)))))
+               ;; Set the symbol's package before storing it into the package
+               ;; so that (symbol-package (intern x #<pkg>)) = #<pkg>.
+               ;; This matters in the case of concurrent INTERN.
+               (%set-symbol-package symbol package)
+               (if ignore-lock
+                   (add-symbol table symbol)
                    (with-single-package-locked-error
                        (:package package "interning ~A" symbol-name)
-                     (let ((symbol ; Symbol kind: 1=keyword, 2=other interned
-                            (%make-symbol (if (eq package *keyword-package*) 1 2)
-                                          symbol-name)))
-                       ;; Simultaneous INTERN calls must not return an incompletely
-                       ;; initialized object, so that
-                       ;; (symbol-package (intern x #<pkg>)) = #<pkg>
-                       (%set-symbol-package symbol package)
-                       (add-symbol (cond ((eq package *keyword-package*)
-                                          (%set-symbol-value symbol symbol)
-                                          (package-external-symbols package))
-                                         (t
-                                          (package-internal-symbols package)))
-                                   symbol)
-                       (values symbol nil))))))))))
+                     (add-symbol table symbol)))
+               (values symbol nil)))))))
 
 ;;; Check internal and external symbols, then scan down the list
 ;;; of hashtables for inherited symbols.

@@ -823,8 +823,9 @@
     ;; MAP and friends are good examples where this pertains]
     (when #+sb-xc-host t ; always trust our own code
           #-sb-xc-host
-          (or (package-locked-p ; callee "probably" won't get redefined
-               (sb-xc:symbol-package (fun-name-block-name fun-name)))
+          (or (let ((pkg (sb-xc:symbol-package (fun-name-block-name fun-name))))
+                ;; callee "probably" won't get redefined
+                (or (not pkg) (package-locked-p pkg)))
               (policy node (= safety 0)))
       (dolist (arg-spec dxable-args)
         (when (symbolp arg-spec)

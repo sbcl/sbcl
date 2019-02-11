@@ -136,9 +136,6 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
-  (let ((*print-length* 10)
-        (*print-level* 5)
-        (*print-circle* t)
-        (*compile-print* nil))
+  (let ((*compile-print* t))
     (dolist (group sources)
       (with-compilation-unit () (do-srcs group))))))
