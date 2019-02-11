@@ -2232,3 +2232,18 @@
           (declare (notinline %f7))
           (%f7)))
     ((10) 10)))
+
+(with-test (:name :dead-sets)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (logtest
+          ((lambda (v &rest args)
+             (declare (ignore args))
+             (setf v
+                   ((lambda (&rest args) (declare (ignore args)) (error "")) v)))
+           1)
+          1))
+    (() (condition 'simple-error))))
+
+

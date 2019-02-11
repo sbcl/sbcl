@@ -1037,7 +1037,7 @@
 ;;;
 ;;; Why do we need to consider LVAR type? -- APD, 2003-07-30
 (defun maybe-terminate-block (node ir1-converting-not-optimizing-p)
-  (declare (type (or basic-combination cast cset ref) node))
+  (declare (type (or basic-combination cast ref) node))
   (let* ((block (node-block node))
          (lvar (node-lvar node))
          (ctran (node-next node))
@@ -1744,11 +1744,11 @@
     (dolist (set (lambda-var-sets var))
       (let ((type (lvar-type (set-value set))))
         (push type types)
-        (when (node-reoptimize set)
+        (when (and (node-reoptimize set)
+                   (not (node-to-be-deleted-p set)))
           (let ((old-type (node-derived-type set)))
             (unless (values-subtypep old-type type)
-              (derive-node-type set (make-single-value-type type))
-              (maybe-terminate-block set nil)))
+              (derive-node-type set (make-single-value-type type))))
           (setf (node-reoptimize set) nil))))
     (let ((res-type (or (maybe-infer-iteration-var-type var initial-type)
                         (apply #'type-union initial-type types))))
