@@ -398,13 +398,18 @@
                  (loop for name in !type-class-fun-slots
                        append `(,(keywordicate name)
                                 (,(!type-class-fun-slot name) parent))))))))
-    #-sb-xc
-    `(if (find ',name *type-classes* :key #'type-class-name)
+    #+sb-xc-host
+    `(progn
+       (if (find ',name *type-classes* :key #'type-class-name)
          ;; Careful: type-classes are very complicated things to redefine.
          ;; For the sake of parallelized make-host-1 we have to allow it
          ;; not to be an error to get here, but we can't overwrite anything.
          (style-warn "Not redefining type-class ~S" ',name)
          (vector-push-extend ,make-it *type-classes*))
+       ;; I have no idea what compiler bug could be fixed by adding a form here,
+       ;; but this certainly achieves something, somehow.
+       #+host-quirks-cmu (print (aref *type-classes* (1- (length *type-classes*)))))
+
     ;; The Nth entry in the array of classes contain a list of instances
     ;; of the type-class created by genesis that need patching.
     ;; Types are dumped into the cold core without pointing to their class

@@ -126,7 +126,10 @@
 ;;; but as we've defined FDEFINITION, that strips encapsulations.
 (defmacro %coerce-name-to-fun (name &optional (lookup-fn 'find-fdefn)
                                     strictly-functionp)
-  (declare (boolean strictly-functionp))
+  ;; Whoa! We were getting a warning from the *host* here -
+  ;;   "Abbreviated type declaration: (BOOLEAN SB-IMPL::STRICTLY-FUNCTIONP)."
+  ;; I guess it's because we hand it a lambda and it doesn't like our style?
+  (declare (type boolean strictly-functionp))
   `(let* ((name ,name) (fdefn (,lookup-fn name)) f)
      (if (and fdefn
               (setq f (fdefn-fun (truly-the fdefn fdefn)))

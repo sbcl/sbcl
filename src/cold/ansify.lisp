@@ -49,6 +49,7 @@
 ;;; cross-compiler from working.)
 #+cmu
 (progn
+  (setq *compile-print* nil) ; too much noise, can't see the actual warnings
   ;; #'IN-HOST-COMPILATION-MODE will push :NO-ANSI-PRINT-OBJECT into SB-XC:*FEATURES*
   (warn "CMU CL doesn't support the :PRINT-OBJECT option to DEFSTRUCT.~%"))
 
