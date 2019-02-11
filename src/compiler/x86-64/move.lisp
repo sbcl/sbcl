@@ -95,8 +95,11 @@
                      (typecase val
                        ((unsigned-byte 8) :byte)
                        ((unsigned-byte 16) :word)
+                       ;; fixups can be :dword size because we don't reference
+                       ;; objects that require a 64-bit address as immediate operands.
                        ;; signed-32 is no good, as it needs sign-extension.
-                       ((unsigned-byte 32) :dword)))
+                       ((or (unsigned-byte 32) fixup)
+                        :dword)))
                 :qword)))
        (inst mov operand-size target val)))
     ;; Otherwise go through the temporary register
