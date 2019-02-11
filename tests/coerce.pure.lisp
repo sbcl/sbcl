@@ -128,3 +128,12 @@
     (declare (ignore failure-p))
     (assert (= 1 (length warnings)))
     (assert-error (funcall fun))))
+
+(with-test (:name :coerce-float-to-float)
+  (checked-compile-and-assert
+      ()
+      '(lambda (f)
+        (coerce f 'float))
+    ((10) 10.0)
+    ((1/2) 0.5)
+    ((30d0) 30d0)))
