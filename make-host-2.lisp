@@ -65,18 +65,23 @@
      (lambda (name)
        (let* ((cell (sb-int:info :function :emitted-full-calls name))
               (inlinep (eq (sb-int:info :function :inlinep name) :inline))
+              (source-xform (sb-int:info :function :source-transform name))
               (info (sb-int:info :function :info name)))
          (if (and cell
                   (or inlinep
+                      source-xform
                       (and info (sb-c::fun-info-templates info))
-                      (sb-int:info :function :compiler-macro-function name)
-                      (sb-int:info :function :source-transform name)))
-             (if inlinep
-                 ;; A full call to an inline function almost always indicates
-                 ;; an out-of-order definition. If not an inline function,
-                 ;; the call could be due to an inapplicable transformation.
-                 (push (cons name cell) likely-suspicious)
-                 (push (cons name cell) possibly-suspicious))))))
+                      (sb-int:info :function :compiler-macro-function name)))
+             (cond (inlinep
+                    ;; A full call to an inline function almost always indicates
+                    ;; an out-of-order definition. If not an inline function,
+                    ;; the call could be due to an inapplicable transformation.
+                    (push (cons name cell) likely-suspicious))
+                   ;; structure constructors aren't inlined by default,
+                   ;; though we have a source-xform.
+                   ((and (listp source-xform) (eq :constructor (cdr source-xform))))
+                   (t
+                    (push (cons name cell) possibly-suspicious)))))))
     (flet ((show (label list)
              (when list
                (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
