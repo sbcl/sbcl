@@ -3331,13 +3331,13 @@ core and return a descriptor to it."
 
      FDEFN   FUNCTION  NAME
 ========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
-              (sort funs #'string<
+              (sort (copy-list funs) #'string<
                     :key (lambda (x) (fun-name-block-name (caddr x)))))
       (format t "~%~|~%II.B. defined functions (numerically):
 
      FDEFN   FUNCTION  NAME
 ========== ==========  ====~:{~%~10,'0X ~10,'0X  ~S~}~%"
-              (sort funs #'< :key #'second))
+              (sort (copy-list funs) #'< :key #'second))
 
       (format t "~%~|
 (a note about initially undefined function references: These functions
