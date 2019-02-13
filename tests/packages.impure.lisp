@@ -939,3 +939,15 @@ if a restart was invoked."
 ;; git revision f7d1550c0e16262f28213c9e3c048f42e3f0b476 broke find-all-symbols
 (with-test (:name :find-all-symbols)
   (find-all-symbols "FIXNUM"))
+
+(defun foo-intern (x) (intern x "PKG-A"))
+(compile 'foo-intern)
+;;; Basic smoke test of compiler transform of INTERN
+(with-test (:name :cached-find-package)
+  (assert-error (foo-intern "X"))
+  (make-package "PKG-A")
+  (locally (declare (notinline intern find-symbol))
+    (assert (eq (foo-intern "X") (find-symbol "X" "PKG-A")))
+    (delete-package "PKG-A")
+    (make-package "PKG-B" :nicknames '("PKG-A"))
+    (assert (eq (foo-intern "X") (find-symbol "X" "PKG-B")))))
