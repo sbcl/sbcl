@@ -2170,15 +2170,18 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     fake_foreign_function_call(context);
 
     /* To allow debugging memory faults in signal handlers and such. */
-    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, sp=%p)",
+#ifdef ARCH_HAS_STACK_POINTER
+    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, fp=%p, sp=%p) tid %#lx",
                                       addr,
                                       *os_context_pc_addr(context),
-#ifdef ARCH_HAS_STACK_POINTER
-                                      *os_context_sp_addr(context)
+                                      *os_context_fp_addr(context),
+                                      *os_context_sp_addr(context),
+                                      thread_self()); // = 0 if -sb-thread
 #else
-                                      0
+    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p)",
+                                      addr, *os_context_pc_addr(context));
 #endif
-                                      );
+
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 #  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 #    error memory fault emulation needs validating for this architecture

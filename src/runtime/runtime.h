@@ -29,6 +29,7 @@
 
 #if defined(LISP_FEATURE_SB_THREAD)
 #define thread_self() pthread_self()
+#define thread_equal(a,b) pthread_equal(a,b)
 #define thread_kill pthread_kill
 
 #ifdef LISP_FEATURE_WIN32
@@ -41,6 +42,7 @@
 #define thread_mutex_unlock(l) pthread_mutex_unlock(l)
 #else
 #define thread_self() 0
+#define thread_equal(a,b) ((a)==(b))
 #define thread_kill kill_safely
 #define thread_sigmask sigprocmask
 #define thread_mutex_lock(l) 0

@@ -1128,7 +1128,10 @@ kill_safely(os_thread_t os_thread, int signal)
          * would go wrong.  Why are we running interruptions while
          * stopping the world though?  Test case is (:ASYNC-UNWIND
          * :SPECIALS), especially with s/10/100/ in both loops. */
-        if (os_thread == pthread_self()) {
+        /* From the linux man page on pthread_self() -
+         * "variables  of  type  pthread_t  can't  portably be compared using
+         *  the C equality operator (==); use pthread_equal(3) instead." */
+        if (thread_equal(os_thread, pthread_self())) {
             pthread_kill(os_thread, signal);
 #ifdef LISP_FEATURE_WIN32
             check_pending_thruptions(NULL);

@@ -164,6 +164,7 @@ os_context_register_t *os_context_lr_addr(os_context_t *context);
  * system stack pointer for that context. */
 #ifdef ARCH_HAS_STACK_POINTER
 os_context_register_t *os_context_sp_addr(os_context_t *context);
+os_context_register_t *os_context_fp_addr(os_context_t *context);
 #endif
 /* Given a signal context, return the address for storage of the
  * signal mask for that context. */
