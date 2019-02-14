@@ -2174,7 +2174,7 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, fp=%p, sp=%p) tid %#lx",
                                       addr,
                                       *os_context_pc_addr(context),
-                                      *os_context_fp_addr(context),
+                                      os_context_frame_pointer(context),
                                       *os_context_sp_addr(context),
                                       thread_self()); // = 0 if -sb-thread
 #else
