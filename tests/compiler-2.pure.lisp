@@ -2247,3 +2247,14 @@
     (() (condition 'simple-error))))
 
 
+(with-test (:name :functional-may-escape-p)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      '(lambda ()
+        (let (x)
+          (block nil
+            (flet ((x () (let (*)
+                           (return 33))))
+              (setf x #'x)))
+          (funcall x)))
+    (() (condition 'control-error))))

@@ -217,7 +217,10 @@
 (defvar *functional-escape-info*)
 
 (defun functional-may-escape-p (functional)
-  (binding* ((table (or *functional-escape-info*
+  (binding* ((functional (if (lambda-p functional)
+                             (lambda-home functional)
+                             functional))
+             (table (or *functional-escape-info*
                         ;; Many components have no escapes, so we
                         ;; allocate it lazily.
                         (setf *functional-escape-info*
