@@ -589,7 +589,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (dfo-as-needed component)
 
     (maybe-mumble "control ")
-    (control-analyze component #'make-ir2-block)
+    (control-analyze component)
 
     (when (or (ir2-component-values-receivers (component-info component))
               (component-dx-lvars component))
