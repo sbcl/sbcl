@@ -41,6 +41,16 @@
             (ash symbol-value-slot word-shift)
             (- other-pointer-lowtag))))
 
+(defun load-foreign-symbol-value (dest symbol temp)
+  (let ((fixup (make-fixup symbol :foreign)))
+    (inst lui temp fixup)
+    (inst #-64-bit lw #+64-bit ld dest temp fixup)))
+
+(defun store-foreign-symbol-value (src symbol temp)
+  (let ((fixup (make-fixup symbol :foreign)))
+    (inst lui temp fixup)
+    (inst #-64-bit sw #+64-bit sd src temp fixup)))
+
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
 byte-ordering issues."

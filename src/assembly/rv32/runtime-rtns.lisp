@@ -48,14 +48,6 @@
   ;; FIXME
   (inst li null-tn #x8000017))
 
-(defun load-foreign-symbol-value (dest symbol temp)
-  (inst li temp (make-fixup symbol :foreign))
-  (loadw dest temp))
-
-(defun store-foreign-symbol-value (src symbol temp)
-  (inst li temp (make-fixup symbol :foreign))
-  (storew src temp))
-
 (define-assembly-routine (call-into-lisp (:return-style :none))
     ((:arg function (descriptor-reg any-reg) ca0-offset)
      (:arg arg-ptr (descriptor-reg any-reg) ca1-offset)
