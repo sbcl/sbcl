@@ -64,8 +64,8 @@
   (defreg nargs 31)
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
-  (defregset descriptor-regs a0 a1 a2 a3 l1 l2 l3 ocfp lra lexenv)
-  (defregset boxed-regs a0 a1 a2 a3 l1 l2 l3 ocfp lra lexenv code)
+  (defregset descriptor-regs a0 a1 a2 a3 l0 l1 l2 l3 ocfp lra lexenv)
+  (defregset boxed-regs a0 a1 a2 a3 l0 l1 l2 l3 ocfp lra lexenv code)
 
   (define-argument-register-set a0 a1 a2 a3))
 
