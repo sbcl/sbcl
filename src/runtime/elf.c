@@ -64,7 +64,7 @@ int apply_pie_relocs(long code_space_translation,
 {
     // If dynamic space was relocated, let coreparse fix everything by itself.
     // The entire heap must be walked anyway to fix intra-dynamic-space pointers.
-    if (dynamic_space_translation != 0)
+    if (dynamic_space_translation != 0 || lisp_rel_section_size == 0)
         return 0;
     // Otherwise, we're going to make it appear that code space was supposed
     // to have been mapped where it actually was.

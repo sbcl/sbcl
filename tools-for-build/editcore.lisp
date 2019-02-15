@@ -394,6 +394,9 @@
         (incf physaddr size)))))
   (bug "Can't find symbol ~A::~A" package-name symbol-name))
 
+(defparameter label-prefix (if (member :darwin *features*) "_" ""))
+(defun labelize (x) (concatenate 'string label-prefix x))
+
 (defun compute-linkage-symbols (spaces entry-size)
   (let* ((hashtable (symbol-global-value
                      (find-target-symbol "SB-SYS" "*LINKAGE-INFO*"
@@ -406,8 +409,8 @@
     (dolist (entry pairs vector)
       (let* ((key (undescriptorize (car entry)))
              (entry-index (/ (- (cdr entry) min) entry-size))
-             (string (translate (if (consp key) (car (translate key spaces)) key)
-                                spaces)))
+             (string (labelize (translate (if (consp key) (car (translate key spaces)) key)
+                                          spaces))))
         (setf (aref vector entry-index)
               (if (consp key) (list string) string))))))
 
@@ -808,6 +811,10 @@
 
 (defun write-preamble (output)
   (format output " .text~% .file \"sbcl.core\"
+~:[~; .macro .size sym size # ignore
+ .endm
+ .macro .type sym type # ignore
+ .endm~]
  .macro lasmsym name size
  .set \"\\name\", .
  .size \"\\name\", \\size
@@ -818,13 +825,15 @@
  .size \"\\name\", \\size
  .type \"\\name\", function
  .endm
- .globl __lisp_code_start, lisp_jit_code, __lisp_code_end
- .balign 4096~%__lisp_code_start:~%CS: # code space~%"))
+ .globl ~alisp_code_start, ~alisp_jit_code, ~alisp_code_end
+ .balign 4096~%~alisp_code_start:~%CS: # code space~%"
+          (member :darwin *features*)
+          label-prefix label-prefix label-prefix label-prefix))
 
 ;;; Convert immobile varyobj space to an assembly file in OUTPUT.
 (defun write-assembler-text
     (spaces output
-     &optional emit-sizes enable-pie (emit-cfi t)
+     &optional enable-pie (emit-cfi t)
      &aux (code-bounds (space-bounds immobile-varyobj-core-space-id spaces))
           (fixedobj-bounds (space-bounds immobile-fixedobj-core-space-id spaces))
           (core (make-core spaces code-bounds fixedobj-bounds enable-pie))
@@ -995,10 +1004,9 @@
                 (raw-fun (sap-ref-word (int-sap ptr)
                                        (ash fdefn-raw-addr-slot word-shift)))
                 (c-name (c-name name core pp-state "F")))
-           (format output "~a: # ~x~%~@[ .size ~0@*~a, 32~%~]"
+           (format output "~a: # ~x~% .size ~0@*~a, 32~%"
                      (c-symbol-quote c-name)
-                     (logior code-addr other-pointer-lowtag)
-                     emit-sizes)
+                     (logior code-addr other-pointer-lowtag))
            (format output " .quad 0x~x, 0x~x, ~:[~;CS+~]0x~x, 0x~x~%"
                    (sap-ref-word (int-sap ptr) 0)
                    (sap-ref-word (int-sap ptr) 8)
@@ -1022,8 +1030,7 @@
                       "unnamed"
                       (fun-name-from-core name core))
                   core pp-state "G")))
-           (format output "~a:~%~@[ .size ~0@*~a, 48~%~]"
-                   (c-symbol-quote c-name) emit-sizes)
+           (format output "~a:~% .size ~0@*~a, 48~%" (c-symbol-quote c-name))
            (format output " .quad 0x~x, .+24, ~:[~;CS+~]0x~x~{, 0x~x~}~%"
                    (sap-ref-word sap 0)
                    code-space-p
@@ -1036,7 +1043,7 @@
   ;; The intent is that compilation to memory can use this reserved area
   ;; (if space remains) so that profilers can associate a C symbol with the
   ;; program counter range. It's better than nothing.
-  (format output "lisp_jit_code:~%")
+  (format output "~a:~%" (labelize "lisp_jit_code"))
 
   ;; Pad so that non-lisp code can't be colocated on a GC page.
   ;; (Lack of Lisp object headers in C code is the issue)
@@ -1054,10 +1061,9 @@
         (when (plusp nwords)
           (format output " .fill ~d~%" (* nwords n-word-bytes))))))
   ;; Extend with .5 MB of filler
-  (format output " .fill ~D~%__lisp_code_end:
+  (format output " .fill ~D~%~alisp_code_end:
  .size lisp_jit_code, .-lisp_jit_code~%"
-          (* 512 1024))
-  ; (format t "~&linker-relocs=~D~%" n-linker-relocs)
+          (* 512 1024) label-prefix)
   (values core total-code-size n-linker-relocs))
 
 ;;;; ELF file I/O
@@ -1572,7 +1578,7 @@
 ;;; is for linking in to a binary that needs no "--core" argument.
 (defun split-core
     (input-pathname asm-pathname
-     &key emit-sizes enable-pie (verbose nil)
+     &key enable-pie (verbose t)
      &aux (split-core-pathname
            (merge-pathnames (make-pathname :type "core") asm-pathname))
           (elf-core-pathname
@@ -1729,15 +1735,14 @@
               (format t "Copying ~d bytes (#x~x) from ptes = ~d PTEs~%"
                       pte-nbytes pte-nbytes (floor pte-nbytes 10)))
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
-          (let ((core (write-assembler-text map asm-file emit-sizes enable-pie))
+          (let ((core (write-assembler-text map asm-file enable-pie))
                 (emit-all-c-symbols t))
-            ;; There's no relation between emit-sizes and which section to put
-            ;; C symbol references in, however it's a safe bet that if sizes
-            ;; are supported then so is the .rodata directive.
-            (format asm-file (if emit-sizes "~% .rodata~%" "~% .data~%"))
+            (format asm-file (if (member :darwin *features*)
+                                 "~% .data~%"
+                                 "~% .section .rodata~%"))
             (format asm-file " .globl ~A~%~:*~A:
  .quad ~d # ct~%"
-                    "__lisp_linkage_values"
+                    (labelize "lisp_linkage_values")
                     (length (core-linkage-symbols core)))
             ;; -1 (not a plausible function address) signifies that word
             ;; following it is a data, not text, reference.
@@ -1747,8 +1752,8 @@
                   do (format asm-file " .quad ~:[~;-1, ~]~a~%"
                              (consp s)
                              (if (consp s) (car s) s))))))
-
-      (format asm-file "~% ~A~%" +noexec-stack-note+))))
+      (when (member :linux *features*)
+        (format asm-file "~% ~A~%" +noexec-stack-note+)))))
 
 ;;; Copy the input core into an ELF section without splitting into code & data.
 ;;; Also force a linker reference to each C symbol that the Lisp core mentions.
@@ -1832,16 +1837,13 @@
   (cond ((string= (car args) "split")
          (pop args)
          (let (pie sizes)
-           (loop (cond ((string= (car args) "--sizes")
-                        (setq sizes t)
-                        (pop args))
-                       ((string= (car args) "--pie")
+           (loop (cond ((string= (car args) "--pie")
                         (setq pie t)
                         (pop args))
                        (t
                         (return))))
            (destructuring-bind (input asm) args
-             (split-core input asm :enable-pie pie :emit-sizes sizes))))
+             (split-core input asm :enable-pie pie))))
         ((string= (car args) "copy")
          (apply #'copy-to-elf-obj (cdr args)))
         #+nil

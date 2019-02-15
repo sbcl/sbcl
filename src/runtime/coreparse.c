@@ -84,12 +84,14 @@ open_binary(char *filename, int mode)
 
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
-extern __attribute__((weak)) lispobj
- __lisp_code_start, lisp_jit_code, __lisp_code_end, __lisp_linkage_values;
-int lisp_code_in_elf() { return &__lisp_code_start != 0; }
-#else
-#define ELFCORE 0
+#endif
+
+#if !defined(ELFCORE) || !ELFCORE
 int lisp_code_in_elf() { return 0; }
+#else
+extern __attribute__((weak)) lispobj
+ lisp_code_start, lisp_jit_code, lisp_code_end, lisp_linkage_values;
+int lisp_code_in_elf() { return &lisp_code_start != 0; }
 #endif
 
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
@@ -134,7 +136,7 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
             read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
             core_start = -1; // reset to invalid
     }
-#if ELFCORE
+#if ELFCORE && !defined(LISP_FEATURE_DARWIN)
     // Specifying "--core" as an ELF file with a lisp.core section doesn't work.
     // (There are bunch of reasons) So only search for a core section if this
     // is an implicit search for a core embedded in an executable.
@@ -749,17 +751,17 @@ process_directory(int count, struct ndir_entry *entry,
     };
 
 #if ELFCORE
-    if (&__lisp_code_start) {
-        VARYOBJ_SPACE_START = (uword_t)&__lisp_code_start;
+    if (&lisp_code_start) {
+        VARYOBJ_SPACE_START = (uword_t)&lisp_code_start;
         varyobj_free_pointer = &lisp_jit_code;
-        varyobj_space_size = (uword_t)&__lisp_code_end - VARYOBJ_SPACE_START;
+        varyobj_space_size = (uword_t)&lisp_code_end - VARYOBJ_SPACE_START;
         spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len = varyobj_space_size;
         if (varyobj_free_pointer < (lispobj*)VARYOBJ_SPACE_START
-            || !PTR_IS_ALIGNED(&__lisp_code_end, 4096))
+            || !PTR_IS_ALIGNED(&lisp_code_end, 4096))
             lose("ELF core alignment bug. Check for proper padding in 'editcore'");
-#if !ENABLE_PAGE_PROTECTION
+#ifdef DEBUG_COREPARSE
         printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
-               (uword_t)&__lisp_code_start, (uword_t)&__lisp_code_end,
+               (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
                varyobj_free_pointer);
 #endif
         // Prefill the Lisp linkage table so that shrinkwrapped executables which link in
@@ -773,7 +775,7 @@ process_directory(int count, struct ndir_entry *entry,
         // but that's more of a change to the asm instructions than I'm comfortable making;
         // whereas "CALL linkage_entry_for_f" -> "CALL f" is quite straightforward.
         // (Rarely would a jmp indirection be used; maybe for newly compiled code?)
-        lispobj* ptr = &__lisp_linkage_values;
+        lispobj* ptr = &lisp_linkage_values;
         gc_assert(ptr);
         char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
         int count;
@@ -799,6 +801,11 @@ process_directory(int count, struct ndir_entry *entry,
     for ( ; --count>= 0; ++entry) {
         long id = entry->identifier;
         uword_t addr = entry->address;
+#ifdef DEBUG_COREPARSE
+        printf("space %d @ %10lx pg=%4d+%4d nwords=%ld\n",
+               (int)id, addr, (int)entry->data_page, (int)entry->page_count,
+               entry->nwords);
+#endif
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)
