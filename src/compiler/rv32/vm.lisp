@@ -101,7 +101,7 @@
  ;; Random objects that must not be seen by GC.  Used only as temporaries.
  (non-descriptor-reg registers :locations #.non-descriptor-regs)
 
- ;; Pointers to the interior of objects.  Used only as an temporary.
+ ;; Pointers to the interior of objects.  Used only as a temporary.
  (interior-reg registers :locations (#.lip-offset))
 
  (character-stack non-descriptor-stack)
