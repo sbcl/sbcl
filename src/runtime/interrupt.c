@@ -760,7 +760,7 @@ fake_foreign_function_call(os_context_t *context)
     check_blockables_blocked_or_lose(0);
 
     /* Get current Lisp state from context. */
-#if defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_GENCGC)
+#if defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RV32) && !defined(LISP_FEATURE_GENCGC)
     dynamic_space_free_pointer = SymbolValue(ALLOCATION_POINTER, thread);
 #endif
 #ifdef reg_ALLOC
