@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -g -Wall -O2 -fdollars-in-identifiers
+CFLAGS += -g -Wall -O2 -fdollars-in-identifiers
 
 ifdef SBCL_MACOSX_VERSION_MIN
   CFLAGS += -mmacosx-version-min=$(SBCL_MACOSX_VERSION_MIN)

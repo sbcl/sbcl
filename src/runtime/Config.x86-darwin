@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS = -arch i386 -g -Wall -O2 -fdollars-in-identifiers -fno-omit-frame-pointer
+CFLAGS += -arch i386 -g -Wall -O2 -fdollars-in-identifiers -fno-omit-frame-pointer
 
 LINKFLAGS += -arch i386
 ifdef SBCL_MACOSX_VERSION_MIN

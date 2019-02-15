@@ -84,9 +84,11 @@ open_binary(char *filename, int mode)
 
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
+#elif !defined(ELFCORE)
+#define ELFCORE 0
 #endif
 
-#if !defined(ELFCORE) || !ELFCORE
+#if !ELFCORE
 int lisp_code_in_elf() { return 0; }
 #else
 extern __attribute__((weak)) lispobj

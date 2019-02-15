@@ -544,7 +544,7 @@ attach_os_thread(init_thread_data *scribble)
   stack_addr = (void*)((size_t)stack.ss_sp - stack_size);
 #elif defined(LISP_FEATURE_DARWIN)
     stack_size = pthread_get_stacksize_np(os);
-    stack_addr = pthread_get_stackaddr_np(os) - stack_size;
+    stack_addr = (char*)pthread_get_stackaddr_np(os) - stack_size;
 #else
     pthread_attr_t attr;
 #ifdef LISP_FEATURE_FREEBSD
