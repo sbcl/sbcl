@@ -169,9 +169,10 @@
      segment 8
      (lambda (segment posn)
        ;; We emit auipc + jalr
-       (let ((disp (relative-offset target posn)))
-         (emit-u-inst segment (dpb 0 (byte 12 0) disp) lip-tn #b0010111)
-         (emit-i-inst segment (ldb (byte 12 0) disp) lip-tn #b000 lr #b1100111))))))
+       (multiple-value-bind (hi lo)
+           (u-and-i-inst-immediate (relative-offset target posn))
+         (emit-u-inst segment hi lip-tn #b0010111)
+         (emit-i-inst segment lo lip-tn #b000 lr #b1100111))))))
 
 ;;; For unconditional jumps, we either emit a one instruction or two
 ;;; instruction sequence.
