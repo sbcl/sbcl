@@ -36,27 +36,42 @@ arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
 
 void arch_skip_instruction(os_context_t *context)
 {
-#warning "Implement arch_skip_instruction"
+    *os_context_pc_addr(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-#warning "Implement."
+    return (unsigned char*)*os_context_pc_addr(context);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
 {
-#warning "Implement."
+    /* FIXME: this foreign_function_call_active test is dubious at
+     * best. If a foreign call is made in a pseudo atomic section
+     * (?) or more likely a pseudo atomic section is in a foreign
+     * call then an interrupt is executed immediately. Maybe it
+     * has to do with C code not maintaining pseudo atomic
+     * properly. MG - 2005-08-10
+     *
+     * The foreign_function_call_active used to live at each call-site
+     * to arch_pseudo_atomic_atomic, but this seems clearer.
+     * --NS 2007-05-15 */
+#ifdef LISP_FEATURE_GENCGC
+    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
+#else
+    return (!foreign_function_call_active)
+        && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
+#endif
 }
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-#warning "Implement."
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-#warning "Implement."
+    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
 }
 
 unsigned int arch_install_breakpoint(void *pc)
