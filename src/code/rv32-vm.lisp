@@ -9,7 +9,7 @@
 
 ;;; FIXUP-CODE-OBJECT
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :i-type :u-type) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:absolute :i-type :s-type :u-type) #'equalp)
 
 (defun u-and-i-inst-immediate (value)
   (let ((hi (ash (+ value (expt 2 11)) -12)))
@@ -22,15 +22,19 @@
     (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
       (error "Unaligned instruction?  offset=#x~X." offset))
     (let ((sap (code-instructions code)))
-      (ecase kind
-        (:absolute
-         (setf (sap-ref-32 sap offset) fixup))
-        (:i-type
-         (setf (ldb (byte 12 20) (sap-ref-32 sap offset))
-               (nth-value 1 (u-and-i-inst-immediate fixup))))
-        (:u-type
-         (setf (ldb (byte 20 12) (sap-ref-32 sap offset))
-               (u-and-i-inst-immediate fixup)))))
+      (multiple-value-bind (u i) (u-and-inst-immediate fixup)
+        (ecase kind
+          (:absolute
+           (setf (sap-ref-32 sap offset) fixup))
+          (:i-type
+           (setf (ldb (byte 12 20) (sap-ref-32 sap offset)) i))
+          (:s-type
+           (setf (ldb (byte 5 7) (sap-ref-32 sap offset))
+                 (ldb (byte 5 0) i))
+           (setf (ldb (byte 7 25) (sap-ref-32 sap offset)) i
+                 (ldb (byte 7 5) i)))
+          (:u-type
+           (setf (ldb (byte 20 12) (sap-ref-32 sap offset)) u)))))
    nil))
 
 ;;; CONTEXT-FLOAT-REGISTER

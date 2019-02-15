@@ -95,7 +95,12 @@
 (define-bitfield-emitter %emit-s-inst 32
   (byte 7 25) (byte 5 20) (byte 5 15) (byte 3 12) (byte 5 7) (byte 7 0))
 (defun emit-s-inst (segment imm rs2 rs1 funct3 opcode)
-  (%emit-s-inst segment (ldb (byte 7 5) imm) (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 5 0) imm) opcode))
+  (etypecase imm
+    (short-immediate
+     (%emit-s-inst segment (ldb (byte 7 5) imm) (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 5 0) imm) opcode))
+    (fixup
+     (note-fixup segment :s-type imm)
+     (%emit-s-inst segment 0 (tn-offset rs2) (tn-offset rs1) funct3 0 opcode))))
 
 (define-instruction-format (b 32)
   (imm :fields (list (byte 1 31) (byte 1 7) (byte 6 25) (byte 4 8)))
