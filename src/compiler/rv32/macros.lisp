@@ -111,7 +111,11 @@ byte-ordering issues."
   (assemble (:elsewhere)
     (let ((start-lab (gen-label)))
       (emit-label start-lab)
-      (emit-error-break vop error-trap (error-number-or-lose error-code) values)
+      (emit-error-break vop
+                        (if (eq error-code 'invalid-arg-count-error)
+                            invalid-arg-count-trap
+                            error-trap)
+                        (error-number-or-lose error-code) values)
       start-lab)))
 
 ;;;; PSEUDO-ATOMIC
