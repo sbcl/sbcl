@@ -114,7 +114,7 @@
     (inst addi csp-tn cfp-tn (* n-word-bytes (sb-allocated-size 'control-stack)))
     (let ((nfp (current-nfp-tn vop)))
       (when nfp
-        (inst addi nsp-tn nsp-tn (- (bytes-needed-for-non-descriptor-stack-frame)))
+        (inst subi nsp-tn nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
         (move nfp nsp-tn)))))
 
 (define-vop (allocate-frame)
@@ -546,10 +546,9 @@
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
                         :from (:argument ,(if (eq return :tail) 0 1))
                         :to :eval)
-                       ,(if named 'name-pass 'lexenv))))
-
-       (:temporary (:scs (descriptor-reg) :to :eval)
-                   function)
+                       ,(if named 'name-pass 'lexenv))
+           (:temporary (:scs (descriptor-reg) :to :eval)
+                       function)))
        (:temporary (:sc any-reg :offset nargs-offset :to
                         ,(if (eq return :fixed)
                              :save
@@ -573,7 +572,10 @@
        ,@(unless (and (eq return :tail)
                       (not (eq named :direct)))
            '((:temporary (:scs (interior-reg)) lip)))
-       
+       ,@(when named
+           ;; RISC-V ABI says that hardware may favor x1 for calls.
+           '((:temporary (:scs (interior-reg) :offset lr-offset) entry-point)))
+
        (:generator ,(+ (if named 5 0)
                        (if variable 19 1)
                        (if (eq return :tail) 0 10)
@@ -664,8 +666,10 @@
                       (constant
                        (load-constant vop name name-pass)
                        (do-next-filler)))
+                    (loadw function name-pass fdefn-fun-slot
+                           other-pointer-lowtag)
                     (insert-step-instrumenting name-pass)
-                    (loadw function name-pass fdefn-raw-addr-slot
+                    (loadw entry-point name-pass fdefn-raw-addr-slot
                            other-pointer-lowtag)
                     (do-next-filler)))
                  ((nil)
@@ -684,18 +688,20 @@
                  (:direct
                   `((typecase (static-fun-offset fun)
                       (short-immediate
-                       (inst #-64-bit lw #+64-bit ld function null-tn (static-fun-offset fun)))
+                       (inst #-64-bit lw #+64-bit ld entry-point null-tn (static-fun-offset fun)))
                       (t
-                       (inst li function (static-fun-offset fun))
-                       (inst add lip null-tn function)
-                       (inst #-64-bit lw #+64-bit ld function lip 0))))))
+                       (inst li lr-tn (static-fun-offset fun))
+                       (inst add lip null-tn lr-tn)
+                       (inst #-64-bit lw #+64-bit ld entry-point lip 0))))))
              (loop
                (if filler
                    (do-next-filler)
                    (return)))
 
              (note-this-location vop :call-site)
-             (lisp-jump function))
+             ,(if (not named)
+                  '(lisp-jump function)
+                  '(inst jalr zero-tn entry-point 0)))
 
            ,@(ecase return
                (:fixed
