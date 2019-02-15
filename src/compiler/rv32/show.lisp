@@ -12,11 +12,14 @@
 
 (in-package "SB-VM")
 
+;;; FIXME. Define someplace that makes more sense.
+(defconstant ca0-offset 10)
+
 (define-vop (print)
-  (:args (object :scs (descriptor-reg any-reg) :target nl0))
+  (:args (object :scs (descriptor-reg any-reg) :target ca0))
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
-  (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 0)) nl0)
+  (:temporary (:sc any-reg :offset ca0-offset :from (:argument 0)) ca0)
   (:temporary (:sc any-reg :offset cfunc-offset) cfunc)
   (:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
   (:vop-var vop)
@@ -24,9 +27,9 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (move nl0 object)
+      (move ca0 object)
       (inst li cfunc (make-fixup "debug_print" :foreign))
-      (inst j (make-fixup 'call-into-c :assembly-routine))
+      (inst jal lr-tn (make-fixup 'call-into-c :assembly-routine))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save))
-      (move result nl0))))
+      (move result ca0))))

@@ -153,7 +153,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (inst j (make-fixup 'call-into-c :assembly-routine))
+      (inst jal lr-tn (make-fixup 'call-into-c :assembly-routine))
       (move cfunc function)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
