@@ -67,7 +67,8 @@ byte-ordering issues."
     (:single-value (inst li nargs-tn -1))
     (:multiple-values)
     (:known))
-  (inst jalr zero-tn return-pc (- other-pointer-lowtag)))
+  ;; Avoid the LRA header word.
+  (inst jalr zero-tn return-pc (- n-word-bytes other-pointer-lowtag)))
 
 (defun emit-return-pc (label)
   "Emit a return-pc header word.  LABEL is the label to use for this return-pc."
