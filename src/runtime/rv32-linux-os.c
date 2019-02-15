@@ -60,13 +60,12 @@ arch_os_thread_cleanup(struct thread *thread)
 os_context_register_t *
 os_context_register_addr(os_context_t *context, int offset)
 {
-    return (os_context_register_t*)(&context->uc_mcontext.__gregs)[offset];
+    return (os_context_register_t*)&(context->uc_mcontext.__gregs[offset]);
 }
 
 os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
-#warning "Implement context_pc_addr properly."
     return os_context_register_addr(context, 0);
 }
 
@@ -91,7 +90,7 @@ os_restore_fp_control(os_context_t *context)
 os_context_register_t   *
 os_context_float_register_addr(os_context_t *context, int offset)
 {
-    return (os_context_register_t*)&context->uc_mcontext.__fpregs.__d.__f[offset];
+    return (os_context_register_t*)&(context->uc_mcontext.__fpregs.__d.__f[offset]);
 }
 
 void
