@@ -1329,6 +1329,19 @@ We could try a few things to mitigate this:
              (setq addr (get-lisp-obj-address (fun-code-header object))))
            (logand #xF (sap-ref-8 (int-sap (logandc2 addr lowtag-mask)) 3))))))
 
+;;; Show objects in a much simpler way than print-allocated-objects.
+;;; Probably don't use this for generation 0 of dynamic space. Other spaces are ok.
+;;; (And this is removed from the image; it's meant for developers)
+#+gencgc
+(defun show-generation-objs (gen space)
+  (let ((*print-pretty* nil))
+    (map-allocated-objects
+     (lambda (obj type size)
+       (declare (ignore type))
+       (when (= (generation-of obj) gen)
+         (format t "~x ~3x ~s~%" (get-lisp-obj-address obj) size obj)))
+     space)))
+
 ;;; Unfortunately this is a near total copy of the test in gc.impure.lisp
 (defun !ensure-genesis-code/data-separation ()
   #+gencgc
