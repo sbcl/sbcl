@@ -14,11 +14,12 @@
 ;;; A CORE-OBJECT structure holds the state needed to resolve cross-component
 ;;; references during in-core compilation.
 (defstruct (core-object
-            (:constructor make-core-object ())
+            (:constructor make-core-object (ephemeral))
             #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t :identity t))))
             (:copier nil))
+  ephemeral
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
   (entry-table (make-hash-table :test 'eq) :type hash-table)

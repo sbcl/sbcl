@@ -1080,13 +1080,11 @@
                        (:macro
                         (let ((macros
                                (mapcar (lambda (binding)
+                                         ;; XC compile-in-lexenv ignores its second arg
+                                         #+sb-xc-host (aver (null-lexenv-p lexenv))
                                          (list* (car binding) 'macro
-                                                #-sb-xc-host
-                                                (eval-in-lexenv (cdr binding) lexenv)
-                                                #+sb-xc-host ; no EVAL-IN-LEXENV
-                                                (if (null-lexenv-p lexenv)
-                                                    (eval (cdr binding))
-                                                    (bug "inline-lexenv?"))))
+                                                (compile-in-lexenv (cdr binding) lexenv
+                                                                   nil nil nil t nil)))
                                        bindings)))
                           (recurse body
                                    (make-lexenv :default lexenv

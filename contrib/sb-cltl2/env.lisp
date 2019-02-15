@@ -532,7 +532,7 @@ is referred to by the expression."
   (let ((env (if environment
                  (sb-c::make-restricted-lexenv environment)
                  (make-null-lexenv))))
-    (compile-in-lexenv lambda-expression env)))
+    (compile-in-lexenv lambda-expression env nil nil nil nil nil)))
 
 ;;; Add a bit of user-data to a lexenv.
 ;;;

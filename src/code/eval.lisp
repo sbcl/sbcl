@@ -56,7 +56,7 @@
                              ;; be using EVAL.
                              (compiler-note #'muffle-warning))
                 (sb-c:compile-in-lexenv lambda lexenv nil *eval-source-info*
-                                        *eval-tlf-index* (not call))))))
+                                        *eval-tlf-index* nil (not call))))))
       (declare (function fun))
       (if call
           (funcall fun)

@@ -327,8 +327,12 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
             (fail "The local macro argument list ~S is not a list."
                   arglist))
           `(,name macro .
-                  ;; FIXME: either: (1) never compile these,
-                  ;; or (2) compile just-in-time (on first use of the expander).
+                  ;; I guess the reason we want to compile here rather than possibly
+                  ;; using an interpreted lambda is that we generate the usual gamut
+                  ;; of style-warnings and such. One might wonder if this could somehow
+                  ;; go through the front-most part of the front-end, to deal with
+                  ;; semantics, but then generate an interpreted function or something
+                  ;; more quick to emit than machine code.
                   ,(compile-in-lexenv
                     (let (#-sb-xc-host
                           (*macro-policy*
@@ -339,7 +343,8 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
                              '(optimize (store-source-form 3))
                              *macro-policy*)))
                       (make-macro-lambda nil arglist body 'macrolet name))
-                    lexenv)))))))
+                    lexenv
+                    nil nil nil t nil))))))) ; name source-info tlf ephemeral errorp
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv

@@ -15,11 +15,15 @@
 
 ;;;; CL:COMPILE
 
-;;; Handle the nontrivial case of CL:COMPILE.
-;;;
-;;; If ERRORP is true signals an error immediately -- otherwise returns
+;;; Handle the following:
+;;;  - CL:COMPILE when the argument is not already a compiled function.
+;;;  - %SIMPLE-EVAL in "pretend we don't have an interpreter" mode
+;;;    a/k/a "compile all the things"
+;;;  - SB-INTERPRETER::EVAL-IN-ENVIRONMENT when it can't just do that.
+
+;;; If ERORRP is true signals an error immediately -- otherwise returns
 ;;; a function that will signal the error.
-(defun actually-compile (name form *lexenv* source-info tlf errorp)
+(defun compile-in-lexenv (form *lexenv* name source-info tlf ephemeral errorp)
   (let ((source-paths (when source-info *source-paths*)))
     (with-compilation-values
       (sb-xc:with-compilation-unit ()
@@ -81,7 +85,7 @@
                          ;; the error came from, not how the compiler got there.
                          (go :error))))
                  (return
-                     (%compile form (make-core-object)
+                     (%compile form (make-core-object ephemeral)
                                :name name
                                :path `(original-source-start 0 ,tlf)))))
            :error
@@ -103,22 +107,6 @@
                        (error 'compiled-program-error
                               :message message
                               :source source)))))))))))
-
-(defun compile-in-lexenv (definition lexenv &optional name source-info tlf errorp)
-  (multiple-value-bind (sexpr lexenv)
-      (typecase definition
-        #+sb-fasteval
-        (sb-interpreter:interpreted-function
-         (sb-interpreter:prepare-for-compile definition))
-        #+sb-eval
-        (sb-eval:interpreted-function
-         (sb-eval:prepare-for-compile definition))
-        (t
-         (values definition lexenv)))
-    (multiple-value-bind (compiled-definition warnings-p failure-p)
-        (actually-compile name (the cons sexpr) lexenv source-info tlf errorp)
-      (aver (typep compiled-definition 'compiled-function))
-      (values compiled-definition warnings-p failure-p))))
 
 (defun compile (name &optional (definition (or (and (symbolp name)
                                                     (macro-function name))
@@ -146,7 +134,20 @@ not STYLE-WARNINGs occur during compilation, and NIL otherwise.
       ;; should compile the methods and reinstall them.
       (if (compiled-function-p definition)
           (values definition nil nil)
-          (compile-in-lexenv definition (make-null-lexenv) name))
+          (multiple-value-bind (sexpr lexenv)
+              (typecase definition
+                #+sb-fasteval
+                (sb-interpreter:interpreted-function
+                 (sb-interpreter:prepare-for-compile definition))
+                #+sb-eval
+                (sb-eval:interpreted-function
+                 (sb-eval:prepare-for-compile definition))
+                (t
+                 (values definition (make-null-lexenv))))
+            (multiple-value-bind (compiled-definition warnings-p failure-p)
+                (compile-in-lexenv (the cons sexpr) lexenv name nil nil nil nil)
+              (aver (typep compiled-definition 'compiled-function))
+              (values compiled-definition warnings-p failure-p))))
     (values (cond (name
                    (if (and (symbolp name) (macro-function name))
                        (setf (macro-function name) compiled-definition)

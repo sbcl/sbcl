@@ -570,7 +570,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (and (eq *compile-file-to-memory-space* :immobile)
                        (neq (component-kind component) :toplevel)
                        :immobile)
-                  *compile-to-memory-space*))))
+                  (if (core-object-ephemeral *compile-object*)
+                      :dynamic
+                      *compile-to-memory-space*)))))
   (defun code-immobile-p (thing)
     #+sb-xc-host (declare (ignore thing)) #+sb-xc-host t
     #-sb-xc-host

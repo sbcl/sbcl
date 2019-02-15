@@ -214,10 +214,11 @@
         (setf (aref a i) code)))))
 
 ;;;; Stubs for host
-(defun sb-c:compile-in-lexenv (lambda lexenv &rest rest)
-  (declare (ignore lexenv))
-  (assert (null rest))
-  (compile nil lambda))
+(defun sb-c:compile-in-lexenv (lambda &rest rest)
+  (declare (ignore rest))
+  (compile nil (if (eq (car lambda) 'named-lambda)
+                   `(lambda ,@(cddr lambda))
+                   lambda)))
 
 (defun sb-impl::%defun (name lambda &optional inline-expansion)
   (declare (ignore inline-expansion))

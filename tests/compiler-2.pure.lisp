@@ -2246,7 +2246,6 @@
           1))
     (() (condition 'simple-error))))
 
-
 (with-test (:name :functional-may-escape-p)
   (checked-compile-and-assert
       (:optimize :safe)
@@ -2258,3 +2257,30 @@
               (setf x #'x)))
           (funcall x)))
     (() (condition 'control-error))))
+
+(declaim (inline make-mystruct))
+(macrolet ((def-mystruct () `(defstruct mystruct a b c)))
+  (def-mystruct)) ; MAKE-MYSTRUCT captures a lexenv (rather pointlessly)
+
+;;; Assert that throwaway code in compiled macrolets does not go in immobile space
+#+immobile-space
+(with-test (:name :macrolet-not-immobile-space :serial t)
+  (labels ((count-code-objects ()
+             (length (sb-vm::list-allocated-objects
+                      :immobile
+                      :test (lambda (x)
+                              (and (sb-kernel:code-component-p x)
+                                   (/= (sb-kernel:generation-of x)
+                                       sb-vm:+pseudo-static-generation+))))))
+           (test (lambda)
+             (let* ((start-count (count-code-objects))
+                    (result
+                     (let ((sb-c::*compile-to-memory-space* :immobile))
+                       (compile nil lambda)))
+                    (end-count (count-code-objects)))
+               (assert (= end-count (1+ start-count)))
+               result)))
+    ;; Test 1: simple macrolet
+    (test '(lambda (x) (macrolet ((baz (arg) `(- ,arg))) (list (baz x)))))
+    ;; Test 2: inline a function that captured a macrolet
+    (test '(lambda (x) (make-mystruct :a x)))))
