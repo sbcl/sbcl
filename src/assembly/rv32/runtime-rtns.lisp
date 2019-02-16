@@ -72,6 +72,8 @@
   ;; Tag nargs.
   (inst slli nargs-tn nargs n-fixnum-tag-bits)
   (pseudo-atomic (pa-temp)
+    (load-foreign-symbol-value temp "dynamic_space_free_pointer" temp)
+    (store-symbol-value temp *allocation-pointer*)
     (load-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (load-foreign-symbol-value ocfp-tn "current_control_frame_pointer" temp)
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
@@ -104,7 +106,10 @@
   (pseudo-atomic (pa-temp)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value ocfp-tn "current_control_frame_pointer" temp)
-    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp))
+    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
+    (load-symbol-value temp *allocation-pointer*)
+    ;; We can destroy csp-tn without harm now.
+    (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn))
 
   (restore-c-registers)
   (inst jalr zero-tn lr-tn 0))
@@ -138,7 +143,10 @@
     (storew nfp-tn cfp-tn 1)
     (storew code-tn cfp-tn 2)
     (store-foreign-symbol-value csp-tn "current_control_frame_pointer" temp)
-    (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp))
+    (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
+    (load-symbol-value temp *allocation-pointer*)
+    ;; We can destroy csp-tn without harm now.
+    (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn))
 
   ;; Call into C.
   (inst jalr lr-tn cfunc 0)
@@ -155,7 +163,9 @@
     (loadw nfp-tn cfp-tn 1)
     (loadw code-tn cfp-tn 2)
     (inst add lr-tn nfp-tn code-tn)
-    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
+    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp)
+    (load-foreign-symbol-value temp "dynamic_space_free_pointer" temp)
+    (store-symbol-value temp *allocation-pointer*))
 
   ;; Reset the Lisp stack.
   (move csp-tn cfp-tn)
