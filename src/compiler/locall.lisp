@@ -502,7 +502,10 @@
             (*compiler-error-context* call))
 
         (when (and (eq (functional-inlinep fun) :inline)
-                   (rest (leaf-refs original-fun)))
+                   (rest (leaf-refs original-fun))
+                   ;; Some REFs are already unused bot not yet deleted,
+                   ;; avoid unneccessary inlining
+                   (> (count-if #'node-lvar (leaf-refs original-fun)) 1))
           (setq fun (maybe-expand-local-inline fun ref call)))
 
         (aver (member (functional-kind fun)

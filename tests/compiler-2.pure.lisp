@@ -2284,3 +2284,12 @@
     (test '(lambda (x) (macrolet ((baz (arg) `(- ,arg))) (list (baz x)))))
     ;; Test 2: inline a function that captured a macrolet
     (test '(lambda (x) (make-mystruct :a x)))))
+
+(with-test (:name :inlining-multiple-refs)
+  (checked-compile
+   `(lambda (x)
+      (labels ((%s (y &rest r)
+                 (some
+                  (lambda (r) (apply #'%s (1+ y) r))
+                  (apply #'eql x r))))
+        (%s 1)))))
