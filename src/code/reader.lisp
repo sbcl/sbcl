@@ -1085,7 +1085,7 @@ standard Lisp readtable when NIL."
                      +char-attr-constituent-digit+)
                  +char-attr-constituent-decimal-digit+))
             ((= att +char-attr-invalid+)
-             (simple-reader-error stream "invalid constituent"))
+             (simple-reader-error stream "invalid constituent: ~s" char))
             (t att))))))
 
 ;;;; token fetching
@@ -1243,7 +1243,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-invalid+ (simple-reader-error stream
-                                                    "invalid constituent"))
+                                                    "invalid constituent: ~s" char))
         ;; can't have eof, whitespace, or terminating macro as first char!
         (t (go SYMBOL)))
      SIGN ; saw "sign"
