@@ -75,6 +75,8 @@
                   ;; Clear the stack.
                   (move ocfp-tn cfp-tn)
                   (move cfp-tn ocfp)
+                  (unless (zerop (- word-shift n-fixnum-tag-bits))
+                    (inst slli nvals nvals (- word-shift n-fixnum-tag-bits)))
                   (inst add csp-tn ocfp-tn nvals)
 
                   ;; Return.
@@ -134,6 +136,8 @@
 
                   DONE
                   ;; We are done.  Do the jump.
+                  (unless (zerop (- word-shift n-fixnum-tag-bits))
+                    (inst srai nargs nargs (- word-shift n-fixnum-tag-bits)))
                   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
                   (lisp-jump temp)))))
   (frob))

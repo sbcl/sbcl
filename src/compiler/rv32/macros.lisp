@@ -161,6 +161,8 @@ and
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 5
+         (unless (zerop (- word-shift n-fixnum-tag-bits))
+           (inst slli index index (- word-shift n-fixnum-tag-bits)))
          (inst add lip object index)
          (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
@@ -187,6 +189,8 @@ and
        (:results (result :scs ,scs))
        (:result-types ,eltype)
        (:generator 3
+         (unless (zerop (- word-shift n-fixnum-tag-bits))
+           (inst slli index index (- word-shift n-fixnum-tag-bits)))
          (inst add lip object index)
          (storew value lip ,offset ,lowtag)
          (move result value)))
@@ -217,9 +221,12 @@ and
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 5
+         ,@(let ((shift (- (integer-length size) n-fixnum-tag-bits)))
+             (unless (zerop shift)
+               (if (minusp shift)
+                   `((inst srai index index ,(- shift)))
+                   `((inst slli index index ,shift)))))
          (inst add lip object index)
-         ,@(when (= size 1)
-             '((inst add lip lip index)))
          (inst ,(ecase size
                   (1 (if signed 'lb 'lbu))
                   (2 (if signed 'lh 'lhu))
@@ -254,11 +261,10 @@ and
        (:temporary (:scs (interior-reg)) lip)
        (:result-types ,eltype)
        (:generator 5
-         ,@(let ((shift size))
-             (decf shift n-fixnum-tag-bits)
+         ,@(let ((shift (- (integer-length size) n-fixnum-tag-bits)))
              (unless (zerop shift)
                (if (minusp shift)
-                   `((inst srai index index ,shift))
+                   `((inst srai index index ,(- shift)))
                    `((inst slli index index ,shift)))))
          (inst add lip object index)
          (inst ,(ecase size (1 'sb) (2 'sh) (4 'sw))

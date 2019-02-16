@@ -18,25 +18,46 @@
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
-  (:temporary (:scs (non-descriptor-reg)) bytes header)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:temporary (:scs (non-descriptor-reg) :to (:result 0) :target result) header)
+  (:temporary (:sc non-descriptor-reg) pa-flag ndescr)
   (:results (result :scs (descriptor-reg)))
   (:generator 13
     ;; Compute the allocation size.
-    (inst addi bytes rank (+ (* array-dimensions-offset n-word-bytes)
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli ndescr rank (- word-shift n-fixnum-tag-bits)))
+    (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                              lowtag-mask))
-    (inst andi bytes bytes (bic-mask lowtag-mask))
+    (inst andi ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
+      (allocation result ndescr other-pointer-lowtag :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header
       ;; value.
-      (inst addi header rank (fixnumize (1- array-dimensions-offset)))
-      (inst slli header header n-widetag-bits)
-      (inst add header header type)
-      ;; Remove the extraneous fixnum tag bits because TYPE and RANK
-      ;; were fixnums.
-      (inst srli header header n-fixnum-tag-bits)
+      (inst slli ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
+      (inst addi ndescr ndescr (ash (1- array-dimensions-offset) n-widetag-bits))
+      (inst srli type type n-fixnum-tag-bits)
+      (inst or ndescr ndescr type)
+      ;; And store the header value.
       (storew header result 0 other-pointer-lowtag))))
+
+(define-vop (make-array-header/c)
+  (:translate make-array-header)
+  (:policy :fast-safe)
+  (:arg-types (:constant t) (:constant t))
+  (:info type rank)
+  (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
+  (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:results (result :scs (descriptor-reg)))
+  (:generator 4
+    (let* ((header-size (+ rank (1- array-dimensions-offset)))
+           (bytes (logandc2 (+ (* (1+ header-size) n-word-bytes)
+                               lowtag-mask)
+                            lowtag-mask))
+           (header-bits (logior (ash header-size n-widetag-bits) type)))
+      (pseudo-atomic (pa-flag)
+        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag)
+        (inst li pa-flag header-bits)
+        (storew pa-flag header 0 other-pointer-lowtag)))
+    (move result header)))
 
 
 ;;;; Additional accessors and setters for the array header.
@@ -147,7 +168,7 @@
                 ;; Compute the offset for the word we're interested in.
                 (inst srli temp index ,bit-shift)
                 ;; Load the word in question.
-                (inst slli temp temp n-fixnum-tag-bits)
+                (inst slli temp temp word-shift)
                 (inst add lip object temp)
                 (loadw result lip vector-data-offset other-pointer-lowtag)
                 ;; Compute the position of the bitfield we need.
@@ -200,6 +221,7 @@
                 ;; Compute the offset for the word we're interested in.
                 (inst srli temp index ,bit-shift)
                 ;; Load the word in question.
+                (inst slli temp temp word-shift)
                 (inst add lip object temp)
                 (loadw old lip vector-data-offset other-pointer-lowtag)
                 ;; Compute the position of the bitfield we need.
@@ -244,6 +266,8 @@
   (:temporary (:scs (interior-reg)) lip)
   (:variant-vars format)
   (:generator 20
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli index index (- word-shift n-fixnum-tag-bits)))
     (inst add lip object index)
     (inst fload format value lip  (- (* vector-data-offset n-word-bytes)
                                      other-pointer-lowtag))))
@@ -276,6 +300,8 @@
   (:temporary (:scs (interior-reg)) lip)
   (:variant-vars format)
   (:generator 20
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli index index (- word-shift n-fixnum-tag-bits)))
     (inst add lip object index)
     (inst fstore format value lip (- (* vector-data-offset n-word-bytes)
                                       other-pointer-lowtag))
@@ -312,8 +338,9 @@
   (:temporary (:scs (interior-reg)) lip)
   (:variant-vars format size)
   (:generator 5
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli index index (- word-shift n-fixnum-tag-bits)))
     (inst add lip object index)
-    (inst add lip lip index)
     (let ((real-tn (complex-reg-real-tn format value)))
       (inst fload format real-tn lip (- (* vector-data-offset size)
                                         other-pointer-lowtag)))
@@ -345,8 +372,9 @@
   (:temporary (:scs (interior-reg)) lip)
   (:variant-vars format size)
   (:generator 5
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli index index (- word-shift n-fixnum-tag-bits)))
     (inst add lip object index)
-    (inst add lip lip index)
     (let ((value-real (complex-reg-real-tn format value))
           (result-real (complex-reg-real-tn format result)))
       (inst fstore format value-real lip (- (* vector-data-offset size)

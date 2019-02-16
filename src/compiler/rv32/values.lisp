@@ -106,7 +106,9 @@
     (cerror-call vop 'bogus-arg-to-values-list-error list)
 
     DONE
-    (inst sub count csp-tn start)))
+    (inst sub count csp-tn start)
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst srai count count (- word-shift n-fixnum-tag-bits)))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
@@ -125,16 +127,20 @@
       (immediate
        (inst addi src context (* (tn-value skip) n-word-bytes)))
       (any-reg
+       (unless (zerop (- word-shift n-fixnum-tag-bits))
+         (inst slli skip skip (- word-shift n-fixnum-tag-bits)))
        (inst add src context skip)))
     (move count num)
     (move start csp-tn)
     (inst beq num zero-tn done)
     (move dst start)
-    (inst add csp-tn csp-tn count)
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli temp count (- word-shift n-fixnum-tag-bits)))
+    (inst add csp-tn start temp)
     LOOP
     (loadw temp src 0)
+    (storew temp dst 0)
     (inst addi src src n-word-bytes)
     (inst addi dst dst n-word-bytes)
-    (storew temp dst (- n-word-bytes))
     (inst bne dst csp-tn loop)
     DONE))

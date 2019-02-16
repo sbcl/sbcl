@@ -181,14 +181,19 @@
   (:result-types unsigned-num)
   (:generator 10
     (loadw res code 0 other-pointer-lowtag)
-    (inst slli res res 2) ; shift out the GC bits
-    ;; Then shift right to clear the widetag, plus 2 more to the right since we just
-    ;; left-shifted to zeroize bits. Then shift left 2 to convert words to bytes.
-    ;; The '>>2' and '<<2' cancel out because we don't need to clear all 8 bits
-    ;; of the widetag, as CODE-HEADER-WIDETAG already has bits 6 and 7 clear.
-    ;; Other places assume the same, though without much commentary.
-    ;; It's brittle magic, save for the AVER above which ensures that it works.
-    (inst srli res res n-widetag-bits)
+    #-64-bit
+    (progn
+      (inst slli res res 2) ; shift out the GC bits
+      ;; Then shift right to clear the widetag, plus 2 more to the right since we just
+      ;; left-shifted to zeroize bits. Then shift left 2 to convert words to bytes.
+      ;; The '>>2' and '<<2' cancel out because we don't need to clear all 8 bits
+      ;; of the widetag, as CODE-HEADER-WIDETAG already has bits 6 and 7 clear.
+      ;; Other places assume the same, though without much commentary.
+      ;; It's brittle magic, save for the AVER above which ensures that it works.
+      (inst srli res res n-widetag-bits))
+    #+64-bit
+    (progn
+      (inst slli res res word-shift))
     (inst add res offset res)
     (inst subi res res other-pointer-lowtag)
     (inst add lip code res)

@@ -281,6 +281,8 @@
 ;;;; raw instance slot accessors
 
 (defun emit-raw-slot-ref (type value lip object index)
+  (unless (zerop (- word-shift n-fixnum-tag-bits))
+    (inst slli index index (- word-shift n-fixnum-tag-bits)))
   (inst add lip object index)
   (let ((effective-offset (- (* instance-slots-offset n-word-bytes)
                              instance-pointer-lowtag)))
@@ -299,6 +301,8 @@
        (inst fload :double (complex-reg-imag-tn :double value) lip (+ 8 effective-offset))))))
 
 (defun emit-raw-slot-set (type value result lip object index)
+  (unless (zerop (- word-shift n-fixnum-tag-bits))
+    (inst slli index index (- word-shift n-fixnum-tag-bits)))
   (inst add lip object index)
   (let ((effective-offset (- (* instance-slots-offset n-word-bytes)
                              instance-pointer-lowtag)))

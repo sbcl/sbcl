@@ -66,7 +66,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic"))
+  (:note #.(format nil "inline (unsigned-byte ~a) arithmetic" n-machine-word-bits)))
 
 (define-vop (fast-signed-binop fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg))
@@ -74,7 +74,7 @@
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
-  (:note "inline (signed-byte 32) arithmetic"))
+  (:note #.(format nil "inline (signed-byte ~a) arithmetic" n-machine-word-bits)))
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg)))
@@ -267,9 +267,9 @@
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
 
-(define-vop (signed-byte-32-len)
+(define-vop (#-64-bit signed-byte-32-len #+64-bit signed-byte-64-len)
   (:translate integer-length)
-  (:note "inline (signed-byte 32) integer-length")
+  (:note #.(format nil "inline (signed-byte ~a) integer-length" n-machine-word-bits))
   (:policy :fast-safe)
   (:args (arg :scs (signed-reg) :target shift))
   (:arg-types signed-num)

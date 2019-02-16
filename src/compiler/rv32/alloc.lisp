@@ -192,7 +192,9 @@
   (:temporary (:sc non-descriptor-reg) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 6
-    (inst addi bytes extra (* (1+ words) n-word-bytes))
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli bytes extra (- word-shift n-fixnum-tag-bits)))
+    (inst addi bytes bytes (* (1+ words) n-word-bytes))
     (inst slli header bytes (- n-widetag-bits n-fixnum-tag-bits))
     ;; The specified EXTRA value is the exact value placed in the
     ;; header as the word count when allocating code.

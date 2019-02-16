@@ -890,6 +890,8 @@
 
 ;;; Copy a more arg from the argument area to the end of the current frame.
 ;;; Fixed is the number of non-more arguments.
+
+;;; FIXME ENTIRELY WRONG CAUSES PROBLEMS PLEASE FIX.
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
@@ -1031,6 +1033,8 @@
   (:note "more-arg-context")
   (:generator 5
     (inst subi count supplied (fixnumize fixed))
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli count count (- word-shift n-fixnum-tag-bits)))
     (inst sub context csp-tn count)))
 
 (define-vop (verify-arg-count)

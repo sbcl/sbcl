@@ -37,6 +37,8 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 5
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli offset offset (- word-shift n-fixnum-tag-bits)))
     (inst add sap object offset)
     (loadw result sap 0)))
 
@@ -49,6 +51,7 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 4
+    ;; Does the offset need to tagged properly on 64-bit?
     (loadw result object offset)))
 
 (define-vop (write-control-stack)
@@ -62,6 +65,8 @@
   (:result-types *)
   (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
   (:generator 2
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli offset offset (- word-shift n-fixnum-tag-bits)))
     (inst add sap object offset)
     (storew value sap 0)
     (move result value)))
