@@ -63,7 +63,9 @@
   (use nil :type (or node null))
   ;; the basic block this continuation is in. This is null only in
   ;; :UNUSED continuations.
-  (block nil :type (or cblock null)))
+  (block nil :type (or cblock null))
+  ;; Entries created by the BLOCK special operator
+  (entries nil :type list))
 
 (defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)

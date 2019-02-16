@@ -471,3 +471,16 @@
               (checked-compile
               `(lambda () (funcall (lambda)))
                :allow-failure t))))
+
+(with-test (:name :inlining-bad-code)
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda (x &rest args)
+                  (unless
+                      (if (eq x :tud)
+                          (zerop (first args))
+                          (every #'identity args (every #'identity args)))
+                    args))
+               :allow-style-warnings t
+               :allow-warnings t))))

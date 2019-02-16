@@ -1263,8 +1263,9 @@
 ;;; otherwise false.
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
-  (let ((next (first (block-succ block))))
-    (when (block-start next)  ; NEXT is not an END-OF-COMPONENT marker
+  (let* ((next (first (block-succ block)))
+        (start (block-start next)))
+    (when start  ; NEXT is not an END-OF-COMPONENT marker
       (cond ( ;; We cannot combine with a successor block if:
              (or
               ;; the successor has more than one predecessor;
@@ -1298,7 +1299,10 @@
                         (and (consp (lvar-uses it))
                              (not (lvar-single-value-p it)))))))
               (neq (block-type-check block)
-                   (block-type-check next)))
+                   (block-type-check next))
+              ;; This ctran is a destination of an EXIT,
+              ;; a later inlined function may want to use it.
+              (ctran-entries start))
              nil)
             (t
              (join-blocks block next)
@@ -2129,31 +2133,38 @@
            (aver (eq prev-kind :block-start))
            (aver (eq node last))
            (let* ((succ (block-succ block))
-                  (next (first succ)))
+                  (next (first succ))
+                  (next-ctran (block-start next)))
              (aver (singleton-p succ))
+             ;; Update the ctran used by EXITs from BLOCKs.
+             (when next-ctran
+               (loop for entry in (ctran-entries prev)
+                     do (setf (second entry) next-ctran))
+               (setf (ctran-entries next-ctran)
+                     (ctran-entries prev)))
              (cond
-              ((eq block (first succ))
-               (with-ir1-environment-from-node node
-                 (let ((exit (make-exit)))
-                   (setf (ctran-next prev) nil)
-                   (link-node-to-previous-ctran exit prev)
-                   (setf (block-last block) exit)))
-               (setf (node-prev node) nil)
-               nil)
-              (t
-               (aver (eq (block-start-cleanup block)
-                         (block-end-cleanup block)))
-               (unlink-blocks block next)
-               (dolist (pred (block-pred block))
-                 (change-block-successor pred block next))
-               (when (block-delete-p block)
-                 (let ((component (block-component block)))
-                   (setf (component-delete-blocks component)
-                         (delq1 block (component-delete-blocks component)))))
-               (remove-from-dfo block)
-               (setf (block-delete-p block) t)
-               (setf (node-prev node) nil)
-               t)))))))
+               ((eq block (first succ))
+                (with-ir1-environment-from-node node
+                  (let ((exit (make-exit)))
+                    (setf (ctran-next prev) nil)
+                    (link-node-to-previous-ctran exit prev)
+                    (setf (block-last block) exit)))
+                (setf (node-prev node) nil)
+                nil)
+               (t
+                (aver (eq (block-start-cleanup block)
+                          (block-end-cleanup block)))
+                (unlink-blocks block next)
+                (dolist (pred (block-pred block))
+                  (change-block-successor pred block next))
+                (when (block-delete-p block)
+                  (let ((component (block-component block)))
+                    (setf (component-delete-blocks component)
+                          (delq1 block (component-delete-blocks component)))))
+                (remove-from-dfo block)
+                (setf (block-delete-p block) t)
+                (setf (node-prev node) nil)
+                t)))))))
 
 ;;; Return true if CTRAN has been deleted, false if it is still a valid
 ;;; part of IR1.
