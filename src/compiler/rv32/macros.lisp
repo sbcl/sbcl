@@ -343,6 +343,7 @@ and
   initializes the object."
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size)
+              (stack-allocate-p stack-allocate-p)
               (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
