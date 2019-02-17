@@ -909,16 +909,20 @@
         (move result csp-tn))
       ;; Allocate the space on the stack.
       (cond ((zerop fixed)
-             (inst beq nargs-tn zero-tn done)
-             (inst add csp-tn csp-tn nargs-tn))
+             (unless (zerop (- word-shift n-fixnum-tag-bits))
+               (inst slli nargs-tn nargs-tn (- word-shift n-fixnum-tag-bits)))
+             (inst add csp-tn result nargs-tn)
+             (inst beq nargs-tn zero-tn done))
             (t
              (inst subi count nargs-tn (fixnumize fixed))
              (inst bge zero-tn count done)
-             (inst add csp-tn csp-tn count)))
+             (unless (zerop (- word-shift n-fixnum-tag-bits))
+               (inst slli count count (- word-shift n-fixnum-tag-bits)))
+             (inst add csp-tn result count)))
       (when (< fixed register-arg-count)
-        ;; We must stop when we run out of stack args, not when we run out of
-        ;; more args.
-        (inst addi count nargs-tn (fixnumize (- register-arg-count))))
+        ;; We must stop when we run out of stack args, not when we run
+        ;; out of more args.
+        (inst addi count nargs-tn (* (- register-arg-count) n-word-bytes)))
       ;; Everything of interest in registers.
       (inst bge zero-tn count do-regs)
       ;; Initialize dst to be end of stack.
@@ -928,18 +932,18 @@
 
       (emit-label loop)
       ;; *--dst = *--src, --count
-      (inst subi src src n-word-bytes)
       (inst subi count count (fixnumize 1))
-      (loadw temp src)
+      (inst subi src src n-word-bytes)
       (inst subi dst dst n-word-bytes)
-      (inst blt zero-tn count loop)
+      (loadw temp src)
       (storew temp dst)
+      (inst blt zero-tn count loop)
 
       (emit-label do-regs)
       (when (< fixed register-arg-count)
-        ;; Now we have to deposit any more args that showed up in registers.
-        ;; We know there is at least one more arg, otherwise we would have
-        ;; branched to done up at the top.
+        ;; Now we have to deposit any more args that showed up in
+        ;; registers.  We know there is at least one more arg,
+        ;; otherwise we would have branched to done up at the top.
         (inst subi count nargs-tn (fixnumize (1+ fixed)))
         (do ((i fixed (1+ i)))
             ((>= i register-arg-count))
