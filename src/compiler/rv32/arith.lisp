@@ -100,8 +100,7 @@
   (:result-types signed-num)
   (:note "inline signed unboxed arithmetic"))
 
-;;; FIXME: We want to have 32-bit constant binary operations. Just define another vop with a higher translation cost?
-(defmacro define-binop (translate cost untagged-cost r-op &optional i-op negate)
+(defmacro define-binop (translate cost untagged-cost r-op &optional i-op)
   `(progn
      (define-vop (,(symbolicate "FAST-" translate "/FIXNUM=>FIXNUM")
                   fast-fixnum-binop)
@@ -119,26 +118,25 @@
        (:generator ,(1+ untagged-cost)
          (inst ,r-op r x y)))
      ,@(when i-op
-         (let ((y (if negate 'y '(- y))))
-           `((define-vop (,(symbolicate "FAST-" translate "-C/FIXNUM=>FIXNUM")
-                          fast-fixnum-binop-c)
-               (:translate ,translate)
-               (:generator ,cost
-                 (inst ,i-op r x (fixnumize ,y))))
-             (define-vop (,(symbolicate "FAST-" translate "-C/SIGNED=>SIGNED")
-                          fast-signed-binop-c)
-               (:translate ,translate)
-               (:generator ,untagged-cost
-                 (inst ,i-op r x ,y)))
-             (define-vop (,(symbolicate "FAST-" translate
-                                        "-C/UNSIGNED=>UNSIGNED")
-                          fast-unsigned-binop-c)
-               (:translate ,translate)
-               (:generator ,untagged-cost
-                 (inst ,i-op r x ,y))))))))
+         `((define-vop (,(symbolicate "FAST-" translate "-C/FIXNUM=>FIXNUM")
+                        fast-fixnum-binop-c)
+             (:translate ,translate)
+             (:generator ,cost
+               (inst ,i-op r x (fixnumize y))))
+           (define-vop (,(symbolicate "FAST-" translate "-C/SIGNED=>SIGNED")
+                        fast-signed-binop-c)
+             (:translate ,translate)
+             (:generator ,untagged-cost
+               (inst ,i-op r x y)))
+           (define-vop (,(symbolicate "FAST-" translate
+                                      "-C/UNSIGNED=>UNSIGNED")
+                        fast-unsigned-binop-c)
+             (:translate ,translate)
+             (:generator ,untagged-cost
+               (inst ,i-op r x y)))))))
 
 (define-binop + 1 5 add addi)
-(define-binop - 1 5 sub addi t)
+(define-binop - 1 5 sub subi)
 (define-binop logior 1 3 or ori)
 (define-binop logxor 1 3 xor xori)
 (define-binop logand 1 3 and andi)
