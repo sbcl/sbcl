@@ -875,7 +875,7 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
      * not updating them. */
     thread->pseudo_atomic_bits = 0;
 #endif
-#if defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_GENCGC)
+#if defined(LISP_FEATURE_ARM) || defined (LISP_FEATURE_RV32) && !defined(LISP_FEATURE_GENCGC)
     SetSymbolValue(ALLOCATION_POINTER, dynamic_space_free_pointer, thread);
 #endif
 }
