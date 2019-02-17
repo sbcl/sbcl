@@ -148,6 +148,6 @@
   ;;
   ;; (Except that purifying actually slows down GENCGC). -- JES, 2006-05-30
   #+(and sbcl (not gencgc))
-  (sb-ext:purify)
+  (host-sb-ext:purify)
 
   (values))
