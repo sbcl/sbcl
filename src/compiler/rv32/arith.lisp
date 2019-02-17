@@ -160,24 +160,25 @@
 
 ;;; Shifting
 
-(define-vop (fast-ash/unsigned=>unsigned)
+(define-vop (fast-ash/signed/unsigned)
   (:note "inline ASH")
-  (:args (number :scs (unsigned-reg) :to :save)
-         (amount :scs (signed-reg) :to :save))
-  (:arg-types unsigned-num signed-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:translate ash)
+  (:args (number)
+         (amount))
+  (:results (result))
   (:policy :fast-safe)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:temporary (:sc non-descriptor-reg :to :eval) temp)
+  (:variant-vars variant)
   (:generator 3
     (inst bge amount zero-tn positive)
-    (inst addi temp zero-tn 32)
     (inst sub ndesc zero-tn amount)
-    (move result zero-tn)
-    (inst blt temp ndesc done)
-    (inst srl result number ndesc)
+    (inst li temp n-word-bits)
+    (inst blt temp ndesc no-overflow)
+    (move ndesc temp)
+    NO-OVERFLOW
+    (ecase variant
+      (:signed (inst sra result number ndesc))
+      (:unsigned (inst srl result number ndesc)))
     (inst j done)
     
     POSITIVE
@@ -186,84 +187,140 @@
 
     DONE))
 
-(define-vop (fast-ash/signed=>signed)
-  (:note "inline ASH")
+(define-vop (fast-ash/unsigned=>unsigned fast-ash/signed/unsigned)
+  (:args (number :scs (unsigned-reg) :to :save)
+         (amount :scs (signed-reg) :to :save :target temp))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate ash)
+  (:variant :unsigned))
+
+(define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
   (:args (number :scs (signed-reg) :to :save)
-         (amount :scs (signed-reg)))
+         (amount :scs (signed-reg) :to :save :target temp))
   (:arg-types signed-num signed-num)
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
   (:translate ash)
+  (:variant :signed))
+
+(define-vop (fast-ash-left-c/fixnum=>fixnum)
+  (:translate ash)
   (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) ndesc)
-  (:temporary (:sc non-descriptor-reg :to :eval) temp)
-  (:generator 3
-    (inst bge amount zero-tn positive)
-    (inst sub ndesc zero-tn amount)
-    (inst addi temp zero-tn 31)
-    (inst srai result number 31)
-    (inst blt temp ndesc done)
-    (inst sra result number ndesc)
-    (inst j done)
+  (:args (number :scs (any-reg) :target result))
+  (:info amount)
+  (:arg-types tagged-num (:constant unsigned-byte))
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:note "inline ASH")
+  (:generator 1
+    (if (< amount n-word-bits)
+        (inst slli result number amount)
+        (inst li result 0))))
 
-    POSITIVE
-    ;; The result-type assures us that this shift will not overflow.
-    (inst sll result number amount)
-
-    DONE))
+(define-vop (fast-ash-right-c/fixnum=>fixnum)
+  (:translate ash)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg) :target result))
+  (:info amount)
+  (:arg-types tagged-num (:constant (integer * -1)))
+  (:results (result :scs (any-reg)))
+  (:result-types tagged-num)
+  (:temporary (:sc unsigned-reg :target result) temp)
+  (:note "inline ASH")
+  (:generator 1
+    (inst srai temp number (min (- amount) (1- n-word-bits)))
+    (inst andi result temp (bic-mask fixnum-tag-mask))))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
-  (:policy :fast-safe)
   (:translate ash)
-  (:note "inline ASH")
-  (:args (number :scs (unsigned-reg)))
-  (:info count)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result))
+  (:info amount)
   (:arg-types unsigned-num (:constant integer))
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:generator 1
-    (cond
-      ((< count -31) (move result zero-tn))
-      ((< count 0) (inst srli result number (min (- count) 31)))
-      ((> count 0) (inst slli result number (min count 31)))
-      (t (bug "identity ASH not transformed away")))))
+  (:note "inline ASH")
+  (:generator 3
+    (cond ((< (- n-word-bits) amount n-word-bits)
+           (if (plusp amount)
+               (inst slli result number amount)
+               (inst srli result number (- amount))))
+          (t
+           (inst li result 0)))))
 
 (define-vop (fast-ash-c/signed=>signed)
-  (:policy :fast-safe)
   (:translate ash)
-  (:note "inline ASH")
-  (:args (number :scs (signed-reg)))
-  (:info count)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg) :target result))
+  (:info amount)
   (:arg-types signed-num (:constant integer))
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
-  (:generator 1
-    (cond
-      ((< count 0) (inst srai result number (min (- count) 31)))
-      ((> count 0) (inst slli result number (min count 31)))
-      (t (bug "identity ASH not transformed away")))))
+  (:note "inline ASH")
+  (:generator 3
+    (cond ((< (- n-word-bits) amount n-word-bits)
+           (if (plusp amount)
+               (inst slli result number amount)
+               (inst srai result number (- amount))))
+          ((= amount n-word-bits)
+           (inst li result 0))
+          (t
+           (inst srai result number (1- n-word-bits))))))
 
 (macrolet ((def (name sc-type type result-type cost)
              `(define-vop (,name)
                 (:note "inline ASH")
                 (:translate ash)
                 (:args (number :scs (,sc-type))
-                       (amount :scs (signed-reg unsigned-reg immediate)))
+                       (amount :scs (signed-reg unsigned-reg)))
                 (:arg-types ,type positive-fixnum)
                 (:results (result :scs (,result-type)))
                 (:result-types ,type)
                 (:policy :fast-safe)
                 (:generator ,cost
-                   (sc-case amount
-                     ((signed-reg unsigned-reg)
-                      (inst sll result number amount))
-                     (immediate
-                      (let ((amount (tn-value amount)))
-                        (aver (> amount 0))
-                        (inst sll result number amount))))))))
+                   (inst sll result number amount)))))
+  ;; FIXME: There's the opportunity for a sneaky optimization here, I
+  ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
   (def fast-ash-left/signed=>signed signed-reg signed-num signed-reg 3)
   (def fast-ash-left/unsigned=>unsigned unsigned-reg unsigned-num unsigned-reg 3))
+
+(define-vop (fast-%ash/right/unsigned)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (unsigned-reg) :target result)
+         (amount :scs (unsigned-reg)))
+  (:arg-types unsigned-num unsigned-num)
+  (:results (result :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 4
+    (inst srl result number amount)))
+
+(define-vop (fast-%ash/right/signed)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (signed-reg) :target result)
+         (amount :scs (unsigned-reg)))
+  (:arg-types signed-num unsigned-num)
+  (:results (result :scs (signed-reg) :from (:argument 0)))
+  (:result-types signed-num)
+  (:generator 4
+    (inst sra result number amount)))
+
+(define-vop (fast-%ash/right/fixnum)
+  (:translate %ash/right)
+  (:policy :fast-safe)
+  (:args (number :scs (any-reg) :target result)
+         (amount :scs (unsigned-reg) :target temp))
+  (:arg-types tagged-num unsigned-num)
+  (:results (result :scs (any-reg) :from (:argument 0)))
+  (:result-types tagged-num)
+  (:temporary (:sc unsigned-reg :target result) temp)
+  (:generator 3
+    (inst sra temp number amount)
+    (inst andi result temp (bic-mask fixnum-tag-mask))))
 
 (define-vop (#-64-bit signed-byte-32-len #+64-bit signed-byte-64-len)
   (:translate integer-length)
