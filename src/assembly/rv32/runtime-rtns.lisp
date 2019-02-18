@@ -157,7 +157,9 @@
   (initialize-boxed-regs)
 
   (pseudo-atomic (pa-temp)
-    (load-foreign-symbol-value csp-tn "current_control_frame_pointer" temp)
+    ;; FIXME: We could do some trickery like in other backends where
+    ;; we allocate these registers to C's callee saved registers and
+    ;; not bother loading out of the symbol.
     (load-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
     (loadw ocfp-tn cfp-tn 0)
     (loadw nfp-tn cfp-tn 1)
