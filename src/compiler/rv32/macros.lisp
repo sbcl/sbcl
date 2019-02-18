@@ -84,15 +84,15 @@ byte-ordering issues."
              (inst bne x y target)
              (inst beq x y target)))
     ((:lt :gt)
-     (when (eq flavor :gt)
+     (when (eq condition :gt)
        (rotatef x y))
      (ecase flavor
        (:unsigned (if not-p
-                      (inst bltu x y target)
-                      (inst bgeu x y target)))
+                      (inst bgeu x y target)
+                      (inst bltu x y target)))
        (:signed (if not-p
-                    (inst blt x y target)
-                    (inst bge x y target)))))))
+                    (inst bge x y target)
+                    (inst blt x y target)))))))
 
 
 (defun emit-error-break (vop kind code values)
