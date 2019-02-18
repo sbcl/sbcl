@@ -2310,3 +2310,15 @@
                   (proc y)))))
         t)
     ((1 2) t)))
+
+(with-test (:name :car-type-on-or-null)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (declare (type (or null (cons fixnum)) x))
+              (if x
+                  (car x)
+                  0))))
+          '(function ((or null (cons fixnum t))) (values fixnum &optional)))))
+

@@ -164,7 +164,15 @@
                    (cdr (leaf-refs leaf)))
               (coerce-to-values
                (if (eq :declared (leaf-where-from leaf))
-                   (leaf-type leaf)
+                   (let ((leaf-type (leaf-type leaf))
+                         (cons-type (specifier-type 'cons)))
+                     ;; If LEAF-TYPE is (or null some-cons-type) and
+                     ;; DERIVED-TYPE is known to be non-null, use
+                     ;; SOME-CONS-TYPE in that case, because a cons
+                     ;; can't become null.
+                     (if (csubtypep derived-type cons-type)
+                         (type-intersection leaf-type cons-type)
+                         leaf-type))
                    (conservative-type derived-type)))
               derived-values-type))
         derived-values-type)))
