@@ -242,9 +242,9 @@
                   (sc-case tn
                     (control-stack
                      (store-stack-tn tn move-temp))
-                    (t)))))
-          ;; Deallocate the callee stack frame.
-          (move csp-tn ocfp-tn)))))
+                    (t))))))
+        ;; Deallocate the callee stack frame.
+        (move csp-tn ocfp-tn))))
   (values))
 
 ;;;; Unknown values receiving:
