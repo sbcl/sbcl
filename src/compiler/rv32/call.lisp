@@ -58,8 +58,9 @@
 ;;; Return the number of bytes needed for the current non-descriptor
 ;;; stack frame.
 (defun bytes-needed-for-non-descriptor-stack-frame ()
-  (* (logandc2 (1+ (sb-allocated-size 'non-descriptor-stack)) 1)
-     n-word-bytes))
+  (logandc2 (+ (* (sb-allocated-size 'non-descriptor-stack) n-word-bytes)
+               +number-stack-alignment-mask+)
+            +number-stack-alignment-mask+))
 
 ;;; This is used for setting up the Old-FP in local call.
 (define-vop (current-fp)
@@ -610,6 +611,8 @@
                         (:load-nargs
                          ,@(if variable
                                `((inst sub nargs-pass csp-tn new-fp)
+                                 (unless (zerop (- word-shift n-fixnum-tag-bits))
+                                   (inst srai nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits)))
                                  ,@(let ((index -1))
                                      (mapcar (lambda (name)
                                                `(loadw ,name new-fp ,(incf index)))
@@ -890,70 +893,102 @@
 
 ;;; Copy a more arg from the argument area to the end of the current frame.
 ;;; Fixed is the number of non-more arguments.
-
-;;; FIXME ENTIRELY WRONG CAUSES PROBLEMS PLEASE FIX.
 (define-vop (copy-more-arg)
   (:temporary (:sc any-reg :offset nl0-offset) result)
   (:temporary (:sc any-reg :offset nl1-offset) count)
-  (:temporary (:sc any-reg :offset nl2-offset) src)
-  (:temporary (:sc any-reg :offset nl3-offset) dst)
+  (:temporary (:sc any-reg :offset nl3-offset) dest)
   (:temporary (:sc descriptor-reg :offset l0-offset) temp)
+  (:vop-var vop)
   (:info fixed)
   (:generator 20
     (let ((loop (gen-label))
           (do-regs (gen-label))
-          (done (gen-label)))
-      (when (< fixed register-arg-count)
-        ;; Save a pointer to the results so we can fill in register args.
-        ;; We don't need this if there are more fixed args than reg args.
-        (move result csp-tn))
-      ;; Allocate the space on the stack.
+          (done (gen-label))
+          (delta (- (sb-allocated-size 'control-stack) fixed)))
+      ;; Compute the end of the fixed stack frame (start of the MORE arg
+      ;; area) into RESULT.
+      (inst addi result cfp-tn
+            (* n-word-bytes (sb-allocated-size 'control-stack)))
+      ;; Compute the end of the MORE arg area (and our overall frame
+      ;; allocation) into the stack pointer.
       (cond ((zerop fixed)
              (unless (zerop (- word-shift n-fixnum-tag-bits))
-               (inst slli nargs-tn nargs-tn (- word-shift n-fixnum-tag-bits)))
-             (inst add csp-tn result nargs-tn)
+               (inst slli dest nargs-tn (- word-shift n-fixnum-tag-bits)))
+             (inst add csp-tn result dest)
              (inst beq nargs-tn zero-tn done))
             (t
              (inst subi count nargs-tn (fixnumize fixed))
+             (move csp-tn result)
              (inst bge zero-tn count done)
              (unless (zerop (- word-shift n-fixnum-tag-bits))
-               (inst slli count count (- word-shift n-fixnum-tag-bits)))
-             (inst add csp-tn result count)))
+               (inst slli dest count (- word-shift n-fixnum-tag-bits)))
+             (inst add csp-tn result dest)))
+      ;; Allocate the space on the stack.
       (when (< fixed register-arg-count)
         ;; We must stop when we run out of stack args, not when we run
         ;; out of more args.
-        (inst addi count nargs-tn (* (- register-arg-count) n-word-bytes)))
-      ;; Everything of interest in registers.
-      (inst bge zero-tn count do-regs)
-      ;; Initialize dst to be end of stack.
-      (move dst csp-tn)
-      ;; Initialize src to be end of args.
-      (inst add src cfp-tn nargs-tn)
+        (inst addi result result (* (- register-arg-count fixed) n-word-bytes)))
+      ;; Initialize dest to be end of stack.
+      (move dest csp-tn)
 
+      ;; We are copying at most (- NARGS FIXED) values, from last to
+      ;; first, in order to shift them out of the allocated part of
+      ;; the stack frame.  The FIXED values remain where they are,
+      ;; as they are part of the allocated stack frame.  Any
+      ;; remaining values are being moved to just beyond the end of
+      ;; the allocated stack frame, for a distance of (-
+      ;; (sb-allocated-size 'control-stack) fixed) words.  There is
+      ;; a constant displacement of a single word in the loop below,
+      ;; because DEST points to the space AFTER the value being
+      ;; moved.
       (emit-label loop)
-      ;; *--dst = *--src, --count
-      (inst subi count count (fixnumize 1))
-      (inst subi src src n-word-bytes)
-      (inst subi dst dst n-word-bytes)
-      (loadw temp src)
-      (storew temp dst)
-      (inst blt zero-tn count loop)
+      (let ((done (gen-label)))
+        (cond ((zerop delta)
+               ;; If DELTA is zero then all of the MORE args are in the
+               ;; right place, so we don't really need to do anything.)
+               )
+              ((plusp delta)
+               ;; If DELTA is positive then the allocated stack frame is
+               ;; overlapping some of the MORE args, and we need to copy
+               ;; the list starting from the end (so that we don't
+               ;; overwrite any elements before they're copied).
+               (inst bge result dest do-regs)
+               (loadw temp dest (- (1+ delta)))
+               (storew temp dest -1)
+               (inst j loop))
+              (t
+               ;; If DELTA is negative then the start of the MORE args
+               ;; is beyond the end of the allocated stack frame, and we
+               ;; need to copy the list from the start in order to close
+               ;; the gap.
+               (inst bge result dest done)
+               (loadw temp result (- delta))
+               (storew temp result 0)
+               (inst addi result result n-word-bytes)
+               (inst j loop)
 
+               (emit-label done)
+               (move csp-tn dest))))
       (emit-label do-regs)
       (when (< fixed register-arg-count)
-        ;; Now we have to deposit any more args that showed up in
-        ;; registers.  We know there is at least one more arg,
-        ;; otherwise we would have branched to done up at the top.
-        (inst subi count nargs-tn (fixnumize (1+ fixed)))
+        ;; Now we have to deposit any more args that showed up in registers.
+        (inst subi count nargs-tn (fixnumize fixed))
         (do ((i fixed (1+ i)))
             ((>= i register-arg-count))
-          ;; Is this the last one?
+          ;; Don't deposit any more than there are.
           (inst beq count zero-tn done)
-          ;; Store it relative to the pointer saved at the start.
-          (storew (nth i *register-arg-tns*) result (- i fixed))
-          ;; Decrement count.
-          (inst subi count count (fixnumize 1))))
-      (emit-label done))))
+          (inst subi count count (fixnumize 1))
+          ;; Store it into the space reserved to it, by displacement
+          ;; from the frame pointer.
+          (storew (nth i *register-arg-tns*) cfp-tn
+                  (+ (sb-allocated-size 'control-stack)
+                     (- i fixed)))))
+      (emit-label done)
+      ;; Now that we're done with the &MORE args, we can set up the
+      ;; number stack frame.
+      (let ((cur-nfp (current-nfp-tn vop)))
+        (when cur-nfp
+          (inst subi cur-nfp nsp-tn (bytes-needed-for-non-descriptor-stack-frame)))))))
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop (listify-rest-args)
