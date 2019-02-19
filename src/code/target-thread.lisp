@@ -1418,8 +1418,14 @@ interactive."
   #+sb-thread
   (prog1
       (with-session-lock (*session*)
-        (not (member *current-thread*
-                     (session-interactive-threads *session*))))
+        (let ((foreground (foreground-thread)))
+          (unless (or (null foreground)
+                      (eq foreground *current-thread*))
+            (format *error-output* "~%The current thread is not at the foreground,~@
+SB-THREAD:RELEASE-FOREGROUND has to be called in ~s~%for this thread to enter the debugger.~%"
+                    foreground))
+          (not (member *current-thread*
+                       (session-interactive-threads *session*)))))
     (get-foreground)))
 
 (defun get-foreground ()
