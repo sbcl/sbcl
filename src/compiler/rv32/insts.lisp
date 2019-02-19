@@ -340,9 +340,10 @@
             (inst lui reg hi)
             (inst addi reg reg lo))))))
     ((or (signed-byte 64) (unsigned-byte 64))
-     ;; FIXME.
+     ;; FIXME. There are a myriad other ways to load a 64-bit
+     ;; immediate.
      (let ((value (coerce-signed value 64)))
-       (inst addi reg reg (coerce-signed (ldb (byte 12 52) value) 12))
+       (inst addi reg zero-tn (coerce-signed (ldb (byte 12 52) value) 12))
        (inst slli reg reg 12)
        (loop for i from 52 downto 19 by 11
              do (unless (zerop (ldb (byte 11 i) value))
