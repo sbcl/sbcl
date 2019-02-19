@@ -54,9 +54,11 @@
              ;; Don't scream on the first invocation.
              (try-to-invoke-debugger))
             (2
-             (safely-print "Will try to reset the IO streams by calling STREAM-COLD-INIT-OR-RESET.")
+             (safely-print "Will try to reset the IO streams and disable debugger hooks.")
              (stream-cold-init-or-reset)
-             (try-to-invoke-debugger))
+             (let (*debugger-hook*
+                   *invoke-debugger-hook*)
+               (try-to-invoke-debugger)))
             (3
              (safely-print "Will try to THROW this thread to the toplevel.")
              (/show0 "*ERROR-ERROR-DEPTH* too big, trying THROW")
