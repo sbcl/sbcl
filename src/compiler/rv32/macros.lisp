@@ -320,23 +320,44 @@ and
           ((control-stack)
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
+(defun align-csp (temp)
+  ;; is used for stack allocation of dynamic-extent objects
+  (let ((aligned (gen-label)))
+    (inst andi temp csp-tn lowtag-mask)
+    (inst beq temp zero-tn aligned)
+    (inst addi csp-tn csp-tn n-word-bytes)
+    (storew zero-tn csp-tn -1)
+    (emit-label aligned)))
+
 
 ;;;; Storage allocation:
 (defun allocation (result-tn size lowtag &key flag-tn
                                               stack-allocate-p)
-  (declare (ignore stack-allocate-p))
-  ;; Normal allocation to the heap.
-  (load-symbol-value flag-tn *allocation-pointer*)
-  (inst addi result-tn flag-tn lowtag)
-  (etypecase size
-    (short-immediate
-     (inst addi flag-tn flag-tn size))
-    ((signed-byte 32)
-     (inst li flag-tn (- size lowtag))
-     (inst add flag-tn flag-tn result-tn))
-    (tn
-     (inst add flag-tn flag-tn size)))
-  (store-symbol-value flag-tn *allocation-pointer*))
+  (cond (stack-allocate-p
+         (assemble ()
+           (align-csp flag-tn)
+           (inst ori result-tn csp-tn lowtag)
+           (etypecase size
+             (short-immediate
+              (inst addi csp-tn csp-tn size))
+             ((signed-byte 32)
+              (inst li flag-tn size)
+              (inst add csp-tn csp-tn flag-tn))
+             (tn
+              (inst add csp-tn csp-tn size)))))
+        ;; Normal allocation to the heap.
+        (t
+         (load-symbol-value flag-tn *allocation-pointer*)
+         (inst addi result-tn flag-tn lowtag)
+         (etypecase size
+           (short-immediate
+            (inst addi flag-tn flag-tn size))
+           ((signed-byte 32)
+            (inst li flag-tn (- size lowtag))
+            (inst add flag-tn flag-tn result-tn))
+           (tn
+            (inst add flag-tn flag-tn size)))
+         (store-symbol-value flag-tn *allocation-pointer*))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                   &key (lowtag other-pointer-lowtag)
