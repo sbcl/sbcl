@@ -91,7 +91,9 @@
   (:results (result :scs (descriptor-reg) :from :load))
   (:policy :fast-safe)
   (:generator 100
-    (inst addi bytes words (+ lowtag-mask (* vector-data-offset n-word-bytes)))
+    (unless (zerop (- word-shift n-fixnum-tag-bits))
+      (inst slli bytes words (- word-shift n-fixnum-tag-bits)))
+    (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))
     (inst andi bytes bytes (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
@@ -111,23 +113,27 @@
   (:translate allocate-vector)
   (:policy :fast-safe)
   (:generator 100
-    (inst srli temp type n-fixnum-tag-bits)
-    (inst slli words words (- word-shift n-fixnum-tag-bits))
-    (inst addi words words (* (1+ vector-data-offset) n-word-bytes))
-    (inst andi words words (bic-mask lowtag-mask))
-    ;; FIXME: It would be good to check for stack overflow here.
     (pseudo-atomic (pa-flag)
-      (allocation result words other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
-      (storew temp result 0 other-pointer-lowtag)
-      (storew length result vector-length-slot other-pointer-lowtag)
-      (inst addi temp result (* n-word-bytes 2))
-      (inst add words result words)
+      (unless (zerop (- word-shift n-fixnum-tag-bits))
+        (inst slli words words (- word-shift n-fixnum-tag-bits)))
+      (inst addi words words (* (1+ vector-data-offset) n-word-bytes))
+      (inst andi words words (bic-mask lowtag-mask))
 
+      ;; FIXME: It would be good to check for stack overflow here.
+      (allocation result words other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
+
+      (storew type result 0 other-pointer-lowtag)
+      (storew length result vector-length-slot other-pointer-lowtag)
+      ;; The header word has already been set, skip it.
+      (inst addi temp result (- (* vector-data-offset n-word-bytes)
+                                other-pointer-lowtag))
+      ;; Zero fill
       (let ((loop (gen-label)))
         (emit-label loop)
         (storew zero-tn temp 0)
-        (inst blt temp words loop)
-        (inst addi temp temp n-word-bytes)))))
+        (inst addi temp temp n-word-bytes)
+        ;; FIXME: This breaks the allocation abstraction a little.
+        (inst bne temp csp-tn loop)))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
@@ -194,15 +200,16 @@
   (:generator 6
     (unless (zerop (- word-shift n-fixnum-tag-bits))
       (inst slli bytes extra (- word-shift n-fixnum-tag-bits)))
-    (inst addi bytes bytes (* (1+ words) n-word-bytes))
-    (inst slli header bytes (- n-widetag-bits n-fixnum-tag-bits))
+    (inst addi bytes bytes (* (1- words) n-word-bytes))
+    (inst slli header bytes (- n-widetag-bits word-shift))
+    (inst addi header header type)
+    ;; Add the object header to the allocation size and round up to
+    ;; the allocation granularity.
     ;; The specified EXTRA value is the exact value placed in the
     ;; header as the word count when allocating code.
-    (cond ((= type code-header-widetag)
-           (inst addi header header type))
-          (t
-           (inst addi header header (+ (ash -2 n-widetag-bits) type))
-           (inst andi bytes bytes (bic-mask lowtag-mask))))
+    (unless #-64-bit (= type code-header-widetag) #+64-bit nil
+      (inst addi bytes bytes (* 2 n-word-bytes)))
+    (inst andi bytes bytes (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag :flag-tn pa-flag)
       (storew header result 0 lowtag))))
