@@ -798,7 +798,7 @@
                             collect (gensym))))
                `(define-vop (return)
                   (:args (old-fp :scs (any-reg))
-                         (return-pc :scs (descriptor-reg))
+                         (return-pc :scs (descriptor-reg) :to (:eval 1))
                          (values :more t))
                   (:ignore values)
                   ,@(loop for an-offset in *register-arg-offsets*
