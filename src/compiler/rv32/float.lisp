@@ -64,7 +64,7 @@
   (:results (y :scs (descriptor-reg)))
   (:note "float to pointer coercion")
   (:generator 4
-    (inst fmove :single tmp x)
+    (inst fmvx<- :single tmp x)
     (inst slli tmp tmp 32)
     (inst addi y tmp single-float-widetag)))
 
