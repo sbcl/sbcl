@@ -348,7 +348,7 @@ and
         ;; Normal allocation to the heap.
         (t
          (load-symbol-value flag-tn *allocation-pointer*)
-         (inst addi result-tn flag-tn lowtag)
+         (inst ori result-tn flag-tn lowtag)
          (etypecase size
            (short-immediate
             (inst addi flag-tn flag-tn size))

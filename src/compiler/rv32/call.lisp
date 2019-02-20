@@ -1012,42 +1012,37 @@
       (move context context-arg)
       (move count count-arg)
       ;; Check to see if there are any arguments.
-      (inst beq count zero-tn done)
       (move result null-tn)
+      (inst beq count zero-tn done)
 
       ;; We need to do this atomically.
       (pseudo-atomic (pa-flag)
-        (let ((size (cond (dx-p
-                           (style-warn "implement dx"))
-                          (t
-                           (inst slli temp count (1+ (- word-shift n-fixnum-tag-bits)))
-                           temp))))
-          (allocation dst size list-pointer-lowtag
-                      :flag-tn pa-flag
-                      :stack-allocate-p dx-p)
-          (move result dst)
+        (inst slli temp count (1+ (- word-shift n-fixnum-tag-bits)))
+        (allocation dst temp list-pointer-lowtag
+                    :flag-tn pa-flag
+                    :stack-allocate-p dx-p)
+        (move result dst)
 
-          (inst j enter)
+        (inst j enter)
 
-          ;; Compute the next cons and store it in the current one.
-          (emit-label loop)
-          (inst addi dst dst (* 2 n-word-bytes))
-          (storew dst dst -1 list-pointer-lowtag)
+        ;; Compute the next cons and store it in the current one.
+        (emit-label loop)
+        (inst addi dst dst (* 2 n-word-bytes))
+        (storew dst dst -1 list-pointer-lowtag)
 
-          ;; Grab one value
-          (emit-label enter)
-          (loadw temp context)
-          (inst addi context context n-word-bytes)
+        (emit-label enter)
+        ;; Grab one value
+        (loadw temp context)
+        (inst addi context context n-word-bytes)
 
-          ;; Dec count, and if != zero, go back for more.
-          (inst addi count count (fixnumize -1))
-          (inst bne count zero-tn loop)
+        ;; Dec count, and if != zero, go back for more.
+        (inst subi count count (fixnumize 1))
+        ;; Store the value into the car of the current cons.
+        (storew temp dst 0 list-pointer-lowtag)
+        (inst bne count zero-tn loop)
 
-          ;; Store the value in the car (in delay slot)
-          (storew temp dst 0 list-pointer-lowtag)
-
-          ;; NIL out the last cons.
-          (storew null-tn dst 1 list-pointer-lowtag))
+        ;; NIL out the last cons.
+        (storew null-tn dst 1 list-pointer-lowtag)
         (emit-label done)))))
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.

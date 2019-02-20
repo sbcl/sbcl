@@ -91,11 +91,11 @@
   (:results (result :scs (descriptor-reg) :from :load))
   (:policy :fast-safe)
   (:generator 100
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli bytes words (- word-shift n-fixnum-tag-bits)))
-    (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))
-    (inst andi bytes bytes (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
+      (unless (zerop (- word-shift n-fixnum-tag-bits))
+        (inst slli bytes words (- word-shift n-fixnum-tag-bits)))
+      (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))
+      (inst andi bytes bytes (bic-mask lowtag-mask))
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
       (storew length result vector-length-slot other-pointer-lowtag))))
@@ -107,20 +107,19 @@
   (:arg-types positive-fixnum
               positive-fixnum
               positive-fixnum)
-  (:temporary (:sc non-descriptor-reg) temp)
+  (:temporary (:sc non-descriptor-reg) bytes temp)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg) :from :load))
-  (:translate allocate-vector)
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
       (unless (zerop (- word-shift n-fixnum-tag-bits))
-        (inst slli words words (- word-shift n-fixnum-tag-bits)))
-      (inst addi words words (* (1+ vector-data-offset) n-word-bytes))
-      (inst andi words words (bic-mask lowtag-mask))
+        (inst slli bytes words (- word-shift n-fixnum-tag-bits)))
+      (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))
+      (inst andi bytes bytes (bic-mask lowtag-mask))
 
       ;; FIXME: It would be good to check for stack overflow here.
-      (allocation result words other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
+      (allocation result bytes other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
 
       (storew type result 0 other-pointer-lowtag)
       (storew length result vector-length-slot other-pointer-lowtag)
