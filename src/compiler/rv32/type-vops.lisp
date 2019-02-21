@@ -102,10 +102,9 @@
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
                                     &key (drop-through (gen-label))
                                          value-tn-ref)
-
-  (inst li temp immediate)
-  ;; should there be a (zero) extension here?
-  (inst beq temp value (if not-p drop-through target))
+  (inst andi temp value widetag-mask)
+  (inst xori temp temp immediate)
+  (inst beq temp zero-tn (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through
                  :value-tn-ref value-tn-ref))
