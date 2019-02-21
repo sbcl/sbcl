@@ -302,14 +302,13 @@
     (ref
      (update-lvar-dependencies new (lambda-var-ref-lvar old)))
     (lvar
-     (when (lvar-p new)
-       (do-uses (node old)
-         (when (exit-p node)
-           ;; Inlined functions will try to use the lvar in the lexenv
-           (loop for block in (lexenv-blocks (node-lexenv node))
-                 for block-lvar = (fourth block)
-                 when (eq old block-lvar)
-                 do (setf (fourth block) new)))))
+     (do-uses (node old)
+       (when (exit-p node)
+         ;; Inlined functions will try to use the lvar in the lexenv
+         (loop for block in (lexenv-blocks (node-lexenv node))
+               for block-lvar = (fourth block)
+               when (eq old block-lvar)
+               do (setf (fourth block) new))))
      (propagate-lvar-annotations new old))))
 
 ;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
@@ -348,7 +347,9 @@
            (add-lvar-use node new))
          (reoptimize-lvar new)
          (propagate-lvar-dx new old propagate-dx))
-        (t (flush-dest old)))
+        (t
+         (update-lvar-dependencies new old)
+         (flush-dest old)))
 
   (values))
 

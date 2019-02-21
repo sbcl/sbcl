@@ -2294,3 +2294,19 @@
                   (lambda (r) (apply #'%s (1+ y) r))
                   (apply #'eql x r))))
         (%s 1)))))
+
+(with-test (:name :update-lvar-dependencies-delete-lvar)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x y)
+        (let ((x x))
+          (block nil
+            (flet ((proc (thing)
+                     (when thing
+                       (return (eval thing)))))
+              (declare (inline proc))
+              (if x
+                  (proc y)
+                  (proc y)))))
+        t)
+    ((1 2) t)))
