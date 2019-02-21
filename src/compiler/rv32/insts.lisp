@@ -525,7 +525,7 @@
   (define-instruction fstore (segment fmt rs1 rs2 offset)
     (:printer s ((opcode #b0100111)))
     (:emitter
-     (emit-s-inst segment offset rs2 rs1 (fmt-funct3 fmt) #b0100111))))
+     (emit-s-inst segment offset rs1 rs2 (fmt-funct3 fmt) #b0100111))))
 
 ;;;; Boxed-object computation instructions (for LRA and CODE)
 

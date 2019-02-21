@@ -465,8 +465,8 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator ,2
-                            (note-this-location vop :internal-error)
-                            (inst fcvt ,to-format ,from-format y x)))))
+                  (note-this-location vop :internal-error)
+                  (inst fcvt ,to-format ,from-format y x)))))
   (frob %single-float/signed %single-float
     signed-reg signed-num :word
     single-reg single-float :single)
