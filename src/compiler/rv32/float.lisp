@@ -547,25 +547,45 @@
     (inst fmvx-> :double res hi-bits)))
 
 (define-vop (single-float-bits)
-   (:args (float :scs (single-reg)))
-   (:results (bits :scs (signed-reg)))
-   (:arg-types single-float)
-   (:result-types signed-num)
-   (:translate single-float-bits)
-   (:policy :fast-safe)
-   (:generator 1
-     (inst fmvx<- :single bits float)))
+  (:args (float :scs (single-reg descriptor-reg)
+                :load-if (not (sc-is float single-stack))))
+  (:results (bits :scs (signed-reg)
+                  :load-if (sc-is float descriptor-reg single-stack)))
+  (:arg-types single-float)
+  (:result-types signed-num)
+  (:translate single-float-bits)
+  (:policy :fast-safe)
+  (:vop-var vop)
+  (:generator 1
+    (sc-case float
+      (single-reg
+       (inst fmvx<- :single bits float))
+      (single-stack
+       (inst lw bits (current-nfp-tn vop) (ash (tn-offset float) word-shift)))
+      (descriptor-reg
+       #+64-bit
+       (inst srai bits float 32)
+       #-64-bit
+       (loadw bits float single-float-value-slot other-pointer-lowtag)))))
 
 #+64-bit
 (define-vop (double-float-bits)
-  (:args (float :scs (double-reg)))
-  (:results (res :scs (signed-reg)))
+  (:args (float :scs (double-reg descriptor-reg)
+                :load-if (not (sc-is float double-stack))))
+  (:results (bits :scs (signed-reg)))
   (:arg-types double-float)
   (:result-types signed-num)
   (:translate double-float-bits)
+  (:vop-var vop)
   (:policy :fast-safe)
   (:generator 1
-    (inst fmvx<- :double res float)))
+    (sc-case float
+      (double-reg
+       (inst fmvx<- :double bits float))
+      (double-stack
+       (loadw bits (current-nfp-tn vop) (* (tn-offset float) n-word-bytes)))
+      (descriptor-reg
+       (loadw bits float double-float-value-slot other-pointer-lowtag)))))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg)))
@@ -583,8 +603,9 @@
       (inst fstore :double float ptr 0)
       (loadw hi-bits ptr 1))
     #+64-bit
-    (inst fmvx<- :double pa-flag float)
-    (inst srli hi-bits pa-flag 32)))
+    (progn
+      (inst fmvx<- :double pa-flag float)
+      (inst srli hi-bits pa-flag 32))))
 
 (define-vop (double-float-low-bits)
   (:args (float :scs (double-reg)))
@@ -595,7 +616,32 @@
   (:policy :fast-safe)
   (:generator 2
     (inst fmvx<- :single lo-bits float)))
+
+;;;; Float mode hackery:
 
+;;; Implement these when the fcsr can be manipulated.
+#+(or)
+(progn
+  (sb-xc:deftype float-modes () '(unsigned-byte 32))
+  (defknown floating-point-modes () float-modes (flushable))
+  (defknown ((setf floating-point-modes)) (float-modes)
+      float-modes)
+
+  (define-vop (floating-point-modes)
+    (:results (res :scs (unsigned-reg)))
+    (:result-types unsigned-num)
+    (:translate floating-point-modes)
+    (:policy :fast-safe)
+    (:generator 3))
+
+  (define-vop (set-floating-point-modes)
+    (:args (new :scs (unsigned-reg) :target res))
+    (:results (res :scs (unsigned-reg)))
+    (:arg-types unsigned-num)
+    (:result-types unsigned-num)
+    (:translate (setf floating-point-modes))
+    (:policy :fast-safe)
+    (:generator 3)))
 
 ;;;; Complex float VOPs
 
