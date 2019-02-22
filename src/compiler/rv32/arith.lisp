@@ -169,12 +169,12 @@
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:temporary (:sc non-descriptor-reg :to :eval) temp)
   (:variant-vars variant)
-  (:generator 3
+  (:generator 5
     (inst bge amount zero-tn positive)
     (inst sub ndesc zero-tn amount)
     (inst li temp n-word-bits)
     (inst blt temp ndesc no-overflow)
-    (move ndesc temp)
+    (inst subi ndesc temp 1)
     NO-OVERFLOW
     (ecase variant
       (:signed (inst sra result number ndesc))
