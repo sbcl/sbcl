@@ -51,7 +51,6 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 4
-    ;; Does the offset need to tagged properly on 64-bit?
     (loadw result object offset)))
 
 (define-vop (write-control-stack)
