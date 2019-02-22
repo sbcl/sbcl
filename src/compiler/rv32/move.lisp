@@ -196,17 +196,15 @@
   (signed-reg) (descriptor-reg))
 
 (define-vop (move-from-fixnum+/-1)
-  (:args (x :scs (signed-reg unsigned-reg) :target y))
+  (:args (x :scs (signed-reg unsigned-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (y :scs (any-reg descriptor-reg)))
   (:vop-var vop)
   (:variant-vars constant)
   (:generator 4
-    (inst srai temp x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
-    (inst beq temp zero-tn done)
-    (inst xori temp temp -1)
-    (inst beq temp zero-tn done)
+    (inst srai temp y n-fixnum-tag-bits)
+    (inst beq temp x done)
     (load-constant vop (emit-constant constant) y)
     DONE))
 
@@ -220,14 +218,16 @@
 ;;; result.  Use a worst-case cost to make sure people know they may
 ;;; be number consing.
 (define-vop (move-from-unsigned)
-  (:args (x :scs (signed-reg unsigned-reg) :target y))
+  (:args (arg :scs (signed-reg unsigned-reg) :target x))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp)
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp x)
   (:temporary (:sc non-descriptor-reg) pa-flag)
+  (:note "unsigned word to integer coercion")
   (:generator 20
-    (inst srli temp temp n-positive-fixnum-bits)
+    (move x arg)
     (inst slli y x n-fixnum-tag-bits)
-    (inst beq temp zero-tn done)
+    (inst srli temp y n-fixnum-tag-bits)
+    (inst beq temp x done)
     (with-fixed-allocation (y pa-flag bignum-widetag (+ bignum-digits-offset 2))
       (inst slt temp x zero-tn)
       (inst slli temp temp n-widetag-bits)
