@@ -434,7 +434,7 @@
                   (:generator 3
                     (note-this-location vop :internal-error)
                     (inst ,op :single temp x y)
-                    (if ,(if complement 'not-p '(not not-p))
+                    (if ,(if complement '(not not-p) 'not-p)
                         (inst beq temp zero-tn target)
                         (inst bne temp zero-tn target))))
                 (define-vop (,dname double-float-compare)
@@ -442,11 +442,13 @@
                   (:generator 3
                     (note-this-location vop :internal-error)
                     (inst ,op :double temp x y)
-                    (if ,(if complement 'not-p '(not not-p))
+                    (if ,(if complement '(not not-p) 'not-p)
                         (inst beq temp zero-tn target)
                         (inst bne temp zero-tn target)))))))
   (frob < flt nil </single-float </double-float)
+  (frob <= fle nil <=/single-float <=/double-float)
   (frob > fle t >/single-float >/double-float)
+  (frob >= flt t >=/single-float >=/double-float)
   (frob = feq nil =/single-float =/double-float))
 
 
