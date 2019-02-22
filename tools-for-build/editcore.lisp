@@ -1060,10 +1060,10 @@
                 nwords)
         (when (plusp nwords)
           (format output " .fill ~d~%" (* nwords n-word-bytes))))))
-  ;; Extend with .5 MB of filler
+  ;; Extend with 1 MB of filler
   (format output " .fill ~D~%~alisp_code_end:
  .size lisp_jit_code, .-lisp_jit_code~%"
-          (* 512 1024) label-prefix)
+          (* 1024 1024) label-prefix)
   (values core total-code-size n-linker-relocs))
 
 ;;;; ELF file I/O
@@ -1225,7 +1225,7 @@
                                       ; symbol table -- ^ ^ -- for which section
              (:note ".note.GNU-stack" ,+sht-null+     0 0 0 1  0)))
          (string-table
-          (string-table (append '("__lisp_code_start") (map 'list #'second sections))))
+          (string-table (append '("lisp_code_start") (map 'list #'second sections))))
          (strings (cdr string-table))
          (padded-strings-size (align-up (length strings) 8))
          (symbols-size (* 2 sym-entry-size))
@@ -1578,7 +1578,7 @@
 ;;; is for linking in to a binary that needs no "--core" argument.
 (defun split-core
     (input-pathname asm-pathname
-     &key enable-pie (verbose t)
+     &key enable-pie (verbose nil)
      &aux (split-core-pathname
            (merge-pathnames (make-pathname :type "core") asm-pathname))
           (elf-core-pathname
