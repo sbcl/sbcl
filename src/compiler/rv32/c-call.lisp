@@ -162,32 +162,20 @@
   (:info amount)
   (:result-types system-area-pointer)
   (:results (result :scs (sap-reg any-reg)))
-  (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
-        (typecase delta
-          (short-immediate
-           (inst subi nsp-tn nsp-tn delta))
-          (t
-           (inst li temp delta)
-           (inst sub nsp-tn nsp-tn delta)))))
+        (inst subi nsp-tn nsp-tn delta)))
     (move result nsp-tn)))
 
 (define-vop (dealloc-number-stack-space)
   (:info amount)
   (:policy :fast-safe)
-  (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
-        (typecase delta
-          (short-immediate
-           (inst addi nsp-tn nsp-tn delta))
-          (t
-           (inst li temp delta)
-           (inst add nsp-tn nsp-tn temp)))))))
+        (inst addi nsp-tn nsp-tn delta)))))
 
 ;;; Callback

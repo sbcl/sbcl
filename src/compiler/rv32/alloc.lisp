@@ -92,9 +92,11 @@
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
-      (unless (zerop (- word-shift n-fixnum-tag-bits))
-        (inst slli bytes words (- word-shift n-fixnum-tag-bits)))
-      (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))
+      (cond ((zerop (- word-shift n-fixnum-tag-bits))
+             (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
+            (t
+             (inst slli bytes words (- word-shift n-fixnum-tag-bits))
+             (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
       (inst andi bytes bytes (bic-mask lowtag-mask))
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
@@ -113,9 +115,11 @@
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
-      (unless (zerop (- word-shift n-fixnum-tag-bits))
-        (inst slli bytes words (- word-shift n-fixnum-tag-bits)))
-      (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))
+      (cond ((zerop (- word-shift n-fixnum-tag-bits))
+             (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
+            (t
+             (inst slli bytes words (- word-shift n-fixnum-tag-bits))
+             (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
       (inst andi bytes bytes (bic-mask lowtag-mask))
 
       ;; FIXME: It would be good to check for stack overflow here.
@@ -197,9 +201,11 @@
   (:temporary (:sc non-descriptor-reg) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 6
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli bytes extra (- word-shift n-fixnum-tag-bits)))
-    (inst addi bytes bytes (* (1- words) n-word-bytes))
+    (cond ((zerop (- word-shift n-fixnum-tag-bits))
+           (inst addi bytes extra (* (1- words) n-word-bytes)))
+          (t
+           (inst slli bytes extra (- word-shift n-fixnum-tag-bits))
+           (inst addi bytes bytes (* (1- words) n-word-bytes))))
     (inst slli header bytes (- n-widetag-bits word-shift))
     (inst addi header header type)
     ;; Add the object header to the allocation size and round up to

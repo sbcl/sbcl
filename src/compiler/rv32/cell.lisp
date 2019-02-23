@@ -280,10 +280,12 @@
 
 ;;;; raw instance slot accessors
 
-(defun emit-raw-slot-ref (type value lip object index)
-  (unless (zerop (- word-shift n-fixnum-tag-bits))
-    (inst slli index index (- word-shift n-fixnum-tag-bits)))
-  (inst add lip object index)
+(defun emit-raw-slot-ref (type value lip object index temp)
+  (cond ((zerop (- word-shift n-fixnum-tag-bits))
+         (inst add lip object index))
+        (t
+         (inst slli temp index (- word-shift n-fixnum-tag-bits))
+         (inst add lip object temp)))
   (let ((effective-offset (- (* instance-slots-offset n-word-bytes)
                              instance-pointer-lowtag)))
     (ecase type
@@ -300,10 +302,12 @@
        (inst fload :double (complex-reg-real-tn :double value) lip effective-offset)
        (inst fload :double (complex-reg-imag-tn :double value) lip (+ 8 effective-offset))))))
 
-(defun emit-raw-slot-set (type value result lip object index)
-  (unless (zerop (- word-shift n-fixnum-tag-bits))
-    (inst slli index index (- word-shift n-fixnum-tag-bits)))
-  (inst add lip object index)
+(defun emit-raw-slot-set (type value result lip object index temp)
+  (cond ((zerop (- word-shift n-fixnum-tag-bits))
+         (inst add lip object index))
+        (t
+         (inst slli temp index (- word-shift n-fixnum-tag-bits))
+         (inst add lip object temp)))
   (let ((effective-offset (- (* instance-slots-offset n-word-bytes)
                              instance-pointer-lowtag)))
     (ecase type
@@ -337,9 +341,10 @@
          (:arg-types * positive-fixnum)
          (:results (value :scs (,value-sc)))
          (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:sc non-descriptor-reg) temp)
          (:result-types ,value-primtype)
          (:generator 5
-           (emit-raw-slot-ref ',name value lip object index)))
+           (emit-raw-slot-ref ',name value lip object index temp)))
        (define-vop (,set-vop)
          (:translate ,(symbolicate "%" set-vop))
          (:policy :fast-safe)
@@ -349,9 +354,10 @@
          (:arg-types * positive-fixnum ,value-primtype)
          (:results (result :scs (,value-sc)))
          (:temporary (:scs (interior-reg)) lip)
+         (:temporary (:sc non-descriptor-reg) temp)
          (:result-types ,value-primtype)
          (:generator 5
-           (emit-raw-slot-set ',name value result lip object index))))))
+           (emit-raw-slot-set ',name value result lip object index temp))))))
 
 (define-raw-slot-vops word unsigned-num unsigned-reg)
 (define-raw-slot-vops single single-float single-reg)

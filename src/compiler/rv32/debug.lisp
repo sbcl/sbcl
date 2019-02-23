@@ -34,12 +34,15 @@
          (offset :scs (any-reg)))
   (:arg-types system-area-pointer positive-fixnum)
   (:temporary (:scs (sap-reg) :from :eval) sap)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:generator 5
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli offset offset (- word-shift n-fixnum-tag-bits)))
-    (inst add sap object offset)
+    (cond ((= word-shift n-fixnum-tag-bits)
+           (inst add sap object offset))
+          (t
+           (inst slli temp offset (- word-shift n-fixnum-tag-bits))
+           (inst add sap object temp)))
     (loadw result sap 0)))
 
 (define-vop (read-control-stack-c)
@@ -63,10 +66,13 @@
   (:results (result :scs (descriptor-reg)))
   (:result-types *)
   (:temporary (:scs (sap-reg) :from (:argument 1)) sap)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:generator 2
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli offset offset (- word-shift n-fixnum-tag-bits)))
-    (inst add sap object offset)
+    (cond ((= word-shift n-fixnum-tag-bits)
+           (inst add sap object offset))
+          (t
+           (inst slli temp offset (- word-shift n-fixnum-tag-bits))
+           (inst add sap object temp)))
     (storew value sap 0)
     (move result value)))
 

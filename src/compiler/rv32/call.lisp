@@ -912,17 +912,24 @@
       ;; Compute the end of the MORE arg area (and our overall frame
       ;; allocation) into the stack pointer.
       (cond ((zerop fixed)
-             (unless (zerop (- word-shift n-fixnum-tag-bits))
-               (inst slli dest nargs-tn (- word-shift n-fixnum-tag-bits)))
-             (inst add csp-tn result dest)
+             (cond ((zerop (- word-shift n-fixnum-tag-bits))
+                    (inst add csp-tn result nargs-tn))
+                   (t
+                    (inst slli dest nargs-tn (- word-shift n-fixnum-tag-bits))
+                    (inst add csp-tn result dest)))
              (inst beq nargs-tn zero-tn done))
             (t
              (inst subi count nargs-tn (fixnumize fixed))
-             (move csp-tn result)
+             (let ((skip (gen-label)))
+               (inst blt zero-tn count skip)
+               (move csp-tn result)
+               (emit-label skip))
              (inst bge zero-tn count done)
-             (unless (zerop (- word-shift n-fixnum-tag-bits))
-               (inst slli dest count (- word-shift n-fixnum-tag-bits)))
-             (inst add csp-tn result dest)))
+             (cond ((zerop (- word-shift n-fixnum-tag-bits))
+                    (inst add csp-tn result count))
+                   (t
+                    (inst slli dest count (- word-shift n-fixnum-tag-bits))
+                    (inst add csp-tn result dest)))))
       ;; Allocate the space on the stack.
       (when (< fixed register-arg-count)
         ;; We must stop when we run out of stack args, not when we run
@@ -955,6 +962,7 @@
                (inst bge result dest do-regs)
                (loadw temp dest (- (1+ delta)))
                (storew temp dest -1)
+               (inst subi dest dest n-word-bytes)
                (inst j loop))
               (t
                ;; If DELTA is negative then the start of the MORE args
@@ -988,7 +996,8 @@
       ;; number stack frame.
       (let ((cur-nfp (current-nfp-tn vop)))
         (when cur-nfp
-          (inst subi cur-nfp nsp-tn (bytes-needed-for-non-descriptor-stack-frame)))))))
+          (inst subi nsp-tn nsp-tn (bytes-needed-for-non-descriptor-stack-frame))
+          (move cur-nfp nsp-tn))))))
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop (listify-rest-args)
@@ -1058,18 +1067,21 @@
 (define-vop (more-arg-context)
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
-  (:args (supplied :scs (any-reg)))
+  (:args (supplied :scs (any-reg) :target temp))
   (:arg-types tagged-num (:constant fixnum))
   (:info fixed)
   (:results (context :scs (descriptor-reg))
             (count :scs (any-reg)))
+  (:temporary (:sc non-descriptor-reg) temp)
   (:result-types t tagged-num)
   (:note "more-arg-context")
   (:generator 5
     (inst subi count supplied (fixnumize fixed))
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli count count (- word-shift n-fixnum-tag-bits)))
-    (inst sub context csp-tn count)))
+    (cond ((zerop (- word-shift n-fixnum-tag-bits))
+           (inst sub context csp-tn count))
+          (t
+           (inst slli temp count (- word-shift n-fixnum-tag-bits))
+           (inst sub context csp-tn temp)))))
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)

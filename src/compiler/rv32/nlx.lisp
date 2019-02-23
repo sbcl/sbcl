@@ -196,7 +196,9 @@
     (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
-  (:args (top) (start) (count))
+  (:args (top)
+         (start)
+         (count))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
@@ -231,14 +233,16 @@
       ;; Copy stuff on stack.
       (emit-label loop)
       (loadw temp src)
-      (inst addi src src n-word-bytes)
-      (inst addi num num (fixnumize -1))
       (storew temp dst)
-      (inst bne num zero-tn loop)
+      (inst addi num num (fixnumize -1))
+      (inst addi src src n-word-bytes)
       (inst addi dst dst n-word-bytes)
+      (inst bne num zero-tn loop)
 
       (emit-label done)
-      (move csp-tn dst))))
+      (move csp-tn dst)
+      (unless (= word-shift n-fixnum-tag-bits)
+        (inst srli new-count num (- word-shift n-fixnum-tag-bits))))))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;

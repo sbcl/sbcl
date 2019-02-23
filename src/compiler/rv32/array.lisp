@@ -23,10 +23,13 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 13
     ;; Compute the allocation size.
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli ndescr rank (- word-shift n-fixnum-tag-bits)))
-    (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
-                             lowtag-mask))
+    (cond ((zerop (- word-shift n-fixnum-tag-bits))
+           (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
+                                     lowtag-mask)))
+          (t
+           (inst slli ndescr rank (- word-shift n-fixnum-tag-bits))
+           (inst addi ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
+                                       lowtag-mask))))
     (inst andi ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation result ndescr other-pointer-lowtag :flag-tn pa-flag)
@@ -348,11 +351,14 @@
          (index))
   (:results (value))
   (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:variant-vars format size)
   (:generator 5
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli index index (- word-shift n-fixnum-tag-bits)))
-    (inst add lip object index)
+    (cond ((zerop (- word-shift n-fixnum-tag-bits))
+           (inst add lip object index))
+          (t
+           (inst slli temp index (- word-shift n-fixnum-tag-bits))
+           (inst add lip object temp)))
     (let ((real-tn (complex-reg-real-tn format value)))
       (inst fload format real-tn lip (- (* vector-data-offset size)
                                         other-pointer-lowtag)))
@@ -382,11 +388,14 @@
          (value :target result))
   (:results (result))
   (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:variant-vars format size)
   (:generator 5
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli index index (- word-shift n-fixnum-tag-bits)))
-    (inst add lip object index)
+    (cond ((zerop (- word-shift n-fixnum-tag-bits))
+           (inst add lip object index))
+          (t
+           (inst slli temp index (- word-shift n-fixnum-tag-bits))
+           (inst add lip object temp)))
     (let ((value-real (complex-reg-real-tn format value))
           (result-real (complex-reg-real-tn format result)))
       (inst fstore format value-real lip (- (* vector-data-offset size)

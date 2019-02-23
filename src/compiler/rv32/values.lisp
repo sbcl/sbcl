@@ -127,16 +127,20 @@
       (immediate
        (inst addi src context (* (tn-value skip) n-word-bytes)))
       (any-reg
-       (unless (zerop (- word-shift n-fixnum-tag-bits))
-         (inst slli skip skip (- word-shift n-fixnum-tag-bits)))
-       (inst add src context skip)))
+       (cond ((zerop (- word-shift n-fixnum-tag-bits))
+              (inst add src context skip))
+             (t
+              (inst slli temp skip (- word-shift n-fixnum-tag-bits))
+              (inst add src context temp)))))
     (move count num)
     (move start csp-tn)
     (inst beq num zero-tn done)
     (move dst start)
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst slli temp count (- word-shift n-fixnum-tag-bits)))
-    (inst add csp-tn start temp)
+    (cond ((zerop (- word-shift n-fixnum-tag-bits))
+           (inst add csp-tn start count))
+          (t
+           (inst slli temp count (- word-shift n-fixnum-tag-bits))
+           (inst add csp-tn start temp)))
     LOOP
     (loadw temp src 0)
     (storew temp dst 0)
