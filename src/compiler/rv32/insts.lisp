@@ -173,11 +173,11 @@
     (emit-back-patch
      segment 8
      (lambda (segment posn)
-       ;; We emit auipc + jalr
        (multiple-value-bind (hi lo)
            (u-and-i-inst-immediate (relative-offset target posn))
-         (emit-u-inst segment hi lip-tn #b0010111)
-         (emit-i-inst segment lo lip-tn #b000 lr #b1100111))))))
+         (assemble (segment)
+           (inst auipc lip-tn hi)
+           (inst jalr lr lip-tn lo)))))))
 
 ;;; For unconditional jumps, we either emit a one instruction or two
 ;;; instruction sequence.
@@ -222,13 +222,13 @@
         t)
        ((signed-byte 20)
         ;; Emit the sequence:
-        ;; b(invert(funct3)) rs1 rs2 2
+        ;; b(invert(funct3)) rs1 rs2 8
         ;; jal x0 target
         (emit-b-inst segment 8 rs2 rs1 (logxor funct3 1) opcode)
         (emit-short-jump-at segment zero-tn target posn)
         t)))
    (lambda (segment posn)
-     (emit-b-inst segment 4 rs2 rs1 (logxor funct3 1) opcode)
+     (emit-b-inst segment 12 rs2 rs1 (logxor funct3 1) opcode)
      (funcall (emit-long-jump-at-fun zero-tn target) segment posn))))
 
 (macrolet ((define-branch-instruction (name funct3)
