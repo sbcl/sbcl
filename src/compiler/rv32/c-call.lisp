@@ -12,8 +12,18 @@
 (in-package "SB-VM")
 
 
+(defenum (:start 10)
+  ca0-offset
+  ca1-offset
+  ca2-offset
+  ca3-offset
+  ca4-offset
+  ca5-offset
+  ca6-offset
+  ca7-offset)
+
 (defconstant-eqx +foreign-register-arg-offsets+
-    '(#.nl0-offset #.nl1-offset #.nl2-offset #.nl3-offset)
+    '(#.ca0-offset #.ca1-offset #.ca2-offset #.ca3-offset #.ca4-offset #.ca5-offset #.ca6-offset #.ca7-offset)
   #'equal)
 
 (defconstant +number-stack-alignment-mask+ (1- (* n-word-bytes 2)))
@@ -29,8 +39,8 @@
 
 (defun result-reg-offset (slot)
   (ecase slot
-    (0 nl0-offset)
-    (1 nl1-offset)))
+    (0 ca0-offset)
+    (1 ca1-offset)))
 
 (defun register-args-offset (index)
   (elt +foreign-register-arg-offsets+ index))
@@ -153,8 +163,8 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (inst jal lr-tn (make-fixup 'call-into-c :assembly-routine))
       (move cfunc function)
+      (inst jal lr-tn (make-fixup 'call-into-c :assembly-routine))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 

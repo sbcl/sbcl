@@ -16,12 +16,6 @@
            8 9 (loop for i from 18 to 27 collect i))
   #'equal)
 
-(defenum (:start 10)
-  ca0-offset
-  ca1-offset
-  ca2-offset
-  ca3-offset)
-
 (defun make-any-reg-tn (offset)
   (make-random-tn :kind :normal
                   :sc (sc-or-lose 'any-reg)

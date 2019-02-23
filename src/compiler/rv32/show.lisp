@@ -12,9 +12,6 @@
 
 (in-package "SB-VM")
 
-;;; FIXME. Define someplace that makes more sense.
-(defconstant ca0-offset 10)
-
 (define-vop (print)
   (:args (object :scs (descriptor-reg any-reg) :target ca0))
   (:results (result :scs (descriptor-reg)))
