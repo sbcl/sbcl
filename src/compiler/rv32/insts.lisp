@@ -269,26 +269,35 @@
   #+64-bit
   (define-store-instruction sd #b011))
 
-(macrolet ((define-immediate-arith-instruction (name funct3 &optional (imm 'imm))
-             `(define-instruction ,name (segment rd rs imm)
-                (:printer i ((funct3 ,funct3) (opcode #b0010011)))
-                (:emitter
-                 (let ((imm ,imm))
-                   (when (typep imm 'tn)
-                     (error "~a" ',name))
-                   (emit-i-inst segment imm rs ,funct3 rd #b0010011))))))
-  (define-immediate-arith-instruction addi #b000)
+(macrolet ((define-immediate-arith-instruction (name funct3 &key (imm 'imm) word-name)
+             `(progn
+                (define-instruction ,name (segment rd rs imm)
+                  (:printer i ((funct3 ,funct3) (opcode #b0010011)))
+                  (:emitter
+                   (let ((imm ,imm))
+                     (emit-i-inst segment imm rs ,funct3 rd #b0010011))))
+                ,(when word-name
+                   #+64-bit
+                   `(define-instruction ,word-name (segment rd rs imm)
+                      (:printer i ((funct3 ,funct3) (opcode #b0011011)))
+                      (:emitter
+                       (let ((imm ,imm))
+                         (emit-i-inst segment imm rs ,funct3 rd #b0011011))))))))
+  (define-immediate-arith-instruction addi #b000 :word-name addiw)
   (define-immediate-arith-instruction slti #b010)
   (define-immediate-arith-instruction sltiu #b011)
   (define-immediate-arith-instruction xori #b100)
   (define-immediate-arith-instruction ori #b110)
   (define-immediate-arith-instruction andi #b111)
   (define-immediate-arith-instruction slli #b001
-    (progn (aver (< imm n-word-bits)) imm))
+    :imm (progn (aver (< imm n-word-bits)) imm)
+    :word-name slliw)
   (define-immediate-arith-instruction srli #b101
-    (progn (aver (< imm n-word-bits)) imm))
+    :imm (progn (aver (< imm n-word-bits)) imm)
+    :word-name srliw)
   (define-immediate-arith-instruction srai #b101
-    (progn (aver (< imm n-word-bits)) (dpb 1 (byte 1 10) imm))))
+    :imm (progn (aver (< imm n-word-bits)) (dpb 1 (byte 1 10) imm))
+    :word-name sraiw))
 
 (define-instruction-macro subi (rd rs imm)
   `(inst addi ,rd ,rs (- ,imm)))
@@ -301,16 +310,20 @@
         (error "~a" ',name))
       (emit-r-inst segment ,funct7 rs2 rs1 ,funct3 rd ,opcode))))
 
-(macrolet ((define-rv32i-arith-instruction (name funct7 funct3)
-             `(define-register-arith-instruction ,name ,funct7 ,funct3 #b0110011)))
-  (define-rv32i-arith-instruction add #b0000000 #b000)
-  (define-rv32i-arith-instruction sub #b0100000 #b000)
-  (define-rv32i-arith-instruction sll #b0000000 #b001)
+(macrolet ((define-rv32i-arith-instruction (name funct7 funct3 &optional word-variant)
+             `(progn
+                (define-register-arith-instruction ,name ,funct7 ,funct3 #b0110011)
+                ,(when word-variant
+                   #+64-bit
+                  `(define-register-arith-instruction ,word-variant ,funct7 ,funct3 #b0111011)))))
+  (define-rv32i-arith-instruction add #b0000000 #b000 addw)
+  (define-rv32i-arith-instruction sub #b0100000 #b000 subw)
+  (define-rv32i-arith-instruction sll #b0000000 #b001 sllw)
   (define-rv32i-arith-instruction slt #b0000000 #b010)
   (define-rv32i-arith-instruction sltu #b0000000 #b011)
   (define-rv32i-arith-instruction xor #b0000000 #b100)
-  (define-rv32i-arith-instruction srl #b0000000 #b101)
-  (define-rv32i-arith-instruction sra #b0100000 #b101)
+  (define-rv32i-arith-instruction srl #b0000000 #b101 srlw)
+  (define-rv32i-arith-instruction sra #b0100000 #b101 sraw)
   (define-rv32i-arith-instruction or #b0000000 #b110)
   (define-rv32i-arith-instruction and #b0000000 #b111))
 
