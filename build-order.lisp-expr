@@ -254,7 +254,6 @@
  ("src/code/stream"        :not-host)
  ("src/code/early-format")
 
- ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ("src/code/common-os" :not-host)
 
  ("src/code/deadline" :not-host)
@@ -659,6 +658,7 @@
  ("src/code/target-thread"     :not-host)
  ("src/code/timer" :not-host)
 
+ ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ;; defines SB-DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
  ("src/code/interr" :not-host)
