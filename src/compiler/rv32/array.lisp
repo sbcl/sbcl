@@ -32,15 +32,16 @@
                                        lowtag-mask))))
     (inst andi ndescr ndescr (bic-mask lowtag-mask))
     (pseudo-atomic (pa-flag)
-      (allocation result ndescr other-pointer-lowtag :flag-tn pa-flag)
+      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header
       ;; value.
       (inst slli ndescr rank (- n-widetag-bits n-fixnum-tag-bits))
       (inst addi ndescr ndescr (ash (1- array-dimensions-offset) n-widetag-bits))
-      (inst srli type type n-fixnum-tag-bits)
-      (inst or ndescr ndescr type)
+      (inst srli pa-flag type n-fixnum-tag-bits)
+      (inst or ndescr ndescr pa-flag)
       ;; And store the header value.
-      (storew header result 0 other-pointer-lowtag))))
+      (storew ndescr header 0 other-pointer-lowtag))
+    (move result header)))
 
 (define-vop (make-array-header/c)
   (:translate make-array-header)
