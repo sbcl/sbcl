@@ -341,30 +341,68 @@
       (dpb unsigned-value (byte (1- width) 0) -1)
       unsigned-value))
 
+(defun coerce-unsigned (signed-value width)
+  (if (minusp signed-value)
+      (+ (ash 1 width) signed-value)
+      signed-value))
+
+(defun load-signed-byte-32-immediate (rd immediate)
+  (multiple-value-bind (hi lo)
+      (u-and-i-inst-immediate immediate)
+    (cond ((zerop hi)
+           (inst addi rd zero-tn immediate))
+          (t
+           (inst lui rd hi)
+           (inst addi rd rd lo)))))
+
 (defun %li (reg value)
   (etypecase value
-    ((or (signed-byte 32) (unsigned-byte 32))
-     (let ((value (coerce-signed value 32)))
-       (etypecase value
-         (short-immediate
-          (inst addi reg zero-tn value))
-         ((signed-byte 32)
-          (multiple-value-bind (hi lo) (u-and-i-inst-immediate value)
-            (inst lui reg hi)
-            (inst addi reg reg lo))))))
+    ((signed-byte #-64-bit 32 #+64-bit 31)
+     (load-signed-byte-32-immediate reg value))
+    #-64-bit
+    ((unsigned-byte 32)
+     (let ((value (coerce-signed value)))
+       (load-signed-byte-32-immediate reg value)))
+    #+64-bit
     ((or (signed-byte 64) (unsigned-byte 64))
-     ;; FIXME. There are a myriad other ways to load a 64-bit
-     ;; immediate.
-     (let ((value (coerce-signed value 64)))
-       (inst addi reg zero-tn (coerce-signed (ldb (byte 12 52) value) 12))
-       (inst slli reg reg 12)
-       (loop for i from 52 downto 19 by 11
-             do (unless (zerop (ldb (byte 11 i) value))
-                  (inst addi reg reg (ldb (byte 11 i) value))
-                  (inst slli reg reg 11)))
-       (inst addi reg reg (ldb (byte 11 8) value))
-       (inst slli reg reg 8)
-       (inst addi reg reg (ldb (byte 8 0) value))))
+     (let* ((value (coerce-unsigned value 64))
+            (integer-length (integer-length value))
+            (2^k (ash 1 integer-length)))
+       (cond ((= value (1- (ash 1 integer-length)))
+              ;; Common special case: the immediate is of the form #xfff...
+              (inst addi reg zero-tn -1)
+              (inst srli reg reg (- 64 integer-length)))
+             ((typep (- value 2^k) 'short-immediate)
+              ;; Common special case: loading an immediate which is a
+              ;; signed 12 bit constant away from a power of 2.
+              (unless (= integer-length 64)
+                (inst addi reg zero-tn 1)
+                (inst slli reg reg integer-length))
+              (unless (= value 2^k)
+                (inst addi reg reg (- value 2^k))))
+             (t
+              ;; The "generic" case.
+              ;; Load in the first 31 non zero most significant bits.
+              (let ((chunk (ldb (byte 12 (- integer-length 31)) value)))
+                (inst lui reg (ldb (byte 20 (- integer-length 19)) value))
+                (cond ((= (1- (ash 1 12)) chunk)
+                       (inst addi reg reg (1- (ash 1 11)))
+                       (inst addi reg reg (1- (ash 1 11)))
+                       (inst addi reg reg 1))
+                      ((logbitp 11 chunk)
+                       (inst addi reg reg (1- (ash 1 11)))
+                       (inst addi reg reg (- chunk (1- (ash 1 11)))))
+                      (t
+                       (inst addi reg reg chunk))))
+              ;; Now we need to load in the rest of the bits properly, in
+              ;; chunks of 11 to avoid sign extension.
+              (do ((i (- integer-length 31) (- i 11)))
+                  ((< i 11)
+                   (inst slli reg reg i)
+                   (unless (zerop (ldb (byte i 0) value))
+                     (inst addi reg reg (ldb (byte i 0) value))))
+                (inst slli reg reg 11)
+                (inst addi reg reg (ldb (byte 11 (- i 11)) value)))))))
     (fixup
      (inst lui reg value)
      (inst addi reg reg value))))
