@@ -69,14 +69,23 @@
 ;;;; The Move VOP:
 ;;;
 (define-vop (move)
-  (:args (x :scs (any-reg descriptor-reg)))
-  (:results (y :scs (any-reg descriptor-reg control-stack)))
+  (:args (x :target y
+            :scs (any-reg descriptor-reg)
+            :load-if (not (or (location= x y)
+                              (and (sc-is x immediate)
+                                   (eql (tn-value x) 0))))))
+  (:results (y :scs (any-reg descriptor-reg control-stack)
+               :load-if (not (location= x y))))
   (:generator 0
-    (cond ((location= x y))
-          ((sc-is y control-stack)
-           (store-stack-tn y x))
-          (t
-           (move y x)))))
+    (let ((x (if (and (sc-is x immediate)
+                      (eql (tn-value x) 0))
+                 zero-tn
+                 x)))
+      (cond ((location= x y))
+            ((sc-is y control-stack)
+             (store-stack-tn y x))
+            (t
+             (move y x))))))
 
 (define-move-vop move :move
   (any-reg descriptor-reg)
