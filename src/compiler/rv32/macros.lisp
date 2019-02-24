@@ -98,12 +98,11 @@ byte-ordering issues."
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop (note-this-location vop :internal-error))
-    ;; Encode both kind and code as an argument to EBREAM
-    (inst ebreak (dpb code (byte 8 8) kind))
-    ;; NARGS is implicitely assumed for invalid-arg-count
-    (unless (= kind invalid-arg-count-trap)
-      (encode-internal-error-args values)
-      (emit-alignment 2))))
+    (inst ebreak)
+    (if (= kind invalid-arg-count-trap) ; there is no "payload" in this trap kind
+        (inst byte kind)
+        (emit-internal-error kind code values))
+    (emit-alignment 2)))
 
 (defun generate-error-code (vop error-code &rest values)
   "Generate-Error-Code Error-code Value*
@@ -133,6 +132,7 @@ byte-ordering issues."
        (let ((not-interrupted (gen-label)))
          (inst beq ,flag-tn zero-tn not-interrupted)
          (inst ebreak pending-interrupt-trap)
+         (emit-alignment 2)
          (emit-label not-interrupted)))))
 
 #|

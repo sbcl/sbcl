@@ -250,11 +250,13 @@
   (:policy :fast-safe)
   (:translate sb-unix::receive-pending-interrupt)
   (:generator 1
-    (inst ebreak pending-interrupt-trap)))
+    (inst ebreak pending-interrupt-trap)
+    (emit-alignment 2)))
 
 (define-vop (halt)
   (:generator 1
-    (inst ebreak halt-trap)))
+    (inst ebreak halt-trap)
+    (emit-alignment 2)))
 
 ;;;; Dummy definition for a spin-loop hint VOP
 (define-vop (spin-loop-hint)

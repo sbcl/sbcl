@@ -171,4 +171,5 @@
 
 (define-assembly-routine (do-pending-interrupt (:return-style :none))
     ()
-  (inst ebreak pending-interrupt-trap))
+  (inst ebreak pending-interrupt-trap)
+  (emit-alignment 2))

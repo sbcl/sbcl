@@ -449,7 +449,7 @@
                (rd #b00000) (opcode #b1110011)))
   (:emitter
    (%emit-i-inst segment #b000000000001 #b00000 #b000 #b00000 #b1110011)
-   (when codep (emit-word segment code))))
+   (when codep (emit-byte segment code))))
 
 ;;; save CSR instructions for later - CSR
 
