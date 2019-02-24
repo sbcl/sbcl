@@ -167,7 +167,7 @@ and
          ,@(cond ((= word-shift n-fixnum-tag-bits)
                   `((inst add lip object index)))
                  (t
-                  `((inst slli temp index (- word-shift n-fixnum-tag-bits))
+                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
                     (inst add lip object temp))))
          (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
@@ -201,7 +201,7 @@ and
          ,@(cond ((= word-shift n-fixnum-tag-bits)
                   `((inst add lip object index)))
                  (t
-                  `((inst slli temp index (- word-shift n-fixnum-tag-bits))
+                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
                     (inst add lip object temp))))
          (storew value lip ,offset ,lowtag)
          (move result value)))

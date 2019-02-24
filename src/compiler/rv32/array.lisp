@@ -191,7 +191,7 @@
               (:arg-types ,type
                           (:constant
                            (integer 0
-                                    ,(1- (* (1+ (- (floor (+ #x7fff
+                                    ,(1- (* (1+ (- (floor (+ #x7ff
                                                              other-pointer-lowtag)
                                                           n-word-bytes)
                                                    vector-data-offset))
@@ -247,9 +247,7 @@
                 (inst sll temp temp shift)
                 (inst or old old temp)
                 ;; Write the altered word back to the array.
-                (inst sw old lip
-                      (- (* vector-data-offset n-word-bytes)
-                         other-pointer-lowtag))
+                (storew old lip vector-data-offset other-pointer-lowtag)
                 (sc-case value
                   (immediate
                    (inst li result (tn-value value)))
@@ -275,7 +273,7 @@
                   ,@(cond ((= word-shift n-fixnum-tag-bits)
                            `((inst add lip object index)))
                           (t
-                           `((inst slli temp index (- word-shift n-fixnum-tag-bits))
+                           `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
                              (inst add lip object temp))))
                   (inst fload format value lip  (- (* vector-data-offset n-word-bytes)
                                                    other-pointer-lowtag))))))
@@ -315,7 +313,7 @@
                   ,@(cond ((= word-shift n-fixnum-tag-bits)
                            `((inst add lip object index)))
                           (t
-                           `((inst slli temp index (- word-shift n-fixnum-tag-bits))
+                           `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
                              (inst add lip object temp))))
                   (inst fstore format value lip (- (* vector-data-offset n-word-bytes)
                                                    other-pointer-lowtag))
