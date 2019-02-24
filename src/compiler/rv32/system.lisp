@@ -18,39 +18,39 @@
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
+  (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 6
     ;; First, pick off the immediate types, starting with FIXNUM.
     (inst andi result object fixnum-tag-mask)
     (inst beq result zero-tn done)
-
-    ;; Pick off objects with headers.
-    (inst andi ndescr object lowtag-mask)
-    (inst xori ndescr ndescr other-pointer-lowtag)
-    (inst beq ndescr zero-tn other-ptr)
-    (inst xori ndescr ndescr (logxor other-pointer-lowtag fun-pointer-lowtag))
-    (inst beq ndescr zero-tn function-ptr)
-
-    ;; Pick off structure and list pointers.
-    (inst andi result object 1)
-    (inst bne result zero-tn lowtag-only)
-
-    ;; Must be an other immediate.
-    (inst j done)
+    ;; If it wasn't a fixnum, start with the full widetag.
     (inst andi result object widetag-mask)
-
-    FUNCTION-PTR
-    (load-type result object (- fun-pointer-lowtag))
-    (inst j done)
-
-    LOWTAG-ONLY
-    (inst j done)
+    ;; Now, we have our result for an immediate type, but we might
+    ;; have a pointer object instead, in which case we need to do more
+    ;; work.  Check for a pointer type, set two low-bits.
+    (inst andi ndescr object 1)
+    (inst beq ndescr zero-tn done)
+    ;; If we have a pointer type, we need to compute a different
+    ;; answer.  For lists and instances, we just need the lowtag.  For
+    ;; functions and "other", we need to load the widetag from the
+    ;; object header.  In both cases, having just the widetag
+    ;; available is handy.
     (inst andi result object lowtag-mask)
 
-    OTHER-PTR
-    (load-type result object (- other-pointer-lowtag))
+    ;; We now have the correct answer for list-pointer-lowtag and
+    ;; instance-pointer-lowtag, but need to pick off the case for the
+    ;; other two pointer types.  KLUDGE: FUN-POINTER-LOWTAG and
+    ;; OTHER-POINTER-LOWTAG are both in the upper half of the lowtag
+    ;; space, while LIST-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG
+    ;; are in the lower half, so we distinguish with a bit test.
+    (inst andi ndescr object #-64-bit 4 #+64-bit 3)
+    (inst beq ndescr zero-tn done)
 
+    ;; And, finally, pick out the widetag from the header.
+    (inst sub lip object result)
+    (load-type result lip)
     DONE))
 
 (define-vop (%other-pointer-widetag)
@@ -100,8 +100,7 @@
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
-    (loadw t1 x 0 other-pointer-lowtag)
-    (inst andi t1 t1 widetag-mask)
+    (load-type t1 x (- other-pointer-lowtag))
     (sc-case data
       (any-reg
        (inst slli t2 data (- n-widetag-bits n-fixnum-tag-bits))

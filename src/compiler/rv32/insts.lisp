@@ -404,6 +404,8 @@
                 (inst slli reg reg 11)
                 (inst addi reg reg (ldb (byte 11 (- i 11)) value)))))))
     (fixup
+     ;; FIXME: Potential to cause problems on 64 bit if address is
+     ;; >#x4000000 becuase of lui sign extension.
      (inst lui reg value)
      (inst addi reg reg value))))
 
