@@ -231,7 +231,10 @@
 (defun file-position (stream &optional position)
   (if (ansi-stream-p stream)
       (ansi-stream-file-position stream position)
-      (stream-file-position stream position)))
+      (let ((result (stream-file-position stream position)))
+        (if (numberp result)
+            result
+            (and result t)))))
 
 ;;; This is a literal translation of the ANSI glossary entry "stream
 ;;; associated with a file".

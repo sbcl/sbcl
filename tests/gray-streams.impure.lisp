@@ -293,7 +293,8 @@
   (let ((stream (make-instance 'character-output-stream)))
     (assert (= (file-position stream) 42))
     (assert (file-position stream 50))
-    (assert (= (file-position stream) 50))))
+    (assert (= (file-position stream) 50))
+    (assert (file-position stream :end))))
 
 ;;; Using gray streams as parts of two-way-, concatenate-, and synonym-streams.
 
