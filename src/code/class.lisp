@@ -898,7 +898,7 @@ between the ~A definition and the ~A definition"
              :prototype-form '*)
 
      (system-area-pointer :codes (,sb-vm:sap-widetag)
-                          :prototype-form (int-sap 42))
+                          :prototype-form (int-sap 0))
      (weak-pointer :codes (,sb-vm:weak-pointer-widetag)
       :prototype-form (make-weak-pointer (find-package "CL")))
      (code-component :codes (,sb-vm:code-header-widetag))
