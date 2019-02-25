@@ -1382,27 +1382,32 @@ We could try a few things to mitigate this:
 ;;; this is a valid test that genesis separated code and data.
 (!ensure-genesis-code/data-separation)
 
-(defun hexdump (obj &optional (n-words
-                               (if (and (typep obj 'code-component)
-                                        (plusp (code-n-entries obj)))
-                                   ;; Display up through the first fun header
-                                   (+ (code-header-words obj)
-                                      (ash (%code-fun-offset obj 0) (- word-shift))
-                                      simple-fun-code-offset)
-                                   ;; at most 16 words
-                                   (min 16 (ash (primitive-object-size obj)
-                                                (- word-shift)))))
-                              ;; pass NIL explicitly if T crashes on you
-                              (decode t))
-  (with-pinned-objects (obj)
-    (let ((a (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
-      (dotimes (i n-words)
-        (let ((word (sap-ref-word (int-sap a) (ash i word-shift))))
+(defun hexdump (thing &optional (n-words nil wordsp)
+                                ;; pass NIL explicitly if T crashes on you
+                                (decode t))
+  (multiple-value-bind (obj addr count)
+      (if (integerp thing)
+          (values nil thing (if wordsp n-words 1))
+          (values
+           thing
+           (logandc2 (get-lisp-obj-address thing) lowtag-mask)
+           (if wordsp
+               n-words
+               (if (and (typep obj 'code-component) (plusp (code-n-entries obj)))
+                   ;; Display up through the first fun header
+                   (+ (code-header-words obj)
+                      (ash (%code-fun-offset obj 0) (- word-shift))
+                      simple-fun-code-offset)
+                   ;; at most 16 words
+                   (min 16 (ash (primitive-object-size obj) (- word-shift)))))))
+    (with-pinned-objects (obj)
+      (dotimes (i count)
+        (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
           (multiple-value-bind (lispobj ok) (if decode (make-lisp-obj word nil))
             (let ((*print-lines* 1)
                   (*print-pretty* t))
               (format t "~x: ~v,'0x~:[~; = ~S~]~%"
-                      (+ a (ash i word-shift))
+                      (+ addr (ash i word-shift))
                       (* 2 n-word-bytes)
                       word ok lispobj))))))))
 
