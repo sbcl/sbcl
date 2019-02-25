@@ -138,4 +138,11 @@
 
   (let ((*compile-print* nil))
     (dolist (group sources)
-      (with-compilation-unit () (do-srcs group))))))
+      (handler-bind ((simple-warning
+                      (lambda (c)
+                        ;; escalate "undefined variable" warnings to errors.
+                        ;; There's no reason to allow them in our code.
+                        (when (search "undefined variable"
+                                      (write-to-string c :escape nil))
+                          (cerror "Finish warm compile ignoring the problem" c)))))
+        (with-compilation-unit () (do-srcs group)))))))

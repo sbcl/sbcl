@@ -1393,13 +1393,13 @@ We could try a few things to mitigate this:
            (logandc2 (get-lisp-obj-address thing) lowtag-mask)
            (if wordsp
                n-words
-               (if (and (typep obj 'code-component) (plusp (code-n-entries obj)))
+               (if (and (typep thing 'code-component) (plusp (code-n-entries thing)))
                    ;; Display up through the first fun header
-                   (+ (code-header-words obj)
-                      (ash (%code-fun-offset obj 0) (- word-shift))
+                   (+ (code-header-words thing)
+                      (ash (%code-fun-offset thing 0) (- word-shift))
                       simple-fun-code-offset)
                    ;; at most 16 words
-                   (min 16 (ash (primitive-object-size obj) (- word-shift)))))))
+                   (min 16 (ash (primitive-object-size thing) (- word-shift)))))))
     (with-pinned-objects (obj)
       (dotimes (i count)
         (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
