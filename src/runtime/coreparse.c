@@ -39,6 +39,7 @@
 
 #include "validate.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "pseudo-atomic.h"
 #include "code.h"
 
@@ -413,8 +414,8 @@ adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_va
         loc += prev_loc;
         prev_loc = loc;
         void* fixup_where = instructions + loc;
-        lispobj rel32operand = UNALIGNED_LOAD32(fixup_where);
-        sword_t adjusted = rel32operand - displacement;
+        int32_t rel32operand = UNALIGNED_LOAD32(fixup_where);
+        sword_t adjusted = (sword_t)rel32operand - displacement;
         if (!(adjusted >= INT32_MIN && adjusted <= INT32_MAX))
             lose("Relative fixup @ %p exceeds 32 bits", fixup_where);
         FIXUP_rel(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
@@ -544,6 +545,10 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
             continue;
         case CODE_HEADER_WIDETAG:
+            if (filler_obj_p(where)) {
+                if (where[2]) adjust_word_at(where+2, adj);
+                continue;
+            }
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
             adjust_pointers(where+2, code_header_words(code)-2, adj);
@@ -947,10 +952,6 @@ process_directory(int count, struct ndir_entry *entry,
             set_alloc_pointer((lispobj)free_pointer);
 
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
-            /* This assertion safeguards the test in zero_pages_with_mmap()
-             * which trusts that if addr > anon_dynamic_space_start
-             * then addr did not come from any file mapping. */
-            gc_assert((lispobj)anon_dynamic_space_start > STATIC_SPACE_END);
         }
     }
 

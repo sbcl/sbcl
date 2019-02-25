@@ -160,13 +160,16 @@ EOF
 run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 200KB \
     --dynamic-space-size 250MB --no-userinit --no-sysinit <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024)))
-  (assert (eql (dynamic-space-size) (* 250 1048576)))
+  ; allow slight shrinkage if heap relocation has to adjust for alignment
+  (defun dynamic-space-size-good-p ()
+    (<= 0 (- (* 250 1048576) (dynamic-space-size)) 65536))
+  (assert (dynamic-space-size-good-p))
   (save-lisp-and-die "${tmpcore}2" :executable t :save-runtime-options t)
 EOF
 chmod u+x "${tmpcore}2"
 ./"${tmpcore}2" --no-userinit --no-sysinit <<EOF
   (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024))
-             (eql (dynamic-space-size) (* 250 1048576)))
+             (dynamic-space-size-good-p))
     (exit :code 42))
 EOF
 status=$?
