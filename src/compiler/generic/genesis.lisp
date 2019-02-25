@@ -3249,7 +3249,10 @@ core and return a descriptor to it."
         (format stream "#define ~A (*)~%" c-symbol))
       (format stream "#define ~A_tlsindex 0x~X~%"
               c-symbol (ensure-symbol-tls-index symbol))))
-
+  #+immobile-space
+  (format stream "~@{#define LAYOUT_OF_~A (lispobj)0x~x~%~}"
+          "LAYOUT" (descriptor-bits (gethash 'layout *cold-layouts*))
+          "FUNCTION" (descriptor-bits (gethash 'function *cold-layouts*)))
   ;; For immobile code, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
   #+immobile-code

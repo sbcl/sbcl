@@ -2693,7 +2693,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             lose("Unhandled widetag %d at %p", widetag, where);
         } else if (unboxed_obj_widetag_p(widetag)) {
             count = sizetab[widetag](where);
-            if (widetag == SAP_WIDETAG && gencgc_verbose && where[1])
+            if (strict_containment && gencgc_verbose
+                && widetag == SAP_WIDETAG && where[1])
                 fprintf(stderr, "\nStrange SAP %p -> %p\n",
                         where, (void*)where[1]);
         } else switch(widetag) {

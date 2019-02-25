@@ -51,6 +51,7 @@
 #include "genesis/gc-tables.h"
 #include "genesis/cons.h"
 #include "genesis/vector.h"
+#include "genesis/layout.h"
 #include "forwarding-ptr.h"
 #include "pseudo-atomic.h"
 #include "var-io.h"
@@ -540,7 +541,6 @@ void immobile_space_preserve_pointer(void* addr)
         else
             gc_mark_obj(compute_lispobj(object_start));
     }
-#undef GEN_MATCH
 }
 
 // Loop over the newly-live objects, scavenging them for pointers.
@@ -1483,6 +1483,7 @@ lispobj* AMD64_SYSV_ABI alloc_fixedobj(int nwords, uword_t header)
 
 lispobj AMD64_SYSV_ABI alloc_layout()
 {
+    const int LAYOUT_SIZE = sizeof (struct layout)/N_WORD_BYTES;
     lispobj* l =
         alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,
                                      ALIGN_UP(LAYOUT_SIZE,2),
