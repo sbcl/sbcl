@@ -87,16 +87,12 @@
   ;; package locking
   (lock nil :type boolean)
   (%implementation-packages nil :type list)
+  ;; Mapping of local nickname to actual package.
+  ;; One vector stores the mapping sorted by string, the other stores it by
+  ;; integer nickname ID so that we can binary search in either.
+  (%local-nicknames nil :type (or null (cons simple-vector simple-vector)))
   ;; Definition source location
-  (source-location nil :type (or null sb-c:definition-source-location))
-  ;; Local package nicknames.
-  ;; In terms of the choice of using a list or vector, often there are 0 local
-  ;; nicknames, but I've seen as many as 80 entries here in some applications,
-  ;; though most commonly the number is less than 10. The breakeven size is 2
-  ;; items, after which vectors use less storage. Copying for each insert/delete
-  ;; isn't a big deal as these should be fairly static. For further gain,
-  ;; we could sort alphabetically so that the vector is binary-searchable.
-  (%local-nicknames nil :type (or null vector)))
+  (source-location nil :type (or null sb-c:definition-source-location)))
 (!set-load-form-method package (:xc)
   (lambda (obj env)
     (declare (ignore env))

@@ -656,6 +656,45 @@ if a restart was invoked."
                 (let ((*package* p1))
                   (intern "FOO" :own-nickname))))))
 
+(defun random-package-name (min max)
+  (let* ((s (make-string (+ min (random (- max min))))))
+    (dotimes (i (length s) s)
+      (setf (char s i) (code-char (+ (char-code #\A) (random 26)))))))
+
+;;; Hammer on the somewhat intricate structure that maintains the bidirection mapping
+;;; between PLNs and packages, and PLN ID to package.
+(with-test (:name :pln-data-structure-bashing)
+  (with-tmp-packages ((referencing-pkg (make-package "FOO")))
+    (prog (plns)
+       (dotimes (i 40)
+         (let ((package (make-package (random-package-name 10 12)))
+               (local-nick (random-package-name 3 6)))
+           (push (cons local-nick package) plns)
+           (add-package-local-nickname local-nick package referencing-pkg)))
+       iterate
+       ;; Test all 3 directions of the mapping
+       (dolist (entry plns)
+         ;; local nickname to package
+         (assert (eq (sb-impl::pkgnick-search-by-name (car entry) referencing-pkg)
+                     (cdr entry)))
+         ;; numeric id to package
+         (let ((id (sb-int:info-gethash (car entry) (car sb-impl::*package-nickname-ids*))))
+           (assert (eq (sb-impl::pkgnick-search-by-id id referencing-pkg)
+                       (cdr entry))))
+         ;; package to local nickname
+         (assert (string= (sb-impl::package-local-nickname (cdr entry)
+                                                           referencing-pkg)
+                          (car entry))))
+       ;; Delete a random package that has a local nickname
+       (let ((entry (nth (random (length plns)) plns)))
+         (delete-package (cdr entry))
+         ;; Deletion removes from local nicknames on attempted lookup
+         (assert (not (sb-impl::find-package-using-package (car entry) referencing-pkg)))
+         (setq plns (delete entry plns))
+         (assert (= (length (car (sb-impl::package-%local-nicknames referencing-pkg)))
+                    (* 2 (length plns)))))
+       (when plns (go iterate)))))
+
 (with-test (:name :delete-package-restart)
   (let* (ok
          (result

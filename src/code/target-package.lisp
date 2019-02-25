@@ -73,55 +73,147 @@
 (define-load-time-global *package-nickname-ids* nil)
 (declaim (type (cons info-hashtable fixnum) *package-nickname-ids*))
 
-;;; PKGNICK objects are weak vectors, but weak-vector is not part of
-;;; the type system, so the constructor is handrolled.
-(defstruct (pkgnick (:type vector) (:constructor nil)
-                    (:copier nil) (:predicate nil))
-  ;; Type declarations are harmful in the sense that they slow down slot reads
-  ;; and they don't buy us anything in any of the code that consumes these values.
-  (actual  nil)                ; :type (or package null)
-  (name    nil :read-only t)   ; :type string
-  (id      nil :read-only t))  ; :type fixnum
+;;; Local nicknames are stored in an immutable cons of two immutable simple-vectors.
+;;; There is a 1:1 correspondence between vector elements but the indices don't line up
+;;; since the orderings are different.
+;;; The car vector is #("nickname" index "nickname" index ...) ordered alphabetically
+;;; where the index is a physical index to the cdr vector.
+;;; The cdr is a weak vector and holds #(token #<pkg> token #<pkg> ...) ordered by
+;;; token. A token is a fixnum whose low 9 bits are a logical index (half the
+;;; physical index) into the car vector and whose upper bits are a nickname-id.
+;;; The number of PLNs within a single package is thus constrained to 512,
+;;; but there is no limit on the maximum nickname id.
+;;; To search by:
+;;;  - integer identifier, binary search the vector of packages.
+;;;  - nickname, binary search the strings, and use the found index into the
+;;;    vector of packages.
+;;;  - package, linearly search the package vector's odd indices, use the low
+;;;    bits of the found token to reference the string vector.
 
-;;; Scan for KEY in the local-nicknames slot of PACKAGE.
-;;; If found, return two values: the package and the PKGNICK object.
-;;; Before returning a package, we check whether it was deleted (via DELETE-PACKAGE).
-;;; Deleted packages in non-matching entries are ignored; they do not imply culling,
-;;; but when we see a broken weak reference, we'll cull the entire list and retry.
-(defun pkg-search-localnicks (key package)
-  (declare (string key))
-  (labels ((deletedp (actual) (or (not actual) (not (package-%name actual))))
-           (cull (old)
-             ;; Cull out DELETE-PACKAGE deletions and broken weak references
-             (let* ((v (remove-if (lambda (entry) (deletedp (pkgnick-actual entry)))
-                                  (the simple-vector old)))
-                    ;; Downgrade a 0-length new vector to NIL.
-                    (new (when (plusp (length v)) v)))
-               ;; Update the entire list.  If this CAS loses ... oh well, it remains as-is
-               ;; and maybe gets fixed next time. Retry in the culled list though.
-               (cas (package-%local-nicknames package) old new)
-               new)))
-    (declare (inline deletedp))
-    (named-let retry ((vector (package-%local-nicknames package)))
-      (if vector
-          (dovector (entry vector (values nil nil))
-            (cond ((string= key (pkgnick-name entry))
-                   (return (let ((pkg (pkgnick-actual entry)))
-                             (if (deletedp pkg) (values nil nil) (values pkg entry)))))
-                  ((not (pkgnick-actual entry))
-                   (return (retry (cull vector))))))
-          (values nil nil)))))
+(defconstant pkgnick-index-bits 9)
 
-;;; Return a nickname for PACKAGE with respect to BASE.
+;;; Produce an alist ordered by string
+(defun package-local-nickname-alist (pkgnicks use-ids &aux result)
+  (when pkgnicks
+    (let ((strings (the simple-vector (car pkgnicks)))
+          (packages (the simple-vector (cdr pkgnicks))))
+      ;; Scan backwards so that pushing preserves order
+      (loop for i downfrom (1- (length strings)) to 1 by 2
+            do (let* ((token (aref packages (1- (aref strings i))))
+                      (package (aref packages (aref strings i)))
+                      (id (ash token (- pkgnick-index-bits))))
+                 (aver (= (ldb (byte pkgnick-index-bits 0) token) (ash i -1)))
+                 ;; cull deleted entries
+                 (when (and (packagep package) (package-%name package))
+                   (let ((pair (cons (aref strings (1- i)) package)))
+                     (push (if use-ids (cons id pair) pair) result)))))
+      result)))
+
+;;; PKGNICK-UPDATE is the insert and delete operation on the nickname->package map.
+;;; If OTHER-PACKAGE is a package, an entry for STRING is inserted; if NIL, the entry
+;;; for STRING, if any, is removed. In either case, culling of deleted packages
+;;; is performed. When STRING itself is NIL, then only culling is performed.
+;;; This function entails quite a bit of work, but it is worth the trouble to maintain
+;;; two binary searchable vectors since in comparison to the number of lookups,
+;;; alterations to the mapping are exceedingly rare.
+(defun pkgnick-update (this-package string other-package)
+  (declare (type (or null package) other-package))
+  (let ((entry
+         (when other-package ; Ensure that STRING has a nickname-id
+           (let* ((id-map *package-nickname-ids*)
+                  (id (info-puthash (car id-map)
+                                    (logically-readonlyize (copy-seq string))
+                                    (lambda (old) (or old (atomic-incf (cdr id-map)))))))
+             (list* id string other-package))))
+        (old (package-%local-nicknames this-package)))
+    (loop
+     (let* ((alist (merge 'list
+                          (let ((alist (package-local-nickname-alist old t)))
+                            (if string
+                                (remove string alist :test #'string= :key #'cadr)
+                                alist))
+                          (when entry (list entry))
+                          #'string< :key #'cadr))
+            (new
+             (when alist
+               ;; Create new sorted vectors:
+               ;;  STRINGS  = #("nickname" index "nickname" index ...)
+               ;;  PACKAGES = #(token #<pkg> token #<pkg> ...)
+               (let* ((strings (coerce (mapcan (lambda (x) (list (cadr x) nil)) alist)
+                                       'vector))
+                      (packages (make-weak-vector (length strings))))
+                 (loop for item in (sort (copy-list alist) #'< :key #'car)
+                       for i from 0 by 2
+                       do (let* ((id (car item))
+                                 (string-num (position id alist :key #'car))
+                                 (token (logior (ash id pkgnick-index-bits) string-num)))
+                            (setf (aref strings (1+ (ash string-num 1))) (1+ i)
+                                  (aref packages i) token
+                                  (aref packages (1+ i)) (cddr item))))
+                 (cons strings packages)))))
+       (when (eq old (setf old (cas (package-%local-nicknames this-package) old new)))
+         (return nil))))))
+
+;;; A macro to help search the nickname vectors.
+;;; Return the logical index of KEY in VECTOR (in which each two
+;;; elements comprise a key/value pair)
+(macrolet ((bsearch (key vector)
+             `(let ((v (the simple-vector ,vector)))
+                ;; The search operates on a logical index, which is half the physical
+                ;; index. The returned value is a physical index.
+                (named-let recurse ((start 0) (end (ash (length v) -1)))
+                  (declare (type (unsigned-byte 9) start end)
+                           (optimize (sb-c::insert-array-bounds-checks 0)))
+                  (when (< start end)
+                    (let* ((i (ash (+ start end) -1))
+                           (elt (keyfn (aref v (ash i 1)))))
+                      (case (compare ,key elt)
+                       (-1 (recurse start i))
+                       (+1 (recurse (1+ i) end))
+                       (t (1+ (ash i 1))))))))))
+
+  (defun pkgnick-search-by-name (string base-package)
+    (labels ((keyfn (x) x)
+             (safe-char (s index)
+               (if (< index (length s)) (char s index) (code-char 0)))
+             (compare (a b)
+               (declare (string a) (simple-string b))
+               (let ((pos (string/= a b)))
+                 (cond ((not pos) 0)
+                       ((char< (safe-char a pos) (safe-char b pos)) -1)
+                       (t +1)))))
+      (declare (inline safe-char))
+      (binding* ((nicks (package-%local-nicknames base-package) :exit-if-null)
+                 (found (bsearch string (car nicks)) :exit-if-null)
+                 (package (aref (cdr nicks) (aref (car nicks) found))))
+        (cond ((and package (package-%name package)) package)
+              (t (pkgnick-update base-package nil nil))))))
+
+  (defun pkgnick-search-by-id (id base-package)
+    (flet ((keyfn (x) (ash x (- pkgnick-index-bits)))
+           (compare (a b) (signum (- a b))))
+      (binding* ((nicks (package-%local-nicknames base-package) :exit-if-null)
+                 (found (bsearch id (cdr nicks)) :exit-if-null)
+                 (package (aref (cdr nicks) found)))
+        (cond ((and package (package-%name package)) package)
+              (t (pkgnick-update base-package nil nil)))))))
+
+;;; Return a nickname for PACKAGE with respect to CURRENT.
 ;;; This could in theory return a package that currently has no name. However,
 ;;; at the time of the call to this function from OUTPUT-SYMBOL - the only
 ;;; consumer - the symbol in question *did* have a non-nil package.
 ;;; So whatever we say as far as nickname, if any, is fine.
-(defun package-local-nickname (package base)
-  (awhen (package-%local-nicknames base)
-    (dovector (entry it)
-      (when (eq (pkgnick-actual entry) package)
-        (return (pkgnick-name entry))))))
+;;; If more than one nickname exists, then one that is alphabetically last wins.
+;;; A better tiebreaker  might be either length in characters
+;;; or whichever nickname was added most recently.
+(defun package-local-nickname (package current)
+  (binding* ((nicks (package-%local-nicknames current) :exit-if-null)
+             (vector (the simple-vector (cdr nicks))))
+    (loop for i downfrom (1- (length vector)) to 1 by 2
+          when (eq package (aref vector i))
+          return (aref (car nicks)
+                       (let ((token (aref vector (1- i))))
+                         (ash (ldb (byte pkgnick-index-bits 0) token) 1))))))
 
 ;;; This would have to be bumped ~ 2*most-positive-fixnum times to overflow.
 (define-load-time-global *package-names-cookie* sb-xc:most-negative-fixnum)
@@ -131,23 +223,6 @@
   `(let ((,table-var *package-names*))
      (sb-thread::with-recursive-system-lock ((info-env-mutex ,table-var))
        ,@body)))
-
-(defun make-pkgnick (actual nickname)
-  (let* ((id-map *package-nickname-ids*)
-         (id (info-puthash (car id-map)
-                           (logically-readonlyize (copy-seq nickname))
-                           (lambda (old) (or old (atomic-incf (cdr id-map))))))
-         (strong-string
-          ;; To ensure that the weak vector representing a PKGNICK does not drop the string
-          ;; in GC, we have to ensure that the string is EQ to a key in the name -> id map.
-          (with-package-names (table) ; just borrowing the lock
-           (block nil
-            (info-maphash (lambda (key value) ; exhaustive scan
-                            (declare (ignore value))
-                            (when (string= key nickname) (return key)))
-                          (car id-map))))))
-    (aver strong-string)
-    (make-weak-vector 3 :initial-contents `(,actual ,strong-string ,id))))
 
 (defmethod make-load-form ((p package) &optional environment)
   (declare (ignore environment))
@@ -492,12 +567,9 @@ See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
-  (collect ((result))
-    (awhen (package-%local-nicknames (find-undeleted-package-or-lose package-designator))
-      (dovector (x it (result))
-        (let ((pkg (pkgnick-actual x)))
-          (when (and pkg (package-%name pkg))
-            (result (cons (pkgnick-name x) pkg))))))))
+  (package-local-nickname-alist
+   (package-%local-nicknames (find-undeleted-package-or-lose package-designator))
+   nil))
 
 (defun signal-package-error (package format-control &rest format-args)
   (error 'simple-package-error
@@ -537,7 +609,7 @@ Experimental: interface subject to change."
     (do-packages (namer)
       ;; NAMER will be added once only to the result if there is more
       ;; than one nickname for designee.
-      (when (find designee (package-%local-nicknames namer) :key #'pkgnick-actual)
+      (when (find designee (cdr (package-%local-nicknames namer)))
         (push namer result)))
     result))
 
@@ -567,21 +639,21 @@ See also: PACKAGE-LOCAL-NICKNAMES, PACKAGE-LOCALLY-NICKNAMED-BY-LIST,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
-  (prog1 (%add-package-local-nickname local-nickname actual-package
-                                      package-designator)
-    (atomic-incf *package-names-cookie*)))
+  (let ((package (find-undeleted-package-or-lose package-designator)))
+    (%add-package-local-nickname local-nickname actual-package package)
+    (atomic-incf *package-names-cookie*)
+    package))
 
 ;;; This is called repeatedly by defpackage's UPDATE-PACKAGE.
 ;;; We only need to bump the name cookie once. Synchronization of package lookups
 ;;; is pretty weak in the sense that concurrent FIND-PACKAGE and alteration
 ;;; of the name -> package association does not really promise much.
-(defun %add-package-local-nickname (local-nickname actual-package package-designator)
-  (let* ((nick (string local-nickname))
-         (actual (find-package-using-package actual-package nil))
-         (package (find-undeleted-package-or-lose package-designator)))
+(defun %add-package-local-nickname (local-nickname actual-package package)
+  (let ((nick (string local-nickname))
+        (actual (find-package-using-package actual-package nil)))
     (unless actual
       (signal-package-error
-       package-designator
+       (package-name package)
        "The name ~S does not designate any package."
        actual-package))
     (unless (package-name actual)
@@ -612,7 +684,7 @@ Experimental: interface subject to change."
        "Attempt to use ~A as a package local nickname (for ~A) in ~
         package nicknamed globally ~A."
        nick (package-name actual) nick))
-    (multiple-value-bind (old-actual cell) (pkg-search-localnicks nick package)
+    (let ((old-actual (pkgnick-search-by-name nick package)))
       (when (and old-actual (neq actual old-actual))
          (restart-case
              (signal-package-error
@@ -623,26 +695,13 @@ Experimental: interface subject to change."
           (keep-old ()
            :report (lambda (s)
                      (format s "Keep ~A as local nickname for ~A."
-                             nick (package-name old-actual))))
+                             nick (package-name old-actual))
+                     (return-from %add-package-local-nickname package)))
           (change-nick ()
             :report (lambda (s)
                       (format s "Use ~A as local nickname for ~A instead."
-                              nick (package-name actual)))
-            ;; This is reasonably safe. The danger is that lazy culling might remove CELL,
-            ;; however OLD-ACTUAL was a valid package, so it should still be there.
-            (setf (pkgnick-actual cell) actual)))
-        (return-from %add-package-local-nickname package))
-      (unless cell
-        ;; Add new entry atomically (due to just-in-time culling of deleted
-        ;; entries which swaps the whole list). But note the bug: two threads
-        ;; can each succeed in pushing the same nickname.
-        ;; This function isn't really intended for use by multiple threads.
-        (let ((old (package-%local-nicknames package)))
-          (loop
-            (let ((new (concatenate 'vector (list (make-pkgnick actual nick)) old)))
-              (when (eq old (setf old (cas (package-%local-nicknames package) old new)))
-                (return)))))))
-    package))
+                              nick (package-name actual)))))))
+    (pkgnick-update package nick actual)))
 
 (defun remove-package-local-nickname (old-nickname
                                       &optional (package-designator (sane-package)))
@@ -654,18 +713,13 @@ See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
 PACKAGE-LOCALLY-NICKNAMED-BY-LIST, and the DEFPACKAGE option :LOCAL-NICKNAMES.
 
 Experimental: interface subject to change."
-  (binding* ((nick (string old-nickname))
-             (package (find-undeleted-package-or-lose package-designator))
-             ((named cell) (pkg-search-localnicks nick package)))
-    (when cell
+  (let* ((nick (string old-nickname))
+         (package (find-undeleted-package-or-lose package-designator))
+         (existing (pkgnick-search-by-name nick package)))
+    (when existing
       (with-single-package-locked-error
-          (:package package "removing local nickname ~A for ~A" nick named))
-      (let ((old (package-%local-nicknames package)))
-        (loop
-          (let* ((vector (remove cell old))
-                 (new (if (plusp (length vector)) vector)))
-            (when (eq old (setf old (cas (package-%local-nicknames package) old new)))
-              (return)))))
+          (:package package "removing local nickname ~A for ~A" nick existing))
+      (pkgnick-update package nick nil)
       (atomic-incf *package-names-cookie*)
       t)))
 
@@ -734,7 +788,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
      (let ((string (string package-designator)))
        (or (and base
                 (package-%local-nicknames base)
-                (pkg-search-localnicks string base))
+                (pkgnick-search-by-name string base))
            (%get-package string *package-names*))))
     ;; Is there a fundamental reason we don't declare the FTYPE
     ;; of FIND-PACKAGE-USING-PACKAGE letting the compiler do the checking?
@@ -1948,15 +2002,10 @@ PACKAGE."
   (let ((memo (car cell)))
     (declare (type (simple-vector 3) memo)) ; #(cookie nick-id #<weak-ptr #<pkg>>)
     (when (eq (aref memo 0) *package-names-cookie*) ; valid cache entry
-      ;; This does not cull out entries containing broken weak references.
-      ;; PKG-SEARCH-LOCALNICKS will take care of them eventually.
-      (binding* ((nicks (package-%local-nicknames *package*) :exit-if-null)
-                 (nick-id (aref memo 1) :exit-if-null)
-                 (entry (find nick-id (the simple-vector nicks)
-                              :test #'eq :key #'pkgnick-id) :exit-if-null)
-                 (pkg (pkgnick-actual entry) :exit-if-null))
-        (when (package-%name pkg)
-          (return-from cached-find-package pkg)))
+      (binding* ((nick-id (aref memo 1) :exit-if-null)
+                 (nicks (package-%local-nicknames *package*) :exit-if-null)
+                 (pkg (pkgnick-search-by-id nick-id nicks) :exit-if-null))
+        (return-from cached-find-package pkg))
       (let ((pkg (weak-pointer-value (aref memo 2))))
         (when (and (packagep pkg) (package-%name pkg))
           (return-from cached-find-package pkg))))
