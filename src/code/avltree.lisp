@@ -173,7 +173,8 @@
                  (write-char c stream)
                  (write (avlnode-key node) :stream stream)
                  (setq c #\space)
-                 (recurse (avlnode-right node))))))
+                 (recurse (avlnode-right node)))))
+           (write-char #\] stream))
           (t
            (format stream "~s ~d" :count ct))))
   (format stream " #x~x>" (get-lisp-obj-address self)))
