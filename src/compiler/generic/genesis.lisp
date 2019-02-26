@@ -1629,12 +1629,10 @@ core and return a descriptor to it."
     (cold-set t-symbol t-symbol))
 
   ;; Establish the value of SB-VM:FUNCTION-LAYOUT
-  #+(and immobile-space 64-bit)
-  (let ((address-bits (descriptor-bits (gethash 'function *cold-layouts*))))
-    (aver (eql address-bits sb-vm:function-layout))
-    (write-wordindexed/raw (cold-intern 'sb-vm:function-layout)
-                           sb-vm:symbol-value-slot
-                           (ash address-bits 32)))
+  #+compact-instance-header
+  (write-wordindexed/raw (cold-intern 'sb-vm:function-layout)
+                         sb-vm:symbol-value-slot
+                         (ash (descriptor-bits (gethash 'function *cold-layouts*)) 32))
 
   (cold-set '**primitive-object-layouts**
             #+immobile-space
@@ -2781,6 +2779,10 @@ core and return a descriptor to it."
   (binding* (((info type arglist name code-object)
                 (values (pop-stack) (pop-stack) (pop-stack) (pop-stack) (pop-stack)))
              (fn (compute-fun code-object fun-index)))
+    #+compact-instance-header
+    (write-wordindexed/raw
+     fn 0 (logior (descriptor-bits (cold-symbol-value 'sb-vm:function-layout))
+                  (read-bits-wordindexed fn 0)))
     #+(or x86 x86-64) ; store a machine-native pointer to the function entry
     ;; note that the bit pattern looks like fixnum due to alignment
     (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
