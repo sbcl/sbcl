@@ -36,12 +36,19 @@ arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
 
 void arch_skip_instruction(os_context_t *context)
 {
+    /* KLUDGE: Other platforms check for trap codes and skip inlined
+     * trap/error parameters.  We should too. */
+
+    /* Note that we're doing integer arithmetic here, not pointer. So
+     * the value that the return value of os_context_pc_addr() points
+     * to will be incremented by 4, not 16.
+     */
     *os_context_pc_addr(context) += 4;
 }
 
 unsigned char *arch_internal_error_arguments(os_context_t *context)
 {
-    return (unsigned char*)*os_context_pc_addr(context);
+    return (unsigned char*)(*os_context_pc_addr(context) + 5);
 }
 
 boolean arch_pseudo_atomic_atomic(os_context_t *context)
@@ -105,7 +112,12 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-#warning "Implement."
+    handle_single_step_trap(context, trap, reg_LEXENV);
+    /* KLUDGE: arch_skip_instruction() only skips one instruction, and
+     * there is a following word to deal with as well, so skip
+     * twice. */
+    arch_skip_instruction(context);
+    arch_skip_instruction(context);
 }
 
 void
@@ -118,7 +130,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
              trap_instruction);
     }
 
-    u32 code = *((u32 *)(4 + *os_context_pc_addr(context))) & 0xFF;
+    u32 code = *((u32 *)(4 + *os_context_pc_addr(context)));
 
     if (code == trap_PendingInterrupt) {
       arch_skip_instruction(context);
