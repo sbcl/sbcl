@@ -243,9 +243,11 @@
                 :page-table (if (= identifier dynamic-core-space-id)
                                 (make-array 100 :adjustable t :initial-element nil))
                 :word-address (ash byte-address (- sb-vm:word-shift))
-                :free-word-index (if (= identifier immobile-fixedobj-core-space-id)
-                                     (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
-                                     0)))
+                :free-word-index (cond #+immobile-space
+                                       ((= identifier immobile-fixedobj-core-space-id)
+                                        (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes))
+                                       (t
+                                        0))))
 
 ;;;; representation of descriptors
 
