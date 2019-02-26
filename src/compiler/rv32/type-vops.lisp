@@ -57,7 +57,6 @@
 
 (defun %test-headers (value temp target not-p function-p headers
                       &key (drop-through (gen-label)) value-tn-ref)
-  (declare (ignore value-tn-ref))
   (let ((lowtag (if function-p fun-pointer-lowtag other-pointer-lowtag)))
     (multiple-value-bind
         (when-true when-false)
@@ -67,7 +66,10 @@
             (values drop-through target)
             (values target drop-through))
       (assemble ()
-        (%test-lowtag value temp when-false t lowtag)
+        (unless (and value-tn-ref
+                     (eq lowtag other-pointer-lowtag)
+                     (other-pointer-tn-ref-p value-tn-ref))
+          (%test-lowtag value temp when-false t lowtag))
         (load-type temp value (- lowtag))
         (let ((delta 0))
           (do ((remaining headers (cdr remaining)))
@@ -147,8 +149,8 @@
           (values target not-target))
     (assemble ()
       ;; Is it a fixnum?
-      (%test-fixnum value temp fixnum nil)
       (move temp value)
+      (%test-fixnum value temp fixnum nil)
 
       ;; If not, is it an other pointer?
       (test-type value temp nope t (other-pointer-lowtag))
