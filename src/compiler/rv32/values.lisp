@@ -82,7 +82,7 @@
 ;;; unknown values continuations.
 ;;;
 (define-vop (values-list)
-  (:args (arg :scs (descriptor-reg)))
+  (:args (arg :scs (descriptor-reg) :target list))
   (:arg-types list)
   (:policy :fast-safe)
   (:results (start :scs (any-reg))

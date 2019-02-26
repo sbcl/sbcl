@@ -16,8 +16,8 @@
 (macrolet ((frob ()
              (let ((a (loop repeat register-arg-count
                             collect (gensym)))
-                   (defaulting-labels (loop repeat (- register-arg-count 2)
-                                             collect (gensym))))
+                   (defaulting-labels (loop repeat (- register-arg-count 1)
+                                            collect (gen-label))))
                `(define-assembly-routine
                     (return-multiple
                      (:return-style :none))
@@ -40,16 +40,16 @@
                   ;; written, we can assume that we are never called
                   ;; with nvals == 1 and that a0 has already been
                   ;; loaded.
-                  (inst bge zero-tn nvals DEFAULT-A0-AND-ON)
                   (inst subi count nvals (fixnumize 2))
+                  (inst bge zero-tn nvals DEFAULT-A0-AND-ON)
                   ,@(loop for label in defaulting-labels
                           for an in (rest a)
                           for i from 1
                           collect `(progn
                                      ,@(unless (= i 1)
                                          `((inst subi count count (fixnumize 1))))
-                                     (inst bge zero-tn count ,label)
-                                     (loadw ,an vals ,i)))
+                                     (loadw ,an vals ,i)
+                                     (inst bge zero-tn count ,label)))
 
                   ;; Copy the remaining args to the top of the stack.
                   (inst addi vals vals (fixnumize register-arg-count))
@@ -60,6 +60,7 @@
                   (inst addi vals vals n-word-bytes)
                   (inst subi count count (fixnumize 1))
                   (storew temp dst)
+                  (inst addi dst dst n-word-bytes)
                   (inst bne count zero-tn LOOP)
 
                   (inst j ,(first (last defaulting-labels)))
@@ -69,15 +70,18 @@
                   (move ,(second a) null-tn)
                   ,@(loop for defaulting-label in defaulting-labels
                           for an in (rest (rest a))
-                          append `(,defaulting-label
+                          append `((emit-label ,defaulting-label)
                                    (move ,an null-tn)))
+                  (emit-label ,(first (last defaulting-labels)))
 
                   ;; Clear the stack.
                   (move ocfp-tn cfp-tn)
                   (move cfp-tn ocfp)
-                  (unless (zerop (- word-shift n-fixnum-tag-bits))
-                    (inst slli nvals nvals (- word-shift n-fixnum-tag-bits)))
-                  (inst add csp-tn ocfp-tn nvals)
+                  (cond ((zerop (- word-shift n-fixnum-tag-bits))
+                         (inst add ocfp-tn nvals))
+                        (t
+                         (inst slli temp nvals (- word-shift n-fixnum-tag-bits))
+                         (inst add csp-tn ocfp-tn temp)))
 
                   ;; Return.
                   (lisp-return lra :multiple-values)))))
@@ -120,19 +124,19 @@
                           collect `(loadw ,an args ,i))
 
                   ;; Calc SRC, DST, and COUNT
-                  (inst subi count nargs (fixnumize register-arg-count))
+                  (inst subi count nargs (* register-arg-count n-word-bytes))
+                  (inst addi src args (* register-arg-count n-word-bytes))
                   (inst bge zero-tn count done)
-                  (inst addi src args (fixnumize register-arg-count))
-                  (inst addi dst cfp-tn (fixnumize register-arg-count))
+                  (inst addi dst cfp-tn (* register-arg-count n-word-bytes))
 
                   LOOP
                   ;; Copy one arg.
                   (loadw temp src)
                   (inst addi src src n-word-bytes)
-                  (inst subi count count (fixnumize 1))
                   (storew temp dst)
-                  (inst blt zero-tn count LOOP)
+                  (inst subi count count n-word-bytes)
                   (inst addi dst dst n-word-bytes)
+                  (inst blt zero-tn count LOOP)
 
                   DONE
                   ;; We are done.  Do the jump.

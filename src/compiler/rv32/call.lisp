@@ -847,19 +847,20 @@
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:scs (descriptor-reg) :offset a0-offset) a0)
+  (:temporary (:scs (descriptor-reg) :offset a1-offset) a1)
   (:vop-var vop)
   (:generator 13
     ;; Clear the number stack.
     (clear-number-stack vop)
-    ;; Check for the single case.
-    (inst li a0 (fixnumize 1))
-    (inst bne nvals-arg a0 NOT-SINGLE)
-    ;; Return with one value.
+    ;; Load the first argument. It's common to both cases.
     (loadw a0 vals-arg)
+    (inst li a1 (fixnumize 1))
+    ;; Check for the single case.
+    (inst bne nvals-arg a1 NOT-SINGLE)
 
-    ;;Return with one value.
+    ;; Return with one value.
     (move csp-tn cfp-tn)
-    (move cfp-tn old-fp)
+    (move cfp-tn old-fp-arg)
     (lisp-return lra-arg :single-value)
 
     NOT-SINGLE
