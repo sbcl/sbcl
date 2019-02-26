@@ -124,7 +124,11 @@
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)
+  #-64-bit
   (def-full-data-vector-frobs simple-character-string character character-reg)
+  #+64-bit
+  (def-partial-data-vector-frobs simple-character-string character
+    4 nil character-reg)
 
   (def-partial-data-vector-frobs simple-array-unsigned-byte-7 positive-fixnum 1 nil unsigned-reg signed-reg)
   (def-partial-data-vector-frobs simple-array-signed-byte-8 tagged-num 1 t signed-reg)
@@ -132,8 +136,6 @@
   (def-partial-data-vector-frobs simple-array-unsigned-byte-15 positive-fixnum 2 nil unsigned-reg signed-reg)
   (def-partial-data-vector-frobs simple-array-signed-byte-16 tagged-num 2 t signed-reg)
   (def-partial-data-vector-frobs simple-array-unsigned-byte-16 positive-fixnum 2 nil unsigned-reg signed-reg)
-  (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum any-reg)
-  (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg)
   #-64-bit
   (progn
     (def-full-data-vector-frobs simple-array-unsigned-byte-31 unsigned-num unsigned-reg)
@@ -146,7 +148,9 @@
     (def-partial-data-vector-frobs simple-array-unsigned-byte-32 positive-fixnum 4 nil unsigned-reg signed-reg)
     (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num unsigned-reg)
     (def-full-data-vector-frobs simple-array-signed-byte-64 signed-num signed-reg)
-    (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num unsigned-reg)))
+    (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num unsigned-reg))
+  (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum any-reg)
+  (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg))
 
 ;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
