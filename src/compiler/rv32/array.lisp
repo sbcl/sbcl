@@ -18,10 +18,10 @@
   (:args (type :scs (any-reg))
          (rank :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
-  (:temporary (:scs (non-descriptor-reg) :to (:result 0) :target result) header)
+  (:temporary (:scs (descriptor-reg) :to (:result 0) :target result) header)
   (:temporary (:sc non-descriptor-reg) pa-flag ndescr)
   (:results (result :scs (descriptor-reg)))
-  (:generator 13
+  (:generator 5
     ;; Compute the allocation size.
     (cond ((zerop (- word-shift n-fixnum-tag-bits))
            (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
