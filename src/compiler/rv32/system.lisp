@@ -29,8 +29,8 @@
     (inst andi result object widetag-mask)
     ;; Now, we have our result for an immediate type, but we might
     ;; have a pointer object instead, in which case we need to do more
-    ;; work.  Check for a pointer type, set two low-bits.
-    (inst andi ndescr object 1)
+    ;; work.  Check for a pointer type.
+    (inst andi ndescr object #-64-bit #b1 #+64-bit #b10)
     (inst beq ndescr zero-tn done)
     ;; If we have a pointer type, we need to compute a different
     ;; answer.  For lists and instances, we just need the lowtag.  For
@@ -45,7 +45,7 @@
     ;; OTHER-POINTER-LOWTAG are both in the upper half of the lowtag
     ;; space, while LIST-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG
     ;; are in the lower half, so we distinguish with a bit test.
-    (inst andi ndescr object #-64-bit 4 #+64-bit 3)
+    (inst andi ndescr object #b100)
     (inst beq ndescr zero-tn done)
 
     ;; And, finally, pick out the widetag from the header.
