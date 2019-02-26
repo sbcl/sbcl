@@ -1543,7 +1543,7 @@
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
                                 '(:named-call :static-call :assembly-routine
-                                  :layout :immobile-object :foreign)))
+                                  :layout :immobile-symbol :foreign)))
                    (emit-prefixes segment dst nil :dword)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
@@ -1578,7 +1578,7 @@
             ;; low enough addresses that this works.
             (aver (member (fixup-flavor src)
                           '(:foreign :foreign-dataref :symbol-tls-index
-                            :assembly-routine :layout :immobile-object)))
+                            :assembly-routine :layout :immobile-symbol)))
             (emit-prefixes segment dst nil size)
             (emit-byte segment #xC7)
             (emit-ea segment dst #b000)
@@ -1846,7 +1846,7 @@
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
-                      (memq (fixup-flavor src) '(:layout :immobile-object))))
+                      (memq (fixup-flavor src) '(:layout :immobile-symbol))))
              (emit-prefixes segment dst nil size :lock lockp)
              (cond ((accumulator-p dst)
                     (emit-byte segment

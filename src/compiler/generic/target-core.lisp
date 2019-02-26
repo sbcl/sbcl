@@ -73,7 +73,8 @@
                    (:code-object (get-lisp-obj-address code-obj))
                    (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address (funcall layout-finder sym)))
-                   (:immobile-object (get-lisp-obj-address sym))
+                   (:immobile-symbol (get-lisp-obj-address sym))
+                   (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
                    #+immobile-code
                    (:named-call
                     (when statically-link-p

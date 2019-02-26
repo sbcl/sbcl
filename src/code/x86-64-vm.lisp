@@ -56,12 +56,15 @@
   ;; references an immobile-space (but not static-space) object.
   ;; Note that:
   ;;  (1) Call fixups occur in both :RELATIVE and :ABSOLUTE kinds.
-  ;;      We can ignore the :RELATIVE kind, except for foreign call.
+  ;;      We can ignore the :RELATIVE kind, except for foreign call,
+  ;;      as those point to the linkage table which has an absolute address
+  ;;      and therefore might change in displacement from the call site
+  ;;      if the immobile code space is relocated on startup.
   ;;  (2) :STATIC-CALL fixups point to immobile space, not static space.
   #+immobile-space
   (return-from fixup-code-object
     (case flavor
-      ((:named-call :layout :immobile-object ; -> fixedobj subspace
+      ((:named-call :layout :immobile-symbol :symbol-value ; -> fixedobj subspace
         :assembly-routine :assembly-routine* :static-call) ; -> varyobj subspace
        (if (eq kind :absolute) :absolute))
       (:foreign

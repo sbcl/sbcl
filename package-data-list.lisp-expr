@@ -2260,6 +2260,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "+STRUCTURE-LAYOUT-FLAG+"
                "+PCL-OBJECT-LAYOUT-FLAG+"
                "+CONDITION-LAYOUT-FLAG+"
+               "**PRIMITIVE-OBJECT-LAYOUTS**"
 
                "*HANDLER-CLUSTERS*" "*RESTART-CLUSTERS*"
                "WITH-SIMPLE-CONDITION-RESTARTS"

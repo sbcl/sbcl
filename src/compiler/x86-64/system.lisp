@@ -17,7 +17,7 @@
 ;;; For lists and non-pointers, return the low 8 descriptor bits.
 ;;; We need not return exactly list-pointer-lowtag for lists - the high 4 bits
 ;;; are arbitrary. Similarly we don't care that fixnums return other than 0.
-;;; Provided that the result is the correct index to **built-in-class-codes**
+;;; Provided that the result is the correct index to **PRIMITIVE-OBJECT-LAYOUTS**
 ;;; everything works out fine.  All backends should follow this simpler model,
 ;;; but might or might not opt to use the same technique of producing a native
 ;;; pointer and doing one memory access for all 3 non-list pointer types.
@@ -50,8 +50,9 @@
 ;; ~20 instructions vs. 35
 (define-vop (layout-of) ; no translation
     (:policy :fast-safe)
+    (:translate layout-of)
     (:args (object :scs (descriptor-reg))
-           (layouts :scs (constant)))
+           #+nil (layouts :scs (constant)))
     (:temporary (:sc unsigned-reg :offset rax-offset) rax)
     (:results (result :scs (descriptor-reg)))
     (:generator 6
@@ -79,10 +80,19 @@
       (inst jmp  :eq NULL)
       (inst movzx '(:byte :dword) rax object)
       LOAD-FROM-VECTOR
-      (inst mov  result layouts)
-      (inst mov  :dword result
-            (ea (+ (ash vector-data-offset word-shift) (- other-pointer-lowtag))
-                result rax 8))
+      #+nil ;; old way
+      (progn
+        (inst mov  result layouts)
+        (inst mov  :dword result
+              (ea (+ (ash vector-data-offset word-shift) (- other-pointer-lowtag))
+                  result rax 8)))
+      ;; new way
+      (inst mov :dword result
+            (ea (make-fixup '**primitive-object-layouts**
+                           :symbol-value
+                           (- (ash vector-data-offset word-shift)
+                              other-pointer-lowtag))
+                nil rax 8)) ; no base register
       (inst jmp  done)
       NULL
       (inst mov  result (make-fixup (find-layout 'null) :layout))

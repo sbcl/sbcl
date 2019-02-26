@@ -16,6 +16,8 @@
 #include <limits.h>
 #include "core.h"
 
+#define FIXEDOBJ_RESERVED_PAGES 1
+
 extern void prepare_immobile_space_for_final_gc(void);
 extern void prepare_immobile_space_for_save(lispobj init_function,
                                             boolean verbose);

@@ -16,7 +16,7 @@
   (ea (let ((offset (- (* slot n-word-bytes) other-pointer-lowtag)))
              (if (static-symbol-p symbol)
                  (+ nil-value (static-symbol-offset symbol) offset)
-                 (make-fixup symbol :immobile-object offset)))))
+                 (make-fixup symbol :immobile-symbol offset)))))
 
 (defun gen-cell-set (ea value result &optional vop pseudo-atomic)
   (when pseudo-atomic
@@ -33,7 +33,7 @@
              ;; Try to move imm-to-mem if BITS fits
              (acond ((or (and (fixup-p bits)
                               ;; immobile-object fixups must fit in 32 bits
-                              (eq (fixup-flavor bits) :immobile-object)
+                              (eq (fixup-flavor bits) :immobile-symbol)
                               bits)
                          (plausible-signed-imm32-operand-p bits))
                      (inst mov :qword ea it))

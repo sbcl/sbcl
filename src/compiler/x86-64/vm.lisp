@@ -460,7 +460,7 @@
           (integer  (if tag (fixnumize val) val))
           (symbol   (if (static-symbol-p val)
                         (+ nil-value (static-symbol-offset val))
-                        (make-fixup val :immobile-object)))
+                        (make-fixup val :immobile-symbol)))
           #+immobile-space
           (layout
            (make-fixup val :layout))

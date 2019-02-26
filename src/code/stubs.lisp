@@ -103,6 +103,7 @@
   (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
+  #+(and compact-instance-header x86-64) (def layout-of)
 
   #+compare-and-swap-vops
   (def* (%array-atomic-incf/word (array index diff))

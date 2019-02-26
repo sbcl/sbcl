@@ -242,7 +242,10 @@
                 ;; Track page usage
                 :page-table (if (= identifier dynamic-core-space-id)
                                 (make-array 100 :adjustable t :initial-element nil))
-                :word-address (ash byte-address (- sb-vm:word-shift))))
+                :word-address (ash byte-address (- sb-vm:word-shift))
+                :free-word-index (if (= identifier immobile-fixedobj-core-space-id)
+                                     (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
+                                     0)))
 
 ;;;; representation of descriptors
 
@@ -604,9 +607,10 @@
 (defun write-header-word (des header-word)
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
   (let ((gen #+gencgc (if (or #+immobile-space
-                               (let ((gspace (descriptor-gspace des)))
-                                 (or (eq gspace *immobile-fixedobj*)
-                                     (eq gspace *immobile-varyobj*))))
+                              (let ((gspace (descriptor-intuit-gspace des)))
+                                (assert gspace)
+                                (or (eq gspace *immobile-fixedobj*)
+                                    (eq gspace *immobile-varyobj*))))
                            sb-vm:+pseudo-static-generation+
                            0)
              #-gencgc 0))
@@ -1632,6 +1636,33 @@ core and return a descriptor to it."
                            sb-vm:symbol-value-slot
                            (ash address-bits 32)))
 
+  (cold-set '**primitive-object-layouts**
+            #+immobile-space
+            (let ((filler
+                   (make-random-descriptor
+                    (logior (gspace-byte-address *immobile-fixedobj*)
+                            sb-vm:other-pointer-lowtag)))
+                  (vector
+                   (make-random-descriptor
+                    (logior (+ (gspace-byte-address *immobile-fixedobj*)
+                               sb-vm:immobile-card-bytes
+                               (* (+ 2 256) (- sb-vm:n-word-bytes)))
+                            sb-vm:other-pointer-lowtag))))
+              (write-header-word filler sb-vm:simple-array-fixnum-widetag)
+              (write-wordindexed filler 1
+                                 (make-fixnum-descriptor
+                                  (- (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes)
+                                     ;; subtract 2 object headers + 256 words
+                                     (+ 4 256))))
+              (write-header-word vector sb-vm:simple-vector-widetag)
+              (write-wordindexed vector 1 (make-fixnum-descriptor 256))
+              vector)
+            #-immobile-space
+            (allocate-vector-object *dynamic*
+                                    sb-vm:n-word-bits
+                                    256
+                                    sb-vm:simple-vector-widetag))
+
   ;; Immobile code prefers all FDEFNs adjacent so that code can be located
   ;; anywhere in the addressable memory allowed by the OS, as long as all
   ;; FDEFNs are near enough all code (i.e. within a 32-bit jmp offset).
@@ -2155,9 +2186,10 @@ core and return a descriptor to it."
               ;; Absolute fixups on x86-64 do not refer to this code component,
               ;; because we have RIP-relative addressing, but references to
               ;; other immobile-space objects must be recorded.
+              ;; FIXME: unfortunately OAOO-violating with x86-64-vm.lisp
               #+x86-64
-              (member flavor '(:named-call :static-call :layout :immobile-object
-                               :assembly-routine :assembly-routine*)))
+              (member flavor '(:named-call :static-call :layout :immobile-symbol
+                               :symbol-value :assembly-routine :assembly-routine*)))
              #+x86-64
              (:absolute64
               (setf (bvref-64 gspace-data gspace-byte-offset)
@@ -2821,10 +2853,12 @@ core and return a descriptor to it."
              (:symbol-tls-index (ensure-symbol-tls-index sym))
              (:layout (descriptor-bits (or (gethash sym *cold-layouts*)
                                            (error "No cold-layout for ~S~%" sym))))
-             (:immobile-object
+             (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
               (descriptor-bits (if (symbolp sym) (cold-intern sym) sym)))
+             (:symbol-value
+              (descriptor-bits (cold-symbol-value sym)))
              (:named-call
               (+ (descriptor-bits (cold-fdefinition-object sym))
                  (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)

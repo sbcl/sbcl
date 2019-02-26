@@ -972,7 +972,8 @@
 (defconstant-eqx +fixup-flavors+
   #(:assembly-routine :assembly-routine* :symbol-tls-index
     :foreign :foreign-dataref :code-object
-    :layout :immobile-object :named-call :static-call)
+    :layout :immobile-symbol :named-call :static-call
+    :symbol-value)
   #'equalp)
 
 ;;; Pack the aspects of a fixup into an integer.
@@ -1016,7 +1017,12 @@
               ((:foreign #+linkage-table :foreign-dataref) (the string name))
               (:code-object (the null name))
               #+immobile-space (:layout (classoid-name (layout-classoid name)))
-              #+immobile-space (:immobile-object (the symbol name))
+              ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
+              ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
+              ;; In the latter case, the symbol's address doesn't matter,
+              ;; but its global value must be an immobile object.
+              #+immobile-space (:immobile-symbol (the symbol name))
+              #+immobile-space (:symbol-value (the symbol name))
               #+immobile-code  ((:named-call :static-call) name))))
       (dump-object operand fasl-output)
       (dump-integer info fasl-output))

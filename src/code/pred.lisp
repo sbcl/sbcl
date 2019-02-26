@@ -188,14 +188,13 @@
 ;;; should about what this returns for built-in objects. For example,
 ;;; it seems that we must return NULL rather than LIST when X is NIL
 ;;; so that GF's can specialize on NULL.
+;;; x86-64 has a vop that implements this without even needing to place
+;;; the vector of layouts in the constant pool of the containing code.
+#-(and compact-instance-header x86-64)
+(progn
 (declaim (inline layout-of))
-#-sb-xc-host
 (defun layout-of (x)
   (declare (optimize (speed 3) (safety 0)))
-  #+(and compact-instance-header x86-64)
-  (values (%primitive layout-of x
-                      (load-time-value sb-kernel::**built-in-class-codes** t)))
-  #-(and compact-instance-header x86-64)
   (cond ((%instancep x) (%instance-layout x))
         ((funcallable-instance-p x) (%funcallable-instance-layout x))
         ;; Compiler can dump literal layouts, which handily sidesteps
@@ -204,8 +203,8 @@
         (t
          ;; Note that WIDETAG-OF is slightly suboptimal here and could be
          ;; improved - we've already ruled out some of the lowtags.
-         (svref (load-time-value sb-kernel::**built-in-class-codes** t)
-                (widetag-of x)))))
+         (svref (load-time-value **primitive-object-layouts** t)
+                (widetag-of x))))))
 
 (declaim (inline classoid-of))
 #-sb-xc-host
