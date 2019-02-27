@@ -53,9 +53,6 @@
                 (interpreted-apply function args)))
       function))
 
-(defun interpreted-function-p (function)
-  (typep function 'interpreted-function))
-
 (defmethod print-object ((obj interpreted-function) stream)
   (print-unreadable-object (obj stream
                             :identity (not (interpreted-function-name obj)))

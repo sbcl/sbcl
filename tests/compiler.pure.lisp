@@ -5689,7 +5689,7 @@
   ;; symbol each time. But if the compiler processes the guts as it
   ;; should, you get back a compiled lambda which returns a constant
   ;; symbol.
-  (let ((f (let ((sb-ext:*evaluator-mode* :interpret))
+  (let ((f (let (#+(or sb-eval sb-fasteval) (sb-ext:*evaluator-mode* :interpret))
              (checked-compile
               `(lambda ()
                  (load-time-value

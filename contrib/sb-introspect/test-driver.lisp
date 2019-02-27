@@ -24,7 +24,7 @@
 ;; definitive answer, and sb-eval always answers with just FUNCTION.
 (defun expect-wild-return-type-p (f)
   (declare (ignorable f))
-  (or #+sb-fasteval (typep f 'sb-interpreter:interpreted-function)))
+  (or #+sb-fasteval (typep f 'sb-kernel:interpreted-function)))
 
 (deftest function-lambda-list.1
     (function-lambda-list 'cl-user::one)

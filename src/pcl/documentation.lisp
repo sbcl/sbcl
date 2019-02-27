@@ -10,12 +10,9 @@
 
 (defun fun-doc (function)
   (typecase function
-    #+sb-fasteval
-    (sb-interpreter:interpreted-function
-     (sb-interpreter:proto-fn-docstring (sb-interpreter:fun-proto-fn function)))
-    #+sb-eval
-    (sb-eval:interpreted-function
-     (sb-eval:interpreted-function-documentation function))
+    (interpreted-function
+     #+sb-fasteval (sb-interpreter:proto-fn-docstring (sb-interpreter:fun-proto-fn function))
+     #+sb-eval (sb-eval:interpreted-function-documentation function))
     (generic-function
      (slot-value function '%documentation))
     (t
@@ -29,12 +26,11 @@
 (defun (setf fun-doc) (new-value function)
   (declare (type (or null string) new-value))
   (typecase function
-    #+sb-fasteval
-    (sb-interpreter:interpreted-function
-     (setf (sb-interpreter:proto-fn-docstring
-            (sb-interpreter:fun-proto-fn function)) new-value))
-    #+sb-eval
-    (sb-eval:interpreted-function
+    (interpreted-function
+     #+sb-fasteval
+     (setf (sb-interpreter:proto-fn-docstring (sb-interpreter:fun-proto-fn function))
+           new-value)
+     #+sb-eval
      (setf (sb-eval:interpreted-function-documentation function) new-value))
     (generic-function
      (setf (slot-value function '%documentation) new-value))

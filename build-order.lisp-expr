@@ -194,7 +194,6 @@
  ("src/code/weak"          :not-host)
  ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
- ("src/code/pred" :not-host)
  ("src/code/debug-var-io")
 
  ("src/code/target-alieneval" :not-host)
@@ -209,6 +208,7 @@
   ;; Define at most one INTERPRETED-FUNCTION type based on target features
  #+sb-eval ("src/code/early-full-eval" :not-host)
  #+sb-fasteval ("src/interpreter/function" :not-host)
+ ("src/code/pred" :not-host)
  ("src/compiler/generic/pinned-objects" :not-host)
 
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants

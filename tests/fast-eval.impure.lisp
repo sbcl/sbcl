@@ -20,7 +20,7 @@
 
 (test-util:with-test (:name :write-bogus-function-instance)
   (write-to-string
-   (sb-pcl::class-prototype (find-class 'sb-interpreter:interpreted-function))))
+   (sb-pcl::class-prototype (find-class 'sb-kernel:interpreted-function))))
 
 (test-util:with-test (:name :type-checker-for-function)
   ;; The test for (FUNCTION (HAIR) (MORE-HAIR)) is just FUNCTIONP.

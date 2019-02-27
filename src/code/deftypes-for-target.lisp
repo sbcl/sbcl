@@ -120,9 +120,10 @@
   `(simple-array bit (,size)))
 
 (sb-xc:deftype compiled-function ()
-  '(and function
-        #+sb-fasteval (not sb-interpreter:interpreted-function)
-        #+sb-eval (not sb-eval:interpreted-function)))
+  '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
+
+;;; Stub type in case there are no interpreted functions
+#-(or sb-eval sb-fasteval) (sb-xc:deftype interpreted-function () nil)
 
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))
 

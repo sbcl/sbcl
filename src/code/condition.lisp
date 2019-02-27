@@ -1377,14 +1377,12 @@ handled by any other handler, it will be muffled.")
 ;;;; Deciding which redefinitions are "interesting".
 
 (defun function-file-namestring (function)
-  #+sb-eval
-  (when (typep function 'sb-eval:interpreted-function)
+  (when (typep function 'interpreted-function)
     (return-from function-file-namestring
+      #+sb-eval
       (sb-c:definition-source-location-namestring
-          (sb-eval:interpreted-function-source-location function))))
-  #+sb-fasteval
-  (when (typep function 'sb-interpreter:interpreted-function)
-    (return-from function-file-namestring
+          (sb-eval:interpreted-function-source-location function))
+      #+sb-fasteval
       (awhen (sb-interpreter:fun-source-location function)
         (sb-c:definition-source-location-namestring it))))
   (let* ((fun (%fun-fun function))
@@ -1404,9 +1402,7 @@ handled by any other handler, it will be muffled.")
           (typep new '(not compiled-function)))
      ;; fin->regular is interesting except for interpreted->compiled.
      (and (typep new '(not funcallable-instance))
-          (typep old '(and funcallable-instance
-                       #+sb-fasteval (not sb-interpreter:interpreted-function)
-                       #+sb-eval (not sb-eval:interpreted-function))))
+          (typep old '(and funcallable-instance (not interpreted-function))))
      ;; different file or unknown location is interesting.
      (let* ((old-namestring (function-file-namestring old))
             (new-namestring (function-file-namestring new)))

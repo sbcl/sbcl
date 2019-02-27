@@ -1878,7 +1878,7 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;;; functionality of !DEFINE-PRIMITIVE-OBJECT..)
 
 ;;; The complete list of alternate-metaclass DEFSTRUCTs:
-;;;   CONDITION SB-EVAL:INTERPRETED-FUNCTION
+;;;   CONDITION SB-KERNEL:INTERPRETED-FUNCTION
 ;;;   SB-PCL::STANDARD-INSTANCE SB-PCL::STANDARD-FUNCALLABLE-INSTANCE
 ;;;   SB-PCL::CTOR SB-PCL::%METHOD-FUNCTION
 ;;;

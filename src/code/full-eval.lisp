@@ -1119,7 +1119,7 @@
 ;;; Try to compile an interpreted function. If the environment
 ;;; contains local functions or lexical variables we'll punt on
 ;;; compiling it.
-(defun prepare-for-compile (function)
+(defun sb-c::prepare-for-compile (function)
   (let ((env (interpreted-function-env function)))
     (when (or (env-tags env)
               (env-blocks env)

@@ -21,8 +21,8 @@
 (define-source-transform compiled-function-p (x)
   (once-only ((x x))
     `(and (functionp ,x)
-          #+sb-fasteval (not (sb-interpreter:interpreted-function-p ,x))
-          #+sb-eval (not (sb-eval:interpreted-function-p ,x)))))
+          #+(or sb-fasteval sb-eval)
+          (not (typep ,x 'interpreted-function)))))
 
 (define-source-transform char-int (x)
   `(char-code ,x))

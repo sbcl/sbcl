@@ -1629,7 +1629,7 @@
 
 ;;;; from the "Miscellaneous" Chapter:
 
-(defknown compile ((or symbol cons) &optional (or list function null))
+(defknown compile ((or symbol cons) &optional (or list function))
   (values (or function symbol cons) boolean boolean))
 
 (defknown compile-file

@@ -1830,6 +1830,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                #+win32 "HANDLE-WIN32-EXCEPTION"
                "INTERNAL-TIME" "INTERNAL-SECONDS"
                "INTERNAL-SECONDS-LIMIT" "SAFE-INTERNAL-SECONDS-LIMIT"
+               "INTERPRETED-FUNCTION"
                "INTERSECTION-TYPE" "INTERSECTION-TYPE-P"
                "INTERSECTION-TYPE-TYPES" "INVALID-ARG-COUNT-ERROR"
                "LOCAL-INVALID-ARG-COUNT-ERROR"
@@ -3389,9 +3390,7 @@ structure representations"
       :doc "internal: the evaluator implementation used to execute code without compiling it."
       :use ("CL" "SB-KERNEL" "SB-EXT" "SB-INT")
       :reexport ("*EVAL-CALLS*")
-      :export ("INTERPRETED-FUNCTION"
-               "INTERPRETED-FUNCTION-P"
-               "INTERPRETED-FUNCTION-NAME"
+      :export ("INTERPRETED-FUNCTION-NAME"
                "INTERPRETED-FUNCTION-DEBUG-NAME"
                "INTERPRETED-FUNCTION-LAMBDA-LIST"
                "INTERPRETED-FUNCTION-DEBUG-LAMBDA-LIST"
@@ -3402,7 +3401,6 @@ structure representations"
                "EVAL-IN-ENVIRONMENT"
                "MAKE-NULL-ENVIRONMENT"
                "EVAL-IN-NATIVE-ENVIRONMENT"
-               "PREPARE-FOR-COMPILE"
                "*EVAL-LEVEL*"))
 
    #+sb-fasteval
@@ -3413,8 +3411,6 @@ structure representations"
       :export ("BASIC-ENV"
                "ENV-POLICY"
                "EVAL-IN-ENVIRONMENT"
-               "INTERPRETED-FUNCTION"
-               "INTERPRETED-FUNCTION-P"
                "FIND-LEXICAL-FUN"
                "FIND-LEXICAL-VAR"
                "FUN-LAMBDA-EXPRESSION"
@@ -3424,7 +3420,6 @@ structure representations"
                "%FUN-TYPE" ; to avoid conflict with SB-KERNEL:FUN-TYPE
                "LEXENV-FROM-ENV"
                "LIST-LOCALS"
-               "PREPARE-FOR-COMPILE"
                "PROTO-FN-DOCSTRING"
                "PROTO-FN-NAME"
                "PROTO-FN-PRETTY-ARGLIST"
@@ -3594,7 +3589,6 @@ SBCL itself"
   sb-interpreter:lexenv-from-env
   sb-interpreter::lexically-unlocked-symbol-p
   sb-interpreter:list-locals
-  sb-interpreter:prepare-for-compile
   sb-interpreter::reconstruct-syntactic-closure-env)
  ;; Other
  (sb-debug::find-interrupted-name-and-frame
@@ -3623,4 +3617,5 @@ SBCL itself"
   sb-c::compiled-debug-info-tlf-number
   sb-c::fopcompilable-p
   sb-c::pack-xref-data
+  sb-c::prepare-for-compile
   sb-sys:reinit-internal-real-time))

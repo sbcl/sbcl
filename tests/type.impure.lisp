@@ -583,13 +583,8 @@
                            '(or fixnum vector end-of-file parse-error fixnum simple-string))))
 
 (with-test (:name (subtypep function compiled-function :interpreted-function))
-  #+sb-eval
   (assert-tri-eq t t (subtypep '(and function (not compiled-function)
-                                 (not sb-eval:interpreted-function))
-                               nil))
-  #+sb-fasteval
-  (assert-tri-eq t t (subtypep '(and function (not compiled-function)
-                                 (not sb-interpreter:interpreted-function))
+                                 (not sb-kernel:interpreted-function))
                                nil)))
 
 ;;; weakening of union type checks

@@ -303,7 +303,7 @@
 
 (with-test (:name (:bug-573747 eval :interpret))
   (let ((*out* (make-string-output-stream))
-        (sb-ext:*evaluator-mode* :interpret))
+        #+(or sb-eval sb-fasteval) (sb-ext:*evaluator-mode* :interpret))
     (declare (special *out*))
     (assert-error (eval '(declare (print "foo" *out*))))
     (assert (string= (get-output-stream-string *out*) ""))))

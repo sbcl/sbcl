@@ -1420,7 +1420,7 @@ register."
             ;; Find a variable named FUN.
             (awhen (car (debug-fun-symbol-vars debug-fun 'sb-interpreter::fun))
               (let ((val (debug-var-value it frame))) ; Ensure it's a function
-                (when (typep val 'sb-interpreter:interpreted-function)
+                (when (typep val 'interpreted-function)
                   (%fun-name val))))))) ; Get its name
        ((sb-c::compiled-debug-fun-closure-save compiler-debug-fun)
         (%fun-name
