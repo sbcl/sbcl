@@ -148,7 +148,9 @@
          (inst lh result sap offset)
          (inst lhu result sap offset)))
     (:word
-     (inst lw result sap offset))
+     (if signed
+         (inst lw result sap offset)
+         (inst lwu result sap offset)))
     #+64-bit
     (:dword
      (inst ld result sap offset))
