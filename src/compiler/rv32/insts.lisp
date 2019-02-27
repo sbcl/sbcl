@@ -367,19 +367,29 @@
     ((or (signed-byte 64) (unsigned-byte 64))
      (let* ((value (coerce-unsigned value 64))
             (integer-length (integer-length value))
-            (2^k (ash 1 integer-length)))
-       (cond ((= value (1- (ash 1 integer-length)))
+            (2^k (ash 1 integer-length))
+            (2^.k-1 (ash 1 (1- integer-length))))
+       (cond ((and (= value (1- (ash 1 integer-length)))
+                   (/= integer-length 64))
               ;; Common special case: the immediate is of the form #xfff...
               (inst addi reg zero-tn -1)
               (inst srli reg reg (- 64 integer-length)))
              ((typep (- value 2^k) 'short-immediate)
               ;; Common special case: loading an immediate which is a
               ;; signed 12 bit constant away from a power of 2.
-              (unless (= integer-length 64)
-                (inst addi reg zero-tn 1)
-                (inst slli reg reg integer-length))
-              (unless (= value 2^k)
-                (inst addi reg reg (- value 2^k))))
+              (cond ((= integer-length 64)
+                     (inst addi reg zero-tn (- value 2^k)))
+                    (t
+                     (inst addi reg zero-tn 1)
+                     (inst slli reg reg integer-length)
+                     (inst addi reg reg (- value 2^k)))))
+             ((typep (- value 2^.k-1) 'short-immediate)
+              ;; Common special case: loading an immediate which is a
+              ;; signed 12 bit constant away from a power of 2.
+              (inst addi reg zero-tn 1)
+              (inst slli reg reg (1- integer-length))
+              (unless (= value 2^.k-1)
+                (inst addi reg reg (- value 2^.k-1))))
              (t
               ;; The "generic" case.
               ;; Load in the first 31 non zero most significant bits.
