@@ -620,6 +620,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
               (events  short)           ; requested events
               (revents short)))         ; returned events
 
+  (declaim (inline unix-poll))
   (defun unix-poll (pollfds nfds to-msec)
     (declare (fixnum nfds to-msec))
     (when (and (minusp to-msec) (not *interrupts-enabled*))
