@@ -29,7 +29,7 @@
           (invoke-asm-routine 'call ',name ,vop)
           (note-this-location ,vop :single-value-return))
         nil))
-      (:full-call
+      ((:full-call :full-call-no-return)
        (values
         `((note-this-location ,vop :call-site)
           (invoke-asm-routine 'call ',name ,vop)
@@ -47,4 +47,4 @@
     (:full-call
      `((inst clc)
        (inst ret)))
-    (:none)))
+    ((:none :full-call-no-return))))

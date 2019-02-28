@@ -11,15 +11,19 @@
 
 (in-package "SB-VM")
 
+;;; #+SB-ASSEMBLING as we don't need VOPS, just the asm routines:
+;;; these are out-of-line versions called by VOPs.
+(fmakunbound 'define-per-register-allocation-routines)
+(defmacro define-per-register-allocation-routines ()
+  #+sb-assembling
+  ;; Don't include r11 or r13 since those are temp and thread-base respectively
+  '(progn (def rax) (def rcx) (def rdx) (def rbx) (def rsi) (def rdi)
+          (def r8) (def r9) (def r10) (def r12) (def r14) (def r15)))
+
 ;;;; Signed and unsigned bignums from word-sized integers. Argument
 ;;;; and return in the same register. No VOPs, as these are only used
 ;;;; as out-of-line versions: MOVE-FROM-[UN]SIGNED VOPs handle the
 ;;;; fixnum cases inline.
-
-;;; #+SB-ASSEMBLING as we don't need VOPS, just the asm routines:
-;;; these are out-of-line versions called by VOPs.
-
-#+sb-assembling
 (macrolet
     ((def (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
@@ -27,21 +31,8 @@
           (inst push number)
           (fixed-alloc number bignum-widetag (+ bignum-digits-offset 1) nil)
           (popw number bignum-digits-offset other-pointer-lowtag))))
-  (def rax)
-  (def rcx)
-  (def rdx)
-  (def rbx)
-  (def rsi)
-  (def rdi)
-  (def r8)
-  (def r9)
-  (def r10)
-  (def r12)
-  (def r13)
-  (def r14)
-  (def r15))
+  (define-per-register-allocation-routines))
 
-#+sb-assembling
 (macrolet
     ((def (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
@@ -55,19 +46,7 @@
           ONE-WORD-BIGNUM
           (fixed-alloc number bignum-widetag (+ bignum-digits-offset 1) nil)
           (popw number bignum-digits-offset other-pointer-lowtag))))
-  (def rax)
-  (def rcx)
-  (def rdx)
-  (def rbx)
-  (def rsi)
-  (def rdi)
-  (def r8)
-  (def r9)
-  (def r10)
-  (def r12)
-  (def r13)
-  (def r14)
-  (def r15))
+  (define-per-register-allocation-routines))
 
 #+sb-thread
 (define-assembly-routine (alloc-tls-index

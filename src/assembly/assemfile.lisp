@@ -168,7 +168,11 @@
          (return-style (or (cadr (assoc :return-style options)) :raw))
          (cost (or (cadr (assoc :cost options)) 247))
          (vop (make-symbol "VOP")))
-    (unless (member return-style '(:raw :full-call :none))
+    ;; :full-call-no-return entails the call site behavior for :full-call
+    ;; without automatic insertion of the return sequence. This avoids some confusion
+    ;; on the part of the human reading the code, especially if the asm routine
+    ;; tail calls something else.
+    (unless (member return-style '(:raw :full-call :none :full-call-no-return))
       (error "unknown return-style for ~S: ~S" name return-style))
     (multiple-value-bind (call-sequence call-temps)
         (generate-call-sequence name return-style vop options)
