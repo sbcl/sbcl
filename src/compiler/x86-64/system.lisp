@@ -95,7 +95,7 @@
                 nil rax 8)) ; no base register
       (inst jmp  done)
       NULL
-      (inst mov  result (make-fixup (find-layout 'null) :layout))
+      (inst mov  result (make-fixup 'null :layout))
       DONE))
 
 (macrolet ((load-type (target source lowtag)

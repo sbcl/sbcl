@@ -240,6 +240,9 @@
   ;; NIL if none assigned yet
   (pcl-class nil))
 
+(defun layout-classoid-name (x)
+  (classoid-name (layout-classoid x)))
+
 ;;; A helper to make classoid (and named-type) hash values stable.
 ;;; For other ctypes, generally improve the randomness of the hash.
 ;;; (The host uses at most 21 bits of randomness. See CTYPE-RANDOM)

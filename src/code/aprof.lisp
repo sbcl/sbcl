@@ -164,7 +164,7 @@
 (defun layout-name (ptr)
   (if (eql (valid-lisp-pointer-p (int-sap ptr)) 0)
       'structure
-      (classoid-name (layout-classoid (make-lisp-obj ptr)))))
+      (layout-classoid-name (make-lisp-obj ptr))))
 
 ;;; map-segment-instructions is really deficient in providing an intelligent
 ;;; decoding of the bits, as they're wired into the instruction printer.

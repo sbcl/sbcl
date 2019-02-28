@@ -599,7 +599,6 @@
                 (inst or :byte result lowtag))))))
     (when instancep ; store its layout
       (inst mov :dword (ea (+ 4 (- lowtag)) result)
-            ;; XXX: should layout fixups use a name, not a layout object?
             (make-fixup type :layout))))))
 
 ;;; Allocate a non-vector variable-length object.

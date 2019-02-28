@@ -54,8 +54,7 @@
          (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)
          (- sb-vm:other-pointer-lowtag)))))
 
-(flet ((fixup (code-obj offset sym kind flavor layout-finder
-               preserved-lists statically-link-p)
+(flet ((fixup (code-obj offset sym kind flavor preserved-lists statically-link-p)
          (declare (ignorable statically-link-p))
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
          ;; at which fixup must be re-applied after code movement.
@@ -72,7 +71,8 @@
                    (:foreign-dataref (foreign-symbol-address sym t))
                    (:code-object (get-lisp-obj-address code-obj))
                    (:symbol-tls-index (ensure-symbol-tls-index sym))
-                   (:layout (get-lisp-obj-address (funcall layout-finder sym)))
+                   (:layout (get-lisp-obj-address
+                             (if (symbolp sym) (find-layout sym) sym)))
                    (:immobile-symbol (get-lisp-obj-address sym))
                    (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
                    #+immobile-code
@@ -132,7 +132,7 @@
           (multiple-value-bind (offset kind flavor)
               (sb-fasl::!unpack-fixup-info (pop-fop-stack))
             (fixup code-obj offset (pop-fop-stack) kind flavor
-                   #'find-layout preserved nil))))
+                   preserved nil))))
       (finish-fixups code-obj preserved)))
 
   (defun apply-core-fixups (fixup-notes code-obj)
@@ -145,11 +145,6 @@
                  (fixup-name fixup)
                  (fixup-note-kind note)
                  (fixup-flavor fixup)
-               ;; Compiling to memory creates layout fixups with the name being
-               ;; an instance of LAYOUT, not a symbol. Those probably should be
-               ;; :IMMOBILE-OBJECT fixups. But since they're not, inform the
-               ;; fixupper not to call find-layout on them.
-                 #'identity
                  preserved t)))
       (finish-fixups code-obj preserved))))
 

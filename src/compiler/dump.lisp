@@ -1012,18 +1012,18 @@
                                    flavor))
            (operand
             (ecase flavor
-              ((:assembly-routine :assembly-routine* :symbol-tls-index)
+              (:code-object (the null name))
+              (:layout (if (symbolp name) name (layout-classoid-name name)))
+              ((:assembly-routine :assembly-routine* :symbol-tls-index
+               ;; Only #+immobile-space can use the following two flavors.
+               ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
+               ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
+               ;; In the latter case, the symbol's address doesn't matter,
+               ;; but its global value must be an immobile object.
+               :immobile-symbol :symbol-value)
                (the symbol name))
               ((:foreign #+linkage-table :foreign-dataref) (the string name))
-              (:code-object (the null name))
-              #+immobile-space (:layout (classoid-name (layout-classoid name)))
-              ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
-              ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
-              ;; In the latter case, the symbol's address doesn't matter,
-              ;; but its global value must be an immobile object.
-              #+immobile-space (:immobile-symbol (the symbol name))
-              #+immobile-space (:symbol-value (the symbol name))
-              #+immobile-code  ((:named-call :static-call) name))))
+              ((:named-call :static-call) name))))
       (dump-object operand fasl-output)
       (dump-integer info fasl-output))
     (incf n))
@@ -1236,7 +1236,7 @@
   ;; STANDARD-OBJECT could in theory be dumpable, but nothing else,
   ;; because all its subclasses can evolve to have new layouts.
   (aver (not (logtest (layout-%flags obj) +pcl-object-layout-flag+)))
-  (let ((name (classoid-name (layout-classoid obj))))
+  (let ((name (layout-classoid-name obj)))
     ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))

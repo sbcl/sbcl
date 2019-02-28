@@ -199,7 +199,7 @@
       (print-unreadable-object (structure stream :identity t :type t))
       (let* ((layout (%instance-layout structure))
              (dd (layout-info layout))
-             (name (classoid-name (layout-classoid layout))))
+             (name (layout-classoid-name layout)))
         (cond ((not dd)
                ;; FIXME? this branch may be unnecessary as a consequence
                ;; of change f02bee325920166b69070e4735a8a3f295f8edfd which
