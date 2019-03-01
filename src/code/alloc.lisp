@@ -519,8 +519,6 @@
           (%make-lisp-obj
            (logior (ash boxed word-shift)
                    #+64-bit
-                   (if space
-                       (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
-                               most-positive-word)
-                       0))))
+                   (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
+                           most-positive-word))))
     code))
