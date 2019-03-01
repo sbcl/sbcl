@@ -508,6 +508,8 @@
     ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
     ;; This slot is allowed to be 0 prior to writing any pointer descriptors
     ;; into the object.
+    ;;
+    ;; If 64-bit words, assign a serial number unless the space is NIL.
     ;; Use ATOMIC-INCF on the serialno to get automatic wraparound,
     ;; and not because atomicity makes things deterministic, which it doesn't
     ;; if there are several threads allocating code.
@@ -517,13 +519,8 @@
           (%make-lisp-obj
            (logior (ash boxed word-shift)
                    #+64-bit
-                   (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
-                           most-positive-word))))
-    ;; Is this slot assignment necessary?  Both the C and Lisp backtrace logic
-    ;; check whether debug-info is an INSTANCE before operating with the value,
-    ;; and GC doesn't care what it is. Since stores to the code go through an
-    ;; assembly routine if soft marking is enabled, it's a spurious call
-    ;; to write a value that needn't add this object to a remembered set.
-    ;; FIXME: find out what breaks if this is removed.
-    (setf (%code-debug-info code) nil)
+                   (if space
+                       (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
+                               most-positive-word)
+                       0))))
     code))
