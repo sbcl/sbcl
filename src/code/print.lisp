@@ -1617,8 +1617,8 @@ variable: an unreadable object representing the error is printed instead.")
       (cond ((code-obj-is-filler-p component)
              (format stream "filler ~dw"
                      (ash (code-object-size component) (- sb-vm:word-shift))))
-            ((eq (setq dinfo (%code-debug-info component)) :bogus-lra)
-             (write-string "bogus code object" stream))
+            ((eq (setq dinfo (%code-debug-info component)) :bpt-lra)
+             (write-string "bpt-trap-return" stream))
             ((functionp dinfo)
              (format stream "trampoline ~S" dinfo))
             (t

@@ -25,4 +25,4 @@
                                            unsigned-long))
                    (code-instructions component)
                    (%code-text-size component))
-  nil)
+  component)

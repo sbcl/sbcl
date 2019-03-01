@@ -291,6 +291,11 @@
           ":IMMOBILE-CODE requires :IMMOBILE-SPACE feature")
          ("(and immobile-symbols (not immobile-space))"
           ":IMMOBILE-SYMBOLS requires :IMMOBILE-SPACE feature")
+         ("(and int4-breakpoints x86)"
+          ;; 0xCE is a perfectly good 32-bit instruction,
+          ;; unlike on x86-64 where it is illegal. It's therefore
+          ;; confusing to allow this feature in a 32-bit build.
+          ":INT4-BREAKPOINTS are incompatible with x86")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))

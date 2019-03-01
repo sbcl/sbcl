@@ -44,12 +44,6 @@
         ((sb-c::compiled-debug-fun-p obj)
          (format stream "#<compiled-debug-fun ~A>"
                  (sb-c::compiled-debug-fun-name obj)))
-        ((sb-kernel:code-component-p obj)
-         (format stream "#<code ~A>"
-                 (let ((dinfo (sb-kernel:%code-debug-info obj)))
-                   (cond
-                     ((eq dinfo :bogus-lra) "BOGUS-LRA")
-                     (t (sb-c::debug-info-name dinfo))))))
         (t
          (format stream "~w" obj))))
 
