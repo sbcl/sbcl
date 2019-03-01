@@ -865,12 +865,13 @@ Users Manual for details about the PROCESS structure.
                                         :direction :output
                                         :if-exists if-error-exists
                                         :external-format external-format)
-                 (with-open-pty ((pty-name pty-stream) (pty cookie))
-                   ;; Make sure we are not notified about the child
-                   ;; death before we have installed the PROCESS
-                   ;; structure in *ACTIVE-PROCESSES*.
-                   (let (child #+win32 handle)
-                     (sb-thread:with-mutex (*spawn-lock*)
+                 ;; Make sure we are not notified about the child
+                 ;; death before we have installed the PROCESS
+                 ;; structure in *ACTIVE-PROCESSES*.
+                 (let (child #+win32 handle)
+                   (sb-thread:with-mutex (*spawn-lock*)
+                     ;; ptsname() is not thread safe, ptsname_r() is, but there's already a lock here
+                     (with-open-pty ((pty-name pty-stream) (pty cookie))
                        (with-active-processes-lock ()
                          (with-environment (environment-vec environment
                                             :null (not (or environment environment-p)))
@@ -901,18 +902,18 @@ Users Manual for details about the PROCESS structure.
                                     :pid child
                                     #+win32 :copiers #+win32 *handlers-installed*
                                     #+win32 :handle #+win32 handle))
-                             (push proc *active-processes*)))))
-                     ;; Report the error outside the lock.
-                     (case child
-                       (-1
-                        (error "Couldn't fork child process: ~A"
-                               (strerror)))
-                       (-2
-                        (error "Couldn't execute ~S: ~A"
-                               progname (strerror)))
-                       (-3
-                        (error "Couldn't change directory to ~S: ~A"
-                               directory (strerror))))))))))
+                             (push proc *active-processes*))))))
+                   ;; Report the error outside the lock.
+                   (case child
+                     (-1
+                      (error "Couldn't fork child process: ~A"
+                             (strerror)))
+                     (-2
+                      (error "Couldn't execute ~S: ~A"
+                             progname (strerror)))
+                     (-3
+                      (error "Couldn't change directory to ~S: ~A"
+                             directory (strerror)))))))))
       (when *sigchld-delayed*
         (get-processes-status-changes))
       (dolist (fd *close-in-parent*)
