@@ -561,10 +561,10 @@ case "$sbcl_os" in
         printf ' :bsd' >> $ltf
         printf ' :darwin' >> $ltf
         if [ $sbcl_arch = "x86" ]; then
-            printf ' :mach-exception-handler :restore-fs-segment-register-from-tls :ud2-breakpoints' >> $ltf
+            printf ' :mach-exception-handler :restore-fs-segment-register-from-tls' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :mach-exception-handler :ud2-breakpoints' >> $ltf
+            printf ' :mach-exception-handler' >> $ltf
             darwin_version=`uname -r`
             darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
     

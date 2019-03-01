@@ -358,6 +358,10 @@ catch_exception_raise(mach_port_t exception_port,
             thread_state.rflags &= ~0x100;
             handler = sigtrap_handler;
             break;
+        } else if (*(unsigned char*)(thread_state.rip-1) == 0xCC) {
+            signal = SIGTRAP;
+            handler = sigtrap_handler;
+            break;
         }
     default:
         ret = KERN_INVALID_RIGHT;
