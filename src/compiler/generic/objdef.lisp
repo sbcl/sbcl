@@ -425,6 +425,27 @@ during backtrace.
   (p2 :c-type "long" :type (unsigned-byte 64))
   (p3 :c-type "long" :type (unsigned-byte 64)))
 
+;;; Define some slots that precede 'struct thread' so that each may be read
+;;; using a small negative 1-byte displacement.
+;;; These slots hold frequently-referenced constants.
+;;; If we can't do that for some reason - like, say, the safepoint page
+;;; is located prior to 'struct thread', then these just become ordinary slots.
+#+immobile-space
+(defglobal *thread-header-slot-names*
+    '(function-layout
+      varyobj-space-addr
+      varyobj-card-count
+      varyobj-card-marks))
+
+#+(and immobile-space (not sb-safepoint))
+(macrolet ((define-thread-header-slots ()
+             (let ((i 0))
+               `(progn
+                  ,@(mapcar (lambda (x)
+                              `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
+                           *thread-header-slot-names*)))))
+  (define-thread-header-slots))
+
 ;;; this isn't actually a lisp object at all, it's a c structure that lives
 ;;; in c-land.  However, we need sight of so many parts of it from Lisp that
 ;;; it makes sense to define it here anyway, so that the GENESIS machinery
@@ -533,24 +554,13 @@ during backtrace.
   #+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #+(and sb-safepoint-strictly (not win32))
-  (sprof-alloc-region :c-type "struct alloc_region" :length 4))
-
-;;; Define some slots that precede 'struct thread' so that each may be read
-;;; using a small negative 1-byte displacement.
-;;; These slots hold frequently-referenced constants.
-(defglobal *thread-header-slot-names*
-    '(function-layout
-      varyobj-space-addr
-      varyobj-card-count
-      varyobj-card-marks))
-
-(macrolet ((define-thread-header-slots ()
-             (let ((i 0))
-               `(progn
-                  ,@(mapcar (lambda (x)
-                              `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
-                           *thread-header-slot-names*)))))
-  (define-thread-header-slots))
+  (sprof-alloc-region :c-type "struct alloc_region" :length 4)
+  ;; If we need the header slots, but they can't precede this structure
+  ;; for technical reasons having to do with no writable memory being there,
+  ;; then stuff them at the end, for lack of any place better.
+  .
+  #+(and immobile-space sb-safepoint) #.(mapcar #'list *thread-header-slot-names*)
+  #-(and immobile-space sb-safepoint) nil)
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable
 ;;; that does not map onto a thread slot.
