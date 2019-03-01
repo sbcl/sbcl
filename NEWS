@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.5.0:
+  * bug fix: thread-safety problems in RUN-PROGRAM with :PTY.
+
 changes in sbcl-1.5.0 relative to sbcl-1.4.16:
   * enhancement: SB-COVER emulates IN-PACKAGE when recording source maps;
     this makes it possible to generate coverage for forms that uses local
