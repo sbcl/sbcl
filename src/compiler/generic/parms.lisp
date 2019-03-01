@@ -236,6 +236,13 @@
 ;;; the choice of this number. Rather than have to two copies
 ;;; of the comment, please see that file before adjusting this.
 (defconstant max-interrupts 1024)
+;;; Thread slots accessed at negative indices relative to struct thread.
+;;; These slots encroach on the interrupt contexts- the maximum that
+;;; can actually be stored is decreased by this amount.
+;;; sb-safepoint puts the safepoint page immediately preceding the
+;;; thread structure, so this trick doesn't work.
+(defconstant thread-header-slots
+  (+ #+(and x86-64 (not sb-safepoint)) 16))
 
 #+gencgc
 (progn

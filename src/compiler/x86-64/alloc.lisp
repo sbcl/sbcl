@@ -59,8 +59,7 @@
 (defun instrument-alloc (size node)
   (when (policy node (> sb-c::instrument-consing 1))
     (let ((skip-instrumentation (gen-label)))
-      (inst mov temp-reg-tn
-            (ea (* n-word-bytes thread-profile-data-slot) thread-base-tn))
+      (inst mov temp-reg-tn (thread-slot-ea thread-profile-data-slot))
       (inst test temp-reg-tn temp-reg-tn)
       ;; This instruction is modified to "JMP :z" when profiling is
       ;; partially enabled. After the buffer is assigned, it becomes

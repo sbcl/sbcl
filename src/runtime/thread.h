@@ -211,7 +211,7 @@ extern __thread struct thread *current_thread;
 
 /* context 0 is the word immediately before the thread struct, and so on. */
 #define nth_interrupt_context(n,thread) \
-      ((os_context_t**)((char*)thread - THREAD_CSP_PAGE_SIZE))[-(n+1)]
+      ((os_context_t**)((char*)thread - THREAD_CSP_PAGE_SIZE))[-(THREAD_HEADER_SLOTS+n+1)]
 
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE +                          \

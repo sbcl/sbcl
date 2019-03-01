@@ -719,16 +719,17 @@ create_thread_struct(lispobj initial_function) {
     for(i = 0; i < TLS_SIZE; i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
 #endif
+    uword_t* constants = (uword_t*)th;
 #ifdef LISP_FEATURE_GENCGC
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     extern unsigned int* varyobj_page_touched_bits;
-    th->varyobj_space_addr  = VARYOBJ_SPACE_START;
-    th->varyobj_card_count  = varyobj_space_size / IMMOBILE_CARD_BYTES;
-    th->varyobj_card_marks  = (lispobj)varyobj_page_touched_bits;
+    constants[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = VARYOBJ_SPACE_START;
+    constants[THREAD_VARYOBJ_CARD_COUNT_SLOT] = varyobj_space_size / IMMOBILE_CARD_BYTES;
+    constants[THREAD_VARYOBJ_CARD_MARKS_SLOT] = (lispobj)varyobj_page_touched_bits;
 #else
-    th->varyobj_space_addr  = 0;
-    th->varyobj_card_count  = 0;
-    th->varyobj_card_marks  = 0;
+    constants[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = 0;
+    constants[THREAD_VARYOBJ_CARD_COUNT_SLOT] = 0;
+    constants[THREAD_VARYOBJ_CARD_MARKS_SLOT] = 0;
 #endif
     th->dynspace_addr       = DYNAMIC_SPACE_START;
     th->dynspace_card_count = page_table_pages;
@@ -747,7 +748,7 @@ create_thread_struct(lispobj initial_function) {
     th->this=th;
     th->os_thread=0;
 #if defined(LAYOUT_OF_FUNCTION) && defined(LISP_FEATURE_SB_THREAD)
-    th->function_layout = LAYOUT_OF_FUNCTION << 32;
+    constants[THREAD_FUNCTION_LAYOUT_SLOT] = LAYOUT_OF_FUNCTION << 32;
 #endif
     // Once allocated, the allocation profiling buffer sticks around.
     // If present and enabled, assign into the new thread.

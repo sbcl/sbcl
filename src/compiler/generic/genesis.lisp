@@ -3206,6 +3206,13 @@ core and return a descriptor to it."
          (lowtag (or (symbol-value (sb-vm:primitive-object-lowtag obj)) 0)))
   ;; writing primitive object layouts
     (format t "#ifndef __ASSEMBLER__~2%")
+    (when (eq name 'sb-vm::thread)
+      (format t "#define THREAD_HEADER_SLOTS ~d~%" sb-vm::thread-header-slots)
+      (dolist (x sb-vm::*thread-header-slot-names*)
+        (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
+          (format t "#define ~a ~d~%"
+                  (c-name (string s)) (symbol-value s))))
+      (terpri t))
     (format t "struct ~A {~%" c-name)
     (when (sb-vm:primitive-object-widetag obj)
       (format t "    lispobj header;~%"))

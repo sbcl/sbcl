@@ -109,11 +109,11 @@ sb-vm::
          (coerce
           `(#xF0 #x49 #xFF #x83 #x80 #x64 #x00 #x00
             #x49 #x89 #x6D ,(* sb-vm::thread-pseudo-atomic-bits-slot 8)
-            #x4D #x8B #x55 #x20
+            #x4D #x8B #x55 ,(* sb-vm::thread-alloc-region-slot 8)
             #x4D #x8D #x5A #x20
-            #x4D #x3B #x5D #x28
+            #x4D #x3B #x5D ,(* (1+ sb-vm::thread-alloc-region-slot) 8)
             #x0F #x87 #x9E #x02 #x00 #x00
-            #x4D #x89 #x5D #x20
+            #x4D #x89 #x5D ,(* sb-vm::thread-alloc-region-slot 8)
             #x4C #x8B #x4D #xC8
             #x4D #x89 #x0A
             #x4D #x8D #x4A #x17

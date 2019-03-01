@@ -926,9 +926,9 @@
 
 (defun nth-interrupt-context (n)
   (declare (muffle-conditions compiler-note))
-  (declare (type (mod #.sb-vm::max-interrupts) n)
+  (declare (type (mod #.(- sb-vm:max-interrupts sb-vm::thread-header-slots)) n)
            (optimize (speed 3) (safety 0)))
-  (let* ((n (- -1 n
+  (let* ((n (- -1 (+ sb-vm::thread-header-slots n)
                #+sb-safepoint
                ;; the C safepoint page
                (/ sb-c:+backend-page-bytes+ n-word-bytes)))

@@ -804,8 +804,9 @@ fake_foreign_function_call(os_context_t *context)
     context_index =
         fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
-    if (context_index >= MAX_INTERRUPTS) {
-        lose("maximum interrupt nesting depth (%d) exceeded\n", MAX_INTERRUPTS);
+    if (context_index >= (MAX_INTERRUPTS-THREAD_HEADER_SLOTS)) {
+        lose("maximum interrupt nesting depth (%d) exceeded\n",
+             MAX_INTERRUPTS-THREAD_HEADER_SLOTS);
     }
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,

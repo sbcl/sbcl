@@ -435,23 +435,20 @@ during backtrace.
   ;; tls[0] = NO_TLS_VALUE_MARKER_WIDETAG because a the tls index slot
   ;; of a symbol is initialized to zero
   (no-tls-value-marker)
+  ;; Technically this slot violates our requirement that the size of the thread
+  ;; primitive object be computable by assuming one word per slot. POSIX says
+  ;; "IEEE Std 1003.1-2001/Cor 2-2004, item XBD/TC2/D6/26 is applied,
+  ;;  adding pthread_t to the list of types that are not required to be arithmetic
+  ;;  types, thus allowing pthread_t to be defined as a structure."
   (os-thread :c-type "os_thread_t")
-  ;; This is the original address at which the memory was allocated,
-  ;; which may have different alignment then what we prefer to use.
-  ;; Kept here so that when the thread dies we can release the whole
-  ;; memory we reserved.
-  (os-address :c-type "void *" :pointer t)
 
-  ;; Keep these next six slots (alloc-region being figured in as 1 slot)
+  ;; Keep this first bunch of slots from binding-stack-pointer through alloc-region
   ;; near the beginning of the structure so that x86[-64] assembly code
   ;; can use single-byte displacements from thread-base-tn.
   ;; Doing so reduces code size for allocation sequences and special variable
   ;; manipulations by fixing their TLS offsets to be < 2^7, the largest
   ;; aligned displacement fitting in a signed byte.
   ;;
-  ;; Information for constructing deterministic consing profile.
-  (profile-data :c-type "uword_t *" :pointer t)
-  #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
   (binding-stack-pointer :c-type "lispobj *" :pointer t
                          :special *binding-stack-pointer*)
   ;; next two not used in C, but this wires the TLS offsets to small values
@@ -463,17 +460,23 @@ during backtrace.
   (alien-stack-pointer :c-type "lispobj *" :pointer t
                        :special *alien-stack-pointer*)
   (stepping)
-  ;; END of slots to keep near the beginning.
-
-  ;; TODO: these slots should be accessible using (SIGNED-BYTE 8) displacement
-  ;; from the thread base. We've nearly exhausted small positive indices
-  ;; so the slots will have to precede 'struct thread' in memory.
-  (varyobj-space-addr)
-  (varyobj-card-count)
-  (varyobj-card-marks)
+  ;; The following slot's existence must NOT be conditional on #+msan
+  #+x86-64 (msan-param-tls) ; = &__msan_param_tls
   (dynspace-addr)
   (dynspace-card-count)
   (dynspace-pte-base)
+  ;; Deterministic consing profile recording area.
+  (profile-data :c-type "uword_t *" :pointer t)
+  ;; Lisp needs only the first two fields of the alloc_region, so it's OK if the
+  ;; final 2 fields have offsets >= 128 from the base of the thread structure.
+  #+gencgc (alloc-region :c-type "struct alloc_region" :length 4)
+  ;; END of slots to keep near the beginning.
+
+  ;; This is the original address at which the memory was allocated,
+  ;; which may have different alignment then what we prefer to use.
+  ;; Kept here so that when the thread dies we can release the whole
+  ;; memory we reserved.
+  (os-address :c-type "void *" :pointer t)
 
   ;; These aren't accessed (much) from Lisp, so don't really care
   ;; if it takes a 4-byte displacement.
@@ -530,12 +533,24 @@ during backtrace.
   #+sb-safepoint (csp-around-foreign-call :c-type "lispobj *")
   #+win32 (synchronous-io-handle-and-flag :c-type "HANDLE" :length 1)
   #+(and sb-safepoint-strictly (not win32))
-  (sprof-alloc-region :c-type "struct alloc_region" :length 4)
-  ;; The following slot's existence must NOT be conditional on #+msan
-  #+x86-64 (msan-param-tls) ; = &__msan_param_tls
-  ;; function-layout is needed for closure creation. it's constant,
-  ;; but we need somewhere to read it from.
-  #+(and immobile-space 64-bit sb-thread) (function-layout))
+  (sprof-alloc-region :c-type "struct alloc_region" :length 4))
+
+;;; Define some slots that precede 'struct thread' so that each may be read
+;;; using a small negative 1-byte displacement.
+;;; These slots hold frequently-referenced constants.
+(defglobal *thread-header-slot-names*
+    '(function-layout
+      varyobj-space-addr
+      varyobj-card-count
+      varyobj-card-marks))
+
+(macrolet ((define-thread-header-slots ()
+             (let ((i 0))
+               `(progn
+                  ,@(mapcar (lambda (x)
+                              `(defconstant ,(symbolicate "THREAD-" x "-SLOT") ,(decf i)))
+                           *thread-header-slot-names*)))))
+  (define-thread-header-slots))
 
 ;;; Compute the smallest TLS index that will be assigned to a special variable
 ;;; that does not map onto a thread slot.
