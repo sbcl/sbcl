@@ -726,6 +726,10 @@ create_thread_struct(lispobj initial_function) {
     constants[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = VARYOBJ_SPACE_START;
     constants[THREAD_VARYOBJ_CARD_COUNT_SLOT] = varyobj_space_size / IMMOBILE_CARD_BYTES;
     constants[THREAD_VARYOBJ_CARD_MARKS_SLOT] = (lispobj)varyobj_page_touched_bits;
+#else
+    constants[THREAD_VARYOBJ_SPACE_ADDR_SLOT] = 0;
+    constants[THREAD_VARYOBJ_CARD_COUNT_SLOT] = 0;
+    constants[THREAD_VARYOBJ_CARD_MARKS_SLOT] = 0;
 #endif
     th->dynspace_addr       = DYNAMIC_SPACE_START;
     th->dynspace_card_count = page_table_pages;
