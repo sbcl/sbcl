@@ -719,7 +719,7 @@ create_thread_struct(lispobj initial_function) {
     for(i = 0; i < TLS_SIZE; i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
 #endif
-    uword_t* constants = (uword_t*)th;
+    uword_t* __attribute__((__unused__)) constants = (uword_t*)th;
 #ifdef LISP_FEATURE_GENCGC
 #ifdef THREAD_VARYOBJ_CARD_MARKS_SLOT
     extern unsigned int* varyobj_page_touched_bits;

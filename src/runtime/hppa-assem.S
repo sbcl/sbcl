@@ -6,6 +6,7 @@
 #include "sbcl.h"
 #include "lispregs.h"
 #include "genesis/closure.h"
+#include "genesis/code.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "genesis/return-pc.h"
@@ -450,7 +451,9 @@ SingleStepTraps:
 	.align	8
 	.export fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_WIDETAG + 0x600
+#define CODE_SIZE 1+(CODE_CONSTANTS_OFFSET+OTHER_POINTER_LOWTAG)/N_WORD_BYTES
+#define ALIGN_TO_EVEN(x) (((x)+1)&~1)
+	.word   (ALIGN_TO_EVEN(CODE_SIZE)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 	/* multiple value return point -- just jump to trap. */
 	b,n	fun_end_breakpoint_trap
 	/* single value return point -- convert to multiple w/ n=1 */

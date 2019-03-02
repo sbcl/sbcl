@@ -218,7 +218,9 @@ call_into_c:
 	.align	8
 	.global	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_WIDETAG + 0x600
+#define CODE_SIZE 1+(CODE_CONSTANTS_OFFSET+OTHER_POINTER_LOWTAG)/N_WORD_BYTES
+#define ALIGN_TO_EVEN(x) (((x)+1)&~1)
+	.word	(ALIGN_TO_EVEN(CODE_SIZE)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 	b	1f
 	nop
 	mov	reg_CSP, reg_OCFP
