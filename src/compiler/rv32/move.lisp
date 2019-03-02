@@ -229,20 +229,27 @@
 (define-vop (move-from-unsigned)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
   (:results (y :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) temp x)
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)
     (inst slli y x n-fixnum-tag-bits)
-    (inst srli temp y n-fixnum-tag-bits)
-    (inst beq temp x done)
+    (inst srli pa-flag y n-fixnum-tag-bits)
+    (inst beq pa-flag x done)
+    ;; Could be optimized further by allocating the right size based
+    ;; on the sign bit from the start.
     (with-fixed-allocation (y pa-flag bignum-widetag (+ bignum-digits-offset 2))
-      (inst slt temp x zero-tn)
-      (inst slli temp temp n-widetag-bits)
-      (inst addi temp temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-      (storew temp y 0 other-pointer-lowtag))
-    (storew x y bignum-digits-offset other-pointer-lowtag)
+      (inst bge x zero-tn NO-SHRINK)
+      ;; WITH-FIXED-ALLOCATION, when using a supplied type-code,
+      ;; leaves PA-FLAG containing the computed header value.  In our
+      ;; case, configured for a 2-word bignum.  If the sign bit in the
+      ;; value we're boxing is CLEAR, we need to shrink the bignum by
+      ;; one word, hence the following:
+      (inst subi pa-flag pa-flag (ash 1 n-widetag-bits))
+      (storew pa-flag y 0 other-pointer-lowtag)
+      NO-SHRINK
+      (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
 
 (define-move-vop move-from-unsigned :move
