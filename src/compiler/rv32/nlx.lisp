@@ -163,50 +163,40 @@
              (loadw (tn-ref-tn values) start)
              (emit-label no-values)))
           (t
-           (collect ((defaults))
-             (do ((i 0 (1+ i))
-                  (tn-ref values (tn-ref-across tn-ref)))
-                 ((null tn-ref))
-               (let ((default-lab (gen-label))
-                     (tn (tn-ref-tn tn-ref)))
-                 (defaults (cons default-lab tn))
-                 (inst subi count count (fixnumize 1))
-                 (inst beq count zero-tn default-lab)
-                 (sc-case tn
-                          ((descriptor-reg any-reg)
-                           (loadw tn start i))
-                          (control-stack
-                           (loadw move-temp start i)
-                           (store-stack-tn tn move-temp)))))
-
-             (let ((defaulting-done (gen-label)))
-
-               (emit-label defaulting-done)
-
-               (assemble (:elsewhere)
-                 (dolist (def (defaults))
-                   (emit-label (car def))
-                   (let ((tn (cdr def)))
-                     (sc-case tn
-                              ((descriptor-reg any-reg)
-                               (move tn null-tn))
-                              (control-stack
-                               (store-stack-tn tn null-tn)))))
-                 (inst j defaulting-done))))))
+           (do ((i 0 (1+ i))
+                (tn-ref values (tn-ref-across tn-ref)))
+               ((null tn-ref))
+             (let ((tn (tn-ref-tn tn-ref)))
+               (inst subi count count (fixnumize 1))
+               (sc-case tn
+                 ((descriptor-reg any-reg)
+                  (assemble ()
+                    (move tn null-tn)
+                    (inst blt count zero-tn LESS-THAN)
+                    (loadw tn start i)
+                    LESS-THAN))
+                 (control-stack
+                  (assemble ()
+                    (move move-temp null-tn)
+                    (inst blt count zero-tn LESS-THAN)
+                    (loadw move-temp start i)
+                    LESS-THAN
+                    (store-stack-tn tn move-temp))))))))
     (load-stack-tn csp-tn sp)))
 
 (define-vop (nlx-entry-multiple)
-  (:args (top)
-         (start)
-         (count))
+  (:args (top :target result)
+         (src)
+         (count :target count-words))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
   (:temporary (:scs (any-reg) :from (:argument 0)) dst)
-  (:temporary (:scs (any-reg) :from (:argument 1)) src)
-  (:temporary (:scs (any-reg) :from (:argument 2)) num)
   (:temporary (:scs (descriptor-reg)) temp)
-  (:results (new-start) (new-count))
+  (:temporary (:scs (interior-reg)) lip)
+  (:temporary (:scs (descriptor-reg)) count-words)
+  (:results (result :scs (any-reg) :from (:argument 0))
+            (num :scs (any-reg) :from (:argument 0)))
   (:save-p :force-to-stack)
   (:vop-var vop)
   (:generator 30
@@ -216,33 +206,28 @@
     (let ((loop (gen-label))
           (done (gen-label)))
 
-      ;; Copy args.
+      ;; Setup results, and test for the zero value case.
       (load-stack-tn dst top)
-      (move src start)
-      (move num count)
+      (inst li num 0)
+      (inst slli count-words count (- word-shift n-fixnum-tag-bits))
+      (inst beq count-words zero-tn done)
+      ;; Compute dst as one slot down from result, because we inc the index
+      ;; before we use it.
+      (inst subi dst result n-word-bytes)
 
-      ;; Establish results.
-      (sc-case new-start
-        (any-reg (move new-start dst))
-        (control-stack (store-stack-tn new-start dst)))
-      (inst beq num zero-tn done)
-      (sc-case new-count
-        (any-reg (move new-count num))
-        (control-stack (store-stack-tn new-count num)))
-
-      ;; Copy stuff on stack.
+      ;; Copy stuff down the stack
       (emit-label loop)
-      (loadw temp src)
-      (storew temp dst)
-      (inst addi num num (fixnumize -1))
-      (inst addi src src n-word-bytes)
-      (inst addi dst dst n-word-bytes)
-      (inst bne num zero-tn loop)
+      (inst add lip src num)
+      (loadw temp lip)
+      (inst addi num num n-word-bytes)
+      (inst add lip dst num)
+      (storew temp lip)
+      (inst bne num count-words loop)
 
+      ;; Reset the CSP.
       (emit-label done)
-      (move csp-tn dst)
-      (unless (= word-shift n-fixnum-tag-bits)
-        (inst srli new-count num (- word-shift n-fixnum-tag-bits))))))
+      (inst add csp-tn result num)
+      (inst srli num num (- word-shift n-fixnum-tag-bits)))))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
