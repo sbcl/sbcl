@@ -24,7 +24,7 @@
 (define-vop (signed-unop fast-safe-arith-op)
   (:args (x :scs (signed-reg)))
   (:results (res :scs (signed-reg)))
-  (:note "inline (signed-byte 32) arithmetic")
+  (:note #.(format nil "inline (signed-byte ~a) arithmetic" n-machine-word-bits))
   (:arg-types signed-num)
   (:result-types signed-num))
 
@@ -348,9 +348,9 @@
       (inst srli shift shift 1)
       (inst bne shift zero-tn loop))))
 
-(define-vop (unsigned-byte-32-count)
+(define-vop (#-64-bit unsigned-byte-32-count #+64-bit unsigned-byte-64-count)
   (:translate logcount)
-  (:note "inline (unsigned-byte 32) logcount")
+  (:note #.(format nil "inline (unsigned-byte ~a) logcount" n-machine-word-bits))
   (:policy :fast-safe)
   (:args (arg :scs (unsigned-reg) :target num))
   (:arg-types unsigned-num)
@@ -360,31 +360,24 @@
                     :target res) num)
   (:temporary (:scs (non-descriptor-reg)) mask temp)
   (:generator 30
-    (inst li mask #x55555555)
-    (inst srli temp arg 1)
-    (inst and num arg mask)
-    (inst and temp temp mask)
-    (inst add num num temp)
-    (inst li mask #x33333333)
-    (inst srli temp num 2)
-    (inst and num num mask)
-    (inst and temp temp mask)
-    (inst add num num temp)
-    (inst li mask #x0f0f0f0f)
-    (inst srli temp num 4)
-    (inst and num num mask)
-    (inst and temp temp mask)
-    (inst add num num temp)
-    (inst li mask #x00ff00ff)
-    (inst srli temp num 8)
-    (inst and num num mask)
-    (inst and temp temp mask)
-    (inst add num num temp)
-    (inst li mask #x0000ffff)
-    (inst srli temp num 16)
-    (inst and num num mask)
-    (inst and temp temp mask)
-    (inst add res num temp)))
+    (let* ((maskers
+             #-64-bit
+             '(#x55555555 #x33333333 #x0f0f0f0f #x00ff00ff #x0000ffff)
+             #+64-bit
+             '(#x5555555555555555 #x3333333333333333 #x0f0f0f0f0f0f0f0f #x00ff00ff00ff00ff #x0000ffff0000ffff #x00000000ffffffff))
+           ;;; FIXME (first (last maskers)) can't transform this early
+           ;;; in the build...
+           (last #-64-bit #x0000ffff #+64-bit #x00000000ffffffff))
+      ;; FIXME: Look at the arm64 backend to see how to potentially
+      ;; optimize this.
+      (loop for masker in maskers
+            for shift = 1 then (ash shift 1) do
+              (inst li mask masker)
+              (let ((input (if (= shift 1) arg num)))
+                (inst srli temp input shift)
+                (inst and num input mask))
+              (inst and temp temp mask)
+              (inst add (if (= shift last) res num) num temp)))))
 
 ;;; Multiply and Divide.
 
@@ -533,7 +526,7 @@
   (:variant-cost 7))
 
 
-;;;; 32-bit logical operations
+;;;; Logical operations
 
 (define-vop (shift-towards-someplace)
   (:policy :fast-safe)
@@ -610,20 +603,8 @@
 #+64-bit
 (define-modular-fun lognot-mod64 (x) lognot :untagged nil 64)
 
-#-64-bit
-(define-vop (lognot-mod32/unsigned=>unsigned)
-  (:translate lognot-mod32)
-  (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num)
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:policy :fast-safe)
-  (:generator 1
-    (inst xori r x -1)))
-
-#+64-bit
-(define-vop (lognot-mod64/unsigned=>unsigned)
-  (:translate lognot-mod64)
+(define-vop (#-64-bit lognot-mod32/unsigned=>unsigned #+64-bit lognot-mod64/unsigned=>unsigned)
+  (:translate #-64-bit lognot-mod32 #+64-bit lognot-mod64)
   (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num)
   (:results (r :scs (unsigned-reg)))
