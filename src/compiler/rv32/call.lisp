@@ -279,8 +279,7 @@
 
     (inst j DONE)
     MULTIPLE
-    #.(assert (evenp register-arg-count))
-    (do ((arg *register-arg-tns* (cddr arg))
+    (do ((arg *register-arg-tns* (rest arg))
          (i 0 (1+ i)))
         ((null arg))
       (storew (first arg) args i))
