@@ -173,7 +173,7 @@
     (inst bge amount zero-tn positive)
     (inst sub ndesc zero-tn amount)
     (inst li temp n-word-bits)
-    (inst blt temp ndesc no-overflow)
+    (inst blt ndesc temp no-overflow)
     (inst subi ndesc temp 1)
     NO-OVERFLOW
     (ecase variant
