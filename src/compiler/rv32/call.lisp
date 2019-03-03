@@ -168,7 +168,10 @@
 (defun default-unknown-values (vop values nvals move-temp lip lra-label)
   (declare (type (or tn-ref null) values)
            (type unsigned-byte nvals) (type tn move-temp))
-  (let ((expecting-values-on-stack (> nvals register-arg-count)))
+  (let ((expecting-values-on-stack (> nvals register-arg-count))
+        (not-single (gen-label))
+        (done (gen-label))
+        defaulting-code-p)
     (note-this-location vop (if (<= nvals 1)
                                 :single-value-return
                                 :unknown-return))
@@ -179,41 +182,39 @@
       ;; Default register values for single-value return case.  The
       ;; callee returns with negative NARGS for single value return.
       (when values
-        (let ((regs-defaulted (gen-label))
-              branchp)
-          (do ((i 1 (1+ i))
-               (val (tn-ref-across values) (tn-ref-across val)))
-              ((= i (min nvals register-arg-count)))
-            (unless (eq (tn-kind (tn-ref-tn val)) :unused)
-              (unless branchp
-                (inst bge nargs-tn zero-tn regs-defaulted)
-                (setf branchp t))
-              (move (tn-ref-tn val) null-tn)))
-          (when branchp
-            (emit-label regs-defaulted))))
+        (do ((i 1 (1+ i))
+             (val (tn-ref-across values) (tn-ref-across val)))
+            ((= i (min nvals register-arg-count)))
+          (unless (eq (tn-kind (tn-ref-tn val)) :unused)
+            (unless defaulting-code-p
+              (inst bge nargs-tn zero-tn not-single)
+              (setf defaulting-code-p t))
+            (move (tn-ref-tn val) null-tn))))
 
       ;; If we're not expecting values on the stack, all that
       ;; remains is to clear the stack frame (for the multiple-
       ;; value return case).
       (unless expecting-values-on-stack
-        (let ((single (gen-label)))
-          (inst blt nargs-tn zero-tn single)
-          (move csp-tn ocfp-tn)
-          (emit-label single)))
+        (cond (defaulting-code-p
+               (inst j done)
+               (emit-label not-single))
+              (t
+               (inst blt nargs-tn zero-tn done)))
+        (move csp-tn ocfp-tn)
+        (emit-label done))
 
       ;; If we ARE expecting values on the stack, we need to
       ;; either move them to their result location or to set their
       ;; result location to the default.
       (when expecting-values-on-stack
-
         ;; For the single-value return case, fake up NARGS and
         ;; OCFP so that we don't screw ourselves with the
         ;; defaulting and stack clearing logic.
-        (let ((single (gen-label)))
-          (inst blt nargs-tn zero-tn single)
-          (move csp-tn ocfp-tn)
-          (inst li nargs-tn (fixnumize 1))
-          (emit-label single))
+        (unless defaulting-code-p
+          (inst bge nargs-tn zero-tn not-single))
+        (move ocfp-tn csp-tn)
+        (inst li nargs-tn (fixnumize 1))
+        (emit-label not-single)
 
         ;; For each expected stack value..
         (do ((i register-arg-count (1+ i))
@@ -233,8 +234,8 @@
                   (setf decrement (fixnumize 1))
                   (inst blt nargs-tn zero-tn NONE)
                   (loadw move-temp ocfp-tn i)
+                  (inst j DEFAULTED)
                   NONE
-                  (inst blt nargs-tn zero-tn DEFAULTED)
                   (move (sc-case tn
                           (control-stack move-temp)
                           (t tn))
