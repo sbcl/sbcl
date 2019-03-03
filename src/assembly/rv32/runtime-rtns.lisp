@@ -66,8 +66,8 @@
   ;; Tag nargs.
   (inst slli nargs-tn nargs n-fixnum-tag-bits)
   (pseudo-atomic (pa-temp)
-    (load-foreign-symbol-value temp "dynamic_space_free_pointer" temp)
-    (store-symbol-value temp *allocation-pointer*)
+    ;; Initializing the allocation pointer is done already in
+    ;; coreparse.
     (load-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (load-foreign-symbol-value ocfp-tn "current_control_frame_pointer" temp)
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
@@ -136,7 +136,7 @@
     (storew ocfp-tn cfp-tn)
     (storew nfp-tn cfp-tn 1)
     (storew code-tn cfp-tn 2)
-    (store-foreign-symbol-value csp-tn "current_control_frame_pointer" temp)
+    (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
     (load-symbol-value temp *allocation-pointer*)
     ;; We can destroy csp-tn without harm now.
