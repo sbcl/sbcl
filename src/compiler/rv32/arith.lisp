@@ -342,10 +342,10 @@
       (inst j test)
 
       (emit-label loop)
+      (inst srli shift shift 1)
       (inst addi res res (fixnumize 1))
 
       (emit-label test)
-      (inst srli shift shift 1)
       (inst bne shift zero-tn loop))))
 
 (define-vop (#-64-bit unsigned-byte-32-count #+64-bit unsigned-byte-64-count)
