@@ -370,8 +370,8 @@
                     (inst ,inst :double r x y))))))
   (frob + fadd +/single-float 2 +/double-float 2)
   (frob - fsub -/single-float 2 -/double-float 2)
-  (frob * fmul */single-float 4 */double-float 5)
-  (frob / fdiv //single-float 12 //double-float 19))
+  (frob * fmul */single-float 4 */double-float 4)
+  (frob / fdiv //single-float 12 //double-float 12))
 
 (macrolet ((frob (name inst fmt translate sc type)
              `(define-vop (,name)
@@ -496,7 +496,7 @@
                 (:result-types signed-num)
                 (:translate ,trans)
                 (:policy :fast-safe)
-                (:note "inline float round")
+                (:note "inline float round/truncate")
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 2
