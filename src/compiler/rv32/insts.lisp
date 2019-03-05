@@ -306,8 +306,6 @@
   `(define-instruction ,name (segment rd rs1 rs2)
      (:printer r ((funct7 ,funct7) (funct3 ,funct3) (opcode ,opcode)))
      (:emitter
-      (when (integerp rs2)
-        (error "~a" ',name))
       (emit-r-inst segment ,funct7 rs2 rs1 ,funct3 rd ,opcode))))
 
 (macrolet ((define-rv32i-arith-instruction (name funct7 funct3 &optional word-variant)
@@ -424,7 +422,7 @@
 
 (defun fence-encoding (ops)
   (let ((vals '(:i 8 :o 4 :r 2 :w 1)))
-    (typecase ops
+    (etypecase ops
       ((unsigned-byte 4) ops)
       (list
        (let ((result 0))
@@ -463,7 +461,42 @@
    (%emit-i-inst segment #b000000000001 #b00000 #b000 #b00000 #b1110011)
    (when codep (emit-byte segment code))))
 
-;;; save CSR instructions for later - CSR
+(defun csr-encoding (kind)
+  (ecase kind
+    (:fflags #x001)
+    (:frm #x002)
+    (:fcsr #x003)))
+
+(defun emit-csr-inst (segment csr funct3 rs rd)
+  (%emit-i-inst segment (csr-encoding csr) (tn-offset rs) funct3 (tn-offset rd) #b1110011))
+
+(defun emit-csr-i-inst (segment csr funct3 zimm rd)
+  (%emit-i-inst segment (csr-encoding csr) zimm funct3 (tn-offset rd) #b1110011))
+
+(macrolet ((define-csr-instruction (name funct3)
+             `(define-instruction ,name (segment rd csr rs)
+                (:printer i ((funct3 ,funct3) (opcode #b1110011)))
+                (:emitter
+                 (emit-csr-inst segment csr ,funct3 rs rd))))
+           (define-csr-i-instruction (name funct3)
+             `(define-instruction ,name (segment csr rd zimm)
+                (:printer i ((funct3 ,funct3) (opcode #b1110011)))
+                (:emitter
+                 (emit-csr-i-inst segment csr ,funct3 zimm rd)))))
+  (define-csr-instruction   csrrw  #b001)
+  (define-csr-instruction   csrrs  #b010)
+  (define-csr-instruction   csrrc  #b011)
+  (define-csr-i-instruction csrrwi #b101)
+  (define-csr-i-instruction csrrsi #b110)
+  (define-csr-i-instruction csrrci #b111))
+
+(define-instruction-macro csrr (rd csr) `(inst csrrs ,rd ,csr zero-tn))
+(define-instruction-macro csrw (csr rs) `(inst csrrw zero-tn ,csr ,rs))
+(define-instruction-macro csrs (csr rs) `(inst csrrs zero-tn ,csr ,rs))
+(define-instruction-macro csrc (csr rs) `(inst csrrc zero-tn ,csr ,rs))
+(define-instruction-macro csrwi (csr imm) `(inst csrrw zero-tn ,csr ,imm))
+(define-instruction-macro csrsi (csr imm) `(inst csrrs zero-tn ,csr ,imm))
+(define-instruction-macro csrci (csr imm) `(inst csrrc zero-tn ,csr ,imm))
 
 (macrolet ((define-rv32m-arith-instruction (name funct3)
              `(define-register-arith-instruction ,name #b0000001 ,funct3 #b0110011)))
