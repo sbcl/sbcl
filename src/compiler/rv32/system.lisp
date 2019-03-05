@@ -162,7 +162,8 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
+    ;; 4 byte load, ignoring serial# in the high bits.
+    (inst #-64-bit lw #+64-bit lwu ndescr code (- (* n-word-bytes code-boxed-size-slot) other-pointer-lowtag))
     (inst subi ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
@@ -179,9 +180,9 @@
   (:temporary (:scs (interior-reg)) lip)
   (:result-types unsigned-num)
   (:generator 10
-    (loadw res code 0 other-pointer-lowtag)
     #-64-bit
     (progn
+      (loadw res code 0 other-pointer-lowtag)
       (inst slli res res 2) ; shift out the GC bits
       ;; Then shift right to clear the widetag, plus 2 more to the right since we just
       ;; left-shifted to zeroize bits. Then shift left 2 to convert words to bytes.
@@ -192,11 +193,12 @@
       (inst srli res res n-widetag-bits))
     #+64-bit
     (progn
+      (inst lwu res code (- 4 other-pointer-lowtag))
       (inst slli res res word-shift))
     (inst add res offset res)
     (inst subi res res other-pointer-lowtag)
     (inst add lip code res)
-    (loadw res lip 0)))
+    (inst #-64-bit lw #+64-bit lwu res lip 0)))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
@@ -205,7 +207,7 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
+    (inst #-64-bit lw #+64-bit lwu ndescr code (- (* n-word-bytes code-boxed-size-slot) other-pointer-lowtag))
     (inst add ndescr ndescr offset)
     (inst subi ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
