@@ -652,6 +652,7 @@
   (:args (real :scs (single-reg) :target r)
          (imag :scs (single-reg) :to :save))
   (:arg-types single-float single-float)
+  (:temporary (:sc non-descriptor-reg) t1 t2)
   (:results (r :scs (complex-single-reg) :from (:argument 0)
                :load-if (not (sc-is r complex-single-stack))))
   (:result-types complex-single-float)
@@ -661,17 +662,26 @@
   (:generator 5
     (sc-case r
       (complex-single-reg
-       (let ((r-real (complex-reg-real-tn :single r)))
-         (unless (location= real r-real)
-           (inst fmove :single r-real real)))
-       (let ((r-imag (complex-reg-imag-tn :single r)))
-         (unless (location= imag r-imag)
-           (inst fmove :single r-imag imag))))
+       #-64-bit
+       (progn
+         (let ((r-real (complex-reg-real-tn :single r)))
+           (unless (location= real r-real)
+             (inst fmove :single r-real real)))
+         (let ((r-imag (complex-reg-imag-tn :single r)))
+           (unless (location= imag r-imag)
+             (inst fmove :single r-imag imag))))
+       #+64-bit
+       (progn
+         (inst fmvx<- :single t1 real)
+         (inst fmvx<- :single t2 imag)
+         (inst slli t2 t2 32)
+         (inst add t2 t2 t1)
+         (inst fmvx-> :double r t2)))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
-         (inst fstore :single real nfp offset)
-         (inst fstore :single imag nfp (+ offset n-word-bytes)))))))
+         (inst fstore :single real nfp (* n-word-bytes offset))
+         (inst fstore :single imag nfp (+ (* n-word-bytes offset) 4)))))))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -696,13 +706,14 @@
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
-         (inst fstore :double real nfp offset)
-         (inst fstore :double imag nfp (+ offset (* #-64-bit 2 n-word-bytes))))))))
+         (inst fstore :double real nfp (* n-word-bytes offset))
+         (inst fstore :double imag nfp (+ (* n-word-bytes offset) 8)))))))
 
 (define-vop (complex-single-float-value)
   (:args (x :scs (complex-single-reg) :target r
             :load-if (not (sc-is x complex-single-stack))))
   (:arg-types complex-single-float)
+  (:temporary (:sc non-descriptor-reg) temp)
   (:results (r :scs (single-reg)))
   (:result-types single-float)
   (:variant-vars slot)
@@ -711,15 +722,29 @@
   (:generator 3
     (sc-case x
       (complex-single-reg
+       #-64-bit
        (let ((value-tn (ecase slot
                          (:real (complex-reg-real-tn :single x))
                          (:imag (complex-reg-imag-tn :single x)))))
          (unless (location= value-tn r)
-           (inst fmove :single r value-tn))))
+           (inst fmove :single r value-tn)))
+       #+64-bit
+       (ecase slot
+         (:real
+          (unless (location= r x)
+            (inst fmove :single r x)))
+         (:imag
+          (unless (location= r x)
+            (inst fmove :double r x))
+          (inst fmvx<- :double temp r)
+          (inst srli temp temp 32)
+          (inst fmvx-> :single r temp))))
       (complex-single-stack
-       (inst fload :single r (current-nfp-tn vop) (* (+ (ecase slot (:real 0) (:imag 1))
-                                                        (tn-offset x))
-                                                     n-word-bytes))))))
+       (inst fload :single r (current-nfp-tn vop)
+             (+ (ecase slot
+                  (:real 0)
+                  (:imag 4))
+                (* n-word-bytes (tn-offset x))))))))
 
 (define-vop (realpart/complex-single-float complex-single-float-value)
   (:translate realpart)
@@ -749,7 +774,7 @@
          (unless (location= value-tn r)
            (inst fmove :double r value-tn))))
       (complex-double-stack
-       (inst fload :double r (current-nfp-tn vop) (* (+ (ecase slot (:real 0) (:imag #+64-bit 1 #-64-bit 2))
+       (inst fload :double r (current-nfp-tn vop) (* (+ (ecase slot (:real 0) (:imag 1))
                                                         (tn-offset x))
                                                      n-word-bytes))))))
 

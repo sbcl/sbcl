@@ -68,7 +68,7 @@
 (defconstant float-round-to-negative 2)
 (defconstant float-round-to-positive 3)
 
-(defconstant-eqx float-rounding-mode (byte 2 5) #'equalp)
+(defconstant-eqx float-rounding-mode (byte 3 5) #'equalp)
 (defconstant-eqx float-sticky-bits (byte 5 0) #'equalp)
 ;;;; RISC-V has no explicit floating point traps.
 (defconstant-eqx float-traps-byte (byte 5 0) #'equalp)
