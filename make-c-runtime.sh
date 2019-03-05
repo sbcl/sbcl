@@ -10,7 +10,7 @@
 # We could make this use the target SBCL as the new host,
 # but that somewhat defeats the purpose.
 
-time $SBCL_XC_HOST <<EOF
+time $SBCL_XC_HOST --noinform --no-userinit --no-sysinit --noprint <<EOF
 (load "src/cold/shared.lisp")
 (load "src/cold/set-up-cold-packages.lisp")
 (load "tools-for-build/corefile.lisp")

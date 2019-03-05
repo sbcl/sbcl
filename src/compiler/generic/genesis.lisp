@@ -3212,7 +3212,7 @@ core and return a descriptor to it."
         (let ((s (package-symbolicate "SB-VM" "THREAD-" x "-SLOT")))
           (format t "#define ~a ~d~%"
                   (c-name (string s)) (symbol-value s))))
-      (terpri t))
+      (terpri))
     (format t "struct ~A {~%" c-name)
     (when (sb-vm:primitive-object-widetag obj)
       (format t "    lispobj header;~%"))
