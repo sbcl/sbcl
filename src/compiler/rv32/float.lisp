@@ -620,30 +620,29 @@
     (inst fmvx<- :single lo-bits float)))
 
 ;;;; Float mode hackery:
+(sb-xc:deftype float-modes () '(unsigned-byte 32))
+(defknown floating-point-modes () float-modes (flushable))
+(defknown ((setf floating-point-modes)) (float-modes)
+    float-modes)
 
-;;; Implement these when the fcsr can be manipulated.
-#+(or)
-(progn
-  (sb-xc:deftype float-modes () '(unsigned-byte 32))
-  (defknown floating-point-modes () float-modes (flushable))
-  (defknown ((setf floating-point-modes)) (float-modes)
-      float-modes)
+(define-vop (floating-point-modes)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate floating-point-modes)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst csrr res :fcsr)))
 
-  (define-vop (floating-point-modes)
-    (:results (res :scs (unsigned-reg)))
-    (:result-types unsigned-num)
-    (:translate floating-point-modes)
-    (:policy :fast-safe)
-    (:generator 3))
-
-  (define-vop (set-floating-point-modes)
-    (:args (new :scs (unsigned-reg) :target res))
-    (:results (res :scs (unsigned-reg)))
-    (:arg-types unsigned-num)
-    (:result-types unsigned-num)
-    (:translate (setf floating-point-modes))
-    (:policy :fast-safe)
-    (:generator 3)))
+(define-vop (set-floating-point-modes)
+  (:args (new :scs (unsigned-reg) :target res))
+  (:results (res :scs (unsigned-reg)))
+  (:arg-types unsigned-num)
+  (:result-types unsigned-num)
+  (:translate (setf floating-point-modes))
+  (:policy :fast-safe)
+  (:generator 3
+    (inst csrw :fcsr new)
+    (move res new)))
 
 ;;;; Complex float VOPs
 
