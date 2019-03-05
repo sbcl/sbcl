@@ -144,7 +144,7 @@
              :alternate-scs (double-stack)
              :save-p t)
 
- (complex-single-stack non-descriptor-stack :element-size #-64-bit 1 #+64-bit 2)
+ (complex-single-stack non-descriptor-stack :element-size #-64-bit 2 #+64-bit 1)
  (complex-single-reg float-registers
                      :locations #.(loop for i below 32 by (/ (* 2 32) n-word-bits) collect i)
                      :element-size (/ (* 2 32) n-word-bits)
