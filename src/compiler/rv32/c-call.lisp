@@ -39,8 +39,8 @@
 
 (defun result-reg-offset (slot)
   (ecase slot
-    (0 ca0-offset)
-    (1 ca1-offset)))
+    (0 nl1-offset)
+    (1 nl0-offset)))
 
 (defun register-args-offset (index)
   (elt +foreign-register-arg-offsets+ index))
@@ -150,7 +150,7 @@
     (loadw res addr)))
 
 (define-vop (call-out)
-  (:args (function :scs (sap-reg))
+  (:args (function :scs (sap-reg sap-stack))
          (args :more t))
   (:results (results :more t))
   (:ignore args results)
@@ -163,7 +163,10 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (move cfunc function)
+      (sc-case function
+        (sap-reg (move cfunc function))
+        (sap-stack
+         (loadw cfunc cur-nfp (tn-offset function))))
       (inst jal lr-tn (make-fixup 'call-into-c :assembly-routine))
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))

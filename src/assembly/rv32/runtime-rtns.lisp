@@ -114,7 +114,8 @@
      (:arg ca1 (any-reg) ca1-offset)
      (:arg ca2 (any-reg) ca2-offset)
 
-     (:temp value (any-reg) ca0-offset)
+     (:temp value0-pass (any-reg) nl1-offset)
+     (:temp value1-pass (any-reg) nl0-offset)
      (:temp pa-temp (any-reg) nl6-offset)
      (:temp temp (any-reg) nl7-offset)
      (:temp a0 (descriptor-reg any-reg) a0-offset))
@@ -145,8 +146,9 @@
   ;; Call into C.
   (inst jalr lr-tn cfunc 0)
 
-  ;; Pass value to Lisp.
-  (move a0 value)
+  ;; Pass the return values to Lisp.
+  (move value0-pass ca0)
+  (move value1-pass ca1)
 
   (initialize-boxed-regs)
 
