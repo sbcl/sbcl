@@ -126,7 +126,7 @@
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
 
       (storew type result 0 other-pointer-lowtag)
-      (storew length result vector-length-slot other-pointer-lowtag)
+
       ;; The header word has already been set, skip it.
       (inst addi temp result (- (* vector-data-offset n-word-bytes)
                                 other-pointer-lowtag))
@@ -136,7 +136,11 @@
         (storew zero-tn temp 0)
         (inst addi temp temp n-word-bytes)
         ;; FIXME: This breaks the allocation abstraction a little.
-        (inst bne temp csp-tn loop)))))
+        (inst blt temp csp-tn loop))
+      ;; Our zero-fill loop always executes at least one store, so to
+      ;; ensure that there is at least one slot available to be
+      ;; clobbered, we defer setting the vector-length slot until now.
+      (storew length result vector-length-slot other-pointer-lowtag))))
 
 (define-vop (make-closure)
   (:args (function :to :save :scs (descriptor-reg)))
