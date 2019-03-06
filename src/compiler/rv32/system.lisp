@@ -196,9 +196,8 @@
       (inst lwu res code (- 4 other-pointer-lowtag))
       (inst slli res res word-shift))
     (inst add res offset res)
-    (inst subi res res other-pointer-lowtag)
     (inst add lip code res)
-    (inst #-64-bit lw #+64-bit lwu res lip 0)))
+    (inst #-64-bit lw #+64-bit lwu res lip (- other-pointer-lowtag))))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
