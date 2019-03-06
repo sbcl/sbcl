@@ -42,7 +42,7 @@
 
 ;;; Do a cell ref with an error check for being unbound.
 (define-vop (checked-cell-ref)
-  (:args (object :scs (descriptor-reg)))
+  (:args (object :scs (descriptor-reg) :to :save))
   (:results (value :scs (descriptor-reg any-reg)))
   (:policy :fast-safe)
   (:vop-var vop)
@@ -233,7 +233,8 @@
     (loadw value object (+ closure-info-offset offset) fun-pointer-lowtag)))
 
 (define-vop (closure-init)
-  (:args (object :scs (descriptor-reg)) (value :scs (descriptor-reg any-reg)))
+  (:args (object :scs (descriptor-reg))
+         (value :scs (descriptor-reg any-reg)))
   (:info offset)
   (:generator 4
     (storew value object (+ closure-info-offset offset) fun-pointer-lowtag)))
@@ -262,7 +263,11 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw temp struct 0 instance-pointer-lowtag)
-    (inst srli res temp n-widetag-bits)))
+    (inst srli res temp n-widetag-bits)
+    #+64-bit
+    (progn
+      (inst li temp short-header-max-words)
+      (inst and res res temp))))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)

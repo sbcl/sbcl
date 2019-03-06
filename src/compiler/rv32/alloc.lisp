@@ -162,7 +162,7 @@
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
-  (:args (value :scs (descriptor-reg any-reg)))
+  (:args (value :to :save :scs (descriptor-reg any-reg)))
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:results (result :scs (descriptor-reg)))
   (:info stack-allocate-p)
