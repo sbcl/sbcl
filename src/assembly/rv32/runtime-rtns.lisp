@@ -39,8 +39,7 @@
   (dolist (boxed-reg-offset boxed-regs)
     (unless (member boxed-reg-offset still-live)
       (inst li (make-any-reg-tn boxed-reg-offset) 0)))
-  ;; FIXME
-  (inst li null-tn #x8000017))
+  (inst li null-tn nil-value))
 
 (define-assembly-routine (call-into-lisp (:return-style :none))
     ((:arg function (descriptor-reg any-reg) ca0-offset)
