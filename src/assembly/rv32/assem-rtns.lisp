@@ -52,8 +52,8 @@
                                      (inst bge zero-tn count ,label)))
 
                   ;; Copy the remaining args to the top of the stack.
-                  (inst addi vals vals (fixnumize register-arg-count))
-                  (inst addi dst cfp-tn (fixnumize register-arg-count))
+                  (inst addi vals vals (* register-arg-count n-word-bytes))
+                  (inst addi dst cfp-tn (* register-arg-count n-word-bytes))
 
                   LOOP
                   (loadw temp vals)
