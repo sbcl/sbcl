@@ -907,6 +907,12 @@ necessary, since type inference may take arbitrarily long to converge.")
                            ;; SBCL stream classes aren't available in the host
                            #-sb-xc-host :class
                            #-sb-xc-host 'form-tracking-stream)))
+                #+(and sb-xc-host sb-show)
+                (setq stream (make-concatenated-stream
+                              stream
+                              (make-string-input-stream
+                               (format nil "(write-string \"Completed TLFs: ~A~%\")"
+                                       (file-info-untruename file-info)))))
                 (when (file-info-subforms file-info)
                   (setf (form-tracking-stream-observer stream)
                         (make-form-tracking-stream-observer file-info)))
@@ -1096,35 +1102,6 @@ necessary, since type inference may take arbitrarily long to converge.")
         ;; and recompute paths, or just snapshot the hash-table.
         ;; (aver (plusp (hash-table-count *source-paths*)))
         (convert-and-maybe-compile form path nil)))))
-
-;;; Read and compile the source file.
-(defun sub-sub-compile-file (info)
-  (do-forms-from-info ((form current-index) info
-                       'input-error-in-compile-file)
-    (with-source-paths
-      (find-source-paths form current-index)
-      (let ((sb-xc:*gensym-counter* 0))
-        (process-toplevel-form
-         form `(original-source-start 0 ,current-index) nil))))
-  (let ((*source-info* info))
-    (process-queued-tlfs))
-  ;; It's easy to get into a situation where cold-init crashes and the only
-  ;; backtrace you get from ldb is TOP-LEVEL-FORM, which means you're anywhere
-  ;; within the 23000 or so blobs of code deferred until cold-init.
-  ;; Seeing each file finish narrows things down without the noise of :sb-show,
-  ;; but this hack messes up form positions, so it's not on unless asked for.
-  #+nil ; change to #+sb-xc-host if desired
-  (let ((file-info (get-toplevelish-file-info info)))
-    (declare (ignorable file-info))
-    (let* ((forms (file-info-forms file-info))
-           (form
-            `(write-string
-              ,(format nil "Completed TLFs: ~A~%" (file-info-name file-info))))
-           (index (fill-pointer forms)))
-      (with-source-paths
-        (find-source-paths form index)
-        (process-toplevel-form
-         form `(original-source-start 0 ,index) nil)))))
 
 ;;; Return the INDEX'th source form read from INFO and the position
 ;;; where it was read.
@@ -1727,8 +1704,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (declare (type source-info info))
   (let ((*package* (sane-package))
         (*readtable* *readtable*)
-        (sb-xc:*compile-file-pathname* nil) ; really bound in
-        (sb-xc:*compile-file-truename* nil) ; SUB-SUB-COMPILE-FILE
+        (sb-xc:*compile-file-pathname* nil) ; set by GET-SOURCE-STREAM
+        (sb-xc:*compile-file-truename* nil) ; "
         (*policy* *policy*)
         (*macro-policy* *macro-policy*)
         (*compiler-coverage-metadata* (cons (make-hash-table :test 'equal)
@@ -1760,7 +1737,15 @@ necessary, since type inference may take arbitrarily long to converge.")
               (with-world-lock ()
                 (setf (sb-fasl::fasl-output-source-info *compile-object*)
                       (debug-source-for-info info))
-                (sub-sub-compile-file info)
+                (do-forms-from-info ((form current-index) info
+                                     'input-error-in-compile-file)
+                  (with-source-paths
+                   (find-source-paths form current-index)
+                   (let ((sb-xc:*gensym-counter* 0))
+                     (process-toplevel-form
+                      form `(original-source-start 0 ,current-index) nil))))
+                (let ((*source-info* info))
+                  (process-queued-tlfs))
                 (let ((code-coverage-records (code-coverage-records *compiler-coverage-metadata*)))
                   (unless (zerop (hash-table-count code-coverage-records))
                   ;; Dump the code coverage records into the fasl.
