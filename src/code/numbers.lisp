@@ -131,6 +131,20 @@
 ;;; list of the form (DISPATCH-TYPE Var-Name) is substituted with the
 ;;; type of that var in that instance of the case.
 ;;;
+;;; [Though it says "_any_ list", it's still an example of how not to perform
+;;; incomplete lexical analysis within a macro imho. Let's say that the body
+;;; code passes a lambda that happens name its args DISPATCH-TYPE and X.
+;;; What happens?
+;;; (macroexpand-1 '(number-dispatch ((x number))
+;;;                  ((float) (f x (lambda (dispatch-type x) (wat))))))
+;;; -> [stuff elided]
+;;;      (TYPECASE X (FLOAT (F X (LAMBDA FLOAT (WAT))))
+;;;
+;;; So the NUMBER-DISPATCH macro indeed substituted for *any* appearance
+;;; just like it says. I wonder if we could define DISPATCH-TYPE as macrolet
+;;; that expands to the type for the current branch, so that it _must_
+;;; be in a for-evaluation position; but maybe I'm missing something?]
+;;;
 ;;; As an alternate to a case spec, there may be a form whose CAR is a
 ;;; symbol. In this case, we apply the CAR of the form to the CDR and
 ;;; treat the result of the call as a list of cases. This process is

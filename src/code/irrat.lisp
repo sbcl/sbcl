@@ -397,8 +397,7 @@
          ;; Is (log -0) -infinity (libm.a) or -infinity + i*pi (Kahan)?
          ;; Since this doesn't seem to be an implementation issue
          ;; I (pw) take the Kahan result.
-         (if (< (float-sign number)
-                (coerce 0 '(dispatch-type number)))
+         (if (= (float-sign-bit number) 1) ; MINUSP
              (complex (log (- number)) (coerce sb-xc:pi '(dispatch-type number)))
              (coerce (%log (coerce number 'double-float))
                      '(dispatch-type number))))
@@ -551,7 +550,7 @@
                         (values double-float))
                (if (zerop x)
                    (if (zerop y)
-                       (if (plusp (float-sign x))
+                       (if (= (float-sign-bit x) 0) ; PLUSP
                            y
                            (float-sign y sb-xc:pi))
                        (float-sign y (/ sb-xc:pi 2)))

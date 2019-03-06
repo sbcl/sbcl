@@ -148,6 +148,22 @@
          (float 1 float1))
      (abs float2)))
 
+;;; When all we want is the sign bit, there is a simpler way to extract it
+;;; than via either integer-decode-float or float-sign. Just shift the msb
+;;; over to the lsb position. FLOAT-SIGN produces some pretty horrific code
+;;; if the specific subtype of float is unnown:
+;;;  (minusp (float-sign x)) becomes (< (float-sign x) (float 0 x))
+;;; which ends up calling not only FLOAT-SIGN, but also FLOAT merely to cast
+;;; the integer 0 into a float of whatever type X is.
+(defun float-sign-bit (x) ; return 1 or 0, literally the sign bit
+  (declare (explicit-check))
+  (number-dispatch ((x float))
+    ((single-float)
+     (logand (ash (single-float-bits x) -31) 1))
+    ((double-float)
+     #-64-bit (logand (ash (double-float-high-bits x) -31) 1)
+     #+64-bit (ash (logand (double-float-bits x) most-positive-word) -63))))
+
 (defun float-format-digits (format)
   (ecase format
     ((short-float single-float) sb-vm:single-float-digits)

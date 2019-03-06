@@ -368,6 +368,10 @@
 ;;; Do some stuff to recognize when the loser is doing mixed float and
 ;;; rational arithmetic, or different float types, and fix it up. If
 ;;; we don't, he won't even get so much as an efficiency note.
+;;; Unfortunately this produces unnecessarily bad code for something
+;;; as simple as (ZEROP (THE FLOAT X)) because we _know_ that the thing
+;;; is a float, but the ZEROP transform injected a rational 0,
+;;; which we then go to the trouble of coercing to a float.
 (deftransform float-contagion-arg1 ((x y) * * :defun-only t :node node)
   (if (or (not (types-equal-or-intersect (lvar-type y) (specifier-type 'single-float)))
           (safe-ctype-for-single-coercion-p (lvar-type x)))
@@ -694,9 +698,9 @@
               (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))
             arg-hi-val arg-hi))
     (flet ((fp-neg-zero-p (f)           ; Is F -0.0?
-             (and (floatp f) (zerop f) (minusp (float-sign f))))
+             (and (floatp f) (zerop f) (= (float-sign-bit f) 1)))
            (fp-pos-zero-p (f)           ; Is F +0.0?
-             (and (floatp f) (zerop f) (plusp (float-sign f)))))
+             (and (floatp f) (zerop f) (= (float-sign-bit f) 0))))
       (and (or (null domain-low)
                (and arg-lo (>= arg-lo-val domain-low)
                     (not (and (fp-pos-zero-p domain-low)

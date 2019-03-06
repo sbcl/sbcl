@@ -577,7 +577,7 @@
      (sb-impl::string-dispatch (single-float double-float)
          number
        (let ((spaceleft w))
-         (when (and w (or atsign (minusp (float-sign number))))
+         (when (and w (or atsign (= (float-sign-bit number) 1)))
            (decf spaceleft))
          (multiple-value-bind (str len lpoint tpoint)
              (sb-impl::flonum-to-string (abs number) spaceleft d k)
@@ -606,7 +606,7 @@
                   (when w
                     (dotimes (i spaceleft)
                       (write-char pad stream)))
-                  (if (minusp (float-sign number))
+                  (if (= (float-sign-bit number) 1)
                       (write-char #\- stream)
                       (when atsign
                         (write-char #\+ stream)))
@@ -679,7 +679,7 @@
                spaceleft)
           (when w
             (setf spaceleft (- w 2 elen))
-            (when (or atsign (minusp (float-sign number)))
+            (when (or atsign (= (float-sign-bit number) 1))
               (decf spaceleft)))
           (if (and w ovf e (> elen e))  ;exponent overflow
               (dotimes (i w) (write-char ovf stream))
@@ -701,7 +701,7 @@
                          (dotimes (i w) (write-char ovf stream)))
                         (t (when w
                              (dotimes (i spaceleft) (write-char pad stream)))
-                           (if (minusp (float-sign number))
+                           (if (= (float-sign-bit number) 1)
                                (write-char #\- stream)
                                (if atsign (write-char #\+ stream)))
                            (when lpoint (write-char #\0 stream))
@@ -781,7 +781,7 @@
     ;; thing, and at least the user shouldn't be surprised.
     (setq number (coerce number 'single-float)))
   (if (floatp number)
-      (let* ((signstr (if (minusp (float-sign number))
+      (let* ((signstr (if (= (float-sign-bit number) 1)
                           "-"
                           (if atsign "+" "")))
              (signlen (length signstr)))

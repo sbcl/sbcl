@@ -23,6 +23,10 @@
           "~&(can't portably mask float traps, proceeding anyway)~%")
   `(progn ,@body))
 
+;;; Portable implementation of FLOAT-SIGN-BIT,
+;;; assuming that we don't use signed zeros.
+(defun float-sign-bit (x) (if (< x 0) 1 0))
+
 ;;; portable implementations of SINGLE-FLOAT-BITS,
 ;;; DOUBLE-FLOAT-LOW-BITS, and DOUBLE-FLOAT-HIGH-BITS
 ;;;

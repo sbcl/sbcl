@@ -619,7 +619,7 @@
     (when fp-zeroes ; avoid doing two passes of nothing
       (dotimes (pass 2)
         (dolist (z fp-zeroes)
-          (let ((sign (if (minusp (nth-value 2 (integer-decode-float z))) 1 0))
+          (let ((sign (float-sign-bit z))
                 (pair-idx
                   (etypecase z
                     (single-float 0)
