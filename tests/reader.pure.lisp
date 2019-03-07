@@ -547,3 +547,22 @@
       (expect nil
               '(simple-array character (9))
               '(simple-array character (9))))))
+
+(with-test (:name :rational-rdff)
+  (with-standard-io-syntax
+    (let ((*read-default-float-format* 'rational))
+      (macrolet ((assert-read-eqlity (x y)
+                   `(assert (eql (read-from-string ,x) ,y)))
+                 (assert-print-string= (x y)
+                   `(assert (string= (prin1-to-string ,x) ,y))))
+        (assert-read-eqlity "1.0" 1)
+        (assert-read-eqlity "-1.0e0" -1)
+        (assert-read-eqlity "0.1" 1/10)
+        (assert-read-eqlity "-0.1e0" -1/10)
+        (assert-read-eqlity "0.1d0" 0.1d0)
+        (assert-read-eqlity "-0.1f0" -0.1f0)
+
+        (assert-print-string= 1 "1")
+        (assert-print-string= 1/10 "1/10")
+        (assert-print-string= 0.1f0 "0.1f0")
+        (assert-print-string= 0.1d0 "0.1d0")))))
