@@ -130,8 +130,7 @@
 
 ;;; a helper function for INFINITE-ERROR-PROTECT
 (defun infinite-error-protector ()
-  (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
-  (/hexstr *current-error-depth*)
+  (/show "entering INFINITE-ERROR-PROTECTOR" *CURRENT-ERROR-DEPTH*)
   ;; *MAXIMUM-ERROR-DEPTH* is not bound during cold-init, and testing BOUNDP
   ;; is superfluous since REALP will return false either way.
   (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
@@ -140,8 +139,7 @@
            (%primitive print "Argh! corrupted error depth, halting")
            (%primitive sb-c:halt))
           ((> cur max)
-           (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
-           (/hexstr max)
+           (/show "*MAXIMUM-ERROR-DEPTH*" max)
            (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
            (sb-impl::error-error "Help! "
                         cur
@@ -154,13 +152,17 @@
 (defun error (datum &rest arguments)
   "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.
   If the condition is not handled, the debugger is invoked."
-  (/show0 "entering ERROR, argument list=..")
-  (/hexstr arguments)
-
-  (/show0 "cold-printing ERROR arguments one by one..")
-  #+sb-show (dolist (argument arguments)
-               (sb-impl::cold-print argument))
-  (/show0 "done cold-printing ERROR arguments")
+  (/show "entering ERROR, argument list=" (get-lisp-obj-address arguments))
+  #+sb-show
+  (when arguments
+    (fresh-line)
+    (write-string "ERROR arguments (")
+    (write (length arguments))
+    (write-string " total)")
+    (terpri)
+    (loop for i from 0
+          for x in arguments
+          do (write i) (write-string "=") (write x) (terpri)))
 
   (infinite-error-protect
    (let ((condition (apply #'coerce-to-condition datum 'simple-error 'error

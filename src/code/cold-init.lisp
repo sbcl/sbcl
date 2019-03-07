@@ -173,9 +173,8 @@
                                  (makunbound '*!cold-toplevels*))
         do
       #+sb-show
-      (when (zerop (mod index-in-cold-toplevels 1024))
-        (/show0 "INDEX-IN-COLD-TOPLEVELS=..")
-        (/hexstr index-in-cold-toplevels))
+      (when (zerop (mod index-in-cold-toplevels 1000))
+        (/show index-in-cold-toplevels))
       (typecase toplevel-thing
         (function
          (funcall toplevel-thing))
@@ -429,5 +428,5 @@ process to continue normally."
     defenum defun-cached with-globaldb-name def!type def!struct
     .
     #+sb-show ()
-    #-sb-show (/hexstr /nohexstr /noshow /noshow0 /show /show0))
+    #-sb-show (/noshow /noshow0 /show /show0))
   *!removable-symbols*)

@@ -309,8 +309,10 @@ lispobj debug_print(lispobj string)
        an unused buffer on the stack before doing anything else
        here */
     char untouched[32];
-    fprintf(stderr, "%s\n",
-            (char *)(VECTOR(string)->data));
+    if (header_widetag(VECTOR(string)->header) != SIMPLE_BASE_STRING_WIDETAG)
+        fprintf(stderr, "debug_print: can't display string\n");
+    else
+        fprintf(stderr, "%s\n", (char *)(VECTOR(string)->data));
     /* shut GCC up about not using this, because that's the point.. */
     (void)untouched;
     return NIL;

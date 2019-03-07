@@ -94,22 +94,8 @@
                   (mapcar #'string string-designators))))
     (declare (ignorable s)) ; (for when #-SB-SHOW)
     #+sb-xc-host `(/show ,s)
-    #-sb-xc-host `(progn
-                    #+sb-show
-                    (%primitive print
-                                ,(concatenate 'simple-string "/" s)))))
+    ;; ensure that fprintf() receives only a SIMPLE-BASE-STRING
+    #+(and sb-show (not sb-xc-host))
+    `(%primitive print ,(concatenate 'simple-base-string "/" s))))
 (defmacro /noshow0 (&rest rest)
   (declare (ignore rest)))
-
-;;; low-level display of a system word, works even early in cold init
-(defmacro /hexstr (thing)
-  (declare (ignorable thing)) ; (for when #-SB-SHOW)
-  #+sb-show
-  (progn
-    #+sb-xc-host `(/show "(/hexstr)" ,thing)
-    #-sb-xc-host `(%primitive print (hexstr ,thing))))
-
-(defmacro /nohexstr (thing)
-  (declare (ignore thing)))
-
-(/show0 "done with show.lisp")

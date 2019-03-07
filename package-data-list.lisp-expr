@@ -1355,7 +1355,6 @@ possibly temporarily, because it might be used internally."
                           "HEXSTR")
                "/SHOW"  "/NOSHOW"
                "/SHOW0" "/NOSHOW0"
-               "/HEXSTR" "/NOHEXSTR"
 
                ;; cross-compilation bootstrap hacks which turn into
                ;; placeholders in a target system
