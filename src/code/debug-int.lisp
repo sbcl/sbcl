@@ -3165,11 +3165,11 @@ register."
   (setf (breakpoint-status breakpoint) :active)
   (without-interrupts
    (unless (breakpoint-data-breakpoints data)
-     (setf (breakpoint-data-instruction data)
-           (without-gcing
-            (breakpoint-install (get-lisp-obj-address
-                                 (breakpoint-data-component data))
-                                (breakpoint-data-offset data)))))
+     (let ((code (breakpoint-data-component data)))
+       (with-pinned-objects (code)
+         (setf (breakpoint-data-instruction data)
+               (breakpoint-install (get-lisp-obj-address code)
+                                   (breakpoint-data-offset data))))))
    (setf (breakpoint-data-breakpoints data)
          (append (breakpoint-data-breakpoints data) (list breakpoint)))
    (setf (breakpoint-internal-data breakpoint) data)))
@@ -3205,11 +3205,11 @@ register."
         (setf (breakpoint-internal-data breakpoint) nil)
         (setf (breakpoint-data-breakpoints data) bpts)
         (unless bpts
-          (without-gcing
-           (breakpoint-remove (get-lisp-obj-address
-                               (breakpoint-data-component data))
-                              (breakpoint-data-offset data)
-                              (breakpoint-data-instruction data)))
+          (let ((code (breakpoint-data-component data)))
+            (with-pinned-objects (code)
+              (breakpoint-remove (get-lisp-obj-address code)
+                                 (breakpoint-data-offset data)
+                                 (breakpoint-data-instruction data))))
           (delete-breakpoint-data data))))
   (setf (breakpoint-status breakpoint) :inactive)
   breakpoint)
