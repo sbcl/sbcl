@@ -3231,7 +3231,9 @@ core and return a descriptor to it."
       (format t "#define ~A_~A_OFFSET ~D~%"
               (c-symbol-name name)
               (c-symbol-name (sb-vm:slot-name slot))
-              (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag))))
+              (- (* (sb-vm:slot-offset slot) sb-vm:n-word-bytes) lowtag)))
+    (format t "#define ~A_SIZE ~d~%"
+            (string-upcase c-name) (sb-vm:primitive-object-length obj)))
   (format t "~%#endif /* __ASSEMBLER__ */~2%"))
 
 (defun write-structure-object (dd *standard-output*)

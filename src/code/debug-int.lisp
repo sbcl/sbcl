@@ -3473,14 +3473,12 @@ register."
            (code-object
             (sb-c:allocate-code-object
              nil
-             ;; For PPC: hardcode as expected by ppc-assem.S
-             ;; For other non-x86: a single boxed constant holds the true LRA.
+             ;; For non-x86: a single boxed constant holds the true LRA.
              ;; For x86[-64]: one boxed constant holds the code object to which
              ;; to return, and one holds the displacement into that object.
              ;; Ensure required boxed header alignment.
-             #+ppc 6
-             #-ppc (align-up (+ sb-vm:code-constants-offset 1 #+(or x86-64 x86) 1)
-                             sb-c::code-boxed-words-align)
+             (align-up (+ sb-vm:code-constants-offset 1 #+(or x86-64 x86) 1)
+                       sb-c::code-boxed-words-align)
              ;; 2 extra raw bytes represent CODE-N-ENTRIES (which is zero)
              (+ length 2))))
       (setf (%code-debug-info code-object) :bpt-lra)
