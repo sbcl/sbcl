@@ -896,13 +896,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
         lose("internal error too early in init, can't recover\n");
     }
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
-#endif
-
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-#endif
 
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_MIPS)
     /* Workaround for blocked SIGTRAP. */
@@ -2235,9 +2229,9 @@ handle_memory_fault_emulation_trap(os_context_t *context)
 #endif /* C_STACK_IS_CONTROL_STACK */
     /* On x86oids, we're in handle_memory_fault_emulation_trap().
      * On real computers, we're still in lisp_memory_fault_error(). */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
-#endif
+
+    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+
     DX_ALLOC_SAP(context_sap, context);
     DX_ALLOC_SAP(fault_address_sap, addr);
     funcall2(StaticSymbolFunction(MEMORY_FAULT_ERROR),
@@ -2251,13 +2245,9 @@ unhandled_trap_error(os_context_t *context)
 {
     DX_ALLOC_SAP(context_sap, context);
     fake_foreign_function_call(context);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
-#endif
 
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-#endif
+
     funcall1(StaticSymbolFunction(UNHANDLED_TRAP_ERROR), context_sap);
     lose("UNHANDLED-TRAP-ERROR fell through");
 }
