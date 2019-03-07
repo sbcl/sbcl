@@ -2274,13 +2274,15 @@
                                    (/= (sb-kernel:generation-of x)
                                        sb-vm:+pseudo-static-generation+))))))
            (test (lambda)
-             (let* ((start-count (count-code-objects))
-                    (result
-                     (let ((sb-c::*compile-to-memory-space* :immobile))
-                       (compile nil lambda)))
-                    (end-count (count-code-objects)))
-               (assert (= end-count (1+ start-count)))
-               result)))
+             (sb-sys:without-gcing
+              (let* ((start-count (count-code-objects))
+                     (result
+                       (let ((sb-c::*compile-to-memory-space* :immobile))
+                         (compile nil lambda)))
+                     (end-count (count-code-objects)))
+                (assert (= end-count (1+ start-count)))
+                result))))
+    (sb-ext:gc :full t)
     ;; Test 1: simple macrolet
     (test '(lambda (x) (macrolet ((baz (arg) `(- ,arg))) (list (baz x)))))
     ;; Test 2: inline a function that captured a macrolet
