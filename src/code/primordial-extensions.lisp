@@ -244,6 +244,13 @@
 (defun ensure-list (thing)
   (if (listp thing) thing (list thing)))
 
+(defun recons (old-cons car cdr)
+  "If CAR is eq to the car of OLD-CONS and CDR is eq to the CDR, return
+  OLD-CONS, otherwise return (cons CAR CDR)."
+  (if (and (eq car (car old-cons)) (eq cdr (cdr old-cons)))
+      old-cons
+      (cons car cdr)))
+
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)
   `(let ((it ,test))

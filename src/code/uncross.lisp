@@ -92,7 +92,8 @@
                       (setf (gethash form inside?) t)
                       (unwind-protect
                           (typecase form
-                            (cons (rcr-cons form))
+                            (cons
+                             (recons form (rcr (car form)) (rcr (cdr form))))
                             (t
                              ;; KLUDGE: There are other types
                              ;; (especially (ARRAY T) and
@@ -109,15 +110,6 @@
                              ;; warnings off. -- WHN 20001105
                              #+nil (warn 'uncross-rcr-failure :form form)
                              form))
-                        (remhash form inside?)))))
-             (rcr-cons (form)
-               (declare (type cons form))
-               (let* ((car (car form))
-                      (rcr-car (rcr car))
-                      (cdr (cdr form))
-                      (rcr-cdr (rcr cdr)))
-                 (if (and (eq rcr-car car) (eq rcr-cdr cdr))
-                   form
-                   (cons rcr-car rcr-cdr)))))
+                        (remhash form inside?))))))
       (clrhash inside?)
       (rcr form))))
