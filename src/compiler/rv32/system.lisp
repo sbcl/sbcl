@@ -45,7 +45,7 @@
     ;; OTHER-POINTER-LOWTAG are both in the upper half of the lowtag
     ;; space, while LIST-POINTER-LOWTAG and INSTANCE-POINTER-LOWTAG
     ;; are in the lower half, so we distinguish with a bit test.
-    (inst andi ndescr object #b100)
+    (inst andi ndescr object #-64-bit #b100 #+64-bit #b1000)
     (inst beq ndescr zero-tn done)
 
     ;; And, finally, pick out the widetag from the header.
