@@ -566,3 +566,14 @@
         (assert-print-string= 1/10 "1/10")
         (assert-print-string= 0.1f0 "0.1f0")
         (assert-print-string= 0.1d0 "0.1d0")))))
+
+(with-test (:name :rational-exponent)
+  (with-standard-io-syntax
+    (macrolet ((assert-read-eqlity (x y)
+                 `(assert (eql (read-from-string ,x) ,y))))
+      (assert-read-eqlity "1.0r0" 1)
+      (assert-read-eqlity "1.0r5" 100000)
+      (assert-read-eqlity "0.1r0" 1/10)
+      (assert-read-eqlity "0.333R0" 333/1000)
+      (assert-read-eqlity "1R-3" 1/1000)
+      (assert-read-eqlity ".1R2" 10))))

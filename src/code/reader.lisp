@@ -190,11 +190,13 @@
         (!set-constituent-trait #\D +char-attr-constituent-expt+)
         (!set-constituent-trait #\S +char-attr-constituent-expt+)
         (!set-constituent-trait #\L +char-attr-constituent-expt+)
+        (!set-constituent-trait #\R +char-attr-constituent-expt+) ; extension
         (!set-constituent-trait #\e +char-attr-constituent-expt+)
         (!set-constituent-trait #\f +char-attr-constituent-expt+)
         (!set-constituent-trait #\d +char-attr-constituent-expt+)
         (!set-constituent-trait #\s +char-attr-constituent-expt+)
         (!set-constituent-trait #\l +char-attr-constituent-expt+)
+        (!set-constituent-trait #\r +char-attr-constituent-expt+) ; extension
         (!set-constituent-trait #\Space +char-attr-invalid+)
         (!set-constituent-trait #\Newline +char-attr-invalid+)
         (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
@@ -1743,7 +1745,8 @@ extended <package-name>::<form-in-package> syntax."
                                   (#\S 'short-float)
                                   (#\F 'single-float)
                                   (#\D 'double-float)
-                                  (#\L 'long-float)))
+                                  (#\L 'long-float)
+                                  (#\R 'rational)))
                   (exponent (truncate-exponent exponent number divisor))
                   (result (make-float-aux (* (expt 10 exponent) number)
                                           divisor float-format stream)))
