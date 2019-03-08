@@ -36,69 +36,69 @@
      (and (zerop (ldb sb-vm:long-float-exponent-byte (long-float-exp-bits x)))
           (not (zerop x))))))
 
-(macrolet ((define-float-inf-or-nan-test
-               (name doc single double #+(and long-float x86) long)
-             `(defun ,name (x) ,doc
-                (number-dispatch ((x float))
-                  ((single-float)
-                   (let ((bits (single-float-bits x)))
-                     (and (> (ldb sb-vm:single-float-exponent-byte bits)
-                             sb-vm:single-float-normal-exponent-max)
-                          ,single)))
-                  ((double-float)
-                   #+64-bit
-                   ;; With 64-bit words, all the FOO-float-byte constants need to be reworked
-                   ;; to refer to a byte position in the whole word. I think we can reasonably
-                   ;; get away with writing the well-known values here.
-                   (let ((bits (double-float-bits x)))
-                     (and (> (ldb (byte 11 52) bits) sb-vm:double-float-normal-exponent-max)
-                          ,double))
-                   #-64-bit
-                   (let ((hi (double-float-high-bits x))
-                         (lo (double-float-low-bits x)))
-                     (declare (ignorable lo))
-                     (and (> (ldb sb-vm:double-float-exponent-byte hi)
-                             sb-vm:double-float-normal-exponent-max)
-                          ,double)))
-                  #+(and long-float x86)
-                  ((long-float)
-                   (let ((exp (long-float-exp-bits x))
-                         (hi (long-float-high-bits x))
-                         (lo (long-float-low-bits x)))
-                     (declare (ignorable lo))
-                     (and (> (ldb sb-vm:long-float-exponent-byte exp)
-                             sb-vm:long-float-normal-exponent-max)
-                          ,long)))))))
+(defmacro define-float-inf-or-nan-test
+    (name doc single double #+(and long-float x86) long)
+  `(defun ,name (x) ,doc
+     (number-dispatch ((x float))
+       ((single-float)
+        (let ((bits (single-float-bits x)))
+          (and (> (ldb sb-vm:single-float-exponent-byte bits)
+                  sb-vm:single-float-normal-exponent-max)
+               ,single)))
+       ((double-float)
+        #+64-bit
+        ;; With 64-bit words, all the FOO-float-byte constants need to be reworked
+        ;; to refer to a byte position in the whole word. I think we can reasonably
+        ;; get away with writing the well-known values here.
+        (let ((bits (double-float-bits x)))
+          (and (> (ldb (byte 11 52) bits) sb-vm:double-float-normal-exponent-max)
+               ,double))
+        #-64-bit
+        (let ((hi (double-float-high-bits x))
+              (lo (double-float-low-bits x)))
+          (declare (ignorable lo))
+          (and (> (ldb sb-vm:double-float-exponent-byte hi)
+                  sb-vm:double-float-normal-exponent-max)
+               ,double)))
+       #+(and long-float x86)
+       ((long-float)
+        (let ((exp (long-float-exp-bits x))
+              (hi (long-float-high-bits x))
+              (lo (long-float-low-bits x)))
+          (declare (ignorable lo))
+          (and (> (ldb sb-vm:long-float-exponent-byte exp)
+                  sb-vm:long-float-normal-exponent-max)
+               ,long))))))
 
-  ;; Infinities and NANs have the maximum exponent
-  (define-float-inf-or-nan-test float-infinity-or-nan-p nil
+;; Infinities and NANs have the maximum exponent
+(define-float-inf-or-nan-test float-infinity-or-nan-p nil
     t t #+(and long-float x86) t)
 
-  ;; Infinity has 0 for the significand
-  (define-float-inf-or-nan-test float-infinity-p
+;; Infinity has 0 for the significand
+(define-float-inf-or-nan-test float-infinity-p
   "Return true if the float X is an infinity (+ or -)."
-    (zerop (ldb sb-vm:single-float-significand-byte bits))
+  (zerop (ldb sb-vm:single-float-significand-byte bits))
 
-    #+64-bit (zerop (ldb (byte 52 0) bits))
-    #-64-bit (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo))
+  #+64-bit (zerop (ldb (byte 52 0) bits))
+  #-64-bit (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo))
 
-    #+(and long-float x86)
-    (and (zerop (ldb sb-vm:long-float-significand-byte hi))
-         (zerop lo)))
+  #+(and long-float x86)
+  (and (zerop (ldb sb-vm:long-float-significand-byte hi))
+       (zerop lo)))
 
-  ;; NaNs have nonzero for the significand
-  (define-float-inf-or-nan-test float-nan-p
+;; NaNs have nonzero for the significand
+(define-float-inf-or-nan-test float-nan-p
   "Return true if the float X is a NaN (Not a Number)."
-    (not (zerop (ldb sb-vm:single-float-significand-byte bits)))
+  (not (zerop (ldb sb-vm:single-float-significand-byte bits)))
 
-    #+64-bit (not (zerop (ldb (byte 52 0) bits)))
-    #-64-bit (not (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo)))
+  #+64-bit (not (zerop (ldb (byte 52 0) bits)))
+  #-64-bit (not (zerop (logior (ldb sb-vm:double-float-significand-byte hi) lo)))
 
-    #+(and long-float x86)
-    (or (not (zerop (ldb sb-vm:long-float-significand-byte hi)))
-        (not (zerop lo))))
+  #+(and long-float x86)
+  (or (not (zerop (ldb sb-vm:long-float-significand-byte hi)))
+      (not (zerop lo))))
 
-  (define-float-inf-or-nan-test float-trapping-nan-p
+(define-float-inf-or-nan-test float-trapping-nan-p
   "Return true if the float X is a trapping NaN (Not a Number)."
   ;; HPPA (and apparently MIPS) have trapping NaNs (SNaNs) with the
   ;; trapping-nan-bit SET.  PPC, SPARC, Alpha, and x86 (and presumably
@@ -107,20 +107,19 @@
   ;; considers infinities to be FLOAT-TRAPPING-NAN-P on most
   ;; architectures.
 
-    ;; SINGLE-FLOAT
-    #+(or mips hppa) (logbitp 22 bits)
-    #-(or mips hppa) (not (logbitp 22 bits))
+  ;; SINGLE-FLOAT
+  #+(or mips hppa) (logbitp 22 bits)
+  #-(or mips hppa) (not (logbitp 22 bits))
 
-    ;; DOUBLE-FLOAT
-    #+(or mips hppa) (logbitp 19 hi)
-    #+(and (not (or mips hppa)) 64-bit) (not (logbitp 51 bits))
-    #+(and (not (or mips hppa)) (not 64-bit)) (not (logbitp 19 hi))
+  ;; DOUBLE-FLOAT
+  #+(or mips hppa) (logbitp 19 hi)
+  #+(and (not (or mips hppa)) 64-bit) (not (logbitp 51 bits))
+  #+(and (not (or mips hppa)) (not 64-bit)) (not (logbitp 19 hi))
 
-    ;; LONG-FLOAT (this code is dead anyway)
-    #+(and long-float x86)
-    (zerop (logand (ldb sb-vm:long-float-significand-byte hi)
-                   (ash 1 30))))
-) ; END MACROLET
+  ;; LONG-FLOAT (this code is dead anyway)
+  #+(and long-float x86)
+  (zerop (logand (ldb sb-vm:long-float-significand-byte hi)
+                 (ash 1 30))))
 
 ;;; If denormalized, use a subfunction from INTEGER-DECODE-FLOAT to find the
 ;;; actual exponent (and hence how denormalized it is), otherwise we just
