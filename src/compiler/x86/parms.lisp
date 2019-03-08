@@ -76,7 +76,6 @@
 (defconstant single-float-normal-exponent-min 1)
 (defconstant single-float-normal-exponent-max 254)
 (defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
 
 (defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte    (byte 11 20) #'equalp)
@@ -84,7 +83,6 @@
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 (defconstant long-float-bias 16382)
 (defconstant-eqx long-float-exponent-byte    (byte 15 0) #'equalp)
@@ -92,7 +90,6 @@
 (defconstant long-float-normal-exponent-min 1)
 (defconstant long-float-normal-exponent-max #x7FFE)
 (defconstant long-float-hidden-bit (ash 1 31))         ; actually not hidden
-(defconstant long-float-trapping-nan-bit (ash 1 30))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))

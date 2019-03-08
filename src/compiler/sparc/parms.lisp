@@ -53,7 +53,6 @@
 (defconstant single-float-normal-exponent-min 1)
 (defconstant single-float-normal-exponent-max 254)
 (defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
 
 (defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
@@ -61,7 +60,6 @@
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 ;;; CMUCL COMMENT:
 ;;;   X These values are for the x86 80 bit format and are no doubt
@@ -73,7 +71,6 @@
 (defconstant long-float-normal-exponent-min 1)
 (defconstant long-float-normal-exponent-max #x7FFE)
 (defconstant long-float-hidden-bit (ash 1 31))
-(defconstant long-float-trapping-nan-bit (ash 1 30))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
