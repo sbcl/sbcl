@@ -398,6 +398,7 @@
   (:generator 3
     (inst mul r x y)))
 
+;;; FIXME: The lifetimes for these truncate VOPs are suboptimal.
 (define-vop (fast-truncate/fixnum fast-fixnum-binop)
   (:translate truncate)
   (:args (x :scs (any-reg) :to :result)
@@ -405,7 +406,7 @@
   (:results (q :scs (any-reg) :from :eval)
             (r :scs (any-reg) :from :eval))
   (:result-types tagged-num tagged-num)
-  (:temporary (:scs (non-descriptor-reg) :to :eval) temp)
+  (:temporary (:scs (non-descriptor-reg) :target q) temp)
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 11
