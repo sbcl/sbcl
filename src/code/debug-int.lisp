@@ -608,8 +608,8 @@
   ;; in practice this function can only be called for code that is somewhere
   ;; on the stack, and therefore conservatively pinned.
   (let ((code (code-header-from-pc pc)))
-    (when code
-      (values (sap- pc (code-instructions code)) code))))
+    (values (if code (sap- pc (code-instructions code)) nil)
+            code)))
 
 ;;; Check for a valid return address - it could be any valid C/Lisp
 ;;; address.
@@ -972,17 +972,16 @@
 
 (defun code-pc-offset (pc code)
   (declare (type code-component code))
-  (let ((code-header-len (* (code-header-words code)
-                            n-word-bytes)))
-    (with-pinned-objects (code)
-      (let ((pc-offset (- (sap-int pc)
-                          (- (get-lisp-obj-address code)
-                             other-pointer-lowtag)
-                          code-header-len))
-            (code-size (%code-text-size code)))
-        (values pc-offset
-                (<= 0 pc-offset code-size)
-                code-size)))))
+  ;; We wrap WITH-PINNED-OBJECTS around CODE, but in truth this can go wrong if the
+  ;; code was transported after taking a PC and before getting here. i.e. there is
+  ;; nothing to be gained by arranging that while we calculate CODE-INSTRUCTIONS
+  ;; the code can't move if it already moved.
+  ;; The precisely GCed backends would be a lot more correct with respect to
+  ;; debug-related stuff if we just never move code that is on-stack.
+  (let ((pc-offset (with-pinned-objects (code)
+                     (sap- pc (code-instructions code))))
+        (code-size (%code-text-size code)))
+    (values pc-offset (<= 0 pc-offset code-size) code-size)))
 
 (defun context-code-pc-offset (context code)
   (code-pc-offset (context-pc context) code))
