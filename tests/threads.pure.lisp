@@ -616,7 +616,7 @@
 ;; timer.impure.lisp.
 (with-test (:name (make-thread :interrupt-with make-thread :bug-1180102)
             :skipped-on (not :sb-thread)
-            :broken-on :win32)
+            :broken-on :sb-safepoint)
   (fresh-line)
   (write-string "; ")
   (force-output)
