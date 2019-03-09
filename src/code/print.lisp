@@ -1530,35 +1530,27 @@ variable: an unreadable object representing the error is printed instead.")
           stream)
          (%output-integer-in-base exp 10 stream))))
 
-(defun output-float-infinity (x stream)
-  (declare (stream stream))
-  (let ((symbol (etypecase x
-                  (single-float (if (minusp x)
-                                    'single-float-negative-infinity
-                                    'single-float-positive-infinity))
-                  (double-float (if (minusp x)
-                                    'double-float-negative-infinity
-                                    'double-float-positive-infinity)))))
-    (cond (*read-eval*
-           (write-string "#." stream)
-           (output-symbol symbol (sb-xc:symbol-package symbol) stream))
-          (t
-           (print-unreadable-object (x stream)
-             (output-symbol symbol (sb-xc:symbol-package symbol) stream))))))
-
-(defun output-float-nan (x stream)
-  (print-unreadable-object (x stream)
-    (princ (float-format-name x) stream)
-    (write-string (if (float-trapping-nan-p x) " trapping" " quiet") stream)
-    (write-string " NaN" stream)))
-
-(declaim (inline output-float))
-(defun output-float (x stream)
+(defmethod print-object ((x float) stream)
   (cond
-    ((float-infinity-p x)
-     (output-float-infinity x stream))
-    ((float-nan-p x)
-     (output-float-nan x stream))
+    ((float-infinity-or-nan-p x)
+     (if (float-infinity-p x)
+         (let ((symbol (etypecase x
+                         (single-float (if (minusp x)
+                                           'single-float-negative-infinity
+                                           'single-float-positive-infinity))
+                         (double-float (if (minusp x)
+                                           'double-float-negative-infinity
+                                           'double-float-positive-infinity)))))
+           (cond (*read-eval*
+                  (write-string "#." stream)
+                  (output-symbol symbol (sb-xc:symbol-package symbol) stream))
+                 (t
+                  (print-unreadable-object (x stream)
+                    (output-symbol symbol (sb-xc:symbol-package symbol) stream)))))
+         (print-unreadable-object (x stream)
+           (princ (float-format-name x) stream)
+           (write-string (if (float-trapping-nan-p x) " trapping" " quiet") stream)
+           (write-string " NaN" stream))))
     (t
      (let ((x (cond ((minusp (float-sign x))
                      (write-char #\- stream)
@@ -1572,12 +1564,7 @@ variable: an unreadable object representing the error is printed instead.")
          (t
           (print-float x stream)))))))
 
-;;; the function called by OUTPUT-OBJECT to handle floats
-(defmethod print-object ((x single-float) stream)
-  (output-float x stream))
 
-(defmethod print-object ((x double-float) stream)
-  (output-float x stream))
 
 
 ;;;; other leaf objects
