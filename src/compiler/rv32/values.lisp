@@ -17,8 +17,8 @@
     (move csp-tn ptr)))
 
 (define-vop (%%nip-values)
-  (:args (last-nipped-ptr :scs (any-reg))
-         (last-preserved-ptr :scs (any-reg))
+  (:args (last-nipped-ptr :scs (any-reg) :target dest)
+         (last-preserved-ptr :scs (any-reg) :target src)
          (moved-ptrs :scs (any-reg) :more t))
   (:results (r-moved-ptrs :scs (any-reg) :more t))
   (:temporary (:sc any-reg) src)
@@ -113,13 +113,13 @@
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
 (define-vop (%more-arg-values)
-  (:args (context :scs (descriptor-reg any-reg))
+  (:args (context :scs (descriptor-reg any-reg) :target src)
          (skip :scs (any-reg immediate))
-         (num :scs (any-reg)))
+         (num :scs (any-reg) :target count))
   (:arg-types * positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
   (:temporary (:sc any-reg :from (:argument 2)) dst)
-  (:temporary (:sc descriptor-reg :from (:argument 1)) temp)
+  (:temporary (:sc descriptor-reg) temp)
   (:results (start :scs (any-reg))
             (count :scs (any-reg)))
   (:generator 20
@@ -135,12 +135,12 @@
     (move count num)
     (move start csp-tn)
     (inst beq num zero-tn done)
-    (move dst start)
+    (move dst csp-tn)
     (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst add csp-tn start count))
+           (inst add csp-tn csp-tn count))
           (t
            (inst slli temp count (- word-shift n-fixnum-tag-bits))
-           (inst add csp-tn start temp)))
+           (inst add csp-tn csp-tn temp)))
     LOOP
     (loadw temp src 0)
     (storew temp dst 0)

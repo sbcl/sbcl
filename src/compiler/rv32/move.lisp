@@ -151,7 +151,7 @@
 ;;; ARG is a fixnum or bignum; figure out which and load if necessary.
 (define-vop (move-to-word/integer)
   (:args (x :scs (descriptor-reg)))
-  (:results (y :scs (signed-reg unsigned-reg)))
+  (:results (y :scs (signed-reg unsigned-reg) :from :eval))
   (:note "integer to untagged word coercion")
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 3
@@ -186,11 +186,11 @@
 ;;; cost to make sure people know they may be number consing.
 (define-vop (move-from-signed)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
-  (:results (y :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg) :from :eval))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:note "signed word to integer coercion")
-  (:generator 18
+  (:generator 15
     (move x arg)
     (inst slli y x n-fixnum-tag-bits)
     (inst srai temp y n-fixnum-tag-bits)
@@ -207,7 +207,7 @@
 (define-vop (move-from-fixnum+/-1)
   (:args (x :scs (signed-reg unsigned-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
-  (:results (y :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg) :from :eval))
   (:vop-var vop)
   (:variant-vars constant)
   (:generator 4
@@ -228,7 +228,7 @@
 ;;; be number consing.
 (define-vop (move-from-unsigned)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
-  (:results (y :scs (any-reg descriptor-reg)))
+  (:results (y :scs (any-reg descriptor-reg) :from :eval))
   (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:note "unsigned word to integer coercion")

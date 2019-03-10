@@ -147,7 +147,7 @@
               ; would be inserted before the LRA.
          (start)
          (count))
-  (:results (values :more t))
+  (:results (values :more t :from :load))
   (:temporary (:scs (descriptor-reg)) move-temp)
   (:info label nvals)
   (:save-p :force-to-stack)
@@ -191,7 +191,7 @@
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
-  (:temporary (:scs (any-reg) :from (:argument 0)) dst)
+  (:temporary (:scs (any-reg)) dst)
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:temporary (:scs (descriptor-reg)) count-words)
@@ -207,7 +207,7 @@
           (done (gen-label)))
 
       ;; Setup results, and test for the zero value case.
-      (load-stack-tn dst top)
+      (load-stack-tn result top)
       (inst li num 0)
       (inst slli count-words count (- word-shift n-fixnum-tag-bits))
       (inst beq count-words zero-tn done)
