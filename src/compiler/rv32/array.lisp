@@ -257,7 +257,56 @@
                   (immediate
                    (inst li result (tn-value value)))
                   (unsigned-reg
-                   (move result value)))))))))
+                   (move result value)))))
+            (define-vop (,(symbolicate "DATA-VECTOR-SET-C/" type))
+              (:translate data-vector-set)
+              (:policy :fast-safe)
+              (:args (object :scs (descriptor-reg))
+                     (value :scs (unsigned-reg immediate) :target result))
+              (:arg-types ,type
+                          (:constant
+                           (integer 0
+                                    ,(1- (* (1+ (- (floor (+ #x7ff
+                                                             other-pointer-lowtag)
+                                                          n-word-bytes)
+                                                   vector-data-offset))
+                                            elements-per-word))))
+                          positive-fixnum)
+              (:info index)
+              (:results (result :scs (unsigned-reg)))
+              (:result-types positive-fixnum)
+              (:temporary (:scs (non-descriptor-reg)) temp old)
+              (:generator 20
+                (multiple-value-bind (word extra) (floor index ,elements-per-word)
+                  (loadw old object (+ word vector-data-offset) other-pointer-lowtag)
+                  (unless (and (sc-is value immediate)
+                               (= (tn-value value) ,(1- (ash 1 bits))))
+                    (cond ((= extra ,(1- elements-per-word))
+                           (inst slli old old ,bits)
+                           (inst srli old old ,bits))
+                          (t
+                           (inst li temp
+                                 (lognot (ash ,(1- (ash 1 bits)) (* extra ,bits))))
+                           (inst and old old temp))))
+                  (sc-case value
+                    (immediate
+                     (let ((value (ash (logand (tn-value value) ,(1- (ash 1 bits)))
+                                       (* extra ,bits))))
+                       (typecase value
+                         (short-immediate
+                          (inst ori old old value))
+                         (t
+                          (inst li temp value)
+                          (inst or old old temp)))))
+                    (unsigned-reg
+                     (inst slli temp value (* extra ,bits))
+                     (inst or old old temp)))
+                  (storew old object (+ word vector-data-offset) other-pointer-lowtag)
+                  (sc-case value
+                    (immediate
+                     (inst li result (tn-value value)))
+                    (unsigned-reg
+                     (move result value))))))))))
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
