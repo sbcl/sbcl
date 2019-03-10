@@ -695,9 +695,11 @@
                       (short-immediate
                        (inst #-64-bit lw #+64-bit ld entry-point null-tn (static-fun-offset fun)))
                       (t
-                       (inst li lr-tn (static-fun-offset fun))
-                       (inst add lip null-tn lr-tn)
-                       (inst #-64-bit lw #+64-bit ld entry-point lip 0))))))
+                       (multiple-value-bind (u i)
+                           (u-and-i-inst-immediate (static-fun-offset fun))
+                         (inst lui entry-point u)
+                         (inst add lip null-tn entry-point)
+                         (inst #-64-bit lw #+64-bit ld entry-point lip i)))))))
              (loop
                (if filler
                    (do-next-filler)

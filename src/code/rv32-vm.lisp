@@ -85,7 +85,8 @@
          (trap-number (sap-ref-8 pc 4)))
     (declare (type system-area-pointer pc))
     (if (= trap-number invalid-arg-count-trap)
-        (values error-number '(#.arg-count-sc) trap-number)
+        (values #.(error-number-or-lose 'invalid-arg-count-error)
+                '(#.arg-count-sc))
         (sb-kernel::decode-internal-error-args (sap+ pc 5) trap-number))))
 
 ;;; CONTEXT-CALL-FUNCTION
