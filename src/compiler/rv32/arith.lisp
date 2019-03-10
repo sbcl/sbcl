@@ -166,8 +166,7 @@
          (amount))
   (:results (result))
   (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) ndesc)
-  (:temporary (:sc non-descriptor-reg :to :eval) temp)
+  (:temporary (:sc non-descriptor-reg) temp ndesc)
   (:variant-vars variant)
   (:generator 5
     (inst bge amount zero-tn positive)
@@ -382,11 +381,11 @@
 ;;; Multiply and Divide.
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
+  (:args (x :scs (signed-reg)) ;; one operand needs to be untagged
+         (y :target r :scs (any-reg)))
   (:translate *)
-  (:temporary (:scs (non-descriptor-reg) :to :eval) temp)
-  (:generator 4
-    (inst srai temp y n-fixnum-tag-bits)
-    (inst mul r x temp)))
+  (:generator 2
+    (inst mul r x y)))
 
 (define-vop (fast-*/signed=>signed fast-signed-binop)
   (:translate *)
@@ -401,10 +400,10 @@
 ;;; FIXME: The lifetimes for these truncate VOPs are suboptimal.
 (define-vop (fast-truncate/fixnum fast-fixnum-binop)
   (:translate truncate)
-  (:args (x :scs (any-reg) :to :result)
-         (y :scs (any-reg) :to :result))
-  (:results (q :scs (any-reg) :from :eval)
-            (r :scs (any-reg) :from :eval))
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg) :to (:eval 1)))
+  (:results (q :scs (any-reg))
+            (r :scs (any-reg) :from (:eval 0)))
   (:result-types tagged-num tagged-num)
   (:temporary (:scs (non-descriptor-reg) :target q) temp)
   (:vop-var vop)
@@ -421,9 +420,9 @@
 (define-vop (fast-truncate/unsigned fast-unsigned-binop)
   (:translate truncate)
   (:args (x :scs (unsigned-reg) :to :result)
-         (y :scs (unsigned-reg) :to :result))
+         (y :scs (unsigned-reg) :to :save))
   (:results (q :scs (unsigned-reg) :from :eval)
-            (r :scs (unsigned-reg) :from :eval))
+            (r :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:vop-var vop)
   (:save-p :compute-only)
@@ -436,9 +435,9 @@
 (define-vop (fast-truncate/signed fast-signed-binop)
   (:translate truncate)
   (:args (x :scs (signed-reg) :to :result)
-         (y :scs (signed-reg) :to :result))
+         (y :scs (signed-reg) :to :save))
   (:results (q :scs (signed-reg) :from :eval)
-            (r :scs (signed-reg) :from :eval))
+            (r :scs (signed-reg)))
   (:result-types signed-num signed-num)
   (:vop-var vop)
   (:save-p :compute-only)
