@@ -21,6 +21,9 @@
     (declare (ignore flavor))
     (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
       (error "Unaligned instruction?  offset=#x~X." offset))
+    #+64-bit
+    (unless (typep fixup '(signed-byte 31))
+      (error "Tried to fixup with ~a" fixup))
     (let ((sap (code-instructions code)))
       (multiple-value-bind (u i) (u-and-i-inst-immediate fixup)
         (ecase kind

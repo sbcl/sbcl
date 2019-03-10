@@ -26,6 +26,18 @@
 (def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
 
 (defun bic-mask (x) (1- (- x)))
+
+;;;; disassembler field definitions
+
+(define-arg-type reg :printer #'print-reg)
+(define-arg-type s-imm :printer #'print-s-imm)
+(define-arg-type fp-reg :printer #'print-fp-reg)
+(define-arg-type control-reg :printer "(CR:#x~X)")
+(define-arg-type float-fmt :printer #'print-float-fmt)
+(define-arg-type float-rm :printer #'print-float-rm)
+;; We don't use :sign-extend, since the immediate fields are hairy.
+(define-arg-type relative-b-label :use-label #'use-b-label)
+(define-arg-type relative-j-label :use-label #'use-j-label)
 
 
 (define-instruction byte (segment byte)
@@ -55,12 +67,16 @@
      (integer
       (emit-machine-word segment word)))))
 
-(define-instruction-format (r 32)
+(defconstant-eqx reg-printer
+    '(:name :tab rd ", " rs1 ", " rs2)
+  #'equalp)
+
+(define-instruction-format (r 32 :default-printer reg-printer)
   (funct7 :field (byte 7 25))
-  (rs2 :field (byte 5 20))
-  (rs1 :field (byte 5 15))
+  (rs2 :field (byte 5 20) :type 'reg)
+  (rs1 :field (byte 5 15) :type 'reg)
   (funct3 :field (byte 3 12))
-  (rd :field (byte 5 7))
+  (rd :field (byte 5 7) :type 'reg)
   (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-r-inst 32
@@ -68,11 +84,17 @@
 (defun emit-r-inst (segment funct7 rs2 rs1 funct3 rd opcode)
   (%emit-r-inst segment funct7 (tn-offset rs2) (tn-offset rs1) funct3 (tn-offset rd) opcode))
 
-(define-instruction-format (i 32)
-  (imm :field (byte 12 20))
-  (rs1 :field (byte 5 15))
+(defconstant-eqx i-printer
+    '(:name :tab rd ", " rs1 ", " imm)
+  #'equalp)
+
+(define-instruction-format (i 32 :default-printer i-printer)
+  (l/a :field (byte 1 30))
+  (shamt :field (byte (integer-length n-word-bits) 20))
+  (imm :field (byte 12 20) :sign-extend t)
+  (rs1 :field (byte 5 15) :type 'reg)
   (funct3 :field (byte 3 12))
-  (rd :field (byte 5 7))
+  (rd :field (byte 5 7) :type 'reg)
   (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-i-inst 32
@@ -85,10 +107,17 @@
      (note-fixup segment :i-type imm)
      (%emit-i-inst segment 0 (tn-offset rs1) funct3 (tn-offset rd) opcode))))
 
-(define-instruction-format (s 32)
-  (imm :fields (list (byte 7 25) (byte 5 7)))
-  (rs2 :field (byte 5 20))
-  (rs1 :field (byte 5 15))
+(defconstant-eqx s-printer
+    '(:name :tab
+      rs2 ", "
+      "(" imm ")"
+      rs1)
+  #'equalp)
+
+(define-instruction-format (s 32 :default-printer s-printer)
+  (imm :fields (list (byte 7 25) (byte 5 7)) :type 's-imm)
+  (rs2 :field (byte 5 20) :type 'reg)
+  (rs1 :field (byte 5 15) :type 'reg)
   (funct3 :field (byte 3 12))
   (opcode :field (byte 7 0)))
 
@@ -102,10 +131,14 @@
      (note-fixup segment :s-type imm)
      (%emit-s-inst segment 0 (tn-offset rs2) (tn-offset rs1) funct3 0 opcode))))
 
-(define-instruction-format (b 32)
-  (imm :fields (list (byte 1 31) (byte 1 7) (byte 6 25) (byte 4 8)))
-  (rs2 :field (byte 5 20))
-  (rs1 :field (byte 5 15))
+(defconstant-eqx cond-branch-printer
+  '(:name :tab rs1 ", " rs2 ", " imm)
+  #'equalp)
+
+(define-instruction-format (b 32 :default-printer cond-branch-printer)
+  (imm :fields (list (byte 1 31) (byte 1 7) (byte 6 25) (byte 4 8)) :type 'relative-b-label)
+  (rs2 :field (byte 5 20) :type 'reg)
+  (rs1 :field (byte 5 15) :type 'reg)
   (funct3 :field (byte 3 12))
   (opcode :field (byte 7 0)))
 
@@ -117,9 +150,13 @@
                 (tn-offset rs2) (tn-offset rs1) funct3 (ldb (byte 4 1) imm)
                 (ldb (byte 1 11) imm) opcode))
 
-(define-instruction-format (u 32)
+(defconstant-eqx u-printer
+    '(:name :tab rd ", " imm)
+  #'equalp)
+
+(define-instruction-format (u 32 :default-printer u-printer)
   (imm :field (byte 20 12))
-  (rd :field (byte 5 7))
+  (rd :field (byte 5 7) :type 'reg)
   (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-u-inst 32
@@ -132,9 +169,13 @@
      (note-fixup segment :u-type imm)
      (%emit-u-inst segment 0 (tn-offset rd) opcode))))
 
-(define-instruction-format (j 32)
-  (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)))
-  (rd :field (byte 5 7))
+(defconstant-eqx j-printer
+  '(:name :tab rd ", " imm)
+  #'equalp)
+
+(define-instruction-format (j 32 :default-printer j-printer)
+  (imm :fields (list (byte 1 31) (byte 8 12) (byte 1 20) (byte 10 21)) :type 'relative-j-label)
+  (rd :field (byte 5 7) :type 'reg)
   (opcode :field (byte 7 0)))
 
 (define-bitfield-emitter %emit-j-inst 32
@@ -234,6 +275,7 @@
 (macrolet ((define-branch-instruction (name funct3)
              `(define-instruction ,name (segment rs1 rs2 offset)
                 (:printer b ((funct3 ,funct3) (opcode #b1100011)))
+                (:dependencies (writes lip-tn))
                 (:emitter
                  (emit-relative-branch segment #b1100011 ,funct3 rs1 rs2 offset)))))
   (define-branch-instruction beq #b000)
@@ -245,7 +287,8 @@
 
 (macrolet ((define-load-instruction (name funct3)
              `(define-instruction ,name (segment rd rs offset)
-                (:printer i ((funct3 ,funct3) (opcode #b0000011)))
+                (:printer i ((funct3 ,funct3) (opcode #b0000011))
+                          '(:name :tab rd ", (" imm ")" rs1))
                 (:emitter
                  (emit-i-inst segment offset rs ,funct3 rd #b0000011)))))
   (define-load-instruction lb #b000)
@@ -269,35 +312,53 @@
   #+64-bit
   (define-store-instruction sd #b011))
 
-(macrolet ((define-immediate-arith-instruction (name funct3 &key (imm 'imm) word-name)
+(macrolet ((define-immediate-arith-instruction (name funct3 &optional word-name)
              `(progn
                 (define-instruction ,name (segment rd rs imm)
-                  (:printer i ((funct3 ,funct3) (opcode #b0010011)))
+                  (:printer i ((funct3 ,funct3)
+                               (opcode #b0010011)))
                   (:emitter
-                   (let ((imm ,imm))
-                     (emit-i-inst segment imm rs ,funct3 rd #b0010011))))
+                   (emit-i-inst segment imm rs ,funct3 rd #b0010011)))
                 ,(when word-name
                    #+64-bit
                    `(define-instruction ,word-name (segment rd rs imm)
-                      (:printer i ((funct3 ,funct3) (opcode #b0011011)))
+                      (:printer i ((funct3 ,funct3)
+                                   (opcode #b0011011)))
                       (:emitter
-                       (let ((imm ,imm))
-                         (emit-i-inst segment imm rs ,funct3 rd #b0011011))))))))
-  (define-immediate-arith-instruction addi #b000 :word-name addiw)
+                       (emit-i-inst segment imm rs ,funct3 rd #b0011011))))))
+           (define-immediate-shift-instruction (name funct3 l/a word-name)
+             `(progn
+                (define-instruction ,name (segment rd rs imm)
+                  (:printer i ((funct3 ,funct3)
+                               (opcode #b0010011)
+                               (l/a ,l/a))
+                            '(:name :tab rd ", " rs1 ", " shamt))
+                  (:emitter
+                   (aver (< imm ,n-word-bits))
+                   ,@(when (= l/a 1)
+                       `((setf (ldb (byte 1 10) imm) 1)))
+                   (emit-i-inst segment imm rs ,funct3 rd #b0010011)))
+                ,(when word-name
+                   #+64-bit
+                   `(define-instruction ,word-name (segment rd rs imm)
+                      (:printer i ((funct3 ,funct3)
+                                   (opcode #b0011011)
+                                   (l/a ,l/a))
+                                '(:name :tab rd ", " rs1 ", " shamt))
+                      (:emitter
+                       (aver (< imm ,n-word-bits))
+                       ,@(when (= l/a 1)
+                           `((setf (ldb (byte 1 10) imm) 1)))
+                       (emit-i-inst segment imm rs ,funct3 rd #b0011011)))))))
+  (define-immediate-arith-instruction addi #b000 addiw)
   (define-immediate-arith-instruction slti #b010)
   (define-immediate-arith-instruction sltiu #b011)
   (define-immediate-arith-instruction xori #b100)
   (define-immediate-arith-instruction ori #b110)
   (define-immediate-arith-instruction andi #b111)
-  (define-immediate-arith-instruction slli #b001
-    :imm (progn (aver (< imm n-word-bits)) imm)
-    :word-name slliw)
-  (define-immediate-arith-instruction srli #b101
-    :imm (progn (aver (< imm n-word-bits)) imm)
-    :word-name srliw)
-  (define-immediate-arith-instruction srai #b101
-    :imm (progn (aver (< imm n-word-bits)) (dpb 1 (byte 1 10) imm))
-    :word-name sraiw))
+  (define-immediate-shift-instruction slli #b001 0 slliw)
+  (define-immediate-shift-instruction srli #b101 0 srliw)
+  (define-immediate-shift-instruction srai #b101 1 sraiw))
 
 (define-instruction-macro subi (rd rs imm)
   `(inst addi ,rd ,rs (- ,imm)))
@@ -449,14 +510,23 @@
   (:emitter
    (emit-fence-inst segment #b0000 #b0000 #b001)))
 
+(define-instruction-format (break 32 :default-printer '(:name :tab code))
+  (opcode-32 :field (byte 32 0))
+  ;; We use a prefilter in order to read trap codes in order to avoid
+  ;; attempting to include the code in the decoded instruction proper
+  ;; (requiring moving to a 40-bit instruction for disassembling trap
+  ;; codes).
+  (code :prefilter (lambda (dstate) (read-suffix 8 dstate))
+        :reader trap-code))
+
 (define-instruction ecall (segment)
   (:printer i ((imm #b000000000000) (rs1 #b00000) (funct3 #b000)
                (rd #b00000) (opcode #b1110011)))
   (:emitter
    (%emit-i-inst segment #b000000000000 #b00000 #b000 #b00000 #b1110011)))
 (define-instruction ebreak (segment &optional (code nil codep))
-  (:printer i ((imm #b000000000001) (rs1 #b00000) (funct3 #b000)
-               (rd #b00000) (opcode #b1110011)))
+  (:printer break ((opcode-32 #x100073))
+            :default :control #'break-control)
   (:emitter
    (%emit-i-inst segment #b000000000001 #b00000 #b000 #b00000 #b1110011)
    (when codep (emit-byte segment code))))
@@ -510,13 +580,17 @@
   (define-rv32m-arith-instruction remu #b111))
 
 ;;; Floating point
-(define-instruction-format (r-float 32)
+(defconstant-eqx r-float-printer
+    '(:name :tab fmt ", " rd ", " rs1 ", " rs2 ", " rm)
+  #'equalp)
+
+(define-instruction-format (r-float 32 :default-printer r-float-printer)
   (rs3/funct5 :field (byte 5 27))
-  (fmt :field (byte 2 25))
-  (rs2 :field (byte 5 20))
-  (rs1 :field (byte 5 15))
-  (rm :field (byte 3 12))
-  (rd :field (byte 5 7))
+  (fmt :field (byte 2 25) :type 'float-fmt)
+  (rs2 :field (byte 5 20) :type 'fp-reg)
+  (rs1 :field (byte 5 15) :type 'fp-reg)
+  (rm :field (byte 3 12) :type 'float-rm)
+  (rd :field (byte 5 7) :type 'fp-reg)
   (opcode :field (byte 7 0)))
 
 (defun ensure-tn-offset (imm/tn)
@@ -582,7 +656,7 @@
 
 (macrolet ((define-3-arg-float-arith-instruction (name opcode)
              `(define-instruction ,name (segment fmt rd rs1 rs2 rs3 &optional (rm :rne))
-                (:printer r ((opcode ,opcode)))
+                (:printer r-float ((opcode ,opcode)))
                 (:emitter
                  (emit-r-float-inst segment rs3 fmt rs2 rs1 (rm-encoding rm) rd ,opcode)))))
   (define-3-arg-float-arith-instruction fmadd #b1000011)
@@ -614,12 +688,18 @@
            (:single #b010)
            (:double #b011))))
   (define-instruction fload (segment fmt rd rs offset)
-    (:printer i ((opcode #b0000111)))
+    (:printer i ((opcode #b0000111)
+                 (rs1 nil :type 'fp-reg)
+                 (rs2 nil :type 'reg)
+                 (imm nil :sign-extend t)))
     (:emitter
      (emit-i-inst segment offset rs (fmt-funct3 fmt) rd #b0000111)))
 
   (define-instruction fstore (segment fmt rs1 rs2 offset)
-    (:printer s ((opcode #b0100111)))
+    (:printer s ((opcode #b0100111)
+                 (rs1 nil :type 'fp-reg)
+                 (rs2 nil :type 'reg)
+                 (imm nil :sign-extend t)))
     (:emitter
      (emit-s-inst segment offset rs1 rs2 (fmt-funct3 fmt) #b0100111))))
 
