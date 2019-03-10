@@ -151,11 +151,11 @@
                   (let ((real-tn (complex-reg-real-tn ,format y)))
                     (inst ,op ,format real-tn nfp offset))
                   (let ((imag-tn (complex-reg-imag-tn ,format y)))
-                    (inst ,op ,format imag-tn nfp (+ offset (* ,size n-word-bytes))))))))
-  (def load-complex-single 2 complex-single-stack complex-single-reg fload :single 1)
-  (def store-complex-single 2 complex-single-reg complex-single-stack fstore :single 1)
-  (def load-complex-double 2 complex-double-stack complex-double-reg fload :double #-64-bit 2 #+64-bit 1)
-  (def store-complex-double 2 complex-double-reg complex-double-stack fstore :double #-64-bit 2 #+64-bit 1))
+                    (inst ,op ,format imag-tn nfp (+ offset ,size)))))))
+  (def load-complex-single 2 complex-single-stack complex-single-reg fload :single 4)
+  (def store-complex-single 2 complex-single-reg complex-single-stack fstore :single 4)
+  (def load-complex-double 2 complex-double-stack complex-double-reg fload :double 8)
+  (def store-complex-double 2 complex-double-reg complex-double-stack fstore :double 8))
 
 
 ;;;
@@ -208,11 +208,11 @@
   (:variant-vars format real-slot imag-slot widetag size)
   (:generator 13
     (with-fixed-allocation (y pa-flag widetag size)
-      (let ((real-tn (complex-reg-real-tn format y)))
-        (inst fstore format real-tn x (- (* real-slot n-word-bytes)
+      (let ((real-tn (complex-reg-real-tn format x)))
+        (inst fstore format real-tn y (- (* real-slot n-word-bytes)
                                          other-pointer-lowtag)))
-      (let ((imag-tn (complex-reg-imag-tn format y)))
-        (inst fstore format imag-tn x (- (* imag-slot n-word-bytes)
+      (let ((imag-tn (complex-reg-imag-tn format x)))
+        (inst fstore format imag-tn y (- (* imag-slot n-word-bytes)
                                          other-pointer-lowtag))))))
 
 #-64-bit
@@ -302,10 +302,10 @@
        (move-complex :single y x))
       (complex-single-stack
        (let ((offset (* (tn-offset y) n-word-bytes)))
-         (let ((real-tn (complex-reg-real-tn :double x)))
+         (let ((real-tn (complex-reg-real-tn :single x)))
            (inst fstore :single real-tn nfp offset))
-         (let ((imag-tn (complex-reg-imag-tn :double x)))
-           (inst fstore :single imag-tn nfp (+ offset n-word-bytes))))))))
+         (let ((imag-tn (complex-reg-imag-tn :single x)))
+           (inst fstore :single imag-tn nfp (+ offset 4))))))))
 (define-move-vop move-complex-single-float-arg :move-arg
   (complex-single-reg descriptor-reg) (complex-single-reg))
 
@@ -323,7 +323,7 @@
          (let ((real-tn (complex-reg-real-tn :double x)))
            (inst fstore :double real-tn nfp offset))
          (let ((imag-tn (complex-reg-imag-tn :double x)))
-           (inst fstore :double imag-tn nfp (+ offset (* #-64-bit 2 n-word-bytes)))))))))
+           (inst fstore :double imag-tn nfp (+ offset 8))))))))
 
 (define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
@@ -684,7 +684,8 @@
 
 (define-vop (make-complex-double-float)
   (:translate complex)
-  (:args (real :scs (double-reg) :target r)
+  (:args (real :scs (double-reg) :target r
+               :load-if (not (location= real r)))
          (imag :scs (double-reg) :to :save))
   (:arg-types double-float double-float)
   (:results (r :scs (complex-double-reg) :from (:argument 0)
@@ -705,7 +706,8 @@
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
-         (inst fstore :double real nfp (* n-word-bytes offset))
+         (unless (location= real r)
+           (inst fstore :double real nfp (* n-word-bytes offset)))
          (inst fstore :double imag nfp (+ (* n-word-bytes offset) 8)))))))
 
 (define-vop (complex-single-float-value)
@@ -773,9 +775,10 @@
          (unless (location= value-tn r)
            (inst fmove :double r value-tn))))
       (complex-double-stack
-       (inst fload :double r (current-nfp-tn vop) (* (+ (ecase slot (:real 0) (:imag 1))
-                                                        (tn-offset x))
-                                                     n-word-bytes))))))
+       (inst fload :double r (current-nfp-tn vop)
+             (* (+ (ecase slot (:real 0) (:imag 1))
+                   (tn-offset x))
+                n-word-bytes))))))
 
 (define-vop (realpart/complex-double-float complex-double-float-value)
   (:translate realpart)
