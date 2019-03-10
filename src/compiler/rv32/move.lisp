@@ -198,7 +198,7 @@
 
     (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
-    
+
     DONE))
 
 (define-move-vop move-from-signed :move
@@ -240,7 +240,7 @@
     ;; Could be optimized further by allocating the right size based
     ;; on the sign bit from the start.
     (with-fixed-allocation (y pa-flag bignum-widetag (+ bignum-digits-offset 2))
-      (inst bge x zero-tn NO-SHRINK)
+      (inst blt x zero-tn NO-SHRINK)
       ;; WITH-FIXED-ALLOCATION, when using a supplied type-code,
       ;; leaves PA-FLAG containing the computed header value.  In our
       ;; case, configured for a 2-word bignum.  If the sign bit in the
