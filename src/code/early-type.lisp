@@ -536,40 +536,42 @@
       ;; Index 31 is available to store *WILD-TYPE*
       ;; because there are fewer than 32 array widetags.
       (make-all *wild-type* 31 array)
-      (dolist (x *specialized-array-element-types*
-                 (progn (aver (< index 31)) array))
+      (dovector (saetp sb-vm:*specialized-array-element-type-properties*
+                       (progn (aver (< index 31)) array))
         (make-all
-         ;; Produce element-type representation without parsing a spec.
-         ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
-         ;; The MAKE- constructors return an interned object as appropriate.
-         (etypecase x
-           ((cons (eql unsigned-byte))
-            (integer-range 0 (1- (ash 1 (second x)))))
-           ((cons (eql signed-byte))
-            (let ((lim (ash 1 (1- (second x)))))
-              (integer-range (- lim) (1- lim))))
-           ((eql bit) (integer-range 0 1))
-           ;; FIXNUM is its own thing, why? See comment in vm-array
-           ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
-           ((eql fixnum) ; One good kludge deserves another.
-            (integer-range sb-xc:most-negative-fixnum
-                           sb-xc:most-positive-fixnum))
-           ((member single-float double-float)
-            (make-numeric-type :class 'float :format x :complexp :real))
-           ((cons (eql complex))
-            (make-numeric-type :class 'float :format (cadr x)
-                               :complexp :complex))
-           ((eql character)
-            (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
-           #+sb-unicode
-           ((eql base-char)
-            (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
-           ((eql t) *universal-type*)
-           ((eql nil) *empty-type*))
-         index array)
+         (let ((x (sb-vm:saetp-specifier saetp)))
+           ;; Produce element-type representation without parsing a spec.
+           ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
+           ;; The MAKE- constructors return an interned object as appropriate.
+           (etypecase x
+             ((cons (eql unsigned-byte))
+              (integer-range 0 (1- (ash 1 (second x)))))
+             ((cons (eql signed-byte))
+              (let ((lim (ash 1 (1- (second x)))))
+                (integer-range (- lim) (1- lim))))
+             ((eql bit) (integer-range 0 1))
+             ;; FIXNUM is its own thing, why? See comment in vm-array
+             ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
+             ((eql fixnum) ; One good kludge deserves another.
+              (integer-range sb-xc:most-negative-fixnum
+                             sb-xc:most-positive-fixnum))
+             ((member single-float double-float)
+              (make-numeric-type :class 'float :format x :complexp :real))
+             ((cons (eql complex))
+              (make-numeric-type :class 'float :format (cadr x)
+                                 :complexp :complex))
+             ((eql character)
+              (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
+             #+sb-unicode
+             ((eql base-char)
+              (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
+             ((eql t) *universal-type*)
+             ((eql nil) *empty-type*)))
+         index
+         array)
         (incf index)))))
 (defvar *parsed-specialized-array-element-types*
-  (let ((a (make-array (length *specialized-array-element-types*))))
+  (let ((a (make-array (length sb-vm:*specialized-array-element-type-properties*))))
     (loop for i below (length a)
           do (setf (aref a i) (array-type-specialized-element-type
                                (aref *interned-array-types* (* i 5)))))

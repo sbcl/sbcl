@@ -156,16 +156,6 @@
        ;; than the word size.
        (<= (saetp-n-bits saetp) n-word-bits)))
 
-#+sb-xc-host
-(defvar sb-kernel::*specialized-array-element-types*
-  (map 'list
-       #'saetp-specifier
-       *specialized-array-element-type-properties*))
-
-#-sb-xc-host
-(!define-load-time-global sb-kernel::*specialized-array-element-types*
-            '#.sb-kernel::*specialized-array-element-types*)
-
 (define-load-time-global *vector-without-complex-typecode-infos*
   #+sb-xc-host
   (loop for saetp across *specialized-array-element-type-properties*

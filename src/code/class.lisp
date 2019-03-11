@@ -1108,20 +1108,20 @@ between the ~A definition and the ~A definition"
       :depth 4
       :inherits (stream))
      ,@(loop for x across sb-vm:*specialized-array-element-type-properties*
-             unless (member (sb-vm::saetp-specifier x) '(t character base-char nil bit))
+             unless (member (sb-vm:saetp-specifier x) '(t character base-char nil bit))
              collect
              ;; I'm not sure if it's an accident that there are distinct SB-KERNEL
              ;; versus SB-VM symbols for the specialized arrays. The former are types
              ;; in the language, and the latter are primitive object types,
              ;; but istm they should be designated by the same symbols.
-             `(,(intern (string (sb-vm::saetp-primitive-type-name x)) *package*)
-               :translation (simple-array ,(sb-vm::saetp-specifier x) (*))
-               :codes (,(sb-vm::saetp-typecode x))
+             `(,(intern (string (sb-vm:saetp-primitive-type-name x)) *package*)
+               :translation (simple-array ,(sb-vm:saetp-specifier x) (*))
+               :codes (,(sb-vm:saetp-typecode x))
                :direct-superclasses (vector simple-array)
                :inherits (vector simple-array array sequence)
                :prototype-form
                (logically-readonlyize
-                (make-array 0 :element-type ',(sb-vm::saetp-specifier x))))))
+                (make-array 0 :element-type ',(sb-vm:saetp-specifier x))))))
   #'equal)
 
 ;;; See also src/code/class-init.lisp where we finish setting up the

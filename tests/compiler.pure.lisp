@@ -3483,7 +3483,8 @@
                      '(eql #\a)
                      #+sb-unicode 'extended-char
                      #+sb-unicode '(eql #\cyrillic_small_letter_yu)
-                     sb-kernel::*specialized-array-element-types*))
+                     (map 'list 'sb-vm:saetp-specifier
+                          sb-vm:*specialized-array-element-type-properties*)))
     (when et
       (let* ((v (make-array 3 :element-type et)))
         (checked-compile-and-assert ()

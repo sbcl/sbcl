@@ -864,7 +864,8 @@
 ;;; Logically they belong with the above, so here they are.
 (with-test (:name :union-of-all-arrays-is-array-of-wild)
   (flet ((huge-union (fn)
-           (mapcar fn sb-kernel::*specialized-array-element-types*)))
+           (map 'list (lambda (x) (funcall fn (sb-vm:saetp-specifier x)))
+                sb-vm:*specialized-array-element-type-properties*)))
 
     (let ((answers '(VECTOR
                      (SIMPLE-ARRAY * (*))
@@ -974,10 +975,11 @@
             (complex single-float)
             (complex double-float)))
     ;; and check all specialized arrays
-    (dolist (spec sb-kernel::*specialized-array-element-types*)
-      (try `(array ,spec (*)))
-      (try `(simple-array ,spec (*)))
-      (try `(and (not simple-array) (array ,spec (*)))))))
+    (sb-int:dovector (saetp sb-vm:*specialized-array-element-type-properties*)
+      (let ((spec (sb-vm:saetp-specifier saetp)))
+        (try `(array ,spec (*)))
+        (try `(simple-array ,spec (*)))
+        (try `(and (not simple-array) (array ,spec (*))))))))
 
 ;; The expansion of FRUITBAT is a class itself, not its name.
 (deftype fruitbat () (find-class 'hash-table))
