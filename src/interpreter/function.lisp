@@ -75,6 +75,7 @@
             (let ((env (interpreted-function-env fun)))
               (not (and (basic-env-p env)
                         (null (env-parent env))
+                        (null (env-payload env))
                         (null (env-symbols env))
                         (null (declarations (env-contour env))))))
             ;; Internally we can distinguish absence of a name

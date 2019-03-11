@@ -312,3 +312,12 @@
   ;; check that source location namestring was preserved
   (assert (string= (sb-kernel::function-file-namestring #'testme-x)
                    "myfile.lisp")))
+
+(macrolet ((some-things () ''(bit-vector string)))
+  (deftype thingz (&optional d)
+    `(or ,@(mapcar (lambda (x) `(,x ,d)) (some-things)))))
+;;; FUNCTION-LAMBDA-EXPRESSION could incorrectly return NIL for the second value
+(test-util:with-test (:name :fun-lambda-expr-closure)
+  (assert (nth-value 1 (function-lambda-expression (sb-int:info :type :expander 'thingz))))
+  ;; and make sure the expander actually works
+  (assert (typep "hey" '(thingz 3))))
