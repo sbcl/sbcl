@@ -16,7 +16,7 @@
 . ./subr.sh
 
 run_sbcl --noinform <<EOF
-  #+(and x86-64 linux immobile-code) (exit :code 0) ; good
+  #+(and x86-64 linux immobile-code sb-dynamic-core) (exit :code 0) ; good
  (exit :code 2) ; otherwise
 EOF
 status=$?
