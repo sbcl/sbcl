@@ -1784,7 +1784,6 @@ core and return a descriptor to it."
         (unless (member pkg-name '("COMMON-LISP" "COMMON-LISP-USER" "KEYWORD")
                         :test 'string=)
           (let ((host-pkg (find-package pkg-name))
-                (sb-xc-pkg (find-package "SB-XC"))
                 syms)
             ;; Now for each symbol directly present in this host-pkg,
             ;; i.e. accessible but not :INHERITED, figure out if the symbol
@@ -1792,8 +1791,7 @@ core and return a descriptor to it."
             (with-package-iterator (iter host-pkg :internal :external)
               (loop (multiple-value-bind (foundp sym accessibility) (iter)
                       (unless foundp (return))
-                      (unless (or (eq (cl:symbol-package sym) host-pkg)
-                                  (eq (cl:symbol-package sym) sb-xc-pkg))
+                      (unless (eq (cl:symbol-package sym) host-pkg)
                         (push (cons sym accessibility) syms)))))
             (dolist (symcons (sort syms #'string< :key #'car))
               (destructuring-bind (sym . accessibility) symcons
