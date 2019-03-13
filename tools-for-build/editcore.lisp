@@ -1836,7 +1836,7 @@
 (defun cl-user::elfinate (&optional (args (cdr sb-ext:*posix-argv*)))
   (cond ((string= (car args) "split")
          (pop args)
-         (let (pie sizes)
+         (let (pie)
            (loop (cond ((string= (car args) "--pie")
                         (setq pie t)
                         (pop args))
