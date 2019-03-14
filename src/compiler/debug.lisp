@@ -1230,3 +1230,32 @@
     (do ((i 0 (1+ i))
          (vop (ir2-block-start-vop block) (vop-next vop)))
         ((= i n) vop))))
+
+(defun ir1-to-dot (component output-file)
+  (with-open-file (stream output-file :if-exists :supersede
+                                      :if-does-not-exist :create
+                                      :direction :output)
+    (write-line "digraph G {" stream)
+    (do-blocks (block component)
+      (when (typep (block-out block) '(cons (eql :graph) cons))
+        (format stream "~a[style=filled color=~a];~%"
+                (block-number block)
+                (case (cadr (block-out block))
+                  (:marked "green")
+                  (:remarked "aquamarine")
+                  (:start "lightblue")
+                  (:end "red"))))
+      (let ((succ (block-pred block)))
+        (when succ
+          (loop for succ in succ
+                for attr = "[style=bold]" then ""
+                do
+                (format stream "~a -> ~a~a;~%"
+                        (block-number block)
+                        (block-number succ)
+                        attr)))
+        (when (nle-block-p block)
+          (format stream "~a -> ~a [style=dotted];~%"
+                  (block-number block)
+                  (block-number (nle-block-entry-block block))))))
+    (write-line "}" stream)))

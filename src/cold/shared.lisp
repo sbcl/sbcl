@@ -148,15 +148,11 @@
 ;;; Return an expression read from the file named NAMESTRING.
 ;;; For user-supplied inputs, protect against more than one expression
 ;;; appearing in the file. With trusted inputs we needn't bother.
-(defun read-from-file (namestring)
+(defun read-from-file (namestring &optional (enforce-single-expr t))
   (with-open-file (s (prepend-genfile-path namestring))
     (let* ((result (read s))
            (eof-result (cons nil nil)))
-      (when (string= (pathname-name namestring) "build-order")
-        ;; build-order uses both host and target conditionals.
-        ;; Our sanity checks during make-host-1 would complain
-        ;; about #+feature when reading the second expression in the file
-        ;; whenever such feature is also a possible target feature.
+      (unless enforce-single-expr
         (return-from read-from-file result))
       (unless (eq (read s nil eof-result) eof-result)
         (error "more than one expression in file ~S" namestring))
@@ -186,8 +182,7 @@
 ;;; When cross-compiling, the *FEATURES* set for the target Lisp is
 ;;; not in general the same as the *FEATURES* set for the host Lisp.
 ;;; In order to refer to target features specifically, we refer to
-;;; SB-XC:*FEATURES* instead of CL:*FEATURES*, and use the #!+ and #!-
-;;; readmacros instead of the ordinary #+ and #- readmacros.
+;;; SB-XC:*FEATURES* instead of CL:*FEATURES*.
 ;;;
 ;;; To support building in a read-only filesystem, the 'local-target-features'
 ;;; file might not be directly located here, since it's a generated file.
@@ -296,6 +291,11 @@
           ":IMMOBILE-CODE requires :IMMOBILE-SPACE feature")
          ("(and immobile-symbols (not immobile-space))"
           ":IMMOBILE-SYMBOLS requires :IMMOBILE-SPACE feature")
+         ("(and int4-breakpoints x86)"
+          ;; 0xCE is a perfectly good 32-bit instruction,
+          ;; unlike on x86-64 where it is illegal. It's therefore
+          ;; confusing to allow this feature in a 32-bit build.
+          ":INT4-BREAKPOINTS are incompatible with x86")
          ;; There is still hope to make multithreading on DragonFly x86-64
          ("(and sb-thread x86 dragonfly)"
           ":SB-THREAD not supported on selected architecture")))
@@ -315,11 +315,11 @@
 ;;; values of special variables such as *** and +, anyway). Set up
 ;;; machinery to warn us when/if we change it.
 ;;;
-;;; All code depending on this is itself dependent on #!+SB-SHOW.
-#!+sb-show
-(progn
+;;; All code depending on this is itself dependent on #+SB-SHOW.
+(defvar *cl-snapshot*)
+(when (member :sb-show sb-xc:*features*)
   (load "src/cold/snapshot.lisp")
-  (defvar *cl-snapshot* (take-snapshot "COMMON-LISP")))
+  (setq *cl-snapshot* (take-snapshot "COMMON-LISP")))
 
 ;;;; master list of source files and their properties
 
@@ -356,13 +356,28 @@
     ;; never figured out but which were apparently acceptable in CMU
     ;; CL. Eventually, it would be great to just get rid of all
     ;; warnings and remove support for this flag. -- WHN 19990323)
-    :ignore-failure-p))
+    :ignore-failure-p
+    ;; meaning: ignore this flag.
+    ;; This works around nonstandard behavior of "#." in certain hosts.
+    ;; When the evaluated form yields 0 values, ECL and CLISP treat it
+    ;; as though if yielded NIL:
+    ;; * (read-from-string "#(#.(cl:if (cl:eql 1 2) x (values)))")
+    ;;   => #(NIL)
+    ;; The correct value for the above expression - as obtained in SBCL,
+    ;; CCL, and ABCL - is #() because _any_ reader macro is permitted
+    ;; to produce 0 values. In fact you can demonstrate this by actually
+    ;; implementing your own "#." which conditionally returns 0 values,
+    ;; and seeing that it works in any lisp including the suspect ones.
+    ;; The oft-used idiom of "#+#.(cl:if (test) '(and) '(or)) X"
+    ;; is sufficiently unclear that its worth allowing a spurious NIL
+    ;; just to avoid that ugly mess.
+    nil))
 
 (defvar *array-to-specialization* (make-hash-table :test #'eq))
 
-(defmacro do-stems-and-flags ((stem flags) &body body)
+(defmacro do-stems-and-flags ((stem flags build-phase) &body body)
   (let ((stem-and-flags (gensym "STEM-AND-FLAGS")))
-    `(dolist (,stem-and-flags (get-stems-and-flags))
+    `(dolist (,stem-and-flags (get-stems-and-flags ,build-phase))
        (let ((,stem (first ,stem-and-flags))
              (,flags (rest ,stem-and-flags)))
          ,@body
@@ -412,13 +427,26 @@
 (compile 'stem-object-path)
 
 (defvar *stems-and-flags* nil)
-;;; Check for stupid typos in FLAGS list keywords.
-(defun get-stems-and-flags ()
- (when *stems-and-flags*
-   (return-from get-stems-and-flags *stems-and-flags*))
- (setf *stems-and-flags* (read-from-file "build-order.lisp-expr"))
- (let ((stems (make-hash-table :test 'equal)))
-  (do-stems-and-flags (stem flags)
+;;; Read the set of files to compile with respect to a build phase, 1 or 2.
+(defun get-stems-and-flags (build-phase)
+  (when (and *stems-and-flags* (eql (car *stems-and-flags*) build-phase))
+    (return-from get-stems-and-flags (cdr *stems-and-flags*)))
+  (let* ((feature (aref #(:sb-xc-host :sb-xc) (1- build-phase)))
+         (list
+          ;; The build phase feature goes into CL:*FEATURES*, not SB-XC:*FEATURES*
+          ;; because firstly we don't use feature expressions to control the set of
+          ;; files pertinent to the build phase - that is governed by :NOT-{HOST,TARGET}
+          ;; flags, and secondly we can not assume existence of the SB-XC package in
+          ;; warm build. The sole reason for this hack is to allow testing for CMU
+          ;; as the build host in make-host-1 which apparently needs to be allowed
+          ;; to produce warnings as a bug workaround.
+          (let ((cl:*features* (cons feature cl:*features*))
+                (*readtable* *xc-readtable*))
+            (read-from-file "build-order.lisp-expr" nil))))
+    (setf *stems-and-flags* (cons build-phase list)))
+  ;; Now check for duplicate stems and bogus flags.
+  (let ((stems (make-hash-table :test 'equal)))
+    (do-stems-and-flags (stem flags build-phase)
     ;; We do duplicate stem comparison based on the object path in
     ;; order to cover the case of stems with an :assem flag, which
     ;; have two entries but separate object paths for each.  KLUDGE:
@@ -426,18 +454,19 @@
     ;; set up later in the build process and we don't actually care
     ;; what it is so long as it doesn't change while we're checking
     ;; for duplicate stems.
-    (let* ((*target-obj-prefix* "")
-           (object-path (stem-object-path stem flags :target-compile)))
-      (if (gethash object-path stems)
-          (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
-          (setf (gethash object-path stems) t)))
+      (let* ((*target-obj-prefix* "")
+             (object-path (stem-object-path stem flags :target-compile)))
+        (if (gethash object-path stems)
+            (error "duplicate stem ~S in *STEMS-AND-FLAGS*" stem)
+            (setf (gethash object-path stems) t)))
+    ;; Check for stupid typos in FLAGS list keywords.
     ;; FIXME: We should make sure that the :assem flag is only used
     ;; when paired with :not-host.
-    (let ((set-difference (set-difference flags *expected-stem-flags*)))
-      (when set-difference
-        (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
-               set-difference)))))
-  *stems-and-flags*)
+      (let ((set-difference (set-difference flags *expected-stem-flags*)))
+        (when set-difference
+          (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
+                 set-difference)))))
+  (cdr *stems-and-flags*))
 
 ;;;; tools to compile SBCL sources to create the cross-compiler
 
@@ -568,11 +597,17 @@
     (pathname obj)))
 (compile 'compile-stem)
 
+(defparameter *host-quirks*
+  (or #+cmu  '(:host-quirks-cmu :no-ansi-print-object)
+      #+ecl  '(:host-quirks-ecl)
+      #+sbcl '(:host-quirks-sbcl))) ; not so much a "quirk", but consistent anyway
+
 ;;; Execute function FN in an environment appropriate for compiling the
 ;;; cross-compiler's source code in the cross-compilation host.
 (defun in-host-compilation-mode (fn)
   (declare (type function fn))
-  (let ((*features* (cons :sb-xc-host *features*)))
+  (let ((sb-xc:*features* (append '(:sb-xc-host) *host-quirks* sb-xc:*features*))
+        (*readtable* *xc-readtable*))
     (funcall fn)))
 (compile 'in-host-compilation-mode)
 

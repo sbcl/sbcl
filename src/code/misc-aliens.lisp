@@ -24,15 +24,15 @@
   (src (* char))
   (n unsigned-int))
 
-(define-alien-routine ("os_get_errno" get-errno) integer)
+(define-alien-routine ("os_get_errno" get-errno) int)
 (setf (documentation 'get-errno 'function)
       "Return the value of the C library pseudo-variable named \"errno\".")
 
 ;;; Decode errno into a string.
-#!-win32
+#-win32
 (defun strerror (&optional (errno (get-errno)))
   (alien-funcall (extern-alien "strerror" (function c-string int)) errno))
 
-#!+win32
+#+win32
 (defun strerror (&optional (errno (sb-win32:get-last-error)))
   (sb-win32:format-system-message errno))

@@ -79,15 +79,16 @@
   (hash-vector nil :type (or null (simple-array sb-vm:word (*))))
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb-thread:make-mutex :name "hash-table lock")
-        :type sb-thread:mutex :read-only t)
+        #-c-headers-only :type #-c-headers-only sb-thread:mutex
+        :read-only t)
   ;; List of values culled out during GC of weak hash table.
   (culled-values nil :type list)
   ;; For detecting concurrent accesses.
-  #!+sb-hash-table-debug
+  #+sb-hash-table-debug
   (signal-concurrent-access t :type (member nil t))
-  #!+sb-hash-table-debug
+  #+sb-hash-table-debug
   (reading-thread nil)
-  #!+sb-hash-table-debug
+  #+sb-hash-table-debug
   (writing-thread nil))
 
 ;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000

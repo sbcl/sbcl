@@ -3,8 +3,6 @@
 .section .note.GNU-stack,"",%progbits
 #endif
 
-#define LANGUAGE_ASSEMBLY
-
 #include "sbcl.h"
 #include "lispregs.h"
 #include "globals.h"
@@ -13,6 +11,7 @@
 #include "genesis/simple-fun.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/code.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
 #include "genesis/thread.h"
@@ -663,13 +662,8 @@ lra:
 
 	/* Due to pointer verification in MAKE-LISP-OBJ, this must
 	include its header data (the offset from the start of the
-	code-object to the LRA).  The code-object header is 4
-	words, there are 1 word of constants, and the instruction
-	space is doubleword-aligned, making an offset of six.
-	This is header data for a widetag, so shift left eight bits
-	and add. */
-        /* FIXME: the above is full of magic numbers. */
-	.long RETURN_PC_WIDETAG + 0x600
+	code-object to the LRA). */
+	.long  (((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 
 	/* We are receiving unknown multiple values, thus must deal
 	with the single-value and multiple-value cases separately. */
@@ -681,11 +675,11 @@ lra:
 	reg_LRA (where the LRA is stored by the return sequence) to
 	obtain a tagged pointer to the enclosing code component.  Both
 	values are tagged OTHER_POINTER_LOWTAG, so we just have to
-	account for the six words (see calculation for
-	RETURN_PC_WIDETAG, above) between the two addresses.
+	account for N words (see calculation for RETURN_PC_WIDETAG, above)
+	between the two addresses.
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
-	addi reg_CODE, reg_LRA, -24
+	addi reg_CODE, reg_LRA, ((CODE_SIZE+1)&~1)*-N_WORD_BYTES
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */

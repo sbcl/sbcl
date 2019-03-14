@@ -37,7 +37,6 @@
 (defconstant single-float-normal-exponent-min 1)
 (defconstant single-float-normal-exponent-max 254)
 (defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
 
 (defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
@@ -45,7 +44,6 @@
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
@@ -74,7 +72,7 @@
 
 ;;;; Description of the target address space.
 
-#!+irix
+#+irix
 (progn
   ;; Where to put the different spaces.
   ;; Old definitions, might be still relevant for an IRIX port.
@@ -88,7 +86,7 @@
   (defparameter dynamic-0-space-start #x08000000)
   (defparameter dynamic-0-space-end   #x0c000000))
 
-#!+linux
+#+linux
 (progn
   ;; Where to put the address spaces on Linux.
   ;;

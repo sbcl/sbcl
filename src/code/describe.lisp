@@ -36,8 +36,8 @@
   NAME is some name (for debugging only) or NIL if there is no name."
   (declare (type function fun))
   (etypecase fun
-    #+sb-eval
-    (sb-eval:interpreted-function
+    (interpreted-function
+     #+sb-eval
      (let ((name (sb-eval:interpreted-function-name fun))
            (lambda-list (sb-eval:interpreted-function-lambda-list fun))
            (declarations (sb-eval:interpreted-function-declarations fun))
@@ -45,9 +45,8 @@
        (values `(lambda ,lambda-list
                   ,@(when declarations `((declare ,@declarations)))
                   ,@body)
-               t name)))
-    #+sb-fasteval
-    (sb-interpreter:interpreted-function
+               t name))
+     #+sb-fasteval
      (sb-interpreter:fun-lambda-expression fun))
     (function
      (let ((name (%fun-name fun))
@@ -181,8 +180,7 @@
   (typecase object
     (simple-fun "compiled function")
     (closure "compiled closure")
-    ((or #+sb-fasteval sb-interpreter:interpreted-function
-         #+sb-eval sb-eval:interpreted-function) "interpreted function")
+    (interpreted-function "interpreted function")
     (generic-function "generic-function")
     (t "funcallable-instance")))
 
@@ -555,12 +553,9 @@
     (t
      (let ((source
              (typecase function
-               #+sb-eval
-               (sb-eval:interpreted-function
-                (sb-eval:interpreted-function-source-location function))
-               #+sb-fasteval
-               (sb-interpreter:interpreted-function
-                (sb-interpreter:fun-source-location function)))))
+               (interpreted-function
+                #+sb-eval (sb-eval:interpreted-function-source-location function)
+                #+sb-fasteval (sb-interpreter:fun-source-location function)))))
        (when source
          (let ((namestring (sb-c:definition-source-location-namestring source)))
            (when namestring
@@ -576,7 +571,7 @@
             (when (or (eq :declared from) (and sure (eq :assumed from)))
               (describe-block (stream "~A names an undefined function" name)
                 (format stream "~@:_~:(~A~) type: ~/sb-impl:print-type/"
-                        from (proclaimed-ftype name))))))
+                        from (global-ftype name))))))
         ;; Defined.
         (multiple-value-bind (fun what lambda-list derived-type declared-type
                               inline methods argument-precedence-order)
@@ -594,7 +589,7 @@
                                              (%fun-type function)))
                           (legal-name-p (legal-fun-name-p name))
                           (ctype (and legal-name-p
-                                      (proclaimed-ftype name)))
+                                      (global-ftype name)))
                           (type (and ctype (type-specifier ctype)))
                           (from (and legal-name-p
                                      (info :function :where-from name)))

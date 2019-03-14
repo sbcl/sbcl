@@ -60,9 +60,6 @@
 (defun fun-proto-fn (f)
   (truly-the interpreted-fun-prototype (interpreted-function-%proto-fn f)))
 
-(defun interpreted-function-p (function) ; necessary stub
-  (typep function 'interpreted-function))
-
 (defun fun-lambda-expression (fun)
   (let* ((proto-fn (fun-proto-fn fun))
          (name (proto-fn-name proto-fn))
@@ -78,6 +75,7 @@
             (let ((env (interpreted-function-env fun)))
               (not (and (basic-env-p env)
                         (null (env-parent env))
+                        (null (env-payload env))
                         (null (env-symbols env))
                         (null (declarations (env-contour env))))))
             ;; Internally we can distinguish absence of a name

@@ -24,12 +24,7 @@
   (let ((x 1)) (defun disassemble-closure (y) (if y (setq x y) x)))
   (silently (disassemble 'disassemble-closure)))
 
-#+sb-eval
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (import 'sb-eval:interpreted-function-p))
-#+sb-fasteval
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (import 'sb-interpreter:interpreted-function-p))
+(defun interpreted-function-p (x) (typep x 'sb-kernel:interpreted-function))
 
 #+(or sb-eval sb-fasteval)
 (with-test (:name (disassemble :interpreted))

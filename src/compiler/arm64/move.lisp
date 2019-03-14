@@ -20,6 +20,13 @@
          (inst movn y (ldb (byte 64 0) (lognot val))))
         ((encode-logical-immediate val)
          (inst orr y zr-tn val))
+        ((loop for i below 64 by 16
+               for part = (ldb (byte 16 i) val)
+               for zeroed = (dpb 0 (byte 16 i) val)
+               thereis (cond ((encode-logical-immediate zeroed)
+                              (inst orr y zr-tn zeroed)
+                              (inst movk y part i)
+                              t))))
         ((minusp val)
          (loop with first = t
                for i below 64 by 16
@@ -49,7 +56,7 @@
          (load-immediate-word temp x))))
 
 (define-move-fun (load-immediate 1) (vop x y)
-  ((null immediate)
+  ((immediate)
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
     (etypecase val
@@ -61,8 +68,6 @@
        (let* ((codepoint (char-code val))
               (encoded-character (dpb codepoint (byte 24 8) character-widetag)))
          (load-immediate-word y encoded-character)))
-      (null
-       (move y null-tn))
       (symbol
        (load-symbol y val)))))
 
@@ -119,7 +124,7 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-            :scs (any-reg descriptor-reg null)
+            :scs (any-reg descriptor-reg)
             :load-if (not (or (location= x y)
                               (and (sc-is x immediate)
                                    (eql (tn-value x) 0))))))
@@ -144,7 +149,7 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg null))
+            :scs (any-reg descriptor-reg))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))
@@ -186,8 +191,6 @@
                                       n-word-bits)))
              (load-arg (x load-tn)
                (sc-case x
-                 (null
-                  (lambda () null-tn))
                  ((constant immediate control-stack)
                   (let ((load-tn (if (and used-load-tn
                                           (location= used-load-tn load-tn))

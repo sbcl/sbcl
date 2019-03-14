@@ -68,6 +68,7 @@
   (:export #:aprof-run #:aprof-show)
   (:import-from #:sb-di #:valid-lisp-pointer-p)
   (:import-from #:sb-disassem #:dstate-inst-properties)
+  (:import-from #:sb-vm #:rbp-offset)
   (:import-from #:sb-x86-64-asm
                 #:lock #:x66 #:rex #:+rex-b+
                 #:inst-operand-size
@@ -163,7 +164,17 @@
 (defun layout-name (ptr)
   (if (eql (valid-lisp-pointer-p (int-sap ptr)) 0)
       'structure
-      (classoid-name (layout-classoid (make-lisp-obj ptr)))))
+      (layout-classoid-name (make-lisp-obj ptr))))
+
+;;; map-segment-instructions is really deficient in providing an intelligent
+;;; decoding of the bits, as they're wired into the instruction printer.
+;;; So figure out what kind of MOV instruction we have, unless it's
+;;; immediate-to-register (I should probably rememdy that).
+(defun infer-mov-direction (dchunk)
+  (case (logand dchunk #xFF)
+    ((#xC6 #xC7) :store)  ; immediate-to-memory (low bit = size)
+    (#x89 :store)  ; register-to-memory
+    (#x8B :load))) ; memory-to-register
 
 ;;; The compiler emits no additional metadata per code component
 ;;; other than the addresses of the enabling JMPs.
@@ -188,16 +199,12 @@
     (declare (type (or null (unsigned-byte 4)) target-reg))
     (setf (sb-disassem::seg-object seg) component
           (sb-disassem:seg-virtual-location seg) pc
-          (sb-disassem:seg-length seg) 64 ; arb
+          (sb-disassem:seg-length seg) 100 ; arb
           (sb-disassem:seg-sap-maker seg)
           (let ((sap (int-sap pc))) (lambda () sap)))
     (macrolet ((fail ()
-                `(progn
-                   (cerror "" "fail ~x: ~x '~s' ~s"
-                           pc (logand dchunk #xFF) opcode component)
-                   (return-from fail)))
+                `(return-from fail))
                (advance (newstate)
-;                 `(format t "~&advance to ~d~%" (setq allocator-state ,newstate))
                  `(setq allocator-state ,newstate))
                (advance-if (condition newstate)
                  `(if ,condition (advance ,newstate) (fail))))
@@ -208,7 +215,7 @@
                    (eq (machine-ea-disp rm)
                        (ash sb-vm::thread-pseudo-atomic-bits-slot
                             sb-vm:word-shift))))
-               (infer-layout (opcode ea dchunk)
+               (infer-layout (opcode ea)
                  (cond ((and (eql lowtag sb-vm:instance-pointer-lowtag)
                              (eq opcode 'mov)
                              (eq (inst-operand-size dstate) :dword)
@@ -258,7 +265,7 @@
                             (eql (machine-ea-base ea) 11)
                             (null (machine-ea-index ea))
                             (eql (machine-ea-disp ea)
-                                (+ profiler-index sb-vm:n-word-bytes))))
+                                 (+ profiler-index sb-vm:n-word-bytes))))
                       (t
                        (advance-if (and (eq opcode 'mov) (pseudoatomic-flag-p))
                                    +state-begin-pa+))))
@@ -314,26 +321,55 @@
                     ;; lowtag/widetag can be assigned in either order
                     (case opcode
                       (lea ; convert to descriptor before writing widetag
-                       (advance-if (and (eql (machine-ea-base ea) orig-free-ptr-reg)
-                                        (not (machine-ea-index ea))
-                                        (<= 0 (machine-ea-disp ea) sb-vm:lowtag-mask))
-                                   +state-lowtag-only+)
-                       (setq target-reg (reg-num (regrm-inst-reg dchunk dstate))
-                             lowtag (machine-ea-disp ea))
-                       (when (= lowtag sb-vm:list-pointer-lowtag)
-                         (return-from infer-type (values 'list size))))
-                      (mov ; widetag stored before ORing in lowtag
-                       (unless target-reg
-                         (setq target-reg orig-free-ptr-reg))
-                       (advance-if (and (eql (machine-ea-base ea) target-reg)
-                                        (not (machine-ea-disp ea))
-                                        (not (machine-ea-index ea)))
-                                   +state-widetag-only+)
-                       (setq widetag (if (eq (inst-operand-size dstate) :qword)
-                                         :variable
-                                         (logand (reg/mem-imm-data 0 dstate) #xFF))))
-                      (t
-                       (fail))))
+                       (cond ((and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                   (not (machine-ea-index ea))
+                                   (<= 0 (machine-ea-disp ea) sb-vm:lowtag-mask))
+                              (advance +state-lowtag-only+)
+                              (setq target-reg (reg-num (regrm-inst-reg dchunk dstate))
+                                    lowtag (machine-ea-disp ea))
+                              (when (= lowtag sb-vm:list-pointer-lowtag)
+                                (return-from infer-type (values 'list size))))
+                             ((and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                   (> (machine-ea-disp ea) (* 2 sb-vm:n-word-bytes))
+                                   (not (machine-ea-index ea)))
+                              ;; do nothing, this is probably a cons, we're computing
+                              ;; the next cell address, and the car was 0 so wasn't stored
+                              )
+                             (t (fail))))
+                      (mov
+                       ;; Some moves ares ignorable, those which either load from
+                       ;; the constant pool or store to the newly allocated memory.
+                       ;; LIST and LIST* sometimes do those. Writing an immediate value
+                       ;; to the car of a cons resembles a widetag store,
+                       ;; so we transition into widetagged state, rightly or not.
+                       (let ((dir (infer-mov-direction dchunk)))
+                         (ecase dir
+                          (:load
+                           (cond ((or (eql (machine-ea-base ea) rbp-offset) ; load from frame
+                                      (eq (machine-ea-base ea) :rip)) ; load from constant pool
+                                  ) ; do nothing
+                                 (t (fail))))
+                          (:store
+                           ;; widetag stored before ORing in lowtag
+                           (unless target-reg
+                             (setq target-reg orig-free-ptr-reg))
+                           (cond ((and (eql (machine-ea-base ea) target-reg)
+                                       (not (machine-ea-disp ea))
+                                       (not (machine-ea-index ea)))
+                                  (advance +state-widetag-only+)
+                                  (setq widetag (if (eq (inst-operand-size dstate) :qword)
+                                                    :variable
+                                                    (logand (reg/mem-imm-data 0 dstate) #xFF))))
+                                 ((and (eql (machine-ea-base ea) target-reg)
+                                       (not (machine-ea-index ea))
+                                       (machine-ea-disp ea))) ; ignore
+                                 (t (fail)))))))
+                      (|or|
+                       (cond ((and (not lowtag)
+                                   (eq (reg/mem-imm-data 0 dstate) sb-vm:list-pointer-lowtag))
+                              (return-from infer-type (values 'list size)))
+                             (t (fail))))
+                      (t (fail))))
                    (#.+state-lowtag-only+
                     (unless (eq opcode 'mov)
                       (fail))
@@ -376,33 +412,46 @@
                       (t
                        (fail))))
                    (#.+state-low-then-widetag+
-                    (infer-layout opcode ea dchunk))
+                    (infer-layout opcode ea))
                    (#.+state-widetag-only+
-                    (cond ((eq opcode 'mov)
-                           ;; Storing to the word 1 past the header is ignored
-                           ;; and the state is unchanged.
-                           (unless (and (null (machine-ea-index ea))
-                                        (eql (machine-ea-base ea) target-reg)
-                                        (typep (machine-ea-disp ea)
-                                               `(integer ,sb-vm:n-word-bytes
-                                                         (,(* sb-vm:n-word-bytes 2)))))
-                             (fail)))
-                          (t
-                           (advance-if (and (eq opcode '|or|)
-                                            ;; TODO: AVER correct register as well
-                                            (not lowtag))
-                                       +state-wide-then-lowtag+)
-                           (setq lowtag (reg/mem-imm-data 0 dstate))
-                           (ecase lowtag
-                             (#.sb-vm:other-pointer-lowtag
-                              (return-from infer-type
-                                (values (if (eq widetag :variable)
-                                            'unknown
-                                            (aref *tag-to-type* widetag))
-                                        size)))
-                             (#.sb-vm:instance-pointer-lowtag)
-                             (#.sb-vm:fun-pointer-lowtag
-                              (return-from infer-type (values 'function size)))))))
+                    (cond
+                     ((eq opcode 'mov)
+                      (let ((dir (infer-mov-direction dchunk)))
+                        ;; load from the constants is ignorable.
+                        ;; storing through the untagged pointer is ignorable.
+                        (cond ((and (eq dir :load) (eq (machine-ea-base ea) :rip)))
+                              ((and (eql (machine-ea-base ea) target-reg)
+                                    (null (machine-ea-index ea))))
+                              (t
+                               (fail)))))
+                     ((eq opcode 'lea)
+                      (cond ((and (eql (machine-ea-base ea) orig-free-ptr-reg)
+                                  (null (machine-ea-index ea))
+                                  (eql (machine-ea-disp ea) sb-vm:list-pointer-lowtag))
+                             (return-from infer-type (values 'list size)))
+                            ;; computing the CDR of the first cons in a list of 2, presumably
+                            ((and (eql (machine-ea-base ea) target-reg)
+                                  (null (machine-ea-index ea))))
+                            (t
+                             (fail))))
+                     (t
+                      (advance-if (and (eq opcode '|or|)
+                                       ;; TODO: AVER correct register as well
+                                       (not lowtag))
+                                  +state-wide-then-lowtag+)
+                      (setq lowtag (reg/mem-imm-data 0 dstate))
+                      (ecase lowtag
+                       (#.sb-vm:other-pointer-lowtag
+                        (return-from infer-type
+                         (values (if (eq widetag :variable)
+                                     'unknown
+                                   (aref *tag-to-type* widetag))
+                                 size)))
+                       (#.sb-vm:instance-pointer-lowtag)
+                       (#.sb-vm:list-pointer-lowtag
+                        (return-from infer-type (values 'list size)))
+                       (#.sb-vm:fun-pointer-lowtag
+                        (return-from infer-type (values 'function size)))))))
                    (#.+state-wide-then-lowtag+
                     (advance-if (and (eq opcode 'xor) (pseudoatomic-flag-p))
                                 +state-end-pa+))
@@ -411,7 +460,7 @@
                    (#.+state-test-interrupted+
                     (advance-if (eq opcode '|break|) +state-pa-trap+))
                    (#.+state-pa-trap+
-                    (infer-layout opcode ea dchunk))
+                    (infer-layout opcode ea))
                    (#.+state-trampoline-arg+
                     (advance-if (eq opcode '|call|) +state-called+))
                    (#.+state-called+
@@ -440,8 +489,11 @@
                            (advance +state-lowtag-only+))
                       (t
                        (fail))))))))
-           seg dstate)))))
-  (values nil nil))
+           seg dstate))))
+    (cerror "" "fail @ ~x in ~x state ~d from=~x"
+            (sb-disassem:dstate-cur-addr dstate)
+            component allocator-state pc)
+    (values nil nil)))
 
 ;;; Return a name for PC-OFFS in CODE. PC-OFFSET is relative
 ;;; to CODE-INSTRUCTIONS.
@@ -464,7 +516,7 @@
                                (return 0))
                              (decf i 2)))))))
 
-(defun aprof-collect ()
+(defun aprof-collect (stream)
   (let* ((metadata *allocation-profile-metadata*)
          (n-hit (extern-alien "alloc_profile_n_counters" int))
          (metadata-len (/ (length metadata) 2))
@@ -472,8 +524,9 @@
          (sap (extern-alien "alloc_profile_buffer" system-area-pointer))
          (index 3)
          (collection (make-hash-table :test 'equal)))
-    (format t "~&~d (of ~d max) profile entries consumed~2%"
-            n-hit metadata-len)
+    (when stream
+      (format stream "~&~d (of ~d max) profile entries consumed~2%"
+              n-hit metadata-len))
     (loop
      (when (>= index n-counters)
        (return collection))
@@ -525,10 +578,10 @@
 ;; DETAIL T shows function, bytes, percent,
 ;;    and unless there is only one detail line, the detail lines
 ;;
-(defun aprof-show (&key (top-n 20) (detail t) (collapse t))
+(defun aprof-show (&key (top-n 20) (detail t) (collapse t) (stream *standard-output*))
   (unless top-n
     (setq top-n 1000))
-  (let* ((collection (%hash-table-alist (aprof-collect)))
+  (let* ((collection (%hash-table-alist (aprof-collect stream)))
          (summary
           (mapcar (lambda (x)
                     (list* (car x)
@@ -541,14 +594,15 @@
          (i 0)
          (sum-pct 0)
          (sum-bytes 0))
-
+    (when (eq stream nil)
+      (setq stream (make-broadcast-stream))) ; lazy's person's approach
     (cond ((not detail)
-           (format t "~&       %    Sum %        Bytes    Allocations   Function~%")
-           (format t "~& -------  -------  -----------    -----------   --------~%"))
+           (format stream "~&       %    Sum %        Bytes    Allocations   Function~%")
+           (format stream "~& -------  -------  -----------    -----------   --------~%"))
           (t
-           (format t "~&       %        Bytes        Count    ~:[~;    PC        ~]Function~%"
+           (format stream "~&       %        Bytes        Count    ~:[~;    PC        ~]Function~%"
                    (not collapse))
-           (format t "~& -------  -----------    ---------    ~:[~;----------    ~]--------~%"
+           (format stream "~& -------  -----------    ---------    ~:[~;----------    ~]--------~%"
                    (not collapse))))
 
     ;; In detailed view, each function takes up either one line or
@@ -565,18 +619,18 @@
             (setq data (sort data #'> :key #'alloc-bytes)))
           (assert (eq bytes (reduce #'+ data :key #'alloc-bytes)))
           (when (and detail (cdr data) (not emitted-newline))
-            (terpri))
+            (terpri stream))
           (incf sum-pct (float (/ bytes total-bytes)))
           ;; Show summary for the function
           (cond ((not detail)
-                 (format t " ~5,1,2f      ~5,1,2f ~12d~15d   ~a~%"
+                 (format stream " ~5,1,2f      ~5,1,2f ~12d~15d   ~a~%"
                          (/ bytes total-bytes)
                          sum-pct
                          bytes
                          (reduce #'+ data :key #'alloc-count)
                          name))
                 (t
-                 (format t " ~5,1,2f   ~12d   ~:[~10@t~;~:*~10d~]~@[~14@a~]    ~a~@[ - ~a~]~%"
+                 (format stream " ~5,1,2f   ~12d   ~:[~10@t~;~:*~10d~]~@[~14@a~]    ~a~@[ - ~a~]~%"
                          (/ bytes total-bytes)
                          bytes
                          (if (cdr data) nil (alloc-count (car data)))
@@ -588,7 +642,7 @@
                          )))
           (when (and detail (cdr data))
             (dolist (point data)
-              (format t "     ~5,1,2f ~12d ~10d~@[~14x~]~@[        ~a~]~%"
+              (format stream "     ~5,1,2f ~12d ~10d~@[~14x~]~@[        ~a~]~%"
                         (/ (alloc-bytes point) bytes) ; fraction within function
                         (alloc-bytes point)
                         (alloc-count point)
@@ -597,29 +651,31 @@
           (incf sum-bytes bytes)
           (when (and detail
                      (setq emitted-newline (not (null (cdr data)))))
-            (terpri)))
+            (terpri stream)))
         (incf i)
         (if (and (neq top-n :all) (>= i top-n)) (return))))
 ;    (assert (= sum-bytes total-bytes))
     (cond ((not detail)
-           (format t "~19@t===========~%~19@t~11d~%" sum-bytes))
+           (format stream "~19@t===========~%~19@t~11d~%" sum-bytes))
           (t
-           (format t " =======  ===========~%~6,1,2f   ~12d~%"
+           (format stream " =======  ===========~%~6,1,2f   ~12d~%"
                    sum-pct sum-bytes)))
     sum-bytes))
 
 ;;; Call FUN and return the exact number of bytes it (an all descendant
 ;;; calls) allocated, provided that they were instrumented for precise
 ;;; cons profiling.
-(defun aprof-run (fun)
+;;; STREAM is where to report, defaulting to *standard-output*.
+;;; The convention is that of map-segment-instructions, meaning NIL is a sink.
+(defun aprof-run (fun &key (stream *standard-output*))
   (aprof-reset)
   (patch-fixups)
   (let (nbytes)
     (unwind-protect
          (progn (aprof-start) (funcall fun))
       (aprof-stop)
-      (setq nbytes (aprof-show))
-      (terpri))
+      (setq nbytes (aprof-show :stream stream))
+      (when stream (terpri stream)))
     nbytes))
 
 ;;;;

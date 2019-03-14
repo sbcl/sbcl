@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; FIXME: The latin9 stuff is currently #!+sb-unicode, because I
+;;; FIXME: The latin9 stuff is currently #+sb-unicode, because I
 ;;; don't like the idea of trying to do CODE-CHAR #x<big>.  Is that a
 ;;; justified fear?  Can we arrange that it's caught and converted to
 ;;; a decoding error error?  Or should we just give up on non-Unicode
@@ -122,7 +122,7 @@
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-od-name (sym1 sym2)
-    (package-symbolicate (symbol-package sym1) sym1 "-" sym2)))
+    (package-symbolicate (cl:symbol-package sym1) sym1 "-" sym2)))
 
 ;;;; to-octets conversions
 
@@ -347,9 +347,9 @@
       ;; the locale settings. Defaulting to an external-format which
       ;; can represent characters that the CHARACTER type can't
       ;; doesn't seem very sensible.
-      #!-sb-unicode
+      #-sb-unicode
       (setf *default-external-format* :latin-1)
-      (let ((external-format #!-win32 (intern (or #!-android
+      (let ((external-format #-win32 (intern (or #-android
                                                   (alien-funcall
                                                    (extern-alien
                                                     "nl_langinfo"
@@ -358,7 +358,7 @@
                                                    sb-unix:codeset)
                                                   "LATIN-1")
                                               "KEYWORD")
-                             #!+win32 (sb-win32::ansi-codepage)))
+                             #+win32 (sb-win32::ansi-codepage)))
         (let ((entry (get-external-format external-format)))
           (cond
             (entry
@@ -453,15 +453,15 @@ STRING (or the subsequence bounded by START and END)."
       (funcall (ef-string-to-octets-fun ef) string start end
                (if null-terminate 1 0)))))
 
-#!+sb-unicode
+#+sb-unicode
 (defvar +unicode-replacement-character+ (string (code-char #xfffd)))
-#!+sb-unicode
+#+sb-unicode
 (defun use-unicode-replacement-char (condition)
   (use-value +unicode-replacement-character+ condition))
 
 ;;; Utilities that maybe should be exported
 
-#!+sb-unicode
+#+sb-unicode
 (defmacro with-standard-replacement-character (&body body)
   `(handler-bind ((octet-encoding-error #'use-unicode-replacement-char))
     ,@body))

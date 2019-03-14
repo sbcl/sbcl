@@ -106,7 +106,7 @@
 
 ;;;; choosing an instruction
 
-#!-sb-fluid (declaim (inline inst-matches-p choose-inst-specialization))
+#-sb-fluid (declaim (inline inst-matches-p choose-inst-specialization))
 
 ;;; Return non-NIL if all constant-bits in INST match CHUNK.
 (defun inst-matches-p (inst chunk)
@@ -287,7 +287,7 @@
 ;;; LRA layout (dual word aligned):
 ;;;     header-word
 
-#!-sb-fluid (declaim (inline words-to-bytes))
+#-sb-fluid (declaim (inline words-to-bytes))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;;; Convert a word-offset NUM to a byte-offset.
@@ -358,7 +358,7 @@
            (type alignment size))
   (zerop (logand (1- size) address)))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (progn
 (defconstant lra-size (words-to-bytes 1))
 (defun lra-hook (chunk stream dstate)
@@ -545,18 +545,18 @@
    ;; Otherwise, operating on huge memory regions could exhaust the heap.
    ;; gencgc can do better though: pin SEG-OBJECT once only outside the loop.
    (macrolet ((with-pinned-segment (&body body)
-                #!-gencgc `(without-gcing
+                #-gencgc `(without-gcing
                             (setf (dstate-segment-sap dstate)
                                   (funcall (seg-sap-maker segment)))
                             ,@body)
-                #!+gencgc `(progn ,@body)))
+                #+gencgc `(progn ,@body)))
 
     (rewind-current-segment dstate segment)
 
-    (#!-gencgc progn
-     #!+gencgc with-pinned-objects #!+gencgc ((seg-object (dstate-segment dstate))
+    (#-gencgc progn
+     #+gencgc with-pinned-objects #+gencgc ((seg-object (dstate-segment dstate))
                                               (dstate-scratch-buf dstate))
-     #!+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
+     #+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
      ;; Now commence disssembly of instructions
      (loop
@@ -1003,7 +1003,7 @@
       (format stream "#X~2,'0x" (sap-ref-8 sap (+ offs start-offs))))))
 
 (defvar *default-dstate-hooks*
-  (list* #!-(or x86 x86-64) #'lra-hook nil))
+  (list* #-(or x86 x86-64) #'lra-hook nil))
 
 ;;; Make a disassembler-state object.
 (defun make-dstate (&optional (fun-hooks *default-dstate-hooks*))
@@ -1619,6 +1619,8 @@
 
 (defun valid-extended-function-designators-for-disassemble-p (thing)
   (typecase thing
+    ((or (cons (eql lambda)) interpreted-function)
+     (compile nil thing))
     ((satisfies legal-fun-name-p)
      (compiled-funs-or-lose (or (and (symbolp thing) (macro-function thing))
                                 (fdefinition thing))
@@ -1626,12 +1628,8 @@
     (sb-pcl::%method-function
          ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
          ;; we to disassemble both.
-         ;; FIXME: interpreted methods need to be compiled as above.
+         ;; FIXME: interpreted methods need to get compiled.
          (list thing (sb-pcl::%method-function-fast-function thing)))
-    ((or (cons (eql lambda))
-         #!+sb-fasteval sb-interpreter:interpreted-function
-         #!+sb-eval sb-eval:interpreted-function)
-     (compile nil thing))
     (function thing)
     (t nil)))
 
@@ -1694,7 +1692,8 @@
                         (sap-int
                          (code-instructions code-component)))))
                 (when (or (< code-offs 0)
-                          ;; Allow looking past instruction bytes if you want
+                          ;; Allow displaying beyond code-text-size
+                          ;; but not beyond code-code-size.
                           (> code-offs (%code-code-size code-component)))
                   (error "address ~X not in the code component ~S"
                          address code-component))
@@ -1861,15 +1860,15 @@
       (let ((code sb-fasl::*assembler-routines*))
         (invert (car (%code-debug-info code))
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
-    #!-sb-dynamic-core
+    #-sb-dynamic-core
        (invert *static-foreign-symbols* #'identity))
     (loop for name across sb-vm::+all-static-fdefns+
           for address =
-          #!+immobile-code (sb-vm::function-raw-address name)
-          #!-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
+          #+immobile-code (sb-vm::function-raw-address name)
+          #-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
-    #!+sb-safepoint
+    #+sb-safepoint
     (setf (gethash (+ sb-vm:gc-safepoint-page-addr
                       sb-c:+backend-page-bytes+
                       (- sb-vm:gc-safepoint-trap-offset)) addr->name)
@@ -1891,7 +1890,7 @@
                    (when (<= (car locs) offset (cadr locs))
                      (return-from find-assembler-routine
                       (values name (- address (+ start (car locs))))))
-                   #!+(or x86 x86-64)
+                   #+(or x86 x86-64)
                    (when (eql index (cddr locs))
                      (return-from find-assembler-routine
                       (values name 0)))))))
@@ -1904,8 +1903,8 @@
            (type (member 1 2 4 8) length)
            (type (member :little-endian :big-endian) byte-order))
   (if (or (eq length 1)
-          (and (eq byte-order #!+big-endian :big-endian #!+little-endian :little-endian)
-               #!-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
+          (and (eq byte-order #+big-endian :big-endian #+little-endian :little-endian)
+               #-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
                (not (logtest (1- length) (sap-int (sap+ sap offset))))))
       (case length
         (8 (sap-ref-64 sap offset))
@@ -2020,7 +2019,7 @@
   (unless (typep address 'address)
     (return-from maybe-note-assembler-routine nil))
   (multiple-value-bind (name offs) (find-assembler-routine address)
-    #!+linkage-table
+    #+linkage-table
     (unless name
       (setq name (sap-foreign-symbol (int-sap address))))
     (when name
@@ -2097,7 +2096,7 @@
            ;; as does MAYBE-NOTE-STATIC-SYMBOL in general - any random immediate
            ;; used in an unboxed context, such as an ADD instruction,
            ;; might be wrongly construed as an address.
-           #!+immobile-space
+           #+immobile-space
            (let ((code (seg-code (dstate-segment dstate))))
              (when code
                (loop for i downfrom (1- (code-header-words code))
@@ -2176,7 +2175,7 @@
 ;;; arm64 stores an error-number in the instruction bytes,
 ;;; so can't easily share this code.
 ;;; But probably we should just add the conditionalization in here.
-#!-arm64
+#-arm64
 (defun snarf-error-junk (sap offset trap-number &optional length-only (compact-error-trap t))
   (let* ((index offset)
          (error-byte t)
@@ -2241,7 +2240,7 @@
   ;; initial instruction space is built, so it can all be removed.
   ;; But if you need all these macros to exist for some reason,
   ;; then define one of the two following features to keep them:
-  #!-(or sb-fluid sb-retain-assembler-macros)
+  #-(or sb-fluid sb-retain-assembler-macros)
   (do-symbols (symbol sb-assem::*backend-instruction-set-package*)
     (remf (symbol-plist symbol) 'arg-type)
     (remf (symbol-plist symbol) 'inst-format)))

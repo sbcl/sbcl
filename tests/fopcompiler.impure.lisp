@@ -13,7 +13,7 @@
 ;;; being executed, in fact mustn't go in "fopcompiler.impure-cload.lisp"
 ;;; because the call to COMPILE-FILE needs to be wrapped in HANDLER-BIND.
 
-(defvar *tmp-filename* "fopcompile-test.tmp")
+(defvar *tmp-filename* (randomish-temp-file-name))
 
 ;; Assert that FORM is handled by the fopcompiler, then compile it.
 (defun assert-fopcompilable-and-compile-it (form)
@@ -51,13 +51,21 @@
             '(defvar *foo* (i-do-not-exist)))))
     (assert (and (typep w 'sb-int:simple-style-warning)
                  (eql (search "undefined"
-                              (simple-condition-format-control w)) 0)))))
+                              (write-to-string w :escape nil))
+                      0)))))
 
+;; Note: This tests fails, but for a bad reason, as opposed to the wrong reason
+;; (which was also bad). It used to fail because the name of the variable that it
+;; used was completely removed, so it failed with "unknown variable".
+;; Nobody noticed because the test got marked as failing when the variable was
+;; removed. But now despite addition of a new deprecated variable, it fails
+;; because it's *actually* failing, because the thing it tests got broken.
 ;; Ensure that FOPCOMPILE warns about deprecated variables.
+(sb-int:define-deprecated-variable :late "1.1.4.9" *i-am-deprecated*)
 (with-test (:name :fopcompiler-deprecated-var-warning
             :fails-on :sbcl)
   (assert (typep (assert-fopcompilable-and-compile-it
-                  '(defvar *frob* (if *SHOW-ENTRY-POINT-DETAILS* 'yes 'no)))
+                  '(defvar *frob* (if *i-am-deprecated* 'yes 'no)))
                  'sb-ext:deprecation-condition)))
 
 (ignore-errors (delete-file *tmp-filename*))

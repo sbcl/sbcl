@@ -31,7 +31,11 @@ lispobj thread_state(struct thread *thread);
 void set_thread_state(struct thread *thread, lispobj state);
 void wait_for_thread_state_change(struct thread *thread, lispobj state);
 
+#ifdef LISP_FEATURE_GCC_TLS
+extern __thread int is_lisp_thread;
+#else
 extern pthread_key_t lisp_thread;
+#endif
 #endif
 
 #if defined(LISP_FEATURE_SB_SAFEPOINT)
@@ -207,7 +211,7 @@ extern __thread struct thread *current_thread;
 
 /* context 0 is the word immediately before the thread struct, and so on. */
 #define nth_interrupt_context(n,thread) \
-      ((os_context_t**)((char*)thread - THREAD_CSP_PAGE_SIZE))[-(n+1)]
+      ((os_context_t**)((char*)thread - THREAD_CSP_PAGE_SIZE))[-(THREAD_HEADER_SLOTS+n+1)]
 
 #define THREAD_STRUCT_SIZE (thread_control_stack_size + BINDING_STACK_SIZE + \
                             ALIEN_STACK_SIZE +                          \
@@ -290,7 +294,11 @@ static inline struct thread *arch_os_get_current_thread(void)
 
 inline static int lisp_thread_p(os_context_t __attribute__((unused)) *context) {
 #ifdef LISP_FEATURE_SB_THREAD
+# ifdef LISP_FEATURE_GCC_TLS
+    return is_lisp_thread;
+# else
     return pthread_getspecific(lisp_thread) != NULL;
+# endif
 #elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
     char *csp = (char *)*os_context_sp_addr(context);
     return (char *)all_threads->control_stack_start < csp &&

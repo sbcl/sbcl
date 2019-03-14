@@ -110,7 +110,7 @@
   (fixup-notes)
   ;; Whether or not to collect dynamic statistics. This is just the same as
   ;; *COLLECT-DYNAMIC-STATISTICS* but is faster to reference.
-  #!+sb-dyncount
+  #+sb-dyncount
   (collect-dynamic-statistics nil))
 (defprinter (segment :identity t))
 
@@ -238,15 +238,15 @@
   (write-dependents (make-sset) :type sset)
   ;; instructions which read what we write
   (read-dependents (make-sset) :type sset))
-#!+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
-#!+sb-show-assem (defvar *next-inst-id* 0)
+#+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
+#+sb-show-assem (defvar *next-inst-id* 0)
 (defmethod print-object ((inst instruction) stream)
   (print-unreadable-object (inst stream :type t :identity t)
-    #!+sb-show-assem
+    #+sb-show-assem
     (princ (ensure-gethash inst *inst-ids* (incf *next-inst-id*))
            stream)
     (format stream
-            #!+sb-show-assem " emitter=~S" #!-sb-show-assem "emitter=~S"
+            #+sb-show-assem " emitter=~S" #-sb-show-assem "emitter=~S"
             (let ((emitter (inst-emitter inst)))
               (if emitter
                   (multiple-value-bind (lambda lexenv-p name)
@@ -257,7 +257,7 @@
     (when (inst-depth inst)
       (format stream ", depth=~W" (inst-depth inst)))))
 
-#!+sb-show-assem
+#+sb-show-assem
 (defun reset-inst-ids ()
   (clrhash *inst-ids*)
   (setf *next-inst-id* 0))
@@ -278,7 +278,7 @@
   ;; - a list (symbol . args) for a machine instruction or assembler directive
   ;; - a label
   ;; - a function to emit a postit
-  (dolist (thing things)
+  (dolist (thing things section)
     (let ((vector (the simple-vector (section-last-buf section)))
           (index (section-buf-index section)))
       (unless (< index (length vector))
@@ -303,7 +303,7 @@
       (setf (aref vector index) thing)
       (setf (section-buf-index section) (1+ index)))))
 
-#!-(or x86-64 x86)
+#-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
   (declare (ignore operand)))
 
@@ -405,7 +405,7 @@
 (defun note-read-dependency (segment inst read)
   (multiple-value-bind (loc-num size)
       (sb-c:location-number read)
-    #!+sb-show-assem (format *trace-output*
+    #+sb-show-assem (format *trace-output*
                              "~&~S reads ~S[~W for ~W]~%"
                              inst read loc-num size)
     (when loc-num
@@ -442,7 +442,7 @@
 (defun note-write-dependency (segment inst write &key partially)
   (multiple-value-bind (loc-num size)
       (sb-c:location-number write)
-    #!+sb-show-assem (format *trace-output*
+    #+sb-show-assem (format *trace-output*
                              "~&~S writes ~S[~W for ~W]~%"
                              inst write loc-num size)
     (when loc-num
@@ -474,8 +474,8 @@
 ;;; already been computed, so we just have to check to see whether the
 ;;; basic block is terminated.
 (defun queue-inst (segment inst)
-  #!+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output* "~&queuing ~S~%" inst)
+  #+sb-show-assem (format *trace-output*
                            "  reads ~S~%  writes ~S~%"
                            (collect ((reads))
                              (do-sset-elements (read
@@ -520,7 +520,7 @@
     (return-from schedule-pending-instructions
                  (values)))
 
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "~&scheduling pending instructions..~%")
 
   ;; Note that any values live at the end of the block have to be
@@ -559,7 +559,7 @@
                (cond ((and (sset-empty (inst-read-dependents inst))
                            (instruction-attributep (inst-attributes inst)
                                                    flushable))
-                      #!+sb-show-assem (format *trace-output*
+                      #+sb-show-assem (format *trace-output*
                                                "flushing ~S~%"
                                                inst)
                       (setf (inst-emitter inst) nil)
@@ -579,13 +579,13 @@
       (setf (segment-delayed segment) delayed))
     (dolist (branch (segment-queued-branches segment))
       (grovel-inst (cdr branch))))
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "queued branches: ~S~%"
                            (segment-queued-branches segment))
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "initially emittable: ~S~%"
                            (segment-emittable-insts-queue segment))
-  #!+sb-show-assem (format *trace-output*
+  #+sb-show-assem (format *trace-output*
                            "initially delayed: ~S~%"
                            (segment-delayed segment))
 
@@ -645,7 +645,7 @@
                                (inst-write-dependents inst))
                               (schedule-one-inst segment t)
                               :nop)))
-                #!+sb-show-assem (format *trace-output*
+                #+sb-show-assem (format *trace-output*
                                          "filling branch delay slot with ~S~%"
                                          fill)
                 (push fill results)))
@@ -653,7 +653,7 @@
             (incf insts-from-end))
           (note-resolved-dependencies segment inst)
           (push inst results)
-          #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
+          #+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
           (advance-one-inst segment))))
 
     ;; Keep scheduling stuff until we run out.
@@ -708,7 +708,7 @@
                    (instruction-attributep (inst-attributes inst)
                                            variable-length))
         ;; We've got us a live one here. Go for it.
-        #!+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
+        #+sb-show-assem (format *trace-output* "emitting ~S~%" inst)
         ;; Delete it from the list of insts.
         (if prev
             (setf (cdr prev) (cdr remaining))
@@ -730,7 +730,7 @@
   (cond ((segment-delayed segment)
          ;; No emittable instructions, but we have more work to do. Emit
          ;; a NOP to fill in a delay slot.
-         #!+sb-show-assem (format *trace-output* "emitting a NOP~%")
+         #+sb-show-assem (format *trace-output* "emitting a NOP~%")
          :nop)
         (t
          ;; All done.
@@ -791,7 +791,7 @@
 ;;; emitting code in SCHEDULE-PENDING-INSTRUCTIONS.
 (defun insert-emittable-inst (segment inst)
   (unless (instruction-attributep (inst-attributes inst) branch)
-    #!+sb-show-assem (format *trace-output* "now emittable: ~S~%" inst)
+    #+sb-show-assem (format *trace-output* "now emittable: ~S~%" inst)
     (do ((my-depth (inst-depth inst))
          (remaining (segment-emittable-insts-queue segment) (cdr remaining))
          (prev nil remaining))
@@ -886,7 +886,7 @@
        (emit-byte segment pattern)))
     ;; EMIT-LONG-NOP does not exist for most backends.
     ;; Better to get an ECASE error than undefined-function.
-    #!+x86-64
+    #+x86-64
     ((eql :long-nop)
      (sb-vm:emit-long-nop segment amount)))
   (values))
@@ -1303,7 +1303,7 @@
                (awhen (rest sections) (combine-sections it)))))
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
-(defun assemble-sections (segment &rest inputs)
+(defun %assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
         (sections (combine-sections inputs))
         (in-without-scheduling)
@@ -1323,7 +1323,7 @@
     (when (plusp (segment-header-skew segment))
       (%emit-skip segment (segment-header-skew segment)))
     (%emit-label segment nil (segment-origin segment))
-    #!+sb-dyncount
+    #+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
     (dolist (buffer sections)
       (dovector (operation buffer)
@@ -1367,18 +1367,87 @@
                     (return-from op))
                    (.comment ; ignore it
                     (return-from op))))
-               (apply mnemonic operands segment
-                      (perform-operand-lowering operands)))))
+               (instruction-hooks segment)
+               (apply mnemonic segment (perform-operand-lowering operands)))))
           (label (%emit-label segment **current-vop** operation))
-          (function (%emit-postit segment operation)))))
-    (finalize-segment segment)
-    segment))
+          (function (%emit-postit segment operation))))))
+  (finalize-segment segment))
+
+;;; The interface to %ASSEMBLE-SECTIONS
+(defun assemble-sections (asmstream simple-fun-labels segment)
+  (let* ((n-entries (length simple-fun-labels))
+         (trailer-len (* (+ n-entries 1) 4))
+         (end-text (gen-label))
+         (octets
+          (segment-buffer
+           (%assemble-sections
+            segment
+            (asmstream-data-section asmstream)
+            (asmstream-code-section asmstream)
+            (asmstream-elsewhere-section asmstream)
+            (emit (make-section)
+                  end-text
+                  `(.align 2)
+                  `(.skip ,trailer-len)
+                  `(.align ,sb-vm:n-lowtag-bits))))))
+    (flet ((store-ub16 (index val)
+             (multiple-value-bind (b0 b1)
+                 #+little-endian
+                 (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
+                 #+big-endian
+                 (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
+               (setf (aref octets (+ index 0)) b0
+                     (aref octets (+ index 1)) b1)))
+           (store-ub32 (index val)
+             (multiple-value-bind (b0 b1 b2 b3)
+                 #+little-endian
+                 (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
+                         (ldb (byte 8 16) val) (ldb (byte 8 24) val))
+                 #+big-endian
+                 (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
+                         (ldb (byte 8  8) val) (ldb (byte 8  0) val))
+               (setf (aref octets (+ index 0)) b0
+                     (aref octets (+ index 1)) b1
+                     (aref octets (+ index 2)) b2
+                     (aref octets (+ index 3)) b3))))
+      (let ((index (length octets))
+            (fun-offsets))
+        ;; Total size of the code object must be multiple of 2 lispwords
+        (aver (not (logtest (+ (segment-header-skew segment) index)
+                            sb-vm:lowtag-mask)))
+        (let ((padding (if (eql n-entries 0)
+                           0
+                           (- index trailer-len (label-position end-text)))))
+          (unless (and (typep trailer-len '(unsigned-byte 16))
+                       (typep n-entries '(unsigned-byte 12))
+                       (typep padding '(unsigned-byte 4)))
+            (bug "Oversized code component?"))
+          (store-ub16 (- index 2) trailer-len)
+          (store-ub16 (- index 4) (logior (ash n-entries 4) padding)))
+        (decf index trailer-len)
+        ;; Iteration over label positions occurs from numerically highest
+        ;; to lowest, which is right because the 0th indexed simple-fun
+        ;; has the lowest entry offset, and is the last one written
+        ;; into the trailer table. The trailer table is indexed backwards:
+        ;;  ... simple-fun-2 | simple-fun-1 | simple-fun-0
+        ;; And because we use PUSH, we collect them in forward order
+        ;; which is the correct thing to return.
+        (dolist (label simple-fun-labels)
+          (let ((val (label-position label)))
+            (push val fun-offsets)
+            (store-ub32 index val)
+            (incf index 4)))
+        (aver (= index (- (length octets) 4)))
+        (values segment
+                (label-position end-text)
+                (segment-fixup-notes segment)
+                fun-offsets)))))
 
 ;;; Most backends do not convert register TNs into a different type of
 ;;; internal object prior to handing the operands off to the emitter.
 ;;; x86-64 does have a different representation, which makes some of
 ;;; the emitter logic easier to understand.
-#!-x86-64
+#-x86-64
 (defun perform-operand-lowering (operands) operands)
 
 (defun truncate-section-to-length (section)
@@ -1463,12 +1532,8 @@
          (aver (typep v '(or null sb-c::vop)))
          (emit dest (if v (cons v inst) inst))))
       (segment ; streaming out of the assembler
-       ;; Pass operands to the machine instruction encoder as a list and as
-       ;; spread arguments. The list alleviates the need for emitter to listify
-       ;; operands prior to calling any instruction hooks. The spread arguments
-       ;; allow the compiler to generate normal &OPTIONAL / &KEY parsing code
-       ;; in lieu of our generating a destructuring-bind to achieve the same.
-       (apply mnemonic operands dest (perform-operand-lowering operands)))))
+       (instruction-hooks dest)
+       (apply mnemonic dest (perform-operand-lowering operands)))))
   (values))
 
 (defun emit-label (label)
@@ -1487,6 +1552,13 @@
     (trace-inst s :align bits)
     (emit s `(.align ,bits ,pattern))))
 
+;; ECL bug workaround: it miscompiles LABEL-POSITION with this decl
+;; This might be unnecessary now that I'm proclaiming an OPTIMIZE policy
+;; that seems to fix everything. It certainly was needed without that.
+;; At least by keeping this we might be able to report some specific bugs
+;; against ECL in the hope it gets fixed. Of course we can't actually ever
+;; remove workarounds.
+#-host-quirks-ecl
 (declaim (ftype (sfunction (label &optional t index) (or null index))
                 label-position))
 (defun label-position (label &optional if-after delta)
@@ -1519,7 +1591,8 @@
         (when (label-p note)
           (decf (label-index note) skew)
           (decf (label-posn note) skew)))))
-  (compact-segment-buffer segment))
+  (compact-segment-buffer segment)
+  segment)
 
 ;;; Return the contents of SEGMENT as a vector. We assume SEGMENT has
 ;;; been finalized so that we can simply return its buffer.
@@ -1680,10 +1753,8 @@
           (t
            (error "unknown option: ~S" option)))))
     (when emitter
-      (push `(instruction-hooks ,segment-name ,sym-name .operands.)
-            emitter)
       (unless cost (setf cost 1))
-      #!+sb-dyncount
+      #+sb-dyncount
       (push `(when (segment-collect-dynamic-statistics ,segment-name)
                (let* ((info (sb-c:ir2-component-dyncount-info
                              (sb-c:component-info
@@ -1724,13 +1795,12 @@
        (setf (get ',defun-name 'sb-disassem::instruction-flavors)
              (list ,@pdefs))
        ,(when emitter
-          `(defun ,defun-name (.operands. ,segment-name ,@(cdr lambda-list))
+          `(defun ,defun-name (,segment-name ,@(cdr lambda-list))
              (declare ,@decls)
              (let ,(and vop-name `((,vop-name **current-vop**)))
                ,@emitter))))))
 
-(defun instruction-hooks (segment mnemonic operands)
-  (declare (ignore mnemonic operands))
+(defun instruction-hooks (segment)
   (let ((postits (segment-postits segment)))
     (setf (segment-postits segment) nil)
     (dolist (postit postits)

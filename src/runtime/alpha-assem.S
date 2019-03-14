@@ -25,6 +25,7 @@
 #include "lispregs.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/code.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/simple-fun.h"
 #include "genesis/static-symbols.h"
@@ -275,7 +276,7 @@ end_of_tramps:
 	.set	noreorder
 	.globl	fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.long	RETURN_PC_WIDETAG + 0x600
+	.long	(((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 	br	zero, fun_end_breakpoint_trap
 	nop
 	mov	reg_CSP, reg_OCFP

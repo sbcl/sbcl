@@ -92,6 +92,16 @@
                       (* char))
            c-string))))
 
+(define-condition exception (error)
+  ((code :initarg :code :reader exception-code)
+   (context :initarg :context :reader exception-context)
+   (record :initarg :record :reader exception-record))
+  (:report (lambda (c s)
+             (format s "An exception occurred in context ~S: ~S. (Exception code: ~S)"
+                     (exception-context c)
+                     (exception-record c)
+                     (exception-code c)))))
+
 ;;; Actual exception handler. We hit something the runtime doesn't
 ;;; want to or know how to deal with (that is, not a sigtrap or gc wp
 ;;; violation), so it calls us here.
@@ -118,8 +128,9 @@
           ((= code +dbg-printexception-c+)
            (dbg-printexception-c record))
           (t
-           (error "An exception occurred in context ~S: ~S. (Exception code: ~S)"
-                  context-sap exception-record-sap code)))))
+           (cerror "Return from the exception handler"
+                   'exception :context context-sap :record exception-record-sap
+                              :code code)))))
 
 
 (in-package "SB-UNIX")

@@ -27,11 +27,12 @@
 ;;; in the long syntax. But it clearly does not, because if you write
 ;;; (&WHOLE v) then you get (LAMBDA (&WHOLE V ...) ...) which is illegal
 ;;;
-(defmacro define-method-combination (&whole form &rest args)
+(defmacro define-method-combination (&whole form name . args)
   (declare (ignore args))
+  (check-designator name define-method-combination)
   `(progn
      (with-single-package-locked-error
-         (:symbol ',(second form) "defining ~A as a method combination"))
+         (:symbol ',name "defining ~A as a method combination"))
      ,(if (and (cddr form)
                (listp (caddr form)))
           (expand-long-defcombin form)

@@ -15,8 +15,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 ;; The tests in this file do not work under the legacy interpreter.
 ;; They mostly do work in the fast interpreter, and are either harmless
 ;; or actually reasonable things to test.
@@ -995,10 +993,10 @@
         (*evaluator-mode* :compile))
     (eval `(defun ,name (x) x))
     (assert (equal '(function (t) (values t &optional))
-                   (sb-kernel:type-specifier (sb-int:proclaimed-ftype name))))
+                   (sb-kernel:type-specifier (sb-int:global-ftype name))))
     (eval `(defun ,name (x &optional y) (or x y)))
     (assert (equal '(function (t &optional t) (values t &optional))
-                   (sb-kernel:type-specifier (sb-int:proclaimed-ftype name))))))
+                   (sb-kernel:type-specifier (sb-int:global-ftype name))))))
 
 ;;;; inline & maybe inline nested calls
 
@@ -1544,7 +1542,7 @@
       ;; dunno.
       (return t))
     (let ((types (template-result-types template))
-          (result-type (fun-type-returns (proclaimed-ftype function))))
+          (result-type (fun-type-returns (global-ftype function))))
       (cond
         ((values-type-p result-type)
          (do ((ltypes (append (args-type-required result-type)
@@ -1582,7 +1580,7 @@
    (lambda (name)
      ;; LEGAL-FUN-NAME-P test is necessary, since (INFO :FUNCTION :TYPE)
      ;; has a defaulting expression that involves calling FDEFINITION.
-     (when (and (legal-fun-name-p name) (proclaimed-ftype name))
+     (when (and (legal-fun-name-p name) (global-ftype name))
        ;; OK, so we have an entry in the INFO database. Now, if ...
        (binding* ((info (info :function :info name) :exit-if-null)
                   (nil (fun-info-templates info) :exit-if-null))
@@ -2150,7 +2148,8 @@
       (two-values y x)
     (assert (and (eql a x) (eql b y)
                  (not (or c d e f g h i j k l m n o p q r s))))))
-(wants-many-values 1 42)
+(test-util:with-test (:name (multiple-value-bind :unknown values))
+  (wants-many-values 1 42))
 
 ;;; constant coalescing
 
@@ -2184,13 +2183,14 @@
 
 ;; named and unnamed
 (defconstant +born-to-coalesce+ '.born-to-coalesce.)
-(multiple-value-bind (file-fun core-fun)
-    (compile2 '(lambda ()
-                (let ((x (cons +born-to-coalesce+ nil))
-                      (y (cons '.born-to-coalesce. nil)))
-                  (list x y))))
-  (assert (= 1 (count-code-constants '.born-to-coalesce. file-fun)))
-  (assert (= 1 (count-code-constants '.born-to-coalesce. core-fun))))
+(test-util:with-test (:name (compile compile-file :coalescing symbol))
+  (multiple-value-bind (file-fun core-fun)
+      (compile2 '(lambda ()
+                  (let ((x (cons +born-to-coalesce+ nil))
+                        (y (cons '.born-to-coalesce. nil)))
+                    (list x y))))
+    (assert (= 1 (count-code-constants '.born-to-coalesce. file-fun)))
+    (assert (= 1 (count-code-constants '.born-to-coalesce. core-fun)))))
 
 ;; some things must retain identity under COMPILE, but we want to coalesce them under COMPILE-FILE
 (defun assert-coalescing (constant)
@@ -2216,13 +2216,16 @@
                      (not (eq a b))))))))
 
 (defconstant +born-to-coalesce2+ "maybe coalesce me!")
-(assert-coalescing '+born-to-coalesce2+)
+(test-util:with-test (:name (compile compile-file :coalescing string))
+  (assert-coalescing '+born-to-coalesce2+))
 
 (defconstant +born-to-coalesce3+ #*01101001011101110100011)
-(assert-coalescing '+born-to-coalesce3+)
+(test-util:with-test (:name (compile compile-file :coalescing bit-vector))
+  (assert-coalescing '+born-to-coalesce3+))
 
 (defconstant +born-to-coalesce4+ '(foo bar "zot" 123 (nested "quux") #*0101110010))
-(assert-coalescing '+born-to-coalesce4+)
+(test-util:with-test (:name (compile compile-file :coalescing :mixed))
+  (assert-coalescing '+born-to-coalesce4+))
 
 (defclass some-constant-thing () ())
 

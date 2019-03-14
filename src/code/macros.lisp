@@ -178,7 +178,7 @@ invoked. In that case it will store into PLACE and start over."
 
 (sb-xc:defmacro define-compiler-macro (name lambda-list &body body)
   "Define a compiler-macro for NAME."
-  (legal-fun-name-or-type-error name)
+  (check-designator name define-compiler-macro)
   (when (and (symbolp name) (special-operator-p name))
     (%program-error "cannot define a compiler-macro for a special operator: ~S"
                     name))
@@ -498,7 +498,7 @@ invoked. In that case it will store into PLACE and start over."
   ;; optional dispatch mechanism for the M-V-B gets increasingly
   ;; hairy.
   (let ((val (and (sb-xc:constantp n env) (constant-form-value n env))))
-    (if (and (integerp val) (<= 0 val (or #!+(or x86-64 arm64) ;; better DEFAULT-UNKNOWN-VALUES
+    (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64) ;; better DEFAULT-UNKNOWN-VALUES
                                           1000
                                           10))) ; Arbitrary limit.
         (let ((dummy-list (make-gensym-list val))

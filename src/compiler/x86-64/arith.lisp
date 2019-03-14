@@ -1562,18 +1562,18 @@ constant shift greater than word length")))
      (:translate ,function)))
 
 (macrolet ((def (name -c-p)
-             (let ((fun64 (intern (format nil "~S-MOD64" name)))
-                   (vopu (intern (format nil "FAST-~S/UNSIGNED=>UNSIGNED" name)))
-                   (vopcu (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
-                   (vopf (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
-                   (vopcf (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name)))
-                   (vop64u (intern (format nil "FAST-~S-MOD64/WORD=>UNSIGNED" name)))
-                   (vop64f (intern (format nil "FAST-~S-MOD64/FIXNUM=>FIXNUM" name)))
-                   (vop64cu (intern (format nil "FAST-~S-MOD64-C/WORD=>UNSIGNED" name)))
-                   (vop64cf (intern (format nil "FAST-~S-MOD64-C/FIXNUM=>FIXNUM" name)))
-                   (funfx (intern (format nil "~S-MODFX" name)))
-                   (vopfxf (intern (format nil "FAST-~S-MODFX/FIXNUM=>FIXNUM" name)))
-                   (vopfxcf (intern (format nil "FAST-~S-MODFX-C/FIXNUM=>FIXNUM" name))))
+             (let ((fun64   (symbolicate name "-MOD64"))
+                   (funfx   (symbolicate name "-MODFX"))
+                   (vopu    (symbolicate "FAST-" name "/UNSIGNED=>UNSIGNED"))
+                   (vopcu   (symbolicate "FAST-" name "-C/UNSIGNED=>UNSIGNED"))
+                   (vopf    (symbolicate "FAST-" name "/FIXNUM=>FIXNUM"))
+                   (vopcf   (symbolicate "FAST-" name "-C/FIXNUM=>FIXNUM"))
+                   (vop64u  (symbolicate "FAST-" name "-MOD64/WORD=>UNSIGNED"))
+                   (vop64f  (symbolicate "FAST-" name "-MOD64/FIXNUM=>FIXNUM"))
+                   (vop64cu (symbolicate "FAST-" name "-MOD64-C/WORD=>UNSIGNED"))
+                   (vop64cf (symbolicate "FAST-" name "-MOD64-C/FIXNUM=>FIXNUM"))
+                   (vopfxf  (symbolicate "FAST-" name "-MODFX/FIXNUM=>FIXNUM"))
+                   (vopfxcf (symbolicate "FAST-" name "-MODFX-C/FIXNUM=>FIXNUM")))
                (declare (ignore vop64cf)) ; maybe someone will want it some day
                `(progn
                   (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
@@ -2102,7 +2102,7 @@ constant shift greater than word length")))
 
 (in-package "SB-C")
 
-(defun *-transformer (y node)
+(defun *-transformer (y node fun)
   (cond
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
@@ -2110,7 +2110,7 @@ constant shift greater than word length")))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
      (delay-ir1-transform node :constraint)
-     `(%lea x x ,(1- y) 0))
+     `(,fun x x ,(1- y) 0))
     (t
      ;; A normal 64-bit multiplication takes 4 cycles on Athlon 64/Opteron.
      ;; Optimizing multiplications (other than the above cases) to
@@ -2128,14 +2128,14 @@ constant shift greater than word length")))
                  :important nil
                  :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node '%lea))
 (deftransform sb-vm::*-mod64
     ((x y) ((unsigned-byte 64) (constant-arg (unsigned-byte 64)))
      (unsigned-byte 64)
      :important nil
      :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node 'sb-vm::%lea-mod64))
 
 (deftransform * ((x y)
                  (fixnum (constant-arg (unsigned-byte 64)))
@@ -2143,11 +2143,11 @@ constant shift greater than word length")))
                  :important nil
                  :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node '%lea))
 (deftransform sb-vm::*-modfx
     ((x y) (fixnum (constant-arg (unsigned-byte 64)))
      fixnum
      :important nil
      :node node)
   "recode as leas, shifts and adds"
-  (*-transformer (lvar-value y) node))
+  (*-transformer (lvar-value y) node 'sb-vm::%lea-modfx))

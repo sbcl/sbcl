@@ -302,7 +302,6 @@ sufficiently motivated to do lengthy fixes."
   ;; Must clear this cache if asm routines are movable.
   (setq sb-disassem::*assembler-routines-by-addr* nil)
   (os-deinit)
-  (setq sb-thread::*stack-addr-table* nil)
   ;; Perform static linkage. Functions become un-statically-linked
   ;; on demand, for TRACE, redefinition, etc.
   #+immobile-code (sb-vm::statically-link-core)
@@ -325,6 +324,11 @@ sufficiently motivated to do lengthy fixes."
 ;;; but it might work to zero them all out, and restore the hash on demand
 ;;; (much the way symbol-hash is lazily computed) which ought to be fine
 ;;; since all hash caches start out empty.
+;;;
+;;; To make this even more aggressive, it should coalesce "bottom up"
+;;; so that ctypes contained in other ctypes would be uniquified first.
+;;; The algorithm is too naive to do that at present.
+;;;
 ;;; Doing too much consing within MAP-ALLOCATED-OBJECTS can lead to heap
 ;;; exhaustion (due to inhibited GC), so this takes several passes.
 (defun coalesce-ctypes (&optional verbose)
@@ -336,16 +340,27 @@ sufficiently motivated to do lengthy fixes."
                ;; from a no-longer-existing stack frame - so only examine
                ;; outgoing references within the dynamic space.
                ;; As to why the pointing object didn't die - who knows?
-               (and (heap-allocated-p part)
+               (and (eq (heap-allocated-p part) :dynamic)
                     (typep part 'ctype)
                     ;; PART is not interesting if it points to an interned
                     ;; ctype, because that's already a canonical object.
                     (not (minusp (type-hash-value part)))))
-             (coalesce (type &aux (spec (type-specifier type)))
-               (dolist (choice (gethash spec table)
-                               (progn (push type (gethash spec table)) type))
-                 (when (type= choice type)
-                   (return choice)))))
+             (coalesce (type &aux
+                             ;; Deal with ctypes instances whose unparser fails.
+                             (spec (ignore-errors (type-specifier type))))
+               ;; There are ctypes that unparse to the same s-expression
+               ;; but are *NOT* TYPE=. Some examples:
+               ;;   classoid LIST  vs UNION-TYPE LIST  = (OR CONS NULL)
+               ;;   classoid FLOAT vs UNION-TYPE FLOAT = (OR SINGLE-FLOAT DOUBLE-FLOAT)
+               ;;   classoid REAL  vs UNION-TYPE REAL  = (OR FLOAT RATIONAL)
+               ;;   classoid RATIO vs INTERSECTION-TYPE RATIO = (AND RATIONAL (NOT INTEGER))
+               (if spec
+                   (dolist (choice (gethash spec table)
+                                   (progn (push type (gethash spec table))
+                                          type))
+                     (when (type= choice type)
+                       (return choice)))
+                   type)))
       ;; Start by collecting interned types, as well as any object that points
       ;; to a ctype.
       ;; Interned ctypes (mostly classoids, but a few others) have the aspect

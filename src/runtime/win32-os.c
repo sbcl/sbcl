@@ -401,13 +401,13 @@ void unmap_gc_page()
  * to leave old-style linking code in place for the sake of
  * _non-linkage-table_ platforms (they probably don't have -ldl or its
  * equivalent, like LL/GPA, at all) -- but i did it usually by moving
- * the entire `old style' code under #!-sb-dynamic-core and
+ * the entire `old style' code under #-sb-dynamic-core and
  * refactoring the `new style' branch, instead of cutting the tail
- * piecemeal and increasing #!+-ifdeffery amount & the world enthropy.
+ * piecemeal and increasing #+-ifdeffery amount & the world enthropy.
  *
  * If we look at the majority of the ``new style'' code units, it's a
- * common thing to observe how #!+-ifdeffery _vanishes_ instead of
- * multiplying: #!-sb-xc, #!+sb-xc-host and #!-sb-xc-host end up
+ * common thing to observe how #+-ifdeffery _vanishes_ instead of
+ * multiplying: #-sb-xc, #+sb-xc-host and #-sb-xc-host end up
  * needing the same code. Runtime checks of static v. dynamic symbol
  * disappear even faster. STDCALL mangling and leading underscores go
  * out of scope (and GCed, hopefully) instead of surfacing here and
@@ -1945,7 +1945,7 @@ win32_unix_write(HANDLE handle, void * buf, int count)
             return -1;
         }
         if (errorCode!=ERROR_IO_PENDING) {
-            errno = EIO;
+            errno = errorCode;
             return -1;
         } else {
             if(WaitForMultipleObjects(2,self->private_events.events,
@@ -1956,10 +1956,10 @@ win32_unix_write(HANDLE handle, void * buf, int count)
                 waitInGOR = FALSE;
             }
             if (!GetOverlappedResult(handle,&overlapped,&written_bytes,waitInGOR)) {
-                if (GetLastError()==ERROR_OPERATION_ABORTED) {
+                if ((errorCode = GetLastError())==ERROR_OPERATION_ABORTED) {
                     errno = EINTR;
                 } else {
-                    errno = EIO;
+                    errno = errorCode;
                 }
                 return -1;
             } else {

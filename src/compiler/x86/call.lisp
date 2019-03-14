@@ -1430,15 +1430,15 @@
   ;; slot from a symbol would require an extra register on +SB-THREAD,
   ;; and reading a slot from a thread structure would require an extra
   ;; register on -SB-THREAD.
-  #!+sb-thread
+  #+sb-thread
   (progn
-    #!+win32 (inst push eax-tn)
-    (with-tls-ea (EA :base #!+win32 eax-tn #!-win32 :unused
+    #+win32 (inst push eax-tn)
+    (with-tls-ea (EA :base #+win32 eax-tn #-win32 :unused
                      :disp-type :constant
                      :disp (* thread-stepping-slot n-word-bytes))
       (inst cmp EA 0 :maybe-fs))
-    #!+win32 (inst pop eax-tn))
-  #!-sb-thread
+    #+win32 (inst pop eax-tn))
+  #-sb-thread
   (inst cmp (make-ea-for-symbol-value sb-impl::*stepping*) 0))
 
 (define-vop (step-instrument-before-vop)

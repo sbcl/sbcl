@@ -91,7 +91,7 @@
   ;; instead of a random mix of both.
   (("unknown system lossage" unknown 0)
    ("An attempt was made to use an undefined FDEFINITION." undefined-fun 1)
-   #!+(or arm arm64 x86-64)
+   #+(or arm arm64 x86-64)
    ("An attempt was made to use an undefined alien function" undefined-alien-fun 1)
    ("invalid argument count" invalid-arg-count 1)
    ("invalid argument count" local-invalid-arg-count 2)
@@ -118,14 +118,14 @@
   ratio
   single-float
   double-float
-  #!+long-float long-float
+  #+long-float long-float
   simple-string
   fixnum
   vector
   string
   base-string
   ((vector nil) object-not-vector-nil)
-  #!+sb-unicode ((vector character) object-not-character-string)
+  #+sb-unicode ((vector character) object-not-character-string)
   bit-vector
   array
   number
@@ -150,12 +150,12 @@
   ((complex float) object-not-complex-float)
   ((complex single-float) object-not-complex-single-float)
   ((complex double-float) object-not-complex-double-float)
-  #!+long-float ((complex long-float) object-not-complex-long-float)
-  #!+sb-simd-pack simd-pack
-  #!+sb-simd-pack-256 simd-pack-256
+  #+long-float ((complex long-float) object-not-complex-long-float)
+  #+sb-simd-pack simd-pack
+  #+sb-simd-pack-256 simd-pack-256
   weak-pointer
   instance
-  #!+sb-unicode
+  #+sb-unicode
   character
   base-char
   ((and vector (not simple-array)) object-not-complex-vector)

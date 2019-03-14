@@ -76,6 +76,12 @@ os_context_sp_addr(os_context_t *context)
 }
 
 os_context_register_t *
+os_context_fp_addr(os_context_t *context)
+{
+    return CONTEXT_ADDR_FROM_STEM(rbp);
+}
+
+os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     return CONTEXT_ADDR_FROM_STEM(rip);

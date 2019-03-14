@@ -1158,7 +1158,7 @@ Test case.
     ;; And this doesn't fix the problem with SETF.
     (when (fboundp fname)
       (let ((f (symbol-function fname)))
-        (when (and (interpreted-function-p f)
+        (when (and (typep f 'interpreted-function)
                    (structure-instance-accessor-p fname))
           ;: Compile the accessor using an explicit call to COMPILE with a
           ;; lambda expression. Don't simply call (COMPILE FNAME) because

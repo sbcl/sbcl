@@ -35,7 +35,7 @@
                                  :wrap-block nil)))
     (declare (ignorable doc)) ; unused on host
     ;; Maybe kill docstring, but only under the cross-compiler.
-    #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq doc nil)
+    #+(and (not sb-doc) sb-xc-host) (setq doc nil)
     `(progn
       (declaim (ftype (function (ctran ctran (or lvar null) t) (values))
                       ,fn-name))
@@ -409,7 +409,7 @@
                                ,@gensyms))
            ,@more-decls ,@forms))
        ,@(when (consp what)
-           `((setf (,(let ((*package* (symbol-package 'fun-info)))
+           `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
                           (symbolicate "FUN-INFO-" (second what)))
                        (fun-info-or-lose ',(first what)))
                       #',name))))))
@@ -607,7 +607,7 @@
 ;;; :TEST keyword may be used to determine the name equality
 ;;; predicate.
 (defmacro lexenv-find (name slot &key test)
-  (once-only ((n-res `(assoc ,name (,(let ((*package* (symbol-package 'lexenv-funs)))
+  (once-only ((n-res `(assoc ,name (,(let ((*package* (sb-xc:symbol-package 'lexenv-funs)))
                                           (symbolicate "LEXENV-" slot))
                                      *lexenv*)
                              :test ,(or test '#'eq))))
@@ -699,13 +699,14 @@
 ;;; event happens.
 (defmacro defevent (name description &optional (level 0))
   (let ((var-name (symbolicate "*" name "-EVENT-INFO*")))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       (define-load-time-global ,var-name
+    `(progn
+       (defglobal ,var-name
          (make-event-info :name ',name
                           :description ',description
                           :var ',var-name
                           :level ,level))
-       (setf (gethash ',name *event-info*) ,var-name)
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (setf (gethash ',name *event-info*) ,var-name))
        ',name)))
 
 ;;; the lowest level of event that will print a note when it occurs
@@ -747,7 +748,7 @@
 ;;;; functions on directly-linked lists (linked through specialized
 ;;;; NEXT operations)
 
-#!-sb-fluid (declaim (inline find-in position-in))
+#-sb-fluid (declaim (inline find-in position-in))
 
 ;;; Find ELEMENT in a null-terminated LIST linked by the accessor
 ;;; function NEXT. KEY and TEST are the same as for generic sequence functions.

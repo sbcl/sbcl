@@ -19,14 +19,14 @@
 ;;; In the target system's compiler, uncrossing is just identity.
 #-sb-xc-host
 (progn
-  #!-sb-fluid (declaim (inline uncross))
+  #-sb-fluid (declaim (inline uncross))
   (defun uncross (x) x))
 ;;; In the cross-compiler, uncrossing is slightly less trivial.
 
 ;;; This condition is only a STYLE-WARNING because generally it isn't important
 ;;; in practice to recurse through anything except CONSes anyway.
 #|
-#!+sb-show
+#+sb-show
 (define-condition uncross-rcr-failure (style-warning)
   ((form :initarg :form :reader uncross-rcr-failure-form))
   (:report (lambda (c s)
@@ -65,10 +65,10 @@
        inside? (make-hash-table)))
   (defun uncross (form)
     (labels ((uncross-symbol (symbol)
-               (let ((old-symbol-package (symbol-package symbol)))
+               (let ((old-symbol-package (cl:symbol-package symbol)))
                  (if (and old-symbol-package
                           (string= (package-name old-symbol-package) "SB-XC"))
-                     (values (intern (symbol-name symbol) "COMMON-LISP"))
+                     (values (intern (symbol-name symbol) *cl-package*))
                      symbol)))
              (rcr (form) ; recursive part
                (cond ((symbolp form)
@@ -92,7 +92,8 @@
                       (setf (gethash form inside?) t)
                       (unwind-protect
                           (typecase form
-                            (cons (rcr-cons form))
+                            (cons
+                             (recons form (rcr (car form)) (rcr (cdr form))))
                             (t
                              ;; KLUDGE: There are other types
                              ;; (especially (ARRAY T) and
@@ -109,15 +110,6 @@
                              ;; warnings off. -- WHN 20001105
                              #+nil (warn 'uncross-rcr-failure :form form)
                              form))
-                        (remhash form inside?)))))
-             (rcr-cons (form)
-               (declare (type cons form))
-               (let* ((car (car form))
-                      (rcr-car (rcr car))
-                      (cdr (cdr form))
-                      (rcr-cdr (rcr cdr)))
-                 (if (and (eq rcr-car car) (eq rcr-cdr cdr))
-                   form
-                   (cons rcr-car rcr-cdr)))))
+                        (remhash form inside?))))))
       (clrhash inside?)
       (rcr form))))

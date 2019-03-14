@@ -40,6 +40,12 @@
 ;;; If something ever needs to be done differently for one OS, then
 ;;; split out the different part into per-os functions.
 
+(define-load-time-global *core-pathname* nil
+  "The absolute pathname of the running SBCL core.")
+
+(define-load-time-global *runtime-pathname* nil
+  "The absolute pathname of the running SBCL runtime.")
+
 (defun os-deinit ()
   (setf *default-pathname-defaults* (make-trivial-default-pathname)
         *core-string* ""

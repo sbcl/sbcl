@@ -194,10 +194,6 @@
             (round-to-dualword (+ (* vector-data-offset n-word-bytes)
                                   n-data-octets)))))
 
-(defun code-component-size (x) ; in bytes
-  (declare (code-component x))
-  (round-to-dualword (+ (* (code-header-words x) n-word-bytes) (%code-code-size x))))
-
 (defun primitive-object-size (object)
   "Return number of bytes of heap or stack directly consumed by OBJECT"
   (if (is-lisp-pointer (get-lisp-obj-address object))
@@ -230,7 +226,7 @@
                                (nth-value 2 (reconstitute-vector
                                              object room-info))))))
                      (code-component
-                      (return-from primitive-object-size (code-component-size object)))
+                      (return-from primitive-object-size (code-object-size object)))
                      (t
                       ;; Other things (symbol, fdefn, value-cell, etc)
                       ;; don't have a sizer, so use GET-HEADER-DATA
@@ -290,7 +286,7 @@
            (let ((c (tagged-object other-pointer-lowtag)))
              (values c
                      code-header-widetag
-                     (code-component-size c))))
+                     (code-object-size c))))
 
           (:other
            (values (tagged-object other-pointer-lowtag)
@@ -1333,6 +1329,19 @@ We could try a few things to mitigate this:
              (setq addr (get-lisp-obj-address (fun-code-header object))))
            (logand #xF (sap-ref-8 (int-sap (logandc2 addr lowtag-mask)) 3))))))
 
+;;; Show objects in a much simpler way than print-allocated-objects.
+;;; Probably don't use this for generation 0 of dynamic space. Other spaces are ok.
+;;; (And this is removed from the image; it's meant for developers)
+#+gencgc
+(defun show-generation-objs (gen space)
+  (let ((*print-pretty* nil))
+    (map-allocated-objects
+     (lambda (obj type size)
+       (declare (ignore type))
+       (when (= (generation-of obj) gen)
+         (format t "~x ~3x ~s~%" (get-lisp-obj-address obj) size obj)))
+     space)))
+
 ;;; Unfortunately this is a near total copy of the test in gc.impure.lisp
 (defun !ensure-genesis-code/data-separation ()
   #+gencgc
@@ -1373,27 +1382,32 @@ We could try a few things to mitigate this:
 ;;; this is a valid test that genesis separated code and data.
 (!ensure-genesis-code/data-separation)
 
-(defun hexdump (obj &optional (n-words
-                               (if (and (typep obj 'code-component)
-                                        (plusp (code-n-entries obj)))
-                                   ;; Display up through the first fun header
-                                   (+ (code-header-words obj)
-                                      (ash (%code-fun-offset obj 0) (- word-shift))
-                                      simple-fun-code-offset)
-                                   ;; at most 16 words
-                                   (min 16 (ash (primitive-object-size obj)
-                                                (- word-shift)))))
-                              ;; pass NIL explicitly if T crashes on you
-                              (decode t))
-  (with-pinned-objects (obj)
-    (let ((a (logandc2 (get-lisp-obj-address obj) lowtag-mask)))
-      (dotimes (i n-words)
-        (let ((word (sap-ref-word (int-sap a) (ash i word-shift))))
+(defun hexdump (thing &optional (n-words nil wordsp)
+                                ;; pass NIL explicitly if T crashes on you
+                                (decode t))
+  (multiple-value-bind (obj addr count)
+      (if (integerp thing)
+          (values nil thing (if wordsp n-words 1))
+          (values
+           thing
+           (logandc2 (get-lisp-obj-address thing) lowtag-mask)
+           (if wordsp
+               n-words
+               (if (and (typep thing 'code-component) (plusp (code-n-entries thing)))
+                   ;; Display up through the first fun header
+                   (+ (code-header-words thing)
+                      (ash (%code-fun-offset thing 0) (- word-shift))
+                      simple-fun-code-offset)
+                   ;; at most 16 words
+                   (min 16 (ash (primitive-object-size thing) (- word-shift)))))))
+    (with-pinned-objects (obj)
+      (dotimes (i count)
+        (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
           (multiple-value-bind (lispobj ok) (if decode (make-lisp-obj word nil))
             (let ((*print-lines* 1)
                   (*print-pretty* t))
               (format t "~x: ~v,'0x~:[~; = ~S~]~%"
-                      (+ a (ash i word-shift))
+                      (+ addr (ash i word-shift))
                       (* 2 n-word-bytes)
                       word ok lispobj))))))))
 

@@ -13,33 +13,33 @@
 
 ;;;; DEFKNOWNs
 
-#!+linkage-table
+#+linkage-table
 (deftransform foreign-symbol-address ((symbol &optional datap)
                                       ((constant-arg simple-string)
                                        &optional (constant-arg boolean)))
-  (if (and #!+sb-dynamic-core
+  (if (and #+sb-dynamic-core
            (not (and datap (lvar-value datap))))
       `(values (sap-int (foreign-symbol-sap symbol datap))
-               (or #!+sb-dynamic-core t))
+               (or #+sb-dynamic-core t))
       (give-up-ir1-transform)))
 
 (deftransform foreign-symbol-sap ((symbol &optional datap)
                                   (simple-string &optional boolean))
-  #!-linkage-table
+  #-linkage-table
   (if (null datap)
       (give-up-ir1-transform)
       `(foreign-symbol-sap symbol))
-  #!+linkage-table
+  #+linkage-table
   (if (and (constant-lvar-p symbol) (constant-lvar-p datap))
-      (let (#!-sb-dynamic-core (name (lvar-value symbol))
+      (let (#-sb-dynamic-core (name (lvar-value symbol))
             (datap (lvar-value datap)))
-        #!-sb-dynamic-core
+        #-sb-dynamic-core
         (if (or #+sb-xc-host t          ; only static symbols on host
                 (not datap)
                 (find-foreign-symbol-in-table name *static-foreign-symbols*))
             `(foreign-symbol-sap ,name)            ; VOP
             `(foreign-symbol-dataref-sap ,name))   ; VOP
-        #!+sb-dynamic-core
+        #+sb-dynamic-core
         (if datap
             `(foreign-symbol-dataref-sap symbol)
             `(foreign-symbol-sap symbol)))
@@ -63,20 +63,20 @@
   system-area-pointer (movable))
 
 (macrolet ((defsapref (fun value-type)
-             (let (#!+x86
+             (let (#+x86
                    (with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun)))
                    (set-fun (intern (format nil "%SET-~A" fun)))
-                   #!+x86
+                   #+x86
                    (set-with-offset-fun (intern (format nil "%SET-~A-WITH-OFFSET" fun))))
                `(progn
                   (defknown ,fun (system-area-pointer fixnum) ,value-type
                     (flushable))
-                  #!+x86
+                  #+x86
                   (defknown ,with-offset-fun (system-area-pointer fixnum fixnum) ,value-type
                     (flushable always-translatable))
                   (defknown ,set-fun (system-area-pointer fixnum ,value-type) ,value-type
                     ())
-                  #!+x86
+                  #+x86
                   (defknown ,set-with-offset-fun (system-area-pointer fixnum fixnum ,value-type) ,value-type
                     (always-translatable))))))
   (defsapref sap-ref-8 (unsigned-byte 8))
@@ -133,7 +133,7 @@
                               (or (eq (first value-type) 'unsigned-byte)
                                   (eq (first value-type) 'signed-byte))
                               (> (second value-type) sb-vm:n-word-bits))
-                   #!+x86
+                   #+x86
                    (let ((with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun))))
                      `(progn
                         ,(cond
@@ -175,8 +175,8 @@
   (def %set-sap-ref-single t single-float)
   (def sap-ref-double)
   (def %set-sap-ref-double t double-float)
-  #!+long-float (def sap-ref-long)
-  #!+long-float (def %set-sap-ref-long t long-float))
+  #+long-float (def sap-ref-long)
+  #+long-float (def %set-sap-ref-long t long-float))
 
 (macrolet ((def (fun args 32-bit 64-bit)
                `(deftransform ,fun (,args)
@@ -192,9 +192,9 @@
 
 ;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
 
-#!-64-bit-registers
+#-64-bit-registers
 (progn
-#!+#.(cl:if (cl:eq :little-endian sb-c:*backend-byte-order*) '(and) '(or))
+#+#.(cl:if (cl:eq :little-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (sap-ref-32 sap offset)
@@ -214,7 +214,7 @@
        (%set-sap-ref-32 sap offset (logand value #xffffffff))
        (%set-signed-sap-ref-32 sap (+ offset 4) (ash value -32)))))
 
-#!+#.(cl:if (cl:eq :big-endian sb-c:*backend-byte-order*) '(and) '(or))
+#+#.(cl:if (cl:eq :big-endian sb-c:*backend-byte-order*) '(and) '(or))
 (progn
   (deftransform sap-ref-64 ((sap offset) (* *))
     '(logior (ash (sap-ref-32 sap offset) 32)

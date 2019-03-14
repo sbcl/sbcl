@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-IMPL") ;(SB-IMPL, not SB-IMPL, since we're built in warm load.)
+(in-package "SB-IMPL")
 
 ;;;; hacking the Unix environment
 ;;;;
@@ -158,6 +158,11 @@
 (define-load-time-global *active-processes-lock*
   (sb-thread:make-mutex :name "Lock for active processes."))
 
+(define-load-time-global *spawn-lock*
+  (sb-thread:make-mutex :name "Around spawn()."))
+
+(defglobal *sigchld-delayed* nil)
+
 ;;; *ACTIVE-PROCESSES* can be accessed from multiple threads so a
 ;;; mutex is needed. More importantly the sigchld signal handler also
 ;;; accesses it, that's why we need without-interrupts.
@@ -181,7 +186,9 @@
   plist                                 ; a place for clients to stash things
   (cookie nil :type cons :read-only t)  ; list of the number of pipes from the subproc
   #+win32 copiers ; list of sb-win32::io-copier
-  #+win32 (handle nil :type (or null (signed-byte 32))))
+  #+win32 (handle nil :type (or null (signed-byte 32)))
+  #-win32
+  serve-event-pipe)
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)
@@ -228,6 +235,37 @@ The function is called with PROCESS as its only argument."
       "T if OBJECT is a PROCESS, NIL otherwise."
       (documentation 'process-pid 'function) "The pid of the child process.")
 
+#-win32
+(defun setup-serve-event-pipe (process)
+  (unless (process-serve-event-pipe process)
+    (multiple-value-bind (read-fd write-fd) (sb-unix:unix-pipe)
+      (let (handler)
+        (setf handler
+              (add-fd-handler read-fd :input
+                              (lambda (fd)
+                                (setf (process-serve-event-pipe process) nil)
+                                (remove-fd-handler handler)
+                                (sb-unix:unix-close fd))))
+        (setf (process-serve-event-pipe process) (list* read-fd write-fd handler))))))
+
+#-win32
+(defun close-serve-event-pipe (process)
+  (let ((pipe (process-serve-event-pipe process)))
+    (when pipe
+      (setf (process-serve-event-pipe process) nil)
+      (destructuring-bind (read write . handler) pipe
+        (remove-fd-handler handler)
+        (sb-unix:unix-close read)
+        (when write
+          (sb-unix:unix-close write))))))
+
+(defun wake-serve-event (process)
+  #+win32 (declare (ignorable process))
+  #-win32
+  (let ((pipe (process-serve-event-pipe process)))
+    (when pipe
+      (sb-unix:unix-close (shiftf (cadr pipe) nil)))))
+
 (defun process-wait (process &optional check-for-stopped)
   "Wait for PROCESS to quit running for some reason. When
 CHECK-FOR-STOPPED is T, also returns when PROCESS is stopped. Returns
@@ -236,16 +274,19 @@ PROCESS."
   #+win32
   (sb-win32::win32-process-wait process)
   #-win32
-  (loop
-      (case (process-status process)
-        (:running)
-        (:stopped
-         (when check-for-stopped
-           (return)))
-        (t
-         (when (zerop (car (process-cookie process)))
-           (return))))
-      (serve-all-events 1))
+  (progn
+    (setup-serve-event-pipe process)
+    (loop
+     (case (process-status process)
+       (:running)
+       (:stopped
+        (when check-for-stopped
+          (return)))
+       (t
+        (when (zerop (car (process-cookie process)))
+          (return))))
+     (serve-all-events 10))
+    (close-serve-event-pipe process))
   process)
 
 #-win32
@@ -317,6 +358,16 @@ status slot."
           (sb-win32::win32-error 'process-close))))
   process)
 
+(defun get-processes-status-changes-sigchld ()
+  (cond
+    ;; Avoid waiting on *active-processes-lock* as we may be
+    ;; interrupting a lock on which fork() is waiting.
+    ((sb-thread:with-recursive-lock (*spawn-lock* :wait-p nil)
+       (setf *sigchld-delayed* nil)
+       (get-processes-status-changes)))
+    (t
+     (setf *sigchld-delayed* t))))
+
 (defun get-processes-status-changes ()
   (let (changed)
     (with-active-processes-lock ()
@@ -331,6 +382,7 @@ status slot."
                          (multiple-value-bind (status code core)
                              (waitpid (process-pid proc))
                            (when status
+                             (wake-serve-event proc)
                              (setf (process-%status proc) status)
                              (setf (process-%exit-code proc) code)
                              (when (process-status-hook proc)
@@ -356,7 +408,7 @@ status slot."
                        *active-processes*)))
     ;; Can't call the hooks before all the processes have been deal
     ;; with, as calling a hook may cause re-entry to
-    ;; GET-PROCESS-STATUS-CHANGES. That may be OK when using waitpid,
+    ;; GET-PROCESSES-STATUS-CHANGES. That may be OK when using waitpid,
     ;; but in the Windows implementation it would be deeply bad.
     (dolist (proc changed)
       (let ((hook (process-status-hook proc)))
@@ -813,54 +865,57 @@ Users Manual for details about the PROCESS structure.
                                         :direction :output
                                         :if-exists if-error-exists
                                         :external-format external-format)
-                 (with-open-pty ((pty-name pty-stream) (pty cookie))
-                   ;; Make sure we are not notified about the child
-                   ;; death before we have installed the PROCESS
-                   ;; structure in *ACTIVE-PROCESSES*.
-                   (let (child #+win32 handle)
-                     (with-active-processes-lock ()
-                       (with-environment (environment-vec environment
-                                          :null (not (or environment environment-p)))
-                         (setf (values child #+win32 handle)
-                               #+win32
-                               (sb-win32::mswin-spawn
-                                progname
-                                args
-                                stdin stdout stderr
-                                search environment-vec directory)
-                               #-win32
-                               (with-args (args-vec args)
-                                 (without-gcing
+                 ;; Make sure we are not notified about the child
+                 ;; death before we have installed the PROCESS
+                 ;; structure in *ACTIVE-PROCESSES*.
+                 (let (child #+win32 handle)
+                   (sb-thread:with-mutex (*spawn-lock*)
+                     ;; ptsname() is not thread safe, ptsname_r() is, but there's already a lock here
+                     (with-open-pty ((pty-name pty-stream) (pty cookie))
+                       (with-active-processes-lock ()
+                         (with-environment (environment-vec environment
+                                            :null (not (or environment environment-p)))
+                           (setf (values child #+win32 handle)
+                                 #+win32
+                                 (sb-win32::mswin-spawn
+                                  progname
+                                  args
+                                  stdin stdout stderr
+                                  search environment-vec directory)
+                                 #-win32
+                                 (with-args (args-vec args)
                                    (spawn progname args-vec
                                           stdin stdout stderr
                                           (if search 1 0)
                                           environment-vec pty-name
-                                          (if wait 1 0) directory))))
-                         (unless (minusp child)
-                           (setf proc
-                                 (make-process
-                                  :input input-stream
-                                  :output output-stream
-                                  :error error-stream
-                                  :status-hook status-hook
-                                  :cookie cookie
-                                  #-win32 :pty #-win32 pty-stream
-                                  :%status :running
-                                  :pid child
-                                  #+win32 :copiers #+win32 *handlers-installed*
-                                  #+win32 :handle #+win32 handle))
-                           (push proc *active-processes*))))
-                     ;; Report the error outside the lock.
-                     (case child
-                       (-1
-                        (error "Couldn't fork child process: ~A"
-                               (strerror)))
-                       (-2
-                        (error "Couldn't execute ~S: ~A"
-                               progname (strerror)))
-                       (-3
-                        (error "Couldn't change directory to ~S: ~A"
-                               directory (strerror))))))))))
+                                          (if wait 1 0) directory)))
+                           (unless (minusp child)
+                             (setf proc
+                                   (make-process
+                                    :input input-stream
+                                    :output output-stream
+                                    :error error-stream
+                                    :status-hook status-hook
+                                    :cookie cookie
+                                    #-win32 :pty #-win32 pty-stream
+                                    :%status :running
+                                    :pid child
+                                    #+win32 :copiers #+win32 *handlers-installed*
+                                    #+win32 :handle #+win32 handle))
+                             (push proc *active-processes*))))))
+                   ;; Report the error outside the lock.
+                   (case child
+                     (-1
+                      (error "Couldn't fork child process: ~A"
+                             (strerror)))
+                     (-2
+                      (error "Couldn't execute ~S: ~A"
+                             progname (strerror)))
+                     (-3
+                      (error "Couldn't change directory to ~S: ~A"
+                             directory (strerror)))))))))
+      (when *sigchld-delayed*
+        (get-processes-status-changes))
       (dolist (fd *close-in-parent*)
         (sb-unix:unix-close fd))
       (unless proc
@@ -1220,3 +1275,14 @@ Users Manual for details about the PROCESS structure.
                   (return (values write-fd nil)))))))
           (t
            (fail "invalid option: ~S" object))))))
+
+#+(or linux sunos hpux)
+(defun software-version ()
+  "Return a string describing version of the supporting software, or NIL
+  if not available."
+  (or sb-sys::*software-version*
+      (setf sb-sys::*software-version*
+            (string-trim '(#\newline)
+                         (sb-kernel:with-simple-output-to-string (stream)
+                           (run-program "/bin/uname" `("-r")
+                                        :output stream))))))

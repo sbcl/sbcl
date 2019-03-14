@@ -402,3 +402,11 @@
 (with-test (:name (butlast :dotted))
   (assert (null (butlast '(1 2 . 3) 4)))
   (assert (null (nbutlast (list* 1 2 3) 4))))
+
+(with-test (:name :tree-equal)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (tree-equal a '(a (b c) (3/4 (d))) :test #'eql))
+    (('(a (b c) (3/4 (d)))) t)
+    (('(a (b c) (3/4 (d) e))) nil)))

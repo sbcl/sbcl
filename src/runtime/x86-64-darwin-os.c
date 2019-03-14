@@ -273,7 +273,10 @@ catch_exception_raise(mach_port_t exception_port,
     }
 
     /* Just need to unprotect the page and do some bookkeeping, no need
-     * to run it from the faulting thread. */
+     * to run it from the faulting thread.
+     * And because the GC uses signals to stop the world it might
+     * interfere with that bookkeeping, because there's a window
+     * before block_blockable_signals is performed. */
     if (exception == EXC_BAD_ACCESS && gencgc_handle_wp_violation(addr)) {
         goto do_not_handle;
     }
@@ -353,6 +356,10 @@ catch_exception_raise(mach_port_t exception_port,
             /* Clear TF or the signal emulation wrapper won't proceed
                with single stepping enabled. */
             thread_state.rflags &= ~0x100;
+            handler = sigtrap_handler;
+            break;
+        } else if (*(unsigned char*)(thread_state.rip-1) == 0xCC) {
+            signal = SIGTRAP;
             handler = sigtrap_handler;
             break;
         }

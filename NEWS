@@ -1,8 +1,53 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.4.14:
+changes relative to sbcl-1.5.0:
+  * bug fix: thread-safety problems in RUN-PROGRAM with :PTY.
+
+changes in sbcl-1.5.0 relative to sbcl-1.4.16:
+  * enhancement: SB-COVER emulates IN-PACKAGE when recording source maps;
+    this makes it possible to generate coverage for forms that uses local
+    package nicknames, or otherwise must be read in the correct package.
+  * build enhancement: new host quirks mechanism, support for building under
+    ABCL and ECL (as well as CCL, CMUCL, CLISP and SBCL itself)
+  * optimization: (FIND-SYMBOL x "P") for constant "P" executes faster,
+    subject to "P" not being a package-local nickname of any
+    package. Similarly INTERN.  (lp#1814924)
+  * optimization: bounds checks are elided when possible where the same array
+    is dereferenced multiple times.
+  * bug fix: initargs are now deduplicated when computing effective slots.
+  * bug fix: TREE-EQUAL with :TEST 'EQL now correctly computes its answer.
+    (reported by Bahodir Mansurov)
+  * bug fix: compiled (COERCE x 'FLOAT) no longer coerces double-floats into
+    single-floats.  (reported by J. Gareth Williams)
+
+changes in sbcl-1.4.16 relative to sbcl-1.4.15:
+  * minor incompatible change: ENSURE-DIRECTORIES-EXIST no longer establishes
+    a CONTINUE restart in case of an error.
+  * minor incompatible change: Defining macros (DEFVAR, etc) which require a
+    symbol as the name will fail to macroexpand if given a non-symbol.
+  * enhancement: the unexported restart names SB-{ALIEN,FASL,IMPL,PCL}::RETRY
+    have been replaced by SB-EXT:RETRY.
+
+changes in sbcl-1.4.15 relative to sbcl-1.4.14:
   * enhancement: added AVX2 instructions on x86-64, which can be used with
     SB-SIMD-PACK.
+  * enhancement: specializer name parsing is less lenient and signals a
+    specific condition in case of syntax errors. (lp#1808681)
+  * enhancement: provide interactive restarts for some file-system errors.
+  * enhancement: COMPILE no longer acquires the world lock.
+    (fixes most occurrences of lp#308959)
+  * bug fix: RUN-PROGRAM is more responsive and less likely to deadlock
+    (lp#1702178, lp#1808641)
+  * bug fix: traceroot can search for simple-fun targets (lp#1808659, reported
+    by Michal Herda)
+  * compiler bug fixes:
+    ** related to code generation: lp#1805899, lp#1806982, lp#1807455
+    ** related to interpreting and constant-folding: lp#1806513
+    ** related to the type system: lp#1804759, lp#1804796
+    ** related to eq-testing of structure slots: lp#1809582, lp#1808273
+    ** related to dynamic-extent: lp#1809565, lp#1809253, lp#1809485,
+       lp#1739652
+    ** related to GC safety: lp#308949
 
 changes in sbcl-1.4.14 relative to sbcl-1.4.13:
   * enhancement: attempting to build on openbsd 6.0 or newer without
@@ -25,8 +70,8 @@ changes in sbcl-1.4.12 relative to sbcl-1.4.11:
     have been removed.
   * minor incompatible change: some changes to the (internal) implementation
     details of the x86 and x86-64 have necessitated changes to some low-level
-    libraries. 
-  * enhancement: attempting to transfer control through GO or RETURN-FROM to 
+    libraries.
+  * enhancement: attempting to transfer control through GO or RETURN-FROM to
     frames which no longer exist are now caught and handled by the debugger.
   * enhancement: identical code (at the machine instruction level) can now be
     shared between functions, if explicitly requested.
@@ -54,7 +99,7 @@ changes in sbcl-1.4.11 relative to sbcl-1.4.10:
     improved.
   * optimization: checking widetags involves fewer conditional jumps on x86
     and x86-64.
-  * bug fix: fix a number of bugs related to constant improper lists as 
+  * bug fix: fix a number of bugs related to constant improper lists as
     sequence arguments (lp#1768563, lp#1768568, lp#1768652)
 
 changes in sbcl-1.4.10 relative to sbcl-1.4.9:

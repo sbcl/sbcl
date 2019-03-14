@@ -126,6 +126,15 @@
                         (values dest lvar))))))
     (pld lvar)))
 
+(defun map-lvar-dest-casts (fun lvar)
+  (labels ((pld (lvar)
+             (and lvar
+                  (let ((dest (lvar-dest lvar)))
+                    (when (cast-p dest)
+                      (funcall fun dest)
+                      (pld (cast-lvar dest)))))))
+    (pld lvar)))
+
 ;;; Update lvar use information so that NODE is no longer a use of its
 ;;; LVAR.
 ;;;
@@ -242,6 +251,15 @@
                 (when (eq (block-start (first (block-succ (node-block node))))
                           (node-prev dest))
                   (return-from almost-immediately-used-p t))))))))
+
+;;; Check that all the uses are almost immediately used and look through CASTs,
+;;; as they can be freely deleted removing the immediateness
+(defun lvar-almost-immediately-used-p (lvar)
+  (do-uses (use lvar t)
+    (unless (and (almost-immediately-used-p lvar use)
+                 (or (not (cast-p use))
+                     (lvar-almost-immediately-used-p (cast-value use))))
+      (return))))
 
 ;;;; BLOCK UTILS
 
@@ -284,14 +302,13 @@
     (ref
      (update-lvar-dependencies new (lambda-var-ref-lvar old)))
     (lvar
-     (when (lvar-p new)
-       (do-uses (node old)
-         (when (exit-p node)
-           ;; Inlined functions will try to use the lvar in the lexenv
-           (loop for block in (lexenv-blocks (node-lexenv node))
-                 for block-lvar = (fourth block)
-                 when (eq old block-lvar)
-                 do (setf (fourth block) new)))))
+     (do-uses (node old)
+       (when (exit-p node)
+         ;; Inlined functions will try to use the lvar in the lexenv
+         (loop for block in (lexenv-blocks (node-lexenv node))
+               for block-lvar = (fourth block)
+               when (eq old block-lvar)
+               do (setf (fourth block) new))))
      (propagate-lvar-annotations new old))))
 
 ;;; In OLD's DEST, replace OLD with NEW. NEW's DEST must initially be
@@ -314,8 +331,7 @@
       (cast (setf (cast-value dest) new)))
 
     (setf (lvar-dest old) nil)
-    (setf (lvar-dest new) dest)
-    (flush-lvar-externally-checkable-type new))
+    (setf (lvar-dest new) dest))
   (values))
 
 ;;; Replace all uses of OLD with uses of NEW, where NEW has an
@@ -331,7 +347,9 @@
            (add-lvar-use node new))
          (reoptimize-lvar new)
          (propagate-lvar-dx new old propagate-dx))
-        (t (flush-dest old)))
+        (t
+         (update-lvar-dependencies new old)
+         (flush-dest old)))
 
   (values))
 
@@ -578,7 +596,7 @@
 (defun node-physenv (node)
   (lambda-physenv (node-home-lambda node)))
 
-#!-sb-fluid (declaim (inline node-stack-allocate-p))
+#-sb-fluid (declaim (inline node-stack-allocate-p))
 (defun node-stack-allocate-p (node)
   (awhen (node-lvar node)
     (lvar-dynamic-extent it)))
@@ -594,7 +612,7 @@
        (and info
             (ir1-attributep attributes flushable)
             (not (ir1-attributep attributes call))
-            (let ((type (proclaimed-ftype name)))
+            (let ((type (global-ftype name)))
               (or
                (not (fun-type-p type)) ;; Functions that accept anything, e.g. VALUES
                (multiple-value-bind (min max) (fun-type-arg-limits type)
@@ -717,7 +735,7 @@
   ;; It's just a distraction otherwise.
   (declare (ignorable lvar flush))
 
-  #!+(and (host-feature sb-xc-host)
+  #+(and sb-xc-host
           (not (and stack-allocatable-closures
                     stack-allocatable-vectors
                     stack-allocatable-lists
@@ -1071,7 +1089,7 @@
 (defun cast-single-value-p (cast)
   (not (values-type-p (cast-asserted-type cast))))
 
-#!-sb-fluid (declaim (inline lvar-single-value-p))
+#-sb-fluid (declaim (inline lvar-single-value-p))
 (defun lvar-single-value-p (lvar)
   (or (not lvar) (%lvar-single-value-p lvar)))
 (defun %lvar-single-value-p (lvar)
@@ -1152,7 +1170,7 @@
                ;; The evaluator will mark lexicals with :BOGUS when it
                ;; translates an interpreter lexenv to a compiler
                ;; lexenv.
-               ((or leaf #!+sb-eval (member :bogus)) nil)
+               ((or leaf #+sb-eval (member :bogus)) nil)
                (cons (aver (eq (car thing) 'macro))
                      t)
                (heap-alien-info nil)))))
@@ -1246,8 +1264,9 @@
 ;;; otherwise false.
 (defun join-successor-if-possible (block)
   (declare (type cblock block))
-  (let ((next (first (block-succ block))))
-    (when (block-start next)  ; NEXT is not an END-OF-COMPONENT marker
+  (let* ((next (first (block-succ block)))
+        (start (block-start next)))
+    (when start  ; NEXT is not an END-OF-COMPONENT marker
       (cond ( ;; We cannot combine with a successor block if:
              (or
               ;; the successor has more than one predecessor;
@@ -1281,7 +1300,10 @@
                         (and (consp (lvar-uses it))
                              (not (lvar-single-value-p it)))))))
               (neq (block-type-check block)
-                   (block-type-check next)))
+                   (block-type-check next))
+              ;; This ctran is a destination of an EXIT,
+              ;; a later inlined function may want to use it.
+              (ctran-entries start))
              nil)
             (t
              (join-blocks block next)
@@ -1527,17 +1549,19 @@
         (when (and (basic-combination-p dest)
                    (eq (basic-combination-fun dest) lvar)
                    (eq (basic-combination-kind dest) :local))
-          (if (mv-combination-p dest)
-              ;; Let FLUSH-DEAD-CODE deal with it
-              ;; since it's a bit tricky to delete multiple-valued
-              ;; args and existing code doesn't expect to see NIL in
-              ;; mv-combination-args.
-              (setf (block-flush-p (node-block dest)) t)
-              (let* ((args (basic-combination-args dest))
-                     (arg (elt args n)))
-                (reoptimize-lvar arg)
-                (flush-dest arg)
-                (setf (elt args n) nil)))))))
+          (cond ((mv-combination-p dest)
+                 ;; Let FLUSH-DEAD-CODE deal with it
+                 ;; since it's a bit tricky to delete multiple-valued
+                 ;; args and existing code doesn't expect to see NIL in
+                 ;; mv-combination-args.
+                 (reoptimize-node dest)
+                 (setf (block-flush-p (node-block dest)) t))
+                (t
+                 (let* ((args (basic-combination-args dest))
+                        (arg (elt args n)))
+                   (reoptimize-lvar arg)
+                   (flush-dest arg)
+                   (setf (elt args n) nil))))))))
 
   ;; The LAMBDA-VAR may still have some SETs, but this doesn't cause
   ;; too much difficulty, since we can efficiently implement
@@ -1833,7 +1857,6 @@
     (when (lvar-dynamic-extent lvar)
       (note-no-stack-allocation lvar :flush t))
     (setf (lvar-dest lvar) nil)
-    (flush-lvar-externally-checkable-type lvar)
     (do-uses (use lvar)
       (flush-node use))
     (setf (lvar-uses lvar) nil))
@@ -1881,7 +1904,7 @@
   (unless (block-component block)
     ;; Already deleted
     (return-from delete-block))
-  #!+high-security (aver (not (memq block (component-delete-blocks (block-component block)))))
+  #+high-security (aver (not (memq block (component-delete-blocks (block-component block)))))
   (unless silent
     (note-block-deletion block))
   (setf (block-delete-p block) t)
@@ -2057,11 +2080,10 @@
                      (or (eq first 'original-source-start)
                          (and (atom first)
                               (or (not (symbolp first))
-                                  (let ((pkg (symbol-package first)))
-                                    (and pkg
-                                         (not (eq pkg (symbol-package :end))))))
+                                  (let ((pkg (cl:symbol-package first)))
+                                    (and pkg (neq pkg *keyword-package*))))
                               (not (member first '(t nil)))
-                              (not (typep first '(or fixnum character)))
+                              (not (cl:typep first '(or fixnum character)))
                               (every (lambda (x)
                                        (present-in-form first x 0))
                                      (source-path-forms path))
@@ -2112,31 +2134,38 @@
            (aver (eq prev-kind :block-start))
            (aver (eq node last))
            (let* ((succ (block-succ block))
-                  (next (first succ)))
+                  (next (first succ))
+                  (next-ctran (block-start next)))
              (aver (singleton-p succ))
+             ;; Update the ctran used by EXITs from BLOCKs.
+             (when next-ctran
+               (loop for entry in (ctran-entries prev)
+                     do (setf (second entry) next-ctran))
+               (setf (ctran-entries next-ctran)
+                     (ctran-entries prev)))
              (cond
-              ((eq block (first succ))
-               (with-ir1-environment-from-node node
-                 (let ((exit (make-exit)))
-                   (setf (ctran-next prev) nil)
-                   (link-node-to-previous-ctran exit prev)
-                   (setf (block-last block) exit)))
-               (setf (node-prev node) nil)
-               nil)
-              (t
-               (aver (eq (block-start-cleanup block)
-                         (block-end-cleanup block)))
-               (unlink-blocks block next)
-               (dolist (pred (block-pred block))
-                 (change-block-successor pred block next))
-               (when (block-delete-p block)
-                 (let ((component (block-component block)))
-                   (setf (component-delete-blocks component)
-                         (delq1 block (component-delete-blocks component)))))
-               (remove-from-dfo block)
-               (setf (block-delete-p block) t)
-               (setf (node-prev node) nil)
-               t)))))))
+               ((eq block (first succ))
+                (with-ir1-environment-from-node node
+                  (let ((exit (make-exit)))
+                    (setf (ctran-next prev) nil)
+                    (link-node-to-previous-ctran exit prev)
+                    (setf (block-last block) exit)))
+                (setf (node-prev node) nil)
+                nil)
+               (t
+                (aver (eq (block-start-cleanup block)
+                          (block-end-cleanup block)))
+                (unlink-blocks block next)
+                (dolist (pred (block-pred block))
+                  (change-block-successor pred block next))
+                (when (block-delete-p block)
+                  (let ((component (block-component block)))
+                    (setf (component-delete-blocks component)
+                          (delq1 block (component-delete-blocks component)))))
+                (remove-from-dfo block)
+                (setf (block-delete-p block) t)
+                (setf (node-prev node) nil)
+                t)))))))
 
 ;;; Return true if CTRAN has been deleted, false if it is still a valid
 ;;; part of IR1.
@@ -2217,8 +2246,7 @@ is :ANY, the function name is not checked."
                (before-args (subseq outside-args 0 arg-position))
                (after-args (subseq outside-args (1+ arg-position))))
           (dolist (arg inside-args)
-            (setf (lvar-dest arg) outside)
-            (flush-lvar-externally-checkable-type arg))
+            (setf (lvar-dest arg) outside))
           (setf (combination-args inside) nil)
           (setf (combination-args outside)
                 (append before-args inside-args after-args))

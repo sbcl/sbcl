@@ -117,10 +117,6 @@
 (defun convert-call (ref call fun)
   (declare (type ref ref) (type combination call) (type clambda fun))
   (propagate-to-args call fun)
-  (unless (call-full-like-p call)
-    (dolist (arg (basic-combination-args call))
-      (when arg
-        (flush-lvar-externally-checkable-type arg))))
   (setf (basic-combination-kind call) :local)
   (sset-adjoin fun (lambda-calls-or-closes (node-home-lambda call)))
   (recognize-dynamic-extent-lvars call fun)
@@ -506,7 +502,10 @@
             (*compiler-error-context* call))
 
         (when (and (eq (functional-inlinep fun) :inline)
-                   (rest (leaf-refs original-fun)))
+                   (rest (leaf-refs original-fun))
+                   ;; Some REFs are already unused bot not yet deleted,
+                   ;; avoid unneccessary inlining
+                   (> (count-if #'node-lvar (leaf-refs original-fun)) 1))
           (setq fun (maybe-expand-local-inline fun ref call)))
 
         (aver (member (functional-kind fun)

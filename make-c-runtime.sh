@@ -10,14 +10,14 @@
 # We could make this use the target SBCL as the new host,
 # but that somewhat defeats the purpose.
 
-time $SBCL_XC_HOST <<EOF
+time $SBCL_XC_HOST --noinform --no-userinit --no-sysinit --noprint <<EOF
 (load "src/cold/shared.lisp")
 (load "src/cold/set-up-cold-packages.lisp")
 (load "tools-for-build/corefile.lisp")
 (in-package "SB-COLD")
 (in-host-compilation-mode
- (lambda (&aux (*features* (cons :c-headers-only *features*)))
-  (do-stems-and-flags (stem flags)
+ (lambda (&aux (sb-xc:*features* (cons :c-headers-only sb-xc:*features*)))
+  (do-stems-and-flags (stem flags 1)
     (when (member :c-headers flags)
        (handler-bind ((style-warning (function muffle-warning)))
          (load (merge-pathnames (stem-remap-target stem) ".lisp")))))

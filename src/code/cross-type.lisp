@@ -14,7 +14,7 @@
 (define-condition cross-type-warning (warning)
   ((call :initarg :call :reader cross-type-warning-call)
    (message :reader cross-type-warning-message
-            #+cmu :initarg #+cmu :message ; (to stop bogus non-STYLE WARNING)
+            #+host-quirks-cmu :initarg #+host-quirks-cmu :message ; (to stop bogus non-STYLE WARNING)
             ))
   (:report (lambda (c s)
              (format
@@ -27,7 +27,7 @@
 ;;; during cross-compilation.
 (define-condition cross-type-giving-up (cross-type-warning)
   ((message :initform "giving up conservatively"
-            #+cmu :reader #+cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
+            #+host-quirks-cmu :reader #+host-quirks-cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
             )))
 
 ;;; This warning refers to the flexibility in the ANSI spec with
@@ -49,413 +49,259 @@
 ;;;
 ;;; KLUDGE: If we ever try to support LONG-FLOAT or SHORT-FLOAT, this
 ;;; situation will get a lot more complicated.
-(defun warn-possible-cross-type-float-info-loss (call)
+(defun warn-possible-cross-type-float-info-loss (caller host-object ctype)
   (when (or (subtypep 'single-float 'double-float)
             (subtypep 'double-float 'single-float))
-    (warn "possible floating point information loss in ~S" call)))
-
-(defun sb-xc:type-of (object)
-  (let ((raw-result (type-of object)))
-    (cond ((or (subtypep raw-result 'float)
-               (subtypep raw-result 'complex))
-           (warn-possible-cross-type-float-info-loss
-            `(sb-xc:type-of ,object))
-           raw-result)
-          ((subtypep raw-result 'integer)
-           (cond ((<= 0 object 1)
-                  'bit)
-                 (;; We can't rely on the host's opinion of whether
-                  ;; it's a FIXNUM, but instead test against target
-                  ;; MOST-fooITIVE-FIXNUM limits.
-                  (fixnump object)
-                  'fixnum)
-                 (t
-                  'integer)))
-          ((subtypep raw-result 'simple-string)
-           `(simple-base-string ,(length object)))
-          ((subtypep raw-result 'string) 'base-string)
-          ((some (lambda (type) (subtypep raw-result type))
-                 '(array character list symbol))
-           raw-result)
-          (t
-           (error "can't handle TYPE-OF ~S in cross-compilation" object)))))
-
-;;; Is SYMBOL in the CL package? Note that we're testing this on the
-;;; cross-compilation host, which could do things any old way. In
-;;; particular, it might be in the CL package even though
-;;; SYMBOL-PACKAGE is not (FIND-PACKAGE :CL). So we test things
-;;; another way.
-(defun in-cl-package-p (symbol)
-  (eql (find-symbol (symbol-name symbol) :cl)
-       symbol))
-
-;;; These hints needs to be tweaked by hand from time to time.
+    (warn "possible floating point information loss in ~S"
+          (list caller host-object ctype))))
 
 ;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
-;; specifier. We assume that anything in CL: is allowed (see explanation at
-;; call point), and beyond that, anything we define has to be expressly listed
-;; here, for fear of later unexpected confusion.
-(defun acceptable-cross-typep-pred (symbol)
-  (and (fboundp symbol)
-       (or (in-cl-package-p symbol)
-           ;; KLUDGE: rather than extensible list of predicates that match
-           ;; in behavior between the host and target lisp, hardcode a few.
-           (memq symbol '(sb-vm::symbol-always-has-tls-index-p
-                          sb-vm:static-symbol-p)))))
+;; specifier. We assume that anything in CL: is allowed.
+(defvar *seen-xtypep-preds* nil)
+(defun acceptable-cross-typep-pred (symbol usage)
+  #+nil
+  (cond ((not (fboundp symbol))
+         (format t "~&XTYPEP: ~S is not fboundp~%" symbol))
+        ((not (member symbol *seen-xtypep-preds*))
+         (format t "~&XTYPEP: checking applicability of ~S for ~S~%"
+                 symbol usage)
+         (push symbol *seen-xtypep-preds*)))
+  ;; For USAGE = TYPEP, always call the predicate.
+  ;; For USAGE = CTYPEP, call it only if it is a foldable function.
+  ;; The major case in which we don't call something for CTYPEP is KEYWORDP
+  ;; which we consider not to be foldable.
+  (and (eq (sb-xc:symbol-package symbol) *cl-package*)
+       (or (eq usage 'sb-xc:typep)
+           (awhen (info :function :info symbol)
+             (sb-c::ir1-attributep (sb-c::fun-info-attributes it) sb-c:foldable)))))
 
-;;; The set of types of which no object can be a member during cross-compilation.
-(dolist (symbol '(alien system-area-pointer sb-alien-internals:alien-value
-                  code-component fdefn lra extended-sequence
-                  sb-pcl::%method-function
-                  sb-pcl::standard-instance sb-pcl::standard-funcallable-instance
-                  funcallable-instance generic-function
-                  sb-format::fmt-control
-                  #!+sb-eval sb-eval:interpreted-function
-                  #!+sb-fasteval sb-interpreter:interpreted-function
-                  weak-pointer simd-pack simd-pack-256))
-  (setf (get symbol :cross-typep-hint) :certainly-nil))
+(defun complex-num-fmt-match-p (num fmt)
+  ;; compiled TYPEP on ECL is wrong. See example at bottom of this file.
+  ;; Of course, it's abstraction-breaking to suppose that TYPECASE
+  ;; directly utilizes TYPEP, but naturally it does.
+  #+host-quirks-ecl (declare (notinline typep))
+  (aver (memq fmt '(single-float double-float rational)))
+  (and (complexp num)
+       (let ((yesp (eq (etypecase (realpart num)
+                         (single-float 'single-float)
+                         (double-float 'double-float)
+                         (rational 'rational))
+                       fmt)))
+         (when yesp
+           (aver (typep (imagpart num) fmt)))
+         yesp)))
 
-;;; The set of objects for which it's accurate to use the host's type system
-;;; as long as the type specifier appeared in its non-list form.
-(dolist (symbol '(atom bit character complex cons float function integer
-                  #| keyword |# ; nope!
-                  list nil null number ratio rational real signed-byte symbol t
-                  unsigned-byte
-                  ;; easy cases of arrays and vectors
-                  ;; But actually only partly right: we might disagree
-                  ;; with the host as to whether an array is simple.
-                  array simple-string simple-vector string vector))
-  (setf (get symbol :cross-typep-hint) :use-host-typep))
-
-;;; Instance types that will be forward-referenced
-(dolist (symbol '(lexenv sb-c::abstract-lexenv
-                  sb-assem:label
-                  condition restart style-warning step-condition
-                  class sb-pcl::condition-class error
-                  hash-table sb-thread:mutex
-                  sb-pretty:pprint-dispatch-table
-                  compiler-note
-                  deprecation-condition
-                  early-deprecation-warning
-                  late-deprecation-warning
-                  final-deprecation-warning))
-  (setf (get symbol :cross-typep-hint) :instance))
+(defun flonum-fmt-match-p (num fmt)
+  (aver (memq fmt '(single-float double-float)))
+  (and (floatp num)
+       (eq (etypecase num
+            (single-float 'single-float)
+            (double-float 'double-float))
+           fmt)))
 
 ;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
-;;; be of TARGET-TYPE when instantiated on the target SBCL. Since this
+;;; be of type TYPE when instantiated on the target SBCL. Since this
 ;;; is hard to determine in some cases, and since in other cases we
 ;;; just haven't bothered to try, it needs to return two values, just
 ;;; like SUBTYPEP: the first value for its conservative opinion (never
 ;;; T unless it's certain) and the second value to tell whether it's
 ;;; certain.
-(defun %cross-typep (mode host-object raw-target-type)
-  (declare (type (member typep ctypep) mode))
-  (let* ((target-type (typexpand raw-target-type))
-         (type-atom (if (consp target-type) (car target-type) target-type))
-         (hint (get type-atom :cross-typep-hint)))
-    (flet ((warn-and-give-up ()
-             ;; Giving up on SATISFIES is sane; don't warn.
-             (unless (typep raw-target-type '(cons (eql satisfies)))
-               (warn 'cross-type-giving-up
-                     :call `(,mode ,host-object ,raw-target-type)))
-             (values nil nil))
-           (warn-about-possible-float-info-loss ()
-             (warn-possible-cross-type-float-info-loss
-               `(cross-typep ,host-object ,raw-target-type)))
-           ;; a convenient idiom for making more matches to special cases:
-           ;; Test both forms of target type for membership in LIST.
-           ;;
-           ;; (In order to avoid having to use too much deep knowledge
-           ;; of types, it's sometimes convenient to test RAW-TARGET-TYPE
-           ;; as well as the expanded type, since we can get matches with
-           ;; just EQL. E.g. SIMPLE-STRING can be matched with EQL
-           (target-type-is-in (list)
-             (or (member raw-target-type list)
-                 (member target-type list))))
-      (cond (;; Handle various SBCL-specific types which can't exist on
-             ;; the ANSI cross-compilation host.
-             (eq hint :certainly-nil)
-             (values nil t))
-            ((and (symbolp target-type)
-                  (or (eq hint :instance)
-                      (and (find-classoid target-type nil)
-                           (sb-xc:subtypep target-type 'cl:structure-object)))
-                  (typep host-object '(or symbol number list character)))
-             (values nil t))
-            ((and (symbolp target-type)
-                  ;; See if the host knows our DEF!STRUCT yet
-                  (find-class target-type nil)
-                  (subtypep target-type 'structure!object))
-             (values (typep host-object target-type) t))
-
-            ;; Many simple types are guaranteed to correspond exactly
-            ;; between any host ANSI Common Lisp and the target SBCL.
-            ((and (symbolp target-type) (eq hint :use-host-typep))
-             (values (typep host-object target-type) t))
-
-            ;; Translate KEYWORD into (SATISFIES KEYWORDP)
-            ((eq target-type 'keyword)
-             (cross-typep mode host-object '(satisfies keywordp)))
-
-            ;; Pick off OR before calling anything that properly parses.
-            ;; Not sure why this isn't always handled by (UNION-TYPE-P CTYPE)
-            ;; in definition of CTYPEP itself, but it isn't.
-            ((typep target-type '(cons (eql or)))
-             (any/type (lambda (x y) (cross-typep mode x y))
-                       host-object (cdr target-type)))
-
-            (;; sequence is not guaranteed to be an exhaustive
-             ;; partition, but it includes at least lists and vectors.
-             (target-type-is-in '(sequence))
-             (if (or (vectorp host-object) (listp host-object))
-                 (values t t)
-                 (if (typep host-object target-type)
-                     (warn-and-give-up)
-                     (values nil t))))
-            (;; general cases of vectors
-             (and (not (hairy-type-p (values-specifier-type target-type)))
-                  (sb-xc:subtypep target-type 'cl:vector))
-             (if (not (vectorp host-object))
-                 (values nil t) ; certainly not a vector
-                 ;; If our type machinery determined that TARGET-TYPE is a
-                 ;; vector type, and the host object is a vector,
-                 ;; we can (usually) perform this typep test with confidence.
-                 (let ((physical-element-type ; what we recorded for it
-                        (!specialized-array-element-type host-object)))
-                   ;; Warn if no specialization recorded, or specialized on T.
-                   ;; If we actually need to do something with SIMPLE-VECTOR,
-                   ;; then !SPECIALIZED-ARRAY-ELEMENT-TYPE will have to return
-                   ;; a second value indicating that T was not merely
-                   ;; the assumed answer.
-                   (if (eq physical-element-type 't)
-                       (warn-and-give-up)
-                       (values (equal (type-specifier
-                                       (array-type-specialized-element-type
-                                        (specifier-type target-type)))
-                                      physical-element-type)
-                               t)))))
-            (;; general cases of arrays
-             (and (not (hairy-type-p (values-specifier-type target-type)))
-                  (sb-xc:subtypep target-type 'cl:array))
-             (if (arrayp host-object)
-                 (warn-and-give-up) ; general-case arrays being way too hard
-                 (values nil t))) ; but "obviously not an array" being easy
-            (;; Floating point types are guaranteed to correspond,
-             ;; too, but less exactly.
-             (target-type-is-in '(single-float double-float))
-             (cond ((floatp host-object)
-                    (warn-about-possible-float-info-loss)
-                    (values (typep host-object target-type) t))
-                   (t
-                    (values nil t))))
-
-            ((member type-atom '(character-set extended-char))
-             (if (characterp host-object)
-                 (warn-and-give-up)
-                 (values nil t)))
-
-            (;; Complexes suffer the same kind of problems as arrays.
-             ;; Our dumping logic is based on contents, however, so
-             ;; reasoning about them should be safe
-             (and (not (hairy-type-p (values-specifier-type target-type)))
-                  (sb-xc:subtypep target-type 'cl:complex))
-             (if (complexp host-object)
-                 (let ((re (realpart host-object))
-                       (im (imagpart host-object)))
-                   (if (or (and (eq target-type 'complex)
-                                (typep re 'rational) (typep im 'rational))
-                           (and (equal target-type '(cl:complex single-float))
-                                (typep re 'single-float) (typep im 'single-float))
-                           (and (equal target-type '(cl:complex double-float))
-                                (typep re 'double-float) (typep im 'double-float)))
-                       (values t t)
-                       (progn
-                         ;; We won't know how to dump it either.
-                         (warn "Host complex too complex: ~S" host-object)
-                         (warn-and-give-up))))
-                 (values nil t)))
-            ;; Some types require translation between the cross-compilation
-            ;; host Common Lisp and the target SBCL.
-            ((target-type-is-in '(classoid))
-             (values (typep host-object 'classoid) t))
-            ((target-type-is-in '(fixnum))
-             (values (fixnump host-object) t))
-            ((target-type-is-in '(bignum))
-             (values (and (integerp host-object) (not (fixnump host-object)))
-                     t))
-            ;; Some types are too hard to handle in the positive
-            ;; case, but at least we can be confident in a large
-            ;; fraction of the negative cases..
-            ((target-type-is-in '(base-string simple-base-string))
-             (if (stringp host-object)
-                 (warn-and-give-up)
-                 (values nil t)))
-            ((target-type-is-in '(character base-char standard-char))
-             (cond ((typep host-object 'standard-char)
-                    (values t t))
-                   ((not (characterp host-object))
-                    (values nil t))
-                   (t
-                    (warn-and-give-up))))
-            ((target-type-is-in '(stream instance sb-impl::string-output-stream
-                                  broadcast-stream file-stream))
-             ;; Neither target CL:STREAM nor target SB-KERNEL:INSTANCE
-             ;; is implemented as a STRUCTURE-OBJECT, so they'll fall
-             ;; through the tests above. We don't want to assume too
-             ;; much about them here, but at least we know enough
-             ;; about them to say that neither T nor NIL nor indeed
-             ;; any other symbol in the cross-compilation host is one.
-             ;; That knowledge suffices to answer so many of the
-             ;; questions that the cross-compiler asks that it's well
-             ;; worth special-casing it here.
-             (if (symbolp host-object)
-                 (values nil t)
-                 (warn-and-give-up)))
-            ;; various hacks for composite types..
-            ((consp target-type)
-             (let ((first (first target-type))
-                   (rest (rest target-type)))
-               (case first
-                 ;; Many complex types are guaranteed to correspond exactly
-                 ;; between any host ANSI Common Lisp and the target SBCL.
-                 ((integer member mod rational real signed-byte unsigned-byte)
-                  (values (typep host-object target-type) t))
-                 (function-designator ; exactly the same as CTYPEP here
-                  (values (typep host-object '(or symbol function)) t))
-                 ;; Floating point types are guaranteed to correspond,
-                 ;; too, but less exactly.
-                 ((single-float double-float)
-                  (cond ((floatp host-object)
-                         (warn-about-possible-float-info-loss)
-                         (values (typep host-object target-type) t))
-                        (t
-                         (values nil t))))
-                 ;; Some complex types have translations that are less
-                 ;; trivial.
-                 (and (every/type (lambda (x y) (cross-typep mode x y))
-                                  host-object rest))
-                 ;; OR was handled earlier above
-                 (not
-                  (multiple-value-bind (value surep)
-                      (cross-typep mode host-object (car rest))
-                    (cond (surep
-                           (values (not value) t))
-                          ((typep (car rest) '(cons (eql satisfies)))
-                           (values nil nil)) ; Don't WARN-AND-...
-                          (t
-                           (warn-and-give-up)))))
-                 ;; If we want to work with the KEYWORD type, we need
-                 ;; to grok (SATISFIES KEYWORDP).
-                 (satisfies
-                  (destructuring-bind (predicate-name) rest
-                    (cond
-                      ((not (acceptable-cross-typep-pred predicate-name))
-                       (warn-and-give-up))
-                      ((eq mode 'ctypep)
-                        ;; Do exactly as (DEFUN CTYPEP) in 'target-type'.
-                        ;; Many predicates like KEYWORDP, ODDP, PACKAGEP,
-                        ;; and NULL correspond between host and target.
-                        ;; But we still need to handle errors, because
-                        ;; the code which calls us may not understand
-                        ;; that a type is unreachable. (E.g. when compiling
-                        ;; (AND STRING (SATISFIES ARRAY-HAS-FILL-POINTER-P))
-                        ;; CTYPEP may be called on the SATISFIES expression
-                        ;; even for non-STRINGs.)
-                       (let ((form `(,predicate-name ',host-object)))
-                         (multiple-value-bind (ok result)
-                             (sb-c::constant-function-call-p form nil nil)
-                           (values (not (null result)) ok))))
-                      (t
-                       ;; Do as (DEFUN %%TYPEP) in 'typep' does, except for the
-                       ;; check of well-formedness (we can trust our code).
-                       (values (funcall predicate-name host-object) t)))))
-                 ;; Some complex types are too hard to handle in the
-                 ;; positive case, but at least we can be confident in
-                 ;; a large fraction of the negative cases..
-                 (cons
-                  (if (consp host-object)
-                      (warn-and-give-up)
-                      (values nil t)))
-                 ((base-string simple-base-string simple-string)
-                  (if (stringp host-object)
-                      (warn-and-give-up)
-                      (values nil t)))
-                 ((vector simple-vector)
-                  (if (vectorp host-object)
-                      (warn-and-give-up)
-                      (values nil t)))
-                 ((array simple-array)
-                  (if (arrayp host-object)
-                      (warn-and-give-up)
-                      (values nil t)))
-                 (function
-                  (if (functionp host-object)
-                      (warn-and-give-up)
-                      (values nil t)))
-                 ;; And the Common Lisp type system is complicated,
-                 ;; and we don't try to implement everything.
-                 (otherwise (warn-and-give-up)))))
-            ;; And the Common Lisp type system is complicated, and
-            ;; we don't try to implement everything.
-            (t
-             (warn-and-give-up))))))
-
-(defvar *cross-typep-calls* nil)
-(defvar *cross-typep-logfile*)
-(defun cross-typep (mode host-object raw-target-type)
-  #-debug-cross-typep
-  (%cross-typep mode host-object raw-target-type)
-  #+debug-cross-typep
-  (multiple-value-bind (v1 v2)
-      (%cross-typep mode host-object raw-target-type)
-    ;; Record all calls so the can be replayed in the target SBCL
-    (unless (or (eq raw-target-type 't)
-                (member (cons host-object raw-target-type) *cross-typep-calls*
-                        :test #'equal))
-      (push (cons host-object raw-target-type) *cross-typep-calls*)
-      (unless (boundp '*cross-typep-logfile*)
-        (setq *cross-typep-logfile*
-              (open (do ((suffix 1 (1+ suffix))) (nil)
-                      (let ((pathname (format nil "output/cross-typep-~D.log" suffix)))
-                        (unless (probe-file pathname)
-                          (format t "~&Opening ~S~%" pathname)
-                          (return pathname))))
-                    :direction :output :if-exists :supersede)))
-      (with-standard-io-syntax
-        (let ((*package* (find-package "COMMON-LISP"))
-              (stream *cross-typep-logfile*))
-          (write-char #\( stream)
-          (typecase host-object
-            (ctype
-             (if (eq host-object *wild-type*)
-                 (write-string "#.*WILD-TYPE*" stream)
-                 (format stream "#.(SPECIFIER-TYPE '~S)"
-                         (type-specifier host-object))))
-            (alien-type
-             (format stream "#.(PARSE-ALIEN-TYPE '~S NIL)"
-                     (unparse-alien-type host-object)))
-            (layout
-             (format stream "#.(FIND-LAYOUT '~S)"
-                     (classoid-name (layout-classoid host-object))))
-            (defstruct-description
-             (format stream "#.(FIND-DEFSTRUCT-DESCRIPTION '~S)"
-                     (dd-name host-object)))
-            (heap-alien-info
-             (format stream
-                     "#.(SB-ALIEN::MAKE-HEAP-ALIEN-INFO :TYPE ~S :ALIEN-NAME ~S :DATAP ~S)"
-                     `(parse-alien-type ',(unparse-alien-type
-                                           (heap-alien-info-type host-object))
-                                        nil)
-                     (sb-alien::heap-alien-info-alien-name host-object)
-                     (sb-alien::heap-alien-info-datap host-object)))
-            (classoid-cell
-             (format stream "#.(FIND-CLASSOID-CELL '~S)"
-                     (classoid-cell-name host-object)))
-            (t
-             (format stream "~S" host-object)))
-          (format stream " ~S ~S ~S)~%" raw-target-type v1 v2)
-          (force-output stream))))
-    (values v1 v2)))
+;;; The logic is a mixture of the code for CTYPEP as defined in src/code/late-type
+;;; and %%TYPEP as defined in src/code/typep.
+;;; The order of clauses is fairly symmetrical with that of %%TYPEP.
+(defun cross-typep (caller host-object type)
+  (declare (type (member sb-xc:typep ctypep) caller))
+  (named-let recurse ((obj host-object) (type type))
+    (flet ((unimplemented ()
+             (bug "Incomplete implementation of ~S ~S ~S" caller obj type))
+           (uncertain ()
+             (values nil nil)))
+      (etypecase type
+       (named-type
+        (ecase (named-type-name type)
+          ((t) (values t t)) ; universal supertype
+          ((instance) (values (%instancep obj) t))
+          ((nil extended-sequence funcallable-instance)
+           (values nil t)))) ; nothing could be these
+       (numeric-type
+        (flet ((bound-test (val)
+                 (let ((low (numeric-type-low type))
+                       (high (numeric-type-high type)))
+                   (and (cond ((null low) t)
+                              ((listp low) (> val (car low)))
+                              (t (>= val low)))
+                        (cond ((null high) t)
+                              ((listp high) (< val (car high)))
+                              (t (<= val high)))))))
+          (if (not (numberp obj))
+              (values nil t) ; false certainly
+              (let ((fmt (numeric-type-format type)))
+                (case (numeric-type-class type)
+                 ((nil)
+                  (if (and (null (numeric-type-complexp type)) (null fmt))
+                      (values (numberp obj) t)
+                      (unimplemented)))
+                 (float
+                  (warn-possible-cross-type-float-info-loss caller host-object type)
+                  (values (ecase (numeric-type-complexp type)
+                           (:complex (complex-num-fmt-match-p obj fmt))
+                           (:real (and (flonum-fmt-match-p obj fmt) (bound-test obj))))
+                          t))
+                 (t ; integer or rational
+                  (values (ecase (numeric-type-complexp type)
+                           (:complex (complex-num-fmt-match-p obj 'rational))
+                           (:real (and (if (eq (numeric-type-class type) 'integer)
+                                           (integerp obj)
+                                           (rationalp obj))
+                                       (bound-test obj))))
+                          t)))))))
+       (array-type
+        ;; Array types correspond fairly closely between host and target, but
+        ;; asking whether an array is definitely non-simple is a nonsensical
+        ;; operation for the cross-compiler. The host can disagree with us,
+        ;; reporting that all arrays are simple. So ensure we don't ask.
+        ;; Otherwise the specialized array registry would need to track
+        ;; our idea of whether the array is non-simple.
+        (when (and (arrayp obj) (eq (array-type-complexp type) t))
+          (bug "Should not call cross-typep with definitely-non-simple array type"))
+        ;; This is essentially just the ARRAY-TYPE case of %%TYPEP
+        ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE,
+        ;; and disregarding simple-ness.
+        (values (and (arrayp obj)
+                     (or (eq (array-type-element-type type) *wild-type*)
+                         (type= (specifier-type
+                                 (!specialized-array-element-type obj))
+                                (array-type-specialized-element-type type)))
+                     (or (eq (array-type-dimensions type) '*)
+                         (and (= (length (array-type-dimensions type))
+                                 (array-rank obj))
+                              (every (lambda (required actual)
+                                       (or (eq required '*) (eql required actual)))
+                                     (array-type-dimensions type)
+                                     (array-dimensions obj)))))
+                t))
+       (member-type
+        (values (if (member-type-member-p obj type) t) t))
+       (compound-type
+        (funcall (etypecase type
+                  (intersection-type #'every/type)
+                  (union-type #'any/type))
+                 #'recurse
+                 obj
+                 (compound-type-types type)))
+       (cons-type
+        (if (not (consp obj))
+            (values nil t)
+            (multiple-value-bind (result certain)
+                (recurse (car obj) (cons-type-car-type type))
+              (if result
+                  (recurse (cdr obj) (cons-type-cdr-type type))
+                  (values nil certain)))))
+       ((or #+sb-simd-pack simd-pack-type
+            #+sb-simd-pack-256 simd-pack-256-type)
+        (values nil t))
+       (character-set-type
+        (cond ((not (characterp obj)) (values nil t)) ; certainly no
+              ;; Return yes if the type is:
+              ;;  - BASE-CHAR, and SB-XC:CHAR-CODE is within BASE-CHAR-CODE-LIMIT
+              ;;  - STANDARD-CHAR and the host says that the char is standard
+              ;;  - the full set of characters
+              ((or (and (type= type (specifier-type 'base-char))
+                        (< (sb-xc:char-code obj) base-char-code-limit))
+                   (and (type= type (specifier-type 'standard-char))
+                        (cl:standard-char-p obj))
+                   (type= type (specifier-type 'character)))
+               (values t t)) ; certainly yes
+              (t (uncertain))))
+       (negation-type
+        (multiple-value-bind (res win) (recurse obj (negation-type-type type))
+          (if win
+              (values (not res) t)
+              (uncertain))))
+       ;; Test BUILT-IN before falling into the CLASSOID case
+       (built-in-classoid
+        (ecase (classoid-name type)
+          (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
+          (function
+           (if (functionp obj)
+               (uncertain)
+               ;; probably not a function. What about FMT-CONTROL instances?
+               (values nil t)))
+          ((system-area-pointer stream fdefn weak-pointer file-stream
+            code-component lra)
+           (values nil t)))) ; nothing could be this type
+       (classoid ; = {structure,condition,standard,static}-classoid
+        (if (not (%instancep obj))
+            (values nil t) ; false certainly
+            (let ((name (classoid-name type)))
+              (if (and (cl:find-class name nil) ; see if the host knows the type
+                       ;; and it's in our object hierarchy
+                       (cl:subtypep name 'structure!object))
+                  (values (cl:typep obj name) t)
+                  (unimplemented)))))
+       ;; Test FUN-DESIGNATOR before falling into the FUN-TYPE case
+       (fun-designator-type (values (typep obj '(or symbol function)) t))
+       (fun-type
+        ;; FUNCTION is not a specifier suitable for discrimination,
+        ;; thus TYPEP is not allowed to determine whether an object
+        ;; is in a particular subtype of function.
+        ;; But be lenient when the object is not a function.
+        (if (and (functionp obj) (eq caller 'sb-xc:typep))
+            (error "TYPEP called with function type")
+            (values (functionp obj) t)))
+       (alien-type-type (if (null obj) (values nil t) (unimplemented)))
+       ;; Test UNKNOWN before falling into the HAIRY case
+       (unknown-type
+        (let ((spec (unknown-type-specifier type)))
+          ;; Apparently we ask whether some objects are CLASSOIDS and other things
+          ;; before we've made the respective type known to our type system,
+          ;; but after the type is known by the host as one of our defstructs.
+          ;; It happens during initialization of the type system, but later too.
+          ;; Ideally we'd restrict this case to initialization only.
+          ;; The post-initialization occurrences are for computing DD-BITMAP
+          ;; of structures, which requires testing whether (TYPEP NIL X) is
+          ;; true for various X that are not known yet.
+          (cond ((and (symbolp spec)
+                      (cl:find-class spec nil)
+                      ;; See if the host knows our DEF!STRUCT yet
+                      (cl:subtypep spec 'structure!object))
+                 (values (cl:typep obj spec) t))
+                ;; Special-case a few forward-referenced instance types.
+                ;; Some are picked off by the quick exit case in (DEFUN SB-XC:TYPEP)
+                ;; but a bunch of other cases arise within the type methods per se
+                ;; which tend not to call via SB-XC:TYPEP but rather CTYPEP.
+                ;; So you might think to pick off (%CROSS-TYPEP NIL AN-UNKNOWN-TYPE)
+                ;; in this function, but then you have a new problem: bootstrap falls down
+                ;; an infinite hole because simplifying unions and intersections often involves
+                ;; asking whether NIL is a member of a type. The stub code we formerly had
+                ;; for SB-XC:TYPEP tried to avoid parsing, and CROSS-TYPEP was almost entirely
+                ;; implemented in terms of unparsed specifiers, not parsed specifiers,
+                ;; which sort of accidentally worked for things like
+                ;; (typep nil '(or (member null ...) blah)). That was a solution, but unprincipled
+                ;; and not very testable, which was a problem considering how much it diverged
+                ;; from the real implementations of CTYPEP and %%TYPEP.
+                ;; So unfortunately we still munst handle a few cases without parsing,
+                ;; but fewer than before, and then some after parsing.
+                ((and (symbolp obj)
+                      (member spec '(;; these occur during make-host-1
+                                     hash-table lexenv sb-c::abstract-lexenv
+                                     condition restart
+                                     sb-assem::label
+                                     ;; in addition to the above, these occur in make-host-2
+                                     interpreted-function
+                                     synonym-stream
+                                     )))
+                 (values nil t))
+                (t
+                 (uncertain)))))
+       (hairy-type
+        (let ((spec (hairy-type-specifier type)))
+          (if (cl:typep spec '(cons (eql satisfies) (cons symbol null)))
+              (let ((predicate (cadr spec)))
+                (if (acceptable-cross-typep-pred predicate caller)
+                    (values (funcall predicate obj) t)
+                    (uncertain)))
+              (unimplemented))))))))
 
 ;;; This is an incomplete TYPEP which runs at cross-compile time to
 ;;; tell whether OBJECT is the host Lisp representation of a target
@@ -466,59 +312,45 @@
 (defun sb-xc:typep (host-object target-type-spec &optional (env nil env-p))
   (declare (ignore env))
   (aver (null env-p)) ; 'cause we're too lazy to think about it
-  (multiple-value-bind (opinion certain-p)
-      (cross-typep 'typep host-object target-type-spec)
+
+  ;; Special case which avoids having to add more more hardcoded types
+  ;; to the list of allowed unknown in cross-typep.
+  ;; This is often used for deciding whether a structure slot can be raw.
+  ;; If NIL is in the type, then it isn't raw.
+  ;; The problem this solves is that even so much as parsing a type
+  ;; can involve asking whether NIL is a member of the type,
+  ;; and thus we need a way to break the endless cycle of not knowing
+  ;; which is problem during self-build. The target system will make
+  ;; any slot non-raw if its type is unknown, but during bootstrap
+  ;; we're trying to be extremeley pedantic by disallowing unknowns.
+  (if (and (null host-object)
+           (typep target-type-spec '(cons (eql or)))
+           (member 'null (cdr target-type-spec)))
+      t
+      (multiple-value-bind (opinion certain-p)
+          (cross-typep 'sb-xc:typep host-object (specifier-type target-type-spec))
     ;; A program that calls TYPEP doesn't want uncertainty and
     ;; probably can't handle it.
-    (if certain-p
-        opinion
-        (error "uncertain in SB-XC:TYPEP ~S ~S"
-               host-object
-               target-type-spec))))
+        (if certain-p
+            opinion
+            (error "uncertain in SB-XC:TYPEP ~S ~S" host-object target-type-spec)))))
 
 ;;; This is an incomplete, portable implementation for use at
 ;;; cross-compile time only.
 (defun ctypep (obj ctype)
-  (check-type ctype ctype)
-  ;; There is at least one possible endless recursion in the
-  ;; cross-compiler type system: (SUBTYPEP NULL (OR UNKOWN0 UNKNOWN1)
-  ;; runs out of stack. The right way would probably be to not
-  ;; implement CTYPEP in terms of TYPE-SPECIFIER (:UNPARSE, that may
-  ;; call TYPE=, that in turn may call CTYPEP). Until then, pick a few
-  ;; cherries off.
-  (cond ((member-type-p ctype)
-         (if (member-type-member-p obj ctype)
-             (values t t)
-             (values nil t)))
-        ((union-type-p ctype)
-         (any/type #'ctypep obj (union-type-types ctype)))
-        ((array-type-p ctype)
-         ;; This is essentially just the ARRAY-TYPE case of %%TYPEP
-         ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE.
-         (if (and (arrayp obj)
-                  (case (array-type-complexp ctype)
-                    ((t) (not (typep obj 'simple-array)))
-                    ((nil) (typep obj 'simple-array)))
-                  (or (eq (array-type-element-type ctype) *wild-type*)
-                      (type= (specifier-type
-                              (!specialized-array-element-type obj))
-                             (array-type-specialized-element-type ctype)))
-                  (or (eq (array-type-dimensions ctype) '*)
-                      (and (= (length (array-type-dimensions ctype))
-                              (array-rank obj)))
-                      (every (lambda (required actual)
-                               (or (eq required '*) (eql required actual)))
-                             (array-type-dimensions ctype)
-                             (array-dimensions obj))))
-               (values t t)
-               (values nil t)))
-        ((and (structure-classoid-p ctype) (symbolp obj))
-         (values nil t))
-        (t
-         (let ( ;; the Common Lisp type specifier corresponding to CTYPE
-               (type (type-specifier ctype)))
-           (check-type type (or symbol cons))
-           (cross-typep 'ctypep obj type)))))
+  (declare (type ctype ctype))
+  (multiple-value-bind (answer certain) (cross-typep 'ctypep obj ctype)
+    (if (or certain
+            ;; Allow uncertainty only if the type contains a SATISFIES
+            (block contains-satisfies
+              (map-type (lambda (type)
+                          (when (and (hairy-type-p type)
+                                     (typep (hairy-type-specifier type)
+                                            '(cons (eql satisfies))))
+                            (return-from contains-satisfies t)))
+                        ctype)))
+        (values answer certain)
+        (warn 'cross-type-giving-up :call `(ctypep ,obj ,ctype)))))
 
 (defun ctype-of (x)
   (typecase x
@@ -557,6 +389,9 @@
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
     (structure!object
      (find-classoid (uncross (class-name (class-of x))))) ; FIXME: TYPE-OF?
+    ;; host packages obviously don't inherit from STRUCTURE!OBJECT
+    ;; but we can use them as if part of our type system for fasl dumping.
+    (package (find-classoid 'package))
     (t
      ;; There might be more cases which we could handle with
      ;; sufficient effort; since all we *need* to handle are enough
@@ -567,3 +402,27 @@
 
 (defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
   (bug "CLASS-HAS-A-FORWARD-REFERENCED-SUPERCLASS-P reached: ~S" x))
+
+#|
+ECL compiler strangeness:
+
+(defun foo-sd (x) ; test for single- then double-float
+  (typecase x
+    ((complex single-float) 'csf)
+    ((complex double-float) 'cdf)))
+
+(defun foo-ds (x) ; test for double- then single-float
+  (typecase x
+    ((complex double-float) 'cdf)
+    ((complex single-float) 'csf)))
+
+(defun try-both ()
+  ;; This test proves that whatever complex type is tried first wins when compiled,
+  ;; but when interpreted it gives what we would call the right answer.
+  (list (foo-sd #c(0.0s0 0.0s0)) (foo-sd #c(0.0d0 0.0d0))
+        (foo-ds #c(0.0s0 0.0s0)) (foo-ds #c(0.0d0 0.0d0))))
+
+(try-both) => (CSF CDF CSF CDF)
+(progn (compile 'foo-sd) (compile 'foo-ds))
+(try-both) => (CSF CSF CDF CDF)
+|#

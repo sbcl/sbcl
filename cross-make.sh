@@ -62,5 +62,6 @@ mv stuff-groveled-from-headers.lisp output
 sh make-host-2.sh
 scp $scp_port_opt -C output/cold-sbcl.core $host:$root/output
 
-# make-target-2
-ssh $ssh_port_opt $host cd $root \; sh make-target-2.sh
+# make-target-2 and the two contribs required to execute 'core.test.sh'
+ssh $ssh_port_opt $host cd $root \; sh make-target-2.sh '&&' \
+   sh make-target-contrib.sh sb-posix sb-bsd-sockets

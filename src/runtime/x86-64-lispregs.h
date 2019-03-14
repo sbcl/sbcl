@@ -20,7 +20,7 @@
  * (excludes stuff like segment registers) */
 #define NREGS   (16)
 
-#ifdef LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLER__
 #define REG(num) $ ## num
 #else
 #define REG(num) num

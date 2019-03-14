@@ -32,5 +32,5 @@
       (:double-float-negative-zero (make-double-float
                                     (opaque-identity #x-80000000)
                                     (opaque-identity #x00000000)))
-      #!+long-float
+      #+long-float
       (:long-float-negative-zero (error "write LONG-FLOAT creation form")))))

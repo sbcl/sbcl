@@ -17,7 +17,7 @@
 
 (defstruct arg-state
   (num-register-args 0)
-  #!-arm-softfp
+  #-arm-softfp
   (fp-registers 0)
   (stack-frame-size 0))
 
@@ -52,12 +52,12 @@
   (declare (ignore type))
   (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number))
 
-#!+arm-softfp
+#+arm-softfp
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (int-arg state 'single-float unsigned-reg-sc-number single-stack-sc-number))
 
-#!-arm-softfp
+#-arm-softfp
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((register (arg-state-fp-registers state)))
@@ -69,7 +69,7 @@
            (incf (arg-state-fp-registers state))
            (make-wired-tn* 'single-float single-reg-sc-number register)))))
 
-#!+arm-softfp
+#+arm-softfp
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let* ((register (arg-state-num-register-args state))
@@ -90,7 +90,7 @@
                               (register-args-offset (1+ register)))
             'move-double-to-int-args)))))
 
-#!-arm-softfp
+#-arm-softfp
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((register (setf (arg-state-fp-registers state)
@@ -120,24 +120,24 @@
   (declare (ignore type state))
   (make-wired-tn* 'system-area-pointer sap-reg-sc-number nargs-offset))
 
-#!+arm-softfp
+#+arm-softfp
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
   (make-wired-tn* 'single-float unsigned-reg-sc-number nargs-offset))
 
-#!-arm-softfp
+#-arm-softfp
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
   (make-wired-tn* 'single-float single-reg-sc-number 0))
 
-#!+arm-softfp
+#+arm-softfp
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
   (list (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number nargs-offset)
         (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number nl3-offset)
         'move-int-args-to-double))
 
-#!-arm-softfp
+#-arm-softfp
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
   (make-wired-tn* 'double-float double-reg-sc-number 0))
@@ -178,7 +178,7 @@
         (emit-label fixup-label)
         (inst word (make-fixup foreign-symbol :foreign))))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -246,7 +246,7 @@
         (composite-immediate-instruction add nsp-tn nsp-tn delta)))))
 ;;;
 
-#!+arm-softfp
+#+arm-softfp
 (define-vop (move-double-to-int-args)
   (:args (double :scs (double-reg)))
   (:results (lo-bits :scs (unsigned-reg))
@@ -257,7 +257,7 @@
   (:generator 1
     (inst fmrrd lo-bits hi-bits double)))
 
-#!+arm-softfp
+#+arm-softfp
 (define-vop (move-int-args-to-double)
   (:args (lo-bits :scs (unsigned-reg))
          (hi-bits :scs (unsigned-reg)))
@@ -305,9 +305,9 @@
                                   (new-arg-types (parse-alien-type '(unsigned 32) env))))
                              (t
                               (incf i (cond ((or (alien-double-float-type-p type)
-                                                 #!-arm-softfp (alien-single-float-type-p type))
-                                             #!+arm-softfp 2
-                                             #!-arm-softfp 0)
+                                                 #-arm-softfp (alien-single-float-type-p type))
+                                             #+arm-softfp 2
+                                             #-arm-softfp 0)
                                             (t
                                              1)))
                               (new-args arg)
@@ -374,7 +374,7 @@
            (r4-tn (make-tn 4))
            (temp-tn (make-tn 5))
            (nsp-save-tn (make-tn 6))
-           #!-arm-softfp
+           #-arm-softfp
            (fp-registers 0)
            (gprs (list r0-tn r1-tn r2-tn r3-tn))
            (frame-size
@@ -407,7 +407,7 @@
                        (alien-pointer-type-p type)
                        (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
                                      type)
-                       #!+arm-softfp
+                       #+arm-softfp
                        (alien-single-float-type-p type))
                    (let ((gpr (pop gprs)))
                      (cond (gpr
@@ -417,7 +417,7 @@
                             (inst ldr temp-tn stack-arg-tn)
                             (inst str temp-tn target-tn))))
                    (incf arg-count))
-                  ((or #!+arm-softfp
+                  ((or #+arm-softfp
                        (alien-double-float-type-p type)
                        ;; long-long
                        (alien-integer-type-p type))
@@ -444,7 +444,7 @@
                         (inst str temp-tn (@ nsp-tn (* arg-count n-word-bytes)))
                         (incf stack-argument-count 2)
                         (incf arg-count)))))
-                  #!-arm-softfp
+                  #-arm-softfp
                   ((alien-double-float-type-p type)
                    (setf fp-registers (logandc2 (+ fp-registers 1) 1))
                    (cond
@@ -465,7 +465,7 @@
                       (inst fstd (make-tn fp-registers 'double-reg) target-tn)
                       (incf fp-registers 2)
                       (incf arg-count 2))))
-                  #!-arm-softfp
+                  #-arm-softfp
                   ((alien-single-float-type-p type)
                    (cond ((> fp-registers 15)
                           (incf stack-argument-count)
@@ -500,18 +500,18 @@
                (alien-pointer-type-p result-type)
                (alien-type-= #.(parse-alien-type 'system-area-pointer nil)
                              result-type)
-               #!+arm-softfp
+               #+arm-softfp
                (alien-single-float-type-p result-type))
            (loadw r0-tn nsp-tn))
-          ((or #!+arm-softfp (alien-double-float-type-p result-type)
+          ((or #+arm-softfp (alien-double-float-type-p result-type)
                ;; long-long
                (alien-integer-type-p result-type))
            (loadw r0-tn nsp-tn)
            (loadw r1-tn nsp-tn 1))
-          #!-arm-softfp
+          #-arm-softfp
           ((alien-single-float-type-p result-type)
            (inst flds (make-tn 0 'single-reg) (@ nsp-tn)))
-          #!-arm-softfp
+          #-arm-softfp
           ((alien-double-float-type-p result-type)
            (inst fldd (make-tn 0 'double-reg) (@ nsp-tn)))
           ((alien-void-type-p result-type))

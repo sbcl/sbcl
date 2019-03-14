@@ -239,7 +239,7 @@
 (with-test (:name (run-program :pty-stream) :fails-on :win32)
   (assert (equal "OK"
                  (handler-case
-                  (with-timeout 1
+                  (with-timeout 2
                     (subseq
                      (with-output-to-string (s)
                        (assert (= 42 (process-exit-code
@@ -392,3 +392,39 @@
       (kill-and-check-status sb-posix:sigkill :signaled)
       (process-wait process)
       (assert (not (process-alive-p process))))))
+
+(defun malloc ()
+  (let ((x (sb-alien:make-alien int 10000)))
+    (sb-alien:free-alien x)
+    1))
+
+(with-test (:name (run-program :malloc-deadlock)
+            :broken-on :sb-safepoint
+            :skipped-on (or (not :sb-thread) :win32))
+  (let* (stop
+         (threads (list*
+                   (sb-thread:make-thread (lambda ()
+                                            (loop until stop
+                                                  do
+                                                  (sleep 0)
+                                                  (gc :full t))))
+                   (loop repeat 3
+                         collect
+                         (sb-thread:make-thread
+                          (lambda ()
+                            (loop until stop
+                                  do (malloc))))))))
+    (loop for time = (get-internal-real-time)
+          for end = (+ time (* internal-time-units-per-second 4)) then end
+          while (> end time)
+          do
+          (when (zerop (mod (- time end) (truncate internal-time-units-per-second 10)))
+            (write-char #\.)
+            (finish-output))
+          (with-output-to-string (str)
+            (run-program "uname" ()
+                         :output str
+                         :search t
+                         :wait t)))
+    (setf stop t)
+    (mapc #'sb-thread:join-thread threads)))

@@ -275,35 +275,28 @@
 
 (define-vop (test-fixnum-mod-power-of-two)
   (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+                      unsigned-reg signed-reg)))
   (:arg-types *
               (:constant (satisfies power-of-two-limit-p)))
   (:translate sb-c::fixnum-mod-p)
   (:conditional :e)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 4
-     (aver (not (sc-is value immediate)))
      (let* ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                            hi
                            (fixnumize hi))))
        (inst test value (lognot fixnum-hi)))))
 
 (define-vop (test-fixnum-mod-tagged-unsigned)
-  (:args (value :scs (any-reg descriptor-reg
-                              unsigned-reg signed-reg
-                              immediate)))
+  (:args (value :scs (any-reg unsigned-reg signed-reg)))
   (:arg-types (:or tagged-num unsigned-num signed-num)
               (:constant fixnum))
   (:translate sb-c::fixnum-mod-p)
   (:conditional :be)
   (:info hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 5
-     (aver (not (sc-is value immediate)))
      (let ((fixnum-hi (if (sc-is value unsigned-reg signed-reg)
                           hi
                           (fixnumize hi))))
@@ -315,7 +308,6 @@
   (:translate sb-c::fixnum-mod-p)
   (:conditional)
   (:info target not-p hi)
-  (:save-p :compute-only)
   (:policy :fast-safe)
   (:generator 6
      (let* ((fixnum-hi (fixnumize hi))

@@ -33,13 +33,13 @@
   ;; word-aligned byte pointers as boxed values in various
   ;; places.  FIXME: This should possibly be exposed for
   ;; configuration via customize-target-features.
-  #!+64-bit 1
+  #+64-bit 1
   ;; On 32-bit targets, this may be as low as 2 (for 30-bit
   ;; fixnums) and as high as 2 (for 30-bit fixnums).  The
   ;; constraint on the low end is simple overcrowding of the
   ;; lowtag space, and the constraint on the high end is that it
   ;; must not exceed WORD-SHIFT.
-  #!-64-bit (1- n-lowtag-bits))
+  #-64-bit (1- n-lowtag-bits))
 ;;; the fixnum tag mask
 (defconstant fixnum-tag-mask (1- (ash 1 n-fixnum-tag-bits)))
 ;;; the bit width of fixnums
@@ -77,10 +77,10 @@
   ;; leaving one bit for a GC mark bit.
   (ldb (byte (- n-word-bits n-widetag-bits 1) 0) -1))
 
-(defconstant sb-xc:char-code-limit #!-sb-unicode 256 #!+sb-unicode #x110000
+(defconstant sb-xc:char-code-limit #-sb-unicode 256 #+sb-unicode #x110000
   "the upper exclusive bound on values produced by CHAR-CODE")
 
-(defconstant base-char-code-limit #!-sb-unicode 256 #!+sb-unicode 128)
+(defconstant base-char-code-limit #-sb-unicode 256 #+sb-unicode 128)
 
 ;;; the size of the chunks returned by RANDOM-CHUNK
 (defconstant n-random-chunk-bits 32)
@@ -105,12 +105,12 @@
 
 ;;;; Point where continuous area starting at dynamic-space-start bumps into
 ;;;; next space. Computed for genesis/constants.h, not used in Lisp.
-#!+(and gencgc (host-feature sb-xc-host))
+#+(and gencgc sb-xc-host)
 (defconstant max-dynamic-space-end
     (let ((stop (1- (ash 1 n-word-bits)))
           (start dynamic-space-start))
       (dolist (other-start (list read-only-space-start static-space-start
-                                 #!+linkage-table
+                                 #+linkage-table
                                  linkage-table-space-start))
         (declare (notinline <)) ; avoid dead code note
         (when (< start other-start)
@@ -120,7 +120,7 @@
 ;; The lowest index that you can pass to %INSTANCE-REF accessing
 ;; a slot of data that is not the instance-layout.
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
-(defconstant instance-data-start (+ #!-compact-instance-header 1))
+(defconstant instance-data-start (+ #-compact-instance-header 1))
 
 ;; The largest number that may appear in the header-data for an instance,
 ;; and some other mostly-boxed objects, such as FDEFNs.
@@ -162,7 +162,7 @@
               (sap-ref-word (sap offset) `(sb-fasl::bvref-word ,sap ,offset)))
      ,@body))
 
-#!+sb-safepoint
+#+sb-safepoint
 ;;; The offset from the fault address reported to the runtime to the
 ;;; END of the global safepoint page.
 (defconstant gc-safepoint-trap-offset n-word-bytes)

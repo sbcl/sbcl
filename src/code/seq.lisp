@@ -32,11 +32,11 @@
     `((count nil
              nil
              (etypecase count
-               (null (1- most-positive-fixnum))
+               (null (1- sb-xc:most-positive-fixnum))
                (fixnum (max 0 count))
                (integer (if (minusp count)
                             0
-                            (1- most-positive-fixnum))))
+                            (1- sb-xc:most-positive-fixnum))))
              (mod #.sb-xc:most-positive-fixnum))
       ;; Entries for {start,end}{,1,2}
       ,@(mapcan (lambda (names)
@@ -92,18 +92,25 @@
               (rebindings/eager)
               ;; Things which may be used/are only used in certain
               ;; code paths (e.g. length).
-              (rebindings/lazy))
+              (rebindings/lazy)
+              (substs))
       (dolist (arg args)
         (let ((sym (if (listp arg) (car arg) arg)))
           (when (member sym '(function predicate key test test-not))
             (funargs sym)))
-        (case arg
-          ;; FIXME: make this robust.  And clean.
-          ((sequence sequence1 sequence2)
-           (let* ((length-var (ecase arg
-                                (sequence  'length)
-                                (sequence1 'length1)
-                                (sequence2 'length2)))
+        (cond
+          ((and (symbolp arg)
+                (search "SEQUENCE" (string arg)))
+           (let* ((length-var (ecase (char (string arg) (1- (length (string arg))))
+                                (#\E
+                                 'length)
+                                (#\1
+                                 ;; For *sequence-keyword-info*
+                                 (substs (cons arg 'sequence1))
+                                 'length1)
+                                (#\2
+                                 (substs (cons arg 'sequence2))
+                                 'length2)))
                   (cache-var (symbolicate length-var '#:-cache)))
              (new-args arg)
              (rebindings/eager `(,cache-var nil))
@@ -111,7 +118,7 @@
               `(,length-var (truly-the
                              index
                              (or ,cache-var (setf ,cache-var (length ,arg))))))))
-          ((function predicate)
+          ((memq arg '(function predicate))
            (new-args arg)
            (rebindings/eager `(,arg (%coerce-callable-to-fun ,arg))))
           (t
@@ -119,6 +126,8 @@
              (cond (info
                     (destructuring-bind (default supplied-p adjuster type) info
                       (new-args `(,arg ,default ,@(when supplied-p (list supplied-p))))
+                      (loop for (new . old) in (substs)
+                            do (setf adjuster (subst new old adjuster)))
                       (rebindings/eager `(,arg ,adjuster))
                       (new-declarations `(type ,type ,arg))))
                    (t (new-args arg)))))))
@@ -611,8 +620,8 @@
            else do
            ;; vector-fill* depends on this assertion
            (assert (member et '(t (complex double-float)
-                                #!-64-bit (complex single-float)
-                                #!-64-bit double-float)
+                                #-64-bit (complex single-float)
+                                #-64-bit double-float)
                            :test #'equal))))
 
 (defun vector-fill* (vector item start end)
@@ -644,10 +653,10 @@
                    (funcall (truly-the function (car (truly-the cons bashers)))
                             (funcall (truly-the function (cdr bashers)) item)
                             vector start (- end start)))
-                  #!-64-bit
+                  #-64-bit
                   ((eq widetag sb-vm:simple-array-double-float-widetag)
                    (fill-float double-float))
-                  #!-64-bit
+                  #-64-bit
                   ((eq widetag sb-vm:simple-array-complex-single-float-widetag)
                    (fill-float (complex single-float)))
                   (t
@@ -664,7 +673,7 @@
     ;; DEFTRANSFORM for FILL will turn these into
     ;; calls to UB*-BASH-FILL.
     (etypecase data
-      #!+sb-unicode
+      #+sb-unicode
       ((simple-array character (*))
        (let ((item (locally (declare (optimize (safety 3)))
                      (the character item))))
@@ -823,7 +832,7 @@
   (when (null source-end) (setq source-end (length source-sequence)))
   (vector-replace-from-vector))
 
-#!+sb-unicode
+#+sb-unicode
 (defun simple-character-string-replace-from-simple-character-string*
     (target-sequence source-sequence
      target-start target-end source-start source-end)
@@ -833,7 +842,7 @@
   (vector-replace-from-vector))
 
 (define-sequence-traverser replace
-    (sequence1 sequence2 &rest args &key start1 end1 start2 end2)
+    (target-sequence1 source-sequence2 &rest args &key start1 end1 start2 end2)
   "Destructively modifies SEQUENCE1 by copying successive elements
 into it from the SEQUENCE2.
 
@@ -842,13 +851,13 @@ from the subsequence bounded by START2 and END2. If these subsequences
 are not of the same length, then the shorter length determines how
 many elements are copied."
   (declare (truly-dynamic-extent args))
-  (declare (explicit-check sequence1 sequence2 :result))
+  (declare (explicit-check target-sequence1 source-sequence2 :result))
   (let* (;; KLUDGE: absent either rewriting FOO-REPLACE-FROM-BAR, or
          ;; excessively polluting DEFINE-SEQUENCE-TRAVERSER, we rebind
          ;; these things here so that legacy code gets the names it's
          ;; expecting.  We could use &AUX instead :-/.
-         (target-sequence sequence1)
-         (source-sequence sequence2)
+         (target-sequence target-sequence1)
+         (source-sequence source-sequence2)
          (target-start start1)
          (source-start start2)
          (target-end (or end1 length1))
@@ -867,8 +876,8 @@ many elements are copied."
     ;; If sequence1 was a list or vector, then sequence2 is an extended-sequence
     ;; or not a sequence. Either way, check it.
     (the sequence
-      (values (apply #'sb-sequence:replace sequence1
-                     (the sequence sequence2) args)))))
+      (values (apply #'sb-sequence:replace target-sequence1
+                     (the sequence source-sequence2) args)))))
 
 ;;;; REVERSE
 (defun reverse (sequence)
@@ -1054,10 +1063,10 @@ many elements are copied."
        (apply #'%concatenate-to-list sequences))
       ((vector simple-vector)
        (apply #'%concatenate-to-simple-vector sequences))
-      #!+sb-unicode
+      #+sb-unicode
       ((string simple-string)
        (apply #'%concatenate-to-string sequences))
-      ((simple-base-string #!-sb-unicode string #!-sb-unicode simple-string)
+      ((simple-base-string #-sb-unicode string #-sb-unicode simple-string)
        (apply #'%concatenate-to-base-string sequences))
       (t
        (let ((type (specifier-type result-type)))
@@ -1115,11 +1124,11 @@ many elements are copied."
                           (replace result seq :start1 start)
                           (incf start length))))
                     result)))))
-  #!+sb-unicode
+  #+sb-unicode
   (def %concatenate-to-string character
     (simple-array character (*)) (simple-array base-char (*)))
   (def %concatenate-to-base-string base-char
-    (simple-array base-char (*)) #!+sb-unicode (simple-array character (*)))
+    (simple-array base-char (*)) #+sb-unicode (simple-array character (*)))
   (def %concatenate-to-simple-vector t simple-vector))
 
 (defun %concatenate-to-list (&rest sequences)
@@ -2497,7 +2506,7 @@ many elements are copied."
                                                (frob sequence t)
                                                (frob sequence nil))))
                        (typecase sequence
-                         #!+sb-unicode
+                         #+sb-unicode
                          ((simple-array character (*)) (frob2))
                          ((simple-array base-char (*)) (frob2))
                          ,@(when bit-frob
@@ -2919,11 +2928,11 @@ many elements are copied."
          (search-compare-list-list ,main ,sub)
          (search-compare-list-vector ,main ,sub)
          ;; KLUDGE: just hack it together so that it works
-         (return-from search (apply #'sb-sequence:search sequence1 sequence2 args)))
+         (return-from search (apply #'sb-sequence:search ,sub ,main args)))
       `(seq-dispatch ,sub
          (search-compare-vector-list ,main ,sub ,index)
          (search-compare-vector-vector ,main ,sub ,index)
-         (return-from search (apply #'sb-sequence:search sequence1 sequence2 args)))))
+         (return-from search (apply #'sb-sequence:search ,sub ,main args)))))
 
 ;;;; SEARCH
 
@@ -2951,21 +2960,21 @@ many elements are copied."
              (return index2)))))
 
 (define-sequence-traverser search
-    (sequence1 sequence2 &rest args &key
+    (sub-sequence1 main-sequence2 &rest args &key
      from-end test test-not start1 end1 start2 end2 key)
   (declare (type fixnum start1 start2)
            (truly-dynamic-extent args))
-  (declare (explicit-check sequence2))
-  (seq-dispatch-checking sequence2
+  (declare (explicit-check main-sequence2))
+  (seq-dispatch-checking main-sequence2
     (let ((end1 (or end1 length1))
           (end2 (or end2 length2)))
       (declare (type index end1 end2))
-      (list-search sequence2 sequence1))
+      (list-search main-sequence2 sub-sequence1))
     (let ((end1 (or end1 length1))
           (end2 (or end2 length2)))
       (declare (type index end1 end2))
-      (vector-search sequence2 sequence1))
-    (apply #'sb-sequence:search sequence1 sequence2 args)))
+      (vector-search main-sequence2 sub-sequence1))
+    (apply #'sb-sequence:search sub-sequence1 main-sequence2 args)))
 
 ;;; FIXME: this was originally in array.lisp; it might be better to
 ;;; put it back there, and make DOSEQUENCE and SEQ-DISPATCH be in

@@ -20,6 +20,14 @@
   (%primitive print "too early in cold init to recover from errors")
   (%halt))
 
+(defun !cold-failed-aver (expr)
+  ;; output the message and invoke ldb monitor
+  (terpri)
+  (write-line "failed AVER:")
+  (write expr)
+  (terpri)
+  (%halt))
+
 ;;; last-ditch error reporting for things which should never happen
 ;;; and which, if they do happen, are sufficiently likely to torpedo
 ;;; the normal error-handling system that we want to bypass it
@@ -32,10 +40,10 @@
 ;;;; !COLD-INIT
 
 ;;; a list of toplevel things set by GENESIS
-(defvar *!cold-toplevels*)                 ; except for DEFUNs and SETF macros
-(defvar *!cold-setf-macros*)               ; just SETF macros
-(defvar *!cold-defconstants*)              ; just DEFCONSTANT-EQXs
-(defvar *!cold-defuns*)                    ; just DEFUNs
+(defvar *!cold-toplevels*)   ; except for DEFUNs and SETF macros
+(defvar *!cold-setf-macros*) ; just SETF macros
+(defvar *!cold-defuns*)      ; just DEFUNs
+(defvar *!cold-defsymbols*)  ; "easy" DEFCONSTANTs and DEFPARAMETERs
 
 ;;; a SIMPLE-VECTOR set by GENESIS
 (defvar *!load-time-values*)
@@ -45,43 +53,24 @@
   ;; not to use it for the COLD-INIT-OR-REINIT functions.)
 (defmacro show-and-call (name)
     `(progn
-       (/primitive-print ,(symbol-name name))
+       (/show "Calling" ,(symbol-name name))
        (,name)))
-
-(defun !encapsulate-stuff-for-cold-init (&aux names)
-  (flet ((encapsulate-1 (name handler)
-           (encapsulate name '!cold-init handler)
-           (push name names)))
-    (encapsulate-1 '%failed-aver
-                   (lambda (f expr)
-                     ;; output the message before signaling error,
-                     ;; as it may be this is too early in the cold init.
-                     (fresh-line)
-                     (write-line "failed AVER:")
-                     (write expr)
-                     (terpri)
-                     (funcall f expr))))
-  names)
-
-(defmacro !with-init-wrappers (&rest forms)
-  `(let ((wrapped-functions (!encapsulate-stuff-for-cold-init)))
-     ,@forms
-     (dolist (f wrapped-functions) (unencapsulate f '!cold-init))))
 
 (defun !c-runtime-noinform-p () (/= (extern-alien "lisp_startup_options" char) 0))
 
 ;;; called when a cold system starts up
-(defun !cold-init (&aux real-choose-symbol-out-fun)
+(defun !cold-init (&aux (real-choose-symbol-out-fun #'choose-symbol-out-fun)
+                        (real-failed-aver-fun #'%failed-aver))
   "Give the world a shove and hope it spins."
 
-  #!+sb-show
-  (sb-int::cannot-/show "Test of CANNOT-/SHOW [don't worry - this is expected]")
   (/show0 "entering !COLD-INIT")
+  (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
   (setq *readtable* (make-readtable)
         *print-length* 6 *print-level* 3)
   (setq *error-output* (!make-cold-stderr-stream)
                       *standard-output* *error-output*
                       *trace-output* *error-output*)
+  (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   (unless (!c-runtime-noinform-p)
     (write-string "COLD-INIT... "))
 
@@ -112,7 +101,6 @@
   ;; that would be nice, and would tidy up some other things too.
   (show-and-call !printer-cold-init)
   ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
-  (setf real-choose-symbol-out-fun #'choose-symbol-out-fun)
   (setf (symbol-function 'choose-symbol-out-fun)
         (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))
 
@@ -135,12 +123,7 @@
   ;; the basic type machinery needs to be initialized before toplevel
   ;; forms run.
   (show-and-call !type-class-cold-init)
-  ;; cold-init-wrappers are closures. Installing a closure as a
-  ;; named function requires consing immobile space code.
-  #!+immobile-code (setq sb-vm::*immobile-space-mutex*
-                         (sb-thread:make-mutex :name "Immobile space"))
-  (!with-init-wrappers (show-and-call sb-kernel::!primordial-type-cold-init))
-  (show-and-call !world-lock-cold-init)
+  (show-and-call sb-kernel::!primordial-type-cold-init)
   (show-and-call !classes-cold-init)
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)
@@ -158,15 +141,25 @@
   ;; to the subclasses of STRUCTURE-OBJECT.
   (show-and-call sb-kernel::!set-up-structure-object-class)
 
-  (dolist (x *!cold-defconstants*)
-    (destructuring-bind (name source-loc &optional docstring) x
-      (setf (info :variable :kind name) :constant)
-      (when source-loc (setf (info :source-location :constant name) source-loc))
-      (when docstring (setf (documentation name 'variable) docstring))))
-  (!with-init-wrappers
-   (dolist (x *!cold-defuns*)
-     (destructuring-bind (name inline-expansion dxable-args) x
-       (%defun name (fdefinition name) inline-expansion dxable-args))))
+  ;; Genesis is able to perform some of the work of DEFCONSTANT and
+  ;; DEFPARAMETER, but not all of it. It assigns symbol values, but can not
+  ;; manipulate globaldb. Therefore, a subtlety of these macros for bootstrap
+  ;; is that we see each DEFthing twice: once during cold-load and again here.
+  ;; Now it being the case that DEFPARAMETER implies variable assignment
+  ;; unconditionally, you may think it should assign. No! This was logically
+  ;; ONE use of the defining macro, but split into pieces as a consequence
+  ;; of the implementation.
+  (dolist (x *!cold-defsymbols*)
+    (destructuring-bind (fun name source-loc . docstring) x
+      (aver (boundp name)) ; it's a bug if genesis didn't initialize
+      (ecase fun
+        (sb-c::%defconstant
+         (apply #'sb-c::%defconstant name (symbol-value name) source-loc docstring))
+        (sb-impl::%defparameter ; use %DEFVAR which will not clobber
+         (apply #'%defvar name source-loc nil docstring)))))
+  (dolist (x *!cold-defuns*)
+    (destructuring-bind (name inline-expansion dxable-args) x
+      (%defun name (fdefinition name) inline-expansion dxable-args)))
 
   (unless (!c-runtime-noinform-p)
     (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
@@ -174,16 +167,14 @@
   ;; only the basic external formats are present at this point.
   (setq sb-impl::*default-external-format* :latin-1)
 
-  (!with-init-wrappers
-    (loop with *package* = *package* ; rebind to self, as if by LOAD
-          for index-in-cold-toplevels from 0
-          for toplevel-thing in (prog1 *!cold-toplevels*
+  (loop with *package* = *package* ; rebind to self, as if by LOAD
+        for index-in-cold-toplevels from 0
+        for toplevel-thing in (prog1 *!cold-toplevels*
                                  (makunbound '*!cold-toplevels*))
         do
-      #!+sb-show
-      (when (zerop (mod index-in-cold-toplevels 1024))
-        (/show0 "INDEX-IN-COLD-TOPLEVELS=..")
-        (/hexstr index-in-cold-toplevels))
+      #+sb-show
+      (when (zerop (mod index-in-cold-toplevels 1000))
+        (/show index-in-cold-toplevels))
       (typecase toplevel-thing
         (function
          (funcall toplevel-thing))
@@ -198,13 +189,13 @@
         ((cons (eql defstruct))
          (apply 'sb-kernel::%defstruct (cdr toplevel-thing)))
         (t
-         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*")))))
+         (!cold-lose "bogus operation in *!COLD-TOPLEVELS*"))))
   (/show0 "done with loop over cold toplevel forms and fixups")
 
   ;; Precise GC seems to think these symbols are live during the final GC
   ;; which in turn enlivens a bunch of other "*!foo*" symbols.
   ;; Setting them to NIL helps a little bit.
-  (setq *!cold-defuns* nil *!cold-defconstants* nil *!cold-toplevels* nil)
+  (setq *!cold-defuns* nil *!cold-defsymbols* nil *!cold-toplevels* nil)
 
   ;; Now that L-T-V forms have executed, the symbol output chooser works.
   (setf (symbol-function 'choose-symbol-out-fun) real-choose-symbol-out-fun)
@@ -229,9 +220,10 @@
   (show-and-call !pathname-cold-init)
 
   (show-and-call stream-cold-init-or-reset)
+  (/show "Enabled buffered streams")
   (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
-  #!-(and win32 (not sb-thread))
+  #-(and win32 (not sb-thread))
   (show-and-call signal-cold-init-or-reinit)
 
   (show-and-call float-cold-init-or-reinit)
@@ -266,6 +258,7 @@
   (setf sb-kernel::*maximum-error-depth* 10)
   (/show0 "enabling internal errors")
   (setf (extern-alien "internal_errors_enabled" int) 1)
+  (setf (symbol-function '%failed-aver) real-failed-aver-fun)
 
   (show-and-call sb-disassem::!compile-inst-printers)
 
@@ -278,7 +271,7 @@
       (logically-readonlyize (sb-c::sc-move-costs sc))))
 
   ; hppa heap is segmented, lisp and c uses a stub to call eachother
-  #!+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
+  #+hpux (%primitive sb-vm::setup-return-from-lisp-stub)
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
@@ -355,7 +348,7 @@ process to continue normally."
   (sb-thread::get-foreground))
 
 (defun reinit ()
-  #!+win32
+  #+win32
   (setf sb-win32::*ansi-codepage* nil)
   (setf *default-external-format* nil)
   (setf sb-alien::*default-c-string-external-format* nil)
@@ -370,7 +363,7 @@ process to continue normally."
     (stream-reinit t)
     (os-cold-init-or-reinit)
     (thread-init-or-reinit)
-    #!-(and win32 (not sb-thread))
+    #-(and win32 (not sb-thread))
     (signal-cold-init-or-reinit)
     (setf (extern-alien "internal_errors_enabled" int) 1)
     (float-cold-init-or-reinit))
@@ -388,7 +381,7 @@ process to continue normally."
 
 ;;; Decode THING into hexadecimal notation using only machinery
 ;;; available early in cold init.
-#!+sb-show
+#+sb-show
 (defun hexstr (thing)
   (/noshow0 "entering HEXSTR")
   (let* ((addr (get-lisp-obj-address thing))
@@ -410,7 +403,7 @@ process to continue normally."
     str))
 
 ;; But: you almost never need this. Just use WRITE in all its glory.
-#!+sb-show
+#+sb-show
 (defun cold-print (x)
   (labels ((%cold-print (obj depthoid)
              (if (> depthoid 4)
@@ -434,7 +427,6 @@ process to continue normally."
   '("SB-INT"
     defenum defun-cached with-globaldb-name def!type def!struct
     .
-    #!+sb-show ()
-    #!-sb-show (/hexstr /nohexstr /noshow /noshow0 /noxhow
-                /primitive-print /show /show0 /xhow))
+    #+sb-show ()
+    #-sb-show (/noshow /noshow0 /show /show0))
   *!removable-symbols*)

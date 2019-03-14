@@ -196,7 +196,7 @@
 
 ;;; Return a function type specifier describing TEMPLATE's type computed
 ;;; from the operand type restrictions.
-#!-sb-fluid (declaim (inline template-conditional-p))
+#-sb-fluid (declaim (inline template-conditional-p))
 (defun template-conditional-p (template)
   (declare (type template template))
   (let ((rtypes (template-result-types template)))

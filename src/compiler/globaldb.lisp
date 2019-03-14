@@ -220,7 +220,7 @@
 ;;; If non-nil, *GLOBALDB-OBSERVER*'s CAR is a bitmask over info numbers
 ;;; for which you'd like to call the function in the CDR whenever info
 ;;; of that number is queried.
-(!defvar *globaldb-observer* nil)
+(defparameter *globaldb-observer* nil)
 (declaim (type (or (cons (unsigned-byte #.(ash 1 info-number-bits)) function)
                    null) *globaldb-observer*))
 #-sb-xc-host (declaim (always-bound *globaldb-observer*))
@@ -266,7 +266,7 @@
 
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 
-(define-info-type (:function :definition) :type-spec (or fdefn null))
+(define-info-type (:function :definition) :type-spec (or #-sb-xc-host fdefn null))
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
@@ -284,7 +284,7 @@
 
 ;;; The deferred mode processor for fasteval special operators.
 ;;; Immediate processors are hung directly off symbols in a dedicated slot.
-#!+sb-fasteval
+#+sb-fasteval
 (define-info-type (:function :interpreter) :type-spec (or function null))
 
 ;;; Indicates whether the function is deprecated.
@@ -328,7 +328,7 @@
 ;;; expression, e.g. '(LAMBDA (X) (+ X 1)) or a lambda-with-lexenv.
 ;;; (B) List of arguments which could be dynamic-extent closures, and which
 ;;; we could, under suitable compilation policy, DXify in the caller
-;;; especially when compiling a NOTINLINE call to this function.
+;;; especially when open-coding a call to this function.
 ;;; If only (A) is stored, then this value is a list (the lambda expression).
 ;;; If only (B) is stored, then this is a DXABLE-ARGS.
 ;;; If both, this is an INLINING-DATA.
@@ -357,6 +357,8 @@
 ;;; We don't actually have anything like that any more though.
 ;;; For user-defined functions, the invariant is maintained that at most
 ;;; one of :source-transform and an inline-expansion exist.
+;;; However, there is one exception: a structure constructor can have an
+;;; inline expansion and also store (#<dd> . :constructor) here.
 (define-info-type (:function :source-transform)
   :type-spec (or function null (cons atom atom)))
 

@@ -67,7 +67,7 @@
 ;;;; KLUDGE: It's not clear that using bit-vectors would be any more efficient.
 ;;;; Perhaps the abstraction could go away. -- WHN 19991124
 
-#!-sb-fluid
+#-sb-fluid
 (declaim (inline dchunk-or dchunk-and dchunk-clear dchunk-not
                  dchunk-make-mask dchunk-make-field
                  dchunk-extract
@@ -81,8 +81,8 @@
 ;;; Ideally this constant would go in the 'insts' file for the architecture,
 ;;; but there's really no easy way to do that at present.
 (defconstant dchunk-bits
-  #!+x86-64 56
-  #!-x86-64 sb-vm:n-word-bits)
+  #+x86-64 56
+  #-x86-64 sb-vm:n-word-bits)
 
 (deftype dchunk ()
   `(unsigned-byte ,dchunk-bits))
@@ -424,9 +424,17 @@
         (let* ((binding (cdr rendering))
                (vars (car binding))
                (vals (cdr binding)))
-          (if (listp vars)
-              (mapc (lambda (var val) (push `(,var ,val) bindings)) vars vals)
-              (push `(,vars ,vals) bindings)))))))
+          ;; We can end up here with VARS = NIL, and VALS = an atom.
+          ;; As the spec says, MAPC "should be prepared to signal an error
+          ;; ... if any list is not a proper list"
+          ;; We don't err in that situation because we check for ENDP of the
+          ;; lists from left to right. However, at least one implementation
+          ;; does rigorously use ENDP on both lists on each iteration.
+          (cond ((not vars))
+                ((listp vars)
+                 (mapc (lambda (var val) (push `(,var ,val) bindings)) vars vals))
+                (t
+                 (push `(,vars ,vals) bindings))))))))
 
 ;;; Return the form(s) that should be evaluated to render ARG in the chosen
 ;;; RENDERING style, which is one of :RAW, :SIGN-EXTENDED,
@@ -437,7 +445,7 @@
   (labels ((tempvars (n)
              (if (plusp n)
                  (cons (package-symbolicate
-                        (load-time-value (find-package "SB-DISASSEM"))
+                        #.(find-package "SB-DISASSEM")
                         ".T" (write-to-string (incf *!temp-var-counter*)))
                        (tempvars (1- n))))))
     (let* ((arg-cell (assq arg funstate))
@@ -716,13 +724,6 @@
 ;;;; some simple functions that help avoid consing when we're just
 ;;;; recursively filtering things that usually don't change
 
-(defun recons (old-cons car cdr)
-  "If CAR is eq to the car of OLD-CONS and CDR is eq to the CDR, return
-  OLD-CONS, otherwise return (cons CAR CDR)."
-  (if (and (eq car (car old-cons)) (eq cdr (cdr old-cons)))
-      old-cons
-      (cons car cdr)))
-
 (defun sharing-mapcar (fun list)
   (declare (type function fun))
   "A simple (one list arg) mapcar that avoids consing up a new list
@@ -879,7 +880,7 @@
           (t
            (pd-error "bogus test-form: ~S" test)))))
 
-#!-sb-fluid (declaim (inline bytes-to-bits))
+#-sb-fluid (declaim (inline bytes-to-bits))
 (declaim (maybe-inline sign-extend tab tab0))
 
 (defun bytes-to-bits (bytes)

@@ -105,11 +105,6 @@ lispobj *search_static_space(void *pointer);
 lispobj *search_immobile_space(void *pointer);
 lispobj *search_dynamic_space(void *pointer);
 
-static inline int instruction_ptr_p(void *pointer, lispobj *start_addr)
-{
-    return widetag_of(start_addr) == CODE_HEADER_WIDETAG &&
-        pointer >= (void*)(start_addr + code_header_words(*start_addr));
-}
 extern int properly_tagged_p_internal(lispobj pointer, lispobj *start_addr);
 static inline int properly_tagged_descriptor_p(void *pointer, lispobj *start_addr) {
   return is_lisp_pointer((lispobj)pointer) &&
@@ -153,7 +148,7 @@ static inline int __immobile_obj_gen_bits(lispobj* pointer) // native pointer
 #endif /* little-endian */
 
 static inline boolean filler_obj_p(lispobj* obj) {
-  return *obj == CODE_HEADER_WIDETAG;
+    return widetag_of(obj) == CODE_HEADER_WIDETAG && obj[1] == 0;
 }
 
 #endif /* immobile space */

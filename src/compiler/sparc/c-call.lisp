@@ -69,7 +69,7 @@
   (declare (ignore type state))
   (make-wired-tn* 'single-float single-reg-sc-number 0))
 
-#!+long-float
+#+long-float
 (define-alien-type-method (long-float :result-tn) (type)
   (declare (ignore type))
   (make-wired-tn* 'long-float long-reg-sc-number 0))
@@ -111,7 +111,7 @@
                       (and (alien-integer-type-p type)
                            (> (sb-alien::alien-integer-type-bits type) 32)))
                   arg-types)
-            #!+long-float (some #'alien-long-float-type-p arg-types)
+            #+long-float (some #'alien-long-float-type-p arg-types)
             (and (alien-integer-type-p result-type)
                  (> (sb-alien::alien-integer-type-bits result-type) 32)))
         (collect ((new-args) (lambda-vars) (new-arg-types))
@@ -137,7 +137,7 @@
                             (new-args `(double-float-low-bits ,arg))
                             (new-arg-types (parse-alien-type '(signed 32) nil))
                             (new-arg-types (parse-alien-type '(unsigned 32) nil)))
-                           #!+long-float
+                           #+long-float
                            ((alien-long-float-type-p type)
                             (new-args `(long-float-exp-bits ,arg))
                             (new-args `(long-float-high-bits ,arg))
@@ -189,7 +189,7 @@
   (:generator 2
     (inst li res (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)

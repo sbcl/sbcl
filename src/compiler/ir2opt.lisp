@@ -68,7 +68,7 @@
         (pushnew 2block (car (gethash new *2block-info*)))))))
 
 ;;;; Conditional move insertion support code
-#!-sb-fluid (declaim (inline vop-name))
+#-sb-fluid (declaim (inline vop-name))
 (defun vop-name (vop &optional default)
   (declare (type vop vop))
   (let ((vop-info (vop-info vop)))

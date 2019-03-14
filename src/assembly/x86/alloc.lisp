@@ -75,7 +75,7 @@
                        routines)))))
   (frob-cons-routines))
 
-#!+sb-thread
+#+sb-thread
 (define-assembly-routine (alloc-tls-index
                           (:translate ensure-symbol-tls-index)
                           (:result-types positive-fixnum)

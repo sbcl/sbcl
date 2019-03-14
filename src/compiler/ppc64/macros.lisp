@@ -67,7 +67,7 @@
   ;; cross-compile time so we can just use a fixed offset within the
   ;; TLS block instead of mucking about with the extra memory access
   ;; (and temp register, for stores)?
-  #!+sb-thread
+  #+sb-thread
   (defmacro load-tl-symbol-value (reg symbol)
     `(progn
        (inst lwz ,reg null-tn
@@ -75,11 +75,11 @@
                 (ash symbol-tls-index-slot word-shift)
                 (- other-pointer-lowtag)))
        (inst lwzx ,reg thread-base-tn ,reg)))
-  #!-sb-thread
+  #-sb-thread
   (defmacro load-tl-symbol-value (reg symbol)
     `(load-symbol-value ,reg ,symbol))
 
-  #!+sb-thread
+  #+sb-thread
   (defmacro store-tl-symbol-value (reg symbol temp)
     `(progn
        (inst lwz ,temp null-tn
@@ -87,7 +87,7 @@
                 (ash symbol-tls-index-slot word-shift)
                 (- other-pointer-lowtag)))
        (inst stwx ,reg thread-base-tn ,temp)))
-  #!-sb-thread
+  #-sb-thread
   (defmacro store-tl-symbol-value (reg symbol temp)
     (declare (ignore temp))
     `(store-symbol-value ,reg ,symbol)))
@@ -191,9 +191,9 @@
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
   (declare (ignore stack-p node)
-           #!-gencgc
+           #-gencgc
            (ignore temp-tn flag-tn))
-    #!-gencgc
+    #-gencgc
     (let ((alloc-size (gensym)))
       `(let ((,alloc-size ,size))
          (if (logbitp (1- n-lowtag-bits) ,lowtag)
@@ -205,7 +205,7 @@
          (if (numberp ,alloc-size)
              (inst addi alloc-tn alloc-tn ,alloc-size)
              (inst add alloc-tn alloc-tn ,alloc-size))))
-    #!+gencgc
+    #+gencgc
     `(progn
        ;; Make temp-tn be the size
        (cond ((numberp ,size)
@@ -213,11 +213,11 @@
              (t
               (move ,temp-tn ,size)))
 
-       #!-sb-thread
+       #-sb-thread
        (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
-       #!-sb-thread
+       #-sb-thread
        (inst ld ,result-tn ,flag-tn 0)
-       #!+sb-thread
+       #+sb-thread
        (inst ld ,result-tn thread-base-tn (* thread-alloc-region-slot
                                               n-word-bytes))
 
@@ -225,9 +225,9 @@
        ;; it working
        ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
        ;; (inst lwz ,flag-tn ,flag-tn 0)
-       #!-sb-thread
+       #-sb-thread
        (inst ld ,flag-tn ,flag-tn n-word-bytes)
-       #!+sb-thread
+       #+sb-thread
        (inst ld ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
                                             n-word-bytes))
 
@@ -251,13 +251,13 @@
          (inst tw :lge ,result-tn ,flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
-         ;; #!-sb-thread three #!+sb-thread one machine instruction.
+         ;; #-sb-thread three #+sb-thread one machine instruction.
          ;; The lr of a fixup counts as two instructions.
-         #!-sb-thread
+         #-sb-thread
          (progn
            (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
            (inst std ,result-tn ,flag-tn 0))
-         #!+sb-thread
+         #+sb-thread
          (inst stw ,result-tn thread-base-tn (* thread-alloc-region-slot
                                                 n-word-bytes)))
 
@@ -336,9 +336,9 @@
 ;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
 (defmacro pseudo-atomic ((flag-tn) &body forms)
-  #!+sb-safepoint-strictly
+  #+sb-safepoint-strictly
   `(progn ,flag-tn ,@forms (emit-safepoint))
-  #!-sb-safepoint-strictly
+  #-sb-safepoint-strictly
   `(progn
      (without-scheduling ()
        ;; Extra debugging stuff:
@@ -358,9 +358,9 @@
      (progn
        (inst andi. ,flag-tn alloc-tn lowtag-mask)
        (inst twi :ne ,flag-tn 0))
-     #!+sb-safepoint
+     #+sb-safepoint
      (emit-safepoint)))
 
-#!+sb-safepoint
+#+sb-safepoint
 (defun emit-safepoint ()
   (inst lwz zero-tn null-tn (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))

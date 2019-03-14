@@ -22,7 +22,7 @@
 
 ;;; Normally IR2 converted, definition needed for interpreted structure
 ;;; constructors only.
-#!+(or sb-eval sb-fasteval)
+#+(or sb-eval sb-fasteval)
 (defun %make-structure-instance (dd slot-specs &rest slot-values)
   (let ((instance (%make-instance (dd-length dd))) ; length = sans header word
         (value-index 0))
@@ -59,9 +59,6 @@
 ;;;
 (defun %target-defstruct (dd)
   (declare (type defstruct-description dd))
-
-  #!+(and sb-show (host-feature sb-xc))
-  (progn (write `(%target-defstruct ,(dd-name dd))) (terpri))
 
   (when (dd-doc dd)
     (setf (documentation (dd-name dd) 'structure)
@@ -102,7 +99,7 @@
     (dolist (fun *defstruct-hooks*)
       (funcall fun classoid)))
 
-  (values))
+  (dd-name dd))
 
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
@@ -184,7 +181,7 @@
     (prin1 name stream)
     (do ((index 0 (1+ index))
          (limit (or (and (not *print-readably*) *print-length*)
-                    most-positive-fixnum))
+                    sb-xc:most-positive-fixnum))
          (remaining-slots (dd-slots dd) (cdr remaining-slots)))
         ((or (null remaining-slots) (>= index limit))
          (write-string (if remaining-slots " ...)" ")") stream))
@@ -202,7 +199,7 @@
       (print-unreadable-object (structure stream :identity t :type t))
       (let* ((layout (%instance-layout structure))
              (dd (layout-info layout))
-             (name (classoid-name (layout-classoid layout))))
+             (name (layout-classoid-name layout)))
         (cond ((not dd)
                ;; FIXME? this branch may be unnecessary as a consequence
                ;; of change f02bee325920166b69070e4735a8a3f295f8edfd which
@@ -247,6 +244,5 @@
              ,(+ (- sb-vm:instance-pointer-lowtag)
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))
-
 
 (/show0 "target-defstruct.lisp end of file")

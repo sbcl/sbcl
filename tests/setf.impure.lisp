@@ -13,8 +13,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 (load "compiler-test-util.lisp")
 
 (defvar *foo* nil)
@@ -141,7 +139,7 @@
 
 ;; This is a test of the compiler, but it belongs with the above.
 ;; FIXME: does this need to go through COMPILE-FILE, or will COMPILE work?
-(defvar *tmpfile* "setf-tmp.lisp")
+(defvar *tmpfile* (randomish-temp-file-name "lisp"))
 (with-test (:name :setf-fun-and-macro-style-2)
   (unwind-protect
        (progn

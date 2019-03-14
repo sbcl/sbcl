@@ -146,11 +146,11 @@
   (sap-stack stack)                     ; System area pointers.
   (single-stack stack)                  ; single-floats
   (double-stack stack :element-size 2)  ; double-floats.
-  #!+long-float
+  #+long-float
   (long-stack stack :element-size 3)    ; long-floats.
   (complex-single-stack stack :element-size 2)  ; complex-single-floats
   (complex-double-stack stack :element-size 4)  ; complex-double-floats
-  #!+long-float
+  #+long-float
   (complex-long-stack stack :element-size 6)    ; complex-long-floats
 
   ;;
@@ -189,11 +189,11 @@
 
   ;; non-descriptor characters
   (character-reg registers
-                 :locations #!-sb-unicode #.*byte-regs*
-                            #!+sb-unicode #.*dword-regs*
-                 #!+sb-unicode #!+sb-unicode
+                 :locations #-sb-unicode #.*byte-regs*
+                            #+sb-unicode #.*dword-regs*
+                 #+sb-unicode #+sb-unicode
                  :element-size 2
-                 #!-sb-unicode #!-sb-unicode
+                 #-sb-unicode #-sb-unicode
                  :reserve-locations (#.ah-offset #.al-offset)
                  :constant-scs (immediate)
                  :save-p t
@@ -253,7 +253,7 @@
               :alternate-scs (double-stack))
 
   ;; non-descriptor LONG-FLOATs
-  #!+long-float
+  #+long-float
   (long-reg float-registers
             :locations (0 1 2 3 4 5 6 7)
             :constant-scs (fp-constant)
@@ -274,7 +274,7 @@
                       :save-p t
                       :alternate-scs (complex-double-stack))
 
-  #!+long-float
+  #+long-float
   (complex-long-reg float-registers
                     :locations (0 2 4 6)
                     :element-size 2
@@ -286,12 +286,12 @@
   (unwind-block stack :element-size unwind-block-size)))
 
 (defparameter *byte-sc-names*
-  '(#!-sb-unicode character-reg byte-reg #!-sb-unicode character-stack))
+  '(#-sb-unicode character-reg byte-reg #-sb-unicode character-stack))
 (defparameter *word-sc-names* '(word-reg))
 (defparameter *dword-sc-names*
   '(any-reg descriptor-reg sap-reg signed-reg unsigned-reg control-stack
     signed-stack unsigned-stack sap-stack single-stack
-    #!+sb-unicode character-reg #!+sb-unicode character-stack constant))
+    #+sb-unicode character-reg #+sb-unicode character-stack constant))
 ;;; added by jrd. I guess the right thing to do is to treat floats
 ;;; as a separate size...
 ;;;
@@ -361,7 +361,7 @@
        (case value
          ((0d0 1d0) fp-constant-sc-number)
          (t fp-double-immediate-sc-number)))
-    #!+long-float
+    #+long-float
     (long-float
        (when (or (eql value 0l0) (eql value 1l0)
                  (eql value pi)

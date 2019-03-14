@@ -106,7 +106,7 @@
 
   (def-data-vector-frobs simple-base-string byte-index
     character character-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (def-data-vector-frobs simple-character-string word-index
     character character-reg)
   (def-data-vector-frobs simple-vector word-index
@@ -361,7 +361,7 @@
     (unless (location= result value)
       (move-double-reg result value))))
 
-#!+long-float
+#+long-float
 (define-vop (data-vector-ref/simple-array-long-float)
   (:note "inline array access")
   (:translate data-vector-ref)
@@ -378,7 +378,7 @@
                         other-pointer-lowtag))
     (load-long-reg value object offset nil)))
 
-#!+long-float
+#+long-float
 (define-vop (data-vector-set/simple-array-long-float)
   (:note "inline array store")
   (:translate data-vector-set)
@@ -539,7 +539,7 @@
       (unless (location= result-imag value-imag)
         (move-double-reg result-imag value-imag)))))
 
-#!+long-float
+#+long-float
 (define-vop (data-vector-ref/simple-array-complex-long-float)
   (:note "inline array access")
   (:translate data-vector-ref)
@@ -560,7 +560,7 @@
       (inst add offset (* 4 n-word-bytes))
       (load-long-reg imag-tn object offset nil))))
 
-#!+long-float
+#+long-float
 (define-vop (data-vector-set/simple-array-complex-long-float)
   (:note "inline array store")
   (:translate data-vector-set)

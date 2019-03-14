@@ -200,17 +200,10 @@
                                (loop while running
                                      do (setf * (make-array 1024))
                                      ;; Busy-wait a bit so we don't TOTALLY flood the
-                                     ;; system with GCs: a GC occurring in the middle of
-                                     ;; S-V-I-T causes it to start over -- we want that
-                                     ;; to occur occasionally, but not _all_ the time.
+                                     ;; system with GCs.
                                         (loop repeat (random 128)
                                               do (setf ** *)))))))
-    (write-string "; ")
-    (dotimes (i #+(or win32 openbsd) 2000
-                #-(or win32 openbsd) 15000)
-      (when (zerop (mod i 200))
-        (write-char #\.)
-        (force-output))
+    (dotimes (i 500)
       (let* ((mom-mark (cons t t))
              (kid-mark (cons t t))
              (child (make-thread
@@ -616,7 +609,7 @@
 ;; timer.impure.lisp.
 (with-test (:name (make-thread :interrupt-with make-thread :bug-1180102)
             :skipped-on (not :sb-thread)
-            :broken-on :win32)
+            :broken-on :sb-safepoint)
   (fresh-line)
   (write-string "; ")
   (force-output)

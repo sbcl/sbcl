@@ -210,7 +210,7 @@
         (funcall (handler-case
                      ;; Final arg of T means signal errors immediately rather
                      ;; than returning a function that signals when called.
-                     (sb-c::actually-compile nil `(lambda () ,form) env nil nil t)
+                     (sb-c:compile-in-lexenv `(lambda () ,form) env nil nil nil nil t)
                   (error ()
                      ;; Whatever went wrong, just say "too complex"
                    (error 'compiler-environment-too-complex-error

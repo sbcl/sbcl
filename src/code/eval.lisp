@@ -11,7 +11,7 @@
 
 (in-package "SB-IMPL")
 
-(!defparameter *eval-calls* 0)
+(defparameter *eval-calls* 0) ; initialized by genesis
 
 (defvar *eval-source-context* nil)
 
@@ -23,20 +23,21 @@
 ;;;; to evaluate EXPR -- if EXPR is already a lambda form, there's
 ;;;; no need.
 (defun make-eval-lambda (expr)
-  (flet ((lexpr-p (x)
-           (typep x '(cons (member lambda named-lambda lambda-with-lexenv)))))
-    (cond ((lexpr-p expr)
-           (values expr nil))
-          (t
-           (when (typep expr '(cons (eql function) (cons t null)))
-             (let ((inner (second expr)))
-               (when (lexpr-p inner)
-                 (return-from make-eval-lambda (values inner nil)))))
-           (values `(lambda ()
+  (let ((lambda (if (typep expr '(cons (eql function) (cons t null)))
+                    (cadr expr)
+                    expr)))
+    (if (typep lambda '(cons (member lambda named-lambda lambda-with-lexenv)))
+        (values lambda nil)
+        (values `(lambda ()
                  ;; why PROGN? So that attempts to eval free declarations
                  ;; signal errors rather than return NIL. -- CSR, 2007-05-01
-                      (progn ,expr))
-                   t)))))
+                 ;; But only force in a PROGN if it's actually needed to flag
+                 ;; that situation as an error. Macros can't expand into DECLARE,
+                 ;; so anything other than DECLARE can be left alone.
+                   ,(if (and (consp expr) (eq (car expr) 'declare))
+                        `(progn ,expr)
+                        expr))
+                t))))
 
 ;;; FIXME: what does "except in that it can't handle toplevel ..." mean?
 ;;; Is there anything wrong with the implementation, or is the comment obsolete?
@@ -55,14 +56,14 @@
                              ;; be using EVAL.
                              (compiler-note #'muffle-warning))
                 (sb-c:compile-in-lexenv lambda lexenv nil *eval-source-info*
-                                        *eval-tlf-index* (not call))))))
+                                        *eval-tlf-index* nil (not call))))))
       (declare (function fun))
       (if call
           (funcall fun)
           fun))))
 
 ;;; Handle PROGN and implicit PROGN.
-#!-sb-fasteval
+#-sb-fasteval
 (progn
 (defun list-with-length-p (x)
   ;; Is X a list for which LENGTH is meaningful, i.e. a list which is
@@ -128,7 +129,7 @@
   (signal 'eval-error :condition condition)
   (bug "Unhandled EVAL-ERROR"))
 
-#!-sb-fasteval
+#-sb-fasteval
 (progn
 ;; See comment in 'full-eval' at its definition of INTERPRETED-PROGRAM-ERROR
 ;; which is not the same as this one. Since neither is more globally used
@@ -288,7 +289,7 @@
 
 ;;; This definition will be replaced after the interpreter is compiled.
 ;;; Until then we just always compile.
-#!+sb-fasteval
+#+sb-fasteval
 (defun sb-interpreter:eval-in-environment (exp lexenv)
   (let ((exp (macroexpand exp lexenv)))
     (if (symbolp exp)
@@ -296,15 +297,15 @@
         (%simple-eval exp (or lexenv (make-null-lexenv))))))
 
 (defun eval-in-lexenv (exp lexenv)
-  #!+sb-eval
+  #+sb-eval
   (let ((lexenv (or lexenv (make-null-lexenv))))
     (if (eq *evaluator-mode* :compile)
         (simple-eval-in-lexenv exp lexenv)
         (sb-eval:eval-in-native-environment exp lexenv)))
-  #!+sb-fasteval
+  #+sb-fasteval
   (sb-c:with-compiler-error-resignalling
    (sb-interpreter:eval-in-environment exp lexenv))
-  #!-(or sb-eval sb-fasteval)
+  #-(or sb-eval sb-fasteval)
   (simple-eval-in-lexenv exp (or lexenv (make-null-lexenv))))
 
 (defun eval (original-exp)

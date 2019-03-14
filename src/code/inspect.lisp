@@ -222,8 +222,7 @@ evaluated expressions.
               (cons "Closed over values" (%closure-values object)))))))
 
 #+(or sb-eval sb-fasteval)
-(defmethod inspected-parts ((object #+sb-fasteval sb-interpreter:interpreted-function
-                                    #+sb-eval sb-eval:interpreted-function))
+(defmethod inspected-parts ((object interpreted-function))
   (multiple-value-bind (defn closurep name) (function-lambda-expression object)
     (declare (ignore closurep))
     (values (format nil "The object is an interpreted function named ~S.~%" name)

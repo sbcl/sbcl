@@ -201,12 +201,7 @@
               (setf (slot-value obj slot-name) val))))))
 
 (!define-fop 64 (fop-end-group () nil)
-  (/show0 "THROWing FASL-GROUP-END")
   (throw 'fasl-group-end t))
-
-;;; We used to have FOP-NORMAL-LOAD as 81 and FOP-MAYBE-COLD-LOAD as
-;;; 82 until GENESIS learned how to work with host symbols and
-;;; packages directly instead of piggybacking on the host code.
 
 (!define-fop 62 (fop-verify-table-size () nil)
   (let ((expected-index (read-word-arg (fasl-input-stream))))
@@ -249,8 +244,7 @@
                         :format-arguments
                         (list (subseq name 0 length)
                               (undefined-package-error package)))
-                 (push-fop-table (without-package-locks
-                                  (%intern name length package elt-type))
+                 (push-fop-table (%intern name length package elt-type t)
                                  fasl-input))))
          ;; Symbol-hash is usually computed lazily and memoized into a symbol.
          ;; Laziness slightly improves the speed of allocation.
@@ -347,18 +341,18 @@
                       (,reader))))))
     (define-complex-fop 72 fop-complex-single-float single-float)
     (define-complex-fop 73 fop-complex-double-float double-float)
-    #!+long-float
+    #+long-float
     (define-complex-fop 67 fop-complex-long-float long-float)
     (define-float-fop 46 fop-single-float single-float)
     (define-float-fop 47 fop-double-float double-float)
-    #!+long-float
+    #+long-float
     (define-float-fop 52 fop-long-float long-float)))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (!define-fop 88 :not-host (fop-simd-pack)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (let ((tag (fast-read-s-integer 8)))
-      (cond #!+sb-simd-pack-256
+      (cond #+sb-simd-pack-256
             ((logbitp 2 tag)
              (%make-simd-pack-256 (logand tag #b11)
                                   (fast-read-u-integer 8)

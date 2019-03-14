@@ -71,7 +71,7 @@ Otherwise, use the Sparc register names")
            (let ((offset (tn-offset loc)))
              (aver (zerop (mod offset 2)))
              (values (+ offset 32) 2)))
-          #!+long-float
+          #+long-float
           (long-reg
            (let ((offset (tn-offset loc)))
              (aver (zerop (mod offset 4)))
@@ -424,8 +424,8 @@ about function addresses and register values.")
 ;;
 (define-instruction-format
     (format-fpop2 32
-                  :default-printer #!-sparc-v9 '(:name :tab rs1 ", " rs2)
-                                   #!+sparc-v9 '(:name :tab rd ", " rs1 ", " rs2))
+                  :default-printer #-sparc-v9 '(:name :tab rs1 ", " rs2)
+                                   #+sparc-v9 '(:name :tab rd ", " rs1 ", " rs2))
   (op   :field (byte 2 30))
   (rd   :field (byte 5 25) :value 0)
   (op3  :field (byte 6 19))
@@ -835,7 +835,7 @@ about function addresses and register values.")
   ;; This instruction is called lduw for V9 , but looks exactly like ld
   ;; on previous architectures.
   (define-f3-inst ld #b11 #b000000 :load-store :load
-                  #!+sparc-v9 :print-name #!+sparc-v9 'lduw)
+                  #+sparc-v9 :print-name #+sparc-v9 'lduw)
 
   (define-f3-inst ldsw #b11 #b001000 :load-store :load) ; v9
 
@@ -939,7 +939,7 @@ about function addresses and register values.")
   (:emitter (emit-format-3-immed segment #b11 0 #b100001
                                  (reg-tn-encoding src1) 1 src2)))
 
-#!+sparc-64
+#+sparc-64
 (define-instruction ldxfsr (segment src1 src2)
   (:declare (type tn src1) (type (signed-byte 13) src2))
   (:printer format-3-immed ((op #b11) (op3 #b100001) (rd 1))
@@ -959,7 +959,7 @@ about function addresses and register values.")
   (:emitter (emit-format-3-immed segment #b11 0 #b100101
                                  (reg-tn-encoding src1) 1 src2)))
 
-#!+sparc-64
+#+sparc-64
 (define-instruction stxfsr (segment src1 src2)
   (:declare (type tn src1) (type (signed-byte 13) src2))
   (:printer format-3-immed ((op #b11) (op3 #b100101) (rd 1))
@@ -1023,7 +1023,7 @@ about function addresses and register values.")
 (define-instruction unimp (segment data)
   (:declare (type (unsigned-byte 22) data))
   (:printer format-2-unimp () :default :control #'unimp-control
-            :print-name #!-sparc-v9 'unimp #!+sparc-v9 'illtrap)
+            :print-name #-sparc-v9 'unimp #+sparc-v9 'illtrap)
   (:delay 0)
   (:emitter (emit-format-2-unimp segment 0 0 0 data)))
 
@@ -1163,7 +1163,7 @@ about function addresses and register values.")
   (:declare (type branch-condition condition)
             ;; KLUDGE: see comments in vm.lisp regarding
             ;; pseudo-atomic-trap.
-            #!-linux
+            #-linux
             (type (integer 16 31) target))
   (:printer format-3-immed ((op #b10)
                             (rd nil :type 'branch-condition)
@@ -1194,10 +1194,10 @@ about function addresses and register values.")
 ;;; breaking the disassembler if these are left in. The printer isn't
 ;;; terribly smart, but the emitted code is right. - CSR, 2002-08-04
 #+nil
-(define-instruction tcc (segment condition target &optional (cc #!-sparc-64 :icc #!+sparc-64 :xcc))
+(define-instruction tcc (segment condition target &optional (cc #-sparc-64 :icc #+sparc-64 :xcc))
   (:declare (type branch-condition condition)
             ;; KLUDGE: see above.
-            #!-linux
+            #-linux
             (type (integer 16 31) target)
             (type integer-condition-register cc))
   (:printer format-4-trap ((op #b10)
@@ -1368,9 +1368,9 @@ about function addresses and register values.")
                   (opf3 ,opf)
                   (rs1 nil :type ',(if extended 'fp-ext-reg 'fp-reg))
                   (rs2 nil :type ',(if extended 'fp-ext-reg 'fp-reg))
-                  #!-sparc-v9
+                  #-sparc-v9
                   (rd 0)
-                  #!+sparc-v9
+                  #+sparc-v9
                   (rd nil :type 'fp-condition-register))
         )
      (:dependencies

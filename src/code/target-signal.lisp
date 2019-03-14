@@ -15,14 +15,14 @@
 
 ;;; Send the signal SIGNAL to the process with process id PID. SIGNAL
 ;;; should be a valid signal number
-#!-sb-fluid (declaim (inline unix-kill))
+#-sb-fluid (declaim (inline unix-kill))
 (define-alien-routine ("kill" unix-kill) int
   (pid int)
   (signal int))
 
 ;;; Send the signal SIGNAL to the all the process in process group
 ;;; PGRP. SIGNAL should be a valid signal number
-#!-sb-fluid (declaim (inline unix-killpg))
+#-sb-fluid (declaim (inline unix-killpg))
 (define-alien-routine ("killpg" unix-killpg) int
   (pgrp int)
   (signal int))
@@ -37,7 +37,7 @@
 ;;; doing things the SBCL way and moving this kind of C-level work
 ;;; down to C wrapper functions.)
 
-#!-sb-safepoint
+#-sb-safepoint
 (defun unblock-gc-signals ()
   (with-alien ((%unblock-gc-signals
                 (function void unsigned-long unsigned-long) :extern
@@ -73,7 +73,7 @@
   (/show0 "enable-interrupt")
   (flet ((run-handler (&rest args)
            (declare (truly-dynamic-extent args))
-           #!-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
+           #-(or c-stack-is-control-stack sb-safepoint) ;; able to do that in interrupt_handle_now()
            (unblock-gc-signals)
            (in-interruption ()
              (apply handler args))))
@@ -107,7 +107,7 @@
 ;;;; Rather, the signal spawns off a fresh native thread, which calls
 ;;;; into lisp with a fake context through this callback:
 
-#!+sb-safepoint-strictly
+#+sb-safepoint-strictly
 (defun signal-handler-callback (run-handler signal args)
   ;; SAPs are dx allocated, close over the values, not the SAPs.
   (let ((thread (without-gcing
@@ -144,10 +144,10 @@
                       (sap-int (sb-vm:context-pc context))))))))
 
 (define-signal-handler sigill-handler "illegal instruction")
-#!-(or linux android)
+#-(or linux android)
 (define-signal-handler sigemt-handler "SIGEMT")
 (define-signal-handler sigbus-handler "bus error")
-#!-(or linux android)
+#-(or linux android)
 (define-signal-handler sigsys-handler "bad argument to a system call")
 ) ; end MACROLET
 
@@ -168,7 +168,7 @@
                  (signal int)
                  ;; Then enter the debugger like BREAK.
                  (%break 'sigint int))))))
-    #!+sb-safepoint
+    #+sb-safepoint
     (let ((target (sb-thread::foreground-thread)))
       ;; Note that INTERRUPT-THREAD on *CURRENT-THREAD* doesn't actually
       ;; interrupt right away, because deferrables are blocked.  Rather,
@@ -183,11 +183,11 @@
       (if (eq target sb-thread:*current-thread*)
           (interrupt-it)
           (sb-thread:interrupt-thread target #'interrupt-it)))
-    #!-sb-safepoint
+    #-sb-safepoint
     (sb-thread:interrupt-thread (sb-thread::foreground-thread)
                                 #'interrupt-it)))
 
-#!-sb-wtimer
+#-sb-wtimer
 (defun sigalrm-handler (signal info context)
   (declare (ignore signal info context))
   (declare (type system-area-pointer context))
@@ -197,7 +197,7 @@
   (declare (ignore signal code context))
   (exit))
 
-#!-sb-thruption
+#-sb-thruption
 ;;; SIGPIPE is not used in SBCL for its original purpose, instead it's
 ;;; for signalling a thread that it should look at its interruption
 ;;; queue. The handler (RUN_INTERRUPTION) just returns if there is
@@ -210,29 +210,29 @@
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
 (defun sigchld-handler  (signal code context)
   (declare (ignore signal code context))
-  (sb-impl::get-processes-status-changes))
+  (sb-impl::get-processes-status-changes-sigchld))
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."
   (enable-interrupt sigint #'sigint-handler)
   (enable-interrupt sigterm #'sigterm-handler)
   (enable-interrupt sigill #'sigill-handler :synchronous t)
-  #!-(or linux android)
+  #-(or linux android)
   (enable-interrupt sigemt #'sigemt-handler)
   (enable-interrupt sigfpe #'sb-vm:sigfpe-handler :synchronous t)
   (if (/= (extern-alien "install_sig_memory_fault_handler" int) 0)
       (enable-interrupt sigbus #'sigbus-handler :synchronous t)
       (write-string ";;;; SIGBUS handler not installed
 " sb-sys:*stderr*))
-  #!-(or linux android)
+  #-(or linux android)
   (enable-interrupt sigsys #'sigsys-handler :synchronous t)
-  #!-sb-wtimer
+  #-sb-wtimer
   (enable-interrupt sigalrm #'sigalrm-handler)
-  #!-sb-thruption
+  #-sb-thruption
   (enable-interrupt sigpipe #'sigpipe-handler)
   (enable-interrupt sigchld #'sigchld-handler)
-  #!+hpux (ignore-interrupt sigxcpu)
-  #!-sb-safepoint (unblock-gc-signals)
+  #+hpux (ignore-interrupt sigxcpu)
+  #-sb-safepoint (unblock-gc-signals)
   (unblock-deferrable-signals)
   (values))
 

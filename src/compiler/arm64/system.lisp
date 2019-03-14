@@ -49,7 +49,7 @@
     ;; We can't use both register and immediate offsets in the same
     ;; load/store instruction, so we need to bias our register offset
     ;; on big-endian systems.
-    #!+big-endian
+    #+big-endian
     (inst sub result result (1- n-word-bytes))
 
     ;; And, finally, pick out the widetag from the header.
@@ -75,6 +75,16 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
+(define-vop (fun-header-data)
+  (:translate fun-header-data)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst lsr res res n-widetag-bits)))
+
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
@@ -84,17 +94,6 @@
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
     (inst lsr res res n-widetag-bits)))
-
-(define-vop (get-closure-length)
-  (:translate get-closure-length)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (inst ubfm res res n-widetag-bits
-          (+ -1 (integer-length short-header-max-words) n-widetag-bits))))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -159,9 +158,24 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (inst ldr (32-bit-reg ndescr) (@ code (- 4 other-pointer-lowtag)))
-    (inst add sap code (lsl ndescr word-shift))
+    ;; 4 byte load, ignoring serial# in the high bits
+    (inst ldr (32-bit-reg ndescr) (@ code (- 8 other-pointer-lowtag)))
+    (inst add sap code ndescr)
     (inst sub sap sap other-pointer-lowtag)))
+
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 10
+    (inst ldr (32-bit-reg res) (@ code (- 4 other-pointer-lowtag)))
+    (inst add res offset (lsl res word-shift))
+    (inst sub res res other-pointer-lowtag)
+    (inst ldr (32-bit-reg res) (@ code res))))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
@@ -170,8 +184,8 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (inst ldr (32-bit-reg ndescr) (@ code (- 4 other-pointer-lowtag)))
-    (inst add ndescr offset (lsl ndescr word-shift))
+    (inst ldr (32-bit-reg ndescr) (@ code (- 8 other-pointer-lowtag)))
+    (inst add ndescr offset ndescr)
     (inst sub ndescr ndescr (- other-pointer-lowtag fun-pointer-lowtag))
     (inst add func code ndescr)))
 ;;;
@@ -224,7 +238,7 @@
 
 ;;;
 
-#!+sb-thread
+#+sb-thread
 (progn
   (defun ldr-str-word-offset-encodable (x)
     (ldr-str-offset-encodable (ash x word-shift)))

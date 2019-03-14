@@ -66,6 +66,11 @@
     ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
     ((inst mov r11-tn rax-tn))) ; result
 
+  #+immobile-space
+  (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
+    () ; no arg
+    ((inst mov r11-tn rax-tn))) ; result
+
   ;; These routines are for the deterministic allocation profiler.
   ;; The C support routine's argument is the return PC
   (def (enable-alloc-counter "allocation_tracker_counted" t)
@@ -77,27 +82,27 @@
     ())) ; result
 
 (define-assembly-routine
-    (#!+immobile-code undefined-fdefn
-     #!-immobile-code undefined-tramp
+    (#+immobile-code undefined-fdefn
+     #-immobile-code undefined-tramp
      (:return-style :none)
-     #!+immobile-code
+     #+immobile-code
      (:export undefined-tramp))
     ((:temp rax descriptor-reg rax-offset))
-  #!+immobile-code
+  #+immobile-code
   (progn
     (inst pop rax) ; gets the address of the fdefn (plus some)
     (inst sub :dword rax
           ;; Subtract the length of the JMP instruction plus offset to the
           ;; raw-addr-slot, and add back the lowtag. Voila, a tagged descriptor.
           (+ 5 (ash fdefn-raw-addr-slot word-shift) (- other-pointer-lowtag))))
-  #!+immobile-code
+  #+immobile-code
   UNDEFINED-TRAMP
   (inst pop (ea n-word-bytes rbp-tn))
   (emit-error-break nil cerror-trap (error-number-or-lose 'undefined-fun-error) (list rax))
   (inst push (ea n-word-bytes rbp-tn))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) rax)))
 
-#!-sb-dynamic-core
+#-sb-dynamic-core
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
@@ -110,7 +115,7 @@
   ;; to toplevel, so a lost frame is not hugely important, but it's annoying.
   (error-call nil 'undefined-alien-fun-error rbx-tn))
 
-#!+sb-dynamic-core
+#+sb-dynamic-core
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()
@@ -148,7 +153,7 @@
 ;;; installed as a globally named function. The fdefn contains a jump opcode
 ;;; to a tiny code component specific to the particular closure.
 ;;; The trampoline is responsible for loading RAX, since named calls don't.
-#!-immobile-code
+#-immobile-code
 (define-assembly-routine
     (closure-tramp (:return-style :none))
     ()

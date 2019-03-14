@@ -8,7 +8,7 @@
 
 ;;;; Check that target machine features are set up consistently with
 ;;;; this file.
-#!-bsd
+#-bsd
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (error "The :BSD feature is missing, we shouldn't be doing this code."))
 
@@ -20,7 +20,7 @@
   (newp (* t))
   (newlen sb-unix:size-t))
 
-#!+darwin
+#+darwin
 (define-alien-routine ("sysctlbyname" %sysctlbyname) int
   (name c-string)
   (oldp (* t))
@@ -53,7 +53,7 @@
                  (free-alien result)
                  (sb-unix::newcharstar-string result)))))))))
 
-#!+darwin
+#+darwin
 (defun sysctlbyname (type name)
   "Retrieves an integer or string value with the given name."
   (with-alien ((result-len sb-unix:size-t))
@@ -73,8 +73,8 @@
 
 (defun software-type ()
   "Return a string describing the supporting software."
-  #!-gnu-kfreebsd (sysctl :str ctl-kern kern-ostype)
-  #!+gnu-kfreebsd "GNU/kFreeBSD")
+  #-gnu-kfreebsd (sysctl :str ctl-kern kern-ostype)
+  #+gnu-kfreebsd "GNU/kFreeBSD")
 
 (defun software-version ()
   "Return a string describing version of the supporting software, or NIL
@@ -96,5 +96,5 @@
 
 ;;; support for CL:MACHINE-VERSION defined OAOO elsewhere
 (defun get-machine-version ()
-  (or #!+darwin (sysctlbyname :str "machdep.cpu.brand_string")
+  (or #+darwin (sysctlbyname :str "machdep.cpu.brand_string")
       (sysctl :str ctl-hw hw-model)))

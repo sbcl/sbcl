@@ -19,11 +19,11 @@
             ea-p ea-base ea-index size-nbyte
             ea make-ea ea-disp rip-relative-ea) "SB-VM")
   ;; Imports from SB-VM into this package
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
-            #!+avx2 sb-vm::avx2-reg
+            #+avx2 sb-vm::avx2-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 ;;; a REG object discards all information about a TN except its storage base
@@ -148,7 +148,7 @@
   :sign-extend t
   :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
   :printer (lambda (value stream dstate)
-             (or #!+immobile-space
+             (or #+immobile-space
                  (and (integerp value) (maybe-note-lisp-callee value dstate))
                  (maybe-note-assembler-routine value nil dstate))
              (print-label value stream dstate)))
@@ -426,7 +426,7 @@
                             :default-printer
                             `(:name :tab ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (op  :field (byte 6 2))
-  (dir :field (byte 1 1)))
+  (dir :field (byte 1 1) :reader regrm-direction-bit))
 
 ;;; Same as reg-reg/mem, but uses the reg field as a second op code.
 (define-instruction-format (reg/mem 16
@@ -1143,7 +1143,7 @@
                                   sb-vm::+byte-register-names+)
                           t)
                          (gpr-id-size-class id)))
-                 #!+avx2
+                 #+avx2
                  ((is-avx2-id-p id)
                   #.(coerce (loop for i below 16 collect (format nil "YMM~D" i))
                             'vector))
@@ -1224,7 +1224,7 @@
                    operand)
                   ((eq (sb-name (sc-sb (tn-sc operand))) 'registers)
                    (tn-reg operand))
-                  #!+avx2
+                  #+avx2
                   ((memq (sc-name (tn-sc operand))
                          '(avx2-reg
                            int-avx2-reg
@@ -1382,7 +1382,7 @@
     (emit-byte segment #x66))
   (ecase lock
     ((nil))
-    (:lock (emit-byte segment #xf0))) ; even if #!-sb-thread
+    (:lock (emit-byte segment #xf0))) ; even if #-sb-thread
   (let ((ea-p (ea-p thing)))
     (emit-rex-if-needed segment
                         (eq operand-size :qword) ; REX.W
@@ -1543,7 +1543,7 @@
                   ((and (fixup-p src)
                         (member (fixup-flavor src)
                                 '(:named-call :static-call :assembly-routine
-                                  :layout :immobile-object :foreign)))
+                                  :layout :immobile-symbol :foreign)))
                    (emit-prefixes segment dst nil :dword)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
@@ -1578,7 +1578,7 @@
             ;; low enough addresses that this works.
             (aver (member (fixup-flavor src)
                           '(:foreign :foreign-dataref :symbol-tls-index
-                            :assembly-routine :layout :immobile-object)))
+                            :assembly-routine :layout :immobile-symbol)))
             (emit-prefixes segment dst nil size)
             (emit-byte segment #xC7)
             (emit-ea segment dst #b000)
@@ -1846,7 +1846,7 @@
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
-                      (memq (fixup-flavor src) '(:layout :immobile-object))))
+                      (memq (fixup-flavor src) '(:layout :immobile-symbol))))
              (emit-prefixes segment dst nil size :lock lockp)
              (cond ((accumulator-p dst)
                     (emit-byte segment
@@ -2399,17 +2399,17 @@
 ;;;; interrupt instructions
 
 (define-instruction break (segment &optional (code nil codep))
-  #!-ud2-breakpoints (:printer byte-imm ((op (or #!+int4-breakpoints #xCE #xCC)))
+  #-ud2-breakpoints (:printer byte-imm ((op (or #+int4-breakpoints #xCE #xCC)))
                                '(:name :tab code) :control #'break-control)
-  #!+ud2-breakpoints (:printer word-imm ((op #x0B0F))
+  #+ud2-breakpoints (:printer word-imm ((op #x0B0F))
                                '(:name :tab code) :control #'break-control)
   (:emitter
-   #!-ud2-breakpoints (emit-byte segment (or #!+int4-breakpoints #xCE #xCC))
+   #-ud2-breakpoints (emit-byte segment (or #+int4-breakpoints #xCE #xCC))
    ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
    ;; throw a sigill with 0x0b0f instead and check for this in the
    ;; SIGILL handler and pass it on to the sigtrap handler if
    ;; appropriate
-   #!+ud2-breakpoints (emit-word segment #x0B0F)
+   #+ud2-breakpoints (emit-word segment #x0B0F)
    (when codep (emit-byte segment (the (unsigned-byte 8) code)))))
 
 (define-instruction int (segment number)
@@ -2487,11 +2487,7 @@
 
 (define-instruction simple-fun-header-word (segment)
   (:emitter
-   (emit-header-data segment
-                     (logior simple-fun-widetag
-                             #!+(and compact-instance-header (host-feature sb-xc-host))
-                             (ash function-layout 32)))))
-
+   (emit-header-data segment simple-fun-widetag)))
 
 ;;;; Instructions required to do floating point operations using SSE
 
@@ -3010,7 +3006,6 @@
   (define-insert-sse-instruction pinsrb #x66 #x3a #x20)
   (define-insert-sse-instruction pinsrw #x66 #xc4 nil)
   (define-insert-sse-instruction pinsrd #x66 #x3a #x22)
-  (define-insert-sse-instruction insertps #x66 #x3a #x21)
 
   (define-extract-sse-instruction pextrb #x66 #x3a #x14)
   (define-extract-sse-instruction pextrd #x66 #x3a #x16)
@@ -3183,6 +3178,8 @@
   (regular-2byte-sse-inst-imm pcmpestri #x66 #x3a #x61)
   (regular-2byte-sse-inst-imm pcmpistrm #x66 #x3a #x62)
   (regular-2byte-sse-inst-imm pcmpistri #x66 #x3a #x63)
+
+  (regular-2byte-sse-inst-imm insertps #x66 #x3a #x21)
 
   (regular-2byte-sse-inst-imm aeskeygenassist #x66 #x3a #xdf))
 
@@ -3379,12 +3376,12 @@
         (setf constant (list :complex-single-float first)))
        ((complex double-float)
         (setf constant (list :complex-double-float first)))
-       #!+sb-simd-pack
+       #+sb-simd-pack
        (simd-pack
         (setq constant
               (list :sse (logior (%simd-pack-low first)
                                  (ash (%simd-pack-high first) 64)))))
-       #!+sb-simd-pack-256
+       #+sb-simd-pack-256
        (simd-pack-256
         (setq constant
               (list :avx2 (logior (%simd-pack-256-0 first)
@@ -3397,7 +3394,7 @@
        (aver (integerp value))
        (cons type value))
       ((:base-char)
-       #!+sb-unicode (aver (typep value 'base-char))
+       #+sb-unicode (aver (typep value 'base-char))
        (cons :byte (char-code value)))
       ((:character)
        (aver (characterp value))
@@ -3426,10 +3423,8 @@
       ((:complex-double-float)
        (aver (typep value '(complex double-float)))
        (cons :oword
-             (ldb (byte 128 0)
-                  (logior (ash (double-float-bits (imagpart value)) 64)
-                          (ldb (byte 64 0)
-                               (double-float-bits (realpart value))))))))))
+             (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
+                     (ldb (byte 64 0) (double-float-bits (realpart value)))))))))
 
 (defun inline-constant-value (constant)
   (declare (ignore constant)) ; weird!

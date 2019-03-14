@@ -19,13 +19,6 @@ set -e
 
 print_help="no"
 
-# The classic form here was to use --userinit $DEVNULL --sysinit
-# $DEVNULL, but that doesn't work on Win32 because SBCL doesn't handle
-# device names properly. We still need $DEVNULL to be NUL on Win32
-# because it's used elsewhere (such as canonicalize-whitespace), so we
-# need an alternate solution for the init file overrides. --no-foos
-# have now been available long enough that this should not stop anyone
-# from building.
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ]
 then
     SBCL_PREFIX="$PROGRAMFILES/sbcl"
@@ -250,13 +243,6 @@ echo "$SBCL_DYNAMIC_SPACE_SIZE" > output/dynamic-space-size.txt
 # whether the cross-compilation host returns suitable values from
 # UPGRADED-ARRAY-ELEMENT-TYPE?)
 
-if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
-    DEVNULL=NUL
-else
-    DEVNULL=/dev/null
-fi
-export DEVNULL
-
 . ./find-gnumake.sh
 find_gnumake
 
@@ -266,7 +252,6 @@ find_gnumake
 # dependencies, write them out to a file to be sourced by other
 # scripts.
 
-echo "DEVNULL=\"$DEVNULL\"; export DEVNULL" > output/build-config
 echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
 echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
 echo "legacy_xc_spec=\"$legacy_xc_spec\"; export legacy_xc_spec" >> output/build-config
@@ -576,10 +561,10 @@ case "$sbcl_os" in
         printf ' :bsd' >> $ltf
         printf ' :darwin' >> $ltf
         if [ $sbcl_arch = "x86" ]; then
-            printf ' :mach-exception-handler :restore-fs-segment-register-from-tls :ud2-breakpoints' >> $ltf
+            printf ' :mach-exception-handler :restore-fs-segment-register-from-tls' >> $ltf
         fi
         if [ $sbcl_arch = "x86-64" ]; then
-            printf ' :mach-exception-handler :ud2-breakpoints' >> $ltf
+            printf ' :mach-exception-handler' >> $ltf
             darwin_version=`uname -r`
             darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
     
@@ -642,7 +627,7 @@ cd "$original_dir"
 # *derived-target-features* or equivalent, so that there was a nicer
 # way to specify them then sprinkling them in this file. They should
 # still be tweakable by advanced users, though, but probably not
-# appear in *features* of target. #!+/- should be adjusted to take
+# appear in *features* of target. #+/- should be adjusted to take
 # them in account as well. At minimum the nicer specification stuff,
 # though:
 #
@@ -687,7 +672,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
-    printf ' :float-eql-vops :integer-eql-vop' >> $ltf
+    printf ' :integer-eql-vop' >> $ltf
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf
     printf ' :undefined-fun-restarts :call-symbol' >> $ltf
     case "$sbcl_os" in

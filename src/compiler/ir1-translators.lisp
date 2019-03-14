@@ -116,6 +116,7 @@ RETURN-FROM can be used to exit the form."
     (let* ((env-entry (list entry next result))
            (*lexenv* (make-lexenv :blocks (list (cons name env-entry))
                                   :cleanup cleanup)))
+      (push env-entry (ctran-entries next))
       (ir1-convert-progn-body dummy next result forms))))
 
 (def-ir1-translator return-from ((name &optional value) start next result)
@@ -327,6 +328,12 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
             (fail "The local macro argument list ~S is not a list."
                   arglist))
           `(,name macro .
+                  ;; I guess the reason we want to compile here rather than possibly
+                  ;; using an interpreted lambda is that we generate the usual gamut
+                  ;; of style-warnings and such. One might wonder if this could somehow
+                  ;; go through the front-most part of the front-end, to deal with
+                  ;; semantics, but then generate an interpreted function or something
+                  ;; more quick to emit than machine code.
                   ,(compile-in-lexenv
                     (let (#-sb-xc-host
                           (*macro-policy*
@@ -337,7 +344,8 @@ Evaluate the FORMS in the specified SITUATIONS (any of :COMPILE-TOPLEVEL,
                              '(optimize (store-source-form 3))
                              *macro-policy*)))
                       (make-macro-lambda nil arglist body 'macrolet name))
-                    lexenv)))))))
+                    lexenv
+                    nil nil nil t nil))))))) ; name source-info tlf ephemeral errorp
 
 (defun funcall-in-macrolet-lexenv (definitions fun context)
   (%funcall-in-foomacrolet-lexenv
@@ -520,7 +528,7 @@ Return VALUE without evaluating it."
                                 (and name
                                      ;; KLUDGE: High debug adds this block on
                                      ;; some platforms.
-                                     #!-unwind-to-frame-and-call-vop
+                                     #-unwind-to-frame-and-call-vop
                                      (neq 'return-value-tag name)
                                      ;; KLUDGE: CATCH produces blocks whose
                                      ;; cleanup is :CATCH.
@@ -630,7 +638,7 @@ be a lambda expression."
              (leaf-has-source-name-p (setf leaf (ref-leaf uses)))
              (symbolp (setf name (leaf-source-name leaf)))
              ;; assume users don't hand-write gensyms
-             (symbol-package name)
+             (cl:symbol-package name)
              name)
         fallback)))
 
@@ -658,7 +666,8 @@ be a lambda expression."
 (def-ir1-translator %funcall ((function &rest args) start next result)
   ;; MACROEXPAND so that (LAMBDA ...) forms arriving here don't get an
   ;; extra cast inserted for them.
-  (let ((function (%macroexpand function *lexenv*)))
+  (let ((function (handler-case (%macroexpand function *lexenv*)
+                    (error () function))))
     (if (typep function '(cons (member function global-function) (cons t null)))
         (with-fun-name-leaf (leaf (cadr function) start
                                   :global-function (eq (car function)
@@ -748,7 +757,7 @@ have been evaluated."
          (ir1-translate-locally body start next result))
         ;; This is just to avoid leaking non-standard special forms
         ;; into macroexpanded code
-        #!-c-stack-is-control-stack
+        #-c-stack-is-control-stack
         ((and (equal bindings '((*alien-stack-pointer* *alien-stack-pointer*))))
          (ir1-convert start next result
                       (let ((nsp (gensym "NSP")))
@@ -880,7 +889,8 @@ lexically apparent function definition in the enclosing environment."
                                  :source-name name
                                  :maybe-add-debug-catch t
                                  :debug-name
-                                 (let ((n (if (and (symbolp name) (not (symbol-package name)))
+                                 (let ((n (if (and (symbolp name)
+                                                   (not (cl:symbol-package name)))
                                               (string name)
                                               name)))
                                    (debug-name 'flet n t)))))
@@ -1014,17 +1024,39 @@ care."
 
 ;;; THE with some options for the CAST
 (def-ir1-translator the* (((value-type &key context silent-conflict
+                                       derive-type-only
                                        truly) form)
                           start next result)
-  (let* ((policy (lexenv-policy *lexenv*))
-         (value-type (values-specifier-type value-type))
-         (cast (the-in-policy value-type form (if truly
-                                                  **zero-typecheck-policy**
-                                                  policy)
-                              start next result)))
-    (when cast
-      (setf (cast-context cast) context)
-      (setf (cast-silent-conflict cast) silent-conflict))))
+  (let ((value-type (values-specifier-type value-type)))
+    (cond (derive-type-only
+           ;; For something where we really know the type and need no mismatch checking,
+           ;; e.g. structure accessors
+           (let ((before-uses (and result
+                                   (lvar-uses result))))
+             (ir1-convert start next result form)
+             (when result
+               ;; Would be great for IR1-CONVERT to return the uses it creates
+               (let ((new-uses (lvar-uses result)))
+                 (derive-node-type (cond ((consp new-uses)
+                                          ;; Handle just a single use for now,
+                                          ;; doubt it'll be useful for multiple uses.
+                                          (aver (= (1- (length new-uses))
+                                                   (if (consp before-uses)
+                                                       (length before-uses)
+                                                       1)))
+                                          (car new-uses))
+                                         (t
+                                          new-uses))
+                                   value-type)))))
+          (t
+           (let* ((policy (lexenv-policy *lexenv*))
+                  (cast (the-in-policy value-type form (if truly
+                                                           **zero-typecheck-policy**
+                                                           policy)
+                                       start next result)))
+             (when cast
+               (setf (cast-context cast) context)
+               (setf (cast-silent-conflict cast) silent-conflict)))))))
 
 (def-ir1-translator with-annotations ((annotations form)
                                       start next result)
@@ -1232,7 +1264,7 @@ the thrown values will be returned."
 ;;; The LET is needed because the cleanup can be emitted multiple
 ;;; times, but there's no reference to NSP before EMIT-CLEANUPS.
 ;;; Passing NSP to the dummy %CLEANUP-FUN keeps it alive.
-#!-c-stack-is-control-stack
+#-c-stack-is-control-stack
 (def-ir1-translator restoring-nsp
     ((nsp &body body) start next result)
   (let ((cleanup (make-cleanup :kind :restore-nsp))

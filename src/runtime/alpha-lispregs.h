@@ -11,7 +11,7 @@
 
 #define NREGS   (32)
 
-#ifdef LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLER__
 #ifdef linux
 #define REG(num) $##num
 #else

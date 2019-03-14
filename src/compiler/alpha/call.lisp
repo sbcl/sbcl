@@ -601,7 +601,7 @@ default-value-8
             ,@(when (eq return :fixed) '(nvals))
             step-instrumenting)
 
-     (:ignore #!+gengc ,@(unless (eq return :tail) '(return-pc-pass))
+     (:ignore #+gengc ,@(unless (eq return :tail) '(return-pc-pass))
               ,@(unless (or variable (eq return :tail)) '(arg-locs))
               ,@(unless variable '(args))
               ;; Step instrumentation for full calls not implemented yet.
@@ -616,7 +616,7 @@ default-value-8
                  ocfp-pass)
 
      (:temporary (:sc descriptor-reg
-                  :offset #!-gengc lra-offset #!+gengc ra-offset
+                  :offset #-gengc lra-offset #+gengc ra-offset
                   :from (:argument ,(if (eq return :tail) 2 1))
                   :to :eval)
                  return-pc-pass)
@@ -632,7 +632,7 @@ default-value-8
                          :from (:argument ,(if (eq return :tail) 0 1))
                          :to :eval)
                         lexenv)
-            #!-gengc
+            #-gengc
             (:temporary (:scs (descriptor-reg) :from (:argument 0) :to :eval)
                         function))))
 
@@ -674,7 +674,7 @@ default-value-8
                                        :load-return-pc)
                                      (when cur-nfp
                                        :frob-nfp))
-                                   '(#!-gengc
+                                   '(#-gengc
                                      :comp-lra
                                      (when cur-nfp
                                        :frob-nfp)
@@ -707,7 +707,7 @@ default-value-8
                                         cfp-tn))))
                               (:load-return-pc
                                (sc-case return-pc
-                                 (#!-gengc descriptor-reg #!+gengc any-reg
+                                 (#-gengc descriptor-reg #+gengc any-reg
                                   (inst move return-pc return-pc-pass))
                                  (control-stack
                                   (inst ldl return-pc-pass
@@ -718,7 +718,7 @@ default-value-8
                                (inst lda nsp-tn
                                      (bytes-needed-for-non-descriptor-stack-frame)
                                      cur-nfp)))
-                            `(#!-gengc
+                            `(#-gengc
                               (:comp-lra
                                (inst compute-lra-from-code
                                      return-pc-pass code-tn lra-label temp))
@@ -762,21 +762,21 @@ default-value-8
                            (- (ash (tn-offset arg-fun) word-shift)
                               other-pointer-lowtag) code-tn)
                      (do-next-filler)))
-                  #!-gengc
+                  #-gengc
                   (inst ldl function
                         (- (ash closure-fun-slot word-shift)
                            fun-pointer-lowtag) lexenv)
-                  #!-gengc
+                  #-gengc
                   (do-next-filler)
-                  #!-gengc
+                  #-gengc
                   (inst addq function
                         (- (ash simple-fun-code-offset word-shift)
                            fun-pointer-lowtag) entry-point)
-                  #!+gengc
+                  #+gengc
                   (inst ldl entry-point
                         (- (ash closure-entry-point-slot word-shift)
                            fun-pointer-lowtag) lexenv)
-                  #!+gengc
+                  #+gengc
                   (do-next-filler)))
                (:direct
                 `((inst ldl entry-point (static-fun-offset fun) null-tn))))
@@ -823,12 +823,12 @@ default-value-8
    (args-arg :scs (any-reg) :target args)
    (function-arg :scs (descriptor-reg) :target lexenv)
    (ocfp-arg :scs (any-reg) :target ocfp)
-   (lra-arg :scs (#!-gengc descriptor-reg #!+gengc any-reg) :target lra))
+   (lra-arg :scs (#-gengc descriptor-reg #+gengc any-reg) :target lra))
 
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 0)) args)
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) ocfp)
-  (:temporary (:sc any-reg :offset #!-gengc lra-offset #!+gengc ra-offset
+  (:temporary (:sc any-reg :offset #-gengc lra-offset #+gengc ra-offset
                    :from (:argument 3)) lra)
   (:temporary (:scs (non-descriptor-reg)) temp)
 
@@ -857,13 +857,13 @@ default-value-8
 ;;; Return a single value using the unknown-values convention.
 (define-vop (return-single)
   (:args (ocfp :scs (any-reg))
-         #!-gengc (return-pc :scs (descriptor-reg))
-         #!+gengc (return-pc :scs (any-reg) :target ra)
+         #-gengc (return-pc :scs (descriptor-reg))
+         #+gengc (return-pc :scs (any-reg) :target ra)
          (value))
   (:ignore value)
-  #!-gengc (:temporary (:scs (interior-reg)) lip)
-  #!+gengc (:temporary (:sc any-reg :offset ra-offset :from (:argument 1)) ra)
-  #!+gengc (:temporary (:scs (any-reg) :from (:argument 1)) temp)
+  #-gengc (:temporary (:scs (interior-reg)) lip)
+  #+gengc (:temporary (:sc any-reg :offset ra-offset :from (:argument 1)) ra)
+  #+gengc (:temporary (:scs (any-reg) :from (:argument 1)) temp)
   (:vop-var vop)
   (:generator 6
     ;; Clear the number stack.
@@ -875,8 +875,8 @@ default-value-8
     (move cfp-tn csp-tn)
     (move ocfp cfp-tn)
     ;; Out of here.
-    #!-gengc (lisp-return return-pc lip :offset 2)
-    #!+gengc
+    #-gengc (lisp-return return-pc lip :offset 2)
+    #+gengc
     (progn
       (inst addq return-pc (* 2 n-word-bytes) temp)
       (unless (location= ra return-pc)
@@ -897,9 +897,9 @@ default-value-8
 ;;; values block (which is the beginning of the current frame.)
 (define-vop (return)
   (:args (ocfp :scs (any-reg))
-         (return-pc :scs (#!-gengc descriptor-reg #!+gengc any-reg)
+         (return-pc :scs (#-gengc descriptor-reg #+gengc any-reg)
                     :to (:eval 1)
-                    #!+gengc :target #!+gengc ra)
+                    #+gengc :target #+gengc ra)
          (values :more t))
   (:ignore values)
   (:info nvals)
@@ -911,8 +911,8 @@ default-value-8
   (:temporary (:sc descriptor-reg :offset a5-offset :from (:eval 0)) a5)
   (:temporary (:sc any-reg :offset nargs-offset) nargs)
   (:temporary (:sc any-reg :offset ocfp-offset) val-ptr)
-  #!-gengc (:temporary (:scs (interior-reg)) lip)
-  #!+gengc (:temporary (:sc any-reg :offset ra-offset :from (:eval 1)) ra)
+  #-gengc (:temporary (:scs (interior-reg)) lip)
+  #+gengc (:temporary (:sc any-reg :offset ra-offset :from (:eval 1)) ra)
   (:vop-var vop)
   (:generator 6
     ;; Clear the number stack.
@@ -946,22 +946,22 @@ default-value-8
 ;;; assembly-routine.
 (define-vop (return-multiple)
   (:args (ocfp-arg :scs (any-reg) :target ocfp)
-         #!-gengc (lra-arg :scs (descriptor-reg) :target lra)
-         #!+gengc (return-pc :scs (any-reg) :target ra)
+         #-gengc (lra-arg :scs (descriptor-reg) :target lra)
+         #+gengc (return-pc :scs (any-reg) :target ra)
          (vals-arg :scs (any-reg) :target vals)
          (nvals-arg :scs (any-reg) :target nvals))
 
   (:temporary (:sc any-reg :offset nl1-offset :from (:argument 0)) ocfp)
-  #!-gengc
+  #-gengc
   (:temporary (:sc descriptor-reg :offset lra-offset :from (:argument 1)) lra)
-  #!+gengc
+  #+gengc
   (:temporary (:sc any-reg :offset ra-offset :from (:argument 1)) ra)
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset a0-offset) a0)
   (:temporary (:scs (non-descriptor-reg)) temp)
-  #!-gengc (:temporary (:scs (interior-reg)) lip)
-  #!+gengc (:temporary (:scs (any-reg) :from (:argument 0)) temp)
+  #-gengc (:temporary (:scs (interior-reg)) lip)
+  #+gengc (:temporary (:scs (any-reg) :from (:argument 0)) temp)
 
   (:vop-var vop)
 

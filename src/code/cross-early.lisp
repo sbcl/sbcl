@@ -33,3 +33,10 @@
 (declaim (declaration explicit-check always-bound))
 
 (defgeneric sb-xc:make-load-form (obj &optional env))
+
+;;; There's no real reason that the cross-compiler shouldn't get the
+;;; same macro as the target for this, except that the host doesn't
+;;; compile 'cl-specials', and it's kind of unlikely that we'd have
+;;; our own sources not fail in make-host-1 using illegal designators.
+;;; As to make-host-2, well, it's not a user-facing problem.
+(defmacro check-designator (&rest junk) (declare (ignore junk)))

@@ -176,7 +176,7 @@
 
 (defun make-modular-fun-type-deriver (prototype kind width signedp)
   (declare (ignore kind))
-  #!-sb-fluid
+  #-sb-fluid
   (binding* ((info (info :function :info prototype) :exit-if-null)
              (fun (fun-info-derive-type info) :exit-if-null)
              (mask-type (specifier-type
@@ -189,7 +189,7 @@
         (when res
           (if (eq signedp nil)
               (logand-derive-type-aux res mask-type))))))
-  #!+sb-fluid
+  #+sb-fluid
   (lambda (call)
     (binding* ((info (info :function :info prototype) :exit-if-null)
                (fun (fun-info-derive-type info) :exit-if-null)

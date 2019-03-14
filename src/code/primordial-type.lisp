@@ -52,10 +52,10 @@
    ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
    (frob extended-sequence *extended-sequence-type*))
 
-;;; a vector that maps type codes to layouts, used for quickly finding
+;;; a vector that maps widetags to layouts, used for quickly finding
 ;;; the layouts of built-in classes
-(defglobal **built-in-class-codes** #()) ; initialized in cold load
-(declaim (type simple-vector **built-in-class-codes**))
+(defglobal **primitive-object-layouts** (make-array 256))
+(declaim (type simple-vector **primitive-object-layouts**))
 
 (!defun-from-collected-cold-init-forms !primordial-type-cold-init)
 
@@ -79,7 +79,6 @@
                        (:constructor %make-hairy-type (specifier))
                        (:constructor !make-interned-hairy-type
                            (specifier &aux (hash-value (interned-type-hash))))
-                       (:copier nil)
-                       #!+cmu (:pure nil))
+                       (:copier nil))
   ;; the Common Lisp type-specifier of the type we represent
   (specifier nil :type t :read-only t))

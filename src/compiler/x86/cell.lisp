@@ -78,7 +78,7 @@
          (old :scs (descriptor-reg any-reg) :target eax)
          (new :scs (descriptor-reg any-reg)))
   (:temporary (:sc descriptor-reg :offset eax-offset) eax)
-  #!+sb-thread
+  #+sb-thread
   (:temporary (:sc descriptor-reg) tls)
   (:results (result :scs (descriptor-reg any-reg)))
   (:policy :fast-safe)
@@ -90,7 +90,7 @@
     (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol))
           (check (gen-label)))
       (move eax old)
-      #!+sb-thread
+      #+sb-thread
       (progn
         (loadw tls symbol symbol-tls-index-slot other-pointer-lowtag)
         ;; Thread-local area, no LOCK needed.
@@ -129,7 +129,7 @@
       (inst cmp value unbound-marker-widetag)
       (inst jmp :e err-lab))))
 
-#!+sb-thread
+#+sb-thread
 (progn
   (define-vop (set)
     (:args (symbol :scs (descriptor-reg))
@@ -190,7 +190,7 @@
         (loadw value object symbol-value-slot other-pointer-lowtag)
         (emit-label ret-lab)))))
 
-#!-sb-thread
+#-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
     (:translate symeval))
@@ -198,7 +198,7 @@
     (:translate symeval))
   (define-vop (set %set-symbol-global-value)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (boundp)
   (:translate boundp)
   (:policy :fast-safe)
@@ -216,7 +216,7 @@
       (emit-label check-unbound-label)
       (inst cmp value unbound-marker-widetag))))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (boundp)
   (:translate boundp)
   (:policy :fast-safe)
@@ -296,14 +296,14 @@
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 ;;
-#!+sb-thread
+#+sb-thread
 (macrolet
     ((def (vopname symbol-arg info sc-offset load-tls-index)
        `(define-vop (,vopname)
           (:args (val :scs (any-reg descriptor-reg)) ,@symbol-arg)
           ,@info
           (:temporary (:sc unsigned-reg ,@sc-offset) tls-index)
-          (:temporary (:sc unsigned-reg) bsp #!+win32 temp)
+          (:temporary (:sc unsigned-reg) bsp #+win32 temp)
           (:generator 10 ; cost is irrelevant. we explicitly pick a vop
            (load-binding-stack-pointer bsp)
            ,@load-tls-index
@@ -311,12 +311,12 @@
            (store-binding-stack-pointer bsp)
      ;; with-tls-ea on win32 causes tls-index to be an absolute address
      ;; which is problematic when UNBIND uses with-tls-ea too.
-           #!+win32(move temp tls-index)
+           #+win32(move temp tls-index)
            (with-tls-ea (EA :base tls-index :base-already-live-p t)
             (inst push EA :maybe-fs)
             (popw bsp (- binding-value-slot binding-size))
-            (storew #!-win32 tls-index
-                    #!+win32 temp
+            (storew #-win32 tls-index
+                    #+win32 temp
                     bsp (- binding-symbol-slot binding-size))
             (inst mov EA val :maybe-fs))))))
   (def bind ; bind a known symbol
@@ -331,7 +331,7 @@
         (inst call (make-fixup 'alloc-tls-index :assembly-routine))
         TLS-INDEX-VALID)))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -345,7 +345,7 @@
     (storew symbol bsp (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (unbind)
   (:temporary (:sc unsigned-reg) temp bsp tls-index)
   (:generator 0
@@ -362,7 +362,7 @@
     (storew 0 bsp binding-value-slot)
     (store-binding-stack-pointer bsp)))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (unbind)
   (:temporary (:sc unsigned-reg) symbol value bsp)
   (:generator 0
@@ -393,8 +393,8 @@
     (inst cmp symbol unbound-marker-widetag)
     (inst jmp :eq skip)
     (loadw value bsp binding-value-slot)
-    #!-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
-    #!+sb-thread (with-tls-ea (EA :base symbol :base-already-live-p t)
+    #-sb-thread (storew value symbol symbol-value-slot other-pointer-lowtag)
+    #+sb-thread (with-tls-ea (EA :base symbol :base-already-live-p t)
                    (inst mov EA value :maybe-fs))
     (storew 0 bsp binding-symbol-slot)
 

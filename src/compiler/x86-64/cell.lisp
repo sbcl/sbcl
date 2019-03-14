@@ -65,7 +65,7 @@
   (:info name dx-p offset lowtag)
   (:generator 1
     (progn name dx-p)
-    (cond #!+compact-instance-header
+    (cond #+compact-instance-header
           ((and (eq name '%make-structure-instance) (eql offset :layout))
         ;; The layout is in the upper half of the header word.
            (inst mov :dword (ea (- 4 instance-pointer-lowtag) object)
@@ -173,7 +173,7 @@
            (new :scs (descriptor-reg any-reg)))
     (:temporary (:sc descriptor-reg :offset rax-offset
                  :from (:argument 1) :to (:result 0)) rax)
-    #!+sb-thread
+    #+sb-thread
     (:temporary (:sc descriptor-reg :to (:result 0)) cell)
     (:results (result :scs (descriptor-reg any-reg)))
     (:policy :fast-safe)
@@ -186,10 +186,10 @@
     ;; tls-index=0, because that would succeed, assigning NEW to each
     ;; symbol in existence having otherwise no thread-local value.
       (let ((unbound (generate-error-code vop 'unbound-symbol-error symbol)))
-        #!+sb-thread (progn (compute-virtual-symbol)
+        #+sb-thread (progn (compute-virtual-symbol)
                             (move rax old)
                             (inst cmpxchg (symbol-value-slot-ea cell) new :lock))
-        #!-sb-thread (progn (move rax old)
+        #-sb-thread (progn (move rax old)
                             ;; is the :LOCK is necessary?
                             (inst cmpxchg (symbol-value-slot-ea symbol) new :lock))
         (inst cmp :dword rax unbound-marker-widetag)
@@ -214,7 +214,7 @@
             new :lock)
       (move result rax)))
 
-  #!+sb-thread
+  #+sb-thread
   (progn
     ;; TODO: SET could be shorter for any known wired-tls symbol.
     (define-vop (set)
@@ -336,7 +336,7 @@
 
 ) ; END OF MACROLET
 
-#!-sb-thread
+#-sb-thread
 (progn
   (define-vop (symbol-value symbol-global-value)
     (:translate symeval))
@@ -388,7 +388,7 @@
       (inst jmp :e err-lab))
     RETRY))
 
-#!-immobile-code
+#-immobile-code
 (define-vop (set-fdefn-fun)
   (:policy :fast-safe)
   (:translate (setf fdefn-fun))
@@ -405,7 +405,7 @@
     (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result function)))
-#!+immobile-code
+#+immobile-code
 (define-vop (set-fdefn-fun)
   (:args (fdefn :scs (descriptor-reg))
          (function :scs (descriptor-reg))
@@ -426,9 +426,9 @@
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:results (result :scs (descriptor-reg)))
   (:vop-var vop)
-  #!+immobile-code (:temporary (:sc unsigned-reg) temp)
+  #+immobile-code (:temporary (:sc unsigned-reg) temp)
   (:generator 38
-    #!+immobile-code
+    #+immobile-code
     (let ((tramp (make-fixup 'undefined-fdefn :assembly-routine)))
      (if (sb-c::code-immobile-p vop)
          (inst lea temp (ea tramp rip-tn))
@@ -443,7 +443,7 @@
      ;; Store
      (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
      (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag))
-    #!-immobile-code
+    #-immobile-code
     (progn
      (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
      (storew (make-fixup 'undefined-tramp :assembly-routine)
@@ -457,7 +457,7 @@
 ;;; symbol.
 ;;; See the "Chapter 9: Specials" of the SBCL Internals Manual.
 
-#!+sb-thread
+#+sb-thread
 (progn
 (define-vop (dynbind) ; bind a symbol in a PROGV form
   (:args (val :scs (any-reg descriptor-reg))
@@ -502,7 +502,7 @@
       (inst mov :dword (ea (ash binding-symbol-slot word-shift) bsp) tls-index)
       (inst mov :qword tls-cell (encode-value-if-immediate val))))))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
@@ -516,7 +516,7 @@
     (storew symbol bsp (- binding-symbol-slot binding-size))
     (storew val symbol symbol-value-slot other-pointer-lowtag)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (unbind-n)
   (:temporary (:sc unsigned-reg) temp bsp)
   (:temporary (:sc complex-double-reg) zero)
@@ -537,7 +537,7 @@
           (inst movapd (ea bsp) zero))
     (store-binding-stack-pointer bsp)))
 
-#!-sb-thread
+#-sb-thread
 (define-vop (unbind)
   (:temporary (:sc unsigned-reg) symbol value bsp)
   (:generator 0
@@ -561,19 +561,19 @@
     (inst sub bsp (* binding-size n-word-bytes))
     ;; on sb-thread symbol is actually a tls-index, and it fits into
     ;; 32-bits.
-    #!+sb-thread
+    #+sb-thread
     (progn
       (inst mov :dword symbol (ea (* binding-symbol-slot n-word-bytes) bsp))
       (inst test :dword symbol symbol))
-    #!-sb-thread
+    #-sb-thread
     (progn
       (loadw symbol bsp binding-symbol-slot)
       (inst test symbol symbol))
     (inst jmp :z SKIP)
     (loadw value bsp binding-value-slot)
-    #!-sb-thread
+    #-sb-thread
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    #!+sb-thread
+    #+sb-thread
     (inst mov (thread-tls-ea symbol) value)
 
     SKIP
@@ -649,7 +649,7 @@
     (inst and :dword res short-header-max-words) ; clear special GC bit
     (inst shl :dword res n-fixnum-tag-bits)))
 
-#!+compact-instance-header
+#+compact-instance-header
 (progn
  (define-vop (%instance-layout)
    (:translate %instance-layout)
@@ -668,8 +668,15 @@
    (:results (res :scs (any-reg descriptor-reg)))
    (:variant-vars lowtag)
    (:variant instance-pointer-lowtag)
-   (:generator 2
-    (inst mov :dword (ea (- 4 lowtag) object) value)
+   (:vop-var vop)
+   (:generator 2 ; underestimates cost, but irrelevant as there's no choice
+    (cond ((= lowtag fun-pointer-lowtag)
+           (pseudo-atomic ()
+             (inst push object)
+             (invoke-asm-routine 'call 'touch-gc-card vop)
+             (inst mov :dword (ea (- 4 lowtag) object) value)))
+          (t
+           (inst mov :dword (ea (- 4 lowtag) object) value)))
     (move res value)))
  (define-vop (%funcallable-instance-layout %instance-layout)
    (:translate %funcallable-instance-layout)

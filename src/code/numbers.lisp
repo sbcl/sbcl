@@ -48,7 +48,7 @@
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
 (defconstant-eqx +type-test-ordering+
-  '(fixnum single-float double-float integer #!+long-float long-float
+  '(fixnum single-float double-float integer #+long-float long-float
     sb-vm:signed-word word bignum
     complex ratio)
   #'equal)
@@ -87,11 +87,11 @@
       (let ((var (first vars))
             (cases (sort cases #'type-test-order :key #'car)))
         (flet ((error-if-sub-or-supertype (type1 type2)
-                 (when (or (subtypep type1 type2)
-                           (subtypep type2 type1))
+                 (when (or (sb-xc:subtypep type1 type2)
+                           (sb-xc:subtypep type2 type1))
                    (error "Types not disjoint: ~S ~S." type1 type2)))
                (error-if-supertype (type1 type2)
-                 (when (subtypep type2 type1)
+                 (when (sb-xc:subtypep type2 type1)
                    (error "Type ~S ordered before subtype ~S."
                           type1 type2)))
                (test-type-pairs (fun)
@@ -130,6 +130,20 @@
 ;;; instantiated for every Each-Type. In the body of each case, any
 ;;; list of the form (DISPATCH-TYPE Var-Name) is substituted with the
 ;;; type of that var in that instance of the case.
+;;;
+;;; [Though it says "_any_ list", it's still an example of how not to perform
+;;; incomplete lexical analysis within a macro imho. Let's say that the body
+;;; code passes a lambda that happens name its args DISPATCH-TYPE and X.
+;;; What happens?
+;;; (macroexpand-1 '(number-dispatch ((x number))
+;;;                  ((float) (f x (lambda (dispatch-type x) (wat))))))
+;;; -> [stuff elided]
+;;;      (TYPECASE X (FLOAT (F X (LAMBDA FLOAT (WAT))))
+;;;
+;;; So the NUMBER-DISPATCH macro indeed substituted for *any* appearance
+;;; just like it says. I wonder if we could define DISPATCH-TYPE as macrolet
+;;; that expands to the type for the current branch, so that it _must_
+;;; be in a for-evaluation position; but maybe I'm missing something?]
 ;;;
 ;;; As an alternate to a case spec, there may be a form whose CAR is a
 ;;; symbol. In this case, we apply the CAR of the form to the CDR and
@@ -179,15 +193,15 @@
 (defun float-contagion (op x y &optional (rat-types '(fixnum bignum ratio)))
   `(((single-float single-float) (,op ,x ,y))
     (((foreach ,@rat-types)
-      (foreach single-float double-float #!+long-float long-float))
+      (foreach single-float double-float #+long-float long-float))
      (,op (coerce ,x '(dispatch-type ,y)) ,y))
-    (((foreach single-float double-float #!+long-float long-float)
+    (((foreach single-float double-float #+long-float long-float)
       (foreach ,@rat-types))
      (,op ,x (coerce ,y '(dispatch-type ,x))))
-    #!+long-float
+    #+long-float
     (((foreach single-float double-float long-float) long-float)
      (,op (coerce ,x 'long-float) ,y))
-    #!+long-float
+    #+long-float
     ((long-float (foreach single-float double-float))
      (,op ,x (coerce ,y 'long-float)))
     (((foreach single-float double-float) double-float)
@@ -212,11 +226,11 @@
 ;;; If IMAGPART is 0, return REALPART, otherwise make a complex. This is
 ;;; used when we know that REALPART and IMAGPART are the same type, but
 ;;; rational canonicalization might still need to be done.
-#!-sb-fluid (declaim (inline canonical-complex))
+#-sb-fluid (declaim (inline canonical-complex))
 (defun canonical-complex (realpart imagpart)
   (if (eql imagpart 0)
       realpart
-      (cond #!+long-float
+      (cond #+long-float
             ((and (typep realpart 'long-float)
                   (typep imagpart 'long-float))
              (truly-the (complex long-float) (complex realpart imagpart)))
@@ -232,7 +246,7 @@
 ;;; Given a numerator and denominator with the GCD already divided
 ;;; out, make a canonical rational. We make the denominator positive,
 ;;; and check whether it is 1.
-#!-sb-fluid (declaim (inline build-ratio))
+#-sb-fluid (declaim (inline build-ratio))
 (defun build-ratio (num den)
   (multiple-value-bind (num den)
       (if (minusp den)
@@ -247,7 +261,7 @@
       (t (%make-ratio num den)))))
 
 ;;; Truncate X and Y, but bum the case where Y is 1.
-#!-sb-fluid (declaim (inline maybe-truncate))
+#-sb-fluid (declaim (inline maybe-truncate))
 (defun maybe-truncate (x y)
   (if (eql y 1)
       x
@@ -259,7 +273,7 @@
   "Return a complex number with the specified real and imaginary components."
   (declare (explicit-check))
   (flet ((%%make-complex (realpart imagpart)
-           (cond #!+long-float
+           (cond #+long-float
                  ((and (typep realpart 'long-float)
                        (typep imagpart 'long-float))
                   (truly-the (complex long-float)
@@ -282,7 +296,7 @@
 (defun realpart (number)
   "Extract the real part of a number."
   (etypecase number
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (truly-the long-float (realpart number)))
     ((complex double-float)
@@ -297,7 +311,7 @@
 (defun imagpart (number)
   "Extract the imaginary part of a number."
   (etypecase number
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (truly-the long-float (imagpart number)))
     ((complex double-float)
@@ -406,7 +420,7 @@
         (canonical-complex (,op (realpart x) (realpart y))
                            (,op (imagpart x) (imagpart y))))
        (((foreach bignum fixnum ratio single-float double-float
-                  #!+long-float long-float) complex)
+                  #+long-float long-float) complex)
         (complex (,op x (realpart y)) (,op 0 (imagpart y))))
        ((complex (or rational float))
         (complex (,op (realpart x) y) (,op (imagpart x) 0)))
@@ -471,7 +485,7 @@
               (iy (imagpart y)))
          (canonical-complex (- (* rx ry) (* ix iy)) (+ (* rx iy) (* ix ry)))))
       (((foreach bignum fixnum ratio single-float double-float
-                 #!+long-float long-float)
+                 #+long-float long-float)
         complex)
        (complex*real y x))
       ((complex (or rational float))
@@ -575,7 +589,7 @@
 (defun %negate (n)
   (declare (explicit-check))
   (number-dispatch ((n number))
-    (((foreach fixnum single-float double-float #!+long-float long-float))
+    (((foreach fixnum single-float double-float #+long-float long-float))
      (%negate n))
     ((bignum)
      (negate-bignum n))
@@ -616,16 +630,16 @@
       ((bignum bignum)
        (bignum-truncate number divisor))
 
-      (((foreach single-float double-float #!+long-float long-float)
+      (((foreach single-float double-float #+long-float long-float)
         (or rational single-float))
        (if (eql divisor 1)
            (let ((res (%unary-truncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
            (truncate-float (dispatch-type number))))
-      #!+long-float
+      #+long-float
       ((long-float (or single-float double-float long-float))
        (truncate-float long-float))
-      #!+long-float
+      #+long-float
       (((foreach double-float single-float) long-float)
        (truncate-float long-float))
       ((double-float (or single-float double-float))
@@ -633,7 +647,7 @@
       ((single-float double-float)
        (truncate-float double-float))
       (((foreach fixnum bignum ratio)
-        (foreach single-float double-float #!+long-float long-float))
+        (foreach single-float double-float #+long-float long-float))
        (truncate-float (dispatch-type divisor))))))
 
 (defun %multiply-high (x y)
@@ -695,7 +709,7 @@
 ;;; ROUND and FROUND are not declared inline since they seem too
 ;;; obscure and too big to inline-expand by default. Also, this gives
 ;;; the compiler a chance to pick off the unary float case.
-#!-sb-fluid (declaim (inline fceiling ffloor ftruncate))
+#-sb-fluid (declaim (inline fceiling ffloor ftruncate))
 (defun ftruncate (number &optional (divisor 1))
   "Same as TRUNCATE, but returns first value as a float."
   (declare (explicit-check))
@@ -710,16 +724,16 @@
        (multiple-value-bind (q r)
            (truncate number divisor)
          (values (float q) r)))
-      (((foreach single-float double-float #!+long-float long-float)
+      (((foreach single-float double-float #+long-float long-float)
         (or rational single-float))
        (if (eql divisor 1)
            (let ((res (%unary-ftruncate number)))
              (values res (- number (coerce res '(dispatch-type number)))))
            (ftruncate-float (dispatch-type number))))
-      #!+long-float
+      #+long-float
       ((long-float (or single-float double-float long-float))
        (ftruncate-float long-float))
-      #!+long-float
+      #+long-float
       (((foreach double-float single-float) long-float)
        (ftruncate-float long-float))
       ((double-float (or single-float double-float))
@@ -727,7 +741,7 @@
       ((single-float double-float)
        (ftruncate-float double-float))
       (((foreach fixnum bignum ratio)
-        (foreach single-float double-float #!+long-float long-float))
+        (foreach single-float double-float #+long-float long-float))
        (ftruncate-float (dispatch-type divisor))))))
 
 (defun ffloor (number &optional (divisor 1))
@@ -865,10 +879,10 @@ the first."
   (defun basic-compare (op &key infinite-x-finite-y infinite-y-finite-x)
     `(((fixnum fixnum) (,op x y))
       ((single-float single-float) (,op x y))
-      #!+long-float
+      #+long-float
       (((foreach single-float double-float long-float) long-float)
        (,op (coerce x 'long-float) y))
-      #!+long-float
+      #+long-float
       ((long-float (foreach single-float double-float))
        (,op x (coerce y 'long-float)))
       ((fixnum (foreach single-float double-float))
@@ -890,7 +904,7 @@ the first."
        (,op (coerce x 'double-float) y))
       ((double-float single-float)
        (,op x (coerce y 'double-float)))
-      (((foreach single-float double-float #!+long-float long-float) rational)
+      (((foreach single-float double-float #+long-float long-float) rational)
        (if (eql y 0)
            (,op x (coerce 0 '(dispatch-type x)))
            (if (float-infinity-p x)
@@ -961,7 +975,7 @@ the first."
      (and (= (realpart x) (realpart y))
           (= (imagpart x) (imagpart y))))
     (((foreach fixnum bignum ratio single-float double-float
-               #!+long-float long-float) complex)
+               #+long-float long-float) complex)
      (and (= x (realpart y))
           (zerop (imagpart y))))
     ((complex (or float rational))
@@ -1034,7 +1048,7 @@ and the number of 0 bits if INTEGER is negative."
   (declare (explicit-check))
   (etypecase integer
     (fixnum
-     (logcount #!-x86-64
+     (logcount #-x86-64
                (truly-the (integer 0
                                    #.(max sb-xc:most-positive-fixnum
                                           (lognot sb-xc:most-negative-fixnum)))
@@ -1042,7 +1056,7 @@ and the number of 0 bits if INTEGER is negative."
                               (lognot (truly-the fixnum integer))
                               integer))
                ;; The VOP handles that case better
-               #!+x86-64 integer))
+               #+x86-64 integer))
     (bignum
      (bignum-logcount integer))))
 
@@ -1439,13 +1453,13 @@ and the number of 0 bits if INTEGER is negative."
 ;;; arithmetic, as that is only (currently) defined for constant
 ;;; shifts.  See also the comment in (LOGAND OPTIMIZER) for more
 ;;; discussion of this hack.  -- CSR, 2003-10-09
-#!-64-bit-registers
+#-64-bit-registers
 (defun sb-vm::ash-left-mod32 (integer amount)
   (etypecase integer
     ((unsigned-byte 32) (ldb (byte 32 0) (ash integer amount)))
     (fixnum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))
     (bignum (ldb (byte 32 0) (ash (logand integer #xffffffff) amount)))))
-#!+64-bit-registers
+#+64-bit-registers
 (defun sb-vm::ash-left-mod64 (integer amount)
   (etypecase integer
     ((unsigned-byte 64) (ldb (byte 64 0) (ash integer amount)))
@@ -1453,7 +1467,7 @@ and the number of 0 bits if INTEGER is negative."
     (bignum (ldb (byte 64 0)
                  (ash (logand integer #xffffffffffffffff) amount)))))
 
-#!+(or x86 x86-64 arm arm64)
+#+(or x86 x86-64 arm arm64)
 (defun sb-vm::ash-left-modfx (integer amount)
   (let ((fixnum-width (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits)))
     (etypecase integer

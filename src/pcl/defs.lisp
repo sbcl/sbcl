@@ -61,27 +61,6 @@
       class))
 
 ;;; interface
-(defun specializer-from-type (type &aux args)
-  ;; Avoid style-warning about compiler-macro being unavailable.
-  (declare (notinline make-instance))
-  (when (symbolp type)
-    (return-from specializer-from-type (find-class type)))
-  (when (consp type)
-    (setq args (cdr type) type (car type)))
-  (cond ((symbolp type)
-         (or (ecase type
-               (class    (coerce-to-class (car args)))
-               (prototype (make-instance 'class-prototype-specializer
-                                         :object (coerce-to-class (car args))))
-               (class-eq (class-eq-specializer (coerce-to-class (car args))))
-               (eql      (intern-eql-specializer (car args))))))
-        ;; FIXME: do we still need this?
-        ((and (null args) (typep type 'classoid))
-         (or (classoid-pcl-class type)
-             (ensure-non-standard-class (classoid-name type) type)))
-        ((specializerp type) type)))
-
-;;; interface
 (defun type-from-specializer (specl)
   (cond ((eq specl t)
          t)
@@ -180,7 +159,7 @@
                          (convert-to-system-type type2))))))))
 
 (defun make-class-symbol (class-name)
-  (format-symbol (load-time-value (find-package "SB-PCL") t)
+  (format-symbol #.(find-package "SB-PCL")
                  "*THE-CLASS-~A*" (symbol-name class-name)))
 
 (defvar *standard-method-combination*)
@@ -198,7 +177,7 @@
 
 ;;;; built-in classes
 
-;;; Grovel over SB-KERNEL::*!BUILT-IN-CLASSES* in order to set
+;;; Grovel over SB-KERNEL::+!BUILT-IN-CLASSES+ in order to set
 ;;; SB-PCL:*BUILT-IN-CLASSES*.
 (/show "about to set up SB-PCL::*BUILT-IN-CLASSES*")
 (define-load-time-global *built-in-classes*
@@ -253,7 +232,7 @@
                                  ;; BUILT-IN-CLASS list
                                  '(t function stream sequence
                                      file-stream string-stream)))
-                       sb-kernel::*!built-in-classes*))))
+                       sb-kernel::+!built-in-classes+))))
 (/noshow "done setting up SB-PCL::*BUILT-IN-CLASSES*")
 
 ;;;; the classes that define the kernel of the metabraid

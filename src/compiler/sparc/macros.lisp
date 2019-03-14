@@ -140,7 +140,7 @@
 ;;;; applied.  The amount of space to be allocated is SIZE bytes (which
 ;;;; must be a multiple of the lisp object size).
 (defmacro allocation (result-tn size lowtag &key stack-p temp-tn)
-  #!+gencgc
+  #+gencgc
   ;; A temp register is needed to do inline allocation.  TEMP-TN, in
   ;; this case, can be any register, since it holds a double-word
   ;; aligned address (essentially a fixnum).
@@ -177,7 +177,7 @@
       ;; Need to rearrange this code.
       (inst add csp-tn ,size))
 
-     #!-gencgc
+     #-gencgc
      ;; Normal allocation to the heap -- cheneygc version.
      ;;
      ;; On cheneygc, the alloc-tn currently has the pseudo-atomic bit.
@@ -190,7 +190,7 @@
      ;;
      ;; Otherwise, we need to zap out the lowtag from alloc-tn, and then
      ;; or in the lowtag.
-     #!-gencgc
+     #-gencgc
      (t
       (inst andn ,result-tn alloc-tn lowtag-mask)
       (inst or ,result-tn ,lowtag)
@@ -201,7 +201,7 @@
      ;; No need to worry about lowtag bits matching up here, since
      ;; alloc-tn is just a "pseudo-atomic-bit-tn" now and we don't read
      ;; it.
-     #!+gencgc
+     #+gencgc
      (t
       (inst li ,temp-tn (make-fixup "gc_alloc_region" :foreign))
       (loadw ,result-tn ,temp-tn 0)     ;boxed_region.free_pointer

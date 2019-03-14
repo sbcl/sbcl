@@ -185,7 +185,7 @@
 ;;;; We do some checking of the consistency of the VM definition at
 ;;;; load time.
 
-;;; FIXME: should probably be conditional on #!+SB-SHOW
+;;; FIXME: should probably be conditional on #+SB-SHOW
 (defun check-move-fun-consistency ()
   (dotimes (i sb-vm:sc-number-limit)
     (let ((sc (svref *backend-sc-numbers* i)))
@@ -292,7 +292,7 @@
                             t)
 
 
-  (let ((min most-positive-fixnum)
+  (let ((min sb-xc:most-positive-fixnum)
         (min-scn nil)
         (unique nil))
     (dolist (scn scs)
@@ -303,7 +303,7 @@
                (setq min cost)
                (setq min-scn scn)
                (setq unique t)))))
-    (values (svref *backend-sc-numbers* min-scn) unique)))
+    (values min-scn unique)))
 
 ;;; Prepare for the possibility of a TN being allocated on the number
 ;;; stack by setting NUMBER-STACK-P in all functions that TN is
@@ -641,7 +641,7 @@
 ;;; If TN is in a number stack SC, make all the right annotations.
 ;;; Note that this should be called after TN has been referenced,
 ;;; since it must iterate over the referencing environments.
-#!-sb-fluid (declaim (inline note-if-number-stack))
+#-sb-fluid (declaim (inline note-if-number-stack))
 (defun note-if-number-stack (tn 2comp restricted)
   (declare (type tn tn) (type ir2-component 2comp))
   (when (if restricted
@@ -665,41 +665,44 @@
 (defun select-representations (component)
   (let ((costs (make-array sb-vm:sc-number-limit))
         (2comp (component-info component)))
-    (labels ((assign-constant-offset (tn)
-               (when (sc-is tn constant)
-                 (setf (tn-offset tn)
-                       (or (position (tn-leaf tn)
-                                     (ir2-component-constants 2comp))
-                           (vector-push-extend (tn-leaf tn)
-                                               (ir2-component-constants 2comp))))))
+    (labels ((set-sc (tn sc)
+               (cond ((not (eq (tn-kind tn) :constant))
+                      (setf (tn-sc tn)
+                            (svref *backend-sc-numbers* sc)))
+                     ;; Translate primitive type scs into constant scs
+                     ((= sc sb-vm::descriptor-reg-sc-number)
+                      (setf (tn-sc tn)
+                            (svref *backend-sc-numbers* sb-vm:constant-sc-number)
+                            (tn-offset tn)
+                            (or (position (tn-leaf tn)
+                                          (ir2-component-constants 2comp))
+                                (vector-push-extend (tn-leaf tn)
+                                                    (ir2-component-constants 2comp)))))
+                     (t
+                      (setf (tn-sc tn)
+                            (svref *backend-sc-numbers*
+                                   (immediate-constant-sc (constant-value (tn-leaf tn))))))))
              (possible-scs (tn)
-               (if (eq (tn-kind tn) :constant)
-                   (list sb-vm:constant-sc-number
-                         (immediate-constant-sc (constant-value (tn-leaf tn))))
-                   (primitive-type-scs (tn-primitive-type tn))))
+               (primitive-type-scs (tn-primitive-type tn)))
              (pass (tn &key unique)
                (do ((tn tn (tn-next tn)))
                    ((null tn))
                  (aver (tn-primitive-type tn))
                  (unless (tn-sc tn)
-                   (let* ((scs (possible-scs tn)))
+                   (let ((scs (possible-scs tn)))
                      (cond ((rest scs)
                             (multiple-value-bind (sc uniquep)
                                 (select-tn-representation tn scs costs)
                               (when (or (not unique)
                                         uniquep)
-                                (setf (tn-sc tn) sc)
-                                (assign-constant-offset tn))))
+                                (set-sc tn sc))))
                            (t
-                            (setf (tn-sc tn)
-                                  (svref *backend-sc-numbers* (first scs)))
-                            (assign-constant-offset tn))))))))
+                            (set-sc tn (first scs)))))))))
 
       ;; First pass; only allocate SCs where there is a distinct choice.
-      (pass (ir2-component-constant-tns 2comp) :unique t)
       (pass (ir2-component-normal-tns 2comp) :unique t)
-      (pass (ir2-component-constant-tns 2comp))
-      (pass (ir2-component-normal-tns 2comp)))
+      (pass (ir2-component-normal-tns 2comp))
+      (pass (ir2-component-constant-tns 2comp)))
 
     (do ((alias (ir2-component-alias-tns 2comp)
                 (tn-next alias)))

@@ -215,8 +215,7 @@
   (declare (type symbol name) (type list scs))
   (let ((scns (mapcar #'sc-number-or-lose scs)))
     `(progn
-       (/show0 "doing !DEF-PRIMITIVE-TYPE, NAME=..")
-       (/primitive-print ,(symbol-name name))
+       (/show "doing !DEF-PRIMITIVE-TYPE" ,(string name))
        (assert (not (gethash ',name *backend-primitive-type-names*)))
        (setf (gethash ',name *backend-primitive-type-names*)
              (make-primitive-type :name ',name
@@ -780,11 +779,11 @@
 (defun make-operand-parse-temp ()
   (without-package-locks
    (intern (format nil "OPERAND-PARSE-TEMP-~D" *parse-vop-operand-count*)
-           (symbol-package '*parse-vop-operand-count*))))
+           #.(find-package "SB-C"))))
 (defun make-operand-parse-load-tn ()
   (without-package-locks
    (intern (format nil "OPERAND-PARSE-LOAD-TN-~D" *parse-vop-operand-count*)
-           (symbol-package '*parse-vop-operand-count*))))
+           #.(find-package "SB-C"))))
 
 ;;; Given a list of operand specifications as given to DEFINE-VOP,
 ;;; return a list of OPERAND-PARSE structures describing the fixed
@@ -979,7 +978,9 @@
         (:info
          (setf (vop-parse-info-args parse) (rest spec)))
         (:ignore
-         (setf (vop-parse-ignores parse) (rest spec)))
+         (setf (vop-parse-ignores parse)
+               (append (vop-parse-ignores parse)
+                       (rest spec))))
         (:variant
          (setf (vop-parse-variant parse) (rest spec)))
         (:variant-vars
@@ -1581,7 +1582,7 @@
               ((quotify-slots ()
                  (collect ((forms))
                    (dolist (x vop-parse-slot-names (cons 'list (forms)))
-                     (let ((reader (package-symbolicate (symbol-package 'vop-parse)
+                     (let ((reader (package-symbolicate (sb-xc:symbol-package 'vop-parse)
                                                         "VOP-PARSE-" x)))
                        (forms
                         (case x

@@ -21,7 +21,7 @@
         do (let ((,xf (first (sb-impl::ef-names ,nxf))))
              ,@body))))
 
-(defvar *test-path* "external-format-test.tmp")
+(defvar *test-path* (randomish-temp-file-name))
 
 (with-test (:name :end-of-file)
   (do-external-formats (xf)
@@ -201,8 +201,10 @@
   (assert (equal (read-line s nil s) s)))
 
 ;;; Test skipping character-decode-errors in comments.
-(let ((s (open "external-format-test.lisp" :direction :output
-               :if-exists :supersede :external-format :latin-1)))
+(let* ((input (randomish-temp-file-name "lisp"))
+       (s (open input :direction :output
+                      :if-exists :supersede :external-format :latin-1))
+       (output))
   (unwind-protect
        (progn
          (write-string ";;; ABCD" s)
@@ -210,10 +212,11 @@
          (terpri s)
          (close s)
          (let ((*error-output* (make-broadcast-stream)))
-           (compile-file "external-format-test.lisp"
-                         :external-format :utf-8 :verbose nil)))
+           (setq output
+                 (compile-file input
+                               :external-format :utf-8 :verbose nil))))
     (delete-file s)
-    (let ((p (probe-file (compile-file-pathname "external-format-test.lisp"))))
+    (let ((p (probe-file output)))
       (when p
         (delete-file p)))))
 

@@ -13,8 +13,28 @@
 
 ;;;; general warm init compilation policy
 
+(locally
+    (declare (notinline find-symbol)) ; don't ask
+  (let ((s (find-symbol "*/SHOW*" "SB-INT")))
+  ;; If you made it this far, chances are that you no longer wish to see
+  ;; whatever it is that show would have shown. Comment this out if you need.
+    (when s (set s nil))))
+
 (assert (zerop (deref (extern-alien "lowtag_for_widetag" (array char 64))
                       (ash sb-vm:character-widetag -2))))
+
+;;; Verify that all defstructs except for one were compiled in a null lexical
+;;; environment. Compiling any call to a structure constructor would like to
+;;; know whether some slots get their default value especially if the default
+;;; is incompatible with the slot type (consider MISSING-ARG, e.g).
+;;; If some initform was compiled in a non-null environment, it might not refer
+;;; to a global function. We'd rather ignore it than incorrectly style-warn.
+(let (result)
+  (do-all-symbols (s)
+    (let ((dd (sb-kernel:find-defstruct-description s nil)))
+      (when (and dd (not (sb-kernel::dd-null-lexenv-p dd)))
+        (push (sb-kernel:dd-name dd) result))))
+  (assert (equal result '(sb-c::conset))))
 
 (proclaim '(optimize (compilation-speed 1)
                      (debug #+sb-show 2 #-sb-show 1)
@@ -55,8 +75,8 @@
 ;;;
 (let ((sources (with-open-file (f (merge-pathnames "../../build-order.lisp-expr"
                                                    *load-pathname*))
-                 (let ((*features* (cons :warm-build-phase *features*)))
-                   (read f))))
+                 (read f) ; skip over the make-host-{1,2} input files
+                 (read f)))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
  (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions compiler-note))
@@ -116,9 +136,13 @@
                     (error "LOAD of ~S failed." output-truename))
                   (sb-int:/show "done loading" output-truename))))))))
 
-  (let ((*print-length* 10)
-        (*print-level* 5)
-        (*print-circle* t)
-        (*compile-print* nil))
+  (let ((*compile-print* nil))
     (dolist (group sources)
-      (with-compilation-unit () (do-srcs group))))))
+      (handler-bind ((simple-warning
+                      (lambda (c)
+                        ;; escalate "undefined variable" warnings to errors.
+                        ;; There's no reason to allow them in our code.
+                        (when (search "undefined variable"
+                                      (write-to-string c :escape nil))
+                          (cerror "Finish warm compile ignoring the problem" c)))))
+        (with-compilation-unit () (do-srcs group)))))))

@@ -33,6 +33,7 @@
 #include "genesis/primitive-objects.h"
 #include "thread.h"
 #include "gc-internal.h"
+#include "code.h"
 #include "var-io.h"
 
 #ifdef LISP_FEATURE_OS_PROVIDES_DLADDR
@@ -65,9 +66,7 @@ unsigned int decode_elsewhere_pc(lispobj packed_integer)
 struct compiled_debug_fun *
 debug_function_from_pc (struct code* code, void *pc)
 {
-    uword_t code_header_len = sizeof(lispobj) * code_header_words(code->header);
-    uword_t offset
-        = (uword_t) pc - (uword_t) code - code_header_len;
+    uword_t offset = (char*)pc - code_text_start(code);
     struct compiled_debug_fun *df;
     struct compiled_debug_info *di;
     struct vector *v;
@@ -202,6 +201,8 @@ print_entry_name (lispobj name, FILE *f)
         } else {
             fprintf(f, "<??? type %d>", widetag_of(object));
         }
+    } else if (fixnump(name)) {
+        fprintf(f, "%d", (int)fixnum_value(name));
     } else {
         fprintf(f, "<??? lowtag %d>", (int) lowtag_of(name));
     }

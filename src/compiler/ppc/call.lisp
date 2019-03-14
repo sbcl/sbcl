@@ -733,9 +733,9 @@ default-value-8
                   ;; Conditionally insert a conditional trap:
                   (when step-instrumenting
                     ;; Get the symbol-value of SB-IMPL::*STEPPING*
-                    #!-sb-thread
+                    #-sb-thread
                     (load-symbol-value stepping sb-impl::*stepping*)
-                    #!+sb-thread
+                    #+sb-thread
                     (loadw stepping thread-base-tn thread-stepping-slot)
                     (inst cmpwi stepping 0)
                     ;; If it's not null, trap.
@@ -1233,9 +1233,9 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     ;; Get the symbol-value of SB-IMPL::*STEPPING*
-    #!-sb-thread
+    #-sb-thread
     (load-symbol-value stepping sb-impl::*stepping*)
-    #!+sb-thread
+    #+sb-thread
     (loadw stepping thread-base-tn thread-stepping-slot)
     (inst cmpwi stepping 0)
     ;; If it's not zero, trap.

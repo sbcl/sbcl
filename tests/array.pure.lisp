@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
+(enable-test-parallelism)
 
 ;;; Array initialization has complicated defaulting for :ELEMENT-TYPE,
 ;;; and both compile-time and run-time logic takes a whack at it.
@@ -124,24 +124,27 @@
       (test-case a (1+ most-positive-fixnum) nil))))
 
 ;;; arrays of bits should work:
-(let ((a (make-array '(10 10) :element-type 'bit :adjustable t)))
-  (setf (bit a 0 0) 1)
-  (assert (= (bit a 0 0) 1)))
-(let ((a (make-array '(10 10) :element-type 'bit)))
-  (setf (sbit a 0 0) 1)
-  (assert (= (sbit a 0 0) 1)))
+(with-test (:name (make-array :element-type bit))
+  (let ((a (make-array '(10 10) :element-type 'bit :adjustable t)))
+    (setf (bit a 0 0) 1)
+    (assert (= (bit a 0 0) 1)))
+  (let ((a (make-array '(10 10) :element-type 'bit)))
+    (setf (sbit a 0 0) 1)
+    (assert (= (sbit a 0 0) 1))))
 
-(let ((x (copy-seq #*0011))
-      (y (copy-seq #*0101)))
-  (assert (equalp (bit-and x y nil) #*0001)))
+(with-test (:name (copy-seq bit-and equalp))
+  (let ((x (copy-seq #*0011))
+        (y (copy-seq #*0101)))
+    (assert (equalp (bit-and x y nil) #*0001))))
 
 ;;; arrays of NIL should work, FSVO "work".
-(let ((a (make-array '(10 10) :element-type 'nil)))
-  (assert (= (array-total-size a) 100))
-  (assert (equal (array-dimensions a) '(10 10)))
-  (assert (eq (array-element-type a) 'nil)))
+(with-test (:name (make-array upgraded-array-element-type :element-type nil))
+  (let ((a (make-array '(10 10) :element-type 'nil)))
+    (assert (= (array-total-size a) 100))
+    (assert (equal (array-dimensions a) '(10 10)))
+    (assert (eq (array-element-type a) 'nil)))
 
-(assert (eq (upgraded-array-element-type 'nil) 'nil))
+  (assert (eq (upgraded-array-element-type 'nil) 'nil)))
 
 (with-test (:name (aref 0 :compile-time-error))
   (multiple-value-bind (fun fail)
@@ -206,8 +209,9 @@
     (assert (= (length big-array) (expt 2 26)))))
 
 ;;; Bug reported by Kalle Olavi Niemitalo for CMUCL through Debian BTS
-(let ((array (make-array nil :initial-contents nil)))
-  (assert (eql (aref array) nil)))
+(with-test (:name (make-array aref :rank 0))
+  (let ((array (make-array nil :initial-contents nil)))
+    (assert (eql (aref array) nil))))
 
 (with-test (:name (make-array (setf aref) length))
   (checked-compile-and-assert ()
@@ -222,9 +226,10 @@
     (() 4 :test (lambda (values expected)
                   (= (length (first values)) (first expected))))))
 
-(let ((x (make-array nil :initial-element 'foo)))
-  (adjust-array x nil)
-  (assert (eql (aref x) 'foo)))
+(with-test (:name (make-array adjust-array :initial-element))
+  (let ((x (make-array nil :initial-element 'foo)))
+    (adjust-array x nil)
+    (assert (eql (aref x) 'foo))))
 
 ;;; BUG 315: "no bounds check for access to displaced array"
 ;;;  reported by Bruno Haible sbcl-devel "various SBCL bugs" from CLISP
@@ -554,3 +559,12 @@
       '(lambda (type)
         (make-array 1 :element-type type))
     (('(or (eql -16) unsigned-byte)) #(0) :test #'equalp)))
+
+(with-test (:name :check-bound-signed-bound-notes
+            :fails-on (not (or :x86-64 :x86 :arm64)))
+  (checked-compile-and-assert
+      (:allow-notes nil)
+      `(lambda (x y)
+         (declare (fixnum y))
+         (svref x (+ y 2)))
+    ((#(1 2 3) 0) 3)))

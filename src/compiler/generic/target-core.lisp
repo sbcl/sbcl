@@ -21,15 +21,40 @@
 (define-load-time-global *allocation-point-fixups*
   (make-hash-table :test 'eq :weakness :key :synchronized t))
 
-#!-x86-64
+#-x86-64
 (progn
 (defun convert-alloc-point-fixups (dummy1 dummy2)
   (declare (ignore dummy1 dummy2)))
 (defun sb-vm::statically-link-code-obj (code fixups)
   (declare (ignore code fixups))))
 
-(flet ((fixup (code-obj offset sym kind flavor layout-finder
-               preserved-lists statically-link-p)
+#+immobile-code
+(progn
+  ;; Use FDEFINITION because it strips encapsulations - whether that's
+  ;; the right behavior for it or not is a separate concern.
+  ;; If somebody tries (TRACE LENGTH) for example, it should not cause
+  ;; compilations to fail on account of LENGTH becoming a closure.
+  (defun sb-vm::function-raw-address (name &aux (fun (fdefinition name)))
+    (cond ((not fun)
+           (error "Can't statically link to undefined function ~S" name))
+          ((not (immobile-space-obj-p fun))
+           (error "Can't statically link to ~S: code is movable" name))
+          ((neq (fun-subtype fun) sb-vm:simple-fun-widetag)
+           (error "Can't statically link to ~S: non-simple function" name))
+          (t
+           (let ((addr (get-lisp-obj-address fun)))
+             (sap-ref-word (int-sap addr)
+                           (- (ash sb-vm:simple-fun-self-slot sb-vm:word-shift)
+                              sb-vm:fun-pointer-lowtag))))))
+
+  ;; Return the address to which to jump when calling NAME through its fdefn.
+  (defun sb-vm::fdefn-entry-address (name)
+    (let ((fdefn (find-or-create-fdefn name)))
+      (+ (get-lisp-obj-address fdefn)
+         (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)
+         (- sb-vm:other-pointer-lowtag)))))
+
+(flet ((fixup (code-obj offset sym kind flavor preserved-lists statically-link-p)
          (declare (ignorable statically-link-p))
          ;; PRESERVED-LISTS is a vector of lists of locations (by kind)
          ;; at which fixup must be re-applied after code movement.
@@ -46,14 +71,16 @@
                    (:foreign-dataref (foreign-symbol-address sym t))
                    (:code-object (get-lisp-obj-address code-obj))
                    (:symbol-tls-index (ensure-symbol-tls-index sym))
-                   (:layout (get-lisp-obj-address (funcall layout-finder sym)))
-                   (:immobile-object (get-lisp-obj-address sym))
-                   #!+immobile-code
+                   (:layout (get-lisp-obj-address
+                             (if (symbolp sym) (find-layout sym) sym)))
+                   (:immobile-symbol (get-lisp-obj-address sym))
+                   (:symbol-value (get-lisp-obj-address (symbol-global-value sym)))
+                   #+immobile-code
                    (:named-call
                     (when statically-link-p
                       (push (cons offset sym) (elt preserved-lists 3)))
                     (sb-vm::fdefn-entry-address sym))
-                   #!+immobile-code (:static-call (sb-vm::function-raw-address sym)))
+                   #+immobile-code (:static-call (sb-vm::function-raw-address sym)))
                  kind flavor)
            (ecase kind
              (:relative (push offset (elt preserved-lists 0)))
@@ -65,7 +92,7 @@
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
-         #!+(or immobile-space x86)
+         #+(or immobile-space x86)
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
            (when (or abs-fixups rel-fixups)
@@ -81,21 +108,21 @@
            (let ((fun (%code-entry-point code-obj i)))
              (setf (%simple-fun-self fun)
                    ;; x86 backends store the address of the entrypoint in 'self'
-                   #!+(or x86 x86-64)
+                   #+(or x86 x86-64)
                    (%make-lisp-obj
                     (truly-the word (+ (get-lisp-obj-address fun)
                                        (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)
                                        (- sb-vm:fun-pointer-lowtag))))
                    ;; non-x86 backends store the function itself (what else?) in 'self'
-                   #!-(or x86 x86-64) fun)
+                   #-(or x86 x86-64) fun)
              ;; And maybe store the layout in the high half of the header
-             #!+(and compact-instance-header x86-64)
+             #+(and compact-instance-header x86-64)
              (setf (sap-ref-32 (int-sap (get-lisp-obj-address fun))
                                (- 4 sb-vm:fun-pointer-lowtag))
                    (truly-the (unsigned-byte 32)
                      (get-lisp-obj-address #.(find-layout 'function))))))
          ;; And finally, make the memory range executable
-         #!-(or x86 x86-64)
+         #-(or x86 x86-64)
          (sb-vm:sanctify-for-execution code-obj)))
 
   (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
@@ -105,7 +132,7 @@
           (multiple-value-bind (offset kind flavor)
               (sb-fasl::!unpack-fixup-info (pop-fop-stack))
             (fixup code-obj offset (pop-fop-stack) kind flavor
-                   #'find-layout preserved nil))))
+                   preserved nil))))
       (finish-fixups code-obj preserved)))
 
   (defun apply-core-fixups (fixup-notes code-obj)
@@ -118,11 +145,6 @@
                  (fixup-name fixup)
                  (fixup-note-kind note)
                  (fixup-flavor fixup)
-               ;; Compiling to memory creates layout fixups with the name being
-               ;; an instance of LAYOUT, not a symbol. Those probably should be
-               ;; :IMMOBILE-OBJECT fixups. But since they're not, inform the
-               ;; fixupper not to call find-layout on them.
-                 #'identity
                  preserved t)))
       (finish-fixups code-obj preserved))))
 

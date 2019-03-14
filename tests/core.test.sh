@@ -13,6 +13,9 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+# FIXME: this file takes >30 seconds to complete.
+# We should run each test in a background shell and wait, or something.
+
 . ./subr.sh
 
 use_test_subdirectory
@@ -23,7 +26,7 @@ tmpoutput=$TEST_FILESTEM.txt
 run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42))
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit \
     --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})"
 check_status_maybe_lose "SAVE-LISP-AND-DIE :TOPLEVEL" $? 0 "(saved core ran)"
 
@@ -32,7 +35,7 @@ run_sbcl <<EOF
   (require :sb-bsd-sockets)
   (save-lisp-and-die "$tmpcore")
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit \
     --eval "(require :sb-posix)" --quit
 check_status_maybe_lose "SAVE-LISP-AND-DIE" $? 0 "(saved core ran)"
 
@@ -55,7 +58,7 @@ run_sbcl <<EOF
      (defvar *afun* (compile nil '(lambda (x) (- (length x))))))
   (save-lisp-and-die "$tmpcore")
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint \
     --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
     <<EOF
   (exit :code (foo 10))
@@ -75,7 +78,7 @@ run_sbcl --load ../heap-reloc/embiggen.lisp <<EOF
   #+gencgc (setf (extern-alien "verify_gens" char) 0)
   (save-lisp-and-die "$tmpcore")
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit --eval "(exit)"
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --eval "(exit)"
 check_status_maybe_lose "Crash GC" $? 0 "(saved core ran)"
 
 # In sbcl-0.9.8 saving cores with callbacks didn't work on gencgc platforms
@@ -144,7 +147,8 @@ fi
 
 # executable core used as "--core" option should not save the memory sizes
 # that were originally saved, but the sizes in the process doing the save.
-run_sbcl_with_args --control-stack-size 160KB --dynamic-space-size 200MB --disable-debugger --no-userinit --no-sysinit --noprint <<EOF
+run_sbcl_with_args --noinform --control-stack-size 160KB --dynamic-space-size 200MB \
+    --disable-debugger --no-userinit --no-sysinit --noprint <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
@@ -153,15 +157,19 @@ chmod u+x "$tmpcore"
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (assert (<= 0 (- (* 200 1048576) (dynamic-space-size)) 65536))
 EOF
-run_sbcl_with_core "$tmpcore" --control-stack-size 200KB --dynamic-space-size 250MB --no-userinit --no-sysinit <<EOF
+run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 200KB \
+    --dynamic-space-size 250MB --no-userinit --no-sysinit <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024)))
-  (assert (eql (dynamic-space-size) (* 250 1048576)))
+  ; allow slight shrinkage if heap relocation has to adjust for alignment
+  (defun dynamic-space-size-good-p ()
+    (<= 0 (- (* 250 1048576) (dynamic-space-size)) 65536))
+  (assert (dynamic-space-size-good-p))
   (save-lisp-and-die "${tmpcore}2" :executable t :save-runtime-options t)
 EOF
 chmod u+x "${tmpcore}2"
 ./"${tmpcore}2" --no-userinit --no-sysinit <<EOF
   (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024))
-             (eql (dynamic-space-size) (* 250 1048576)))
+             (dynamic-space-size-good-p))
     (exit :code 42))
 EOF
 status=$?
@@ -175,7 +183,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :toplevel (lambda () 42)
                       :compression (and (member :sb-core-compression *features*) t))
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit \
     --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})"
 check_status_maybe_lose "SAVE-LISP-AND-DIE :COMPRESS" $? 0 "(compressed saved core ran)"
 
@@ -187,5 +195,35 @@ EOF
 chmod u+x "$tmpcore"
 ./"$tmpcore" --no-userinit --no-sysinit
 check_status_maybe_lose "SAVE-LISP-AND-DIE :EXECUTABLE-COMPRESS" $? 0 "(executable compressed saved core ran)"
+
+# Verify that for funcallable instances which were moved into the
+# immobile varyobj space by SAVE-LISP-AND-DIE, setting the layout
+# updates the GC card touched bit.
+# Going through instance-obsolescence stuff makes things mostly work
+# by accident, because (SETF %FUNCALLABLE-INSTANCE-INFO) touches
+# the card dirty bit when reassigning the CLOS slot vector.
+# We need to simulate a GC interrupt after altering the layout,
+# but prior to affecting the slot vector.
+run_sbcl <<EOF
+  (defclass subgf (standard-generic-function) (a)
+    (:metaclass sb-mop:funcallable-standard-class))
+  (defgeneric myfun (a)
+    (:generic-function-class subgf)
+    (:method ((self integer)) 'hey-integer))
+  (defun assign-layout ()
+    #+gencgc (setf (extern-alien "verify_gens" char) 0)
+    (defclass subgf (standard-generic-function) (a b) ; add a slot
+      (:metaclass sb-mop:funcallable-standard-class))
+    (defclass subgf (standard-generic-function) (a) ; remove a slot
+      (:metaclass sb-mop:funcallable-standard-class))
+    (let ((nl (sb-kernel:find-layout 'subgf))) ; new layout
+      (assert (not (eq (sb-kernel:%funcallable-instance-layout #'myfun)
+                       nl)))
+      (setf (sb-kernel:%funcallable-instance-layout #'myfun) nl)
+      (gc)))
+  (save-lisp-and-die "$tmpcore" :toplevel #'assign-layout)
+EOF
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit
+check_status_maybe_lose "SET-FIN-LAYOUT" $? 0 "(saved core ran)"
 
 exit $EXIT_TEST_WIN

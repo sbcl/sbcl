@@ -66,6 +66,16 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
+(define-vop (fun-header-data)
+  (:translate fun-header-data)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst srwi res res n-widetag-bits)))
+
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
@@ -75,18 +85,6 @@
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
     (inst srwi res res n-widetag-bits)))
-
-(define-vop (get-closure-length)
-  (:translate get-closure-length)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    ;; Shift right by 8 bits (i.e. rotate left 24)
-    ;; and take the 15 rightmost bits.
-    (inst rlwinm res res 24 17 31)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -163,11 +161,26 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srwi ndescr ndescr n-widetag-bits)
-    (inst slwi ndescr ndescr word-shift)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst subi ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
+
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:generator 10
+    (loadw res code 0 other-pointer-lowtag) ; get object size in words
+    ;; Shift out the widetag, shift left by 2 bits to convert words to bytes,
+    ;; mask off the GC bits.
+    (inst rlwinm res res 26 8 29)
+    (inst add res res offset)
+    (inst subi res res other-pointer-lowtag)
+    (inst lwzx res code res)))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
@@ -176,9 +189,7 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srwi ndescr ndescr n-widetag-bits)
-    (inst slwi ndescr ndescr word-shift)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst add ndescr ndescr offset)
     (inst addi ndescr ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst add func code ndescr)))
@@ -195,7 +206,7 @@
   (:generator 1
     (inst unimp pending-interrupt-trap)))
 
-#!+sb-thread
+#+sb-thread
 (define-vop (current-thread-offset-sap)
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)

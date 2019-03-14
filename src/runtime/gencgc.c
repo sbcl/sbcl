@@ -48,6 +48,7 @@
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "alloc.h"
+#include "code.h"
 #include "genesis/gc-tables.h"
 #include "genesis/vector.h"
 #include "genesis/weak-pointer.h"
@@ -1998,8 +1999,9 @@ update_page_write_prot(page_index_t page)
 
     if (!ENABLE_PAGE_PROTECTION) return 0;
 
-    /* Skip if it's unboxed or already write-protected */
-    if (page_table[page].write_protected || !page_boxed_p(page))
+    /* Skip if it's unboxed, already write-protected, or pinned */
+    if (page_table[page].write_protected || !page_boxed_p(page) ||
+        page_table[page].pinned)
         return (0);
 
     /* Scan the page for pointers to younger generations or the
@@ -2691,6 +2693,10 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             lose("Unhandled widetag %d at %p", widetag, where);
         } else if (unboxed_obj_widetag_p(widetag)) {
             count = sizetab[widetag](where);
+            if (strict_containment && gencgc_verbose
+                && widetag == SAP_WIDETAG && where[1])
+                fprintf(stderr, "\nStrange SAP %p -> %p\n",
+                        where, (void*)where[1]);
         } else switch(widetag) {
                 /* boxed or partially boxed objects */
                 lispobj layout_word;
@@ -2732,7 +2738,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
             case CODE_HEADER_WIDETAG:
                 {
                 struct code *code = (struct code *) where;
-                sword_t nheader_words = code_header_words(code->header);
+                sword_t nheader_words = code_header_words(code);
                 gc_assert(fixnump(where[1])); // code_size
                 /* Verify the boxed section of the code data block */
                 state->min_pointee_gen = 8; // initialize to "positive infinity"
@@ -2766,8 +2772,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                          where, my_gen, state->min_pointee_gen,
                          rememberedp ? "written" : "not written");
 #endif
-                count = ALIGN_UP(nheader_words +
-                                 code_unboxed_nwords(code->code_size), 2);
+                count = code_total_nwords(code);
                 break;
                 }
             case FDEFN_WIDETAG:
@@ -3493,16 +3498,16 @@ collect_garbage(generation_index_t last_gen)
     }
     gc_close_all_regions();
 
+    /* Immobile space generation bits are lazily updated for gen0
+       (not touched on every object allocation) so do it now */
+    update_immobile_nursery_bits();
+
     /* Verify the new objects created by Lisp code. */
     if (pre_verify_gen_0)
         verify_heap(VERIFY_PRE_GC);
 
     if (gencgc_verbose > 1)
         print_generation_stats();
-
-    /* Immobile space generation bits are lazily updated for gen0
-       (not touched on every object allocation) so do it now */
-    update_immobile_nursery_bits();
 
     if (gc_mark_only) {
         garbage_collect_generation(PSEUDO_STATIC_GENERATION, 0);
@@ -4313,7 +4318,6 @@ static inline boolean obj_gen_lessp(lispobj obj, generation_index_t b)
 sword_t scav_code_header(lispobj *object, lispobj header)
 {
     ++n_scav_calls[CODE_HEADER_WIDETAG/4];
-    sword_t n_header_words = code_header_words(header);
 
     int my_gen = gen_of((lispobj)object) & 7;
     if (my_gen == from_space) {
@@ -4342,6 +4346,7 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         // gc_assert(!card_protected_p(object));
 
         /* Scavenge the boxed section of the code data block. */
+        sword_t n_header_words = code_header_words((struct code *)object);
         scavenge(object + 2, n_header_words - 2);
 
         /* Scavenge the boxed section of each function object in the
@@ -4371,5 +4376,5 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         ++n_scav_skipped[CODE_HEADER_WIDETAG/4];
     }
 done:
-    return ALIGN_UP(n_header_words + code_unboxed_nwords(object[1]), 2);
+    return code_total_nwords((struct code*)object);
 }

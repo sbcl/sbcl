@@ -134,6 +134,6 @@
        xset1))
     t))
 
-#!-sb-fluid (declaim (inline xset-empty-p))
+#-sb-fluid (declaim (inline xset-empty-p))
 (defun xset-empty-p (xset)
   (not (xset-data xset)))

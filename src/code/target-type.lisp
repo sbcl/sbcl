@@ -34,8 +34,8 @@
          member-type
          character-set-type
          built-in-classoid
-         #!+sb-simd-pack simd-pack-type
-         #!+sb-simd-pack-256 simd-pack-256-type)
+         #+sb-simd-pack simd-pack-type
+         #+sb-simd-pack-256 simd-pack-256-type)
      (values (%%typep obj type)
              t))
     (array-type
@@ -163,7 +163,7 @@
          ;; because the compiler is too naive to see that
          ;; the last 2 cases partition CHARACTER.
          (t (specifier-type 'extended-char))))
-      #!+sb-simd-pack
+      #+sb-simd-pack
       (simd-pack
        (let ((tag (%simd-pack-tag x)))
          (svref (load-time-value
@@ -175,7 +175,7 @@
                 (if (<= 0 tag #.(1- (length *simd-pack-element-types*)))
                     (1+ tag)
                     0))))
-      #!+sb-simd-pack-256
+      #+sb-simd-pack-256
       (simd-pack-256
        (let ((tag (%simd-pack-256-tag x)))
          (svref (load-time-value
@@ -287,45 +287,3 @@ Experimental."
   ;; just deem it invalid.
   (not (null (ignore-errors
                (type-or-nil-if-unknown type-specifier t)))))
-
-;;; Parse the log file from CROSS-TYPEP and check that its values
-;;; agree with the target type system.
-;;; To be used after build of the system.
-(defun verify-cross-typep ()
-  (let ((ct/rt-mismatch-typespecs nil)
-        (linenum))
-    (dotimes (i 3)
-      (with-open-file (f (format nil "output/cross-typep-~D.log" (1+ i)))
-        (setq linenum 0)
-        (loop
-         (let ((line (read-line f nil nil)))
-           (unless line (return))
-           (incf linenum)
-           (unless (or (search "BEFORE-XC-TESTS" line)
-                       (search "SB-COLD" line)
-                       (search "SB-INT:!DEFINE-LOAD-TIME-GLOBAL" line)
-                       (search "*!INITIAL-LAYOUTS*" line)
-                       (search "*!INITIAL-SYMBOLS*" line)
-                       (search "*!INITIAL-ASSEMBLER-ROUTINES*" line)
-                       (search "*!LOAD-TIME-VALUES*" line)
-                       (search "(SB-FASL:*!COLD-" line)
-                       (search "#S(SB-C::RESTART-LOCATION" line))
-             (let ((form (read-from-string line)))
-               (destructuring-bind (obj typespec xc-winp xc-certainp) form
-                 (binding* (((winp certainp)
-                             (ctypep obj (values-specifier-type typespec)))
-                            (typep-answer
-                             (%%typep obj (values-specifier-type typespec) nil)))
-                   (unless (eq winp typep-answer)
-                     (unless (member typespec ct/rt-mismatch-typespecs
-                                     :test 'equal)
-                       (push typespec ct/rt-mismatch-typespecs)
-                       (format t "COMPILER/RUNTIME DISAGREE: ~S -> ~S ~S ~S~%"
-                               form winp certainp typep-answer)))
-                   (unless xc-certainp
-                     (format t "XC UNCERTAIN: ~S~%" form))
-                   ;; This is not always right because I don't record
-                   ;; which mode CROSS-TYPEP was invoked in.
-                   (unless (eq xc-winp winp)
-                     (format t "WRONG ANSWER: ~S~%SHOULD BE: ~S~%"
-                             form winp))))))))))))

@@ -18,8 +18,7 @@
 ;;; The target function is never called, but if omitted via #-sb-xc-host,
 ;;; compilation of !GENCGC-SPACE-SETUP would issue an "undefined" warning.
 (defun !read-dynamic-space-size ()
-  (unless (member :sb-xc-host *features*)
-    (return-from !read-dynamic-space-size (symbol-value 'default-dynamic-space-size)))
+  #+sb-xc-host
   (with-open-file (f "output/dynamic-space-size.txt" :if-does-not-exist nil)
     (unless f
       (return-from !read-dynamic-space-size nil))
@@ -35,9 +34,10 @@
                                 (expt 2 30))
                                (t
                                 (error "Invalid --dynamic-space-size=~A" line)))))
-              (* number mult)))))))
+              (* number mult))))))
+  #-sb-xc-host (symbol-value 'default-dynamic-space-size))
 
-#!+gencgc
+#+gencgc
 ;; Define START/END constants for GENCGC spaces.
 ;; Assumptions:
 ;;     We only need very small read-only and static spaces, because
@@ -76,13 +76,13 @@
                )))
     (let*
         ((spaces (append `((read-only ,small-space-size)
-                           #!+sb-safepoint
+                           #+sb-safepoint
                            (safepoint ,(symbol-value '+backend-page-bytes+)
                                       gc-safepoint-page-addr)
                            (static ,small-space-size))
-                         #!+linkage-table
+                         #+linkage-table
                          `((linkage-table ,small-space-size))
-                         #!+immobile-space
+                         #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
                            (varyobj ,varyobj-space-size*))))
          (ptr small-spaces-start)
@@ -93,7 +93,7 @@
                           ;; TODO: linkage-table could move with code, if the CPU
                           ;; prefers PC-relative jumps, and we emit better code
                           ;; (which we don't- for x86 we jmp via RBX always)
-                          #!+relocatable-heap (member space '(fixedobj varyobj)))
+                          #+relocatable-heap (member space '(fixedobj varyobj)))
                         (start ptr)
                         (end (+ ptr size)))
                    (setf ptr end)
@@ -116,7 +116,7 @@
                                       ,(- end start)))))))))))
       `(progn
          ,@small-space-forms
-         ,(defconstantish (or #!+relocatable-heap t) 'dynamic-space-start
+         ,(defconstantish (or #+relocatable-heap t) 'dynamic-space-start
             (or dynamic-space-start* ptr))
          (defconstant default-dynamic-space-size
            ;; Build-time make-config.sh option "--dynamic-space-size" overrides
@@ -139,14 +139,14 @@
     sb-kernel::memory-fault-error
     sb-kernel::unhandled-trap-error
     ;; On these it's called through the internal errors mechanism
-    #!-(or arm arm64 x86-64) undefined-alien-fun-error
+    #-(or arm arm64 x86-64) undefined-alien-fun-error
     sb-di::handle-breakpoint
     sb-di::handle-single-step-trap
-    #!+win32 sb-kernel::handle-win32-exception
-    #!+sb-thruption sb-thread::run-interruption
+    #+win32 sb-kernel::handle-win32-exception
+    #+sb-thruption sb-thread::run-interruption
     enter-alien-callback
-    #!+sb-thread sb-thread::enter-foreign-callback
-    #!+(and sb-safepoint-strictly (not win32))
+    #+sb-thread sb-thread::enter-foreign-callback
+    #+(and sb-safepoint-strictly (not win32))
     sb-unix::signal-handler-callback)
   #'equal)
 
@@ -161,14 +161,14 @@
     (sb-sys:*interrupts-enabled* t)
     *alloc-signal*
     sb-sys:*interrupt-pending*
-    #!+sb-thruption sb-sys:*thruption-pending*
+    #+sb-thruption sb-sys:*thruption-pending*
     *in-without-gcing*
     *gc-inhibit*
     *gc-pending*
-    #!+sb-safepoint sb-impl::*in-safepoint*
-    #!+sb-thread *stop-for-gc-pending*
+    #+sb-safepoint sb-impl::*in-safepoint*
+    #+sb-thread *stop-for-gc-pending*
     ;; non-x86oid gencgc object pinning
-    #!+(and gencgc (not (or x86 x86-64))) *pinned-objects*
+    #+(and gencgc (not (or x86 x86-64))) *pinned-objects*
     ;; things needed for non-local-exit
     (*current-catch-block* 0)
     (*current-unwind-protect-block* 0)
@@ -179,37 +179,37 @@
   `(t
     ;; These symbols are accessed from C only through TLS,
     ;; never the symbol-value slot
-    #!-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
+    #-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
                            !per-thread-c-interface-symbols)
     ;; NLX variables are thread slots on x86-64.  A static sym is needed
     ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
     ;; so must lookup the TLS index given the symbol.
-    #!+(and sb-thread (not x86-64)) ,@'(*current-catch-block*
+    #+(and sb-thread (not x86-64)) ,@'(*current-catch-block*
                                         *current-unwind-protect-block*)
 
     ;; sb-safepoint in addition to accessing this symbol via TLS,
     ;; uses the symbol itself as a value. Kinda weird.
-    #!+(and sb-safepoint sb-thread) *in-without-gcing*
+    #+(and sb-safepoint sb-thread) *in-without-gcing*
 
-    #!+immobile-space *immobile-freelist* ; not per-thread (yet...)
+    #+immobile-space *immobile-freelist* ; not per-thread (yet...)
 
-    #!+hpux *c-lra*
+    #+hpux *c-lra*
 
     ;; stack pointers
-    #!-sb-thread *binding-stack-start* ; a thread slot if #!+sb-thread
-    #!-sb-thread *control-stack-start* ; ditto
-    #!-sb-thread *control-stack-end*   ; ditto
+    #-sb-thread *binding-stack-start* ; a thread slot if #+sb-thread
+    #-sb-thread *control-stack-start* ; ditto
+    #-sb-thread *control-stack-end*   ; ditto
 
-    #!-sb-thread *stepping*
+    #-sb-thread *stepping*
 
     ;; threading support
-    #!+sb-thread *free-tls-index*
+    #+sb-thread *free-tls-index*
     ;; Keep in sync with 'compiler/early-backend.lisp':
     ;;  "only PPC uses a separate symbol for the TLS index lock"
-    #!+(and sb-thread ppc) *tls-index-lock*
+    #+(and sb-thread ppc) *tls-index-lock*
 
     ;; dynamic runtime linking support
-    #!+sb-dynamic-core +required-foreign-symbols+
+    #+sb-dynamic-core +required-foreign-symbols+
 
     ;; List of Lisp specials bindings made by create_thread_struct()
     ;; excluding the names in !PER-THREAD-C-INTERFACE-SYMBOLS.
@@ -218,8 +218,8 @@
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.
-    ;;; However there is no efficiency gain if we have #!+immobile-space.
-    #!-immobile-space ,@'(
+    ;;; However there is no efficiency gain if we have #+immobile-space.
+    #-immobile-space ,@'(
      ;; arbitrary object that changes after each GC
      sb-kernel::*gc-epoch*
      ;; Dispatch tables for generic array access
@@ -236,8 +236,15 @@
 ;;; the choice of this number. Rather than have to two copies
 ;;; of the comment, please see that file before adjusting this.
 (defconstant max-interrupts 1024)
+;;; Thread slots accessed at negative indices relative to struct thread.
+;;; These slots encroach on the interrupt contexts- the maximum that
+;;; can actually be stored is decreased by this amount.
+;;; sb-safepoint puts the safepoint page immediately preceding the
+;;; thread structure, so this trick doesn't work.
+(defconstant thread-header-slots
+  (+ #+(and x86-64 (not sb-safepoint)) 16))
 
-#!+gencgc
+#+gencgc
 (progn
   (defconstant +highest-normal-generation+ 5)
   (defconstant +pseudo-static-generation+ 6))

@@ -28,7 +28,7 @@
     (:import-from "<package-name> {symbol-name}*")
     (:shadow "{symbol-name}*")
     (:shadowing-import-from "<package-name> {symbol-name}*")
-    (:local-nicknames "{local-nickname actual-package-name}*")
+    (:local-nicknames "{(local-nickname actual-package-name)}*")
     (:lock "boolean")
     (:implement "{package-name}*")
     (:documentation "doc-string")
@@ -225,9 +225,10 @@
                   exports)
           package)
   ;; 5. :local-nicknames
+  ;; FIXME: See bug at PACKAGE-LOCALLY-NICKNAMED-BY-LIST
   (setf (package-%local-nicknames package) nil) ; throw out the old ones.
   (loop :for (nickname . nickname-package) :in local-nicknames :do
-     (add-package-local-nickname nickname nickname-package package))
+     (%add-package-local-nickname nickname nickname-package package))
   ;; Everything was created: update metadata
   (when source-location
     (setf (package-source-location package) source-location))
@@ -237,6 +238,8 @@
       (add-implementation-package package p))
   ;; Handle lock
   (setf (package-lock package) lock)
+  ;; Flush cached FIND-PACKAGE values
+  (atomic-incf *package-names-cookie*)
   package)
 
 (declaim (type list *on-package-variance*))

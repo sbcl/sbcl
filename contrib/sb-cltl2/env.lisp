@@ -282,7 +282,7 @@ appear."
           (setf binding :function
                 localp nil
                 ftype (when (eq :declared (info :function :where-from name))
-                        (proclaimed-ftype name))
+                        (global-ftype name))
                 inlinep (info :function :inlinep name))))))
     (values binding
             localp
@@ -532,7 +532,7 @@ is referred to by the expression."
   (let ((env (if environment
                  (sb-c::make-restricted-lexenv environment)
                  (make-null-lexenv))))
-    (compile-in-lexenv lambda-expression env)))
+    (compile-in-lexenv lambda-expression env nil nil nil nil nil)))
 
 ;;; Add a bit of user-data to a lexenv.
 ;;;

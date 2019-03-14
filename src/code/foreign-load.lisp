@@ -81,15 +81,15 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
         ;; always designate _exactly the same library image_; Unix
         ;; tricks like deleting an open library and replacing it with
         ;; another version just don't work here.
-        #!-win32
+        #-win32
         (dlopen-or-lose obj)
-        #!+win32
+        #+win32
         (unless old
           (dlopen-or-lose obj))
         (setf *shared-objects* (append (remove obj *shared-objects*)
                                        (list obj)))
         ;; FIXME: Why doesn't the linkage table work on Windows? (Or maybe it
-        ;; does and this can be just #!+linkage-table?) Note: remember to change
+        ;; does and this can be just #+linkage-table?) Note: remember to change
         ;; FOREIGN-DEINIT as well then!
         ;;
         ;; Kovalenko 2010-11-24: I think so. Alien _data_ references
@@ -97,7 +97,7 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
         ;; problematic. Handle function references in the same way as
         ;; other linkage-table platforms is easy.
         ;;
-        #!+linkage-table
+        #+linkage-table
         (when (or old (undefined-foreign-symbols-p))
           (update-linkage-table))))
     pathname))
@@ -113,9 +113,9 @@ Experimental."
                        :key #'shared-object-pathname
                        :test #'equal)))
         (when old
-          #!-hpux (dlclose-or-lose old)
+          #-hpux (dlclose-or-lose old)
           (setf *shared-objects* (remove old *shared-objects*))
-          #!+linkage-table
+          #+linkage-table
           (update-linkage-table))))))
 
 (defun try-reopen-shared-object (obj)
@@ -153,7 +153,7 @@ Experimental."
   ;; Ensure that the runtime is open
   (setf *runtime-dlhandle* (dlopen-or-lose))
   ;; Without this many symbols aren't accessible.
-  #!+android (load-shared-object "libc.so" :dont-save t)
+  #+android (load-shared-object "libc.so" :dont-save t)
   ;; Reopen stuff.
   (setf *shared-objects*
         (remove nil (mapcar #'try-reopen-shared-object *shared-objects*))))
@@ -163,11 +163,11 @@ Experimental."
 (defun close-shared-objects ()
   (let (saved)
     (dolist (obj (reverse *shared-objects*))
-      #!-hpux (dlclose-or-lose obj)
+      #-hpux (dlclose-or-lose obj)
       (unless (shared-object-dont-save obj)
         (push obj saved)))
     (setf *shared-objects* saved))
-  #!-hpux
+  #-hpux
   (dlclose-or-lose))
 
 ;;; These tables are synchronized by the lock on *LINKAGE-INFO*
@@ -181,11 +181,14 @@ error is immediately signalled if the symbol isn't found. The returned address
 is never in the linkage-table."
     (declare (ignorable datap))
     (let ((addr (find-dynamic-foreign-symbol-address symbol)))
-      (cond  #!-linkage-table
+      (cond  #-linkage-table
              ((not addr)
               (error 'undefined-alien-error :name symbol))
-             #!+linkage-table
+             #+linkage-table
              ((not addr)
+              ;; If we can report the actual name when an undefined
+              ;; alien is called don't warn.
+              #-(or arm arm64 x86-64)
               (style-warn 'sb-kernel:undefined-alien-style-warning
                           :symbol symbol)
               (setf (gethash symbol undefineds) t)
@@ -205,7 +208,7 @@ is never in the linkage-table."
     (plusp (hash-table-count symbols)))
   (defun list-dynamic-foreign-symbols ()
     (loop for symbol being each hash-key in symbols
-         collect symbol))
+          collect symbol))
   (defun list-undefined-foreign-symbols ()
     (loop for symbol being each hash-key in undefineds
           collect symbol)))

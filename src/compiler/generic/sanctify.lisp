@@ -13,19 +13,16 @@
 ;;;; more information.
 
 (in-package "SB-VM")
-
-
 
-;;; Do whatever is necessary to make the given code component executable.
-;;; On the 601, we have less to do than on some other PowerPC chips.
-;;; This should be what needs to be done in the general case.
+;;; Do whatever is necessary to make the given code component
+;;; executable.  This isn't always strictly necessary (some ARM
+;;; systems have coherent caches, for example), but it covers the
+;;; general case.
 (defun sanctify-for-execution (component)
-  (alien-funcall (extern-alien "ppc_flush_icache"
+   (alien-funcall (extern-alien "os_flush_icache"
                                  (function void
                                            system-area-pointer
                                            unsigned-long))
                    (code-instructions component)
                    (%code-text-size component))
-  nil)
-
-
+  component)

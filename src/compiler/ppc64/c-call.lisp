@@ -19,19 +19,19 @@
 
 (defconstant +stack-alignment-bytes+
   ;; Duh.  PPC Linux (and VxWorks) adhere to the EABI.
-  #!-darwin 7
+  #-darwin 7
   ;; But Darwin doesn't
-  #!+darwin 15)
+  #+darwin 15)
 
 (defstruct arg-state
   (gpr-args 0)
   (fpr-args 0)
   ;; SVR4 [a]abi wants two words on stack (callee saved lr,
   ;; backpointer).
-  #!-darwin (stack-frame-size 2)
+  #-darwin (stack-frame-size 2)
   ;; PowerOpen ABI wants 8 words on the stack corresponding to GPR3-10
   ;; in addition to the 6 words of link area (see number-stack-displacement)
-  #!+darwin (stack-frame-size (+ 8 6)))
+  #+darwin (stack-frame-size (+ 8 6)))
 
 (defun int-arg (state prim-type reg-sc stack-sc)
   (let ((reg-args (arg-state-gpr-args state)))
@@ -62,7 +62,7 @@
 ;;;   Excess floats stored on the stack are stored as floats.
 ;;;
 ;;; We follow gcc.
-#!-darwin
+#-darwin
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let* ((fprs (arg-state-fpr-args state)))
@@ -78,7 +78,7 @@
 ;;; If a single-float arg has to go on the stack, it's promoted to
 ;;; double.  That way, C programs can get subtle rounding errors when
 ;;; unrelated arguments are introduced.
-#!+darwin
+#+darwin
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
   (let* ((fprs (arg-state-fpr-args state))
@@ -99,7 +99,7 @@
              (incf (arg-state-stack-frame-size state))
              (make-wired-tn* 'single-float single-stack-sc-number stack-offset))))))
 
-#!-darwin
+#-darwin
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let* ((fprs (arg-state-fpr-args state)))
@@ -114,7 +114,7 @@
              (setf (arg-state-stack-frame-size state) (+ stack-offset 2))
              (make-wired-tn* 'double-float double-stack-sc-number stack-offset))))))
 
-#!+darwin
+#+darwin
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((fprs (arg-state-fpr-args state))
@@ -153,7 +153,7 @@
     (0 nl0-offset)
     (1 nl1-offset)))
 
-;;; FIXME: These #!-DARWIN methods should be adjusted to take a state
+;;; FIXME: These #-DARWIN methods should be adjusted to take a state
 ;;; argument, firstly because that's our "official" API (see
 ;;; src/code/host-alieneval) and secondly because that way we can
 ;;; probably have less duplication of code.  -- CSR, 2003-07-29
@@ -208,7 +208,7 @@
 ;;; Sort out long longs, by splitting them up.  However, need to take
 ;;; care about register/stack alignment and whether they will fully
 ;;; fit into registers or must go on the stack.
-#!-darwin
+#-darwin
 (deftransform %alien-funcall ((function type &rest args))
   (aver (sb-c::constant-lvar-p type))
   (let* ((type (sb-c::lvar-value type))
@@ -304,7 +304,7 @@
                            ,@(new-args))))))
         (sb-c::give-up-ir1-transform))))
 
-#!+darwin
+#+darwin
 (deftransform %alien-funcall ((function type &rest args))
   (aver (sb-c::constant-lvar-p type))
   (let* ((type (sb-c::lvar-value type))
@@ -376,7 +376,7 @@
   (:generator 2
     (inst lr res  (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -473,17 +473,17 @@
   ;;; The "Mach-O Runtime Conventions" document for OS X almost
   ;;; specifies the calling convention (it neglects to mention that
   ;;; the linkage area is 24 bytes).
-  #!+darwin
+  #+darwin
   (defconstant n-foreign-linkage-area-bytes 24)
 
   ;;; On linux only use 8 bytes for LR and Back chain.  JRXR
   ;;; 2006/11/10.
-  #!-darwin
+  #-darwin
   (defconstant n-foreign-linkage-area-bytes 8)
 
   ;;; Returns a vector in static space containing machine code for the
   ;;; callback wrapper.  Linux version.  JRXR.  2006/11/13
-  #!-darwin
+  #-darwin
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
              (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
@@ -652,8 +652,8 @@
               (load-address-into
                r0
                (foreign-symbol-address
-                #!-sb-thread "funcall3"
-                #!+sb-thread "callback_wrapper_trampoline"))
+                #-sb-thread "funcall3"
+                #+sb-thread "callback_wrapper_trampoline"))
               (inst mtlr r0)
               (inst blrl)
 
@@ -702,7 +702,7 @@
 
   ;;; Returns a vector in static space containing machine code for the
   ;;; callback wrapper
-  #!+darwin
+  #+darwin
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
              (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))

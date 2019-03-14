@@ -14,22 +14,20 @@
 ;;; This file contains the simplest test that the multiple subclasses
 ;;; of generic function metacircle is gone.
 
-(defpackage "MOP-7"
-  (:use "CL" "SB-MOP" "TEST-UTIL"))
-
-(in-package "MOP-7")
-
 (defclass g1 (standard-generic-function)
   ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 (defclass g2 (standard-generic-function)
   ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 
 (defgeneric f1 ()
   (:generic-function-class g1))
 (defgeneric f2 ()
   (:generic-function-class g2))
 
-(print #'f1)
-(print #'f2)
+(with-test (:name :mop-7)
+  (assert (plusp (length (with-output-to-string (stream)
+                           (print #'f1 stream)))))
+  (assert (plusp (length (with-output-to-string (stream)
+                           (print #'f2 stream))))))

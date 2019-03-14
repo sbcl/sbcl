@@ -438,13 +438,12 @@ If an unsupported TYPE is requested, the function will return NIL.
                             (sb-mop:method-specializers object))
                            (sb-mop:method-specializers object)))))
        source))
-    #+sb-eval
-    (sb-eval:interpreted-function
+    (interpreted-function
+     #+sb-eval
      (let ((source (translate-source-location
                     (sb-eval:interpreted-function-source-location object))))
-       source))
-    #+sb-fasteval
-    (sb-interpreter:interpreted-function
+       source)
+     #+sb-fasteval
      (translate-source-location (sb-interpreter:fun-source-location object)))
     (function
      (find-function-definition-source object))
@@ -524,7 +523,7 @@ value."
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
   (flet ((ftype-of (function-designator)
            (type-specifier
-            (proclaimed-ftype function-designator))))
+            (global-ftype function-designator))))
     (etypecase function-designator
       (symbol
        (when (and (fboundp function-designator)

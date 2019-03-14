@@ -15,7 +15,7 @@
 ;;; arbitrary sequence arguments, both in the full call case and in
 ;;; the open code case.
 (flet ((expand (pred sequences test found-result unfound-result)
-         (unless (proper-list-of-length-p sequences 1 call-arguments-limit)
+         (unless (proper-list-of-length-p sequences 1 sb-xc:call-arguments-limit)
            (return-from expand (values nil t))) ; give up
          (binding* ((elements (make-gensym-list (length sequences)))
                     ((bind-fun call-it) (funarg-bind/call-forms pred elements))

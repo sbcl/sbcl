@@ -13,7 +13,7 @@
            sb-vm:instance-widetag sb-vm:instance-pointer-lowtag
            nil)
 
-#!+stack-allocatable-fixed-objects
+#+stack-allocatable-fixed-objects
 (defoptimizer (%make-structure-instance stack-allocate-result)
     ((defstruct-description &rest args) node dx)
   (declare (ignore args dx))
@@ -25,16 +25,15 @@
   ;; when we're on GENCGC (since CHENEYGC doesn't have conservation)
   ;; and C-STACK-IS-CONTROL-STACK (otherwise, the C stack is the
   ;; number stack, and we precisely-scavenge the control stack).
-  #!-(and :gencgc :c-stack-is-control-stack)
+  #-(and :gencgc :c-stack-is-control-stack)
   (every (lambda (x) (eq (dsd-raw-type x) t))
          (dd-slots (lvar-value defstruct-description)))
-  #!+(and :gencgc :c-stack-is-control-stack)
+  #+(and :gencgc :c-stack-is-control-stack)
   t)
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar
-                                (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (res (first locs)))
     (vop slot node block (lvar-tn node block object)
          name offset lowtag res)
@@ -54,11 +53,11 @@
          name offset lowtag)
     (move-lvar-result node block (list value-tn) (node-lvar node))))
 
-#!+compare-and-swap-vops
+#+compare-and-swap-vops
 (defoptimizer ir2-convert-casser
     ((object old new) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (res (first locs)))
     (vop compare-and-swap-slot node block
          (lvar-tn node block object)
@@ -70,7 +69,7 @@
 
 (eval-when (:compile-toplevel)
   ;; Assert correctness of build order. (Need not be exhaustive)
-  #!+(and x86-64 (not (vop-named sb-vm::raw-instance-init/word)))
+  #+(and x86-64 (not (vop-named sb-vm::raw-instance-init/word)))
   (error "Expected raw-instance-init vops"))
 
 (defun emit-inits (node block name object lowtag inits args)
@@ -111,14 +110,14 @@
                                    (vop ,(sb-kernel::raw-slot-data-init-vop rsd)
                                         node block object arg-tn slot)))
                                (symbol-value rsd-list)))))
-                    (make-case #!+(vop-named sb-vm::raw-instance-init/word)
+                    (make-case #+(vop-named sb-vm::raw-instance-init/word)
                                sb-kernel::*raw-slot-data*))))))
            (:dd
             (vop init-slot node block object
                  (emit-constant (sb-kernel::dd-layout-or-lose slot))
                  name dx-p
                  ;; Layout has no index if compact headers.
-                 (or #!+compact-instance-header :layout sb-vm:instance-slots-offset)
+                 (or #+compact-instance-header :layout sb-vm:instance-slots-offset)
                  lowtag))
            (otherwise
             (if (and (eq kind :arg)
@@ -165,7 +164,7 @@
 (defoptimizer ir2-convert-fixed-allocation
               ((&rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (emit-fixed-alloc node block name words type lowtag result lvar)
     (emit-inits node block name result lowtag inits args)
@@ -174,7 +173,7 @@
 (defoptimizer ir2-convert-variable-allocation
               ((extra &rest args) node block name words type lowtag inits)
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
@@ -188,18 +187,18 @@
     ((dd slot-specs &rest args) node block name words type lowtag inits)
   (declare (ignore inits))
   (let* ((lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list *backend-t-primitive-type*)))
+         (locs (lvar-result-tns lvar (list *universal-type*)))
          (result (first locs)))
     (aver (and (constant-lvar-p dd) (constant-lvar-p slot-specs) (= words 1)))
     (let* ((c-dd (lvar-value dd))
            (c-slot-specs (lvar-value slot-specs))
            (words (+ (dd-length c-dd) words)))
-      #!+compact-instance-header
+      #+compact-instance-header
       (progn (aver (= type sb-vm:instance-widetag))
              (emit-constant (setq type (sb-kernel::dd-layout-or-lose c-dd))))
       (emit-fixed-alloc node block name words type lowtag result lvar)
       (emit-inits node block name result lowtag
-                  `(#!-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)
+                  `(#-compact-instance-header (:dd . ,c-dd) ,@c-slot-specs) args)
       (move-lvar-result node block locs lvar))))
 
 (defoptimizer (initialize-vector ir2-convert)
@@ -211,7 +210,7 @@
                              'initialize-vector)))
          (saetp (find-saetp-by-ctype elt-ctype))
          (lvar (node-lvar node))
-         (locs (lvar-result-tns lvar (list (primitive-type vector-ctype))))
+         (locs (lvar-result-tns lvar (list vector-ctype)))
          (result (first locs))
          (elt-ptype (primitive-type elt-ctype))
          (tmp (make-normal-tn elt-ptype)))
@@ -226,16 +225,16 @@
                                    (push
                                     `(,(sb-vm:saetp-typecode s)
                                        (lambda (index tn)
-                                         #!+x86-64
+                                         #+x86-64
                                          (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
                                                             (sb-vm:saetp-primitive-type-name s)
                                                             "-C")
                                               node block result tn index 0 tn)
-                                         #!+x86
+                                         #+x86
                                          (vop ,(symbolicate "DATA-VECTOR-SET-WITH-OFFSET/"
                                                             (sb-vm:saetp-primitive-type-name s))
                                               node block result index tn 0 tn)
-                                         #!-(or x86 x86-64)
+                                         #-(or x86 x86-64)
                                          (vop ,(symbolicate "DATA-VECTOR-SET/"
                                                             (sb-vm:saetp-primitive-type-name s))
                                               node block result index tn tn)))
@@ -245,9 +244,9 @@
                          ,@(nreverse clauses)))))
                (frob)))
            (tnify (index)
-             #!-x86-64
+             #-x86-64
              (emit-constant index)
-             #!+x86-64
+             #+x86-64
              index))
       (let ((setter (compute-setter))
             (length (length initial-contents))
@@ -292,7 +291,7 @@
 
 ;;; :SET-TRANS (in objdef.lisp !DEFINE-PRIMITIVE-OBJECT) doesn't quite
 ;;; cut it for symbols, where under certain compilation options
-;;; (e.g. #!+SB-THREAD) we have to do something complicated, rather
+;;; (e.g. #+SB-THREAD) we have to do something complicated, rather
 ;;; than simply set the slot.  So we build the IR2 converting function
 ;;; by hand.  -- CSR, 2003-05-08
 (let ((fun-info (fun-info-or-lose '%set-symbol-value)))
@@ -307,7 +306,7 @@
                  node block (list value-tn) (node-lvar node))))))))
 
 ;;; Stack allocation optimizers per platform support
-#!+stack-allocatable-vectors
+#+stack-allocatable-vectors
 (progn
   (defoptimizer (make-array-header* stack-allocate-result) ((&rest args) node dx)
     args dx
@@ -318,9 +317,9 @@
     (and
      ;; Can't put unboxed data on the stack unless we scavenge it
      ;; conservatively.
-     #!-c-stack-is-control-stack
+     #-c-stack-is-control-stack
      (constant-lvar-p type)
-     #!-c-stack-is-control-stack
+     #-c-stack-is-control-stack
      (member (lvar-value type)
              '#.(list (sb-vm:saetp-typecode (find-saetp 't))
                       (sb-vm:saetp-typecode (find-saetp 'fixnum))))
@@ -360,7 +359,7 @@
         (annotate-1-value-lvar arg)))))
 
 ;;; ...lists
-#!+stack-allocatable-lists
+#+stack-allocatable-lists
 (progn
   (defoptimizer (list stack-allocate-result) ((&rest args) node dx)
     (declare (ignore dx))
@@ -373,7 +372,7 @@
     t))
 
 ;;; ...conses
-#!+stack-allocatable-fixed-objects
+#+stack-allocatable-fixed-objects
 (progn
   (defoptimizer (cons stack-allocate-result) ((&rest args) node dx)
     (declare (ignore args dx))
@@ -383,7 +382,7 @@
     t))
 
 ;;; MAKE-LIST optimizations
-#!+x86-64
+#+x86-64
 (progn
   (defoptimizer (%make-list stack-allocate-result) ((length element) node dx)
     (declare (ignore element))

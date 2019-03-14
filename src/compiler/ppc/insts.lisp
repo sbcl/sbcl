@@ -184,7 +184,7 @@
 
 (defconstant-eqx trap-values-alist
   '((:t . 31) (:lt . 16) (:le . 20) (:eq . 4) (:lng . 6)
-    (:ge .12) (:ne . 24) (:ng . 20) (:llt . 2) (:f . 0)
+    (:ge . 12) (:ne . 24) (:ng . 20) (:llt . 2) (:f . 0)
     (:lle . 6) (:lge . 5) (:lgt . 1) (:lnl . 5))
   #'equal)
 

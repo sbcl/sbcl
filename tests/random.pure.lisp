@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
+(enable-test-parallelism)
 
 ;;; Tests in this file that rely on properties of the distribution of
 ;;; the random numbers are designed to be fast and have a very low

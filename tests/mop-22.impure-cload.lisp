@@ -13,11 +13,6 @@
 
 ;;; Forward-referenced classes as specializers.
 
-(defpackage "MOP-22"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-22")
-
 ;;; It's generally unclear to me whether this should be allowed.  On
 ;;; the one hand, FORWARD-REFERENCED-CLASS is a subclass of CLASS and
 ;;; hence of SPECIALIZER, and AMOP specifies that as-yet-undefined
@@ -46,10 +41,11 @@
 
 (defclass forward () ())
 
-(assert (eq (incomplete/1 (make-instance 'incomplete)) 'incomplete))
-(assert (eq (forward/1 (make-instance 'forward)) 'forward))
-(assert (eq (incomplete/7 (make-instance 'incomplete)
-                          (make-instance 'incomplete)
-                          t 1 (make-condition 'error)
-                          (find-class 'incomplete) 3)
-            t))
+(with-test (:name :mop-22)
+  (assert (eq (incomplete/1 (make-instance 'incomplete)) 'incomplete))
+  (assert (eq (forward/1 (make-instance 'forward)) 'forward))
+  (assert (eq (incomplete/7 (make-instance 'incomplete)
+                            (make-instance 'incomplete)
+                            t 1 (make-condition 'error)
+                            (find-class 'incomplete) 3)
+              t)))

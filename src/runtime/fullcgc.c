@@ -20,6 +20,7 @@
 #include "genesis/vector.h"
 #include "genesis/layout.h"
 #include "genesis/hash-table.h"
+#include "code.h"
 #include "immobile-space.h"
 #include "queue.h"
 
@@ -328,7 +329,7 @@ static void trace_object(lispobj* where)
             gc_mark_range(SIMPLE_FUN_SCAV_START(fun),
                           SIMPLE_FUN_SCAV_NWORDS(fun));
         })
-        scan_to = code_header_words(header);
+        scan_to = code_header_words((struct code*)where);
         break;
     case FDEFN_WIDETAG:
         gc_mark_obj(fdefn_callee_lispobj((struct fdefn*)where));
@@ -464,7 +465,7 @@ static void sweep_fixedobj_pages(long *zeroed)
 {
     low_page_index_t page;
 
-    for (page = 0 ; ; ++page) {
+    for (page = FIXEDOBJ_RESERVED_PAGES ; ; ++page) {
         lispobj *obj = fixedobj_page_address(page);
         if (obj >= fixedobj_free_pointer)
             break;
@@ -519,14 +520,14 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                     goto cons;
                 struct code* code  = (struct code*)where;
                 // Keep in sync with the definition of filler_obj_p()
-                lispobj header = CODE_HEADER_WIDETAG;
-                if (code->header != header) {
+                if (!filler_obj_p((lispobj*)code)) {
                     page_index_t page = find_page_index(where);
                     int gen = page >= 0 ? page_table[page].gen
                       : __immobile_obj_gen_bits(where);
                     NOTE_GARBAGE(gen, where, nwords, zeroed, {
-                        code->header = header;
-                        code->code_size = make_fixnum(nwords * N_WORD_BYTES);
+                        code->boxed_size = 0;
+                        code->header = (nwords << CODE_HEADER_SIZE_SHIFT)
+                                     | CODE_HEADER_WIDETAG;
                         memset(where+2, 0, (nwords - 2) * N_WORD_BYTES);
                     })
                 }

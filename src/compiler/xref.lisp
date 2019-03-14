@@ -138,23 +138,17 @@
     (list
      (every #'internal-name-p what))
     (symbol
-     #!+sb-xref-for-internals
-     (eq '.anonymous. what)
-     #!-sb-xref-for-internals
      (or (eq '.anonymous. what)
-         (member (symbol-package what)
+         #-sb-xref-for-internals
+         (member (sb-xc:symbol-package what)
                  (load-time-value
-                  (list* (find-package "COMMON-LISP")
-                         #+sb-xc-host (find-package "SB-XC")
-                         (remove-if-not
-                          (lambda (package)
-                            (= (mismatch "SB-" (package-name package))
-                               3))
-                          (list-all-packages))) t))
-         #+sb-xc-host   ; again, special case like in genesis and dump
-         (multiple-value-bind (cl-symbol cl-status)
-             (find-symbol (symbol-name what) *cl-package*)
-           (and (eq what cl-symbol) (eq cl-status :external)))))
+                  (cons *cl-package*
+                        (remove-if-not
+                         (lambda (package)
+                           (= (mismatch "SB-" (package-name package))
+                              3))
+                         (list-all-packages)))
+                  t))))
     (t t)))
 
 (defun record-xref (kind what context node path)

@@ -59,33 +59,31 @@
 (defun sc-locations-member (location locations)
   (logbitp location locations))
 
+;;; This used to have two local functions in it, but when it did,
+;;; using ABCL as the build host crashed thusly with no backtrace:
+;;; (funcall (macro-function 'do-sc-locations)
+;;;           '(do-sc-locations (el (sc-locations sc) nil (sc-element-size sc))
+;;;             (feep))
+;;;            nil)
+;;;  => Debugger invoked on condition of type TYPE-ERROR
+;;;     The value NIL is not of type STRUCTURE-OBJECT.
 (defmacro do-sc-locations ((location locations
-                            &optional result increment (limit nil limitp))
+                            &optional result increment (limit 'sb-vm:finite-sc-offset-limit))
                            &body body)
-  (let* ((limit (cond
-                  ((not limitp)
-                   sb-vm:finite-sc-offset-limit)
-                  ((not (constantp limit))
-                   limit)
-                  ((eval limit))
-                  (t
-                   sb-vm:finite-sc-offset-limit)))
-         (mid   (floor sb-vm:finite-sc-offset-limit 2)))
+  (let ((mid (floor sb-vm:finite-sc-offset-limit 2)))
     (once-only ((locations locations)
                 (increment `(the sb-vm:finite-sc-offset ,(or increment 1))))
-      (labels ((make-block (start end)
-                 `(loop named #:noname
-                        for ,location
-                        from ,start below ,end by ,increment
-                        when (logbitp ,location ,locations)
-                        do (locally (declare (type sb-vm:finite-sc-offset
-                                              ,location))
-                             ,@body)))
-               (make-guarded-block (start end)
-                 (unless (and (numberp limit) (<= limit start))
+      (flet ((make-guarded-block (start end)
+                 (unless (and (integerp limit) (> start limit))
                    (let ((mask (dpb -1 (byte mid start) 0)))
                      `((when (logtest ,mask ,locations)
-                         ,(make-block start end )))))))
+                         (loop named #:noname
+                               for ,location
+                               from ,start below ,end by ,increment
+                               when (logbitp ,location ,locations)
+                                 do (locally (declare (type sb-vm:finite-sc-offset
+                                                            ,location))
+                                      ,@body))))))))
         `(block nil
            ,@(make-guarded-block 0   mid)
            ,@(make-guarded-block mid limit)
@@ -363,7 +361,7 @@
   ;; dynamic vop count info. This is needed by both ir2-convert and
   ;; setup-dynamic-count-info. (But only if we are generating code to
   ;; collect dynamic statistics.)
-  #!+sb-dyncount
+  #+sb-dyncount
   (dyncount-info nil :type (or null dyncount-info)))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
@@ -415,11 +413,11 @@
   (return-pc-pass (missing-arg) :type tn :read-only t)
   ;; a label that marks the first instruction after the RETURN-PC has
   ;; been moved from its passing location to its save location.
-  #!-fp-and-pc-standard-save
+  #-fp-and-pc-standard-save
   (lra-saved-pc nil :type (or label null))
   ;; a label that marks the first instruction after the OLD-FP has
   ;; been moved from its passing location to its save location.
-  #!-fp-and-pc-standard-save
+  #-fp-and-pc-standard-save
   (cfp-saved-pc nil :type (or label null))
   ;; True if this function has a frame on the number stack. This is
   ;; set by representation selection whenever it is possible that some
@@ -439,7 +437,7 @@
   ;; function as far as the debugger is concerned.
   (environment-start nil :type (or label null))
   (closure-save-tn nil :type (or tn null))
-  #!+unwind-to-frame-and-call-vop
+  #+unwind-to-frame-and-call-vop
   (bsp-save-tn nil :type (or tn null)))
 
 (defprinter (ir2-physenv)
@@ -484,10 +482,10 @@
   (save-sp nil :type (or tn null))
   ;; the list of dynamic state save TNs
 
-  (dynamic-state #!-x86-64
+  (dynamic-state #-x86-64
                  (list* (make-stack-pointer-tn)
                         (make-dynamic-state-tns))
-                 #!+x86-64 nil
+                 #+x86-64 nil
                  :type list)
   ;; the target label for NLX entry
   (target (gen-label) :type label))
@@ -993,7 +991,7 @@
         :type (member :normal :environment :debug-environment
                       :save :save-once  :load :constant
                       :component :alias :unused
-                      #!-fp-and-pc-standard-save :specified-save
+                      #-fp-and-pc-standard-save :specified-save
                       :arg-pass))
   ;; the primitive-type for this TN's value. Null in restricted or
   ;; wired TNs.

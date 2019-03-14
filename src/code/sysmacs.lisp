@@ -22,14 +22,14 @@
 ;;; out what it should be yet.
 (defvar *gc-pending*)
 
-#!+sb-thread
+#+sb-thread
 (defvar *stop-for-gc-pending*)
 
 ;;; This one is initialized by the runtime, at thread creation.  On
 ;;; non-x86oid gencgc targets, this is a per-thread list of objects
 ;;; which must not be moved during GC.  It is frobbed by the code for
 ;;; with-pinned-objects in src/compiler/target/macros.lisp.
-#!+(and gencgc (not (or x86 x86-64)))
+#+(and gencgc (not (or x86 x86-64)))
 (defvar sb-vm::*pinned-objects*)
 
 (defmacro without-gcing (&body body)
@@ -68,7 +68,7 @@ maintained."
                ;; is a pending gc or stop-for-gc.
                (when (or *interrupt-pending*
                          *gc-pending*
-                         #!+sb-thread *stop-for-gc-pending*)
+                         #+sb-thread *stop-for-gc-pending*)
                  (sb-unix::receive-pending-interrupt))))))))
 
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.
@@ -90,7 +90,7 @@ maintained."
        (cond ((null ,svar) *standard-input*)
              ((eq ,svar t) *terminal-io*)
              (t
-                #!+high-security
+                #+high-security
                 (unless (input-stream-p ,svar)
                   (error 'simple-type-error
                          :datum ,svar
@@ -115,7 +115,7 @@ maintained."
        (cond ((null ,svar) *standard-output*)
              ((eq ,svar t) *terminal-io*)
              (t
-                #!+high-security
+                #+high-security
                 (unless (output-stream-p ,svar)
                   (error 'simple-type-error
                          :datum ,svar
@@ -237,27 +237,25 @@ maintained."
                 (type index ,f-index))
        (declare (disable-package-locks fast-read-byte))
        (flet ((fast-read-byte ()
-                  (,@(cond ((equal '(unsigned-byte 8) type)
-                            ;; KLUDGE: For some reason I haven't tracked down
-                            ;; this makes a difference even in given the TRULY-THE.
-                            `(logand #xff))
-                           (t
-                            `(identity)))
-                   (truly-the ,type
-                              (cond
-                                ((not ,f-buffer)
-                                 (funcall ,f-method ,f-stream ,eof-p ,eof-val))
-                                ((= ,f-index +ansi-stream-in-buffer-length+)
-                                 (prog1 (fast-read-byte-refill ,f-stream ,eof-p ,eof-val)
-                                   (setq ,f-index (ansi-stream-in-index ,f-stream))))
-                                (t
-                                 (prog1 (aref ,f-buffer ,f-index)
-                                   (incf ,f-index))))))))
+                (,@(cond ((equal '(unsigned-byte 8) type)
+                          ;; KLUDGE: For some reason I haven't tracked down
+                          ;; this makes a difference even in given the TRULY-THE.
+                          `(logand #xff))
+                         (t
+                          `(identity)))
+                 (truly-the ,type
+                            (cond
+                              ((not ,f-buffer)
+                               (funcall ,f-method ,f-stream ,eof-p ,eof-val))
+                              ((< ,f-index (length ,f-buffer))
+                               (prog1 (aref ,f-buffer ,f-index)
+                                 (setf (ansi-stream-in-index ,f-stream) (incf ,f-index))))
+                              (t
+                               (prog1 (fast-read-byte-refill ,f-stream ,eof-p ,eof-val)
+                                 (setq ,f-index (ansi-stream-in-index ,f-stream)))))))))
          (declare (inline fast-read-byte))
          (declare (enable-package-locks fast-read-byte))
-         (unwind-protect
-              (locally ,@body)
-           (setf (ansi-stream-in-index ,f-stream) ,f-index))))))
+         (locally ,@body)))))
 
 ;; This is an internal-use-only macro.
 (defmacro do-rest-arg (((var &optional index-var) rest-var

@@ -915,7 +915,7 @@ muffle these warnings at runtime, SBCL provides a variable
 @findex @cl{inspect}
 
 SBCL provides a profiler and other extensions to the ANSI @code{trace}
-facility.  For more information, see @ref{Macro common-lisp:trace}.
+facility.  For more information, see @ref{Macro common-lisp trace}.
 
 The debugger supports a number of options. Its documentation is
 accessed by typing @kbd{help} at the debugger prompt. @xref{Debugger}.
@@ -1181,16 +1181,16 @@ and its context.
 @headitem Operation                                            @tab Timeout Parameter @tab Affected by Deadlines
 @item     @code{cl:sleep}                                      @tab -                 @tab since SBCL 1.4.3
 @item     @code{cl:read-line}, etc.                            @tab no                @tab yes
-@item     @ref{Macro sb-ext:wait-for}                          @tab yes               @tab yes
-@item     @ref{Function sb-ext:process-wait}                   @tab no                @tab yes
-@item     @ref{Function sb-thread:grab-mutex}                  @tab yes               @tab yes
-@item     @ref{Function sb-thread:condition-wait}              @tab yes               @tab yes
-@item     @ref{Function sb-thread:wait-on-semaphore}           @tab yes               @tab yes
-@item     @ref{Function sb-thread:join-thread}                 @tab yes               @tab yes
-@item     @ref{Function sb-concurrency:receive-message}        @tab yes               @tab yes?
-@item     @ref{Function sb-concurrency:wait-on-gate}           @tab yes               @tab yes?
-@item     @ref{Macro sb-concurrency:frlock-write}              @tab yes               @tab yes?
-@item     @ref{Function sb-concurrency:grab-frlock-write-lock} @tab yes               @tab yes?
+@item     @ref{Macro sb-ext wait-for,,@code{wait-for}}@:  @tab yes               @tab yes
+@item     @ref{Function sb-ext process-wait,,@code{process-wait}}@:                   @tab no                @tab yes
+@item     @ref{Function sb-thread grab-mutex,,@code{grab-mutex}}@:                  @tab yes               @tab yes
+@item     @ref{Function sb-thread condition-wait,,@code{condition-wait}}@:              @tab yes               @tab yes
+@item     @ref{Function sb-thread wait-on-semaphore,,@code{wait-on-semaphore}}@:           @tab yes               @tab yes
+@item     @ref{Function sb-thread join-thread,,@code{join-thread}}@:                 @tab yes               @tab yes
+@item     @ref{Function sb-concurrency receive-message,,@code{receive-message}}@:        @tab yes               @tab yes?
+@item     @ref{Function sb-concurrency wait-on-gate,,@code{wait-on-gate}}@:           @tab yes               @tab yes?
+@item     @ref{Macro sb-concurrency frlock-write,,@code{frlock-write}}@:              @tab yes               @tab yes?
+@item     @ref{Function sb-concurrency grab-frlock-write-lock,,@code{grab-frlock-write-lock}}@: @tab yes               @tab yes?
 @end multitable
 
 @node    Miscellaneous Extensions

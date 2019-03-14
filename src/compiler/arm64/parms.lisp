@@ -55,7 +55,6 @@
 (defconstant single-float-normal-exponent-min 1)
 (defconstant single-float-normal-exponent-max 254)
 (defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
 
 (defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
@@ -63,7 +62,6 @@
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
@@ -96,7 +94,7 @@
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#!-gencgc
+#-gencgc
 (progn
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
@@ -105,12 +103,12 @@
 
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000)
-  #!+linux
+  #+linux
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
 
-#!+gencgc
+#+gencgc
 (!gencgc-space-setup #xF0000000 :dynamic-space-start #x1000000000)
 
 (defconstant linkage-table-entry-size 16)
@@ -139,7 +137,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
- `#(#!-sb-thread
+ `#(#-sb-thread
     ,@'(*binding-stack-pointer*
         *pseudo-atomic-atomic*
         *pseudo-atomic-interrupted*)

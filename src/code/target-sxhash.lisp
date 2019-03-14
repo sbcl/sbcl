@@ -76,15 +76,15 @@
 ;; The result is guaranteed to be a positive fixnum.
 (declaim (inline address-based-counter-val))
 (defun address-based-counter-val ()
-  #!+(and (not sb-thread) cheneygc)
+  #+(and (not sb-thread) cheneygc)
   (ash (sap-int (dynamic-space-free-pointer)) (- (1+ sb-vm:word-shift)))
   ;; dynamic-space-free-pointer increments only when a page is full.
   ;; Using boxed_region directly is finer-grained.
-  #!+(and (not sb-thread) gencgc)
+  #+(and (not sb-thread) gencgc)
   (ash (extern-alien "gc_alloc_region" unsigned-long)
        (- (1+ sb-vm:word-shift)))
   ;; threads imply gencgc. use the per-thread alloc region pointer
-  #!+sb-thread
+  #+sb-thread
   (ash (sap-int (sb-vm::current-thread-offset-sap
                  #.sb-vm::thread-alloc-region-slot))
        (- (1+ sb-vm:word-shift))))
@@ -139,7 +139,7 @@
       (set-result (+ result (ash result 3)))
       (set-result (logxor result (ash result -11)))
       (set-result (logxor result (ash result 15)))
-      (logand result most-positive-fixnum))))
+      (logand result sb-xc:most-positive-fixnum))))
 ;;; test:
 ;;;   (let ((ht (make-hash-table :test 'equal)))
 ;;;     (do-all-symbols (symbol)
@@ -192,7 +192,7 @@
            (quasi-random-address-based-hash
             (load-time-value (make-array 1 :element-type '(and fixnum unsigned-byte))
                              t)
-            most-positive-fixnum))))
+            sb-xc:most-positive-fixnum))))
      (when (plusp answer)
        ;; Make sure we never return 0 (almost no chance of that anyway).
        (return answer)))))
@@ -207,7 +207,7 @@
           (let ((old (cas (sb-kernel::condition-hash instance) 0 new)))
             (if (eql old 0) new old))))))
 
-#!+(and compact-instance-header x86-64)
+#+(and compact-instance-header x86-64)
 (progn
   (declaim (inline %std-instance-hash))
   (defun %std-instance-hash (slots) ; return or compute the 32-bit hash
@@ -222,7 +222,7 @@
   ;; Apparently we care that the object is of primitive type INSTANCE, but not
   ;; whether it is STANDARD-INSTANCE. It had better be, or we're in trouble.
   (declare (instance instance))
-  #!+(and compact-instance-header x86-64)
+  #+(and compact-instance-header x86-64)
   ;; The one logical slot (excluding layout) in the primitive object is index 0.
   ;; That holds a vector of the clos slots, and its header holds the hash.
   (let* ((slots (%instance-ref instance 0))
@@ -231,7 +231,7 @@
     ;; in case people use the high order bits.
     ;; (There are only 32 bits of actual randomness, if even that)
     (logxor (ash hash (- sb-vm:n-positive-fixnum-bits 32)) hash))
-  #!-(and compact-instance-header x86-64)
+  #-(and compact-instance-header x86-64)
   (locally
    (declare (optimize (sb-c::type-check 0)))
    (let ((hash (sb-pcl::standard-instance-hash-code instance)))
@@ -250,10 +250,10 @@
   (declare (function fin))
   (locally
    (declare (optimize (sb-c::type-check 0)))
-   #!+compact-instance-header
+   #+compact-instance-header
    (sb-vm::get-header-data-high
     (sb-pcl::standard-funcallable-instance-clos-slots fin))
-   #!-compact-instance-header
+   #-compact-instance-header
    (sb-pcl::standard-funcallable-instance-hash-code fin)))
 
 (defun sxhash (x)
@@ -273,7 +273,7 @@
   ;;    so we should pick off SYMBOL sooner than INSTANCE as well.
   ;;  * INSTANCE (except for PATHNAME) doesn't recurse anyway - in fact
   ;;    it is particularly dumb (by design), so performing that test later
-  ;;    doesn't incur much of a penalty. And our users probably know thatb
+  ;;    doesn't incur much of a penalty. And our users probably know that
   ;;    SXHASH on instance doesn't really do anything.
   ;; Anyway, afaiu, the code below was previously ordered by gut feeling
   ;; rather than than actual measurement, so having any rationale for ordering
@@ -295,13 +295,13 @@
                  (integer (sb-bignum:sxhash-bignum x))
                  (single-float (sxhash x)) ; through DEFTRANSFORM
                  (double-float (sxhash x)) ; through DEFTRANSFORM
-                 #!+long-float (long-float (error "stub: no LONG-FLOAT"))
+                 #+long-float (long-float (error "stub: no LONG-FLOAT"))
                  (ratio (let ((result 127810327))
                           (declare (type fixnum result))
                           (mixf result (sxhash-number (numerator x)))
                           (mixf result (sxhash-number (denominator x)))
                           result))
-                 #!+long-float
+                 #+long-float
                  ((complex long-float)
                   (hash-complex-float))
                  ((complex double-float)
@@ -582,11 +582,11 @@
                 (etypecase key
                   (single-float (hash-float single-float key))
                   (double-float (hash-float double-float key))
-                  #!+long-float
+                  #+long-float
                   (long-float (error "LONG-FLOAT not currently supported")))))
-       (rational (if (and (<= most-negative-double-float
+       (rational (if (and (<= sb-xc:most-negative-double-float
                               key
-                              most-positive-double-float)
+                              sb-xc:most-positive-double-float)
                           (= (coerce key 'double-float) key))
                      (sxhash-double-float (coerce key 'double-float))
                      (sxhash key)))

@@ -21,29 +21,28 @@
 ;;;; This file strives to do better on all fronts:
 ;;;; the tests should be fast, named, and not noisy.
 
-(cl:in-package :cl-user)
-
 (enable-test-parallelism)
 
 (defun compiles-with-warning (lambda)
   (assert (nth-value 2 (checked-compile lambda :allow-warnings t))))
 
-(with-test (:name :position-derive-type)
+(with-test (:name (position :derive-type))
   (checked-compile '(lambda (x)
                       (ash 1 (position (the (member a b c) x) #(a b c )))))
   (checked-compile '(lambda (x)
                       (ash 1 (position x #(a b c ))))
                    :allow-style-warnings t)
-  (let ((f (compile nil '(lambda (x) (position x '(a b c d e f g h i j k l m))))))
+  (let ((f (checked-compile '(lambda (x)
+                              (position x '(a b c d e f g h i j k l m))))))
     ;; test should be EQ, not EQL
     (assert (or (find (symbol-function 'eq)
                       (ctu:find-code-constants f :type 'sb-kernel:simple-fun))
                 (ctu:find-named-callees f :name 'eq))))
-  (let ((f (compile nil
-                    '(lambda (x)
-                       (position x '(a b c d e d c b a) :from-end t)))))
-    (assert (= (funcall f 'a) 8))
-    (assert (= (funcall f 'b) 7))))
+  (checked-compile-and-assert ()
+      '(lambda (x)
+        (position x '(a b c d e d c b a) :from-end t))
+    (('a) 8)
+    (('b) 7)))
 
 (with-test (:name (ldb :recognize-local-macros))
   ;; Should not call %LDB
@@ -1825,6 +1824,22 @@
                 (let ((x o)) x)))))))
    ((10 20) 10)))
 
+(with-test (:name :substitute-single-use-lvar-unknown-exits.6)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (block b
+        (return-from b
+          (let ((lv3 (random 10))
+                *)
+            (boole boole-1 lv3
+                   (the integer
+                        (catch 'ct4
+                          (let ((x (list '*)))
+                            (declare (dynamic-extent x))
+                            (return-from b (eval x))))))))))
+   (() 1)))
+
 (with-test (:name :lambda-let-inline)
   (let ((fun (checked-compile
               `(lambda ()
@@ -1914,3 +1929,398 @@
    (('a) nil)
    ((()) nil)
    (((1- most-negative-fixnum)) nil)))
+
+(with-test (:name :fixnum-mod-p-word-descriptor)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare (type sb-vm:signed-word a))
+      (typep a '(integer 0 ,(1- most-positive-fixnum))))
+   (((1- most-positive-fixnum)) t)
+   ((0) t)
+   ((1) t)
+   ((most-positive-fixnum) nil)
+   (((1+ most-positive-fixnum)) nil)
+   ((most-negative-fixnum) nil)
+   (((1+ most-negative-fixnum)) nil)
+   (((1- (expt 2 (1- sb-vm:n-word-bits)))) nil)
+   ((-1) nil)))
+
+(with-test (:name :check-bound-zero-safety-notes)
+  (checked-compile-and-assert
+      (:allow-notes nil
+       :optimize '(:speed 3 :safety 0))
+      `(lambda (a x y z)
+         (declare (fixnum x y z)
+                  ((simple-array t (*)) a)
+                  (optimize (speed 3) (safety 0)))
+         (aref a (+ x (- y z))))
+    ((#(1 2 3) 1 0 0) 2)))
+
+(defstruct %instance-ref-eq (n 0))
+
+(with-test (:name :%instance-ref-eq-immediately-used)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (let ((n (%instance-ref-eq-n s)))
+        (incf (%instance-ref-eq-n s))
+        (eql n 0)))
+   (((make-%instance-ref-eq)) t)))
+
+(with-test (:name :%instance-ref-eq-load-immediate)
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (eql (%instance-ref-eq-n s)
+           most-positive-fixnum))
+   (((make-%instance-ref-eq :n most-positive-fixnum)) t)
+   (((make-%instance-ref-eq :n -1)) nil))
+  (checked-compile-and-assert
+   ()
+   `(lambda (s)
+      (eql (%instance-ref-eq-n s)
+           (1- (expt 2 31))))
+   (((make-%instance-ref-eq :n (1- (expt 2 31)))) t)
+   (((make-%instance-ref-eq :n -1)) nil)))
+
+(with-test (:name :convert-mv-bind-to-let-multiple-uses)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f)
+      (let* ((a (eval 1))
+             (b (eval 2)))
+        (multiple-value-bind (x y) (if f
+                                       (values a 1)
+                                       (values b 2))
+          (values x y))))
+   ((t) (values 1 1))
+   ((nil) (values 2 2))))
+
+(with-test (:name :substitute-single-use-lvar-multiple-uses)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f)
+      (let* ((a (eval 1))
+             (b (eval 2))
+             (m (if f
+                    (values a)
+                    (values b))))
+        m))
+   ((t) 1)
+   ((nil) 2)))
+
+(with-test (:name :tn-ref-type-multiple-moves)
+  (checked-compile-and-assert
+   ()
+   `(lambda  (a c)
+      (declare (type (integer 546181490258163 937632934000433) c))
+      (let ((v8 c))
+        (multiple-value-bind (v9 v6)
+            (if (/= a v8)
+                (values 0 10983313414045189807)
+                (values 0 c))
+          (declare (ignore v9))
+          (loop repeat 2
+                do (eval v6))
+          v6)))
+   ((0 571816791704489) 10983313414045189807)))
+
+(with-test (:name :substitute-single-use-lvar-cast-chains)
+  (checked-compile-and-assert
+   ()
+   `(lambda (f a b)
+      (labels ((fun (z)
+                 (let ((m z))
+                   ;; delays type derivation of FUN as FIXNUM until constraint propagation
+                   ;; making sure SUBSTITUTE-SINGLE-USE-LVAR runs first.
+                   (if (typep m 'fixnum)
+                       m
+                       0))))
+        (declare (inline fun))
+        (let* ((a (fun a))
+               (b (fun b)))
+          (let ((m
+                  (if f
+                      (the fixnum (the integer a))
+                      (the fixnum (the integer b)))))
+            m))))
+   ((t 1 2) 1)
+   ((nil 1 2) 2)))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.1)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (multiple-value-bind (a b)
+                  (if z
+                      10
+                      (values (sxhash m) m))
+                (declare (ignore a))
+                b)))))
+    (assert (eql (funcall f t 33) nil))
+    (assert (eql (funcall f nil 33) 33))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.2)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (multiple-value-bind (a b c)
+                  (if z
+                      (values 10)
+                      (values (sxhash m) m))
+                (declare (ignore a))
+                (list b c))))))
+    (assert (equal (funcall f t 33) '(nil nil)))
+    (assert (equal (funcall f nil 33) '(33 nil)))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.3)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (multiple-value-bind (a b)
+                  (if z
+                      10
+                      (values m (sxhash m)))
+                (declare (ignore b))
+                a)))))
+    (assert (eql (funcall f t 33) 10))
+    (assert (eql (funcall f nil 33) 33))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.4
+            :skipped-on :sbcl)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (nth-value 1
+               (if z
+                   (funcall (the function z))
+                   (values (sxhash m) m)))))))
+    (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
+    (assert (eql (funcall f nil 34) 34))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-unused-values.5
+            :skipped-on :sbcl)
+  (let ((f (checked-compile
+            '(lambda (z m)
+              (nth-value 1
+               (if z
+                   (funcall (the function z))
+                   (sxhash m)))))))
+    (assert (eql (funcall f (lambda () (values 1 22)) 33) 22))
+    (assert (eql (funcall f nil 34) nil))
+    (assert (not (ctu:find-named-callees f)))))
+
+(with-test (:name :m-v-bind-multi-use-variable-type-change)
+  (checked-compile-and-assert
+   ()
+   '(lambda (p)
+     (when (position #\a (the (or (simple-string 1) (simple-string 2)) p))
+       nil))
+   (("a") nil)
+   (("ab") nil)))
+
+(with-test (:name :array-element-type-cons.1)
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   '(lambda (vector)
+     (declare ((or (simple-array (unsigned-byte 32) (2))
+                   (simple-array (unsigned-byte 32) (4))) vector))
+     (make-array 10 :element-type (array-element-type vector)))
+   (((make-array 2 :element-type '(unsigned-byte 32)))
+    '(unsigned-byte 32) :test (lambda (x y)
+                                (equal (array-element-type (car x)) (car y))))))
+
+(with-test (:name :array-element-type-cons.2)
+  (checked-compile-and-assert
+   (:allow-notes nil)
+   '(lambda (vector)
+     (declare ((and (simple-array (unsigned-byte 32) (2))
+                (satisfies eval)) vector))
+     (make-array 10 :element-type (array-element-type vector)))
+   (((make-array 2 :element-type '(unsigned-byte 32)))
+    '(unsigned-byte 32) :test (lambda (x y)
+                                (equal (array-element-type (car x)) (car y))))))
+
+(with-test (:name :about-to-modify-symbol-value-relax-fun-type)
+  (let* ((compiled-lambda (compile nil '(lambda (&rest x) x 'hi)))
+         (sb-c::*compiler-error-bailout*
+          (lambda (&optional c) (error c))))
+    (declare (notinline set))
+    (set 'sb-c::*compiler-error-bailout* compiled-lambda)))
+
+(with-test (:name :self-evaluating-p-not)
+  (let ((s (gensym)))
+    (set s 9)
+    (unintern s)
+    (import s 'keyword)
+    (assert (not (sb-int:self-evaluating-p s)))))
+
+(with-test (:name :lea-modfx-constant-folding)
+  (checked-compile-and-assert
+      ()
+      '(lambda (c)
+        (if (if c
+                c
+                (if 444
+                    nil
+                    99))
+            11
+            (logand 3
+                    (logxor
+                     (* 5
+                        (if c
+                            0
+                            (ash most-positive-fixnum -2)))
+                     3))))
+    ((t) 11)
+    ((nil) 0)))
+
+(with-test (:name :setup-environment-tn-conflicts)
+  (checked-compile-and-assert
+      ()
+      '(lambda (z)
+        (let ((c 0))
+          (flet ((bar ()
+                   (let ((m (eval :bad)))
+                     (eval m)
+                     (and m c))))
+            (declare (notinline bar))
+            (cond (z
+                   (setf c 10)
+                   (bar))
+                  (44)))))
+    ((t) 10)
+    ((nil) 44)))
+
+(with-test (:name :setup-environment-tn-conflicts.2)
+  (checked-compile-and-assert
+      ()
+      '(lambda (z)
+        (let ((c 0)
+              (b 0)
+              (a 0)
+              (d 0))
+          (labels ((bar ()
+                     (let ((m (eval :bad)))
+                       (eval m)
+                       (if m
+                           (values a b c d))))
+                   (jam ()
+                     (multiple-value-list (bar))))
+            (declare (notinline bar
+                                jam))
+            (cond (z
+                   (setf a 10
+                         c 10
+                         b 10
+                         d 10)
+                   (jam))
+                  (44)))))
+    ((t) '(10 10 10 10) :test #'equal)
+    ((nil) 44)))
+
+(with-test (:name :setup-environment-tn-conflicts.3)
+  (checked-compile-and-assert
+      ()
+      '(lambda (b)
+        (flet ((%f7 ()
+                 (flet ((%f10 ()
+                          (setf b b)))
+                   (declare (dynamic-extent #'%f10))
+                   (funcall (eval #'%f10)))))
+          (declare (notinline %f7))
+          (%f7)))
+    ((10) 10)))
+
+(with-test (:name :dead-sets)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (logtest
+          ((lambda (v &rest args)
+             (declare (ignore args))
+             (setf v
+                   ((lambda (&rest args) (declare (ignore args)) (error "")) v)))
+           1)
+          1))
+    (() (condition 'simple-error))))
+
+(with-test (:name :functional-may-escape-p)
+  (checked-compile-and-assert
+      (:optimize :safe)
+      '(lambda ()
+        (let (x)
+          (block nil
+            (flet ((x () (let (*)
+                           (return 33))))
+              (setf x #'x)))
+          (funcall x)))
+    (() (condition 'control-error))))
+
+(declaim (inline make-mystruct))
+(macrolet ((def-mystruct () `(defstruct mystruct a b c)))
+  (def-mystruct)) ; MAKE-MYSTRUCT captures a lexenv (rather pointlessly)
+
+;;; Assert that throwaway code in compiled macrolets does not go in immobile space
+#+immobile-space
+(with-test (:name :macrolet-not-immobile-space :serial t
+            :skipped-on :interpreter)
+  (labels ((count-code-objects ()
+             (length (sb-vm::list-allocated-objects
+                      :immobile
+                      :test (lambda (x)
+                              (and (sb-kernel:code-component-p x)
+                                   (/= (sb-kernel:generation-of x)
+                                       sb-vm:+pseudo-static-generation+))))))
+           (test (lambda)
+             (sb-sys:without-gcing
+              (let* ((start-count (count-code-objects))
+                     (result
+                       (let ((sb-c::*compile-to-memory-space* :immobile))
+                         (compile nil lambda)))
+                     (end-count (count-code-objects)))
+                (assert (= end-count (1+ start-count)))
+                result))))
+    (sb-ext:gc :full t)
+    ;; Test 1: simple macrolet
+    (test '(lambda (x) (macrolet ((baz (arg) `(- ,arg))) (list (baz x)))))
+    ;; Test 2: inline a function that captured a macrolet
+    (test '(lambda (x) (make-mystruct :a x)))))
+
+(with-test (:name :inlining-multiple-refs)
+  (checked-compile
+   `(lambda (x)
+      (labels ((%s (y &rest r)
+                 (some
+                  (lambda (r) (apply #'%s (1+ y) r))
+                  (apply #'eql x r))))
+        (%s 1)))))
+
+(with-test (:name :update-lvar-dependencies-delete-lvar)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x y)
+        (let ((x x))
+          (block nil
+            (flet ((proc (thing)
+                     (when thing
+                       (return (eval thing)))))
+              (declare (inline proc))
+              (if x
+                  (proc y)
+                  (proc y)))))
+        t)
+    ((1 2) t)))
+
+(with-test (:name :car-type-on-or-null)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (declare (type (or null (cons fixnum)) x))
+              (if x
+                  (car x)
+                  0))))
+          '(function ((or null (cons fixnum t))) (values fixnum &optional)))))
+

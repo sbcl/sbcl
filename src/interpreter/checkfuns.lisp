@@ -50,11 +50,9 @@
 (defun type-checker (type)
   (labels
       ((get-unary-predicate (type)
-         (dolist (entry sb-c::*backend-type-predicates*)
-           ;; Slowish, because there's no hashtable for TYPE=, but better
-           ;; than the alternative of not using these at all!
-           (when (type= type (car entry))
-             (return (symbol-function (cdr entry))))))
+         (let ((pred (sb-c::backend-type-predicate type)))
+           (when pred
+             (symbol-function pred))))
        (simplify (type)
          (etypecase type
            ((or named-type numeric-type member-type classoid

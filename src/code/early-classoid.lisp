@@ -81,7 +81,7 @@
   ;; PURIFY).
   ;; This is only meaningful if DD-CLASS-P = T.
   (pure nil :type (member t nil)))
-#!-sb-fluid (declaim (freeze-type defstruct-description))
+#-sb-fluid (declaim (freeze-type defstruct-description))
 (!set-load-form-method defstruct-description (:host :xc :target))
 
 ;;;; basic LAYOUT stuff
@@ -115,7 +115,11 @@
 ;;; well, since the initialization of layout slots is hardcoded there.
 ;;;
 ;;; FIXME: ...it would be better to automate this, of course...
-(def!struct (layout #-sb-xc-host (:constructor #!+immobile-space nil)
+(def!struct (layout (:constructor make-layout
+                        ;; Accept a specific subset of keywords
+                        (&key %flags clos-hash classoid invalid
+                              inherits depthoid length info bitmap
+                              depth2-ancestor depth3-ancestor depth4-ancestor))
                     (:copier nil))
   ;; one +something-LAYOUT-FLAG+ bit or none of them
   (%flags 0 :type fixnum :read-only nil)
@@ -186,25 +190,6 @@
 (defun layout-for-std-class-p (x)
   (logtest (layout-%flags x) +pcl-object-layout-flag+))
 
-#!+(and immobile-space (host-feature sb-xc))
-(macrolet ((def-layout-maker ()
-             (let ((slots (dd-slots (find-defstruct-description 'layout))))
-               `(defun make-layout
-                    (&key ,@(mapcar (lambda (s) `(,(dsd-name s) ,(dsd-default s)))
-                                    slots))
-                  (declare ,@(mapcar (lambda (s) `(type ,(dsd-type s) ,(dsd-name s)))
-                                     slots))
-                  ;; After calling into C, registers are trashed,
-                  ;; so we pass everything as a single vector,
-                  ;; and don't rely on Lisp to write the slots of the layout.
-                  (dx-let ((data (vector ,@(mapcar #'dsd-name slots))))
-                    (truly-the layout
-                     (values (%primitive sb-vm::alloc-immobile-layout data))))))))
-   (assert (<= (* sb-vm:n-word-bytes
-                 (1+ (dd-length (find-defstruct-description 'layout))))
-              sb-vm::layout-align))
-  (def-layout-maker))
-
 ;;; The CLASSOID structure is a supertype of all classoid types.  A
 ;;; CLASSOID is also a CTYPE structure as recognized by the type
 ;;; system.  (FIXME: It's also a type specifier, though this might go
@@ -254,6 +239,9 @@
   ;; we don't just call it the CLASS slot) object for this class, or
   ;; NIL if none assigned yet
   (pcl-class nil))
+
+(defun layout-classoid-name (x)
+  (classoid-name (layout-classoid x)))
 
 ;;; A helper to make classoid (and named-type) hash values stable.
 ;;; For other ctypes, generally improve the randomness of the hash.
@@ -424,12 +412,12 @@
           (specifier-type (sb-impl::%fun-type fun)))
         (specifier-type 'function)))))
 
-;;; The type specifier for this function, or a DEFSTRUCT-DESCRIPTION
-;;; or the symbol :GENERIC-FUNTION.
-;;; If a DD, it must contain a constructor whose name is
-;;; the one being sought in globaldb, which is used to derive the type.
-;;; If :GENERIC-FUNCTION, the info is recomputed from existing methods
-;;; and stored back into globaldb.
+;;; The parsed or unparsed type for this function, or the symbol :GENERIC-FUNCTION.
+;;; Ordinarily a parsed type is stored. Only if the parsed type contains
+;;; an unknown type will the original specifier be stored; we attempt to reparse
+;;; on each lookup, in the hope that the type becomes known at some point.
+;;; If :GENERIC-FUNCTION, the info is recomputed from methods at the time of lookup
+;;; and stored back. Method redefinition resets the value to :GENERIC-FUNCTION.
 (define-info-type (:function :type)
-  :type-spec (or ctype defstruct-description (member :generic-function))
+  :type-spec (or ctype (cons (eql function)) (member :generic-function))
   :default #'ftype-from-fdefn)

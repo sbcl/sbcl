@@ -19,7 +19,7 @@
 (defconstant +backend-fasl-file-implementation+ :arm)
 
   ;; Minumum observed value, not authoritative.
-(defconstant +backend-page-bytes+ #!+linux 4096 #!+netbsd 8192)
+(defconstant +backend-page-bytes+ #+linux 4096 #+netbsd 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
@@ -55,7 +55,6 @@
 (defconstant single-float-normal-exponent-min 1)
 (defconstant single-float-normal-exponent-max 254)
 (defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
 
 (defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
@@ -63,7 +62,6 @@
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
@@ -71,7 +69,7 @@
 (defconstant double-float-digits
   (+ (byte-size double-float-significand-byte) n-word-bits 1))
 
-#!+arm-vfp
+#+arm-vfp
 (progn
   (defconstant float-invalid-trap-bit (ash 1 0))
   (defconstant float-divide-by-zero-trap-bit (ash 1 1))
@@ -95,13 +93,13 @@
 ;; NOTE: As with the FLOAT-REGISTERS SB in vm.lisp, if you define this
 ;; for non-VFP systems, please use a specific positive feature
 ;; conditional.
-#!-arm-vfp
+#-arm-vfp
 (error "Don't know how to set the FPU control word layout on non-VFP systems")
 
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
-#!-gencgc
+#-gencgc
 (progn
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
@@ -111,14 +109,14 @@
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000))
 
-#!+gencgc
+#+gencgc
 (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
 (defconstant linkage-table-entry-size 16)
 
-#!+(or linux netbsd)
+#+(or linux netbsd)
 (progn
-  #!-gencgc
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))

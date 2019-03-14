@@ -27,8 +27,10 @@
       (sanity-check-feature-evaluation))
     ;; Enforce absence of unexpected forward-references to warm loaded code.
     ;; Looking into a hidden detail of this compiler seems fair game.
-    #!+(or x86 x86-64 arm64) ; until all the rest are clean
-    (when sb-c::*undefined-warnings*
+    (when (and sb-c::*undefined-warnings*
+               (feature-in-list-p
+                '(:or :x86 :x86-64 :arm64) ; until all the rest are clean
+                :target))
       (setf fail t)
       (dolist (warning sb-c::*undefined-warnings*)
         (case (sb-c::undefined-warning-kind warning)
@@ -36,8 +38,8 @@
           (:type (setf types t))
           (:function (setf functions t))))))
   ;; Exit the compilation unit so that the summary is printed. Then complain.
-  (when fail
-    #!-win32 ; build is known to be unclean
+  ;; win32 is not clean
+  (when (and fail (not (feature-in-list-p :win32 :target)))
     (cerror "Proceed anyway"
             "Undefined ~:[~;variables~] ~:[~;types~]~
              ~:[~;functions (incomplete SB-COLD::*UNDEFINED-FUN-WHITELIST*?)~]"
@@ -63,18 +65,23 @@
      (lambda (name)
        (let* ((cell (sb-int:info :function :emitted-full-calls name))
               (inlinep (eq (sb-int:info :function :inlinep name) :inline))
+              (source-xform (sb-int:info :function :source-transform name))
               (info (sb-int:info :function :info name)))
          (if (and cell
                   (or inlinep
+                      source-xform
                       (and info (sb-c::fun-info-templates info))
-                      (sb-int:info :function :compiler-macro-function name)
-                      (sb-int:info :function :source-transform name)))
-             (if inlinep
-                 ;; A full call to an inline function almost always indicates
-                 ;; an out-of-order definition. If not an inline function,
-                 ;; the call could be due to an inapplicable transformation.
-                 (push (cons name cell) likely-suspicious)
-                 (push (cons name cell) possibly-suspicious))))))
+                      (sb-int:info :function :compiler-macro-function name)))
+             (cond (inlinep
+                    ;; A full call to an inline function almost always indicates
+                    ;; an out-of-order definition. If not an inline function,
+                    ;; the call could be due to an inapplicable transformation.
+                    (push (cons name cell) likely-suspicious))
+                   ;; structure constructors aren't inlined by default,
+                   ;; though we have a source-xform.
+                   ((and (listp source-xform) (eq :constructor (cdr source-xform))))
+                   (t
+                    (push (cons name cell) possibly-suspicious)))))))
     (flet ((show (label list)
              (when list
                (format t "~%~A suspicious calls:~:{~%~4d ~S~@{~%     ~S~}~}~%"
@@ -89,8 +96,9 @@
       (show "Possibly" possibly-suspicious))
     ;; As each platform's build becomes warning-free,
     ;; it should be added to the list here to prevent regresssions.
-    #!+(and (or x86 x86-64) (or linux darwin))
-    (when likely-suspicious
+    (when (and likely-suspicious
+               (feature-in-list-p '(:and (:or :x86 :x86-64) (:or :linux :darwin))
+                                  :target))
       (warn "Expected zero inlinining failures"))))
 
 ;; After cross-compiling, show me a list of types that checkgen

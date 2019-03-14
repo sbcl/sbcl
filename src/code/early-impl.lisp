@@ -23,15 +23,15 @@
                   sb-vm:*control-stack-start*
                   sb-vm:*control-stack-end*
                   sb-vm:*binding-stack-start*
-                  #!+(or hpux) sb-vm::*c-lra*
+                  #+(or hpux) sb-vm::*c-lra*
                   *allow-with-interrupts*
                   sb-unix::*unblock-deferrables-on-enabling-interrupts-p*
                   *interrupts-enabled*
                   *interrupt-pending*
-                  #!+sb-thruption *thruption-pending*
-                  #!+sb-safepoint *in-safepoint*
+                  #+sb-thruption *thruption-pending*
+                  #+sb-safepoint *in-safepoint*
                   *free-interrupt-context-index*
-                  #!-gencgc
+                  #-gencgc
                   sb-vm::*allocation-pointer*
                   sb-vm::*binding-stack-pointer*
                   sb-pcl::*cache-miss-values-stack*
@@ -40,10 +40,10 @@
 ;;; This is a slot of 'struct thread' if multithreaded,
 ;;; and the symbol-global-value should never be used.
 ;;; (And in any case it is not really a special var)
-#!+(and (or x86 x86-64) (not sb-thread))
-(!defvar *pseudo-atomic-bits* 0)
+#+(and (or x86 x86-64) (not sb-thread))
+(defparameter *pseudo-atomic-bits* 0) ; initialized by genesis
 
-#!+c-stack-is-control-stack
+#+c-stack-is-control-stack
 (setf (info :variable :always-bound 'sb-c:*alien-stack-pointer*) :always-bound)
 
 ;;; A unique GC id. This is supplied for code that needs to detect

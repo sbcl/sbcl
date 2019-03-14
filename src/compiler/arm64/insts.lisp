@@ -962,19 +962,12 @@
   (imm :field (byte 16 5) :type 'unsigned-immediate)
   (rd :field (byte 5 0) :type 'reg))
 
-(defmacro process-null-sc (reg)
-  `(setf ,reg (if (and (tn-p ,reg)
-                       (eq 'null (sc-name (tn-sc ,reg))))
-                  sb-vm::null-tn
-                  ,reg)))
-
 (define-instruction-macro mov-sp (rd rm)
   `(inst add ,rd ,rm 0))
 
 (define-instruction-macro mov (rd rm)
   `(let ((rd ,rd)
          (rm ,rm))
-     (process-null-sc rm)
      (if (integerp rm)
          (sb-vm::load-immediate-word rd rm)
          (inst orr rd zr-tn rm))))
@@ -1303,7 +1296,6 @@
              (typep qout '(unsigned-byte 12))))))
 
 (defun emit-load-store (size opc segment dst address)
-  (process-null-sc dst)
   (let* ((base (memory-operand-base address))
          (offset (memory-operand-offset address))
          (mode (memory-operand-mode address))
@@ -2506,7 +2498,7 @@
          (aver (integerp value))
          (cons type value))
         (:base-char
-         #!+sb-unicode (aver (typep value 'base-char))
+         #+sb-unicode (aver (typep value 'base-char))
          (cons :byte (char-code value)))
         (:character
          (aver (characterp value))
@@ -2518,8 +2510,7 @@
         (:double-float
          (aver (typep value 'double-float))
          (cons (if alignedp :oword :qword)
-               (ldb (byte 64 0) (logior (ash (double-float-high-bits value) 32)
-                                        (double-float-low-bits value)))))
+               (ldb (byte 64 0) (double-float-bits value))))
         (:complex-single-float
          (aver (typep value '(complex single-float)))
          (cons (if alignedp :oword :qword)
@@ -2530,12 +2521,8 @@
         (:complex-double-float
          (aver (typep value '(complex double-float)))
          (cons :oword
-               (logior (ash (double-float-high-bits (imagpart value)) 96)
-                       (ash (double-float-low-bits (imagpart value)) 64)
-                       (ash (ldb (byte 32 0)
-                                 (double-float-high-bits (realpart value)))
-                            32)
-                       (double-float-low-bits (realpart value)))))
+               (logior (ash (ldb (byte 64 0) (double-float-bits (imagpart value))) 64)
+                       (ldb (byte 64 0) (double-float-bits (realpart value))))))
         (:fixup
          (cons :fixup value))))))
 

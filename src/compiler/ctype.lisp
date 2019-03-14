@@ -160,12 +160,14 @@
               and i from 1
               do (check-arg-type arg *wild-type* i)))
     (awhen (lvar-fun-name (combination-fun call) t)
-      (let ((type (info :function :type it)))
-        (validate-test-and-test-not call)
-        ;; One more check for structure constructors:
-        (when (typep type 'defstruct-description)
-          (awhen (assq it (dd-constructors type))
-            (check-structure-constructor-call call type (cdr it))))))
+      (validate-test-and-test-not call)
+      (let ((xform (info :function :source-transform it)))
+        ;; One more check for structure constructors, because satisfying the
+        ;; ftype is not sufficient to ensure that slots get valid defaults.
+        (when (typep xform '(cons defstruct-description (eql :constructor)))
+          (let ((dd (car xform)))
+            (awhen (assq it (dd-constructors dd))
+              (check-structure-constructor-call call dd (cdr it)))))))
     (cond (*lossage-detected* (values nil t unknown-keys))
           (*unwinnage-detected* (values nil nil unknown-keys))
           (t (values t t unknown-keys)))))
@@ -886,7 +888,7 @@ and no value was provided for it." name))))))))))
         (explicit-check (getf (functional-plist fun) 'explicit-check)))
     (if (eq where :declared)
         (let ((type
-               (massage-global-definition-type (proclaimed-ftype name) fun)))
+               (massage-global-definition-type (global-ftype name) fun)))
           (setf (leaf-type fun) type)
           (assert-definition-type
            fun type
@@ -922,9 +924,10 @@ and no value was provided for it." name))))))))))
 
 ;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
 (defun map-combination-args-and-types (fun call &optional info
-                                                          unknown-keys-fun)
+                                                          unknown-keys-fun
+                                                          declared-only)
   (declare (type function fun) (type combination call))
-  (binding* ((type (lvar-fun-type (combination-fun call)))
+  (binding* ((type (lvar-fun-type (combination-fun call) declared-only declared-only))
              (nil (fun-type-p type) :exit-if-null)
              (annotation (and info
                               (fun-info-annotation info)))
@@ -1055,7 +1058,9 @@ and no value was provided for it." name))))))))))
                     (not trusted))
                (reoptimize-lvar arg)))
            call
-           info))))
+           info
+           nil
+           t))))
   (values))
 
 ;;;; FIXME: Move to some other file.

@@ -16,12 +16,7 @@
 ;;; strategy implicit in the second return value of
 ;;; compute-applicable-methods-using-classes.
 
-(defpackage "OR-SPECIALIZER-TEST"
-  (:use "CL" "SB-MOP" "ASSERTOID"))
-
-(in-package "OR-SPECIALIZER-TEST")
-
-(defclass or-specializer (specializer)
+(defclass or-specializer (sb-mop:specializer)
   ((classes :initform nil :reader or-specializer-classes :initarg :classes)
    (direct-methods :initform nil :reader specializer-direct-methods)))
 
@@ -36,7 +31,7 @@
               (make-instance 'or-specializer :classes sorted-classes)))))
 
 (defclass gf-with-or (standard-generic-function) ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 
 (defmethod sb-pcl:specializer-type-specifier
     ((proto-generic-function gf-with-or)
@@ -44,21 +39,21 @@
      (specializer or-specializer))
   `(or ,@(or-specializer-classes specializer)))
 
-(defmethod compute-applicable-methods-using-classes
+(defmethod sb-mop:compute-applicable-methods-using-classes
     ((generic-function gf-with-or) classes)
   ;; FIXME: assume one-argument for now
   (let (applicable-methods)
-    (let ((methods (generic-function-methods generic-function)))
+    (let ((methods (sb-mop:generic-function-methods generic-function)))
       (dolist (m methods)
-        (let ((specializer (car (method-specializers m)))
-              (class (car classes)))
+        (let ((specializer (first (sb-mop:method-specializers m)))
+              (class (first classes)))
           (typecase specializer
             (class (when (subtypep class specializer)
                      (push m applicable-methods)))
-            (eql-specializer
-             (when (eql (class-of (eql-specializer-object specializer))
+            (sb-mop:eql-specializer
+             (when (eql (class-of (sb-mop:eql-specializer-object specializer))
                         class)
-               (return-from compute-applicable-methods-using-classes
+               (return-from sb-mop:compute-applicable-methods-using-classes
                  (values nil nil))))
             (or-specializer
              (dolist (c (or-specializer-classes specializer))
@@ -67,19 +62,19 @@
     ;; FIXME: sort the methods
     (values applicable-methods t)))
 
-(defmethod compute-applicable-methods
+(defmethod sb-mop:compute-applicable-methods
     ((generic-function gf-with-or) arguments)
   ;; FIXME: assume one-argument for now
   (let (applicable-methods)
-    (let ((methods (generic-function-methods generic-function)))
+    (let ((methods (sb-mop:generic-function-methods generic-function)))
       (dolist (m methods)
-        (let ((specializer (car (method-specializers m)))
-              (argument (car arguments)))
+        (let ((specializer (first (sb-mop:method-specializers m)))
+              (argument (first arguments)))
           (typecase specializer
             (class (when (typep argument specializer)
                      (push m applicable-methods)))
-            (eql-specializer
-             (when (eql (eql-specializer-object specializer) argument)
+            (sb-mop:eql-specializer
+             (when (eql (sb-mop:eql-specializer-object specializer) argument)
                (push m applicable-methods)))
             (or-specializer
              (dolist (c (or-specializer-classes specializer))
@@ -88,10 +83,10 @@
     ;; FIXME: sort the methods
     applicable-methods))
 
-(defmethod add-direct-method ((specializer or-specializer) method)
+(defmethod sb-mop:add-direct-method ((specializer or-specializer) method)
   (pushnew method (slot-value specializer 'direct-methods)))
 
-(defmethod remove-direct-method ((specializer or-specializer) method)
+(defmethod sb-mop:remove-direct-method ((specializer or-specializer) method)
   (setf (slot-value specializer 'direct-methods)
         (remove method (slot-value specializer 'direct-methods))))
 
@@ -108,11 +103,13 @@
 (let ((specializer (ensure-or-specializer 'class1 'class2)))
   (eval `(defmethod foo ((x ,specializer)) t)))
 
-(assert (foo (make-instance 'class1)))
-(assert (foo (make-instance 'class2)))
-(assert-error (foo (make-instance 'class3)))
-(assert (foo (make-instance 'class4)))
+(with-test (:name (:mop-28 1))
+  (assert (foo (make-instance 'class1)))
+  (assert (foo (make-instance 'class2)))
+  (assert-error (foo (make-instance 'class3)))
+  (assert (foo (make-instance 'class4))))
 
 ;;; check that we are actually cacheing effective methods.  If the
 ;;; representation in PCL changes, this test needs to change too.
-(assert (typep (cddr (sb-pcl::gf-dfun-state #'foo)) 'sb-pcl::caching))
+(with-test (:name (:mop-28 2))
+  (assert (typep (cddr (sb-pcl::gf-dfun-state #'foo)) 'sb-pcl::caching)))

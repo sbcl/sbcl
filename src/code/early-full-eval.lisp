@@ -11,8 +11,8 @@
 
 (in-package "SB-EVAL")
 
-(!defparameter *eval-level* -1)
-(!defparameter *eval-verbose* nil)
+(defparameter *eval-level* -1) ; initialized by genesis
+(defparameter *eval-verbose* nil) ; initialized by genesis
 
 ;; !defstruct-with-alternate-metaclass is unslammable and the
 ;; RECOMPILE restart doesn't work on it.  This is the main reason why
@@ -52,9 +52,6 @@
             #'(lambda (&rest args)
                 (interpreted-apply function args)))
       function))
-
-(defun interpreted-function-p (function)
-  (typep function 'interpreted-function))
 
 (defmethod print-object ((obj interpreted-function) stream)
   (print-unreadable-object (obj stream

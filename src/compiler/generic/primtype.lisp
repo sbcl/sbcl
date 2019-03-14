@@ -24,26 +24,26 @@
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
   :type (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
-#!-64-bit-registers
+#-64-bit-registers
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 31))
 (/show0 "primtype.lisp 31")
-#!-64-bit-registers
+#-64-bit-registers
 (!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 32))
 (/show0 "primtype.lisp 35")
-#!+64-bit-registers
+#+64-bit-registers
 (!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
-#!+64-bit-registers
+#+64-bit-registers
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ n-positive-fixnum-bits)))
-#!-64-bit-registers
+#-64-bit-registers
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
-#!+64-bit-registers
+#+64-bit-registers
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 
@@ -91,7 +91,7 @@
 (/show0 "about to !DEF-PRIMITIVE-TYPE COMPLEX-DOUBLE-FLOAT")
 (!def-primitive-type complex-double-float (complex-double-reg descriptor-reg)
   :type (complex double-float))
-#!+sb-simd-pack
+#+sb-simd-pack
 (progn
   (/show0 "about to !DEF-PRIMITIVE-TYPE SIMD-PACK")
   (!def-primitive-type simd-pack-single (single-sse-reg descriptor-reg)
@@ -102,7 +102,7 @@
    :type (simd-pack integer))
   (!def-primitive-type-alias simd-pack
    '(:or simd-pack-single simd-pack-double simd-pack-int)))
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (progn
   (!def-primitive-type simd-pack-256-single (single-avx2-reg descriptor-reg)
     :type (simd-pack-256 single-float))
@@ -387,7 +387,7 @@
          (if (eq type (specifier-type 'character))
              (exactly character)
              (part-of character)))
-        #!+sb-simd-pack
+        #+sb-simd-pack
         (simd-pack-type
          (let ((eltypes (simd-pack-type-element-type type)))
            (cond ((member 'integer eltypes)
@@ -396,7 +396,7 @@
                   (exactly simd-pack-single))
                  ((member 'double-float eltypes)
                   (exactly simd-pack-double)))))
-        #!+sb-simd-pack-256
+        #+sb-simd-pack-256
         (simd-pack-256-type
          (let ((eltypes (simd-pack-256-type-element-type type)))
            (cond ((member 'integer eltypes)
@@ -407,11 +407,11 @@
                   (exactly simd-pack-256-double)))))
         (built-in-classoid
          (case (classoid-name type)
-           #!+sb-simd-pack
+           #+sb-simd-pack
            ;; Can't tell what specific type; assume integers.
            (simd-pack
             (exactly simd-pack-int))
-           #!+sb-simd-pack-256
+           #+sb-simd-pack-256
            (simd-pack-256
             (exactly simd-pack-256-int))
            ((complex function system-area-pointer weak-pointer)

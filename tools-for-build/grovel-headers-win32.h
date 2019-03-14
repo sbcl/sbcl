@@ -109,6 +109,7 @@
 
     defconstant("error-io-pending", ERROR_IO_PENDING);
     defconstant("error-broken-pipe", ERROR_BROKEN_PIPE);
+    defconstant("error-no-data", ERROR_NO_DATA);
     defconstant("error-handle-eof", ERROR_HANDLE_EOF);
 
 

@@ -488,7 +488,6 @@
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 6
     (move eax x)
     (inst mul eax y)
@@ -540,7 +539,6 @@
   (:result-types tagged-num tagged-num)
   (:note "inline fixnum arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 30
     (move eax x)
     (inst cdq)
@@ -594,7 +592,6 @@
   (:result-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 32
     (move eax x)
     (inst xor edx edx)
@@ -645,7 +642,6 @@
   (:result-types signed-num signed-num)
   (:note "inline (signed-byte 32) arithmetic")
   (:vop-var vop)
-  (:save-p :compute-only)
   (:generator 32
     (move eax x)
     (inst cdq)
@@ -1423,18 +1419,18 @@ constant shift greater than word length")))
      (:translate ,function)))
 
 (macrolet ((def (name -c-p)
-             (let ((fun32 (intern (format nil "~S-MOD32" name)))
-                   (vopu (intern (format nil "FAST-~S/UNSIGNED=>UNSIGNED" name)))
-                   (vopcu (intern (format nil "FAST-~S-C/UNSIGNED=>UNSIGNED" name)))
-                   (vopf (intern (format nil "FAST-~S/FIXNUM=>FIXNUM" name)))
-                   (vopcf (intern (format nil "FAST-~S-C/FIXNUM=>FIXNUM" name)))
-                   (vop32u (intern (format nil "FAST-~S-MOD32/WORD=>UNSIGNED" name)))
-                   (vop32f (intern (format nil "FAST-~S-MOD32/FIXNUM=>FIXNUM" name)))
-                   (vop32cu (intern (format nil "FAST-~S-MOD32-C/WORD=>UNSIGNED" name)))
-                   (vop32cf (intern (format nil "FAST-~S-MOD32-C/FIXNUM=>FIXNUM" name)))
-                   (funfx (intern (format nil "~S-MODFX" name)))
-                   (vopfxf (intern (format nil "FAST-~S-MODFX/FIXNUM=>FIXNUM" name)))
-                   (vopfxcf (intern (format nil "FAST-~S-MODFX-C/FIXNUM=>FIXNUM" name))))
+             (let ((fun32   (symbolicate name "-MOD32"))
+                   (funfx   (symbolicate name "-MODFX"))
+                   (vopu    (symbolicate "FAST-" name "/UNSIGNED=>UNSIGNED"))
+                   (vopcu   (symbolicate "FAST-" name "-C/UNSIGNED=>UNSIGNED"))
+                   (vopf    (symbolicate "FAST-" name "/FIXNUM=>FIXNUM"))
+                   (vopcf   (symbolicate "FAST-" name "-C/FIXNUM=>FIXNUM"))
+                   (vop32u  (symbolicate "FAST-" name "-MOD32/WORD=>UNSIGNED"))
+                   (vop32f  (symbolicate "FAST-" name "-MOD32/FIXNUM=>FIXNUM"))
+                   (vop32cu (symbolicate "FAST-" name "-MOD32-C/WORD=>UNSIGNED"))
+                   (vop32cf (symbolicate "FAST-" name "-MOD32-C/FIXNUM=>FIXNUM"))
+                   (vopfxf  (symbolicate "FAST-" name "-MODFX/FIXNUM=>FIXNUM"))
+                   (vopfxcf (symbolicate "FAST-" name "-MODFX-C/FIXNUM=>FIXNUM")))
                (declare (ignore vop32cf)) ; maybe someone will want it some day
                `(progn
                   (define-modular-fun ,fun32 (x y) ,name :untagged nil 32)
@@ -1995,14 +1991,14 @@ constant shift greater than word length")))
               (t (incf count)))))
     (decompose-multiplication class width arg x n-bits condensed)))
 
-(defun *-transformer (class width y)
+(defun *-transformer (class width y &optional (fun '%lea))
   (cond
     ((= y (ash 1 (integer-length y)))
      ;; there's a generic transform for y = 2^k
      (give-up-ir1-transform))
     ((member y '(3 5 9))
      ;; we can do these multiplications directly using LEA
-     `(%lea x x ,(1- y) 0))
+     `(,fun x x ,(1- y) 0))
     ((member :pentium4 *backend-subfeatures*)
      ;; the pentium4's multiply unit is reportedly very good
      (give-up-ir1-transform))
@@ -2024,7 +2020,7 @@ constant shift greater than word length")))
      (unsigned-byte 32))
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :unsigned 32 y)))
+    (*-transformer :unsigned 32 y 'sb-vm::%lea-mod32)))
 
 (deftransform * ((x y)
                  (fixnum (constant-arg (unsigned-byte 32)))
@@ -2037,7 +2033,8 @@ constant shift greater than word length")))
      fixnum)
   "recode as leas, shifts and adds"
   (let ((y (lvar-value y)))
-    (*-transformer :signed (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) y)))
+    (*-transformer :signed (- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) y
+                   'sb-vm::%lea-modfx)))
 
 ;;; FIXME: we should also be able to write an optimizer or two to
 ;;; convert (+ (* x 2) 17), (- (* x 9) 5) to a %LEA.

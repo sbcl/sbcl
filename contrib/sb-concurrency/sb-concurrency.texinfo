@@ -42,7 +42,7 @@ or multiple ends can send messages to one or multiple receivers. The
 difference to @ref{Section sb-concurrency:queue, queues} is that the receiving
 end may block until a message arrives.
 @*@*
-Built on top of the @ref{Structure sb-concurrency:queue, queue} implementation.
+Built on top of the @ref{Structure sb-concurrency queue, queue} implementation.
 
 @include struct-sb-concurrency-mailbox.texinfo
 

@@ -14,11 +14,12 @@
 ;;; A CORE-OBJECT structure holds the state needed to resolve cross-component
 ;;; references during in-core compilation.
 (defstruct (core-object
-            (:constructor make-core-object ())
+            (:constructor make-core-object (ephemeral))
             #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t :identity t))))
             (:copier nil))
+  ephemeral
   ;; A hashtable translating ENTRY-INFO structures to the corresponding actual
   ;; FUNCTIONs for functions in this compilation.
   (entry-table (make-hash-table :test 'eq) :type hash-table)
@@ -37,29 +38,3 @@
   (funcall (or (gethash (leaf-info entry)
                         (core-object-entry-table object))
                (error "Unresolved forward reference."))))
-
-#!+(and immobile-code (host-feature sb-xc))
-(progn
-  ;; Use FDEFINITION because it strips encapsulations - whether that's
-  ;; the right behavior for it or not is a separate concern.
-  ;; If somebody tries (TRACE LENGTH) for example, it should not cause
-  ;; compilations to fail on account of LENGTH becoming a closure.
-  (defun sb-vm::function-raw-address (name &aux (fun (fdefinition name)))
-    (cond ((not fun)
-           (error "Can't statically link to undefined function ~S" name))
-          ((not (immobile-space-obj-p fun))
-           (error "Can't statically link to ~S: code is movable" name))
-          ((neq (fun-subtype fun) sb-vm:simple-fun-widetag)
-           (error "Can't statically link to ~S: non-simple function" name))
-          (t
-           (let ((addr (get-lisp-obj-address fun)))
-             (sap-ref-word (int-sap addr)
-                           (- (ash sb-vm:simple-fun-self-slot sb-vm:word-shift)
-                              sb-vm:fun-pointer-lowtag))))))
-
-  ;; Return the address to which to jump when calling NAME through its fdefn.
-  (defun sb-vm::fdefn-entry-address (name)
-    (let ((fdefn (find-or-create-fdefn name)))
-      (+ (get-lisp-obj-address fdefn)
-         (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)
-         (- sb-vm:other-pointer-lowtag)))))

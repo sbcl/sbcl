@@ -250,8 +250,7 @@ bootstrapping.
 
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
-  (unless (legal-fun-name-p fun-name)
-    (%program-error "illegal generic function name ~S" fun-name))
+  (check-designator fun-name defgeneric)
   (with-current-source-form (lambda-list)
     (check-gf-lambda-list lambda-list))
   (let ((initargs ())
@@ -426,10 +425,11 @@ bootstrapping.
   (fmakunbound 'defmethod))
 ;;; As per CLHS -
 ;;; "defmethod is not required to perform any compile-time side effects."
-;;; and we don't do much other than to make the function be defined,
+;;; and we don't do much other than to make the function known to be defined,
 ;;; which means that checking of callers' arglists can only occur after called
 ;;; methods are actually loaded.
 (defmacro defmethod (name &rest args)
+  (check-designator name defmethod)
   (multiple-value-bind (qualifiers lambda-list body)
       (parse-defmethod args)
     `(progn
@@ -951,6 +951,26 @@ bootstrapping.
               ,@(when plist `(plist ,plist))
               ,@(when documentation `(:documentation ,documentation))))))
 
+(define-condition specializer-name-syntax-error (error
+                                                 reference-condition)
+  ((generic-function :initarg :generic-function
+                     :reader specializer-name-syntax-error-generic-function)
+   (specializer-name :initarg :specializer-name
+                     :reader specializer-name-syntax-error-specializer-name))
+  (:default-initargs
+   :references '((:ansi-cl :macro defmethod)
+                 (:ansi-cl :glossary "parameter specializer name")))
+  (:report
+   (lambda (condition stream)
+     (format stream "~@<~S is not a valid parameter specializer name ~
+                     for ~S.~@:>"
+             (specializer-name-syntax-error-specializer-name condition)
+             (specializer-name-syntax-error-generic-function condition)))))
+
+(defun specializer-name-syntax-error (specializer-name generic-function)
+  (error 'specializer-name-syntax-error :generic-function generic-function
+                                        :specializer-name specializer-name))
+
 (defun real-make-method-specializers-form
     (proto-generic-function proto-method specializer-names environment)
   (flet ((make-parse-form (name)
@@ -964,13 +984,8 @@ bootstrapping.
 
 (defun real-make-specializer-form-using-class/t
     (proto-generic-function proto-method specializer-name environment)
-  (declare (ignore proto-generic-function proto-method environment))
-  (error 'simple-reference-error
-         :format-control
-         "~@<~S is not a valid parameter specializer name.~@:>"
-         :format-arguments (list specializer-name)
-         :references '((:ansi-cl :macro defmethod)
-                       (:ansi-cl :glossary "parameter specializer name"))))
+  (declare (ignore proto-method environment))
+  (specializer-name-syntax-error specializer-name proto-generic-function))
 
 (defun real-make-specializer-form-using-class/specializer
     (proto-generic-function proto-method specializer-name environment)
@@ -1172,11 +1187,29 @@ bootstrapping.
         (symbol-function 'real-specializer-type-specifier)))
 
 (defun real-parse-specializer-using-class (generic-function specializer)
-  (let ((result (specializer-from-type specializer)))
-    (if (specializerp result)
-        result
-        (error "~@<~S cannot be parsed as a specializer for ~S.~@:>"
-               specializer generic-function))))
+  ;; Avoid style-warning about compiler-macro being unavailable.
+  (declare (notinline make-instance))
+  (typecase specializer
+    (symbol
+     (find-class specializer))
+    ((cons (eql class) (cons t null))
+     (coerce-to-class (second specializer)))
+    ((cons (eql prototype) (cons t null))
+     (let ((class (coerce-to-class (second specializer))))
+       (make-instance 'class-prototype-specializer :class class)))
+    ((cons (eql class-eq) (cons t null))
+     (class-eq-specializer (coerce-to-class (second specializer))))
+    ((cons (eql eql) (cons t null))
+     (intern-eql-specializer (second specializer)))
+    ;; FIXME: do we still need this?
+    (classoid
+     (or (classoid-pcl-class specializer)
+         (ensure-non-standard-class
+          (classoid-name specializer) specializer)))
+    (specializer
+     specializer)
+    (t
+     (specializer-name-syntax-error specializer generic-function))))
 
 (unless (fboundp 'parse-specializer-using-class)
   (setf (gdefinition 'parse-specializer-using-class)
@@ -1919,7 +1952,7 @@ bootstrapping.
   (multiple-value-bind (llks nrequired noptional keywords keyword-parameters)
       (analyze-lambda-list lambda-list)
     (declare (ignore keyword-parameters))
-    (let* ((old (proclaimed-ftype name))
+    (let* ((old (global-ftype name))
            (old-ftype (if (fun-type-p old) old nil))
            (old-restp (and old-ftype (fun-type-rest old-ftype)))
            (old-keys (and old-ftype
@@ -2443,7 +2476,7 @@ bootstrapping.
     ;; is a subtype of the old one, though -- even though the type is not
     ;; trusted anymore, the warning is still not quite as interesting.
     (when (and (eq :declared (info :function :where-from fun-name))
-               (not (csubtypep gf-type (setf old-type (proclaimed-ftype fun-name)))))
+               (not (csubtypep gf-type (setf old-type (global-ftype fun-name)))))
       (style-warn "~@<Generic function ~
                    ~/sb-ext:print-symbol-with-prefix/ clobbers an ~
                    earlier ~S proclamation ~/sb-impl:print-type/ for ~

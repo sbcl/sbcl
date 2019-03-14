@@ -146,7 +146,7 @@
   ;; 1.0.20.30 failed here.
   (checked-compile '(lambda () (foo 5 :w 10 :foo 15)))
   (assert
-   (not (sb-kernel::args-type-keyp (sb-int:proclaimed-ftype 'foo)))))
+   (not (sb-kernel::args-type-keyp (sb-int:global-ftype 'foo)))))
 
 ;; If the GF has &KEY and &ALLOW-OTHER-KEYS, the methods' keys can be
 ;; anything, and we don't warn about unrecognized keys.
@@ -160,14 +160,14 @@
   ;; Now the FTYPE is computed the instant anyone asks for it.
   (assert (equal (mapcar 'sb-kernel:key-info-name
                          (sb-kernel:fun-type-keywords
-                          (sb-int:proclaimed-ftype 'foo)))
+                          (sb-int:global-ftype 'foo)))
                  '(:y :z)))
   (checked-compile '(lambda () (foo 5 :z 10 :y 15)))
   (checked-compile '(lambda () (foo 5 :z 10 :foo 15)))
   (assert
-   (sb-kernel::args-type-keyp (sb-int:proclaimed-ftype 'foo)))
+   (sb-kernel::args-type-keyp (sb-int:global-ftype 'foo)))
   (assert
-   (sb-kernel::args-type-allowp (sb-int:proclaimed-ftype 'foo))))
+   (sb-kernel::args-type-allowp (sb-int:global-ftype 'foo))))
 
 ;; If any method has &ALLOW-OTHER-KEYS, 7.6.4 point 5 seems to say the
 ;; GF should be construed to have &ALLOW-OTHER-KEYS.
@@ -176,8 +176,8 @@
   (defgeneric foo (x &key))
   (defmethod foo ((x integer) &rest y &key &allow-other-keys) (list x y))
   (checked-compile '(lambda () (foo 10 :foo 20)))
-  (assert (sb-kernel::args-type-keyp (sb-int:proclaimed-ftype 'foo)))
-  (assert (sb-kernel::args-type-allowp (sb-int:proclaimed-ftype 'foo))))
+  (assert (sb-kernel::args-type-keyp (sb-int:global-ftype 'foo)))
+  (assert (sb-kernel::args-type-allowp (sb-int:global-ftype 'foo))))
 
 (fmakunbound 'foo)
 (with-test (:name (defmethod symbol-macrolet))

@@ -37,10 +37,10 @@
             (sb-thread:join-thread thr)))))))
 
 (defun cload-test (file)
-  (let ((compile-name (compile-file-pathname file)))
+  (let ((compile-name (randomish-temp-file-name "fasl")))
     (unwind-protect
          (progn
-           (compile-file file :print nil)
+           (compile-file file :print nil :output-file compile-name)
            (load compile-name))
       (ignore-errors
        (delete-file compile-name)))))
@@ -48,9 +48,8 @@
 (defun sh-test (file)
   (clear-test-status)
   (progn
-    (sb-posix:setenv "TEST_SBCL_EVALUATOR_MODE"
-                     (string-downcase *test-evaluator-mode*)
-                     1)
+    (test-util::setenv "TEST_SBCL_EVALUATOR_MODE"
+                        (string-downcase *test-evaluator-mode*))
     (let ((process (sb-ext:run-program "/bin/sh"
                                        (list (native-namestring file))
                                        :output *error-output*)))

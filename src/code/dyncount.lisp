@@ -109,7 +109,7 @@ comments from CMU CL:
     (setf (vop-stats-cost res) cost)
     res))
 
-#!-sb-fluid (declaim (freeze-type dyncount-info vop-stats))
+#-sb-fluid (declaim (freeze-type dyncount-info vop-stats))
 
 ;;;    Add the Info into the cumulative result on the VOP name plist. We use
 ;;; plists so that we will touch minimal system code outside of this file
@@ -389,7 +389,7 @@ comments from CMU CL:
 (defun entry-report (entries cut-off compensated compare total-cost)
   (let ((counter (if (and cut-off (> (length entries) cut-off))
                      cut-off
-                     most-positive-fixnum)))
+                     sb-xc:most-positive-fixnum)))
   (dolist (entry entries)
     (let* ((cost (vop-stats-cost entry))
            (name (vop-stats-name entry))

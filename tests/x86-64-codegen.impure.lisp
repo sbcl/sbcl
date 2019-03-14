@@ -46,7 +46,8 @@
           (butlast lines 4)
           lines))))
 
-(with-test (:name :symeval-known-thread-local)
+(with-test (:name :symeval-known-thread-local
+            :skipped-on (not :sb-thread))
   ;; It should take 1 instruction to read a known thread-local var
   (assert (= (length (disasm 1 'sb-thread:*current-thread*)) 1))
   (assert (= (length (disasm 1 'sb-sys:*interrupt-pending*)) 1))
@@ -62,7 +63,8 @@
 (compile nil '(lambda (foo) (eval 'frob)))
 
 (with-test (:name :symeval-known-tls-index
-                  :skipped-on (or (not :immobile-space) :immobile-symbols))
+            :skipped-on (or (not :immobile-space) :immobile-symbols
+                            (not :sb-thread)))
   ;; When symbol SC is IMMEDIATE:
   ;;    498B9578210000     MOV RDX, [R13+disp]       ; tls: *PRINT-BASE*
   ;;    83FA61             CMP EDX, 97
@@ -83,7 +85,8 @@
 #-immobile-symbols (assert (not (sb-kernel:immobile-space-obj-p 'blub)))
 
 (with-test (:name :symeval-unknown-tls-index
-                  :skipped-on (or (not :immobile-space) :immobile-symbols))
+            :skipped-on (or (not :immobile-space) :immobile-symbols
+                            (not :sb-thread)))
   ;; When symbol SC is immediate:
   ;;    8B142514A24C20     MOV EDX, [#x204CA214]    ; tls_index: *BLUB*
   ;;    4A8B142A           MOV RDX, [RDX+R13]
@@ -182,7 +185,7 @@
         (expect "#<FDEFN G>" lines)))))
 
 (with-test (:name :c-call
-            :broken-on (not :sb-dynamic-core))
+            :skipped-on (not :sb-dynamic-core))
   (let* ((lines (split-string
                  (with-output-to-string (s)
                    (let ((sb-disassem:*disassem-location-column-width* 0))

@@ -19,11 +19,11 @@
   (or (let ((sbcl-homedir (sbcl-homedir-pathname)))
         (when sbcl-homedir
           (probe-file (merge-pathnames "sbclrc" sbcl-homedir))))
-      #!+win32
+      #+win32
       (merge-pathnames "sbcl\\sbclrc"
                        (sb-win32::get-folder-pathname
                         sb-win32::csidl_common_appdata))
-      #!-win32
+      #-win32
       "/etc/sbclrc"))
 
 (defun userinit-pathname ()
@@ -141,7 +141,7 @@ means to wait indefinitely.")
   (sb-unix:nanosleep sec nsec))
 
 (declaim (inline %sleep))
-#!-win32
+#-win32
 (defun %sleep (seconds)
   (typecase seconds
     (double-float
@@ -153,13 +153,13 @@ means to wait indefinitely.")
     (t
      (multiple-value-call #'%nanosleep (split-ratio-for-sleep seconds)))))
 
-#!+(and win32 sb-thread)
+#+(and win32 sb-thread)
 (defun %sleep (seconds)
   (if (integerp seconds)
       (%nanosleep seconds 0)
       (multiple-value-call #'%nanosleep (split-seconds-for-sleep seconds))))
 
-#!+(and win32 (not sb-thread))
+#+(and win32 (not sb-thread))
 (defun %sleep (seconds)
   (sb-win32:millisleep (truncate (* seconds 1000))))
 
@@ -181,11 +181,11 @@ any non-negative real number."
             ;; use the largest representable value in that case.
             (timeout (or (seconds-to-maybe-internal-time seconds)
                          (* safe-internal-seconds-limit
-                            internal-time-units-per-second))))
+                            sb-xc:internal-time-units-per-second))))
         (labels ((sleep-for-a-bit (remaining)
                    (multiple-value-bind
                          (timeout-sec timeout-usec stop-sec stop-usec deadlinep)
-                       (decode-timeout (/ remaining internal-time-units-per-second))
+                       (decode-timeout (/ remaining sb-xc:internal-time-units-per-second))
                      (declare (ignore stop-sec stop-usec))
                      ;; Sleep until either the timeout or the deadline
                      ;; expires.
@@ -302,11 +302,12 @@ any non-negative real number."
            ;; Scripts don't need to be stylish or fast, but silence is usually a
            ;; desirable quality...
            (handler-bind (((or style-warning compiler-note) #'muffle-warning)
-                          (stream-error (lambda (e)
-                                          ;; Shell-style.
-                                          (when (member (stream-error-stream e)
-                                                        (list *stdout* *stdin* *stderr*))
-                                            (exit)))))
+                          ((or broken-pipe end-of-file)
+                            (lambda (e)
+                              ;; Shell-style.
+                              (when (member (stream-error-stream e)
+                                            (list *stdout* *stdin* *stderr*))
+                                (exit)))))
              ;; Let's not use the *TTY* for scripts, ok? Also, normally we use
              ;; synonym streams, but in order to have the broken pipe/eof error
              ;; handling right we want to bind them for scripts.
@@ -594,7 +595,7 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
                    ;; In the event of a control-stack-exhausted-error, we
                    ;; should have unwound enough stack by the time we get
                    ;; here that this is now possible.
-                   #!-win32
+                   #-win32
                    (sb-kernel::reset-control-stack-guard-page)
                    (funcall repl-fun noprint)
                    (critically-unreachable "after REPL")))))))))

@@ -203,7 +203,7 @@ from now. For timers with a repeat interval it returns true."
 ;;; real time conversion
 
 (defun delta->real (delta)
-  (floor (* delta internal-time-units-per-second)))
+  (floor (* delta sb-xc:internal-time-units-per-second)))
 
 ;;; Public interface
 
@@ -342,13 +342,13 @@ triggers."
 ;;; win32 waitable timers using a timerfd-like portability layer in
 ;;; the runtime.
 
-#!+sb-wtimer
+#+sb-wtimer
 (define-alien-type wtimer
-    #!+win32 system-area-pointer ;HANDLE, but that's not defined yet
-    #!+sunos system-area-pointer ;struct os_wtimer *
-    #!+(or android linux bsd) int)
+    #+win32 system-area-pointer ;HANDLE, but that's not defined yet
+    #+sunos system-area-pointer ;struct os_wtimer *
+    #+(or android linux bsd) int)
 
-#!+sb-wtimer
+#+sb-wtimer
 (progn
   (define-alien-routine "os_create_wtimer" wtimer)
   (define-alien-routine "os_wait_for_wtimer" int (wt wtimer))
@@ -401,15 +401,15 @@ triggers."
   (let ((min-nsec 100000))
     (if (minusp time)
         (values 0 min-nsec)
-        (multiple-value-bind (s u) (floor time internal-time-units-per-second)
-          (setf u (floor (* (/ u internal-time-units-per-second)
+        (multiple-value-bind (s u) (floor time sb-xc:internal-time-units-per-second)
+          (setf u (floor (* (/ u sb-xc:internal-time-units-per-second)
                             #.(expt 10 9))))
           (if (and (= 0 s) (< u min-nsec))
               ;; 0 0 means "shut down the timer" for setitimer
               (values 0 min-nsec)
               (values s u))))))
 
-#!-(or sb-wtimer win32)
+#-(or sb-wtimer win32)
 (progn
   (defun %set-system-timer (sec nsec)
     (sb-unix:unix-setitimer :real 0 0 sec (ceiling nsec 1000)))

@@ -112,17 +112,16 @@
 ;;; We defer walking successors whose successor is the component tail
 ;;; (end in an error, NLX or tail full call.) This is to discourage
 ;;; making error code the drop-through.
-(defun control-analyze-block (block tail block-info-constructor)
+(defun control-analyze-block (block tail)
   (declare (type cblock block)
-           (type block-annotation tail)
-           (type function block-info-constructor))
+           (type block-annotation tail))
   (unless (block-flag block)
     (let ((block (find-rotated-loop-head block)))
       (setf (block-flag block) t)
       (aver (and (block-component block) (not (block-delete-p block))))
       (add-to-emit-order (or (block-info block)
                              (setf (block-info block)
-                                   (funcall block-info-constructor block)))
+                                   (make-ir2-block block)))
                          (block-annotation-prev tail))
 
       (let ((last (block-last block)))
@@ -137,11 +136,10 @@
                      (fun nil))
                  (dolist (succ block-succ)
                    (unless (eq (first (block-succ succ)) component-tail)
-                     (let ((res (control-analyze-block
-                                 succ tail block-info-constructor)))
+                     (let ((res (control-analyze-block succ tail)))
                        (when res (setq fun res)))))
                  (dolist (succ block-succ)
-                   (control-analyze-block succ tail block-info-constructor))
+                   (control-analyze-block succ tail))
                  fun)))))))
 
 ;;; Analyze all of the NLX EPs first to ensure that code reachable
@@ -155,17 +153,15 @@
 ;;; we start over again there to help the call drop through. Of
 ;;; course, it will never get a drop-through if either function has
 ;;; NLX code.
-(defun control-analyze-1-fun (fun component block-info-constructor)
+(defun control-analyze-1-fun (fun component)
   (declare (type clambda fun)
-           (type component component)
-           (type function block-info-constructor))
+           (type component component))
   (let* ((tail-block (block-info (component-tail component)))
          (prev-block (block-annotation-prev tail-block))
          (bind-block (node-block (lambda-bind fun))))
     (unless (block-flag bind-block)
       (dolist (nlx (physenv-nlx-info (lambda-physenv fun)))
-        (control-analyze-block (nlx-info-target nlx) tail-block
-                               block-info-constructor))
+        (control-analyze-block (nlx-info-target nlx) tail-block))
       (cond
        ((block-flag bind-block)
         (let* ((block-note (block-info bind-block))
@@ -177,11 +173,9 @@
        (t
         (let ((new-fun (control-analyze-block bind-block
                                               (block-annotation-next
-                                               prev-block)
-                                              block-info-constructor)))
+                                               prev-block))))
           (when new-fun
-            (control-analyze-1-fun new-fun component
-                                   block-info-constructor)))))))
+            (control-analyze-1-fun new-fun component)))))))
   (values))
 
 ;;; Do control analysis on COMPONENT, finding the emit order. Our only
@@ -194,13 +188,12 @@
 ;;; IR2-COMPONENT VALUES-RECEIVERS to keep stack analysis from getting
 ;;; confused.
 (defevent control-deleted-block "control analysis deleted dead block")
-(defun control-analyze (component block-info-constructor)
-  (declare (type component component)
-           (type function block-info-constructor))
+(defun control-analyze (component)
+  (declare (type component component))
   (let* ((head (component-head component))
-         (head-block (funcall block-info-constructor head))
+         (head-block (make-ir2-block head))
          (tail (component-tail component))
-         (tail-block (funcall block-info-constructor tail)))
+         (tail-block (make-ir2-block tail)))
     (setf (block-info head) head-block)
     (setf (block-info tail) tail-block)
     (setf (block-annotation-prev tail-block) head-block)
@@ -210,10 +203,10 @@
 
     (dolist (fun (component-lambdas component))
       (when (xep-p fun)
-        (control-analyze-1-fun fun component block-info-constructor)))
+        (control-analyze-1-fun fun component)))
 
     (dolist (fun (component-lambdas component))
-      (control-analyze-1-fun fun component block-info-constructor))
+      (control-analyze-1-fun fun component))
 
     (do-blocks (block component)
       (unless (block-flag block)

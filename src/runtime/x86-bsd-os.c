@@ -72,6 +72,12 @@ os_context_sp_addr(os_context_t *context)
     return (int *)CONTEXT_ADDR_FROM_STEM(esp);
 }
 
+int *
+os_context_fp_addr(os_context_t *context)
+{
+    return (int *)CONTEXT_ADDR_FROM_STEM(ebp);
+}
+
 #endif /* LISP_FEATURE_FREEBSD || __OpenBSD__ || __DragonFly__ */
 
 #ifdef __NetBSD__

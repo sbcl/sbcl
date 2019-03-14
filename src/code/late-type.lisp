@@ -39,6 +39,37 @@
   (:default-initargs
    :specifier (missing-arg)))
 
+;;; For-effect-only variant of CHECK-DEPRECATED-THING for
+;;; type-specifiers that descends into compound type-specifiers.
+(defun sb-impl::%check-deprecated-type (type-specifier)
+  (let ((seen '()))
+    ;; KLUDGE: we have to use SPECIFIER-TYPE to sanely traverse
+    ;; TYPE-SPECIFIER and detect references to deprecated types. But
+    ;; then we may have to drop its cache to get the
+    ;; PARSE-DEPRECATED-TYPE condition when TYPE-SPECIFIER is parsed
+    ;; again later.
+    ;;
+    ;; Proper fix would be a
+    ;;
+    ;;   walk-type function type-specifier
+    ;;
+    ;; mechanism that could drive VALUES-SPECIFIER-TYPE but also
+    ;; things like this function.
+    (block nil
+      (handler-bind
+          ((parse-deprecated-type
+             (lambda (condition)
+               (let ((type-specifier (parse-deprecated-type-specifier condition)))
+                 (aver (symbolp type-specifier))
+                 (unless (memq type-specifier seen)
+                   (push type-specifier seen)
+                   (check-deprecated-thing 'type type-specifier)))))
+           ((or error parse-unknown-type)
+             (lambda (condition)
+               (declare (ignore condition))
+               (return))))
+        (specifier-type type-specifier)))))
+
 ;;; These functions are used as method for types which need a complex
 ;;; subtypep method to handle some superclasses, but cover a subtree
 ;;; of the type graph (i.e. there is no simple way for any other type
@@ -58,29 +89,30 @@
         (hierarchical-intersection2 type1 type2))))
 
 (defun map-type (function ctype)
-  (labels ((%map (type)
-             (typecase type
-               (compound-type
-                (mapc #'%map (compound-type-types type)))
-               (negation-type (%map (negation-type-type type)))
-               (cons-type
-                (%map (cons-type-car-type type))
-                (%map (cons-type-cdr-type type)))
-               (array-type
-                (%map (array-type-element-type type)))
-               (args-type
-                (mapc #'%map (args-type-required type))
-                (mapc #'%map (args-type-optional type))
-                (when (args-type-rest type)
-                  (%map (args-type-rest type)))
-                (mapc (lambda (x) (%map (key-info-type x)))
-                      (args-type-keywords type))
-                (when (fun-type-p type)
-                  (%map (fun-type-returns type))))
-               (t
-                (funcall function type)))))
-    (%map ctype)
-    nil))
+  (declare (type (or ctype null) ctype)
+           (dynamic-extent function))
+  (named-let %map ((type ctype))
+    (typecase type
+      (compound-type
+       (mapc #'%map (compound-type-types type)))
+      (negation-type (%map (negation-type-type type)))
+      (cons-type
+       (%map (cons-type-car-type type))
+       (%map (cons-type-cdr-type type)))
+      (array-type
+       (%map (array-type-element-type type)))
+      (args-type
+       (mapc #'%map (args-type-required type))
+       (mapc #'%map (args-type-optional type))
+       (when (args-type-rest type)
+         (%map (args-type-rest type)))
+       (mapc (lambda (x) (%map (key-info-type x)))
+             (args-type-keywords type))
+       (when (fun-type-p type)
+         (%map (fun-type-returns type))))
+      (t
+       (funcall function type))))
+  nil)
 
 (defun contains-unknown-type-p (ctype)
   (map-type (lambda (type)
@@ -257,10 +289,10 @@
 ;;; a flag that we can bind to cause complex function types to be
 ;;; unparsed as FUNCTION. This is useful when we want a type that we
 ;;; can pass to TYPEP.
-(!defvar *unparse-fun-type-simplify* nil)
+(defparameter *unparse-fun-type-simplify* nil) ; initialized by genesis
 ;;; A flag to prevent TYPE-OF calls by user applications from returning
 ;;; (NOT x). TYPE-SPECIFIER usually allows it to preserve information.
-(!defvar *unparse-allow-negation* t)
+(defparameter *unparse-allow-negation* t) ; initialized by genesis
 
 (!define-type-method (function :negate) (type) (make-negation-type type))
 
@@ -530,11 +562,11 @@
   (etypecase type
     (named-type
      (ecase (named-type-name type)
-       ((t *) call-arguments-limit)
+       ((t *) sb-xc:call-arguments-limit)
        ((nil) 0)))
     (values-type
      (if (values-type-rest type)
-         call-arguments-limit
+         sb-xc:call-arguments-limit
          (+ (length (values-type-optional type))
             (length (values-type-required type)))))))
 
@@ -552,7 +584,7 @@
 
 ;;; Return the type of the first value indicated by TYPE. This is used
 ;;; by people who don't want to have to deal with VALUES types.
-#!-sb-fluid (declaim (freeze-type values-type))
+#-sb-fluid (declaim (freeze-type values-type))
 ; (inline single-value-type))
 (defun single-value-type (type)
   (declare (type ctype type))
@@ -956,6 +988,13 @@
          (values nil t))
         (t
          (memoize (!invoke-type-method :simple-= :complex-= type1 type2)))))
+
+(declaim (inline ctype-eq-comparable))
+(defun ctype-eq-comparable (ctype)
+  (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
+
+(defun ctype-interned-p (ctype)
+  (minusp (type-hash-value ctype)))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -1959,51 +1998,33 @@
 (defun numeric-types-adjacent (low high)
   (let ((low-bound (numeric-type-high low))
         (high-bound (numeric-type-low high)))
-    (cond ((not (and low-bound high-bound)) nil)
-          ((and (consp low-bound) (consp high-bound)) nil)
-          ((consp low-bound)
-           (let ((low-value (car low-bound)))
-             (or (eql low-value high-bound)
-                 (and (eql low-value
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t))
-                      (eql high-bound 0f0))
-                 (and (eql low-value 0f0)
-                      (eql high-bound
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t)))
-                 (and (eql low-value
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))
-                      (eql high-bound 0d0))
-                 (and (eql low-value 0d0)
-                      (eql high-bound
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))))))
-          ((consp high-bound)
-           (let ((high-value (car high-bound)))
-             (or (eql high-value low-bound)
-                 (and (eql high-value
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t))
-                      (eql low-bound 0f0))
-                 (and (eql high-value 0f0)
-                      (eql low-bound
-                           (load-time-value (make-unportable-float
-                                             :single-float-negative-zero) t)))
-                 (and (eql high-value
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))
-                      (eql low-bound 0d0))
-                 (and (eql high-value 0d0)
-                      (eql low-bound
-                           (load-time-value (make-unportable-float
-                                             :double-float-negative-zero) t))))))
-          ((and (eq (numeric-type-class low) 'integer)
-                (eq (numeric-type-class high) 'integer))
-           (eql (1+ low-bound) high-bound))
-          (t
-           nil))))
+    ;; Return T if and only if X is EQL to Y, or X = 0 and -X is EQL to Y.
+    ;; If both intervals have the same sign of zero at the adjacency point,
+    ;; then they intersect (as per NUMERIC-TYPES-INTESECT)
+    ;; so it doesn't matter much what we say here.
+    (flet ((oppositely-signed-zeros-or-eql (x y)
+             (or (eql x y)
+                 ;; Calling (EQL (- X) Y) might cons. Using = would be almost the same
+                 ;; but not cons, however I prefer not to assume that the caller has
+                 ;; already checked for matching float formats. EQL enforces that.
+                 (let ((answer (and (fp-zero-p x) (fp-zero-p y) (eql (- x) y))))
+                   ;; KLUDGE: if the host does not support floating-point negative-zero,
+                   ;; then this function can never return T, which is fine unless T would
+                   ;; be the right answer. Let's assert that it isn't, which works on
+                   ;; a self-hosted build because we do support signed zeros.
+                   #+sb-xc-host (aver (eq answer nil))
+                   answer))))
+      (cond ((not (and low-bound high-bound)) nil)
+            ((and (consp low-bound) (consp high-bound)) nil)
+            ((consp low-bound)
+             (oppositely-signed-zeros-or-eql (car low-bound) high-bound))
+            ((consp high-bound)
+             (oppositely-signed-zeros-or-eql low-bound (car high-bound)))
+            ((and (eq (numeric-type-class low) 'integer)
+                  (eq (numeric-type-class high) 'integer))
+             (eql (1+ low-bound) high-bound))
+            (t
+             nil)))))
 
 ;;; Return a numeric type that is a supertype for both TYPE1 and TYPE2.
 ;;;
@@ -2165,7 +2186,7 @@ used for a COMPLEX component.~:@>"
 ;;; member of TYPE or a one-element list of a member of TYPE.
 ;;; This is not necessarily the canonical bound. An integer bound
 ;;; should always be an atom, which we'll enforce later if needed.
-#!-sb-fluid (declaim (inline valid-bound))
+#-sb-fluid (declaim (inline valid-bound))
 (defun valid-bound (bound type)
   (cond ((eq bound '*) nil)
         ((sb-xc:typep (if (singleton-p bound) (car bound) bound) type) bound)
@@ -2303,7 +2324,7 @@ used for a COMPLEX component.~:@>"
                       ,(coerced-float-bound high 'single-float t))
         (double-float ,(coerced-float-bound  low 'double-float nil)
                       ,(coerced-float-bound high 'double-float t))
-        #!+long-float ,(error "stub: no long float support yet"))))
+        #+long-float ,(error "stub: no long float support yet"))))
 
 (macrolet ((define-float-format (f) `(!def-bounded-type ,f float ,f)))
   (define-float-format single-float)
@@ -2383,11 +2404,11 @@ used for a COMPLEX component.~:@>"
            (let ((res
                    (cond
                      ((and format (subtypep format 'double-float))
-                      (if (<= most-negative-double-float cx most-positive-double-float)
+                      (if (<= sb-xc:most-negative-double-float cx sb-xc:most-positive-double-float)
                           (coerce cx format)
                           nil))
                      (t
-                      (if (<= most-negative-single-float cx most-positive-single-float)
+                      (if (<= sb-xc:most-negative-single-float cx sb-xc:most-positive-single-float)
                           ;; FIXME: bug #389
                           (coerce cx (or format 'single-float))
                           nil)))))
@@ -2481,13 +2502,13 @@ used for a COMPLEX component.~:@>"
                           ((nil)
                            ;; A double-float with any real number is a
                            ;; double-float.
-                           #!-long-float
+                           #-long-float
                            (if (eq format1 'double-float)
                              'double-float
                              nil)
                            ;; A long-float with any real number is a
                            ;; long-float.
-                           #!+long-float
+                           #+long-float
                            (if (eq format1 'long-float)
                              'long-float
                              nil)))
@@ -2580,12 +2601,12 @@ used for a COMPLEX component.~:@>"
                       (if (eq (car dims) '*)
                           (case eltype
                             (bit 'bit-vector)
-                            ((base-char #!-sb-unicode character) 'base-string)
+                            ((base-char #-sb-unicode character) 'base-string)
                             (* 'vector)
                             (t `(vector ,eltype)))
                           (case eltype
                             (bit `(bit-vector ,(car dims)))
-                            ((base-char #!-sb-unicode character)
+                            ((base-char #-sb-unicode character)
                              `(base-string ,(car dims)))
                             (t `(vector ,eltype ,(car dims)))))))
                  (if (eql complexp :maybe)
@@ -2594,12 +2615,12 @@ used for a COMPLEX component.~:@>"
                (if (eq (car dims) '*)
                    (case eltype
                      (bit 'simple-bit-vector)
-                     ((base-char #!-sb-unicode character) 'simple-base-string)
+                     ((base-char #-sb-unicode character) 'simple-base-string)
                      ((t) 'simple-vector)
                      (t `(simple-array ,eltype (*))))
                    (case eltype
                      (bit `(simple-bit-vector ,(car dims)))
-                     ((base-char #!-sb-unicode character)
+                     ((base-char #-sb-unicode character)
                       `(simple-base-string ,(car dims)))
                      ((t) `(simple-vector ,(car dims)))
                      (t `(simple-array ,eltype ,dims))))))
@@ -3753,7 +3774,7 @@ used for a COMPLEX component.~:@>"
                                                eltype))))
 
 ;;;; SIMD-PACK types
-#!+sb-simd-pack
+#+sb-simd-pack
 (progn
   (!define-type-class simd-pack :enumerable nil
                       :might-contain-other-types nil)
@@ -3811,7 +3832,7 @@ used for a COMPLEX component.~:@>"
 
   (!define-superclasses simd-pack ((simd-pack)) !cold-init-forms))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (progn
   (!define-type-class simd-pack-256 :enumerable nil
                       :might-contain-other-types nil)

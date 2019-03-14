@@ -196,6 +196,7 @@ Please check that all strings which were not recognizable to the compiler
                (multiple-value-bind (type present)
                    (sb-int:info kind :type s)
                  (when (and present
+                            (sb-kernel:ctype-p type)
                             (sb-kernel:contains-unknown-type-p type))
                    (setf (sb-int:info kind :type s)
                          (sb-kernel:specifier-type (sb-kernel:type-specifier type)))
@@ -261,10 +262,6 @@ Please check that all strings which were not recognizable to the compiler
                             :key #'dsd-name)))
   (funcall #'(setf slot-value) 'character dsd 'sb-kernel::default))
 
-;;; Even if /SHOW output was wanted during build, it's probably
-;;; not wanted by default after build is complete. (And if it's
-;;; wanted, it can easily be turned back on.)
-#+sb-show (setf sb-int:*/show* nil)
 ;;; The system is complete now, all standard functions are
 ;;; defined.
 ;;; The call to CTYPE-OF-CACHE-CLEAR is probably redundant.
@@ -360,6 +357,8 @@ Please check that all strings which were not recognizable to the compiler
 ;; See comments in 'readtable.lisp'
 (setf (readtable-base-char-preference *readtable*) :symbols)
 
+#+sb-devel
+(sb-impl::%enter-new-nicknames (find-package :cl) '("SB-XC" "CL"))
 "done with warm.lisp, about to SAVE-LISP-AND-DIE"
 
 #|

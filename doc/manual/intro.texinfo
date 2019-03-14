@@ -122,7 +122,7 @@ standardization process.
 
 @item Executable Delivery
 The @code{:executable} argument to @ref{Function
-sb-ext:save-lisp-and-die} can produce a `standalone' executable
+sb-ext save-lisp-and-die} can produce a `standalone' executable
 containing both an image of the current Lisp session and an SBCL
 runtime.
 
@@ -337,7 +337,7 @@ include the SBCL runtime itself, so no restrictions are placed on
 program functionality.  For example, a deployed program can call
 @code{compile} and @code{load}, which requires the compiler to be present
 in the executable.  For further information, @xref{Function
-sb-ext:save-lisp-and-die}.
+sb-ext save-lisp-and-die}.
 
 
 @node More SBCL Information

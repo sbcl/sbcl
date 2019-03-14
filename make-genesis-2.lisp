@@ -10,7 +10,7 @@
 
 (sb-cold:genesis :object-file-names
                  (let (list)
-                   (do-stems-and-flags (stem flags)
+                   (do-stems-and-flags (stem flags 2)
                      (unless (member :not-target flags)
                        (push (stem-object-path stem flags :target-compile) list)))
                    (nreverse list))

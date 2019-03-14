@@ -14,6 +14,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+
 ;;;; Pathname accessors
 
 (with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))

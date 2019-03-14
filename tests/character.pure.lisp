@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 ;;; ANSI's specification of #'CHAR-NAME imposes these constraints.
 ;;;
 ;;; (Obviously, the numeric values in this test implicitly assume

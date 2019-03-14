@@ -32,7 +32,7 @@
 (defun c-strings->string-list (c-strings)
   (declare (type (alien (* c-string)) c-strings))
   (let ((reversed-result nil))
-    (dotimes (i most-positive-fixnum (error "argh! can't happen"))
+    (dotimes (i sb-xc:most-positive-fixnum (error "argh! can't happen"))
       (declare (type index i))
       (let ((c-string (deref c-strings i)))
         (if c-string
@@ -64,7 +64,7 @@
 (defmacro syscall ((name &rest arg-types) success-form &rest args)
   (when (eql 3 (mismatch "[_]" name))
     (setf name
-          (concatenate 'string #!+win32 "_" (subseq name 3))))
+          (concatenate 'string #+win32 "_" (subseq name 3))))
   `(locally
     (declare (optimize (sb-c::float-accuracy 0)))
     (let ((result (alien-funcall (extern-alien ,name (function int ,@arg-types))
@@ -96,20 +96,20 @@ SYSCALL-FORM. Repeat evaluation of SYSCALL-FORM if it is interrupted."
   `(let (,value ,errno)
      (loop (multiple-value-setq (,value ,errno)
              ,syscall-form)
-        (unless #!-win32 (eql ,errno eintr) #!+win32 nil
+        (unless #-win32 (eql ,errno eintr) #+win32 nil
           (return (values ,value ,errno))))
      ,@body))
 
 (defmacro void-syscall ((name &rest arg-types) &rest args)
   `(syscall (,name ,@arg-types) (values t 0) ,@args))
 
-#!+win32
+#+win32
 (progn
   (defconstant espipe 29))
 
 ;;;; hacking the Unix environment
 
-#!-win32
+#-win32
 (define-alien-routine ("getenv" posix-getenv) c-string
   "Return the \"value\" part of the environment string \"name=value\" which
 corresponds to NAME, or NIL if there is none."
@@ -119,7 +119,7 @@ corresponds to NAME, or NIL if there is none."
 
 ;;; Rename the file with string NAME1 to the string NAME2. NIL and an
 ;;; error code is returned if an error occurs.
-#!-win32
+#-win32
 (defun unix-rename (name1 name2)
   (declare (type unix-pathname name1 name2))
   (void-syscall ("rename" (c-string :not-null t)
@@ -156,18 +156,18 @@ corresponds to NAME, or NIL if there is none."
 ;;; If the O_CREAT flag is specified, then the file is created with a
 ;;; permission of argument MODE if the file doesn't exist. An integer
 ;;; file descriptor is returned by UNIX-OPEN.
-(defun unix-open (path flags mode &key #!+win32 overlapped)
+(defun unix-open (path flags mode &key #+win32 overlapped)
   (declare (type unix-pathname path)
            (type fixnum flags)
            (type unix-file-mode mode)
-           #!+win32
+           #+win32
            (ignore mode))
-  #!+win32 (sb-win32:unixlike-open path flags :overlapped overlapped)
-  #!-win32
+  #+win32 (sb-win32:unixlike-open path flags :overlapped overlapped)
+  #-win32
   (with-restarted-syscall (value errno)
     (int-syscall ("open" c-string int int)
                  path
-                 (logior #!+largefile o_largefile
+                 (logior #+largefile o_largefile
                          flags)
                  mode)))
 
@@ -175,9 +175,9 @@ corresponds to NAME, or NIL if there is none."
 ;;; associated with it.
 (/show0 "unix.lisp 391")
 (defun unix-close (fd)
-  #!+win32 (sb-win32:unixlike-close fd)
-  #!-win32 (declare (type unix-fd fd))
-  #!-win32 (void-syscall ("close" int) fd))
+  #+win32 (sb-win32:unixlike-close fd)
+  #-win32 (declare (type unix-fd fd))
+  #-win32 (void-syscall ("close" int) fd))
 
 ;;;; stdlib.h
 
@@ -200,7 +200,7 @@ corresponds to NAME, or NIL if there is none."
                                mode)))
         (if (minusp fd)
             (values nil (get-errno))
-            (values #!-win32 fd #!+win32 (sb-win32::duplicate-and-unwrap-fd fd)
+            (values #-win32 fd #+win32 (sb-win32::duplicate-and-unwrap-fd fd)
                     (octets-to-string template-buffer)))))))
 
 ;;;; resourcebits.h
@@ -244,7 +244,7 @@ corresponds to NAME, or NIL if there is none."
 ;;; In Windows, the MODE argument to access is defined in terms of
 ;;; literal magic numbers---there are no constants to grovel.  X_OK
 ;;; is not defined.
-#!+win32
+#+win32
 (progn
   (defconstant f_ok 0)
   (defconstant w_ok 2)
@@ -263,14 +263,14 @@ corresponds to NAME, or NIL if there is none."
 
 ;; off_t is 32 bit on Windows, yet our functions support 64 bit seeks.
 (define-alien-type unix-offset
-  #!-win32 off-t
-  #!+win32 (signed 64))
+  #-win32 off-t
+  #+win32 (signed 64))
 
 ;;; Is a stream interactive?
 (defun unix-isatty (fd)
   (declare (type unix-fd fd))
-  #!-win32 (int-syscall ("isatty" int) fd)
-  #!+win32 (sb-win32::windows-isatty fd))
+  #-win32 (int-syscall ("isatty" int) fd)
+  #+win32 (sb-win32::windows-isatty fd))
 
 (defun unix-lseek (fd offset whence)
   "Unix-lseek accepts a file descriptor and moves the file pointer by
@@ -283,12 +283,12 @@ corresponds to NAME, or NIL if there is none."
   (declare (type unix-fd fd)
            (type (integer 0 2) whence))
   (let ((result
-         #!-win32
-          (alien-funcall (extern-alien #!-largefile "lseek"
-                                             #!+largefile "lseek_largefile"
+         #-win32
+          (alien-funcall (extern-alien #-largefile "lseek"
+                                             #+largefile "lseek_largefile"
                                              (function off-t int off-t int))
                         fd offset whence)
-          #!+win32 (sb-win32:lseeki64 fd offset whence)))
+          #+win32 (sb-win32:lseeki64 fd offset whence)))
     (if (minusp result)
         (values nil (get-errno))
       (values result 0))))
@@ -303,7 +303,7 @@ corresponds to NAME, or NIL if there is none."
 (defun unix-read (fd buf len)
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) len))
-  (int-syscall (#!-win32 "read" #!+win32 "win32_unix_read"
+  (int-syscall (#-win32 "read" #+win32 "win32_unix_read"
                 int (* char) int) fd buf len))
 
 ;;; UNIX-WRITE accepts a file descriptor, a buffer, an offset, and the
@@ -312,14 +312,14 @@ corresponds to NAME, or NIL if there is none."
 ;;; the actual number of bytes written.
 (defun unix-write (fd buf offset len)
   ;; KLUDGE: change 60fa88b187e438cc made this function unusable in cold-init
-  ;; if compiled with #!+sb-show (which increases DEBUG to 2) because of
+  ;; if compiled with #+sb-show (which increases DEBUG to 2) because of
   ;; full calls to SB-ALIEN-INTERNALS:DEPORT-ALLOC and DEPORT.
   (declare (optimize (debug 1)))
   (declare (type unix-fd fd)
            (type (unsigned-byte 32) offset len))
   (flet ((%write (sap)
            (declare (system-area-pointer sap))
-           (int-syscall (#!-win32 "write" #!+win32 "win32_unix_write"
+           (int-syscall (#-win32 "write" #+win32 "win32_unix_write"
                          int (* char) int)
                         fd
                         (with-alien ((ptr (* char) sap))
@@ -337,14 +337,14 @@ corresponds to NAME, or NIL if there is none."
 ;;; value is the pipe to be read from and the second is can be written
 ;;; to. If an error occurred the first value is NIL and the second the
 ;;; unix error code.
-#!-win32
+#-win32
 (defun unix-pipe ()
   (with-alien ((fds (array int 2)))
     (syscall ("pipe" (* int))
              (values (deref fds 0) (deref fds 1))
              (cast fds (* int)))))
 
-#!+win32
+#+win32
 (defun unix-pipe ()
   (sb-win32::windows-pipe))
 
@@ -352,12 +352,12 @@ corresponds to NAME, or NIL if there is none."
 ;; actually call it passing the mode argument, but some sharp-eyed reader
 ;; would put five and twenty-seven together and ask us about it, so...
 ;;    -- AB, 2005-12-27
-#!-win32
+#-win32
 (defun unix-mkdir (name mode)
   (declare (type unix-pathname name)
            (type unix-file-mode mode)
-           #!+win32 (ignore mode))
-  (void-syscall ("mkdir" c-string #!-win32 int) name #!-win32 mode))
+           #+win32 (ignore mode))
+  (void-syscall ("mkdir" c-string #-win32 int) name #-win32 mode))
 
 ;;; Given a C char* pointer allocated by malloc(), free it and return a
 ;;; corresponding Lisp string (or return NIL if the pointer is a C NULL).
@@ -371,7 +371,7 @@ corresponds to NAME, or NIL if there is none."
 
 ;;; Return the Unix current directory as a SIMPLE-STRING, in the
 ;;; style returned by getcwd() (no trailing slash character).
-#!-win32
+#-win32
 (defun posix-getcwd ()
   ;; This implementation relies on a BSD/Linux extension to getcwd()
   ;; behavior, automatically allocating memory when a null buffer
@@ -388,18 +388,18 @@ corresponds to NAME, or NIL if there is none."
   ;;
   ;; Signal an error at compile-time, since it's needed for the
   ;; runtime to start up
-  #!-(or android linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
+  #-(or android linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
   #.(error "POSIX-GETCWD is not implemented.")
   (or
-   #!+(or linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
+   #+(or linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
    (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                     (function (* char)
                                                               (* char)
                                                               size-t))
                                       nil
-                                      #!+(or linux openbsd freebsd netbsd darwin win32 dragonfly) 0
-                                      #!+(or sunos hpux) 1025))
-   #!+android
+                                      #+(or linux openbsd freebsd netbsd darwin win32 dragonfly) 0
+                                      #+(or sunos hpux) 1025))
+   #+android
    (with-alien ((ptr (array char #.path-max)))
      ;; Older bionic versions do not have the above feature.
      (alien-funcall
@@ -416,7 +416,7 @@ corresponds to NAME, or NIL if there is none."
 ;;; Duplicate an existing file descriptor (given as the argument) and
 ;;; return it. If FD is not a valid file descriptor, NIL and an error
 ;;; number are returned.
-#!-win32
+#-win32
 (defun unix-dup (fd)
   (declare (type unix-fd fd))
   (int-syscall ("dup" int) fd))
@@ -439,14 +439,14 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (os-exit code))
 
 ;;; Return the process id of the current process.
-(define-alien-routine (#!+win32 "_getpid" #!-win32 "getpid" unix-getpid) int)
+(define-alien-routine (#+win32 "_getpid" #-win32 "getpid" unix-getpid) int)
 
 ;;; Return the real user id associated with the current process.
-#!-win32
+#-win32
 (define-alien-routine ("getuid" unix-getuid) int)
 
 ;;; Translate a user id into a login name.
-#!-win32
+#-win32
 (defun uid-username (uid)
   (or (newcharstar-string (alien-funcall (extern-alien "uid_username"
                                                        (function (* char) int))
@@ -455,7 +455,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 ;;; Return the namestring of the home directory, being careful to
 ;;; include a trailing #\/
-#!-win32
+#-win32
 (progn
   (defun uid-homedir (uid)
     (or (newcharstar-string (alien-funcall (extern-alien "uid_homedir"
@@ -472,7 +472,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; Invoke readlink(2) on the file name specified by PATH. Return
 ;;; (VALUES LINKSTRING NIL) on success, or (VALUES NIL ERRNO) on
 ;;; failure.
-#!-win32
+#-win32
 (defun unix-readlink (path)
   (declare (type unix-pathname path))
   (with-alien ((ptr (* char)
@@ -486,7 +486,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
             (values (with-alien ((c-string c-string ptr)) c-string)
                     nil)
           (free-alien ptr)))))
-#!+win32
+#+win32
 ;; Win32 doesn't do links, but something likes to call this anyway.
 ;; Something in this file, no less. But it only takes one result, so...
 (defun unix-readlink (path)
@@ -514,14 +514,14 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (void-syscall ("[_]unlink" c-string) name))
 
 ;;; Return the name of the host machine as a string.
-#!-win32
+#-win32
 (defun unix-gethostname ()
   (with-alien ((buf (array char 256)))
     (syscall ("gethostname" (* char) int)
              (cast buf c-string)
              (cast buf (* char)) 256)))
 
-#!-win32
+#-win32
 (defun unix-setsid ()
   (int-syscall ("setsid")))
 
@@ -530,7 +530,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; UNIX-IOCTL performs a variety of operations on open i/o
 ;;; descriptors. See the UNIX Programmer's Manual for more
 ;;; information.
-#!-win32
+#-win32
 (defun unix-ioctl (fd cmd arg)
   (declare (type unix-fd fd)
            (type word cmd))
@@ -543,8 +543,8 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; This is like getrusage(2), except it returns only the system and
 ;;; user time, and returns the seconds and microseconds as separate
 ;;; values.
-#!-sb-fluid (declaim (inline unix-fast-getrusage))
-#!-win32
+#-sb-fluid (declaim (inline unix-fast-getrusage))
+#-win32
 (defun unix-fast-getrusage (who)
   (declare (values (member t)
                    unsigned-byte fixnum
@@ -563,7 +563,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; (rusage_self) or all of the terminated child processes
 ;;; (rusage_children). NIL and an error number is returned if the call
 ;;; fails.
-#!-win32
+#-win32
 (defun unix-getrusage (who)
   (with-alien ((usage (struct rusage)))
     (syscall ("sb_getrusage" int (* (struct rusage)))
@@ -612,7 +612,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
     nil))
 
 ;;;; poll.h
-#!+os-provides-poll
+#+os-provides-poll
 (progn
   (define-alien-type nil
       (struct pollfd
@@ -620,6 +620,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
               (events  short)           ; requested events
               (revents short)))         ; returned events
 
+  (declaim (inline unix-poll))
   (defun unix-poll (pollfds nfds to-msec)
     (declare (fixnum nfds to-msec))
     (when (and (minusp to-msec) (not *interrupts-enabled*))
@@ -777,7 +778,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   (loop for index below (/ fd-setsize sb-vm:n-machine-word-bits)
         do (setf (deref (slot fd-set 'fds-bits) index) 0)))
 
-#!-os-provides-poll
+#-os-provides-poll
 (defun unix-simple-poll (fd direction to-msec)
   (multiple-value-bind (to-sec to-usec)
       (if (minusp to-msec)
@@ -889,9 +890,9 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
              (%extract-stat-results (addr buf))
              name (addr buf))))
 (defun unix-fstat (fd)
-  #!-win32
+  #-win32
   (declare (type unix-fd fd))
-  (#!-win32 funcall #!+win32 sb-win32::call-with-crt-fd
+  (#-win32 funcall #+win32 sb-win32::call-with-crt-fd
    (lambda (fd)
      (with-alien ((buf (struct wrapped_stat)))
        (syscall ("fstat_wrapper" int (* (struct wrapped_stat)))
@@ -899,7 +900,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                 fd (addr buf))))
    fd))
 
-#!-win32
+#-win32
 (defun fd-type (fd)
   (declare (type unix-fd fd))
   (let ((mode (or (with-alien ((buf (struct wrapped_stat)))
@@ -939,19 +940,19 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
   ;; KLUDGE: the runtime `boolean' is defined as `int', but the alien
   ;; type is N-WORD-BITS wide.
   (daylight-savings-p (boolean 32) :out))
-#!-win32
+#-win32
 (defun nanosleep (secs nsecs)
   (alien-funcall (extern-alien "sb_nanosleep" (function int time-t int))
                  secs nsecs)
   nil)
 
-#!-win32
+#-win32
 (defun nanosleep-double (seconds)
   (alien-funcall (extern-alien "sb_nanosleep_double" (function (values) double))
                  seconds)
   nil)
 
-#!-win32
+#-win32
 (defun nanosleep-float (seconds)
   (alien-funcall (extern-alien "sb_nanosleep_float" (function (values) float))
                  seconds)
@@ -978,7 +979,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 (defconstant itimer-virtual 1)
 (defconstant itimer-prof 2)
 
-#!-win32
+#-win32
 (defun unix-getitimer (which)
   "UNIX-GETITIMER returns the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). On success,
@@ -1001,7 +1002,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
                         (slot (slot itv 'it-value) 'tv-usec))
                 which (alien-sap (addr itv))))))
 
-#!-win32
+#-win32
 (defun unix-setitimer (which int-secs int-usec val-secs val-usec)
   "UNIX-SETITIMER sets the INTERVAL and VALUE slots of one of
    three system timers (:real :virtual or :profile). A SIGALRM signal
@@ -1048,14 +1049,14 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 
 ;;; UNIX specific code, that has been cleanly separated from the
 ;;; Windows build.
-#!-win32
+#-win32
 (progn
 
-  #!-sb-fluid (declaim (inline get-time-of-day))
+  #-sb-fluid (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
-    #!+(or darwin netbsd)
+    #+(or darwin netbsd)
     (with-alien ((tv (struct timeval)))
       ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
       ;; gettimeofday occasionally fails. passing in a null pointer for the
@@ -1068,7 +1069,7 @@ the UNIX epoch (January 1st 1970.)"
                         (slot tv 'tv-usec))
                 (addr tv)
                 nil))
-    #!-(or darwin netbsd)
+    #-(or darwin netbsd)
     (with-alien ((tv (struct timeval))
                  (tz (struct timezone)))
       (syscall* ("sb_gettimeofday" (* (struct timeval))
@@ -1082,7 +1083,7 @@ the UNIX epoch (January 1st 1970.)"
                    system-real-time-values))
 
   (defun system-real-time-values ()
-    #!+win32 (declare (notinline get-time-of-day)) ; forward ref
+    #+win32 (declare (notinline get-time-of-day)) ; forward ref
     (multiple-value-bind (sec usec) (get-time-of-day)
       (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
       (values sec (truncate usec micro-seconds-per-internal-time-unit))))
@@ -1167,7 +1168,7 @@ the UNIX epoch (January 1st 1970.)"
 ;;; So we're stuck with it for a while -- maybe delete it towards the end
 ;;; of 2009.
 (defun unix-gettimeofday ()
-  #!+win32 (declare (notinline get-time-of-day)) ; forward ref
+  #+win32 (declare (notinline get-time-of-day)) ; forward ref
   (multiple-value-bind (sec usec) (get-time-of-day)
     (values t sec usec nil nil)))
 

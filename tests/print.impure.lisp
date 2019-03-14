@@ -667,7 +667,7 @@
         (dimss (loop repeat 10
                      collect (loop repeat (1+ (random 3))
                                    collect (1+ (random 10)))))
-        (props sb-vm::*specialized-array-element-type-properties*))
+        (props sb-vm:*specialized-array-element-type-properties*))
     (labels ((random-elt (type)
                (case type
                  (base-char
@@ -696,7 +696,7 @@
                       (complex
                        (complex (random-elt x) (random-elt x)))))))))
       (dotimes (i (length props))
-        (let ((et (sb-vm::saetp-specifier (aref props i))))
+        (let ((et (sb-vm:saetp-specifier (aref props i))))
           (when et
             (when (eq 'base-char et)
               ;; base-strings not included in the #. printing.

@@ -43,7 +43,7 @@
 
 ;;;; utilities for reading from fasl files
 
-#!-sb-fluid (declaim (inline read-byte))
+#-sb-fluid (declaim (inline read-byte))
 
 ;;; This expands into code to read an N-byte unsigned integer using
 ;;; FAST-READ-BYTE.
@@ -167,10 +167,10 @@
 
 (defun nuke-fop-vector (vector)
   (declare (simple-vector vector)
-           #!-gencgc (ignore vector)
+           #-gencgc (ignore vector)
            (optimize speed))
   ;; Make sure we don't keep any garbage.
-  #!+gencgc
+  #+gencgc
   (fill vector 0))
 
 
@@ -262,54 +262,16 @@
 ;;; Skips past the shebang line on stream, if any.
 (defun maybe-skip-shebang-line (stream)
   (let ((p (file-position stream)))
-    (flet ((next () (read-byte stream nil)))
-      (unwind-protect
-           (when (and (eq (next) (char-code #\#))
-                      (eq (next) (char-code #\!)))
-             (setf p nil)
-             (loop for x = (next)
-                   until (or (not x) (eq x (char-code #\newline)))))
-        (when p
-          (file-position stream p))))
-    t))
-
-;;; Returns T if the stream is a binary input stream with a FASL header.
-#-sb-xc-host ;; FIXME: function belongs in 'target-load'
-(defun fasl-header-p (stream &key errorp)
-  (unless (and (member (stream-element-type stream) '(character base-char))
-               ;; give up if it's not a file stream, or it's an
-               ;; fd-stream but it's either not bivalent or not
-               ;; seekable (doesn't really have a file)
-               (or (not (typep stream 'file-stream))
-                   (and (typep stream 'fd-stream)
-                        (or (not (sb-impl::fd-stream-bivalent-p stream))
-                            (not (sb-impl::fd-stream-file stream))))))
-    (let ((p (file-position stream)))
-      (unwind-protect
-           (let* ((header *fasl-header-string-start-string*)
-                  (buffer (make-array (length header) :element-type '(unsigned-byte 8)))
-                  (n 0))
-             (flet ((scan ()
-                      (maybe-skip-shebang-line stream)
-                      (setf n (read-sequence buffer stream))))
-               (if errorp
-                   (scan)
-                   (or (ignore-errors (scan))
-                       ;; no a binary input stream
-                       (return-from fasl-header-p nil))))
-             (if (mismatch buffer header
-                           :test #'(lambda (code char) (= code (char-code char))))
-                 ;; Immediate EOF is valid -- we want to match what
-                 ;; CHECK-FASL-HEADER does...
-                 (or (zerop n)
-                     (when errorp
-                       (error 'fasl-header-missing
-                              :stream stream
-                              :fhsss buffer
-                              :expected header)))
-                 t))
-        (file-position stream p)))))
-
+    (when p
+      (flet ((next () (read-byte stream nil)))
+        (unwind-protect
+             (when (and (eq (next) (char-code #\#))
+                        (eq (next) (char-code #\!)))
+               (setf p nil)
+               (loop for x = (next)
+                     until (or (not x) (eq x (char-code #\newline)))))
+          (when p
+            (file-position stream p)))))))
 
 ;;;; LOAD-AS-FASL
 ;;;;
@@ -390,7 +352,7 @@
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.
-#!+sb-show
+#+sb-show
 (defvar *show-fops-p* nil)
 
 ;;;
@@ -411,7 +373,7 @@
   ;;
   (declare (ignorable print))
   (let ((stream (%fasl-input-stream fasl-input))
-        (trace #!+sb-show *show-fops-p*))
+        (trace #+sb-show *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))
     (catch 'fasl-group-end

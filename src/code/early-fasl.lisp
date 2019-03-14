@@ -43,7 +43,7 @@
     (append '(:sb-thread :sb-package-locks :sb-unicode :cheneygc
               :gencgc :msan :sb-safepoint :sb-safepoint-strictly
               :sb-dynamic-core)
-            #!+(or x86 x86-64) '(:int4-breakpoints :ud2-breakpoints)))
+            #+(or x86 x86-64) '(:int4-breakpoints :ud2-breakpoints)))
 
 ;;; Return a string representing symbols in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
 ;;; which are present in a particular compilation.
@@ -174,7 +174,7 @@
   ;; function calls) while executing other FOPs. SKIP-UNTIL will
   ;; either contain the position where the skipping will stop, or
   ;; NIL if we're executing normally.
-  (skip-until nil))
+  (skip-until nil :type (or null fixnum)))
 (declaim (freeze-type fasl-input))
 
 ;;; Unique number assigned into high 4 bytes of 64-bit code size slot

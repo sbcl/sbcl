@@ -33,7 +33,13 @@
 ;;; package system would help make most violations of the declared
 ;;; dependencies obvious at build time. -- WHN 20000803
 
-#-warm-build-phase
+;;; make-host-n build steps
+;;; All uses of #+ and #- reader macros within this file refer to
+;;; the chosen target features, and not CL:*FEATURES*.
+;;; The "host escape" syntax #+(host-feature x) must not be used,
+;;; because during the warm build phase, the reader is completely
+;;; standard and lacks the custom character macro handler.
+;;; If you must test a host feature, use "#.(cl:if ..)" syntax.
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; miscellaneous
@@ -88,7 +94,6 @@
  ("src/code/cross-char"  :c-headers :not-target)
  ("src/code/cross-float" :not-target)
  ("src/code/cross-io"    :not-target)
- ("src/code/cross-thread" :c-headers :not-target)
  ("src/code/cross-condition" :not-target)
 
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -120,7 +125,7 @@
  ("src/code/parse-body" :c-headers)       ; on host for PARSE-BODY
  ("src/code/unportable-float")
  ("src/compiler/policy" :c-headers)
- #!+sb-fasteval ("src/interpreter/basic-env")
+ #+sb-fasteval ("src/interpreter/basic-env")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known
  ;; condition subtypes as soon as possible
  ("src/code/condition-boot" :not-host)
@@ -133,7 +138,7 @@
  ("src/code/early-fasl" :c-headers)
 
  ("src/code/defbangstruct" :c-headers)
- ("src/code/early-thread")
+ ("src/code/early-thread" :c-headers)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
@@ -189,7 +194,6 @@
  ("src/code/weak"          :not-host)
  ;; 'target-alieneval' needs FILL-POINTER which is defined in 'array'
  ("src/code/array"         :not-host) ; needs WEAK-POINTER-VALUE
- ("src/code/pred" :not-host)
  ("src/code/debug-var-io")
 
  ("src/code/target-alieneval" :not-host)
@@ -202,8 +206,9 @@
  ("src/code/early-float"   :not-host)
  ("src/pcl/early-low" :not-host)
   ;; Define at most one INTERPRETED-FUNCTION type based on target features
- #!+sb-eval ("src/code/early-full-eval" :not-host)
- #!+sb-fasteval ("src/interpreter/function" :not-host)
+ #+sb-eval ("src/code/early-full-eval" :not-host)
+ #+sb-fasteval ("src/interpreter/function" :not-host)
+ ("src/code/pred" :not-host)
  ("src/compiler/generic/pinned-objects" :not-host)
 
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
@@ -220,24 +225,20 @@
 
  ("src/code/early-time" :c-headers)
  ("src/code/unix" :not-host)
- #!+win32 ("src/code/win32" :not-host)
- #!+mach  ("src/code/mach"     :not-host)
+ #+win32 ("src/code/win32" :not-host)
+ #+mach  ("src/code/mach"     :not-host)
 
- #!+android ("src/code/android-os" :not-host)
- #!+mach  ("src/code/mach-os"  :not-host)
- #!+sunos ("src/code/sunos-os" :not-host)
- #!+hpux  ("src/code/hpux-os"  :not-host)
- #!+irix  ("src/code/irix-os"  :not-host)
- #!+bsd   ("src/code/bsd-os"   :not-host)
- #!+linux ("src/code/linux-os" :not-host)
- #!+win32 ("src/code/win32-os" :not-host)
+ #+android ("src/code/android-os" :not-host)
+ #+sunos ("src/code/sunos-os" :not-host)
+ #+hpux  ("src/code/hpux-os"  :not-host)
+ #+bsd   ("src/code/bsd-os"   :not-host)
+ #+linux ("src/code/linux-os" :not-host)
+ #+win32 ("src/code/win32-os" :not-host)
 
  ("src/code/share-vm" :not-host)
 
  ("src/code/thread" :not-host) ; provides *CURRENT-THREAD* for target-signal
  ("src/code/target-signal-common" :not-host)
- #!-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
- #!+win32 ("src/code/target-exception" :not-host)
 
  ("src/code/bignum"     :not-host)
  ("src/code/numbers"    :not-host)
@@ -253,7 +254,6 @@
  ("src/code/stream"        :not-host)
  ("src/code/early-format")
 
- ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ("src/code/common-os" :not-host)
 
  ("src/code/deadline" :not-host)
@@ -325,16 +325,16 @@
 
  ;; KLUDGE: I'd prefer to have this done with a "code/target" softlink
  ;; instead of a bunch of reader macros. -- WHN 19990308
- #!+sparc ("src/code/sparc-vm")
- #!+hppa  ("src/code/hppa-vm")
- #!+x86   ("src/code/x86-vm"   :not-host)
- #!+x86-64("src/code/x86-64-vm"   :not-host)
- #!+(or ppc ppc64)
+ #+sparc ("src/code/sparc-vm")
+ #+hppa  ("src/code/hppa-vm")
+ #+x86   ("src/code/x86-vm"   :not-host)
+ #+x86-64("src/code/x86-64-vm"   :not-host)
+ #+(or ppc ppc64)
  ("src/code/ppc-vm")
- #!+alpha ("src/code/alpha-vm")
- #!+mips  ("src/code/mips-vm")
- #!+arm   ("src/code/arm-vm")
- #!+arm64 ("src/code/arm64-vm")
+ #+alpha ("src/code/alpha-vm")
+ #+mips  ("src/code/mips-vm")
+ #+arm   ("src/code/arm-vm")
+ #+arm64 ("src/code/arm64-vm")
 
  ;; RANDOM-LAYOUT-CLOS-HASH (in 'class') uses RANDOM, the transform for which
  ;; uses GENERATE-RANDOM-EXPR-FOR-POWER-OF-2 which becomes BIG-RANDOM-CHUNK,
@@ -349,10 +349,16 @@
  ("src/pcl/pre-warm")
  ("src/pcl/low" :not-host)
 
- ("src/code/debug-info" :c-headers)
+ ("src/code/debug-info" :c-headers
+  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
+                (cl:find :cmucl cl:*features*)) ; gets fatal warnings in CMUCL 20c
+        :ignore-failure-p))
+
  ("src/code/source-location")
  ("src/code/early-class")
  ("src/code/condition" :not-host)
+ #-win32 ("src/code/target-signal" :not-host) ; needs OS-CONTEXT-T from share-vm
+ #+win32 ("src/code/target-exception" :not-host)
  ("src/code/toplevel"  :not-host)
  ("src/code/parse-defmacro-errors")
  ("src/code/format-directive")
@@ -401,8 +407,12 @@
  ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB-XC:PROCLAIM, defined in "src/compiler/proclaim"
- ;; FIXME: #+ should be (and sb-xc-host) but it isn't set yet.
- ("src/code/defstruct"  :c-headers #+cmucl :ignore-failure-p)
+
+ ;; KLUDGE: do we still need the special hack for cmucl?
+ ("src/code/defstruct"  :c-headers
+  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
+                (cl:find :cmucl cl:*features*))
+        :ignore-failure-p))
  ("src/code/target-defstruct" :not-host)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
@@ -429,6 +439,7 @@
  ("src/code/hash-table" :c-headers)
  ("src/code/readtable")
  ("src/code/pathname")
+ ("src/code/host-pprint") ; defines QUEUED-OP needed by 'pprint'
 
  ("src/compiler/fndb")
  ("src/compiler/generic/vm-fndb")
@@ -441,11 +452,11 @@
 
  ("src/code/load")
 
- #!+linkage-table ("src/code/linkage-table" :not-host)
+ #+linkage-table ("src/code/linkage-table" :not-host)
  ("src/code/foreign" :not-host)
- #!+os-provides-dlopen ("src/code/foreign-load" :not-host)
- #!+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)
- #!+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
+ #+os-provides-dlopen ("src/code/foreign-load" :not-host)
+ #+(and os-provides-dlopen (not win32)) ("src/code/unix-foreign-load" :not-host)
+ #+(and os-provides-dlopen win32) ("src/code/win32-foreign-load" :not-host)
 
  ("src/code/fop") ; needs macros from code/load.lisp
 
@@ -463,9 +474,17 @@
  ("src/compiler/target-main" :not-host)
  ("src/compiler/ir1tran")
  ("src/compiler/ir1tran-lambda")
- ("src/compiler/ir1-translators")
- ;; FIXME: #+ should be (and sb-xc-host) but it isn't set yet.
- ("src/compiler/ir1util" #+cmucl :ignore-failure-p)
+ ("src/compiler/ir1-translators"
+  ;; workaround for ABCL warnings that are not of type STYLE-WARNING:
+  ;;  "Unable to compile function IR1-CONVERT-TAGBODY.  Using interpreted form instead."
+  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
+                (cl:find :abcl cl:*features*))
+        :ignore-failure-p))
+ ;; KLUDGE: do we still need the special hack for cmucl?
+ ("src/compiler/ir1util"
+  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
+                (cl:find :cmucl cl:*features*))
+        :ignore-failure-p))
  ("src/compiler/callable-args")
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
@@ -478,7 +497,6 @@
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")
- ("src/compiler/generic/vm-tran")
  ("src/compiler/locall")
  ("src/compiler/dfo")
  ("src/compiler/dce")
@@ -495,7 +513,7 @@
 
  ("src/compiler/target-dstate" :not-host)
  ("src/compiler/target/insts")
- #!+avx2
+ #+avx2
  ("src/compiler/target/avx2-insts")
  ("src/compiler/target/macros")
  ("src/compiler/generic/early-type-vops")
@@ -504,9 +522,9 @@
 
  ("src/compiler/target/move")
  ("src/compiler/target/float")
- #!+sb-simd-pack
+ #+sb-simd-pack
  ("src/compiler/target/simd-pack")
-  #!+sb-simd-pack-256
+  #+sb-simd-pack-256
  ("src/compiler/target/simd-pack-256")
  ("src/compiler/target/sap")
  ("src/compiler/target/system")
@@ -530,7 +548,7 @@
   ;; x compilation, for now we blithely ignore them and press on to more
   ;; x pressing problems. Someday, though, it would be nice to figure out
   ;; x what the problem is and fix it.
-  #!+(or ppc ppc64) :ignore-failure-p)
+  #+(or ppc ppc64) :ignore-failure-p)
  ("src/compiler/target/pred")
 
  ;; this file defines the INTERVAL struct which is also used in 'srctran'
@@ -538,6 +556,7 @@
  ;; This is a terrible name for a file that contains type derivers
  ;; and IR1 transforms. Maybe split it up into more appropriately named pieces.
  ("src/compiler/srctran")
+ ("src/compiler/generic/vm-tran")
  ("src/compiler/generic/late-type-vops")
  ("src/compiler/target/type-vops")
  ("src/compiler/typetran")
@@ -592,8 +611,8 @@
  ("src/compiler/codegen")
  ("src/compiler/debug")
 
- #!+sb-dyncount ("src/compiler/dyncount")
- #!+sb-dyncount ("src/code/dyncount")
+ #+sb-dyncount ("src/compiler/dyncount")
+ #+sb-dyncount ("src/code/dyncount")
 
  ("src/code/format-time" :not-host)
 
@@ -619,14 +638,13 @@
  ("src/code/bignum-random"     :not-host) ; needs "code/random" and
                                           ;   "code/bignum"
  ("src/code/target-hash-table" :not-host) ; needs "code/hash-table"
- ("src/code/host-pprint") ; defines QUEUED-OP needed by 'pprint'
  ("src/code/pprint" :not-host) ; defines WITH-PRETTY-STREAM needed by 'print'
  ("src/code/print" :not-host)
  ("src/code/reader"            :not-host) ; needs "code/readtable"
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
- #!-win32
+ #-win32
  ("src/code/unix-pathname"     :not-host)
- #!+win32
+ #+win32
  ("src/code/win32-pathname"    :not-host)
  ("src/code/filesys"           :not-host) ; needs HOST from "code/pathname"
 
@@ -636,10 +654,11 @@
  ("src/code/early-step")                  ; target-thread needs *STEP-OUT*
 
  ("src/code/gc"                :not-host)
- ("src/code/target-bst"        :not-host)
+ ("src/code/avltree"           :not-host)
  ("src/code/target-thread"     :not-host)
  ("src/code/timer" :not-host)
 
+ ("src/code/error-error" :not-host) ; needs WITH-STANDARD-IO-SYNTAX macro
  ;; defines SB-DI:DO-DEBUG-FUN-BLOCKS, needed by target-disassem.lisp
  ("src/code/debug-int" :not-host)
  ("src/code/interr" :not-host)
@@ -649,23 +668,23 @@
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
  ("src/compiler/target/target-insts" :not-host)
- #!+avx2
+ #+avx2
  ("src/compiler/target/target-avx2-insts" :not-host)
 
  ("src/code/debug" :not-host)
 
  ("src/code/octets" :not-host)
  ("src/code/external-formats/enc-basic" :not-host)
- #!+sb-unicode
+ #+sb-unicode
  ("src/code/external-formats/enc-ucs" :not-host) ; win32 needs this
 
- #!+sb-eval
+ #+sb-eval
  ("src/code/full-eval"   :not-host) ; uses INFO, ARG-COUNT-ERROR
 
  ("src/code/bit-bash"    :not-host) ; needs %NEGATE from assembly/target/arith
 
- #!-(or x86 x86-64)
- ("src/compiler/target/sanctify" :not-host)
+ #-(or x86 x86-64)
+ ("src/compiler/generic/sanctify" :not-host)
 
  ;; FIXME: Does this really need stuff from compiler/dump.lisp?
  ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
@@ -690,18 +709,15 @@
  ;; other target-code-building stuff which can't be processed until
  ;; machinery like SB-XC:DEFMACRO exists
 
- ("src/code/late-format") ; needs SB-XC:DEFMACRO
+ ("src/code/late-format" ; needs SB-XC:DEFMACRO
+  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
+                (cl:find :cmucl cl:*features*)) ; gets fatal warnings in CMUCL 20c
+        :ignore-failure-p))
 
  ("src/code/late-globaldb" :not-host)
  )
 
-;;; warm build skips the list of files above even though there is no "#!" macro
-;;; at this point. That's not specified behavior of *READ-SUPPRESS*.
-;;; The place to change this behavior is in DISPATCH-CHAR-ERROR.
-;;; Then we would need to define "#!" to do something whenever this file is read.
-;;; If we're going down that route, we should change these feature expressions
-;;; to use "#!" syntax rather than rely on a bug to skip the above form.
-#+warm-build-phase
+;;; make-target-2 build steps
 (("src/code/warm-error"
   "src/code/early-ntrace" ; lets PCL hook into tracing
   "src/code/room" ; for MAP-ALLOCATED-OBJECTS

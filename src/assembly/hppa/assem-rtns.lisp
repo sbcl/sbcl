@@ -177,7 +177,7 @@
     (inst ble fixup lisp-heap-space fix))
   (move catch target t))
 
-#!+hpux
+#+hpux
 (define-assembly-routine
   (return-from-lisp-stub (:return-style :none))
   ((:temp lip interior-reg lip-offset)

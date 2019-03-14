@@ -83,7 +83,7 @@
                 sb-c:inlining-dependency-failure))
 
 (test-util:with-test (:name :redef-macro-same-file)
-  (let* ((lisp "compiler-impure-tmp.lisp")
+  (let* ((lisp (randomish-temp-file-name "lisp"))
          (fasl (compile-file-pathname lisp)))
     (unwind-protect
          (let ((redef-count 0))

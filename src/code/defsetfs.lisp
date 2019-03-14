@@ -31,7 +31,6 @@
 (in-package "SB-DI")
 (defsetf stack-ref %set-stack-ref)
 (defsetf debug-var-value %set-debug-var-value)
-(defsetf debug-var-value %set-debug-var-value)
 (defsetf breakpoint-info %set-breakpoint-info)
 
 ;;; from bignum.lisp
@@ -47,7 +46,7 @@
 ;;   (vop-translates sb-kernel:%raw-instance-ref/signed-word)
 ;; however the defknown is only executed if the raw slot type exists.
 ;; (See compiler/generic/vm-fndb where it maps over *raw-slot-data*)
-#!+(vop-named sb-vm::raw-instance-ref/signed-word)
+#+(vop-named sb-vm::raw-instance-ref/signed-word)
 (defsetf %raw-instance-ref/signed-word %raw-instance-set/signed-word)
 (defsetf %raw-instance-ref/single %raw-instance-set/single)
 (defsetf %raw-instance-ref/double %raw-instance-set/double)
@@ -179,7 +178,7 @@
 (defsetf sap-ref-lispobj %set-sap-ref-lispobj)
 (defsetf sap-ref-single %set-sap-ref-single)
 (defsetf sap-ref-double %set-sap-ref-double)
-#!+long-float (defsetf sap-ref-long %set-sap-ref-long)
+#+long-float (defsetf sap-ref-long %set-sap-ref-long)
 (defsetf subseq (sequence start &optional end) (v)
   `(progn (replace ,sequence ,v :start1 ,start :end1 ,end) ,v))
 
@@ -339,9 +338,10 @@ place with bits from the low-order end of the new value."
 (locally (declare (notinline info)) ; can't inline
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (%defsetf 'truly-the (info :setf :expander 'the))
+  (%defsetf 'the* (info :setf :expander 'the))
 
   (%defsetf 'mask-field (info :setf :expander 'ldb)
-  "The first argument is a byte specifier. The second is any place form
+            "The first argument is a byte specifier. The second is any place form
 acceptable to SETF. Replaces the specified byte of the number in this place
 with bits from the corresponding position in the new value.")
 

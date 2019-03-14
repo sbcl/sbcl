@@ -14,9 +14,9 @@
 
 ;;;; miscellaneous constants, utility functions, and macros
 
-(defconstant pi
-  #!+long-float 3.14159265358979323846264338327950288419716939937511l0
-  #!-long-float 3.14159265358979323846264338327950288419716939937511d0)
+(defconstant sb-xc:pi
+  #+long-float 3.14159265358979323846264338327950288419716939937511l0
+  #-long-float 3.14159265358979323846264338327950288419716939937511d0)
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun handle-reals (function var)
@@ -48,7 +48,7 @@
            ,@args))))))
 
 
-#!+x86 ;; for constant folding
+#+x86 ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %atan2 (x y))
@@ -63,7 +63,7 @@
   (def %log (x))
   (def %exp (x)))
 
-#!+(or x86-64 arm-vfp arm64) ;; for constant folding
+#+(or x86-64 arm-vfp arm64) ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
   (def %sqrt (x)))
@@ -74,29 +74,29 @@
 ;;;; into the FPU.
 
 ;;; trigonometric
-#!-x86 (def-math-rtn "sin" 1)
-#!-x86 (def-math-rtn "cos" 1)
-#!-x86 (def-math-rtn "tan" 1)
-#!-x86 (def-math-rtn "atan" 1)
-#!-x86 (def-math-rtn "atan2" 2)
+#-x86 (def-math-rtn "sin" 1)
+#-x86 (def-math-rtn "cos" 1)
+#-x86 (def-math-rtn "tan" 1)
+#-x86 (def-math-rtn "atan" 1)
+#-x86 (def-math-rtn "atan2" 2)
 
-(def-math-rtn "acos" 1 #!+win32 t)
-(def-math-rtn "asin" 1 #!+win32 t)
-(def-math-rtn "cosh" 1 #!+win32 t)
-(def-math-rtn "sinh" 1 #!+win32 t)
-(def-math-rtn "tanh" 1 #!+win32 t)
-(def-math-rtn "asinh" 1 #!+win32 t)
-(def-math-rtn "acosh" 1 #!+win32 t)
-(def-math-rtn "atanh" 1 #!+win32 t)
+(def-math-rtn "acos" 1 #+win32 t)
+(def-math-rtn "asin" 1 #+win32 t)
+(def-math-rtn "cosh" 1 #+win32 t)
+(def-math-rtn "sinh" 1 #+win32 t)
+(def-math-rtn "tanh" 1 #+win32 t)
+(def-math-rtn "asinh" 1 #+win32 t)
+(def-math-rtn "acosh" 1 #+win32 t)
+(def-math-rtn "atanh" 1 #+win32 t)
 
 ;;; exponential and logarithmic
-(def-math-rtn "hypot" 2 #!+win32 t)
-#!-x86 (def-math-rtn "exp" 1)
-#!-x86 (def-math-rtn "log" 1)
-#!-x86 (def-math-rtn "log10" 1)
+(def-math-rtn "hypot" 2 #+win32 t)
+#-x86 (def-math-rtn "exp" 1)
+#-x86 (def-math-rtn "log" 1)
+#-x86 (def-math-rtn "log10" 1)
 (def-math-rtn "pow" 2)
-#!-(or x86 x86-64 arm-vfp arm64) (def-math-rtn "sqrt" 1)
-#!-x86 (def-math-rtn "log1p" 1)
+#-(or x86 x86-64 arm-vfp arm64) (def-math-rtn "sqrt" 1)
+#-x86 (def-math-rtn "log1p" 1)
 
 
 ;;;; power functions
@@ -257,7 +257,7 @@
                            (when (< x-hi 0)
                              (cond ((and (= x-ihi #x3ff00000) (zerop yisint))
                                     ;; (-1)**non-int
-                                    (let ((y*pi (* y pi)))
+                                    (let ((y*pi (* y sb-xc:pi)))
                                       (declare (double-float y*pi))
                                       (return-from real-expt
                                         (complex
@@ -280,7 +280,7 @@
                                (2 ; even
                                 (coerce pow rtype))
                                (t ; non-integer
-                                (let ((y*pi (* y pi)))
+                                (let ((y*pi (* y sb-xc:pi)))
                                   (declare (double-float y*pi))
                                   (complex
                                    (coerce (* pow (%cos y*pi))
@@ -379,11 +379,11 @@
       (number-dispatch ((number number))
         (((foreach fixnum bignum))
          (if (minusp number)
-             (complex (log (- number)) (coerce pi 'single-float))
+             (complex (log (- number)) (coerce sb-xc:pi 'single-float))
              (coerce (/ (log2 number) (log (exp 1.0d0) 2.0d0)) 'single-float)))
         ((ratio)
          (if (minusp number)
-             (complex (log (- number)) (coerce pi 'single-float))
+             (complex (log (- number)) (coerce sb-xc:pi 'single-float))
              (let ((numerator (numerator number))
                    (denominator (denominator number)))
                (if (= (integer-length numerator)
@@ -397,9 +397,8 @@
          ;; Is (log -0) -infinity (libm.a) or -infinity + i*pi (Kahan)?
          ;; Since this doesn't seem to be an implementation issue
          ;; I (pw) take the Kahan result.
-         (if (< (float-sign number)
-                (coerce 0 '(dispatch-type number)))
-             (complex (log (- number)) (coerce pi '(dispatch-type number)))
+         (if (= (float-sign-bit number) 1) ; MINUSP
+             (complex (log (- number)) (coerce sb-xc:pi '(dispatch-type number)))
              (coerce (%log (coerce number 'double-float))
                      '(dispatch-type number))))
         ((complex)
@@ -454,15 +453,15 @@
   (number-dispatch ((number number))
     ((rational)
      (if (minusp number)
-         (coerce pi 'single-float)
+         (coerce sb-xc:pi 'single-float)
          0.0f0))
     ((single-float)
      (if (minusp (float-sign number))
-         (coerce pi 'single-float)
+         (coerce sb-xc:pi 'single-float)
          0.0f0))
     ((double-float)
      (if (minusp (float-sign number))
-         (coerce pi 'double-float)
+         (coerce sb-xc:pi 'double-float)
          0.0d0))
     (handle-complex
      (atan (imagpart number) (realpart number)))))
@@ -551,10 +550,10 @@
                         (values double-float))
                (if (zerop x)
                    (if (zerop y)
-                       (if (plusp (float-sign x))
+                       (if (= (float-sign-bit x) 0) ; PLUSP
                            y
-                           (float-sign y pi))
-                       (float-sign y (/ pi 2)))
+                           (float-sign y sb-xc:pi))
+                       (float-sign y (/ sb-xc:pi 2)))
                    (%atan2 y x))))
         (number-dispatch ((y real) (x real))
           ((double-float
@@ -778,7 +777,7 @@
 ;;;   Create complex number with real part X and imaginary part Y
 ;;;   such that has the same type as Z.  If Z has type (complex
 ;;;   rational), the X and Y are coerced to single-float.
-#!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
+#+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
                 (error "needs work for long float support"))
 (declaim (inline coerce-to-complex-type))
 (defun coerce-to-complex-type (x y z)
@@ -794,7 +793,7 @@
 
 ;;; Compute |(x+i*y)/2^k|^2 scaled to avoid over/underflow. The
 ;;; result is r + i*k, where k is an integer.
-#!+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
+#+long-float (eval-when (:compile-toplevel :load-toplevel :execute)
                 (error "needs work for long float support"))
 (defun cssqs (z)
   (declare (muffle-conditions compiler-note))
@@ -818,9 +817,9 @@
             ((let ((threshold
                     ;; (/ least-positive-double-float double-float-epsilon)
                     (load-time-value
-                     #!-long-float
+                     #-long-float
                      (make-double-float #x1fffff #xfffffffe)
-                     #!+long-float
+                     #+long-float
                      (error "(/ least-positive-long-float long-float-epsilon)")))
                    (traps (ldb sb-vm:float-sticky-bits
                                (sb-vm:floating-point-modes))))
@@ -896,9 +895,9 @@
   ;; choose them.  We'll just assume his choices matches our
   ;; implementation of log1p.
   (let ((t0 (load-time-value
-             #!-long-float
+             #-long-float
              (make-double-float #x3fe6a09e #x667f3bcd)
-             #!+long-float
+             #+long-float
              (error "(/ (sqrt 2l0))")))
         ;; KLUDGE: if repeatable fasls start failing under some weird
         ;; xc host, this 1.2d0 might be a good place to examine: while
@@ -907,9 +906,9 @@
         (t1 1.2d0)
         (t2 3d0)
         (ln2 (load-time-value
-              #!-long-float
+              #-long-float
               (make-double-float #x3fe62e42 #xfefa39ef)
-              #!+long-float
+              #+long-float
               (error "(log 2l0)")))
         (x (float (realpart z) 1.0d0))
         (y (float (imagpart z) 1.0d0)))
@@ -940,9 +939,9 @@
   (declare (muffle-conditions compiler-note))
   (declare (type (or rational complex) z))
   (let* (;; constants
-         (theta (/ (sqrt most-positive-double-float) 4.0d0))
-         (rho (/ 4.0d0 (sqrt most-positive-double-float)))
-         (half-pi (/ pi 2.0d0))
+         (theta (/ (sqrt sb-xc:most-positive-double-float) 4.0d0))
+         (rho (/ 4.0d0 (sqrt sb-xc:most-positive-double-float)))
+         (half-pi (/ sb-xc:pi 2.0d0))
          (rp (float (realpart z) 1.0d0))
          (beta (float-sign rp 1.0d0))
          (x (* beta rp))
@@ -1004,9 +1003,9 @@
       (declare (optimize (speed 3) (space 0)))
     (cond ((> (abs x)
               (load-time-value
-               #!-long-float
+               #-long-float
                (make-double-float #x406633ce #x8fb9f87e)
-               #!+long-float
+               #+long-float
                (error "(/ (+ (log 2l0) (log most-positive-long-float)) 4l0)")))
            (coerce-to-complex-type (float-sign x)
                                    (float-sign y) z))

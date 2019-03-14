@@ -24,7 +24,7 @@
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:temporary (:scs (non-descriptor-reg)) gc-temp)
-  #!-gencgc (:ignore gc-temp)
+  #-gencgc (:ignore gc-temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 0
     (pseudo-atomic (pa-flag)
@@ -114,7 +114,7 @@
        (:result-types ,element-type)))))
   (def-data-vector-frobs simple-base-string byte-index
     character character-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (def-data-vector-frobs simple-character-string word-index
     character character-reg)
   (def-data-vector-frobs simple-vector word-index

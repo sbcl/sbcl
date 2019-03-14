@@ -78,4 +78,4 @@
 ;;; merely involved TYPEP not as the thing under test) as often as 10% of the
 ;;; time due just to worse luck in terms of thread concurrency.
 (with-test (:name :concurrent-classoid-typep)
-  (assert (zerop (run-classoid-typep-test 5000))))
+  (assert (zerop (run-classoid-typep-test 1000))))

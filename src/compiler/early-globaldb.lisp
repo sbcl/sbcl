@@ -33,7 +33,7 @@
 ;;; (:FUNCTION :TYPE) information is extracted through a wrapper.
 ;;; The globaldb representation is not necessarily literally a CTYPE.
 #-sb-xc-host
-(declaim (ftype (sfunction (t) (values ctype boolean)) proclaimed-ftype))
+(declaim (ftype (sfunction (t) ctype) global-ftype))
 
 ;;; At run time, we represent the type of a piece of INFO in the globaldb
 ;;; by a small integer between 1 and 63.  [0 is reserved for internal use.]
@@ -96,10 +96,9 @@
 ;;; so that it does not get tested when building the cross-compiler.
 ;;; This was the best way I could see to work around a spurious warning
 ;;; about a wrongly ordered VM definition in make-host-1.
-;;; The #!+/- reader can't see that a VOP-TRANSLATES term is not for the
+;;; The #+/- reader can't see that a VOP-TRANSLATES term is not for the
 ;;; host compiler unless the whole thing is one expression.
-#!-(or (host-feature sb-xc-host)
-       (vop-translates sb-kernel:symbol-info-vector))
+#-(or sb-xc-host (vop-translates sb-kernel:symbol-info-vector))
 (declaim (inline symbol-info-vector))
 #-sb-xc-host
 (defun symbol-info-vector (symbol)
@@ -191,6 +190,10 @@
                             .whole.)))
                     .whole.))))
 
+  ;; ECL bug workaround: INFO ceases to be a valid macrolet name
+  ;; because it tries to run the compiler-macro before the local macro.
+  ;; In particular, "(collect ((info)) ...)" will not compile correctly.
+  #-host-quirks-ecl
   (def info (category kind name)
     `(truly-the (values ,(meta-info-type-spec meta-info) boolean)
                 (get-info-value ,name ,(meta-info-number meta-info))))
@@ -346,6 +349,6 @@
   `(the attributes
         (logand ,@(mapcar (lambda (x) `(the attributes ,x)) attributes))))
 (declaim (ftype (function (attributes attributes) boolean) attributes=))
-#!-sb-fluid (declaim (inline attributes=))
+#-sb-fluid (declaim (inline attributes=))
 (defun attributes= (attr1 attr2)
   (eql attr1 attr2))

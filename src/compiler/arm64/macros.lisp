@@ -76,8 +76,8 @@
   (once-only ((n-target target)
               (n-source source)
               (n-offset offset))
-    (let ((target-offset #!+little-endian n-offset
-                         #!+big-endian `(+ ,n-offset (1- n-word-bytes))))
+    (let ((target-offset #+little-endian n-offset
+                         #+big-endian `(+ ,n-offset (1- n-word-bytes))))
       `(inst ldrb ,n-target (@ ,n-source ,target-offset)))))
 
 ;;; Macros to handle the fact that our stack pointer isn't actually in
@@ -173,7 +173,7 @@
 ;;; surround a call to ALLOCATION anyway), and to indicate that the
 ;;; P-A FLAG-TN is also acceptable here.
 
-#!+gencgc
+#+gencgc
 (defun allocation-tramp (alloc-tn size back-label return-in-tmp lip)
   (unless (eq size tmp-tn)
     (inst mov tmp-tn size))
@@ -210,33 +210,33 @@
               ALIGNED2
               (when ,lowtag
                 (inst add ,result-tn ,result-tn ,lowtag))))
-           #!-gencgc
+           #-gencgc
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
             (inst add ,flag-tn ,flag-tn (add-sub-immediate ,size))
             (store-symbol-value ,flag-tn *allocation-pointer*))
-           #!+gencgc
+           #+gencgc
            (t
             (let ((alloc (gen-label))
                   (back-from-alloc (gen-label))
                   size)
-              #!-sb-thread
+              #-sb-thread
               (progn
                 (load-inline-constant ,flag-tn '(:fixup "gc_alloc_region" :foreign) ,lip)
                 (inst ldp ,result-tn ,flag-tn (@ ,flag-tn)))
-              #!+sb-thread
+              #+sb-thread
               (inst ldp ,result-tn ,flag-tn (@ thread-tn
                                                (* n-word-bytes thread-alloc-region-slot)))
               (setf size (add-sub-immediate ,size))
               (inst add ,result-tn ,result-tn size)
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
-              #!-sb-thread
+              #-sb-thread
               (progn
                 (load-inline-constant ,flag-tn '(:fixup "gc_alloc_region" :foreign) ,lip)
                 (storew ,result-tn ,flag-tn))
-              #!+sb-thread
+              #+sb-thread
               (storew ,result-tn thread-tn thread-alloc-region-slot)
 
               ;; alloc_tramp uses tmp-tn for returning the result,
@@ -309,7 +309,7 @@
 
 ;;;; PSEUDO-ATOMIC
 
-#!+sb-safepoint
+#+sb-safepoint
 (defun emit-safepoint ()
   (inst ldr zr-tn (@ null-tn
                      (- (+ gc-safepoint-trap-offset n-word-bytes
@@ -317,25 +317,25 @@
 
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn) &body forms)
-  #!+sb-safepoint-strictly
+  #+sb-safepoint-strictly
   `(progn ,@forms (emit-safepoint))
-  #!-sb-safepoint-strictly
+  #-sb-safepoint-strictly
   `(progn
      (without-scheduling ()
-       #!-sb-thread
+       #-sb-thread
        (store-symbol-value csp-tn *pseudo-atomic-atomic*)
-       #!+sb-thread
+       #+sb-thread
        (inst str (32-bit-reg null-tn)
              (@ thread-tn
                 (* n-word-bytes thread-pseudo-atomic-bits-slot))))
      (assemble ()
        ,@forms)
      (without-scheduling ()
-       #!-sb-thread
+       #-sb-thread
        (progn
          (store-symbol-value null-tn *pseudo-atomic-atomic*)
          (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*))
-       #!+sb-thread
+       #+sb-thread
        (progn
          (inst dmb)
          (inst str (32-bit-reg zr-tn)
@@ -348,7 +348,7 @@
          (inst cbz ,flag-tn not-interrputed)
          (inst brk pending-interrupt-trap)
          (emit-label not-interrputed))
-       #!+sb-safepoint
+       #+sb-safepoint
        (emit-safepoint))))
 
 ;;;; memory accessor vop generators
@@ -493,31 +493,31 @@
 ;;;
 
 (defmacro load-binding-stack-pointer (reg)
-  #!+sb-thread `(loadw ,reg thread-tn thread-binding-stack-pointer-slot)
-  #!-sb-thread `(load-symbol-value ,reg *binding-stack-pointer*))
+  #+sb-thread `(loadw ,reg thread-tn thread-binding-stack-pointer-slot)
+  #-sb-thread `(load-symbol-value ,reg *binding-stack-pointer*))
 
 (defmacro store-binding-stack-pointer (reg)
-  #!+sb-thread `(storew ,reg thread-tn thread-binding-stack-pointer-slot)
-  #!-sb-thread `(store-symbol-value ,reg *binding-stack-pointer*))
+  #+sb-thread `(storew ,reg thread-tn thread-binding-stack-pointer-slot)
+  #-sb-thread `(store-symbol-value ,reg *binding-stack-pointer*))
 
-#!+sb-thread
+#+sb-thread
 (defmacro tls-index-of (sym)
-  `(@ ,sym (- #!+little-endian 4 other-pointer-lowtag)))
+  `(@ ,sym (- #+little-endian 4 other-pointer-lowtag)))
 
 (defmacro load-tl-symbol-value (reg symbol)
-  #!+sb-thread
+  #+sb-thread
   `(let ((reg ,reg))
      (load-symbol tmp-tn ',symbol)
      (inst ldr (32-bit-reg tmp-tn) (tls-index-of tmp-tn))
      (inst ldr reg (@ thread-tn tmp-tn)))
-  #!-sb-thread
+  #-sb-thread
   `(load-symbol-value ,reg ,symbol))
 
 (defmacro store-tl-symbol-value (reg symbol)
-  #!+sb-thread
+  #+sb-thread
   `(let ((reg ,reg))
      (load-symbol tmp-tn ',symbol)
      (inst ldr (32-bit-reg tmp-tn) (tls-index-of tmp-tn))
      (inst str reg (@ thread-tn tmp-tn)))
-  #!-sb-thread
+  #-sb-thread
   `(store-symbol-value ,reg ,symbol))

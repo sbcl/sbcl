@@ -1489,3 +1489,65 @@
     (setq blah nil) ; be safe, don't look at other stacks
     (sb-thread:signal-semaphore sem2)
     (sb-thread:join-thread thread)))
+
+(with-test (:name :back-propagation-losing-blocks)
+  (checked-compile-and-assert ()
+   `(lambda ()
+      (let ((v (list (list :good)
+                     (labels ((r (v)
+                                (or v
+                                    (r (not v)))))
+                       (r nil)))))
+        (declare (dynamic-extent v))
+        (caar v)))
+   (() :good)))
+
+(with-test (:name :back-propagation-losing-blocks.2)
+  (checked-compile-and-assert
+   ()
+   `(lambda (b c)
+      (let ((v
+              (vector
+               (list 10)
+               (BLOCK NIL
+                 (let ((loop-repeat-550 1)
+                       (loop-sum-551 0))
+                   (tagbody
+                    next-loop
+                      (if (<= loop-repeat-550 0)
+                          (go end-loop)
+                          (decf loop-repeat-550))
+                      (setq loop-sum-551
+                            (if (not c)
+                                (return-from nil 0)
+                                (block nil
+                                  (let ((loop-repeat-552 1)
+                                        (loop-sum-553 0))
+                                    (tagbody
+                                     next-loop
+                                       (if (<= loop-repeat-552 0)
+                                           (go end-loop)
+                                           (decf loop-repeat-552))
+                                       (setq loop-sum-553
+                                             (if b
+                                                 1
+                                                 2))
+                                       (go next-loop)
+                                     end-loop
+                                       (return-from nil loop-sum-553))))))
+                      (go next-loop)
+                    end-loop)
+                   loop-sum-551)))))
+        (declare (dynamic-extent v))
+        (car (elt v 0))))
+   ((t t) 10)))
+
+(with-test (:name :back-propagate-one-dx-lvar-nlx)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (catch 'c
+        (let ((v (list (vector 0 c 0 0) (catch 'ct5 (throw 'ct5 0)) 0)))
+          (declare (dynamic-extent v))
+          (elt (elt v 0) 1))))
+   ((33) 33)))

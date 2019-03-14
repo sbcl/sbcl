@@ -68,13 +68,13 @@
 ;;; the same format as returned by FLOATING-POINT-MODES.
 
 ;;; Under SunOS, we have a straightforward implementation in C:
-#!+sunos
+#+sunos
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 32)
   (context (* os-context-t)))
 
 ;;; Under Linux, we have to contend with utterly broken signal handling.
-#!+linux
+#+linux
 (defun context-floating-point-modes (context)
   (declare (ignore context))
   (warn "stub CONTEXT-FLOATING-POINT-MODES")

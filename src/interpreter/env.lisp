@@ -979,7 +979,7 @@
                (map 'vector
                     (lambda (cell)
                       (let ((expander (cddr cell)))
-                        (if (interpreted-function-p expander)
+                        (if (typep expander 'interpreted-function)
                             expander
                             (make-function
                              (%make-proto-fn `(macrolet ,(car cell)) '(form env)
@@ -1044,7 +1044,7 @@
 ;;; In practice it's likely that an interpreted closure would be "too complex"
 ;;; for other reasons, usually due to surrounding BLOCK. It would be somewhat
 ;;; nifty to walk the code and find that the block is never used.
-(defun prepare-for-compile (function &aux nullify-lexenv)
+(defun sb-c::prepare-for-compile (function &aux nullify-lexenv)
   (if (named-let too-complex-p ((env (interpreted-function-env function)))
         (when (null env)
           (return-from too-complex-p nil))
@@ -1202,7 +1202,7 @@
                       (let ((defined-fun
                              (sb-c::make-defined-fun
                               :%source-name fname
-                              :type (sb-int:proclaimed-ftype fname))))
+                              :type (sb-int:global-ftype fname))))
                         (setf (sb-c::defined-fun-inlinep defined-fun) inlinep)
                         (push (cons fname defined-fun) funs))))))))
             (ftype

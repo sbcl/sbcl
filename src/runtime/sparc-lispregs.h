@@ -12,7 +12,7 @@
 
 #define NREGS (32)
 
-#ifdef LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLER__
 #define GREG(num) %g##num
 #define OREG(num) %o##num
 #define LREG(num) %l##num

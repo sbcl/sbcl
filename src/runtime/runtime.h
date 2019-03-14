@@ -29,6 +29,7 @@
 
 #if defined(LISP_FEATURE_SB_THREAD)
 #define thread_self() pthread_self()
+#define thread_equal(a,b) pthread_equal(a,b)
 #define thread_kill pthread_kill
 
 #ifdef LISP_FEATURE_WIN32
@@ -41,6 +42,7 @@
 #define thread_mutex_unlock(l) pthread_mutex_unlock(l)
 #else
 #define thread_self() 0
+#define thread_equal(a,b) ((a)==(b))
 #define thread_kill kill_safely
 #define thread_sigmask sigprocmask
 #define thread_mutex_lock(l) 0
@@ -367,28 +369,7 @@ fixnum_value(lispobj n)
     return (sword_t)n >> N_FIXNUM_TAG_BITS;
 }
 
-// Return signed int in case something tries to compute the number of boxed
-// words excluding the header word itself using "code_header_words(header) - 1",
-// which, for a filler needs to come out as negative, not a huge positive.
-static inline sword_t
-code_header_words(lispobj header) // given header = code->header
-{
-#ifdef LISP_FEATURE_64_BIT
-    return header >> 32;
-#else
-    /* Mask out bits reserved for GC */
-    return HeaderValue(header & ~((1 << 31) | (1 << 30)));
-#endif
-}
-
 #include "align.h"
-static inline unsigned int
-code_unboxed_nwords(lispobj n) // given n = code->code_size
-{
-    // Return ceiling |N / N_WORD_BYTES|
-    // Cast out high 32 bits of code_size if lispobj is 64 bits.
-    return (fixnum_value((uint32_t)n) + (N_WORD_BYTES-1)) >> WORD_SHIFT;
-}
 
 #if defined(LISP_FEATURE_WIN32)
 /* KLUDGE: Avoid double definition of boolean by rpcndr.h included via

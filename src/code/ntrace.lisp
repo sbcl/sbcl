@@ -48,7 +48,7 @@
         (values (%closure-fun res) named-p :compiled-closure))
        (funcallable-instance
         (values res named-p :funcallable-instance))
-       ;; FIXME: What about SB-EVAL:INTERPRETED-FUNCTION -- it gets picked off
+       ;; FIXME: What about SB-KERNEL:INTERPRETED-FUNCTION -- it gets picked off
        ;; by the FIN above, is that right?
        (t
         (values res named-p :compiled))))))

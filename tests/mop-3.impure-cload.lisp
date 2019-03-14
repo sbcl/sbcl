@@ -16,28 +16,23 @@
 
 ;;; tests from Bruno Haible (sbcl-devel 2004-08-02)
 
-(defpackage "MOP-3"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-3")
-
 (defclass msl-generic-function (standard-generic-function)
   ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 
 (defun reverse-method-list (methods)
   (let ((result '()))
     (dolist (method methods)
       (if (and (consp result)
-               (equal (method-qualifiers method)
-                      (method-qualifiers (caar result))))
+               (equal (sb-mop:method-qualifiers method)
+                      (sb-mop:method-qualifiers (caar result))))
           (push method (car result))
           (push (list method) result)))
     (reduce #'append result)))
 
-(defmethod compute-applicable-methods ((gf msl-generic-function) arguments)
+(defmethod sb-mop:compute-applicable-methods ((gf msl-generic-function) arguments)
   (reverse-method-list (call-next-method)))
-(defmethod compute-applicable-methods-using-classes
+(defmethod sb-mop:compute-applicable-methods-using-classes
     ((gf msl-generic-function) classes)
   (reverse-method-list (call-next-method)))
 
@@ -52,23 +47,24 @@
   (:method :around ((x integer))
     (coerce (call-next-method) 'vector)))
 
-(assert (equalp (list (testgf07 5.0) (testgf07 17))
-                '((number real) #(number real integer))))
+(with-test (:name (:mop-3 1))
+  (assert (equalp (list (testgf07 5.0) (testgf07 17))
+                  '((number real) #(number real integer)))))
 
 (defclass nonumber-generic-function (standard-generic-function)
   ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 
 (defun nonumber-method-list (methods)
   (remove-if #'(lambda (method)
                  (member (find-class 'number)
-                         (sb-pcl:method-specializers method)))
+                         (sb-mop:method-specializers method)))
              methods))
 
-(defmethod compute-applicable-methods
+(defmethod sb-mop:compute-applicable-methods
     ((gf nonumber-generic-function) arguments)
   (nonumber-method-list (call-next-method)))
-(defmethod compute-applicable-methods-using-classes
+(defmethod sb-mop:compute-applicable-methods-using-classes
     ((gf nonumber-generic-function) classes)
   (nonumber-method-list (call-next-method)))
 
@@ -83,5 +79,6 @@
   (:method :around ((x integer))
     (coerce (call-next-method) 'vector)))
 
-(assert (equalp (list (testgf08 5.0) (testgf08 17))
-                '((real) #(integer real))))
+(with-test (:name (:mop-3 2))
+  (assert (equalp (list (testgf08 5.0) (testgf08 17))
+                  '((real) #(integer real)))))

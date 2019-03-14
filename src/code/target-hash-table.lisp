@@ -14,6 +14,10 @@
 
 ;;;; utilities
 
+;;; like INDEX, but only up to half the maximum. Used by hash-table
+;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
+(deftype index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
+
 ;;; T if and only if table has non-null weakness kind.
 (declaim (inline hash-table-weak-p))
 (defun hash-table-weak-p (ht) (logbitp 0 (hash-table-flags ht)))
@@ -51,9 +55,9 @@
 (defmacro with-concurrent-access-check (hash-table operation &body body)
   (declare (ignorable hash-table operation)
            (type (member :read :write) operation))
-  #!-sb-hash-table-debug
+  #-sb-hash-table-debug
   `(progn ,@body)
-  #!+sb-hash-table-debug
+  #+sb-hash-table-debug
   (let ((thread-slot-accessor (if (eq operation :read)
                                   'hash-table-reading-thread
                                   'hash-table-writing-thread)))
@@ -97,13 +101,13 @@
                    (setf (,thread-slot-accessor ,hash-table) nil)))
                (body-fun)))))))
 
-#!-sb-fluid (declaim (inline eq-hash))
+#-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values hash (member t nil)))
   (values (pointer-hash key)
           (oddp (get-lisp-obj-address key))))
 
-#!-sb-fluid (declaim (inline equal-hash))
+#-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)
   (declare (values hash (member t nil)))
   (typecase key
@@ -117,7 +121,7 @@
     (t
      (eq-hash key))))
 
-#!-sb-fluid (declaim (inline eql-hash))
+#-sb-fluid (declaim (inline eql-hash))
 (defun eql-hash (key)
   (declare (values hash (member t nil)))
   (if (%other-pointer-subtype-p
@@ -381,7 +385,7 @@ Examples:
                            ;; SIZE is just a hint, so if the user asks
                            ;; for a SIZE which'd be too big for us to
                            ;; easily implement, we bump it down.
-                           (floor array-dimension-limit 1024))))
+                           (floor sb-xc:array-dimension-limit 1024))))
            (rehash-size (if (integerp rehash-size)
                             rehash-size
                             (float rehash-size 1.0)))

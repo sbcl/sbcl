@@ -24,8 +24,8 @@
   (inst test :byte temp fixnum-tag-mask))
 
 (defun !static-fun-addr (name)
-  #!+immobile-code (make-fixup name :static-call)
-  #!-immobile-code (ea (+ nil-value (static-fun-offset name))))
+  #+immobile-code (make-fixup name :static-call)
+  #-immobile-code (ea (+ nil-value (static-fun-offset name))))
 
 (defun !call-static-fun (fun arg-count)
   (inst push rbp-tn)
@@ -48,10 +48,22 @@
 
 ;;;; addition, subtraction, and multiplication
 
+#+sb-assembling
+(defun return-single-word-bignum (dest alloc-tn source)
+  (instrument-alloc 16 nil)
+  (let ((header (logior (ash 1 n-widetag-bits) bignum-widetag)))
+    (pseudo-atomic ()
+      (allocation alloc-tn 16 nil nil 0)
+      (storew* header alloc-tn 0 0 t)
+      (storew source alloc-tn bignum-digits-offset 0)
+      (if (eq dest alloc-tn)
+          (inst or :byte dest other-pointer-lowtag)
+          (inst lea dest (ea other-pointer-lowtag alloc-tn))))))
+
 (macrolet ((define-generic-arith-routine ((fun cost) &body body)
              `(define-assembly-routine (,(symbolicate "GENERIC-" fun)
                                         (:cost ,cost)
-                                        (:return-style :full-call)
+                                        (:return-style :full-call-no-return)
                                         (:translate ,fun)
                                         (:policy :safe)
                                         (:save-p t))
@@ -72,48 +84,42 @@
                 DO-STATIC-FUN
                 (!tail-call-static-fun ',(symbolicate "TWO-ARG-" fun) 2))))
 
-  #.`
   (define-generic-arith-routine (+ 10)
     (move res x)
     (inst add res y)
-    (inst jmp :no OKAY)
+    (inst jmp :o BIGNUM)
+    (inst clc) (inst ret)
+    BIGNUM
     ;; Unbox the overflowed result, recovering the correct sign from
     ;; the carry flag, then re-box as a bignum.
     (inst rcr res 1)
-    ,@(when (> n-fixnum-tag-bits 1)   ; don't shift by 0
-            '((inst sar res (1- n-fixnum-tag-bits))))
+    (when (> n-fixnum-tag-bits 1)   ; don't shift by 0
+      (inst sar res (1- n-fixnum-tag-bits)))
+    (return-single-word-bignum res rcx res))
 
-    (move rcx res)
-
-    (fixed-alloc res bignum-widetag (1+ bignum-digits-offset) nil)
-    (storew rcx res bignum-digits-offset other-pointer-lowtag)
-
-    OKAY)
-
-  #.`
   (define-generic-arith-routine (- 10)
     (move res x)
     (inst sub res y)
-    (inst jmp :no OKAY)
+    (inst jmp :o BIGNUM)
+    (inst clc) (inst ret)
+    BIGNUM
     ;; Unbox the overflowed result, recovering the correct sign from
     ;; the carry flag, then re-box as a bignum.
     (inst cmc)                        ; carry has correct sign now
     (inst rcr res 1)
-    ,@(when (> n-fixnum-tag-bits 1)   ; don't shift by 0
-            '((inst sar res (1- n-fixnum-tag-bits))))
-
-    (move rcx res)
-
-    (fixed-alloc res bignum-widetag (1+ bignum-digits-offset) nil)
-    (storew rcx res bignum-digits-offset other-pointer-lowtag)
-    OKAY)
+    (when (> n-fixnum-tag-bits 1)   ; don't shift by 0
+      (inst sar res (1- n-fixnum-tag-bits)))
+    (return-single-word-bignum res rcx res))
 
   (define-generic-arith-routine (* 30)
     (move rax x)                     ; must use eax for 64-bit result
     (inst sar rax n-fixnum-tag-bits) ; remove *8 fixnum bias
     (inst imul y)                    ; result in edx:eax
-    (inst jmp :no OKAY)              ; still fixnum
+    (inst jmp :o BIGNUM)
+    (move res rax)
+    (inst clc) (inst ret)
 
+    BIGNUM
     (inst shrd rax x n-fixnum-tag-bits) ; high bits from edx
     (inst sar x n-fixnum-tag-bits)      ; now shift edx too
 
@@ -125,23 +131,16 @@
     (fixed-alloc res bignum-widetag (+ bignum-digits-offset 2) nil)
     (storew rax res bignum-digits-offset other-pointer-lowtag)
     (storew rcx res (1+ bignum-digits-offset) other-pointer-lowtag)
-    (inst jmp DONE)
+    (inst clc) (inst ret)
 
     SINGLE-WORD-BIGNUM
-
-    (fixed-alloc res bignum-widetag (1+ bignum-digits-offset) nil)
-    (storew rax res bignum-digits-offset other-pointer-lowtag)
-    (inst jmp DONE)
-
-    OKAY
-    (move res rax)
-    DONE))
+    (return-single-word-bignum res res rax)))
 
 ;;;; negation
 
 (define-assembly-routine (generic-negate
                           (:cost 10)
-                          (:return-style :full-call)
+                          (:return-style :full-call-no-return)
                           (:policy :safe)
                           (:translate %negate)
                           (:save-p t))
@@ -149,21 +148,17 @@
                           (:res res (descriptor-reg any-reg) rdx-offset)
                           (:temp rcx unsigned-reg rcx-offset))
   (inst test :byte x fixnum-tag-mask)
-  (inst jmp :z FIXNUM)
-
-  (!tail-call-static-fun '%negate 1)
-
-  FIXNUM
+  (inst jmp :nz GENERIC)
   (move res x)
   (inst neg res)                        ; (- most-negative-fixnum) is BIGNUM
-  (inst jmp :no OKAY)
+  (inst jmp :o BIGNUM)
+  (inst clc) (inst ret)
+  BIGNUM
   (inst shr res n-fixnum-tag-bits)      ; sign bit is data - remove type bits
-  (move rcx res)
-
-  (fixed-alloc res bignum-widetag (1+ bignum-digits-offset) nil)
-  (storew rcx res bignum-digits-offset other-pointer-lowtag)
-
-  OKAY)
+  (return-single-word-bignum res rcx res)
+  (inst clc) (inst ret)
+  GENERIC
+  (!tail-call-static-fun '%negate 1))
 
 ;;;; comparison
 

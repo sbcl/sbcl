@@ -20,16 +20,16 @@
                :from :eval
                :to (:result 0))
               eax)
-  #!+darwin
+  #+darwin
   (:temporary (:sc unsigned-reg
                    :offset esi-offset)
               prev-stack-pointer)
   (:results (result :scs (descriptor-reg)))
   (:save-p t)
   (:generator 100
-    #!-darwin
+    #-darwin
     (inst push object)
-    #!+darwin
+    #+darwin
     (progn
       ;; the stack should be 16-byte aligned on Darwin
       (inst mov prev-stack-pointer esp-tn)
@@ -38,8 +38,8 @@
       (storew object esp-tn))
     (inst lea eax (make-fixup "debug_print" :foreign))
     (inst call (make-fixup "call_into_c" :foreign))
-    #!-darwin
+    #-darwin
     (inst add esp-tn n-word-bytes)
-    #!+darwin
+    #+darwin
     (inst mov esp-tn prev-stack-pointer)
     (move result eax)))

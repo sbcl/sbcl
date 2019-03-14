@@ -62,34 +62,34 @@
 (defun allocation-inline (alloc-tn size)
   (let* ((ok (gen-label))
          (done (gen-label))
-         #!+(and sb-thread win32)
+         #+(and sb-thread win32)
          (scratch-tns (loop for my-tn in `(,eax-tn ,ebx-tn ,edx-tn ,ecx-tn)
                             when (and (not (location= alloc-tn my-tn))
                                       (or (not (tn-p size))
                                           (not (location= size my-tn))))
                             collect my-tn))
-         (tls-prefix #!+sb-thread :fs)
-         #!+(and sb-thread win32) (scratch-tn (pop scratch-tns))
-         #!+(and sb-thread win32) (swap-tn (pop scratch-tns))
+         (tls-prefix #+sb-thread :fs)
+         #+(and sb-thread win32) (scratch-tn (pop scratch-tns))
+         #+(and sb-thread win32) (swap-tn (pop scratch-tns))
          (free-pointer
            ;; thread->alloc_region.free_pointer
            (make-ea :dword
-                    :base (or #!+(and sb-thread win32)
+                    :base (or #+(and sb-thread win32)
                               scratch-tn)
                     :disp
-                    #!+sb-thread (* n-word-bytes thread-alloc-region-slot)
-                    #!-sb-thread (make-fixup "gc_alloc_region" :foreign)))
+                    #+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                    #-sb-thread (make-fixup "gc_alloc_region" :foreign)))
          (end-addr
             ;; thread->alloc_region.end_addr
            (make-ea :dword
-                    :base (or #!+(and sb-thread win32)
+                    :base (or #+(and sb-thread win32)
                               scratch-tn)
                     :disp
-                    #!+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-                    #!-sb-thread (make-fixup "gc_alloc_region" :foreign 4))))
+                    #+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
+                    #-sb-thread (make-fixup "gc_alloc_region" :foreign 4))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
-    #!+(and sb-thread win32)
+    #+(and sb-thread win32)
     (progn
       (inst push scratch-tn)
       (inst push swap-tn)
@@ -113,12 +113,12 @@
     ;; Swap ALLOC-TN and FREE-POINTER
     (cond ((and (tn-p size) (location= alloc-tn size))
            ;; XCHG is extremely slow, use the xor swap trick
-           #!-(and sb-thread win32)
+           #-(and sb-thread win32)
            (progn
              (inst xor alloc-tn free-pointer tls-prefix)
              (inst xor free-pointer alloc-tn tls-prefix)
              (inst xor alloc-tn free-pointer tls-prefix))
-           #!+(and sb-thread win32)
+           #+(and sb-thread win32)
            (progn
              (inst mov swap-tn free-pointer tls-prefix)
              (inst mov free-pointer alloc-tn tls-prefix)
@@ -128,7 +128,7 @@
            (inst mov free-pointer alloc-tn tls-prefix)
            (inst sub alloc-tn size)))
     (emit-label done)
-    #!+(and sb-thread win32)
+    #+(and sb-thread win32)
     (progn
       (inst pop swap-tn)
       (inst pop scratch-tn))
@@ -151,7 +151,7 @@
      (stack-allocation alloc-tn size lowtag))
     ;; Inline allocation can't work if (and (not sb-thread) sb-dynamic-core)
     ;; because boxed_region points to the linkage table, not the alloc region.
-    #!+(or sb-thread (not sb-dynamic-core))
+    #+(or sb-thread (not sb-dynamic-core))
     ((or (null node) (policy node (>= speed space)))
      (allocation-inline alloc-tn size))
     (t

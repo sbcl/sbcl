@@ -46,13 +46,12 @@
                                    (lambda (x)
                                      (loop repeat 50
                                            do (send-message mbox x)
-                                              (sleep #-win32 0.001
-                                                     #+win32 0)))
+                                              (sleep 0)))
                                    :arguments i)))
            (readers (loop repeat 10
                           collect (make-thread
                                    (lambda ()
-                                     (loop while (receive-message mbox :timeout 0.1)
+                                     (loop while (receive-message mbox :timeout 0.5)
                                            count t))))))
       (mapc #'join-thread writers)
       (apply #'+ (mapcar #'join-thread readers)))

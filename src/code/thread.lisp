@@ -21,7 +21,7 @@
   "Type of native threads which are attached to the runtime as Lisp threads
 temporarily.")
 
-#!+(and sb-safepoint-strictly (not win32))
+#+(and sb-safepoint-strictly (not win32))
 (defstruct (signal-handling-thread
              (:copier nil)
              (:include foreign-thread)
@@ -186,7 +186,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
   (def call-with-system-mutex :without-gcing)
   (def call-with-system-mutex :allow-with-interrupts))
 
-#!-sb-thread
+#-sb-thread
 (progn
   (defun call-with-mutex (function mutex value waitp timeout)
     (declare (ignore mutex waitp timeout)
@@ -211,7 +211,7 @@ held mutex, WITH-RECURSIVE-LOCK allows recursive lock attempts to succeed."
     (without-gcing
       (funcall function))))
 
-#!+sb-thread
+#+sb-thread
 ;;; KLUDGE: These need to use DX-LET, because the cleanup form that
 ;;; closes over GOT-IT causes a value-cell to be allocated for it --
 ;;; and we prefer that to go on the stack since it can.

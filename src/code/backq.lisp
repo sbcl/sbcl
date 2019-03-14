@@ -313,10 +313,12 @@
 ;;; exist on the target Lisp, we ensure that backquote expansions in
 ;;; code-generating code work properly.)
 
-(defun !backq-cold-init ()
-  (set-macro-character #\` 'backquote-charmacro)
-  (set-macro-character #\, 'comma-charmacro))
-#-sb-xc (!backq-cold-init)
+(defun !backq-cold-init (&optional (rt *readtable*))
+  (set-macro-character #\` 'backquote-charmacro nil rt)
+  (set-macro-character #\, 'comma-charmacro nil rt))
+;;; This is a load-time effect, not compile-time, and *READTABLE* will have been
+;;; reverted to the standard one, so be sure to assign into ours, not that.
+#-sb-xc (!backq-cold-init sb-cold:*xc-readtable*)
 
 ;;; Since our backquote is installed on the host lisp, and since
 ;;; developers make mistakes with backquotes and commas too, let's

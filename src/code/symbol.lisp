@@ -203,9 +203,9 @@ distinct from the global value. Can also be SETF."
 
 (defun symbol-plist (symbol)
   "Return SYMBOL's property list."
-  #!+(vop-translates cl:symbol-plist)
+  #+(vop-translates cl:symbol-plist)
   (symbol-plist symbol)
-  #!-(vop-translates cl:symbol-plist)
+  #-(vop-translates cl:symbol-plist)
   (let ((list (car (truly-the list (symbol-info symbol))))) ; a white lie
     ;; Just ensure the result is not a fixnum, and we're done.
     (if (fixnump list) nil list)))
@@ -292,9 +292,9 @@ distinct from the global value. Can also be SETF."
   "Return SYMBOL's name as a string."
   (symbol-name symbol))
 
-(defun symbol-package (symbol)
+(defun sb-xc:symbol-package (symbol)
   "Return the package SYMBOL was interned in, or NIL if none."
-  (symbol-package symbol))
+  (sb-xc:symbol-package symbol))
 
 (defun %set-symbol-package (symbol package)
   (declare (type symbol symbol))
@@ -305,7 +305,7 @@ distinct from the global value. Can also be SETF."
   (declare (type string string))
   (%make-symbol 0 (if (simple-string-p string) string (subseq string 0))))
 
-;;; All symbols go into immobile space if #!+immobile-symbols is enabled,
+;;; All symbols go into immobile space if #+immobile-symbols is enabled,
 ;;; but not if disabled. The win with immobile space that is that all symbols
 ;;; can be considered static from an addressing viewpoint, but GC'able.
 ;;; (After codegen learns how, provided that defrag becomes smart enough
@@ -326,17 +326,17 @@ distinct from the global value. Can also be SETF."
 ;;; It's kinda useless to do that, though not technically forbidden.
 ;;; (It can produce a not-necessarily-self-evaluating keyword)
 
-#!+immobile-space
+#+immobile-space
 (defun %make-symbol (kind name)
   (declare (ignorable kind) (type simple-string name))
   (set-header-data name sb-vm:+vector-shareable+) ; Set "logically read-only" bit
-  (if #!-immobile-symbols
+  (if #-immobile-symbols
       (or (eql kind 1) ; keyword
           (and (eql kind 2) ; random interned symbol
                (plusp (length name))
                (char= (char name 0) #\*)
                (char= (char name (1- (length name))) #\*)))
-      #!+immobile-symbols t ; always place them there
+      #+immobile-symbols t ; always place them there
       (truly-the (values symbol) (sb-vm::make-immobile-symbol name))
       (sb-vm::%%make-symbol name)))
 
@@ -448,7 +448,7 @@ distinct from the global value. Can also be SETF."
 (defun keywordp (object)
   "Return true if Object is a symbol in the \"KEYWORD\" package."
   (and (symbolp object)
-       (eq (symbol-package object) *keyword-package*)))
+       (eq (sb-xc:symbol-package object) *keyword-package*)))
 
 ;;;; GENSYM and friends
 
@@ -465,7 +465,7 @@ distinct from the global value. Can also be SETF."
                      (if (plusp q)
                          (recurse (1+ depth) q)
                          (let ((et (if (or (base-string-p prefix)
-                                           #!+sb-unicode ; no #'base-char-p
+                                           #+sb-unicode ; no #'base-char-p
                                            (every #'base-char-p prefix))
                                        'base-char 'character)))
                            (setq s (make-string (+ (length prefix) depth)
@@ -551,7 +551,7 @@ distinct from the global value. Can also be SETF."
           (multiple-value-bind (type declaredp) (info :variable :type symbol)
             ;; If globaldb returned the default of *UNIVERSAL-TYPE*,
             ;; don't bother with a type test.
-            (when (and declaredp (not (%%typep new-value type nil)))
+            (when (and declaredp (not (%%typep new-value type 'functionp)))
               (let ((spec (type-specifier type)))
                 (error 'simple-type-error
                        :format-control "~@<Cannot ~@? to ~S, not of type ~S.~:@>"

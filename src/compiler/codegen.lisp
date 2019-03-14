@@ -114,7 +114,7 @@
 ;;; to get handles (as returned by sb-vm:inline-constant-value) from constant
 ;;; descriptors.
 ;;;
-#!+(or x86 x86-64 arm64)
+#+(or x86 x86-64 arm64)
 (defun register-inline-constant (&rest constant-descriptor)
   (declare (dynamic-extent constant-descriptor))
   (let ((asmstream *asmstream*)
@@ -126,7 +126,7 @@
        (vector-push-extend (cons constant label)
                            (asmstream-constant-vector asmstream))
        value))))
-#!-(or x86 x86-64 arm64)
+#-(or x86 x86-64 arm64)
 (progn (defun sb-vm:sort-inline-constants (constants) constants)
        (defun sb-vm:emit-inline-constant (&rest args)
          (error "EMIT-INLINE-CONSTANT called with ~S" args)))
@@ -271,7 +271,7 @@
                    (format t
                            "missing generator for ~S~%"
                            (template-name (vop-info vop))))
-                  #!+arm64
+                  #+arm64
                   ((and (vop-next vop)
                         (eq (vop-name vop)
                             (vop-name (vop-next vop)))
@@ -287,74 +287,23 @@
     (coverage-mark-lowering-pass component asmstream)
 
     (emit-inline-constants)
-    (let* ((fun-table)
-           (end-text (gen-label))
-           (start-fun-table (gen-label))
-           (n-entries (length (ir2-component-entries (component-info component))))
-           (fun-table-section
-            (let ((section (sb-assem::make-section)))
-              ;; Create space for the simple-fun offset table:
-              ;;  1 uint32 * N simple-funs
-              ;;  1 uint16 for the number of simple-funs
-              (emit section
-                    end-text `(.align 2) start-fun-table
-                    `(.skip ,(+ (* n-entries 4) 2)))
-              section))
-           (segment
-            (assemble-sections
-               (make-segment :header-skew
-                             (if (and (= code-boxed-words-align 1)
-                                      (oddp (length (ir2-component-constants
-                                                     (component-info component)))))
-                                 sb-vm:n-word-bytes
-                                 0)
-                             :run-scheduler (default-segment-run-scheduler)
-                             :inst-hook (default-segment-inst-hook))
-               (asmstream-data-section asmstream)
-               (asmstream-code-section asmstream)
-               (asmstream-elsewhere-section asmstream)
-               fun-table-section))
-           (octets
-            (segment-buffer segment))
-           (index
-            (label-position start-fun-table)))
-      (flet ((store-ub16 (index val)
-                 (multiple-value-bind (b0 b1)
-                     #!+little-endian
-                     (values (ldb (byte 8 0) val) (ldb (byte 8 8) val))
-                     #!+big-endian
-                     (values (ldb (byte 8 8) val) (ldb (byte 8 0) val))
-                   (setf (aref octets (+ index 0)) b0
-                         (aref octets (+ index 1)) b1)))
-             (store-ub32 (index val)
-                 (multiple-value-bind (b0 b1 b2 b3)
-                     #!+little-endian
-                     (values (ldb (byte 8  0) val) (ldb (byte 8  8) val)
-                             (ldb (byte 8 16) val) (ldb (byte 8 24) val))
-                     #!+big-endian
-                     (values (ldb (byte 8 24) val) (ldb (byte 8 16) val)
-                             (ldb (byte 8  8) val) (ldb (byte 8  0) val))
-                   (setf (aref octets (+ index 0)) b0
-                         (aref octets (+ index 1)) b1
-                         (aref octets (+ index 2)) b2
-                         (aref octets (+ index 3)) b3))))
-        (let ((padding (- index (label-position end-text))))
-          (unless (and (typep n-entries '(unsigned-byte 12))
-                       (typep padding '(unsigned-byte 4)))
-            (bug "Oversized code component?"))
-          ;; Assert that we are aligned for storing uint32_t
-          (aver (not (logtest index #b11)))
-          (dolist (entry (sb-c::ir2-component-entries
-                          (component-info component)))
-            (let ((val (label-position (entry-info-offset entry))))
-              (push val fun-table)
-              (store-ub32 index val)
-              (incf index 4)))
-          (store-ub16 index (logior (ash n-entries 4) padding)))
-        (aver (= (+ index 2) (length octets))))
-      (values segment (label-position end-text) fun-table
-              (asmstream-elsewhere-label asmstream)
-              (sb-assem::segment-fixup-notes segment)))))
+    (let* ((info (component-info component))
+           (simple-fun-labels
+            (mapcar #'entry-info-offset (ir2-component-entries info)))
+           (n-boxed (length (ir2-component-constants info)))
+           ;; Skew is either 0 or N-WORD-BYTES depending on whether the boxed
+           ;; header length is even or odd
+           (skew (if (and (= code-boxed-words-align 1) (oddp n-boxed))
+                     sb-vm:n-word-bytes
+                     0)))
+      (multiple-value-bind (segment text-length fixup-notes fun-table)
+          (assemble-sections asmstream
+                             simple-fun-labels
+                             (make-segment :header-skew skew
+                                           :run-scheduler (default-segment-run-scheduler)
+                                           :inst-hook (default-segment-inst-hook)))
+        (values segment text-length fun-table
+                (asmstream-elsewhere-label asmstream) fixup-notes)))))
 
 (defun label-elsewhere-p (label-or-posn kind)
   (let ((elsewhere (label-position *elsewhere-label*))
@@ -376,7 +325,7 @@
 ;;; FIXME: this pass runs even if no coverage instrumentation was generated.
 (defun coverage-mark-lowering-pass (component asmstream)
   (declare (ignorable component asmstream))
-  #!+(or x86-64 x86)
+  #+(or x86-64 x86)
   (let ((label (gen-label))
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))

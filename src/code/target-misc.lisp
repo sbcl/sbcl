@@ -14,20 +14,21 @@
 
 ;;; various environment inquiries
 
-(!defvar *features*
+(defparameter *features*
+   ;; The :SB-XC keyword indicates the build phase and is not intended
+   ;; to persist into the target.
    ;; GCC_TLS is not a Lisp feature- it's just freeloading off the means
    ;; by which additional #defines get into "genesis/config.h".
    ;; Literally nothing except C code tests for it.
-   '#.(remove-if (lambda (x)
-                   (member x '(:gcc-tls)))
+   '#.(remove-if (lambda (x) (member x '(:sb-xc :gcc-tls)))
                  sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")
 
 (defun machine-instance ()
   "Return a string giving the name of the local machine."
-  #!+win32 (sb-win32::get-computer-name)
-  #!-win32 (truly-the simple-string (sb-unix:unix-gethostname)))
+  #+win32 (sb-win32::get-computer-name)
+  #-win32 (truly-the simple-string (sb-unix:unix-gethostname)))
 
 (declaim (type (or null string) *machine-version*))
 (defvar *machine-version*)
@@ -135,8 +136,9 @@ the file system."
 
 ;;; DEFmumble helpers
 
-(defun %defglobal (name value boundp doc docp source-location)
-  (%compiler-defglobal name :always-bound value (not boundp))
+(defun %defglobal (name value source-location &optional (doc nil docp))
+  (%compiler-defglobal name :always-bound
+                       (not (unbound-marker-p value)) value)
   (when docp
     (setf (documentation name 'variable) doc))
   (when source-location
@@ -163,19 +165,21 @@ the file system."
     (setf (info :source-location :variable var) source-location))
   var)
 
-(defun %defun (name def &optional inline-lambda dxable-args)
+(defun %defun (name def &optional inline-lambda extra-info)
   (declare (type function def))
   ;; should've been checked by DEFMACRO DEFUN
   (aver (legal-fun-name-p name))
-  (sb-c:%compiler-defun name nil inline-lambda dxable-args)
+  ;; If a warning handler decides to disallow this redefinition
+  ;; by nonlocally exiting, then we'll skip the rest of this stuff.
   (when (fboundp name)
     (warn 'redefinition-with-defun :name name :new-function def))
+  (sb-c:%compiler-defun name nil inline-lambda extra-info)
   (setf (fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it
   ;; also checks package locks. By doing this here we let (SETF
   ;; FDEFINITION) do the load-time package lock checking before
   ;; we frob any existing inline expansions.
-  (sb-c::%set-inline-expansion name nil inline-lambda dxable-args)
+  (sb-c::%set-inline-expansion name nil inline-lambda extra-info)
   (sb-c::note-name-defined name :function)
   name)
 
@@ -247,7 +251,7 @@ version 1[.0.0...] or greater."
               (lisp-implementation-version)
               subversions))))
 
-(!defvar sb-pcl::*!docstrings* nil)
+(defparameter sb-pcl::*!docstrings* nil)
 (defun (setf documentation) (string name doc-type)
   (declare (type (or null string) string))
   (push (list string name doc-type) sb-pcl::*!docstrings*)

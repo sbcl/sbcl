@@ -403,8 +403,8 @@
              (or end length)
              (sequence-bounding-indices-bad-error vector start end)))))
 
-(def!type eq-comparable-type ()
-  '(or fixnum #!+64-bit single-float (not number)))
+(sb-xc:deftype eq-comparable-type ()
+  '(or fixnum #+64-bit single-float (not number)))
 
 ;;; True if EQL comparisons involving type can be simplified to EQ.
 (defun eq-comparable-type-p (type)
@@ -424,7 +424,7 @@
                      (when variant
                        (write-char #\- s)
                        (write-string (symbol-name variant) s)))
-                   (load-time-value (find-package "SB-KERNEL") t))
+                   #.(find-package "SB-KERNEL"))
       (bug "Unknown list item seek transform: name=~S, key-functions=~S variant=~S"
            function-name key-functions variant)))
 
@@ -629,18 +629,16 @@
          (element-ctype (sb-vm:saetp-ctype saetp))
          (n-bits (sb-vm:saetp-n-bits saetp))
          (basher-name (format nil "UB~D-BASH-FILL" n-bits))
-         (basher (or (find-symbol basher-name
-                                  (load-time-value
-                                   (find-package "SB-KERNEL") t))
+         (basher (or (find-symbol basher-name #.(find-package "SB-KERNEL"))
                      (abort-ir1-transform
                       "Unknown fill basher, please report to sbcl-devel: ~A"
                       basher-name)))
          (kind (cond ((sb-vm:saetp-fixnum-p saetp) :tagged)
                      ((member element-type '(character base-char)) :char)
                      ((eq element-type 'single-float) :single-float)
-                     #!+64-bit
+                     #+64-bit
                      ((eq element-type 'double-float) :double-float)
-                     #!+64-bit
+                     #+64-bit
                      ((equal element-type '(complex single-float))
                       :complex-single-float)
                      (t
@@ -665,11 +663,10 @@
                                   tmp)
                                  (:single-float
                                   (single-float-bits tmp))
-                                 #!+64-bit
+                                 #+64-bit
                                  (:double-float
-                                  (logior (ash (double-float-high-bits tmp) 32)
-                                          (double-float-low-bits tmp)))
-                                 #!+64-bit
+                                  (double-float-bits tmp))
+                                 #+64-bit
                                  (:complex-single-float
                                   (logior (ash (single-float-bits (imagpart tmp)) 32)
                                           (ldb (byte 32 0)
@@ -696,11 +693,10 @@
                                           `item)
                                          (:single-float
                                           `(single-float-bits item))
-                                         #!+64-bit
+                                         #+64-bit
                                          (:double-float
-                                          `(logior (ash (double-float-high-bits item) 32)
-                                                   (double-float-low-bits item)))
-                                         #!+64-bit
+                                          `(double-float-bits item))
+                                         #+64-bit
                                          (:complex-single-float
                                           `(logior (ash (single-float-bits (imagpart item)) 32)
                                                    (ldb (byte 32 0)
@@ -764,7 +760,7 @@
                ;; Force bounds-checks to 0 even if local policy had it >0.
                (declare (optimize (safety 0) (speed 3)
                                   (insert-array-bounds-checks 0)))
-               ,(cond #!+x86-64
+               ,(cond #+x86-64
                       ((type= element-ctype *universal-type*)
                        '(vector-fill/t data item start end))
                       (t
@@ -997,7 +993,7 @@
      (define-one-transform (sequence-type1 sequence-type2)
        (!make-replace-transform nil sequence-type1 sequence-type2)))
   (define-replace-transforms)
-  #!+sb-unicode
+  #+sb-unicode
   (progn
    (define-one-transform (simple-array base-char (*)) (simple-array character (*)))
    (define-one-transform (simple-array character (*)) (simple-array base-char (*)))))
@@ -1694,7 +1690,7 @@
                              (t
                               (prog1
                                   `(sb-impl::string-dispatch
-                                       (#!+sb-unicode
+                                       (#+sb-unicode
                                         (simple-array character (*))
                                         (simple-array base-char (*))
                                         t)
@@ -1726,9 +1722,9 @@
               (loop for type in (union-type-types type)
                     always (and (array-type-p type)
                                 (equal (array-type-dimensions type) '(*)))))
-         #!+sb-unicode
+         #+sb-unicode
          sb-vm:simple-character-string-widetag
-         #!-sb-unicode
+         #-sb-unicode
          sb-vm:simple-base-string-widetag)))
 
 (deftransform concatenate ((result-type &rest lvars)
@@ -1758,7 +1754,7 @@
              (give-up-ir1-transform))
             ((= vector-widetag sb-vm:simple-base-string-widetag)
              (string-concatenate-transform node 'simple-base-string lvars))
-            #!+sb-unicode
+            #+sb-unicode
             ((= vector-widetag sb-vm:simple-character-string-widetag)
              (string-concatenate-transform node 'string lvars))
             ;; FIXME: other vectors may use inlined expansion from
@@ -2138,7 +2134,7 @@
                   (when (and (eq effective-test 'eql)
                              const-seq
                              (or (vectorp const-seq) (proper-list-p const-seq))
-                             (every (lambda (x) (typep x 'eq-comparable-type))
+                             (every (lambda (x) (sb-xc:typep x 'eq-comparable-type))
                                     const-seq))
                     (setq test-form '#'eq))
                   `(nth-value ,',values-index

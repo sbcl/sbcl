@@ -152,12 +152,13 @@
                     et-locked et-lockfree ratio))
           (setq best (max ratio best))))))))
 
-(test-util:with-test (:name :lockfree-list-performance)
+(test-util:with-test (:name :lockfree-list-performance
+                      :skipped-on :sbcl)
   (let ((cpus
-         (max 1
-              #-win32 (sb-alien:alien-funcall
-                       (sb-alien:extern-alien "sysconf"
-                                              (function sb-alien:long sb-alien:int))
-                       sb-unix::sc-nprocessors-onln)
-              #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int))))
+          (max 1
+               #-win32 (sb-alien:alien-funcall
+                        (sb-alien:extern-alien "sysconf"
+                                               (function sb-alien:long sb-alien:int))
+                        sb-unix::sc-nprocessors-onln)
+               #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int))))
     (assert (> (primitive-benchmark) (min 2 (log cpus 2))))))

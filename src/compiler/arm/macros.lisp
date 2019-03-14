@@ -199,7 +199,7 @@
 ;;; surround a call to ALLOCATION anyway), and to indicate that the
 ;;; P-A FLAG-TN is also acceptable here.
 
-#!+gencgc
+#+gencgc
 (defun allocation-tramp (alloc-tn size back-label)
   (let ((fixup (gen-label)))
     (when (integerp size)
@@ -236,7 +236,7 @@
             ;; stack pointer has been stored.
             (storew null-tn ,result-tn -1 0 :ne)
             (inst orr ,result-tn ,result-tn ,lowtag))
-           #!-gencgc
+           #-gencgc
            (t
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
@@ -244,7 +244,7 @@
                 (composite-immediate-instruction add ,flag-tn ,flag-tn ,size)
                 (inst add ,flag-tn ,flag-tn ,size))
             (store-symbol-value ,flag-tn *allocation-pointer*))
-           #!+gencgc
+           #+gencgc
            (t
             (let ((fixup (gen-label))
                   (alloc (gen-label))

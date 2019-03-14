@@ -21,7 +21,7 @@
     (if (numeric-type-p type)
         (let ((limit-high (numeric-type-high (lvar-type limit))))
           (aver limit-high)
-          (if (<= limit-high (1+ most-positive-fixnum))
+          (if (<= limit-high (1+ sb-xc:most-positive-fixnum))
               '(%inclusive-random-fixnum (1- limit)
                                          (or state *random-state*))
               '(%inclusive-random-integer (1- limit)

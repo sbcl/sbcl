@@ -14,14 +14,9 @@
 ;;; this file contains tests of REINITIALIZE-INSTANCE on generic
 ;;; functions.
 
-(defpackage "MOP-10"
-  (:use "CL" "SB-MOP" "TEST-UTIL"))
-
-(in-package "MOP-10")
-
 (defclass my-generic-function (standard-generic-function)
   ()
-  (:metaclass funcallable-standard-class))
+  (:metaclass sb-mop:funcallable-standard-class))
 
 (defgeneric foo (x)
   (:method-combination list)
@@ -30,12 +25,16 @@
   (:method list ((x number)) (expt x 2))
   (:generic-function-class my-generic-function))
 
-(assert (equal (foo 3) '(4 9)))
-(defmethod compute-discriminating-function ((gf my-generic-function))
+(with-test (:name (:mop-10 1))
+  (assert (equal (foo 3) '(4 9))))
+
+(defmethod sb-mop:compute-discriminating-function ((gf my-generic-function))
   (let ((orig (call-next-method)))
     (lambda (&rest args)
       (let ((orig-result (apply orig args)))
         (cons gf (reverse orig-result))))))
-(assert (equal (foo 3) '(4 9)))
-(reinitialize-instance #'foo)
-(assert (equal (foo 3) (cons #'foo '(9 4))))
+
+(with-test (:name (:mop-10 2))
+  (assert (equal (foo 3) '(4 9)))
+  (reinitialize-instance #'foo)
+  (assert (equal (foo 3) (cons #'foo '(9 4)))))

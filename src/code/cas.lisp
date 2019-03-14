@@ -18,7 +18,7 @@
          (casser
           (case (dsd-raw-type slotd)
             ((t) '%instance-cas)
-            #!+(or x86 x86-64)
+            #+(or x86 x86-64)
             ((word) '%raw-instance-cas/word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
@@ -294,12 +294,12 @@ been defined. (See SB-EXT:CAS for more information.)
            (invalid-place))
          (with-unique-names (array)
            `(let ((,array (the (simple-array word (*)) ,(car args))))
-              #!+compare-and-swap-vops
+              #+compare-and-swap-vops
               (%array-atomic-incf/word
                ,array
                (check-bound ,array (array-dimension ,array 0) ,(cadr args))
                ,(compute-delta))
-              #!-compare-and-swap-vops
+              #-compare-and-swap-vops
               ,(with-unique-names (index old-value)
                 `(without-interrupts
                   (let* ((,index ,(cadr args))
@@ -337,13 +337,13 @@ been defined. (See SB-EXT:CAS for more information.)
            (when (dsd-read-only slotd)
              (error "Cannot use ~S with structure accessor for a read-only slot: ~S"
                     name place))
-           #!+compare-and-swap-vops
+           #+compare-and-swap-vops
            `(truly-the sb-vm:word
              (%raw-instance-atomic-incf/word
               (the ,(dd-name (car accessor-info)) ,@args)
               ,(dsd-index slotd)
               ,(compute-delta)))
-           #!-compare-and-swap-vops
+           #-compare-and-swap-vops
            (with-unique-names (structure old-value)
              `(without-interrupts
                (let* ((,structure ,@args)
@@ -408,12 +408,3 @@ EXPERIMENTAL: Interface subject to change."
   sb-vm:n-word-bits most-positive-word
   sb-xc:most-negative-fixnum sb-xc:most-positive-fixnum)
   (expand-atomic-frob 'atomic-decf place diff env))
-
-;; Interpreter stubs for ATOMIC-INCF.
-#!+(and compare-and-swap-vops (host-feature sb-xc))
-(progn
-  ;; argument types are declared in vm-fndb
-  (defun %array-atomic-incf/word (array index diff)
-    (%array-atomic-incf/word array index diff))
-  (defun %raw-instance-atomic-incf/word (instance index diff)
-    (%raw-instance-atomic-incf/word instance index diff)))

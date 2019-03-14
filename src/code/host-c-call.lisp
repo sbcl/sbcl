@@ -74,7 +74,7 @@
               (or (eq (first (sb-impl::ef-names external-format)) :ascii)
                   ;; On non-SB-UNICODE all latin-1 codepoints will fit
                   ;; into a base-char, on SB-UNICODE they won't.
-                  #!-sb-unicode
+                  #-sb-unicode
                   (eq (first (sb-impl::ef-names external-format)) :latin-1))))))
 
 (declaim (ftype (sfunction (t) nil) null-error))
@@ -100,8 +100,8 @@
        ;; If we need to check for non-ascii data in the input, we
        ;; might as well go through the usual external-format machinery
        ;; instead of rewriting another version of it.
-       ,(if #!+sb-unicode t
-            #!-sb-unicode (c-string-needs-conversion-p type)
+       ,(if #+sb-unicode t
+            #-sb-unicode (c-string-needs-conversion-p type)
             `(c-string-to-string ,alien
                                  (c-string-external-format ,type)
                                  (alien-c-string-type-element-type

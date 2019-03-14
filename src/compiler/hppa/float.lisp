@@ -555,7 +555,7 @@
   ;; FIXME-lav: let 'inst cmp' translate keywords into raw binary instead of giving it here
   (frob < #b01001 #b10101 </single-float </double-float)
   (frob > #b10001 #b01101 >/single-float >/double-float)
-  (frob = #b00101 #b11001 eql/single-float eql/double-float))
+  (frob = #b00101 #b11001 =/single-float =/double-float))
 
 
 ;;;; Conversion:

@@ -11,11 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defpackage :mop-test-30
-  (:use :sb-pcl :sb-ext :cl :test-util))
-
-(in-package :mop-test-30)
-
 (defclass foo ()
   ((bar :initarg :bar)
    (quux :initarg :quux)))
@@ -24,33 +19,31 @@
   ())
 
 (defun find-slot (name class)
-  (let ((class (find-class class)))
-    (unless (class-finalized-p class)
-      (finalize-inheritance class))
-    (find name (class-slots class) :key #'slot-definition-name)))
+  (let ((class (sb-pcl:ensure-class-finalized (find-class class))))
+    (find name (sb-mop:class-slots class) :key #'sb-mop:slot-definition-name)))
 
-(add-dependent (find-class 'foo) (find-class 'foomagic))
+(sb-mop:add-dependent (find-class 'foo) (find-class 'foomagic))
 
-(defglobal **bar-loc** (slot-definition-location (find-slot 'bar 'foo)))
-(defglobal **quux-loc** (slot-definition-location (find-slot 'quux 'foo)))
+(defglobal **bar-loc** (sb-mop:slot-definition-location (find-slot 'bar 'foo)))
+(defglobal **quux-loc** (sb-mop:slot-definition-location (find-slot 'quux 'foo)))
 
-(defmethod update-dependent ((meta (eql (find-class 'foo)))
-                             (dep (eql (find-class 'foomagic)))
-                             &key)
-  (setf **bar-loc** (slot-definition-location (find-slot 'bar 'foo))
-        **quux-loc** (slot-definition-location (find-slot 'quux 'foo))))
+(defmethod sb-mop:update-dependent ((meta (eql (find-class 'foo)))
+                                    (dep (eql (find-class 'foomagic)))
+                                    &key)
+  (setf **bar-loc** (sb-mop:slot-definition-location (find-slot 'bar 'foo))
+        **quux-loc** (sb-mop:slot-definition-location (find-slot 'quux 'foo))))
 
 (defun foo-bar/quux (foo)
   (declare (type foo foo))
-  (values (standard-instance-access foo **bar-loc**)
-          (standard-instance-access foo **quux-loc**)))
+  (values (sb-mop:standard-instance-access foo **bar-loc**)
+          (sb-mop:standard-instance-access foo **quux-loc**)))
 
 (defun swap-bar/quux (foo)
   (declare (type foo foo))
-  (rotatef (standard-instance-access foo **bar-loc**)
-           (standard-instance-access foo **quux-loc**)))
+  (rotatef (sb-mop:standard-instance-access foo **bar-loc**)
+           (sb-mop:standard-instance-access foo **quux-loc**)))
 
-(with-test (:name :standard-instance-access)
+(with-test (:name (:mop-30 sb-mop:standard-instance-access))
   (let ((bar (cons t t))
         (quux (cons nil nil)))
     (multiple-value-bind (bar? quux?)
@@ -58,7 +51,7 @@
       (assert (eq bar bar?))
       (assert (eq quux quux?)))))
 
-(with-test (:name :standard-instance-access/setf)
+(with-test (:name (:mop-30 (setf sb-mop::standard-instance-access)))
   (let* ((bar (cons t t))
          (quux (cons nil nil))
          (foo
@@ -76,7 +69,7 @@
   ((quux :initarg :quux)
    (bar :initarg :bar)))
 
-(with-test (:name :standard-instance-access/updated)
+(with-test (:name (:mop-30 sb-mop:standard-instance-access :updated))
   (let ((bar (cons t t))
         (quux (cons nil nil)))
     (multiple-value-bind (bar? quux?)
@@ -84,9 +77,9 @@
       (assert (eq bar bar?))
       (assert (eq quux quux?)))))
 
-(with-test (:name :standard-instance-access/slot-unbound)
+(with-test (:name (:mop-30 sb-mop:standard-instance-access slot-unbound))
   (let ((bar (cons t t)))
     (multiple-value-bind (bar? quux?)
         (foo-bar/quux (make-instance 'foo :bar bar))
       (assert (eq bar bar?))
-      (assert (eq +slot-unbound+ quux?)))))
+      (assert (eq sb-pcl:+slot-unbound+ quux?)))))

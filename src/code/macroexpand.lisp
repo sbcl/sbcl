@@ -83,7 +83,7 @@
            (flet ((global-expansion () (info :variable :macro-expansion sym)))
              (typecase env
                (null (global-expansion))
-               #!+(and sb-fasteval (host-feature sb-xc))
+               #+(and sb-fasteval (not sb-xc-host))
                (sb-interpreter:basic-env
                 (multiple-value-bind (cell kind frame-ptr def)
                     (sb-interpreter:find-lexical-var env sym)

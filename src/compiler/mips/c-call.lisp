@@ -156,7 +156,7 @@
                             ;; aligned to 8 bytes.
                             (when (oddp (length (new-args)))
                               (new-args nil))
-                            #!-little-endian
+                            #-little-endian
                             (progn (new-args `(ash ,arg -32))
                                    (new-args `(logand ,arg #xffffffff))
                                    (if (oddp (length (new-arg-types)))
@@ -165,7 +165,7 @@
                                        (new-arg-types (parse-alien-type '(signed 32) env))
                                        (new-arg-types (parse-alien-type '(unsigned 32) env)))
                                    (new-arg-types (parse-alien-type '(unsigned 32) env)))
-                            #!+little-endian
+                            #+little-endian
                             (progn (new-args `(logand ,arg #xffffffff))
                                    (new-args `(ash ,arg -32))
                                    (if (oddp (length (new-arg-types)))
@@ -183,18 +183,18 @@
                                (let ((sb-alien::*values-type-okay* t))
                                  (parse-alien-type
                                   (if (alien-integer-type-signed result-type)
-                                      #!-little-endian
+                                      #-little-endian
                                       '(values (signed 32) (unsigned 32))
-                                      #!+little-endian
+                                      #+little-endian
                                       '(values (unsigned 32) (signed 32))
                                       '(values (unsigned 32) (unsigned 32)))
                                   env))))
                           `(lambda (function type ,@(lambda-vars))
                             (declare (ignore type))
                              (multiple-value-bind
-                               #!-little-endian
+                               #-little-endian
                                (high low)
-                               #!+little-endian
+                               #+little-endian
                                (low high)
                                (%alien-funcall function
                                   ',(make-alien-fun-type
@@ -223,7 +223,7 @@
   (:generator 2
     (inst li res (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)

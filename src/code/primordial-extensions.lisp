@@ -74,19 +74,17 @@
 ;;;; miscellany
 
 ;;; Lots of code wants to get to the KEYWORD package or the
-;;; COMMON-LISP package without a lot of fuss, so we cache them in
-;;; variables on the host, or use L-T-V forms on the target.
-(macrolet ((def-it (sym expr)
-             #+sb-xc-host
-             `(progn (declaim (type package ,sym))
-                     (defvar ,sym ,expr))
-             #-sb-xc-host
-             ;; We don't need to declaim the type. FIND-PACKAGE
-             ;; returns a package, and L-T-V propagates types.
-             ;; It's ugly how it achieves that, but it's a separate concern.
-             `(define-symbol-macro ,sym (load-time-value ,expr t))))
-  (def-it *cl-package* (find-package "COMMON-LISP"))
-  (def-it *keyword-package* (find-package "KEYWORD")))
+;;; COMMON-LISP package without going through FIND-PACKAGE, so we refer to them
+;;; as constants which is ever so slightly more efficient than a defglobal.
+;;; DEFINE-SYMBOL-MACRO should be ok in any host lisp. We used to distrust it,
+;;; but it is specified by CLHS, as are package constants, so there should
+;;; be no need to fear this idiom.
+(macrolet ((def-it (sym name) `(define-symbol-macro ,sym ,(find-package name))))
+  ;; *CL-PACKAGE* is always COMMON-LISP, not XC-STRICT-CL on the host, because the latter
+  ;; is just a means to avoid inheriting symbols that are not supposed to be in the CL:
+  ;; package but might be due to non-ansi-compliance of the host.
+  (def-it *cl-package* "COMMON-LISP")
+  (def-it *keyword-package* "KEYWORD"))
 
 (declaim (inline singleton-p))
 (defun singleton-p (list)
@@ -108,7 +106,7 @@
                              (l (length s)))
                         (setf (svref strings index) s)
                         (incf length l)
-                        #!+sb-unicode
+                        #+sb-unicode
                         (when (and (typep s '(array character (*)))
                                    ;; BASE-CHAR-p isn't a standard predicate.
                                    ;; and host ignores ELT-TYPE anyway.
@@ -124,13 +122,13 @@
                  (setq name (make-array length :element-type elt-type)))
                (dotimes (index (length things)
                                (if package
-                                   (values (%intern name length package elt-type))
+                                   (values (%intern name length package elt-type nil))
                                    (make-symbol name)))
                  (let ((s (svref strings index)))
                    (replace name s :start1 start)
                    (incf start (length s)))))))
-         #+sb-xc-host (%intern (name length package elt-type)
-                        (declare (ignore length elt-type))
+         #+sb-xc-host (%intern (name length package elt-type dummy)
+                        (declare (ignore length elt-type dummy))
                         ;; Copy, in case the host respects the DX declaration,
                         ;; but does not copy, which makes our assumption wrong.
                         (intern (copy-seq name) package)))
@@ -179,8 +177,7 @@
           (t
            ;; We're in the undefined behavior zone. First, munge the
            ;; system back into a defined state.
-           (let ((really-package
-                  (load-time-value (find-package :cl-user) t)))
+           (let ((really-package #.(find-package :cl-user)))
              (setf *package* really-package)
              ;; Then complain.
              (error 'simple-type-error
@@ -247,6 +244,13 @@
 (defun ensure-list (thing)
   (if (listp thing) thing (list thing)))
 
+(defun recons (old-cons car cdr)
+  "If CAR is eq to the car of OLD-CONS and CDR is eq to the CDR, return
+  OLD-CONS, otherwise return (cons CAR CDR)."
+  (if (and (eq car (car old-cons)) (eq cdr (cdr old-cons)))
+      old-cons
+      (cons car cdr)))
+
 ;;; Anaphoric macros
 (defmacro awhen (test &body body)
   `(let ((it ,test))
@@ -271,11 +275,13 @@
   compiled into code. If the variable already has a value, and this is not
   EQL to the new value, the code is not portable (undefined behavior). The
   third argument is an optional documentation string for the variable."
+  (check-designator name defconstant)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (sb-c::%defconstant ',name ,value (sb-c:source-location)
                          ,@(and docp `(',doc)))))
 
 (defvar *!removable-symbols* nil)
+(push '("SB-INT" check-designator) *!removable-symbols*)
 
 (defun %defconstant-eqx-value (symbol expr eqx)
   (declare (type function eqx))

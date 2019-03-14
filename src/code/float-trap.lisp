@@ -22,7 +22,7 @@
       (:inexact . ,float-inexact-trap-bit)
       (:invalid . ,float-invalid-trap-bit)
       (:divide-by-zero . ,float-divide-by-zero-trap-bit)
-      #!+x86 (:denormalized-operand . ,float-denormal-trap-bit))
+      #+x86 (:denormalized-operand . ,float-denormal-trap-bit))
   #'equal)
 
 (defconstant-eqx +rounding-mode-alist+
@@ -32,7 +32,7 @@
       (:negative-infinity . ,float-round-to-negative))
   #'equal)
 
-#!+x86
+#+x86
 (defconstant-eqx +precision-mode-alist+
     `((:24-bit . ,float-precision-24-bit)
       (:53-bit . ,float-precision-53-bit)
@@ -51,7 +51,7 @@
 ;;; interpreter stubs for floating point modes get/setters for the
 ;;; alpha have been removed to alpha-vm.lisp, as they are implemented
 ;;; in C rather than as VOPs. Likewise for x86-64 and mips.
-#!-(or alpha x86-64 mips)
+#-(or alpha x86-64 mips)
 (progn
   (defun floating-point-modes ()
     (floating-point-modes))
@@ -64,7 +64,7 @@
                                  (current-exceptions nil current-x-p)
                                  (accrued-exceptions nil accrued-x-p)
                                  (fast-mode nil fast-mode-p)
-                                 #!+x86 (precision nil precisionp))
+                                 #+x86 (precision nil precisionp))
   "This function sets options controlling the floating-point
 hardware. If a keyword is not supplied, then the current value is
 preserved. Possible keywords:
@@ -114,13 +114,13 @@ in effect."
       (if fast-mode
           (setq modes (logior float-fast-bit modes))
           (setq modes (logand (lognot float-fast-bit) modes))))
-    #!+x86
+    #+x86
     (when precisionp
       (setf (ldb float-precision-control modes)
             (or (cdr (assoc precision +precision-mode-alist+))
                 (error "unknown precision mode: ~S" precision))))
     ;; FIXME: This apparently doesn't work on Darwin
-    #!-(and darwin ppc)
+    #-(and darwin ppc)
     (setf (floating-point-modes) modes))
   (values))
 
@@ -148,8 +148,8 @@ sets the floating point modes to their current values (and thus is a no-op)."
         :current-exceptions ,(exc-keys (ldb float-exceptions-byte modes))
         :accrued-exceptions ,(exc-keys (ldb float-sticky-bits modes))
         :fast-mode ,(logtest float-fast-bit modes)
-        #!+x86 :precision
-        #!+x86 ,(car (rassoc (ldb float-precision-control modes)
+        #+x86 :precision
+        #+x86 ,(car (rassoc (ldb float-precision-control modes)
                              +precision-mode-alist+))))))
 
 ;;; FIXME: For some unknown reason, NetBSD/x86 won't run with the
@@ -160,10 +160,10 @@ sets the floating point modes to their current values (and thus is a no-op)."
 ;;; disabled by default. Joe User can explicitly enable them if
 ;;; desired.
 (defvar *saved-floating-point-modes*
-  '(:traps (:overflow #!-(or netbsd ppc) :invalid :divide-by-zero)
+  '(:traps (:overflow #-(or netbsd ppc) :invalid :divide-by-zero)
     :rounding-mode :nearest :current-exceptions nil
     :accrued-exceptions nil :fast-mode nil
-    #!+x86 :precision #!+x86 :53-bit))
+    #+x86 :precision #+x86 :53-bit))
 
 (defun float-cold-init-or-reinit ()
   (apply #'set-floating-point-modes *saved-floating-point-modes*))
@@ -178,7 +178,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
                        (floating-point-modes)))))
 
 ;;; SIGFPE code to floating-point error
-#!-win32
+#-win32
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant-eqx +sigfpe-code-error-alist+
     `((,sb-unix::fpe-intovf . floating-point-overflow)
@@ -192,7 +192,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
     #'equal))
 
 ;;; Signal the appropriate condition when we get a floating-point error.
-#!-win32
+#-win32
 (defun sigfpe-handler (signal info context)
   (declare (ignore signal))
   (declare (type system-area-pointer info))
@@ -201,7 +201,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
      (with-interrupts
        ;; Reset the accumulated exceptions, may be needed on other
        ;; platforms too, at least Linux doesn't seem to require it.
-       #!+(or sunos (and hppa linux))
+       #+(or sunos (and hppa linux))
        (setf (ldb sb-vm:float-sticky-bits (floating-point-modes)) 0)
        (error (or (cdr (assoc code +sigfpe-code-error-alist+))
                   'floating-point-exception)
@@ -225,7 +225,7 @@ sets the floating point modes to their current values (and thus is a no-op)."
         ;; actually used to cause the exception to be delivered, and
         ;; which can be set from user code.  Compute the mask here,
         ;; and clear them below.
-        #!+mips (cause-mask (dpb (lognot (float-trap-mask traps))
+        #+mips (cause-mask (dpb (lognot (float-trap-mask traps))
                                  float-exceptions-byte #xffffffff))
         (orig-modes (gensym)))
     `(let ((,orig-modes (floating-point-modes)))
@@ -239,4 +239,4 @@ sets the floating point modes to their current values (and thus is a no-op)."
               (logior (logand ,orig-modes ,(logior traps exceptions))
                       (logand (floating-point-modes)
                               ,(logand trap-mask exception-mask
-                                       #!+mips cause-mask))))))))
+                                       #+mips cause-mask))))))))

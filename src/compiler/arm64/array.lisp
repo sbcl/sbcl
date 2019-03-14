@@ -106,22 +106,43 @@
   (:variant t)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:generator 5
-    (let ((error (generate-error-code vop 'invalid-array-index-error array bound index))
-          (index (if (sc-is index immediate)
-                     (fixnumize (tn-value index))
-                     index))
+  (:generator 6
+    (let ((error (generate-error-code vop 'invalid-array-index-error
+                                      array bound index))
           (bound (if (sc-is bound immediate)
-                     (fixnumize (tn-value bound))
-                     bound)))
-      (when %test-fixnum
-        (%test-fixnum index nil error t))
-      (cond ((integerp bound)
-             (inst cmp index bound)
-             (inst b :hs error))
+                     (let ((value (tn-value bound)))
+                       (cond ((and %test-fixnum
+                                   (power-of-two-limit-p (1- value)))
+                              (lognot (fixnumize (1- value))))
+                             ((sc-is index any-reg descriptor-reg)
+                              (fixnumize value))
+                             (t
+                              value)))
+                     bound))
+          (index (if (sc-is index immediate)
+                     (let ((value (tn-value index)))
+                       (if (sc-is bound any-reg descriptor-reg)
+                           (fixnumize value)
+                           value))
+                     index)))
+      (cond ((eql bound -1)
+             (inst cbnz index error))
+            ((typep bound '(integer * -1))
+             ;; Power of two bound, can be checked for fixnumness at
+             ;; the same time as it always occupies a consecutive bit
+             ;; range, everything else, including the tag, has to be
+             ;; zero.
+             (inst tst index bound)
+             (inst b :ne error))
             (t
-             (inst cmp bound index)
-             (inst b :ls error))))))
+             (when (and %test-fixnum (not (integerp index)))
+               (%test-fixnum index nil error t))
+             (cond ((integerp bound)
+                    (inst cmp index bound)
+                    (inst b :hs error))
+                   (t
+                    (inst cmp bound index)
+                    (inst b :ls error))))))))
 
 (define-vop (check-bound/fast check-bound)
   (:policy :fast)
@@ -135,6 +156,15 @@
   (:arg-types * * tagged-num)
   (:variant nil)
   (:variant-cost 4))
+
+(define-vop (check-bound/untagged check-bound)
+  (:args (array)
+         (bound :scs (unsigned-reg signed-reg))
+         (index :scs (unsigned-reg signed-reg)))
+  (:arg-types * (:or unsigned-num signed-num)
+                (:or unsigned-num signed-num))
+  (:variant nil)
+  (:variant-cost 5))
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
@@ -144,7 +174,7 @@
   `(progn
      (define-full-reffer ,(symbolicate "DATA-VECTOR-REF/" type) ,type
        vector-data-offset other-pointer-lowtag
-       ,(remove-if #'(lambda (x) (member x '(null))) scs)
+       ,scs
        ,element-type
        data-vector-ref)
      (define-full-setter ,(symbolicate "DATA-VECTOR-SET/" type) ,type
@@ -161,11 +191,11 @@
        ,element-type data-vector-set))))
 
   (def-full-data-vector-frobs simple-vector *
-    descriptor-reg any-reg null)
+    descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character
     :byte nil character-reg)
-  #!+sb-unicode
+  #+sb-unicode
   (def-partial-data-vector-frobs simple-character-string character
     :word nil character-reg)
 

@@ -19,7 +19,7 @@
 ;; building without SB-THREAD. With SB-THREAD, a slot in the thread
 ;; structure is used instead. (See EMIT-SINGLE-STEP-TEST in
 ;; src/compiler/x86/call.lisp).
-#!-sb-thread
+#-sb-thread
 (defvar *stepping* 0)
 
 ;; Used for implementing the STEP-OUT restart. The step-wrapper will
@@ -36,8 +36,8 @@
 ;; Adding a file of target-only code for these isn't worth the trouble.
 #-sb-xc-host
 (symbol-macrolet ((place
-                   #!+sb-thread (sb-thread::thread-stepping)
-                   #!-sb-thread *stepping*))
+                   #+sb-thread (sb-thread::thread-stepping)
+                   #-sb-thread *stepping*))
   (defun (setf stepping) (new-value)
     (setf place new-value))
   (defun stepping-enabled-p ()

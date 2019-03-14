@@ -65,10 +65,10 @@
                 t)
 
 
-(deftest ppc-little-endian (capstone-check '(#x03 #x10 #x40 #x3c #x00 #x81 #x42 #x38)
+(deftest ppc-little-endian (capstone-check '(#x03 #x10 #x40 #x3c #x00 #x71 #x42 #x38)
                                            '(:ppc64 :little-endian)
                                            '("LIS R2, 0X1003"
-                                             "ADDI R2, R2, -0X7F00"))
+                                             "ADDI R2, R2, 0X7100"))
                            t)
 
 (deftest ppc-big-endian (capstone-check '(#x7c #x08 #x02 #xa6)

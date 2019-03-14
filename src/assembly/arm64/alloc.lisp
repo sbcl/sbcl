@@ -1,6 +1,6 @@
 (in-package "SB-VM")
 
-#!+sb-thread
+#+sb-thread
 (define-assembly-routine (alloc-tls-index
                           (:translate ensure-symbol-tls-index)
                           (:result-types positive-fixnum)
@@ -13,7 +13,7 @@
   (inst mov free-tls-index (+ nil-value (static-symbol-offset '*free-tls-index*)
                               (- (* symbol-value-slot n-word-bytes)
                                  other-pointer-lowtag)
-                              #!+little-endian 4))
+                              #+little-endian 4))
   (pseudo-atomic (free-tls-index)
     (assemble ()
       RETRY
@@ -29,12 +29,12 @@
       (inst cbnz (32-bit-reg result) RELEASE-LOCK)
 
       ;; Allocate a new tls-index.
-      (inst ldr (32-bit-reg result) (@ free-tls-index #!+little-endian -4 #!+big-endian 4))
+      (inst ldr (32-bit-reg result) (@ free-tls-index #+little-endian -4 #+big-endian 4))
       (inst cmp (32-bit-reg result) (* tls-size n-word-bytes))
       (inst b :hs tls-full)
 
       (inst add (32-bit-reg tmp-tn) (32-bit-reg result) n-word-bytes)
-      (inst str (32-bit-reg tmp-tn) (@ free-tls-index #!+little-endian -4 #!+big-endian 4))
+      (inst str (32-bit-reg tmp-tn) (@ free-tls-index #+little-endian -4 #+big-endian 4))
       (inst str (32-bit-reg result) (tls-index-of symbol))
 
       RELEASE-LOCK

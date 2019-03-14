@@ -380,7 +380,7 @@
   (frob > :gt >/single-float >/double-float nil)
   (frob <= :le <=/single-float <=/double-float nil)
   (frob >= :ge >=/single-float >=/double-float nil)
-  (frob = :eq eql/single-float eql/double-float t))
+  (frob = :eq =/single-float =/double-float t))
 
 (define-vop (float-compare-zero)
   (:args (x))

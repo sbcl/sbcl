@@ -389,6 +389,7 @@
    Condition types are classes, but (as allowed by ANSI and not as described in
    CLtL2) are neither STANDARD-OBJECTs nor STRUCTURE-OBJECTs. WITH-SLOTS and
    SLOT-VALUE may not be used on condition objects."
+  (check-designator name define-condition)
   (let* ((parent-types (or parent-types '(condition)))
          (layout (find-condition-layout name parent-types))
          (documentation nil)
@@ -477,7 +478,7 @@
            (error "unknown option: ~S" (first option)))))
 
       ;; Maybe kill docstring, but only under the cross-compiler.
-      #!+(and (not sb-doc) (host-feature sb-xc-host)) (setq documentation nil)
+      #+(and (not sb-doc) sb-xc-host) (setq documentation nil)
       `(progn
          ,@(when *top-level-form-p*
              ;; Avoid dumping uninitialized layouts, for sb-fasl::dump-layout
@@ -1376,14 +1377,12 @@ handled by any other handler, it will be muffled.")
 ;;;; Deciding which redefinitions are "interesting".
 
 (defun function-file-namestring (function)
-  #!+sb-eval
-  (when (typep function 'sb-eval:interpreted-function)
+  (when (typep function 'interpreted-function)
     (return-from function-file-namestring
+      #+sb-eval
       (sb-c:definition-source-location-namestring
-          (sb-eval:interpreted-function-source-location function))))
-  #!+sb-fasteval
-  (when (typep function 'sb-interpreter:interpreted-function)
-    (return-from function-file-namestring
+          (sb-eval:interpreted-function-source-location function))
+      #+sb-fasteval
       (awhen (sb-interpreter:fun-source-location function)
         (sb-c:definition-source-location-namestring it))))
   (let* ((fun (%fun-fun function))
@@ -1403,9 +1402,7 @@ handled by any other handler, it will be muffled.")
           (typep new '(not compiled-function)))
      ;; fin->regular is interesting except for interpreted->compiled.
      (and (typep new '(not funcallable-instance))
-          (typep old '(and funcallable-instance
-                       #!+sb-fasteval (not sb-interpreter:interpreted-function)
-                       #!+sb-eval (not sb-eval:interpreted-function))))
+          (typep old '(and funcallable-instance (not interpreted-function))))
      ;; different file or unknown location is interesting.
      (let* ((old-namestring (function-file-namestring old))
             (new-namestring (function-file-namestring new)))
@@ -1510,7 +1507,7 @@ the usual naming convention (names like *FOO*) for special variables"
              (format stream "Undefined alien: ~S"
                      (undefined-alien-symbol warning)))))
 
-#!+(or sb-eval sb-fasteval)
+#+(or sb-eval sb-fasteval)
 (define-condition lexical-environment-too-complex (style-warning)
   ((form :initarg :form :reader lexical-environment-too-complex-form)
    (lexenv :initarg :lexenv :reader lexical-environment-too-complex-lexenv))
@@ -1678,9 +1675,7 @@ conditions."))
                             (deprecation-condition-software condition)
                             (deprecation-condition-name condition)))))))
 
-  ;; PRINT-SYMBOL-WITH-PREFIX is spelled using its target package name,
-  ;; not its cold package name, because these methods aren't unsable until
-  ;; warm load. (!CALL-A-METHOD does not understand method qualifiers)
+  ;; These conditions must not occur in self-build!
   (define-deprecation-warning early-deprecation-warning style-warning nil
      "~%~@<~:@_In future~@[ ~A~] versions ~
       ~/sb-ext:print-symbol-with-prefix/ will signal a full warning ~
@@ -1824,8 +1819,15 @@ the restart does not exist."))
 
 (define-condition simple-control-error (simple-condition control-error) ())
 (define-condition simple-file-error    (simple-condition file-error)    ())
-(define-condition simple-stream-error  (simple-condition stream-error)  ())
-(define-condition simple-parse-error   (simple-condition parse-error)   ())
+
+(define-condition file-exists (simple-file-error) ())
+(define-condition file-does-not-exist (simple-file-error) ())
+(define-condition delete-file-error (simple-file-error) ())
+
+(define-condition simple-stream-error (simple-condition stream-error) ())
+(define-condition simple-parse-error  (simple-condition parse-error)  ())
+
+(define-condition broken-pipe (simple-stream-error) ())
 
 (define-condition character-coding-error (error)
   ((external-format :initarg :external-format :reader character-coding-error-external-format)))

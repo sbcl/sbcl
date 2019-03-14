@@ -78,7 +78,7 @@
 ;;;
 ;;; FIXME: surely this must be accessible somewhere under Darwin?  Or
 ;;; under NetBSD?
-#!+linux
+#+linux
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 32)
   (context (* os-context-t)))

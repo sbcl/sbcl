@@ -353,7 +353,7 @@ os_set_cheneygc_spaces(uword_t space0_start, uword_t space1_start)
 void
 os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 {
-    if (mprotect(address, length, prot) == -1) {
+    if (mprotect(address, length, prot)) {
         if (errno == ENOMEM) {
             lose("An mprotect call failed with ENOMEM. This probably means that the maximum amount\n"
                  "of separate memory mappings was exceeded. To fix the problem, either increase\n"

@@ -87,7 +87,7 @@
   (movable foldable flushable commutative))
 (defknown (equal equalp) (t t) boolean (foldable flushable recursive))
 
-#!+(or x86 x86-64 arm arm64)
+#+(or x86 x86-64 arm arm64)
 (defknown fixnum-mod-p (t fixnum) boolean
   (movable foldable flushable always-translatable))
 
@@ -187,7 +187,7 @@
 (defknown sb-vm::%%make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
-(defknown symbol-package (symbol) (or package null) (flushable))
+(defknown sb-xc:symbol-package (symbol) (or package null) (flushable))
 (defknown keywordp (t) boolean (flushable))       ; If someone uninterns it...
 
 ;;;; from the "Packages" chapter:
@@ -1568,7 +1568,7 @@
                                            :append :supersede nil))
                        (:if-does-not-exist (member :error :create nil))
                        (:external-format external-format-designator)
-                       #!+win32 (:overlapped t))
+                       #+win32 (:overlapped t))
   (or stream null))
 
 (defknown rename-file (pathname-designator filename)
@@ -1629,7 +1629,7 @@
 
 ;;;; from the "Miscellaneous" Chapter:
 
-(defknown compile ((or symbol cons) &optional (or list function null))
+(defknown compile ((or symbol cons) &optional (or list function))
   (values (or function symbol cons) boolean boolean))
 
 (defknown compile-file
@@ -1769,7 +1769,7 @@
 (defknown %listify-rest-args (t index) list (flushable))
 (defknown %more-arg-context (t t) (values t index) (flushable))
 (defknown %more-arg (t index) t)
-#!+stack-grows-downward-not-upward
+#+stack-grows-downward-not-upward
 ;;; FIXME: The second argument here should really be NEGATIVE-INDEX, but doing that
 ;;; breaks the build, and I cannot seem to figure out why. --NS 2006-06-29
 (defknown %more-kw-arg (t fixnum) (values t t))
@@ -1946,11 +1946,11 @@
 (defknown %alien-funcall ((or string system-area-pointer) alien-type &rest *) *)
 
 ;; Used by WITH-PINNED-OBJECTS
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defknown sb-vm::touch-object (t) (values)
   (always-translatable))
 
-#!+linkage-table
+#+linkage-table
 (defknown foreign-symbol-dataref-sap (simple-string)
   system-area-pointer
   (movable flushable))
@@ -1979,6 +1979,21 @@
   (values)
   ())
 (defknown style-warn (t &rest t) null ())
+;;; The following defknowns are essentially a workaround for a deficiency in
+;;; at least some versions of CCL which do not agree that NIL is legal here:
+;;; * (declaim (ftype (function () nil) missing-arg))
+;;; * (defun call-it (a) (if a 'ok (missing-arg)))
+;;; Compiler warnings :
+;;;   In CALL-IT: Conflicting type declarations for BUG
+;;;
+;;; Unfortunately it prints that noise at each call site.
+;;; Using DEFKNOWN we can make the proclamation effective when
+;;; running the cross-compiler but not when building it.
+;;; Alternatively we could use SB-XC:PROCLAIM, except that that
+;;; doesn't exist soon enough, and would need conditionals guarding
+;;; it, which is sort of the very thing this is trying to avoid.
+(defknown missing-arg () nil)
+(defknown give-up-ir1-transform (&rest t) nil)
 
 (defknown coerce-to-condition ((or condition symbol string function)
                                type-specifier symbol &rest t)
@@ -2003,7 +2018,7 @@
 (defknown sb-vm:%write-barrier () (values) ())
 (defknown sb-vm:%data-dependency-barrier () (values) ())
 
-#!+sb-safepoint
+#+sb-safepoint
 ;;; Note: This known function does not have an out-of-line definition;
 ;;; and if such a definition were needed, it would not need to "call"
 ;;; itself inline, but could be a no-op, because the compiler inserts a
@@ -2014,7 +2029,7 @@
 (defknown %compare-and-swap-svref (simple-vector index t t) t
     ())
 (defknown (%compare-and-swap-symbol-value
-           #!+x86-64 %cas-symbol-global-value)
+           #+x86-64 %cas-symbol-global-value)
     (symbol t t) t
     (unwind))
 (defknown (%atomic-dec-symbol-global-value %atomic-inc-symbol-global-value)

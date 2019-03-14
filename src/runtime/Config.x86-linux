@@ -36,6 +36,7 @@ ifdef LISP_FEATURE_LARGEFILE
   CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
 endif
 CFLAGS += -m32 -fno-omit-frame-pointer
+CPPFLAGS += -include memcpy.h
 
 ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread

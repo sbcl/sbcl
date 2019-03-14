@@ -56,16 +56,10 @@ more reliable bactracing across foreign calls.")
   ("no" "maybe" "yes" "yes"))
 
 (define-optimization-quality insert-debug-catch
-  ;; It's more expansive to be enabled by default without
-  ;; UNWIND-TO-FRAME-AND-CALL
-  #!-unwind-to-frame-and-call-vop
-  (if (> debug (max speed space))
-      3
-      0)
-  #!+unwind-to-frame-and-call-vop
   (cond ((and (= debug 3)
               (> debug speed))
          3)
+        #+unwind-to-frame-and-call-vop
         ((and (> debug 0)
               (>= debug speed))
          1)
@@ -148,7 +142,7 @@ debugger.")
     1
   ("no" "no" "yes" "yes"))
 
-#!+sb-safepoint
+#+sb-safepoint
 (define-optimization-quality inhibit-safepoints
     0
   ("no" "no" "yes" "yes")

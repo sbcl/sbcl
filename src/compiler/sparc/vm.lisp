@@ -154,13 +154,13 @@
   (single-stack non-descriptor-stack) ; single-floats
   (double-stack non-descriptor-stack
                 :element-size 2 :alignment 2) ; double floats.
-  #!+long-float
+  #+long-float
   (long-stack non-descriptor-stack :element-size 4 :alignment 4) ; long floats.
   ;; complex-single-floats
   (complex-single-stack non-descriptor-stack :element-size 2)
   ;; complex-double-floats.
   (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
-  #!+long-float
+  #+long-float
   ;; complex-long-floats.
   (complex-long-stack non-descriptor-stack :element-size 8 :alignment 4)
 
@@ -214,7 +214,7 @@
 
   ;; Non-Descriptor double-floats.
   (double-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 2 collect i)
    :element-size 2 :alignment 2
    :reserve-locations (28 30)
@@ -223,9 +223,9 @@
    :alternate-scs (double-stack))
 
   ;; Non-Descriptor double-floats.
-  #!+long-float
+  #+long-float
   (long-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 4 collect i)
    :element-size 4 :alignment 4
    :reserve-locations (28)
@@ -242,7 +242,7 @@
    :alternate-scs (complex-single-stack))
 
   (complex-double-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 4 collect i)
    :element-size 4 :alignment 4
    :reserve-locations (28)
@@ -250,9 +250,9 @@
    :save-p t
    :alternate-scs (complex-double-stack))
 
-  #!+long-float
+  #+long-float
   (complex-long-reg float-registers
-   :locations #.(loop for i from 0 to #!-sparc-64 31 #!+sparc-64 63
+   :locations #.(loop for i from 0 to #-sparc-64 31 #+sparc-64 63
                       by 8 collect i)
    :element-size 8 :alignment 8
    :constant-scs ()

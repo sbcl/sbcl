@@ -44,7 +44,7 @@
 (defvar *current-internal-trap-number*)
 (defvar *current-internal-error-args*)
 
-#!+undefined-fun-restarts
+#+undefined-fun-restarts
 (defun restart-undefined (name condition fdefn-or-symbol context)
   (multiple-value-bind (tn-offset pc-offset)
       (if context
@@ -144,16 +144,16 @@
                                        (sb-c::fun-locally-defined-p
                                         name sb-c:*lexenv*))
                                   :local))))
-         #!+undefined-fun-restarts
+         #+undefined-fun-restarts
          context)
-    (cond #!+undefined-fun-restarts
+    (cond #+undefined-fun-restarts
           ((or (= *current-internal-trap-number* sb-vm:cerror-trap)
                (integerp (setf context (sb-di:error-context))))
            (restart-undefined name condition fdefn-or-symbol context))
           (t
            (error condition)))))
 
-#!+(or arm arm64 x86-64)
+#+(or arm arm64 x86-64)
 (deferr undefined-alien-fun-error (address)
   (error 'undefined-alien-function-error
          :name
@@ -162,7 +162,7 @@
              (and (integerp address)
                   (sap-foreign-symbol (int-sap address))))))
 
-#!-(or arm arm64 x86-64)
+#-(or arm arm64 x86-64)
 (defun undefined-alien-fun-error ()
   (error 'undefined-alien-function-error))
 
@@ -173,14 +173,14 @@
       (decf nargs 2)))
   (restart-case
       (%program-error "invalid number of arguments: ~S" nargs)
-    #!+(or x86-64 arm64)
+    #+(or x86-64 arm64)
     (replace-function (value)
       :report (lambda (stream)
                 (format stream "Call a different function with the same arguments"))
       :interactive read-evaluated-form
       (sb-vm::context-call-function *current-internal-error-context*
                                     (fdefinition value)))
-    #!+(or x86-64 arm64)
+    #+(or x86-64 arm64)
     (call-form (form)
       :report (lambda (stream)
                 (format stream "Call a different form"))
@@ -190,7 +190,7 @@
                                       ;; Don't invoke the compiler in
                                       ;; case it's dealing with an
                                       ;; error within the compiler
-                                      (let (#!+(or sb-eval sb-fasteval)
+                                      (let (#+(or sb-eval sb-fasteval)
                                             (*evaluator-mode* :interpret))
                                         (eval form)))
                                     0))))
@@ -271,7 +271,7 @@
 
 (deferr unseen-throw-tag-error (tag)
   (let ((text "attempt to THROW to a tag that does not exist: ~S"))
-    #!+sb-fasteval
+    #+sb-fasteval
     (when (listp tag)
       (binding* ((frame (find-interrupted-frame))
                  (name (sb-di:debug-fun-name (sb-di:frame-debug-fun frame)))
@@ -363,13 +363,13 @@
 ;;; This is needed for restarting XEPs, which do not bind anything but
 ;;; also do not save their own BSP, and we need to discard the
 ;;; bindings made by the error handling machinery.
-#!+unwind-to-frame-and-call-vop
+#+unwind-to-frame-and-call-vop
 (defvar *interr-current-bsp* nil)
 
 (defun internal-error (context continuable)
   (declare (type system-area-pointer context))
   (declare (ignore continuable))
-  (let (#!+unwind-to-frame-and-call-vop
+  (let (#+unwind-to-frame-and-call-vop
         (*interr-current-bsp*
           ;; Needs to be done before anything is bound
           (%primitive sb-c:current-binding-pointer)))
@@ -494,7 +494,7 @@
   (declare (optimize allow-non-returning-tail-call))
   (error 'undefined-alien-variable-error))
 
-#!-win32
+#-win32
 (defun memory-fault-error (context-sap address-sap)
   (declare (ignore context-sap))
   (let ((sb-debug:*stack-top-hint* (find-interrupted-frame)))

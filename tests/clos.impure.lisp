@@ -2525,7 +2525,8 @@
                (((or warning error) #'error))
              (load file))))
     (multiple-value-bind (fasl warnings errorsp)
-          (compile-file "bug-503095.lisp" :print nil :verbose nil)
+          (compile-file "bug-503095.lisp" :print nil :verbose nil
+                        :output-file (randomish-temp-file-name "fasl"))
       (unwind-protect
            (progn (assert (and fasl (not warnings) (not errorsp)))
                   (test-load fasl))
@@ -2664,3 +2665,14 @@
           `(lambda ()
              (defmethod foo ((bar keyword))))
         (() (condition 'sb-pcl:class-not-found-error))))))
+
+(defclass removing-a-class () ())
+
+(defvar *removing-a-class* (sb-ext:make-weak-pointer (find-class 'removing-a-class)))
+(setf (find-class 'removing-a-class) nil)
+(sb-mop:remove-direct-subclass (find-class 'standard-object)
+                               (sb-ext:weak-pointer-value *removing-a-class*))
+
+(with-test (:name :removing-a-class)
+  (sb-ext:gc :full t)
+  (assert (not (sb-ext:weak-pointer-value *removing-a-class*))))

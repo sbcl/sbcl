@@ -33,7 +33,7 @@
 ;;; The PCL package is internal and is used by code in potential
 ;;; bottlenecks. And since it's internal, no one should be
 ;;; doing things like deleting and recreating it in a running target Lisp.
-(define-symbol-macro *pcl-package* (load-time-value (find-package "SB-PCL") t))
+(define-symbol-macro *pcl-package* #.(find-package "SB-PCL"))
 
 (declaim (inline class-classoid))
 (defun class-classoid (class)
@@ -74,19 +74,19 @@
 
 (sb-kernel::!defstruct-with-alternate-metaclass standard-instance
   ;; KLUDGE: arm64 needs to have CAS-HEADER-DATA-HIGH implemented
-  :slot-names (slots #!-(and compact-instance-header x86-64) hash-code)
+  :slot-names (slots #-(and compact-instance-header x86-64) hash-code)
   :constructor %make-standard-instance
   :superclass-name t
   :metaclass-name static-classoid
   :metaclass-constructor make-static-classoid
   :dd-type structure)
 
-;;; Note: for x8-64 with #!+immobile-code there are 2 additional raw slots which
+;;; Note: for x8-64 with #+immobile-code there are 2 additional raw slots which
 ;;; hold machine instructions to load the funcallable-instance-fun and jump to
 ;;; it, so that funcallable-instances can act like simple-funs, in as much as
 ;;; there's an address you can jump to without loading a register.
 (sb-kernel::!defstruct-with-alternate-metaclass standard-funcallable-instance
-  :slot-names (clos-slots #!-compact-instance-header hash-code)
+  :slot-names (clos-slots #-compact-instance-header hash-code)
   :constructor %make-standard-funcallable-instance
   :superclass-name function
   :metaclass-name static-classoid

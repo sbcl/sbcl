@@ -103,18 +103,18 @@
         (return-from string=* nil))
       ;; Optimizing the non-unicode builds is not terribly important
       ;; because no per-character test for base/UCS4 is needed.
-      #!+sb-unicode
+      #+sb-unicode
       (let* ((widetag1 (%other-pointer-widetag string1))
              (widetag2 (%other-pointer-widetag string2))
              (char-shift
-              #!+(or x86 x86-64)
+              #+(or x86 x86-64)
               ;; The cost of WITH-PINNED-OBJECTS is near nothing on x86,
               ;; and memcmp() is much faster except below a cutoff point.
               ;; The threshold is higher on x86-32 because the overhead
               ;; of a foreign call is higher due to FPU stack save/restore.
               (if (and (= widetag1 widetag2)
-                       (>= len #!+x86 16
-                               #!+x86-64 8))
+                       (>= len #+x86 16
+                               #+x86-64 8))
                   (case widetag1
                     (#.sb-vm:simple-base-string-widetag 0)
                     (#.sb-vm:simple-character-string-widetag 2)))))
@@ -159,7 +159,7 @@
           ;; On non-x86, Lisp code is used always because I did not profile
           ;; memcmp(), and this code is at least as good as %SP-STRING-COMPARE.
           ;; Also, (ARRAY NIL) always punts.
-          (cond #!-x86-64
+          (cond #-x86-64
                 ((= widetag1 widetag2)
                  (case widetag1
                    (#.sb-vm:simple-base-string-widetag

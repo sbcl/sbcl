@@ -47,8 +47,8 @@
                          for items = (mapcar #'(lambda (item)
                                                  (map 'simple-string
                                                       #'code-char item))
-                                             #!+sb-unicode set
-                                             #!-sb-unicode
+                                             #+sb-unicode set
+                                             #-sb-unicode
                                              (remove-if-not
                                               #'(lambda (item)
                                                   (every
@@ -675,16 +675,16 @@ Acceptable values for form are :NFD, :NFC, :NFKD, and :NFKC.
 If FILTER is a function it is called on each decomposed character and
 only characters for which it returns T are collected."
   (declare (type (member :nfd :nfkd :nfc :nfkc) form))
-  #!-sb-unicode
+  #-sb-unicode
   (declare (ignore filter))
-  #!-sb-unicode
+  #-sb-unicode
   (etypecase string
     ((array nil (*)) string)
     (string
      (ecase form
        ((:nfc :nfkc) string)
        ((:nfd :nfkd) (error "Cannot normalize to ~A form in #-SB-UNICODE builds" form)))))
-  #!+sb-unicode
+  #+sb-unicode
   (etypecase string
     (base-string string)
     ((array character (*))
@@ -762,9 +762,9 @@ only characters for which it returns T are collected."
 (declaim (type function sb-unix::posix-getenv))
 (defun get-user-locale ()
   (let ((raw-locale
-         #!+(or win32 unix) (or (sb-unix::posix-getenv "LC_ALL")
+         #+(or win32 unix) (or (sb-unix::posix-getenv "LC_ALL")
                                 (sb-unix::posix-getenv "LANG"))
-         #!-(or win32 unix) nil))
+         #-(or win32 unix) nil))
     (when raw-locale
       (let ((lang-code (string-upcase
                         (subseq raw-locale 0 (position #\_ raw-locale)))))
@@ -782,8 +782,8 @@ Win32 only)."
   (when (eq locale t) (setf locale (get-user-locale)))
   (string-somethingcase
    #'char-uppercase string
-   #!-sb-unicode (constantly nil)
-   #!+sb-unicode ;; code-char with a constant > 255 breaks the build
+   #-sb-unicode (constantly nil)
+   #+sb-unicode ;; code-char with a constant > 255 breaks the build
    #'(lambda (char index len)
        (declare (ignore len))
        (cond
@@ -808,8 +808,8 @@ The result is not guaranteed to have the same length as the input.
   (when (eq locale t) (setf locale (get-user-locale)))
   (string-somethingcase
    #'char-lowercase string
-   #!-sb-unicode (constantly nil)
-   #!+sb-unicode
+   #-sb-unicode (constantly nil)
+   #+sb-unicode
    #'(lambda (char index len)
        (cond
          ((and (char= char (code-char #x03A3))
@@ -882,11 +882,11 @@ be longer than the input.
       for initial = (char word first-cased)
       for rest = (subseq word (1+ first-cased))
       do (let ((up (char-titlecase initial)) (down (lowercase rest)))
-           #!+sb-unicode
+           #+sb-unicode
            (when (and (or (eql locale :tr) (eql locale :az))
                       (eql initial #\i))
              (setf up (list (code-char #x0130))))
-           #!+sb-unicode
+           #+sb-unicode
            (when (and (eql locale :lt)
                       (soft-dotted-p initial)
                       (eql (char down
@@ -988,7 +988,7 @@ The result is not guaranteed to have the same length as the input."
   (def map-graphemes map-grapheme-boundaries))
 
 (defun graphemes (string)
-  "Breaks STRING into graphemes acording to the default
+  "Breaks STRING into graphemes according to the default
 grapheme breaking rules specified in UAX #29, returning a list of strings."
   (let (result)
     (map-graphemes (lambda (a) (push (subseq a 0) result)) string)
@@ -1047,7 +1047,7 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
            (push ,%thing ,list)))))
 
 (defun words (string)
-  "Breaks STRING into words acording to the default
+  "Breaks STRING into words according to the default
 word breaking rules specified in UAX #29. Returns a list of strings"
   (let ((chars (mapcar
                  #'(lambda (s)
@@ -1167,7 +1167,7 @@ Specifically,
     (flush) (nreverse clusters))))
 
 (defun sentences (string)
-  "Breaks STRING into sentences acording to the default
+  "Breaks STRING into sentences according to the default
 sentence breaking rules specified in UAX #29"
   (let ((special-handling '(:close :sp :sep :cr :lf :scontinue :sterm :aterm))
         (chars (sentence-prebreak string))
@@ -1626,7 +1626,7 @@ with variable-weight characters, as described in UTS #10"
 (defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Determines whether STRING1 and STRING2 could be visually confusable
 according to the IDNA confusableSummary.txt table"
-    (let* ((form #!+sb-unicode :nfd #!-sb-unicode :nfc)
+    (let* ((form #+sb-unicode :nfd #-sb-unicode :nfc)
            (str1 (normalize-string (subseq string1 start1 end1) form))
            (str2 (normalize-string (subseq string2 start2 end2) form))
            (skeleton1 (normalize-string (canonically-deconfuse str1) form))

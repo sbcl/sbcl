@@ -9,7 +9,7 @@
 ;;;; bootstrap issues, SBCLification (e.g. DECLARE used to check
 ;;;; argument types), and other maintenance. Whether or not it then
 ;;;; supported all the environments implied by the reader conditionals
-;;;; in the source code (e.g. #!+CLOE-RUNTIME) before that
+;;;; in the source code (e.g. #+CLOE-RUNTIME) before that
 ;;;; modification, it sure doesn't now. It might perhaps, by blind
 ;;;; luck, be appropriate for some other CMU-CL-derived system, but
 ;;;; really it only attempts to be appropriate for SBCL.
@@ -177,7 +177,7 @@ constructed.
 (defconstant-eqx +loop-minimax-type-infinities-alist+
   ;; FIXME: Now that SBCL supports floating point infinities again, we
   ;; should have floating point infinities here, as cmucl-2.4.8 did.
-  '((fixnum most-positive-fixnum most-negative-fixnum))
+  '((fixnum sb-xc:most-positive-fixnum sb-xc:most-negative-fixnum))
   #'equal)
 
 (defun make-loop-minimax (answer-variable type)
@@ -276,9 +276,7 @@ code to be loaded.
   ;; most atoms. The real test is whether type = :PRIMITIVE, as there are CL
   ;; symbols naming types which are not standard builtin type specifiers, e.g.
   ;; ARRAY-RANK, CHAR-CODE. (One almost wonders if that is technically wrong).
-  ;; At any rate, in the cross-compiler, we must not rely on the host's idea
-  ;; of SYMBOL-PACKAGE as it does not accurately model the target per se.
-  (and #-sb-xc-host (eq (symbol-package symbol) *cl-package*)
+  (and (eq (sb-xc:symbol-package symbol) *cl-package*)
        (or (eq (info :type :kind symbol) :primitive)
            ;; allow certain :instance types, but not all of them
            (member symbol '(hash-table package pathname random-state readtable)))
@@ -735,22 +733,22 @@ code to be loaded.
 
 (defun loop-typed-init (data-type &optional step-var-p)
   ;; FIXME: can't tell if unsupplied or NIL, but it has to be rare.
-  (when data-type
-   (let ((ctype (specifier-type data-type)))
-     ;; FIXME: use the ctype for the rest of the type operations, now
-     ;; that it's parsed.
-     (cond ((eql ctype *empty-type*)
-            (values nil t))
-           ((sb-xc:subtypep data-type 'number)
+  ;; FIXME: returns either 2 values or 1 value, which is poor style.
+  (unless data-type
+    (return-from loop-typed-init (values nil nil)))
+  (let ((ctype (specifier-type data-type)))
+    (when (eq ctype *empty-type*)
+      (return-from loop-typed-init (values nil t)))
+    (cond ((csubtypep ctype (specifier-type 'number))
             (let ((init (if step-var-p 1 0)))
               (flet ((like (&rest types)
-                       (coerce init (find-if (lambda (type)
-                                               (sb-xc:subtypep data-type type))
+                       (coerce init (find-if (lambda (spec)
+                                               (csubtypep ctype (specifier-type spec)))
                                              types))))
-                (cond ((sb-xc:subtypep data-type 'float)
+                (cond ((csubtypep ctype (specifier-type 'float))
                        (like 'single-float 'double-float
                              'short-float 'long-float 'float))
-                      ((sb-xc:subtypep data-type '(complex float))
+                      ((csubtypep ctype (specifier-type '(complex float)))
                        (like '(complex single-float)
                              '(complex double-float)
                              '(complex short-float)
@@ -758,18 +756,18 @@ code to be loaded.
                              '(complex float)))
                       (t
                        init)))))
-           ((sb-xc:subtypep data-type 'vector)
+           ((csubtypep ctype (specifier-type 'vector))
             (when (array-type-p ctype)
               (let ((etype (type-*-to-t
                             (array-type-specialized-element-type ctype))))
                 (make-array 0 :element-type (type-specifier etype)))))
-           #!+sb-unicode
-           ((sb-xc:subtypep data-type 'extended-char)
+           #+sb-unicode
+           ((csubtypep ctype (specifier-type 'extended-char))
             (code-char base-char-code-limit))
-           ((sb-xc:subtypep data-type 'character)
+           ((csubtypep ctype (specifier-type 'character))
             #\x)
            (t
-            nil)))))
+            nil))))
 
 (defun loop-optional-type (&optional variable &aux (loop *loop*))
   ;; No variable specified implies that no destructuring is permissible.
@@ -935,10 +933,19 @@ code to be loaded.
            ((sb-xc:typep init type)
             type)
            ((sb-xc:typep init '(simple-array * (*)))
+            ;; The cross-compiler must not inquire of the host
+            ;; for an array's element type.
+            #+sb-xc-host (bug "Can't get here")
             ;; type-of lets the size in
             `(or (simple-array ,(array-element-type init) (*)) ,type))
            (t
-            `(or ,(sb-xc:type-of init) ,type)))
+            (let ((disjunct
+                   #+sb-xc-host (if (null init)
+                                    'null
+                                    (error "Unexpected need for (TYPE-OF ~S) in xc"
+                                           init))
+                   #-sb-xc-host (type-of init)))
+              `(or ,disjunct ,type))))
      init)))
 
 (defun loop-declare-var (name dtype &key step-var-p initialization
@@ -946,7 +953,7 @@ code to be loaded.
   (cond ((or (null name) (null dtype) (eq dtype t)) nil)
         ((symbolp name)
          (unless (or (sb-xc:subtypep t dtype)
-                     (and (eq (find-package :cl) (symbol-package name))
+                     (and (eq (sb-xc:symbol-package name) *cl-package*)
                           (eq :special (info :variable :kind name))))
            (let ((dtype `(type ,(if initialization
                                     dtype
@@ -1591,8 +1598,8 @@ code to be loaded.
          (limit-given nil) ; T when prep phrase has specified end
          (limit-constantp nil)
          (limit-value nil))
-     ;; Work around some "Unused" (rather, assigned-but-never-set) warnings
-     #+(or ccl clisp) (declare (ignorable start-constantp start-value))
+     ;; Silence the assigned-but-never-set warnings that CCL and CLISP emit
+     (declare (ignorable start-constantp start-value))
      (flet ((assert-index-for-arithmetic (index)
               (unless (atom index)
                 (loop-error "Arithmetic index must be an atom."))))

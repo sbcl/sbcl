@@ -26,6 +26,16 @@
 
 ;;;; tests of interface machinery
 
+(with-test (:name :defthingy-fail-early)
+  (dolist (form '((defun "hi" 3)
+                  (defconstant "hi" 3)
+                  (defvar "hi" 3)
+                  (define-modify-macro "hi" :operator 'wat)))
+    (multiple-value-bind (exp err) (ignore-errors (macroexpand-1 form))
+      (assert (and (not exp)
+                   (search "is not"
+                           (write-to-string err :escape nil)))))))
+
 ;;; APROPOS should accept a package designator, not just a package, and
 ;;; furthermore do the right thing when it gets a package designator.
 ;;; (bug reported and fixed by Alexey Dejneka sbcl-devel 2001-10-17)

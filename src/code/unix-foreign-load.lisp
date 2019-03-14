@@ -20,8 +20,8 @@
 (define-alien-routine dlerror c-string)
 
 (define-alien-routine
-    #!-openbsd dlsym
-    #!+openbsd ("os_dlsym" dlsym)
+    #-openbsd dlsym
+    #+openbsd ("os_dlsym" dlsym)
     system-area-pointer
   (handle system-area-pointer)
   (symbol c-string))
@@ -48,7 +48,7 @@
     (cond ((and (not objp) *runtime-dlhandle*)
            ;; CLH/NS: if we're on sufficiently old darwin we can't close
            ;; *runtime-dlhandle* for some reason, so don't.
-           #!-darwin
+           #-darwin
            (dlclose *runtime-dlhandle*)
            (setf dlerror (dlerror)
                  *runtime-dlhandle* nil))

@@ -66,17 +66,17 @@
 ;;;;      and internal error handling) the extra runtime cost should be
 ;;;;      negligible.
 
-#!+(or linux win32)
+#+(or linux win32)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
 (defun context-float-register (context index format)
   (declare (ignorable context index))
-  #!-(or linux win32)
+  #-(or linux win32)
   (progn
     (warn "stub CONTEXT-FLOAT-REGISTER")
     (coerce 0 format))
-  #!+(or linux win32)
+  #+(or linux win32)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
@@ -97,7 +97,7 @@
 
 ;;; Given a signal context, return the floating point modes word in
 ;;; the same format as returned by FLOATING-POINT-MODES.
-#!-(or linux sunos)
+#-(or linux sunos)
 (defun context-floating-point-modes (context)
   ;; FIXME: As of sbcl-0.6.7 and the big rewrite of signal handling for
   ;; POSIXness and (at the Lisp level) opaque signal contexts,
@@ -107,7 +107,7 @@
   (warn "stub CONTEXT-FLOATING-POINT-MODES")
   0)
 
-#!+(or linux sunos)
+#+(or linux sunos)
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (sb-alien:unsigned 32)
   (context (* os-context-t)))

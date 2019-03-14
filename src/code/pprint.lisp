@@ -11,7 +11,7 @@
 
 (in-package "SB-PRETTY")
 
-#!-sb-fluid (declaim (inline index-posn posn-index posn-column))
+#-sb-fluid (declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
   (declare (type index index) (type pretty-stream stream)
            (values posn))
@@ -56,7 +56,7 @@
   (let* ((end (or end (length string))))
     (unless (= start end)
       (sb-impl::string-dispatch (simple-base-string
-                                 #!+sb-unicode
+                                 #+sb-unicode
                                  (simple-array character (*)))
           string
         ;; For POSITION transform
@@ -759,8 +759,8 @@ line break."
                            (and pred (fboundp pred)
                                 (symbol-function pred))))))))
       ;; avoid compiling code for CONS, ARRAY, VECTOR, etc
-      (awhen (assoc ctype sb-c::*backend-type-predicates* :test #'type=)
-        (symbol-function (cdr it)))
+      (awhen (sb-c::backend-type-predicate ctype)
+        (symbol-function it))
       ;; OK, compile something
       (let ((name
              ;; Keep name as a string, because NAMED-LAMBDA with a symbol
@@ -841,7 +841,6 @@ line break."
            (type real priority)
            (type pprint-dispatch-table table))
   (declare (explicit-check))
-  #!+(and sb-show (host-feature sb-xc)) (format t "* SET-PP-DISPATCH ~S~%" type)
   (assert-not-standard-pprint-dispatch-table table 'set-pprint-dispatch)
   (let* ((ctype (or (handler-bind
                         ((parse-unknown-type

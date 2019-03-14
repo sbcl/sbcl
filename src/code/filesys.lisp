@@ -267,9 +267,9 @@
 ;;;; Grabbing the kind of file when we have a namestring.
 (defun native-file-kind (namestring)
   (multiple-value-bind (existsp errno ino mode)
-      #!-win32
+      #-win32
       (sb-unix:unix-lstat namestring)
-      #!+win32
+      #+win32
       (sb-unix:unix-stat namestring)
     (declare (ignore errno ino))
     (when existsp
@@ -277,7 +277,7 @@
        (case ifmt
          (#.sb-unix:s-ifreg :file)
          (#.sb-unix:s-ifdir :directory)
-         #!-win32
+         #-win32
          (#.sb-unix:s-iflnk :symlink)
          (t :special))))))
 
@@ -318,17 +318,26 @@
 ;;; logical pathnames, too (but never returns LPNs).  For internal
 ;;; use.
 (defun query-file-system (pathspec query-for &optional (errorp t))
-  (let ((pathname (translate-logical-pathname
-                   (merge-pathnames
-                    (pathname pathspec)
-                    (sane-default-pathname-defaults)))))
-    (when (wild-pathname-p pathname)
-      (simple-file-perror
-       "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
-       pathname nil query-for pathspec))
-    (%query-file-system pathname query-for errorp)))
+  (block nil
+    (tagbody
+     retry
+       (restart-case
+           (let ((pathname (translate-logical-pathname
+                            (merge-pathnames
+                             (pathname pathspec)
+                             (sane-default-pathname-defaults)))))
+             (when (wild-pathname-p pathname)
+               (simple-file-perror
+                "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
+                pathname nil query-for pathspec))
+             (return (%query-file-system pathname query-for errorp)))
+         (use-value (value)
+           :report "Specify a different path."
+           :interactive read-evaluated-form
+           (setf pathspec value)
+           (go retry))))))
 
-#!+win32
+#+win32
 (defun %query-file-system (pathname query-for errorp)
   (let ((filename (native-namestring pathname :as-file t)))
     (case query-for
@@ -359,7 +368,7 @@
            "Failed to find the ~*~A~2:* of ~A"
            filename (sb-win32:get-last-error) query-for)))))))
 
-#!-win32
+#-win32
 (defun %query-file-system (pathname query-for errorp)
   (labels ((parse (filename &key as-directory)
              (values (parse-native-namestring
@@ -532,15 +541,16 @@ per standard Unix unlink() behaviour."
   (let* ((pathname (translate-logical-pathname
                     (merge-pathnames file (sane-default-pathname-defaults))))
          (namestring (native-namestring pathname :as-file t)))
-    #!+win32
+    #+win32
     (when (streamp file)
       (close file))
     (multiple-value-bind (res err)
-        #!-win32 (sb-unix:unix-unlink namestring)
-        #!+win32 (or (sb-win32::native-delete-file namestring)
+        #-win32 (sb-unix:unix-unlink namestring)
+        #+win32 (or (sb-win32::native-delete-file namestring)
                      (values nil (sb-win32:get-last-error)))
         (unless res
-          (simple-file-perror "couldn't delete ~A" namestring err))))
+          (with-simple-restart (continue "Return T")
+            (file-perror 'delete-file-error "Couldn't delete ~A" namestring err)))))
   t)
 
 (defun directorize-pathname (pathname)
@@ -603,10 +613,10 @@ exist or if is a file or a symbolic link."
            (delete-dir (dir)
              (let ((namestring (native-namestring dir :as-file t)))
                (multiple-value-bind (res errno)
-                 #!+win32
+                 #+win32
                  (or (sb-win32::native-delete-directory namestring)
                      (values nil (sb-win32:get-last-error)))
-                 #!-win32
+                 #-win32
                  (values
                   (not (minusp (alien-funcall
                                 (extern-alien "rmdir"
@@ -645,7 +655,7 @@ exist or if is a file or a symbolic link."
        (lose (&optional username)
          (error "Couldn't find home directory~@[ for ~S~]." username)))
 
-  #!-win32
+  #-win32
   (defun user-homedir-namestring (&optional username)
     (if username
         (sb-unix:user-homedir username)
@@ -653,7 +663,7 @@ exist or if is a file or a symbolic link."
             (not-empty (sb-unix:uid-homedir (sb-unix:unix-getuid)))
             (lose))))
 
-  #!+win32
+  #+win32
   (defun user-homedir-namestring (&optional username)
     (if username
         (lose username)
@@ -675,7 +685,7 @@ system. HOST argument is ignored by SBCL."
   (values
    (parse-native-namestring
     (or (user-homedir-namestring)
-        #!+win32
+        #+win32
         (sb-win32::get-folder-namestring sb-win32::csidl_profile))
     *physical-host*
     *default-pathname-defaults*
@@ -814,10 +824,10 @@ filenames."
             (macrolet ((,iterator ()
                          `(funcall ,',one-iter)))
               ,@body)))
-       #!+win32
+       #+win32
        (sb-win32::native-call-with-directory-iterator
         #'iterate ,namestring ,errorp)
-       #!-win32
+       #-win32
        (call-with-native-directory-iterator #'iterate ,namestring ,errorp))))
 
 (defun call-with-native-directory-iterator (function namestring errorp)
@@ -1264,11 +1274,7 @@ Experimental: interface subject to change."
                         :report "Retry directory creation."
                         (ensure-directories-exist
                          pathspec
-                         :verbose verbose :mode mode))
-                      (continue ()
-                        :report
-                        "Continue as if directory creation was successful."
-                        nil)))
+                         :verbose verbose :mode mode))))
                   (setf created-p t)))))
       (values pathspec created-p))))
 

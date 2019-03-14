@@ -13,21 +13,11 @@
 
 ;;; Check that target machine features are set up consistently with
 ;;; this file.
-#!-hpux (error "missing :HPUX feature")
+#-hpux (error "missing :HPUX feature")
 
 (defun software-type ()
   "Return a string describing the supporting software."
   (values "HPUX"))
-
-(defun software-version ()
-  "Return a string describing version of the supporting software, or NIL
-  if not available."
-  (or *software-version*
-      (setf *software-version*
-            (string-trim '(#\newline)
-                         (sb-kernel:with-simple-output-to-string (stream)
-                           (run-program "/bin/uname" `("-r")
-                                        :output stream))))))
 
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()

@@ -6,6 +6,11 @@
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
 
+           ;; type tools
+           #:type-evidently-=
+           #:ctype=
+           #:assert-tri-eq
+
            ;; thread tools
            #:make-kill-thread #:make-join-thread
            ;; cause tests to run in multiple threads
@@ -19,6 +24,8 @@
            #:checked-compile #:checked-compile-and-assert
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
+
+           #:randomish-temp-file-name
 
            ;; RUNTIME
            #:runtime #:split-string #:integer-sequence #:shuffle))
@@ -34,11 +41,51 @@
 (defvar *threads-to-kill*)
 (defvar *threads-to-join*)
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (require :sb-posix))
+(defun setenv (name value)
+  #-win32
+  (let ((r (sb-alien:alien-funcall
+            (sb-alien:extern-alien
+             "setenv" (function sb-alien:int (sb-alien:c-string :not-null t)
+                                (sb-alien:c-string :not-null t) sb-alien:int))
+                          name value 1)))
+    (if (minusp r)
+        (error "setenv: ~a" (sb-int:strerror))
+        r))
+  #+win32
+  (let ((r (sb-alien:alien-funcall
+            (sb-alien:extern-alien "_putenv" (function sb-alien:int (sb-alien:c-string :not-null t)))
+                          (format nil "~A=~A" name value))))
+    (if (minusp r)
+        (error "putenv: ~a" (sb-int:strerror))
+        r)))
 
-(sb-posix:putenv (format nil "SBCL_MACHINE_TYPE=~A" (machine-type)))
-(sb-posix:putenv (format nil "SBCL_SOFTWARE_TYPE=~A" (software-type)))
+(setenv "SBCL_MACHINE_TYPE" (machine-type))
+(setenv "SBCL_SOFTWARE_TYPE" (software-type))
+
+
+;;; Type tools
+
+(defun type-evidently-= (x y)
+  (and (subtypep x y) (subtypep y x)))
+
+(defun ctype= (left right)
+  (let ((a (sb-kernel:specifier-type left)))
+    ;; SPECIFIER-TYPE is a memoized function, and TYPE= is a trivial
+    ;; operation if A and B are EQ.
+    ;; To actually exercise the type operation, remove the memoized parse.
+    (sb-int:drop-all-hash-caches)
+    (let ((b (sb-kernel:specifier-type right)))
+      (assert (not (eq a b)))
+      (sb-kernel:type= a b))))
+
+(defmacro assert-tri-eq (expected-result expected-certainp form)
+  (sb-int:with-unique-names (result certainp)
+    `(multiple-value-bind (,result ,certainp) ,form
+       (assert (eq ,expected-result ,result))
+       (assert (eq ,expected-certainp ,certainp)))))
+
+
+;;; Thread tools
 
 #+sb-thread
 (defun make-kill-thread (&rest args)
@@ -179,7 +226,10 @@
      `(progn
         (start-test)
         (fail-test :skipped-disabled ',name "Test disabled for this combination of platform and features")))
-    ((and (boundp '*deferred-test-forms*) (not fails-on) (not serial))
+    ((and (boundp '*deferred-test-forms*)
+          (not serial)
+          (or (not fails-on)
+              (not (expected-failure-p fails-on))))
      ;; To effectively parallelize calls to COMPILE, we must defer compilation
      ;; until a worker thread has picked off the test from shared worklist.
      ;; Thus we push only the form to be compiled, not a lambda.
@@ -773,3 +823,22 @@
              unless (= chosen lim)
              do (rotatef (aref vector chosen) (aref vector lim)))
        vector))))
+
+;;; Return a random file name to avoid writing into the source tree.
+;;; We can't use any of the interfaces provided in libc because those are inadequate
+;;; for purposes of COMPILE-FILE. This is not trying to be robust against attacks.
+(defun randomish-temp-file-name (&optional extension)
+  (let ((a (make-array 10 :element-type 'character)))
+    (dotimes (i 10)
+      (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
+    ;; not sure where to write files on win32. this is no worse than what it was
+    #+win32 (format nil "~a~@[.~a~]" a extension)
+    #-win32 (let ((dir (posix-getenv "TMPDIR"))
+                  (file (format nil "sbcl~d~a~@[.~a~]"
+                                (sb-unix:unix-getpid) a extension)))
+              (if dir
+                  (namestring
+                   (merge-pathnames
+                    file (parse-native-namestring dir nil *default-pathname-defaults*
+                                                  :as-directory t)))
+                  (concatenate 'string "/tmp/" file)))))

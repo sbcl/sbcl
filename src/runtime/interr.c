@@ -27,7 +27,7 @@
 #include "lispregs.h"
 #include "genesis/static-symbols.h"
 #include "genesis/vector.h"
-#include "genesis/code.h"
+#include "code.h"
 #include "thread.h"
 #include "monitor.h"
 #include "breakpoint.h"
@@ -162,11 +162,10 @@ void print_constant(os_context_t *context, int offset) {
     lispobj code = find_code(context);
     if (code != NIL) {
         struct code *codeptr = (struct code *)native_pointer(code);
-        int length = code_header_words(codeptr->header);
         putchar('\t');
-        if (offset >= length) {
-            printf("Constant offset %d out of bounds for the code object of length %d.\n",
-                   offset, length);
+        if (offset >= code_header_words(codeptr)) {
+            printf("Constant offset %d out of bounds for the code object @ %p\n",
+                   offset, codeptr);
         } else {
             brief_print(codeptr->constants[offset -
                                            (offsetof(struct code, constants) >> WORD_SHIFT)]);
@@ -310,8 +309,10 @@ lispobj debug_print(lispobj string)
        an unused buffer on the stack before doing anything else
        here */
     char untouched[32];
-    fprintf(stderr, "%s\n",
-            (char *)(VECTOR(string)->data));
+    if (header_widetag(VECTOR(string)->header) != SIMPLE_BASE_STRING_WIDETAG)
+        fprintf(stderr, "debug_print: can't display string\n");
+    else
+        fprintf(stderr, "%s\n", (char *)(VECTOR(string)->data));
     /* shut GCC up about not using this, because that's the point.. */
     (void)untouched;
     return NIL;

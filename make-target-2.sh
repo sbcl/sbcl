@@ -46,19 +46,20 @@ if [ "$1" != --load ]; then
     fi
     echo //doing warm init - compilation phase
     ./src/runtime/sbcl --core output/cold-sbcl.core \
-     --lose-on-corruption --no-sysinit --no-userinit \
+     --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
      --eval '(sb-fasl::!warm-load "src/cold/warm.lisp")' --quit
 fi
 echo //doing warm init - load and dump phase
 ./src/runtime/sbcl --core output/cold-sbcl.core \
- --lose-on-corruption --no-sysinit --no-userinit \
+ --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
  --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
  --eval '(progn #+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2))' \
- --eval '(sb-ext:save-lisp-and-die "output/sbcl.core")'
+ --eval '(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
+ (sb-ext:save-lisp-and-die "output/sbcl.core"))'
 
 echo //checking for leftover cold-init symbols
 ./src/runtime/sbcl --core output/sbcl.core \
- --lose-on-corruption --noinform --no-sysinit --no-userinit --eval '
+ --lose-on-corruption --noinform $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit --eval '
     (restart-case
       (let (l1 l2)
         (sb-vm::map-allocated-objects
@@ -85,6 +86,6 @@ echo //checking for leftover cold-init symbols
                    "STRING-LESS-GREATER-EQUAL-TESTS")))
          (format t "~&Leftover from [disabled?] tree-shaker:~%~S~%" sb-int:it))
         (format t "Found ~D fdefns named by uninterned symbols:~%~S~%" (length l2) l2))
-    (abort ()
+    (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1)))' --quit

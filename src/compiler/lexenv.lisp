@@ -19,7 +19,7 @@
   (etypecase x
     (null (make-null-lexenv))
     (lexenv x)
-    #!+(and sb-fasteval (host-feature sb-xc))
+    #+(and sb-fasteval (not sb-xc-host))
     (sb-interpreter:basic-env (sb-interpreter:lexenv-from-env x))))
 
 ;;; Take the lexenv surrounding an inlined function and extract things
@@ -126,9 +126,9 @@
              ;; defining form. The syntactic env is correctly captured.
              ((reconstruct-lexenv lexenv)
               `(lambda-with-lexenv ,it ,@(cdr lambda))))))
-   #!+(and sb-fasteval (host-feature sb-xc))
+   #+(and sb-fasteval (not sb-xc-host))
    (sb-interpreter:basic-env
     (awhen (sb-interpreter::reconstruct-syntactic-closure-env lexenv)
       `(lambda-with-lexenv ,it ,@(cdr lambda))))
-   #!+sb-fasteval
+   #+sb-fasteval
    (null lambda))) ; trivial case. Never occurs in the compiler.

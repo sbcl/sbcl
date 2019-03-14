@@ -145,7 +145,7 @@
               (unless (typep res output-type-spec)
                 (coerce-error))
               res))
-           #!+long-float
+           #+long-float
            ((csubtypep type (specifier-type 'long-float))
             (let ((res (%long-float object)))
               (unless (typep res output-type-spec)
@@ -165,7 +165,7 @@
                      ((csubtypep type (specifier-type '(complex double-float)))
                       (complex (%double-float (realpart object))
                                (%double-float (imagpart object))))
-                     #!+long-float
+                     #+long-float
                      ((csubtypep type (specifier-type '(complex long-float)))
                       (complex (%long-float (realpart object))
                                (%long-float (imagpart object))))

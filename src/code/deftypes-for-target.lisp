@@ -109,7 +109,7 @@
 ;;; On Unicode builds, SIMPLE-CHARACTER-STRING is a builtin type.
 ;;; For non-Unicode it is convenient to be able to use the type name
 ;;; as an alias of SIMPLE-BASE-STRING.
-#!-sb-unicode
+#-sb-unicode
 (sb-xc:deftype simple-character-string (&optional size)
   `(simple-base-string ,size))
 
@@ -120,9 +120,10 @@
   `(simple-array bit (,size)))
 
 (sb-xc:deftype compiled-function ()
-  '(and function
-        #!+sb-fasteval (not sb-interpreter:interpreted-function)
-        #!+sb-eval (not sb-eval:interpreted-function)))
+  '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
+
+;;; Stub type in case there are no interpreted functions
+#-(or sb-eval sb-fasteval) (sb-xc:deftype interpreted-function () nil)
 
 (sb-xc:deftype simple-fun () '(satisfies simple-fun-p))
 
@@ -158,6 +159,9 @@
 (sb-xc:deftype array-total-size ()
   `(integer 0 (,sb-xc:array-total-size-limit)))
 
+;;; The range returned by SXHASH and PSXHASH
+(sb-xc:deftype hash () `(integer 0 ,sb-xc:most-positive-fixnum))
+
 ;;; something legal in an evaluated context
 ;;; FIXME: could probably go away
 (sb-xc:deftype form () t)
@@ -169,7 +173,7 @@
 
 ;;; legal args to pathname functions
 (sb-xc:deftype pathname-designator ()
-  '(or string pathname #+sb-xc-host stream #-sb-xc-host synonym-stream #-sb-xc-host file-stream))
+  '(or string pathname synonym-stream file-stream))
 (sb-xc:deftype logical-host-designator ()
   '(or host string))
 (sb-xc:deftype pathname-component-case ()

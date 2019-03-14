@@ -110,8 +110,7 @@
 (defstruct (negation-type (:include ctype
                                     (class-info (type-class-or-lose 'negation)))
                           (:copier nil)
-                          (:constructor make-negation-type (type))
-                          #!+cmu (:pure nil))
+                          (:constructor make-negation-type (type)))
   (type (missing-arg) :type ctype :read-only t))
 
 ;; Former comment was:
@@ -357,7 +356,7 @@
       (return-from make-numeric-type
         (if (bounds-unbounded-p low high)
             (specifier-type 'float)
-            (unionize (single-float double-float #!+long-float (error "long-float"))
+            (unionize (single-float double-float #+long-float (error "long-float"))
                       (:class 'float :format thing))))))
   (multiple-value-bind (low high)
       (case class
@@ -427,9 +426,18 @@
                     ;; negative bignum
                     (int-type nil #.(1- sb-xc:most-negative-fixnum))))))
           (rational
-           (when (and (eq complexp :real) (bounds-unbounded-p low high))
-             (literal-ctype (interned-numeric-type nil :class 'rational)
-                            rational))))
+           (cond ((and (eq complexp :real) (bounds-unbounded-p low high))
+                  (literal-ctype (interned-numeric-type nil :class 'rational)
+                      rational))
+                 ((and (eq complexp :complex) (bounds-unbounded-p low high))
+                  (literal-ctype (interned-numeric-type nil :complexp :complex
+                                                            :class 'rational)
+                      (complex rational)))))
+          ((nil)
+           (and (not format)
+                (not complexp)
+                (bounds-unbounded-p low high)
+                (literal-ctype (interned-numeric-type nil :complexp nil) number))))
         (%make-numeric-type :class class :format format :complexp complexp
                             :low low :high high :enumerable enumerable))))
 
@@ -487,11 +495,11 @@
                  (cond ((eql low 0)
                         (range 0 #.(1- sb-xc:char-code-limit)
                                (sb-vm::saetp-index-or-lose 'character)))
-                       #!+sb-unicode
+                       #+sb-unicode
                        ((eql low base-char-code-limit)
                         (range #.base-char-code-limit
                                #.(1- sb-xc:char-code-limit)))))
-                #!+sb-unicode
+                #+sb-unicode
                 ((and (eql low 0) (eql high (1- base-char-code-limit)))
                  (range 0 #.(1- base-char-code-limit)
                         (sb-vm::saetp-index-or-lose 'base-char)))))))
@@ -528,40 +536,42 @@
       ;; Index 31 is available to store *WILD-TYPE*
       ;; because there are fewer than 32 array widetags.
       (make-all *wild-type* 31 array)
-      (dolist (x *specialized-array-element-types*
-                 (progn (aver (< index 31)) array))
+      (dovector (saetp sb-vm:*specialized-array-element-type-properties*
+                       (progn (aver (< index 31)) array))
         (make-all
-         ;; Produce element-type representation without parsing a spec.
-         ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
-         ;; The MAKE- constructors return an interned object as appropriate.
-         (etypecase x
-           ((cons (eql unsigned-byte))
-            (integer-range 0 (1- (ash 1 (second x)))))
-           ((cons (eql signed-byte))
-            (let ((lim (ash 1 (1- (second x)))))
-              (integer-range (- lim) (1- lim))))
-           ((eql bit) (integer-range 0 1))
-           ;; FIXNUM is its own thing, why? See comment in vm-array
-           ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
-           ((eql fixnum) ; One good kludge deserves another.
-            (integer-range sb-xc:most-negative-fixnum
-                           sb-xc:most-positive-fixnum))
-           ((member single-float double-float)
-            (make-numeric-type :class 'float :format x :complexp :real))
-           ((cons (eql complex))
-            (make-numeric-type :class 'float :format (cadr x)
-                               :complexp :complex))
-           ((eql character)
-            (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
-           #!+sb-unicode
-           ((eql base-char)
-            (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
-           ((eql t) *universal-type*)
-           ((eql nil) *empty-type*))
-         index array)
+         (let ((x (sb-vm:saetp-specifier saetp)))
+           ;; Produce element-type representation without parsing a spec.
+           ;; (SPECIFIER-TYPE doesn't work when bootstrapping.)
+           ;; The MAKE- constructors return an interned object as appropriate.
+           (etypecase x
+             ((cons (eql unsigned-byte))
+              (integer-range 0 (1- (ash 1 (second x)))))
+             ((cons (eql signed-byte))
+              (let ((lim (ash 1 (1- (second x)))))
+                (integer-range (- lim) (1- lim))))
+             ((eql bit) (integer-range 0 1))
+             ;; FIXNUM is its own thing, why? See comment in vm-array
+             ;; saying to "See the comment in PRIMITIVE-TYPE-AUX"
+             ((eql fixnum) ; One good kludge deserves another.
+              (integer-range sb-xc:most-negative-fixnum
+                             sb-xc:most-positive-fixnum))
+             ((member single-float double-float)
+              (make-numeric-type :class 'float :format x :complexp :real))
+             ((cons (eql complex))
+              (make-numeric-type :class 'float :format (cadr x)
+                                 :complexp :complex))
+             ((eql character)
+              (make-character-set-type `((0 . ,(1- sb-xc:char-code-limit)))))
+             #+sb-unicode
+             ((eql base-char)
+              (make-character-set-type `((0 . ,(1- base-char-code-limit)))))
+             ((eql t) *universal-type*)
+             ((eql nil) *empty-type*)))
+         index
+         array)
         (incf index)))))
 (defvar *parsed-specialized-array-element-types*
-  (let ((a (make-array (length *specialized-array-element-types*))))
+  (let ((a (make-array (length sb-vm:*specialized-array-element-type-properties*))))
     (loop for i below (length a)
           do (setf (aref a i) (array-type-specialized-element-type
                                (aref *interned-array-types* (* i 5)))))
@@ -611,12 +621,12 @@
     (when fp-zeroes ; avoid doing two passes of nothing
       (dotimes (pass 2)
         (dolist (z fp-zeroes)
-          (let ((sign (if (minusp (nth-value 2 (integer-decode-float z))) 1 0))
+          (let ((sign (float-sign-bit z))
                 (pair-idx
                   (etypecase z
                     (single-float 0)
                     (double-float 2
-                    #!+long-float (long-float 4)))))
+                    #+long-float (long-float 4)))))
             (if (= pass 0)
                 (setf (ldb (byte 1 (+ pair-idx sign)) presence) 1)
                 (if (= (ldb (byte 2 pair-idx) presence) #b11)
@@ -712,7 +722,7 @@
          (%make-cons-type car-type cdr-type))))
 
 ;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
-#!+sb-simd-pack
+#+sb-simd-pack
 (defstruct (simd-pack-type
             (:include ctype (class-info (type-class-or-lose 'simd-pack)))
             (:constructor %make-simd-pack-type (element-type))
@@ -721,7 +731,7 @@
    :type (cons #||(member #.*simd-pack-element-types*) ||#)
    :read-only t))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defstruct (simd-pack-256-type
             (:include ctype (class-info (type-class-or-lose 'simd-pack-256)))
             (:constructor %make-simd-pack-256-type (element-type))
@@ -730,7 +740,7 @@
    :type (cons #||(member #.*simd-pack-element-types*) ||#)
    :read-only t))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (defun make-simd-pack-type (element-type)
   (aver (neq element-type *wild-type*))
   (if (eq element-type *empty-type*)
@@ -744,7 +754,7 @@
          (when (csubtypep element-type (specifier-type pack-type))
            (return (list pack-type)))))))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defun make-simd-pack-256-type (element-type)
   (aver (neq element-type *wild-type*))
   (if (eq element-type *empty-type*)
@@ -1039,8 +1049,8 @@ expansion happened."
       (built-in-classoid t)
       (classoid nil)
       ;; HAIRY is just an s-expression, so it's dumpable. Same for simd-pack
-      ((or named-type character-set-type hairy-type #!+sb-simd-pack simd-pack-type
-                                                    #!+sb-simd-pack-256 simd-pack-256-type)
+      ((or named-type character-set-type hairy-type #+sb-simd-pack simd-pack-type
+                                                    #+sb-simd-pack-256 simd-pack-256-type)
        t))))
 
 (setf (get '!specifier-type :sb-cold-funcall-handler/for-value)

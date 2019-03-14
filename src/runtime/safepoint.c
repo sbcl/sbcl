@@ -648,7 +648,7 @@ check_pending_gc(os_context_t *ctx)
         write_TLS(IN_SAFEPOINT,NIL,self);
     }
     if (thread_may_gc() && (read_TLS(IN_SAFEPOINT, self) == NIL)) {
-        if ((read_TLS(GC_PENDING, self) == T)) {
+        if (read_TLS(GC_PENDING, self) == T) {
             lispobj gc_happened = NIL;
 
             bind_variable(IN_SAFEPOINT,T,self);

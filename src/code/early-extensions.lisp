@@ -13,18 +13,6 @@
 
 (in-package "SB-IMPL")
 
-(defglobal *core-pathname* nil
-  "The absolute pathname of the running SBCL core.")
-
-(defglobal *runtime-pathname* nil
-  "The absolute pathname of the running SBCL runtime.")
-
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defconstant max-hash sb-xc:most-positive-fixnum))
-
-(def!type hash ()
-  `(integer 0 ,max-hash))
-
 ;;; A number that can represent an index into a vector, including
 ;;; one-past-the-end
 (deftype array-range ()
@@ -49,31 +37,11 @@
 ;;; represent the result.
 (def!type index () `(integer 0 (,sb-xc:array-dimension-limit)))
 
-;;; like INDEX, but only up to half the maximum. Used by hash-table
-;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
-(def!type index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
-
 ;;; like INDEX, but augmented with -1 (useful when using the index
 ;;; to count downwards to 0, e.g. LOOP FOR I FROM N DOWNTO 0, with
 ;;; an implementation which terminates the loop by testing for the
 ;;; index leaving the loop range)
 (def!type index-or-minus-1 () `(integer -1 (,sb-xc:array-dimension-limit)))
-
-;;; A couple of VM-related types that are currently used only on the
-;;; alpha and mips platforms. -- CSR, 2002-06-24
-(def!type unsigned-byte-with-a-bite-out (size bite)
-  (unless (typep size '(integer 1))
-    (error "Bad size for the ~S type specifier: ~S."
-           'unsigned-byte-with-a-bite-out size))
-  (let ((bound (ash 1 size)))
-    `(integer 0 ,(- bound bite 1))))
-
-(def!type signed-byte-with-a-bite-out (size bite)
-  (unless (typep size '(integer 2))
-    (error "Bad size for ~S type specifier: ~S."
-            'signed-byte-with-a-bite-out size))
-  (let ((bound (ash 1 (1- size))))
-    `(integer ,(- bound) ,(- bound bite 1))))
 
 ;;; The smallest power of two that is equal to or greater than X.
 (declaim (inline power-of-two-ceiling))
@@ -81,43 +49,9 @@
   (declare (type index x))
   (ash 1 (integer-length (1- x))))
 
-(def!type load/store-index (scale lowtag min-offset
-                                 &optional (max-offset min-offset))
-  `(integer ,(- (truncate (+ (ash 1 16)
-                             (* min-offset sb-vm:n-word-bytes)
-                             (- lowtag))
-                          scale))
-            ,(truncate (- (+ (1- (ash 1 16)) lowtag)
-                          (* max-offset sb-vm:n-word-bytes))
-                       scale)))
-
 (declaim (inline align-up))
 (defun align-up (value granularity &aux (mask (1- granularity)))
   (logandc2 (+ value mask) mask))
-
-#!+(or x86 x86-64)
-(defun displacement-bounds (lowtag element-size data-offset)
-  (let* ((adjustment (- (* data-offset sb-vm:n-word-bytes) lowtag))
-         (bytes-per-element (ceiling element-size sb-vm:n-byte-bits))
-         (min (truncate (+ sb-vm::minimum-immediate-offset adjustment)
-                        bytes-per-element))
-         (max (truncate (+ sb-vm::maximum-immediate-offset adjustment)
-                        bytes-per-element)))
-    (values min max)))
-
-#!+(or x86 x86-64)
-(def!type constant-displacement (lowtag element-size data-offset)
-  (flet ((integerify (x)
-           (etypecase x
-             (integer x)
-             (symbol (symbol-value x)))))
-    (let ((lowtag (integerify lowtag))
-          (element-size (integerify element-size))
-          (data-offset (integerify data-offset)))
-      (multiple-value-bind (min max) (displacement-bounds lowtag
-                                                          element-size
-                                                          data-offset)
-        `(integer ,min ,max)))))
 
 ;;; CHAR-CODE values for ASCII characters which we care about but
 ;;; which aren't defined in section "2.1.3 Standard Characters" of the
@@ -610,7 +544,7 @@ NOTE: This interface is experimental and subject to change."
                  ;; it is inconsequential to performance.
                  (if *profile-hash-cache*
                      `(let ((statistics
-                             (let ((*package* (symbol-package symbol)))
+                             (let ((*package* (sb-xc:symbol-package symbol)))
                                (symbolicate symbol "STATISTICS"))))
                         (unless (boundp statistics)
                           (set! statistics
@@ -926,7 +860,7 @@ NOTE: This interface is experimental and subject to change."
 
 (defun looks-like-name-of-special-var-p (x)
   (and (symbolp x)
-       (symbol-package x)
+       (sb-xc:symbol-package x)
        (let ((name (symbol-name x)))
          (and (> (length name) 2) ; to exclude '* and '**
               (char= #\* (aref name 0))
@@ -974,8 +908,6 @@ NOTE: This interface is experimental and subject to change."
 ;;; error indicating that a required &KEY argument was not supplied.
 ;;; This function is also useful for DEFSTRUCT slot defaults
 ;;; corresponding to required arguments.
-(declaim (ftype (function () #+(and sb-xc-host ccl) *
-                             #-(and sb-xc-host ccl) nil) missing-arg))
 (defun missing-arg ()
   (/show0 "entering MISSING-ARG")
   (error "A required &KEY or &OPTIONAL argument was not supplied."))
@@ -1326,38 +1258,6 @@ NOTE: This interface is experimental and subject to change."
        state (first since) (second since) namespace name replacements)
       (values state since replacements))))
 
-;;; For-effect-only variant of CHECK-DEPRECATED-THING for
-;;; type-specifiers that descends into compound type-specifiers.
-(defun %check-deprecated-type (type-specifier)
-  (let ((seen '()))
-    ;; KLUDGE: we have to use SPECIFIER-TYPE to sanely traverse
-    ;; TYPE-SPECIFIER and detect references to deprecated types. But
-    ;; then we may have to drop its cache to get the
-    ;; PARSE-DEPRECATED-TYPE condition when TYPE-SPECIFIER is parsed
-    ;; again later.
-    ;;
-    ;; Proper fix would be a
-    ;;
-    ;;   walk-type function type-specifier
-    ;;
-    ;; mechanism that could drive VALUES-SPECIFIER-TYPE but also
-    ;; things like this function.
-    (block nil
-      (handler-bind
-          ((sb-kernel::parse-deprecated-type
-             (lambda (condition)
-               (let ((type-specifier (sb-kernel::parse-deprecated-type-specifier
-                                      condition)))
-                 (aver (symbolp type-specifier))
-                 (unless (memq type-specifier seen)
-                   (push type-specifier seen)
-                   (check-deprecated-thing 'type type-specifier)))))
-           ((or error sb-kernel:parse-unknown-type)
-             (lambda (condition)
-               (declare (ignore condition))
-               (return))))
-        (specifier-type type-specifier)))))
-
 (defun check-deprecated-type (type-specifier)
   (typecase type-specifier
     ((or symbol cons)
@@ -1582,20 +1482,18 @@ NOTE: This interface is experimental and subject to change."
 (defmacro with-sane-io-syntax (&body forms)
   `(call-with-sane-io-syntax (lambda () ,@forms)))
 
-(!defvar *print-vector-length* nil
-  "Like *PRINT-LENGTH* but works on strings and bit-vectors.
-Does not affect the cases that are already controlled by *PRINT-LENGTH*")
-(declaim (always-bound *print-vector-length*))
-
 (defun call-with-sane-io-syntax (function)
   (declare (type function function))
   #-sb-xc-host (declare (dynamic-extent function)) ; "unable"
+  ;; force BOUNDP to be tested by declaring maximal safety
+  ;; in case unsafe code really screwed things up.
+  (declare (optimize (safety 3)))
   (macrolet ((true (sym)
                `(and (boundp ',sym) ,sym)))
     (let ((*print-readably* nil)
           (*print-level* (or (true *print-level*) 6))
           (*print-length* (or (true *print-length*) 12))
-          (*print-vector-length* (or (true *print-vector-length*) 200)))
+          #-sb-xc-host (*print-vector-length* (or (true *print-vector-length*) 200)))
       (funcall function))))
 
 ;;; Returns a list of members of LIST. Useful for dealing with circular lists.
@@ -1614,9 +1512,9 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
 
 ;;; Default evaluator mode (interpeter / compiler)
 
-(declaim (type (member :compile #!+(or sb-eval sb-fasteval) :interpret)
+(declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
                *evaluator-mode*))
-(!defparameter *evaluator-mode* :compile
+(defparameter *evaluator-mode* :compile ; initialized by genesis
   "Toggle between different evaluator implementations. If set to :COMPILE,
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
@@ -1630,7 +1528,7 @@ to :INTERPRET, an interpreter will be used.")
 '(defun show-hash-cache-statistics ()
   (flet ((cache-stats (symbol)
            (let* ((name (string symbol))
-                  (statistics (let ((*package* (symbol-package symbol)))
+                  (statistics (let ((*package* (sb-xc:symbol-package symbol)))
                                 (symbolicate symbol "STATISTICS")))
                   (prefix
                    (subseq name 0 (- (length name) (length "VECTOR**")))))
@@ -1666,7 +1564,7 @@ to :INTERPRET, an interpreter will be used.")
   (typecase x
     (single-float (zerop x))
     (double-float (zerop x))
-    #!+long-float
+    #+long-float
     (long-float (zerop x))
     (t nil)))
 
@@ -1680,7 +1578,7 @@ to :INTERPRET, an interpreter will be used.")
      (if (eql x 0.0d0)
          (make-unportable-float :double-float-negative-zero)
          0.0d0))
-    #!+long-float
+    #+long-float
     (long-float
      (if (eql x 0.0l0)
          (make-unportable-float :long-float-negative-zero)
@@ -1724,7 +1622,7 @@ to :INTERPRET, an interpreter will be used.")
            ,@forms)
         `(let ((,var #+sb-xc-host (make-string-output-stream)
                      #-sb-xc-host (sb-impl::%make-string-output-stream
-                                   (or #!-sb-unicode 'character :default)
+                                   (or #-sb-unicode 'character :default)
                                    #'sb-impl::string-ouch)))
 
            ,@decls
@@ -1734,16 +1632,27 @@ to :INTERPRET, an interpreter will be used.")
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
   (declare (string s))
-  (cond #!+(and sb-unicode (host-feature sb-xc))
+  (cond #+(and sb-unicode (not sb-xc-host))
         ((and (typep s '(array character (*))) (every #'base-char-p s))
          (coerce s 'base-string))
         (t
          (coerce s 'simple-string))))
 
+;;; Return T if X is an object that always evaluates to itself. Guard against:
+;;;  (LET ((S 'XXX)) (SET S 9) (UNINTERN S) (IMPORT S 'KEYWORD) (SYMBOL-VALUE S)) => 9
+;;; whereby :XXX satisfies KEWORDP and has value 9, or maybe even has no value
+;;; if not assigned anything previously.
+;;; Interestingly, CLISP and CCL cause the symbol-value to become itself
+;;; (and MAKUNBOUND to be illegal). That's an interesting choice which closes
+;;; a weird loophole, but is not universal in all implementations.
 (defun self-evaluating-p (x)
   (typecase x
     (null t)
-    (symbol (or (eq x t) (eq (symbol-package x) *keyword-package*)))
+    (symbol
+     (or (eq x t)
+         (and (eq (cl:symbol-package x) *keyword-package*)
+              (boundp x)
+              (eq (symbol-value x) x))))
     (cons nil)
     (t t)))
 

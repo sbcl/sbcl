@@ -53,7 +53,6 @@
 (defconstant single-float-normal-exponent-min 1)
 (defconstant single-float-normal-exponent-max 254)
 (defconstant single-float-hidden-bit (ash 1 23))
-(defconstant single-float-trapping-nan-bit (ash 1 22))
 
 (defconstant double-float-bias 1022)
 (defconstant-eqx double-float-exponent-byte (byte 11 20) #'equalp)
@@ -61,7 +60,6 @@
 (defconstant double-float-normal-exponent-min 1)
 (defconstant double-float-normal-exponent-max #x7FE)
 (defconstant double-float-hidden-bit (ash 1 20))
-(defconstant double-float-trapping-nan-bit (ash 1 19))
 
 ;;; CMUCL COMMENT:
 ;;;   X These values are for the x86 80 bit format and are no doubt
@@ -73,7 +71,6 @@
 (defconstant long-float-normal-exponent-min 1)
 (defconstant long-float-normal-exponent-max #x7FFE)
 (defconstant long-float-hidden-bit (ash 1 31))
-(defconstant long-float-trapping-nan-bit (ash 1 30))
 
 (defconstant single-float-digits
   (+ (byte-size single-float-significand-byte) 1))
@@ -112,11 +109,11 @@
 
 ;;;; Description of the target address space.
 
-#!+gencgc ; sensibly small read-only and static spaces
+#+gencgc ; sensibly small read-only and static spaces
 (!gencgc-space-setup #x0f800000 :dynamic-space-start #x30000000)
 
 ;;; Where to put the different spaces.  Must match the C code!
-#!+(and linux cheneygc)
+#+(and linux cheneygc)
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)
@@ -130,7 +127,7 @@
   (defparameter dynamic-0-space-start #x30000000)
   (defparameter dynamic-0-space-end   #x38000000))
 
-#!+(and sunos cheneygc) ; might as well start by trying the same numbers
+#+(and sunos cheneygc) ; might as well start by trying the same numbers
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)
@@ -144,7 +141,7 @@
   (defparameter dynamic-0-space-start    #x30000000)
   (defparameter dynamic-0-space-end      #x38000000))
 
-#!+(and netbsd cheneygc) ; Need a gap at 0x4000000 for shared libraries
+#+(and netbsd cheneygc) ; Need a gap at 0x4000000 for shared libraries
 (progn
   (defconstant linkage-table-space-start #x0f800000)
   (defconstant linkage-table-space-end   #x10000000)
@@ -172,7 +169,7 @@
   after-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
-  #!+gencgc allocation-trap
+  #+gencgc allocation-trap
   error-trap)
 
 ;;;; static symbols.
@@ -209,7 +206,7 @@
 ;;; allowing other architectures (which don't necessarily use traps
 ;;; for pseudo-atomic) to propagate a magic number to C land via
 ;;; sbcl.h.
-#!-linux
+#-linux
 (defconstant pseudo-atomic-trap #x10)
-#!+linux
+#+linux
 (defconstant pseudo-atomic-trap #x40)

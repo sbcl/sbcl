@@ -64,6 +64,12 @@ set -e
 # recommended way to make that happen.
 #######################################################################
 
+warm_option=""
+if [ "$1" == --load ]; then
+    warm_option="--load"
+    shift
+fi
+
 HOST_TYPE="${1:-sbcl}"
 
 echo //HOST_TYPE=\"$HOST_TYPE\"
@@ -123,7 +129,7 @@ EOF
 #
 sh make-genesis-2.sh
 
-sh make-target-2.sh
+sh make-target-2.sh "$warm_option"
 
 echo //ordinary termination of slam.sh
 date

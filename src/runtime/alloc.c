@@ -33,44 +33,41 @@ boolean alloc_profiling;              // enabled flag
 static pthread_mutex_t allocation_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t alloc_profiler_lock = PTHREAD_MUTEX_INITIALIZER;
 #endif
-lispobj alloc_code_object (unsigned boxed_nwords, unsigned unboxed_nbytes,
-                           unsigned __attribute__((unused)) serialno)
+lispobj alloc_code_object (unsigned total_words)
 {
+    struct thread *th = arch_os_get_current_thread();
+#if defined(LISP_FEATURE_X86_64) && !defined(LISP_FEATURE_WIN32)
+#  define REQUIRE_GC_INHIBIT 0
+#else
+#  define REQUIRE_GC_INHIBIT 1
+#endif
+#if REQUIRE_GC_INHIBIT
     /* It used to be that even on gencgc builds the
      * ALLOCATE-CODE-OBJECT VOP did all this initialization within
      * pseudo atomic. Here, we rely on gc being inhibited. */
-    struct thread *th = arch_os_get_current_thread();
     if (read_TLS(GC_INHIBIT, th) == NIL)
         lose("alloc_code_object called with GC enabled.");
-
-    int total_size = ALIGN_UP(boxed_nwords*N_WORD_BYTES + unboxed_nbytes,
-                              2*N_WORD_BYTES);
-
     /* Since alloc_code_object is run under WITHOUT-GCING it doesn't
      * actaully need to be pseudo-atomic, this is just to appease the
      * assertions in general_alloc() */
     set_pseudo_atomic_atomic(th);
+#endif
 
     /* Allocations of code are all serialized. We might also acquire
      * free_pages_lock depending on availability of space in the region */
     int result = thread_mutex_lock(&allocation_lock);
     gc_assert(!result);
     struct code *code = (struct code *)
-      lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1], total_size,
+      lisp_alloc(&gc_alloc_region[CODE_PAGE_TYPE-1], total_words*N_WORD_BYTES,
                  CODE_PAGE_TYPE, th);
     result = thread_mutex_unlock(&allocation_lock);
     gc_assert(!result);
 
+#if REQUIRE_GC_INHIBIT
     clear_pseudo_atomic_atomic(th);
-
-#ifdef LISP_FEATURE_64_BIT
-    code->header = (uword_t)boxed_nwords << 32 | CODE_HEADER_WIDETAG;
-    code->code_size = (uword_t)serialno << 32 | make_fixnum(unboxed_nbytes);
-#else
-    code->header = (boxed_nwords << N_WIDETAG_BITS) | CODE_HEADER_WIDETAG;
-    code->code_size = make_fixnum(unboxed_nbytes);
 #endif
-    code->debug_info = NIL;
+
+    code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 #endif

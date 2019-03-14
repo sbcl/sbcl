@@ -29,10 +29,13 @@
 ;;; eliminate the duplicate code.
 
 (defmacro def!type (name &rest rest)
+  ;; Attempting to define a type named by a CL symbol is an error.
+  ;; Therefore NAME is wrong if it uncrosses to something other than itself.
+  (assert (eq (uncross name) name))
   `(progn
      (deftype ,name ,@rest)
      #+sb-xc-host
-     ,(let ((form `(sb-xc:deftype ,(uncross name) ,@rest)))
+     ,(let ((form `(sb-xc:deftype ,name ,@rest)))
         (if (boundp '*delayed-def!types*)
             `(push ',form *delayed-def!types*)
             form))))

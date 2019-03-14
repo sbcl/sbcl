@@ -67,6 +67,16 @@
   (:generator 6
     (load-type result function (- fun-pointer-lowtag))))
 
+(define-vop (fun-header-data)
+  (:translate fun-header-data)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst srl res res n-widetag-bits)))
+
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
@@ -76,22 +86,6 @@
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
     (inst srl res res n-widetag-bits)))
-
-(define-vop (get-closure-length)
-  (:translate get-closure-length)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (let* ((n-size-bits (integer-length short-header-max-words))
-           (lshift (- n-word-bits (+ n-size-bits n-widetag-bits))))
-      ;; To avoid constructing a 15-bit mask which would require another
-      ;; instruction, (ldb (byte n-size-bits n-widetag-bits) ...)
-      ;; is done as "shift left, shift right" discarding bits out both ends.
-      (inst sll res res lshift)
-      (inst srl res res (+ lshift n-widetag-bits)))))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -169,9 +163,7 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr n-widetag-bits)
-    (inst sll ndescr word-shift)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst sub ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
@@ -182,9 +174,7 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr n-widetag-bits)
-    (inst sll ndescr word-shift)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst add ndescr offset)
     (inst add ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst add func code ndescr)))
@@ -201,7 +191,7 @@
   (:generator 1
     (inst unimp pending-interrupt-trap)))
 
-#!+sb-thread
+#+sb-thread
 (error "write a VOP for CURRENT-THREAD-OFFSET-SAP")
 
 (define-vop (halt)

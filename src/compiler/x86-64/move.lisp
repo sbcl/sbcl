@@ -84,7 +84,7 @@
      (cond ((and (numberp val) (zerop val)) (zeroize target))
            (t (inst mov target val))))
     ;; Likewise if the value is small enough.
-    ((typep val '(or (signed-byte 32) #!+immobile-space fixup))
+    ((typep val '(or (signed-byte 32) #+immobile-space fixup))
      ;; This logic is similar to that of STOREW*.
      ;; It would be nice to pull it all together in one place.
      ;; The basic idea is that storing any byte-aligned 8-bit value
@@ -95,8 +95,11 @@
                      (typecase val
                        ((unsigned-byte 8) :byte)
                        ((unsigned-byte 16) :word)
+                       ;; fixups can be :dword size because we don't reference
+                       ;; objects that require a 64-bit address as immediate operands.
                        ;; signed-32 is no good, as it needs sign-extension.
-                       ((unsigned-byte 32) :dword)))
+                       ((or (unsigned-byte 32) fixup)
+                        :dword)))
                 :qword)))
        (inst mov operand-size target val)))
     ;; Otherwise go through the temporary register

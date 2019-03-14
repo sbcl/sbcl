@@ -173,11 +173,20 @@
 ;;; here, the values are read by an automatically generated reader method.
 (defmethod add-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
-    (pushnew subclass direct-subclasses :test #'eq)
+    (with-world-lock ()
+      (pushnew subclass direct-subclasses :test #'eq))
     subclass))
 (defmethod remove-direct-subclass ((class class) (subclass class))
   (with-slots (direct-subclasses) class
-    (setq direct-subclasses (remove subclass direct-subclasses))
+    (with-world-lock ()
+      (setq direct-subclasses (remove subclass direct-subclasses))
+      ;; Remove from classoid subclasses as well.
+      (let ((classoid (class-classoid subclass)))
+        (dovector (super-layout (layout-inherits (classoid-layout classoid)))
+          (let* ((super (layout-classoid super-layout))
+                 (subclasses (classoid-subclasses super)))
+            (when subclasses
+              (remhash classoid subclasses))))))
     subclass))
 
 ;;; Maintaining the direct-methods and direct-generic-functions backpointers.
@@ -1223,18 +1232,18 @@
 
 (defmethod compute-effective-slot-definition-initargs
     ((class slot-class) direct-slotds)
-  (let* ((name nil)
-         (initfunction nil)
-         (initform nil)
-         (initargs nil)
-         (allocation nil)
-         (allocation-class nil)
-         (type t)
-         (documentation nil)
-         (documentationp nil)
-         (namep  nil)
-         (initp  nil)
-         (allocp nil))
+  (let ((name nil)
+        (initfunction nil)
+        (initform nil)
+        (initargs nil)
+        (allocation nil)
+        (allocation-class nil)
+        (type t)
+        (documentation nil)
+        (documentationp nil)
+        (namep  nil)
+        (initp  nil)
+        (allocp nil))
 
     (dolist (slotd direct-slotds)
       (when slotd
@@ -1254,7 +1263,7 @@
           (setq allocation (slot-definition-allocation slotd)
                 allocation-class (slot-definition-class slotd)
                 allocp t))
-        (setq initargs (append (slot-definition-initargs slotd) initargs))
+        (setq initargs (union (slot-definition-initargs slotd) initargs))
         (let ((slotd-type (slot-definition-type slotd)))
           (setq type (cond
                        ((eq type t) slotd-type)
@@ -1484,13 +1493,17 @@
                                 old-class new-class)
   (do () ((typep value slot-type))
     (restart-case
-        (bad-type value slot-type
+        (error 'simple-type-error
+               :datum value
+               :expected-type slot-type
+               :format-control
                   (sb-format:tokens
                   "~@<Error during ~A. Current value in slot ~
                    ~/sb-ext:print-symbol-with-prefix/ of an instance ~
                    of ~S is ~S, which does not match the new slot type ~
                    ~S in class ~S.~:@>")
-                  context slot-name old-class value slot-type new-class)
+               :format-arguments
+               (list context slot-name old-class value slot-type new-class))
       (use-value (new-value)
         :interactive read-evaluated-form
         :report (lambda (stream)

@@ -146,7 +146,6 @@
 ;;; Note: The warnings from this code were somewhat useful when first setting
 ;;; up the cross-compilation system, have a rather low signal/noise ratio in
 ;;; the mature system. They can generally be safely ignored.
-#!+sb-show
 (progn
   (defun cl-snapshot-diff (cl-snapshot)
     (remove-if (lambda (entry)

@@ -17,21 +17,14 @@
 ;;; optimization, or if the optimization is deemed to be invalid, then
 ;;; this test can go away.
 
-(defpackage "MOP-16"
-  (:use "CL" "SB-MOP"))
-
-(in-package "MOP-16")
-
 (defclass foo-class (standard-class) ())
 
 (defclass foo-effective-slot-definition (standard-effective-slot-definition)
   ())
 
-(multiple-value-bind (value condition)
-    (ignore-errors
-      (defmethod (setf slot-value-using-class)
-          ((new-value integer) (class foo-class)
-           (object standard-object) (slotd foo-effective-slot-definition))
-        "Haha"))
-  (assert (null value))
-  (assert (typep condition 'error)))
+(with-test (:name :mop-16)
+  (assert-error
+   (defmethod (setf sb-mop:slot-value-using-class)
+       ((new-value integer) (class foo-class)
+        (object standard-object) (slotd foo-effective-slot-definition))
+     "Haha")))

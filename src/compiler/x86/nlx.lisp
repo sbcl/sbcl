@@ -46,7 +46,7 @@
 
 (define-vop (restore-dynamic-state)
   (:args (catch :scs (descriptor-reg)))
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
+  #+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:generator 10
     (store-tl-symbol-value catch *current-catch-block* temp)))
 
@@ -76,7 +76,7 @@
     (storew ebp-tn block unwind-block-cfp-slot)
     (storew (make-fixup nil :code-object entry-label)
             block catch-block-entry-pc-slot)
-    #!+win32
+    #+win32
     (progn
       (inst mov temp (make-ea :dword :disp 0) :fs)
       (storew temp block unwind-block-next-seh-frame-slot))))
@@ -96,7 +96,7 @@
     (storew ebp-tn block  unwind-block-cfp-slot)
     (storew (make-fixup nil :code-object entry-label)
             block catch-block-entry-pc-slot)
-    #!+win32
+    #+win32
     (progn
       (inst mov temp (make-ea :dword :disp 0) :fs)
       (storew temp block unwind-block-next-seh-frame-slot))
@@ -109,10 +109,10 @@
 ;;; unwind block as an unwind-protect.
 (define-vop (set-unwind-protect)
   (:args (uwp :scs (any-reg)))
-  #!+(or sb-thread win32)
-  (:temporary (:sc unsigned-reg) #!+sb-thread tls #!+win32 seh-frame)
+  #+(or sb-thread win32)
+  (:temporary (:sc unsigned-reg) #+sb-thread tls #+win32 seh-frame)
   (:generator 7
-    #!+win32
+    #+win32
     (progn
       (storew (make-fixup 'uwp-seh-handler :assembly-routine)
               uwp unwind-block-seh-frame-handler-slot)
@@ -123,7 +123,7 @@
     (store-tl-symbol-value uwp *current-unwind-protect-block* tls)))
 
 (define-vop (unlink-catch-block)
-  (:temporary (:sc unsigned-reg) #!+sb-thread tls block)
+  (:temporary (:sc unsigned-reg) #+sb-thread tls block)
   (:policy :fast-safe)
   (:translate %catch-breakup)
   (:generator 17
@@ -132,13 +132,13 @@
     (store-tl-symbol-value block *current-catch-block* tls)))
 
 (define-vop (unlink-unwind-protect)
-    ;; NOTE: When we have both #!+sb-thread and #!+win32, we only need one temp
-    (:temporary (:sc unsigned-reg) block #!+sb-thread tls #!+win32 seh-frame)
+    ;; NOTE: When we have both #+sb-thread and #+win32, we only need one temp
+    (:temporary (:sc unsigned-reg) block #+sb-thread tls #+win32 seh-frame)
   (:policy :fast-safe)
   (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
-    #!+win32
+    #+win32
     (progn
       (loadw seh-frame block unwind-block-next-seh-frame-slot)
       (inst mov (make-ea :dword :disp 0) seh-frame :fs))

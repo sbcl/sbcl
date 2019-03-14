@@ -804,8 +804,9 @@ fake_foreign_function_call(os_context_t *context)
     context_index =
         fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
-    if (context_index >= MAX_INTERRUPTS) {
-        lose("maximum interrupt nesting depth (%d) exceeded\n", MAX_INTERRUPTS);
+    if (context_index >= (MAX_INTERRUPTS-THREAD_HEADER_SLOTS)) {
+        lose("maximum interrupt nesting depth (%d) exceeded\n",
+             MAX_INTERRUPTS-THREAD_HEADER_SLOTS);
     }
 
     bind_variable(FREE_INTERRUPT_CONTEXT_INDEX,
@@ -895,13 +896,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
         lose("internal error too early in init, can't recover\n");
     }
 
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
-#endif
-
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-#endif
 
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_MIPS)
     /* Workaround for blocked SIGTRAP. */
@@ -2170,15 +2165,18 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     fake_foreign_function_call(context);
 
     /* To allow debugging memory faults in signal handlers and such. */
-    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, sp=%p)",
+#ifdef ARCH_HAS_STACK_POINTER
+    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, fp=%p, sp=%p) tid %#lx",
                                       addr,
                                       *os_context_pc_addr(context),
-#ifdef ARCH_HAS_STACK_POINTER
-                                      *os_context_sp_addr(context)
+                                      os_context_frame_pointer(context),
+                                      *os_context_sp_addr(context),
+                                      thread_self()); // = 0 if -sb-thread
 #else
-                                      0
+    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p)",
+                                      addr, *os_context_pc_addr(context));
 #endif
-                                      );
+
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
 #  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 #    error memory fault emulation needs validating for this architecture
@@ -2231,9 +2229,9 @@ handle_memory_fault_emulation_trap(os_context_t *context)
 #endif /* C_STACK_IS_CONTROL_STACK */
     /* On x86oids, we're in handle_memory_fault_emulation_trap().
      * On real computers, we're still in lisp_memory_fault_error(). */
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
-#endif
+
+    thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
+
     DX_ALLOC_SAP(context_sap, context);
     DX_ALLOC_SAP(fault_address_sap, addr);
     funcall2(StaticSymbolFunction(MEMORY_FAULT_ERROR),
@@ -2247,13 +2245,9 @@ unhandled_trap_error(os_context_t *context)
 {
     DX_ALLOC_SAP(context_sap, context);
     fake_foreign_function_call(context);
-#ifndef LISP_FEATURE_SB_SAFEPOINT
-    unblock_gc_signals(0, 0);
-#endif
 
-#if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
-#endif
+
     funcall1(StaticSymbolFunction(UNHANDLED_TRAP_ERROR), context_sap);
     lose("UNHANDLED-TRAP-ERROR fell through");
 }

@@ -11,7 +11,7 @@
 
 (in-package "SB-KERNEL")
 
-(!defvar *break-on-signals* nil
+(defparameter *break-on-signals* nil ; initialized by genesis
   "When (TYPEP condition *BREAK-ON-SIGNALS*) is true, then calls to SIGNAL will
    enter the debugger prior to signalling that condition.")
 
@@ -112,17 +112,17 @@
 
 ;;; counts of nested errors (with internal errors double-counted)
 (defvar *maximum-error-depth*) ; this gets set to 10 in !COLD-INIT
-(!defvar *current-error-depth* 0)
+(defparameter *current-error-depth* 0) ; initialized by genesis
 
 ;;; INFINITE-ERROR-PROTECT is used by ERROR and friends to keep us out
 ;;; of hyperspace.
 (defmacro infinite-error-protect (&rest forms)
   `(let ((*current-error-depth* (infinite-error-protector)))
      (/show0 "in INFINITE-ERROR-PROTECT, incremented error depth")
-     ;; This is almost totally unhelpful. Running with #!+sb-show does not mean
+     ;; This is almost totally unhelpful. Running with #+sb-show does not mean
      ;; that you care to see an additional 16K characters of output
      ;; each time this macro is used when no error is actually happening.
-     #| #!+sb-show (sb-debug:print-backtrace :count 8) ; arbitrary truncation |#
+     #| #+sb-show (sb-debug:print-backtrace :count 8) ; arbitrary truncation |#
      ,@forms))
 ;;; This symbol isn't removed automatically because it's exported,
 ;;; but nothing can use it after the build is complete.
@@ -130,8 +130,7 @@
 
 ;;; a helper function for INFINITE-ERROR-PROTECT
 (defun infinite-error-protector ()
-  (/show0 "entering INFINITE-ERROR-PROTECTOR, *CURRENT-ERROR-DEPTH*=..")
-  (/hexstr *current-error-depth*)
+  (/show "entering INFINITE-ERROR-PROTECTOR" *CURRENT-ERROR-DEPTH*)
   ;; *MAXIMUM-ERROR-DEPTH* is not bound during cold-init, and testing BOUNDP
   ;; is superfluous since REALP will return false either way.
   (let ((cur (locally (declare (optimize (safety 0))) *current-error-depth*))
@@ -140,8 +139,7 @@
            (%primitive print "Argh! corrupted error depth, halting")
            (%primitive sb-c:halt))
           ((> cur max)
-           (/show0 "*MAXIMUM-ERROR-DEPTH*=..")
-           (/hexstr max)
+           (/show "*MAXIMUM-ERROR-DEPTH*" max)
            (/show0 "in INFINITE-ERROR-PROTECTOR, calling ERROR-ERROR")
            (sb-impl::error-error "Help! "
                         cur
@@ -154,13 +152,17 @@
 (defun error (datum &rest arguments)
   "Invoke the signal facility on a condition formed from DATUM and ARGUMENTS.
   If the condition is not handled, the debugger is invoked."
-  (/show0 "entering ERROR, argument list=..")
-  (/hexstr arguments)
-
-  (/show0 "cold-printing ERROR arguments one by one..")
-  #!+sb-show (dolist (argument arguments)
-               (sb-impl::cold-print argument))
-  (/show0 "done cold-printing ERROR arguments")
+  (/show "entering ERROR, argument list=" (get-lisp-obj-address arguments))
+  #+sb-show
+  (when arguments
+    (fresh-line)
+    (write-string "ERROR arguments (")
+    (write (length arguments))
+    (write-string " total)")
+    (terpri)
+    (loop for i from 0
+          for x in arguments
+          do (write i) (write-string "=") (write x) (terpri)))
 
   (infinite-error-protect
    (let ((condition (apply #'coerce-to-condition datum 'simple-error 'error

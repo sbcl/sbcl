@@ -578,7 +578,7 @@ has written, having proved that it is unreachable."))
   ;; Whitelist functions are looked up prior to UNCROSS,
   ;; so that we can distinguish CL:SOMEFUN from SB-XC:SOMEFUN.
   (when (and (eq kind :function)
-             (gethash name *undefined-fun-whitelist*))
+             (gethash name sb-cold:*undefined-fun-whitelist*))
     (return-from note-undefined-reference (values)))
   (setq name (uncross name))
   (unless (and

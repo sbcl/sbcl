@@ -51,8 +51,8 @@
             (push (truename (parse-namestring arg)) *explicit-test-files*))))
   (setf *explicit-test-files* (nreverse *explicit-test-files*))
   (with-open-file (log "test.log" :direction :output
-                                  :if-exists :overwrite
-                                  :if-does-not-exist :create)
+                       :if-exists :supersede
+                       :if-does-not-exist :create)
     (pure-runner (pure-load-files) 'load-test log)
     (pure-runner (pure-cload-files) 'cload-test log)
     (impure-runner (impure-load-files) 'load-test log)
@@ -191,6 +191,11 @@
       (format stream "~2@T</testcase>~%")))
   (format stream "</testsuite>~%"))
 
+(defun write-elapsed-time (source-file begin-time log)
+  (let ((end-time (get-internal-real-time)))
+    (format log "~5d - ~a~%" (- end-time begin-time) source-file)
+    (force-output log)))
+
 (defun pure-runner (files test-fun log)
   (when files
     (format t "// Running pure tests (~a)~%" test-fun)
@@ -209,9 +214,7 @@
                            *features*)))
                 (let ((start (get-internal-real-time)))
                   (funcall test-fun file)
-                  (let ((end (get-internal-real-time)))
-                    (format log "~5d - ~a~%" (- end start) file)
-                    (force-output log)))))
+                  (write-elapsed-time file start log))))
           (skip-file ())))
       (append-results))))
 
@@ -244,12 +247,13 @@
      ,(eq *test-evaluator-mode* :interpret))))
 
 (defun impure-runner (files test-fun log)
-  (declare (ignore log))
   (when files
     (format t "// Running impure tests (~a)~%" test-fun)
     (dolist (file files)
       (force-output)
-      (let ((exit-code (run-impure-in-child-sbcl file test-fun)))
+      (let ((start (get-internal-real-time))
+            (exit-code (run-impure-in-child-sbcl file test-fun)))
+        (write-elapsed-time file start log)
         (if (= exit-code 104)
             (with-open-file (stream "test-status.lisp-expr"
                                     :direction :input

@@ -48,7 +48,6 @@
   (def %byte-blt (src src-start dst dst-start dst-end))
   (def get-header-data)
   (def set-header-data (x val))
-  (def get-closure-length)
   (def widetag-of)
   (def %other-pointer-widetag)
   (def vector-sap)
@@ -86,8 +85,6 @@
   (def value-cell-ref)
   (def %caller-frame ())
   (def %caller-pc ())
-  ;; %code-code-size is an inline fun on 64-bit
-  #-64-bit (def %code-code-size)
   (def %code-debug-info)
   #+(or x86 immobile-space) (def sb-vm::%code-fixups)
 
@@ -106,6 +103,11 @@
   (def (setf %funcallable-instance-fun) (fin new-value))
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
+  #+(and compact-instance-header x86-64) (def layout-of)
+
+  #+compare-and-swap-vops
+  (def* (%array-atomic-incf/word (array index diff))
+        (%raw-instance-atomic-incf/word (instance index diff)))
 
   #+sb-simd-pack
   (def* (%make-simd-pack (tag low high))

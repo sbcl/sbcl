@@ -29,16 +29,16 @@
 
 ;;; Define feature LITTLE-ENDIAN-AND-MISALIGNED-READ?
 (defun sap-ref-16le (sap offset)
-  #!+(or x86 x86-64)
+  #+(or x86 x86-64)
   (sap-ref-16 sap offset)
-  #!-(or x86 x86-64)
+  #-(or x86 x86-64)
   (dpb (sap-ref-8 sap (1+ offset)) (byte 8 8)
        (sap-ref-8 sap offset)))
 
 (defun (setf sap-ref-16le) (value sap offset)
-  #!+(or x86 x86-64)
+  #+(or x86 x86-64)
   (setf (sap-ref-16 sap offset) value)
-  #!-(or x86 x86-64)
+  #-(or x86 x86-64)
   (setf (sap-ref-8 sap offset) (logand value #xff)
         (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)))
 
@@ -51,17 +51,17 @@
         (sap-ref-8 sap offset) (ldb (byte 8 8) value)))
 
 (defun sap-ref-32le (sap offset)
-  #!+(or x86 x86-64)
+  #+(or x86 x86-64)
   (sap-ref-32 sap offset)
-  #!-(or x86 x86-64)
+  #-(or x86 x86-64)
   (dpb (sap-ref-8 sap (+ offset 3)) (byte 8 24)
        (dpb (sap-ref-8 sap (+ offset 2)) (byte 8 16)
             (sap-ref-16le sap offset))))
 
 (defun (setf sap-ref-32le) (value sap offset)
-  #!+(or x86 x86-64)
+  #+(or x86 x86-64)
   (setf (sap-ref-32 sap offset) value)
-  #!-(or x86 x86-64)
+  #-(or x86 x86-64)
   (setf (sap-ref-8 sap offset) (logand value #xff)
         (sap-ref-8 sap (1+ offset)) (ldb (byte 8 8) value)
         (sap-ref-8 sap (+ offset 2)) (ldb (byte 8 16) value)
@@ -235,7 +235,7 @@
 
 (instantiate-octets-definition define-ucs-2->string)
 
-(define-external-format/variable-width (:ucs-2le :ucs2le #!+win32 :ucs2 #!+win32 :ucs-2) t
+(define-external-format/variable-width (:ucs-2le :ucs2le #+win32 :ucs2 #+win32 :ucs-2) t
   (code-char #xfffd)
   2
   (if (< bits #x10000)

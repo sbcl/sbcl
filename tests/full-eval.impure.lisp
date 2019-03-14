@@ -75,7 +75,7 @@
             (cl:ed)))
         42)))))
 
-(defvar *file* #p"full-eval-temp.lisp")
+(defvar *file* (randomish-temp-file-name "lisp"))
 (with-test (:name (:full-eval :redefinition-warnings))
   (with-open-file (stream *file* :direction :output :if-exists :supersede)
     (write '(defun function-for-redefinition () nil) :stream stream))

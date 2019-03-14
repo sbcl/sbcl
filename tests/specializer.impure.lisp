@@ -11,11 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
-(defun type= (left right)
-  (and (subtypep left right) (subtypep right left)))
-
 ;;; Custom specializer 1
 ;;;
 ;;; Always signals an error when parsing the specializer specifier.
@@ -55,6 +50,61 @@
 
 ;;; Test
 
+(with-test (:name (sb-pcl:parse-specializer-using-class :smoke))
+  (let ((proto-gf (sb-pcl:class-prototype
+                   (find-class 'standard-generic-function))))
+    (flet ((test (specializer-name expected)
+             (flet ((do-it ()
+                      (sb-pcl:parse-specializer-using-class
+                       proto-gf specializer-name)))
+               (case expected
+                 (sb-pcl:specializer-name-syntax-error
+                  (assert-error (do-it) sb-pcl:specializer-name-syntax-error))
+                 (sb-pcl:class-not-found-error
+                  (assert-error (do-it) sb-pcl:class-not-found-error))
+                 (t
+                  (typecase expected
+                    (sb-pcl::class-prototype-specializer
+                     (assert (eq (sb-pcl::specializer-object (do-it))
+                                 (sb-pcl::specializer-object expected))))
+                    (t
+                     (assert (eq (do-it) expected)))))))))
+      ;; Atoms
+      (test 1                                    'sb-pcl:specializer-name-syntax-error)
+      (test nil                                  'sb-pcl:class-not-found-error)
+
+      (test t                                    (find-class t))
+      (test 'null                                (find-class 'null))
+      (test (find-class t)                       (find-class t))
+      (test (find-class 'null)                   (find-class 'null))
+
+      ;; Lists
+      (test `(1)                                 'sb-pcl:specializer-name-syntax-error)
+      (test `(,(find-class t))                   'sb-pcl:specializer-name-syntax-error)
+
+      (test `(class)                             'sb-pcl:specializer-name-syntax-error)
+      (test `(class t 2)                         'sb-pcl:specializer-name-syntax-error)
+      (test `(class t)                           (find-class t))
+      (test `(class ,(find-class t))             (find-class t))
+
+      (test `(sb-pcl::prototype)                 'sb-pcl:specializer-name-syntax-error)
+      (test `(sb-pcl::prototype t 2)             'sb-pcl:specializer-name-syntax-error)
+      (test `(sb-pcl::prototype t)               (make-instance 'sb-pcl::class-prototype-specializer
+                                                                :class (find-class t)))
+      (test `(sb-pcl::prototype ,(find-class t)) (make-instance 'sb-pcl::class-prototype-specializer
+                                                                :class (find-class t)))
+
+      (test `(sb-pcl::class-eq)                  'sb-pcl:specializer-name-syntax-error)
+      (test `(sb-pcl::class-eq t 2)              'sb-pcl:specializer-name-syntax-error)
+      (test `(sb-pcl::class-eq t)                (sb-pcl::class-eq-specializer
+                                                  (find-class t)))
+      (test `(sb-pcl::class-eq ,(find-class t))  (sb-pcl::class-eq-specializer
+                                                  (find-class t)))
+
+      (test `(eql)                               'sb-pcl:specializer-name-syntax-error)
+      (test `(eql t 2)                           'sb-pcl:specializer-name-syntax-error)
+      (test `(eql t)                             (sb-mop:intern-eql-specializer t)))))
+
 (with-test (:name (sb-pcl:specializer-type-specifier :smoke))
   (let* ((proto-gf (sb-pcl:class-prototype
                     (find-class 'standard-generic-function)))
@@ -68,21 +118,21 @@
                       (sb-pcl:specializer-type-specifier
                        proto-gf proto-method specializer)))
                (case expected
-                 (error
-                  (assert-error (compute-it)))
                  (warning
                   (assert (null (assert-signal (compute-it) warning))))
                  (style-warning
                   (assert (null (assert-signal (compute-it) style-warning))))
                  (t
-                  (assert (type= (compute-it) expected)))))))
+                  (assert (type-evidently-= (compute-it) expected)))))))
       ;; Non-parsed class specializers
       (test 'package                            'package)
       (test 'integer                            'integer)
       (test 'class                              nil)
       (test 'no-such-class                      'style-warning)
 
+      (test '(eql)                              'style-warning)
       (test '(eql 5)                            '(eql 5))
+      (test '(eql 5 6)                          'style-warning)
       (test '(sb-pcl::class-eq integer)         'integer)
       (test '(sb-pcl::class-eq class)           nil)
 
@@ -91,7 +141,7 @@
       (test 'custom-3                           'custom-3)
 
       ;; Parsed EQL and CLASS-EQ specializers
-      (test (parse '(eql 5))                    '(eql 5) )
+      (test (parse '(eql 5))                    '(eql 5))
       (test (parse '(sb-pcl::class-eq integer)) 'integer)
       (test (parse '(sb-pcl::class-eq class))   nil)
 

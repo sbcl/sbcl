@@ -31,7 +31,7 @@
     (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
 #endif
 
-#if !defined(LANGUAGE_ASSEMBLY)
+#if !defined(__ASSEMBLER__)
 #include "thread.h"
 
 #ifdef LISP_FEATURE_STACK_GROWS_DOWNWARD_NOT_UPWARD

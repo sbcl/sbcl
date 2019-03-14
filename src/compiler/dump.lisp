@@ -262,9 +262,8 @@
            (res (make-fasl-output :stream stream)))
       ;; Before the actual FASL header, write a shebang line using the current
       ;; runtime path, so our fasls can be executed directly from the shell.
+      #-sb-xc-host ; cross-compiled fasls are not directly executable
       (when *runtime-pathname*
-        #+sb-xc-host (bug "Can't write shebang line") ; no #'NATIVE-PATHNAME
-        #-sb-xc-host
         (fasl-write-string
          (format nil "#!~A --script~%"
                  (native-namestring *runtime-pathname* :as-file t))
@@ -365,7 +364,7 @@
                   (float (dump-float x file))
                   (integer (dump-integer x file)))
                 (equal-save-object x file)))
-             #!+(and (not (host-feature sb-xc-host)) sb-simd-pack)
+             #+(and (not sb-xc-host) sb-simd-pack)
              (simd-pack
               (unless (equal-check-table x file)
                 (dump-fop 'fop-simd-pack file)
@@ -373,7 +372,7 @@
                 (dump-integer-as-n-bytes (%simd-pack-low  x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-high x) 8 file))
               (equal-save-object x file))
-             #!+(and (not (host-feature sb-xc-host)) sb-simd-pack-256)
+             #+(and (not sb-xc-host) sb-simd-pack-256)
              (simd-pack-256
               (unless (equal-check-table x file)
                 (dump-fop 'fop-simd-pack file)
@@ -534,7 +533,7 @@
        (declare (double-float x))
        (dump-integer-as-n-bytes (double-float-low-bits x) 4 file)
        (dump-integer-as-n-bytes (double-float-high-bits x) 4 file)))
-    #!+long-float
+    #+long-float
     (long-float
      (dump-fop 'fop-long-float file)
      (dump-long-float x file))))
@@ -581,7 +580,7 @@
      (dump-complex-single-float (realpart x) (imagpart x) file))
     ((complex double-float)
      (dump-complex-double-float (realpart x) (imagpart x) file))
-    #!+long-float
+    #+long-float
     ((complex long-float)
      (dump-fop 'fop-complex-long-float file)
      (dump-long-float (realpart x) file)
@@ -762,7 +761,7 @@
          (string-save-object x file)))
       #-sb-xc-host
       ((simple-array character (*))
-       #!-sb-unicode (bug "how did we get here?")
+       #-sb-unicode (bug "how did we get here?")
        (unless (string-check-table x file)
          (dump-fop 'fop-character-string file (length simple-version))
          (dump-chars simple-version file nil)
@@ -851,14 +850,14 @@
                  (8  sb-vm:simple-array-signed-byte-8-widetag)
                  (16 sb-vm:simple-array-signed-byte-16-widetag)
                  (32 sb-vm:simple-array-signed-byte-32-widetag)
-                 #!+64-bit
+                 #+64-bit
                  (64 sb-vm:simple-array-signed-byte-64-widetag)))
               (unsigned-byte
                (ecase bits
                  (8  sb-vm:simple-array-unsigned-byte-8-widetag)
                  (16 sb-vm:simple-array-unsigned-byte-16-widetag)
                  (32 sb-vm:simple-array-unsigned-byte-32-widetag)
-                 #!+64-bit
+                 #+64-bit
                  (64 sb-vm:simple-array-unsigned-byte-64-widetag))))
             (/ bits sb-vm:n-byte-bits)
             bits)))
@@ -901,7 +900,7 @@
 ;;; Dump a SIMPLE-STRING.
 (defun dump-chars (s fasl-output base-string-p)
   (declare (type simple-string s))
-  (if (or base-string-p #!-sb-unicode t) ; if non-unicode, every char is 1 byte
+  (if (or base-string-p #-sb-unicode t) ; if non-unicode, every char is 1 byte
       (dovector (c s)
         (dump-byte (sb-xc:char-code c) fasl-output))
       (dovector (c s) ; varint (a/k/a LEB128) is better for this than UTF-8.
@@ -918,17 +917,7 @@
          (base-string-p (and #-sb-xc-host (typep pname 'base-string)))
          (length+flag (logior (ash pname-length 1) (if base-string-p 1 0)))
          (dumped-as-copy nil)
-         (pkg (symbol-package s)))
-    ;; see comment in genesis: we need this here for repeatable fasls
-    #+sb-xc-host
-    (multiple-value-bind (cl-symbol cl-status)
-        (find-symbol (symbol-name s) *cl-package*)
-      (when (and (eq s cl-symbol)
-                 (eq cl-status :external))
-        ;; special case, to work around possible xc host "design
-        ;; choice" weirdness in COMMON-LISP package
-        (setq pkg *cl-package*)))
-
+         (pkg (sb-xc:symbol-package s)))
     (cond ((null pkg)
            (let ((this-base-p base-string-p))
              (dolist (lookalike (gethash pname (fasl-output-string=-table file))
@@ -983,14 +972,15 @@
 (defconstant-eqx +fixup-flavors+
   #(:assembly-routine :assembly-routine* :symbol-tls-index
     :foreign :foreign-dataref :code-object
-    :layout :immobile-object :named-call :static-call)
+    :layout :immobile-symbol :named-call :static-call
+    :symbol-value)
   #'equalp)
 
 ;;; Pack the aspects of a fixup into an integer.
 (declaim (inline !pack-fixup-info))
 (defun !pack-fixup-info (offset kind flavor)
   ;; ARM gets "error during constant folding"
-  #!+arm (declare (notinline position))
+  #+arm (declare (notinline position))
   (logior (ash (the (mod 16) (or (position flavor +fixup-flavors+)
                                  (error "Bad fixup flavor ~s" flavor)))
                3)
@@ -1002,7 +992,7 @@
 (declaim (inline !unpack-fixup-info))
 (defun !unpack-fixup-info (packed-info) ; Return (VALUES offset kind flavor)
   ;; ARM gets "error during constant folding"
-  #!+arm (declare (notinline aref))
+  #+arm (declare (notinline aref))
   (values (ash packed-info -7)
           (aref +fixup-kinds+ (ldb (byte 3 0) packed-info))
           (aref +fixup-flavors+ (ldb (byte 4 3) packed-info))))
@@ -1022,13 +1012,18 @@
                                    flavor))
            (operand
             (ecase flavor
-              ((:assembly-routine :assembly-routine* :symbol-tls-index)
-               (the symbol name))
-              ((:foreign #!+linkage-table :foreign-dataref) (the string name))
               (:code-object (the null name))
-              #!+immobile-space (:layout (classoid-name (layout-classoid name)))
-              #!+immobile-space (:immobile-object (the symbol name))
-              #!+immobile-code  ((:named-call :static-call) name))))
+              (:layout (if (symbolp name) name (layout-classoid-name name)))
+              ((:assembly-routine :assembly-routine* :symbol-tls-index
+               ;; Only #+immobile-space can use the following two flavors.
+               ;; An :IMMOBILE-SYMBOL fixup references the symbol itself,
+               ;; whereas a :SYMBOL-VALUE fixup references the value of the symbol.
+               ;; In the latter case, the symbol's address doesn't matter,
+               ;; but its global value must be an immobile object.
+               :immobile-symbol :symbol-value)
+               (the symbol name))
+              ((:foreign #+linkage-table :foreign-dataref) (the string name))
+              ((:named-call :static-call) name))))
       (dump-object operand fasl-output)
       (dump-integer info fasl-output))
     (incf n))
@@ -1151,7 +1146,7 @@
   (dump-fop 'fop-verify-table-size file)
   (dump-word (fasl-output-table-free file) file)
 
-  #!+sb-dyncount
+  #+sb-dyncount
   (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))
     (when info
       (fasl-validate-structure info file)))
@@ -1241,7 +1236,7 @@
   ;; STANDARD-OBJECT could in theory be dumpable, but nothing else,
   ;; because all its subclasses can evolve to have new layouts.
   (aver (not (logtest (layout-%flags obj) +pcl-object-layout-flag+)))
-  (let ((name (classoid-name (layout-classoid obj))))
+  (let ((name (layout-classoid-name obj)))
     ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name
       (compiler-error "dumping anonymous layout: ~S" obj))

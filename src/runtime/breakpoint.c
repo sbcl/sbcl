@@ -22,30 +22,14 @@
 #include "alloc.h"
 #include "breakpoint.h"
 #include "thread.h"
-#include "genesis/code.h"
+#include "code.h"
 #include "genesis/fdefn.h"
 
-#ifdef LISP_FEATURE_X86_64
 #define REAL_LRA_SLOT 0
-#define KNOWN_RETURN_P_SLOT 2
-#define BOGUS_LRA_CONSTANTS 3
-#elif defined(LISP_FEATURE_X86)
-#define REAL_LRA_SLOT 1
-#define KNOWN_RETURN_P_SLOT 3
-#define BOGUS_LRA_CONSTANTS 4
-#else
-#define REAL_LRA_SLOT 0
-#define KNOWN_RETURN_P_SLOT 1
-#define BOGUS_LRA_CONSTANTS 2
-#endif
 
 static void *compute_pc(lispobj code_obj, int pc_offset)
 {
-    struct code *code;
-
-    code = (struct code *)native_pointer(code_obj);
-    return (void *)((char *)code + code_header_words(code->header)*sizeof(lispobj)
-                    + pc_offset);
+    return code_text_start((struct code*)native_pointer(code_obj)) + pc_offset;
 }
 
 unsigned int breakpoint_install(lispobj code_obj, int pc_offset)
@@ -104,30 +88,20 @@ lispobj find_code(os_context_t *context)
 
 static long compute_offset(os_context_t *context, lispobj code)
 {
-    if (code == NIL)
-        return 0;
-    else {
-        uword_t code_start;
-        struct code *codeptr = (struct code *)native_pointer(code);
+  if (code != NIL) {
 #ifdef LISP_FEATURE_HPPA
         uword_t pc = *os_context_pc_addr(context) & ~3;
 #else
         uword_t pc = *os_context_pc_addr(context);
 #endif
-
-        code_start = (uword_t)codeptr
-            + code_header_words(codeptr->header)*sizeof(lispobj);
-        if (pc < code_start)
-            return 0;
-        else {
-            int offset = pc - code_start;
-            // Cast out high 32 bits of code_size if lispobj is 64 bits.
-            if (offset >= fixnum_value((uint32_t)codeptr->code_size))
-                return 0;
-            else
-                return make_fixnum(offset);
-        }
+        struct code *codeptr = (struct code *)native_pointer(code);
+        uword_t code_start = (uword_t)code_text_start(codeptr);
+        int offset;
+        if (pc >= code_start &&
+            ((offset = pc - code_start) < code_text_size(codeptr)))
+            return make_fixnum(offset);
     }
+    return 0;
 }
 
 void handle_breakpoint(os_context_t *context)

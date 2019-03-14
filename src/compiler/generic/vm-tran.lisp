@@ -15,14 +15,14 @@
 ;;; transform picks whichever predicate was defined last when there
 ;;; are multiple predicates for equivalent types.
 (define-source-transform short-float-p (x) `(single-float-p ,x))
-#!-long-float
+#-long-float
 (define-source-transform long-float-p (x) `(double-float-p ,x))
 
 (define-source-transform compiled-function-p (x)
   (once-only ((x x))
     `(and (functionp ,x)
-          #!+sb-fasteval (not (sb-interpreter:interpreted-function-p ,x))
-          #!+sb-eval (not (sb-eval:interpreted-function-p ,x)))))
+          #+(or sb-fasteval sb-eval)
+          (not (typep ,x 'interpreted-function)))))
 
 (define-source-transform char-int (x)
   `(char-code ,x))
@@ -33,14 +33,14 @@
 (deftransform make-symbol ((string) (simple-string))
   `(%make-symbol 0 string))
 
-#!-immobile-space
+#-immobile-space
 (define-source-transform %make-symbol (kind string)
   (declare (ignore kind))
   ;; Set "logically read-only" bit in pname.
   `(sb-vm::%%make-symbol (set-header-data ,string ,sb-vm:+vector-shareable+)))
 
 ;;; We don't want to clutter the bignum code.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (define-source-transform sb-bignum:%bignum-ref (bignum index)
   ;; KLUDGE: We use TRULY-THE here because even though the bignum code
   ;; is (currently) compiled with (SAFETY 0), the compiler insists on
@@ -52,7 +52,7 @@
   `(sb-bignum:%bignum-ref-with-offset ,bignum
                                       (truly-the bignum-index ,index) 0))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (defun fold-index-addressing (fun-name element-size lowtag data-offset
                               index offset &optional setter-p)
   (multiple-value-bind (func index-args) (extract-fun-args index '(+ -) 2)
@@ -76,7 +76,7 @@
            (,fun-name thing index ',new-offset ,@(when setter-p
                                                    '(value))))))))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (deftransform sb-bignum:%bignum-ref-with-offset
     ((bignum index offset) * * :node node)
   (fold-index-addressing 'sb-bignum:%bignum-ref-with-offset
@@ -87,7 +87,7 @@
 ;;; The layout is stored in slot 0.
 ;;; *** These next two transforms should be the only code, aside from
 ;;;     some parts of the C runtime, with knowledge of the layout index.
-#!-compact-instance-header
+#-compact-instance-header
 (progn
   (define-source-transform %instance-layout (x)
     `(truly-the layout (%instance-ref ,x 0)))
@@ -108,7 +108,7 @@
         `(etypecase string
           ((simple-array character (*))
            (data-vector-ref string index))
-          #!+sb-unicode
+          #+sb-unicode
           ((simple-array base-char (*))
            (data-vector-ref string index))
           ((simple-array nil (*))
@@ -165,11 +165,11 @@
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities. On platforms that support DATA-VECTOR-REF-WITH-OFFSET
 ;;; DATA-VECTOR-REF is not supported at all.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (define-source-transform data-vector-ref (array index)
   `(data-vector-ref-with-offset ,array ,index 0))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (deftransform data-vector-ref-with-offset ((array index offset))
   (let ((array-type (lvar-type array)))
     (when (or (not (array-type-p array-type))
@@ -198,7 +198,7 @@
         `(typecase string
            ((simple-array character (*))
             (data-vector-set string index (the* (character :context :aref) new-value)))
-           #!+sb-unicode
+           #+sb-unicode
            ((simple-array base-char (*))
             (data-vector-set string index (the* (base-char :context :aref
                                                            :silent-conflict t)
@@ -255,11 +255,11 @@
 
 ;;; Transform data vector access to a form that opens up optimization
 ;;; opportunities.
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (define-source-transform data-vector-set (array index new-value)
   `(data-vector-set-with-offset ,array ,index 0 ,new-value))
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (deftransform data-vector-set-with-offset ((array index offset new-value))
   (let ((array-type (lvar-type array)))
     (when (or (not (array-type-p array-type))
@@ -612,7 +612,7 @@
       ;; Prevent failure caused by memmove() hitting a write-protected page
       ;; and the fault handler losing, since it thinks you're not in Lisp.
       ;; This is wasteful, but better than being randomly broken (lp#1366263).
-      #!+cheneygc
+      #+cheneygc
       (let ((dst (sapify dst)))
         (setf (sap-ref-8 dst dst-start) (sap-ref-8 dst dst-start)
               (sap-ref-8 dst (1- dst-end)) (sap-ref-8 dst (1- dst-end))))
@@ -622,14 +622,15 @@
      (values)))
 
 ;;;; transforms for EQL of floating point values
-#!-float-eql-vops
+#-(vop-named sb-vm::eql/single-float)
 (deftransform eql ((x y) (single-float single-float))
   '(= (single-float-bits x) (single-float-bits y)))
 
-#!-float-eql-vops
+#-(vop-named sb-vm::eql/double-float)
 (deftransform eql ((x y) (double-float double-float))
-  '(and (= (double-float-low-bits x) (double-float-low-bits y))
-        (= (double-float-high-bits x) (double-float-high-bits y))))
+  #-64-bit '(and (= (double-float-low-bits x) (double-float-low-bits y))
+                  (= (double-float-high-bits x) (double-float-high-bits y)))
+  #+64-bit '(= (double-float-bits x) (double-float-bits y)))
 
 
 ;;;; modular functions
@@ -655,35 +656,6 @@
   (define-good-signed-modular-funs
       logand logandc1 logandc2 logeqv logior lognand lognor lognot
       logorc1 logorc2 logxor))
-
-(macrolet
-    ((def (name kind width signedp)
-       (let ((type (ecase signedp
-                     ((nil) 'unsigned-byte)
-                     ((t) 'signed-byte))))
-         `(progn
-            (defknown ,name (integer (integer 0)) (,type ,width)
-                      (foldable flushable movable))
-            (define-modular-fun-optimizer ash ((integer count) ,kind ,signedp :width width)
-              (when (and (<= width ,width)
-                         (or (and (constant-lvar-p count)
-                                  (plusp (lvar-value count)))
-                             (csubtypep (lvar-type count)
-                                        (specifier-type '(and unsigned-byte fixnum)))))
-                (cut-to-width integer ,kind width ,signedp)
-                ',name))
-            (setf (gethash ',name (modular-class-versions (find-modular-class ',kind ',signedp)))
-                  `(ash ,',width))))))
-  ;; This should really be dependent on SB-VM:N-WORD-BITS, but since we
-  ;; don't have a true Alpha64 port yet, we'll have to stick to
-  ;; SB-VM:N-MACHINE-WORD-BITS for the time being.  --njf, 2004-08-14
-  #.`(progn
-       #!+(or x86 x86-64 arm arm64)
-       (def sb-vm::ash-left-modfx
-           :tagged ,(- sb-vm:n-word-bits sb-vm:n-fixnum-tag-bits) t)
-       (def ,(intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits)
-                     "SB-VM")
-           :untagged ,sb-vm:n-machine-word-bits nil)))
 
 ;;;; word-wise logical operations
 

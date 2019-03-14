@@ -87,8 +87,14 @@
   ;; package locking
   (lock nil :type boolean)
   (%implementation-packages nil :type list)
+  ;; Mapping of local nickname to actual package.
+  ;; One vector stores the mapping sorted by string, the other stores it by
+  ;; integer nickname ID so that we can binary search in either.
+  (%local-nicknames nil :type (or null (cons simple-vector simple-vector)))
   ;; Definition source location
-  (source-location nil :type (or null sb-c:definition-source-location))
-  ;; Local package nicknames.
-  (%local-nicknames nil :type list)
-  (%locally-nicknamed-by nil :type list))
+  (source-location nil :type (or null sb-c:definition-source-location)))
+(!set-load-form-method package (:xc)
+  (lambda (obj env)
+    (declare (ignore env))
+    ;; the target code will use FIND-UNDELETED-PACKAGE-OR-LOSE
+    `(find-package ,(package-name obj))))

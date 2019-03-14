@@ -25,15 +25,15 @@
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
          (value :scs (descriptor-reg any-reg null zero)))
-  (:info name offset lowtag #!+gengc remember)
+  (:info name offset lowtag #+gengc remember)
   (:ignore name)
   (:results)
   (:generator 1
-    #!+gengc
+    #+gengc
     (if remember
         (storew-and-remember-slot value object offset lowtag)
         (storew value object offset lowtag))
-    #!-gengc
+    #-gengc
     (storew value object offset lowtag)))
 
 (define-vop (init-slot set-slot)
@@ -184,7 +184,7 @@
     (inst addq bsp-tn (* 2 n-word-bytes) bsp-tn)
     (storew temp bsp-tn (- binding-value-slot binding-size))
     (storew symbol bsp-tn (- binding-symbol-slot binding-size))
-    (#!+gengc storew-and-remember-slot #!-gengc storew
+    (#+gengc storew-and-remember-slot #-gengc storew
              val symbol symbol-value-slot other-pointer-lowtag)))
 
 
@@ -193,7 +193,7 @@
   (:generator 0
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
-    (#!+gengc storew-and-remember-slot #!-gengc storew
+    (#+gengc storew-and-remember-slot #-gengc storew
              value symbol symbol-value-slot other-pointer-lowtag)
     (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
     (storew zero-tn bsp-tn (- binding-value-slot binding-size))
@@ -217,7 +217,7 @@
       (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
       (loadw value bsp-tn (- binding-value-slot binding-size))
       (inst beq symbol skip)
-      (#!+gengc storew-and-remember-slot #!-gengc storew
+      (#+gengc storew-and-remember-slot #-gengc storew
                value symbol symbol-value-slot other-pointer-lowtag)
       (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
 
@@ -299,7 +299,7 @@
 
 ;;;; mutator accessing
 
-#!+gengc
+#+gengc
 (progn
 
 (eval-when (:compile-toplevel :load-toplevel :execute)

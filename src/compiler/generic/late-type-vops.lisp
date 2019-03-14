@@ -13,7 +13,7 @@
 
 ;;; FIXME: backend-specific junk doesn't belong in compiler/generic.
 
-#!+(or x86 x86-64)
+#+(or x86 x86-64)
 (progn
 (define-vop (type-predicate)
   (:args (value :scs (any-reg descriptor-reg)))
@@ -21,7 +21,7 @@
   ;; since they can't be accessed as an 8-bit byte.
   ;; x86-64 being more regular, any reg can serve as the temp.
   ;; In all likelihood, it'll get rax anyway just because.
-  (:temporary (:sc unsigned-reg #!+x86 :offset #!+x86 eax-offset) temp)
+  (:temporary (:sc unsigned-reg #+x86 :offset #+x86 eax-offset) temp)
   (:conditional)
   (:info target not-p)
   (:args-var args)
@@ -42,7 +42,7 @@
       (%test-headers value temp target not-p nil headers :except except
                                                          :value-tn-ref args)))))
 
-#!-(or x86 x86-64)
+#-(or x86 x86-64)
 (progn
 (define-vop (type-predicate)
   (:args (value :scs (any-reg descriptor-reg)))
@@ -76,7 +76,7 @@
 
 (!define-type-vop fixnump
   #.fixnum-lowtags
-  #!+(or x86-64 x86) simple-type-predicate) ;; save a register
+  #+(or x86-64 x86) simple-type-predicate) ;; save a register
 
 (!define-type-vop functionp (fun-pointer-lowtag))
 
@@ -94,13 +94,13 @@
 
 (!define-type-vop complexp
   (complex-widetag complex-single-float-widetag complex-double-float-widetag
-                   #!+long-float complex-long-float-widetag))
+                   #+long-float complex-long-float-widetag))
 
 (!define-type-vop complex-rational-p (complex-widetag))
 
 (!define-type-vop complex-float-p
   (complex-single-float-widetag complex-double-float-widetag
-                                #!+long-float complex-long-float-widetag))
+                                #+long-float complex-long-float-widetag))
 
 (!define-type-vop complex-single-float-p (complex-single-float-widetag))
 
@@ -111,7 +111,7 @@
 (!define-type-vop double-float-p (double-float-widetag))
 
 (!define-type-vop simple-string-p
-  (#!+sb-unicode simple-character-string-widetag
+  (#+sb-unicode simple-character-string-widetag
    simple-base-string-widetag simple-array-nil-widetag))
 
 (macrolet
@@ -141,7 +141,7 @@
 
 (!define-type-vop code-component-p (code-header-widetag))
 
-#!-(or x86 x86-64) (!define-type-vop lra-p (return-pc-widetag))
+#-(or x86 x86-64) (!define-type-vop lra-p (return-pc-widetag))
 
 (!define-type-vop fdefn-p (fdefn-widetag))
 
@@ -153,7 +153,7 @@
 
 (!define-type-vop array-header-p
   (simple-array-widetag
-   #!+sb-unicode complex-character-string-widetag
+   #+sb-unicode complex-character-string-widetag
    complex-base-string-widetag complex-bit-vector-widetag
    complex-vector-widetag complex-array-widetag complex-vector-nil-widetag))
 
@@ -161,8 +161,8 @@
   (simple-array-widetag))
 
 (!define-type-vop stringp
-  (#!+sb-unicode simple-character-string-widetag
-   #!+sb-unicode complex-character-string-widetag
+  (#+sb-unicode simple-character-string-widetag
+   #+sb-unicode complex-character-string-widetag
    simple-base-string-widetag complex-base-string-widetag
    simple-array-nil-widetag complex-vector-nil-widetag))
 
@@ -175,7 +175,7 @@
 (!define-type-vop vector-nil-p
   (simple-array-nil-widetag complex-vector-nil-widetag))
 
-#!+sb-unicode
+#+sb-unicode
 (!define-type-vop character-string-p
   (simple-character-string-widetag complex-character-string-widetag))
 
@@ -226,11 +226,11 @@
    ratio-widetag
    single-float-widetag
    double-float-widetag
-   #!+long-float long-float-widetag
+   #+long-float long-float-widetag
    complex-widetag
    complex-single-float-widetag
    complex-double-float-widetag
-   #!+long-float complex-long-float-widetag
+   #+long-float complex-long-float-widetag
    . #.fixnum-lowtags))
 
 (!define-type-vop rationalp
@@ -240,19 +240,19 @@
   (bignum-widetag . #.fixnum-lowtags))
 
 (!define-type-vop floatp
-  (single-float-widetag double-float-widetag #!+long-float long-float-widetag))
+  (single-float-widetag double-float-widetag #+long-float long-float-widetag))
 
 (!define-type-vop realp
   (ratio-widetag
    bignum-widetag
    single-float-widetag
    double-float-widetag
-   #!+long-float long-float-widetag
+   #+long-float long-float-widetag
    . #.fixnum-lowtags))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (!define-type-vop simd-pack-p (simd-pack-widetag))
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (!define-type-vop simd-pack-256-p (simd-pack-256-widetag))
 
 (!define-type-vop unbound-marker-p (unbound-marker-widetag))

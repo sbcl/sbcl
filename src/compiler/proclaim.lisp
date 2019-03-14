@@ -76,7 +76,11 @@
       (enable-package-locks
        (set-difference old names :test #'equal)))))
 
-(!defvar *queued-proclaims* nil) ; should this be !*QUEUED-PROCLAIMS* ?
+;;; This variable really wants to be a DEFVAR, but the "if (boundp)" expression
+;;; is too tricky for genesis. Let's ensure proper behavior by not clobbering
+;;; it in the host, but doing the only thing that genesis can do in the target.
+(#+sb-xc-host defvar #-sb-xc-host defparameter
+ *queued-proclaims* nil) ; should this be !*QUEUED-PROCLAIMS* ?
 
 (defun process-variable-declaration (name kind info-value)
   (unless (symbolp name)
@@ -135,7 +139,7 @@
   (with-single-package-locked-error
       (:symbol name "globally declaring the FTYPE of ~A")
     (when (eq (info :function :where-from name) :declared)
-      (let ((old-type (proclaimed-ftype name))
+      (let ((old-type (global-ftype name))
             (type (if (ctype-p type-oid)
                       type-oid
                       (specifier-type type-specifier))))
@@ -334,8 +338,7 @@
            (compiler-warn "unrecognized declaration ~S" raw-form)))))))
 
 (defun sb-xc:proclaim (raw-form)
-  #!+(and sb-show (host-feature sb-xc))
-  (progn (write-string "* ") (write `(declaim ,raw-form) :level nil) (terpri))
+  (/noshow "PROCLAIM" raw-form)
   (%proclaim raw-form nil)
   (values))
 

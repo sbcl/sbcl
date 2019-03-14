@@ -37,7 +37,7 @@
                       sap-stack-sc-number
                       stack-frame-size)))
 
-#!+long-float
+#+long-float
 (define-alien-type-method (long-float :arg-tn) (type state)
   (declare (ignore type))
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
@@ -87,7 +87,7 @@
     (make-wired-tn* 'system-area-pointer sap-reg-sc-number
                       (result-reg-offset num-results))))
 
-#!+long-float
+#+long-float
 (define-alien-type-method (long-float :result-tn) (type state)
   (declare (ignore type))
   (let ((num-results (result-state-num-results state)))
@@ -235,7 +235,7 @@
   (:generator 2
    (inst lea res (make-fixup foreign-symbol :foreign))))
 
-#!+linkage-table
+#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
@@ -258,7 +258,7 @@
      (let ((ea (ea-for-df-stack fp-temp)))
        (inst fstpd ea)
        (inst fldd ea)))
-    #!+long-float
+    #+long-float
     (long-reg  ; nothing to do!
      )))
 
@@ -269,9 +269,9 @@
   (:temporary (:sc unsigned-reg :offset eax-offset
                :from :eval :to :result) eax)
   (:temporary (:sc double-stack) fp-temp)
-  #!+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
-  #!-sb-safepoint (:node-var node)
-  #!+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
+  #+sb-safepoint (:temporary (:sc unsigned-reg :offset edi-offset) edi)
+  #-sb-safepoint (:node-var node)
+  #+sb-safepoint (:temporary (:sc unsigned-stack) pc-save)
   (:vop-var vop)
   (:save-p t)
   (:ignore args)
@@ -284,11 +284,11 @@
             ;; calling routine irrespectively of SPACE and SPEED policy.
             ;; An inline version of said changes is left to the
             ;; sufficiently motivated maintainer.
-            #!-sb-safepoint (policy node (> space speed)))
+            #-sb-safepoint (policy node (> space speed)))
            ;; On safepoint builds, we need to stash the return address
            ;; on the "protected" part of the control stack so that it
            ;; doesn't move on us.  Pass the address of pc-save in EDI.
-           #!+sb-safepoint
+           #+sb-safepoint
            (inst lea edi (make-ea :dword :base ebp-tn
                                   :disp (frame-byte-offset (tn-offset pc-save))))
            (move eax function)
@@ -362,10 +362,10 @@
 
 (define-vop (alloc-alien-stack-space)
   (:info amount)
-  #!+sb-thread (:temporary (:sc unsigned-reg) temp)
+  #+sb-thread (:temporary (:sc unsigned-reg) temp)
   (:results (result :scs (sap-reg any-reg)))
   (:result-types system-area-pointer)
-  #!+sb-thread
+  #+sb-thread
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
@@ -375,7 +375,7 @@
                          :disp (make-ea-for-symbol-tls-index *alien-stack-pointer*))
           (inst sub EA delta :maybe-fs))))
     (load-tl-symbol-value result *alien-stack-pointer*))
-  #!-sb-thread
+  #-sb-thread
   (:generator 0
     (aver (not (location= result esp-tn)))
     (unless (zerop amount)
@@ -422,12 +422,12 @@ pointer to the arguments."
               (inst push eax)                       ; arg1
               (inst push (ash index 2))             ; arg0
 
-              #!+sb-thread
+              #+sb-thread
               (progn
                 (inst mov eax (foreign-symbol-address "callback_wrapper_trampoline"))
                 (inst call eax))
 
-              #!-sb-thread
+              #-sb-thread
               (progn
                 (inst push (make-ea :dword ; function
                                     :disp (static-fdefn-fun-addr 'enter-alien-callback)))

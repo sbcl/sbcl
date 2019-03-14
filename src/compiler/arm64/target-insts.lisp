@@ -274,7 +274,7 @@
        (maybe-note-assembler-routine offset nil dstate)
        (maybe-note-static-symbol (logior offset other-pointer-lowtag)
                                               dstate)))
-    #!+sb-thread
+    #+sb-thread
     (#.sb-vm::thread-offset
      (let* ((thread-slots
              (load-time-value

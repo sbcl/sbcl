@@ -39,7 +39,9 @@
 
 #include "validate.h"
 #include "gc-internal.h"
+#include "gc-private.h"
 #include "pseudo-atomic.h"
+#include "code.h"
 
 #include <errno.h>
 
@@ -83,12 +85,16 @@ open_binary(char *filename, int mode)
 
 #if defined(LISP_FEATURE_LINUX) && defined(LISP_FEATURE_IMMOBILE_CODE)
 #define ELFCORE 1
-extern __attribute__((weak)) lispobj
- __lisp_code_start, lisp_jit_code, __lisp_code_end, __lisp_linkage_values;
-static inline boolean code_in_elf() { return &__lisp_code_start != 0; }
-#else
+#elif !defined(ELFCORE)
 #define ELFCORE 0
-static inline boolean code_in_elf() { return 0; }
+#endif
+
+#if !ELFCORE
+int lisp_code_in_elf() { return 0; }
+#else
+extern __attribute__((weak)) lispobj
+ lisp_code_start, lisp_jit_code, lisp_code_end, lisp_linkage_values;
+int lisp_code_in_elf() { return &lisp_code_start != 0; }
 #endif
 
 /* Search 'filename' for an embedded core.  An SBCL core has, at the
@@ -133,7 +139,7 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
             read(fd, &header, lispobj_size) != lispobj_size || header != CORE_MAGIC)
             core_start = -1; // reset to invalid
     }
-#if ELFCORE
+#if ELFCORE && !defined(LISP_FEATURE_DARWIN)
     // Specifying "--core" as an ELF file with a lisp.core section doesn't work.
     // (There are bunch of reasons) So only search for a core section if this
     // is an implicit search for a core embedded in an executable.
@@ -378,11 +384,11 @@ static void __attribute__((unused))
 adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_vaddr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    // Dynamic space is a always relocated before immobile space,
+    // Dynamic space always gets relocated before immobile space does,
     // and dynamic space code does not use fixups (except on 32-bit x86).
     // So if we're here, it must be to relocate an immobile object.
     // If 'code->fixups' is a bignum, the pointer itself was already fixed up.
-    char* instructions = (char*)((lispobj*)code + code_header_words(code->header));
+    char* instructions = code_text_start(code);
     struct varint_unpacker unpacker;
 
     varint_unpacker_init(&unpacker, code->fixups);
@@ -408,8 +414,8 @@ adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_va
         loc += prev_loc;
         prev_loc = loc;
         void* fixup_where = instructions + loc;
-        lispobj rel32operand = UNALIGNED_LOAD32(fixup_where);
-        sword_t adjusted = rel32operand - displacement;
+        int32_t rel32operand = UNALIGNED_LOAD32(fixup_where);
+        sword_t adjusted = (sword_t)rel32operand - displacement;
         if (!(adjusted >= INT32_MIN && adjusted <= INT32_MAX))
             lose("Relative fixup @ %p exceeds 32 bits", fixup_where);
         FIXUP_rel(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
@@ -539,10 +545,14 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #endif
             continue;
         case CODE_HEADER_WIDETAG:
+            if (filler_obj_p(where)) {
+                if (where[2]) adjust_word_at(where+2, adj);
+                continue;
+            }
             // Fixup the constant pool. The word at where+1 is a fixnum.
-            adjust_pointers(where+2, code_header_words(header_word)-2, adj);
-            // Fixup all embedded simple-funs
             code = (struct code*)where;
+            adjust_pointers(where+2, code_header_words(code)-2, adj);
+            // Fixup all embedded simple-funs
             for_each_simple_fun(i, f, code, 1, {
                 fix_fun_header_layout((lispobj*)f, adj);
 #if FUN_SELF_FIXNUM_TAGGED
@@ -681,12 +691,12 @@ static void relocate_heap(struct heap_adjust* adj)
     // Assembler routines move with varyobj space.
     // (They're in readonly space if no immobile space)
     struct code* code = get_asm_routine_code_component();
-    lispobj* jump_table = (lispobj*)code + code_header_words(code->header);
+    lispobj* jump_table = (lispobj*)code_text_start(code);
     for ( ; *jump_table ; ++jump_table )
         adjust_word_at(jump_table, adj);
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
-    if (code_in_elf())
+    if (lisp_code_in_elf())
         adj->range[2].delta = 0; // FIXME: isn't this this already the case?
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
@@ -748,21 +758,21 @@ process_directory(int count, struct ndir_entry *entry,
     };
 
 #if ELFCORE
-    if (&__lisp_code_start) {
-        VARYOBJ_SPACE_START = (uword_t)&__lisp_code_start;
+    if (&lisp_code_start) {
+        VARYOBJ_SPACE_START = (uword_t)&lisp_code_start;
         varyobj_free_pointer = &lisp_jit_code;
-        varyobj_space_size = (uword_t)&__lisp_code_end - VARYOBJ_SPACE_START;
+        varyobj_space_size = (uword_t)&lisp_code_end - VARYOBJ_SPACE_START;
         spaces[IMMOBILE_VARYOBJ_CORE_SPACE_ID].len = varyobj_space_size;
         if (varyobj_free_pointer < (lispobj*)VARYOBJ_SPACE_START
-            || !PTR_IS_ALIGNED(&__lisp_code_end, 4096))
+            || !PTR_IS_ALIGNED(&lisp_code_end, 4096))
             lose("ELF core alignment bug. Check for proper padding in 'editcore'");
-#if !ENABLE_PAGE_PROTECTION
+#ifdef DEBUG_COREPARSE
         printf("Lisp code present in executable @ %lx:%lx (freeptr=%p)\n",
-               (uword_t)&__lisp_code_start, (uword_t)&__lisp_code_end,
+               (uword_t)&lisp_code_start, (uword_t)&lisp_code_end,
                varyobj_free_pointer);
 #endif
-        // Prefill the Lisp linkage table so that we can (pending some additional work)
-        // remove "-ldl" from the linker options when making a shrinkwrapped executable.
+        // Prefill the Lisp linkage table so that shrinkwrapped executables which link in
+        // all their C library dependencies can avoid linking with -ldl.
         // All data references are potentially needed because aliencomp doesn't emit
         // SAP-REF-n in a way that admits elision of the linkage entry. e.g.
         //     MOV RAX, [#x20200AA0] ; some_c_symbol
@@ -772,7 +782,7 @@ process_directory(int count, struct ndir_entry *entry,
         // but that's more of a change to the asm instructions than I'm comfortable making;
         // whereas "CALL linkage_entry_for_f" -> "CALL f" is quite straightforward.
         // (Rarely would a jmp indirection be used; maybe for newly compiled code?)
-        lispobj* ptr = &__lisp_linkage_values;
+        lispobj* ptr = &lisp_linkage_values;
         gc_assert(ptr);
         char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
         int count;
@@ -798,6 +808,11 @@ process_directory(int count, struct ndir_entry *entry,
     for ( ; --count>= 0; ++entry) {
         long id = entry->identifier;
         uword_t addr = entry->address;
+#ifdef DEBUG_COREPARSE
+        printf("space %d @ %10lx pg=%4d+%4d nwords=%ld\n",
+               (int)id, addr, (int)entry->data_page, (int)entry->page_count,
+               entry->nwords);
+#endif
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)
@@ -937,10 +952,6 @@ process_directory(int count, struct ndir_entry *entry,
             set_alloc_pointer((lispobj)free_pointer);
 
             anon_dynamic_space_start = (os_vm_address_t)(addr + len);
-            /* This assertion safeguards the test in zero_pages_with_mmap()
-             * which trusts that if addr > anon_dynamic_space_start
-             * then addr did not come from any file mapping. */
-            gc_assert((lispobj)anon_dynamic_space_start > STATIC_SPACE_END);
         }
     }
 
@@ -967,7 +978,7 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
 #  endif // LISP_FEATURE_GENCGC
     if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta) {
-        if (adj->range[1].delta && code_in_elf())
+        if (adj->range[1].delta && lisp_code_in_elf())
             lose("Relocation of fixedobj space not supported with ELF core.\n\
 Please report this as a bug");
         relocate_heap(adj);
@@ -1108,8 +1119,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
             if (lowtag_of(sym = table->data[i]) == OTHER_POINTER_LOWTAG
                 && widetag_of(&SYMBOL(sym)->header) == SYMBOL_WIDETAG
                 && !strcmp(name, (char*)(VECTOR(SYMBOL(sym)->name)->data)))
-                return code_header_words(code->header)*N_WORD_BYTES
-                    + fixnum_value(CONS(table->data[i+1])->car) + (os_vm_address_t)code;
+                return code_text_start(code) + fixnum_value(CONS(table->data[i+1])->car);
         // Something is wrong if we have a hashtable but find nothing.
         fprintf(stderr, "WARNING: get_asm_routine_by_name(%s) failed\n",
                 name);

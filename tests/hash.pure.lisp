@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 ;;; +MAGIC-HASH-VECTOR-VALUE+ is used to mark empty entries in the slot
 ;;; HASH-VECTOR of hash tables. It must be a value outside of the range
 ;;; of SXHASH. The range of SXHASH is the non-negative fixnums.
@@ -149,3 +147,7 @@
     (clrhash tbl)
     ;; The need-to-rehash bit is not set
     (assert (eql 0 (svref (sb-impl::hash-table-table tbl) 1)))))
+
+(with-test (:name :sxhash-signed-floating-point-zeros)
+  (assert (not (eql (sxhash -0f0) (sxhash 0f0))))
+  (assert (not (eql (sxhash -0d0) (sxhash 0d0)))))

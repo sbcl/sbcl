@@ -271,7 +271,7 @@ Examples:
          (cond ((simple-vector-p finalizers) (fill finalizers 0))
                ((consp finalizers) (rplaca finalizers 0))))))))
 
-#!+sb-thread
+#+sb-thread
 (progn
   ;; *FINALIZER-THREAD* is either a boolean value indicating whether to start a
   ;; thread, or a thread object (which is created no sooner than needed).
@@ -287,11 +287,11 @@ Examples:
 
 (defun run-pending-finalizers ()
   (when (hash-table-culled-values (finalizer-id-map **finalizer-store**))
-    (cond #!+sb-thread
+    (cond #+sb-thread
           ((%instancep *finalizer-thread*)
            (sb-thread::with-system-mutex (*finalizer-queue-lock*)
              (sb-thread:condition-notify *finalizer-queue*)))
-          #!+sb-thread
+          #+sb-thread
           ((eq *finalizer-thread* t) ; Create a new thread
            (sb-thread:make-thread
             (lambda ()
@@ -322,7 +322,7 @@ Examples:
 ;;; (When called from EXIT, the user must invoke a final GC if there is
 ;;; an expectation that GC-based things run. Similarly when saving a core)
 (defun finalizer-thread-stop ()
-  #!+sb-thread
+  #+sb-thread
   (let ((thread *finalizer-thread*))
     (when thread ; if it was NIL it can't become a thread. So there's no race.
       ;; Setting to NIL causes the thread to exit after waking

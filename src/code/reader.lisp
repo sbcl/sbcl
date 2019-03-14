@@ -16,12 +16,9 @@
 ;;; ANSI: "the floating-point format that is to be used when reading a
 ;;; floating-point number that has no exponent marker or that has e or
 ;;; E for an exponent marker"
-(!defvar *read-default-float-format* 'single-float)
-(declaim (type (member short-float single-float double-float long-float)
-               *read-default-float-format*))
+(defparameter *read-default-float-format* 'single-float)
 
 (defvar *readtable*)
-(declaim (type readtable *readtable*))
 
 (setf (documentation '*readtable* 'variable)
       "Variable bound to current readtable.")
@@ -133,7 +130,7 @@
 
 ;;; predicates for testing character attributes
 
-#!-sb-fluid
+#-sb-fluid
 (progn
   (declaim (inline whitespace[1]p whitespace[2]p))
   (declaim (inline constituentp terminating-macrop))
@@ -171,7 +168,8 @@
 
 ;;; There are a number of "secondary" attributes which are constant
 ;;; properties of characters (as long as they are constituents).
-
+;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
+;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
 (defconstant +constituent-trait-table+
   #.(let ((a (!make-specialized-array base-char-code-limit '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
@@ -927,7 +925,7 @@ standard Lisp readtable when NIL."
                                   buf (make-array lim :element-type 'character)))
                           (setq ptr 0))
                         (setf (schar buf ptr) (truly-the character char))
-                        #!+sb-unicode ; BASE-CHAR-P does not exist if not
+                        #+sb-unicode ; BASE-CHAR-P does not exist if not
                         (unless (base-char-p char) (setq only-base-chars nil))
                         (incf ptr)))))
     (let* ((token-buf *read-buffer*)
@@ -1087,7 +1085,7 @@ standard Lisp readtable when NIL."
                      +char-attr-constituent-digit+)
                  +char-attr-constituent-decimal-digit+))
             ((= att +char-attr-invalid+)
-             (simple-reader-error stream "invalid constituent"))
+             (simple-reader-error stream "invalid constituent: ~s" char))
             (t att))))))
 
 ;;;; token fetching
@@ -1097,7 +1095,6 @@ standard Lisp readtable when NIL."
 
 (defvar *read-base* 10
   "the radix that Lisp reads numbers in")
-(declaim (type (integer 2 36) *read-base*))
 
 ;;; Normalize TOKEN-BUF to NFKC, returning a new TOKEN-BUF and the
 ;;; COLON value
@@ -1246,7 +1243,7 @@ extended <package-name>::<form-in-package> syntax."
         (#.+char-attr-package-delimiter+ (go COLON))
         (#.+char-attr-multiple-escape+ (go MULT-ESCAPE))
         (#.+char-attr-invalid+ (simple-reader-error stream
-                                                    "invalid constituent"))
+                                                    "invalid constituent: ~s" char))
         ;; can't have eof, whitespace, or terminating macro as first char!
         (t (go SYMBOL)))
      SIGN ; saw "sign"
@@ -1568,7 +1565,8 @@ extended <package-name>::<form-in-package> syntax."
                          pkg
                          (if (token-buf-only-base-chars buf)
                              (%readtable-symbol-preference rt)
-                             'character))))))))
+                             'character)
+                         nil)))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of
@@ -1675,7 +1673,7 @@ extended <package-name>::<form-in-package> syntax."
   ;; Use the least positive float, because denormalized exponent
   ;; can be larger than normalized.
   (let* ((max-exponent
-          #!-long-float
+          #-long-float
           (+ sb-vm:double-float-digits sb-vm:double-float-bias))
          (number-magnitude (integer-length number))
          (divisor-magnitude (1- (integer-length divisor)))
@@ -1782,6 +1780,14 @@ extended <package-name>::<form-in-package> syntax."
   (declare (optimize allow-non-returning-tail-call))
   (declare (ignore ignore))
   (if *read-suppress*
+      ;; This seems dubious. For comparison's sake, other implementations
+      ;; will signal an error if the character is not a defined macro.
+      ;; Test case: (read-from-string "#+nope (#!+(or feat) a) b") => B and 25
+      ;; CLISP:
+      ;; *** - READ from #<INPUT STRING-INPUT-STREAM>: After #\# is #\! an undefined dispatch macro character
+      ;; CCL:
+      ;; Error: Reader error on #<STRING-INPUT-STREAM  #x3020004913AD>, near position 10, within "#+nope (#!+(or feat)":
+      ;;        Undefined character #\! in a #\# dispatch macro.
       (values)
       (simple-reader-error stream
                            "no dispatch function defined for ~S"

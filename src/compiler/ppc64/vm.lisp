@@ -18,8 +18,8 @@
 ;;; work. This must be a power of 2 - see BYTES-REQUIRED-FOR-NUMBER-STACK.
 ;;;
 (defconstant number-stack-displacement
-  (* #!-darwin 2
-     #!+darwin 8
+  (* #-darwin 2
+     #+darwin 8
      n-word-bytes))
 
 ;;;; Define the registers
@@ -69,20 +69,20 @@
   (defreg a3 27)
   (defreg l0 28)
   (defreg l1 29)
-  (defreg #!-sb-thread l2 #!+sb-thread thread 30)
+  (defreg #-sb-thread l2 #+sb-thread thread 30)
   (defreg lip 31)
 
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 cfunc nargs nfp)
 
   (defregset descriptor-regs
-      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 #!-sb-thread l2 )
+      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1 #-sb-thread l2 )
 
   ;; OAOOM: Same as runtime/ppc-lispregs.h
   (defregset boxed-regs
       fdefn code cname lexenv ocfp lra
       a0 a1 a2 a3
-      l0 l1 #!-sb-thread l2 #!+sb-thread thread)
+      l0 l1 #-sb-thread l2 #+sb-thread thread)
 
 
  (defregset *register-arg-offsets*  a0 a1 a2 a3)
@@ -316,7 +316,7 @@
                               :offset n))
           *register-arg-offsets*))
 
-#!+sb-thread
+#+sb-thread
 (defparameter thread-base-tn
   (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
                   :offset thread-offset))

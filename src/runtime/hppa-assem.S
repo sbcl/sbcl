@@ -3,11 +3,10 @@
 .section .note.GNU-stack,"",%progbits
 #endif
 
-#define LANGUAGE_ASSEMBLY
-
 #include "sbcl.h"
 #include "lispregs.h"
 #include "genesis/closure.h"
+#include "genesis/code.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "genesis/return-pc.h"
@@ -452,7 +451,7 @@ SingleStepTraps:
 	.align	8
 	.export fun_end_breakpoint_guts
 fun_end_breakpoint_guts:
-	.word	RETURN_PC_WIDETAG + 0x600
+	.word	(((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 	/* multiple value return point -- just jump to trap. */
 	b,n	fun_end_breakpoint_trap
 	/* single value return point -- convert to multiple w/ n=1 */

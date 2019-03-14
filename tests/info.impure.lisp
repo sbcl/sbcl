@@ -42,7 +42,7 @@
 #||
 (assert
   (equal
-   (format nil "~A" (sb-int:proclaimed-ftype 'foo))
+   (format nil "~A" (sb-int:global-ftype 'foo))
    "#<FUN-TYPE (FUNCTION (T T) LIST)>"))
 ||#
 

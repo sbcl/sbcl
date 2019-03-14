@@ -84,7 +84,7 @@
                (setf (info :function :type source-name) defined-ftype))
              (setf (info :function :where-from source-name) :defined))
             ((:declared :defined-method)
-             (let ((declared-ftype (proclaimed-ftype source-name)))
+             (let ((declared-ftype (global-ftype source-name)))
                (unless (defined-ftype-matches-declared-ftype-p
                          defined-ftype declared-ftype)
                  (compiler-style-warn
@@ -123,7 +123,7 @@
       (let ((dest (when lvar (lvar-dest lvar))))
         (cond ((and (cast-p dest)
                     (not (cast-type-check dest))
-                    (immediately-used-p lvar node))
+                    (almost-immediately-used-p lvar node))
                (let ((dtype (node-derived-type node))
                      (atype (node-derived-type dest)))
                  (when (values-types-equal-or-intersect
@@ -199,9 +199,9 @@
   (do-blocks (block component)
     (do-nodes (node nil block)
       (when (and (combination-p node)
-                 (eq (combination-kind node) :known))
-        (let ((comination-name (lvar-fun-name (combination-fun node) t)))
-          (map-callable-arguments
+                 (eq (combination-kind node) :known)
+                 (neq (lvar-fun-name (combination-fun node) t) 'reduce))
+        (map-callable-arguments
            (lambda (lvar args results &key no-function-conversion &allow-other-keys)
              (declare (ignore results))
              (unless no-function-conversion
@@ -209,17 +209,15 @@
                      (arg-count (length args)))
                  (labels ((translate-two-args (name)
                             (and (eql arg-count 2)
-                                 (neq comination-name 'reduce)
+                                 (not (fun-lexically-notinline-p name (node-lexenv node)))
                                  (cadr (assoc name *two-arg-functions*))))
                           (translate (ref)
                             (let* ((leaf (ref-leaf ref))
                                    (fun-name (and (constant-p leaf)
                                                   (constant-value leaf)))
                                    (replacement
-                                     (cond ((and fun-name
-                                                 (symbolp fun-name))
-                                            (or (translate-two-args fun-name)
-                                                fun-name))
+                                     (cond ((and fun-name (symbolp fun-name))
+                                            (translate-two-args fun-name))
                                            ((and (global-var-p leaf)
                                                  (eq (global-var-kind leaf) :global-function))
                                             (translate-two-args (global-var-%source-name leaf)))))
@@ -239,16 +237,18 @@
                                   (change-ref-leaf ref replacement :recklessly t)
                                   (setf (node-derived-type cast)
                                         (lvar-derived-type (cast-value cast)))))))))))))
-           node))))))
+           node)))))
 
 (defun rewrite-full-call (combination)
-  (let ((comination-name (lvar-fun-name (combination-fun combination) t))
+  (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
-    (let ((two-arg (cadr (assoc comination-name *two-arg-functions*)))
+    (let ((two-arg (cadr (assoc combination-name *two-arg-functions*)))
           (ref (lvar-uses (combination-fun combination))))
       (when (and two-arg
                  (ref-p ref)
-                 (= (length args) 2))
+                 (= (length args) 2)
+                 (not (fun-lexically-notinline-p combination-name
+                                                 (node-lexenv combination))))
         (change-ref-leaf
          ref
          (find-free-fun two-arg "rewrite-full-call"))))))

@@ -113,7 +113,7 @@ testmain: testmain.c libsbcl.so -ldl
 
 SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp
 shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
-	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --sizes \
+	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split \
 		../../output/sbcl.core shrinkwrap-sbcl.s
 pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 	../../run-sbcl.sh --script ../../tools-for-build/editcore.lisp split --pie \
@@ -127,7 +127,7 @@ pie-shrinkwrap-sbcl: pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o $(PIC_OBJS
 semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)
 	$(CC) $(LINKFLAGS) $(CFLAGS) -o $@ $^ $(LIBS)
 
-sbcl.mk:
+sbcl.mk: Config
 	( echo 'CC=$(CC)' ; \
 	  echo 'LD=$(LD)' ; \
 	  echo 'CFLAGS=$(CFLAGS)' ; \

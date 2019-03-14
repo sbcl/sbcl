@@ -49,8 +49,9 @@
 ;;; cross-compiler from working.)
 #+cmu
 (progn
-  (warn "CMU CL doesn't support the :PRINT-OBJECT option to DEFSTRUCT.~%")
-  (pushnew :no-ansi-print-object *features*))
+  (setq *compile-print* nil) ; too much noise, can't see the actual warnings
+  ;; #'IN-HOST-COMPILATION-MODE will push :NO-ANSI-PRINT-OBJECT into SB-XC:*FEATURES*
+  (warn "CMU CL doesn't support the :PRINT-OBJECT option to DEFSTRUCT.~%"))
 
 ;;; This is apparently quite old, according to
 ;;; <http://tunes.org/~nef/logs/lisp/03.10.22>:
@@ -71,39 +72,3 @@
 #+openmcl
 (unless (ignore-errors (funcall (constantly t) 1 2 3))
   (error "please find a binary that understands CONSTANTLY to build from"))
-
-;;;; general non-ANSI-ness
-
-(in-package :sb-cold)
-
-(defmacro munging-cl-package (&body body)
-  #-clisp `(progn ,@body)
-  #+clisp `(ext:without-package-lock ("CL")
-             ,@body))
-
-;;; Do the exports of COMMON-LISP conform to the standard? If not, try
-;;; to make them conform. (Of course, ANSI says that bashing symbols
-;;; in the COMMON-LISP package like this is undefined, but then if the
-;;; host Common Lisp were ANSI, we wouldn't be doing this, now would
-;;; we? "One dirty unportable hack deserves another.":-)
-(let ((standard-ht (make-hash-table :test 'equal))
-      (host-ht     (make-hash-table :test 'equal))
-      (cl         (find-package "COMMON-LISP")))
-  (do-external-symbols (i cl)
-    (setf (gethash (symbol-name i) host-ht) t))
-  (dolist (i (read-from-file "common-lisp-exports.lisp-expr"))
-    (setf (gethash i standard-ht) t))
-  (maphash (lambda (key value)
-             (declare (ignore value))
-             (unless (gethash key standard-ht)
-               (warn "removing non-ANSI export from package CL: ~S" key)
-               (munging-cl-package
-                (unexport (intern key cl) cl))))
-           host-ht)
-  (maphash (lambda (key value)
-             (declare (ignore value))
-             (unless (gethash key host-ht)
-               (warn "adding required-by-ANSI export to package CL: ~S" key)
-               (munging-cl-package
-                (export (intern key cl) cl))))
-           standard-ht))

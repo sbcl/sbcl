@@ -414,7 +414,7 @@
       (let ((symbol
              (without-package-locks
                  (package-symbolicate
-                  (load-time-value (find-package "SB-FORMAT") t)
+                  #.(find-package "SB-FORMAT")
                   "FORMAT-ARG"
                   (write-to-string (incf *format-gensym-counter*)
                                    :pretty nil :base 10 :radix nil)))))
@@ -1323,7 +1323,7 @@
                 (t name)))
          (package
             (if (not first-colon)
-                (load-time-value (find-package "COMMON-LISP-USER") t)
+                #.(find-package "COMMON-LISP-USER")
                 (let ((package-name (subseq name 0 first-colon)))
                   (or (find-package package-name)
                       ;; FIXME: should be PACKAGE-ERROR? Could we just

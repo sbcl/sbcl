@@ -287,6 +287,11 @@ report, otherwise ignored. The default value is CL:IDENTITY.
     (* 100
        (/ (ok-of count) (all-of count)))))
 
+;; This special is bound to the package in which forms will be read,
+;; and reassigned as read-and-record-source-map detects what look like
+;; "IN-PACKAGE" forms.
+(defvar *current-package*)
+
 (defun report-file (file html-stream external-format)
   "Print a code coverage report of FILE into the stream HTML-STREAM."
   (format html-stream "<html><head>")
@@ -303,7 +308,8 @@ report, otherwise ignored. The default value is CL:IDENTITY.
          (branch-records (convert-records (gethash file hashtable) :branch))
          ;; Cache the source-maps
          (maps (with-input-from-string (stream source)
-                 (loop with map = nil
+                 (loop with *current-package* = (find-package "CL-USER")
+                       with map = nil
                        with form = nil
                        with eof = nil
                        for i from 0
@@ -648,15 +654,51 @@ The source locations are stored in SOURCE-MAP."
                                         (apply sharp-dot args)))
                                     readtable))))
 
+;;; The detection logic for "IN-PACKAGE" is stolen from swank's
+;;; source-path-parser.lisp.
+;;;
+;;; We look for lines that start with "(in-package " or
+;;; "(cl:in-package ", without leading whitespace.
+(defun starts-with-p (string prefix)
+  (declare (type string string prefix))
+  (not (mismatch string prefix
+                 :end1 (min (length string) (length prefix))
+                 :test #'char-equal)))
+
+(defun extract-package (line)
+  (declare (type string line))
+  (let ((*package* *current-package*))
+    (second (read-from-string line))))
+
+(defun look-for-in-package-form (string)
+  (when (or (starts-with-p string "(in-package ")
+            (starts-with-p string "(cl:in-package "))
+    (let ((package (find-package (extract-package string))))
+      (when package
+        (setf *current-package* package)))))
+
+(defun look-for-in-package-form-in-stream (stream start-position end-position)
+  "Scans the stream between start-position up to end-position for
+   something that looks like an in-package form. If it does find
+   something, the function updates *current-package*. In all cases,
+   the stream is reset to end-position on exit."
+  (assert (file-position stream start-position))  ; rewind the stream
+  (loop until (>= (file-position stream) end-position)
+     do (look-for-in-package-form (or (read-line stream nil)
+                                      (return))))
+  (assert (file-position stream end-position)))
+
 (defun read-and-record-source-map (stream)
   "Read the next object from STREAM.
 Return the object together with a hashtable that maps
 subexpressions of the object to stream positions."
   (let* ((source-map (make-hash-table :test #'eq))
-         (*readtable* (make-source-recording-readtable *readtable* source-map))
          (start (file-position stream))
-         (form (read stream))
+         (form (let ((*readtable* (make-source-recording-readtable *readtable* source-map))
+                     (*package* *current-package*))
+                 (read stream)))
          (end (file-position stream)))
+    (look-for-in-package-form-in-stream stream start end)
     ;; ensure that at least FORM is in the source-map
     (unless (gethash form source-map)
       (push (list start end nil)

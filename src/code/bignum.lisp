@@ -138,7 +138,7 @@
   (declare (type bignum-element-type digit))
   (not (logbitp (1- digit-size) digit)))
 
-#!-sb-fluid (declaim (inline %bignum-0-or-plusp))
+#-sb-fluid (declaim (inline %bignum-0-or-plusp))
 (defun %bignum-0-or-plusp (bignum len)
   (declare (type bignum bignum)
            (type bignum-length len))
@@ -255,7 +255,7 @@
 ;;; is suitable for infinite sign extension to complete additions,
 ;;; subtractions, negations, etc. This cannot return a -1 represented as
 ;;; a negative fixnum since it would then have to low zeros.
-#!-sb-fluid (declaim (inline %sign-digit))
+#-sb-fluid (declaim (inline %sign-digit))
 (defun %sign-digit (bignum len)
   (declare (type bignum bignum)
            (type bignum-length len))
@@ -642,7 +642,7 @@
                  n2 n1
                  d2 d1))
     (values n2 (if (>= d2 (expt 2 (1- digit-size)))
-                   (lognot (logand most-positive-fixnum (lognot d2)))
+                   (lognot (logand sb-xc:most-positive-fixnum (lognot d2)))
                    (logand lower-ones-digit d2)))))
 
 
@@ -654,7 +654,7 @@
 
 ;;; Allocate a single word bignum that holds fixnum. This is useful when
 ;;; we are trying to mix fixnum and bignum operands.
-#!-sb-fluid (declaim (inline make-small-bignum))
+#-sb-fluid (declaim (inline make-small-bignum))
 (defun make-small-bignum (fixnum)
   (let ((res (%allocate-bignum 1)))
     (setf (%bignum-ref res 0) (%fixnum-to-digit fixnum))
@@ -1188,7 +1188,7 @@
                            hi
                            (logior hi (ash -1 sb-vm:float-sign-shift)))
                        lo)))
-#!+(and long-float x86)
+#+(and long-float x86)
 (defun long-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   (make-long-float
@@ -1234,7 +1234,7 @@
                    (check-exponent len sb-vm:double-float-bias
                                    sb-vm:double-float-normal-exponent-max)
                    plusp))
-                 #!+long-float
+                 #+long-float
                  (long-float
                   (long-float-from-bits
                    bits
@@ -1888,7 +1888,7 @@
 ;;; incoming data, such as in-place shifting. This is basically the same as
 ;;; the first form in %NORMALIZE-BIGNUM, but we return the length of the buffer
 ;;; instead of shrinking the bignum.
-#!-sb-fluid (declaim (maybe-inline %normalize-bignum-buffer))
+#-sb-fluid (declaim (maybe-inline %normalize-bignum-buffer))
 (defun %normalize-bignum-buffer (result len)
   (declare (type bignum result)
            (type bignum-length len))
@@ -1914,7 +1914,7 @@
   (declare (type bignum result)
            (type bignum-length len)
            (muffle-conditions compiler-note)
-           #!-sb-fluid (inline %normalize-bignum-buffer))
+           #-sb-fluid (inline %normalize-bignum-buffer))
   (let ((newlen (%normalize-bignum-buffer result len)))
     (declare (type bignum-length newlen))
     (unless (= newlen len)
@@ -1933,7 +1933,7 @@
 (defun %mostly-normalize-bignum (result len)
   (declare (type bignum result)
            (type bignum-length len)
-           #!-sb-fluid (inline %normalize-bignum-buffer))
+           #-sb-fluid (inline %normalize-bignum-buffer))
   (let ((newlen (%normalize-bignum-buffer result len)))
     (declare (type bignum-length newlen))
     (unless (= newlen len)
@@ -1950,7 +1950,7 @@
       (declare (type index i))
       (let ((xi (%bignum-ref x i)))
         (mixf result
-              (logand most-positive-fixnum
+              (logand sb-xc:most-positive-fixnum
                       (logxor xi
                               (ash xi -7))))))
     result))

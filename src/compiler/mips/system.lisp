@@ -76,6 +76,16 @@
     (load-type result function (- fun-pointer-lowtag))
     (inst nop)))
 
+(define-vop (fun-header-data)
+  (:translate fun-header-data)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:results (res :scs (unsigned-reg)))
+  (:result-types positive-fixnum)
+  (:generator 6
+    (loadw res x 0 fun-pointer-lowtag)
+    (inst srl res res n-widetag-bits)))
+
 (define-vop (get-header-data)
   (:translate get-header-data)
   (:policy :fast-safe)
@@ -85,17 +95,6 @@
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
     (inst srl res res n-widetag-bits)))
-
-(define-vop (get-closure-length)
-  (:translate get-closure-length)
-  (:policy :fast-safe)
-  (:args (x :scs (descriptor-reg)))
-  (:results (res :scs (unsigned-reg)))
-  (:result-types positive-fixnum)
-  (:generator 6
-    (loadw res x 0 fun-pointer-lowtag)
-    (inst srl res res n-widetag-bits)
-    (inst and res res short-header-max-words)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
@@ -172,11 +171,37 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr n-widetag-bits)
-    (inst sll ndescr word-shift)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst subu ndescr other-pointer-lowtag)
     (inst addu sap code ndescr)))
+
+(eval-when (:compile-toplevel)
+  (aver (not (logtest code-header-widetag #b11000000))))
+
+(define-vop (code-trailer-ref)
+  (:translate code-trailer-ref)
+  (:policy :fast-safe)
+  (:args (code :scs (descriptor-reg) :to (:result 0))
+         (offset :scs (signed-reg) :to (:result 0)))
+  (:arg-types * fixnum)
+  (:results (res :scs (unsigned-reg) :from (:argument 0)))
+  (:result-types unsigned-num)
+  (:temporary (:scs (interior-reg)) lip)
+  (:generator 10
+    (loadw res code 0 other-pointer-lowtag)
+    (inst sll res res 2) ; shift out the GC bits
+    ;; Then shift right to clear the widetag, plus 2 more to the right since we just
+    ;; left-shifted to zeroize bits. Then shift left 2 to convert words to bytes.
+    ;; The '>>2' and '<<2' cancel out because we don't need to clear all 8 bits
+    ;; of the widetag, as CODE-HEADER-WIDETAG already has bits 6 and 7 clear.
+    ;; Other places assume the same, though without much commentary.
+    ;; It's brittle magic, save for the AVER above which ensures that it works.
+    (inst srl res res n-widetag-bits)
+    (inst add res offset res)
+    (inst subu res other-pointer-lowtag)
+    (inst add lip code res)
+    (inst lw res lip 0)
+    (inst nop)))
 
 (define-vop (compute-fun)
   (:args (code :scs (descriptor-reg))
@@ -185,9 +210,7 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    (loadw ndescr code 0 other-pointer-lowtag)
-    (inst srl ndescr n-widetag-bits)
-    (inst sll ndescr word-shift)
+    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
     (inst addu ndescr offset)
     (inst addu ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst addu func code ndescr)))

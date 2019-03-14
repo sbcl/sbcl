@@ -86,7 +86,7 @@
                       ;; If it's a lisp-rep-type, the CTYPE should be one already.
                       (aver (not (compute-lisp-rep-type alien-type)))
                       `(sb-alien::alien-value-typep object ',alien-type)))
-                   #!+(vop-translates sb-int:fixnump-instance-ref)
+                   #+(vop-translates sb-int:fixnump-instance-ref)
                    ((and (type= type (specifier-type 'fixnum))
                          (let ((use (lvar-uses object)) index)
                            (and (combination-p use)
@@ -236,7 +236,7 @@
 (define-source-transform atom (x)
   `(not (consp ,x)))
 
-#!+(and sb-unicode (not (or x86-64 arm64)))
+#+(and sb-unicode (not (or x86-64 arm64)))
 (define-source-transform base-char-p (x)
   `(typep ,x 'base-char))
 ;; CONS is implemented as (and list (not (eql nil))) where the 'and' is
@@ -297,7 +297,7 @@
                  ((nil) 'real))))
     (ecase (numeric-type-complexp type)
       (:real
-       (cond #!+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
+       (cond #+(or x86 x86-64 arm arm64) ;; Not implemented elsewhere yet
              ((and
                (eql (numeric-type-class type) 'integer)
                (or (eql (numeric-type-low type) 0)
@@ -570,7 +570,7 @@
     (or (and (= (length pairs) 1)
              (= (caar pairs) 0)
              (cond
-               #!+(and sb-unicode (or x86-64 arm64))
+               #+(and sb-unicode (or x86-64 arm64))
                ((= (cdar pairs) (1- base-char-code-limit))
                 `(base-char-p ,object))
                ((= (cdar pairs) (1- sb-xc:char-code-limit))
@@ -583,7 +583,7 @@
                            collect
                            `(<= ,(car pair) ,n-code ,(cdr pair))))))))))
 
-#!+sb-simd-pack
+#+sb-simd-pack
 (defun source-transform-simd-pack-typep (object type)
   (if (type= type (specifier-type 'simd-pack))
       `(simd-pack-p ,object)
@@ -596,7 +596,7 @@
                     for index = (position type *simd-pack-element-types*)
                     collect `(eql ,n-tag ,index))))))))
 
-#!+sb-simd-pack-256
+#+sb-simd-pack-256
 (defun source-transform-simd-pack-256-typep (object type)
   (if (type= type (specifier-type 'simd-pack-256))
       `(simd-pack-256-p ,object)
@@ -643,9 +643,9 @@
       (cond ((cdr dims)
              (values `(,header-test
                        ,@(when (eq (array-type-dimensions stype) '*)
-                           #!+x86-64
+                           #+x86-64
                            `((%array-rank= ,obj ,(length dims)))
-                           #!-x86-64
+                           #-x86-64
                            `((= (%array-rank ,obj) ,(length dims))))
                        ,@(loop for d in dims
                                for i from 0
@@ -689,9 +689,9 @@
              ;; If we know OBJ is an array header, and that the array is
              ;; simple, we also know there is exactly one indirection to
              ;; follow.
-             `(#!-x86-64
+             `(#-x86-64
                (eq (%other-pointer-widetag (%array-data ,obj)) ,typecode)
-               #!+x86-64
+               #+x86-64
                (widetag= (%array-data ,obj) ,typecode))
              `((do ((,data ,(if headerp `(%array-data ,obj) obj)
                            (%array-data ,data)))
@@ -850,7 +850,7 @@
                                      (eq object-layout ',other-layout))))
                              ;; FIXME: not defined in time for make-host-1,
                              ;; so the cross-compiler isn't getting this branch.
-                             #!+(vop-named sb-vm::layout-eq)
+                             #+(vop-named sb-vm::layout-eq)
                              ((equal layout-getter '(%instance-layout object))
                               `(sb-vm::layout-eq object ',layout))
                              (t
@@ -887,10 +887,10 @@
                      ;; (eq (data-vector-ref ...) k) has a single instruction form,
                      ;; but lacking that, force it into a single call
                      ;; that a vop can translate.
-                     #!+(and immobile-space x86-64)
+                     #+(and immobile-space x86-64)
                      `(sb-vm::layout-inherits-ref-eq ; only implemented on x86-64
                        (layout-inherits ,n-layout) ,depthoid ,layout)
-                     #!-(and immobile-space x86-64)
+                     #-(and immobile-space x86-64)
                      `(eq ,get-ancestor ,layout))
                    (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
@@ -980,12 +980,9 @@
                      `(eql ,object ',value))))
          (handler-case
              (or
-              (let ((pred (cdr (assoc ctype *backend-type-predicates*
-                                      :test #'type=))))
+              (let ((pred (backend-type-predicate ctype)))
                 (when pred `(,pred ,object)))
-              (let ((pred (cdr (assoc (type-negation ctype)
-                                      *backend-type-predicates*
-                                      :test #'type=))))
+              (let ((pred (backend-type-predicate (type-negation ctype))))
                 (when pred `(not (,pred ,object)))))
            #+sb-xc-host
            (sb-kernel::cross-type-warning
@@ -1016,10 +1013,10 @@
             (source-transform-cons-typep object ctype))
            (character-set-type
             (source-transform-character-set-typep object ctype))
-           #!+sb-simd-pack
+           #+sb-simd-pack
            (simd-pack-type
             (source-transform-simd-pack-typep object ctype))
-           #!+sb-simd-pack-256
+           #+sb-simd-pack-256
            (simd-pack-256-type
             (source-transform-simd-pack-256-typep object ctype))
            (t nil))
@@ -1122,25 +1119,63 @@
                     (error "~a is not a subtype of VECTOR." type)))))
     (simplify type)))
 
+
+(defun check-coerce (value-type to-type type-specifier node)
+  (flet ((fail ()
+           (compiler-warn "Cannot coerce ~s to ~s"
+                          (type-specifier value-type)
+                          (type-specifier to-type))
+           (setf (combination-kind node) :error)
+           (give-up-ir1-transform)))
+    (cond ((eq to-type *empty-type*)
+           (fail))
+          ((types-equal-or-intersect value-type to-type))
+          ((csubtypep to-type (specifier-type 'sequence))
+           (unless (csubtypep to-type (specifier-type 'sequence))
+             (fail)))
+          ((eql type-specifier 'character)
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type 'string))
+             (fail)))
+          ((csubtypep to-type (specifier-type 'complex))
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type 'number))
+             (fail)))
+
+          ((csubtypep to-type (specifier-type 'float))
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type 'real))
+             (fail)))
+          ((eq type-specifier 'function)
+           (unless (types-equal-or-intersect value-type
+                                             (specifier-type '(or symbol cons)))
+             (fail)))
+          (t
+           (fail)))))
+
 (deftransform coerce ((x type) (* *) * :node node)
   (unless (constant-lvar-p type)
     (give-up-ir1-transform))
   (let* ((tval (lvar-value type))
-         (tspec (ir1-transform-specifier-type tval)))
+         (tspec (ir1-transform-specifier-type tval))
+         (value-type (lvar-type x)))
+    (check-coerce value-type tspec tval node)
     ;; Note: The THE forms we use to wrap the results make sure that
     ;; specifiers like (SINGLE-FLOAT 0.0 1.0) can raise a TYPE-ERROR.
     (cond
-      ((eq tspec *empty-type*)
-       (compiler-warn "Can't coerce to NIL.")
-       (setf (combination-kind node) :error)
-       (give-up-ir1-transform))
-      ((csubtypep (lvar-type x) tspec)
+      ((csubtypep value-type tspec)
        'x)
       ((csubtypep tspec (specifier-type 'double-float))
        `(the ,tval (%double-float x)))
-      ;; FIXME: #!+long-float (t ,(error "LONG-FLOAT case needed"))
-      ((csubtypep tspec (specifier-type 'float))
+      ((csubtypep tspec (specifier-type 'single-float))
        `(the ,tval (%single-float x)))
+      ;; FIXME: #+long-float (t ,(error "LONG-FLOAT case needed"))
+      ((csubtypep tspec (specifier-type 'float))
+       (if (types-equal-or-intersect value-type (specifier-type 'float))
+           `(the ,tval (if (floatp x)
+                           x
+                           (%single-float x)))
+           `(the ,tval (%single-float x))))
       ((csubtypep tspec (specifier-type 'complex))
        (multiple-value-bind (part-type result-type)
            (cond ((and (numeric-type-p tspec)
@@ -1159,9 +1194,15 @@
               ((typep x ',tval)
                x)
               (t         ; X is COMPLEX, but not of the requested type
-               (the ,result-type
-                    (complex (coerce (realpart x) ',part-type)
-                             (coerce (imagpart x) ',part-type))))))))
+               ,(if (eq part-type 'rational)
+                    ;; Can't coerce non-rational to a rational and
+                    ;; CHECK-COERCE will warn, so just full call
+                    ;; COERCE and let it signal an error.
+                    `(locally (declare (notinline coerce))
+                       (coerce x ',tval))
+                    `(the ,result-type
+                          (complex (coerce (realpart x) ',part-type)
+                                   (coerce (imagpart x) ',part-type)))))))))
       ;; Special case STRING and SIMPLE-STRING as they are union types
       ;; in SBCL.
       ((member tval '(string simple-string))
@@ -1220,14 +1261,14 @@
         "~@<open coding coercion to ~S not implemented.~:@>"
         tval)))))
 
-(deftransform #!+64-bit unsigned-byte-64-p #!-64-bit unsigned-byte-32-p
+(deftransform #+64-bit unsigned-byte-64-p #-64-bit unsigned-byte-32-p
   ((value) (fixnum))
   `(>= value 0))
 
 (deftransform %other-pointer-p ((object))
   (let ((this-type
           (specifier-type '(or fixnum
-                            #!+64-bit single-float
+                            #+64-bit single-float
                             function
                             list
                             instance

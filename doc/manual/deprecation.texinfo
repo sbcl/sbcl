@@ -91,7 +91,9 @@ SBCL doesn't have infinite developer resources.
 
 We also believe that sometimes cleaning out legacy interfaces helps
 keep the whole system more comprehensible to users, and makes
-introspective tools such as @code{apropos} more useful.
+introspective tools such as
+@findex @cl{apropos}
+@code{apropos} more useful.
 
 @end itemize
 
@@ -119,8 +121,11 @@ applicable.
 
 During early deprecation the interface is kept in working
 condition. However, when a thing in this deprecation stage is used, an
-@sbext{early-deprecation-warning}, which is a @cl{style-warning}, is
-signaled at compile-time.
+@tindex @sbext{early-deprecation-warning}
+@code{sb-ext:early-deprecation-warning}, which is a
+@tindex @cl{style-warning}
+@code{style-warning}, is signaled at
+compile-time.
 
 The internals may change at this stage: typically because the interface
 is re-implemented on top of its successor. While we try to keep things
@@ -140,15 +145,24 @@ returning @code{NIL} for a mutexes, trouble could ensue.
 
 During late deprecation the interface remains as it was during early
 deprecation, but the compile-time warning is upgraded: when a thing in
-this deprecation stage is used, a @sbext{late-deprecation-warning},
-which is a full @cl{warning}, is signaled at compile-time.
+this deprecation stage is used, a
+@tindex @sbext{late-deprecation-warning}
+@code{sb-ext:late-deprecation-warning},
+which is a full
+@tindex @cl{warning}
+@code{warning}, is signaled at compile-time.
 
 @item @strong{Final Deprecation}
 
 During final deprecation the symbols still exist. However, when a thing
-in this deprecation stage is used, a @sbext{final-deprecation-warning},
-which is a full @cl{warning}, is signaled at compile-time and an
-@cl{error} is signaled at run-time.
+in this deprecation stage is used, a
+@tindex @sbext{final-deprecation-warning}
+@code{sb-ext:final-deprecation-warning},
+which is a full
+@tindex @cl{warning}
+@code{warning}, is signaled at compile-time and an
+@tindex @cl{error}
+@code{error} is signaled at run-time.
 
 @item @strong{After Final Deprecation}
 
@@ -161,7 +175,8 @@ The interface is deleted entirely.
 @section Deprecation Conditions
 @cindex Deprecation Conditions
 
-@sbext{deprecation-condition} is the superclass of all
+@tindex @sbext{deprecation-condition}
+@code{sb-ext:deprecation-condition} is the superclass of all
 deprecation-related warning and error conditions. All common slots and
 readers are defined in this condition class.
 
@@ -182,8 +197,8 @@ readers are defined in this condition class.
 @comment TODO @findex @sbcltl{function-information}
 @comment TODO @findex @sbcltl{variable-information}
 
-The deprecation status of functions and variables can be inspected using
-the @code{sb-cltl2:function-information} and
+The deprecation status of functions and variables can be inspected
+using the @code{sb-cltl2:function-information} and
 @code{sb-cltl2:variable-information} functions provided by the
 @code{sb-cltl2} contributed module.
 
@@ -228,8 +243,9 @@ Declare functions, compiler-macros or macros as deprecated.
 @quotation note
 When declaring a function to be in @code{:final} deprecation, there
 should be no actual definition of the function as the declaration emits
-a stub function that signals a @sbext{deprecation-error} at run-time
-when called.
+a stub function that signals a
+@tindex @sbext{deprecation-error}
+@code{sb-ext:deprecation-error} at run-time when called.
 @end quotation
 
 @item cl:variable
@@ -239,8 +255,9 @@ deprecated.
 @quotation note
 When declaring a variable to be in @code{:final} deprecation, there
 should be no actual definition of the variable as the declaration emits
-a symbol-macro that signals a @code{sb-ext:deprecation-error} at
-run-time when accessed.
+a symbol-macro that signals a
+@tindex @sbext{deprecation-error}
+@code{sb-ext:deprecation-error} at run-time when accessed.
 @end quotation
 
 @item cl:type
@@ -294,6 +311,8 @@ This sections lists legacy interfaces in various stages of deprecation.
 @subsection List of Deprecated Interfaces
 
 @subsubsection Early Deprecation
+
+@tindex @sbext{early-deprecation-warning}
 
 @itemize
 
@@ -380,6 +399,8 @@ Internally deprecated in 2012. Declared deprecated as of 1.2.10 in March
 @end itemize
 
 @subsubsection Late Deprecation
+
+@tindex @sbext{late-deprecation-warning}
 
 @itemize
 
@@ -486,6 +507,8 @@ character IO -- in conjunction with @code{write-sequence}.
 @end itemize
 
 @subsubsection Final Deprecation
+
+@tindex @sbext{final-deprecation-warning}
 
 No interfaces are currently in final deprecation.
 

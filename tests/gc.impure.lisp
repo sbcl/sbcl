@@ -215,7 +215,7 @@
 
 (with-test (:name :gc-logfile :skipped-on (not :gencgc))
   (assert (not (gc-logfile)))
-  (let ((p #p"gc.log"))
+  (let ((p (randomish-temp-file-name "log")))
     (assert (not (probe-file p)))
     (assert (equal p (setf (gc-logfile) p)))
     (gc)
@@ -360,6 +360,27 @@
            (setf (aref a serial) 1))))
      :all)))
 
+(defvar *foo*)
+#+gencgc
+(with-test (:name :traceroot-simple-fun)
+  (setq *foo* (compile nil '(lambda () 42)))
+  (let ((wp (sb-ext:make-weak-pointer *foo*)))
+    (assert (eql (sb-ext:search-roots wp) 1))))
+
 #+gencgc
 (with-test (:name :traceroot-ignore-immediate)
   (gc-and-search-roots (make-weak-pointer 48)))
+
+#+sb-thread
+(with-test (:name :concurrently-alloc-code)
+  (let ((gc-thread
+         (sb-thread:make-thread
+          (let ((stop (+ (get-internal-real-time)
+                         internal-time-units-per-second)))
+            (lambda ()
+              (loop while (<= (get-internal-real-time) stop)
+                    do (gc) (sleep 0)))))))
+    (loop (compile nil `(lambda () (print 20)))
+          (unless (sb-thread:thread-alive-p gc-thread)
+            (return)))
+    (sb-thread:join-thread gc-thread)))
