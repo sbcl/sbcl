@@ -103,7 +103,7 @@
 
 (defun file-compile (toplevel-forms &key load
                                          before-load)
-  (let* ((lisp (test-util:randomish-temp-file-name "lisp"))
+  (let* ((lisp (test-util:scratch-file-name "lisp"))
          (fasl (compile-file-pathname lisp))
          (error-stream (make-string-output-stream)))
     (unwind-protect

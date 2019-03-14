@@ -5570,7 +5570,7 @@
       (let ((err-string (with-output-to-string (*error-output*)
                           (compile-file input :print nil
                                               :output-file
-                                              (randomish-temp-file-name "fasl")))))
+                                              (scratch-file-name "fasl")))))
         (assert (search expect err-string))))))
 
 (with-test (:name (coerce :derive-type))

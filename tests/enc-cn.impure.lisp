@@ -6,7 +6,7 @@
 (let ((str (coerce '(#\u0031 #\u0041 #\uff21 #\u3042 #\u80e1 #\u73a5 #\u59ee)
                    'string))
       (gbk '(#x31 #x41 #xa3 #xc1 #xa4 #xa2 #xba #xfa #xab #x68 #x8a #xac))
-      (file (randomish-temp-file-name)))
+      (file (scratch-file-name)))
   (dolist (pair (list (list gbk :gbk)))
     (destructuring-bind (bytes enc) pair
       ;; check if output works

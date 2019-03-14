@@ -11,12 +11,6 @@
 
 (use-package :sb-unicode)
 
-(defun split-string (string delimiter)
-  (loop for begin = 0 then (1+ end)
-        for end = (position delimiter string) then (position delimiter string :start begin)
-        collect (subseq string begin end)
-        while end))
-
 ;; Taken straight out of the common lisp cookbook
 (defun replace-all (part replacement string &key (test #'char=))
 "Returns a new string in which all the occurences of the part
@@ -109,7 +103,7 @@ is replaced with replacement."
                       (make-pathname
                        :directory '(:relative :up "tools-for-build")
                        :name "UnicodeData" :type "txt")
-                      (or *load-truename* *compile-file-truename*)))
+                      (or *load-pathname* *compile-file-pathname*)))
     (with-test (:name (:unicode-properties))
       (loop for line = (read-line s nil nil)
             while line

@@ -151,8 +151,8 @@
 
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
-    (load (compile-file "bug-414.lisp"
-                        :output-file (randomish-temp-file-name "fasl")))
+    (with-scratch-file (output "fasl")
+      (load (compile-file "bug-414.lisp" :output-file output)))
     (disassemble 'bug-414)))
 
 ;; A known function can be stored as a code constant in lieu of the
@@ -161,12 +161,12 @@
 ;; Show that declaring the function locally notinline uses the #<fdefn>
 ;; by first compiling a call that would have elided the #<fdefn>
 ;; and then TRACE.
+;; XXX: what purpose has the JUNK argument?
 (defun test-compile-then-load (filename junk)
   (declare (notinline compile-file load))
-  (apply 'load (apply 'compile-file filename
-                      :output-file (randomish-temp-file-name "fasl")
-                      junk)
-         junk))
+  (with-scratch-file (output "fasl")
+    (apply 'load (apply 'compile-file filename :output-file output junk)
+           junk)))
 (compile 'test-compile-then-load)
 (with-test (:name :traceable-known-fun)
   (let ((s (make-string-output-stream)))

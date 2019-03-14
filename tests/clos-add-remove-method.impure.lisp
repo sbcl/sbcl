@@ -42,7 +42,7 @@
   (let ((n-junk 0)
         (starting-eql-spec-count
          (hash-table-count sb-pcl::*eql-specializer-table*)))
-    (make-tons-o-methods 50000)
+    (make-tons-o-methods 5000)
     (sb-int:dx-flet ((visit (object type size)
                        (declare (ignore type size))
                        (when (and (typep object '(cons string (simple-vector 20001)))
