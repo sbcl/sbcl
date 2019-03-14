@@ -156,7 +156,6 @@
      ,(eq *test-evaluator-mode* :interpret))))
 
 (defun impure-runner (files test-fun log)
-  (declare (ignore log))
   (when files
     (format t "// Running impure tests (~a)~%" test-fun)
     (dolist (file files)
