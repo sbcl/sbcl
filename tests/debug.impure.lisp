@@ -151,7 +151,8 @@
 
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
-    (load (compile-file "bug-414.lisp"))
+    (load (compile-file "bug-414.lisp"
+                        :output-file (randomish-temp-file-name "fasl")))
     (disassemble 'bug-414)))
 
 ;; A known function can be stored as a code constant in lieu of the
@@ -162,7 +163,10 @@
 ;; and then TRACE.
 (defun test-compile-then-load (filename junk)
   (declare (notinline compile-file load))
-  (apply 'load (apply 'compile-file filename junk) junk))
+  (apply 'load (apply 'compile-file filename
+                      :output-file (randomish-temp-file-name "fasl")
+                      junk)
+         junk))
 (compile 'test-compile-then-load)
 (with-test (:name :traceable-known-fun)
   (let ((s (make-string-output-stream)))

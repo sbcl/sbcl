@@ -444,7 +444,7 @@
 ;;;
 ;;; This is not part of the interface, but it is the behaviour we want
 (with-test (:name (compile-file load :locked-package))
-  (let* ((tmp "package-locks.tmp.lisp")
+  (let* ((tmp (randomish-temp-file-name "lisp"))
          (fasl (compile-file-pathname tmp)))
     (dolist (form *illegal-runtime-forms*)
       (unwind-protect

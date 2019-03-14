@@ -96,7 +96,7 @@
             (*read-eval* nil))
         (print-them 'print-not-readable)))))
 
-(defvar *tmp-filename* "load-test.tmp")
+(defvar *tmp-filename* (randomish-temp-file-name))
 
 (defvar *pack*)
 (with-test (:name :load-simd-pack-int)

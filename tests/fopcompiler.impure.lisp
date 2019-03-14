@@ -13,7 +13,7 @@
 ;;; being executed, in fact mustn't go in "fopcompiler.impure-cload.lisp"
 ;;; because the call to COMPILE-FILE needs to be wrapped in HANDLER-BIND.
 
-(defvar *tmp-filename* "fopcompile-test.tmp")
+(defvar *tmp-filename* (randomish-temp-file-name))
 
 ;; Assert that FORM is handled by the fopcompiler, then compile it.
 (defun assert-fopcompilable-and-compile-it (form)

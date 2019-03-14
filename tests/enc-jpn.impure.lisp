@@ -7,7 +7,7 @@
       (eucjp '(#x41 #x8e #xb1 #xa3 #xc1 #xa4 #xa2 #xdf #xa1 #xe0 #xa1
                #x8f #xe3 #xaf))
       (sjis '(#x41 #xb1 #x82 #x60 #x82 #xa0 #xe0 #x40 #xe0 #x9f #xfb #xbd))
-      (file "enc-jpn-test.txt"))
+      (file (randomish-temp-file-name)))
   (dolist (pair (list (list eucjp :euc-jp)
                       (list sjis :shift_jis)))
     (destructuring-bind (bytes enc) pair

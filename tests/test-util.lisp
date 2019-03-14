@@ -23,6 +23,7 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
 
+           #:randomish-temp-file-name
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
 (in-package :test-util)
@@ -795,3 +796,22 @@
              unless (= chosen lim)
              do (rotatef (aref vector chosen) (aref vector lim)))
        vector))))
+
+;;; Return a random file name to avoid writing into the source tree.
+;;; We can't use any of the interfaces provided in libc because those are inadequate
+;;; for purposes of COMPILE-FILE. This is not trying to be robust against attacks.
+(defun randomish-temp-file-name (&optional extension)
+  (let ((a (make-array 10 :element-type 'character)))
+    (dotimes (i 10)
+      (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
+    ;; not sure where to write files on win32. this is no worse than what it was
+    #+win32 (format nil "~a~@[.~a~]" a extension)
+    #-win32 (let ((dir (posix-getenv "TMPDIR"))
+                  (file (format nil "sbcl~d~a~@[.~a~]"
+                                (sb-unix:unix-getpid) a extension)))
+              (if dir
+                  (namestring
+                   (merge-pathnames
+                    file (parse-native-namestring dir nil *default-pathname-defaults*
+                                                  :as-directory t)))
+                  (concatenate 'string "/tmp/" file)))))

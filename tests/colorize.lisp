@@ -3,7 +3,9 @@
 
 (defvar *color-error* nil)
 
-(unless *no-color*
+(if *no-color*
+  (defun %output-colored-text (text color &key bold)
+    (declare (ignore text color bold)))
   (let ((file #-win32 "colorize-control-codes.lisp"
               #+win32 "colorize-windows-console.lisp"))
     (handler-case (load file)
