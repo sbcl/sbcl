@@ -344,7 +344,8 @@
 ;; See (MAKE-THREAD :INTERRUPT-WITH MAKE-THREAD :BUG-1180102) in
 ;; threads.pure.lisp.
 (with-test (:name (:timer :dispatch-thread :make-thread :bug-1180102)
-            :skipped-on (not :sb-thread))
+            :skipped-on (not :sb-thread)
+            :broken-on :sb-safepoint)
   (flet ((test (thread)
            (let ((timer (make-timer (lambda ()) :thread thread)))
              (schedule-timer timer .01 :repeat-interval 0.1)
