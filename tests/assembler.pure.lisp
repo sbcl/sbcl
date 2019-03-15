@@ -12,6 +12,7 @@
 ;;;; more information.
 
 (cl:in-package "SB-VM")
+(shadow '("ASSEMBLE"))
 (use-package "TEST-UTIL")
 
 (enable-test-parallelism)
