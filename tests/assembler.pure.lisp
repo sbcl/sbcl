@@ -241,7 +241,7 @@
   ;; Cause SUB-GC to become un-statically-linked
   (progn (trace sb-impl::sub-gc) (untrace))
   (let ((lines
-         (split-string (with-output-to-string (s)
+         (test-util:split-string (with-output-to-string (s)
                          (disassemble 'sb-impl::gc :stream s))
                        #\Newline))
         (found))
