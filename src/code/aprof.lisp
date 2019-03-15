@@ -359,7 +359,10 @@
                                   (advance +state-widetag-only+)
                                   (setq widetag (if (eq (inst-operand-size dstate) :qword)
                                                     :variable
-                                                    (logand (reg/mem-imm-data 0 dstate) #xFF))))
+                                                    (logand (reg/mem-imm-data 0 dstate) #xFF)))
+                                  (when (integerp widetag)
+                                    (return-from infer-type
+                                      (values (aref *tag-to-type* widetag) size))))
                                  ((and (eql (machine-ea-base ea) target-reg)
                                        (not (machine-ea-index ea))
                                        (machine-ea-disp ea))) ; ignore

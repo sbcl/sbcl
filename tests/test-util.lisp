@@ -23,6 +23,7 @@
            #:checked-compile #:checked-compile-and-assert
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
+           #:assemble
 
            #:scratch-file-name
            #:with-scratch-file
@@ -826,3 +827,27 @@
   `(let ((,var (scratch-file-name ,extension)))
      (unwind-protect (progn ,@forms)
        (ignore-errors (delete-file ,var)))))
+
+;;; Take a list of lists and assemble them as though they are
+;;; instructions inside the body of a vop. There is no need
+;;; to use the INST macro in front of each list.
+;;; As a special case, an atom is the symbol LABEL, it will be
+;;; changed to a generated label. At most one such atom may appear.
+(defun assemble (instructions)
+  (let ((segment (sb-assem:make-segment))
+        (label))
+    (sb-assem:assemble (segment 'nil)
+       (dolist (inst instructions)
+         (setq inst (copy-list inst))
+         (mapl (lambda (cell &aux (x (car cell)))
+                 (when (and (symbolp x) (string= x "LABEL"))
+                   (setq label (sb-assem:gen-label))
+                   (rplaca cell label)))
+               inst)
+         (apply #'sb-assem::%inst
+                (sb-assem::op-encoder-name (car inst))
+                (cdr inst)))
+       (when label
+         (sb-assem::%emit-label segment nil label)))
+    (sb-assem:segment-buffer
+     (sb-assem:finalize-segment segment))))
