@@ -226,9 +226,6 @@
   (assert t))
 
 
-(defun random-type (n)
-  `(integer ,(random n) ,(+ n (random n))))
-
 ;;; FIXME: Since timeouts do not work on Windows this would loop
 ;;; forever.
 (with-test (:name (:hash-cache :interrupt) :skipped-on :win32)

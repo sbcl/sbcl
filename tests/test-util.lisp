@@ -6,12 +6,16 @@
            #:*elapsed-times*
 
            ;; type tools
+           #:random-type
            #:type-evidently-=
            #:ctype=
            #:assert-tri-eq
 
            ;; thread tools
            #:make-kill-thread #:make-join-thread
+           #:wait-for-threads
+           #:process-all-interrupts
+           #:test-interrupt
            ;; cause tests to run in multiple threads
            #:enable-test-parallelism
 
@@ -64,6 +68,9 @@
 
 ;;; Type tools
 
+(defun random-type (n)
+  `(integer ,(random n) ,(+ n (random n))))
+
 (defun type-evidently-= (x y)
   (and (subtypep x y) (subtypep y x)))
 
@@ -100,6 +107,23 @@
     (when (boundp '*threads-to-join*)
       (push thread *threads-to-join*))
     thread))
+
+(defun wait-for-threads (threads)
+  (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
+  (assert (not (some #'sb-thread:thread-alive-p threads))))
+
+(defun process-all-interrupts (&optional (thread sb-thread:*current-thread*))
+  (sb-ext:wait-for (null (sb-thread::thread-interruptions thread))))
+
+(defun test-interrupt (function-to-interrupt &optional quit-p)
+  (let ((child  (make-kill-thread function-to-interrupt)))
+    (format t "interrupting child ~A~%" child)
+    (sb-thread:interrupt-thread child
+     (lambda ()
+       (format t "child pid ~A~%" sb-thread:*current-thread*)
+       (when quit-p (sb-thread:abort-thread))))
+    (process-all-interrupts child)
+    child))
 
 (defun log-msg (stream &rest args)
   (prog1 (apply #'format stream "~&::: ~@?~%" args)
