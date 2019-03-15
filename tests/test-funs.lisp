@@ -37,7 +37,7 @@
             (sb-thread:join-thread thr)))))))
 
 (defun cload-test (file)
-  (let ((compile-name (randomish-temp-file-name "fasl")))
+  (let ((compile-name (scratch-file-name "fasl")))
     (unwind-protect
          (progn
            (compile-file file :print nil :output-file compile-name)

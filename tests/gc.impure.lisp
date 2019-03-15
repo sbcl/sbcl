@@ -215,7 +215,7 @@
 
 (with-test (:name :gc-logfile :skipped-on (not :gencgc))
   (assert (not (gc-logfile)))
-  (let ((p (randomish-temp-file-name "log")))
+  (let ((p (scratch-file-name "log")))
     (assert (not (probe-file p)))
     (assert (equal p (setf (gc-logfile) p)))
     (gc)

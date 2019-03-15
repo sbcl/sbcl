@@ -21,7 +21,7 @@
         do (let ((,xf (first (sb-impl::ef-names ,nxf))))
              ,@body))))
 
-(defvar *test-path* (randomish-temp-file-name))
+(defvar *test-path* (scratch-file-name))
 
 (with-test (:name :end-of-file)
   (do-external-formats (xf)
@@ -201,7 +201,7 @@
   (assert (equal (read-line s nil s) s)))
 
 ;;; Test skipping character-decode-errors in comments.
-(let* ((input (randomish-temp-file-name "lisp"))
+(let* ((input (scratch-file-name "lisp"))
        (s (open input :direction :output
                       :if-exists :supersede :external-format :latin-1))
        (output))

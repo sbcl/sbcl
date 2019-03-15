@@ -79,7 +79,7 @@
 ;;; "Alien bug" on sbcl-devel 2004-10-11 by Thomas F. Burdick caused
 ;;; by recursive struct definition.
 (with-test (:name (compile-file :nested define-alien-type struct))
-  (let ((fname (randomish-temp-file-name "lisp")))
+  (let ((fname (scratch-file-name "lisp")))
     (unwind-protect
          (progn
            (with-open-file (f fname :direction :output :if-exists :supersede)
@@ -451,7 +451,7 @@
                                          (sb-alien::c-string-to-string
                                           (sb-sys:vector-sap c-string)
                                           :utf-8 'character)))))))
-                  (let ((namestring (randomish-temp-file-name)))
+                  (let ((namestring (scratch-file-name)))
                     (unwind-protect
                          (progn
                            (with-open-file (f namestring

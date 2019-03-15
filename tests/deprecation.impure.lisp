@@ -339,7 +339,7 @@
                     (documentation 'function.defun.late 'function))))
 
 (with-test (:name :load-time-deprecation-warning)
-  (let ((source (randomish-temp-file-name "tmp")) fasl)
+  (let ((source (scratch-file-name "tmp")) fasl)
     (with-open-file (f source :direction :output
                        :if-does-not-exist :create :if-exists :supersede)
       (write-string "(defun a () (sb-unix:unix-exit))" f)

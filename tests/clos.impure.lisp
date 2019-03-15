@@ -2526,7 +2526,7 @@
              (load file))))
     (multiple-value-bind (fasl warnings errorsp)
           (compile-file "bug-503095.lisp" :print nil :verbose nil
-                        :output-file (randomish-temp-file-name "fasl"))
+                        :output-file (scratch-file-name "fasl"))
       (unwind-protect
            (progn (assert (and fasl (not warnings) (not errorsp)))
                   (test-load fasl))

@@ -5,6 +5,7 @@
 
            #:really-invoke-debugger
            #:*break-on-failure* #:*break-on-expected-failure*
+           #:*elapsed-times*
 
            ;; type tools
            #:type-evidently-=
@@ -25,9 +26,8 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
 
-           #:randomish-temp-file-name
-
-           ;; RUNTIME
+           #:scratch-file-name
+           #:with-scratch-file
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
 (in-package :test-util)
@@ -125,9 +125,11 @@
       (print-unreadable-object (object stream :type t :identity t)
         (format stream "~A ~A" (result-name object) (result-status object)))))
 
+(defvar *elapsed-times* nil)
 (defun run-test (test-function name fails-on)
   (start-test)
   (let (#+sb-thread (threads (sb-thread:list-all-threads))
+        (start-time (get-internal-real-time))
         (*threads-to-join* nil)
         (*threads-to-kill* nil))
     (handler-bind ((error (lambda (error)
@@ -163,6 +165,8 @@
         (when any-leftover
           (fail-test :leftover-thread name any-leftover)
           (return-from run-test)))
+      (let ((et (- (get-internal-real-time) start-time)))
+        (push (cons et name) *elapsed-times*))
       (if (expected-failure-p fails-on)
           (fail-test :unexpected-success name nil)
           (progn
@@ -827,7 +831,7 @@
 ;;; Return a random file name to avoid writing into the source tree.
 ;;; We can't use any of the interfaces provided in libc because those are inadequate
 ;;; for purposes of COMPILE-FILE. This is not trying to be robust against attacks.
-(defun randomish-temp-file-name (&optional extension)
+(defun scratch-file-name (&optional extension)
   (let ((a (make-array 10 :element-type 'character)))
     (dotimes (i 10)
       (setf (aref a i) (code-char (+ (char-code #\a) (random 26)))))
@@ -842,3 +846,8 @@
                     file (parse-native-namestring dir nil *default-pathname-defaults*
                                                   :as-directory t)))
                   (concatenate 'string "/tmp/" file)))))
+
+(defmacro with-scratch-file ((var extension) &body forms)
+  `(let ((,var (scratch-file-name ,extension)))
+     (unwind-protect (progn ,@forms)
+       (ignore-errors (delete-file ,var)))))

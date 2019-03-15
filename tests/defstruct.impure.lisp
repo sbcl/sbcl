@@ -555,7 +555,7 @@
 ;;; dump all of them into a fasl
 (defmethod make-load-form ((self manyraw) &optional env)
   (make-load-form-saving-slots self :environment env))
-(defvar *tempfile* (randomish-temp-file-name "lisp"))
+(defvar *tempfile* (scratch-file-name "lisp"))
 (with-open-file (s *tempfile*
                  :direction :output
                  :if-exists :supersede)
@@ -563,7 +563,7 @@
   (terpri s)
   (write-string "(defun dumped-huge-manyraw () '#.(make-huge-manyraw))" s)
   (write-string "(defun dumped-hugest-manyraw () '#.(make-hugest-manyraw))" s))
-(compile-file *tempfile*)
+(defvar *tempfasl* (compile-file *tempfile*))
 (delete-file *tempfile*)
 
 ;;; nuke the objects and try another GC just to be extra careful
@@ -571,7 +571,8 @@
 (sb-ext:gc :full t)
 
 ;;; re-read the dumped structures and check them
-(load (compile-file-pathname *tempfile*))
+(load *tempfasl*)
+(delete-file *tempfasl*)
 (with-test (:name (:defstruct-raw-slot load))
   (check-manyraws (dumped-manyraws))
   (check-huge-manyraw (make-huge-manyraw))
@@ -856,7 +857,7 @@
 delete the files at the end."
   (let* ((paths (loop for var in vars
                       as index upfrom 0
-                      collect (randomish-temp-file-name "lisp")))
+                      collect (scratch-file-name "lisp")))
          (binding-spec (mapcar
                         (lambda (var path) `(,var ,path)) vars paths)))
     (labels ((frob (n)

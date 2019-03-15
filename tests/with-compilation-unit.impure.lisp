@@ -12,8 +12,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defvar *file-a* #p"with-compilation-unit-temp-a.lisp")
-(defvar *file-b* #p"with-compilation-unit-temp-b.lisp")
+(defvar *file-a* (scratch-file-name "lisp"))
+(defvar *file-b* (scratch-file-name "lisp"))
 
 (defun test-files (reset &optional want-suppress-p)
   (funcall reset)
@@ -105,4 +105,5 @@
 
 (delete-file *file-a*)
 (delete-file *file-b*)
-
+(ignore-errors (delete-file (compile-file-pathname *file-a*)))
+(ignore-errors (delete-file (compile-file-pathname *file-b*)))

@@ -196,6 +196,7 @@
     (format log "~5d - ~a~%" (- end-time begin-time) source-file)
     (force-output log)))
 
+(defvar *summarize-test-times* nil)
 (defun pure-runner (files test-fun log)
   (when files
     (format t "// Running pure tests (~a)~%" test-fun)
@@ -213,8 +214,14 @@
                            (cons :interpreter *features*)
                            *features*)))
                 (let ((start (get-internal-real-time)))
+                  (setq test-util:*elapsed-times* nil)
                   (funcall test-fun file)
-                  (write-elapsed-time file start log))))
+                  (write-elapsed-time file start log)
+                  (when *summarize-test-times*
+                    (format t "~2%Tests ordered by descending elapsed time:~%")
+                    (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
+                      (let ((*print-pretty* nil))
+                        (format t "~5d ~a~%" (car x) (cdr x))))))))
           (skip-file ())))
       (append-results))))
 

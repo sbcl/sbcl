@@ -26,8 +26,9 @@
               :initial-contents elements))
 
 (defmacro with-bivalent-io-setup ((file) &body body)
+  (declare (ignore file))
   (let ((file-var (gensym)))
-    `(let ((,file-var ,file))
+    `(let ((,file-var (scratch-file-name)))
        (unwind-protect
             (macrolet
                 ((with-stream ((stream &rest args &key &allow-other-keys) &body body)
