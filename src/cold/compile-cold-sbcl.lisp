@@ -37,10 +37,7 @@
      `(optimize
        (compilation-speed 1)
        (debug ,(if (find :sb-show sb-xc:*features*) 2 1))
-       ;; CLISP's pretty-printer is fragile and tends to cause stack
-       ;; corruption or fail internal assertions, as of 2003-04-20; we
-       ;; therefore turn off as many notes as possible.
-       (sb-ext:inhibit-warnings #-clisp 2 #+clisp 3)
+       (sb-ext:inhibit-warnings 2)
        ;; SAFETY = SPEED (and < 3) should provide reasonable safety,
        ;; but might skip some unreasonably expensive stuff
        (safety 2) (space 1) (speed 2)

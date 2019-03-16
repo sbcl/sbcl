@@ -13,6 +13,19 @@
 
 ;;;; general warm init compilation policy
 
+;;;; Use the same settings as PROCLAIM-TARGET-OPTIMIZATION
+;;;; I could not think of a trivial way to ensure that this stays functionally
+;;;; identical to the corresponding code in 'compile-cold-sbcl'.
+;;;; (One possibility would be to read this form from a lisp-expr file)
+;;;; The intent is that we should generate identical code if a file is moved
+;;;; from the cross-compiled sources to warm-compiled or vice-versa.
+(proclaim '(optimize
+            #+sb-show (debug 2)
+            (safety 2) (speed 2)
+            ;; never insert stepper conditions
+            (sb-c:insert-step-conditions 0)
+            (sb-c:alien-funcall-saves-fp-and-pc #+x86 3 #-x86 0)))
+
 (locally
     (declare (notinline find-symbol)) ; don't ask
   (let ((s (find-symbol "*/SHOW*" "SB-INT")))
