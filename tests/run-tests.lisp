@@ -128,9 +128,12 @@
                   (write-elapsed-time file start log)
                   (when *summarize-test-times*
                     (format t "~2%Tests ordered by descending elapsed time:~%")
-                    (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
-                      (let ((*print-pretty* nil))
-                        (format t "~5d ~a~%" (car x) (cdr x))))))))
+                    (let ((tot 0))
+                      (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
+                        (incf tot (car x))
+                        (let ((*print-pretty* nil))
+                          (format t "~6d ~a~%" (car x) (cdr x))))
+                      (format t "~6d TOTAL TIME (~a)~%" tot file))))))
           (skip-file ())))
       (append-failures))))
 
