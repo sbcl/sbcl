@@ -926,8 +926,8 @@
              (let ((skip (gen-label)))
                (inst blt zero-tn count skip)
                (move csp-tn result)
+               (inst j done)
                (emit-label skip))
-             (inst bge zero-tn count done)
              (cond ((zerop (- word-shift n-fixnum-tag-bits))
                     (inst add csp-tn result count))
                    (t

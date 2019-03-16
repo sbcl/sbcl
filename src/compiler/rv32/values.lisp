@@ -135,7 +135,7 @@
     (move count num)
     (move start csp-tn)
     (inst beq num zero-tn done)
-    (move dst csp-tn)
+    (move dst start)
     (cond ((zerop (- word-shift n-fixnum-tag-bits))
            (inst add csp-tn csp-tn count))
           (t

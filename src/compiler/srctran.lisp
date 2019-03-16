@@ -4303,7 +4303,7 @@
   (source-transform-transitive 'logxor args 0 'integer))
 (define-source-transform logand (&rest args)
   (source-transform-transitive 'logand args -1 'integer))
-#-(or arm arm64 hppa mips x86 x86-64) ; defined in compiler/target/arith.lisp
+#-(or arm arm64 hppa mips x86 x86-64 rv32) ; defined in compiler/target/arith.lisp
 (define-source-transform logeqv (&rest args)
   (source-transform-transitive 'logeqv args -1 'integer))
 (define-source-transform gcd (&rest args)
