@@ -2238,7 +2238,7 @@ used for a COMPLEX component.~:@>"
 ;;; bounded RATIONAL types should be represented as (OR RATIO INTEGER).
 (defun coerce-bound (bound type upperp inner-coerce-bound-fun)
   (declare (type function inner-coerce-bound-fun))
-  (if (eql bound '*)
+  (if (eq bound '*)
       bound
       (funcall inner-coerce-bound-fun bound type upperp)))
 

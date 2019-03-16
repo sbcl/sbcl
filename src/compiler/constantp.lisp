@@ -46,7 +46,7 @@
                   (%constantp (comma-expr expr) environment envp))
                  ((simple-vector-p expr) (every #'recurse expr))
                  (t)))
-          ((eql (car expr) 'quasiquote) nil) ; give up
+          ((eq (car expr) 'quasiquote) nil) ; give up
           (t (and (recurse (car expr)) (recurse (cdr expr)))))))
 
 (defun %constant-form-value (form environment envp)
