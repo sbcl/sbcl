@@ -222,7 +222,7 @@
 (progn
   ;; When running from a read-only filesystem, and/or under a test scaffold in which
   ;; no C compiler exists, we'll trust that the extra "test data file" was prepared
-  ;; already. Moreover we have to assume that it it get's get out-of-date with respect
+  ;; already. Moreover we have to assume that it can't get out-of-date with respect
   ;; to this lisp file. i.e. it always contains at least the one C function neccesary.
   ;; (There's logically no "make clean ; make")
   (unless (probe-file "threads-foreign.so")

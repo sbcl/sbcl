@@ -10,6 +10,7 @@
            #:type-evidently-=
            #:ctype=
            #:assert-tri-eq
+           #:random-type
 
            ;; thread tools
            #:make-kill-thread #:make-join-thread

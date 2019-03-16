@@ -409,13 +409,6 @@
     (assert (and (null value)
                  error))))
 
-(with-test (:name (:wait-for :basics))
-  (assert (not (sb-ext:wait-for nil :timeout 0.1)))
-  (assert (eql 42 (sb-ext:wait-for 42)))
-  (let ((n 0))
-    (assert (eql 100 (sb-ext:wait-for (when (= 100 (incf n))
-                                        n))))))
-
 (with-test (:name (:wait-for :deadline))
   (assert (eq :ok
               (sb-sys:with-deadline (:seconds 10)
@@ -497,17 +490,6 @@
                        (remove nil values)))
         ;; (At least) one thread should decrease the count to 0.
         (assert (find 0 values))))))
-
-(with-test (:name (:join-thread :timeout)
-                  :skipped-on (not :sb-thread))
-  (assert-error
-   (join-thread (make-join-thread (lambda () (sleep 10))) :timeout 0.01)
-   join-thread-error)
-  (let ((cookie (cons t t)))
-    (assert (eq cookie
-                (join-thread (make-join-thread (lambda () (sleep 10)))
-                             :timeout 0.01
-                             :default cookie)))))
 
 (with-test (:name (wait-on-semaphore semaphore-notification :lp-1038034)
             :skipped-on (not :sb-thread)
@@ -597,36 +579,3 @@
 (with-test (:name (abort-thread :main-thread))
   (assert (main-thread-p))
   (assert-error (abort-thread) thread-error))
-
-;; SB-THREAD:MAKE-THREAD used to lock SB-THREAD:*MAKE-THREAD-LOCK*
-;; before entering WITHOUT-INTERRUPTS. When a thread which was
-;; executing SB-THREAD:MAKE-THREAD was interrupted with code which
-;; also called SB-THREAD:MAKE-THREAD, it could happen that the first
-;; thread already owned SB-THREAD:*MAKE-THREAD-LOCK* and the
-;; interrupting code thus made a recursive lock attempt.
-;;
-;; See (:TIMER :DISPATCH-THREAD :MAKE-THREAD :BUG-1180102) in
-;; timer.impure.lisp.
-(with-test (:name (make-thread :interrupt-with make-thread :bug-1180102)
-            :skipped-on (not :sb-thread)
-            :broken-on :sb-safepoint)
-  (fresh-line)
-  (write-string "; ")
-  (force-output)
-  (dotimes (i 100)
-    (let (outer-threads
-          (inner-threads (list nil))
-          (parent *current-thread*))
-      (dotimes (i 100)
-        (push (make-thread
-               (lambda ()
-                 (interrupt-thread
-                  parent
-                  (lambda () (atomic-push (make-thread (lambda ()))
-                                          (car inner-threads))))))
-              outer-threads)
-        (push (make-thread (lambda ())) outer-threads))
-      (mapc #'join-thread outer-threads)
-      (mapc #'join-thread (car inner-threads)))
-    (write-char #\.)
-    (force-output)))
