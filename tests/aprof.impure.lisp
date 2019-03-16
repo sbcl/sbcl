@@ -158,7 +158,9 @@ sb-vm::
 (defstruct this-struct)
 (defstruct that-struct)
 (declaim (inline make-this-struct make-that-struct))
-(defun make-structs () (values (make-this-struct) (make-that-struct)))
+(defun make-structs ()
+  (declare (optimize sb-c::instrument-consing))
+  (values (make-this-struct) (make-that-struct)))
 (compile 'make-structs)
 #-win32
 (with-test (:name :aprof-instance)
