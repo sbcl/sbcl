@@ -154,3 +154,19 @@ sb-vm::
           (sb-aprof::infer-type (sb-sys:sap-int (sb-sys:vector-sap bytes)) bytes)
         (assert (eq type 'bignum))
         (assert (= size (* 2 sb-vm:n-word-bytes)))))))
+
+(defstruct this-struct)
+(defstruct that-struct)
+(declaim (inline make-this-struct make-that-struct))
+(defun make-structs () (values (make-this-struct) (make-that-struct)))
+(compile 'make-structs)
+#-win32
+(with-test (:name :aprof-instance)
+  (let (seen-this seen-that)
+    (dolist (line (split-string
+                   (with-output-to-string (s)
+                     (sb-aprof:aprof-run #'make-structs :stream s))
+                   #\newline))
+      (when (search "THIS-STRUCT" line) (setq seen-this t))
+      (when (search "THAT-STRUCT" line) (setq seen-that t)))
+    (assert (and seen-this seen-that))))

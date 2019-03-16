@@ -360,7 +360,10 @@
                                   (setq widetag (if (eq (inst-operand-size dstate) :qword)
                                                     :variable
                                                     (logand (reg/mem-imm-data 0 dstate) #xFF)))
-                                  (when (integerp widetag)
+                                  ;; Done, unless we need to scan more in order to infer the layout
+                                  (when (and (integerp widetag)
+                                             (not (member widetag `(,sb-vm:funcallable-instance-widetag
+                                                                    ,sb-vm:instance-widetag))))
                                     (return-from infer-type
                                       (values (aref *tag-to-type* widetag) size))))
                                  ((and (eql (machine-ea-base ea) target-reg)
