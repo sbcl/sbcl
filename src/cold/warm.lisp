@@ -49,12 +49,6 @@
         (push (sb-kernel:dd-name dd) result))))
   (assert (equal result '(sb-c::conset))))
 
-(proclaim '(optimize (compilation-speed 1)
-                     (debug #+sb-show 2 #-sb-show 1)
-                     (safety 2)
-                     (space 1)
-                     (speed 2)))
-
 ;;; Assert that genesis preserved shadowing symbols.
 (let ((p sb-assem::*backend-instruction-set-package*))
   (unless (eq p (find-package "SB-VM"))
