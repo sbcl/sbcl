@@ -79,8 +79,8 @@
   (loadw a2 cfp-tn 2)
   (loadw a3 cfp-tn 3)
 
-  (inst compute-lra lra lip-tn lra-label)
   ;; Indirect closure.
+  (inst compute-lra lra lip-tn lra-label)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   ;; Call into Lisp!
   (inst jalr zero-tn code-tn (- (* simple-fun-code-offset n-word-bytes)

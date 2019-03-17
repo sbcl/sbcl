@@ -350,7 +350,7 @@
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label)
+      (inst compute-lra (callee-return-pc-tn callee) lip label code-tn)
       (note-this-location vop :call-site)
       (inst j target)
       (emit-return-pc label)
@@ -386,7 +386,7 @@
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label)
+      (inst compute-lra (callee-return-pc-tn callee) lip label code-tn)
       (note-this-location vop :call-site)
       (inst j target)
       (emit-return-pc label)
@@ -425,7 +425,7 @@
         (when callee-nfp
           (maybe-load-stack-tn callee-nfp nfp)))
       (maybe-load-stack-tn cfp-tn fp)
-      (inst compute-lra (callee-return-pc-tn callee) lip label)
+      (inst compute-lra (callee-return-pc-tn callee) lip label code-tn)
       (note-this-location vop :call-site)
       (inst j target)
       (emit-return-pc label)
@@ -635,7 +635,7 @@
                                  (inst addi nsp-tn cur-nfp
                                   (bytes-needed-for-non-descriptor-stack-frame))))
                               `((:comp-lra
-                                 (inst compute-lra return-pc-pass lip lra-label))
+                                 (inst compute-lra return-pc-pass lip lra-label code-tn))
                                 (:frob-nfp
                                  (store-stack-tn nfp-save cur-nfp))
                                 (:save-fp

@@ -86,7 +86,7 @@
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
-    (inst compute-lra temp lip entry-label)
+    (inst compute-lra temp lip entry-label code-tn)
     (storew temp block catch-block-entry-pc-slot)))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
@@ -105,7 +105,7 @@
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
     (storew code-tn result catch-block-code-slot)
-    (inst compute-lra temp lip entry-label)
+    (inst compute-lra temp lip entry-label code-tn)
     (storew temp result catch-block-entry-pc-slot)
 
     (storew tag result catch-block-tag-slot)

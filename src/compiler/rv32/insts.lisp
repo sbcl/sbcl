@@ -705,27 +705,53 @@
 
 ;;;; Boxed-object computation instructions (for LRA and CODE)
 
-(defun emit-compute (segment vop dest lip compute-delta)
-  (emit-back-patch segment 8
-                   (lambda (segment position)
-                     (multiple-value-bind (u i)
-                         (u-and-i-inst-immediate (funcall compute-delta position))
-                       (assemble (segment vop)
-                         (inst auipc lip u)
-                         (inst addi dest lip i))))))
+;;; Try to compute DEST from SRC if possible. Otherwise, fall back to
+;;; using a PC relative calculation as the worst case.
+(defun emit-compute (segment vop dest lip pc-relative-delta src-relative-delta &optional src)
+  (labels ((pc-relative-emitter (segment position)
+             (multiple-value-bind (u i)
+                 (u-and-i-inst-immediate (funcall pc-relative-delta position))
+               (assemble (segment vop)
+                 (inst auipc lip u)
+                 (inst addi dest lip i))))
+           (src-relative-emitter (segment position)
+             (assemble (segment vop)
+               (inst addi dest src (funcall src-relative-delta position))))
+           (maybe-shrink (segment chooser position magic-value)
+             (declare (ignore chooser))
+             (when (and src
+                        (typep (funcall src-relative-delta position magic-value)
+                               'short-immediate))
+               (emit-back-patch segment 4 #'src-relative-emitter)
+               t)))
+    (emit-chooser
+     segment 8 2
+     #'maybe-shrink
+     #'pc-relative-emitter)))
 
-(define-instruction compute-code (segment code lip object-label)
+;;; FIXME: Could potentially optimize away an instruction in
+;;; XEP-ALLOCATE-FRAME in some cases when the code can be computed off
+;;; of the register used to call the function, like MIPS. Probably
+;;; requires always using LR as a lip tn though. Also, if the return
+;;; register is fixed, could compute code in one instruction in values
+;;; receiving routines.
+(define-instruction compute-code (segment code lip label &optional src)
   (:vop-var vop)
-  (:declare (ignore object-label))
   (:emitter
    (emit-compute segment vop code lip
                  (lambda (position &optional magic-value)
                    (declare (ignore magic-value))
                    (- other-pointer-lowtag
                       position
-                      (component-header-length))))))
+                      (component-header-length)))
+                 ;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tagged
+                 ;;      = lra - (header + label-offset)
+                 (lambda (position &optional (magic-value 0))
+                   (- (+ (label-position label position magic-value)
+                         (component-header-length))))
+                 src)))
 
-(define-instruction compute-lra (segment dest lip lra-label)
+(define-instruction compute-lra (segment dest lip lra-label &optional src)
   (:vop-var vop)
   (:emitter
    (emit-compute segment vop dest lip
@@ -734,7 +760,13 @@
                                          (when magic-value position)
                                          magic-value)
                          other-pointer-lowtag)
-                      position)))))
+                      position))
+                 ;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
+                 ;;     = code + header + label-offset
+                 (lambda (position &optional (magic-value 0))
+                   (+ (label-position lra-label position magic-value)
+                      (component-header-length)))
+                 src)))
 
 (defun emit-header-data (segment type)
   (emit-back-patch
