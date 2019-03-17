@@ -1982,6 +1982,17 @@
   (def ffloor floor-quotient-bound floor-rem-bound)
   (def fceiling ceiling-quotient-bound ceiling-rem-bound))
 
+;;; The quotient for floats depends on the divisor,
+;;; make the result conservative, without letting it cross 0
+(defmacro conservative-quotient-bound (result direction bound)
+  (let ((result-sym (gensym)))
+    `(let ((,result-sym ,result))
+       (,direction ,result-sym
+                   (if (and (floatp ,bound)
+                            (/= ,result-sym 0))
+                       1
+                       0)))))
+
 ;;; functions to compute the bounds on the quotient and remainder for
 ;;; the FLOOR function
 (defun floor-quotient-bound (quot)
@@ -1994,28 +2005,25 @@
      ;; closed lower bound.
      :low
      (and lo
-          (- (floor (type-bound-number lo))
-             ;; FLOOR on floats depends on the divisor,
-             ;; make it conservative
-             (if (floatp (type-bound-number lo))
-                 1
-                 0)))
+          (conservative-quotient-bound
+           (floor (type-bound-number lo))
+           -
+           (type-bound-number lo)))
      :high
      (and hi
-          (+ (if (consp hi)
-                 ;; An open bound. We need to be careful here because
-                 ;; the floor of '(10.0) is 9, but the floor of
-                 ;; 10.0 is 10.
-                 (multiple-value-bind (q r) (floor (first hi))
-                   (if (zerop r)
-                       (1- q)
-                       q))
-                 ;; A closed bound, so the answer is obvious.
-                 (floor hi))
-             ;; Be conservative
-             (if (floatp (type-bound-number hi))
-                 1
-                 0))))))
+          (conservative-quotient-bound
+           (if (consp hi)
+               ;; An open bound. We need to be careful here because
+               ;; the floor of '(10.0) is 9, but the floor of
+               ;; 10.0 is 10.
+               (multiple-value-bind (q r) (floor (first hi))
+                 (if (zerop r)
+                     (1- q)
+                     q))
+               ;; A closed bound, so the answer is obvious.
+               (floor hi))
+           +
+           (type-bound-number hi))))))
 
 (defun floor-rem-bound (div)
   ;; The remainder depends only on the divisor. Try to get the
@@ -2091,30 +2099,28 @@
     (make-interval
      :low
      (and lo
-          (- (if (consp lo)
-                 ;; An open bound. We need to be careful here because
-                 ;; the ceiling of '(10.0) is 11, but the ceiling of
-                 ;; 10.0 is 10.
-                 (multiple-value-bind (q r) (ceiling (first lo))
-                   (if (zerop r)
-                       (1+ q)
-                       q))
-                 ;; A closed bound, so the answer is obvious.
-                 (ceiling lo))
-             ;; CEILING on floats depends on the divisor,
-             ;; make it conservative
-             (if (floatp (type-bound-number lo))
-                 1
-                 0)))
+          (conservative-quotient-bound
+           (if (consp lo)
+               ;; An open bound. We need to be careful here because
+               ;; the ceiling of '(10.0) is 11, but the ceiling of
+               ;; 10.0 is 10.
+               (multiple-value-bind (q r) (ceiling (first lo))
+                 (if (zerop r)
+                     (1+ q)
+                     q))
+               ;; A closed bound, so the answer is obvious.
+               (ceiling lo))
+           -
+           (type-bound-number lo)))
      :high
      ;; Take the ceiling of the upper bound. The result is always a
      ;; closed upper bound.
      (and hi
-          (+ (ceiling (type-bound-number hi))
-             ;; Be conservative
-             (if (floatp (type-bound-number hi))
-                 1
-                 0))))))
+          (conservative-quotient-bound
+           (ceiling (type-bound-number hi))
+           +
+           (type-bound-number hi))))))
+
 (defun ceiling-rem-bound (div)
   ;; The remainder depends only on the divisor. Try to get the
   ;; correct sign for the remainder if we can.
