@@ -2186,25 +2186,27 @@ used for a COMPLEX component.~:@>"
 ;;; member of TYPE or a one-element list of a member of TYPE.
 ;;; This is not necessarily the canonical bound. An integer bound
 ;;; should always be an atom, which we'll enforce later if needed.
-#-sb-fluid (declaim (inline valid-bound))
-(defun valid-bound (bound type)
-  (cond ((eq bound '*) nil)
-        ((sb-xc:typep (if (singleton-p bound) (car bound) bound) type) bound)
-        (t
-         (error "Bound is not * or ~A ~S or list of one ~:*~S: ~S"
-                (if (eq type 'integer) "an" "a") type bound))))
+(defmacro valid-bound (bound type)
+  `(cond ((eq ,bound '*) nil)
+         ((sb-xc:typep (if (singleton-p ,bound) (car ,bound) ,bound) ',type) ,bound)
+         (t
+          (error ,(format nil "~A bound is not * or ~A ~A or list of one ~:*~A: ~~S"
+                          (string-capitalize bound)
+                          (if (eq type 'integer) "an" "a")
+                          (string-downcase type))
+                 ,bound))))
 
 (!def-type-translator integer (&optional (low '*) (high '*))
-  (let ((lb (valid-bound low 'integer))
-        (hb (valid-bound high 'integer)))
+  (let ((lb (valid-bound low integer))
+        (hb (valid-bound high integer)))
     (make-numeric-type :class 'integer :complexp :real
                        :enumerable (not (null (and lb hb)))
                        :low lb :high hb)))
 
 (defmacro !def-bounded-type (type class format)
   `(!def-type-translator ,type (&optional (low '*) (high '*))
-     (let ((lb (valid-bound low ',type))
-           (hb (valid-bound high ',type)))
+     (let ((lb (valid-bound low ,type))
+           (hb (valid-bound high ,type)))
        (make-numeric-type :class ',class :format ',format
                           :low lb :high hb))))
 
