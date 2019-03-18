@@ -38,6 +38,8 @@
 ;; We don't use :sign-extend, since the immediate fields are hairy.
 (define-arg-type relative-b-label :use-label #'use-b-label)
 (define-arg-type relative-j-label :use-label #'use-j-label)
+(define-arg-type load-annotation :printer #'print-load-annotation)
+(define-arg-type store-annotation :printer #'print-store-annotation)
 
 
 (define-instruction byte (segment byte)
@@ -89,6 +91,7 @@
   #'equalp)
 
 (define-instruction-format (i 32 :default-printer i-printer)
+  (load-annotation :fields (list (byte 5 15) (byte 12 20)) :type 'load-annotation)
   (l/a :field (byte 1 30))
   (shamt :field (byte (integer-length n-word-bits) 20))
   (imm :field (byte 12 20) :sign-extend t)
@@ -108,13 +111,11 @@
      (%emit-i-inst segment 0 (tn-offset rs1) funct3 (tn-offset rd) opcode))))
 
 (defconstant-eqx s-printer
-    '(:name :tab
-      rs2 ", "
-      "(" imm ")"
-      rs1)
+    '(:name :tab rs2 ", " "(" imm ")" rs1 store-annotation)
   #'equalp)
 
 (define-instruction-format (s 32 :default-printer s-printer)
+  (store-annotation :fields (list (byte 5 15) (byte 7 25) (byte 5 7)) :type 'store-annotation)
   (imm :fields (list (byte 7 25) (byte 5 7)) :type 's-imm)
   (rs2 :field (byte 5 20) :type 'reg)
   (rs1 :field (byte 5 15) :type 'reg)
@@ -285,10 +286,12 @@
   (define-branch-instruction bltu #b110)
   (define-branch-instruction bgeu #b111))
 
-(macrolet ((define-load-instruction (name funct3)
+(macrolet ((define-load-instruction (name funct3 &optional wordp)
              `(define-instruction ,name (segment rd rs offset)
-                (:printer i ((funct3 ,funct3) (opcode #b0000011))
-                          '(:name :tab rd ", (" imm ")" rs1))
+                (:printer i
+                          ((funct3 ,funct3) (opcode #b0000011))
+                          '(:name :tab rd ", (" imm ")" rs1
+                            ,(when wordp 'load-annotation)))
                 (:emitter
                  (emit-i-inst segment offset rs ,funct3 rd #b0000011)))))
   (define-load-instruction lb #b000)
@@ -296,8 +299,8 @@
   (define-load-instruction lw #b010)
   #+64-bit
   (progn
-    (define-load-instruction lwu #b110)
-    (define-load-instruction ld #b011))
+    (define-load-instruction ld #b011)
+    (define-load-instruction lwu #b110))
   (define-load-instruction lbu #b100)
   (define-load-instruction lhu #b101))
 

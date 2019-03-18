@@ -53,13 +53,12 @@ Otherwise, use the RISC-V register names")
     (maybe-note-associated-storage-ref
      value 'float-registers regname dstate)))
 
+(defun reconstruct-s-immediate (value)
+  (coerce-signed (dpb (first value) (byte 7 5) (second value)) 12))
+
 (defun print-s-imm (value stream dstate)
   (declare (stream stream) (ignore dstate))
-  (princ (coerce-signed (dpb (first value)
-                             (byte 7 5)
-                             (second value))
-                        12)
-         stream))
+  (princ (reconstruct-s-immediate value) stream))
 
 (defun use-b-label (value dstate)
   (declare (type disassem-state dstate))
@@ -112,6 +111,41 @@ Otherwise, use the RISC-V register names")
   (let ((addr (ash value 2)))
     (maybe-note-assembler-routine addr t dstate)
     (write addr :base 16 :radix t :stream stream)))
+
+(defun annotate-load-store (register offset dstate)
+  (case register
+    (#.sb-vm::code-offset
+     (note-code-constant offset dstate))
+    (#.sb-vm::null-offset
+     (let ((offset (+ sb-vm::nil-value offset)))
+       (maybe-note-assembler-routine offset nil dstate)
+       (maybe-note-static-symbol (logior offset other-pointer-lowtag)
+                                 dstate)))
+    #+sb-thread
+    (#.sb-vm::thread-offset
+     (let* ((thread-slots
+              (load-time-value
+               (primitive-object-slots
+                (find 'sb-vm::thread *primitive-objects*
+                      :key #'primitive-object-name)) t))
+            (slot (find (ash offset (- word-shift)) thread-slots
+                        :key #'slot-offset)))
+       (when slot
+         (note (lambda (stream)
+                 (format stream "thread.~(~A~)" (slot-name slot)))
+               dstate))))))
+
+(defun print-load-annotation (value stream dstate)
+  (declare (ignore stream))
+  (annotate-load-store (first value)
+                       (coerce-signed (second value) 12)
+                       dstate))
+
+(defun print-store-annotation (value stream dstate)
+  (declare (ignore stream))
+  (annotate-load-store (first value)
+                       (reconstruct-s-immediate (rest value))
+                       dstate))
 
 ;;;; interrupt instructions
 
