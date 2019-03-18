@@ -676,8 +676,7 @@
 
 (defun walk-binding-stack (symbol function)
   (let* (#+sb-thread
-         (tls-index #+sb-thread
-                    (get-lisp-obj-address (symbol-tls-index symbol)))
+         (tls-index (get-lisp-obj-address (symbol-tls-index symbol)))
          (current-value
            #+sb-thread
            (sap-ref-lispobj (sb-thread::current-thread-sap) tls-index)

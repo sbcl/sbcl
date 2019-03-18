@@ -1007,10 +1007,9 @@ Users Manual for details about the PROCESS structure.
                                          (sap+ (vector-sap buf) read-end)
                                          (- (length buf) read-end)))
                   (cond
-                    ((and #-win32 (or (and (null count)
-                                           (eql errno sb-unix:eio))
-                                      (eql count 0))
-                          #+win32 (<= count 0))
+                    ((or (and (null count)
+                              (eql errno sb-unix:eio))
+                         (eql count 0))
                      (remove-fd-handler handler)
                      (setf handler nil)
                      (decf (car cookie))
