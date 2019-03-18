@@ -646,6 +646,10 @@
   (define-rv32-float-arith-instruction fmax     #b00101 :rm  #b001)
   (define-rv32-float-arith-instruction fcvtw<-  #b11000 :rs2 #b00000)
   (define-rv32-float-arith-instruction fcvtwu<- #b11000 :rs2 #b00001)
+  #+64-bit
+  (define-rv32-float-arith-instruction fcvtl<-  #b11000 :rs2 #b00010)
+  #+64-bit
+  (define-rv32-float-arith-instruction fcvtlu<-  #b11000 :rs2 #b00011)
   (define-rv32-float-arith-instruction fmvx<-   #b11100 :rs2 #b00000 :rm #b000)
   (define-rv32-float-arith-instruction feq      #b10100 :rm  #b010)
   (define-rv32-float-arith-instruction flt      #b10100 :rm  #b001)
@@ -653,6 +657,10 @@
   (define-rv32-float-arith-instruction fclass   #b11100 :rs2 #b00000 :rm #b001)
   (define-rv32-float-arith-instruction fcvtw->  #b11010 :rs2 #b00000)
   (define-rv32-float-arith-instruction fcvtwu-> #b11010 :rs2 #b00001)
+  #+64-bit
+  (define-rv32-float-arith-instruction fcvtl->  #b11010 :rs2 #b00010)
+  #+64-bit
+  (define-rv32-float-arith-instruction fcvtlu-> #b11010 :rs2 #b00011)
   (define-rv32-float-arith-instruction fmvx->   #b11110 :rs2 #b00000 :rm #b000)
   (define-rv32-float-arith-instruction fcvtd->  #b01000 :rs2 #b00001)
   (define-rv32-float-arith-instruction fcvts->  #b01000 :rs2 #b00000))
@@ -676,14 +684,14 @@
 
 (define-instruction-macro fcvt (to-format from-format dst src &optional (rm :rne))
   (case to-format
-    (:word `(inst fcvtw<- ,from-format ,dst ,src ,rm))
-    (:unsigned-word `(inst fcvtwu<- ,from-format ,dst ,src ,rm))
+    (:word `(inst #-64-bit fcvtw<- #+64-bit fcvtl<- ,from-format ,dst ,src ,rm))
+    (:unsigned-word `(inst #-64-bit fcvtwu<- #+64-bit fcvtlu<- ,from-format ,dst ,src ,rm))
     (otherwise
      `(inst ,(ecase from-format
                (:double 'fcvtd->)
                (:single 'fcvts->)
-               (:word 'fcvtw->)
-               (:unsigned-word 'fcvtwu->))
+               (:word #-64-bit 'fcvtw-> #+64-bit 'fcvtl->)
+               (:unsigned-word #-64-bit 'fcvtwu-> #+64-bit 'fcvtlu->))
             ,to-format ,dst ,src ,rm))))
 
 (flet ((fmt-funct3 (fmt)
