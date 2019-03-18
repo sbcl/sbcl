@@ -5067,8 +5067,7 @@
 
 #-(and win32 (not sb-thread))
 (deftransform sleep ((seconds)
-                     ((constant-arg (and (real 0)
-                                         (not (satisfies float-infinity-p))))))
+                     ((constant-arg (or rational (not (satisfies float-infinity-p))))))
   (let ((seconds-value (lvar-value seconds)))
     (multiple-value-bind (seconds nano)
         (sb-impl::split-seconds-for-sleep seconds-value)

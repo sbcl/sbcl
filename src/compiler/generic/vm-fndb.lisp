@@ -88,6 +88,10 @@
 ;; is in the collection specified by the second arg.
 (defknown %other-pointer-subtype-p (t list) boolean
   (movable foldable flushable always-translatable))
+
+;;; Predicates that don't accept T for the first argument type
+(defknown (float-infinity-p float-nan-p float-infinity-or-nan-p)
+  (float) boolean (movable foldable flushable))
 
 ;;;; miscellaneous "sub-primitives"
 
