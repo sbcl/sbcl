@@ -135,13 +135,21 @@
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
-  #(two-arg-gcd two-arg-lcm
-    two-arg-+ two-arg-- two-arg-* two-arg-/
-    two-arg-< two-arg-> two-arg-=
-    two-arg-and two-arg-ior two-arg-xor two-arg-eqv
-
+  #(two-arg-+
+    two-arg--
+    two-arg-*
+    two-arg-/
+    two-arg-<
+    two-arg->
+    two-arg-=
+    sb-kernel:%negate
     eql
-    sb-kernel:%negate)
+    two-arg-and
+    two-arg-ior
+    two-arg-xor
+    two-arg-gcd
+    two-arg-lcm
+    two-arg-eqv)
   #'equalp)
 
 
