@@ -4199,8 +4199,7 @@
                   "open-code RATIONAL to FLOAT comparison"
                   (let ((y (lvar-value y)))
                     #-sb-xc-host
-                    (when (or (float-nan-p y)
-                              (float-infinity-p y))
+                    (when (float-infinity-or-nan-p y)
                       (give-up-ir1-transform))
                     (setf y (rational y))
                     `(,',comparator
@@ -4219,8 +4218,7 @@
   "open-code RATIONAL to FLOAT comparison"
   (let ((y (lvar-value y)))
     #-sb-xc-host
-    (when (or (float-nan-p y)
-              (float-infinity-p y))
+    (when (float-infinity-or-nan-p y)
       (give-up-ir1-transform))
     (setf y (rational y))
     (if (and (csubtypep (lvar-type x)
@@ -4272,13 +4270,10 @@
                       (cond #+(and (or arm arm64)
                                     (not sb-xc-host))
                             ((or (and (floatp value)
-                                      (or (float-infinity-p value)
-                                          (float-nan-p value)))
+                                      (float-infinity-or-nan-p value))
                                  (and (complex-float-p value)
-                                      (or (float-infinity-p (imagpart value))
-                                          (float-nan-p (imagpart value))
-                                          (float-infinity-p (realpart value))
-                                          (float-nan-p (realpart value)))))
+                                      (or (float-infinity-or-nan-p (imagpart value))
+                                          (float-infinity-or-nan-p (realpart value)))))
                              (not-constants arg))
                             (t
                              (setf reduced-value value

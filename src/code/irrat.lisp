@@ -806,10 +806,8 @@
     (with-float-traps-masked (:underflow :overflow)
       (let ((rho (+ (square x) (square y))))
        (declare (optimize (speed 3) (space 0)))
-      (cond ((and (or (float-nan-p rho)
-                      (float-infinity-p rho))
-                  (or (float-infinity-p (abs x))
-                      (float-infinity-p (abs y))))
+      (cond ((and (float-infinity-or-nan-p rho)
+                  (or (float-infinity-p x) (float-infinity-p y)))
              ;; DOUBLE-FLOAT-POSITIVE-INFINITY
              (values
               (double-from-bits 0 (1+ sb-vm:double-float-normal-exponent-max) 0)
@@ -876,7 +874,7 @@
       (setf nu y)
 
       (when (/= rho 0d0)
-        (when (not (float-infinity-p (abs nu)))
+        (when (not (float-infinity-p nu))
           (setf nu (/ (/ nu rho) 2d0)))
         (when (< x 0d0)
           (setf eta (abs nu))
@@ -1014,7 +1012,7 @@
                   (beta (+ 1.0d0 (* tv tv)))
                   (s (sinh x))
                   (rho (sqrt (+ 1.0d0 (* s s)))))
-             (if (float-infinity-p (abs tv))
+             (if (float-infinity-p tv)
                  (coerce-to-complex-type (/ rho s)
                                          (/ tv)
                                          z)
