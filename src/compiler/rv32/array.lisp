@@ -194,8 +194,7 @@
               (:policy :fast-safe)
               (:args (object :scs (descriptor-reg)))
               (:arg-types ,type
-                          (:constant
-                           (integer 0
+                (:constant (integer 0
                                     ,(1- (* (1+ (- (floor (+ #x7ff
                                                              other-pointer-lowtag)
                                                           n-word-bytes)

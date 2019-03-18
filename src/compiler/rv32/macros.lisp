@@ -176,8 +176,7 @@ and
        (:args (object :scs (descriptor-reg)))
        (:info index)
        (:arg-types ,type
-         (:constant
-         (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
+         (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 4
@@ -254,7 +253,7 @@ and
          (:args (object :scs (descriptor-reg)))
          (:info index)
          (:arg-types ,type
-                     (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset))))
+           (:constant (load/store-index ,(eval size) ,(eval lowtag) ,(eval offset))))
          (:results (value :scs ,scs))
          (:result-types ,eltype)
          (:generator 4
@@ -299,8 +298,8 @@ and
                 (value :scs ,scs :target result))
          (:info index)
          (:arg-types ,type
-                     (:constant (load/store-index #.n-word-bytes ,(eval lowtag) ,(eval offset)))
-                     ,eltype)
+           (:constant (load/store-index ,(eval size) ,(eval lowtag) ,(eval offset)))
+           ,eltype)
          (:results (result :scs ,scs))
          (:result-types ,eltype)
          (:generator 4
