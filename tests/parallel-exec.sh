@@ -1,8 +1,8 @@
 #!/bin/sh
 
-mkdir -p /var/tmp/junk
+mkdir -p /var/tmp/junk /var/tmp/sbcl-test-logs
 TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
-  --noinform --core ../output/sbcl.core --noprint << EOF
+  --noinform --core ../output/sbcl.core --no-userinit --no-sysinit --noprint --disable-debugger << EOF
 (require :sb-posix)
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
