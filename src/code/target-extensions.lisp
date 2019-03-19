@@ -193,7 +193,7 @@ unspecified."
            (when (packagep value)
              (return (values value ,@(and reader
                                           '(nil)))))
-           (setf ,package-designator (truly-the package-designator value)))
+           (setf ,package-designator (the package-designator value)))
          ,@(and reader
              `((unintern ()
                          :report "Read the symbol as uninterned."
