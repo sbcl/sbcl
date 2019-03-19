@@ -792,30 +792,85 @@ NOTE: This interface is experimental and subject to change."
 
 ;;;; package idioms
 
+(defmacro find-package-restarts ((package-designator &optional reader)
+                                 &body body)
+  #+sb-xc-host
+  (declare (ignore package-designator package symbol current))
+  #+sb-xc-host
+  `(progn  ,@body)
+
+  #-sb-xc-host
+  (let ((package `(or ,(if reader
+                           '*reader-package*
+                           '*package*)
+                      (sane-package))))
+    `(locally
+         ;; Used before make-restart is defined
+         (declare (notinline make-restart))
+       (restart-case ,@body
+         (continue ()
+           :report (lambda (stream)
+                     (format stream "Use the current package, ~a."
+                             (package-name ,package)))
+           (return (values ,package
+                           ,@(and reader
+                                  '(:current)))))
+         (retry ()
+           :report "Retry finding the package.")
+         (use-value (value)
+           :report "Specify a different package"
+           :interactive
+           (lambda ()
+             (read-evaluated-form-of-type 'package-designator))
+           (when (packagep value)
+             (return (values value ,@(and reader
+                                          '(nil)))))
+           (setf ,package-designator (truly-the package-designator value)))
+         ,@(and reader
+             `((unintern ()
+                         :report "Read the symbol as uninterned."
+                         (return (values nil :uninterned)))))
+         ,@(and reader
+             `((symbol (value)
+                       :report "Specify a symbol to return"
+                       :interactive
+                       (lambda ()
+                         (read-evaluated-form-of-type 'symbol))
+                       (values value :symbol)))))
+       (go retry))))
+
 ;;; Note: Almost always you want to use FIND-UNDELETED-PACKAGE-OR-LOSE
 ;;; instead of this function. (The distinction only actually matters when
 ;;; PACKAGE-DESIGNATOR is actually a deleted package, and in that case
 ;;; you generally do want to signal an error instead of proceeding.)
 (defun %find-package-or-lose (package-designator)
   #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
-  (or (find-package package-designator)
-      (error 'simple-package-error
-             :package package-designator
-             :format-control "The name ~S does not designate any package."
-             :format-arguments (list package-designator))))
+  (let ((package-designator package-designator))
+    (prog () retry
+       (let ((result (find-package package-designator)))
+         (if result
+             (return result)
+             (find-package-restarts (package-designator)
+               (error 'package-does-not-exist
+                      :package package-designator
+                      :format-control "The name ~S does not designate any package."
+                      :format-arguments (list package-designator))))))))
 
 ;;; ANSI specifies (in the section for FIND-PACKAGE) that the
 ;;; consequences of most operations on deleted packages are
 ;;; unspecified. We try to signal errors in such cases.
 (defun find-undeleted-package-or-lose (package-designator)
   #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
-  (let ((maybe-result (%find-package-or-lose package-designator)))
-    (if (package-%name maybe-result)    ; if not deleted
-        maybe-result
-        (error 'simple-package-error
-               :package maybe-result
-               :format-control "The package ~S has been deleted."
-               :format-arguments (list maybe-result)))))
+  (let ((package-designator package-designator))
+    (prog () retry
+       (let ((maybe-result (%find-package-or-lose package-designator)))
+         (if (package-%name maybe-result) ; if not deleted
+             (return maybe-result)
+             (find-package-restarts (package-designator)
+               (error 'package-does-not-exist
+                      :package maybe-result
+                      :format-control "The package ~S has been deleted."
+                      :format-arguments (list maybe-result))))))))
 
 ;;;; various operations on names
 
