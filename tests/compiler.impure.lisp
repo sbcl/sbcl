@@ -1782,20 +1782,18 @@
         (coerce result 'string)))))
 
 ;;; Calling thru constant symbols
-(require :sb-introspect)
 
 (declaim (inline target-fun))
 (defun target-fun (arg0 arg1)
   (+ arg0 arg1))
 (declaim (notinline target-fun))
 
-;; FIXME: should use compiler-test-util, not sb-introspect here.
 ;; That issue aside, neither sb-introspect nor ctu:find-named-callees
 ;; can examine an interpreted function for its callees,
 ;; so we can't actually use this function.
 (defun test-target-fun-called (fun res)
   (assert (member #'target-fun
-                  (sb-introspect:find-function-callees #'caller-fun-1)))
+                  (ctu:find-named-callees #'caller-fun-1)))
   (assert (equal (funcall fun) res)))
 
 (defun caller-fun-1 ()

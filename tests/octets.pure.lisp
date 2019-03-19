@@ -410,6 +410,7 @@
         (assert (string= (read-line f1) (read-line f2))))))
   (flet ((compile-and-load (file encoding main-fun)
            (let ((fasl (compile-file file
+                                     :output-file (scratch-file-name "fasl")
                                      :external-format encoding
                                      :print nil :verbose nil)))
              (load fasl)
