@@ -111,7 +111,7 @@
      (%emit-i-inst segment 0 (tn-offset rs1) funct3 (tn-offset rd) opcode))))
 
 (defconstant-eqx s-printer
-    '(:name :tab rs2 ", " "(" imm ")" rs1 store-annotation)
+    '(:name :tab rs2 ", " "(" imm ")" rs1)
   #'equalp)
 
 (define-instruction-format (s 32 :default-printer s-printer)
@@ -296,24 +296,26 @@
                  (emit-i-inst segment offset rs ,funct3 rd #b0000011)))))
   (define-load-instruction lb #b000)
   (define-load-instruction lh #b001)
-  (define-load-instruction lw #b010)
+  (define-load-instruction lw #b010 #-64-bit t)
   #+64-bit
   (progn
-    (define-load-instruction ld #b011)
+    (define-load-instruction ld #b011 t)
     (define-load-instruction lwu #b110))
   (define-load-instruction lbu #b100)
   (define-load-instruction lhu #b101))
 
-(macrolet ((define-store-instruction (name funct3)
+(macrolet ((define-store-instruction (name funct3 &optional wordp)
              `(define-instruction ,name (segment rs1 rs2 offset)
-                (:printer s ((funct3 ,funct3) (opcode #b0100011)))
+                (:printer s ((funct3 ,funct3) (opcode #b0100011))
+                          '(:name :tab rs2 ", " "(" imm ")" rs1
+                            ,(when wordp 'store-annotation)))
                 (:emitter
                  (emit-s-inst segment offset rs1 rs2 ,funct3 #b0100011)))))
   (define-store-instruction sb #b000)
   (define-store-instruction sh #b001)
-  (define-store-instruction sw #b010)
+  (define-store-instruction sw #b010 #-64-bit t)
   #+64-bit
-  (define-store-instruction sd #b011))
+  (define-store-instruction sd #b011 t))
 
 (macrolet ((define-immediate-arith-instruction (name funct3 &optional word-name)
              `(progn
