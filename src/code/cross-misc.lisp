@@ -119,7 +119,11 @@
   (declare (ignore value))
   (error "cross-compiler can not make value cells"))
 
-;;; package locking nops for the cross-compiler
+;;; package-related stubs for the cross-compiler
+
+(defun find-undeleted-package-or-lose (string)
+  (or (find-package string)
+      (error "Cross-compiler bug: no package named ~S" string)))
 
 (defmacro without-package-locks (&body body)
   `(progn ,@body))

@@ -167,3 +167,42 @@ unspecified."
   `(sb-thread::with-recursive-system-lock
        ((hash-table-lock ,hash-table))
      ,@body))
+
+(defmacro find-package-restarts ((package-designator &optional reader)
+                                 &body body)
+  (let ((package `(or ,(if reader
+                           '*reader-package*
+                           '*package*)
+                      (sane-package))))
+    `(locally
+       (restart-case ,@body
+         (continue ()
+           :report (lambda (stream)
+                     (format stream "Use the current package, ~a."
+                             (package-name ,package)))
+           (return (values ,package
+                           ,@(and reader
+                                  '(:current)))))
+         (retry ()
+           :report "Retry finding the package.")
+         (use-value (value)
+           :report "Specify a different package"
+           :interactive
+           (lambda ()
+             (read-evaluated-form-of-type 'package-designator))
+           (when (packagep value)
+             (return (values value ,@(and reader
+                                          '(nil)))))
+           (setf ,package-designator (truly-the package-designator value)))
+         ,@(and reader
+             `((unintern ()
+                         :report "Read the symbol as uninterned."
+                         (return (values nil :uninterned)))))
+         ,@(and reader
+             `((symbol (value)
+                       :report "Specify a symbol to return"
+                       :interactive
+                       (lambda ()
+                         (read-evaluated-form-of-type 'symbol))
+                       (values value :symbol)))))
+       (go retry))))

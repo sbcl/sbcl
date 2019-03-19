@@ -1995,6 +1995,39 @@ PACKAGE."
 (defmethod (setf documentation) (new-value (x package) (doc-type (eql 't)))
   (setf (package-doc-string x) new-value))
 
+;;; Note: Almost always you want to use FIND-UNDELETED-PACKAGE-OR-LOSE
+;;; instead of this function. (The distinction only actually matters when
+;;; PACKAGE-DESIGNATOR is actually a deleted package, and in that case
+;;; you generally do want to signal an error instead of proceeding.)
+(defun %find-package-or-lose (package-designator)
+  (declare (optimize allow-non-returning-tail-call))
+  (let ((package-designator package-designator))
+    (prog () retry
+       (let ((result (find-package package-designator)))
+         (if result
+             (return result)
+             (find-package-restarts (package-designator)
+               (error 'package-does-not-exist
+                      :package package-designator
+                      :format-control "The name ~S does not designate any package."
+                      :format-arguments (list package-designator))))))))
+
+;;; ANSI specifies (in the section for FIND-PACKAGE) that the
+;;; consequences of most operations on deleted packages are
+;;; unspecified. We try to signal errors in such cases.
+(defun find-undeleted-package-or-lose (package-designator)
+  (declare (optimize allow-non-returning-tail-call))
+  (let ((package-designator package-designator))
+    (prog () retry
+       (let ((maybe-result (%find-package-or-lose package-designator)))
+         (if (package-%name maybe-result) ; if not deleted
+             (return maybe-result)
+             (find-package-restarts (package-designator)
+               (error 'package-does-not-exist
+                      :package maybe-result
+                      :format-control "The package ~S has been deleted."
+                      :format-arguments (list maybe-result))))))))
+
 ;;; Given a cell containing memoization data for FIND-PACKAGE, perform that action
 ;;; with as little work as possible.
 (defun cached-find-package (cell)
