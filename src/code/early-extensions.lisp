@@ -795,10 +795,9 @@ NOTE: This interface is experimental and subject to change."
 (defmacro find-package-restarts ((package-designator &optional reader)
                                  &body body)
   #+sb-xc-host
-  (declare (ignore package-designator package symbol current))
+  (declare (ignore package-designator reader))
   #+sb-xc-host
-  `(progn  ,@body)
-
+  `(progn ,@body)
   #-sb-xc-host
   (let ((package `(or ,(if reader
                            '*reader-package*
