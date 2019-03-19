@@ -2195,9 +2195,13 @@ core and return a descriptor to it."
               ;; Never record it. (FIXME: this is a problem for relocatable heap)
               nil)
              (:relative ; (used for arguments to X86 relative CALL instruction)
-              (setf (bvref-32 gspace-data gspace-byte-offset)
-                    (the (signed-byte 32)
-                      (- addr (+ gspace-base gspace-byte-offset 4)))) ; 4 = size of rel32off
+              (let ((diff (- addr (+ gspace-base gspace-byte-offset 4)))) ; 4 = size of rel32off
+                (setf (bvref-32 gspace-data gspace-byte-offset)
+                      ;; 32-bit: use modular arithmetic since the address space is 32 bits
+                      #+x86 (ldb (byte 32 0) diff)
+                      ;; 64-bit: ensure that the fixup actually fits in the size
+                      ;; encodable in the instruction, or we're screwed
+                      #+x86-64 (the (signed-byte 32) diff)))
               ;; Relative fixups are recorded if outside of the object.
               ;; Except that read-only space contains calls to asm routines,
               ;; and we don't record those fixups.
