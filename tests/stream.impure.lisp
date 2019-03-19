@@ -11,6 +11,18 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+;;; Some of the tests herein try to read this file after we mess up *D-P-D*
+;;; (to place temp files in TMPDIR). So stash the truename for later use.
+(defvar *this-file* (truename "stream.impure.lisp"))
+
+#-win32
+(let ((dir (posix-getenv "TMPDIR")))
+  (setq *default-pathname-defaults*
+        (if dir
+            (parse-native-namestring dir nil #P"" :as-directory t)
+            #P"/tmp/")))
+(require :sb-posix)
+
 ;;; type errors for inappropriate stream arguments, fixed in
 ;;; sbcl-0.7.8.19
 (with-test (:name (make-two-way-stream type-error))
@@ -533,18 +545,18 @@
 ;;; READ-LINE used to work on closed streams because input buffers were left in place
 (with-test (:name (close read-line :bug-425))
   ;; Normal close
-  (let ((f (open "stream.impure.lisp" :direction :input)))
+  (let ((f (open *this-file* :direction :input)))
     (assert (stringp (read-line f)))
     (close f)
     (assert-error (read-line f) sb-int:closed-stream-error))
   ;; Abort
-  (let ((f (open "stream.impure.lisp" :direction :input)))
+  (let ((f (open *this-file* :direction :input)))
     (assert (stringp (read-line f nil nil)))
     (close f :abort t)
     (assert-error (read-line f) sb-int:closed-stream-error)))
 
 (with-test (:name :regression-1.0.12.22)
-  (with-open-file (s "stream.impure.lisp" :direction :input)
+  (with-open-file (s *this-file* :direction :input)
     (let ((buffer (make-string 20)))
       (assert (= 2 (read-sequence buffer s :start 0 :end 2)))
       (assert (= 3 (read-sequence buffer s :start 2 :end 3)))
@@ -635,15 +647,11 @@
       (read-char-no-hang stream)
       (assert (< (- (get-universal-time) time) 2)))))
 
-(require :sb-posix)
 #-win32
 (with-test (:name (open :interrupt) :skipped-on :win32)
-  (let ((fifo nil)
-        (to 0))
-    (unwind-protect
-         (progn
+  (let ((to 0))
+    (with-scratch-file (fifo)
            ;; Make a FIFO
-           (setf fifo (sb-posix:mktemp "SBCL-fifo.XXXXXXX"))
            (sb-posix:mkfifo fifo (logior sb-posix:s-iwusr sb-posix:s-irusr))
            ;; Try to open it (which hangs), and interrupt ourselves with a timer,
            ;; continue (this used to result in an error due to open(2) returning with
@@ -661,46 +669,58 @@
                    :timeout
                    :wtf))
              (error (e)
-               e)))
-      (when fifo
-        (ignore-errors (delete-file fifo))))))
+               e)))))
 
+;; We used to not return from read on a named pipe unless the external-format
+;; routine had filled an input buffer. Now we'll return as soon as a request
+;; is satisfied, or on EOF. (https://bugs.launchpad.net/sbcl/+bug/643686)
 #-win32
 (with-test (:name :overeager-character-buffering :skipped-on :win32)
-  (let ((fifo nil)
+  (let ((use-threads #+sb-thread t)
         (proc nil))
-    (maphash
-     (lambda (format _)
-       (declare (ignore _))
-       ;; (format t "trying ~A~%" format)
-       ;; (finish-output t)
-       (unwind-protect
+    (sb-int:dohash ((format _) sb-impl::*external-formats*)
+      (declare (ignore _))
+      (with-scratch-file (fifo)
+        (unwind-protect
             (progn
-              (setf fifo (sb-posix:mktemp "SBCL-fifo-XXXXXXX"))
               (sb-posix:mkfifo fifo (logior sb-posix:s-iwusr sb-posix:s-irusr))
               ;; KLUDGE: because we have both ends in the same process, we would
               ;; need to use O_NONBLOCK, but this works too.
-              (setf proc
-                    (run-program "/bin/sh"
-                                 (list "-c"
-                                       (format nil "cat > ~A" (native-namestring fifo)))
-                                 :input :stream
-                                 :wait nil
-                                 :external-format format))
-              (write-line "foobar" (process-input proc))
-              (finish-output (process-input proc))
+              ;; Prefer to use threads rather than processes, as the test
+              ;; execute significantly faster.
+              ;; Note also that O_NONBLOCK would probably counteract the original
+              ;; bug, so it's better that we eschew O_NONBLOCK.
+              (cond (use-threads
+                     (setf proc
+                           (make-kill-thread
+                            (lambda ()
+                              (with-open-file (f fifo :direction :output
+                                                      :if-exists :overwrite
+                                                      :external-format format)
+                                (write-line "foobar" f)
+                                (finish-output f)
+                                (sleep most-positive-fixnum))))))
+                    (t
+                     (setf proc
+                           (run-program "/bin/sh"
+                                   (list "-c"
+                                         (format nil "cat > ~A" (native-namestring fifo)))
+                                   :input :stream
+                                   :wait nil
+                                   :external-format format))
+                     (write-line "foobar" (process-input proc))
+                     (finish-output (process-input proc))))
+              ;; Whether we're using threads or processes, the writer isn't
+              ;; injecting any more input, but isn't indicating EOF either.
               (with-open-file (f fifo :direction :input :external-format format)
                 (assert (equal "foobar" (read-line f)))))
-         (when proc
-           (ignore-errors
-             (close (process-input proc) :abort t)
-             (process-wait proc))
-           (ignore-errors (process-close proc))
-           (setf proc nil))
-         (when fifo
-           (ignore-errors (delete-file fifo))
-           (setf fifo nil))))
-     sb-impl::*external-formats*)))
+          (when proc
+            (cond (use-threads (sb-thread:terminate-thread proc))
+                  (t (ignore-errors
+                      (close (process-input proc) :abort t)
+                      (process-wait proc))
+                     (ignore-errors (process-close proc))))
+            (setf proc nil)))))))
 
 (with-test (:name :bug-657183 :skipped-on (not :sb-unicode))
   #+sb-unicode
@@ -759,11 +779,15 @@
                (assert (eql 9 p2)))))
       (ignore-errors (delete-file p)))))
 
+(defun mock-fd-stream-in-fun (stream eof-err-p eof-val)
+  (sb-impl::eof-or-lose stream eof-err-p eof-val))
+(declaim (ftype function mock-fd-stream-n-bin-fun))
+
 (defstruct (mock-fd-stream
             (:constructor %make-mock-fd-stream (buffer-chain))
             (:include sb-impl::ansi-stream
-                      (in #'mock-fd-stream-in)
-                      (n-bin #'mock-fd-stream-n-bin)
+                      (in #'mock-fd-stream-in-fun)
+                      (n-bin #'mock-fd-stream-n-bin-fun)
                       (cin-buffer
                        (make-array sb-impl::+ansi-stream-in-buffer-length+
                                    :element-type 'character))))
@@ -774,10 +798,7 @@
   (%make-mock-fd-stream
    (mapcar (lambda (x) (substitute #\Newline #\| x)) buffer-chain)))
 
-(defun mock-fd-stream-in (stream eof-err-p eof-val)
-  (sb-impl::eof-or-lose stream eof-err-p eof-val))
-
-(defun mock-fd-stream-n-bin (stream char-buf start count eof-err-p)
+(defun mock-fd-stream-n-bin-fun (stream char-buf start count eof-err-p)
   (cond ((mock-fd-stream-buffer-chain stream)
          (let* ((chars (pop (mock-fd-stream-buffer-chain stream)))
                 (n-chars (length chars)))

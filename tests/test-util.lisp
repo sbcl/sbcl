@@ -848,7 +848,7 @@
                                                   :as-directory t)))
                   (concatenate 'string "/tmp/" file)))))
 
-(defmacro with-scratch-file ((var extension) &body forms)
+(defmacro with-scratch-file ((var &optional extension) &body forms)
   `(let ((,var (scratch-file-name ,extension)))
      (unwind-protect (progn ,@forms)
        (ignore-errors (delete-file ,var)))))
