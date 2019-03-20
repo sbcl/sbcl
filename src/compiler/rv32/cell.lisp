@@ -86,8 +86,7 @@
 (define-vop (%set-symbol-global-value set))
 (define-vop (symbol-global-value symbol-value)
   (:translate sym-global-val))
-
-(define-vop (fast-symbol-global-value symbol-value)
+(define-vop (fast-symbol-global-value fast-symbol-value)
   (:translate sym-global-val))
 
 (define-vop (symbol-hash)
