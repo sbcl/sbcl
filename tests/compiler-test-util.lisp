@@ -132,7 +132,7 @@
                   (disassemble function :stream s))))
         (n 0))
     (flet ((asm-line-calls-name-p (line name)
-             (dolist (herald '("#<FDEFN" "#<FUNCTION"))
+             (dolist (herald '("#<FDEFN" "#<SB-KERNEL:FDEFN" "#<FUNCTION"))
                (let ((pos (search herald line)))
                  (when pos
                    (return (string= (subseq line
