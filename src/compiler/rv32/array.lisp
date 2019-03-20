@@ -93,13 +93,37 @@
          (bound :scs (any-reg descriptor-reg))
          (index :scs (any-reg descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) temp)
+  (:variant-vars %test-fixnum)
+  (:variant t)
   (:vop-var vop)
   (:save-p :compute-only)
-  (:generator 5
+  (:generator 6
     (let ((error (generate-error-code vop 'invalid-array-index-error array bound index)))
-      (%test-fixnum index temp error t)
+      (when %test-fixnum
+        (%test-fixnum index temp error t))
       (inst bgeu index bound error))))
 
+(define-vop (check-bound/fast check-bound)
+  (:policy :fast)
+  (:variant nil)
+  (:variant-cost 4))
+
+(define-vop (check-bound/fixnum check-bound)
+  (:args (array)
+         (bound)
+         (index :scs (any-reg)))
+  (:arg-types * * tagged-num)
+  (:variant nil)
+  (:variant-cost 4))
+
+(define-vop (check-bound/untagged check-bound)
+  (:args (array)
+         (bound :scs (unsigned-reg signed-reg))
+         (index :scs (unsigned-reg signed-reg)))
+  (:arg-types * (:or unsigned-num signed-num)
+                (:or unsigned-num signed-num))
+  (:variant nil)
+  (:variant-cost 5))
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
