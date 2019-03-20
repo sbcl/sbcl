@@ -14,8 +14,8 @@ CPPFLAGS+=-I../src/runtime
 LDFLAGS:=$(LDFLAGS)
 LDLIBS:=$(OS_LIBS)
 
-all: grovel-headers determine-endianness where-is-mcontext
+all: grovel-headers determine-endianness where-is-mcontext mmap-rwx
 
 clean:
-	rm -f *.o grovel-headers determine-endianness where-is-mcontext
+	rm -f *.o grovel-headers determine-endianness where-is-mcontext mmap-rwx
 	rm -f *.exe
