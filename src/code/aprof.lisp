@@ -629,14 +629,14 @@
           (incf sum-pct (float (/ bytes total-bytes)))
           ;; Show summary for the function
           (cond ((not detail)
-                 (format stream " ~5,1,2f      ~5,1,2f ~12d~15d   ~a~%"
+                 (format stream " ~5,1,2f      ~5,1,2f ~12d~15d   ~s~%"
                          (/ bytes total-bytes)
                          sum-pct
                          bytes
                          (reduce #'+ data :key #'alloc-count)
                          name))
                 (t
-                 (format stream " ~5,1,2f   ~12d   ~:[~10@t~;~:*~10d~]~@[~14@a~]    ~a~@[ - ~a~]~%"
+                 (format stream " ~5,1,2f   ~12d   ~:[~10@t~;~:*~10d~]~@[~14@a~]    ~s~@[ - ~s~]~%"
                          (/ bytes total-bytes)
                          bytes
                          (if (cdr data) nil (alloc-count (car data)))
@@ -648,7 +648,7 @@
                          )))
           (when (and detail (cdr data))
             (dolist (point data)
-              (format stream "     ~5,1,2f ~12d ~10d~@[~14x~]~@[        ~a~]~%"
+              (format stream "     ~5,1,2f ~12d ~10d~@[~14x~]~@[        ~s~]~%"
                         (/ (alloc-bytes point) bytes) ; fraction within function
                         (alloc-bytes point)
                         (alloc-count point)
