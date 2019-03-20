@@ -141,10 +141,22 @@
        (let ((refname (symbolicate "DATA-VECTOR-REF/" type))
              (setname (symbolicate "DATA-VECTOR-SET/" type)))
          `(progn
-            (define-partial-reffer ,refname ,type ,size ,signed vector-data-offset other-pointer-lowtag ,scs ,element-type data-vector-ref)
+            (define-partial-reffer ,refname ,type
+              ,size ,signed vector-data-offset other-pointer-lowtag ,scs
+              ,element-type data-vector-ref)
             (define-partial-setter ,setname ,type
               ,size vector-data-offset other-pointer-lowtag ,scs
-              ,element-type data-vector-set)))))
+              ,element-type data-vector-set))))
+     (def-float-data-vector-frobs (type format element-type size &rest scs)
+       (let ((refname (symbolicate "DATA-VECTOR-REF/" type))
+             (setname (symbolicate "DATA-VECTOR-SET/" type)))
+         `(progn
+            (define-float-reffer ,refname ,type
+              ,size ,format vector-data-offset other-pointer-lowtag ,scs
+              ,element-type "inline array access" data-vector-ref)
+            (define-float-setter ,setname ,type
+              ,size ,format vector-data-offset other-pointer-lowtag ,scs
+              ,element-type "inline array store" data-vector-set)))))
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)
@@ -174,7 +186,10 @@
     (def-full-data-vector-frobs simple-array-signed-byte-64 signed-num signed-reg)
     (def-full-data-vector-frobs simple-array-unsigned-byte-64 unsigned-num unsigned-reg))
   (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum any-reg)
-  (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg))
+  (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg)
+
+  (def-float-data-vector-frobs simple-array-single-float :single single-float 4 single-reg)
+  (def-float-data-vector-frobs simple-array-double-float :double double-float 8 double-reg))
 
 ;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
@@ -335,89 +350,6 @@
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 
 ;;; And the float variants.
-(macrolet ((frob ()
-             `(define-vop (data-vector-ref/simple-array-float)
-                (:note "inline array access")
-                (:policy :fast-safe)
-                (:args (object)
-                       (index))
-                (:results (value))
-                (:temporary (:scs (interior-reg)) lip)
-                ,@(unless (= word-shift n-fixnum-tag-bits)
-                    `((:temporary (:sc non-descriptor-reg) temp)))
-                (:variant-vars format)
-                (:generator 20
-                  ,@(cond ((= word-shift n-fixnum-tag-bits)
-                           `((inst add lip object index)))
-                          (t
-                           `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                             (inst add lip object temp))))
-                  (inst fload format value lip  (- (* vector-data-offset n-word-bytes)
-                                                   other-pointer-lowtag))))))
-  (frob))
-
-(define-vop (data-vector-ref/simple-array-single-float data-vector-ref/simple-array-float)
-  (:translate data-vector-ref)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types simple-array-single-float positive-fixnum)
-  (:results (value :scs (single-reg)))
-  (:result-types single-float)
-  (:variant :single))
-
-(define-vop (data-vector-ref/simple-array-double-float data-vector-ref/simple-array-float)
-  (:translate data-vector-ref)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg)))
-  (:arg-types simple-array-double-float positive-fixnum)
-  (:results (value :scs (double-reg)))
-  (:result-types double-float)
-  (:variant :double))
-
-(macrolet ((frob ()
-             `(define-vop (data-vector-set/simple-array-float)
-                (:note "inline array store")
-                (:policy :fast-safe)
-                (:args (object)
-                       (index)
-                       (value :target result))
-                (:results (result))
-                (:temporary (:scs (interior-reg)) lip)
-                ,@(unless (= word-shift n-fixnum-tag-bits)
-                    `((:temporary (:sc non-descriptor-reg) temp)))
-                (:variant-vars format)
-                (:generator 20
-                  ,@(cond ((= word-shift n-fixnum-tag-bits)
-                           `((inst add lip object index)))
-                          (t
-                           `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                             (inst add lip object temp))))
-                  (inst fstore format value lip (- (* vector-data-offset n-word-bytes)
-                                                   other-pointer-lowtag))
-                  (unless (location= result value)
-                    (inst fmove format result value))))))
-  (frob))
-
-(define-vop (data-vector-set/simple-array-single-float data-vector-set/simple-array-float)
-  (:translate data-vector-set)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (single-reg) :target result))
-  (:arg-types simple-array-single-float positive-fixnum single-float)
-  (:results (result :scs (single-reg)))
-  (:result-types single-float)
-  (:variant :single))
-
-(define-vop (data-vector-set/simple-array-double-float data-vector-set/simple-array-float)
-  (:translate data-vector-set)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (double-reg) :target result))
-  (:arg-types simple-array-double-float positive-fixnum double-float)
-  (:results (result :scs (double-reg)))
-  (:result-types double-float)
-  (:variant :double))
-
 ;;; Complex float arrays.
 (define-vop (data-vector-ref/simple-array-complex-float)
   (:note "inline array access")
