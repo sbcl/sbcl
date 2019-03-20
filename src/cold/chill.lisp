@@ -30,6 +30,9 @@
 
 ;;; We need the #! readtable modifications.
 (load (merge-pathnames "shebang.lisp" *load-truename*))
+;;; ... applied to the default readtable
+(set-dispatch-macro-character #\# #\+ #'read-targ-feature-expr)
+(set-dispatch-macro-character #\# #\- #'read-targ-feature-expr)
 
 ;;; Just in case we want to play with the initial value of
 ;;; backend-subfeatures
