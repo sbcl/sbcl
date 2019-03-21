@@ -696,25 +696,6 @@ This is interpreted as
            ;; The KEYs remain bound, but they should not be used for anything.
            ,hairy))))
 
-;; Given Info-Vector VECT, return the fdefn that it contains for its root name,
-;; or nil if there is no value. NIL input is acceptable and will return NIL.
-(declaim (inline info-vector-fdefn))
-(defun info-vector-fdefn (vect)
-  (when vect
-    ;; This is safe: Info-Vector invariant requires that it have length >= 1.
-    (let ((word (the fixnum (svref vect 0))))
-      ;; Test that the first info-number is +fdefn-info-num+ and its n-infos
-      ;; field is nonzero. These conditions can be tested simultaneously
-      ;; using a SIMD-in-a-register idea. The low 6 bits must be nonzero
-      ;; and the next 6 must be exactly #b111111, so considered together
-      ;; as a 12-bit unsigned integer it must be >= #b111111000001
-      (when (>= (ldb (byte (* info-number-bits 2) 0) word)
-                (1+ (ash +fdefn-info-num+ info-number-bits)))
-        ;; DATA-REF-WITH-OFFSET doesn't know the info-vector length invariant,
-        ;; so depite (safety 0) eliding bounds check, FOLD-INDEX-ADDRESSING
-        ;; wasn't kicking in without (TRULY-THE (INTEGER 1 *)).
-        (aref vect (1- (truly-the (integer 1 *) (length vect))))))))
-
 ;;; Some of this stuff might belong in 'symbol.lisp', but can't be,
 ;;; because 'symbol.lisp' is :NOT-HOST in build-order.
 
