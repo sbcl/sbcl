@@ -16,7 +16,7 @@
 
 (load "test-funs")
 
-(defun run-all ()
+(defun run-all (&aux (start-time (get-internal-real-time)))
   (loop :with remainder = (rest *posix-argv*)
      :while remainder
      :for arg = (pop remainder)
@@ -50,7 +50,8 @@
     (pure-runner (pure-cload-files) 'cload-test log)
     (impure-runner (impure-load-files) 'load-test log)
     (impure-runner (impure-cload-files) 'cload-test log)
-    #-win32 (impure-runner (sh-files) 'sh-test log))
+    #-win32 (impure-runner (sh-files) 'sh-test log)
+    (log-file-elapsed-time "GRAND TOTAL" start-time log))
   (report)
   (sb-ext:exit :code (if (unexpected-failures)
                          1
@@ -100,12 +101,11 @@
           (t
            (format t "All tests succeeded~%")))))
 
-(defun write-elapsed-time (source-file begin-time log)
+(defun log-file-elapsed-time (source-file begin-time log)
   (let ((end-time (get-internal-real-time)))
-    (format log "~5d - ~a~%" (- end-time begin-time) source-file)
+    (format log "~6d - ~a~%" (- end-time begin-time) source-file)
     (force-output log)))
 
-(defvar *summarize-test-times* nil)
 (defun pure-runner (files test-fun log)
   (when files
     (format t "// Running pure tests (~a)~%" test-fun)
@@ -123,17 +123,8 @@
                            (cons :interpreter *features*)
                            *features*)))
                 (let ((start (get-internal-real-time)))
-                  (setq test-util:*elapsed-times* nil)
                   (funcall test-fun file)
-                  (write-elapsed-time file start log)
-                  (when *summarize-test-times*
-                    (format t "~2%Tests ordered by descending elapsed time:~%")
-                    (let ((tot 0))
-                      (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
-                        (incf tot (car x))
-                        (let ((*print-pretty* nil))
-                          (format t "~6d ~a~%" (car x) (cdr x))))
-                      (format t "~6d TOTAL TIME (~a)~%" tot file))))))
+                  (log-file-elapsed-time file start log))))
           (skip-file ())))
       (append-failures))))
 
@@ -172,7 +163,7 @@
       (force-output)
       (let ((start (get-internal-real-time))
             (exit-code (run-impure-in-child-sbcl file test-fun)))
-        (write-elapsed-time file start log)
+        (log-file-elapsed-time file start log)
         (if (= exit-code 104)
             (with-open-file (stream "test-status.lisp-expr"
                                     :direction :input

@@ -134,11 +134,17 @@
   (let ((*print-pretty* nil))
     (apply #'log-msg stream args)))
 
-(defvar *elapsed-times* nil)
-(defun run-test (test-function name fails-on)
+(defvar *elapsed-times*)
+(defun record-test-elapsed-time (test-name start-time)
+  (let ((et (- (get-internal-real-time) start-time)))
+    ;; ATOMIC in case we have within-file test concurrency
+    ;; (not sure if it actually works, but it looks right anyway)
+    (sb-ext:atomic-push (cons et test-name) *elapsed-times*)))
+
+(defun run-test (test-function name fails-on
+                 &aux (start-time (get-internal-real-time)))
   (start-test)
   (let (#+sb-thread (threads (sb-thread:list-all-threads))
-        (start-time (get-internal-real-time))
         (*threads-to-join* nil)
         (*threads-to-kill* nil))
     (handler-bind ((error (lambda (error)
@@ -174,12 +180,11 @@
         (when any-leftover
           (fail-test :leftover-thread name any-leftover)
           (return-from run-test)))
-      (let ((et (- (get-internal-real-time) start-time)))
-        (push (cons et name) *elapsed-times*))
       (if (expected-failure-p fails-on)
           (fail-test :unexpected-success name nil)
           ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-          (log-msg/non-pretty *trace-output* "Success ~S" name)))))
+          (log-msg/non-pretty *trace-output* "Success ~S" name))))
+  (record-test-elapsed-time name start-time))
 
 ;;; Like RUN-TEST but do not perform any of the automated thread management.
 ;;; Since multiple threads are executing tests, there is no reason to kill
