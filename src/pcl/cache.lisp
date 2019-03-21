@@ -152,7 +152,7 @@
 ;;; Compute the starting index of the next cache line in the cache vector.
 (declaim (inline next-cache-index))
 (defun next-cache-index (mask index line-size)
-  (declare (type (unsigned-byte #.sb-vm:n-word-bits) index line-size mask))
+  (declare (type word index line-size mask))
   (logand mask (+ index line-size)))
 
 ;;; Returns the hash-value for layout, or executes ELSE if the layout

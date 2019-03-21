@@ -197,7 +197,7 @@
                        ;; -C/SIGNED=>UNSIGNED, below, when the
                        ;; higher-level lisp code can't optimize away the
                        ;; non-trivial identity.
-                       `(unless (= y #.(1- (ash 1 n-word-bits)))
+                       `(unless (= y most-positive-word)
                           (inst ,op r y))
                        `(inst ,op r y)))))))
   (define-binop - 4 sub)

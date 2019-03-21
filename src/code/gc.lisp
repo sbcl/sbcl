@@ -369,7 +369,7 @@ Note: currently changes to this value are lost when saving core."
 ;;;; as well.
 #+gencgc
 (deftype generation-index ()
-  '(integer 0 #.sb-vm:+pseudo-static-generation+))
+  `(integer 0 ,sb-vm:+pseudo-static-generation+))
 
 ;;; FIXME: GENERATION (and PAGE, as seen in room.lisp) should probably be
 ;;; defined in Lisp, and written to header files by genesis, instead of this

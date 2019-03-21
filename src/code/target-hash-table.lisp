@@ -413,16 +413,12 @@ Examples:
            ;; We can not possibly support hash-tables that need
            ;; such large indices. It doesn't work.
            ;; Reducing this to (unsigned-byte 32) would save memory.
-           (index-vector (make-array length
-                                     :element-type
-                                     '(unsigned-byte #.sb-vm:n-word-bits)
+           (index-vector (make-array length :element-type 'word
                                      :initial-element 0))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indeces at 2i and 2i+1 -
            ;; together.
-           (next-vector (make-array size+1
-                                    :element-type
-                                    '(unsigned-byte #.sb-vm:n-word-bits)))
+           (next-vector (make-array size+1 :element-type 'word))
            (kv-vector (make-array (* 2 size+1)
                                   :initial-element +empty-ht-slot+))
            (weakness (if weakness
@@ -443,9 +439,7 @@ Examples:
                    next-vector
                    (unless (eq test 'eq)
                      ;; See FIXME at INDEX-VECTOR. Same concern.
-                     (make-array size+1
-                                 :element-type '(unsigned-byte
-                                                 #.sb-vm:n-word-bits)
+                     (make-array size+1 :element-type 'word
                                  :initial-element +magic-hash-vector-value+))
                    (logior (if synchronized 2 0) weakness))))
       (declare (type index size+1 scaled-size length))

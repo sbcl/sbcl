@@ -65,7 +65,7 @@
 (sb-xc:deftype atom () '(not cons))
 
 (sb-xc:deftype base-char ()
-  '(character-set ((0 . #.(1- base-char-code-limit)))))
+  `(character-set ((0 . ,(1- base-char-code-limit)))))
 
 (sb-xc:deftype extended-char ()
   "Type of CHARACTERs that aren't BASE-CHARs."

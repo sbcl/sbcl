@@ -2538,7 +2538,7 @@ register."
       (#.sb-vm:sap-reg-sc-number
        (set-escaped-value (sap-int value)))
       (#.sb-vm:signed-reg-sc-number
-       (set-escaped-value (logand value (1- (ash 1 sb-vm:n-word-bits)))))
+       (set-escaped-value (logand value most-positive-word)))
       (#.sb-vm:unsigned-reg-sc-number
        (set-escaped-value value))
       #-(or x86 x86-64)

@@ -636,8 +636,8 @@ We could try a few things to mitigate this:
 ;;; allocated in Space.
 (defun type-breakdown (space)
   (declare (muffle-conditions compiler-note))
-  (let ((sizes (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.n-word-bits)))
-        (counts (make-array 256 :initial-element 0 :element-type '(unsigned-byte #.n-word-bits))))
+  (let ((sizes (make-array 256 :initial-element 0 :element-type 'word))
+        (counts (make-array 256 :initial-element 0 :element-type 'word)))
     (map-allocated-objects
      (lambda (obj type size)
        (declare (word size) (optimize (speed 3)) (ignore obj))

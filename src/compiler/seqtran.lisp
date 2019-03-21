@@ -1040,7 +1040,7 @@
                     ;; sign of the shift count prior to shifting when
                     ;; all we need is a simple negate and shift
                     ;; right.  Yuck.
-                    (mask (ash #.(1- (ash 1 sb-vm:n-word-bits))
+                    (mask (ash most-positive-word
                                (* (- extra ,n-elems-per-word)
                                   ,n-bits-per-elem))))
                (setf (%vector-raw-bits dst end)

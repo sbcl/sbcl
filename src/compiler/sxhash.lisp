@@ -98,7 +98,7 @@
 ;;; SXHASH of FLOAT values is defined directly in terms of DEFTRANSFORM in
 ;;; order to avoid boxing.
 (deftransform sxhash ((x) (single-float))
-  '(let ((bits (logand (single-float-bits x) #.(1- (ash 1 32)))))
+  `(let ((bits (logand (single-float-bits x) ,(1- (ash 1 32)))))
      (logxor 66194023
              (sxhash (the fixnum
                           (logand sb-xc:most-positive-fixnum
@@ -106,7 +106,7 @@
                                           (ash bits -7))))))))
 #-64-bit
 (deftransform sxhash ((x) (double-float))
-  '(let* ((hi (logand (double-float-high-bits x) #.(1- (ash 1 32))))
+  `(let* ((hi (logand (double-float-high-bits x) ,(1- (ash 1 32))))
           (lo (double-float-low-bits x))
           (hilo (logxor hi lo)))
      (logxor 475038542

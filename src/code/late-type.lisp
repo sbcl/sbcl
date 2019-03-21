@@ -3600,7 +3600,7 @@ used for a COMPLEX component.~:@>"
 ;;;; CHARACTER-SET types
 
 (!def-type-translator character-set
-    (&optional (pairs '((0 . #.(1- sb-xc:char-code-limit)))))
+    (&optional (pairs `((0 . ,(1- sb-xc:char-code-limit)))))
   (make-character-set-type pairs))
 
 (!define-type-method (character-set :negate) (type)
@@ -3612,7 +3612,7 @@ used for a COMPLEX component.~:@>"
         (let ((not-character
                (make-negation-type
                 (make-character-set-type
-                 '((0 . #.(1- sb-xc:char-code-limit)))))))
+                 `((0 . ,(1- sb-xc:char-code-limit)))))))
           (type-union
            not-character
            (make-character-set-type

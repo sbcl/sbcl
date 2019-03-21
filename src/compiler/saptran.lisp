@@ -49,17 +49,15 @@
           (system-area-pointer system-area-pointer) boolean
   (movable flushable))
 
-(defknown sap+ (system-area-pointer (signed-byte #.sb-vm:n-word-bits))
-               system-area-pointer
+(defknown sap+ (system-area-pointer sb-vm:signed-word) system-area-pointer
   (movable flushable))
-(defknown sap- (system-area-pointer system-area-pointer)
-               (signed-byte #.sb-vm:n-machine-word-bits)
+(defknown sap- (system-area-pointer system-area-pointer) sb-vm:signed-word
   (movable flushable))
 
 (defknown sap-int (system-area-pointer)
-  (unsigned-byte #.sb-vm::n-machine-word-bits)
+  (unsigned-byte #.sb-vm:n-machine-word-bits)
   (movable flushable foldable))
-(defknown int-sap ((unsigned-byte #.sb-vm::n-machine-word-bits))
+(defknown int-sap ((unsigned-byte #.sb-vm:n-machine-word-bits))
   system-area-pointer (movable))
 
 (macrolet ((defsapref (fun value-type)
@@ -83,12 +81,12 @@
   (defsapref sap-ref-16 (unsigned-byte 16))
   (defsapref sap-ref-32 (unsigned-byte 32))
   (defsapref sap-ref-64 (unsigned-byte 64))
-  (defsapref sap-ref-word (unsigned-byte #.sb-vm:n-word-bits))
+  (defsapref sap-ref-word word)
   (defsapref signed-sap-ref-8 (signed-byte 8))
   (defsapref signed-sap-ref-16 (signed-byte 16))
   (defsapref signed-sap-ref-32 (signed-byte 32))
   (defsapref signed-sap-ref-64 (signed-byte 64))
-  (defsapref signed-sap-ref-word (signed-byte #.sb-vm:n-word-bits))
+  (defsapref signed-sap-ref-word sb-vm:signed-word)
   (defsapref sap-ref-sap system-area-pointer)
   (defsapref sap-ref-lispobj t)
   (defsapref sap-ref-single single-float)

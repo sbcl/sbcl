@@ -2491,7 +2491,7 @@
                   (optimize speed))
                  (logandc2 x (ash -1 n)))))
          (thing-not-to-call
-          (intern (format nil "ASH-LEFT-MOD~D" sb-vm::n-machine-word-bits) "SB-VM")))
+          (intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")))
     (assert (not (member (symbol-function thing-not-to-call)
                          (ctu:find-named-callees fun))))
     (assert (= 7 (funcall fun 15 3)))))

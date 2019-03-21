@@ -139,7 +139,7 @@
 (deftype address ()
   "Type used for addresses, for instance, program counters,
    code start/end locations etc."
-  '(unsigned-byte #.sb-vm::n-machine-word-bits))
+  `(unsigned-byte ,sb-vm:n-machine-word-bits))
 
 ;;; A call graph.  Vertices are NODE structures, edges are CALL
 ;;; structures.

@@ -521,7 +521,7 @@
             (return (setf (descriptor-gspace des) gspace)))))))
 
 (defun %fixnum-descriptor-if-possible (num)
-  (and (typep num '(signed-byte #.sb-vm:n-fixnum-bits))
+  (and (typep num `(signed-byte ,sb-vm:n-fixnum-bits))
        (make-random-descriptor (ash num sb-vm:n-fixnum-tag-bits))))
 
 (defun make-fixnum-descriptor (num)

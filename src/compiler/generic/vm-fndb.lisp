@@ -443,8 +443,7 @@
   (values bignum-element-type bignum-element-type)
   (foldable flushable movable))
 
-(defknown %fixnum-digit-with-correct-sign (bignum-element-type)
-  (signed-byte #.sb-vm:n-word-bits)
+(defknown %fixnum-digit-with-correct-sign (bignum-element-type) sb-vm:signed-word
   (foldable flushable movable))
 
 (defknown (%ashl %ashr %digit-logical-shift-right)

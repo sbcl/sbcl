@@ -142,7 +142,7 @@
     (assert (= 0 (box-word box)))))
 
 (with-test (:name :atomic-incf-wraparound)
-  (let ((box (make-box :word (1- (ash 1 sb-vm:n-word-bits)))))
+  (let ((box (make-box :word sb-ext:most-positive-word)))
     (sb-ext:atomic-incf (box-word box) 2)
     (assert (= 1 (box-word box)))))
 
