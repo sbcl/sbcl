@@ -2168,7 +2168,7 @@
 
 (defun compile2 (lambda)
   (let* ((lisp (test-util:scratch-file-name "lisp"))
-         (fasl (test-util:scratch-file-name)))
+         (fasl (test-util:scratch-file-name "fasl")))
     (unwind-protect
          (progn
            (with-open-file (f lisp :direction :output)
@@ -2523,7 +2523,7 @@
   ;; source, and our error reporting would happily use that
   ;; as source forms.
   (let* ((src "bug-943953.lisp")
-         (obj (test-util:scratch-file-name)))
+         (obj (test-util:scratch-file-name "fasl")))
     (unwind-protect (let ((*error-output* (make-broadcast-stream)))
                       (compile-file src
                                     :output-file obj

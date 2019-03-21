@@ -127,17 +127,15 @@
     (assert-error (funcall fun) unbound-variable)))
 
 (defun compile-form (form)
-  (let* ((lisp "defglobal-impure-tmp.lisp"))
-    (unwind-protect
-         (progn
-           (with-open-file (f lisp :direction :output)
-             (prin1 form f))
-           (multiple-value-bind (fasl warn fail) (compile-file lisp)
-             (declare (ignore warn))
-             (when fail
-               (error "compiling ~S failed" form))
-             fasl))
-      (ignore-errors (delete-file lisp)))))
+  (with-scratch-file (lisp "lisp")
+    (with-open-file (f lisp :direction :output)
+      (prin1 form f))
+    (let ((fasl (scratch-file-name "fasl")))
+      (multiple-value-bind (fasl warn fail) (compile-file lisp :output-file fasl)
+        (declare (ignore warn))
+        (when fail
+          (error "compiling ~S failed" form))
+        fasl))))
 
 (defvar *counter*)
 (with-test (:name :defconstant-evals)
@@ -183,5 +181,6 @@
                                (defglobal **global-1** :fii)
                                (defglobal **global-2** **global-1**)))))
     (load fasl)
+    (ignore-errors (delete-file fasl))
     (assert (eq (symbol-value '**global-1**) (symbol-value '**global-2**)))
     (assert (eq :fii (symbol-value '**global-1**)))))
