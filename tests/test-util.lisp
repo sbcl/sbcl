@@ -854,9 +854,11 @@
                   (concatenate 'string "/tmp/" file)))))
 
 (defmacro with-scratch-file ((var &optional extension) &body forms)
-  `(let ((,var (scratch-file-name ,extension)))
-     (unwind-protect (progn ,@forms)
-       (ignore-errors (delete-file ,var)))))
+  (sb-int:with-unique-names (tempname)
+    `(let ((,tempname (scratch-file-name ,extension)))
+       (unwind-protect
+            (let ((,var ,tempname)) ,@forms) ; rebind, as test might asssign into VAR
+         (ignore-errors (delete-file ,tempname))))))
 
 ;;; Take a list of lists and assemble them as though they are
 ;;; instructions inside the body of a vop. There is no need

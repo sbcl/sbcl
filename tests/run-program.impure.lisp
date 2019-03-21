@@ -171,7 +171,7 @@
 
 #-win32
 (progn
-  (defparameter *tmpfile* "run-program-ed-test.tmp")
+  (defparameter *tmpfile* (scratch-file-name))
 
   (with-test (:name (run-program :/bin/ed))
     (with-open-file (f *tmpfile*
@@ -211,16 +211,13 @@
 ;; pathname designator.  Since these use the same code, it should
 ;; suffice to test just :INPUT.
 (with-test (:name (run-program :input :output pathname))
-  (let ((file))
-    (unwind-protect
-         (progn (with-open-file (f "run-program-test.tmp" :direction :output)
-                  (setf file (truename f))
-                  (write-line "Foo" f))
-                (assert (run-program "cat" ()
-                                     :input file :output t
-                                     :search t :wait t)))
-      (when file
-        (delete-file file)))))
+  (with-scratch-file (file)
+    (with-open-file (f file :direction :output)
+      (setf file (truename file))
+      (write-line "Foo" f))
+    (assert (run-program "cat" ()
+                         :input file :output t
+                         :search t :wait t))))
 
 ;;; This used to crash on Darwin and trigger recursive lock errors on
 ;;; every platform.
