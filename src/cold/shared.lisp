@@ -664,3 +664,83 @@
              (funcall *target-compile-file* filename))))
 (compile 'target-compile-file)
 
+;;;; Floating-point number reader interceptor
+
+(defvar *choke-on-host-irrationals* t)
+(defun reader-intercept (f &optional stream (errp t) errval recursive)
+  (declare (ignorable f stream errp errval recursive))
+  #+sbcl
+  (labels ((contains-irrational (x)
+             (typecase x
+               (cons (or (contains-irrational (car x))
+                         (contains-irrational (cdr x))))
+               (simple-vector (some #'contains-irrational x))
+               ;; We use package literals -- see e.g. SANE-PACKAGE - which
+               ;; must be treated as opaque, but COMMAs should not be opaque.
+               ;; There are also a few uses of "#.(find-layout)".
+               ;; However, the target-num objects should also be opaque
+               ;; and, testing for those types before the structure is defined
+               ;; is not fun. Other than moving the definitions into here
+               ;; from cross-early, there's no good way. But 'chill'
+               ;; should not define those structures.
+               ((and structure-object (not package))
+                (let ((type-name (string (type-of x))))
+                  ;; This "LAYOUT" refers to *our* object, not host-sb-kernel:layout.
+                  (unless (member type-name '("LAYOUT" "FLOAT" "COMPLEXNUM")
+                                  :test #'string=)
+                    ;(Format t "visit a ~/host-sb-ext:print-symbol-with-prefix/~%" (type-of x))
+                    ;; This generalizes over any structure. I need it because we
+                    ;; observe instances of SB-IMPL::COMMA and also HOST-SB-IMPL::COMMA.
+                    ;; (primordial-extensions get compiled before 'backq' is installed)
+                    ;; DO-INSTANCE-TAGGED-SLOT was defined circa Nov 2014.
+                    ;; As explained futher below, it doesn't really matter
+                    ;; whether we catch erroneous forms using all possible
+                    ;; build hosts as long as *some* host can trap the bug.
+                    #.(when (eq (nth-value 1 (find-symbol "DO-INSTANCE-TAGGED-SLOT"
+                                                          "SB-KERNEL")) :external)
+                        '(sb-kernel:do-instance-tagged-slot (i x)
+                          (when (contains-irrational (sb-kernel:%instance-ref x i))
+                            (return-from contains-irrational t)))))))
+               ((or cl:complex cl:float)
+                x))))
+    (let* ((form (funcall f stream errp errval recursive))
+           (bad-atom (and (not recursive) ; avoid checking inner forms
+                          (not (eq form errval))
+                          *choke-on-host-irrationals*
+                          (contains-irrational form))))
+      (when bad-atom
+        (setq *choke-on-host-irrationals* nil) ; one shot, otherwise tough to debug
+        (error "Oops! didn't expect to read ~s containing ~s" form bad-atom))
+      form)))
+(compile 'reader-intercept)
+;;; Intercept READ to catch inadvertent use of host floating-point literals
+;;; without wrapping. This prevents regressions in the portable float logic
+;;; and allows passing characters to a floating-point library if we so choose.
+;;; Only SBCL uses the interceptor because we can't portably redefine READ.
+(defun install-read-interceptor ()
+  #+sbcl
+  (unless (sb-kernel:closurep (symbol-function 'read))
+    (sb-int:encapsulate 'read-preserving-whitespace 'protect #'reader-intercept)
+    (sb-int:encapsulate 'read 'protect #'reader-intercept)
+    (format t "~&; Installed READ interceptor~%")))
+
+(defvar *math-ops-memoization* (make-hash-table :test 'equal))
+(defmacro with-math-journal (&body body)
+  `(let* ((table *math-ops-memoization*)
+          (memo (cons table (hash-table-count table))))
+     (assert (atom table)) ; prevent nested use of this macro
+     ;; Don't intercept READ until just-in-time, so that "chill" doesn't
+     ;; annoyingly get the interceptor installed.
+     (install-read-interceptor)
+     (let ((*math-ops-memoization* memo))
+       ,@body)
+     (when nil ; *compile-verbose*
+       (funcall (intern "SHOW-INTERNED-NUMBERS" "SB-IMPL") *standard-output*))
+     (when (> (hash-table-count table) (cdr memo))
+       (let ((filename "float-math.lisp-expr"))
+         (with-open-file (stream filename :direction :output
+                                          :if-exists :supersede)
+           (funcall (intern "DUMP-MATH-MEMOIZATION-TABLE" "SB-IMPL")
+                    table stream))
+         (format t "~&; wrote ~a - ~d entries"
+                 filename (hash-table-count table))))))

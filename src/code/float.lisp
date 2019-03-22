@@ -416,7 +416,7 @@
          (exp (ldb sb-vm:single-float-exponent-byte bits))
          (sign (float-sign x)))
     (cond ((zerop bits)
-           (values 0.0f0 0 sign))
+           (values $0.0f0 0 sign))
           ((< exp sb-vm:single-float-normal-exponent-min)
            (decode-single-denorm x))
           ((> exp sb-vm:single-float-normal-exponent-max)
@@ -449,7 +449,7 @@
          (exp (ldb sb-vm:double-float-exponent-byte hi))
          (sign (float-sign x)))
     (cond ((zerop x)
-           (values 0.0d0 0 sign))
+           (values $0.0d0 0 sign))
           ((< exp sb-vm:double-float-normal-exponent-min)
            (decode-double-denorm x))
           ((> exp sb-vm:double-float-normal-exponent-max)
@@ -541,7 +541,7 @@
                  :operands (list x exp)))
         (let ((shift (1- new-exp)))
           (if (< shift (- (1- digits)))
-              (float-sign x 0.0)
+              (float-sign x $0.0)
               (etypecase x
                 (single-float (single-from-bits sign 0 (ash sig shift)))
                 (double-float (double-from-bits sign 0 (ash sig shift)))))))
@@ -998,3 +998,9 @@
                           p1 p2
                           q1 q2))))))))
     ((rational) x)))
+
+;;; Unlike most interpreter stubs the definitions of which can be deferred
+;;; until warm build, these two are essential to sanity-checking
+;;; the floating-point operation cache at the very start of warm build.
+(defun make-single-float (x) (make-single-float x))
+(defun make-double-float (hi lo) (make-double-float hi lo))

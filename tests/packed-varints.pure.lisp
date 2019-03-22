@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (with-test (:name :pack-compiled-debug-info-tlf-num+offset)
   (flet ((test (a b)
            (let ((cdi

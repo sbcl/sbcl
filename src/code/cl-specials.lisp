@@ -97,8 +97,8 @@
 
 (declaim (type (member :upcase :downcase :capitalize) cl:*print-case*))
 
-(declaim (type (member cl:single-float cl:double-float
-                       cl:short-float cl:long-float) cl:*read-default-float-format*))
+(declaim (type (member single-float double-float short-float long-float)
+               cl:*read-default-float-format*))
 
 (declaim (type list cl:/ cl:// cl:/// cl:*features* cl:*modules*))
 

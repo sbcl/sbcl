@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (with-test (:name :length)
     (funcall (lambda ()
                (let ((simple-t (make-array 35))

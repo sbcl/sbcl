@@ -9,8 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 ;;; Test for monotonicity of GET-INTERNAL-RUN-TIME. (On OpenBSD, this
 ;;; is not a given, because of a longstanding bug in getrusage().)
 (with-test (:name (get-internal-run-time :monotonic))

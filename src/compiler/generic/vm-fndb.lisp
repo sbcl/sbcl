@@ -569,33 +569,33 @@
   (movable foldable flushable))
 
 (defknown (%sin %cos %tanh %sin-quick %cos-quick)
-  (double-float) (double-float -1.0d0 1.0d0)
+  (double-float) (double-float $-1.0d0 $1.0d0)
   (movable foldable flushable))
 
 (defknown (%asin %atan)
   (double-float)
-  (double-float #.(coerce (- (/ pi 2)) 'double-float)
-                #.(coerce (/ pi 2) 'double-float))
+  (double-float #.(coerce (sb-xc:- (sb-xc:/ sb-xc:pi 2)) 'double-float)
+                #.(coerce (sb-xc:/ sb-xc:pi 2) 'double-float))
   (movable foldable flushable))
 
 (defknown (%acos)
-  (double-float) (double-float 0.0d0 #.(coerce pi 'double-float))
+  (double-float) (double-float $0.0d0 #.(coerce sb-xc:pi 'double-float))
   (movable foldable flushable))
 
 (defknown (%cosh)
-  (double-float) (double-float 1.0d0)
+  (double-float) (double-float $1.0d0)
   (movable foldable flushable))
 
 (defknown (%acosh %exp %sqrt)
-  (double-float) (double-float 0.0d0)
+  (double-float) (double-float $0.0d0)
   (movable foldable flushable))
 
 (defknown %expm1
-  (double-float) (double-float -1d0)
+  (double-float) (double-float $-1d0)
   (movable foldable flushable))
 
 (defknown (%hypot)
-  (double-float double-float) (double-float 0d0)
+  (double-float double-float) (double-float $0d0)
   (movable foldable flushable))
 
 (defknown (%pow)
@@ -604,8 +604,8 @@
 
 (defknown (%atan2)
   (double-float double-float)
-  (double-float #.(coerce (- pi) 'double-float)
-                #.(coerce pi 'double-float))
+  (double-float #.(coerce (sb-xc:- sb-xc:pi) 'double-float)
+                #.(coerce sb-xc:pi 'double-float))
   (movable foldable flushable))
 
 (defknown (%scalb)

@@ -779,93 +779,78 @@ core and return a descriptor to it."
     des))
 
 (defun write-double-float-bits (address index x)
-  (let ((high-bits (double-float-high-bits x))
-        (low-bits (double-float-low-bits x)))
-    (ecase sb-vm:n-word-bits
-      (32
+  (ecase sb-vm:n-word-bits
+    (32
+     (let ((high-bits (double-float-high-bits x))
+           (low-bits (double-float-low-bits x)))
        (ecase sb-c:*backend-byte-order*
          (:little-endian
           (write-wordindexed/raw address index low-bits)
           (write-wordindexed/raw address (1+ index) high-bits))
          (:big-endian
           (write-wordindexed/raw address index high-bits)
-          (write-wordindexed/raw address (1+ index) low-bits))))
-      (64
-       (let ((bits (ecase sb-c:*backend-byte-order*
-                     (:little-endian (logior low-bits (ash high-bits 32)))
-                     (:big-endian (logior (logand high-bits #xffffffff)
-                                          (ash low-bits 32))))))
-         (write-wordindexed/raw address index bits))))
-
-    address))
+          (write-wordindexed/raw address (1+ index) low-bits)))))
+    (64
+     (write-wordindexed/raw address index (double-float-bits x))))
+  address)
 
 (defun float-to-core (x)
-  (etypecase x
+  (ecase (sb-impl::flonum-format x)
     (single-float
-     ;; 64-bit platforms have immediate single-floats.
-     #+64-bit
-     (make-random-descriptor (logior (ash (single-float-bits x) 32)
-                                     sb-vm:single-float-widetag))
-     #-64-bit
-     (let ((des (allocate-header+object *dynamic*
-                                         (1- sb-vm:single-float-size)
-                                         sb-vm:single-float-widetag)))
-       (write-wordindexed/raw des sb-vm:single-float-value-slot
-                              (single-float-bits x))
-       des))
+     (let ((bits (single-float-bits x)))
+       #+64-bit ; 64-bit platforms have immediate single-floats
+       (make-random-descriptor (logior (ash bits 32) sb-vm:single-float-widetag))
+       #-64-bit
+       (let ((des (allocate-header+object *dynamic*
+                                          (1- sb-vm:single-float-size)
+                                          sb-vm:single-float-widetag)))
+         (write-wordindexed/raw des sb-vm:single-float-value-slot bits)
+         des)))
     (double-float
      (let ((des (allocate-header+object *dynamic*
                                          (1- sb-vm:double-float-size)
                                          sb-vm:double-float-widetag)))
        (write-double-float-bits des sb-vm:double-float-value-slot x)))))
 
-(defun complex-single-float-to-core (num)
-  (declare (type (complex single-float) num))
-  (let ((des (allocate-header+object *dynamic*
-                                      (1- sb-vm:complex-single-float-size)
-                                      sb-vm:complex-single-float-widetag)))
-    #-64-bit
-    (progn
-      (write-wordindexed/raw des sb-vm:complex-single-float-real-slot
-                             (single-float-bits (realpart num)))
-      (write-wordindexed/raw des sb-vm:complex-single-float-imag-slot
-                             (single-float-bits (imagpart num))))
-    #+64-bit
-    (write-wordindexed/raw
-     des sb-vm:complex-single-float-data-slot
-     (logior (ldb (byte 32 0) (single-float-bits (realpart num)))
-             (ash (single-float-bits (imagpart num)) 32)))
-    des))
-
-(defun complex-double-float-to-core (num)
-  (declare (type (complex double-float) num))
-  (let ((des (allocate-header+object *dynamic*
-                                      (1- sb-vm:complex-double-float-size)
-                                      sb-vm:complex-double-float-widetag)))
-    (write-double-float-bits des sb-vm:complex-double-float-real-slot
-                             (realpart num))
-    (write-double-float-bits des sb-vm:complex-double-float-imag-slot
-                             (imagpart num))))
+(defun complexnum-to-core (num &aux (r (realpart num)) (i (imagpart num)))
+  (if (rationalp r)
+      (number-pair-to-core (number-to-core r) (number-to-core i) sb-vm:complex-widetag)
+      (ecase (sb-impl::flonum-format r)
+       (single-float
+        (let ((des (allocate-header+object *dynamic*
+                                            (1- sb-vm:complex-single-float-size)
+                                            sb-vm:complex-single-float-widetag)))
+          #-64-bit
+          (progn
+            (write-wordindexed/raw
+             des sb-vm:complex-single-float-real-slot (single-float-bits r))
+            (write-wordindexed/raw
+             des sb-vm:complex-single-float-imag-slot (single-float-bits i)))
+          #+64-bit
+          (write-wordindexed/raw
+           des sb-vm:complex-single-float-data-slot
+           ;; FIXME: we seem to be assuming a certain endianness here aren't we?
+           (logior (ldb (byte 32 0) (single-float-bits r))
+                   (ash (single-float-bits i) 32)))
+          des))
+       (double-float
+        (let ((des (allocate-header+object *dynamic*
+                                            (1- sb-vm:complex-double-float-size)
+                                            sb-vm:complex-double-float-widetag)))
+          (write-double-float-bits des sb-vm:complex-double-float-real-slot r)
+          (write-double-float-bits des sb-vm:complex-double-float-imag-slot i)
+          des)))))
 
 ;;; Copy the given number to the core.
 (defun number-to-core (number)
-  ;; compiled TYPEP on ECL is wrong. See example in cross-typep.
-  #+host-quirks-ecl (declare (notinline typep))
   (typecase number
     (integer (or (%fixnum-descriptor-if-possible number)
                  (bignum-to-core number)))
     (ratio (number-pair-to-core (number-to-core (numerator number))
                                 (number-to-core (denominator number))
                                 sb-vm:ratio-widetag))
-    ((complex single-float) (complex-single-float-to-core number))
-    ((complex double-float) (complex-double-float-to-core number))
-    #+long-float
-    ((complex long-float)
-     (error "~S isn't a cold-loadable number at all!" number))
-    (complex (number-pair-to-core (number-to-core (realpart number))
-                                  (number-to-core (imagpart number))
-                                  sb-vm:complex-widetag))
     (float (float-to-core number))
+    (sb-xc::complexnum (complexnum-to-core number))
     (t (error "~S isn't a cold-loadable number at all!" number))))
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
@@ -1036,8 +1021,8 @@ core and return a descriptor to it."
 ;;; and vector has to precede ARRAY. Kludge it for now.
 (defun class-depthoid (class-name) ; DEPTHOID-ish thing, any which way you can
   (case class-name
-    (vector 0.5)
-    (array  0.25)
+    (vector 1/2)
+    (array  1/4)
     ;; The depthoid of CONDITION has to be faked. The proper value is 1.
     ;; But STRUCTURE-OBJECT is also at depthoid 1, and its predicate
     ;; is %INSTANCEP (which is too weak), so to select the correct method
@@ -1505,6 +1490,7 @@ core and return a descriptor to it."
 
 ;; Look up the target's descriptor for #'FUN where FUN is a host symbol.
 (defun cold-symbol-function (symbol &optional (errorp t))
+  (declare (symbol symbol))
   (let ((f (cold-fdefn-fun (cold-fdefinition-object symbol))))
     (cond ((not (cold-null f)) f)
           (errorp (error "Expected a definition for ~S in cold load" symbol))
@@ -1515,15 +1501,17 @@ core and return a descriptor to it."
 (defun cold-intern (symbol
                     &key (access nil)
                          (gspace (symbol-value *cold-symbol-gspace*))
-                    &aux (package (sb-xc:symbol-package symbol)))
-
-  (declare (symbol symbol))
-
+                    &aux (name (symbol-name symbol))
+                         (package (sb-xc:symbol-package symbol)))
   ;; Symbols that are logically in COMMON-LISP but accessed through the SB-XC package
   ;; need to be re-interned since the cold-intern-info must be associated with
-  ;; exactly one of the possible lookalikes, not both.
+  ;; exactly one of the possible lookalikes, not both. The re-interned symbol
+  ;; is usually homed in CL:, but might be homed in SB-XC. When the symbols identity
+  ;; matters to the type system (floating-point specifiers), we never want to see the
+  ;; host's symbol; the canonical package shall be SB-XC. We can figure out the
+  ;; canonical home package by finding the symbol via the XC-STRICT-CL package.
   (cond ((eq package *cl-package*)
-         (setf symbol (intern (symbol-name symbol) *cl-package*)))
+         (setq symbol (find-symbol name (canonical-home-package name))))
         ((not (or (eq package *keyword-package*)
                   (= (mismatch (package-name package) "SB-") 3)))
          (bug "~S in bad package for target: ~A" symbol package)))
@@ -1539,8 +1527,7 @@ core and return a descriptor to it."
                              (member symbol '(sb-sys:with-pinned-objects)))
                          sb-vm:extended-symbol-size
                          sb-vm:symbol-size)
-                     (symbol-name symbol)
-                     :gspace gspace)))
+                     name :gspace gspace)))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
@@ -1548,7 +1535,7 @@ core and return a descriptor to it."
                             (error "No target package descriptor for ~S" package))))
           (write-wordindexed handle sb-vm:symbol-package-slot (cdr pkg-info))
           (record-accessibility
-           (or access (nth-value 1 (find-symbol (symbol-name symbol) package)))
+           (or access (nth-value 1 (find-symbol name package)))
            pkg-info handle package symbol))
         #+sb-thread
         (let ((index (info :variable :wired-tls symbol)))
@@ -1677,14 +1664,14 @@ core and return a descriptor to it."
 
   #-immobile-code
   (dolist (sym sb-vm::+c-callable-fdefns+)
-    (cold-fdefinition-object (cold-intern sym) nil *static*))
+    (cold-fdefinition-object sym nil *static*))
 
   ;; With immobile-code, static-fdefns as a concept are useful -
   ;; the implication is that the function's definition will not change.
   ;; But the fdefn per se is not useful - callers refer to callees directly.
   #-immobile-code
   (dovector (sym sb-vm:+static-fdefns+)
-    (let* ((fdefn (cold-fdefinition-object (cold-intern sym) nil *static*))
+    (let* ((fdefn (cold-fdefinition-object sym nil *static*))
            (offset (- (+ (- (descriptor-bits fdefn)
                             sb-vm:other-pointer-lowtag)
                          (* sb-vm:fdefn-raw-addr-slot sb-vm:n-word-bytes))
@@ -1809,10 +1796,10 @@ core and return a descriptor to it."
 
   #+x86
   (progn
-    (cold-set 'sb-vm::*fp-constant-0d0* (number-to-core 0d0))
-    (cold-set 'sb-vm::*fp-constant-1d0* (number-to-core 1d0))
-    (cold-set 'sb-vm::*fp-constant-0f0* (number-to-core 0f0))
-    (cold-set 'sb-vm::*fp-constant-1f0* (number-to-core 1f0))))
+    (cold-set 'sb-vm::*fp-constant-0d0* (number-to-core $0d0))
+    (cold-set 'sb-vm::*fp-constant-1d0* (number-to-core $1d0))
+    (cold-set 'sb-vm::*fp-constant-0f0* (number-to-core $0f0))
+    (cold-set 'sb-vm::*fp-constant-1f0* (number-to-core $1f0))))
 
 ;;;; functions and fdefinition objects
 
@@ -1861,7 +1848,7 @@ core and return a descriptor to it."
              ;; This parallels the logic at the start of COLD-INTERN
              ;; which re-homes symbols in SB-XC to COMMON-LISP.
              (if (eq (cl:symbol-package des) (find-package "SB-XC"))
-                 (intern (symbol-name des) *cl-package*)
+                 (intern (symbol-name des) (canonical-home-package (string des)))
                  des)
              (ecase (descriptor-lowtag des)
               (#.sb-vm:list-pointer-lowtag
@@ -2406,12 +2393,27 @@ core and return a descriptor to it."
 
 ;;;; cold fops for loading symbols
 
+;;; Given STRING naming a symbol exported from COMMON-LISP, return either "SB-XC"
+;;; or "COMMON-LISP" depending on which we consider canonical for the symbol's
+;;; home package during genesis. If finding the symbol via XC-STRICT-CL finds a
+;;; symbol in SB-XC, then that package is canonical.  This is very important to
+;;; get right for symbols whose identity matters (floating-point type specifiers),
+;;; or else the interned ctype objects get all messed up.
+(defun canonical-home-package (string)
+  (if (eq (cl:symbol-package (find-symbol string "XC-STRICT-CL"))
+          (find-package "SB-XC"))
+      "SB-XC"
+      "COMMON-LISP"))
+
 ;;; Load a symbol SIZE characters long from FASL-INPUT, and
 ;;; intern that symbol in PACKAGE.
 (defun cold-load-symbol (length+flag package fasl-input)
   (let ((string (make-string (ash length+flag -1))))
     (read-string-as-bytes (%fasl-input-stream fasl-input) string)
-    (push-fop-table (intern string package) fasl-input)))
+    (push-fop-table (intern string (if (eq package *cl-package*)
+                                       (canonical-home-package string)
+                                       package))
+                    fasl-input)))
 
 (define-cold-fop (fop-symbol-in-package-save (length+flag pkg-index))
   (cold-load-symbol length+flag (ref-fop-table (fasl-input) pkg-index)
@@ -3852,6 +3854,12 @@ III. initially undefined function references (alphabetically):
       (error "Can't warm a deferred LTV placeholder"))
     (when (is-fixnum-lowtag (descriptor-lowtag x))
       (return-from recurse (descriptor-fixnum x)))
+    #+64-bit
+    (when (is-other-immediate-lowtag (descriptor-lowtag x))
+      (ecase (logand (descriptor-bits x) sb-vm:widetag-mask)
+       (#.sb-vm:single-float-widetag
+        (return-from recurse
+         (sb-impl::make-flonum (ash (descriptor-bits x) -32) 'single-float)))))
     (ecase (descriptor-lowtag x)
       (#.sb-vm:instance-pointer-lowtag
        (if strictp (error "Can't invert INSTANCE type") "#<instance>"))
@@ -3873,4 +3881,6 @@ III. initially undefined function references (alphabetically):
                      (recurse (read-wordindexed x sb-vm:symbol-name-slot))))))
            (#.sb-vm:simple-base-string-widetag (base-string-from-core x))
            (#.sb-vm:simple-vector-widetag (vector-from-core x #'recurse))
+           (#.sb-vm:double-float-widetag
+            (sb-impl::make-flonum (read-bits-wordindexed x 1) 'double-float))
            (#.sb-vm:bignum-widetag (bignum-from-core x))))))))

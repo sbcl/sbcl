@@ -3365,29 +3365,22 @@
     (typecase first
       (single-float (setf constant (list :single-float first)))
       (double-float (setf constant (list :double-float first)))
-      .
-      #+sb-xc-host
-      ((complex
-        ;; It's an error (perhaps) on the host to use simd-pack type.
-        ;; [and btw it's disconcerting that this isn't an ETYPECASE.]
-        (error "xc-host can't reference complex float")))
-      #-sb-xc-host
-      (((complex single-float)
-        (setf constant (list :complex-single-float first)))
-       ((complex double-float)
-        (setf constant (list :complex-double-float first)))
-       #+sb-simd-pack
-       (simd-pack
-        (setq constant
-              (list :sse (logior (%simd-pack-low first)
-                                 (ash (%simd-pack-high first) 64)))))
-       #+sb-simd-pack-256
-       (simd-pack-256
-        (setq constant
-              (list :avx2 (logior (%simd-pack-256-0 first)
-                                  (ash (%simd-pack-256-1 first) 64)
-                                  (ash (%simd-pack-256-2 first) 128)
-                                  (ash (%simd-pack-256-3 first) 192))))))))
+      ((complex single-float)
+       (setf constant (list :complex-single-float first)))
+      ((complex double-float)
+       (setf constant (list :complex-double-float first)))
+      #+(and sb-simd-pack (not sb-xc-host))
+      (simd-pack
+       (setq constant
+             (list :sse (logior (%simd-pack-low first)
+                                (ash (%simd-pack-high first) 64)))))
+      #+(and sb-simd-pack-256 (not sb-xc-host))
+      (simd-pack-256
+       (setq constant
+             (list :avx2 (logior (%simd-pack-256-0 first)
+                                 (ash (%simd-pack-256-1 first) 64)
+                                 (ash (%simd-pack-256-2 first) 128)
+                                 (ash (%simd-pack-256-3 first) 192)))))))
   (destructuring-bind (type value) constant
     (ecase type
       ((:byte :word :dword :qword)

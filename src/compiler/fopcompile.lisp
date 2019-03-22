@@ -258,7 +258,7 @@
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
                ;; FIXME: OAOOM. See MAYBE-EMIT-MAKE-LOAD-FORMS.
-               (unless (typep value
+               (unless (sb-xc:typep value
                               '(or #-sb-xc-host unboxed-array
                                 symbol
                                 number

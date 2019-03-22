@@ -129,13 +129,32 @@
   ;; routines.
   (if (and (make-host-1-parallelism)
            (eq load-or-cload-stem #'host-cload-stem))
-      (funcall (intern "PARALLEL-MAKE-HOST-1" 'sb-cold)
-               (make-host-1-parallelism))
-      (do-stems-and-flags (stem flags 1)
-        (unless (find :not-host flags)
-          (funcall load-or-cload-stem stem flags)
-          (when (member :sb-show sb-xc:*features*)
-            (warn-when-cl-snapshot-diff *cl-snapshot*)))))
+      (progn
+        ;; Multiprocess build uses the in-memory math ops cache but not
+        ;; the persistent cache file because we don't need each child
+        ;; to be forced to read the file. Moreover, newly inserted values
+        ;; can not propagate back to this process. And we can't read the
+        ;; file up front because the reading function - though simple -
+        ;; isn't defined until we compile src/code/cross-float.
+        (funcall (intern "PARALLEL-MAKE-HOST-1" 'sb-cold)
+                 (make-host-1-parallelism))
+        ;; Flush the math ops cache. Why: loading fasls after parallel compile
+        ;; causes some entries to be inserted, but without first prefilling
+        ;; the cache from disk. Thus we have an incorrect opinion of whether the
+        ;; in-memory view has strictly more values than on disk. This would cause
+        ;; WITH-MATH-JOURNAL around loading of the "tests/*.before-xc.lisp" files
+        ;; to behave wrong. It would initially observe the cache to have N (say 50)
+        ;; entries instead of the much larger number of disk entries. Then after
+        ;; the tests, it would observe a few more (say 70 total) entries, which,
+        ;; because it is more, completely overwrite the disk cache that should have
+        ;; had over 500 entries. So it would lose entries. CLRHASH fixes that.
+        (clrhash *math-ops-memoization*))
+      (with-math-journal
+       (do-stems-and-flags (stem flags 1)
+         (unless (find :not-host flags)
+           (funcall load-or-cload-stem stem flags)
+           (when (member :sb-show sb-xc:*features*)
+             (warn-when-cl-snapshot-diff *cl-snapshot*))))))
 
   ;; If the cross-compilation host is SBCL itself, we can use the
   ;; PURIFY extension to freeze everything in place, reducing the

@@ -247,7 +247,7 @@ Examples:
 ;;;; construction and simple accessors
 
 (defconstant +min-hash-table-size+ 16)
-(defconstant +min-hash-table-rehash-threshold+ (float 1/16 1.0))
+(defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
 
 ;; The GC will set this to 1 if it moves an EQ-based key. This used
 ;; to be signaled by a bit in the header of the kv vector, but that
@@ -268,7 +268,7 @@ Examples:
 (defun make-hash-table (&key
                         (test 'eql)
                         (size +min-hash-table-size+)
-                        (rehash-size 1.5)
+                        (rehash-size $1.5)
                         (rehash-threshold 1)
                         (hash-function nil)
                         (weakness nil)
@@ -388,12 +388,12 @@ Examples:
                            (floor sb-xc:array-dimension-limit 1024))))
            (rehash-size (if (integerp rehash-size)
                             rehash-size
-                            (float rehash-size 1.0)))
+                            (float rehash-size $1.0))) ; always single-float
            ;; FIXME: Original REHASH-THRESHOLD default should be 1.0,
            ;; not 1, to make it easier for the compiler to avoid
            ;; boxing.
            (rehash-threshold (max +min-hash-table-rehash-threshold+
-                                  (float rehash-threshold 1.0)))
+                                  (float rehash-threshold $1.0))) ; always single-float
            (size+1 (1+ size))       ; The first element is not usable.
            ;; KLUDGE: The most natural way of expressing the below is
            ;; (round (/ (float size+1) rehash-threshold)), and indeed

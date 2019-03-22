@@ -9,9 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
-
 ;;;; DIRECTORY
 
 ;;; In sbcl-0.6.9 DIRECTORY failed on paths with :WILD or

@@ -49,6 +49,11 @@
 ) ; EVAL-WHEN
 
 ;;;; float parameters
+(defconstant sb-xc:most-positive-single-float #.sb-xc:most-positive-single-float)
+(defconstant sb-xc:most-negative-single-float #.sb-xc:most-negative-single-float)
+(defconstant sb-xc:most-positive-double-float #.sb-xc:most-positive-double-float)
+(defconstant sb-xc:most-negative-double-float #.sb-xc:most-negative-double-float)
+(defconstant sb-xc:pi #.sb-xc:pi)
 
 (defconstant sb-xc:least-positive-single-float (single-from-bits 0 0 1))
 (defconstant sb-xc:least-positive-short-float (single-from-bits 0 0 1))
@@ -92,48 +97,20 @@
   (long-from-bits 1 sb-vm:long-float-normal-exponent-min
                   (ash sb-vm:long-float-hidden-bit 32)))
 
-(defconstant sb-xc:most-positive-single-float
-  (single-from-bits 0 sb-vm:single-float-normal-exponent-max
-                    (ldb sb-vm:single-float-significand-byte -1)))
 (defconstant sb-xc:most-positive-short-float sb-xc:most-positive-single-float)
-(defconstant sb-xc:most-negative-single-float
-  (single-from-bits 1 sb-vm:single-float-normal-exponent-max
-                    (ldb sb-vm:single-float-significand-byte -1)))
 (defconstant sb-xc:most-negative-short-float sb-xc:most-negative-single-float)
-(defconstant sb-xc:most-positive-double-float
-  (double-from-bits 0 sb-vm:double-float-normal-exponent-max
-                    (ldb (byte sb-vm:double-float-digits 0) -1)))
+(defconstant sb-xc:most-positive-long-float  sb-xc:most-positive-double-float)
+(defconstant sb-xc:most-negative-long-float  sb-xc:most-negative-double-float)
 
-(defconstant sb-xc:most-positive-long-float sb-xc:most-positive-double-float)
+(defconstant single-float-positive-infinity #.(sb-impl::make-flonum :+infinity 'single-float))
+(defconstant single-float-negative-infinity #.(sb-impl::make-flonum :-infinity 'single-float))
+(defconstant double-float-positive-infinity #.(sb-impl::make-flonum :+infinity 'double-float))
+(defconstant double-float-negative-infinity #.(sb-impl::make-flonum :-infinity 'double-float))
 
-(defconstant sb-xc:most-negative-double-float
-  (double-from-bits 1 sb-vm:double-float-normal-exponent-max
-                    (ldb (byte sb-vm:double-float-digits 0) -1)))
-(defconstant sb-xc:most-negative-long-float sb-xc:most-negative-double-float)
-
-;;; We don't want to do these DEFCONSTANTs at cross-compilation time,
-;;; because the cross-compilation host might not support floating
-;;; point infinities. Putting them inside a LET removes
-;;; toplevel-formness, so that any EVAL-WHEN trickiness in the
-;;; DEFCONSTANT forms is suppressed.
-;;;
-;;; Note that it might be worth performing a similar MAKE-LOAD-FORM
-;;; trick as with -0.0 (see the UNPORTABLE-FLOAT structure).  CSR,
-;;; 2004-03-09
-(let ()
-(defconstant single-float-positive-infinity
-  (single-from-bits 0 (1+ sb-vm:single-float-normal-exponent-max) 0))
-(defconstant short-float-positive-infinity
-  (single-from-bits 0 (1+ sb-vm:single-float-normal-exponent-max) 0))
-(defconstant single-float-negative-infinity
-  (single-from-bits 1 (1+ sb-vm:single-float-normal-exponent-max) 0))
-(defconstant short-float-negative-infinity
-  (single-from-bits 1 (1+ sb-vm:single-float-normal-exponent-max) 0))
-(defconstant double-float-positive-infinity
-  (double-from-bits 0 (1+ sb-vm:double-float-normal-exponent-max) 0))
+(defconstant short-float-positive-infinity single-float-positive-infinity)
+(defconstant short-float-negative-infinity single-float-negative-infinity)
 #+(not long-float)
-(defconstant long-float-positive-infinity
-  (double-from-bits 0 (1+ sb-vm:double-float-normal-exponent-max) 0))
+(defconstant long-float-positive-infinity double-float-positive-infinity)
 #+(and long-float x86)
 (defconstant long-float-positive-infinity
   (long-from-bits 0 (1+ sb-vm:long-float-normal-exponent-max)
@@ -141,13 +118,11 @@
 (defconstant double-float-negative-infinity
   (double-from-bits 1 (1+ sb-vm:double-float-normal-exponent-max) 0))
 #+(not long-float)
-(defconstant long-float-negative-infinity
-  (double-from-bits 1 (1+ sb-vm:double-float-normal-exponent-max) 0))
+(defconstant long-float-negative-infinity double-float-negative-infinity)
 #+(and long-float x86)
 (defconstant long-float-negative-infinity
   (long-from-bits 1 (1+ sb-vm:long-float-normal-exponent-max)
                   (ash sb-vm:long-float-hidden-bit 32)))
-) ; LET-to-suppress-possible-EVAL-WHENs
 
 (defconstant sb-xc:single-float-epsilon
   (single-from-bits 0 (- sb-vm:single-float-bias
@@ -175,6 +150,8 @@
                   (+ 1 (ash sb-vm:long-float-hidden-bit 32))))
 
 ;;; Limits for floats that can be truncated into a fixnum
+;;; with no loss of precision.
+;;; (We don't have constants for "most-fooative-fixnum as a mumble-float")
 (defconstant most-positive-fixnum-single-float
   (single-from-bits 0 (+ sb-vm:n-fixnum-bits sb-vm:single-float-bias -1)
                                (ldb (byte (1- sb-vm:single-float-digits) 0) -1)))
@@ -188,3 +165,38 @@
 
 (defconstant most-negative-fixnum-double-float
   (double-from-bits 1 (+ sb-vm:n-fixnum-bits sb-vm:double-float-bias) 0))
+
+;;; Dummy functions to test that complex number are dumped correctly in genesis.
+(defun try-folding-complex-single ()
+  (let ((re (make-single-float #x4E000000))
+        (im (make-single-float #x-21800000)))
+    (values (complex re im)
+            (locally (declare (notinline complex)) (complex re im)))))
+
+(defun try-folding-complex-double ()
+  (let ((re (make-double-float #X3FE62E42 #xFEFA39EF))
+        (im (make-double-float #X43CFFFFF #XFFFFFFFF)))
+    (values (complex re im)
+            (locally (declare (notinline complex)) (complex re im)))))
+
+(dolist (test '(try-folding-complex-single try-folding-complex-double))
+  (multiple-value-bind (a b) (funcall test)
+    (assert (eql a b)))
+  (let ((code (fun-code-header (symbol-function test))))
+    (declare (notinline code-header-words)) ; forward ref
+    ;; KLUDGE: code-constants-offset is also not defined yet
+    ;; but is accessible from make-host-1's definition.
+    (aver (loop for index from #.sb-vm:code-constants-offset
+                below (code-header-words code)
+                thereis (typep (code-header-ref code index) 'complex))))
+  (fmakunbound test))
+
+;;; An example that we can't cross-compile: CTYPE-OF-NUMBER tries to compute
+;;; low/high bounds so that it can return (COMPLEX (SINGLE-FLOAT <LOW> <HIGH>))
+;;; but we haven't taught the MIN,MAX interceptors how to operate on infinity.
+#+nil
+(defun more-folding ()
+  (values (complex single-float-positive-infinity single-float-positive-infinity)
+          (complex single-float-negative-infinity single-float-positive-infinity)
+          (complex single-float-negative-infinity single-float-negative-infinity)
+          (complex single-float-positive-infinity single-float-negative-infinity)))

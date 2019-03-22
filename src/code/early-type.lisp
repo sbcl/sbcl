@@ -337,7 +337,8 @@
 ;;; Moreover, it seems like this function should be responsible
 ;;; for figuring out the right value so that callers don't have to.
 (defun make-numeric-type (&key class format (complexp :real) low high
-                            enumerable)
+                               enumerable)
+  (declare (type (member integer rational float nil) class))
   (macrolet ((unionize (things initargs)
                `(let (types)
                   (dolist (thing ',things (apply #'type-union types))
@@ -371,8 +372,8 @@
     ;; if interval is empty
     (when (and low high
                (if (or (consp low) (consp high)) ; if either bound is exclusive
-                   (>= (type-bound-number low) (type-bound-number high))
-                   (> low high)))
+                   (sb-xc:>= (type-bound-number low) (type-bound-number high))
+                   (sb-xc:> low high)))
       (return-from make-numeric-type *empty-type*))
     (when (and (eq class 'rational) (integerp low) (eql low high))
       (setf class 'integer))

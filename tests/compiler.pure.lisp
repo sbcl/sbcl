@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 ;; The tests in this file do not work under the legacy interpreter.
 (when (and (eq sb-ext:*evaluator-mode* :interpret)
            (not (member :sb-fasteval *features*)))
@@ -4581,8 +4579,9 @@
                   (or (simple-array character 24) (vector t))))))
     (dolist (pair types)
       (destructuring-bind (orig conservative) pair
-        (assert sb-c::(type= (specifier-type cl-user::conservative)
-                             (conservative-type (specifier-type cl-user::orig))))))))
+        (assert (sb-kernel:type= (sb-kernel:specifier-type conservative)
+                                 (sb-c::conservative-type
+                                  (sb-kernel:specifier-type orig))))))))
 
 (with-test (:name (compile :smodular64 :wrong-width))
   (checked-compile-and-assert ()

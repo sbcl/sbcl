@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 ;;; As reported by Gregory Wright sbcl-devel 2002-07-15, SBCL 0.7.5
 ;;; didn't honor the LOAD :IF-DOES-NOT-EXIST argument when the type of
 ;;; the LOADed file was specified.

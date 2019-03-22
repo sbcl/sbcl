@@ -55,6 +55,20 @@
     (dolist (expect '("SEGMENT" "MAKE-SEGMENT"))
       (assert (find expect (package-shadowing-symbols p) :test 'string=)))))
 
+;;; Verify that compile-time floating-point math matches load-time.
+(defvar *compile-files-p*)
+(when (or (not (boundp '*compile-files-p*)) *compile-files-p*)
+  (with-open-file (stream "float-math.lisp-expr" :if-does-not-exist nil)
+    (when stream
+      (format t "; Checking ~S~%" (pathname stream))
+      ;; Ensure that we're reading the correct variant of the file
+      ;; in case there is more than one set of floating-point formats.
+      (assert (eq (read stream) :default))
+      (let ((*package* (find-package "SB-KERNEL")))
+        (dolist (expr (read stream))
+          (destructuring-bind (fun args result) expr
+            (let ((actual (apply fun (sb-int:ensure-list args))))
+              (assert (eql actual result)))))))))
 
 ;;;; compiling and loading more of the system
 
@@ -85,7 +99,6 @@
                  (read f) ; skip over the make-host-{1,2} input files
                  (read f)))
       (sb-c::*handled-conditions* sb-c::*handled-conditions*))
- (declare (special *compile-files-p*))
  (proclaim '(sb-ext:muffle-conditions compiler-note))
  (flet ((do-srcs (list)
          (dolist (stem list)

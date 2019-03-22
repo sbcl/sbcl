@@ -55,14 +55,16 @@
 ;;; as proxies for target packages, those too must satisfy our INSTANCEP
 ;;; - even if not a subtype of (OR STANDARD-OBJECT STRUCTURE-OBJECT).
 ;;; Nothing else satisfies this definition of INSTANCEP.
-;;; As a guarantee this our set of host object types is exhaustive, we add one
+;;; As a guarantee that our set of host object types is exhaustive, we add one
 ;;; more constraint when self-hosted: host instances of unknown type cause failure.
 ;;; Some objects manipulated by the cross-compiler like the INTERVAL struct
 ;;; - which is not a STRUCTURE!OBJECT - should never be seen as literals in code.
 ;;; We assert that by way of the guard function.
 #+host-quirks-sbcl
 (defun unsatisfiable-instancep (x)
-  (when (host-sb-kernel:%instancep x) (bug "%INSTANCEP test on ~S" x)))
+  (when (and (host-sb-kernel:%instancep x)
+             (not (target-num-p x)))
+    (bug "%INSTANCEP test on ~S" x)))
 (deftype instance ()
   '(or structure!object package
     #+host-quirks-sbcl (and host-sb-kernel:instance ; optimizes out a call when false
@@ -105,7 +107,7 @@
   nil)
 
 (defun %negate (number)
-  (- number))
+  (sb-xc:- number))
 
 (defun %single-float (number)
   (coerce number 'single-float))

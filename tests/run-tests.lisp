@@ -198,15 +198,21 @@
     (force-output log)))
 
 (defun pure-runner (files test-fun log)
-  (when files
-    (format t "// Running pure tests (~a)~%" test-fun)
-    (let ((*package* (find-package :cl-user))
-          (*results* '()))
-      (setup-cl-user)
-      (dolist (file files)
-        (format t "// Running ~a in ~a evaluator mode~%"
-                file *test-evaluator-mode*)
-        (restart-case
+  (unless files
+    (return-from pure-runner))
+  (format t "// Running pure tests (~a)~%" test-fun)
+  (let ((*failures* nil)
+        ;; in case somebody corrupts CL-USER's use list, of course
+        (standard-use-list (package-use-list "CL-USER")))
+    (dolist (file files)
+      (format t "// Running ~a in ~a evaluator mode~%"
+              file *test-evaluator-mode*)
+      (let ((test-package (make-package
+                           (format nil "TEST~36,5,'_R" (random (expt 36 5)))
+                           :use (append '("ASSERTOID" "TEST-UTIL")
+                                        standard-use-list))))
+        (let ((*package* test-package))
+          (restart-case
             (handler-bind ((error (make-error-handler file)))
               (let* ((sb-ext:*evaluator-mode* *test-evaluator-mode*)
                      (*features*
@@ -216,8 +222,10 @@
                 (let ((start (get-internal-real-time)))
                   (funcall test-fun file)
                   (log-file-elapsed-time file start log))))
-          (skip-file ())))
-      (append-results))))
+            (skip-file ())))
+        (delete-package test-package)))
+    ;; after all the files are done
+    (append-failures)))
 
 (defun run-in-child-sbcl (load eval)
   (process-exit-code
@@ -289,10 +297,6 @@
                          :skipped-broken
                          :skipped-disabled)))
              *all-results*))
-
-(defun setup-cl-user ()
-  (use-package :test-util)
-  (use-package :assertoid))
 
 (defun filter-test-files (wild-mask)
   (if *explicit-test-files*

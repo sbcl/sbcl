@@ -479,8 +479,7 @@
 (with-test (:name (parse-namestring stream))
   (assert (equal (parse-namestring "foo" nil "/")
                  (parse-namestring "foo" nil #P"/")))
-  (let ((test "parse-namestring-test.tmp"))
-    (unwind-protect
+  (with-scratch-file (test "tmp")
         (with-open-file (f test :direction :output)
           ;; FIXME: This test is a bit flaky, since we only check that
           ;; no error is signalled. The dilemma here is "what is the
@@ -488,9 +487,7 @@
           ;; directory". Currently (0.8.10.73) we get #P"foo" here (as
           ;; opposed to eg. #P"/path/to/current/foo"), which is
           ;; possibly mildly surprising but probably conformant.
-          (assert (parse-namestring "foo" nil f)))
-      (when (probe-file test)
-        (delete-file test)))))
+          (assert (parse-namestring "foo" nil f)))))
 
 ;;; ENOUGH-NAMESTRING should probably not fail when the namestring in
 ;;; question has a :RELATIVE pathname.
@@ -734,11 +731,16 @@
   #|""         |#     "C:\\tmp\\"   "C:\\tmp\\"   "C:\\tmp\\."  "C:\\tmp\\.a"
   #|"a"        |#     "C:\\tmp\\a"  "C:\\tmp\\a"  "C:\\tmp\\a." "C:\\tmp\\a.a"))))
 
+(defun scratch-dir-truename ()
+  (with-scratch-file (name)
+    (truename (make-pathname :directory (pathname-directory name)))))
+
 (with-test (:name (delete-file logical-pathname))
   (setf (logical-pathname-translations "SB-TEST")
         (list (list "**;*.*.*" (make-pathname :name :wild
                                               :type :wild
-                                              :defaults (truename ".")))))
+                                              :defaults
+                                              (scratch-dir-truename)))))
   (let ((test (pathname "SB-TEST:delete-logical-pathname.tmp")))
     (assert (typep test 'logical-pathname))
     (with-open-file (f test :direction :output)
@@ -755,9 +757,8 @@
                  (read-from-string "#p\"\\\\\\\\\""))))
 
 (with-test (:name :load-logical-pathname-translations)
-  (let* ((cwd (truename "."))
-         (foo (merge-pathnames "llpnt-foo.translations" cwd))
-         (bar (merge-pathnames "llpnt-bar.translations" cwd))
+  (let* ((foo (scratch-file-name "translations"))
+         (bar (scratch-file-name "translations"))
          (translations (logical-pathname-translations "SYS")))
     (unwind-protect
          (progn
@@ -771,8 +772,8 @@
                                         :directory '(:absolute "my" "bar")
                                         :name :wild :type "lisp"))) f))
            (setf (logical-pathname-translations "SYS")
-                 (list* (list "SITE;LLPNT-FOO.TRANSLATIONS.NEWEST" foo)
-                        (list "SITE;LLPNT-BAR.TRANSLATIONS.NEWEST" bar)
+                 (list* (list "SITE;LLPNT-FOO.TRANSLATIONS.NEWEST" (truename foo))
+                        (list "SITE;LLPNT-BAR.TRANSLATIONS.NEWEST" (truename bar))
                         translations))
            (assert (load-logical-pathname-translations "LLPNT-FOO"))
            (assert (load-logical-pathname-translations "LLPNT-BAR"))

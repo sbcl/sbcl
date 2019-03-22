@@ -39,10 +39,10 @@
   ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
-  (rehash-size nil :type (or index (single-float (1.0)))
+  (rehash-size nil :type (or index (single-float ($1.0)))
                :read-only t)
   ;; How full the hash table has to get before we rehash
-  (rehash-threshold nil :type (single-float (0.0) 1.0) :read-only t)
+  (rehash-threshold nil :type (single-float ($0.0) $1.0) :read-only t)
   ;; The number of entries before a rehash, just one less than the
   ;; size of the next-vector, hash-vector, and half the size of the
   ;; kv-vector.

@@ -119,13 +119,11 @@
 
 ;;; NaNs can not be constructed from constant bits mainly due to compiler problems
 ;;; in so doing. See https://bugs.launchpad.net/sbcl/+bug/486812
-#-sb-xc-host
 (deftransform make-single-float ((bits) ((constant-arg t)))
   "Conditional constant folding"
   (let ((float (make-single-float (lvar-value bits))))
     (if (float-nan-p float) (give-up-ir1-transform) float)))
 
-#-sb-xc-host
 (deftransform make-double-float ((hi lo) ((constant-arg t) (constant-arg t)))
   "Conditional constant folding"
   (let ((float (make-double-float (lvar-value hi) (lvar-value lo))))
@@ -149,7 +147,7 @@
       (let ((temp (gensym)))
         `(let ((,temp (abs float2)))
           (if (minusp (single-float-bits float)) (- ,temp) ,temp)))
-      '(if (minusp (single-float-bits float)) -1f0 1f0)))
+      '(if (minusp (single-float-bits float)) $-1f0 $1f0)))
 
 (deftransform float-sign ((float &optional float2)
                           (double-float &optional double-float) *)
@@ -161,16 +159,16 @@
         (let ((temp (gensym)))
           `(let ((,temp (abs float2)))
             (if (minusp ,bits) (- ,temp) ,temp)))
-        `(if (minusp ,bits) -1d0 1d0))))
+        `(if (minusp ,bits) $-1d0 $1d0))))
 
 ;;;; DECODE-FLOAT, INTEGER-DECODE-FLOAT, and SCALE-FLOAT
 
 (defknown decode-single-float (single-float)
-  (values single-float single-float-exponent (member -1f0 1f0))
+  (values single-float single-float-exponent (member $-1f0 $1f0))
   (movable foldable flushable))
 
 (defknown decode-double-float (double-float)
-  (values double-float double-float-exponent (member -1d0 1d0))
+  (values double-float double-float-exponent (member $-1d0 $1d0))
   (movable foldable flushable))
 
 (defknown integer-decode-single-float (single-float)
@@ -281,13 +279,13 @@
             (new-lo nil)
             (new-hi nil))
         (when f-hi
-          (if (< (float-sign (type-bound-number f-hi)) 0.0)
+          (if (< (float-sign (type-bound-number f-hi)) $0.0)
               (when ex-lo
                 (setf new-hi (scale-bound f-hi ex-lo)))
               (when ex-hi
                 (setf new-hi (scale-bound f-hi ex-hi)))))
         (when f-lo
-          (if (< (float-sign (type-bound-number f-lo)) 0.0)
+          (if (< (float-sign (type-bound-number f-lo)) $0.0)
               (when ex-hi
                 (setf new-lo (scale-bound f-lo ex-hi)))
               (when ex-lo
@@ -392,10 +390,11 @@
                   (if (minusp y)
                       '(%negate x)
                       'x)))))
-  (def single-float 1.0 -1.0)
-  (def double-float 1.0d0 -1.0d0))
+  (def single-float $1.0 $-1.0)
+  (def double-float $1.0d0 $-1.0d0))
 
 ;;; Return the reciprocal of X if it can be represented exactly, NIL otherwise.
+#-sb-xc-host
 (defun maybe-exact-reciprocal (x)
   (unless (zerop x)
     (handler-case
@@ -438,17 +437,17 @@
                                  :policy (zerop float-accuracy))
                 'x)))
   ;; No signed zeros, thanks.
-  (def + single-float 0 0.0)
-  (def - single-float 0 0.0)
-  (def + double-float 0 0.0 0.0d0)
-  (def - double-float 0 0.0 0.0d0))
+  (def + single-float 0 $0.0)
+  (def - single-float 0 $0.0)
+  (def + double-float 0 $0.0 $0.0d0)
+  (def - double-float 0 $0.0 $0.0d0))
 
 ;;; On most platforms (+ x x) is faster than (* x 2)
 (macrolet ((def (type &rest args)
              `(deftransform * ((x y) (,type (constant-arg (member ,@args))))
                 '(+ x x))))
-  (def single-float 2 2.0)
-  (def double-float 2 2.0 2.0d0))
+  (def single-float 2 $2.0)
+  (def double-float 2 $2.0 $2.0d0))
 
 ;;; Prevent ZEROP, PLUSP, and MINUSP from losing horribly. We can't in
 ;;; general float rational args to comparison, since Common Lisp
@@ -484,11 +483,11 @@
 ;;; Derive the result to be float for argument types in the
 ;;; appropriate domain.
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(dolist (stuff '((asin (real -1.0 1.0))
-                 (acos (real -1.0 1.0))
-                 (acosh (real 1.0))
-                 (atanh (real -1.0 1.0))
-                 (sqrt (real 0.0))))
+(dolist (stuff '((asin (real $-1.0 $1.0))
+                 (acos (real $-1.0 $1.0))
+                 (acosh (real $1.0))
+                 (atanh (real $-1.0 $1.0))
+                 (sqrt (real $0.0))))
   (destructuring-bind (name type) stuff
     (let ((type (specifier-type type)))
       (setf (fun-info-derive-type (fun-info-or-lose name))
@@ -502,10 +501,10 @@
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (log derive-type) ((x &optional y))
   (when (and (csubtypep (lvar-type x)
-                        (specifier-type '(real 0.0)))
+                        (specifier-type '(real $0.0)))
              (or (null y)
                  (csubtypep (lvar-type y)
-                            (specifier-type '(real 0.0)))))
+                            (specifier-type '(real $0.0)))))
     (specifier-type 'float)))
 
 ;;;; irrational transforms
@@ -537,9 +536,9 @@
              `(progn
                 (deftransform ,name ((x) (single-float) *)
                   #+x86 (cond ((csubtypep (lvar-type x)
-                                           (specifier-type '(single-float
-                                                             (#.(- (expt 2f0 63)))
-                                                             (#.(expt 2f0 63)))))
+                                          (specifier-type
+                                           `(single-float (,(sb-xc:- (expt $2f0 63)))
+                                                          (,(expt $2f0 63)))))
                                 `(coerce (,',prim-quick (coerce x 'double-float))
                                   'single-float))
                                (t
@@ -551,9 +550,9 @@
                   #-x86 `(coerce (,',prim (coerce x 'double-float)) 'single-float))
                (deftransform ,name ((x) (double-float) *)
                  #+x86 (cond ((csubtypep (lvar-type x)
-                                          (specifier-type '(double-float
-                                                            (#.(- (expt 2d0 63)))
-                                                            (#.(expt 2d0 63)))))
+                                         (specifier-type
+                                          `(double-float (,(sb-xc:- (expt $2d0 63)))
+                                                         (,(expt $2d0 63)))))
                                `(,',prim-quick x))
                               (t
                                (compiler-notify
@@ -572,15 +571,15 @@
 (deftransform atan ((x y) (double-float double-float) *)
   `(%atan2 x y))
 
-(deftransform expt ((x y) ((single-float 0f0) single-float) *)
+(deftransform expt ((x y) ((single-float $0f0) single-float) *)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
-(deftransform expt ((x y) ((double-float 0d0) double-float) *)
+(deftransform expt ((x y) ((double-float $0d0) double-float) *)
   `(%pow x y))
-(deftransform expt ((x y) ((single-float 0f0) (signed-byte 32)) *)
+(deftransform expt ((x y) ((single-float $0f0) (signed-byte 32)) *)
   `(coerce (%pow (coerce x 'double-float) (coerce y 'double-float))
     'single-float))
-(deftransform expt ((x y) ((double-float 0d0) (signed-byte 32)) *)
+(deftransform expt ((x y) ((double-float $0d0) (signed-byte 32)) *)
   `(%pow x (coerce y 'double-float)))
 
 ;;; ANSI says log with base zero returns zero.
@@ -654,7 +653,8 @@
   ;; the host does not have long floats, then setting *R-D-F-F* to
   ;; LONG-FLOAT doesn't actually buy us anything.  FIXME.
   (setf *read-default-float-format*
-        #+long-float 'long-float #-long-float 'double-float))
+        #+long-float 'cl:long-float #-long-float 'cl:double-float))
+
 ;;; Test whether the numeric-type ARG is within the domain specified by
 ;;; DOMAIN-LOW and DOMAIN-HIGH, consider negative and positive zero to
 ;;; be distinct.
@@ -671,8 +671,8 @@
                (minusp (float-sign arg-lo-val)))
       (setf arg-lo
             (typecase arg-lo-val
-              (single-float 0f0)
-              (double-float 0d0)
+              (single-float $0f0)
+              (double-float $0d0)
               #+long-float
               (long-float 0l0))
             arg-lo-val arg-lo))
@@ -680,10 +680,10 @@
                (plusp (float-sign arg-hi-val)))
       (setf arg-hi
             (typecase arg-lo-val
-              (single-float (load-time-value (make-unportable-float :single-float-negative-zero)))
-              (double-float (load-time-value (make-unportable-float :double-float-negative-zero)))
+              (single-float $-0f0)
+              (double-float $-0d0)
               #+long-float
-              (long-float (load-time-value (make-unportable-float :long-float-negative-zero))))
+              (long-float   $-0L0))
             arg-hi-val arg-hi))
     (flet ((fp-neg-zero-p (f)           ; Is F -0.0?
              (and (floatp f) (zerop f) (= (float-sign-bit f) 1)))
@@ -697,8 +697,9 @@
                (and arg-hi (<= arg-hi-val domain-high)
                     (not (and (fp-neg-zero-p domain-high)
                               (fp-pos-zero-p arg-hi)))))))))
+
 (eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'single-float))
+  (setf *read-default-float-format* 'cl:single-float))
 
 ;;; The basic interval type. It can handle open and closed intervals.
 ;;; A bound is open if it is a list containing a number, just like
@@ -798,20 +799,22 @@
 
   ;; These functions are only defined for part of the real line. The
   ;; condition selects the desired part of the line.
-  (frob asin -1d0 1d0 (- (/ sb-xc:pi 2)) (/ sb-xc:pi 2))
+  (frob asin $-1d0 $1d0 (sb-xc:- (sb-xc:/ sb-xc:pi 2)) (sb-xc:/ sb-xc:pi 2))
   ;; Acos is monotonic decreasing, so we need to swap the function
   ;; values at the lower and upper bounds of the input domain.
-  (frob acos -1d0 1d0 0 sb-xc:pi :increasingp nil)
-  (frob acosh 1d0 nil nil nil)
-  (frob atanh -1d0 1d0 -1 1)
+  (frob acos $-1d0 $1d0 0 sb-xc:pi :increasingp nil)
+  (frob acosh $1d0 nil nil nil)
+  (frob atanh $-1d0 $1d0 -1 1)
   ;; Kahan says that (sqrt -0.0) is -0.0, so use a specifier that
   ;; includes -0.0.
-  (frob sqrt (load-time-value (make-unportable-float :double-float-negative-zero)) nil 0 nil))
+  (frob sqrt $-0.0d0 nil 0 nil))
 
 ;;; Compute bounds for (expt x y). This should be easy since (expt x
 ;;; y) = (exp (* y (log x))). However, computations done this way
 ;;; have too much roundoff. Thus we have to do it the hard way.
 (defun safe-expt (x y)
+  #+sb-xc-host (when (< (abs y) 10000) (expt x y))
+  #-sb-xc-host
   (handler-case
       (when (< (abs y) 10000)
         (expt x y))
@@ -820,7 +823,7 @@
 
 ;;; Handle the case when x >= 1.
 (defun interval-expt-> (x y)
-  (case (interval-range-info y 0d0)
+  (case (interval-range-info y $0d0)
     (+
      ;; Y is positive and log X >= 0. The range of exp(y * log(x)) is
      ;; obviously non-negative. We just have to be careful for
@@ -848,7 +851,7 @@
 
 ;;; Handle the case when x <= 1
 (defun interval-expt-< (x y)
-  (case (interval-range-info x 0d0)
+  (case (interval-range-info x $0d0)
     (+
      ;; The case of 0 <= x <= 1 is easy
      (case (interval-range-info y)
@@ -1030,7 +1033,7 @@
         ;; A real raised to a non-integral power can be a float or a
         ;; complex number.
         ((or (csubtypep x (specifier-type '(rational 0)))
-             (csubtypep x (specifier-type '(float (0d0)))))
+             (csubtypep x (specifier-type '(float ($0d0)))))
          ;; But a positive real to any power is well-defined.
          (merged-interval-expt x y))
         ((and (csubtypep x (specifier-type 'rational))
@@ -1049,7 +1052,7 @@
 ;;; Note we must assume that a type including 0.0 may also include
 ;;; -0.0 and thus the result may be complex -infinity + i*pi.
 (defun log-derive-type-aux-1 (x)
-  (elfun-derive-type-simple x #'log 0d0 nil nil nil))
+  (elfun-derive-type-simple x #'log $0d0 nil nil nil))
 
 (defun log-derive-type-aux-2 (x y same-arg)
   (let ((log-x (log-derive-type-aux-1 x))
@@ -1068,7 +1071,7 @@
       (one-arg-derive-type x #'log-derive-type-aux-1 #'log)))
 
 (defun atan-derive-type-aux-1 (y)
-  (elfun-derive-type-simple y #'atan nil nil (- (/ sb-xc:pi 2)) (/ sb-xc:pi 2)))
+  (elfun-derive-type-simple y #'atan nil nil (sb-xc:- (sb-xc:/ sb-xc:pi 2)) (sb-xc:/ sb-xc:pi 2)))
 
 (defun atan-derive-type-aux-2 (y x same-arg)
   (declare (ignore same-arg))
@@ -1085,7 +1088,7 @@
              (make-numeric-type :class 'float
                                 :format format
                                 :complexp :real
-                                :low (coerce (- sb-xc:pi) bound-format)
+                                :low (coerce (sb-xc:- sb-xc:pi) bound-format)
                                 :high (coerce sb-xc:pi bound-format))))
           (t
            ;; The result is a float or a complex number
@@ -1113,7 +1116,7 @@
                    (t (numeric-type-format arg))))
          (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
-           (case (interval-range-info (numeric-type->interval arg) 0.0)
+           (case (interval-range-info (numeric-type->interval arg) $0.0)
              (+
               ;; The number is positive, so the phase is 0.
               (make-numeric-type :class 'float
@@ -1148,7 +1151,7 @@
            (make-numeric-type :class 'float
                               :format format
                               :complexp :real
-                              :low (coerce (- sb-xc:pi) bound-type)
+                              :low (coerce (sb-xc:- sb-xc:pi) bound-type)
                               :high (coerce sb-xc:pi bound-type))))))
 
 (defoptimizer (phase derive-type) ((num))
@@ -1459,7 +1462,7 @@
      ;; Derive the bounds if the arg is in [-pi/2, pi/2].
      (trig-derive-type-aux
       arg
-      (specifier-type `(float ,(- (/ sb-xc:pi 2)) ,(/ sb-xc:pi 2)))
+      (specifier-type `(float ,(sb-xc:- (sb-xc:/ sb-xc:pi 2)) ,(sb-xc:/ sb-xc:pi 2)))
       #'sin
       -1 1))
    #'sin))
@@ -1470,7 +1473,7 @@
    (lambda (arg)
      ;; Derive the bounds if the arg is in [0, pi].
      (trig-derive-type-aux arg
-                           (specifier-type `(float 0d0 ,sb-xc:pi))
+                           (specifier-type `(float $0d0 ,sb-xc:pi))
                            #'cos
                            -1 1
                            nil))
@@ -1482,7 +1485,8 @@
    (lambda (arg)
      ;; Derive the bounds if the arg is in [-pi/2, pi/2].
      (trig-derive-type-aux arg
-                           (specifier-type `(float ,(- (/ sb-xc:pi 2)) ,(/ sb-xc:pi 2)))
+                           (specifier-type `(float ,(sb-xc:- (sb-xc:/ sb-xc:pi 2))
+                                                   ,(sb-xc:/ sb-xc:pi 2)))
                            #'tan
                            nil nil))
    #'tan))
@@ -1600,7 +1604,7 @@
     (declare (type (signed-byte 32) bits))
     (cond
       ((= exp sb-vm:single-float-normal-exponent-max) x)
-      ((<= biased 0) (* x 0f0))
+      ((<= biased 0) (* x $0f0))
       ((>= biased (float-digits x)) x)
       (t
        (let ((frac-bits (- (float-digits x) biased)))
@@ -1621,7 +1625,7 @@
              (type (unsigned-byte 32) low))
     (cond
       ((= exp sb-vm:double-float-normal-exponent-max) x)
-      ((<= biased 0) (* x 0d0))
+      ((<= biased 0) (* x $0d0))
       ((>= biased (float-digits x)) x)
       (t
        (let ((frac-bits (- (float-digits x) biased)))

@@ -396,8 +396,6 @@
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
-  ;; compiled TYPEP on ECL is wrong. See example in cross-typep.
-  #+host-quirks-ecl (declare (notinline typep))
   (typecase value
     ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
          character)
@@ -426,15 +424,15 @@
     (layout
        immediate-sc-number)
     (single-float
-       (if (eql value 0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
+       (if (eql value $0f0) fp-single-zero-sc-number fp-single-immediate-sc-number))
     (double-float
-       (if (eql value 0d0) fp-double-zero-sc-number fp-double-immediate-sc-number))
+       (if (eql value $0d0) fp-double-zero-sc-number fp-double-immediate-sc-number))
     ((complex single-float)
-       (if (eql value #c(0f0 0f0))
+       (if (eql value (complex $0f0 $0f0))
             fp-complex-single-zero-sc-number
             fp-complex-single-immediate-sc-number))
     ((complex double-float)
-       (if (eql value #c(0d0 0d0))
+       (if (eql value (complex $0d0 $0d0))
             fp-complex-double-zero-sc-number
             fp-complex-double-immediate-sc-number))
     #+(and sb-simd-pack (not sb-xc-host))

@@ -703,7 +703,7 @@
   `(defun ,name (number &optional (divisor 1))
     ,doc
     (multiple-value-bind (res rem) (,op number divisor)
-      (values (float res (if (floatp rem) rem 1.0)) rem))))
+      (values (float res (if (floatp rem) rem $1.0)) rem))))
 
 ;;; Declare these guys inline to let them get optimized a little.
 ;;; ROUND and FROUND are not declared inline since they seem too
@@ -773,7 +773,7 @@
   (declare (explicit-check))
   (multiple-value-bind (res rem)
       (round number divisor)
-    (values (float res (if (floatp rem) rem 1.0)) rem)))
+    (values (float res (if (floatp rem) rem $1.0)) rem)))
 
 ;;;; comparisons
 

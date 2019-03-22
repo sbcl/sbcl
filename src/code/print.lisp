@@ -1437,13 +1437,13 @@ variable: an unreadable object representing the error is printed instead.")
 
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format*
-        #+long-float 'long-float #-long-float 'double-float))
+        #+long-float 'cl:long-float #-long-float 'cl:double-float))
 (defun scale-exponent (original-x)
   (let* ((x (coerce original-x 'long-float)))
     (multiple-value-bind (sig exponent) (decode-float x)
       (declare (ignore sig))
-      (if (= x 0.0e0)
-          (values (float 0.0e0 original-x) 1)
+      (if (= x $0.0e0)
+          (values (float $0.0e0 original-x) 1)
           (let* ((ex (locally (declare (optimize (safety 0)))
                        (the fixnum
                          (round (* exponent
@@ -1455,32 +1455,31 @@ variable: an unreadable object representing the error is printed instead.")
                                    ;; out that sbcl itself is off by 1
                                    ;; ulp in this value, which is a
                                    ;; little unfortunate.)
-                                   (load-time-value
                                     #-long-float
                                     (make-double-float 1070810131 1352628735)
                                     #+long-float
-                                    (error "(log 2 10) not computed")))))))
+                                    (error "(log 2 10) not computed"))))))
                  (x (if (minusp ex)
                         (if (float-denormalized-p x)
                             #-long-float
-                            (* x 1.0e16 (expt 10.0e0 (- (- ex) 16)))
+                            (* x $1.0e16 (expt $10.0e0 (- (- ex) 16)))
                             #+long-float
-                            (* x 1.0e18 (expt 10.0e0 (- (- ex) 18)))
-                            (* x 10.0e0 (expt 10.0e0 (- (- ex) 1))))
-                        (/ x 10.0e0 (expt 10.0e0 (1- ex))))))
-            (do ((d 10.0e0 (* d 10.0e0))
+                            (* x $1.0e18 (expt $10.0e0 (- (- ex) 18)))
+                            (* x $10.0e0 (expt $10.0e0 (- (- ex) 1))))
+                        (/ x $10.0e0 (expt $10.0e0 (1- ex))))))
+            (do ((d $10.0e0 (* d $10.0e0))
                  (y x (/ x d))
                  (ex ex (1+ ex)))
-                ((< y 1.0e0)
-                 (do ((m 10.0e0 (* m 10.0e0))
+                ((< y $1.0e0)
+                 (do ((m $10.0e0 (* m $10.0e0))
                       (z y (* y m))
                       (ex ex (1- ex)))
-                     ((>= z 0.1e0)
+                     ((>= z $0.1e0)
                       (values (float z original-x) ex))
                    (declare (long-float m) (integer ex))))
               (declare (long-float d))))))))
 (eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'single-float))
+  (setf *read-default-float-format* 'cl:single-float))
 
 ;;;; entry point for the float printer
 

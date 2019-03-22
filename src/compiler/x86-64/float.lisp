@@ -112,7 +112,7 @@
   (inst movsd  (ea-for-df-stack y) x))
 
 (eval-when (:compile-toplevel :execute)
-  (setf *read-default-float-format* 'single-float))
+  (setf *read-default-float-format* 'cl:single-float))
 
 ;;;; complex float move functions
 

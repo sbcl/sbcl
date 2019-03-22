@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 (enable-test-parallelism)
 
 ;;; Since *another* BUTLAST problem was reported (anonymously!) on the

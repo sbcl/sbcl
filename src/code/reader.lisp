@@ -1692,9 +1692,9 @@ extended <package-name>::<form-in-package> syntax."
          (magnitude (- number-magnitude divisor-magnitude)))
     (if (minusp exponent)
         (max exponent (ceiling (- (+ max-exponent magnitude))
-                               #.(floor (log 10 2))))
+                               #.(cl:floor (cl:log 10 2))))
         (min exponent (floor (- max-exponent magnitude)
-                             #.(floor (log 10 2)))))))
+                             #.(cl:floor (cl:log 10 2)))))))
 
 (defun make-float (stream)
   ;; Assume that the contents of *read-buffer* are a legal float, with nothing

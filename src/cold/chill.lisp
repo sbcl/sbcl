@@ -28,11 +28,17 @@
     (when (eql (mismatch name "SB-") 3)
       (sb-ext:unlock-package package))))
 
+;;; Define this first to avoid a style-warning from 'shebang'
+(defun read-target-float (stream char)
+  (declare (ignore stream char))
+  (values)) ; ignore the $ as if it weren't there
+(compile 'read-target-float)
 ;;; We need the #! readtable modifications.
 (load (merge-pathnames "shebang.lisp" *load-truename*))
 ;;; ... applied to the default readtable
 (set-dispatch-macro-character #\# #\+ #'read-targ-feature-expr)
 (set-dispatch-macro-character #\# #\- #'read-targ-feature-expr)
+(set-macro-character #\$ #'read-target-float t)
 
 ;;; Just in case we want to play with the initial value of
 ;;; backend-subfeatures
