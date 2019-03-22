@@ -11,10 +11,7 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:defpackage #:thread-test
-  (:use #:cl #:sb-thread #:sb-ext #:test-util #:assertoid))
-
-(cl:in-package #:thread-test)
+(use-package '("SB-EXT" "SB-THREAD"))
 
 (with-test (:name atomic-update
             :skipped-on (not :sb-thread))

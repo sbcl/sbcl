@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (enable-test-parallelism)
 
 ;;; Once upon a time, in the process of porting CMUCL's SPARC backend

@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (with-test (:name (case :duplicate-key :compile-time-warning))
  (loop
     for (expected kind . clauses) in

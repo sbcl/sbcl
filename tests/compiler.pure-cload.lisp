@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 ;;; Exercise a compiler bug (by causing a call to ERROR).
 ;;;
 ;;; This bug was in sbcl-0.6.11.6.

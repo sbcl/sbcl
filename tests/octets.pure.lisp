@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(cl:in-package :cl-user)
-
 (locally
     (declare (optimize debug (speed 0)))
 

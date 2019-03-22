@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 (assert (equal (symbol-name '#:|fd\sA|) "fdsA"))
 
 ;;; Prior to sbcl-0.7.2.10, SBCL disobeyed the ANSI requirements on

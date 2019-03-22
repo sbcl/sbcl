@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
 ;;; The bug reported by Alexei Dejneka on sbcl-devel 2001-09-03
 ;;; is fixed now.
 (assert (equal (let ((hash (make-hash-table)))

@@ -554,12 +554,18 @@
                         (sb-kernel:specifier-type '(not bad)))
                  sb-kernel:parse-unknown-type 2)) ; expect 2 signals
 
+(with-test (:name (typep :complex-integer))
+  (assert (not (eval '(typep #c(0 1/2) '(complex integer))))))
+
+(with-test (:name :typep-satisfies-boolean)
+  (assert (eq (eval '(typep 1 '(satisfies eval))) t)))
+
 (in-package "SB-KERNEL")
 
 (test-util:with-test (:name :partition-array-into-simple/hairy)
   ;; Some tests that (simple-array | hairy-array) = array
   ;; At present this works only for wild element-type.
-  (cl-user::assert-tri-eq
+  (test-util:assert-tri-eq
    t t (type= (specifier-type '(not (and array (not simple-array))))
               (specifier-type '(or (not array) simple-array))))
 
@@ -647,11 +653,3 @@
             (b (specifier-type `(single-float (,y) 20s0))))
         (assert (not (numeric-types-intersect a b)))
         (assert (numeric-types-adjacent a b))))))
-
-(in-package "CL-USER")
-
-(with-test (:name (typep :complex-integer))
-  (assert (not (eval '(typep #c(0 1/2) '(complex integer))))))
-
-(with-test (:name :typep-satisfies-boolean)
-  (assert (eq (eval '(typep 1 '(satisfies eval))) t)))

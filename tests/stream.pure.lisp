@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package :cl-user)
-
 ;;; Until sbcl-0.6.11.31, we didn't have an N-BIN method for
 ;;; CONCATENATED-STREAM, so stuff like this would fail.
 (with-test (:name (concatenated-stream read-sequence 1))
