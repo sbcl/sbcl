@@ -50,11 +50,23 @@
 ;;; In the target SBCL, the INSTANCE type refers to a base
 ;;; implementation for compound types with lowtag
 ;;; INSTANCE-POINTER-LOWTAG. There's no way to express exactly that
-;;; concept portably, but we can get essentially the same effect by
-;;; testing for any of the standard types which would, in the target
-;;; SBCL, be derived from INSTANCE:
+;;; concept portably, but we know that anything derived from STRUCTURE!OBJECT
+;;; is equivalent to the target INSTANCE type. Also, because we use host packages
+;;; as proxies for target packages, those too must satisfy our INSTANCEP
+;;; - even if not a subtype of (OR STANDARD-OBJECT STRUCTURE-OBJECT).
+;;; Nothing else satisfies this definition of INSTANCEP.
+;;; As a guarantee this our set of host object types is exhaustive, we add one
+;;; more constraint when self-hosted: host instances of unknown type cause failure.
+;;; Some objects manipulated by the cross-compiler like the INTERVAL struct
+;;; - which is not a STRUCTURE!OBJECT - should never be seen as literals in code.
+;;; We assert that by way of the guard function.
+#+host-quirks-sbcl
+(defun unsatisfiable-instancep (x)
+  (when (host-sb-kernel:%instancep x) (bug "%INSTANCEP test on ~S" x)))
 (deftype instance ()
-  '(or condition structure-object standard-object))
+  '(or structure!object package
+    #+host-quirks-sbcl (and host-sb-kernel:instance ; optimizes out a call when false
+                            (satisfies unsatisfiable-instancep))))
 (defun %instancep (x)
   (typep x 'instance))
 
@@ -241,7 +253,7 @@
 ;;; mainly for the sake of showing that it's quite easily done.
 ;;; Truth be told I'd have preferred to use the anti-expansion technique consistently,
 ;;; however occasionally we see things like (LET ((V FROB)) (%SVSET *THING* X V))
-;;; which means that the host is going to do the LET and the call %SVSET.
+;;; which means that the host is going to do the LET and then call %SVSET.
 (defun eval-tlf (form index &optional lexenv)
   (declare (ignore index lexenv))
   (flet ((matchp (template form &aux results)
