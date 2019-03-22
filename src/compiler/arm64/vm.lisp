@@ -320,8 +320,8 @@
            (values :default nil)))
       (logbitp
        (cond
-         ((or (valid-funtype '((constant-arg (mod #.n-word-bits)) signed-word) '*)
-              (valid-funtype '((constant-arg (mod #.n-word-bits)) word) '*))
+         ((or (valid-funtype `((constant-arg (mod ,n-word-bits)) signed-word) '*)
+              (valid-funtype `((constant-arg (mod ,n-word-bits)) word) '*))
           (values :transform '(lambda (index integer)
                                (%logbitp integer index))))
          (t (values :default nil))))

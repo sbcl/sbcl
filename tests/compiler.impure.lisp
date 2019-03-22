@@ -491,10 +491,10 @@
 (with-test (:name (compile-file defmacro))
   (fmakunbound 'defmacro-test-aux)
   (let* ((src "defmacro-test.lisp")
-         (obj (compile-file-pathname src)))
+         (obj (scratch-file-name "fasl")))
     (unwind-protect
          (progn
-           (compile-file src)
+           (compile-file src :output-file obj)
            (assert (equal *defmacro-test-status* '(function a)))
            (setq *defmacro-test-status* nil)
            (load obj)
@@ -510,11 +510,11 @@
 
 (with-test (:name (compile-file eval-when :local-environment :bug-204))
   (let* ((src "bug204-test.lisp")
-         (obj (compile-file-pathname src)))
+         (obj (scratch-file-name "fasl")))
     (unwind-protect
          (progn
            (setq *bug204-test-status* nil)
-           (compile-file src :verbose nil :print nil)
+           (compile-file src :output-file obj :verbose nil :print nil)
            (assert (equal *bug204-test-status* '((:expanded :load-toplevel)
                                                  (:called :compile-toplevel)
                                                  (:expanded :compile-toplevel))))
@@ -529,11 +529,11 @@
 
 (with-test (:name (compile-file symbol-macrolet) :skipped-on :interpreter)
   (let* ((src "symbol-macrolet-test.lisp")
-         (obj (compile-file-pathname src)))
+         (obj (scratch-file-name "fasl")))
     (unwind-protect
          (progn
            (setq *symbol-macrolet-test-status* nil)
-           (compile-file src :verbose nil :print nil)
+           (compile-file src :output-file obj :verbose nil :print nil)
            (assert (equal *symbol-macrolet-test-status*
                           '(2 1)))
            (setq *symbol-macrolet-test-status* nil)
@@ -907,7 +907,7 @@
 ;;; COMPILE-FILE did not bind *READTABLE*
 (with-test (:name (compile-file *readtable*))
   (let* ((source "bug-doug-mcnaught-20030914.lisp")
-         (fasl (compile-file-pathname source)))
+         (fasl (scratch-file-name "fasl")))
     (labels ((check ()
                (assert (null (get-macro-character #\]))))
              (full-check ()
@@ -916,7 +916,7 @@
                               '(simple-array (unsigned-byte 4) (*))))
                (assert (equalp *bug-doug-mcnaught-20030914* #(1 2 3)))
                (makunbound '*bug-doug-mcnaught-20030914*)))
-      (compile-file source)
+      (compile-file source :output-file fasl)
       (check)
       (load fasl)
       (full-check)
@@ -1334,6 +1334,7 @@
   (let* ((*error-output* (make-string-output-stream))
          (output (with-output-to-string (*standard-output*)
                    (compile-file "compiler-output-test.lisp"
+                                 :output-file (scratch-file-name)
                                  :print nil :verbose nil))))
     (unless (zerop (length output))
       (error "Unexpected output: ~S" output))))
@@ -1782,20 +1783,18 @@
         (coerce result 'string)))))
 
 ;;; Calling thru constant symbols
-(require :sb-introspect)
 
 (declaim (inline target-fun))
 (defun target-fun (arg0 arg1)
   (+ arg0 arg1))
 (declaim (notinline target-fun))
 
-;; FIXME: should use compiler-test-util, not sb-introspect here.
 ;; That issue aside, neither sb-introspect nor ctu:find-named-callees
 ;; can examine an interpreted function for its callees,
 ;; so we can't actually use this function.
 (defun test-target-fun-called (fun res)
   (assert (member #'target-fun
-                  (sb-introspect:find-function-callees #'caller-fun-1)))
+                  (ctu:find-named-callees #'caller-fun-1)))
   (assert (equal (funcall fun) res)))
 
 (defun caller-fun-1 ()
@@ -1976,7 +1975,8 @@
 (assertoid:assert-error (frob-367 0 (make-e367)) type-error)
 
 (handler-case
-    (delete-file (compile-file "circ-tree-test.lisp"))
+    (delete-file (compile-file "circ-tree-test.lisp"
+                               :output-file (test-util:scratch-file-name)))
   (storage-condition (e)
     (error e)))
 
@@ -2110,11 +2110,14 @@
 (assert (equal '(1 2 3) (wpo-multiple-call-local)))
 
 ;;; bug 417: toplevel NIL confusing source path logic
-(handler-case
-    (delete-file (let ((*error-output* (make-broadcast-stream)))
-                   (compile-file "bug-417.lisp" :verbose nil :print nil)))
-  (sb-ext:code-deletion-note (e)
-    (error e)))
+(test-util:with-test (:name :bug-417)
+  (handler-case
+      (delete-file (let ((*error-output* (make-broadcast-stream)))
+                     (compile-file "bug-417.lisp"
+                                   :output-file (test-util:scratch-file-name)
+                                   :verbose nil :print nil)))
+    (sb-ext:code-deletion-note (e)
+      (error e))))
 
 ;;; unknown values return convention getting disproportionate
 ;;; amounts of values.
@@ -2164,14 +2167,14 @@
 (defvar *lambda*)
 
 (defun compile2 (lambda)
-  (let* ((lisp "compiler-impure-tmp.lisp")
-         (fasl (compile-file-pathname lisp)))
+  (let* ((lisp (test-util:scratch-file-name "lisp"))
+         (fasl (test-util:scratch-file-name "fasl")))
     (unwind-protect
          (progn
            (with-open-file (f lisp :direction :output)
              (prin1 `(setf *lambda* ,lambda) f))
            (multiple-value-bind (fasl warn fail)
-               (compile-file lisp :verbose nil :print nil)
+               (compile-file lisp :output-file fasl :verbose nil :print nil)
              (declare (ignore warn))
              (when fail
                (error "File-compiling ~S failed." lambda))
@@ -2488,7 +2491,7 @@
                   (optimize speed))
                  (logandc2 x (ash -1 n)))))
          (thing-not-to-call
-          (intern (format nil "ASH-LEFT-MOD~D" sb-vm::n-machine-word-bits) "SB-VM")))
+          (intern (format nil "ASH-LEFT-MOD~D" sb-vm:n-machine-word-bits) "SB-VM")))
     (assert (not (member (symbol-function thing-not-to-call)
                          (ctu:find-named-callees fun))))
     (assert (= 7 (funcall fun 15 3)))))
@@ -2520,9 +2523,11 @@
   ;; source, and our error reporting would happily use that
   ;; as source forms.
   (let* ((src "bug-943953.lisp")
-         (obj (compile-file-pathname src)))
+         (obj (test-util:scratch-file-name "fasl")))
     (unwind-protect (let ((*error-output* (make-broadcast-stream)))
-                      (compile-file src :verbose nil :print nil))
+                      (compile-file src
+                                    :output-file obj
+                                    :verbose nil :print nil))
       (ignore-errors (delete-file obj)))))
 
 (declaim (inline vec-1177703))
@@ -2635,7 +2640,8 @@
                               (muffle-warning))))
               (multiple-value-bind (fasl warnings errors)
                   (compile-file "macro-policy-test.lisp"
-                               :print nil :verbose nil)
+                                :output-file (test-util:scratch-file-name)
+                                :print nil :verbose nil)
                 (ignore-errors (delete-file fasl))
                 (assert (and (not warnings) (not errors)))
                 count)))))
@@ -2652,6 +2658,7 @@
 (with-test (:name :merge-lambdas-dead-return)
   (let ((fasl (let ((*error-output* (make-broadcast-stream)))
                 (compile-file "merge-lambdas.lisp"
+                              :output-file (scratch-file-name)
                               :print nil :verbose nil))))
     (ignore-errors (delete-file fasl))))
 
@@ -2671,6 +2678,7 @@
 
 (with-test (:name :derived-function-type-casts)
   (let ((fasl (compile-file "derived-function-type-casts.lisp"
+                            :output-file (scratch-file-name)
                             :print nil :verbose nil)))
     (load fasl)
     (ignore-errors (delete-file fasl))

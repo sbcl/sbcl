@@ -524,3 +524,13 @@
   (exercise-float-decoder 'double-float 11 52)
   ;; TODO: test denormals
   )
+
+
+(with-test (:name :conservative-floor-bounds)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            `(lambda (x)
+               (declare (unsigned-byte x))
+               (values (truncate 1.0 x)))))
+          '(function (unsigned-byte) (values unsigned-byte &optional)))))

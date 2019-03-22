@@ -344,12 +344,12 @@
            t)
           ((csubtypep integer-type (specifier-type '(or word
                                                      sb-vm:signed-word)))
-           `(if (>= index #.sb-vm:n-word-bits)
+           `(if (>= index ,sb-vm:n-word-bits)
                 (minusp integer)
                 (not (zerop (logand integer (ash 1 index))))))
           ((csubtypep integer-type (specifier-type 'bignum))
            (if (csubtypep (lvar-type index)
-                          (specifier-type '(mod #.sb-vm:n-word-bits))) ; word-index
+                          (specifier-type `(mod ,sb-vm:n-word-bits))) ; word-index
                `(logbitp index (%bignum-ref integer 0))
                `(bignum-logbitp index integer)))
           (t
@@ -1982,6 +1982,17 @@
   (def ffloor floor-quotient-bound floor-rem-bound)
   (def fceiling ceiling-quotient-bound ceiling-rem-bound))
 
+;;; The quotient for floats depends on the divisor,
+;;; make the result conservative, without letting it cross 0
+(defmacro conservative-quotient-bound (result direction bound)
+  (let ((result-sym (gensym)))
+    `(let ((,result-sym ,result))
+       (,direction ,result-sym
+                   (if (and (floatp ,bound)
+                            (/= ,result-sym 0))
+                       1
+                       0)))))
+
 ;;; functions to compute the bounds on the quotient and remainder for
 ;;; the FLOOR function
 (defun floor-quotient-bound (quot)
@@ -1994,28 +2005,25 @@
      ;; closed lower bound.
      :low
      (and lo
-          (- (floor (type-bound-number lo))
-             ;; FLOOR on floats depends on the divisor,
-             ;; make it conservative
-             (if (floatp (type-bound-number lo))
-                 1
-                 0)))
+          (conservative-quotient-bound
+           (floor (type-bound-number lo))
+           -
+           (type-bound-number lo)))
      :high
      (and hi
-          (+ (if (consp hi)
-                 ;; An open bound. We need to be careful here because
-                 ;; the floor of '(10.0) is 9, but the floor of
-                 ;; 10.0 is 10.
-                 (multiple-value-bind (q r) (floor (first hi))
-                   (if (zerop r)
-                       (1- q)
-                       q))
-                 ;; A closed bound, so the answer is obvious.
-                 (floor hi))
-             ;; Be conservative
-             (if (floatp (type-bound-number hi))
-                 1
-                 0))))))
+          (conservative-quotient-bound
+           (if (consp hi)
+               ;; An open bound. We need to be careful here because
+               ;; the floor of '(10.0) is 9, but the floor of
+               ;; 10.0 is 10.
+               (multiple-value-bind (q r) (floor (first hi))
+                 (if (zerop r)
+                     (1- q)
+                     q))
+               ;; A closed bound, so the answer is obvious.
+               (floor hi))
+           +
+           (type-bound-number hi))))))
 
 (defun floor-rem-bound (div)
   ;; The remainder depends only on the divisor. Try to get the
@@ -2091,30 +2099,28 @@
     (make-interval
      :low
      (and lo
-          (- (if (consp lo)
-                 ;; An open bound. We need to be careful here because
-                 ;; the ceiling of '(10.0) is 11, but the ceiling of
-                 ;; 10.0 is 10.
-                 (multiple-value-bind (q r) (ceiling (first lo))
-                   (if (zerop r)
-                       (1+ q)
-                       q))
-                 ;; A closed bound, so the answer is obvious.
-                 (ceiling lo))
-             ;; CEILING on floats depends on the divisor,
-             ;; make it conservative
-             (if (floatp (type-bound-number lo))
-                 1
-                 0)))
+          (conservative-quotient-bound
+           (if (consp lo)
+               ;; An open bound. We need to be careful here because
+               ;; the ceiling of '(10.0) is 11, but the ceiling of
+               ;; 10.0 is 10.
+               (multiple-value-bind (q r) (ceiling (first lo))
+                 (if (zerop r)
+                     (1+ q)
+                     q))
+               ;; A closed bound, so the answer is obvious.
+               (ceiling lo))
+           -
+           (type-bound-number lo)))
      :high
      ;; Take the ceiling of the upper bound. The result is always a
      ;; closed upper bound.
      (and hi
-          (+ (ceiling (type-bound-number hi))
-             ;; Be conservative
-             (if (floatp (type-bound-number hi))
-                 1
-                 0))))))
+          (conservative-quotient-bound
+           (ceiling (type-bound-number hi))
+           +
+           (type-bound-number hi))))))
+
 (defun ceiling-rem-bound (div)
   ;; The remainder depends only on the divisor. Try to get the
   ;; correct sign for the remainder if we can.
@@ -2623,9 +2629,7 @@
   (declare (ignore newbyte))
   (%deposit-field-derive-type-aux size posn int))
 
-(deftransform %ldb ((size posn int)
-                    (fixnum fixnum integer)
-                    (unsigned-byte #.sb-vm:n-word-bits))
+(deftransform %ldb ((size posn int) (fixnum fixnum integer) word)
   "convert to inline logical operations"
   (if (and (constant-lvar-p size)
            (constant-lvar-p posn)
@@ -2633,20 +2637,13 @@
       (let ((size (lvar-value size))
             (posn (lvar-value posn)))
         `(logand (ash (mask-signed-field sb-vm:n-fixnum-bits int) ,(- posn))
-                 ,(ash (1- (ash 1 sb-vm:n-word-bits))
-                       (- size sb-vm:n-word-bits))))
+                 ,(ash most-positive-word (- size sb-vm:n-word-bits))))
       `(logand (ash int (- posn))
-               (ash ,(1- (ash 1 sb-vm:n-word-bits))
-                    (- size ,sb-vm:n-word-bits)))))
+               (ash ,most-positive-word (- size ,sb-vm:n-word-bits)))))
 
-(deftransform %mask-field ((size posn int)
-                           (fixnum fixnum integer)
-                           (unsigned-byte #.sb-vm:n-word-bits))
+(deftransform %mask-field ((size posn int) (fixnum fixnum integer) word)
   "convert to inline logical operations"
-  `(logand int
-           (ash (ash ,(1- (ash 1 sb-vm:n-word-bits))
-                     (- size ,sb-vm:n-word-bits))
-                posn)))
+  `(logand int (ash (ash ,most-positive-word (- size ,sb-vm:n-word-bits)) posn)))
 
 ;;; Note: for %DPB and %DEPOSIT-FIELD, we can't use
 ;;;   (OR (SIGNED-BYTE N) (UNSIGNED-BYTE N))
@@ -2654,33 +2651,25 @@
 ;;; the range -2^(n-1) .. 1-2^n, instead of allowing result types of
 ;;; (UNSIGNED-BYTE N) and result types of (SIGNED-BYTE N).
 
-(deftransform %dpb ((new size posn int)
-                    *
-                    (unsigned-byte #.sb-vm:n-word-bits))
+(deftransform %dpb ((new size posn int) * word)
   "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
              (logand int (lognot (ash mask posn))))))
 
-(deftransform %dpb ((new size posn int)
-                    *
-                    (signed-byte #.sb-vm:n-word-bits))
+(deftransform %dpb ((new size posn int) * sb-vm:signed-word)
   "convert to inline logical operations"
   `(let ((mask (ldb (byte size 0) -1)))
      (logior (ash (logand new mask) posn)
              (logand int (lognot (ash mask posn))))))
 
-(deftransform %deposit-field ((new size posn int)
-                              *
-                              (unsigned-byte #.sb-vm:n-word-bits))
+(deftransform %deposit-field ((new size posn int) * word)
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
              (logand int (lognot mask)))))
 
-(deftransform %deposit-field ((new size posn int)
-                              *
-                              (signed-byte #.sb-vm:n-word-bits))
+(deftransform %deposit-field ((new size posn int) * sb-vm:signed-word)
   "convert to inline logical operations"
   `(let ((mask (ash (ldb (byte size 0) -1) posn)))
      (logior (logand new mask)
@@ -4193,8 +4182,7 @@
                   "open-code RATIONAL to FLOAT comparison"
                   (let ((y (lvar-value y)))
                     #-sb-xc-host
-                    (when (or (float-nan-p y)
-                              (float-infinity-p y))
+                    (when (float-infinity-or-nan-p y)
                       (give-up-ir1-transform))
                     (setf y (rational y))
                     `(,',comparator
@@ -4213,8 +4201,7 @@
   "open-code RATIONAL to FLOAT comparison"
   (let ((y (lvar-value y)))
     #-sb-xc-host
-    (when (or (float-nan-p y)
-              (float-infinity-p y))
+    (when (float-infinity-or-nan-p y)
       (give-up-ir1-transform))
     (setf y (rational y))
     (if (and (csubtypep (lvar-type x)
@@ -4266,13 +4253,10 @@
                       (cond #+(and (or arm arm64)
                                     (not sb-xc-host))
                             ((or (and (floatp value)
-                                      (or (float-infinity-p value)
-                                          (float-nan-p value)))
+                                      (float-infinity-or-nan-p value))
                                  (and (complex-float-p value)
-                                      (or (float-infinity-p (imagpart value))
-                                          (float-nan-p (imagpart value))
-                                          (float-infinity-p (realpart value))
-                                          (float-nan-p (realpart value)))))
+                                      (or (float-infinity-or-nan-p (imagpart value))
+                                          (float-infinity-or-nan-p (realpart value)))))
                              (not-constants arg))
                             (t
                              (setf reduced-value value
@@ -5061,8 +5045,7 @@
 
 #-(and win32 (not sb-thread))
 (deftransform sleep ((seconds)
-                     ((constant-arg (and (real 0)
-                                         (not (satisfies float-infinity-p))))))
+                     ((constant-arg (or rational (not (satisfies float-infinity-p))))))
   (let ((seconds-value (lvar-value seconds)))
     (multiple-value-bind (seconds nano)
         (sb-impl::split-seconds-for-sleep seconds-value)

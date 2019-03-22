@@ -84,7 +84,7 @@
 ;;; on 32-bit word size -- WHN 2001-03-19).
 (defun start-mask (count)
   (declare (fixnum count))
-  (shift-towards-start (1- (ash 1 sb-vm:n-word-bits)) (- count)))
+  (shift-towards-start most-positive-word (- count)))
 
 ;;; Produce a mask that contains 1's for the COUNT "end" bits and 0's
 ;;; for the remaining "start" bits. Only the lower 5 bits of COUNT are
@@ -92,7 +92,7 @@
 ;;; 32-bit word size -- WHN 2001-03-19).
 (defun end-mask (count)
   (declare (fixnum count))
-  (shift-towards-end (1- (ash 1 sb-vm:n-word-bits)) (- count)))
+  (shift-towards-end most-positive-word (- count)))
 
 #-sb-fluid (declaim (inline word-sap-ref %set-word-sap-ref))
 (defun word-sap-ref (sap offset)

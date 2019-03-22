@@ -1,0 +1,6 @@
+(with-test (:name (:wait-for :basics))
+  (assert (not (sb-ext:wait-for nil :timeout 0.1)))
+  (assert (eql 42 (sb-ext:wait-for 42)))
+  (let ((n 0))
+    (assert (eql 100 (sb-ext:wait-for (when (= 100 (incf n))
+                                        n))))))

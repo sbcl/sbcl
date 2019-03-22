@@ -216,19 +216,6 @@
                       (wait-for-threads threads)))))
       (assert ok))))
 
-(with-test (:name (:with-timeout :dead-thread) :skipped-on (not :sb-thread))
-  (make-join-thread
-   (lambda ()
-     (let ((timer (make-timer (lambda ()))))
-       (schedule-timer timer 3)
-       (assert t))))
-  (sleep 6)
-  (assert t))
-
-
-(defun random-type (n)
-  `(integer ,(random n) ,(+ n (random n))))
-
 ;;; FIXME: Since timeouts do not work on Windows this would loop
 ;;; forever.
 (with-test (:name (:hash-cache :interrupt) :skipped-on :win32)
@@ -331,32 +318,6 @@
             (sched thread)))
         (loop for thread in threads
               do (sb-thread:join-thread thread :timeout 20))))))
-
-;; SB-THREAD:MAKE-THREAD used to lock SB-THREAD:*MAKE-THREAD-LOCK*
-;; before entering WITHOUT-INTERRUPTS. When a thread which was
-;; executing SB-THREAD:MAKE-THREAD was interrupted with code which
-;; also called SB-THREAD:MAKE-THREAD, it could happen that the first
-;; thread already owned SB-THREAD:*MAKE-THREAD-LOCK* and the
-;; interrupting code thus made a recursive lock attempt. A timer with
-;; :THREAD T or :THREAD <some thread spawning child threads> could
-;; also trigger this problem.
-;;
-;; See (MAKE-THREAD :INTERRUPT-WITH MAKE-THREAD :BUG-1180102) in
-;; threads.pure.lisp.
-(with-test (:name (:timer :dispatch-thread :make-thread :bug-1180102)
-            :skipped-on (not :sb-thread))
-  (flet ((test (thread)
-           (let ((timer (make-timer (lambda ()) :thread thread)))
-             (schedule-timer timer .01 :repeat-interval 0.1)
-             (dotimes (i 100)
-               (let ((threads '()))
-                 (dotimes (i 100)
-                   (push (sb-thread:make-thread (lambda () (sleep .01)))
-                         threads))
-                 (mapc #'sb-thread:join-thread threads)))
-             (unschedule-timer timer))))
-    (test t)
-    (test sb-thread:*current-thread*)))
 
 ;; A timer with a repeat interval can be configured to "catch up" in
 ;; case of missed calls.

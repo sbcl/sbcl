@@ -196,7 +196,7 @@
 #+sunos     (!gencgc-space-setup #x20000000 :dynamic-space-start #x48000000)
 #+freebsd   (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
 #+dragonfly (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
-#+openbsd   (!gencgc-space-setup #x3d000000 :dynamic-space-start #x8d000000)
+#+openbsd   (!gencgc-space-setup #x11000000 :dynamic-space-start #x8d000000)
 #+netbsd    (!gencgc-space-setup #x20000000 :dynamic-space-start #x60000000)
 #+darwin    (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000)
 

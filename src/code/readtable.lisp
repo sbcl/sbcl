@@ -12,7 +12,7 @@
 (in-package "SB-IMPL")
 
 (sb-xc:deftype attribute-table ()
-  '(simple-array (unsigned-byte 8) (#.base-char-code-limit)))
+  `(simple-array (unsigned-byte 8) (,base-char-code-limit)))
 
 ;;; constants for readtable character attributes. These are all as in
 ;;; the manual.

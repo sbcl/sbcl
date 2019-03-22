@@ -107,7 +107,7 @@
 
 (defconstant digit-size sb-vm:n-word-bits)
 
-(defconstant all-ones-digit (1- (ash 1 sb-vm:n-word-bits)))
+(defconstant all-ones-digit most-positive-word)
 
 ;;;; internal inline routines
 
@@ -575,7 +575,7 @@
         (umask 0)
         (imask 1)
         (m 0))
-    (declare (type (unsigned-byte #.sb-vm:n-word-bits) ud vd umask imask m))
+    (declare (type word ud vd umask imask m))
     (dotimes (i digit-size)
       (setf umask (logior umask imask))
       (when (logtest ud umask)
@@ -605,7 +605,7 @@
                     (bignum-buffer-integer-length v v-len))))
          (n (1- (ash 1 d))))
     (declare (type (unsigned-byte #.(integer-length #.sb-vm:n-word-bits)) d)
-             (type (unsigned-byte #.sb-vm:n-word-bits) n))
+             (type word n))
     (gcd-assert (>= d 0))
     (when (logtest (%bignum-ref u 0) n)
       (let ((tmp1-len
@@ -629,7 +629,7 @@
          (d1 1)
          (n2 (modularly (1+ (modularly (lognot n1)))))
          (d2 (modularly -1)))
-    (declare (type (unsigned-byte #.sb-vm:n-word-bits) n1 d1 n2 d2))
+    (declare (type word n1 d1 n2 d2))
     (loop while (> n2 (expt 2 (truncate digit-size 2))) do
           (loop for i of-type (mod #.sb-vm:n-word-bits)
                 downfrom (- (integer-length n1) (integer-length n2))

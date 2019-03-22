@@ -171,7 +171,7 @@
 
 #-win32
 (progn
-  (defparameter *tmpfile* "run-program-ed-test.tmp")
+  (defparameter *tmpfile* (scratch-file-name))
 
   (with-test (:name (run-program :/bin/ed))
     (with-open-file (f *tmpfile*
@@ -211,30 +211,34 @@
 ;; pathname designator.  Since these use the same code, it should
 ;; suffice to test just :INPUT.
 (with-test (:name (run-program :input :output pathname))
-  (let ((file))
-    (unwind-protect
-         (progn (with-open-file (f "run-program-test.tmp" :direction :output)
-                  (setf file (truename f))
-                  (write-line "Foo" f))
-                (assert (run-program "cat" ()
-                                     :input file :output t
-                                     :search t :wait t)))
-      (when file
-        (delete-file file)))))
+  (with-scratch-file (file)
+    (with-open-file (f file :direction :output)
+      (setf file (truename file))
+      (write-line "Foo" f))
+    (assert (run-program "cat" ()
+                         :input file :output t
+                         :search t :wait t))))
 
 ;;; This used to crash on Darwin and trigger recursive lock errors on
 ;;; every platform.
 (with-test (:name (run-program :stress))
   ;; Do it a hundred times in batches of 10 so that with a low limit
   ;; of the number of processes the test can have a chance to pass.
-  (loop
-   repeat 10 do
-   (map nil #'process-wait
-        (loop repeat 10
-              collect
-              (run-program "echo"
-                           '("It would be nice if this didn't crash.")
-                           :search t :wait nil :output nil)))))
+  ;;
+  ;; If #+sb-thread, then make this test even more brutal by calling
+  ;; RUN-PROGRAM in new threads. This is neither good nor bad as far as
+  ;; total run time, but good in that it excercises RUN-PROGRAM
+  ;; from other than the main thread.
+  (flet ((start-run ()
+           (run-program "echo"
+                        '("It would be nice if this didn't crash.")
+                        :search t :wait nil :output nil)))
+    (dotimes (i 10)
+      (mapc #'process-wait
+            #+sb-thread (mapcar #'sb-thread:join-thread
+                                (loop repeat 10
+                                      collect (sb-thread:make-thread #'start-run)))
+            #-sb-thread (loop repeat 10 collect (start-run))))))
 
 (with-test (:name (run-program :pty-stream) :fails-on :win32)
   (assert (equal "OK"

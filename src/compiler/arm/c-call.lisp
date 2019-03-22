@@ -30,7 +30,7 @@
     (1 nl3-offset)))
 
 (defun register-args-offset (index)
-  (elt '(#.ocfp-offset #.nargs-offset #.nl2-offset #.nl3-offset)
+  (elt `(,ocfp-offset ,nargs-offset ,nl2-offset ,nl3-offset)
        index))
 
 (defun int-arg (state prim-type reg-sc stack-sc)

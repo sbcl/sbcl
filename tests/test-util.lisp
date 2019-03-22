@@ -8,12 +8,17 @@
            #:*elapsed-times*
 
            ;; type tools
+           #:random-type
            #:type-evidently-=
            #:ctype=
            #:assert-tri-eq
+           #:random-type
 
            ;; thread tools
            #:make-kill-thread #:make-join-thread
+           #:wait-for-threads
+           #:process-all-interrupts
+           #:test-interrupt
            ;; cause tests to run in multiple threads
            #:enable-test-parallelism
 
@@ -25,6 +30,7 @@
            #:checked-compile #:checked-compile-and-assert
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
+           #:assemble
 
            #:scratch-file-name
            #:with-scratch-file
@@ -65,6 +71,9 @@
 
 ;;; Type tools
 
+(defun random-type (n)
+  `(integer ,(random n) ,(+ n (random n))))
+
 (defun type-evidently-= (x y)
   (and (subtypep x y) (subtypep y x)))
 
@@ -102,6 +111,23 @@
       (push thread *threads-to-join*))
     thread))
 
+(defun wait-for-threads (threads)
+  (mapc (lambda (thread) (sb-thread:join-thread thread :default nil)) threads)
+  (assert (not (some #'sb-thread:thread-alive-p threads))))
+
+(defun process-all-interrupts (&optional (thread sb-thread:*current-thread*))
+  (sb-ext:wait-for (null (sb-thread::thread-interruptions thread))))
+
+(defun test-interrupt (function-to-interrupt &optional quit-p)
+  (let ((child  (make-kill-thread function-to-interrupt)))
+    (format t "interrupting child ~A~%" child)
+    (sb-thread:interrupt-thread child
+     (lambda ()
+       (format t "child pid ~A~%" sb-thread:*current-thread*)
+       (when quit-p (sb-thread:abort-thread))))
+    (process-all-interrupts child)
+    child))
+
 (defun log-msg (stream &rest args)
   (prog1 (apply #'format stream "~&::: ~@?~%" args)
     (force-output stream)))
@@ -126,10 +152,17 @@
         (format stream "~A ~A" (result-name object) (result-status object)))))
 
 (defvar *elapsed-times* nil)
-(defun run-test (test-function name fails-on)
+
+(defun record-test-elapsed-time (test-name start-time)
+  (let ((et (- (get-internal-real-time) start-time)))
+    ;; ATOMIC in case we have within-file test concurrency
+    ;; (not sure if it actually works, but it looks right anyway)
+    (sb-ext:atomic-push (cons et test-name) *elapsed-times*)))
+
+(defun run-test (test-function name fails-on
+                 &aux (start-time (get-internal-real-time)))
   (start-test)
   (let (#+sb-thread (threads (sb-thread:list-all-threads))
-        (start-time (get-internal-real-time))
         (*threads-to-join* nil)
         (*threads-to-kill* nil))
     (handler-bind ((error (lambda (error)
@@ -165,8 +198,6 @@
         (when any-leftover
           (fail-test :leftover-thread name any-leftover)
           (return-from run-test)))
-      (let ((et (- (get-internal-real-time) start-time)))
-        (push (cons et name) *elapsed-times*))
       (if (expected-failure-p fails-on)
           (fail-test :unexpected-success name nil)
           (progn
@@ -175,7 +206,8 @@
                                :status :success)
                   *results*)
             ;; Non-pretty is for cases like (with-test (:name (let ...)) ...
-            (log-msg/non-pretty *trace-output* "Success ~S" name))))))
+            (log-msg/non-pretty *trace-output* "Success ~S" name)))
+      (record-test-elapsed-time name start-time))))
 
 ;;; Like RUN-TEST but do not perform any of the automated thread management.
 ;;; Since multiple threads are executing tests, there is no reason to kill
@@ -847,7 +879,33 @@
                                                   :as-directory t)))
                   (concatenate 'string "/tmp/" file)))))
 
-(defmacro with-scratch-file ((var extension) &body forms)
-  `(let ((,var (scratch-file-name ,extension)))
-     (unwind-protect (progn ,@forms)
-       (ignore-errors (delete-file ,var)))))
+(defmacro with-scratch-file ((var &optional extension) &body forms)
+  (sb-int:with-unique-names (tempname)
+    `(let ((,tempname (scratch-file-name ,extension)))
+       (unwind-protect
+            (let ((,var ,tempname)) ,@forms) ; rebind, as test might asssign into VAR
+         (ignore-errors (delete-file ,tempname))))))
+
+;;; Take a list of lists and assemble them as though they are
+;;; instructions inside the body of a vop. There is no need
+;;; to use the INST macro in front of each list.
+;;; As a special case, an atom is the symbol LABEL, it will be
+;;; changed to a generated label. At most one such atom may appear.
+(defun assemble (instructions)
+  (let ((segment (sb-assem:make-segment))
+        (label))
+    (sb-assem:assemble (segment 'nil)
+       (dolist (inst instructions)
+         (setq inst (copy-list inst))
+         (mapl (lambda (cell &aux (x (car cell)))
+                 (when (and (symbolp x) (string= x "LABEL"))
+                   (setq label (sb-assem:gen-label))
+                   (rplaca cell label)))
+               inst)
+         (apply #'sb-assem::%inst
+                (sb-assem::op-encoder-name (car inst))
+                (cdr inst)))
+       (when label
+         (sb-assem::%emit-label segment nil label)))
+    (sb-assem:segment-buffer
+     (sb-assem:finalize-segment segment))))

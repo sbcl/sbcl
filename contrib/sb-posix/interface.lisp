@@ -471,7 +471,7 @@ not supported."
 (progn
  (define-call ("mmap" :options :largefile) sb-sys:system-area-pointer
    (lambda (res)
-     (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm::n-machine-word-bits))))
+     (= (sb-sys:sap-int res) #.(1- (expt 2 sb-vm:n-machine-word-bits))))
    (addr sap-or-nil) (length size-t) (prot unsigned)
    (flags unsigned) (fd file-descriptor) (offset off-t))
 

@@ -355,9 +355,8 @@ corresponds to NAME, or NIL if there is none."
 #-win32
 (defun unix-mkdir (name mode)
   (declare (type unix-pathname name)
-           (type unix-file-mode mode)
-           #+win32 (ignore mode))
-  (void-syscall ("mkdir" c-string #-win32 int) name #-win32 mode))
+           (type unix-file-mode mode))
+  (void-syscall ("mkdir" c-string int) name mode))
 
 ;;; Given a C char* pointer allocated by malloc(), free it and return a
 ;;; corresponding Lisp string (or return NIL if the pointer is a C NULL).
@@ -1083,7 +1082,6 @@ the UNIX epoch (January 1st 1970.)"
                    system-real-time-values))
 
   (defun system-real-time-values ()
-    #+win32 (declare (notinline get-time-of-day)) ; forward ref
     (multiple-value-bind (sec usec) (get-time-of-day)
       (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))
       (values sec (truncate usec micro-seconds-per-internal-time-unit))))

@@ -80,10 +80,7 @@
 
         (inst sub csp-tn csp-tn (+ 32 80)) ;; deallocate the frame
         #+sb-thread
-        (inst str zr-tn #+sb-thread
-                        (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes))
-                        #-sb-thread
-                        (@ tmp-tn))
+        (inst str zr-tn (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes)))
 
         (inst mov tmp-tn nl0) ;; result
 

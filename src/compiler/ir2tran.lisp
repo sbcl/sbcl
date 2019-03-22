@@ -2193,7 +2193,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                   (vop count-me
                        first-node
                        2block
-                       #+sb-dyncount *dynamic-counts-tn* #-sb-dyncount nil
+                       *dynamic-counts-tn*
                        num))))
               #+sb-safepoint
               (let ((first-node (block-start-node block)))

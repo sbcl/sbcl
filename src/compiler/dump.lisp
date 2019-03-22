@@ -514,9 +514,9 @@
     ((unsigned-byte #.(1- sb-vm:n-word-bits))
      (dump-fop 'fop-word-integer file)
      (dump-word n file))
-    ((signed-byte #.sb-vm:n-word-bits)
+    (sb-vm:signed-word
      (dump-fop 'fop-word-integer file)
-     (dump-integer-as-n-bytes n #.sb-vm:n-word-bytes file))
+     (dump-integer-as-n-bytes n sb-vm:n-word-bytes file))
     (t
      (let ((bytes (ceiling (1+ (integer-length n)) 8)))
        (dump-fop 'fop-integer file bytes)

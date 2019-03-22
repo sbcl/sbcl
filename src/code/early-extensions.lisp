@@ -16,7 +16,7 @@
 ;;; A number that can represent an index into a vector, including
 ;;; one-past-the-end
 (deftype array-range ()
-  '(integer 0 #.sb-xc:array-dimension-limit))
+  `(integer 0 ,sb-xc:array-dimension-limit))
 
 ;;; a type used for indexing into sequences, and for related
 ;;; quantities like lengths of lists and other sequences.
@@ -789,33 +789,6 @@ NOTE: This interface is experimental and subject to change."
                 (eql (pop x) (pop y))))
           (t
            (return)))))
-
-;;;; package idioms
-
-;;; Note: Almost always you want to use FIND-UNDELETED-PACKAGE-OR-LOSE
-;;; instead of this function. (The distinction only actually matters when
-;;; PACKAGE-DESIGNATOR is actually a deleted package, and in that case
-;;; you generally do want to signal an error instead of proceeding.)
-(defun %find-package-or-lose (package-designator)
-  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
-  (or (find-package package-designator)
-      (error 'simple-package-error
-             :package package-designator
-             :format-control "The name ~S does not designate any package."
-             :format-arguments (list package-designator))))
-
-;;; ANSI specifies (in the section for FIND-PACKAGE) that the
-;;; consequences of most operations on deleted packages are
-;;; unspecified. We try to signal errors in such cases.
-(defun find-undeleted-package-or-lose (package-designator)
-  #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
-  (let ((maybe-result (%find-package-or-lose package-designator)))
-    (if (package-%name maybe-result)    ; if not deleted
-        maybe-result
-        (error 'simple-package-error
-               :package maybe-result
-               :format-control "The package ~S has been deleted."
-               :format-arguments (list maybe-result)))))
 
 ;;;; various operations on names
 

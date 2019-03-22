@@ -128,7 +128,7 @@
              (set-result (form)
                `(setf result (ldb (byte #.sb-vm:n-word-bits 0) ,form))))
     (let ((result 238625159)) ; (logandc2 most-positive-fixnum (sxhash #\S)) on 32 bits
-      (declare (type (unsigned-byte #.sb-vm:n-word-bits) result))
+      (declare (type word result))
       ;; Avoid accessing elements of a (simple-array nil (*)).
       ;; The expansion of STRING-DISPATCH involves ETYPECASE,
       ;; so we can't simply omit one case. Therefore that macro

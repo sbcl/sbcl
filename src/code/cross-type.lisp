@@ -382,16 +382,10 @@
     (character
      (cond ((typep x 'standard-char)
             (specifier-type 'base-char))
-           ((not (characterp x))
-            nil)
            (t
             ;; Beyond this, there seems to be no portable correspondence.
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
-    (structure!object
-     (find-classoid (uncross (class-name (class-of x))))) ; FIXME: TYPE-OF?
-    ;; host packages obviously don't inherit from STRUCTURE!OBJECT
-    ;; but we can use them as if part of our type system for fasl dumping.
-    (package (find-classoid 'package))
+    (instance (find-classoid (type-of x)))
     (t
      ;; There might be more cases which we could handle with
      ;; sufficient effort; since all we *need* to handle are enough

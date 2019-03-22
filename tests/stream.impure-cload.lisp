@@ -25,7 +25,7 @@
 ;;; The code below tests only UNREAD-CHAR. It would be nice to test
 ;;; CLEAR-INPUT too, but I'm not sure how to do it cleanly and
 ;;; portably in a noninteractive test. -- WHN 2001-05-05
-(defparameter *scratch-file-name* "sbcl-wrapped-stream-test-data.tmp")
+(defparameter *scratch-file-name* (scratch-file-name))
 (defvar *scratch-file-stream*)
 (dolist (scratch-file-length '(1 ; everyone's favorite corner case
                                200123)) ; hopefully much bigger than buffer

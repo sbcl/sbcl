@@ -98,11 +98,11 @@
   #+(and win32 x86-64) unsigned-long-long)
 
 (deftype ui ()
-  #-(and win32 x86-64) '(unsigned-byte #.sb-vm:n-word-bits)
+  #-(and win32 x86-64) 'word
   #+(and win32 x86-64) '(unsigned-byte 32))
 
 (deftype si ()
-  #-(and win32 x86-64) '(signed-byte #.sb-vm:n-word-bits)
+  #-(and win32 x86-64) 'sb-vm:signed-word
   #+(and win32 x86-64) '(signed-byte 32))
 
 (define-alien-type nil

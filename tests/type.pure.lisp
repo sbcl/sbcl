@@ -233,13 +233,13 @@
                                  '(member #c(1 1) #c(1 2) #c(2 1) #c(2 2)))))
 
 (with-test (:name (typep real))
-  (assert (typep 0 '(real #.(ash -1 10000) #.(ash 1 10000)))))
+  (assert (typep 0 `(real ,(ash -1 10000) ,(ash 1 10000)))))
 
 (with-test (:name (subtypep real))
-  (assert-tri-eq t t (subtypep '(real #.(ash -1 1000) #.(ash 1 1000))
-                               '(real #.(ash -1 10000) #.(ash 1 10000))))
-  (assert-tri-eq t t (subtypep '(real (#.(ash -1 1000)) (#.(ash 1 1000)))
-                               '(real #.(ash -1 1000) #.(ash 1 1000)))))
+  (assert-tri-eq t t (subtypep `(real ,(ash -1 1000) ,(ash 1 1000))
+                               `(real ,(ash -1 10000) ,(ash 1 10000))))
+  (assert-tri-eq t t (subtypep `(real (,(ash -1 1000)) (,(ash 1 1000)))
+                               `(real ,(ash -1 1000) ,(ash 1 1000)))))
 
 ;;; Bug, found by Paul F. Dietz
 (with-test (:name (typep subtypep complex rational))

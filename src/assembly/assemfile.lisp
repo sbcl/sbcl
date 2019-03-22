@@ -22,7 +22,9 @@
 ;;; COMPILE-FILE, but in fact it's arguably more like LOAD, even down
 ;;; to the return convention. It LOADs a file, then writes out any
 ;;; assembly code created by the process.
-(defun assemble-file (name &key (output-file (error "Missing keyword")))
+(defun assemble-file (name &key (output-file (error "Missing keyword"))
+                                print)
+  (declare (ignore print))
   (when sb-cold::*compile-for-effect-only*
     (return-from assemble-file t))
   (let* ((*emit-assembly-code-not-vops-p* t)

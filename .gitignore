@@ -30,6 +30,7 @@ src/runtime/sbcl.exe
 src/runtime/sbcl.h
 src/runtime/sbcl.mk
 src/runtime/sbcl.nm
+src/runtime/shrinkwrap-sbcl*
 src/runtime/target-arch-os.h
 src/runtime/target-arch.h
 src/runtime/target-lispregs.h
@@ -45,6 +46,7 @@ tools-for-build/determine-endianness
 tools-for-build/determine-endianness.exe
 tools-for-build/grovel-headers
 tools-for-build/grovel-headers.exe
+tools-for-build/mmap-rwx
 tools-for-build/os-provides-putwc-test
 tools-for-build/os-provides-putwc-test.exe
 tools-for-build/where-is-mcontext

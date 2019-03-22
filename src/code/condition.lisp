@@ -1179,7 +1179,10 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
 
 (define-condition simple-package-error (simple-condition package-error) ())
 
+(define-condition package-does-not-exist (simple-package-error) ())
+
 (define-condition simple-reader-package-error (simple-reader-error package-error) ())
+(define-condition reader-package-does-not-exist (simple-reader-package-error package-does-not-exist) ())
 
 (define-condition reader-eof-error (end-of-file)
   ((context :reader reader-eof-error-context :initarg :context))

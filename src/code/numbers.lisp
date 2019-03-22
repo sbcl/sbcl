@@ -1089,7 +1089,7 @@ and the number of 0 bits if INTEGER is negative."
                               sb-vm:n-word-bits))
                      (bignum-ashift-left-fixnum integer count))
                     (t
-                     (truly-the (signed-byte #.sb-vm:n-word-bits)
+                     (truly-the sb-vm:signed-word
                                 (ash (truly-the fixnum integer) count))))))
            ((minusp count)
             (if (minusp integer) -1 0))

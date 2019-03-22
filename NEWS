@@ -2,6 +2,7 @@
 
 changes relative to sbcl-1.5.0:
   * bug fix: thread-safety problems in RUN-PROGRAM with :PTY.
+  * enhancement: restarts for missing package errors.
 
 changes in sbcl-1.5.0 relative to sbcl-1.4.16:
   * enhancement: SB-COVER emulates IN-PACKAGE when recording source maps;

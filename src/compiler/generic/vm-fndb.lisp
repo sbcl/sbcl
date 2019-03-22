@@ -88,6 +88,10 @@
 ;; is in the collection specified by the second arg.
 (defknown %other-pointer-subtype-p (t list) boolean
   (movable foldable flushable always-translatable))
+
+;;; Predicates that don't accept T for the first argument type
+(defknown (float-infinity-p float-nan-p float-infinity-or-nan-p)
+  (float) boolean (movable foldable flushable))
 
 ;;;; miscellaneous "sub-primitives"
 
@@ -439,8 +443,7 @@
   (values bignum-element-type bignum-element-type)
   (foldable flushable movable))
 
-(defknown %fixnum-digit-with-correct-sign (bignum-element-type)
-  (signed-byte #.sb-vm:n-word-bits)
+(defknown %fixnum-digit-with-correct-sign (bignum-element-type) sb-vm:signed-word
   (foldable flushable movable))
 
 (defknown (%ashl %ashr %digit-logical-shift-right)

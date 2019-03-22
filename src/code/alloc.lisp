@@ -14,13 +14,13 @@
 
 #-sb-fluid (declaim (inline store-word))
 (defun store-word (word base &optional (offset 0) (lowtag 0))
-  (declare (type (unsigned-byte #.n-word-bits) word base offset)
+  (declare (type word word base offset)
            (type (unsigned-byte #.n-lowtag-bits) lowtag))
   (setf (sap-ref-word (int-sap base) (- (ash offset word-shift) lowtag)) word))
 
 (defun allocate-static-vector (widetag length words)
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)
-           (type (unsigned-byte #.n-word-bits) words)
+           (type word words)
            (type index length))
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS
   (or

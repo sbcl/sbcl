@@ -117,31 +117,19 @@
 
 ;;;; float accessors
 
+;;; NaNs can not be constructed from constant bits mainly due to compiler problems
+;;; in so doing. See https://bugs.launchpad.net/sbcl/+bug/486812
 #-sb-xc-host
-(deftransform make-single-float ((bits)
-                                 ((signed-byte 32)))
+(deftransform make-single-float ((bits) ((constant-arg t)))
   "Conditional constant folding"
-  (unless (constant-lvar-p bits)
-    (give-up-ir1-transform))
-  (let* ((bits  (lvar-value bits))
-         (float (make-single-float bits)))
-    (when (float-nan-p float)
-      (give-up-ir1-transform))
-    float))
+  (let ((float (make-single-float (lvar-value bits))))
+    (if (float-nan-p float) (give-up-ir1-transform) float)))
 
 #-sb-xc-host
-(deftransform make-double-float ((hi lo)
-                                 ((signed-byte 32) (unsigned-byte 32)))
+(deftransform make-double-float ((hi lo) ((constant-arg t) (constant-arg t)))
   "Conditional constant folding"
-  (unless (and (constant-lvar-p hi)
-               (constant-lvar-p lo))
-    (give-up-ir1-transform))
-  (let* ((hi    (lvar-value hi))
-         (lo    (lvar-value lo))
-         (float (make-double-float hi lo)))
-    (when (float-nan-p float)
-      (give-up-ir1-transform))
-    float))
+  (let ((float (make-double-float (lvar-value hi) (lvar-value lo))))
+    (if (float-nan-p float) (give-up-ir1-transform) float)))
 
 ;;; On the face of it, these transforms are ridiculous because if we're going
 ;;; to express (MINUSP X) as (MINUSP (foo-FLOAT-BITS X)), then why not _always_

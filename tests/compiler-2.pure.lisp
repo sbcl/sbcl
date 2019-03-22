@@ -1366,6 +1366,15 @@
 (with-test (:name (compile sleep float :infinity :lp-1754081))
   (checked-compile '(lambda () (sleep single-float-positive-infinity)))
   (checked-compile '(lambda () (sleep double-float-positive-infinity))))
+;;; And it didn't work at all after the fix for aforementioned
+(with-test (:name :sleep-float-transform
+                  :skipped-on (and :win32 (not :sb-thread)))
+  (let* ((xform (car (sb-c::fun-info-transforms (sb-int:info :function :info 'sleep))))
+         (type (car (sb-kernel:fun-type-required (sb-c::transform-type xform)))))
+    (assert (sb-kernel:constant-type-p type))
+    ;; CONSTANT-TYPE isn't actually testable through CTYPEP.
+    ;; So pull out the actual type as the compiler would do.
+    (assert (sb-kernel:ctypep 1.5 (sb-kernel:constant-type-type type)))))
 
 (with-test (:name :atanh-type-derivation)
   (checked-compile-and-assert
@@ -2323,4 +2332,3 @@
                   (car x)
                   0))))
           '(function ((or null (cons fixnum t))) (values fixnum &optional)))))
-

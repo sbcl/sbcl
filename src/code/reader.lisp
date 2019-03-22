@@ -1185,20 +1185,27 @@ standard Lisp readtable when NIL."
 (declaim (type (or null package) *reader-package*)
          (always-bound *reader-package*))
 
-(defun reader-find-package (package-designator stream)
+(defun reader-find-package (package-designator stream restarts)
   (if (%instancep package-designator)
       package-designator
-      (let ((package (find-package package-designator)))
-        (cond (package
-               ;; Release the token-buf that was used for the designator
-               (release-token-buf (shiftf (token-buf-next *read-buffer*) nil))
-               package)
-              (t
-               (error 'simple-reader-package-error
-                      :package package-designator
-                      :stream stream
-                      :format-control "Package ~A does not exist."
-                      :format-arguments (list package-designator)))))))
+      (block nil
+        (tagbody retry
+           (let ((package (find-package package-designator)))
+             (cond (package
+                    ;; Release the token-buf that was used for the designator
+                    (release-token-buf (shiftf (token-buf-next *read-buffer*) nil))
+                    (return (values package nil)))
+                   (t
+                    (macrolet ((err ()
+                                 `(error 'simple-reader-package-error
+                                         :package package-designator
+                                         :stream stream
+                                         :format-control "Package ~A does not exist."
+                                         :format-arguments (list package-designator))))
+                      (if restarts
+                          (find-package-restarts (package-designator t)
+                            (err))
+                          (err))))))))))
 
 (defun read-token (stream firstchar)
   "Default readmacro function. Handles numbers, symbols, and SBCL's
@@ -1527,7 +1534,7 @@ extended <package-name>::<form-in-package> syntax."
          (unread-char char stream)
          (if package-designator
              (let* ((*reader-package*
-                     (reader-find-package package-designator stream)))
+                     (reader-find-package package-designator stream nil)))
                (return (read stream t nil t)))
              (simple-reader-error stream
                                   "illegal terminating character after a double-colon: ~S"
@@ -1540,33 +1547,38 @@ extended <package-name>::<form-in-package> syntax."
                               package-designator))
         (t (go SYMBOL)))
       RETURN-SYMBOL
-      (setf buf (normalize-read-buffer buf))
-      (casify-read-buffer buf)
-      (let* ((pkg (if package-designator
-                      (reader-find-package package-designator stream)
-                      (or *reader-package* (sane-package))))
-             (intern-p (or (/= colons 1) (eq pkg *keyword-package*))))
-        (unless intern-p ; Try %FIND-SYMBOL
-          (multiple-value-bind (symbol accessibility)
-              (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
-            (when (eq accessibility :external) (return symbol))
-            (with-simple-restart (continue "Use symbol anyway.")
-              (error 'simple-reader-package-error
-                     :package pkg
-                     :stream stream
-                     :format-arguments
-                     (list (copy-token-buf-string buf) (package-name pkg))
-                     :format-control
-                     (if accessibility
-                         "The symbol ~S is not external in the ~A package."
-                         "Symbol ~S not found in the ~A package.")))))
-        (return (%intern (token-buf-string buf)
-                         (token-buf-fill-ptr buf)
-                         pkg
-                         (if (token-buf-only-base-chars buf)
-                             (%readtable-symbol-preference rt)
-                             'character)
-                         nil)))))))
+        (setf buf (normalize-read-buffer buf))
+        (casify-read-buffer buf)
+        (multiple-value-bind (pkg restart-kind)
+            (if package-designator
+                (reader-find-package package-designator stream t)
+                (or *reader-package* (sane-package)))
+          (if (eq restart-kind :uninterned)
+              (return (make-symbol (copy-token-buf-string buf)))
+              (let* ((intern-p (or (/= colons 1)
+                                   (eq pkg *keyword-package*)
+                                   (eq restart-kind :current))))
+                (unless intern-p        ; Try %FIND-SYMBOL
+                  (multiple-value-bind (symbol accessibility)
+                      (%find-symbol (token-buf-string buf) (token-buf-fill-ptr buf) pkg)
+                    (when (eq accessibility :external) (return symbol))
+                    (with-simple-restart (continue "Use symbol anyway.")
+                      (error 'simple-reader-package-error
+                             :package pkg
+                             :stream stream
+                             :format-arguments
+                             (list (copy-token-buf-string buf) (package-name pkg))
+                             :format-control
+                             (if accessibility
+                                 "The symbol ~S is not external in the ~A package."
+                                 "Symbol ~S not found in the ~A package.")))))
+                (return (%intern (token-buf-string buf)
+                                 (token-buf-fill-ptr buf)
+                                 pkg
+                                 (if (token-buf-only-base-chars buf)
+                                     (%readtable-symbol-preference rt)
+                                     'character)
+                                 nil)))))))))
 
 ;;; For semi-external use: Return 3 values: the token-buf,
 ;;; a flag for whether there was an escape char, and the position of

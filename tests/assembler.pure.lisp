@@ -12,9 +12,8 @@
 ;;;; more information.
 
 (cl:in-package "SB-VM")
-(use-package "TEST-UTIL")
 
-(enable-test-parallelism)
+(test-util:enable-test-parallelism)
 
 ;; this is architecture-agnostic
 (defun test-assemble (inst expect)
@@ -64,13 +63,13 @@
 (defvar r8d-tn (reg-in-size r8-tn :dword))
 (defvar r9d-tn (reg-in-size r9-tn :dword)))
 
-(with-test (:name :assemble-movti-instruction :skipped-on (not :x86-64))
+(test-util:with-test (:name :assemble-movti-instruction :skipped-on (not :x86-64))
   (flet ((test-movnti (dst src expect)
            (test-assemble `(movnti ,dst ,src) expect)))
     (test-movnti (ea 57 rdi-tn) eax-tn "0FC34739         MOVNTI [RDI+57], EAX")
     (test-movnti (ea rax-tn) r12-tn "4C0FC320         MOVNTI [RAX], R12")))
 
-(with-test (:name :assemble-crc32 :skipped-on (not :x86-64))
+(test-util:with-test (:name :assemble-crc32 :skipped-on (not :x86-64))
   ;; Destination size = :DWORD
   (test-assemble `(crc32 :byte ,eax-tn ,(ea rbp-tn))
                  "F20F38F04500     CRC32 EAX, BYTE PTR [RBP]")
@@ -100,7 +99,7 @@
   (test-assemble `(crc32 :qword ,r9-tn ,(ea r14-tn r15-tn))
                  "F24F0F38F10C3E   CRC32 R9, QWORD PTR [R14+R15]"))
 
-(with-test (:name :assemble-unsigned-qword-imm-to-mem :skipped-on (not :x86-64))
+(test-util:with-test (:name :assemble-unsigned-qword-imm-to-mem :skipped-on (not :x86-64))
   ;; unsigned bits cast as signed bits
   (let ((const #xffffffff801234BB))
     (test-assemble `(mov :qword ,(ea rcx-tn) ,const)
@@ -109,7 +108,7 @@
     (dolist (size '(:byte :word :dword))
       (check-does-not-assemble `(mov ,size ,(ea rcx-tn) ,const)))))
 
-(with-test (:name :unsigned-as-signed-imm8 :skipped-on (not :x86-64))
+(test-util:with-test (:name :unsigned-as-signed-imm8 :skipped-on (not :x86-64))
   ;; PUSH
   (test-assemble `(push #xfffffffffffffffc) "6AFC             PUSH -4")
 
@@ -121,7 +120,7 @@
   ;; imm16 operand; the encoding length is the same either way.
   (test-assemble `(or ,ax-tn #xfff7) "6683C8F7         OR AX, -9"))
 
-(with-test (:name :assemble-movsx :skipped-on (not :x86-64))
+(test-util:with-test (:name :assemble-movsx :skipped-on (not :x86-64))
   ;; source = :BYTE, signed
   (check-does-not-assemble `(movsx (:byte :byte) ,r8b-tn ,cl-tn))
   (test-assemble `(movsx (:byte :word)  ,r8w-tn ,cl-tn) "66440FBEC1       MOVSX R8W, CL")
@@ -142,14 +141,14 @@
   (test-assemble `(movsx (:dword :qword) ,r8-tn ,ecx-tn) "4C63C1           MOVSX R8, ECX")
   (test-assemble `(movzx (:dword :qword) ,r8-tn ,ecx-tn) "448BC1           MOV R8D, ECX"))
 
-(with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
+(test-util:with-test (:name :disassemble-movabs-instruction :skipped-on (not :x86-64))
   (let* ((bytes (coerce '(#x48 #xA1 8 7 6 5 4 3 2 1
                           #xA1 8 7 6 5 4 3 2 1
                           #x66 #xA1 8 7 6 5 4 3 2 1
                           #xA0 8 7 6 5 4 3 2 1)
                         '(array (unsigned-byte 8) 1)))
          (lines
-          (split-string
+          (test-util:split-string
            (with-output-to-string (s)
              (sb-sys:with-pinned-objects (bytes)
                (sb-disassem:disassemble-memory
@@ -162,7 +161,7 @@
       (assert (search (format nil "MOVABS ~A, [#x102030405060708]" dest-reg)
                       (pop lines))))))
 
-(with-test (:name :disassemble-arith-insts :skipped-on (not (or :x86 :x86-64)))
+(test-util:with-test (:name :disassemble-arith-insts :skipped-on (not (or :x86 :x86-64)))
   (flet ((try (inst expect)
            (let ((p (search "$fp" expect)))
              (when p
@@ -216,13 +215,13 @@
     (try `(add ,rcx-tn ,(memref :qword)) "48034D00         ADD RCX, [$fp]")
     ))
 
-(with-test (:name :disassemble-imul :skipped-on (not (or :x86 :x86-64)))
+(test-util:with-test (:name :disassemble-imul :skipped-on (not (or :x86 :x86-64)))
   (test-assemble `(imul ,dl-tn)  "F6EA             IMUL DL")
   (test-assemble `(imul ,cx-tn)  "66F7E9           IMUL CX")
   (test-assemble `(imul ,ebx-tn) "F7EB             IMUL EBX")
   (test-assemble `(imul ,edi-tn 92) "6BFF5C           IMUL EDI, EDI, 92"))
 
-(with-test (:name :disassemble-fs-prefix :skipped-on (not (or :x86-64)))
+(test-util:with-test (:name :disassemble-fs-prefix :skipped-on (not (or :x86-64)))
   (let ((bytes (coerce '(#x64 #xF0 #x44 #x08 #x04 #x25 #x00 #x04 #x10 #x20)
                        '(array (unsigned-byte 8) 1)))
         (s (make-string-output-stream)))
@@ -235,14 +234,14 @@
 
 ;;; This seems to be testing that we can find fdefns in static space
 ;;; which I guess was broken.  immobile-code has no fdefns in static space.
-(with-test (:name :disassemble-static-fdefn
+(test-util:with-test (:name :disassemble-static-fdefn
             :skipped-on (or (not :x86-64) :immobile-code))
   (assert (< (get-lisp-obj-address (sb-kernel::find-fdefn 'sb-impl::sub-gc))
              sb-vm:static-space-end))
   ;; Cause SUB-GC to become un-statically-linked
   (progn (trace sb-impl::sub-gc) (untrace))
   (let ((lines
-         (split-string (with-output-to-string (s)
+         (test-util:split-string (with-output-to-string (s)
                          (disassemble 'sb-impl::gc :stream s))
                        #\Newline))
         (found))
@@ -253,7 +252,7 @@
         (setq found t)))
     (assert found)))
 
-(with-test (:name :cast-reg-to-size :skipped-on (not :x86-64))
+(test-util:with-test (:name :cast-reg-to-size :skipped-on (not :x86-64))
   (test-assemble `(mov :byte ,rsi-tn ,rdi-tn)
                  "408AF7           MOV SIL, DIL")
   (test-assemble `(movsx (:byte :word) ,rax-tn ,rdi-tn)
@@ -273,7 +272,7 @@
   (test-assemble `(movq ,float0-tn ,eax-tn)
                  "66480F6EC0       MOVQ XMM0, RAX"))
 
-(with-test (:name :assemble-high-byte-regs :skipped-on (not :x86-64))
+(test-util:with-test (:name :assemble-high-byte-regs :skipped-on (not :x86-64))
   (test-assemble `(cmp (,rdx-tn . :high-byte) 1)
                  "80FE01           CMP DH, 1")
   (test-assemble `(mov (,rdx-tn . :high-byte) (,rcx-tn . :high-byte))
