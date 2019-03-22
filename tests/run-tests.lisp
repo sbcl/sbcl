@@ -225,7 +225,7 @@
             (skip-file ())))
         (delete-package test-package)))
     ;; after all the files are done
-    (append-failures)))
+    (append-results)))
 
 (defun run-in-child-sbcl (load eval)
   (process-exit-code
