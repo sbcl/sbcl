@@ -116,8 +116,7 @@
     (dolist (file files)
       (format t "// Running ~a in ~a evaluator mode~%"
               file *test-evaluator-mode*)
-      (let ((n-packages (length (list-all-packages)))
-            (test-package (make-package
+      (let ((test-package (make-package
                            (format nil "TEST~36,5,'_R" (random (expt 36 5)))
                            :use (append '("ASSERTOID" "TEST-UTIL")
                                         standard-use-list))))
