@@ -382,8 +382,6 @@
     (character
      (cond ((typep x 'standard-char)
             (specifier-type 'base-char))
-           ((not (characterp x))
-            nil)
            (t
             ;; Beyond this, there seems to be no portable correspondence.
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
