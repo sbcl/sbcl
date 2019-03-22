@@ -30,31 +30,6 @@
             #+host-quirks-cmu :reader #+host-quirks-cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
             )))
 
-;;; This warning refers to the flexibility in the ANSI spec with
-;;; regard to run-time distinctions between floating point types.
-;;; (E.g. the cross-compilation host might not even distinguish
-;;; between SINGLE-FLOAT and DOUBLE-FLOAT, so a DOUBLE-FLOAT number
-;;; would test positive as SINGLE-FLOAT.) If the target SBCL does make
-;;; this distinction, then information is lost. It's not too hard to
-;;; contrive situations where this would be a problem. In practice we
-;;; don't tend to run into them because all widely used Common Lisp
-;;; environments do recognize the distinction between SINGLE-FLOAT and
-;;; DOUBLE-FLOAT, and we don't really need the other distinctions
-;;; (e.g. between SHORT-FLOAT and SINGLE-FLOAT), so we call
-;;; WARN-POSSIBLE-CROSS-TYPE-FLOAT-INFO-LOSS to test at runtime
-;;; whether we need to worry about this at all, and not warn unless we
-;;; do. If we *do* have to worry about this at runtime, my (WHN
-;;; 19990808) guess is that the system will break in multiple places,
-;;; so this is a real WARNING, not just a STYLE-WARNING.
-;;;
-;;; KLUDGE: If we ever try to support LONG-FLOAT or SHORT-FLOAT, this
-;;; situation will get a lot more complicated.
-(defun warn-possible-cross-type-float-info-loss (caller host-object ctype)
-  (when (or (subtypep 'single-float 'double-float)
-            (subtypep 'double-float 'single-float))
-    (warn "possible floating point information loss in ~S"
-          (list caller host-object ctype))))
-
 ;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
 ;; specifier. We assume that anything in CL: is allowed.
 (defvar *seen-xtypep-preds* nil)
@@ -75,30 +50,6 @@
            (awhen (info :function :info symbol)
              (sb-c::ir1-attributep (sb-c::fun-info-attributes it) sb-c:foldable)))))
 
-(defun complex-num-fmt-match-p (num fmt)
-  ;; compiled TYPEP on ECL is wrong. See example at bottom of this file.
-  ;; Of course, it's abstraction-breaking to suppose that TYPECASE
-  ;; directly utilizes TYPEP, but naturally it does.
-  #+host-quirks-ecl (declare (notinline typep))
-  (aver (memq fmt '(single-float double-float rational)))
-  (and (complexp num)
-       (let ((yesp (eq (etypecase (realpart num)
-                         (single-float 'single-float)
-                         (double-float 'double-float)
-                         (rational 'rational))
-                       fmt)))
-         (when yesp
-           (aver (typep (imagpart num) fmt)))
-         yesp)))
-
-(defun flonum-fmt-match-p (num fmt)
-  (aver (memq fmt '(single-float double-float)))
-  (and (floatp num)
-       (eq (etypecase num
-            (single-float 'single-float)
-            (double-float 'double-float))
-           fmt)))
-
 ;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
 ;;; be of type TYPE when instantiated on the target SBCL. Since this
 ;;; is hard to determine in some cases, and since in other cases we
@@ -111,6 +62,8 @@
 ;;; The order of clauses is fairly symmetrical with that of %%TYPEP.
 (defun cross-typep (caller host-object type)
   (declare (type (member sb-xc:typep ctypep) caller))
+  (when (or (cl:floatp host-object) (cl:complexp host-object))
+    (error "Can't happen"))
   (named-let recurse ((obj host-object) (type type))
     (flet ((unimplemented ()
              (bug "Incomplete implementation of ~S ~S ~S" caller obj type))
@@ -124,37 +77,7 @@
           ((nil extended-sequence funcallable-instance)
            (values nil t)))) ; nothing could be these
        (numeric-type
-        (flet ((bound-test (val)
-                 (let ((low (numeric-type-low type))
-                       (high (numeric-type-high type)))
-                   (and (cond ((null low) t)
-                              ((listp low) (> val (car low)))
-                              (t (>= val low)))
-                        (cond ((null high) t)
-                              ((listp high) (< val (car high)))
-                              (t (<= val high)))))))
-          (if (not (numberp obj))
-              (values nil t) ; false certainly
-              (let ((fmt (numeric-type-format type)))
-                (case (numeric-type-class type)
-                 ((nil)
-                  (if (and (null (numeric-type-complexp type)) (null fmt))
-                      (values (numberp obj) t)
-                      (unimplemented)))
-                 (float
-                  (warn-possible-cross-type-float-info-loss caller host-object type)
-                  (values (ecase (numeric-type-complexp type)
-                           (:complex (complex-num-fmt-match-p obj fmt))
-                           (:real (and (flonum-fmt-match-p obj fmt) (bound-test obj))))
-                          t))
-                 (t ; integer or rational
-                  (values (ecase (numeric-type-complexp type)
-                           (:complex (complex-num-fmt-match-p obj 'rational))
-                           (:real (and (if (eq (numeric-type-class type) 'integer)
-                                           (integerp obj)
-                                           (rationalp obj))
-                                       (bound-test obj))))
-                          t)))))))
+        (values (number-typep obj type) t))
        (array-type
         ;; Array types correspond fairly closely between host and target, but
         ;; asking whether an array is definitely non-simple is a nonsensical

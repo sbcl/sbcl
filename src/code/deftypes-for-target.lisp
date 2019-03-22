@@ -245,4 +245,44 @@
 (sb-xc:deftype double-float-significand ()
   `(integer 0 (,(ash 1 sb-vm:double-float-digits))))
 
+;;; Common logic for %%TYPEP and CROSS-TYPEP
+(defmacro number-typep (object type)
+  `(let ((object ,object) (type ,type))
+     (and (numberp object)
+          (let ((num (if (complexp object) (realpart object) object)))
+            (ecase (numeric-type-class type)
+              (integer (and (integerp num)
+                            ;; If the type is (COMPLEX INTEGER), it can
+                            ;; only match the object if both real and imag
+                            ;; parts are integers.
+                            (or (not (complexp object))
+                                (integerp (imagpart object)))))
+              (rational (rationalp num))
+              (float
+               (ecase (numeric-type-format type)
+                 ;; (short-float (typep num 'short-float))
+                 (single-float (typep num 'single-float))
+                 (double-float (typep num 'double-float))
+                 ;; (long-float (typep num 'long-float))
+                 ((nil) (floatp num))))
+              ((nil) t)))
+          (flet ((bound-test (val)
+                   (let ((low (numeric-type-low type))
+                         (high (numeric-type-high type)))
+                     (and (cond ((null low) t)
+                                ((listp low) (sb-xc:> val (car low)))
+                                (t (sb-xc:>= val low)))
+                          (cond ((null high) t)
+                                ((listp high) (sb-xc:< val (car high)))
+                                (t (sb-xc:<= val high)))))))
+            (ecase (numeric-type-complexp type)
+              ((nil) t)
+              (:complex
+               (and (complexp object)
+                    (bound-test (realpart object))
+                    (bound-test (imagpart object))))
+              (:real
+               (and (not (complexp object))
+                    (bound-test object))))))))
+
 (/show0 "deftypes-for-target.lisp end of file")

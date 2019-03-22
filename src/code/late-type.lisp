@@ -1893,8 +1893,7 @@
     (if (and low
              (eql low high)
              (eql (numeric-type-complexp type) :real)
-             (member (numeric-type-class type) '(integer rational
-                                                 #-sb-xc-host float)))
+             (member (numeric-type-class type) '(integer rational float)))
         (values t (numeric-type-low type))
         (values nil nil))))
 
@@ -1909,6 +1908,8 @@
 ;;; This is for comparing bounds of the same kind, e.g. upper and
 ;;; upper. Use NUMERIC-BOUND-TEST* for different kinds of bounds.
 (defmacro numeric-bound-test (x y closed open)
+  (setq closed (intern (string closed) "SB-XC")
+        open (intern (string open) "SB-XC"))
   `(cond ((not ,y) t)
          ((not ,x) nil)
          ((consp ,x)
@@ -1927,6 +1928,8 @@
 ;;; -- an open inner bound is "greater" and also squeezes the interval,
 ;;;    causing us to use the OPEN test for those cases as well.
 (defmacro numeric-bound-test* (x y closed open)
+  (setq closed (intern (string closed) "SB-XC")
+        open (intern (string open) "SB-XC"))
   `(cond ((not ,y) t)
          ((not ,x) t)
          ((consp ,x)
@@ -1944,6 +1947,8 @@
 ;;; upper. If MAX-P is true, then we return NIL if X or Y is NIL,
 ;;; otherwise we return the other arg.
 (defmacro numeric-bound-max (x y closed open max-p)
+  (setq closed (intern (string closed) "SB-XC")
+        open (intern (string open) "SB-XC"))
   (once-only ((n-x x)
               (n-y y))
     `(cond ((not ,n-x) ,(if max-p nil n-y))
@@ -2244,73 +2249,60 @@ used for a COMPLEX component.~:@>"
       bound
       (funcall inner-coerce-bound-fun bound type upperp)))
 
-(macrolet ((fp-const (name)
-             `(load-time-value (locally (declare (notinline symbol-value))
-                                 (symbol-value ',name)) t)))
+(macrolet ((make-bound (val)
+             `(let ((coerced ,val))
+                (if (listp bound) (list coerced) coerced))))
+
 (defun inner-coerce-real-bound (bound type upperp)
-  #+sb-xc-host (declare (ignore upperp))
-  (let #+sb-xc-host ()
-       #-sb-xc-host ((nl (fp-const sb-xc:most-negative-long-float))
-                     (pl (fp-const sb-xc:most-positive-long-float)))
-    (let ((nbound (if (consp bound) (car bound) bound))
-          (consp (consp bound)))
+  (let ((nl sb-xc:most-negative-long-float)
+        (pl sb-xc:most-positive-long-float))
+    (let ((nbound (if (listp bound) (car bound) bound)))
       (ecase type
         (rational
-         (if consp
-             (list (rational nbound))
-             (rational nbound)))
+         (make-bound (rational nbound)))
         (float
          (cond
            ((floatp nbound) bound)
            (t
             ;; Coerce to the widest float format available, to avoid
             ;; unnecessary loss of precision, but don't coerce
-            ;; unrepresentable numbers, except on the host where we
-            ;; shouldn't be making these types (but KLUDGE: can't even
-            ;; assert portably that we're not).
-            #-sb-xc-host
+            ;; unrepresentable numbers.
             (ecase upperp
               ((nil)
-               (when (< nbound nl) (return-from inner-coerce-real-bound nl)))
+               (when (sb-xc:< nbound nl) (return-from inner-coerce-real-bound nl)))
               ((t)
-               (when (> nbound pl) (return-from inner-coerce-real-bound pl))))
-            (let ((result (coerce nbound 'long-float)))
-              (if consp (list result) result)))))))))
+               (when (sb-xc:> nbound pl) (return-from inner-coerce-real-bound pl))))
+            (make-bound (coerce nbound 'long-float)))))))))
+
 (defun inner-coerce-float-bound (bound type upperp)
-  #+sb-xc-host (declare (ignore upperp))
-  (let #+sb-xc-host ()
-       #-sb-xc-host ((nd (fp-const sb-xc:most-negative-double-float))
-                     (pd (fp-const sb-xc:most-positive-double-float))
-                     (ns (fp-const sb-xc:most-negative-single-float))
-                     (ps (fp-const sb-xc:most-positive-single-float)))
-    (let ((nbound (if (consp bound) (car bound) bound))
-          (consp (consp bound)))
+  (let ((nd sb-xc:most-negative-double-float)
+        (pd sb-xc:most-positive-double-float)
+        (ns sb-xc:most-negative-single-float)
+        (ps sb-xc:most-positive-single-float))
+    (let ((nbound (if (listp bound) (car bound) bound)))
       (ecase type
         (single-float
          (cond
-           ((typep nbound 'single-float) bound)
+           ((cl:typep nbound 'single-float) bound)
            (t
-            #-sb-xc-host
             (ecase upperp
               ((nil)
-               (when (< nbound ns) (return-from inner-coerce-float-bound ns)))
+               (when (sb-xc:< nbound ns) (return-from inner-coerce-float-bound ns)))
               ((t)
-               (when (> nbound ps) (return-from inner-coerce-float-bound ps))))
-            (let ((result (coerce nbound 'single-float)))
-              (if consp (list result) result)))))
+               (when (sb-xc:> nbound ps) (return-from inner-coerce-float-bound ps))))
+            (make-bound (coerce nbound 'single-float)))))
         (double-float
          (cond
-           ((typep nbound 'double-float) bound)
+           ((cl:typep nbound 'double-float) bound)
            (t
-            #-sb-xc-host
             (ecase upperp
               ((nil)
-               (when (< nbound nd) (return-from inner-coerce-float-bound nd)))
+               (when (sb-xc:< nbound nd) (return-from inner-coerce-float-bound nd)))
               ((t)
-               (when (> nbound pd) (return-from inner-coerce-float-bound pd))))
-            (let ((result (coerce nbound 'double-float)))
-              (if consp (list result) result)))))))))
+               (when (sb-xc:> nbound pd) (return-from inner-coerce-float-bound pd))))
+            (make-bound (coerce nbound 'double-float)))))))))
 ) ; end MACROLET
+
 (defun coerced-real-bound (bound type upperp)
   (coerce-bound bound type upperp #'inner-coerce-real-bound))
 (defun coerced-float-bound (bound type upperp)
@@ -2403,14 +2395,15 @@ used for a COMPLEX component.~:@>"
                (if up-p (1+ cx) (1- cx))
                (if up-p (ceiling cx) (floor cx))))
           (float
+           (aver format)
            (let ((res
                    (cond
                      ((and format (subtypep format 'double-float))
-                      (if (<= sb-xc:most-negative-double-float cx sb-xc:most-positive-double-float)
+                      (if (sb-xc:<= sb-xc:most-negative-double-float cx sb-xc:most-positive-double-float)
                           (coerce cx format)
                           nil))
                      (t
-                      (if (<= sb-xc:most-negative-single-float cx sb-xc:most-positive-single-float)
+                      (if (sb-xc:<= sb-xc:most-negative-single-float cx sb-xc:most-positive-single-float)
                           ;; FIXME: bug #389
                           (coerce cx (or format 'single-float))
                           nil)))))
@@ -2912,7 +2905,7 @@ used for a COMPLEX component.~:@>"
                    (make-negation-type (make-member-type xset nil)))
                (mapcar
                 (lambda (x)
-                  (let* ((opposite (neg-fp-zero x))
+                  (let* ((opposite (sb-xc:- x))
                          (type (ctype-of opposite)))
                     (type-union
                      (make-negation-type
@@ -3936,7 +3929,7 @@ used for a COMPLEX component.~:@>"
     (multiple-value-bind (complexp low high)
         (if (complexp x)
             (let ((imag (imagpart x)))
-              (values :complex (min num imag) (max num imag)))
+              (values :complex (sb-xc:min num imag) (sb-xc:max num imag)))
             (values :real num num))
       (make-numeric-type :class (etypecase num
                                   (integer (if (complexp x)

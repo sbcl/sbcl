@@ -79,10 +79,12 @@
  ;; Let's check that the type system, and various other things, are
  ;; reasonably sane. (It's easy to spend a long time wandering around
  ;; confused trying to debug cross-compilation if it isn't.)
- (let ((*readtable* *xc-readtable*))
-   (load "tests/type.before-xc.lisp")
-   (load "tests/info.before-xc.lisp")
-   (load "tests/vm.before-xc.lisp"))
+ (let ((*readtable* *xc-readtable*)
+       (*load-verbose* t))
+   (with-math-journal
+     (load "tests/type.before-xc.lisp")
+     (load "tests/info.before-xc.lisp")
+     (load "tests/vm.before-xc.lisp")))
 
  ;; propagate structure offset and other information to the C runtime
  ;; support code.

@@ -313,48 +313,48 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
 ;;; with random bits, then subtracting 1.0. This hides the fact that
 ;;; we have a hidden bit.
 #-sb-fluid (declaim (inline %random-single-float %random-double-float))
-(declaim (ftype (function ((single-float (0f0)) random-state)
-                          (single-float 0f0))
+(declaim (ftype (function ((single-float ($0f0)) random-state)
+                          (single-float $0f0))
                 %random-single-float))
 (defun %random-single-float (arg state)
-  (declare (type (single-float (0f0)) arg)
+  (declare (type (single-float ($0f0)) arg)
            (type random-state state))
   (* arg
      (- (make-single-float
          (dpb (ash (random-chunk state)
                    (- sb-vm:single-float-digits n-random-chunk-bits))
               sb-vm:single-float-significand-byte
-              (single-float-bits 1.0)))
-        1.0)))
-(declaim (ftype (function ((double-float (0d0)) random-state)
-                          (double-float 0d0))
+              (single-float-bits $1.0)))
+        $1.0)))
+(declaim (ftype (function ((double-float ($0d0)) random-state)
+                          (double-float $0d0))
                 %random-double-float))
 
 ;;; 32-bit version
 #+nil
 (defun %random-double-float (arg state)
-  (declare (type (double-float (0d0)) arg)
+  (declare (type (double-float ($0d0)) arg)
            (type random-state state))
-  (* (float (random-chunk state) 1d0) (/ 1d0 (expt 2 32))))
+  (* (float (random-chunk state) $1d0) (/ $1d0 (expt 2 32))))
 
 ;;; 53-bit version
 #-x86
 (defun %random-double-float (arg state)
-  (declare (type (double-float (0d0)) arg)
+  (declare (type (double-float ($0d0)) arg)
            (type random-state state))
   (* arg
      (- (sb-impl::make-double-float
          (dpb (ash (random-chunk state)
                    (- sb-vm:double-float-digits n-random-chunk-bits 32))
               sb-vm:double-float-significand-byte
-              (sb-impl::double-float-high-bits 1d0))
+              (sb-impl::double-float-high-bits $1d0))
          (random-chunk state))
-        1d0)))
+        $1d0)))
 
 ;;; using a faster inline VOP
 #+x86
 (defun %random-double-float (arg state)
-  (declare (type (double-float (0d0)) arg)
+  (declare (type (double-float ($0d0)) arg)
            (type random-state state))
   (let ((state-vector (random-state-state state)))
     (* arg
@@ -363,9 +363,9 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
                      (- sb-vm:double-float-digits n-random-chunk-bits
                         sb-vm:n-word-bits))
                 sb-vm:double-float-significand-byte
-                (sb-impl::double-float-high-bits 1d0))
+                (sb-impl::double-float-high-bits $1d0))
            (sb-vm::random-mt19937 state-vector))
-          1d0))))
+          $1d0))))
 
 
 ;;;; random fixnums
@@ -410,12 +410,12 @@ http://www.math.sci.hiroshima-u.ac.jp/~m-mat/MT/emt.html
   (cond
     ((and (fixnump arg) (> arg 0))
      (%random-fixnum arg state))
-    ((and (typep arg 'single-float) (> arg 0.0f0))
+    ((and (typep arg 'single-float) (> arg $0.0f0))
      (%random-single-float arg state))
-    ((and (typep arg 'double-float) (> arg 0.0d0))
+    ((and (typep arg 'double-float) (> arg $0.0d0))
      (%random-double-float arg state))
     #+long-float
-    ((and (typep arg 'long-float) (> arg 0.0l0))
+    ((and (typep arg 'long-float) (> arg $0.0l0))
      (%random-long-float arg state))
     ((and (bignump arg) (> arg 0))
      (%random-bignum arg state))

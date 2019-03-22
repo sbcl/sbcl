@@ -65,7 +65,7 @@
 (declaim (ftype (sfunction (unsigned-byte)
                            (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
                 primify))
-(defun make-info-storage (n-cells-min &optional (load-factor .7))
+(defun make-info-storage (n-cells-min &optional (load-factor $.7))
   ;; If you ask for 40 entries at 50% load, you get (PRIMIFY 80) entries.
   (let* ((n-cells (primify (ceiling n-cells-min load-factor)))
          (a (make-array (+ +info-keys-offset+ (* 2 n-cells))))
@@ -316,7 +316,7 @@
   (let* ((old-count (info-env-count env))
          (old-storage (info-env-storage env))
          ;; the new storage begins life at ~50% capacity
-         (new-storage (make-info-storage (ceiling old-count .5)))
+         (new-storage (make-info-storage (ceiling old-count $.5)))
          (old-capacity (info-storage-capacity old-storage))
          (new-capacity (info-storage-capacity new-storage)))
 

@@ -187,7 +187,7 @@
 (defknown sb-vm::%%make-symbol (simple-string) symbol (flushable))
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
-(defknown sb-xc:symbol-package (symbol) (or package null) (flushable))
+(defknown symbol-package (symbol) (or package null) (flushable))
 (defknown keywordp (t) boolean (flushable))       ; If someone uninterns it...
 
 ;;;; from the "Packages" chapter:
@@ -307,7 +307,7 @@
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defknown (sin cos) (number)
-  (or (float -1.0 1.0) (complex float))
+  (or (float $-1.0 $1.0) (complex float))
   (movable foldable flushable recursive)
   :derive-type #'result-type-float-contagion)
 
@@ -324,7 +324,7 @@
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defknown (sin cos) (number)
-  (or (float -1.0 1.0) (complex float))
+  (or (float $-1.0 $1.0) (complex float))
   (movable foldable flushable recursive))
 
 (defknown atan
@@ -437,8 +437,8 @@
   (movable foldable flushable))
 (defknown deposit-field (integer byte-specifier integer) integer
   (movable foldable flushable))
-(defknown random ((or (float (0.0)) (integer 1)) &optional random-state)
-  (or (float 0.0) (integer 0))
+(defknown random ((or (float ($0.0f0)) (integer 1)) &optional random-state)
+  (or (float $0.0f0) (integer 0))
   ())
 (defknown make-random-state (&optional (or random-state (member nil t)))
   random-state (flushable))
@@ -1029,7 +1029,7 @@
 
 (defknown make-hash-table
   (&key (:test function-designator) (:size unsigned-byte)
-        (:rehash-size (or (integer 1) (float (1.0))))
+        (:rehash-size (or (integer 1) (float ($1.0))))
         (:rehash-threshold (real 0 1))
         (:hash-function (or null function-designator))
         (:weakness (member nil :key :value :key-and-value :key-or-value))
@@ -1047,9 +1047,9 @@
 (defknown maphash ((function-designator (t t)) hash-table) null (flushable call))
 (defknown clrhash ((modifying hash-table)) hash-table ())
 (defknown hash-table-count (hash-table) index (flushable))
-(defknown hash-table-rehash-size (hash-table) (or index (single-float (1.0)))
+(defknown hash-table-rehash-size (hash-table) (or index (single-float ($1.0)))
   (foldable flushable))
-(defknown hash-table-rehash-threshold (hash-table) (single-float (0.0) 1.0)
+(defknown hash-table-rehash-threshold (hash-table) (single-float ($0.0) $1.0)
   (foldable flushable))
 (defknown hash-table-size (hash-table) index (flushable))
 (defknown hash-table-test (hash-table) symbol (foldable flushable))

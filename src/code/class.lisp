@@ -917,23 +917,23 @@ between the ~A definition and the ~A definition"
       :translation complex
       :inherits (number)
       :codes (,sb-vm:complex-widetag)
-      :prototype-form (complex 42 42))
+      :prototype-form ,(complex 0 1))
      (complex-single-float
       :translation (complex single-float)
       :inherits (complex number)
       :codes (,sb-vm:complex-single-float-widetag)
-      :prototype-form (complex 42f0 42f0))
+      :prototype-form ,(complex $0f0 $0f0))
      (complex-double-float
       :translation (complex double-float)
       :inherits (complex number)
       :codes (,sb-vm:complex-double-float-widetag)
-      :prototype-form (complex 42d0 42d0))
+      :prototype-form ,(complex $0d0 $0d0))
      #+long-float
      (complex-long-float
       :translation (complex long-float)
       :inherits (complex number)
       :codes (,sb-vm:complex-long-float-widetag)
-      :prototype-form (complex 42l0 42l0))
+      :prototype-form ,(complex $0L0 $0L0))
      #+sb-simd-pack
      (simd-pack
       :translation simd-pack
@@ -955,18 +955,18 @@ between the ~A definition and the ~A definition"
       :translation single-float
       :inherits (float real number)
       :codes (,sb-vm:single-float-widetag)
-      :prototype-form 42f0)
+      :prototype-form $0f0)
      (double-float
       :translation double-float
       :inherits (float real number)
       :codes (,sb-vm:double-float-widetag)
-      :prototype-form 42d0)
+      :prototype-form $0d0)
      #+long-float
      (long-float
       :translation long-float
       :inherits (float real number)
       :codes (,sb-vm:long-float-widetag)
-      :prototype-form 42l0)
+      :prototype-form $0L0)
      (rational
       :translation rational
       :inherits (real number))

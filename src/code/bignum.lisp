@@ -1160,6 +1160,7 @@
 
 ;;; Make a single or double float with the specified significand,
 ;;; exponent and sign.
+;;; FIXME: how are these not the same as {SINGLE,DOUBLE}-FROM-BITS ???
 (defun single-float-from-bits (bits exp plusp)
   (declare (fixnum exp))
   ;; "float to pointer coercion -> return value"

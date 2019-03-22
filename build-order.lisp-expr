@@ -92,7 +92,7 @@
  ("src/code/cross-byte"  :c-headers :not-target)
  ("src/code/cross-misc"  :c-headers :not-target)
  ("src/code/cross-char"  :c-headers :not-target)
- ("src/code/cross-float" :not-target)
+ ("src/code/cross-float" :c-headers :not-target)
  ("src/code/cross-io"    :not-target)
  ("src/code/cross-condition" :not-target)
 
@@ -123,7 +123,6 @@
  ;; required for some code in 'early-extensions'
  ("src/code/barrier" :not-host)
  ("src/code/parse-body" :c-headers)       ; on host for PARSE-BODY
- ("src/code/unportable-float")
  ("src/compiler/policy" :c-headers)
  #+sb-fasteval ("src/interpreter/basic-env")
  ;; PARSE-{UNKNOWN,DEPRECATED}-TYPE and other things should be known

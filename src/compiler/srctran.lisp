@@ -285,9 +285,9 @@
 
 ;;;; arithmetic and numerology
 
-(define-source-transform plusp (x) `(> ,x 0))
-(define-source-transform minusp (x) `(< ,x 0))
-(define-source-transform zerop (x) `(= ,x 0))
+(define-source-transform plusp (x) `(sb-xc:> ,x 0))
+(define-source-transform minusp (x) `(sb-xc:< ,x 0))
+(define-source-transform zerop (x) `(sb-xc:= ,x 0))
 
 (define-source-transform 1+ (x) `(+ ,x 1))
 (define-source-transform 1- (x) `(- ,x 1))
@@ -402,11 +402,11 @@
                 (if (and (floatp x) (floatp y) (zerop x) (zerop y))
                     (,op (float-sign x) (float-sign y))
                     (,op x y)))))
-  (def signed-zero->= >=)
-  (def signed-zero-> >)
-  (def signed-zero-= =)
-  (def signed-zero-< <)
-  (def signed-zero-<= <=))
+  (def signed-zero->= sb-xc:>=)
+  (def signed-zero-> sb-xc:>)
+  (def signed-zero-= sb-xc:=)
+  (def signed-zero-< sb-xc:<)
+  (def signed-zero-<= sb-xc:<=))
 
 (defun make-interval (&key low high)
   (labels ((normalize-bound (val)
@@ -456,7 +456,7 @@
 
 (defun safe-double-coercion-p (x)
   (or (typep x 'double-float)
-      (<= sb-xc:most-negative-double-float x sb-xc:most-positive-double-float)))
+      (sb-xc:<= sb-xc:most-negative-double-float x sb-xc:most-positive-double-float)))
 
 (defun safe-single-coercion-p (x)
   (or (typep x 'single-float)
@@ -490,7 +490,7 @@
        #+x86
        (not (typep x `(or (integer * (,most-negative-exactly-single-float-fixnum))
                           (integer (,most-positive-exactly-single-float-fixnum) *))))
-       (<= sb-xc:most-negative-single-float x sb-xc:most-positive-single-float))))
+       (sb-xc:<= sb-xc:most-negative-single-float x sb-xc:most-positive-single-float))))
 
 ;;; Apply a binary operator OP to two bounds X and Y. The result is
 ;;; NIL if either is NIL. Otherwise bound is computed and the result
@@ -530,8 +530,8 @@
                          (and (or (consp ,x) (consp ,y))
                               ;; Open bounds can very easily be messed up
                               ;; by FP rounding, so take care here.
-                              ,(case op
-                                 (*
+                              ,(ecase op
+                                 (sb-xc:*
                                   ;; Multiplying a greater-than-zero with
                                   ;; less than one can round to zero.
                                   `(or (not (fp-zero-p ,res))
@@ -539,7 +539,7 @@
                                               (>= (abs ,yb) 1))
                                              ((and (consp ,y) (fp-zero-p ,yb))
                                               (>= (abs ,xb) 1)))))
-                                 (/
+                                 (sb-xc:/
                                   ;; Dividing a greater-than-zero with
                                   ;; greater than one can round to zero.
                                   `(or (not (fp-zero-p ,res))
@@ -547,7 +547,7 @@
                                               (<= (abs ,yb) 1))
                                              ((and (consp ,y) (fp-zero-p ,yb))
                                               (<= (abs ,xb) 1)))))
-                                 ((+ -)
+                                 ((sb-xc:+ sb-xc:-)
                                   ;; Adding or subtracting greater-than-zero
                                   ;; can end up with identity.
                                   `(and (not (fp-zero-p ,xb))
@@ -570,12 +570,12 @@
        (if (coercion-loses-precision-p (car val) type)
            xbound
            (list xbound))))
-    ((subtypep type 'double-float)
-     (if (<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
+    ((sb-xc:subtypep type 'double-float)
+     (if (sb-xc:<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
          (coerce val type)))
-    ((or (subtypep type 'single-float) (subtypep type 'float))
+    ((or (sb-xc:subtypep type 'single-float) (sb-xc:subtypep type 'float))
      ;; coerce to float returns a single-float
-     (if (<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
+     (if (sb-xc:<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
          (coerce val type)))
     (t (coerce val type))))
 
@@ -587,16 +587,16 @@
               xbound
               (list xbound)))
         (cond
-          ((subtypep type 'double-float)
-           (if (<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
+          ((sb-xc:subtypep type 'double-float)
+           (if (sb-xc:<= sb-xc:most-negative-double-float val sb-xc:most-positive-double-float)
                (coerce val type)
-               (if (< val sb-xc:most-negative-double-float)
+               (if (sb-xc:< val sb-xc:most-negative-double-float)
                    sb-xc:most-negative-double-float sb-xc:most-positive-double-float)))
-          ((or (subtypep type 'single-float) (subtypep type 'float))
+          ((or (sb-xc:subtypep type 'single-float) (sb-xc:subtypep type 'float))
            ;; coerce to float returns a single-float
-           (if (<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
+           (if (sb-xc:<= sb-xc:most-negative-single-float val sb-xc:most-positive-single-float)
                (coerce val type)
-               (if (< val sb-xc:most-negative-single-float)
+               (if (sb-xc:< val sb-xc:most-negative-single-float)
                    sb-xc:most-negative-single-float sb-xc:most-positive-single-float)))
           (t (coerce val type))))))
 
@@ -745,7 +745,7 @@
   (flet ((adjacent (lo hi)
            ;; Check to see whether lo and hi are adjacent. If either is
            ;; nil, they can't be adjacent.
-           (when (and lo hi (= (type-bound-number lo) (type-bound-number hi)))
+           (when (and lo hi (sb-xc:= (type-bound-number lo) (type-bound-number hi)))
              ;; The bounds are equal. They are adjacent if one of
              ;; them is closed (a number). If both are open (consp),
              ;; then there is a number that lies between them.
@@ -788,19 +788,19 @@
                       (hin (type-bound-number hi)))
                  (cond
                    ;; Interval may be a point.
-                   ((and lon hin (= lon hin pn))
+                   ((and lon hin (sb-xc:= lon hin pn))
                     (and (numberp p) (numberp lo) (numberp hi)))
                    ;; Point matches the low end.
                    ;; [P] [P,?} => TRUE     [P] (P,?} => FALSE
                    ;; (P  [P,?} => TRUE      P) [P,?} => FALSE
                    ;; (P  (P,?} => TRUE      P) (P,?} => FALSE
-                   ((and lon (= pn lon))
+                   ((and lon (sb-xc:= pn lon))
                     (or (and (numberp p) (numberp lo))
                         (and (consp p) (eq :low bound))))
                    ;; [P] {?,P] => TRUE     [P] {?,P) => FALSE
                    ;;  P) {?,P] => TRUE     (P  {?,P] => FALSE
                    ;;  P) {?,P) => TRUE     (P  {?,P) => FALSE
-                   ((and hin (= pn hin))
+                   ((and hin (sb-xc:= pn hin))
                     (or (and (numberp p) (numberp hi))
                         (and (consp p) (eq :high bound))))
                    ;; Not an endpoint, all is well.
@@ -871,8 +871,8 @@
              (x-hi (copy-interval-limit (interval-high x)))
              (y-lo (copy-interval-limit (interval-low y)))
              (y-hi (copy-interval-limit (interval-high y))))
-        (make-interval :low (select-bound x-lo y-lo #'< #'>)
-                       :high (select-bound x-hi y-hi #'> #'<))))))
+        (make-interval :low (select-bound x-lo y-lo #'sb-xc:< #'sb-xc:>)
+                       :high (select-bound x-hi y-hi #'sb-xc:> #'sb-xc:<))))))
 
 ;;; return the minimal interval, containing X and Y
 (defun interval-approximate-union (x y)
@@ -891,20 +891,20 @@
 ;;; the negative of an interval
 (defun interval-neg (x)
   (declare (type interval x))
-  (make-interval :low (bound-func #'- (interval-high x) t)
-                 :high (bound-func #'- (interval-low x) t)))
+  (make-interval :low (bound-func #'sb-xc:- (interval-high x) t)
+                 :high (bound-func #'sb-xc:- (interval-low x) t)))
 
 ;;; Add two intervals.
 (defun interval-add (x y)
   (declare (type interval x y))
-  (make-interval :low (bound-binop + (interval-low x) (interval-low y))
-                 :high (bound-binop + (interval-high x) (interval-high y))))
+  (make-interval :low (bound-binop sb-xc:+ (interval-low x) (interval-low y))
+                 :high (bound-binop sb-xc:+ (interval-high x) (interval-high y))))
 
 ;;; Subtract two intervals.
 (defun interval-sub (x y)
   (declare (type interval x y))
-  (make-interval :low (bound-binop - (interval-low x) (interval-high y))
-                 :high (bound-binop - (interval-high x) (interval-low y))))
+  (make-interval :low (bound-binop sb-xc:- (interval-low x) (interval-high y))
+                 :high (bound-binop sb-xc:- (interval-high x) (interval-low y))))
 
 ;;; Multiply two intervals.
 (defun interval-mul (x y)
@@ -920,14 +920,15 @@
                   ;; with zero; we want the multiplication to produce
                   ;; the correct signed zero, if needed. Use SIGNUM
                   ;; to avoid trying to multiply huge bignums with 0.0.
-                  (* (signum (type-bound-number x)) (signum (type-bound-number y))))
+                  (sb-xc:* (signum (type-bound-number x))
+                           (signum (type-bound-number y))))
                  ((or (and (floatp x) (float-infinity-p x))
                       (and (floatp y) (float-infinity-p y)))
                   ;; Infinity times anything is infinity
                   nil)
                  (t
                   ;; General multiply. The result is open if either is open.
-                  (bound-binop * x y)))))
+                  (bound-binop sb-xc:* x y)))))
     (let ((x-range (interval-range-info x))
           (y-range (interval-range-info y)))
       (cond ((null x-range)
@@ -964,8 +965,8 @@
                   ;; to watch out for positive or negative infinity.
                   (if (floatp (type-bound-number x))
                       (if y-low-p
-                          (- (float-sign (type-bound-number x) 0.0))
-                          (float-sign (type-bound-number x) 0.0))
+                          (- (float-sign (type-bound-number x) $0.0))
+                          (float-sign (type-bound-number x) $0.0))
                       0))
                  ((zerop (type-bound-number y))
                   ;; Divide by zero means result is infinity
@@ -974,7 +975,7 @@
                   ;; Zero divided by anything is zero, but don't lose the sign
                   (/ x (signum (type-bound-number y))))
                  (t
-                  (bound-binop / x y)))))
+                  (bound-binop sb-xc:/ x y)))))
     (let ((top-range (interval-range-info top))
           (bot-range (interval-range-info bot)))
       (cond ((null bot-range)
@@ -1030,12 +1031,12 @@
     ;; don't overlap.
     (let ((left (interval-high x))
           (right (interval-low y)))
-      (cond ((> (type-bound-number left)
-                (type-bound-number right))
+      (cond ((sb-xc:> (type-bound-number left)
+                      (type-bound-number right))
              ;; The intervals definitely overlap, so result is NIL.
              nil)
-            ((< (type-bound-number left)
-                (type-bound-number right))
+            ((sb-xc:< (type-bound-number left)
+                      (type-bound-number right))
              ;; The intervals definitely don't touch, so result is T.
              t)
             (t
@@ -1050,8 +1051,8 @@
   ;; X >= Y if lower bound of X >= upper bound of Y
   (when (and (interval-bounded-p x 'below)
              (interval-bounded-p y 'above))
-    (>= (type-bound-number (interval-low x))
-        (type-bound-number (interval-high y)))))
+    (sb-xc:>= (type-bound-number (interval-low x))
+              (type-bound-number (interval-high y)))))
 
 ;;; Return T if X = Y.
 (defun interval-= (x y)
@@ -2508,7 +2509,7 @@
              ;; 0d0) within the derivation mechanism doesn't include
              ;; -0d0.  Ugh.  So force it in here, instead.
              (zero (make-numeric-type :class class :format format
-                                      :low (- zero) :high zero)))
+                                      :low (sb-xc:- zero) :high zero)))
         (case range-info
           (+ (if contains-0-p (type-union plus zero) plus))
           (- (if contains-0-p (type-union minus zero) minus))
@@ -3573,7 +3574,7 @@
           ((= val -1/2) '(/ (sqrt x)))
           (t (give-up-ir1-transform)))))
 
-(deftransform expt ((x y) ((constant-arg (member -1 -1.0 -1.0d0)) integer) *)
+(deftransform expt ((x y) ((constant-arg (member -1 $-1.0 $-1.0d0)) integer) *)
   "recode as an ODDP check"
   (let ((val (lvar-value x)))
     (if (eql -1 val)
@@ -4181,7 +4182,6 @@
                     ((x y) (rational (constant-arg float)))
                   "open-code RATIONAL to FLOAT comparison"
                   (let ((y (lvar-value y)))
-                    #-sb-xc-host
                     (when (float-infinity-or-nan-p y)
                       (give-up-ir1-transform))
                     (setf y (rational y))
@@ -4200,7 +4200,6 @@
 (deftransform = ((x y) (rational (constant-arg float)))
   "open-code RATIONAL to FLOAT comparison"
   (let ((y (lvar-value y)))
-    #-sb-xc-host
     (when (float-infinity-or-nan-p y)
       (give-up-ir1-transform))
     (setf y (rational y))

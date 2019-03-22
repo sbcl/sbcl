@@ -18,7 +18,7 @@
     ((def (&rest situations)
        `(eval-when ,situations
           (defun call-with-each-globaldb-name (fun-designator)
-            (let ((function (coerce fun-designator 'function)))
+            (let ((function (cl:coerce fun-designator 'function)))
               (with-package-iterator (iter (list-all-packages) :internal :external)
                 (loop (multiple-value-bind (winp symbol access package) (iter)
                         (declare (ignore access))

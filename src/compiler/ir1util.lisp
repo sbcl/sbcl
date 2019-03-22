@@ -2721,6 +2721,12 @@ is :ANY, the function name is not checked."
                           (values list boolean))
                 careful-call))
 (defun careful-call (function args node warn-fun context)
+  (declare (ignorable node warn-fun context))
+  ;; When cross-compiling, being "careful" is the wrong thing - our code should
+  ;; not allowed malformed or out-of-order definitions to proceed as if all is well.
+  #+sb-xc-host
+  (values (multiple-value-list (apply function args)) t)
+  #-sb-xc-host
   (values
    (multiple-value-list
     (handler-case (apply function args)

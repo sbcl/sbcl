@@ -374,19 +374,6 @@
              (setq ,val (pop ,tail))
              (progn ,@body)))))
 
-;;; Like GETHASH if HASH-TABLE contains an entry for KEY.
-;;; Otherwise, evaluate DEFAULT, store the resulting value in
-;;; HASH-TABLE and return two values: 1) the result of evaluating
-;;; DEFAULT 2) NIL.
-(defmacro ensure-gethash (key hash-table &optional default)
-  (with-unique-names (n-key n-hash-table value foundp)
-    `(let ((,n-key ,key)
-           (,n-hash-table ,hash-table))
-       (multiple-value-bind (,value ,foundp) (gethash ,n-key ,n-hash-table)
-         (if ,foundp
-             (values ,value t)
-             (values (setf (gethash ,n-key ,n-hash-table) ,default) nil))))))
-
 ;;; (binding* ({(names initial-value [flag])}*) body)
 ;;; FLAG may be NIL or :EXIT-IF-NULL
 ;;;
@@ -920,6 +907,7 @@ NOTE: This interface is experimental and subject to change."
 ;;; The "more or less" bit is that the no-bound-at-all case is
 ;;; represented by NIL (not by * as in ANSI type specifiers); and in
 ;;; this case we return NIL.
+(declaim (ftype (sfunction (t) (or null real)) type-bound-number))
 (defun type-bound-number (x)
   (if (consp x)
       (destructuring-bind (result) x result)
@@ -1540,22 +1528,6 @@ to :INTERPRET, an interpreter will be used.")
     #+long-float
     (long-float (zerop x))
     (t nil)))
-
-(defun neg-fp-zero (x)
-  (etypecase x
-    (single-float
-     (if (eql x 0.0f0)
-         (make-unportable-float :single-float-negative-zero)
-         0.0f0))
-    (double-float
-     (if (eql x 0.0d0)
-         (make-unportable-float :double-float-negative-zero)
-         0.0d0))
-    #+long-float
-    (long-float
-     (if (eql x 0.0l0)
-         (make-unportable-float :long-float-negative-zero)
-         0.0l0))))
 
 (declaim (inline schwartzian-stable-sort-list))
 (defun schwartzian-stable-sort-list (list comparator &key key)

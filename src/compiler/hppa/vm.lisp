@@ -308,11 +308,11 @@
          immediate-sc-number
          nil))
     (single-float
-     (if (eql value 0f0)
+     (if (eql value $0f0)
          fp-single-zero-sc-number
          nil))
     (double-float
-     (if (eql value 0d0)
+     (if (eql value $0d0)
          fp-double-zero-sc-number
          nil))))
 

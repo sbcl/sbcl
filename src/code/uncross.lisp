@@ -65,11 +65,17 @@
        inside? (make-hash-table)))
   (defun uncross (form)
     (labels ((uncross-symbol (symbol)
-               (let ((old-symbol-package (cl:symbol-package symbol)))
-                 (if (and old-symbol-package
-                          (string= (package-name old-symbol-package) "SB-XC"))
-                     (values (intern (symbol-name symbol) *cl-package*))
-                     symbol)))
+               ;; If SYMBOL's logical home package is CL: (meaning that its physical
+               ;; home package is XC-STRICT-CL or SB-XC or CL, or depending on
+               ;; the host's design, some other package exposed via CL:),
+               ;; then return the symbol as found via XC-STRICT-CL.
+               ;; This ensures that symbols that are used for their identity and
+               ;; not function compare as EQ after uncrossing, which they would not
+               ;; if for example, we altered (EQ (FLONUM-FORMAT x) 'SHORT-FLOAT)
+               ;; to compare against CL:SHORT-FLOAT.
+               (if (eq (sb-xc:symbol-package symbol) *cl-package*)
+                   (find-symbol (symbol-name symbol) "XC-STRICT-CL")
+                   symbol))
              (rcr (form) ; recursive part
                (cond ((symbolp form)
                       (uncross-symbol form))

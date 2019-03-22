@@ -95,6 +95,7 @@
       (sb-xc:gensym (symbol-name x))
       (sb-xc:gensym)))
 
+(eval-when (:load-toplevel :execute #+sb-xc-host :compile-toplevel)
 (labels ((symbol-concat (package &rest things)
            (dx-let ((strings (make-array (length things)))
                     (length 0)
@@ -147,7 +148,7 @@
   ;; consistency with the above would not be particularly enlightening
   ;; as to how it isn't just GENSYMIFY]
   (defun gensymify* (&rest things)
-    (apply #'symbol-concat nil things)))
+    (apply #'symbol-concat nil things))))
 
 ;;; Access *PACKAGE* in a way which lets us recover when someone has
 ;;; done something silly like (SETF *PACKAGE* :CL-USER) in unsafe code.
@@ -268,6 +269,19 @@
                       `(let ((it ,it)) (declare (ignorable it)) ,@body)
                       it)
                  (acond ,@rest)))))))
+
+;;; Like GETHASH if HASH-TABLE contains an entry for KEY.
+;;; Otherwise, evaluate DEFAULT, store the resulting value in
+;;; HASH-TABLE and return two values: 1) the result of evaluating
+;;; DEFAULT 2) NIL.
+(defmacro ensure-gethash (key hash-table &optional default)
+  (with-unique-names (n-key n-hash-table value foundp)
+    `(let ((,n-key ,key)
+           (,n-hash-table ,hash-table))
+       (multiple-value-bind (,value ,foundp) (gethash ,n-key ,n-hash-table)
+         (if ,foundp
+             (values ,value t)
+             (values (setf (gethash ,n-key ,n-hash-table) ,default) nil))))))
 
 ;; This is not an 'extension', but is needed super early, so ....
 (defmacro sb-xc:defconstant (name value &optional (doc nil docp))

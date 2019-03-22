@@ -167,6 +167,71 @@
   ;; which this package uses
   use)
 
+;;; A symbol in the "shadows" list ALWAYS refers to the symbol
+;;; in SB-XC when unqualified. Each symbol uncrosses to itself.
+;;; I'm taking the stance that since we don't seem to have any calls to
+;;; PLUSP or MINUSP involving target floatnums, we don't need to provide
+;;; alternate symbols.
+(defparameter *shadows*
+  '("FLOAT" "SHORT-FLOAT" "SINGLE-FLOAT" "DOUBLE-FLOAT" "LONG-FLOAT"
+    "REAL" "COMPLEX" "NUMBER"
+    ;; "RATIONAL" is here for the same reason are the preceding:
+    ;; we don't want to mess up all tests of the form (IF (EQ X 'RATIONAL) ...)
+    ;; or worry about the package of the symbol we're testing (since identity matters).
+    ;; But we also need to logically shadow #'RATIONAL which would not be legal
+    ;; if it refers to the standard CL:RATIONAL symbol,
+    ;; but we need not to harm the standard type specifier '(RATIONAL).
+    "RATIONAL"
+    ;; Since we're shadowing the types, it also makes sense to shadow
+    ;; the predicates lest it be confusing to have to write SB-XC:
+    ;; in front of them but not in front of the type.
+    ;; RATIONALP isn't here because its behavior is unchanged.
+    "FLOATP" "REALP" "COMPLEXP" "NUMBERP"
+    "COERCE" "EXP" "EXPT" "LOG" "SIGNUM" "IMAGPART" "REALPART"
+    "ZEROP" "ABS" "SIGNUM" "FLOAT-SIGN"
+    "CEILING" "FLOOR" "ROUND" "TRUNCATE" "MOD" "REM"
+    ;;
+    "BYTE" "BYTE-POSITION" "BYTE-SIZE"
+    "DPB" "LDB" "LDB-TEST"
+    "DEPOSIT-FIELD" "MASK-FIELD"))
+
+;;; A symbol in the "dual personality" list refers to the symbol in CL unless
+;;; package-prefixed with SB-XC:.  The main reason for not putting these
+;;; in the *shadows* list is that it's not worth trying to handle, or inefficient
+;;; to handle the general case of +,-,*,/ and the comparators.
+;;; i.e. the code compiled in make-host-1 by the host compiler would be
+;;; that much less efficient by always having to use the intercepted function)
+;;; We're also not handling 1+ or 1- or INCF, DECF.
+;;; It's unlikely that a host floating-pointer value could sneak through
+;;; to one of the un-intercepted functions given the prohibition against
+;;; using floating-point literals and that almost all other functions
+;;; are intercepted. Granted there are some roundabout ways to spell a
+;;; floating-point number that can not be detected, such as:
+;;;   (* 50 (hash-table-rehash-threshold (make-hash-table)))
+;;; because we are not intercepting '*.
+(defparameter *dual-personality-math-symbols*
+  '("+" "-" "*" "/" "=" "/=" "<" "<=" ">" ">=" "MIN" "MAX"))
+
+;;; When playing such tricky package games, it's best to have the symbols that
+;;; are visible by default, i.e. XC-STRICT-CL:NAME, have no definition,
+;;; and the expressly qualified (with SB-XC:) symbols have definitions.
+;;; This idiom makes you pick one or the other of CL:THING or SB-XC:THING,
+;;; and not ever just get one at random.
+;;; In fact I especially don't like the magic byte specifier hacks. It would be
+;;; safer and clearer to have no definition associated with the symbols that you
+;;; see by default, so that using them by accident fails.
+(defparameter *undefineds*
+  '("SYMBOL-PACKAGE"
+    ;; Irrational functions are never used in the cross-compiler (yet).
+    ;; Prove that by making them undefined.
+    "ACOS" "ACOSH" "ASIN" "ASINH" "ATAN" "ATANH"  "CIS" "CONJUGATE"
+    "COS" "COSH"  "FCEILING" "FFLOOR" "FROUND" "FTRUNCATE"
+    "PHASE" "RATIONALIZE" "SIN" "SINH" "SQRT" "TAN" "TANH"
+    ;; Float decoding: don't want to see these used either.
+    "DECODE-FLOAT" "INTEGER-DECODE-FLOAT"
+    "FLOAT-DIGITS" "FLOAT-PRECISION" "FLOAT-RADIX"
+    "SCALE-FLOAT"))
+
 ;; The running-in-the-host-Lisp Python cross-compiler defines its
 ;; own versions of a number of functions which should not overwrite
 ;; host-Lisp functions. Instead we put them in a special package.
@@ -176,6 +241,8 @@
 ;; compilation of the target.
 ;;
 (let ((package-name "SB-XC"))
+  (dolist (name (append (append *undefineds* *dual-personality-math-symbols*)))
+    (export (intern name package-name) package-name))
   (dolist (name '(;; the constants (except for T and NIL which have
                   ;; a specially hacked correspondence between
                   ;; cross-compilation host Lisp and target Lisp)
@@ -239,11 +306,8 @@
                   "SHORT-FLOAT-NEGATIVE-EPSILON"
                   "SINGLE-FLOAT-EPSILON"
                   "SINGLE-FLOAT-NEGATIVE-EPSILON"
+                  "*READ-DEFAULT-FLOAT-FORMAT*"
 
-                  ;; everything else which needs a separate
-                  ;; existence in xc and target
-                  "SYMBOL-PACKAGE"
-                  "BYTE" "BYTE-POSITION" "BYTE-SIZE"
                   "CHAR-CODE"
                   "CODE-CHAR"
                   "COMPILE-FILE"
@@ -258,16 +322,13 @@
                   "DEFINE-MODIFY-MACRO"
                   "DEFINE-SETF-EXPANDER"
                   "DEFMACRO" "DEFSETF" "DEFSTRUCT" "DEFTYPE"
-                  "DEPOSIT-FIELD" "DPB"
                   "GENSYM" "*GENSYM-COUNTER*"
                   "GET-SETF-EXPANSION"
-                  "LDB" "LDB-TEST"
                   "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
                   "MACRO-FUNCTION"
                   "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
                   "MAKE-LOAD-FORM"
                   "MAKE-LOAD-FORM-SAVING-SLOTS"
-                  "MASK-FIELD"
                   "PROCLAIM"
                   "SPECIAL-OPERATOR-P"
                   "SUBTYPEP"
@@ -276,25 +337,6 @@
                   "UPGRADED-COMPLEX-PART-TYPE"
                   "WITH-COMPILATION-UNIT"))
       (export (intern name package-name) package-name)))
-
-;;; When playing such tricky package games, it's best to have the symbols that
-;;; are visible by default, i.e. XC-STRICT-CL:NAME, have no definition,
-;;; and the expressly qualified (with SB-XC:) symbols have definitions.
-;;; This idiom makes you pick one or the other of CL:THING or SB-XC:THING,
-;;; and not ever just get one at random.
-;;; In fact I especially don't like the magic byte specifier hacks. It would be
-;;; safer and clearer to have no definition associated with the symbols that you
-;;; see by default, so that using them by accident fails.
-(defparameter *undefineds*
-  '("SYMBOL-PACKAGE"))
-;;; Symbols that we want never to accidentally see the host's definition of.
-;;; these aren't actually implemented as shadowing symbols,
-;;; but they logically obscure the corresponding CL: symbols
-(defparameter *shadows*
-  (mapcar (lambda (name) (find-symbol name "SB-XC"))
-          '("BYTE" "BYTE-POSITION" "BYTE-SIZE"
-            "DPB" "LDB" "LDB-TEST"
-            "DEPOSIT-FIELD" "MASK-FIELD")))
 
 (defun count-symbols (pkg)
   (let ((n 0))
@@ -305,24 +347,24 @@
 ;;; what the host CL exports. This deals with hosts that have too many
 ;;; symbols exported froM CL.
 (let ((cl-model-package (make-package "XC-STRICT-CL" :use nil)))
-  (flet ((export-new (x)
-           (export (intern x cl-model-package) cl-model-package))
+  (flet ((new-external (x package &aux (s (intern x package)))
+           (export s package)
+           s)
          (reexport (x)
            (import x cl-model-package)
            (export x cl-model-package)))
     (reexport (list nil))
     (dolist (string (read-from-file "common-lisp-exports.lisp-expr"))
       (unless (string= string "NIL") ; already done
-        (if (member string *undefineds* :test #'string=)
-            (export-new string)
-            (let ((symbol
-                   (or (find string *shadows* :key #'symbol-name :test #'string=)
-                       (find-symbol string "CL"))))
-              (cond (symbol
-                     (reexport symbol))
-                    (t
-                     (warn "No symbol named ~S in host CL package!" string)
-                     (export-new string)))))))))
+        (cond ((member string *undefineds* :test #'string=)
+               (new-external string cl-model-package))
+              ((find string *shadows* :test #'string=)
+               (reexport (new-external string "SB-XC")))
+              ((find-symbol string "CL")
+               (reexport (find-symbol string "CL")))
+              (t
+               (warn "No symbol named ~S in host CL package!" string)
+               (new-external string cl-model-package)))))))
 
 ;;; Snapshot so that we can ascertain in genesis that nothing new got interned
 ;;; in the standardized packages.
