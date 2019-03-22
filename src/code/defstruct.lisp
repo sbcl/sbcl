@@ -1364,14 +1364,16 @@ or they must be declared locally notinline at each call site.~@:>"
 ;;; would be possible in as much as it won't harm the garbage collector.
 ;;; Harm potentially results from turning a raw word into a tagged word.
 (defun mutable-layout-p (old-layout new-layout)
-  (let ((old-bitmap (layout-bitmap old-layout))
-        (new-bitmap (layout-bitmap new-layout)))
-    (aver (= old-bitmap (dd-bitmap (layout-info old-layout))))
-    (aver (= new-bitmap (dd-bitmap (layout-info new-layout))))
-    (dotimes (i (dd-length (layout-info old-layout)) t)
-      (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
-                 (not (logbitp i old-bitmap))) ; that was opaque bits
-        (return nil)))))
+  (if (layout-info old-layout)
+      (let ((old-bitmap (layout-bitmap old-layout))
+            (new-bitmap (layout-bitmap new-layout)))
+        (aver (= old-bitmap (dd-bitmap (layout-info old-layout))))
+        (aver (= new-bitmap (dd-bitmap (layout-info new-layout))))
+        (dotimes (i (dd-length (layout-info old-layout)) t)
+          (when (and (logbitp i new-bitmap) ; a tagged (i.e. scavenged) slot
+                     (not (logbitp i old-bitmap))) ; that was opaque bits
+            (return nil))))
+      t))
 
 ;;; This function is called when we are incompatibly redefining a
 ;;; structure CLASS to have the specified NEW-LAYOUT. We signal an
