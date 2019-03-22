@@ -843,8 +843,6 @@ core and return a descriptor to it."
 
 ;;; Copy the given number to the core.
 (defun number-to-core (number)
-  ;; compiled TYPEP on ECL is wrong. See example in cross-typep.
-  #+host-quirks-ecl (declare (notinline typep))
   (typecase number
     (integer (or (%fixnum-descriptor-if-possible number)
                  (bignum-to-core number)))

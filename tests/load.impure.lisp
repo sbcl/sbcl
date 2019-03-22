@@ -26,7 +26,7 @@
 #-win32 (setq *default-pathname-defaults*
               (truename (make-pathname :directory
                                        (pathname-directory (scratch-file-name)))))
-                                 
+
 ;;; Loading from Lisp should set the TOPLEVEL-FORM-NUMBER slot
 (with-test (:name :load-lisp-assigns-tlf-num)
   (with-open-file (f *tmp-filename* :direction :output

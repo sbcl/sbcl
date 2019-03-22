@@ -319,27 +319,3 @@
 
 (defun sb-pcl::class-has-a-forward-referenced-superclass-p (x)
   (bug "CLASS-HAS-A-FORWARD-REFERENCED-SUPERCLASS-P reached: ~S" x))
-
-#|
-ECL compiler strangeness:
-
-(defun foo-sd (x) ; test for single- then double-float
-  (typecase x
-    ((complex single-float) 'csf)
-    ((complex double-float) 'cdf)))
-
-(defun foo-ds (x) ; test for double- then single-float
-  (typecase x
-    ((complex double-float) 'cdf)
-    ((complex single-float) 'csf)))
-
-(defun try-both ()
-  ;; This test proves that whatever complex type is tried first wins when compiled,
-  ;; but when interpreted it gives what we would call the right answer.
-  (list (foo-sd #c(0.0s0 0.0s0)) (foo-sd #c(0.0d0 0.0d0))
-        (foo-ds #c(0.0s0 0.0s0)) (foo-ds #c(0.0d0 0.0d0))))
-
-(try-both) => (CSF CDF CSF CDF)
-(progn (compile 'foo-sd) (compile 'foo-ds))
-(try-both) => (CSF CSF CDF CDF)
-|#

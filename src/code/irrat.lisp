@@ -871,7 +871,7 @@
   ;; influences the choices of these constants but doesn't say how to
   ;; choose them.  We'll just assume his choices matches our
   ;; implementation of log1p.
-  (let ((t0 #-long-float #.(make-double-float #x3fe6a09e #x667f3bcd)
+  (let ((t0 #-long-float (make-double-float #x3fe6a09e #x667f3bcd)
             #+long-float (error "(/ (sqrt 2l0) 2)"))
         ;; KLUDGE: if repeatable fasls start failing under some weird
         ;; xc host, this 1.2d0 might be a good place to examine: while
@@ -879,7 +879,7 @@
         ;; is not exactly representable, so something could go wrong.
         (t1 $1.2d0)
         (t2 $3d0)
-        (ln2 #-long-float #.(make-double-float #x3fe62e42 #xfefa39ef)
+        (ln2 #-long-float (make-double-float #x3fe62e42 #xfefa39ef)
              #+long-float (error "(log 2l0)"))
         (x (float (realpart z) $1.0d0))
         (y (float (imagpart z) $1.0d0)))
@@ -963,6 +963,24 @@
                             (- (* beta nu))
                              z))))
 
+#|
+(format t "~x~%" (double-float-bits (/ (+ (log 2l0) (log most-positive-long-float)) 4l0)))
+=> 406633CE8FB9F87D
+
+and:
+#include <math.h>
+#include <string.h>
+#include <stdio.h>
+void main() {
+    double most_pos_dbl = 1.7976931348623157e308;
+    double thing = (log(most_pos_dbl) + log(2.0e0)) / 4.0e0;
+    unsigned long word;
+    memcpy(&word, &thing, 8);
+    printf("%lX = %20.15lf\n", word, thing);
+}
+prints: 406633CE8FB9F87D =  177.618965018485966
+|#
+
 ;;; Compute tanh z = sinh z / cosh z.
 (defun complex-tanh (z)
   (declare (muffle-conditions compiler-note))
@@ -973,7 +991,7 @@
       ;; space 0 to get maybe-inline functions inlined
       (declare (optimize (speed 3) (space 0)))
     (cond ((> (abs x)
-              #-long-float #.(make-double-float #x406633ce #x8fb9f87e)
+              #-long-float (make-double-float #x406633ce #x8fb9f87d)
               #+long-float (error "(/ (+ (log 2l0) (log most-positive-long-float)) 4l0)"))
            (coerce-to-complex-type (float-sign x)
                                    (float-sign y) z))
