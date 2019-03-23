@@ -116,10 +116,42 @@
     (dolist (file files)
       (format t "// Running ~a in ~a evaluator mode~%"
               file *test-evaluator-mode*)
-      (let ((test-package (make-package
-                           (format nil "TEST~36,5,'_R" (random (expt 36 5)))
-                           :use (append '("ASSERTOID" "TEST-UTIL")
-                                        standard-use-list))))
+      (let* ((actually-pure
+              (not (or (search ".impure" (namestring file))
+                       (search ".impure-cload" (namestring file)))))
+             (packages-to-use '("ASSERTOID" "TEST-UTIL"))
+             (test-package
+              (if actually-pure
+                  (make-package
+                   (format nil "TEST~36,5,'_R" (random (expt 36 5)))
+                   :use (append packages-to-use standard-use-list))
+                  (find-package "CL-USER"))))
+        ;; We want to ensure that pure tests remain as pure as possible.
+        ;; DEFSTRUCT, DEFCLASS, DEFGENERIC, DEFMETHOD are certainly impure
+        ;; as there is no easy way to eradicate after-effects. Supposing that
+        ;; one did (SETF (FIND-CLASS 'x) NIL) for each classoid type defined in
+        ;; a test, it does not remove from CLASS-DIRECT-SUBCLASSES of the ancestor.
+        ;; We need to disallow all those impure macros by shadowing them
+        ;; and providing no definition.
+        ;; However, parallel execution uses PURE-RUNNER for impure tests,
+        ;; so we need to leave the definitions alone in that case.
+        ;; DEF{constant,fun,macro,parameter,setf,type,var} are generally ok
+        ;; except when DEFfoo defines something too hairy to hang off a symbol.
+        (cond (actually-pure
+               (shadow '("DEFSTRUCT" "DEFMETHDO") test-package)
+               ;; We have pure tests that exercise the DEFCLASS and DEFGENERIC
+               ;; macros to generate macroexpansion-time errors.  That's mostly ok.
+               ;; We can trap attempts to use SB-KERNEL::%COMPILER-mumble
+               ;; functions though.
+               (dolist (symbol '(sb-kernel::%compiler-defclass
+                                 sb-pcl::compile-or-load-defgeneric))
+                 (sb-int:encapsulate symbol 'defblah-guard
+                                     (lambda (f &rest args)
+                                       (if (eq *package* test-package)
+                                           (error "Can't call ~S" f)
+                                           (apply f args))))))
+              (t
+               (use-package packages-to-use test-package)))
         (let ((*package* test-package))
           (restart-case
             (handler-bind ((error (make-error-handler file)))
@@ -132,7 +164,11 @@
                   (funcall test-fun file)
                   (log-file-elapsed-time file start log))))
             (skip-file ())))
-        (delete-package test-package)))
+        (when actually-pure
+          (dolist (symbol '(sb-pcl::compile-or-load-defgeneric
+                            sb-kernel::%compiler-defclass))
+            (sb-int:unencapsulate symbol 'defblah-guard))
+          (delete-package test-package))))
     ;; after all the files are done
     (append-failures)))
 

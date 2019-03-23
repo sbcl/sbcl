@@ -11,11 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package "CL-USER")
-
-(eval-when (:compile-toplevel)
-  (load "compiler-test-util.lisp"))
-
 ;; In the expression `(,@l1 a b ,@l2) is it preferable that we expand this
 ;; as (APPEND L1 (LIST* 'A 'B L2)) or as (APPEND L1 '(A) '(B) L2)?
 ;; The IR1 transform is designed to catch the latter case, but the expander
