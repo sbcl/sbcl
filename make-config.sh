@@ -720,6 +720,7 @@ elif [ "$sbcl_arch" = "rv32" ]; then
     printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :linkage-table' >> $ltf
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate

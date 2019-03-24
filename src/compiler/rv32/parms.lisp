@@ -86,7 +86,7 @@
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000))
 
-(defconstant linkage-table-entry-size 16)
+(defconstant linkage-table-entry-size #-64-bit 8 #+64-bit 20)
 
 #+(or linux netbsd)
 (progn
