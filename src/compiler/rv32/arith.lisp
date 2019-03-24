@@ -160,50 +160,6 @@
 
 ;;; Shifting
 
-(define-vop (fast-ash/signed/unsigned)
-  (:note "inline ASH")
-  (:args (number)
-         (amount))
-  (:results (result))
-  (:policy :fast-safe)
-  (:temporary (:sc non-descriptor-reg) temp ndesc)
-  (:variant-vars variant)
-  (:generator 5
-    (inst bge amount zero-tn positive)
-    (inst sub ndesc zero-tn amount)
-    (inst li temp n-word-bits)
-    (inst blt ndesc temp no-overflow)
-    (inst subi ndesc temp 1)
-    NO-OVERFLOW
-    (ecase variant
-      (:signed (inst sra result number ndesc))
-      (:unsigned (inst srl result number ndesc)))
-    (inst j done)
-    
-    POSITIVE
-    ;; The result-type assures us that this shift will not overflow.
-    (inst sll result number amount)
-
-    DONE))
-
-(define-vop (fast-ash/unsigned=>unsigned fast-ash/signed/unsigned)
-  (:args (number :scs (unsigned-reg) :to :save)
-         (amount :scs (signed-reg) :to :save :target temp))
-  (:arg-types unsigned-num signed-num)
-  (:results (result :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:translate ash)
-  (:variant :unsigned))
-
-(define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
-  (:args (number :scs (signed-reg) :to :save)
-         (amount :scs (signed-reg) :to :save :target temp))
-  (:arg-types signed-num signed-num)
-  (:results (result :scs (signed-reg)))
-  (:result-types signed-num)
-  (:translate ash)
-  (:variant :signed))
-
 (define-vop (fast-ash-left-c/fixnum=>fixnum)
   (:translate ash)
   (:policy :fast-safe)
@@ -263,10 +219,56 @@
            (if (plusp amount)
                (inst slli result number amount)
                (inst srai result number (- amount))))
-          ((= amount n-word-bits)
+          ((>= amount n-word-bits)
            (inst li result 0))
           (t
            (inst srai result number (1- n-word-bits))))))
+
+(define-vop (fast-ash/signed/unsigned)
+  (:note "inline ASH")
+  (:args (number)
+         (amount))
+  (:results (result))
+  (:policy :fast-safe)
+  ;; ANY-REG is fine because N-WORD-BITS is even.
+  (:temporary (:sc any-reg) temp)
+  (:temporary (:sc non-descriptor-reg) ndesc)
+  (:variant-vars variant)
+  (:generator 3
+    (inst bge amount zero-tn positive)
+    (inst sub ndesc zero-tn amount)
+    (inst li temp n-word-bits)
+    (inst blt ndesc temp no-overflow)
+    (inst subi ndesc temp 1) ;;WRONG. YOU THINK YOURE CLEVER BUT NO
+    NO-OVERFLOW
+    (ecase variant
+      (:signed (inst sra result number ndesc))
+      (:unsigned (inst srl result number ndesc)))
+    (inst j done)
+
+    POSITIVE
+    ;; The result-type assures us that this shift will not overflow.
+    (inst sll result number amount)
+
+    DONE))
+
+(define-vop (fast-ash/unsigned=>unsigned fast-ash/signed/unsigned)
+  (:args (number :scs (unsigned-reg) :to :save)
+         (amount :scs (signed-reg) :to :save :target ndesc))
+  (:arg-types unsigned-num signed-num)
+  (:results (result :scs (unsigned-reg)))
+  (:result-types unsigned-num)
+  (:translate ash)
+  (:variant :unsigned))
+
+(define-vop (fast-ash/signed=>signed fast-ash/signed/unsigned)
+  (:args (number :scs (signed-reg) :to :save)
+         (amount :scs (signed-reg) :to :save :target ndesc))
+  (:arg-types signed-num signed-num)
+  (:results (result :scs (signed-reg)))
+  (:result-types signed-num)
+  (:translate ash)
+  (:variant :signed))
 
 (macrolet ((def (name sc-type type result-type cost)
              `(define-vop (,name)
@@ -279,7 +281,7 @@
                 (:result-types ,type)
                 (:policy :fast-safe)
                 (:generator ,cost
-                   (inst sll result number amount)))))
+                  (inst sll result number amount)))))
   ;; FIXME: There's the opportunity for a sneaky optimization here, I
   ;; think: a FAST-ASH-LEFT-C/FIXNUM=>SIGNED vop.  -- CSR, 2003-09-03
   (def fast-ash-left/fixnum=>fixnum any-reg tagged-num any-reg 2)
@@ -397,7 +399,6 @@
   (:generator 3
     (inst mul r x y)))
 
-;;; FIXME: The lifetimes for these truncate VOPs are suboptimal.
 (define-vop (fast-truncate/fixnum fast-fixnum-binop)
   (:translate truncate)
   (:args (x :scs (any-reg))
@@ -471,7 +472,7 @@
   (:args (x :scs (signed-reg))
          (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
-  (:note "inline (signed-byte 32) comparison")
+  (:note #.(format nil "inline (signed-byte ~a) comparison" n-word-bits))
   (:generator 1
     (three-way-comparison x y condition :signed not-p target)))
 
@@ -479,7 +480,7 @@
   (:args (x :scs (unsigned-reg))
          (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
-  (:note "inline (unsigned-byte 32) comparison")
+  (:note #.(format nil "inline (unsigned-byte ~a) comparison" n-word-bits))
   (:generator 1
     (three-way-comparison x y condition :unsigned not-p target)))
 
@@ -550,23 +551,49 @@
 
 
 ;;;; Modular arithmetic
-(macrolet
-    ((define-modular-backend (fun &optional constantp)
-       (let ((mfun-name (symbolicate fun #-64-bit '-mod32 #+64-bit '-mod64))
-             (modvop (symbolicate 'fast- fun #-64-bit '-mod32/unsigned=>unsigned #+64-bit '-mod64/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun #-64-bit '-mod32-c/unsigned=>unsigned #+64-bit '-mod64-c/unsigned=>unsigned))
-             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
-             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
-         `(progn
-            (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 32)
-            (define-vop (,modvop ,vop)
-              (:translate ,mfun-name))
-            ,@(when constantp
-                `((define-vop (,modcvop ,cvop)
-                    (:translate ,mfun-name))))))))
-  (define-modular-backend + t)
-  (define-modular-backend - t)
-  (define-modular-backend *))
+(defmacro define-mod-binop ((name prototype) function)
+  `(define-vop (,name ,prototype)
+     (:args (x :target r :scs (unsigned-reg signed-reg))
+            (y :scs (unsigned-reg signed-reg)))
+     (:arg-types untagged-num untagged-num)
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+
+(defmacro define-mod-binop-c ((name prototype) function)
+  `(define-vop (,name ,prototype)
+     (:args (x :target r :scs (unsigned-reg signed-reg)))
+     (:info y)
+     (:arg-types untagged-num (:constant short-immediate))
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+
+(macrolet ((def (name -c-p)
+             (let ((funmod   (symbolicate name "-MODXLEN"))
+                   (funfx   (symbolicate name "-MODFX"))
+                   (vopu    (symbolicate "FAST-" name "/UNSIGNED=>UNSIGNED"))
+                   (vopcu   (symbolicate "FAST-" name "-C/UNSIGNED=>UNSIGNED"))
+                   (vopf    (symbolicate "FAST-" name "/FIXNUM=>FIXNUM"))
+                   (vopcf   (symbolicate "FAST-" name "-C/FIXNUM=>FIXNUM"))
+                   (vopmodu  (symbolicate "FAST-" name "-MODXLEN/WORD=>UNSIGNED"))
+                   (vopmodf  (symbolicate "FAST-" name "-MODXLEN/FIXNUM=>FIXNUM"))
+                   (vopmodcu (symbolicate "FAST-" name "-MODXLEN-C/WORD=>UNSIGNED"))
+                   (vopfxf  (symbolicate "FAST-" name "-MODFX/FIXNUM=>FIXNUM"))
+                   (vopfxcf (symbolicate "FAST-" name "-MODFX-C/FIXNUM=>FIXNUM")))
+               `(progn
+                  (define-modular-fun ,funmod (x y) ,name :untagged nil ,n-word-bits)
+                  (define-modular-fun ,funfx (x y) ,name :tagged t
+                                      ,(- n-word-bits n-fixnum-tag-bits))
+                  (define-mod-binop (,vopmodu ,vopu) ,funmod)
+                  (define-vop (,vopmodf ,vopf) (:translate ,funmod))
+                  (define-vop (,vopfxf ,vopf) (:translate ,funfx))
+                  ,@(when -c-p
+                      `((define-mod-binop-c (,vopmodcu ,vopcu) ,funmod)
+                        (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
+  (def + t)
+  (def - t)
+  (def * nil))
 
 #-64-bit
 (progn
