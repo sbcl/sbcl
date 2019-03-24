@@ -654,11 +654,11 @@
                       ;; If it's not 0, trap.
                       (inst beq stepping zero-tn STEP-DONE-LABEL)
                       ;; CONTEXT-PC will be pointing here when the
-                      ;; interrupt is handled, not after the BREAK.
+                      ;; interrupt is handled, not after the EBREAK.
                       (note-this-location vop :step-before-vop)
-                      (inst ebreak
-                            (tn-offset callable-tn)
-                            single-step-around-trap)
+                      (inst ebreak single-step-around-trap)
+                      (inst byte (tn-offset callable-tn))
+                      (emit-alignment 2)
                       (emit-label step-done-label))))
              (declare (ignorable #'insert-step-instrumenting))
              ,@(case named
@@ -1122,9 +1122,10 @@
     ;; If it's not 0, trap.
     (inst beq stepping zero-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
-    ;; not after the BREAK.
+    ;; not after the EBREAK.
     (note-this-location vop :step-before-vop)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
-    (inst ebreak 0 single-step-before-trap)
+    (inst ebreak single-step-before-trap)
+    (emit-alignment 2)
     DONE))
