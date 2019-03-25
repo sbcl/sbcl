@@ -218,7 +218,7 @@ during backtrace.
         :set-trans %set-fdefn-name :set-known ())
   (fun :type (or function null) :ref-trans fdefn-fun)
   ;; raw-addr is used differently by the various backends:
-  ;; - Sparc and ARM store the same object as 'fun'
+  ;; - Sparc, ARM, and RV32 store the same object as 'fun'
   ;;   unless the function is non-simple, in which case
   ;;   they store a descriptorized (fun-pointer lowtag)
   ;;   pointer to the closure tramp

@@ -1921,11 +1921,11 @@ core and return a descriptor to it."
        ;; X86-64 w/immobile code - raw addr encodes a JMP instruction
        #+(and immobile-code x86-64)
        (encode-fdefn-raw-addr fdefn function fun-entry-addr #xE9)
-       ;; Sparc/ARM - raw addr is the function descriptor
-       #+(and (not immobile-code) (or sparc arm))
+       ;; Sparc/ARM/RV32 - raw addr is the function descriptor
+       #+(and (not immobile-code) (or sparc arm rv32))
        (descriptor-bits function)
        ;; All other cases - raw addr is exactly what it says
-       #+(and (not immobile-code) (not (or sparc arm)))
+       #+(and (not immobile-code) (not (or sparc arm rv32)))
        fun-entry-addr))
     fdefn))
 

@@ -549,9 +549,9 @@
          `((:temporary (:sc descriptor-reg :offset lexenv-offset
                         :from (:argument ,(if (eq return :tail) 0 1))
                         :to :eval)
-                       ,(if named 'name-pass 'lexenv))
-           (:temporary (:scs (descriptor-reg) :to :eval)
-                       function)))
+                       ,(if named 'name-pass 'lexenv))))
+       (:temporary (:scs (descriptor-reg) :to :eval)
+                   function)
        (:temporary (:sc any-reg :offset nargs-offset :to
                         ,(if (eq return :fixed)
                              :save
@@ -575,9 +575,6 @@
        ,@(unless (and (eq return :tail)
                       (not (eq named :direct)))
            '((:temporary (:scs (interior-reg)) lip)))
-       ,@(when named
-           ;; RISC-V ABI says that hardware may favor x1 for calls.
-           '((:temporary (:scs (interior-reg) :offset lr-offset) entry-point)))
 
        (:generator ,(+ (if named 5 0)
                        (if variable 19 1)
@@ -671,10 +668,8 @@
                       (constant
                        (load-constant vop name name-pass)
                        (do-next-filler)))
-                    (loadw function name-pass fdefn-fun-slot
-                           other-pointer-lowtag)
                     (insert-step-instrumenting name-pass)
-                    (loadw entry-point name-pass fdefn-raw-addr-slot
+                    (loadw function name-pass fdefn-raw-addr-slot
                            other-pointer-lowtag)
                     (do-next-filler)))
                  ((nil)
@@ -693,22 +688,22 @@
                  (:direct
                   `((typecase (static-fun-offset fun)
                       (short-immediate
-                       (inst #-64-bit lw #+64-bit ld entry-point null-tn (static-fun-offset fun)))
+                       (inst #-64-bit lw #+64-bit ld function null-tn (static-fun-offset fun)))
                       (t
                        (multiple-value-bind (u i)
                            (u-and-i-inst-immediate (static-fun-offset fun))
-                         (inst lui entry-point u)
-                         (inst add lip null-tn entry-point)
-                         (inst #-64-bit lw #+64-bit ld entry-point lip i)))))))
+                         ;; FIXME: Looks bad, try to have this case
+                         ;; never happen... Have nil be in the middle!
+                         (inst lui lr-tn u)
+                         (inst add lip null-tn lr-tn)
+                         (inst #-64-bit lw #+64-bit ld function lip i)))))))
              (loop
                (if filler
                    (do-next-filler)
                    (return)))
 
              (note-this-location vop :call-site)
-             ,(if (not named)
-                  '(lisp-jump function)
-                  '(inst jalr zero-tn entry-point 0)))
+             (lisp-jump function))
 
            ,@(ecase return
                (:fixed

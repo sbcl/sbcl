@@ -793,7 +793,7 @@ static lispobj trans_bignum(lispobj object)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
 /* 'cause the raw-addr has a function lowtag. */
-#if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM)
+#if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_RV32)
 static sword_t
 scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 {

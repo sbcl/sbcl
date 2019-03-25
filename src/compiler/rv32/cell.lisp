@@ -130,10 +130,9 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 3
-    (inst addi lip function (- (ash simple-fun-code-offset word-shift)
-                               fun-pointer-lowtag))
     (load-type type function (- fun-pointer-lowtag))
     (inst xori type type simple-fun-widetag)
+    (move lip function)
     (inst beq type zero-tn simple-fun)
     (inst li lip (make-fixup 'closure-tramp :assembly-routine))
     SIMPLE-FUN

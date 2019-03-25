@@ -69,7 +69,7 @@ do {                                                                   \
 
 // Offset from an fdefn raw address to the underlying simple-fun,
 // if and only if it points to a simple-fun.
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RV32)
 #define FUN_RAW_ADDR_OFFSET 0
 #else
 #define FUN_RAW_ADDR_OFFSET (offsetof(struct simple_fun, code) - FUN_POINTER_LOWTAG)

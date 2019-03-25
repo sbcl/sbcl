@@ -77,7 +77,7 @@
     (unbound-marker "immediate")
     (weak-pointer "lose" "weak_pointer" "boxed")
     (instance "instance" "lose" "short_boxed")
-    (fdefn ,(or #+(or sparc arm) "boxed" "fdefn") "tiny_boxed")
+    (fdefn ,(or #+(or sparc arm rv32) "boxed" "fdefn") "tiny_boxed")
 
     (no-tls-value-marker "immediate")
 

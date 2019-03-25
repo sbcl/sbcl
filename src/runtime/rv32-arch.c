@@ -176,7 +176,7 @@ void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int dat
 
     inst = 0x37 | LINKAGE_TEMP_REG << 7 | hi << 12;
     *inst_ptr++ = inst;
-    
+
     inst = 0x67 | LINKAGE_TEMP_REG << 15 | lo << 20;
     *inst_ptr++ = inst;
 #else

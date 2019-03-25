@@ -9,7 +9,6 @@
 
 (in-package "SB-VM")
 
-
 (defconstant-eqx c-saved-registers
     (list* lr-offset
            global-offset
@@ -37,7 +36,7 @@
 
 (defun initialize-boxed-regs (&optional still-live)
   (dolist (boxed-reg-offset boxed-regs)
-    (unless (member boxed-reg-offset still-live)
+    (unless (member boxed-reg-offset still-live :key #'tn-offset)
       (inst li (make-any-reg-tn boxed-reg-offset) 0)))
   (inst li null-tn nil-value))
 
@@ -49,18 +48,18 @@
      (:temp a0 descriptor-reg a0-offset)
      (:temp a1 descriptor-reg a1-offset)
      (:temp a2 descriptor-reg a2-offset)
-     (:temp a3 descriptor-reg l3-offset)
-     
+     (:temp a3 descriptor-reg a3-offset)
+
      (:temp lra descriptor-reg lra-offset)
      (:temp value (descriptor-reg any-reg) ca0-offset)
 
      ;; Don't want these to overlap with C args.
-     (:temp pa-temp any-reg nl6-offset)
-     (:temp temp any-reg nl7-offset))
+     (:temp pa-temp non-descriptor-reg nl6-offset)
+     (:temp temp non-descriptor-reg nl7-offset))
   (save-c-registers)
   ;; FIXME save floating point regs
 
-  (initialize-boxed-regs (list ca0-offset ca1-offset ca2-offset))
+  (initialize-boxed-regs (list function arg-ptr nargs))
 
   ;; Tag nargs.
   (inst slli nargs-tn nargs n-fixnum-tag-bits)
@@ -79,8 +78,8 @@
   (loadw a2 cfp-tn 2)
   (loadw a3 cfp-tn 3)
 
-  ;; Indirect closure.
   (inst compute-lra lra lip-tn lra-label)
+  ;; Indirect closure.
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   ;; Call into Lisp!
   (inst jalr zero-tn code-tn (- (* simple-fun-code-offset n-word-bytes)
@@ -109,15 +108,14 @@
 
 (define-assembly-routine (call-into-c (:return-style :none))
     ((:arg cfunc (any-reg) cfunc-offset)
-     (:arg ca0 (any-reg) ca0-offset)
-     (:arg ca1 (any-reg) ca1-offset)
-     (:arg ca2 (any-reg) ca2-offset)
 
-     (:temp value0-pass (any-reg) nl1-offset)
-     (:temp value1-pass (any-reg) nl0-offset)
+     (:temp ca0 (any-reg) ca0-offset)
+     (:temp ca1 (any-reg) ca1-offset)
+
+     (:temp value0-pass (any-reg) (result-reg-offset 0))
+     (:temp value1-pass (any-reg) (result-reg-offset 1))
      (:temp pa-temp (any-reg) nl6-offset)
-     (:temp temp (any-reg) nl7-offset)
-     (:temp a0 (descriptor-reg any-reg) a0-offset))
+     (:temp temp (any-reg) nl7-offset))
   ;; The C stack frame and argument registers should have already been
   ;; set up in Lisp.
 
@@ -126,8 +124,6 @@
   (move ocfp-tn cfp-tn)
   (move cfp-tn csp-tn)
   (inst addi csp-tn cfp-tn 32)
-
-  (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
 
   (pseudo-atomic (pa-temp)
     ;; Convert the return address to an offset and save it on the stack.
@@ -138,6 +134,7 @@
     (storew code-tn cfp-tn 2)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
+    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
     (load-symbol-value temp *allocation-pointer*)
     ;; We can destroy csp-tn without harm now.
     (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn))
