@@ -11,26 +11,43 @@
 
 ;;;; DIRECTORY
 
+(defun truename-as-expected-p ()
+  #.(and (string= (pathname-name *load-pathname*) (pathname-name *load-truename*))
+         (string= (pathname-type *load-pathname*) (pathname-type *load-truename*))))
+
 ;;; In sbcl-0.6.9 DIRECTORY failed on paths with :WILD or
 ;;; :WILD-INFERIORS in their directory components.
 (with-test (:name (directory :wild-inferiors))
   (let ((dir (directory "../**/*.*")))
     ;; We know a little bit about the structure of this result;
     ;; let's test to make sure that this test file is in it.
-    (assert (find-if (lambda (pathname)
-                       (search "tests/filesys.pure.lisp"
-                               (namestring pathname)))
-                     dir))))
+    ;; If the  truename of this file is not as expected, the look for only the
+    ;; name+type regardless of directory, treating all parts as essentially random.
+    (let ((string-to-find
+           (if (truename-as-expected-p)
+               "tests/filesys.pure.lisp"
+               (namestring (make-pathname :name (pathname-name *load-truename*)
+                                          :type (pathname-type *load-truename*))))))
+      (assert (find string-to-find dir
+                    :test #'search :key #'namestring)))))
+
 ;;; In sbcl-0.9.7 DIRECTORY failed on pathnames with character-set
 ;;; components.
-(with-test (:name (directory :character-set :pattern) )
-  (let ((dir (directory "[f]*.*")))
-    ;; We know a little bit about the structure of this result;
-    ;; let's test to make sure that this test file is in it.
-    (assert (find-if (lambda (pathname)
-                       (search "filesys.pure.lisp"
-                               (namestring pathname)))
-                     dir))))
+(with-test (:name (directory :character-set :pattern))
+  ;; In addition to potential truename randomization,
+  ;; do not assume that the current directory is the place to look.
+  (let* ((pattern (if (truename-as-expected-p)
+                      "[f]*.*"
+                      (format nil "~a[~a]*~:[~;.*~]"
+                              (namestring
+                               (make-pathname :directory (pathname-directory *load-truename*)))
+                              (char (pathname-name *load-truename*) 0)
+                              (pathname-type *load-truename*))))
+         (string-to-find (if (truename-as-expected-p)
+                             "filesys.pure.lisp"
+                             (pathname-name *load-truename*)))
+         (dir (directory pattern)))
+    (assert (find string-to-find dir :test #'search :key #'namestring))))
 
 ;;; Canonicalization of pathnames for DIRECTORY
 (with-test (:name (directory :/.))
