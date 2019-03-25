@@ -22,17 +22,24 @@
   ca6-offset
   ca7-offset)
 
-(defconstant-eqx +foreign-register-arg-offsets+
-    '(#.ca0-offset #.ca1-offset #.ca2-offset #.ca3-offset #.ca4-offset #.ca5-offset #.ca6-offset #.ca7-offset)
-  #'equal)
+(defenum (:start 10)
+  fa0-offset
+  fa1-offset
+  fa2-offset
+  fa3-offset
+  fa4-offset
+  fa5-offset
+  fa6-offset
+  fa7-offset)
 
 (defconstant +number-stack-alignment-mask+ (1- (* n-word-bytes 2)))
-(defconstant +max-register-args+ (length +foreign-register-arg-offsets+))
+(defconstant foreign-register-arg-start 10)
+(defconstant n-foreign-register-args 8)
 
 (defstruct arg-state
-  (num-register-args 0)
+  (int-arg-index 0)
   (stack-frame-size 0)
-  (fp-registers 0))
+  (float-arg-index 0))
 
 (defstruct (result-state (:copier nil))
   (num-results 0))
@@ -42,45 +49,37 @@
     (0 nl1-offset)
     (1 nl0-offset)))
 
-(defun register-args-offset (index)
-  (elt +foreign-register-arg-offsets+ index))
+(defun register-args-offset (index) (+ foreign-register-arg-start index))
 
-(defun int-arg (state prim-type reg-sc stack-sc)
-  (let ((reg-args (arg-state-num-register-args state)))
-    (cond ((< reg-args +max-register-args+)
-           (setf (arg-state-num-register-args state) (1+ reg-args))
-           (make-wired-tn* prim-type reg-sc (register-args-offset reg-args)))
-          (t
-           (let ((frame-size (arg-state-stack-frame-size state)))
-             (setf (arg-state-stack-frame-size state) (1+ frame-size))
-             (make-wired-tn* prim-type stack-sc frame-size))))))
-
-(defun float-arg (state prim-type reg-sc stack-sc)
-  (let ((reg-args (arg-state-fp-registers state)))
-    (cond ((< reg-args +max-register-args+)
-           (setf (arg-state-fp-registers state) (1+ reg-args))
-           (make-wired-tn* prim-type reg-sc reg-args))
-          (t
-           (let ((frame-size (arg-state-stack-frame-size state)))
-             (setf (arg-state-stack-frame-size state) (1+ frame-size))
-             (make-wired-tn* prim-type stack-sc frame-size))))))
+(macrolet ((def (name index-accessor)
+             `(defun ,name (state prim-type reg-sc stack-sc)
+                (let ((index (,index-accessor state)))
+                  (cond ((< index n-foreign-register-args)
+                         (setf (,index-accessor state) (1+ index))
+                         (make-wired-tn* prim-type reg-sc (register-args-offset index)))
+                        (t
+                         (let ((frame-size (arg-state-stack-frame-size state)))
+                           (setf (arg-state-stack-frame-size state) (1+ frame-size))
+                           (make-wired-tn* prim-type stack-sc frame-size))))))))
+  (def int-arg-tn arg-state-int-arg-index)
+  (def float-arg-tn arg-state-float-arg-index))
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (if (alien-integer-type-signed type)
-      (int-arg state #-64-bit 'signed-byte-32 #+64-bit 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
-      (int-arg state #-64-bit 'unsigned-byte-32  #+64-bit 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
+      (int-arg-tn state #-64-bit 'signed-byte-32 #+64-bit 'signed-byte-64 signed-reg-sc-number signed-stack-sc-number)
+      (int-arg-tn state #-64-bit 'unsigned-byte-32  #+64-bit 'unsigned-byte-64 unsigned-reg-sc-number unsigned-stack-sc-number)))
 
 (define-alien-type-method (system-area-pointer :arg-tn) (type state)
   (declare (ignore type))
-  (int-arg state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number))
+  (int-arg-tn state 'system-area-pointer sap-reg-sc-number sap-stack-sc-number))
 
 (define-alien-type-method (single-float :arg-tn) (type state)
   (declare (ignore type))
-  (float-arg state 'single-float single-reg-sc-number single-stack-sc-number))
+  (float-arg-tn state 'single-float single-reg-sc-number single-stack-sc-number))
 
 (define-alien-type-method (double-float :arg-tn) (type state)
   (declare (ignore type))
-  (float-arg state 'double-float double-reg-sc-number double-stack-sc-number))
+  (float-arg-tn state 'double-float double-reg-sc-number double-stack-sc-number))
 
 (define-alien-type-method (integer :result-tn) (type state)
   (let ((num-results (result-state-num-results state)))
@@ -98,11 +97,11 @@
 
 (define-alien-type-method (single-float :result-tn) (type state)
   (declare (ignore type state))
-  (make-wired-tn* 'single-float single-reg-sc-number 0))
+  (make-wired-tn* 'single-float single-reg-sc-number fa0-offset))
 
 (define-alien-type-method (double-float :result-tn) (type state)
   (declare (ignore type state))
-  (make-wired-tn* 'double-float double-reg-sc-number 0))
+  (make-wired-tn* 'double-float double-reg-sc-number fa0-offset))
 
 (define-alien-type-method (values :result-tn) (type state)
   (let ((values (alien-values-type-values type)))
@@ -118,7 +117,7 @@
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (make-wired-tn* 'positive-fixnum any-reg-sc-number nsp-offset)
-              (* (max (arg-state-stack-frame-size arg-state) +max-register-args+) n-word-bytes)
+              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
               (arg-tns)
               (invoke-alien-type-method :result-tn
                                         (alien-fun-type-result-type type)
@@ -146,6 +145,7 @@
   (:result-types system-area-pointer)
   (:temporary (:scs (non-descriptor-reg)) addr)
   (:generator 2
+    ;; FIXME: can optimize to lui + load.
     (inst li addr (make-fixup foreign-symbol :foreign-dataref))
     (loadw res addr)))
 
@@ -190,5 +190,15 @@
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
         (inst addi nsp-tn nsp-tn delta)))))
-
+
 ;;; Callback
+#-sb-xc-host
+(defun alien-callback-accessor-form (type sap offset)
+  `(deref (sap-alien (sap+ ,sap ,offset) (* ,type))))
+
+;;; Returns a vector in static space containing machine code for the
+;;; callback wrapper.
+#-sb-xc-host
+(defun alien-callback-assembler-wrapper (index result-type argument-types)
+  (declare (ignore index result-type argument-types))
+  (error "please implement"))
