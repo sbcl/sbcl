@@ -5,6 +5,7 @@
 #include "genesis/simple-fun.h"
 #include "genesis/fdefn.h"
 #include "genesis/closure.h"
+#include "genesis/code.h"
 #include "genesis/funcallable-instance.h"
 #include "genesis/static-symbols.h"
 #ifdef LISP_FEATURE_SB_THREAD
