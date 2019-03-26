@@ -150,7 +150,7 @@
     (:word
      (if signed
          (inst lw result sap offset)
-         (inst lwu result sap offset)))
+         (inst #-64-bit lw #+64-bit lwu result sap offset)))
     #+64-bit
     (:dword
      (inst ld result sap offset))
@@ -245,6 +245,7 @@
     signed-reg tagged-num :short :signed t)
   (def-system-ref-and-set sap-ref-32 %set-sap-ref-32
     unsigned-reg unsigned-num :word :signed nil)
+  #+64-bit
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
     signed-reg signed-num :word :signed t)
   #+64-bit

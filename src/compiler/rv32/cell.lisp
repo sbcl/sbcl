@@ -302,7 +302,7 @@
   instance-pointer-lowtag (double-reg) double-float "raw instance store" %raw-instance-set/double)
 
 ;;; FIX THESE
-(defun emit-raw-slot-ref (type value lip object index temp)
+(defun emit-raw-slot-ref (type value lip object index &optional temp)
   (cond ((zerop (- word-shift n-fixnum-tag-bits))
          (inst add lip object index))
         (t
@@ -318,7 +318,7 @@
        (inst fload :double (complex-reg-real-tn :double value) lip effective-offset)
        (inst fload :double (complex-reg-imag-tn :double value) lip (+ 8 effective-offset))))))
 
-(defun emit-raw-slot-set (type value result lip object index temp)
+(defun emit-raw-slot-set (type value result lip object index &optional temp)
   (declare (ignore result))
   ;; FIX THESE. DEFINE COMPLEX REFFERS AND REMOVE
   (cond ((zerop (- word-shift n-fixnum-tag-bits))
@@ -351,7 +351,7 @@
          (:temporary (:sc non-descriptor-reg) temp)
          (:result-types ,value-primtype)
          (:generator 5
-           (emit-raw-slot-ref ',name value lip object index temp)))
+           (emit-raw-slot-ref ',name value lip object index #+64-bit temp)))
        (define-vop (,set-vop)
          (:translate ,(symbolicate "%" set-vop))
          (:policy :fast-safe)
@@ -365,7 +365,7 @@
              `((:temporary (:sc non-descriptor-reg) temp)))
          (:result-types ,value-primtype)
          (:generator 5
-           (emit-raw-slot-set ',name value result lip object index temp))))))
+           (emit-raw-slot-set ',name value result lip object index #+64-bit temp))))))
 
 (define-raw-slot-vops complex-single complex-single-float complex-single-reg)
 (define-raw-slot-vops complex-double complex-double-float complex-double-reg)
