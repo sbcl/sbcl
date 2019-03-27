@@ -710,9 +710,9 @@
 
   (define-instruction fstore (segment fmt rs1 rs2 offset)
     (:printer s ((opcode #b0100111)
-                 (rs1 nil :type 'fp-reg)
-                 (rs2 nil :type 'reg)
-                 (imm nil :sign-extend t)))
+                 (rs1 nil :type 'reg)
+                 (rs2 nil :type 'fp-reg)
+                 (imm nil :type 's-imm)))
     (:emitter
      (emit-s-inst segment offset rs1 rs2 (fmt-funct3 fmt) #b0100111))))
 
