@@ -235,7 +235,9 @@
   (:generator 20
     (move x arg)
     (inst slli y x n-fixnum-tag-bits)
-    (inst srli pa-flag y n-fixnum-tag-bits)
+    ;; Arithemtic shift because we're testing if y is a fixnum, so the
+    ;; sign bit matters.
+    (inst srai pa-flag y n-fixnum-tag-bits)
     (inst beq pa-flag x done)
     ;; Could be optimized further by allocating the right size based
     ;; on the sign bit from the start.
