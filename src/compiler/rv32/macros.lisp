@@ -413,7 +413,6 @@ and
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
 (defun align-csp (temp)
-  ;; is used for stack allocation of dynamic-extent objects
   (let ((aligned (gen-label)))
     (inst andi temp csp-tn lowtag-mask)
     (inst beq temp zero-tn aligned)
@@ -423,21 +422,61 @@ and
 
 
 ;;;; Storage allocation:
+
+;;; This is the main mechanism for allocating memory in the lisp heap.
+;;;
+;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
+;;; applied.  The amount of space to be allocated is SIZE bytes (which
+;;; must be a multiple of the lisp object size).
+;;;
+;;; Each platform seems to have its own slightly different way to do
+;;; heap allocation, taking various different options as parameters.
+;;; For RISC-V, we take the bare minimum parameters, RESULT-TN, SIZE,
+;;; and LOWTAG, and we require a single temporary register called
+;;; FLAG-TN to emphasize the parallelism with PSEUDO-ATOMIC (which
+;;; must surround a call to ALLOCATION anyway), and to indicate that
+;;; the P-A FLAG-TN is also acceptable here.
+
+#+gencgc
+(defun allocation-tramp (alloc-tn size back-label)
+  (let ((size-tn (cond ((integerp size)
+                        (inst li alloc-tn size)
+                        alloc-tn)
+                       (t size))))
+    ;; Pass alloc-tn on the number stack.
+    ;; Instead of allocating space here, we save some code size by
+    ;; delegating the stack pointer frobbing to the assembly routine.
+    (storew size-tn nsp-tn -1))
+  (invoke-asm-routine 'alloc-tramp)
+  (loadw alloc-tn nsp-tn -1)
+  (inst j back-label))
+
 (defun allocation (result-tn size lowtag &key flag-tn
-                                              stack-allocate-p)
+                                              stack-allocate-p
+                                              temp-tn)
+  #-gencgc (declare (ignore temp-tn))
+  (when (integerp size)
+    (assert (zerop (logand size lowtag-mask))))
   (cond (stack-allocate-p
-         (assemble ()
-           (align-csp flag-tn)
-           (inst ori result-tn csp-tn lowtag)
-           (etypecase size
-             (short-immediate
-              (inst addi csp-tn csp-tn size))
-             ((signed-byte 32)
-              (inst li flag-tn size)
-              (inst add csp-tn csp-tn flag-tn))
-             (tn
-              (inst add csp-tn csp-tn size)))))
+         ;; Stack allocation
+         ;;
+         ;; The control stack grows up, so round up CSP to a
+         ;; multiple of the lispobj size.  Use that as the
+         ;; allocation pointer.  Then add SIZE bytes to the
+         ;; allocation and set CSP to that, so we have the desired
+         ;; space.
+         (align-csp flag-tn)
+         (inst ori result-tn csp-tn lowtag)
+         (etypecase size
+           (short-immediate
+            (inst addi csp-tn csp-tn size))
+           ((signed-byte 32)
+            (inst li flag-tn size)
+            (inst add csp-tn csp-tn flag-tn))
+           (tn
+            (inst add csp-tn csp-tn size))))
         ;; Normal allocation to the heap.
+        #-gencgc
         (t
          (load-symbol-value flag-tn *allocation-pointer*)
          (inst ori result-tn flag-tn lowtag)
@@ -449,11 +488,46 @@ and
             (inst add flag-tn flag-tn result-tn))
            (tn
             (inst add flag-tn flag-tn size)))
-         (store-symbol-value flag-tn *allocation-pointer*))))
+         (store-symbol-value flag-tn *allocation-pointer*))
+        #+gencgc
+        (t
+         (let ((alloc (gen-label))
+               (back-from-alloc (gen-label)))
+           ;; FIXME: Can optimize this to direct lui hi + load lo?
+           ;; Hit problems if the second struct member is past the
+           ;; most positive lo offset. Need relaxation.
+           (inst li flag-tn (make-fixup "gc_alloc_region" :foreign))
+           (loadw result-tn flag-tn)
+           (loadw flag-tn flag-tn 1)
+           (etypecase size
+             (short-immediate
+              (inst addi result-tn result-tn size))
+             ((signed-byte 32)
+              (inst li temp-tn size)
+              (inst add result-tn result-tn size))
+             (tn
+              (inst add result-tn result-tn size)))
+           (inst blt flag-tn result-tn alloc)
+           (store-foreign-symbol-value result-tn "gc_alloc_region" flag-tn)
+           (etypecase size
+             (short-immediate
+              (inst subi result-tn result-tn size))
+             ((signed-byte 32)
+              (inst li temp-tn size)
+              (inst sub result-tn result-tn temp-tn))
+             (tn
+              (inst sub result-tn result-tn size)))
+           (emit-label back-from-alloc)
+           (when lowtag
+             (inst ori result-tn result-tn lowtag))
+           (assemble (:elsewhere)
+             (emit-label alloc)
+             (allocation-tramp result-tn size back-from-alloc))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                   &key (lowtag other-pointer-lowtag)
-                                       stack-allocate-p)
+                                       stack-allocate-p
+                                       temp-tn)
                                  &body body)
   "Do stuff to allocate an other-pointer object of fixed Size with a single
   word header having the specified Type-Code.  The result is placed in
@@ -467,7 +541,8 @@ and
     `(pseudo-atomic (,flag-tn)
        (allocation ,result-tn (pad-data-block ,size) ,lowtag
                    :flag-tn ,flag-tn
-                   :stack-allocate-p ,stack-allocate-p)
+                   :stack-allocate-p ,stack-allocate-p
+                   ,@(when temp-tn `(:temp-tn ,temp-tn)))
        (when ,type-code
          (inst li ,flag-tn (+ (ash (1- ,size) n-widetag-bits) ,type-code))
          (storew ,flag-tn ,result-tn 0 ,lowtag))

@@ -78,7 +78,7 @@ os_context_lr_addr(os_context_t *context)
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
-    return &(context->uc_sigmask);
+    return &context->uc_sigmask;
 }
 
 void

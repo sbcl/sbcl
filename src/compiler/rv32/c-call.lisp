@@ -12,6 +12,29 @@
 (in-package "SB-VM")
 
 
+(defconstant-eqx c-saved-registers
+    (list* lr-offset
+           8 9 (loop for i from 18 to 27 collect i))
+  #'equal)
+
+(defconstant-eqx c-unsaved-registers
+    (append (list lr-offset)
+            (loop for i from 5 to 7 collect i)
+            (loop for i from 10 to 17 collect i)
+            (loop for i from 28 to 31 collect i))
+  #'equal)
+
+(defconstant-eqx c-unsaved-float-registers
+    (append (loop for i from 0 to 7 collect i)
+            (loop for i from 10 to 17 collect i)
+            (loop for i from 28 to 31 collect i))
+  #'equal)
+
+(defun make-reg-tn (offset &optional (sc 'any-reg))
+  (make-random-tn :kind :normal
+                  :sc (sc-or-lose sc)
+                  :offset offset))
+
 (defenum (:start 10)
   ca0-offset
   ca1-offset

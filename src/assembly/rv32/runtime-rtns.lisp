@@ -9,35 +9,24 @@
 
 (in-package "SB-VM")
 
-(defconstant-eqx c-saved-registers
-    (list* lr-offset
-           global-offset
-           8 9 (loop for i from 18 to 27 collect i))
-  #'equal)
-
-(defun make-any-reg-tn (offset)
-  (make-random-tn :kind :normal
-                  :sc (sc-or-lose 'any-reg)
-                  :offset offset))
-
 (defun save-c-registers ()
   (let ((framesize (* n-word-bytes (length c-saved-registers))))
     (inst subi nsp-tn nsp-tn framesize)
     (loop for offset from 0
           for saved-offset in c-saved-registers
-          do (storew (make-any-reg-tn saved-offset) nsp-tn offset))))
+          do (storew (make-reg-tn saved-offset) nsp-tn offset))))
 
 (defun restore-c-registers ()
   (let ((framesize (* n-word-bytes (length c-saved-registers))))
     (loop for offset from 0
           for saved-offset in c-saved-registers
-          do (loadw (make-any-reg-tn saved-offset) nsp-tn offset))
+          do (loadw (make-reg-tn saved-offset) nsp-tn offset))
     (inst addi nsp-tn nsp-tn framesize)))
 
 (defun initialize-boxed-regs (&optional still-live)
   (dolist (boxed-reg-offset boxed-regs)
     (unless (member boxed-reg-offset still-live :key #'tn-offset)
-      (inst li (make-any-reg-tn boxed-reg-offset) 0)))
+      (inst li (make-reg-tn boxed-reg-offset) 0)))
   (inst li null-tn nil-value))
 
 (define-assembly-routine (call-into-lisp (:return-style :none))
@@ -99,9 +88,11 @@
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value ocfp-tn "current_control_frame_pointer" temp)
     (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
-    (load-symbol-value temp *allocation-pointer*)
-    ;; We can destroy csp-tn without harm now.
-    (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn))
+    #-gencgc
+    (progn
+      (load-symbol-value temp *allocation-pointer*)
+      ;; We can destroy csp-tn without harm now.
+      (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn)))
 
   (restore-c-registers)
   (inst jalr zero-tn lr-tn 0))
@@ -135,9 +126,11 @@
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
     (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
-    (load-symbol-value temp *allocation-pointer*)
-    ;; We can destroy csp-tn without harm now.
-    (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn))
+    #-gencgc
+    (progn
+      (load-symbol-value temp *allocation-pointer*)
+      ;; We can destroy csp-tn without harm now.
+      (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn)))
 
   ;; Call into C.
   (inst jalr lr-tn cfunc 0)
@@ -158,8 +151,10 @@
     (loadw code-tn cfp-tn 2)
     (inst add lr-tn nfp-tn code-tn)
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp)
-    (load-foreign-symbol-value temp "dynamic_space_free_pointer" temp)
-    (store-symbol-value temp *allocation-pointer*))
+    #-gencgc
+    (progn
+      (load-foreign-symbol-value temp "dynamic_space_free_pointer" temp)
+      (store-symbol-value temp *allocation-pointer*)))
 
   ;; Reset the Lisp stack.
   (move csp-tn cfp-tn)
@@ -167,6 +162,7 @@
 
   (inst jalr zero-tn lr-tn (- other-pointer-lowtag)))
 
+#+gencgc
 (define-assembly-routine (do-pending-interrupt (:return-style :none))
     ()
   (inst ebreak pending-interrupt-trap)

@@ -127,12 +127,13 @@ extern boolean handle_guard_page_triggered(os_context_t *,os_vm_address_t);
 extern boolean maybe_defer_handler(void *handler, struct interrupt_data *data,
                                    int signal, siginfo_t *info,
                                    os_context_t *context);
+#ifdef LISP_FEATURE_GENCGC
 #ifdef DO_PENDING_INTERRUPT
 #define do_pending_interrupt ((void(*)(void))SYMBOL(DO_PENDING_INTERRUPT)->value)
-#endif
-#if defined LISP_FEATURE_GENCGC
+#else
 /* assembly language stub that executes trap_PendingInterrupt */
 extern void do_pending_interrupt(void);
+#endif
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD

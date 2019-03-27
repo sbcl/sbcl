@@ -20,6 +20,19 @@
 
 (defconstant +backend-page-bytes+ #+linux 4096 #+netbsd 8192)
 
+;;; The size in bytes of GENCGC cards, i.e. the granularity at which
+;;; writes to old generations are logged.  With mprotect-based write
+;;; barriers, this must be a multiple of the OS page size.
+(defconstant gencgc-card-bytes +backend-page-bytes+)
+;;; The minimum size of new allocation regions.  While it doesn't
+;;; currently make a lot of sense to have a card size lower than
+;;; the alloc granularity, it will, once we are smarter about finding
+;;; the start of objects.
+(defconstant gencgc-alloc-granularity 0)
+;;; The minimum size at which we release address ranges to the OS.
+;;; This must be a multiple of the OS page size.
+(defconstant gencgc-release-granularity +backend-page-bytes+)
+
 ;;; number of bits per word where a word holds one lisp descriptor
 (defconstant n-word-bits #-64-bit 32 #+64-bit 64)
 
@@ -77,19 +90,27 @@
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
+#-gencgc
 (progn
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
   (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x097fff00)
+  (defconstant static-space-end      #x097fff00
+                                     ; #+64-bit #x0c7fff00
+    )
 
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000))
+
+;;; While on gencgc we don't.
+#+gencgc
+(!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
 (defconstant linkage-table-entry-size #-64-bit 8 #+64-bit 20)
 
 #+(or linux netbsd)
 (progn
+  #-gencgc
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
@@ -109,7 +130,7 @@
 
 
 (defconstant-eqx +runtime-asm-routines+
-    '(call-into-lisp do-pending-interrupt)
+    '(call-into-lisp #+gencgc do-pending-interrupt)
   #'equal)
 
 ;;;; Static symbols.
@@ -158,5 +179,3 @@
 ;;; The number of bits per element in the assemblers code vector.
 ;;;
 (defparameter *assembly-unit-length* 8)
-
-(defvar *allocation-pointer*)

@@ -477,63 +477,63 @@
 ;;; are made for alignment considerations or the fixed slots.
 (defun allocate-code-object (space boxed unboxed)
   (declare (ignorable space))
-  ;; FIXME clear when fixed properly for RV32
-  (without-gcing
-    (let* ((total-words
-             (the (unsigned-byte 22) ; Enforce limit on total words as well
-                  (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
-           (code
-             #+gencgc
-             (or #+immobile-code
-                 (when (member space '(:immobile :auto))
-                   ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
-                   ;; Indicate that there are initially 2 boxed words, otherwise
-                   ;; immobile space GC thinks this object is freeable.
-                   (allocate-immobile-obj (ash total-words word-shift)
-                                          (logior (ash total-words code-header-size-shift)
-                                                  code-header-widetag)
-                                          (ash 2 n-fixnum-tag-bits)
-                                          other-pointer-lowtag
-                                          (eq space :immobile)))
+  (let* ((total-words
+           (the (unsigned-byte 22) ; Enforce limit on total words as well
+                (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
+         (code
+           #+gencgc
+           (or #+immobile-code
+               (when (member space '(:immobile :auto))
+                 ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
+                 ;; Indicate that there are initially 2 boxed words, otherwise
+                 ;; immobile space GC thinks this object is freeable.
+                 (allocate-immobile-obj (ash total-words word-shift)
+                                        (logior (ash total-words code-header-size-shift)
+                                                code-header-widetag)
+                                        (ash 2 n-fixnum-tag-bits)
+                                        other-pointer-lowtag
+                                        (eq space :immobile)))
               ;;; x86-64 has a vop which is nothing more than wrapping
-                 ;; pseudo-atomic around a call to alloc_code_object() in the C runtime.
-                 ;; The vop is defined in such a way that it can't be inserted into
-                 ;; this fuction, but instead needs an out-of-line call to a helper function
-                 ;; (because it clobbers all registers and doesn't indicate that)
-                 #+(and x86-64 (not win32))
-                 (alloc-dynamic-space-code total-words)
-                 #-(and x86-64 (not win32))
-                 (without-gcing
-                   (%make-lisp-obj
-                    (alien-funcall (extern-alien "alloc_code_object"
-                                                 (function unsigned (unsigned 32)))
-                                   total-words))))
-             #+cheneygc
-             (%primitive var-alloc total-words 'alloc-code
-                         ;; subtract 1 because var-alloc always adds 1 word
-                         ;; for the header, which is not right for code objects.
-                         -1 code-header-widetag other-pointer-lowtag)))
-      ;; The 1st slot beyond the header stores the boxed header size in bytes
-      ;; as an untagged number, which has the same representation as a tagged
-      ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
-      ;; This slot is allowed to be 0 prior to writing any pointer descriptors
-      ;; into the object.
-      ;;
-      ;; If 64-bit words, assign a serial number unless the space is NIL.
-      ;; Use ATOMIC-INCF on the serialno to get automatic wraparound,
-      ;; and not because atomicity makes things deterministic, which it doesn't
-      ;; if there are several threads allocating code.
-      ;; TODO: this unnecessarily calls CODE-HEADER-SET if code cards use soft
-      ;; marking. Maybe pin the object and use (SETF SAP-REF-WORD) instead.
-      #+rv32
-      (setf (code-header-ref code 0)
-            (%make-lisp-obj
-             (logior (ash total-words 32)
-                     sb-vm:code-header-widetag)))
-      (setf (code-header-ref code code-boxed-size-slot)
-            (%make-lisp-obj
-             (logior (ash boxed word-shift)
-                     #+64-bit
-                     (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
-                             most-positive-word))))
-      code)))
+               ;; pseudo-atomic around a call to alloc_code_object() in the C runtime.
+               ;; The vop is defined in such a way that it can't be inserted into
+               ;; this fuction, but instead needs an out-of-line call to a helper function
+               ;; (because it clobbers all registers and doesn't indicate that)
+               #+(and x86-64 (not win32))
+               (alloc-dynamic-space-code total-words)
+               #-(and x86-64 (not win32))
+               (without-gcing
+                 (%make-lisp-obj
+                  (alien-funcall (extern-alien "alloc_code_object"
+                                               (function unsigned (unsigned 32)))
+                                 total-words))))
+           #+cheneygc
+           (%primitive var-alloc total-words 'alloc-code
+                       ;; subtract 1 because var-alloc always adds 1 word
+                       ;; for the header, which is not right for code objects.
+                       -1 code-header-widetag other-pointer-lowtag)))
+    ;; The 1st slot beyond the header stores the boxed header size in bytes
+    ;; as an untagged number, which has the same representation as a tagged
+    ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
+    ;; This slot is allowed to be 0 prior to writing any pointer descriptors
+    ;; into the object.
+    ;;
+    ;; If 64-bit words, assign a serial number unless the space is NIL.
+    ;; Use ATOMIC-INCF on the serialno to get automatic wraparound,
+    ;; and not because atomicity makes things deterministic, which it doesn't
+    ;; if there are several threads allocating code.
+    ;; TODO: this unnecessarily calls CODE-HEADER-SET if code cards use soft
+    ;; marking. Maybe pin the object and use (SETF SAP-REF-WORD) instead.
+
+    ;; FIXME: Sort out 64-bit and cheneygc.
+    #+(and 64-bit cheneygc)
+    (setf (code-header-ref code 0)
+          (%make-lisp-obj
+           (logior (ash total-words 32)
+                   sb-vm:code-header-widetag)))
+    (setf (code-header-ref code code-boxed-size-slot)
+          (%make-lisp-obj
+           (logior (ash boxed word-shift)
+                   #+64-bit
+                   (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
+                           most-positive-word))))
+    code))

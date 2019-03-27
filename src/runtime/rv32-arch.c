@@ -64,7 +64,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
 #ifdef LISP_FEATURE_GENCGC
-    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
+    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
 #else
     return (!foreign_function_call_active)
         && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
@@ -112,7 +112,9 @@ arch_handle_fun_end_breakpoint(os_context_t *context)
 void
 arch_handle_single_step_trap(os_context_t *context, int trap)
 {
-    handle_single_step_trap(context, trap, reg_LEXENV);
+    unsigned char register_offset =
+      *((unsigned char *)(*os_context_pc_addr(context)) + 5);
+    handle_single_step_trap(context, trap, register_offset);
     /* KLUDGE: arch_skip_instruction() only skips one instruction, and
      * there is a following word to deal with as well, so skip
      * twice. */

@@ -257,7 +257,7 @@
           ":GENCGC and :CHENEYGC are incompatible")
          ("(and cheneygc (not (or alpha arm hppa mips ppc rv32 sparc)))"
           ":CHENEYGC not supported on selected architecture")
-         ("(and gencgc (not (or sparc ppc ppc64 x86 x86-64 arm arm64)))"
+         ("(and gencgc (not (or sparc ppc ppc64 x86 x86-64 arm arm64 rv32)))"
           ":GENCGC not supported on selected architecture")
          ("(not (or gencgc cheneygc))"
           "One of :GENCGC or :CHENEYGC must be enabled")

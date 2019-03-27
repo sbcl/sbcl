@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(defun invoke-asm-routine (routine tailp)
+(defun invoke-asm-routine (routine &optional tailp)
   (inst jal (if tailp zero-tn lr-tn) (make-fixup routine :assembly-routine)))
 
 (defun generate-call-sequence (name style vop options)
@@ -30,7 +30,7 @@
   (ecase style
     (:none)
     (:raw
-     `((inst j lr-tn)))))
+     `((inst jalr zero-tn lr-tn 0)))))
 
 #-sb-xc-host ; CONTEXT-REGISTER is not defined at xc-time
 (defun return-machine-address (scp)
