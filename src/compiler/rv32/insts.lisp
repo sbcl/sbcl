@@ -425,7 +425,7 @@
      (load-signed-byte-32-immediate reg value))
     #-64-bit
     ((unsigned-byte 32)
-     (let ((value (coerce-signed value)))
+     (let ((value (coerce-signed value 32)))
        (load-signed-byte-32-immediate reg value)))
     #+64-bit
     ((or (signed-byte 64) (unsigned-byte 64))
