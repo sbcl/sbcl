@@ -55,7 +55,9 @@
   fa6-offset
   fa7-offset)
 
-(defconstant +number-stack-alignment-mask+ (1- (* n-word-bytes 2)))
+;; On RISC-V, the number stack is always aligned to 16-byte
+;; boundraries, no matter the word size.
+(defconstant +number-stack-alignment-mask+ (1- 16))
 (defconstant foreign-register-arg-start 10)
 (defconstant n-foreign-register-args 8)
 

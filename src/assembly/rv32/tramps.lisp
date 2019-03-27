@@ -54,8 +54,20 @@
                           lisp-registers)
                    csp-tn)
     (loadw ca0 nsp-tn (- nl-framesize))
-    (save-to-stack float-registers nsp-tn t)
-    (inst jal lr-tn (make-fixup "alloc" :foreign))
+    ;; FIXME: A lot of repeated stack pointer adjustments which could
+    ;; be done in one instruction instead.
+    (let* ((float-framesize (save-to-stack float-registers nsp-tn t))
+           ;; Account for the argument slot.
+           (delta (logand (* n-word-bytes
+                             (+ (- float-framesize)
+                                (- nl-framesize)
+                                1))
+                          +number-stack-alignment-mask+)))
+      (unless (zerop delta)
+        (inst subi nsp-tn nsp-tn delta))
+      (inst jal lr-tn (make-fixup "alloc" :foreign))
+      (unless (zerop delta)
+        (inst addi nsp-tn nsp-tn delta)))
     (pop-from-stack float-registers nsp-tn t)
     (storew ca0 nsp-tn (- nl-framesize))
     (pop-from-stack (list* ca0 cfp-tn null-tn code-tn lr-tn
