@@ -130,7 +130,7 @@
 
 
 (defconstant-eqx +runtime-asm-routines+
-    '(call-into-lisp #+gencgc do-pending-interrupt)
+    '(call-into-lisp do-pending-interrupt)
   #'equal)
 
 ;;;; Static symbols.

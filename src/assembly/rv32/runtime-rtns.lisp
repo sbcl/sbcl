@@ -162,7 +162,6 @@
 
   (inst jalr zero-tn lr-tn (- other-pointer-lowtag)))
 
-#+gencgc
 (define-assembly-routine (do-pending-interrupt (:return-style :none))
     ()
   (inst ebreak pending-interrupt-trap)
