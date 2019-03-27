@@ -187,14 +187,14 @@
 (define-vop (move-from-signed)
   (:args (arg :scs (signed-reg unsigned-reg) :target x))
   (:results (y :scs (any-reg descriptor-reg) :from :eval))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x temp)
+  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:note "signed word to integer coercion")
   (:generator 15
     (move x arg)
     (inst slli y x n-fixnum-tag-bits)
-    (inst srai temp y n-fixnum-tag-bits)
-    (inst beq temp x done)
+    (inst srai pa-flag y n-fixnum-tag-bits)
+    (inst beq pa-flag x done)
 
     (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
