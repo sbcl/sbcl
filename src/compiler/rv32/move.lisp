@@ -41,7 +41,17 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (any-reg descriptor-reg))
-  (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+  (let ((offset (- (* (tn-offset x) n-word-bytes) other-pointer-lowtag)))
+    (etypecase offset
+      (short-immediate
+       (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+      ((signed-byte 32)
+       (multiple-value-bind (u i)
+           (u-and-i-inst-immediate offset)
+         ;; Should be GC safe.
+         (inst lui y u)
+         (inst add lip-tn code-tn y)
+         (inst #-64-bit lw #+64-bit ld y lip-tn i))))))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
