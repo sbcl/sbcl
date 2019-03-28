@@ -42,7 +42,7 @@
                   (:note "float move")
                   (:generator 0
                     (unless (location= y x)
-                      (inst fmove ,format x y))))
+                      (inst fmove ,format y x))))
                 (define-move-vop ,vop :move (,sc) (,sc)))))
   (frob single-move single-reg :single)
   (frob double-move double-reg :double))
