@@ -91,8 +91,8 @@
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)
-  (:args (thing :scs (descriptor-reg)))
-  (:results (code :scs (descriptor-reg)))
+  (:args (thing :scs (descriptor-reg) :to :result))
+  (:results (code :scs (descriptor-reg) :from :eval))
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:variant-vars lowtag)
   (:generator 5
