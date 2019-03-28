@@ -2254,3 +2254,16 @@
                   (car x)
                   0))))
           '(function ((or null (cons fixnum t))) (values fixnum &optional)))))
+
+(with-test (:name :nlx-entry-zero-values)
+  (checked-compile-and-assert
+      ()
+      '(lambda (x)
+        (multiple-value-call (lambda (&optional x) x)
+          (block nil
+            (funcall (eval (lambda ()
+                             (return (if x
+                                         (values)
+                                         10))))))))
+    ((t) nil)
+    ((nil) 10)))
