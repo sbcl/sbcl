@@ -597,7 +597,11 @@
 ;;; Floating point
 (defconstant-eqx r-float-printer
     '(:name :tab fmt ", " rd ", " rs1 ", " rs2 ", " rm)
-  #'equalp)
+  #'equal)
+
+(defconstant-eqx r-float-unop-printer
+    '(:name :tab fmt ", " rd ", " rs1 ", " rm)
+  #'equal)
 
 (define-instruction-format (r-float 32 :default-printer r-float-printer)
   (rs3/funct5 :field (byte 5 27))
@@ -640,7 +644,8 @@
                 (:printer r-float ((rs3/funct5 ,funct5)
                                    ,@(when rs2 `((rs2 ,rs2)))
                                    ,@(when rm `((rm ,rm)))
-                                   (opcode #b1010011)))
+                                   (opcode #b1010011))
+                          ,@(when rs2 '(r-float-unop-printer)))
                 (:emitter
                  (emit-r-float-inst segment ,funct5 fmt
                                     ,(if rs2 rs2 'rs2) rs1
@@ -712,8 +717,8 @@
            (:double #b011))))
   (define-instruction fload (segment fmt rd rs offset)
     (:printer i ((opcode #b0000111)
-                 (rs1 nil :type 'fp-reg)
-                 (rs2 nil :type 'reg)
+                 (rs1 nil :type 'reg)
+                 (rs2 nil :type 'fp-reg)
                  (imm nil :sign-extend t)))
     (:emitter
      (emit-i-inst segment offset rs (fmt-funct3 fmt) rd #b0000111)))
