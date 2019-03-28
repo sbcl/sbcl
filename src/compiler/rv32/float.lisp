@@ -539,14 +539,15 @@
   (:args (hi-bits :scs (signed-reg))
          (lo-bits :scs (unsigned-reg)))
   (:results (res :scs (double-reg)))
+  (:temporary (:sc unsigned-reg) temp)
   (:arg-types signed-num unsigned-num)
   (:result-types double-float)
   (:translate make-double-float)
   (:policy :fast-safe)
   (:generator 2
-    (inst slli hi-bits hi-bits 32)
-    (inst add hi-bits hi-bits lo-bits)          
-    (inst fmvx-> :double res hi-bits)))
+    (inst slli temp hi-bits 32)
+    (inst add temp temp lo-bits)
+    (inst fmvx-> :double res temp)))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg descriptor-reg)
