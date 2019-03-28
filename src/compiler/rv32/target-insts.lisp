@@ -13,9 +13,24 @@
 
 (in-package "SB-RV32-ASM")
 
+(defun current-instruction (dstate &optional (offset 0))
+  (sap-ref-int (dstate-segment-sap dstate)
+               (+ (dstate-cur-offs dstate) offset)
+               n-word-bytes
+               (dstate-byte-order dstate)))
+
+(defun instruction-opcode (instruction)
+  (ldb (byte 7 0) instruction))
+
 (defvar *disassem-use-lisp-reg-names* t
   "If non-NIL, print registers using the Lisp register names.
 Otherwise, use the RISC-V register names")
+
+;; FIXME: Can this be a property of DSTATE instead?
+(defvar *note-u-inst* (make-array 32 :initial-element nil)
+  "An map for the disassembler indicating the target register and
+value used in a u-type instruction.  This is used to make annotations
+about function addresses and register values.")
 
 (defconstant-eqx lisp-reg-symbols
   (map 'vector
@@ -35,10 +50,22 @@ Otherwise, use the RISC-V register names")
   (let ((regname (aref (if *disassem-use-lisp-reg-names*
                            lisp-reg-symbols
                            riscv-reg-symbols)
-                       value)))
+                       value))
+        (instruction (current-instruction dstate)))
+    (case (instruction-opcode instruction)
+      ;; U-type
+      ((#b0110111 #b0010111)
+       (note-u-inst value (ldb (byte 20 12) instruction)))
+      (t
+       ;; Delete any u-inst entry with the same target register.
+       #+ (or)
+       (setf (aref *note-u-inst* value) nil)))
     (princ regname stream)
     (maybe-note-associated-storage-ref
      value 'registers regname dstate)))
+
+(defun note-u-inst (rd u-imm)
+  (setf (aref *note-u-inst* rd) u-imm))
 
 (defconstant-eqx float-reg-symbols
   (coerce
@@ -107,11 +134,6 @@ Otherwise, use the RISC-V register names")
                value)
          stream))
 
-(defun print-jump-target (value stream dstate)
-  (let ((addr (ash value 2)))
-    (maybe-note-assembler-routine addr t dstate)
-    (write addr :base 16 :radix t :stream stream)))
-
 (defun annotate-load-store (register offset dstate)
   (case register
     (#.sb-vm::code-offset
@@ -146,6 +168,15 @@ Otherwise, use the RISC-V register names")
   (annotate-load-store (first value)
                        (reconstruct-s-immediate (rest value))
                        dstate))
+
+(defun maybe-augment (rd i-imm)
+  (+ (ash (or (aref *note-u-inst* rd) 0) 12)
+     (coerce-signed i-imm 12)))
+
+(defun print-jalr-annotation (value stream dstate)
+  (declare (ignore stream))
+  (destructuring-bind (rs i-imm) value
+    (maybe-note-assembler-routine (maybe-augment rs i-imm) t dstate)))
 
 ;;;; interrupt instructions
 

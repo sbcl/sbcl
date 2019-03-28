@@ -40,6 +40,7 @@
 (define-arg-type relative-j-label :use-label #'use-j-label)
 (define-arg-type load-annotation :printer #'print-load-annotation)
 (define-arg-type store-annotation :printer #'print-store-annotation)
+(define-arg-type jalr-annotation :printer #'print-jalr-annotation)
 
 
 (define-instruction byte (segment byte)
@@ -91,7 +92,7 @@
   #'equalp)
 
 (define-instruction-format (i 32 :default-printer i-printer)
-  (load-annotation :fields (list (byte 5 15) (byte 12 20)) :type 'load-annotation)
+  (i-annotation :fields (list (byte 5 15) (byte 12 20)))
   (l/a :field (byte 1 30))
   (shamt :field (byte (integer-length n-word-bits) 20))
   (imm :field (byte 12 20) :sign-extend t)
@@ -156,7 +157,7 @@
   #'equalp)
 
 (define-instruction-format (u 32 :default-printer u-printer)
-  (imm :field (byte 20 12))
+  (imm :field (byte 20 12) :printer "#x~5,'0X")
   (rd :field (byte 5 7) :type 'reg)
   (opcode :field (byte 7 0)))
 
@@ -242,8 +243,15 @@
            t))
        (emit-long-jump-at-fun lr target))))))
 
+(defconstant-eqx jalr-printer
+    '(:name :tab rd ", " rs1 ", " imm i-annotation)
+  #'equal)
+
 (define-instruction jalr (segment lr rs offset)
-  (:printer i ((funct3 #b000) (opcode #b1100111)))
+  (:printer i ((funct3 #b000)
+               (opcode #b1100111)
+               (i-annotation nil :type 'jalr-annotation))
+            jalr-printer)
   (:emitter
    (emit-i-inst segment offset rs #b000 lr #b1100111)))
 
@@ -289,9 +297,11 @@
 (macrolet ((define-load-instruction (name funct3 &optional wordp)
              `(define-instruction ,name (segment rd rs offset)
                 (:printer i
-                          ((funct3 ,funct3) (opcode #b0000011))
+                          ((funct3 ,funct3)
+                           (opcode #b0000011)
+                           (i-annotation nil :type 'load-annotation))
                           '(:name :tab rd ", (" imm ")" rs1
-                            ,(when wordp 'load-annotation)))
+                            ,(when wordp 'i-annotation)))
                 (:emitter
                  (emit-i-inst segment offset rs ,funct3 rd #b0000011)))))
   (define-load-instruction lb #b000)
@@ -651,7 +661,7 @@
   #+64-bit
   (define-rv32-float-arith-instruction fcvtl<-  #b11000 :rs2 #b00010)
   #+64-bit
-  (define-rv32-float-arith-instruction fcvtlu<-  #b11000 :rs2 #b00011)
+  (define-rv32-float-arith-instruction fcvtlu<- #b11000 :rs2 #b00011)
   (define-rv32-float-arith-instruction fmvx<-   #b11100 :rs2 #b00000 :rm #b000)
   (define-rv32-float-arith-instruction feq      #b10100 :rm  #b010)
   (define-rv32-float-arith-instruction flt      #b10100 :rm  #b001)
