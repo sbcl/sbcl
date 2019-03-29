@@ -202,9 +202,11 @@
   (:note "signed word to integer coercion")
   (:generator 15
     (move x arg)
+    (inst srai pa-flag x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
-    (inst srai pa-flag y n-fixnum-tag-bits)
-    (inst beq pa-flag x done)
+    (inst beq pa-flag zero-tn done)
+    (inst xori pa-flag pa-flag -1)
+    (inst beq pa-flag zero-tn done)
 
     (with-fixed-allocation (y pa-flag bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
@@ -221,16 +223,18 @@
   (:vop-var vop)
   (:variant-vars constant)
   (:generator 4
+    (inst srai temp x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
-    (inst srai temp y n-fixnum-tag-bits)
-    (inst beq temp x done)
+    (inst beq temp zero-tn done)
+    (inst xori temp temp -1)
+    (inst beq temp zero-tn done)
     (load-constant vop (emit-constant constant) y)
     DONE))
 
 (define-vop (move-from-fixnum+1 move-from-fixnum+/-1)
   (:variant (1+ sb-xc:most-positive-fixnum)))
 
-(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+(define-vop (move-from-fixnum-1 move-from-fixnum+/-1)
   (:variant (1- sb-xc:most-negative-fixnum)))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
@@ -244,23 +248,16 @@
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)
+    (inst srli pa-flag x n-positive-fixnum-bits)
     (inst slli y x n-fixnum-tag-bits)
-    ;; Arithemtic shift because we're testing if y is a fixnum, so the
-    ;; sign bit matters.
-    (inst srai pa-flag y n-fixnum-tag-bits)
-    (inst beq pa-flag x done)
-    ;; Could be optimized further by allocating the right size based
-    ;; on the sign bit from the start.
-    (with-fixed-allocation (y pa-flag bignum-widetag (+ bignum-digits-offset 2))
-      (inst blt x zero-tn NO-SHRINK)
-      ;; WITH-FIXED-ALLOCATION, when using a supplied type-code,
-      ;; leaves PA-FLAG containing the computed header value.  In our
-      ;; case, configured for a 2-word bignum.  If the sign bit in the
-      ;; value we're boxing is CLEAR, we need to shrink the bignum by
-      ;; one word, hence the following:
-      (inst subi pa-flag pa-flag (ash 1 n-widetag-bits))
+    (inst beq pa-flag zero-tn done)
+    (pseudo-atomic (pa-flag)
+      (allocation y (pad-data-block (+ bignum-digits-offset 2))
+                  other-pointer-lowtag :flag-tn pa-flag)
+      (inst slt pa-flag x zero-tn)
+      (inst slli pa-flag pa-flag n-widetag-bits)
+      (inst addi pa-flag pa-flag (logior (ash 1 n-widetag-bits) bignum-widetag))
       (storew pa-flag y 0 other-pointer-lowtag)
-      NO-SHRINK
       (storew x y bignum-digits-offset other-pointer-lowtag))
     DONE))
 
