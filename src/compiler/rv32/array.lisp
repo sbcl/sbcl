@@ -147,16 +147,22 @@
             (define-partial-setter ,setname ,type
               ,size vector-data-offset other-pointer-lowtag ,scs
               ,element-type data-vector-set))))
-     (def-float-data-vector-frobs (type format element-type size &rest scs)
+     (def-float-data-vector-frobs (type format element-type size complexp &rest scs)
        (let ((refname (symbolicate "DATA-VECTOR-REF/" type))
              (setname (symbolicate "DATA-VECTOR-SET/" type)))
          `(progn
-            (define-float-reffer ,refname ,type
-              ,size ,format vector-data-offset other-pointer-lowtag ,scs
-              ,element-type "inline array access" data-vector-ref)
-            (define-float-setter ,setname ,type
-              ,size ,format vector-data-offset other-pointer-lowtag ,scs
-              ,element-type "inline array store" data-vector-set)))))
+            (,(if complexp
+                  'define-complex-float-reffer
+                  'define-float-reffer)
+             ,refname ,type
+             ,size ,format vector-data-offset other-pointer-lowtag ,scs
+             ,element-type "inline array access" data-vector-ref)
+            (,(if complexp
+                  'define-complex-float-setter
+                  'define-float-setter)
+             ,setname ,type
+             ,size ,format vector-data-offset other-pointer-lowtag ,scs
+             ,element-type "inline array store" data-vector-set)))))
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)
@@ -188,8 +194,10 @@
   (def-full-data-vector-frobs simple-array-unsigned-fixnum positive-fixnum any-reg)
   (def-full-data-vector-frobs simple-array-fixnum tagged-num any-reg)
 
-  (def-float-data-vector-frobs simple-array-single-float :single single-float 4 single-reg)
-  (def-float-data-vector-frobs simple-array-double-float :double double-float 8 double-reg))
+  (def-float-data-vector-frobs simple-array-single-float :single single-float 4 nil single-reg)
+  (def-float-data-vector-frobs simple-array-double-float :double double-float 8 nil double-reg)
+  (def-float-data-vector-frobs simple-array-complex-single-float :single complex-single-float 4 t complex-single-reg)
+  (def-float-data-vector-frobs simple-array-complex-double-float :double complex-double-float 8 t complex-double-reg))
 
 ;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
@@ -348,95 +356,6 @@
   (def-small-data-vector-frobs simple-bit-vector 1)
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
-
-;;; And the float variants.
-;;; Complex float arrays.
-(define-vop (data-vector-ref/simple-array-complex-float)
-  (:note "inline array access")
-  (:policy :fast-safe)
-  (:args (object)
-         (index))
-  (:results (value))
-  (:temporary (:scs (interior-reg)) lip)
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:variant-vars format size)
-  (:generator 5
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst add lip object index))
-          (t
-           (inst slli temp index (- word-shift n-fixnum-tag-bits))
-           (inst add lip object temp)))
-    (let ((real-tn (complex-reg-real-tn format value)))
-      (inst fload format real-tn lip (- (* vector-data-offset size)
-                                        other-pointer-lowtag)))
-    (let ((imag-tn (complex-reg-imag-tn format value)))
-      (inst fload format imag-tn lip (- (* (1+ vector-data-offset) size)
-                                        other-pointer-lowtag)))))
-
-(define-vop (data-vector-ref/simple-array-complex-single-float data-vector-ref/simple-array-complex-float)
-  (:translate data-vector-ref)
-  (:arg-types simple-array-complex-single-float positive-fixnum)
-  (:results (value :scs (complex-single-reg)))
-  (:result-types complex-single-float)
-  (:variant :single 4))
-
-(define-vop (data-vector-ref/simple-array-complex-double-float data-vector-ref/simple-array-complex-float)
-  (:translate data-vector-ref)
-  (:arg-types simple-array-complex-double-float positive-fixnum)
-  (:results (value :scs (complex-double-reg)))
-  (:result-types complex-double-float)
-  (:variant :double 8))
-
-(define-vop (data-vector-set/simple-array-complex-float)
-  (:note "inline array store")
-  (:policy :fast-safe)
-  (:args (object)
-         (index)
-         (value :target result))
-  (:results (result))
-  (:temporary (:scs (interior-reg)) lip)
-  (:temporary (:sc non-descriptor-reg) temp)
-  (:variant-vars format size)
-  (:generator 5
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst add lip object index))
-          (t
-           (inst slli temp index (- word-shift n-fixnum-tag-bits))
-           (inst add lip object temp)))
-    (let ((value-real (complex-reg-real-tn format value))
-          (result-real (complex-reg-real-tn format result)))
-      (inst fstore format value-real lip (- (* vector-data-offset size)
-                                            other-pointer-lowtag))
-      (unless (location= result-real value-real)
-        (inst fmove format result-real value-real)))
-    (let ((value-imag (complex-reg-imag-tn format value))
-          (result-imag (complex-reg-imag-tn format result)))
-      (inst fstore format value-imag lip (- (* (1+ vector-data-offset) size)
-                                            other-pointer-lowtag))
-      (unless (location= result-imag value-imag)
-        (inst fmove format result-imag value-imag)))))
-
-(define-vop (data-vector-set/simple-array-complex-single-float data-vector-set/simple-array-complex-float)
-  (:translate data-vector-set)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (complex-single-reg) :target result))
-  (:arg-types simple-array-complex-single-float positive-fixnum
-              complex-single-float)
-  (:results (result :scs (complex-single-reg)))
-  (:result-types complex-single-float)
-  (:variant :single 4))
-
-(define-vop (data-vector-set/simple-array-complex-double-float data-vector-set/simple-array-complex-float)
-  (:translate data-vector-set)
-  (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg))
-         (value :scs (complex-double-reg) :target result))
-  (:arg-types simple-array-complex-double-float positive-fixnum
-              complex-double-float)
-  (:results (result :scs (complex-double-reg)))
-  (:result-types complex-double-float)
-  (:variant :double 8))
 
 
 ;;; These vops are useful for accessing the bits of a vector irrespective of

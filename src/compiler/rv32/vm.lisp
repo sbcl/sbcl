@@ -138,7 +138,7 @@
              :locations #.(loop for i below 32 collect i)
              :alternate-scs (single-stack)
              :save-p t)
- (double-stack non-descriptor-stack :element-size 2)
+ (double-stack non-descriptor-stack :element-size (/ 64 n-word-bits))
  (double-reg float-registers
              :locations #.(loop for i below 32 collect i)
              :alternate-scs (double-stack)
@@ -146,13 +146,13 @@
 
  (complex-single-stack non-descriptor-stack :element-size (/ (* 2 32) n-word-bits))
  (complex-single-reg float-registers
-                     :locations #.(loop for i below 32 by (/ (* 2 32) n-word-bits) collect i)
+                     :locations #.(loop for i below 32 collect i)
                      :element-size (/ (* 2 32) n-word-bits)
                      :alternate-scs (complex-single-stack)
                      :save-p t)
- (complex-double-stack non-descriptor-stack :element-size (/ (* 4 32) n-word-bits))
+ (complex-double-stack non-descriptor-stack :element-size (/ (* 2 64) n-word-bits))
  (complex-double-reg float-registers
-                     :locations #.(loop for i below 32 by (/ (* 2 64) n-word-bits) collect i)
+                     :locations #.(loop for i below 32 by 2 collect i)
                      :element-size (/ (* 2 64) n-word-bits)
                      :save-p t
                      :alternate-scs (complex-double-stack))

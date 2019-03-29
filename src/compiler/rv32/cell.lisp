@@ -289,83 +289,23 @@
 (define-full-setter raw-instance-set/word * instance-slots-offset
   instance-pointer-lowtag (unsigned-reg) unsigned-num %raw-instance-set/word)
 
-(define-float-reffer raw-instance-ref/single * 4 :single instance-slots-offset
-  instance-pointer-lowtag (single-reg) single-float "raw instance access" %raw-instance-ref/single)
-
-(define-float-setter raw-instance-set/single * 4 :single instance-slots-offset
-  instance-pointer-lowtag (single-reg) single-float "raw instance store" %raw-instance-set/single)
-
-(define-float-reffer raw-instance-ref/double * 8 :single instance-slots-offset
-  instance-pointer-lowtag (double-reg) double-float "raw instance access" %raw-instance-ref/double)
-
-(define-float-setter raw-instance-set/double * 8 :single instance-slots-offset
-  instance-pointer-lowtag (double-reg) double-float "raw instance store" %raw-instance-set/double)
-
-;;; FIX THESE
-(defun emit-raw-slot-ref (type value lip object index &optional temp)
-  (cond ((zerop (- word-shift n-fixnum-tag-bits))
-         (inst add lip object index))
-        (t
-         (inst slli temp index (- word-shift n-fixnum-tag-bits))
-         (inst add lip object temp)))
-  (let ((effective-offset (- (* instance-slots-offset n-word-bytes)
-                             instance-pointer-lowtag)))
-    (ecase type
-      (complex-single
-       (inst fload :single (complex-reg-real-tn :single value) lip effective-offset)
-       (inst fload :single (complex-reg-imag-tn :single value) lip (+ 4 effective-offset)))
-      (complex-double
-       (inst fload :double (complex-reg-real-tn :double value) lip effective-offset)
-       (inst fload :double (complex-reg-imag-tn :double value) lip (+ 8 effective-offset))))))
-
-(defun emit-raw-slot-set (type value result lip object index &optional temp)
-  (declare (ignore result))
-  ;; FIX THESE. DEFINE COMPLEX REFFERS AND REMOVE
-  (cond ((zerop (- word-shift n-fixnum-tag-bits))
-         (inst add lip object index))
-        (t
-         (inst slli temp index (- word-shift n-fixnum-tag-bits))
-         (inst add lip object temp)))
-  (let ((effective-offset (- (* instance-slots-offset n-word-bytes)
-                             instance-pointer-lowtag)))
-    (ecase type
-      (complex-single
-       (inst fstore :single (complex-reg-real-tn :single value) lip effective-offset)
-       (inst fstore :single (complex-reg-imag-tn :single value) lip (+ 4 effective-offset)))
-      (complex-double
-       (inst fstore :double (complex-reg-real-tn :double value) lip effective-offset)
-       (inst fstore :double (complex-reg-imag-tn :double value) lip (+ 8 effective-offset))))))
-
-(defmacro define-raw-slot-vops (name value-primtype value-sc)
-  (let ((ref-vop (symbolicate "RAW-INSTANCE-REF/" name))
-        (set-vop (symbolicate "RAW-INSTANCE-SET/" name)))
-    `(progn
-       (define-vop (,ref-vop)
-         (:translate ,(symbolicate "%" ref-vop))
-         (:policy :fast-safe)
-         (:args (object :scs (descriptor-reg))
-                (index :scs (any-reg)))
-         (:arg-types * positive-fixnum)
-         (:results (value :scs (,value-sc)))
-         (:temporary (:scs (interior-reg)) lip)
-         (:temporary (:sc non-descriptor-reg) temp)
-         (:result-types ,value-primtype)
-         (:generator 5
-           (emit-raw-slot-ref ',name value lip object index #+64-bit temp)))
-       (define-vop (,set-vop)
-         (:translate ,(symbolicate "%" set-vop))
-         (:policy :fast-safe)
-         (:args (object :scs (descriptor-reg))
-                (index :scs (any-reg))
-                (value :scs (,value-sc) :target result))
-         (:arg-types * positive-fixnum ,value-primtype)
-         (:results (result :scs (,value-sc)))
-         (:temporary (:scs (interior-reg)) lip)
-         ,@(unless (= word-shift n-fixnum-tag-bits)
-             `((:temporary (:sc non-descriptor-reg) temp)))
-         (:result-types ,value-primtype)
-         (:generator 5
-           (emit-raw-slot-set ',name value result lip object index #+64-bit temp))))))
-
-(define-raw-slot-vops complex-single complex-single-float complex-single-reg)
-(define-raw-slot-vops complex-double complex-double-float complex-double-reg)
+(macrolet ((define-raw-slot-float-vops (name value-primtype value-sc size format &optional complexp)
+             (let ((ref-vop (symbolicate "RAW-INSTANCE-REF/" name))
+                   (set-vop (symbolicate "RAW-INSTANCE-SET/" name)))
+               `(progn
+                  (,(if complexp
+                        'define-complex-float-reffer
+                        'define-float-reffer)
+                   ,ref-vop * ,size ,format instance-slots-offset
+                   instance-pointer-lowtag (,value-sc) ,value-primtype "raw instance access"
+                   ,(symbolicate "%" ref-vop))
+                  (,(if complexp
+                        'define-complex-float-setter
+                        'define-float-setter)
+                   ,set-vop * ,size ,format instance-slots-offset
+                   instance-pointer-lowtag (,value-sc) ,value-primtype "raw instance store"
+                   ,(symbolicate "%" set-vop))))))
+  (define-raw-slot-float-vops single single-float single-reg 4 :single)
+  (define-raw-slot-float-vops double double-float double-reg 4 :single)
+  (define-raw-slot-float-vops complex-single complex-single-float complex-single-reg 8 :double t)
+  (define-raw-slot-float-vops complex-double complex-double-float complex-double-reg 8 :double t))
