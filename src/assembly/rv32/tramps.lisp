@@ -5,78 +5,70 @@
 
 (in-package "SB-VM")
 
-(defun save-to-stack (tns sp-tn &optional floatp)
-  (let* ((sign (if (eq nsp-tn sp-tn) -1 1))
-         (amount (* sign (length tns))))
-    (inst addi sp-tn sp-tn (* n-word-bytes amount))
-    (loop for tn in tns
-          for i from 0
-          do (if floatp
-                 (inst fstore :double tn sp-tn (* (- sign) i n-word-bytes))
-                 (storew tn sp-tn (* (- sign) i))))
-    amount))
+(defun save-to-stack (tns sp-tn &optional (start 0) floatp)
+  (loop for tn in tns
+        for i from start by (if floatp 8 n-word-bytes)
+        do (if floatp
+               (inst fstore :double tn sp-tn i)
+               (inst #-64-bit sw #+64-bit sd tn sp-tn i))))
 
-(defun pop-from-stack (tns sp-tn &optional floatp)
-  (let* ((sign (if (eq nsp-tn sp-tn) -1 1))
-         (amount (* sign (length tns))))
-    (loop for tn in tns
-          for i from 0
-          do (if floatp
-                 (inst fload :double tn sp-tn (* (- sign) i n-word-bytes))
-                 (loadw tn sp-tn (* (- sign) i))))
-    (inst subi sp-tn sp-tn (* n-word-bytes amount))
-    amount))
+(defun pop-from-stack (tns sp-tn &optional (start 0) floatp)
+  (loop for tn in tns
+        for i from start by (if floatp 8 n-word-bytes)
+        do (if floatp
+               (inst fload :double tn sp-tn i)
+               (inst #-64-bit lw #+64-bit ld tn sp-tn i))))
 
 #+gencgc
 (define-assembly-routine (alloc-tramp (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)
 
      (:temp ca0 unsigned-reg ca0-offset))
-  ;; See comment in macros.lisp. Can fold this into the stack saving routine too.
-  (inst subi nsp-tn nsp-tn n-word-bytes)
-  (let* ((nl-registers (loop for i in (intersection
-                                       non-descriptor-regs
-                                       c-unsaved-registers)
-                             collect (make-reg-tn i 'unsigned-reg)))
-         (lisp-registers (loop for i in (intersection
-                                         descriptor-regs
-                                         c-unsaved-registers)
-                               collect (make-reg-tn i 'unsigned-reg)))
-         (float-registers (loop for i in c-unsaved-float-registers
-                                collect (make-reg-tn i 'complex-double-reg)))
-         (nl-framesize (save-to-stack nl-registers nsp-tn)))
+  (let* ((nl-registers
+           (loop for i in (intersection non-descriptor-regs
+                                        c-unsaved-registers)
+                 collect (make-reg-tn i 'unsigned-reg)))
+         (lisp-registers
+           (loop for i in (intersection
+                           (union (list ca0-offset lr-offset cfp-offset null-offset code-offset)
+                                  descriptor-regs)
+                           c-unsaved-registers)
+                 collect (make-reg-tn i 'unsigned-reg)))
+         (float-registers
+           (loop for i in c-unsaved-float-registers
+                 collect (make-reg-tn i 'complex-double-reg)))
+         (float-framesize (* (length float-registers) 8))
+         (nl-framesize (* (length nl-registers) n-word-bytes))
+         (number-framesize
+           ;; New space for the number stack, making sure to respect
+           ;; number stack alignment. Don't forget about the nbytes
+           ;; argument.
+           (logandc2 (+ (+ n-word-bytes nl-framesize float-framesize)
+                        +number-stack-alignment-mask+)
+                     +number-stack-alignment-mask+))
+         (lisp-framesize (* (length lisp-registers) n-word-bytes))
+         (nbytes-start (- number-framesize n-word-bytes))
+         (nl-start (- nbytes-start nl-framesize))
+         (float-start (- nl-start float-framesize)))
+    (inst subi nsp-tn nsp-tn number-framesize)
+    (save-to-stack nl-registers nsp-tn nl-start)
     (store-foreign-symbol-value csp-tn "foreign_function_call_active" nl0)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" nl0)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" nl0)
     ;; Create a new frame and save descriptor regs on the stack for GC
     ;; to see.
-    (save-to-stack (list* ca0 cfp-tn null-tn code-tn lr-tn
-                          lisp-registers)
-                   csp-tn)
-    (loadw ca0 nsp-tn (- nl-framesize))
-    ;; FIXME: A lot of repeated stack pointer adjustments which could
-    ;; be done in one instruction instead.
-    (let* ((float-framesize (save-to-stack float-registers nsp-tn t))
-           ;; Account for the argument slot.
-           (delta (logand (* n-word-bytes
-                             (+ (- float-framesize)
-                                (- nl-framesize)
-                                1))
-                          +number-stack-alignment-mask+)))
-      (unless (zerop delta)
-        (inst subi nsp-tn nsp-tn delta))
-      (inst jal lr-tn (make-fixup "alloc" :foreign))
-      (unless (zerop delta)
-        (inst addi nsp-tn nsp-tn delta)))
-    (pop-from-stack float-registers nsp-tn t)
-    (storew ca0 nsp-tn (- nl-framesize))
-    (pop-from-stack (list* ca0 cfp-tn null-tn code-tn lr-tn
-                           lisp-registers)
-                    csp-tn)
+    (save-to-stack lisp-registers csp-tn)
+    (inst addi csp-tn csp-tn lisp-framesize)
+    (inst #-64-bit lw #+64-bit ld ca0 nsp-tn nbytes-start)
+    (save-to-stack float-registers nsp-tn float-start t)
+    (inst jal lr-tn (make-fixup "alloc" :foreign))
+    (pop-from-stack float-registers nsp-tn float-start t)
+    (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)
+    (inst subi csp-tn csp-tn lisp-framesize)
+    (pop-from-stack lisp-registers csp-tn)
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" nl0)
-    (pop-from-stack nl-registers nsp-tn)
-    ;; Can fold this into above.
-    (inst addi nsp-tn nsp-tn n-word-bytes)
+    (pop-from-stack nl-registers nsp-tn nl-start)
+    (inst addi nsp-tn nsp-tn number-framesize)
     (inst jalr zero-tn lr-tn 0)))
 
 (define-assembly-routine
