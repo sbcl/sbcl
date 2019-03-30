@@ -192,7 +192,7 @@
         (sap-reg (move cfunc function))
         (sap-stack
          (loadw cfunc cur-nfp (tn-offset function))))
-      (inst jal lr-tn (make-fixup 'call-into-c :assembly-routine))
+      (invoke-asm-routine 'call-into-c nil)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
