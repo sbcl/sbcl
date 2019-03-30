@@ -142,51 +142,49 @@
 ;;; An (UNSIGNED-BYTE N-WORD-BITS) can be represented with either a positive
 ;;; fixnum, a bignum with exactly one positive digit, or a bignum with
 ;;; exactly two digits and the second digit all zeros.
-(defun unsigned-byte-n-word-bits-test (value temp not-p target not-target)
-  (multiple-value-bind (yep nope)
-      (if not-p
-          (values not-target target)
-          (values target not-target))
-    (assemble ()
-      ;; Is it a fixnum?
-      (move temp value)
-      (%test-fixnum value temp fixnum nil)
-
-      ;; If not, is it an other pointer?
-      (test-type value temp nope t (other-pointer-lowtag))
-      ;; Get the header.
-      (loadw temp value 0 other-pointer-lowtag)
-      ;; Is it one?
-      (inst xori temp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
-      (inst beq temp zero-tn single-word)
-      ;; If it's other than two, we can't be an (unsigned-byte n-word-bits)
-      (inst xori temp temp
-            (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
-                    (+ (ash 2 n-widetag-bits) bignum-widetag)))
-      (inst bne temp zero-tn nope)
-      ;; Get the second digit.
-      (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-      ;; All zeros, its an (unsigned-byte n-word-bits).
-      (inst beq temp zero-tn yep)
-      (inst j nope)
-
-      SINGLE-WORD
-      ;; Get the single digit.
-      (loadw temp value bignum-digits-offset other-pointer-lowtag)
-
-      ;; positive implies (unsigned-byte n-word-bits).
-      FIXNUM
-      (if not-p
-          (inst blt temp zero-tn target)
-          (inst bge temp zero-tn target))))
-  (values))
-
 (define-vop (#-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p type-predicate)
   (:translate #-64-bit unsigned-byte-32-p #+64-bit unsigned-byte-64-p)
+  (:temporary (:scs (non-descriptor-reg)) temp1)
   (:generator 45
-   (let ((not-target (gen-label)))
-     (unsigned-byte-n-word-bits-test value temp not-p target not-target)
-     (emit-label not-target))))
+    (let ((not-target (gen-label)))
+      (multiple-value-bind (yep nope)
+          (if not-p
+              (values not-target target)
+              (values target not-target))
+        (assemble ()
+          ;; Is it a fixnum?
+          (inst andi temp1 value fixnum-tag-mask)
+          (move temp value)
+          (inst beq temp1 zero-tn fixnum)
+
+          ;; If not, is it an other pointer?
+          (test-type value temp nope t (other-pointer-lowtag))
+          ;; Get the header.
+          (loadw temp value 0 other-pointer-lowtag)
+          ;; Is it one?
+          (inst xori temp temp (+ (ash 1 n-widetag-bits) bignum-widetag))
+          (inst beq temp zero-tn single-word)
+          ;; If it's other than two, we can't be an (unsigned-byte n-word-bits)
+          (inst xori temp temp
+                (logxor (+ (ash 1 n-widetag-bits) bignum-widetag)
+                        (+ (ash 2 n-widetag-bits) bignum-widetag)))
+          (inst bne temp zero-tn nope)
+          ;; Get the second digit.
+          (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
+          ;; All zeros, its an (unsigned-byte n-word-bits).
+          (inst beq temp zero-tn yep)
+          (inst j nope)
+
+          SINGLE-WORD
+          ;; Get the single digit.
+          (loadw temp value bignum-digits-offset other-pointer-lowtag)
+
+          ;; positive implies (unsigned-byte n-word-bits).
+          FIXNUM
+          (if not-p
+              (inst blt temp zero-tn target)
+              (inst bge temp zero-tn target))))
+      (emit-label not-target))))
 
 ;;;; List/symbol types:
 ;;;
