@@ -156,13 +156,13 @@
                   'define-float-reffer)
              ,refname ,type
              ,size ,format vector-data-offset other-pointer-lowtag ,scs
-             ,element-type "inline array access" data-vector-ref)
+             ,element-type t "inline array access" data-vector-ref)
             (,(if complexp
                   'define-complex-float-setter
                   'define-float-setter)
              ,setname ,type
              ,size ,format vector-data-offset other-pointer-lowtag ,scs
-             ,element-type "inline array store" data-vector-set)))))
+             ,element-type t "inline array store" data-vector-set)))))
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)

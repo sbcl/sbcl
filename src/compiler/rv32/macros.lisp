@@ -308,9 +308,93 @@ and
                  (- (+ (* ,offset n-word-bytes) (* index ,size)) ,lowtag))
            (move result value))))))
 
-(defmacro define-float-reffer (name type size format offset lowtag scs eltype &optional note translate)
-  `(progn
-     (define-vop (,name)
+(defmacro define-float-reffer (name type size format offset lowtag scs eltype &optional arrayp note translate)
+  (let ((shift (if arrayp
+                   (- (integer-length size) n-fixnum-tag-bits 1)
+                   (- word-shift n-fixnum-tag-bits))))
+    `(progn
+       (define-vop (,name)
+         (:note ,note)
+         ,@(when translate `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (any-reg)))
+         (:arg-types ,type tagged-num)
+         (:temporary (:scs (interior-reg)) lip)
+         ,@(unless (zerop shift)
+             `((:temporary (:sc non-descriptor-reg) temp)))
+         (:results (value :scs ,scs))
+         (:result-types ,eltype)
+         (:generator 5
+           ,@(cond ((zerop shift)
+                    `((inst add lip object index)))
+                   (t
+                    `((inst slli temp index ,shift)
+                      (inst add lip object temp))))
+           (inst fload ,format value lip (- (* ,offset n-word-bytes) ,lowtag))))
+       (define-vop (,(symbolicate name "-C"))
+         (:note ,note)
+         ,@(when translate `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg)))
+         (:info index)
+         (:arg-types ,type
+           (:constant (load/store-index ,(if arrayp size n-word-bytes) ,(eval lowtag) ,(eval offset))))
+         (:results (value :scs ,scs))
+         (:result-types ,eltype)
+         (:generator 4
+           (inst fload ,format value object (- (+ (* ,offset n-word-bytes) (* (* index ,(if arrayp size n-word-bytes)))) ,lowtag)))))))
+
+(defmacro define-float-setter (name type size format offset lowtag scs eltype &optional arrayp note translate)
+  (let ((shift (if arrayp
+                   (- (integer-length size) n-fixnum-tag-bits 1)
+                   (- word-shift n-fixnum-tag-bits))))
+    `(progn
+       (define-vop (,name)
+         (:note ,note)
+         ,@(when translate `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (index :scs (any-reg))
+                (value :scs ,scs :target result))
+         (:arg-types ,type tagged-num ,eltype)
+         (:temporary (:scs (interior-reg)) lip)
+         ,@(unless (zerop shift)
+             `((:temporary (:sc non-descriptor-reg) temp)))
+         (:results (result :scs ,scs))
+         (:result-types ,eltype)
+         (:generator 5
+           ,@(cond ((zerop shift)
+                    `((inst add lip object index)))
+                   (t
+                    `((inst slli temp index ,shift)
+                      (inst add lip object temp))))
+           (inst fstore ,format value lip (- (* ,offset n-word-bytes) ,lowtag))
+           (unless (location= result value)
+             (inst fmove ,format result value))))
+       (define-vop (,(symbolicate name "-C"))
+         (:note ,note)
+         ,@(when translate `((:translate ,translate)))
+         (:policy :fast-safe)
+         (:args (object :scs (descriptor-reg))
+                (value :scs ,scs :target result))
+         (:info index)
+         (:arg-types ,type
+           (:constant (load/store-index ,(if arrayp size n-word-bytes) ,(eval lowtag) ,(eval offset)))
+           ,eltype)
+         (:results (result :scs ,scs))
+         (:result-types ,eltype)
+         (:generator 4
+           (inst fstore ,format value object (- (+ (* ,offset n-word-bytes) (* index ,(if arrayp size n-word-bytes))) ,lowtag))
+           (unless (location= result value)
+             (inst fmove ,format result value)))))))
+
+;; FIXME: constant arg VOPs missing.
+(defmacro define-complex-float-reffer (name type size format offset lowtag scs eltype &optional arrayp note translate)
+  (let ((shift (if arrayp
+                   (- (integer-length size) n-fixnum-tag-bits)
+                   (- word-shift n-fixnum-tag-bits))))
+    `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
@@ -318,33 +402,32 @@ and
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(unless (= word-shift n-fixnum-tag-bits)
+       ,@(unless (zerop shift)
            `((:temporary (:sc non-descriptor-reg) temp)))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
-       (:generator 5
-         ,@(cond ((= word-shift n-fixnum-tag-bits)
+       (:generator 6
+         ,@(cond ((zerop shift)
                   `((inst add lip object index)))
                  (t
-                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
+                  `((inst slli temp index ,shift)
                     (inst add lip object temp))))
-         (inst fload ,format value lip (- (* ,offset n-word-bytes) ,lowtag))))
-     (define-vop (,(symbolicate name "-C"))
-       (:note ,note)
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg)))
-       (:info index)
-       (:arg-types ,type
-         (:constant (load/store-index ,size ,(eval lowtag) ,(eval offset))))
-       (:results (value :scs ,scs))
-       (:result-types ,eltype)
-       (:generator 4
-         (inst fload ,format value object (- (* (+ ,offset index) n-word-bytes) ,lowtag))))))
+         ,(ecase format
+            #+64-bit
+            (:single
+             `(inst fload :double value lip (- (* ,offset n-word-bytes) ,lowtag)))
+            ((#-64-bit :single :double)
+             `(progn
+                (let ((real-tn (complex-reg-real-tn ,format value)))
+                  (inst fload ,format real-tn lip (- (* ,offset n-word-bytes) ,lowtag)))
+                (let ((imag-tn (complex-reg-imag-tn ,format value)))
+                  (inst fload ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))))))
 
-(defmacro define-float-setter (name type size format offset lowtag scs eltype &optional note translate)
-  `(progn
-     (define-vop (,name)
+(defmacro define-complex-float-setter (name type size format offset lowtag scs eltype &optional arrayp note translate)
+  (let ((shift (if arrayp
+                   (- (integer-length size) n-fixnum-tag-bits)
+                   (- word-shift n-fixnum-tag-bits))))
+    `(define-vop (,name)
        (:note ,note)
        ,@(when translate `((:translate ,translate)))
        (:policy :fast-safe)
@@ -353,96 +436,27 @@ and
               (value :scs ,scs :target result))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(unless (= word-shift n-fixnum-tag-bits)
+       ,@(unless (zerop shift)
            `((:temporary (:sc non-descriptor-reg) temp)))
        (:results (result :scs ,scs))
        (:result-types ,eltype)
-       (:generator 3
-         ,@(cond ((= word-shift n-fixnum-tag-bits)
+       (:generator 6
+         ,@(cond ((zerop shift)
                   `((inst add lip object index)))
                  (t
-                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
+                  `((inst slli temp index ,shift)
                     (inst add lip object temp))))
-         (inst fstore ,format value lip (- (* ,offset n-word-bytes) ,lowtag))
-         (inst fmove ,format result value)))
-     (define-vop (,(symbolicate name "-C"))
-       (:note ,note)
-       ,@(when translate `((:translate ,translate)))
-       (:policy :fast-safe)
-       (:args (object :scs (descriptor-reg))
-              (value :scs ,scs :target result))
-       (:info index)
-       (:arg-types ,type
-         (:constant (load/store-index ,size ,(eval lowtag) ,(eval offset)))
-         ,eltype)
-       (:results (result :scs ,scs))
-       (:result-types ,eltype)
-       (:generator 1
-         (inst fstore ,format value object (- (* (+ ,offset index) n-word-bytes) ,lowtag))
-         (inst fmove ,format result value)))))
-
-;; FIXME: constant arg VOPs missing.
-(defmacro define-complex-float-reffer (name type size format offset lowtag scs eltype &optional note translate)
-  `(define-vop (,name)
-     (:note ,note)
-     ,@(when translate `((:translate ,translate)))
-     (:policy :fast-safe)
-     (:args (object :scs (descriptor-reg))
-            (index :scs (any-reg)))
-     (:arg-types ,type tagged-num)
-     (:temporary (:scs (interior-reg)) lip)
-     ,@(unless (= word-shift n-fixnum-tag-bits)
-         `((:temporary (:sc non-descriptor-reg) temp)))
-     (:results (value :scs ,scs))
-     (:result-types ,eltype)
-     (:generator 5
-       ,@(cond ((zerop (- word-shift n-fixnum-tag-bits))
-                `((inst add lip object index)))
-               (t
-                `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                  (inst add lip object temp))))
-       ,(ecase format
-          #+64-bit
-          (:single
-           `(inst fload :double value lip (- (* ,offset n-word-bytes) ,lowtag)))
-          ((#-64-bit :single :double)
-           `(progn
-              (let ((real-tn (complex-reg-real-tn ,format value)))
-                (inst fload ,format real-tn lip (- (* ,offset n-word-bytes) ,lowtag)))
-              (let ((imag-tn (complex-reg-imag-tn ,format value)))
-                (inst fload ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag)))))))))
-
-(defmacro define-complex-float-setter (name type size format offset lowtag scs eltype &optional note translate)
-  `(define-vop (,name)
-     (:note ,note)
-     ,@(when translate `((:translate ,translate)))
-     (:policy :fast-safe)
-     (:args (object :scs (descriptor-reg))
-            (index :scs (any-reg))
-            (value :scs ,scs :target result))
-     (:arg-types ,type tagged-num ,eltype)
-     (:temporary (:scs (interior-reg)) lip)
-     ,@(unless (= word-shift n-fixnum-tag-bits)
-         `((:temporary (:sc non-descriptor-reg) temp)))
-     (:results (result :scs ,scs))
-     (:result-types ,eltype)
-     (:generator 5
-       ,@(cond ((zerop (- word-shift n-fixnum-tag-bits))
-                `((inst add lip object index)))
-               (t
-                `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                  (inst add lip object temp))))
-       ,(ecase format
-          #+64-bit
-          (:single
-           `(inst fstore :double value lip (- (* ,offset n-word-bytes) ,lowtag)))
-          ((#-64-bit :single :double)
-           `(progn
-              (let ((real-tn (complex-reg-real-tn ,format value)))
-                (inst fstore ,format real-tn lip (- (* ,offset n-word-bytes) ,lowtag)))
-              (let ((imag-tn (complex-reg-imag-tn ,format value)))
-                (inst fstore ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))
-       (move-complex ,format result value))))
+         ,(ecase format
+            #+64-bit
+            (:single
+             `(inst fstore :double value lip (- (* ,offset n-word-bytes) ,lowtag)))
+            ((#-64-bit :single :double)
+             `(progn
+                (let ((real-tn (complex-reg-real-tn ,format value)))
+                  (inst fstore ,format real-tn lip (- (* ,offset n-word-bytes) ,lowtag)))
+                (let ((imag-tn (complex-reg-imag-tn ,format value)))
+                  (inst fstore ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))
+         (move-complex ,format result value)))))
 
 
 ;;;; Stack TN's

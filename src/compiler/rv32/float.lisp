@@ -142,31 +142,31 @@
   (make-random-tn :kind :normal :sc (sc-or-lose (format-sc format))
                   :offset (1+ (tn-offset x))))
 
-(macrolet ((def (name cost stack-sc sc op format size)
+(macrolet ((def (name cost stack-sc sc op format size a b)
              `(define-move-fun (,name ,cost) (vop x y)
                 ((,stack-sc) (,sc))
                 (let ((nfp (current-nfp-tn vop))
-                      (offset (* (tn-offset x) n-word-bytes)))
-                  (let ((real-tn (complex-reg-real-tn ,format y)))
+                      (offset (* (tn-offset ,b) n-word-bytes)))
+                  (let ((real-tn (complex-reg-real-tn ,format ,a)))
                     (inst ,op ,format real-tn nfp offset))
-                  (let ((imag-tn (complex-reg-imag-tn ,format y)))
+                  (let ((imag-tn (complex-reg-imag-tn ,format ,a)))
                     (inst ,op ,format imag-tn nfp (+ offset ,size)))))))
   #-64-bit
-  (def load-complex-single 2 complex-single-stack complex-single-reg fload :single 4)
+  (def load-complex-single 2 complex-single-stack complex-single-reg fload :single 4 y x)
   #-64-bit
-  (def store-complex-single 2 complex-single-reg complex-single-stack fstore :single 4)
-  (def load-complex-double 2 complex-double-stack complex-double-reg fload :double 8)
-  (def store-complex-double 2 complex-double-reg complex-double-stack fstore :double 8))
+  (def store-complex-single 2 complex-single-reg complex-single-stack fstore :single 4 x y)
+  (def load-complex-double 2 complex-double-stack complex-double-reg fload :double 8 y x)
+  (def store-complex-double 2 complex-double-reg complex-double-stack fstore :double 8 x y))
 
 #+64-bit
-(macrolet ((def (name cost stack-sc sc op)
+(macrolet ((def (name cost stack-sc sc op a b)
              `(define-move-fun (,name ,cost) (vop x y)
-                              ((,stack-sc) (,sc))
+                               ((,stack-sc) (,sc))
                 (let ((nfp (current-nfp-tn vop))
-                      (offset (* (tn-offset x) n-word-bytes)))
-                  (inst ,op :double y nfp offset)))))
-  (def load-complex-single 2 complex-single-stack complex-single-reg fload)
-  (def store-complex-single 2 complex-single-reg complex-single-stack fstore))
+                      (offset (* (tn-offset ,b) n-word-bytes)))
+                  (inst ,op :double ,a nfp offset)))))
+  (def load-complex-single 2 complex-single-stack complex-single-reg fload y x)
+  (def store-complex-single 2 complex-single-reg complex-single-stack fstore x y))
 
 
 ;;;
@@ -177,17 +177,20 @@
   (ecase format
     #+64-bit
     (:single
-     (inst fmove :double y x))
+     (unless (location= x y)
+       (inst fmove :double y x)))
     ((#-64-bit :single #+64-bit :double)
      (unless (location= x y)
        ;; Note the complex-float-regs are aligned to every second
        ;; float register so there is not need to worry about overlap.
        (let ((x-real (complex-reg-real-tn format x))
              (y-real (complex-reg-real-tn format y)))
-         (inst fmove format y-real x-real))
+         (unless (location= x-real y-real)
+           (inst fmove format y-real x-real)))
        (let ((x-imag (complex-reg-imag-tn format x))
              (y-imag (complex-reg-imag-tn format y)))
-         (inst fmove format y-imag x-imag))))))
+         (unless (location= x-imag y-imag)
+           (inst fmove format y-imag x-imag)))))))
 
 (define-vop (complex-single-move)
   (:args (x :scs (complex-single-reg) :target y

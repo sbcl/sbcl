@@ -297,13 +297,13 @@
                         'define-complex-float-reffer
                         'define-float-reffer)
                    ,ref-vop * ,size ,format instance-slots-offset
-                   instance-pointer-lowtag (,value-sc) ,value-primtype "raw instance access"
+                   instance-pointer-lowtag (,value-sc) ,value-primtype nil "raw instance access"
                    ,(symbolicate "%" ref-vop))
                   (,(if complexp
                         'define-complex-float-setter
                         'define-float-setter)
                    ,set-vop * ,size ,format instance-slots-offset
-                   instance-pointer-lowtag (,value-sc) ,value-primtype "raw instance store"
+                   instance-pointer-lowtag (,value-sc) ,value-primtype nil "raw instance store"
                    ,(symbolicate "%" set-vop))))))
   (define-raw-slot-float-vops single single-float single-reg 4 :single)
   (define-raw-slot-float-vops double double-float double-reg 4 :single)
