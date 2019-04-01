@@ -253,9 +253,10 @@
 ;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
 ;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
 (defun dumpable-leaflike-p (obj)
-  (sb-xc:typep obj '(or symbol number character unboxed-array
-                        #+sb-simd-pack simd-pack
-                        #+sb-simd-pack-256 simd-pack-256)))
+  (or (sb-xc:typep obj '(or symbol number character unboxed-array
+                            #+sb-simd-pack simd-pack
+                            #+sb-simd-pack-256 simd-pack-256))
+      (sb-fasl:dumpable-layout-p obj)))
 
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.

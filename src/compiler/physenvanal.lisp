@@ -466,7 +466,7 @@
                        (basic-combination-args node))))
           (ecase (cleanup-kind cleanup)
             (:special-bind
-             (code `(%special-unbind ',(leaf-source-name (lvar-value (car args))))))
+             (code `(%special-unbind ',(lvar-value (car args)))))
             (:catch
              (code `(%catch-breakup)))
             (:unwind-protect

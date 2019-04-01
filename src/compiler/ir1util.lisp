@@ -2367,23 +2367,24 @@ is :ANY, the function name is not checked."
 ;;; We are allowed to coalesce things like EQUAL strings and bit-vectors
 ;;; when file-compiling, but not when using COMPILE.
 (defun find-constant (object &optional (name nil namep))
+  ;; Pick off some objects that aren't actually constants in user code.
+  ;; These things appear as literals in forms such as `(%POP-VALUES ,x)
+  ;; acting as a magic mechanism for passing data along.
+  (when (opaque-box-p object) ; quote an object without examining it
+    (return-from find-constant (make-constant (opaque-box-value object))))
+  (when (typep object '(or lvar nlx-info restart-location))
+    ;; implicitly opaque-boxed
+    (return-from find-constant (make-constant object)))
+  ;; Note that we haven't picked off LAYOUT yet for two reasons:
+  ;;  1. layouts go in the hash-table so that a code component references
+  ;;     any given layout at most once
+  ;;  2. STANDARD-OBJECT layouts use MAKE-LOAD-FORM
   (let ((faslp (producing-fasl-file)))
-    (labels ((make-it ()
-               (when faslp
-                 (if namep
-                     (maybe-emit-make-load-forms object name)
-                     (maybe-emit-make-load-forms object)))
-               (make-constant object))
-             (core-coalesce-p (x)
+    (labels ((core-coalesce-p (x)
                ;; True for things which retain their identity under EQUAL,
                ;; so we can safely share the same CONSTANT leaf between
                ;; multiple references.
-               (or (typep x '(or symbol number character))
-                   ;; Amusingly enough, we see CLAMBDAs --among other things--
-                   ;; here, from compiling things like %ALLOCATE-CLOSUREs forms.
-                   ;; No point in stuffing them in the hash-table.
-                   (and (typep x 'instance)
-                        (not (or (leaf-p x) (node-p x))))))
+               (typep x '(or symbol number character instance)))
              (cons-coalesce-p (x)
                (if (eq +code-coverage-unmarked+ (cdr x))
                    ;; These are already coalesced, and the CAR should
@@ -2428,9 +2429,7 @@ is :ANY, the function name is not checked."
                ;; other things when file-compiling.
                (if (consp x)
                    (cons-coalesce-p x)
-                   (atom-colesce-p x)))
-             (coalescep (x)
-               (if faslp (file-coalesce-p x) (core-coalesce-p x))))
+                   (atom-colesce-p x))))
       ;; When compiling to core we don't coalesce strings, because
       ;;  "The functions eval and compile are required to ensure that literal objects
       ;;   referenced within the resulting interpreted or compiled code objects are
@@ -2445,9 +2444,20 @@ is :ANY, the function name is not checked."
       #-sb-xc-host
       (when (and (not faslp) (simple-string-p object))
         (logically-readonlyize object nil))
-      (if (and (boundp '*constants*) (coalescep object))
-          (ensure-gethash object *constants* (make-it))
-          (make-it)))))
+      (let ((hashp (and (boundp '*constants*)
+                        (if faslp
+                            (file-coalesce-p object)
+                            (core-coalesce-p object)))))
+        (awhen (and hashp (gethash object *constants*))
+          (return-from find-constant it))
+        (when (and faslp (not (sb-fasl:dumpable-layout-p object)))
+          (if namep
+              (maybe-emit-make-load-forms object name)
+              (maybe-emit-make-load-forms object)))
+        (let ((new (make-constant object)))
+          (when hashp
+            (setf (gethash object *constants*) new))
+          new)))))
 
 ;;; Return true if X and Y are lvars whose only use is a
 ;;; reference to the same leaf, and the value of the leaf cannot

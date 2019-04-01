@@ -44,7 +44,6 @@
             (:copier nil))
   (label nil :type (or null label))
   (tn nil :type (or null tn) :read-only t))
-(!set-load-form-method restart-location (:xc :target) :ignore-it)
 
 ;;; This is called during code generation in places where there is an
 ;;; "interesting" location: someplace where we are likely to end up

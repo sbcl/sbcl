@@ -2188,8 +2188,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (multiple-value-bind (creation-form init-form)
         (handler-case (sb-xc:make-load-form constant (make-null-lexenv))
           (error (condition) (sb-c:compiler-error condition)))
-      (cond ((eq creation-form :ignore-it) (values :ignore-it nil))
-            ((and (listp creation-form)
+      (cond ((and (listp creation-form)
                   (typep constant 'structure-object)
                   (typep creation-form
                          '(cons (eql new-instance) (cons symbol null)))

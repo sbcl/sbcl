@@ -207,7 +207,7 @@
           (bind-ctran (make-ctran))
           (cleanup-ctran (make-ctran)))
       (ir1-convert start bind-ctran nil
-                   `(%special-bind ',(lambda-var-specvar var) ,var))
+                   `(%special-bind ',(leaf-source-name (lambda-var-specvar var)) ,var))
       (setf (cleanup-mess-up cleanup) (ctran-use bind-ctran))
       (let ((*lexenv* (make-lexenv :cleanup cleanup)))
         (ir1-convert bind-ctran cleanup-ctran nil '(%cleanup-point))

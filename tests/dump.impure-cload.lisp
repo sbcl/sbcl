@@ -397,3 +397,8 @@
 ;; This tests the edge case: that we DO call slot-makunbound.
 (with-test (:name :mlfss-slot-makunbound)
   (assert (not (slot-boundp *fool1* 'a-slot))))
+
+(defun try-literal-layout () #.(sb-kernel:find-layout 'class-with-shared-slot))
+(with-test (:name :dump-std-obj-literal-layout)
+  (assert (eq (try-literal-layout)
+              (sb-kernel:find-layout 'class-with-shared-slot))))

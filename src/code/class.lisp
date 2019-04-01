@@ -201,7 +201,6 @@
                              ',(layout-inherits layout)
                              ',(layout-depthoid layout)
                              ',(layout-bitmap layout)))))
-(!set-load-form-method layout (:xc :target) :ignore-it)
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.

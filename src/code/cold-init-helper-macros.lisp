@@ -72,8 +72,6 @@
         ((nil) ; default
          (values '(cl:make-load-form-saving-slots obj :environment env)
                  '(sb-xc:make-load-form-saving-slots obj :environment env)))
-        (:ignore-it
-         (values '(bug "Can't :ignore-it for host") :ignore-it))
         (t
          (assert (not (member :host usable-by)))
          (values nil `(funcall ,method obj env))))

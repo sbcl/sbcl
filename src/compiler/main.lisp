@@ -2085,8 +2085,6 @@ SPEED and COMPILATION-SPEED optimization values, and the
         (sb-fasl::fop-struct
          (fasl-validate-structure constant fasl)
          t)
-        (:ignore-it
-         nil)
         (t
          (let* ((name (write-to-string constant :level 1 :length 2))
                 (info (if init-form
