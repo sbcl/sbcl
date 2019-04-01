@@ -710,15 +710,26 @@
                (:unsigned-word #-64-bit 'fcvtwu-> #+64-bit 'fcvtlu->))
             ,to-format ,dst ,src ,rm))))
 
-(flet ((fmt-funct3 (fmt)
-         (ecase fmt
-           (:single #b010)
-           (:double #b011))))
+(labels ((fmt-funct3 (fmt)
+           (ecase fmt
+             (:single #b010)
+             (:double #b011)))
+         (funct3-fmt (funct3)
+           (case funct3
+             (#b010 's)
+             (#b011 'd)
+             (t '?)))
+         (funct3-printer (funct3 stream dstate)
+           (declare (ignore dstate))
+           (princ (funct3-fmt funct3)
+                  stream)))
   (define-instruction fload (segment fmt rd rs offset)
     (:printer i ((opcode #b0000111)
+                 (rd nil :type 'fp-reg)
                  (rs1 nil :type 'reg)
-                 (rs2 nil :type 'fp-reg)
-                 (imm nil :sign-extend t)))
+                 (funct3 nil :printer #'funct3-printer)
+                 (imm nil :sign-extend t))
+              '(:name :tab funct3 ", " rd ", (" imm ")" rs1))
     (:emitter
      (emit-i-inst segment offset rs (fmt-funct3 fmt) rd #b0000111)))
 
@@ -726,7 +737,9 @@
     (:printer s ((opcode #b0100111)
                  (rs1 nil :type 'reg)
                  (rs2 nil :type 'fp-reg)
-                 (imm nil :type 's-imm)))
+                 (funct3 nil :printer #'funct3-printer)
+                 (imm nil :type 's-imm))
+              '(:name :tab funct3 ", " rs2 ", " "(" imm ")" rs1))
     (:emitter
      (emit-s-inst segment offset rs1 rs2 (fmt-funct3 fmt) #b0100111))))
 
