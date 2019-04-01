@@ -98,7 +98,7 @@
   #+(and win32 x86-64) unsigned-long-long)
 
 (deftype ui ()
-  #-(and win32 x86-64) 'word
+  #-(and win32 x86-64) 'sb-vm:word
   #+(and win32 x86-64) '(unsigned-byte 32))
 
 (deftype si ()
