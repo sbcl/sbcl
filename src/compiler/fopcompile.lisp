@@ -249,62 +249,65 @@
        (member (car form)
                '(lambda named-lambda lambda-with-lexenv))))
 
+;;; Return T if and only if OBJ's nature as an externalizable thing renders
+;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
+;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
+(defun dumpable-leaflike-p (obj)
+  (sb-xc:typep obj '(or symbol number character unboxed-array
+                        #+sb-simd-pack simd-pack
+                        #+sb-simd-pack-256 simd-pack-256)))
+
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
+;;; In particular, pathnames are not trivially dumpable because the HOST slot
+;;; might need to be dumped as a reference to the *PHYSICAL-HOST* symbol.
 (defun constant-fopcompilable-p (constant)
   (declare (optimize (debug 1))) ;; TCO
   (let ((xset (alloc-xset)))
-    (labels ((grovel (value)
-               ;; Unless VALUE is an object which which obviously
-               ;; can't contain other objects
-               ;; FIXME: OAOOM. See MAYBE-EMIT-MAKE-LOAD-FORMS.
-               (unless (sb-xc:typep value
-                              '(or #-sb-xc-host unboxed-array
-                                symbol
-                                number
-                                character
-                                string))
-                 (if (xset-member-p value xset)
-                     (return-from grovel nil)
-                     (add-to-xset value xset))
-                 (typecase value
-                   (cons
-                    (grovel (car value))
-                    (grovel (cdr value)))
-                   (simple-vector
-                    (dotimes (i (length value))
-                      (grovel (svref value i))))
-                   ((vector t)
-                    (dotimes (i (length value))
-                      (grovel (aref value i))))
-                   ((simple-array t)
-                    ;; Even though the (ARRAY T) branch does the exact
-                    ;; same thing as this branch we do this separately
-                    ;; so that the compiler can use faster versions of
-                    ;; array-total-size and row-major-aref.
-                    (dotimes (i (array-total-size value))
-                      (grovel (row-major-aref value i))))
-                   ((array t)
-                    (dotimes (i (array-total-size value))
-                      (grovel (row-major-aref value i))))
-                   (instance
-                    (case (%make-load-form value)
-                      (sb-fasl::fop-struct
-                         ;; FIXME: Why is this needed? If the constant
-                         ;; is deemed fopcompilable, then when we dump
-                         ;; it we bind *dump-only-valid-structures* to
-                         ;; NIL.
-                         (fasl-validate-structure value *compile-object*)
-                         ;; The above FIXME notwithstanding,
-                         ;; there's never a need to grovel a layout.
-                         (do-instance-tagged-slot (i value)
-                           (grovel (%instance-ref value i))))
-                      (:ignore-it)
-                      (t (return-from constant-fopcompilable-p nil))))
-                   (t
-                    (return-from constant-fopcompilable-p nil))))))
-      (grovel constant))
-    t))
+    (named-let grovel ((value constant))
+      ;; Unless VALUE is an object which which obviously
+      ;; can't contain other objects
+      (unless (dumpable-leaflike-p value)
+        (if (xset-member-p value xset)
+            (return-from grovel nil)
+            (add-to-xset value xset))
+        (typecase value
+          (cons
+           (grovel (car value))
+           (grovel (cdr value)))
+          (simple-vector
+           (dotimes (i (length value))
+             (grovel (svref value i))))
+          ((vector t)
+           (dotimes (i (length value))
+             (grovel (aref value i))))
+          ((simple-array t)
+           ;; Even though the (ARRAY T) branch does the exact
+           ;; same thing as this branch we do this separately
+           ;; so that the compiler can use faster versions of
+           ;; array-total-size and row-major-aref.
+           (dotimes (i (array-total-size value))
+             (grovel (row-major-aref value i))))
+          ((array t)
+           (dotimes (i (array-total-size value))
+             (grovel (row-major-aref value i))))
+          (instance
+           (case (%make-load-form value)
+             (sb-fasl::fop-struct
+                ;; FIXME: Why is this needed? If the constant
+                ;; is deemed fopcompilable, then when we dump
+                ;; it we bind *dump-only-valid-structures* to
+                ;; NIL.
+                (fasl-validate-structure value *compile-object*)
+                ;; The above FIXME notwithstanding,
+                ;; there's never a need to grovel a layout.
+                (do-instance-tagged-slot (i value)
+                  (grovel (%instance-ref value i))))
+             (:ignore-it)
+             (t (return-from constant-fopcompilable-p nil))))
+          (t
+           (return-from constant-fopcompilable-p nil))))))
+    t)
 
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
 ;;; FOP stack), or NIL if any value will be discarded. FOPCOMPILABLE-P

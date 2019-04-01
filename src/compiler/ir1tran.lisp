@@ -315,22 +315,10 @@
 ;;; any subparts) are dumpable at all.
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((xset (alloc-xset)))
-    (labels ((trivialp (value)
-               (sb-xc:typep value
-                      '(or
-                        #-sb-xc-host
-                        (or unboxed-array #+sb-simd-pack simd-pack
-                                          #+sb-simd-pack-256 simd-pack-256)
-                        #+sb-xc-host
-                        (and array (not (array t)))
-                        symbol
-                        number
-                        character
-                        string))) ; subsumed by UNBOXED-ARRAY
-             (grovel (value)
+    (labels ((grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
-               (unless (trivialp value)
+               (unless (dumpable-leaflike-p value)
                  (if (xset-member-p value xset)
                      (return-from grovel nil)
                      (add-to-xset value xset))
