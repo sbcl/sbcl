@@ -186,7 +186,7 @@
   (:note "inline ASH")
   (:generator 1
     (inst srai temp number (min (- amount) (1- n-word-bits)))
-    (inst andi result temp (bic-mask fixnum-tag-mask))))
+    (inst andi result temp (lognot fixnum-tag-mask))))
 
 (define-vop (fast-ash-c/unsigned=>unsigned)
   (:translate ash)
@@ -321,7 +321,7 @@
   (:temporary (:sc unsigned-reg :target result) temp)
   (:generator 3
     (inst sra temp number amount)
-    (inst andi result temp (bic-mask fixnum-tag-mask))))
+    (inst andi result temp (lognot fixnum-tag-mask))))
 
 (define-vop (#-64-bit signed-byte-32-len #+64-bit signed-byte-64-len)
   (:translate integer-length)
@@ -801,7 +801,7 @@
   (:result-types positive-fixnum)
   (:generator 15
     (inst mulhu temp x y)
-    (inst andi hi temp (bic-mask fixnum-tag-mask))))
+    (inst andi hi temp (lognot fixnum-tag-mask))))
 
 (define-vop (bignum-lognot #-64-bit lognot-mod32/unsigned=>unsigned
                            #+64-bit lognot-mod64/unsigned=>unsigned)

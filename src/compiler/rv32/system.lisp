@@ -121,7 +121,7 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst andi res ptr (bic-mask lowtag-mask))
+    (inst andi res ptr (lognot lowtag-mask))
     (inst srli res res (- n-lowtag-bits n-fixnum-tag-bits))))
 
 

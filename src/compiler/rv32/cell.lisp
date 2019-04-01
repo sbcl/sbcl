@@ -103,7 +103,7 @@
     ;; required to ensure this is explained in the comment in
     ;; objdef.lisp
     (loadw temp symbol symbol-hash-slot other-pointer-lowtag)
-    (inst andi res temp (bic-mask fixnum-tag-mask))))
+    (inst andi res temp (lognot fixnum-tag-mask))))
 
 ;;;; Fdefinition (fdefn) objects.
 (define-vop (fdefn-fun cell-ref)

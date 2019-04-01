@@ -30,7 +30,7 @@
            (inst slli ndescr rank (- word-shift n-fixnum-tag-bits))
            (inst addi ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
                                        lowtag-mask))))
-    (inst andi ndescr ndescr (bic-mask lowtag-mask))
+    (inst andi ndescr ndescr (lognot lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header

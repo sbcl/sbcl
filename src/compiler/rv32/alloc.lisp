@@ -97,7 +97,7 @@
             (t
              (inst slli bytes words (- word-shift n-fixnum-tag-bits))
              (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
-      (inst andi bytes bytes (bic-mask lowtag-mask))
+      (inst andi bytes bytes (lognot lowtag-mask))
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
       (storew length result vector-length-slot other-pointer-lowtag))))
@@ -120,7 +120,7 @@
             (t
              (inst slli bytes words (- word-shift n-fixnum-tag-bits))
              (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
-      (inst andi bytes bytes (bic-mask lowtag-mask))
+      (inst andi bytes bytes (lognot lowtag-mask))
 
       ;; FIXME: It would be good to check for stack overflow here.
       (allocation result bytes other-pointer-lowtag :flag-tn pa-flag :stack-allocate-p t)
@@ -218,7 +218,7 @@
     ;; header as the word count when allocating code.
     (unless #-64-bit (= type code-header-widetag) #+64-bit nil
       (inst addi bytes bytes (* 2 n-word-bytes)))
-    (inst andi bytes bytes (bic-mask lowtag-mask))
+    (inst andi bytes bytes (lognot lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag :flag-tn pa-flag)
       (storew header result 0 lowtag))))
