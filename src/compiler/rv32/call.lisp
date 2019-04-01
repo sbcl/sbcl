@@ -567,7 +567,7 @@
                    register-arg-names *register-arg-offsets*))
        ,@(when (eq return :fixed)
            '((:temporary (:scs (descriptor-reg) :from :eval) move-temp)))
-       
+
        (:temporary (:scs (descriptor-reg) :to :eval) stepping)
 
        ,@(unless (eq return :tail)

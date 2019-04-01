@@ -744,7 +744,7 @@
             (lo :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 4
-    (inst mulhu hi x y) 
+    (inst mulhu hi x y)
     (inst mul lo x y)
     (inst add lo lo carry-in)
     (inst sltu temp lo carry-in)

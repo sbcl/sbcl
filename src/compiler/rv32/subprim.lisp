@@ -44,7 +44,7 @@
       (test-type ptr temp loop nil (list-pointer-lowtag))
 
       (emit-label not-list)
-      
+
       (cerror-call vop 'object-not-list-error ptr)
 
       (emit-label done)
