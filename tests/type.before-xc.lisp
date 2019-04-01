@@ -28,6 +28,44 @@
 (assert (type= (specifier-type '(and (member $1.0 2 3) single-float))
                (specifier-type '(member $1.0))))
 
+(assert (typep "hello" '(and array (not (array t)))))
+(assert (typep "hello" 'string))
+(assert (typep "hello" 'simple-string))
+(assert (typep "hello" 'unboxed-array))
+(assert (typep "hello" 'simple-unboxed-array))
+
+(assert (typep #*101 '(and array (not (array t)))))
+(assert (typep #*101 'bit-vector))
+(assert (typep #*101 'simple-bit-vector))
+(assert (typep #*101 'unboxed-array))
+(assert (typep #*101 'simple-unboxed-array))
+
+;;; When the host does not have (UNSIGNED-BYTE n), this makes an excellent test.
+;;; When the host *does* have it, this test is "suspicious" (in the sense that
+;;; it would not necessarily detect a bug in our portable array logic),
+;;; but is nonetheless valid, and especially since most other lisps don't
+;;; have (UNSIGNED-BYTE 2), it's a pretty reasonable thing to check.
+(dovector (x sb-vm:*specialized-array-element-type-properties*)
+  (let ((et (sb-vm:saetp-specifier x)))
+    ;; Test the numeric array specializations.
+    (unless (member et '(nil t base-char character))
+      (let ((a (!make-specialized-array 11 et)))
+        (assert (type= (ctype-of a) (specifier-type `(simple-array ,et (11)))))
+        (assert (typep a '(and array (not (array t)))))
+        (assert (typep a `(simple-array ,et (11))))
+        (assert (typep a `(array ,et (11))))
+        (dolist (type-atom '(unboxed-array simple-unboxed-array))
+          (assert (typep a type-atom))
+          (assert (typep a `(,type-atom *)))
+          (assert (typep a `(,type-atom (*))))
+          (assert (typep a `(,type-atom (11)))))))))
+
+;;; Here it doesn't matter what we specify as element-type to MAKE-ARRAY
+;;; because it introspects as if it were SIMPLE-VECTOR due to
+;;; non-use of make-specialized-array.
+(assert (type= (ctype-of (make-array 11 :element-type '(signed-byte 8)))
+               (specifier-type '(simple-vector 11))))
+
 (assert (typep #(1 2 3) 'simple-vector))
 (assert (typep #(1 2 3) 'vector))
 (assert (not (typep '(1 2 3) 'vector)))
