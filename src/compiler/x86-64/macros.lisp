@@ -229,6 +229,16 @@
 
 ;;;; indexed references
 
+(def!type load/store-index (scale lowtag min-offset
+                                 &optional (max-offset min-offset))
+  `(integer ,(- (truncate (+ (ash 1 16)
+                             (* min-offset sb-vm:n-word-bytes)
+                             (- lowtag))
+                          scale))
+            ,(truncate (- (+ (1- (ash 1 16)) lowtag)
+                          (* max-offset sb-vm:n-word-bytes))
+                       scale)))
+
 (defmacro define-full-compare-and-swap
     (name type offset lowtag scs el-type &optional translate)
   `(progn

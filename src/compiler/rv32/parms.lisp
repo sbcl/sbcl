@@ -129,9 +129,8 @@
   error-trap)
 
 
-(defconstant-eqx +runtime-asm-routines+
-    '(call-into-lisp do-pending-interrupt)
-  #'equal)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *runtime-asm-routines* '(call-into-lisp do-pending-interrupt)))
 
 ;;;; Static symbols.
 
@@ -152,7 +151,7 @@
     *pseudo-atomic-atomic*
     *pseudo-atomic-interrupted*
 
-    ,@+runtime-asm-routines+)
+    ,@*runtime-asm-routines*)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

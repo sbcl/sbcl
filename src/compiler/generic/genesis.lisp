@@ -3218,7 +3218,7 @@ core and return a descriptor to it."
                  (* index (sb-vm:pad-data-block sb-vm:fdefn-size)))))))
 
 (defun init-runtime-routines ()
-  (dolist (symbol sb-vm::+runtime-asm-routines+)
+  (dolist (symbol sb-vm::*runtime-asm-routines*)
     (let* ((des (cold-intern symbol :gspace *static*)))
       (cold-set des (make-descriptor (lookup-assembler-reference symbol))))))
 

@@ -1459,6 +1459,11 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 extern int *context_eflags_addr(os_context_t *context);
 #endif
 
+#ifdef CALL_INTO_LISP
+#define call_into_lisp ((lispobj(*)(lispobj fun, lispobj *args, int nargs))SYMBOL(CALL_INTO_LISP)->value)
+#else
+extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+#endif
 extern void post_signal_tramp(void);
 extern void call_into_lisp_tramp(void);
 

@@ -106,13 +106,6 @@ struct interrupt_data {
 typedef lispobj (*call_into_lisp_lookalike)(
     lispobj fun, lispobj *args, int nargs);
 
-/* This is implemented in either assembly language or assembly/runtime-rtns.lisp and called from C: */
-#ifdef CALL_INTO_LISP
-#define call_into_lisp ((lispobj(*)(lispobj fun, lispobj *args, int nargs))SYMBOL(CALL_INTO_LISP)->value)
-#else
-extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs)
-#endif
-
 extern boolean interrupt_handler_pending_p(void);
 extern void interrupt_init(void);
 extern void fake_foreign_function_call(os_context_t* context);
@@ -130,7 +123,7 @@ extern boolean maybe_defer_handler(void *handler, struct interrupt_data *data,
 
 #ifdef DO_PENDING_INTERRUPT
 #define do_pending_interrupt ((void(*)(void))SYMBOL(DO_PENDING_INTERRUPT)->value)
-#elif LISP_FEATURE_GENCGC
+#elif defined(LISP_FEATURE_GENCGC)
 /* assembly language stub that executes trap_PendingInterrupt */
 extern void do_pending_interrupt(void);
 #endif

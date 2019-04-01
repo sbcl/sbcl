@@ -249,5 +249,7 @@
   (defconstant +highest-normal-generation+ 5)
   (defconstant +pseudo-static-generation+ 6))
 
+(defparameter *runtime-asm-routines* nil)
+
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)
