@@ -239,7 +239,12 @@
     (inst sub ndesc zero-tn amount)
     (inst li temp n-word-bits)
     (inst blt ndesc temp no-overflow)
-    (inst subi ndesc temp 1) ;;WRONG. YOU THINK YOURE CLEVER BUT NO
+    ;; KLUDGE: Even though this gives the wrong answer for 64-bit
+    ;; values with a shift less than -63, I think that this VOP cannot
+    ;; be selected in that case, since any positive shift amount would
+    ;; overflow. In that case, a more correct VOP would be
+    ;; selected. More testing/thinking required.
+    (inst subi ndesc temp 1)
     NO-OVERFLOW
     (ecase variant
       (:signed (inst sra result number ndesc))
@@ -373,12 +378,13 @@
       ;; optimize this.
       (loop for masker in maskers
             for shift = 1 then (ash shift 1) do
-              (inst li mask masker)
+              (inst li mask masker) ; NL1
               (let ((input (if (= shift 1) arg num)))
+                ; TEMP = NL2 ARG = NL3 NUM = NL0
                 (inst srli temp input shift)
                 (inst and num input mask))
               (inst and temp temp mask)
-              (inst add (if (= shift last) res num) num temp)))))
+              (inst add (if (= masker last) res num) num temp)))))
 
 ;;; Multiply and Divide.
 
