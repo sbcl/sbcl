@@ -163,13 +163,6 @@
                              (not (eq operator 'declare))
                              (not (special-operator-p operator))
                              (not (macro-function operator)) ; redundant check
-                             ;; We can't FOP-FUNCALL with more than 255
-                             ;; parameters. (We could theoretically use
-                             ;; APPLY, but then we'd need to construct
-                             ;; the parameter list for APPLY without
-                             ;; calling LIST, which is probably more
-                             ;; trouble than it's worth).
-                             (<= (length args) 255)
                              (every #'fopcompilable-p args)))))))))))
 
  ;; Special version of FOPCOMPILABLE-P which recognizes toplevel calls
@@ -474,18 +467,14 @@
                           (when (eq (info :function :where-from operator) :assumed)
                             (note-undefined-reference operator :function))
                           (fopcompile-constant fasl operator t)
-                          (dolist (arg args)
-                            (fopcompile arg path t))
-                          (if for-value-p
-                              (dump-fop 'sb-fasl::fop-funcall fasl)
-                              (dump-fop 'sb-fasl::fop-funcall-for-effect fasl))
-                          (let ((n-args (length args)))
-                            ;; stub: FOP-FUNCALL isn't going to be usable
-                            ;; to compile more than this, since its count
-                            ;; is a single byte. Maybe we should just punt
-                            ;; to the ordinary compiler in that case?
-                            (aver (<= n-args 255))
-                            (sb-fasl::dump-byte n-args fasl))))))))))
+                          (let ((n 0))
+                            (dolist (arg args)
+                              (incf n)
+                              (fopcompile arg path t))
+                            (if for-value-p
+                                (dump-fop 'sb-fasl::fop-funcall fasl n)
+                                (dump-fop 'sb-fasl::fop-funcall-for-effect
+                                          fasl n)))))))))))
            (t
             (bug "looks unFOPCOMPILEable: ~S" form))))))
 
@@ -502,14 +491,12 @@
          (compiler-error "~S is not a legal function name." form))))
 
 (defun fopcompile-if (fasl args path for-value-p)
-  (destructuring-bind (condition then &optional else)
-      args
+  (destructuring-bind (condition then &optional else) args
     (let ((else-label (incf *fopcompile-label-counter*))
           (end-label (incf *fopcompile-label-counter*)))
-      (sb-fasl::dump-integer else-label fasl)
       (fopcompile condition path t)
       ;; If condition was false, skip to the ELSE
-      (dump-fop 'sb-fasl::fop-skip-if-false fasl)
+      (dump-fop 'sb-fasl::fop-skip-if-false fasl else-label)
       (fopcompile then path for-value-p)
       ;; The THEN branch will have produced a value even if we were
       ;; currently skipping to the ELSE branch (or over this whole
@@ -520,18 +507,15 @@
       (when for-value-p
         (dump-fop 'sb-fasl::fop-drop-if-skipping fasl))
       ;; Now skip to the END
-      (sb-fasl::dump-integer end-label fasl)
-      (dump-fop 'sb-fasl::fop-skip fasl)
+      (dump-fop 'sb-fasl::fop-skip fasl end-label)
       ;; Start of the ELSE branch
-      (sb-fasl::dump-integer else-label fasl)
-      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl)
+      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl else-label)
       (fopcompile else path for-value-p)
       ;; As before
       (when for-value-p
         (dump-fop 'sb-fasl::fop-drop-if-skipping fasl))
       ;; End of IF
-      (sb-fasl::dump-integer end-label fasl)
-      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl)
+      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl end-label)
       ;; If we're still skipping, we must've triggered both of the
       ;; drop-if-skipping fops. To keep the stack balanced, push a
       ;; dummy value if needed.

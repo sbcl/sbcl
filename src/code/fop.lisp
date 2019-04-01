@@ -27,7 +27,7 @@
 (defmacro !define-fop (fop-code &rest stuff)
   (multiple-value-bind (name allowp operands stack-args pushp forms)
       (let ((allowp (if (eq (car stuff) :not-host)
-                        (progn (pop stuff) (or #+sb-xc t))
+                        (progn (pop stuff) (or #-sb-xc-host t))
                         t)))
         (destructuring-bind ((name &optional arglist (pushp t)) . forms) stuff
           (aver (member pushp '(nil t)))
@@ -136,7 +136,7 @@
 (!define-fop 3 (fop-truth) t)
 (!define-fop 4 (fop-push ((:operands index)))
   (ref-fop-table (fasl-input) index))
-(!define-fop 9 (fop-move-to-table (x))
+(!define-fop 5 (fop-move-to-table (x))
   (push-fop-table x (fasl-input))
   x)
 
@@ -185,12 +185,8 @@
 
 ;; Fill in object slots as dictated by the second return value from
 ;; MAKE-LOAD-FORM-SAVING-SLOTS.
-;; This wants a 'count' as the first item in the SLOT-NAMES argument
-;; rather than using read-arg because many calls of this might share
-;; the list, which must be constructed into the fop-table no matter what.
-(!define-fop 69 :not-host (fop-set-slot-values (slot-names obj) nil)
-  (let* ((n-slots (pop slot-names))
-         (stack (operand-stack))
+(!define-fop 69 :not-host (fop-set-slot-values ((:operands n-slots) slot-names obj) nil)
+  (let* ((stack (operand-stack))
          (ptr (fop-stack-pop-n stack n-slots)))
       (dotimes (i n-slots)
         (let ((val (svref stack (+ ptr i)))
@@ -203,10 +199,9 @@
 (!define-fop 64 (fop-end-group () nil)
   (throw 'fasl-group-end t))
 
-(!define-fop 62 (fop-verify-table-size () nil)
-  (let ((expected-index (read-word-arg (fasl-input-stream))))
-    (unless (= (svref (%fasl-input-table (fasl-input)) 0) expected-index)
-      (bug "fasl table of improper size"))))
+(!define-fop 62 (fop-verify-table-size ((:operands expected-index)) nil)
+  (unless (= (svref (%fasl-input-table (fasl-input)) 0) expected-index)
+    (bug "fasl table of improper size")))
 (!define-fop 63 (fop-verify-empty-stack () nil)
   (unless (fop-stack-empty-p (operand-stack))
     (bug "fasl stack not empty when it should be")))
@@ -257,27 +252,27 @@
            symbol))
 
   #-sb-xc-host (declare (inline ensure-hashed))
-  (!define-fop 80 :not-host (fop-lisp-symbol-save ((:operands length+flag)))
+  (!define-fop 77 :not-host (fop-lisp-symbol-save ((:operands length+flag)))
     (aux-fop-intern length+flag *cl-package* (fasl-input)))
-  (!define-fop 84 :not-host (fop-keyword-symbol-save ((:operands length+flag)))
+  (!define-fop 78 :not-host (fop-keyword-symbol-save ((:operands length+flag)))
     (aux-fop-intern length+flag *keyword-package* (fasl-input)))
-  (!define-fop #xF0 :not-host (fop-symbol-in-package-save ((:operands length+flag pkg-index)))
+  (!define-fop 79 :not-host (fop-symbol-in-package-save ((:operands length+flag pkg-index)))
     (aux-fop-intern length+flag (ref-fop-table (fasl-input) pkg-index) (fasl-input)))
 
-  (!define-fop 96 :not-host (fop-uninterned-symbol-save ((:operands length+flag)))
+  (!define-fop 80 :not-host (fop-uninterned-symbol-save ((:operands length+flag)))
     (multiple-value-bind (name len) (read-symbol-name length+flag (fasl-input))
       (push-fop-table (ensure-hashed (make-symbol (subseq name 0 len)))
                       (fasl-input))))
 
-  (!define-fop 104 :not-host (fop-copy-symbol-save ((:operands table-index)))
+  (!define-fop 81 :not-host (fop-copy-symbol-save ((:operands table-index)))
     (push-fop-table (ensure-hashed
                      (copy-symbol (ref-fop-table (fasl-input) table-index)))
                     (fasl-input))))
 
-(!define-fop 44 (fop-package (pkg-designator))
+(!define-fop 82 (fop-package (pkg-designator))
   (find-undeleted-package-or-lose pkg-designator))
 
-(!define-fop 156 :not-host (fop-named-package-save ((:operands length)) nil)
+(!define-fop 83 :not-host (fop-named-package-save ((:operands length)) nil)
   (let ((package-name (make-string length)))
     (read-char-string-as-varints (fasl-input-stream) package-name)
     (push-fop-table
@@ -316,6 +311,13 @@
   ;; than regular READ-BYTE. The expansion of READ-ARG corroborates this claim.
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
     (fast-read-s-integer 1)))
+
+;; There's a long tail to the distribution of FOP-BYTE-INTEGER uses,
+;; but these 4 seem to account for about half of them.
+(!define-fop 37 (fop-int-const0) 0)
+(!define-fop 38 (fop-int-const1) 1)
+(!define-fop 39 (fop-int-const2) 2)
+(!define-fop 40 (fop-int-const-neg1) -1)
 
 ;; No %MAKE-RATIO on host
 (!define-fop 70 :not-host (fop-ratio (num den)) (%make-ratio num den))
@@ -366,50 +368,25 @@
 
 ;;;; loading lists
 
-(defun fop-list-from-stack (stack n)
-  ;; N is 0-255 when called from FOP-LIST,
-  ;; but it is as large as ARRAY-RANK-LIMIT in FOP-ARRAY.
-  (declare (type (unsigned-byte 16) n)
+#-sb-xc-host
+(progn
+(defun fop-list (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
+  (declare (type index n)
            (optimize (speed 3)))
   (with-fop-stack ((stack) ptr n)
     (do* ((i (+ ptr n) (1- i))
           (res () (cons (fop-stack-ref i) res)))
          ((= i ptr) res)
       (declare (type index i)))))
-
-(!define-fop 33 (fop-list)
-  (fop-list-from-stack (operand-stack) (read-byte-arg (fasl-input-stream))))
-(!define-fop 16 (fop-list*)
-  ;; N is the number of cons cells (0 is ok)
-  (let ((n (read-byte-arg (fasl-input-stream))))
-    (with-fop-stack ((stack (operand-stack)) ptr (1+ n))
-      (do* ((i (+ ptr n) (1- i))
-            (res (fop-stack-ref (+ ptr n))
-                 (cons (fop-stack-ref i) res)))
-           ((= i ptr) res)
-        (declare (type index i))))))
-
-(macrolet ((frob (name op fun n)
-             (let ((args (make-gensym-list n)))
-               `(!define-fop ,op (,name ,args) (,fun ,@args)))))
-
-  (frob fop-list-1 17 list 1)
-  (frob fop-list-2 18 list 2)
-  (frob fop-list-3 19 list 3)
-  (frob fop-list-4 20 list 4)
-  (frob fop-list-5 21 list 5)
-  (frob fop-list-6 22 list 6)
-  (frob fop-list-7 23 list 7)
-  (frob fop-list-8 24 list 8)
-
-  (frob fop-list*-1 25 list* 2)
-  (frob fop-list*-2 26 list* 3)
-  (frob fop-list*-3 27 list* 4)
-  (frob fop-list*-4 28 list* 5)
-  (frob fop-list*-5 29 list* 6)
-  (frob fop-list*-6 30 list* 7)
-  (frob fop-list*-7 31 list* 8)
-  (frob fop-list*-8 32 list* 9))
+(defun fop-list* (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
+  (declare (type index n)
+           (optimize (speed 3)))
+  (with-fop-stack ((stack) ptr (1+ n))
+    (do* ((i (+ ptr n) (1- i))
+          (res (fop-stack-ref (+ ptr n))
+               (cons (fop-stack-ref i) res)))
+         ((= i ptr) res)
+      (declare (type index i))))))
 
 ;;;; fops for loading arrays
 
@@ -418,7 +395,7 @@
    (read-base-string-as-bytes (fasl-input-stream)
                               (make-string length :element-type 'base-char))))
 
-(!define-fop 160 :not-host (fop-character-string ((:operands length)))
+(!define-fop 101 :not-host (fop-character-string ((:operands length)))
   (logically-readonlyize
    (read-char-string-as-varints (fasl-input-stream) (make-string length))))
 
@@ -433,15 +410,12 @@
         (logically-readonlyize res))))
 
 ;; No MAKE-ARRAY-HEADER on host
-(!define-fop 89 :not-host (fop-array (vec))
-  (let* ((rank (read-word-arg (fasl-input-stream)))
-         (length (length vec))
-         (res (make-array-header sb-vm:simple-array-widetag rank)))
+(!define-fop 89 :not-host (fop-array ((:operands rank) vec))
+  (let ((length (length vec))
+        (res (make-array-header sb-vm:simple-array-widetag rank)))
     (declare (simple-array vec)
              (type (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits)) rank))
-    (set-array-header res vec length nil 0
-                      (fop-list-from-stack (operand-stack) rank)
-                      nil t)
+    (set-array-header res vec length nil 0 (fop-list (fasl-input) rank) nil t)
     res))
 
 (defglobal **saetp-bits-per-length**
@@ -458,9 +432,8 @@
                **saetp-bits-per-length**))
 
 ;; No ALLOCATE-VECTOR on host (nor READ-N-BYTES)
-(!define-fop 43 :not-host (fop-spec-vector)
-  (let* ((length (read-word-arg (fasl-input-stream)))
-         (widetag (read-byte-arg (fasl-input-stream)))
+(!define-fop 43 :not-host (fop-spec-vector  ((:operands length)))
+  (let* ((widetag (read-byte-arg (fasl-input-stream)))
          (bits-per-length (aref **saetp-bits-per-length** widetag))
          (bits (progn (aver (< bits-per-length 255))
                       (* length bits-per-length)))
@@ -486,58 +459,47 @@
     (eval expr))
   nil)
 
-(defun fop-funcall* (input-stream stack skipping)
- (let ((argc (read-byte-arg input-stream)))
-   (with-fop-stack ((stack) ptr (1+ argc))
-     (unless skipping
-       (do ((i (+ ptr argc))
-            (args))
-           ((= i ptr) (apply (fop-stack-ref i) args))
-         (declare (type index i))
-         (push (fop-stack-ref i) args)
-         (decf i))))))
+(defun fop-funcall* (argc stack skipping)
+  (with-fop-stack ((stack) ptr (1+ argc))
+    (unless skipping
+      (do ((i (+ ptr argc))
+           (args))
+          ((= i ptr) (apply (fop-stack-ref i) args))
+        (declare (type index i))
+        (push (fop-stack-ref i) args)
+        (decf i)))))
 
-;; FIXME: there should be a syntax to share these identical bodies
-(!define-fop 55 (fop-funcall)
-  (fop-funcall* (fasl-input-stream) (operand-stack) (skip-until)))
-(!define-fop 56 (fop-funcall-for-effect () nil)
-  (fop-funcall* (fasl-input-stream) (operand-stack) (skip-until)))
+(!define-fop 55 (fop-funcall ((:operands n)))
+  (fop-funcall* n (operand-stack) (skip-until)))
+(!define-fop 56 (fop-funcall-for-effect ((:operands n)) nil)
+  (fop-funcall* n (operand-stack) (skip-until)))
 
 ;;; For LOAD-TIME-VALUE which is used for MAKE-LOAD-FORM
-(!define-fop 57 (fop-funcall-no-skip)
-  (fop-funcall* (fasl-input-stream) (operand-stack) nil))
+(!define-fop 57 (fop-funcall-no-skip ((:operands n)))
+  (fop-funcall* n (operand-stack) nil))
 
 ;;;; fops for fixing up circularities
 
-(!define-fop 200 (fop-rplaca (val) nil)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
-        (idx (read-word-arg (fasl-input-stream))))
+(!define-fop 11 (fop-rplaca ((:operands tbl-slot idx) val) nil)
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (setf (car (nthcdr idx obj)) val)))
 
-(!define-fop 201 (fop-rplacd (val) nil)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
-        (idx (read-word-arg (fasl-input-stream))))
+(!define-fop 12 (fop-rplacd ((:operands tbl-slot idx) val) nil)
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (setf (cdr (nthcdr idx obj)) val)))
 
-(!define-fop 202 (fop-svset (val) nil)
-  (let* ((obi (read-word-arg (fasl-input-stream)))
-         (obj (ref-fop-table (fasl-input) obi))
-         (idx (read-word-arg (fasl-input-stream))))
+(!define-fop 13 (fop-svset ((:operands tbl-slot idx) val) nil)
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (if (%instancep obj) ; suspicious. should have been FOP-STRUCTSET
         #+sb-xc (setf (%instance-ref obj idx) val)
         #-sb-xc (bug "%instance-set?")
         (setf (svref obj idx) val))))
 
-(!define-fop 204 :not-host (fop-structset (val) nil)
-  (setf (%instance-ref (ref-fop-table (fasl-input)
-                                      (read-word-arg (fasl-input-stream)))
-                       (read-word-arg (fasl-input-stream)))
-        val))
+(!define-fop 14 :not-host (fop-structset ((:operands tbl-slot idx) val) nil)
+  (setf (%instance-ref (ref-fop-table (fasl-input) tbl-slot) idx) val))
 
-;;; In the original CMUCL code, this actually explicitly declared PUSHP
-;;; to be T, even though that's what it defaults to in DEFINE-FOP.
-(!define-fop 203 (fop-nthcdr (obj))
-  (nthcdr (read-word-arg (fasl-input-stream)) obj))
+(!define-fop 15 (fop-nthcdr ((:operands n) obj))
+  (nthcdr n obj))
 
 ;;;; fops for loading functions
 
@@ -549,16 +511,15 @@
 ;;; fasl file header.)
 
 ;; Cold-load calls COLD-LOAD-CODE instead
-(!define-fop #xE0 :not-host (fop-load-code ((:operands immobile-p
-                                                       n-boxed-words
-                                                       n-code-bytes)))
-  (let ((n-constants (- n-boxed-words sb-vm:code-constants-offset)))
+(!define-fop 16 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
+  (let* ((n-boxed-words (ash header -1))
+         (n-constants (- n-boxed-words sb-vm:code-constants-offset)))
     ;; stack has (at least) N-CONSTANTS words plus debug-info
     (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
       (let* ((debug-info-index (+ ptr n-constants))
              (n-boxed-words (+ sb-vm:code-constants-offset n-constants))
              (code (sb-c:allocate-code-object
-                    (if (eql immobile-p 1) :immobile :dynamic)
+                    (if (oddp header) :immobile :dynamic)
                     (align-up n-boxed-words sb-c::code-boxed-words-align)
                     n-code-bytes)))
         (setf (%code-debug-info code) (svref stack debug-info-index))
@@ -567,7 +528,7 @@
               do (setf (code-header-ref code i) (svref stack j)))
         (with-pinned-objects (code)
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
-          (sb-c::apply-fasl-fixups stack code))
+          (sb-c::apply-fasl-fixups stack code n-fixups))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
@@ -577,22 +538,22 @@
 
 ;; this gets you an #<fdefn> object, not the result of (FDEFINITION x)
 ;; cold-loader uses COLD-FDEFINITION-OBJECT instead.
-(!define-fop 60 :not-host (fop-fdefn (name))
+(!define-fop 17 :not-host (fop-fdefn (name))
   (awhen (deprecated-thing-p 'function name) ; returns the stage of deprecation
     (pushnew (list* it name :function)
              (%fasl-input-deprecated-stuff (fasl-input)) :test 'equal))
   (find-or-create-fdefn name))
 
-(!define-fop 65 :not-host (fop-known-fun (name))
+(!define-fop 18 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
 ;;; Modify a slot in a CONSTANTS object.
-(!define-fop 140 :not-host (fop-alter-code ((:operands index) code value) nil)
+(!define-fop 19 :not-host (fop-alter-code ((:operands index) code value) nil)
   (setf (code-header-ref code index) value)
   (values))
 
-(!define-fop #xFC :not-host (fop-fun-entry ((:operands fun-index)
-                                            code-object name arglist type info))
+(!define-fop 20 :not-host (fop-fun-entry ((:operands fun-index)
+                                           code-object name arglist type info))
   (let ((fun (%code-entry-point code-object fun-index)))
     (setf (%simple-fun-name fun) name)
     (setf (%simple-fun-arglist fun) arglist)
@@ -614,7 +575,7 @@
 
 ;;;; assemblerish fops
 
-(!define-fop 144 (fop-assembler-code)
+(!define-fop 21 (fop-assembler-code)
   (error "cannot load assembler code except at cold load"))
 
 ;;; FOPs needed for implementing an IF operator in a FASL
@@ -624,33 +585,33 @@
 ;;; for ones that a) funcall/eval b) start skipping. This needs to
 ;;; be done to ensure that the fop table gets populated correctly
 ;;; regardless of the execution path.
-(!define-fop 151 (fop-skip (position) nil)
+(!define-fop 6 (fop-skip ((:operands position)) nil)
   (unless (skip-until)
     (setf (skip-until) position))
   (values))
 
 ;;; As before, but only start skipping if the top of the FOP stack is NIL.
-(!define-fop 152 (fop-skip-if-false (position condition) nil)
+(!define-fop 7 (fop-skip-if-false ((:operands position) condition) nil)
   (unless (or condition (skip-until))
     (setf (skip-until) position))
   (values))
 
 ;;; If skipping, pop the top of the stack and discard it. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
-(!define-fop 153 (fop-drop-if-skipping () nil)
+(!define-fop 8 (fop-drop-if-skipping () nil)
   (when (skip-until)
     (fop-stack-pop-n (operand-stack) 1))
   (values))
 
 ;;; If skipping, push a dummy value on the stack. Needed for
 ;;; ensuring that the stack stays balanced when skipping.
-(!define-fop 154 (fop-push-nil-if-skipping () nil)
+(!define-fop 9 (fop-push-nil-if-skipping () nil)
   (when (skip-until)
     (push-fop-stack nil (fasl-input)))
   (values))
 
 ;;; Stop skipping if the top of the stack matches SKIP-UNTIL
-(!define-fop 155 (fop-maybe-stop-skipping (label) nil)
+(!define-fop 10 (fop-maybe-stop-skipping ((:operands label)) nil)
   (when (eql (skip-until) label)
     (setf (skip-until) nil))
   (values))

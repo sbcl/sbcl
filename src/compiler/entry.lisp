@@ -63,19 +63,10 @@
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
-    (let (#-sb-xc-host
-          (form (functional-inline-expansion internal-fun))
+    (let ((form (functional-inline-expansion internal-fun))
           (doc (functional-documentation internal-fun))
           (xrefs (pack-xref-data (functional-xref internal-fun))))
       (setf (entry-info-form/doc/xrefs info)
-            ;; Simpler case for cross-compiler for two reasons:
-            ;; (1) It doesn't make sense to handle the condition
-            ;; that won't ever be signaled.
-            ;; (2) More importantly, I don't want to emulate
-            ;; SET-SIMPLE-FUN-INFO in genesis.
-            #+sb-xc-host
-            (if (and doc xrefs) (cons doc xrefs) (or doc xrefs))
-            #-sb-xc-host
             (list (if (fasl-output-p *compile-object*)
                       (and (policy bind (= store-source-form 3))
                            ;; Downgrade the error to a warning if this was signaled

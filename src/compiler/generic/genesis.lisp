@@ -2446,48 +2446,15 @@ core and return a descriptor to it."
 
 ;;; Make a list of the top LENGTH things on the fop stack. The last
 ;;; cdr of the list is set to LAST.
-(defmacro cold-stack-list (length last)
-  `(do* ((index ,length (1- index))
-         (result ,last (cold-cons (pop-stack) result)))
-        ((= index 0) result)
-     (declare (fixnum index))))
-
-(define-cold-fop (fop-list)
-  (cold-stack-list (read-byte-arg (fasl-input-stream)) *nil-descriptor*))
-(define-cold-fop (fop-list*)
-  (cold-stack-list (read-byte-arg (fasl-input-stream)) (pop-stack)))
-(define-cold-fop (fop-list-1)
-  (cold-stack-list 1 *nil-descriptor*))
-(define-cold-fop (fop-list-2)
-  (cold-stack-list 2 *nil-descriptor*))
-(define-cold-fop (fop-list-3)
-  (cold-stack-list 3 *nil-descriptor*))
-(define-cold-fop (fop-list-4)
-  (cold-stack-list 4 *nil-descriptor*))
-(define-cold-fop (fop-list-5)
-  (cold-stack-list 5 *nil-descriptor*))
-(define-cold-fop (fop-list-6)
-  (cold-stack-list 6 *nil-descriptor*))
-(define-cold-fop (fop-list-7)
-  (cold-stack-list 7 *nil-descriptor*))
-(define-cold-fop (fop-list-8)
-  (cold-stack-list 8 *nil-descriptor*))
-(define-cold-fop (fop-list*-1)
-  (cold-stack-list 1 (pop-stack)))
-(define-cold-fop (fop-list*-2)
-  (cold-stack-list 2 (pop-stack)))
-(define-cold-fop (fop-list*-3)
-  (cold-stack-list 3 (pop-stack)))
-(define-cold-fop (fop-list*-4)
-  (cold-stack-list 4 (pop-stack)))
-(define-cold-fop (fop-list*-5)
-  (cold-stack-list 5 (pop-stack)))
-(define-cold-fop (fop-list*-6)
-  (cold-stack-list 6 (pop-stack)))
-(define-cold-fop (fop-list*-7)
-  (cold-stack-list 7 (pop-stack)))
-(define-cold-fop (fop-list*-8)
-  (cold-stack-list 8 (pop-stack)))
+(macrolet ((cold-stack-list (length last)
+             `(do* ((index ,length (1- index))
+                    (result ,last (cold-cons (pop-fop-stack stack) result)))
+                   ((= index 0) result)
+                (declare (fixnum index)))))
+  (defun fop-list (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
+    (cold-stack-list n *nil-descriptor*))
+  (defun fop-list* (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
+    (cold-stack-list n (pop-fop-stack stack))))
 
 ;;;; cold fops for loading vectors
 
@@ -2515,9 +2482,8 @@ core and return a descriptor to it."
                              (pop-stack)))
         (set-readonly result))))
 
-(define-cold-fop (fop-spec-vector)
-  (let* ((len (read-word-arg (fasl-input-stream)))
-         (type (read-byte-arg (fasl-input-stream)))
+(define-cold-fop (fop-spec-vector (len))
+  (let* ((type (read-byte-arg (fasl-input-stream)))
          (sizebits (aref **saetp-bits-per-length** type))
          (result (progn (aver (< sizebits 255))
                         (allocate-vector-object *dynamic* sizebits len type)))
@@ -2532,7 +2498,7 @@ core and return a descriptor to it."
                                     :end end)
     (set-readonly result)))
 
-(not-cold-fop fop-array)
+; (not-cold-fop fop-array) ; the syntax doesn't work
 #+nil
 ;; This code is unexercised. The only use of FOP-ARRAY is from target-dump.
 ;; It would be a shame to delete it though, as it might come in handy.
@@ -2577,6 +2543,10 @@ core and return a descriptor to it."
 (define-cold-number-fop fop-complex-single-float)
 (define-cold-number-fop fop-complex-double-float)
 (define-cold-number-fop fop-integer (n-bytes))
+(define-cold-number-fop fop-int-const0)
+(define-cold-number-fop fop-int-const1)
+(define-cold-number-fop fop-int-const2)
+(define-cold-number-fop fop-int-const-neg1)
 
 (define-cold-fop (fop-ratio)
   (let ((den (pop-stack)))
@@ -2593,18 +2563,17 @@ core and return a descriptor to it."
 
 (defvar *load-time-value-counter*)
 
-(flet ((pop-args (fasl-input)
+(flet ((pop-args (argc fasl-input)
          (let ((args)
                (stack (%fasl-input-stack fasl-input)))
-           (dotimes (i (read-byte-arg (%fasl-input-stream fasl-input))
-                       (values (pop-fop-stack stack) args))
+           (dotimes (i argc (values (pop-fop-stack stack) args))
              (push (pop-fop-stack stack) args))))
        (call (fun-name handler-name args)
          (acond ((get fun-name handler-name) (apply it args))
                 (t (error "Can't ~S ~S in cold load" handler-name fun-name)))))
 
-  (define-cold-fop (fop-funcall)
-    (multiple-value-bind (fun args) (pop-args (fasl-input))
+  (define-cold-fop (fop-funcall (n))
+    (multiple-value-bind (fun args) (pop-args n (fasl-input))
       (if args
           (case fun
            (fdefinition
@@ -2620,8 +2589,8 @@ core and return a descriptor to it."
             (setf *load-time-value-counter* (1+ counter))
             (make-ltv-patch counter)))))
 
-  (define-cold-fop (fop-funcall-for-effect)
-    (multiple-value-bind (fun args) (pop-args (fasl-input))
+  (define-cold-fop (fop-funcall-for-effect (n))
+    (multiple-value-bind (fun args) (pop-args n (fasl-input))
       (if (not args)
           (push fun *!cold-toplevels*)
           (case fun
@@ -2659,19 +2628,16 @@ core and return a descriptor to it."
 
 ;;;; cold fops for fixing up circularities
 
-(define-cold-fop (fop-rplaca)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
-        (idx (read-word-arg (fasl-input-stream))))
+(define-cold-fop (fop-rplaca (tbl-slot idx))
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (write-wordindexed (cold-nthcdr idx obj) 0 (pop-stack))))
 
-(define-cold-fop (fop-rplacd)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
-        (idx (read-word-arg (fasl-input-stream))))
+(define-cold-fop (fop-rplacd (tbl-slot idx))
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (write-wordindexed (cold-nthcdr idx obj) 1 (pop-stack))))
 
-(define-cold-fop (fop-svset)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
-        (idx (read-word-arg (fasl-input-stream))))
+(define-cold-fop (fop-svset (tbl-slot idx))
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (write-wordindexed obj
                    (+ idx
                       (ecase (descriptor-lowtag obj)
@@ -2679,13 +2645,12 @@ core and return a descriptor to it."
                         (#.sb-vm:other-pointer-lowtag 2)))
                    (pop-stack))))
 
-(define-cold-fop (fop-structset)
-  (let ((obj (ref-fop-table (fasl-input) (read-word-arg (fasl-input-stream))))
-        (idx (read-word-arg (fasl-input-stream))))
+(define-cold-fop (fop-structset (tbl-slot idx))
+  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
     (write-wordindexed obj (+ idx sb-vm:instance-slots-offset) (pop-stack))))
 
-(define-cold-fop (fop-nthcdr)
-  (cold-nthcdr (read-word-arg (fasl-input-stream)) (pop-stack)))
+(define-cold-fop (fop-nthcdr (n))
+  (cold-nthcdr n (pop-stack)))
 
 (defun cold-nthcdr (index obj)
   (dotimes (i index)
@@ -2706,45 +2671,43 @@ core and return a descriptor to it."
 ;;; fixups (or function headers) are applied.
 (defvar *show-pre-fixup-code-p* nil)
 
-(define-cold-fop (fop-load-code (immobile-p n-boxed-words code-size))
-  (progn immobile-p) ; potentially unused
+(define-cold-fop (fop-load-code (header code-size n-fixups))
   (let* (;; The number of constants is rounded up to even (if required)
-            ;; to ensure that the code vector will be properly aligned.
-            (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
-            (debug-info (pop-stack))
-            (des (allocate-cold-descriptor
-                  (or #+immobile-code (and (eql immobile-p 1) *immobile-varyobj*)
+         ;; to ensure that the code vector will be properly aligned.
+         (n-boxed-words (ash header -1))
+         (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
+         (debug-info (pop-stack))
+         (des (allocate-cold-descriptor
+                  (or #+immobile-code (and (oddp header) *immobile-varyobj*)
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
-      (write-code-header-words des aligned-n-boxed-words code-size
-                               (incf *code-serialno*))
-       (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
-       (do ((index (1- n-boxed-words) (1- index)))
-           ((< index sb-vm:code-constants-offset))
-         (let ((obj (pop-stack)))
-           (if (and (consp obj) (eq (car obj) :known-fun))
-               (push (list* (cdr obj) des index) *deferred-known-fun-refs*)
-               (write-wordindexed des index obj))))
-       (let* ((start (+ (descriptor-byte-offset des)
-                        (ash aligned-n-boxed-words sb-vm:word-shift)))
-              (end (+ start code-size)))
-         (read-bigvec-as-sequence-or-die (descriptor-mem des)
-                                         (fasl-input-stream)
-                                         :start start
-                                         :end end)
-         (when *show-pre-fixup-code-p*
-           (format *trace-output*
-                   "~&LOAD-CODE: ~d header words, ~d code bytes.~%"
-                   n-boxed-words code-size)
-           (do ((i start (+ i sb-vm:n-word-bytes)))
-               ((>= i end))
-             (format *trace-output*
-                     " ~X: ~V,'.X~%"
-                     (+ i (gspace-byte-address (descriptor-gspace des)))
-                     (* 2 sb-vm:n-word-bytes)
-                     (bvref-word (descriptor-mem des) i)))))
-       (apply-fixups (%fasl-input-stack (fasl-input)) des)))
+    (write-code-header-words des aligned-n-boxed-words code-size
+                             (incf *code-serialno*))
+    (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
+    (do ((index (1- n-boxed-words) (1- index)))
+        ((< index sb-vm:code-constants-offset))
+        (let ((obj (pop-stack)))
+          (if (and (consp obj) (eq (car obj) :known-fun))
+              (push (list* (cdr obj) des index) *deferred-known-fun-refs*)
+              (write-wordindexed des index obj))))
+    (let* ((start (+ (descriptor-byte-offset des)
+                     (ash aligned-n-boxed-words sb-vm:word-shift)))
+           (end (+ start code-size)))
+      (read-bigvec-as-sequence-or-die (descriptor-mem des) (fasl-input-stream)
+                                      :start start :end end)
+      (when *show-pre-fixup-code-p*
+        (format *trace-output*
+                "~&LOAD-CODE: ~d header words, ~d code bytes.~%"
+                n-boxed-words code-size)
+        (do ((i start (+ i sb-vm:n-word-bytes)))
+            ((>= i end))
+          (format *trace-output*
+                  " ~X: ~V,'.X~%"
+                  (+ i (gspace-byte-address (descriptor-gspace des)))
+                  (* 2 sb-vm:n-word-bytes)
+                  (bvref-word (descriptor-mem des) i)))))
+    (apply-fixups (%fasl-input-stack (fasl-input)) des n-fixups)))
 
 (defun resolve-deferred-known-funs ()
   (dolist (item *deferred-known-fun-refs*)
@@ -2794,12 +2757,24 @@ core and return a descriptor to it."
     (write-wordindexed fn sb-vm:simple-fun-name-slot name)
     (write-wordindexed fn sb-vm:simple-fun-arglist-slot arglist)
     (write-wordindexed fn sb-vm:simple-fun-type-slot type)
-    (write-wordindexed fn sb-vm:simple-fun-info-slot info)
+    ;; Emulate SET-SIMPLE-FUN-INFO
+    (aver (cold-null (cold-car info))) ; no source form
+    (let* ((doc (cold-car (cold-cdr info)))
+           (docp (not (cold-null doc)))
+           (xref (cold-car (cold-cdr (cold-cdr info))))
+           (xrefp (not (cold-null xref))))
+      (write-wordindexed fn sb-vm:simple-fun-info-slot
+                         (cond ((and docp xrefp) (cold-cons doc xref))
+                               (docp doc)
+                               (xrefp xref)
+                               (t *nil-descriptor*))))
     fn))
 
 (define-cold-fop (fop-assembler-code)
   (aver (not *cold-assembler-obj*))
   (let* ((length (read-word-arg (fasl-input-stream)))
+         (n-routines (read-word-arg (fasl-input-stream)))
+         (n-fixups (read-word-arg (fasl-input-stream)))
          (rounded-length (round-up length (* 2 sb-vm:n-word-bytes)))
          (header-n-words
           ;; Note: we round the number of constants up to ensure that
@@ -2820,15 +2795,15 @@ core and return a descriptor to it."
                                       :start start
                                       :end (+ start length)))
     ;; Update the name -> address table.
-    (dotimes (i (descriptor-fixnum (pop-stack)))
+    (dotimes (i n-routines)
       (let ((offset (descriptor-fixnum (pop-stack)))
             (name (pop-stack)))
         (push (cons name offset) *cold-assembler-routines*)))
-    (apply-fixups (%fasl-input-stack (fasl-input)) asm-code)))
+    (apply-fixups (%fasl-input-stack (fasl-input)) asm-code n-fixups)))
 
 ;;; Target variant of this is defined in 'target-load'
-(defun apply-fixups (fop-stack code-obj)
-  (dotimes (i (descriptor-fixnum (pop-fop-stack fop-stack)) code-obj)
+(defun apply-fixups (fop-stack code-obj n-fixups)
+  (dotimes (i n-fixups code-obj)
     (binding* ((info (descriptor-fixnum (pop-fop-stack fop-stack)))
                (sym (pop-fop-stack fop-stack))
                ((offset kind flavor) (!unpack-fixup-info info)))

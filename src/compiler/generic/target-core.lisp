@@ -125,10 +125,10 @@
          #-(or x86 x86-64)
          (sb-vm:sanctify-for-execution code-obj)))
 
-  (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
+  (defun apply-fasl-fixups (fop-stack code-obj n-fixups &aux (top (svref fop-stack 0)))
     (dx-let ((preserved (make-array 4 :initial-element nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
-        (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
+        (dotimes (i n-fixups (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
               (sb-fasl::!unpack-fixup-info (pop-fop-stack))
             (fixup code-obj offset (pop-fop-stack) kind flavor

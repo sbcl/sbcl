@@ -313,9 +313,7 @@
     (aver (zerop (hash-table-count (fasl-output-patch-table fasl-output))))
     ;; End the group.
     (dump-fop 'fop-verify-empty-stack fasl-output)
-    (dump-fop 'fop-verify-table-size fasl-output)
-    (dump-word (fasl-output-table-free fasl-output)
-               fasl-output)
+    (dump-fop 'fop-verify-table-size fasl-output (fasl-output-table-free fasl-output))
     (dump-fop 'fop-end-group fasl-output))
 
   ;; That's all, folks.
@@ -427,17 +425,17 @@
           (do ((current enclosing (cdr current))
                (i 0 (1+ i)))
               ((eq current value)
-               (dump-fop 'fop-nthcdr file)
-               (dump-word i file))
+               (dump-fop 'fop-nthcdr file i))
             (declare (type index i)))))
 
-      (ecase (circularity-type info)
-        (:rplaca     (dump-fop 'fop-rplaca    file))
-        (:rplacd     (dump-fop 'fop-rplacd    file))
-        (:svset      (dump-fop 'fop-svset     file))
-        (:struct-set (dump-fop 'fop-structset file)))
-      (dump-word (gethash (circularity-object info) table) file)
-      (dump-word (circularity-index info) file))))
+      (dump-byte (ecase (circularity-type info)
+                   (:rplaca     #.(get 'fop-rplaca 'opcode))
+                   (:rplacd     #.(get 'fop-rplacd 'opcode))
+                   (:svset      #.(get 'fop-svset 'opcode))
+                   (:struct-set #.(get 'fop-structset 'opcode)))
+                 file)
+      (dump-varint (gethash (circularity-object info) table) file)
+      (dump-varint (circularity-index info) file))))
 
 ;;; Set up stuff for circularity detection, then dump an object. All
 ;;; shared and circular structure will be exactly preserved within a
@@ -469,9 +467,8 @@
     (dump-push handle file)
     ;; Can't skip MAKE-LOAD-FORM due to later references
     (if no-skip
-        (dump-fop 'fop-funcall-no-skip file)
-        (dump-fop 'fop-funcall file))
-    (dump-byte 0 file))
+        (dump-fop 'fop-funcall-no-skip file 0)
+        (dump-fop 'fop-funcall file 0)))
   (dump-pop file))
 
 ;;; Return T iff CONSTANT has already been dumped. It's been dumped if
@@ -509,8 +506,13 @@
 (defun dump-integer (n file)
   (typecase n
     ((signed-byte 8)
-     (dump-fop 'fop-byte-integer file)
-     (dump-byte (logand #xFF n) file))
+     (case n
+       (0  (dump-fop 'fop-int-const0 file))
+       (1  (dump-fop 'fop-int-const1 file))
+       (2  (dump-fop 'fop-int-const2 file))
+       (-1 (dump-fop 'fop-int-const-neg1 file))
+       (t  (dump-fop 'fop-byte-integer file)
+           (dump-byte (logand #xFF n) file))))
     ((unsigned-byte #.(1- sb-vm:n-word-bits))
      (dump-fop 'fop-word-integer file)
      (dump-word n file))
@@ -659,51 +661,25 @@
                 (t
                  (sub-dump-object obj file))))))))
 
+(defconstant fop-list-base-opcode 128)
+
 (defun terminate-dotted-list (n file)
   (declare (type index n) (type fasl-output file))
-  (case n
-    (1 (dump-fop 'fop-list*-1 file))
-    (2 (dump-fop 'fop-list*-2 file))
-    (3 (dump-fop 'fop-list*-3 file))
-    (4 (dump-fop 'fop-list*-4 file))
-    (5 (dump-fop 'fop-list*-5 file))
-    (6 (dump-fop 'fop-list*-6 file))
-    (7 (dump-fop 'fop-list*-7 file))
-    (8 (dump-fop 'fop-list*-8 file))
-    (t (do ((nn n (- nn 255)))
-           ((< nn 256)
-            (dump-fop 'fop-list* file)
-            (dump-byte nn file))
-         (declare (type index nn))
-         (dump-fop 'fop-list* file)
-         (dump-byte 255 file)))))
-
-;;; If N > 255, must build list with one LIST operator, then LIST*
-;;; operators.
+  (aver (plusp n))
+  (cond ((< n 16)
+         (dump-byte (logior fop-list-base-opcode #b10000 n) file))
+        (t
+         (dump-byte (logior fop-list-base-opcode #b10000) file)
+         (dump-varint (- n 16) file))))
 
 (defun terminate-undotted-list (n file)
   (declare (type index n) (type fasl-output file))
-  (case n
-    (1 (dump-fop 'fop-list-1 file))
-    (2 (dump-fop 'fop-list-2 file))
-    (3 (dump-fop 'fop-list-3 file))
-    (4 (dump-fop 'fop-list-4 file))
-    (5 (dump-fop 'fop-list-5 file))
-    (6 (dump-fop 'fop-list-6 file))
-    (7 (dump-fop 'fop-list-7 file))
-    (8 (dump-fop 'fop-list-8 file))
-    (t (cond ((< n 256)
-              (dump-fop 'fop-list file)
-              (dump-byte n file))
-             (t (dump-fop 'fop-list file)
-                (dump-byte 255 file)
-                (do ((nn (- n 255) (- nn 255)))
-                    ((< nn 256)
-                     (dump-fop 'fop-list* file)
-                     (dump-byte nn file))
-                  (declare (type index nn))
-                  (dump-fop 'fop-list* file)
-                  (dump-byte 255 file)))))))
+  (aver (plusp n))
+  (cond ((< n 16)
+         (dump-byte (logior fop-list-base-opcode n) file))
+        (t
+         (dump-byte (logior fop-list-base-opcode) file)
+         (dump-varint (- n 16) file))))
 
 ;;;; array dumping
 
@@ -803,8 +779,7 @@
                  ((<= bits 0) output)))
            (dump-unsigned-vector (widetag bytes bits)
              (unless data-only
-               (dump-fop 'fop-spec-vector file)
-               (dump-word (length vector) file)
+               (dump-fop 'fop-spec-vector file (length vector))
                (dump-byte widetag file))
              (dovector (i vector)
                (dump-integer-as-n-bytes
@@ -857,8 +832,7 @@
          (bits-per-length (aref **saetp-bits-per-length** widetag)))
     (aver (< bits-per-length 255))
     (unless data-only
-      (dump-fop 'fop-spec-vector file)
-      (dump-word length file)
+      (dump-fop 'fop-spec-vector file length)
       (dump-byte widetag file))
     (dump-raw-bytes vector
                     (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
@@ -975,7 +949,7 @@
 ;;;  - everything else: a symbol for the name.
 (defun dump-fixups (fixups fasl-output &aux (n 0))
   (declare (list fixups) (type fasl-output fasl-output))
-  (dolist (note fixups)
+  (dolist (note fixups n)
     (let* ((fixup (fixup-note-fixup note))
            (name (fixup-name fixup))
            (flavor (fixup-flavor fixup))
@@ -998,8 +972,7 @@
               ((:named-call :static-call) name))))
       (dump-object operand fasl-output)
       (dump-integer info fasl-output))
-    (incf n))
-  (dump-integer n fasl-output))
+    (incf n)))
 
 ;;; Dump out the constant pool and code-vector for component, push the
 ;;; result in the table, and return the offset.
@@ -1017,8 +990,8 @@
   (declare (type component component)
            (type index code-length)
            (type fasl-output fasl-output))
-  (dump-fixups fixups fasl-output)
-  (let* ((2comp (component-info component))
+  (let* ((n-fixups (dump-fixups fixups fasl-output))
+         (2comp (component-info component))
          (constants (sb-c:ir2-component-constants 2comp))
          (header-length (length constants)))
     (collect ((patches))
@@ -1062,8 +1035,9 @@
         (dump-object info fasl-output))
 
       (dump-fop 'fop-load-code fasl-output
-                (if (sb-c::code-immobile-p component) 1 0)
-                header-length code-length)
+                (logior (ash header-length 1)
+                        (if (sb-c::code-immobile-p component) 1 0))
+                code-length n-fixups)
 
       (dump-segment code-segment code-length fasl-output)
 
@@ -1077,23 +1051,22 @@
 ;;; This is only called from assemfile, which doesn't exist in the target.
 #+sb-xc-host
 (defun dump-assembler-routines (code-segment octets fixups routines file)
-  (dump-fixups fixups file)
-
-  ;; Mapping from name to address has to be created before applying fixups
-  ;; because a fixup may refer to an entry point in the same code component.
-  ;; So these go on the stack last, i.e. nearest the top.
-  ;; Reversing sorts the entry points in ascending address order
-  ;; except possibly when there are multiple entry points to one routine
-  (dolist (routine (reverse routines))
-    (dump-object (car routine) file)
-    (dump-integer (+ (label-position (cadr routine))
-                     (caddr routine))
-                  file))
-  (dump-integer (length routines) file)
-  (dump-fop 'fop-assembler-code file)
-  (dump-word (length octets) file)
-  (write-segment-contents code-segment (fasl-output-stream file))
-  (dump-pop file))
+  (let ((n-fixups (dump-fixups fixups file)))
+    ;; The name -> address table has to be created before applying fixups
+    ;; because a fixup may refer to an entry point in the same code component.
+    ;; So these go on the stack last, i.e. nearest the top.
+    ;; Reversing sorts the entry points in ascending address order
+    ;; except possibly when there are multiple entry points to one routine
+    (dolist (routine (reverse routines))
+      (dump-object (car routine) file)
+      (dump-integer (+ (label-position (cadr routine))
+                       (caddr routine))
+                    file))
+    (dump-fop 'fop-assembler-code file)
+    (dolist (word (list (length octets) (length routines) n-fixups))
+      (dump-word word file))
+    (write-segment-contents code-segment (fasl-output-stream file))
+    (dump-pop file)))
 
 ;;; Alter the code object referenced by CODE-HANDLE at the specified
 ;;; OFFSET, storing the object referenced by ENTRY-HANDLE.
@@ -1115,8 +1088,7 @@
   (declare (type component component))
   (declare (type fasl-output file))
 
-  (dump-fop 'fop-verify-table-size file)
-  (dump-word (fasl-output-table-free file) file)
+  (dump-fop 'fop-verify-table-size file (fasl-output-table-free file))
 
   #+sb-dyncount
   (let ((info (sb-c::ir2-component-dyncount-info (component-info component))))
@@ -1162,8 +1134,7 @@
 (defun fasl-dump-toplevel-lambda-call (fun fasl-output)
   (declare (type sb-c::clambda fun))
   (dump-push-previously-dumped-fun fun fasl-output)
-  (dump-fop 'fop-funcall-for-effect fasl-output)
-  (dump-byte 0 fasl-output)
+  (dump-fop 'fop-funcall-for-effect fasl-output 0)
   (values))
 
 ;;;; dumping structures

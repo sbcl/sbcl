@@ -38,8 +38,7 @@
       (if (and (= start 0) (= end (length vector)))
           (sub-dump-object vector file)
           (sub-dump-object (subseq vector start end) file)))
-    (dump-fop 'fop-array file)
-    (dump-word rank file)
+    (dump-fop 'fop-array file rank)
     (eq-save-object array file)))
 
 #+(and long-float x86)
