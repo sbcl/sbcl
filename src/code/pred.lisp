@@ -182,6 +182,29 @@
   (and (fixnump x)
        (<= 0 x limit)))
 
+;;; a vector that maps widetags to layouts, used for quickly finding
+;;; the layouts of built-in classes
+(define-load-time-global **primitive-object-layouts** nil)
+(declaim (type simple-vector **primitive-object-layouts**))
+(defun !pred-cold-init ()
+  ;; This vector is allocated in immobile space when possible. There isn't
+  ;; a way to do that from lisp, so it's special-cased in genesis.
+  #-immobile-space (setq **primitive-object-layouts** (make-array 256))
+  (map-into **primitive-object-layouts**
+            (lambda (name) (classoid-layout (find-classoid name)))
+            #.(let ((table (make-array 256 :initial-element 'sb-kernel::random-class)))
+                (dolist (x sb-kernel::+!built-in-classes+)
+                  (destructuring-bind (name &key codes &allow-other-keys) x
+                    (dolist (code codes)
+                      (setf (svref table code) name))))
+                (loop for i from sb-vm:list-pointer-lowtag by (* 2 sb-vm:n-word-bytes)
+                      below 256
+                      do (setf (aref table i) 'cons))
+                (loop for i from sb-vm:even-fixnum-lowtag by (ash 1 sb-vm:n-fixnum-tag-bits)
+                      below 256
+                      do (setf (aref table i) 'fixnum))
+                table)))
+
 ;;; Return the layout for an object. This is the basic operation for
 ;;; finding out the "type" of an object, and is used for generic
 ;;; function dispatch. The standard doesn't seem to say as much as it

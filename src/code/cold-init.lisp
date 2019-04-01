@@ -125,6 +125,7 @@
   (show-and-call !type-class-cold-init)
   (show-and-call sb-kernel::!primordial-type-cold-init)
   (show-and-call !classes-cold-init)
+  (show-and-call !pred-cold-init)
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)
   (show-and-call !alien-type-cold-init)

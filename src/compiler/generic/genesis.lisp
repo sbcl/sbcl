@@ -1623,8 +1623,8 @@ core and return a descriptor to it."
                          sb-vm:symbol-value-slot
                          (ash (descriptor-bits (gethash 'function *cold-layouts*)) 32))
 
+  #+immobile-space
   (cold-set '**primitive-object-layouts**
-            #+immobile-space
             (let ((filler
                    (make-random-descriptor
                     (logior (gspace-byte-address *immobile-fixedobj*)
@@ -1643,12 +1643,7 @@ core and return a descriptor to it."
                                      (+ 4 256))))
               (write-header-word vector sb-vm:simple-vector-widetag)
               (write-wordindexed vector 1 (make-fixnum-descriptor 256))
-              vector)
-            #-immobile-space
-            (allocate-vector-object *dynamic*
-                                    sb-vm:n-word-bits
-                                    256
-                                    sb-vm:simple-vector-widetag))
+              vector))
 
   ;; Immobile code prefers all FDEFNs adjacent so that code can be located
   ;; anywhere in the addressable memory allowed by the OS, as long as all

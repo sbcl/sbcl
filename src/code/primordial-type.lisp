@@ -52,11 +52,6 @@
    ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
    (frob extended-sequence *extended-sequence-type*))
 
-;;; a vector that maps widetags to layouts, used for quickly finding
-;;; the layouts of built-in classes
-(defglobal **primitive-object-layouts** (make-array 256))
-(declaim (type simple-vector **primitive-object-layouts**))
-
 (!defun-from-collected-cold-init-forms !primordial-type-cold-init)
 
 ;;; A HAIRY-TYPE represents anything too weird to be described

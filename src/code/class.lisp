@@ -1247,26 +1247,4 @@ between the ~A definition and the ~A definition"
              (error "Something strange with forward layout for ~S:~%  ~S"
                     name layout))))))
 
-;;; There's an even denser representation of this vector possible with immobile space-
-;;; allocate only 4 bytes per element and consider it as an unboxed array.
-;;; Of course then we'd have other issues to resolve, such as GC and space relocation.
-(!cold-init-forms
- (replace **primitive-object-layouts**
-          (let* ((initial-element (classoid-layout (find-classoid 'random-class)))
-                 (table (make-array 256 :initial-element initial-element)))
-            (dolist (x +!built-in-classes+)
-              (destructuring-bind (name &key codes &allow-other-keys) x
-                (let ((layout (classoid-layout (find-classoid name))))
-                  (dolist (code codes)
-                    (setf (svref table code) layout)))))
-            (loop with layout = (aref table sb-vm:list-pointer-lowtag)
-                  for i from sb-vm:list-pointer-lowtag by (* 2 sb-vm:n-word-bytes)
-                    below 256
-                  do (setf (aref table i) layout))
-            (loop with layout = (aref table sb-vm:even-fixnum-lowtag)
-                  for i from sb-vm:even-fixnum-lowtag by (ash 1 sb-vm:n-fixnum-tag-bits)
-                    below 256
-                  do (setf (aref table i) layout))
-            table)))
-
 (!defun-from-collected-cold-init-forms !classes-cold-init)
