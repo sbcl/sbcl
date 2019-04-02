@@ -134,7 +134,7 @@
               (inst add src context temp)))))
     (move count num)
     (move start csp-tn)
-    (inst beq num zero-tn done)
+    (inst beq count zero-tn done)
     (move dst start)
     (cond ((zerop (- word-shift n-fixnum-tag-bits))
            (inst add csp-tn csp-tn count))
