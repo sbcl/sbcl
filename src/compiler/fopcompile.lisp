@@ -249,6 +249,9 @@
   (or (sb-xc:typep obj '(or symbol number character unboxed-array
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256))
+      ;; The cross-compiler wants to dump CTYPE instances as leaves,
+      ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
+      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))
       (sb-fasl:dumpable-layout-p obj)))
 
 ;;; Check that a literal form is fopcompilable. It would not be, for example,

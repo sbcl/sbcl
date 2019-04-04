@@ -767,8 +767,8 @@ core and return a descriptor to it."
       (let ((bits (read-bits-wordindexed descriptor
                                          (+ i sb-vm:bignum-digits-offset))))
         ;; sign-extend the highest word
-        (when (and (= i (1- n-words)) (logbitp (1- sb-vm:n-word-bits) bits))
-          (setq bits (dpb bits (byte sb-vm:n-word-bits 0) -1)))
+        (when (= i (1- n-words))
+          (setq bits (sb-vm::sign-extend bits sb-vm:n-word-bits)))
         (setq val (logior (ash bits (* i sb-vm:n-word-bits)) val))))))
 
 (defun number-pair-to-core (first second type)
@@ -811,6 +811,18 @@ core and return a descriptor to it."
                                          (1- sb-vm:double-float-size)
                                          sb-vm:double-float-widetag)))
        (write-double-float-bits des sb-vm:double-float-value-slot x)))))
+
+(defun unsigned-bits-to-single-float (bits)
+  (sb-impl::make-flonum (sb-vm::sign-extend bits 32) 'single-float))
+(defun double-float-from-core (des)
+  (let ((bits
+         #+64-bit (read-bits-wordindexed des 1)
+         #-64-bit (let* ((word0 (read-bits-wordindexed des 1))
+                         (word1 (read-bits-wordindexed des 2)))
+                    (ecase sb-c:*backend-byte-order*
+                     (:little-endian (logior (ash word1 32) word0))
+                     (:big-endian    (logior (ash word0 32) word1))))))
+    (sb-impl::make-flonum (sb-vm::sign-extend bits 64) 'double-float)))
 
 (defun complexnum-to-core (num &aux (r (realpart num)) (i (imagpart num)))
   (if (rationalp r)
@@ -2582,6 +2594,10 @@ core and return a descriptor to it."
             (cold-symbol-function (car args)))
            (cons (cold-cons (first args) (second args)))
            (symbol-global-value (cold-symbol-value (first args)))
+           (values-specifier-type
+            (let* ((des (first args))
+                   (spec (if (descriptor-p des) (host-object-from-core des) des)))
+              (ctype-to-core spec (funcall fun spec))))
            (t (call fun :sb-cold-funcall-handler/for-value args)))
           (let ((counter *load-time-value-counter*))
             (push (cold-list (cold-intern :load-time-value) fun
@@ -3829,7 +3845,7 @@ III. initially undefined function references (alphabetically):
       (ecase (logand (descriptor-bits x) sb-vm:widetag-mask)
        (#.sb-vm:single-float-widetag
         (return-from recurse
-         (sb-impl::make-flonum (ash (descriptor-bits x) -32) 'single-float)))))
+         (unsigned-bits-to-single-float (ash (descriptor-bits x) -32))))))
     (ecase (descriptor-lowtag x)
       (#.sb-vm:instance-pointer-lowtag
        (if strictp (error "Can't invert INSTANCE type") "#<instance>"))
@@ -3851,6 +3867,9 @@ III. initially undefined function references (alphabetically):
                      (recurse (read-wordindexed x sb-vm:symbol-name-slot))))))
            (#.sb-vm:simple-base-string-widetag (base-string-from-core x))
            (#.sb-vm:simple-vector-widetag (vector-from-core x #'recurse))
+           #-64-bit
+           (#.sb-vm:single-float-widetag
+            (unsigned-bits-to-single-float (read-bits-wordindexed x 1)))
            (#.sb-vm:double-float-widetag
-            (sb-impl::make-flonum (read-bits-wordindexed x 1) 'double-float))
+            (double-float-from-core x))
            (#.sb-vm:bignum-widetag (bignum-from-core x))))))))

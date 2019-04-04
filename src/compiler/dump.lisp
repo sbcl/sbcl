@@ -347,6 +347,12 @@
              (layout
               (dump-layout x file)
               (eq-save-object x file))
+             #+sb-xc-host
+             (ctype
+              (aver (not (classoid-p x)))
+              (dump-object 'values-specifier-type file)
+              (dump-object (type-specifier x) file)
+              (dump-fop 'fop-funcall file 1))
              (instance
               (dump-structure x file)
               (eq-save-object x file))

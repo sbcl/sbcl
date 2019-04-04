@@ -27,6 +27,10 @@
         `(find-classoid ',name)
         (error "can't use anonymous or undefined class as constant:~%  ~S"
                self))))
+#+sb-xc-host
+(defmethod sb-xc:make-load-form ((self classoid) &optional env)
+  (declare (ignore env))
+  `(find-classoid ',(classoid-name self)))
 
 
 ;;;; basic LAYOUT stuff

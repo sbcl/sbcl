@@ -1162,15 +1162,6 @@
   (print-unreadable-object (ctype stream :type t)
     (prin1 (type-specifier ctype) stream)))
 
-;;; Same here.
-;;; Just dump it as a specifier. (We'll convert it back upon loading.)
-(defmethod make-load-form ((type ctype) &optional env)
-  (declare (ignore env))
-  `(,(if (values-type-p type)
-         'values-specifier-type
-         'specifier-type)
-    ',(type-specifier type)))
-
 (defun-cached (type-negation :hash-function #'type-hash-value
                              :hash-bits 8
                              :values 1)
