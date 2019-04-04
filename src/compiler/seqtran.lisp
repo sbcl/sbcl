@@ -2134,8 +2134,19 @@
                   (when (and (eq effective-test 'eql)
                              const-seq
                              (or (vectorp const-seq) (proper-list-p const-seq))
-                             (every (lambda (x) (sb-xc:typep x 'eq-comparable-type))
-                                    const-seq))
+                             (let ((key (if key
+                                            (let ((name (lvar-fun-name* key)))
+                                              (and (constant-fold-arg-p name)
+                                                   name))
+                                            #'identity)))
+                               (and key
+                                    (every (lambda (x)
+                                             (block nil
+                                               (sb-xc:typep (handler-case (funcall key x)
+                                                              (error ()
+                                                                (return)))
+                                                            'eq-comparable-type)))
+                                           const-seq))))
                     (setq test-form '#'eq))
                   `(nth-value ,',values-index
                               (%find-position item sequence

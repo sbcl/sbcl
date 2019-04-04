@@ -2267,3 +2267,11 @@
                                          10))))))))
     ((t) nil)
     ((nil) 10)))
+
+(with-test (:name :find-test-to-eq-with-key)
+  (checked-compile-and-assert
+   ()
+   '(lambda (x)
+     (position (1- (expt x 64)) '((#xFFFFFFFFFFFFFFFF)) :key #'car))
+   ((2) 0)
+   ((1) nil)))
