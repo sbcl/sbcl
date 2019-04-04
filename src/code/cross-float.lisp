@@ -555,11 +555,17 @@
         ((double-float-p x) $0d0)
         (t (complexnum-imag x))))
 
+(defun sb-vm::sign-extend (x size)
+  (if (logbitp (1- size) x) (cl:dpb x (cl:byte size 0) -1) x))
+
 (defun make-single-float (bits)
+  (declare (type (signed-byte 32) bits))
   (make-flonum bits 'single-float))
 
 (defun make-double-float (hi lo)
- (make-flonum (logior (ash hi 32) lo) 'double-float))
+  (declare (type (signed-byte 32) hi)
+           (type (unsigned-byte 32) lo))
+  (make-flonum (logior (ash hi 32) lo) 'double-float))
 
 (defun float-infinity-p (x)
   (member (flonum-%value x) '(:-infinity :+infinity)))
