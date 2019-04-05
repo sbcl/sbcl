@@ -15,7 +15,7 @@
 
 (in-package "SB-C")
 
-;;; And OPAQUE-BOX instance is used to pass data from IR1 to IR2 as
+;;; An OPAQUE-BOX instance is used to pass data from IR1 to IR2 as
 ;;; a quoted object in a "source form" (not user-written) such that the
 ;;; contained object is in a for-evaluation position but ignored by
 ;;; the compiler's constant-dumping logic. In addition to this structure

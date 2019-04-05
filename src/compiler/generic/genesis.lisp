@@ -989,15 +989,27 @@ core and return a descriptor to it."
   (read-wordindexed cold-fdefn sb-vm:fdefn-fun-slot))
 
 (defun unbound-cold-symbol-handler (symbol)
+  (awhen (and (eq (sb-xc:symbol-package symbol) *cl-package*)
+              (find-symbol (string symbol) "SB-XC"))
+    (setq symbol it))
   (let ((host-val (and (boundp symbol) (symbol-value symbol))))
-    (if (typep host-val 'named-type)
-        (let ((target-val (ctype-to-core (named-type-name host-val) host-val)))
+    (etypecase host-val
+      (number
+       ;; This case is intended to handle
+       ;; (DEFCONSTANT SB-XC:LEAST-POSITIVE-NORMALIZED-SHORT-FLOAT
+       ;;              SB-XC:LEAST-POSITIVE-NORMALIZED-SINGLE-FLOAT) ; etc
+       ;; Several uses of MOST-POSITIVE-FIXNUM come through here as well
+       ;; due to (DEFCONSTANT SB-XC:mumble-LIMIT sb-xc:most-positive-fixnum).
+       ;; That seems weird but doesn't seem to be a problem.
+       ;; (i.e. why don't we just dump the fixnum?)
+       (number-to-core host-val))
+      (named-type
+       (let ((target-val (ctype-to-core (named-type-name host-val) host-val)))
           ;; Though it looks complicated to assign cold symbols on demand,
           ;; it avoids writing code to build the layout of NAMED-TYPE in the
           ;; way we build other primordial stuff such as layout-of-layout.
           (cold-set symbol target-val)
-          target-val)
-        (error "Taking Cold-symbol-value of unbound symbol ~S" symbol))))
+          target-val)))))
 
 ;;;; layouts and type system pre-initialization
 

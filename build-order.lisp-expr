@@ -202,7 +202,7 @@
  ;; This needs DEFINE-ALIEN-ROUTINE from target-alieneval.
  ("src/code/misc-aliens" :not-host)
 
- ("src/code/early-float"   :not-host)
+ ("src/code/early-float")
  ("src/pcl/early-low" :not-host)
   ;; Define at most one INTERPRETED-FUNCTION type based on target features
  #+sb-eval ("src/code/early-full-eval" :not-host)

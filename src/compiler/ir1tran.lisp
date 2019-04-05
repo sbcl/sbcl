@@ -366,12 +366,7 @@
                        can't be dumped into fasl files."
                      (type-of value)))))))
       ;; Dump all non-trivial named constants using the name.
-      (if (and namep (not (typep constant '(or symbol character
-                                            ;; FIXME: Cold init breaks if we
-                                            ;; try to reference FP constants
-                                            ;; thru their names.
-                                            #+sb-xc-host number
-                                            #-sb-xc-host fixnum))))
+      (if (and namep (not (sb-xc:typep constant '(or symbol character fixnum))))
           (emit-make-load-form constant name)
           (grovel constant))))
   (values))

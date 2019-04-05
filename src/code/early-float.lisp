@@ -179,6 +179,7 @@
     (values (complex re im)
             (locally (declare (notinline complex)) (complex re im)))))
 
+#-sb-xc-host
 (dolist (test '(try-folding-complex-single try-folding-complex-double))
   (multiple-value-bind (a b) (funcall test)
     (assert (eql a b)))

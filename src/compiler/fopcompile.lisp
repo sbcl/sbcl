@@ -175,6 +175,13 @@
    (declare (ignore expand))
    (or (and (self-evaluating-p form)
             (constant-fopcompilable-p form))
+       ;; Arbitrary computed constants aren't supported because we don't know
+       ;; where in FOPCOMPILE's recursion it should stop recursing and just dump
+       ;; whatever the constant piece is. For example in (cons `(a ,(+ 1 2)) (f))
+       ;; the CAR is built wholly from foldable operators but the CDR is not.
+       ;; Constant symbols and QUOTE forms are generally fine to use though.
+       (and (symbolp form)
+            (eq (info :variable :kind form) :constant))
        (and (typep form '(cons (eql quote) (cons t null)))
             (constant-fopcompilable-p (constant-form-value form)))
        (and (listp form)
