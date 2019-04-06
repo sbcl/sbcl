@@ -1229,31 +1229,6 @@ core and return a descriptor to it."
 ;;; in the cold core.
 (defvar *ctype-cache*)
 
-(defvar *ctype-nullified-slots* nil)
-(defvar *built-in-classoid-nullified-slots* nil)
-
-;; This function is memoized because it's essentially a constant,
-;; but *nil-descriptor* isn't initialized by the time it's defined.
-(defun get-exceptional-slots (obj-type)
-  (flet ((index (classoid-name slot-name)
-           (dsd-index (find slot-name
-                            (dd-slots (find-defstruct-description classoid-name))
-                            :key #'dsd-name))))
-    (case obj-type
-      (built-in-classoid
-       (or *built-in-classoid-nullified-slots*
-           (setq *built-in-classoid-nullified-slots*
-                 (append (get-exceptional-slots 'ctype)
-                         (list (cons (index 'built-in-classoid 'sb-kernel::subclasses)
-                                     *nil-descriptor*)
-                               (cons (index 'built-in-classoid 'layout)
-                                     *nil-descriptor*))))))
-      (t
-       (or *ctype-nullified-slots*
-           (setq *ctype-nullified-slots*
-                 (list (cons (index 'ctype 'sb-kernel::class-info)
-                             *nil-descriptor*))))))))
-
 (defun ctype-to-core (specifier obj)
   (declare (type ctype obj))
   (if (classoid-p obj)
@@ -1268,13 +1243,12 @@ core and return a descriptor to it."
       (awhen (gethash specifier *ctype-cache*)
         (return-from ctype-to-core it)))
   (let ((result
-         (ctype-to-core-helper
+         (struct-to-core
                obj
                (lambda (obj)
                  (typecase obj
-                   (xset (ctype-to-core-helper obj nil nil))
-                   (ctype (ctype-to-core (type-specifier obj) obj))))
-               (get-exceptional-slots (type-of obj)))))
+                   (xset (struct-to-core obj nil))
+                   (ctype (ctype-to-core (type-specifier obj) obj)))))))
     (let ((type-class-vector
            (cold-symbol-value 'sb-kernel::*type-classes*))
           (index (position (sb-kernel::type-class-info obj)
@@ -1291,10 +1265,24 @@ core and return a descriptor to it."
         (setf (gethash specifier *ctype-cache*) result))
     result))
 
-(defun ctype-to-core-helper (obj obj-to-core-helper exceptional-slots)
+;;; Reflect OBJ, a host object, into the core and return a descriptor to it.
+;;; The helper function is responsible for dealing with shared substructure.
+(defun struct-to-core (obj obj-to-core-helper)
   (let* ((host-type (type-of obj))
          (target-layout (or (gethash host-type *cold-layouts*)
                             (error "No target layout for ~S" obj)))
+         (simple-slots
+          ;; Precompute the list of slot indices which should assign
+          ;; a fixed value rather than reflect the value in the host object.
+          ;; Importantly, the CLASS-INFO slot (basically a vtable) in CTYPE
+          ;; instances makes no sense to externalize.
+          (typecase obj
+           (built-in-classoid
+            `((,(get-dsd-index built-in-classoid sb-kernel::class-info) . nil)
+              (,(get-dsd-index built-in-classoid sb-kernel::subclasses) . nil)
+              (,(get-dsd-index built-in-classoid layout) . nil)))
+           (ctype
+            `((,(get-dsd-index ctype sb-kernel::class-info) . nil)))))
          (result (allocate-struct *dynamic* target-layout))
          (cold-dd-slots (dd-slots-from-core host-type)))
     (aver (eql (layout-bitmap (find-layout host-type))
@@ -1306,7 +1294,7 @@ core and return a descriptor to it."
       (write-wordindexed
        result
        (+ sb-vm:instance-slots-offset index)
-       (acond ((assq index exceptional-slots) (cdr it))
+       (acond ((assq index simple-slots) (or (cdr it) *nil-descriptor*))
               (t (host-constant-to-core
                   (funcall (dsd-accessor-from-cold-slots cold-dd-slots index)
                            obj)
