@@ -563,7 +563,7 @@
 (import '(sb-kernel:specifier-type
           sb-kernel:type-specifier
           sb-kernel:type-intersection
-          sb-kernel::character-string
+          #+sb-unicode sb-kernel::character-string
           sb-kernel:simple-character-string
           sb-kernel:type=
           sb-kernel:find-classoid
