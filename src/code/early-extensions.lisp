@@ -134,25 +134,6 @@
     (sequence
      (>= (length sequence) length))))
 
-;;; Is X is a positive prime integer?
-(defun positive-primep (x)
-  ;; This happens to be called only from one place in sbcl-0.7.0, and
-  ;; only for fixnums, we can limit it to fixnums for efficiency. (And
-  ;; if we didn't limit it to fixnums, we should use a cleverer
-  ;; algorithm, since this one scales pretty badly for huge X.)
-  (declare (fixnum x))
-  (if (<= x 5)
-      (and (>= x 2) (/= x 4))
-      (and (not (evenp x))
-           (not (zerop (rem x 3)))
-           (do ((q 6)
-                (r 1)
-                (inc 2 (logxor inc 6)) ;; 2,4,2,4...
-                (d 5 (+ d inc)))
-               ((or (= r 0) (> d q)) (/= r 0))
-             (declare (fixnum inc))
-             (multiple-value-setq (q r) (truncate x d))))))
-
 ;;; Could this object contain other objects? (This is important to
 ;;; the implementation of things like *PRINT-CIRCLE* and the dumper.)
 (defun compound-object-p (x)
@@ -273,21 +254,6 @@
     (when (and (eq (car pair) item) (not (null pair)))
       (return pair))))
 
-;;; like (DELETE .. :TEST #'EQ):
-;;;   Delete all LIST entries EQ to ITEM (destructively modifying
-;;;   LIST), and return the modified LIST.
-(defun delq (item list)
-  (declare (explicit-check))
-  (let ((list list))
-    (do ((x list (cdr x))
-         (splice '()))
-        ((endp x) list)
-      (cond ((eq item (car x))
-             (if (null splice)
-                 (setq list (cdr x))
-                 (rplacd splice (cdr x))))
-            (t (setq splice x)))))) ; Move splice along to include element.
-
 ;;; Delete just one item
 (defun delq1 (item list)
   (do ((prev nil x)
@@ -298,15 +264,6 @@
           (return (cdr x))
           (rplacd prev (cdr x)))
       (return list))))
-
-;;; like (POSITION .. :TEST #'EQ):
-;;;   Return the position of the first element EQ to ITEM.
-(defun posq (item list)
-  (do ((i list (cdr i))
-       (j 0 (1+ j)))
-      ((null i))
-    (when (eq (car i) item)
-      (return j))))
 
 (declaim (inline neq))
 (defun neq (x y)
@@ -1127,12 +1084,6 @@ NOTE: This interface is experimental and subject to change."
 (defun print-type (stream type &optional colon at)
   (print-type-specifier stream (type-specifier type) colon at)))
 
-(declaim (ftype (sfunction (index &key (:comma-interval (and (integer 1) index))) index)
-                decimal-with-grouped-digits-width))
-(defun decimal-with-grouped-digits-width (value &key (comma-interval 3))
-  (let ((digits (length (write-to-string value :base 10))))
-    (+ digits (floor (1- digits) comma-interval))))
-
 
 ;;;; Deprecating stuff
 
@@ -1229,21 +1180,6 @@ NOTE: This interface is experimental and subject to change."
                   (eq type-specifier (find-class name nil)))
          (%check-deprecated-type name))))))
 
-;; This is the moral equivalent of a warning from /usr/bin/ld that
-;; "gets() is dangerous." You're informed by both the compiler and linker.
-(defun loader-deprecation-warn (stuff whence)
-  ;; Stuff is a list: ((<state> name . category) ...)
-  ;; For now we only deal with category = :FUNCTION so we ignore it.
-  (let ((warning-class
-         ;; We're only going to warn once (per toplevel form),
-         ;; so pick the most stern warning applicable.
-         (if (every (lambda (x) (eq (car x) :early)) stuff)
-             'simple-style-warning 'simple-warning)))
-    (warn warning-class
-          :format-control "Reference to deprecated function~P ~S~@[ from ~S~]"
-          :format-arguments
-          (list (length stuff) (mapcar #'second stuff) whence))))
-
 ;;; STATE is one of
 ;;;
 ;;;   :EARLY, for a compile-time style-warning.
@@ -1282,29 +1218,6 @@ NOTE: This interface is experimental and subject to change."
 ;;; - SB-C::STACK-ALLOCATE-VECTOR (policy)         since 1.0.19.7            -> Final: anytime
 ;;; - SB-C::STACK-ALLOCATE-VALUE-CELLS (policy)    since 1.0.19.7            -> Final: anytime
 
-(sb-cold:preserving-host-function
-(defun print-deprecation-replacements (stream replacements &optional colonp atp)
-  (declare (ignore colonp atp))
-  ;; I don't think this is callable during cross-compilation, is it?
-  ;; Anyway, the format string tokenizer can not handle APPLY on its own.
-  (apply #'format stream
-         (sb-format:tokens "~#[~;~
-             Use ~/sb-ext:print-symbol-with-prefix/ instead.~;~
-             Use ~/sb-ext:print-symbol-with-prefix/ or ~
-             ~/sb-ext:print-symbol-with-prefix/ instead.~:;~
-             Use~@{~#[~; or~] ~
-             ~/sb-ext:print-symbol-with-prefix/~^,~} instead.~
-           ~]")
-         replacements)))
-
-(defun print-deprecation-message (namespace name software version
-                                  &optional replacements stream)
-  (format stream
-           "The ~(~A~) ~/sb-ext:print-symbol-with-prefix/ has been ~
-            deprecated as of ~@[~A ~]version ~A.~
-            ~@[~2%~/sb-impl::print-deprecation-replacements/~]"
-          namespace name software version replacements))
-
 (defun setup-function-in-final-deprecation
     (software version name replacement-spec)
   #+sb-xc-host (declare (ignore software version name replacement-spec))
@@ -1333,45 +1246,6 @@ NOTE: This interface is experimental and subject to change."
     (software version name replacement-spec)
   (declare (ignore software version replacement-spec))
   (%compiler-deftype name (constant-type-expander name t) nil))
-
-(defmacro define-deprecated-function (state version name replacements lambda-list
-                                      &body body)
-  (declare (type deprecation-state state)
-           (type string version)
-           (type function-name name)
-           (type (or function-name list) replacements)
-           (type list lambda-list)
-           #+sb-xc-host (ignore version replacements))
-  `(progn
-     #-sb-xc-host
-     (declaim (deprecated
-               ,state ("SBCL" ,version)
-               (function ,name ,@(when replacements
-                                   `(:replacement ,replacements)))))
-     ,(ecase state
-        ((:early :late)
-         `(defun ,name ,lambda-list
-            ,@body))
-        ((:final)
-         `',name))))
-
-(defmacro define-deprecated-variable (state version name
-                                      &key (value nil valuep) replacement)
-  (declare (type deprecation-state state)
-           (type string version)
-           (type symbol name)
-           #+sb-xc-host (ignore version replacement))
-  `(progn
-     #-sb-xc-host
-     (declaim (deprecated
-               ,state ("SBCL" ,version)
-               (variable ,name ,@(when replacement
-                                   `(:replacement ,replacement)))))
-     ,(ecase state
-        ((:early :late)
-         `(defvar ,name ,@(when valuep (list value))))
-        ((:final)
-         `',name))))
 
 ;; Given DECLS as returned by from parse-body, and SYMBOLS to be bound
 ;; (with LET, MULTIPLE-VALUE-BIND, etc) return two sets of declarations:

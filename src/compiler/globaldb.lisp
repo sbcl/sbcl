@@ -40,20 +40,6 @@
     (format stream "~S ~S, ~D" (meta-info-category x) (meta-info-kind x)
             (meta-info-number x))))
 
-;;; Given any non-negative integer, return a prime number >= to it.
-;;;
-;;; FIXME: This logic should be shared with ALMOST-PRIMIFY in
-;;; hash-table.lisp. Perhaps the merged logic should be
-;;; PRIMIFY-HASH-TABLE-SIZE, implemented as a lookup table of primes
-;;; after integral powers of two:
-;;;    #(17 37 67 131 ..)
-;;; (Or, if that's too coarse, after half-integral powers of two.) By
-;;; thus getting rid of any need for primality testing at runtime, we
-;;; could punt POSITIVE-PRIMEP, too.
-(defun primify (x)
-  (declare (type unsigned-byte x))
-  (do ((n (logior x 1) (+ n 2)))
-      ((positive-primep n) n)))
 
 ;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're
 ;;; running the cross-compiler? The cross-compiler (which was built

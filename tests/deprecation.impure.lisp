@@ -340,7 +340,7 @@
 
 ;;; FIXME: this was supposed to print a warning about using the deprecated QUIT
 ;;; function, but it instead warns about is an incorrect call to UNIX-EXIT.
-:;; This was broken by rev b2c767cea2008282 which un-deprecated QUIT without
+;;; This was broken by rev b2c767cea2008282 which un-deprecated QUIT without
 ;;; appropriately fixing the test, but instead blindly changing the call
 ;;; to its "correct" replacement, thereby losing the meaning of this test.
 (with-test (:name :load-time-deprecation-warning)

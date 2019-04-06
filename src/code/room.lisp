@@ -712,6 +712,12 @@ We could try a few things to mitigate this:
         (format t "~%Summary total:~%    ~:D bytes, ~:D objects.~%"
                 summary-total-bytes summary-total-objects)))))
 
+(declaim (ftype (sfunction (index &key (:comma-interval (and (integer 1) index))) index)
+                decimal-with-grouped-digits-width))
+(defun decimal-with-grouped-digits-width (value &key (comma-interval 3))
+  (let ((digits (length (write-to-string value :base 10))))
+    (+ digits (floor (1- digits) comma-interval))))
+
 ;;; Report object usage for a single space.
 (defun report-space-total (space-info cutoff)
   (declare (list space-info) (type (or single-float null) cutoff))

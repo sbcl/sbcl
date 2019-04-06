@@ -443,6 +443,21 @@
                (load-fresh-line)
                (prin1 result)))))))))
 
+;; This is the moral equivalent of a warning from /usr/bin/ld that
+;; "gets() is dangerous." You're informed by both the compiler and linker.
+(defun loader-deprecation-warn (stuff whence)
+  ;; Stuff is a list: ((<state> name . category) ...)
+  ;; For now we only deal with category = :FUNCTION so we ignore it.
+  (let ((warning-class
+         ;; We're only going to warn once (per toplevel form),
+         ;; so pick the most stern warning applicable.
+         (if (every (lambda (x) (eq (car x) :early)) stuff)
+             'simple-style-warning 'simple-warning)))
+    (warn warning-class
+          :format-control "Reference to deprecated function~P ~S~@[ from ~S~]"
+          :format-arguments
+          (list (length stuff) (mapcar #'second stuff) whence))))
+
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))
     (error "attempt to load an empty FASL file:~%  ~S" (namestring stream)))

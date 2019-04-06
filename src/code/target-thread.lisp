@@ -1301,6 +1301,7 @@ on this semaphore, then N of them is woken up."
   (with-session-lock (session)
     (let ((was-foreground (eq thread (foreground-thread session))))
       (setf (session-threads session)
+            ;; FIXME: I assume these could use DELQ1.
             ;; DELQ never conses, but DELETE does. (FIXME)
             (delq thread (session-threads session))
             (session-interactive-threads session)
