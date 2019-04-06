@@ -11,6 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+#+os-provides-poll
 (import '(sb-impl::make-handler
           sb-impl::handler-descriptor
           sb-impl::handler-bogus
