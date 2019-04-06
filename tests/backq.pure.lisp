@@ -208,7 +208,7 @@
                           '`(,@(list 1 2 3) 4) nil)
                  '(sb-impl::|Append| (list 1 2 3) '(4)))))
 
-(in-package sb-impl)
+(import 'sb-int:quasiquote)
 
 (test-util:with-test (:name :backquote-more-weirdness)
   ;; No expectation on any other Lisp.

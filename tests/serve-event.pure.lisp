@@ -11,7 +11,10 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(in-package sb-impl)
+(import '(sb-impl::make-handler
+          sb-impl::handler-descriptor
+          sb-impl::handler-bogus
+          sb-impl::compute-pollfds))
 
 ;; Tests for SERVE-EVENT are somewhat lacking,
 ;; although RUN-PROGRAM exercises some multiplexed I/O.

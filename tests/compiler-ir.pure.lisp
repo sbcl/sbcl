@@ -11,7 +11,16 @@
 
 (enable-test-parallelism)
 
-(in-package :sb-c)
+(import '(sb-c::combination-fun-debug-name
+          sb-c::combination-fun-source-name
+          sb-c::*compile-component-hook*
+          sb-c::basic-combination-p
+          sb-c::basic-combination-info
+          sb-c::node-tail-p
+          sb-c::do-blocks
+          sb-c::do-nodes
+          sb-c::%check-bound
+          sb-kernel:%bit-position/1))
 
 (defun inspect-ir (form fun &rest checked-compile-args)
   (let ((*compile-component-hook* fun))

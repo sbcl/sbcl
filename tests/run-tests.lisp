@@ -138,7 +138,12 @@
         ;; DEF{constant,fun,macro,parameter,setf,type,var} are generally ok
         ;; except when DEFfoo defines something too hairy to hang off a symbol.
         (cond (actually-pure
-               (shadow '("DEFSTRUCT" "DEFMETHDO") test-package)
+               (shadow '("DEFSTRUCT" "DEFMETHOD"
+                         ;; Hiding IN-PACKAGE is a good preventative measure.
+                         ;; There are other ways to do nasty things of course.
+                         ;; Deliberately violating a package lock has got to be impure.
+                         "IN-PACKAGE" "WITHOUT-PACKAGE-LOCKS")
+                       test-package)
                ;; We have pure tests that exercise the DEFCLASS and DEFGENERIC
                ;; macros to generate macroexpansion-time errors.  That's mostly ok.
                ;; We can trap attempts to use SB-KERNEL::%COMPILER-mumble

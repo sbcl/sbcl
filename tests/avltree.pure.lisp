@@ -1,4 +1,7 @@
-(in-package "SB-THREAD")
+(use-package "SB-INT")
+(import 'sb-thread::(avlnode-key avlnode-data avlnode-left avlnode-right
+                     avl-insert avl-delete avl-find
+                     avl-balance-factor avl-count))
 
 (defun tree-to-dot (tree output)
   (with-open-file (stream output :direction :output :if-exists :supersede)
