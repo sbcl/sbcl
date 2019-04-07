@@ -496,11 +496,7 @@
     (setf (cdr (nthcdr idx obj)) val)))
 
 (!define-fop 13 (fop-svset ((:operands tbl-slot idx) val) nil)
-  (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
-    (if (%instancep obj) ; suspicious. should have been FOP-STRUCTSET
-        #+sb-xc (setf (%instance-ref obj idx) val)
-        #-sb-xc (bug "%instance-set?")
-        (setf (svref obj idx) val))))
+  (setf (svref (ref-fop-table (fasl-input) tbl-slot) idx) val))
 
 (!define-fop 14 :not-host (fop-structset ((:operands tbl-slot idx) val) nil)
   (setf (%instance-ref (ref-fop-table (fasl-input) tbl-slot) idx) val))
@@ -554,10 +550,13 @@
 (!define-fop 18 :not-host (fop-known-fun (name))
   (%coerce-name-to-fun name))
 
-;;; Modify a slot in a CONSTANTS object.
-(!define-fop 19 :not-host (fop-alter-code ((:operands index) code value) nil)
-  (setf (code-header-ref code index) value)
-  (values))
+;;; Modify a slot of the code boxed constants.
+(!define-fop 19 (fop-alter-code ((:operands index) code value) nil)
+  (flet (#+sb-xc-host
+         ((setf code-header-ref) (value code index)
+            (write-wordindexed code index value)))
+    (setf (code-header-ref code index) value)
+    (values)))
 
 (!define-fop 20 :not-host (fop-fun-entry ((:operands fun-index)
                                            code-object name arglist type info))
@@ -567,18 +566,6 @@
     (setf (%simple-fun-type fun) type)
     (apply #'set-simple-fun-info fun info)
     fun))
-
-;;;; Some Dylan FOPs used to live here. By 1 November 1998 the code
-;;;; was sufficiently stale that the functions it called were no
-;;;; longer defined, so I (William Harold Newman) deleted it.
-;;;;
-;;;; In case someone in the future is trying to make sense of FOP layout,
-;;;; it might be worth recording that the Dylan FOPs were
-;;;;    100 FOP-DYLAN-SYMBOL-SAVE
-;;;;    101 FOP-SMALL-DYLAN-SYMBOL-SAVE
-;;;;    102 FOP-DYLAN-KEYWORD-SAVE
-;;;;    103 FOP-SMALL-DYLAN-KEYWORD-SAVE
-;;;;    104 FOP-DYLAN-VARINFO-VALUE
 
 ;;;; assemblerish fops
 

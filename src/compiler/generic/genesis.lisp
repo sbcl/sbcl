@@ -2610,12 +2610,7 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-svset (tbl-slot idx))
   (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
-    (write-wordindexed obj
-                   (+ idx
-                      (ecase (descriptor-lowtag obj)
-                        (#.sb-vm:instance-pointer-lowtag 1)
-                        (#.sb-vm:other-pointer-lowtag 2)))
-                   (pop-stack))))
+    (write-wordindexed obj (+ idx sb-vm:vector-data-offset) (pop-stack))))
 
 (define-cold-fop (fop-structset (tbl-slot idx))
   (let ((obj (ref-fop-table (fasl-input) tbl-slot)))
@@ -2686,11 +2681,6 @@ core and return a descriptor to it."
     (let ((fun (cold-symbol-function (car item)))
           (place (cdr item)))
       (write-wordindexed (car place) (cdr place) fun))))
-
-(define-cold-fop (fop-alter-code (slot))
-  (let ((value (pop-stack))
-        (code (pop-stack)))
-    (write-wordindexed code slot value)))
 
 (defun compute-fun (code-object fun-index)
   (let ((fun-offset
