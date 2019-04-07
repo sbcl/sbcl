@@ -5145,3 +5145,6 @@
 
 (deftransforms (prin1-to-string princ-to-string) ((object) (number))
   `(stringify-object object))
+
+(deftransform princ ((object &optional stream) (string &optional t))
+  `(write-string object stream))
