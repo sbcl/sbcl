@@ -78,6 +78,14 @@
           (sbit (cdr **fop-signatures**) opcode) pushp))
   name)
 
+;;; Compatibity macros that allow some fops to share the identical
+;;; body between genesis and the target code.
+#-sb-xc-host
+(progn
+  (defmacro cold-cons (x y) `(cons ,x ,y))
+  (defmacro number-to-core (x) x)
+  (defmacro make-character-descriptor (x) `(code-char ,x)))
+
 ;;; helper functions for reading string values from FASL files: sort
 ;;; of like READ-SEQUENCE specialized for files of (UNSIGNED-BYTE 8),
 ;;; with an automatic conversion from (UNSIGNED-BYTE 8) into CHARACTER
@@ -144,7 +152,7 @@
   (make-unbound-marker))
 
 (!define-fop 76 (fop-character ((:operands char-code)))
-  (code-char char-code))
+  (make-character-descriptor char-code))
 
 ;; %MAKE-INSTANCE does not exist on the host.
 (!define-fop 48 :not-host (fop-struct ((:operands size) layout))
@@ -300,31 +308,32 @@
       (declare (fixnum index byte bits)))))
 
 (!define-fop 36 (fop-integer ((:operands n-bytes)))
-  (load-s-integer n-bytes (fasl-input-stream)))
+  (number-to-core (load-s-integer n-bytes (fasl-input-stream))))
 
 (!define-fop 34 (fop-word-integer)
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
-    (fast-read-s-integer #.sb-vm:n-word-bytes)))
+    (number-to-core (fast-read-s-integer #.sb-vm:n-word-bytes))))
 
 (!define-fop 35 (fop-byte-integer)
   ;; FIXME: WITH-FAST-READ-BYTE for exactly 1 byte is not really faster/better
   ;; than regular READ-BYTE. The expansion of READ-ARG corroborates this claim.
   (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
-    (fast-read-s-integer 1)))
+    (number-to-core (fast-read-s-integer 1))))
 
 ;; There's a long tail to the distribution of FOP-BYTE-INTEGER uses,
 ;; but these 4 seem to account for about half of them.
-(!define-fop 37 (fop-int-const0) 0)
-(!define-fop 38 (fop-int-const1) 1)
-(!define-fop 39 (fop-int-const2) 2)
-(!define-fop 40 (fop-int-const-neg1) -1)
+(!define-fop 37 (fop-int-const0) (number-to-core 0))
+(!define-fop 38 (fop-int-const1) (number-to-core 1))
+(!define-fop 39 (fop-int-const2) (number-to-core 2))
+(!define-fop 40 (fop-int-const-neg1) (number-to-core -1))
 
-;; No %MAKE-RATIO on host
-(!define-fop 70 :not-host (fop-ratio (num den)) (%make-ratio num den))
+(!define-fop 70 (fop-ratio (num den))
+  #+sb-xc-host (number-pair-to-core num den sb-vm:ratio-widetag)
+  #-sb-xc-host (%make-ratio num den))
 
-;; No %MAKE-COMPLEX on host
-(!define-fop 71 :not-host (fop-complex (realpart imagpart))
-  (%make-complex realpart imagpart))
+(!define-fop 71 (fop-complex (realpart imagpart))
+  #+sb-xc-host (number-pair-to-core realpart imagpart sb-vm:complex-widetag)
+  #-sb-xc-host (%make-complex realpart imagpart))
 
 (macrolet ((fast-read-single-float ()
              '(make-single-float (fast-read-s-integer 4)))
@@ -334,13 +343,13 @@
   (macrolet ((define-complex-fop (opcode name type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(!define-fop ,opcode (,name)
-                      (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
-                        (complex (,reader) (,reader))))))
+                    (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
+                      (number-to-core (complex (,reader) (,reader)))))))
              (define-float-fop (opcode name type)
                (let ((reader (symbolicate "FAST-READ-" type)))
                  `(!define-fop ,opcode (,name)
                     (with-fast-read-byte ((unsigned-byte 8) (fasl-input-stream))
-                      (,reader))))))
+                      (number-to-core (,reader)))))))
     (define-complex-fop 72 fop-complex-single-float single-float)
     (define-complex-fop 73 fop-complex-double-float double-float)
     #+long-float
@@ -368,14 +377,12 @@
 
 ;;;; loading lists
 
-#-sb-xc-host
-(progn
 (defun fop-list (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
   (declare (type index n)
            (optimize (speed 3)))
   (with-fop-stack ((stack) ptr n)
     (do* ((i (+ ptr n) (1- i))
-          (res () (cons (fop-stack-ref i) res)))
+          (res () (cold-cons (fop-stack-ref i) res)))
          ((= i ptr) res)
       (declare (type index i)))))
 (defun fop-list* (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
@@ -384,9 +391,9 @@
   (with-fop-stack ((stack) ptr (1+ n))
     (do* ((i (+ ptr n) (1- i))
           (res (fop-stack-ref (+ ptr n))
-               (cons (fop-stack-ref i) res)))
+               (cold-cons (fop-stack-ref i) res)))
          ((= i ptr) res)
-      (declare (type index i))))))
+      (declare (type index i)))))
 
 ;;;; fops for loading arrays
 

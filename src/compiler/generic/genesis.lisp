@@ -2327,12 +2327,6 @@ core and return a descriptor to it."
 
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
 
-(define-cold-fop (fop-character (c))
-  (make-character-descriptor c))
-
-(define-cold-fop (fop-empty-list) nil)
-(define-cold-fop (fop-truth) t)
-
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
   (let* ((layout (pop-stack))
          (result (allocate-struct *dynamic* layout size))
@@ -2457,20 +2451,6 @@ core and return a descriptor to it."
     (read-string-as-bytes (fasl-input-stream) name)
     (push-fop-table (find-package name) (fasl-input))))
 
-;;;; cold fops for loading lists
-
-;;; Make a list of the top LENGTH things on the fop stack. The last
-;;; cdr of the list is set to LAST.
-(macrolet ((cold-stack-list (length last)
-             `(do* ((index ,length (1- index))
-                    (result ,last (cold-cons (pop-fop-stack stack) result)))
-                   ((= index 0) result)
-                (declare (fixnum index)))))
-  (defun fop-list (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
-    (cold-stack-list n *nil-descriptor*))
-  (defun fop-list* (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
-    (cold-stack-list n (pop-fop-stack stack))))
-
 ;;;; cold fops for loading vectors
 
 (define-cold-fop (fop-base-string (len))
@@ -2543,33 +2523,6 @@ core and return a descriptor to it."
                          (make-fixnum-descriptor total-elements)))
     result))
 
-
-;;;; cold fops for loading numbers
-
-(defmacro define-cold-number-fop (fop &optional arglist)
-  ;; Invoke the ordinary warm version of this fop to cons the number.
-  `(define-cold-fop (,fop ,arglist)
-     (number-to-core (,fop (fasl-input) ,@arglist))))
-
-(define-cold-number-fop fop-single-float)
-(define-cold-number-fop fop-double-float)
-(define-cold-number-fop fop-word-integer)
-(define-cold-number-fop fop-byte-integer)
-(define-cold-number-fop fop-complex-single-float)
-(define-cold-number-fop fop-complex-double-float)
-(define-cold-number-fop fop-integer (n-bytes))
-(define-cold-number-fop fop-int-const0)
-(define-cold-number-fop fop-int-const1)
-(define-cold-number-fop fop-int-const2)
-(define-cold-number-fop fop-int-const-neg1)
-
-(define-cold-fop (fop-ratio)
-  (let ((den (pop-stack)))
-    (number-pair-to-core (pop-stack) den sb-vm:ratio-widetag)))
-
-(define-cold-fop (fop-complex)
-  (let ((im (pop-stack)))
-    (number-pair-to-core (pop-stack) im sb-vm:complex-widetag)))
 
 ;;;; cold fops for calling (or not calling)
 
