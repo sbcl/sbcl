@@ -2275,3 +2275,11 @@
      (position (1- (expt x 64)) '((#xFFFFFFFFFFFFFFFF)) :key #'car))
    ((2) 0)
    ((1) nil)))
+
+(with-test (:name :maybe-infer-iteration-var-type-on-union)
+  (checked-compile-and-assert
+      (:allow-notes nil :optimize '(:speed 3 :compilation-speed 1 :space 1))
+      `(lambda (a)
+         (loop repeat (if a 2 0) count 1))
+    ((t) 2)
+    ((nil) 0)))
