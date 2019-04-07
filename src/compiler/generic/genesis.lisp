@@ -817,8 +817,10 @@ core and return a descriptor to it."
 (defun double-float-from-core (des)
   (let ((bits
          #+64-bit (read-bits-wordindexed des 1)
-         #-64-bit (let* ((word0 (read-bits-wordindexed des 1))
-                         (word1 (read-bits-wordindexed des 2)))
+         #-64-bit (let* ((word0 (read-bits-wordindexed
+                                 des sb-vm:double-float-value-slot))
+                         (word1 (read-bits-wordindexed
+                                 des (1+ sb-vm:double-float-value-slot))))
                     (ecase sb-c:*backend-byte-order*
                      (:little-endian (logior (ash word1 32) word0))
                      (:big-endian    (logior (ash word0 32) word1))))))

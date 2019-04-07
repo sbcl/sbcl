@@ -165,39 +165,3 @@
 
 (defconstant most-negative-fixnum-double-float
   (double-from-bits 1 (+ sb-vm:n-fixnum-bits sb-vm:double-float-bias) 0))
-
-;;; Dummy functions to test that complex number are dumped correctly in genesis.
-(defun try-folding-complex-single ()
-  (let ((re (make-single-float #x4E000000))
-        (im (make-single-float #x-21800000)))
-    (values (complex re im)
-            (locally (declare (notinline complex)) (complex re im)))))
-
-(defun try-folding-complex-double ()
-  (let ((re (make-double-float #X3FE62E42 #xFEFA39EF))
-        (im (make-double-float #X43CFFFFF #XFFFFFFFF)))
-    (values (complex re im)
-            (locally (declare (notinline complex)) (complex re im)))))
-
-#-sb-xc-host
-(dolist (test '(try-folding-complex-single try-folding-complex-double))
-  (multiple-value-bind (a b) (funcall test)
-    (assert (eql a b)))
-  (let ((code (fun-code-header (symbol-function test))))
-    (declare (notinline code-header-words)) ; forward ref
-    ;; KLUDGE: code-constants-offset is also not defined yet
-    ;; but is accessible from make-host-1's definition.
-    (aver (loop for index from #.sb-vm:code-constants-offset
-                below (code-header-words code)
-                thereis (typep (code-header-ref code index) 'complex))))
-  (fmakunbound test))
-
-;;; An example that we can't cross-compile: CTYPE-OF-NUMBER tries to compute
-;;; low/high bounds so that it can return (COMPLEX (SINGLE-FLOAT <LOW> <HIGH>))
-;;; but we haven't taught the MIN,MAX interceptors how to operate on infinity.
-#+nil
-(defun more-folding ()
-  (values (complex single-float-positive-infinity single-float-positive-infinity)
-          (complex single-float-negative-infinity single-float-positive-infinity)
-          (complex single-float-negative-infinity single-float-negative-infinity)
-          (complex single-float-positive-infinity single-float-negative-infinity)))
