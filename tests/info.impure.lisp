@@ -366,11 +366,10 @@
 (in-package "SB-IMPL")
 
 (defglobal *make-classoid-cell-callcount* (make-array 1 :element-type 'sb-ext:word))
-(defglobal *really-make-classoid-cell* #'sb-kernel::make-classoid-cell)
-(without-package-locks
-  (defun sb-kernel::make-classoid-cell (name &optional classoid)
-    (sb-ext:atomic-incf (aref *make-classoid-cell-callcount* 0))
-    (funcall *really-make-classoid-cell* name classoid)))
+(sb-int:encapsulate 'sb-kernel::make-classoid-cell 'count
+  (compile nil '(lambda (f name &optional classoid)
+                 (sb-ext:atomic-incf (aref *make-classoid-cell-callcount* 0))
+                 (funcall f name classoid))))
 
 ;; Return a set of symbols to play around with
 (defun classoid-cell-test-get-lotsa-symbols ()
@@ -502,7 +501,7 @@
   ;; Precompute random generalized function names for testing, some of which
   ;; are "simple" (per the taxonomy of globaldb) and some hairy.
   (let ((work (coerce (loop repeat 10000
-                            nconc (list `(defmacro ,(gensym)) ; simple name
+                            nconc (list `(sb-pcl::slow-method ,(gensym)) ; simple name
                                          (gensym))) ; very simple name
                       'vector))
         (n-threads 10) readers writers fdefn-results random-results)
