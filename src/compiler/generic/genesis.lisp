@@ -1277,9 +1277,12 @@ core and return a descriptor to it."
           ;; Importantly, the CLASS-INFO slot (basically a vtable) in CTYPE
           ;; instances makes no sense to externalize.
           (typecase obj
-           (built-in-classoid
+           (classoid
             `((,(get-dsd-index built-in-classoid sb-kernel::class-info) . nil)
               (,(get-dsd-index built-in-classoid sb-kernel::subclasses) . nil)
+              ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
+              ;; we nonetheless must set LAYOUT to NIL or else warm build fails
+              ;; in the twisty maze of class initializations.
               (,(get-dsd-index built-in-classoid layout) . nil)))
            (ctype
             `((,(get-dsd-index ctype sb-kernel::class-info) . nil)))))
