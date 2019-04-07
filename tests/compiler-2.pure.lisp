@@ -2283,3 +2283,11 @@
          (loop repeat (if a 2 0) count 1))
     ((t) 2)
     ((nil) 0)))
+
+(with-test (:name :maybe-infer-iteration-var-type-on-union.2)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (let ((v4 (the (or (single-float (1.0) (3.0)) (single-float 4.0 5.0)) a)))
+           (incf v4 1.0)))
+    ((4.0) 5.0)))
