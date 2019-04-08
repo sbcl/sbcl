@@ -206,7 +206,7 @@
   (let* ((vector-ctype (lvar-type vector))
          (elt-ctype (if (array-type-p vector-ctype)
                         (array-type-specialized-element-type vector-ctype)
-                        (bug "Unknow vector type in IR2 conversion for ~S."
+                        (bug "Unknown vector type in IR2 conversion for ~S."
                              'initialize-vector)))
          (saetp (find-saetp-by-ctype elt-ctype))
          (lvar (node-lvar node))

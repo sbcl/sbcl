@@ -22,26 +22,26 @@
      '(unsigned-byte 32)))
 
 (macrolet ((unicode-property-init ()
-             (let ((proplist-dump
-                    (sb-cold:read-from-file "output/misc-properties.lisp-expr"))
-                   (confusable-sets
+             (let ((confusable-sets
                     (sb-cold:read-from-file "output/confusables.lisp-expr"))
                    (bidi-mirroring-list
                     (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
                `(progn
-                  (sb-ext:define-load-time-global **proplist-properties**
-                    ',proplist-dump)
+                  (sb-ext:define-load-time-global **proplist-properties** nil)
                   (sb-ext:define-load-time-global **confusables**
                     ',confusable-sets)
                   (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
                     ',bidi-mirroring-list)
                   (defun !unicode-properties-cold-init ()
-                    (let ((hash (make-hash-table)) (list ',proplist-dump))
-                      (do ((k (car list) (car list)) (v (cadr list) (cadr list)))
-                          ((not list) hash)
-                        (setf (gethash k hash) v)
-                        (setf list (cddr list)))
-                      (setf **proplist-properties** hash))
+                    ;;
+                    (let ((hash (make-hash-table :test 'eq))
+                          (list ',(sb-cold:read-from-file
+                                   "output/misc-properties.lisp-expr")))
+                      (setq **proplist-properties** hash)
+                      (loop for (symbol ranges) on list by #'cddr
+                            do (setf (gethash symbol hash)
+                                     (coerce ranges '(vector (unsigned-byte 32))))))
+                    ;;
                     (let ((hash (make-hash-table :test #'equal)))
                       (loop for set in ',confusable-sets
                          for items = (mapcar #'(lambda (item)
@@ -61,6 +61,7 @@
                                     (logically-readonlyize
                                      (possibly-base-stringize (first items))))))
                       (setf **confusables** hash))
+                    ;;
                     (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
                       (loop for (k v) in list do
                            (setf (gethash k hash) v))
@@ -69,8 +70,8 @@
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
-  (declare (type simple-vector vector)
-           (type fixnum item)
+  (declare (type (simple-array (unsigned-byte 32) 1) vector)
+           (type char-code item)
            (optimize speed))
   (labels ((recurse (start end)
              (declare (type index start end)
@@ -78,8 +79,8 @@
              (when (< start end)
                (let* ((i (+ start (truncate (the index (- end start)) 2)))
                       (index (* 2 i))
-                      (elt1 (svref vector index))
-                      (elt2 (svref vector (1+ index))))
+                      (elt1 (aref vector index))
+                      (elt2 (aref vector (1+ index))))
                  (declare (type index i)
                           (fixnum elt1 elt2))
                  (cond ((< item elt1)
@@ -440,6 +441,10 @@ are excluded."
 disappears when accents are placed on top of it. and NIL otherwise"
   (proplist-p character :soft-dotted))
 
+(eval-when (:compile-toplevel)
+  (sb-xc:defmacro coerce-to-ordered-ranges (array)
+    (!coerce-to-specialized array '(unsigned-byte 32))))
+
 (defun default-ignorable-p (character)
   "Returns T if CHARACTER is a Default_Ignorable_Code_Point"
   (and
@@ -450,8 +455,9 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (or (whitespace-p character)
         (ordered-ranges-member
          (char-code character)
-         #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
-           #x110BD #x110BD))))))
+         (coerce-to-ordered-ranges
+          #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
+            #x110BD #x110BD)))))))
 
 
 ;;; Implements UAX#15: Normalization Forms
@@ -1000,11 +1006,13 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
   (when (listp char) (setf char (car char)))
   (let ((cp (when char (char-code char)))
         (gc (when char (general-category char)))
-        (newlines #(#xB #xC #x0085 #x0085 #x2028 #x2029))
+        (newlines
+         (coerce-to-ordered-ranges #(#xB #xC #x0085 #x0085 #x2028 #x2029)))
         (also-katakana
-         #(#x3031 #x3035 #x309B #x309C
-           #x30A0 #x30A0 #x30FC #x30FC
-           #xFF70 #xFF70))
+         (coerce-to-ordered-ranges
+          #(#x3031 #x3035 #x309B #x309C
+            #x30A0 #x30A0 #x30FC #x30FC
+            #xFF70 #xFF70)))
         (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
         (midletter
          #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))

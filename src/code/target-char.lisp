@@ -42,7 +42,7 @@
                                (array (make-array
                                        length :element-type '(unsigned-byte 8))))
                           (read-sequence array stream)
-                          array)))
+                          (!coerce-to-specialized array '(unsigned-byte 8)))))
                     (init-global (name type &optional length)
                       `(progn
                          (define-load-time-global ,name
@@ -52,14 +52,14 @@
                          (declaim (type ,(if (eql type 'hash-table)
                                              'hash-table
                                              `(simple-array ,type (,length))) ,name)))))
-               (let ((misc-database (coerce-it (read-ub8-vector (file "ucdmisc" "dat"))))
-                     (ucd-high-pages (coerce-it (read-ub8-vector (file "ucdhigh" "dat"))))
-                     (ucd-low-pages (coerce-it (read-ub8-vector (file "ucdlow" "dat"))))
-                     (decompositions (coerce-it (read-ub8-vector (file "decomp" "dat"))))
-                     (primary-compositions (coerce-it (read-ub8-vector (file "comp" "dat"))))
-                     (case-data (coerce-it (read-ub8-vector (file "case" "dat"))))
-                     (case-pages (coerce-it (read-ub8-vector (file "casepages" "dat"))))
-                     (collations (coerce-it (read-ub8-vector (file "collation" "dat")))))
+               (let ((misc-database (read-ub8-vector (file "ucdmisc" "dat")))
+                     (ucd-high-pages (read-ub8-vector (file "ucdhigh" "dat")))
+                     (ucd-low-pages (read-ub8-vector (file "ucdlow" "dat")))
+                     (decompositions (read-ub8-vector (file "decomp" "dat")))
+                     (primary-compositions (read-ub8-vector (file "comp" "dat")))
+                     (case-data (read-ub8-vector (file "case" "dat")))
+                     (case-pages (read-ub8-vector (file "casepages" "dat")))
+                     (collations (read-ub8-vector (file "collation" "dat"))))
                  `(progn
                     ;; KLUDGE: All temporary values, fixed up in cold-load
                     ,(init-global '**character-misc-database** '(unsigned-byte 8)
