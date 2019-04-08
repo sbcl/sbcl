@@ -55,22 +55,15 @@
 
 ;;; CHAR-CODE values for ASCII characters which we care about but
 ;;; which aren't defined in section "2.1.3 Standard Characters" of the
-;;; ANSI specification for Lisp
-;;;
-;;; KLUDGE: These are typically used in the idiom (CODE-CHAR
-;;; FOO-CHAR-CODE). I suspect that the current implementation is
-;;; expanding this idiom into a full call to CODE-CHAR, which is an
-;;; annoying overhead. I should check whether this is happening, and
-;;; if so, perhaps implement a DEFTRANSFORM or something to stop it.
-;;; (or just find a nicer way of expressing characters portably?) --
-;;; WHN 19990713
+;;; ANSI specification for Lisp.
+;;; These are typically used in the idiom (CODE-CHAR FOO-CHAR-CODE)
 (defconstant bell-char-code 7)
 (defconstant backspace-char-code 8)
 (defconstant tab-char-code 9)
 (defconstant line-feed-char-code 10)
 (defconstant form-feed-char-code 12)
 (defconstant return-char-code 13)
-(defconstant escape-char-code 27)
+(defconstant escape-char-code 27) ; unused
 (defconstant rubout-char-code 127)
 
 ;;;; type-ish predicates
@@ -882,16 +875,6 @@ NOTE: This interface is experimental and subject to change."
           (list (c (car bound)))
           (c bound)))))
 
-;;; some commonly-occurring CONSTANTLY forms
-(macrolet ((def-constantly-fun (name constant-expr)
-             `(progn
-                (declaim (ftype (sfunction * (eql ,constant-expr)) ,name))
-                (setf (symbol-function ',name)
-                      (constantly ,constant-expr)))))
-  (def-constantly-fun constantly-t t)
-  (def-constantly-fun constantly-nil nil)
-  (def-constantly-fun constantly-0 0))
-
 
 ;;;; utilities for two-VALUES predicates
 
@@ -1345,15 +1328,6 @@ NOTE: This interface is experimental and subject to change."
          (values members (or (not (listp tail))
                              (and (>= count max-length) :maybe)))))))
 
-;;; Default evaluator mode (interpeter / compiler)
-
-(declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
-               *evaluator-mode*))
-(defparameter *evaluator-mode* :compile ; initialized by genesis
-  "Toggle between different evaluator implementations. If set to :COMPILE,
-an implementation of EVAL that calls the compiler will be used. If set
-to :INTERPRET, an interpreter will be used.")
-(declaim (always-bound *evaluator-mode*))
 ;; This is not my preferred name for this function, but chosen for harmony
 ;; with everything else that refers to these as 'hash-caches'.
 ;; Hashing is just one particular way of memoizing, and it would have been

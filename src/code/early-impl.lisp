@@ -61,3 +61,13 @@
 ;;; small to measure. -- JES, 2007-09-30
 (declaim (type cons sb-kernel::*gc-epoch*))
 (!define-load-time-global sb-kernel::*gc-epoch* '(nil . nil))
+
+;;; Default evaluator mode (interpeter / compiler)
+
+(declaim (type (member :compile #+(or sb-eval sb-fasteval) :interpret)
+               *evaluator-mode*))
+(defparameter *evaluator-mode* :compile ; initialized by genesis
+  "Toggle between different evaluator implementations. If set to :COMPILE,
+an implementation of EVAL that calls the compiler will be used. If set
+to :INTERPRET, an interpreter will be used.")
+(declaim (always-bound *evaluator-mode*))
