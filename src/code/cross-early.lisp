@@ -47,8 +47,8 @@
 
 ;;; Target floating-point and COMPLEX number representation
 ;;; is defined sufficiently early to avoid "undefined type" warnings.
-(defstruct (sb-xc::target-num (:constructor nil)))
-(defstruct (float (:include sb-xc::target-num)
+(defstruct (target-num (:constructor nil)))
+(defstruct (float (:include target-num)
                   (:conc-name "FLONUM-")
                   (:constructor %make-flonum (%bits format))
                   (:predicate floatp))
@@ -78,9 +78,9 @@
 
 ;;; This is used not only for (COMPLEX FLOAT) but also (COMPLEX RATIONAL)
 ;;; to eliminate reliance on host complex number type reflection.
-(defstruct (sb-xc::complexnum (:include sb-xc::target-num)
-                              (:predicate complexp)
-                              (:constructor %make-complexnum (real imag)))
+(defstruct (complexnum (:include target-num)
+                       (:predicate complexp)
+                       (:constructor %make-complexnum (real imag)))
   (real nil :type real :read-only t)
   (imag nil :type real :read-only t))
 
@@ -94,7 +94,7 @@
 ;;; need not be as complete as (!def-type-translator complex).
 ;;; It's just enough to handle all cases parsed by the host.
 (deftype complex (&optional spec)
-  (cond ((member spec '(* real)) 'sb-xc::complexnum)
+  (cond ((member spec '(* real)) 'complexnum)
         ((eq spec 'single-float) '(satisfies complex-single-float-p))
         ((eq spec 'double-float) '(satisfies complex-double-float-p))
         (t (error "complex type specifier too complicated: ~s" spec))))
@@ -122,7 +122,7 @@
   (define truncate xfloat-truncate)
   (define round xfloat-round))
 
-(defmethod make-load-form ((self sb-xc::target-num) &optional env)
+(defmethod make-load-form ((self target-num) &optional env)
   (declare (ignore env))
   (if (complexp self)
       `(complex ,(complexnum-real self) ,(complexnum-imag self))

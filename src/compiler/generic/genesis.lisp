@@ -864,7 +864,7 @@ core and return a descriptor to it."
                                 (number-to-core (denominator number))
                                 sb-vm:ratio-widetag))
     (float (float-to-core number))
-    (sb-xc::complexnum (complexnum-to-core number))
+    (complex (complexnum-to-core number))
     (t (error "~S isn't a cold-loadable number at all!" number))))
 
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.

@@ -41,7 +41,7 @@
     (write-string "#." stream)
     (output-part self stream))
 
-  (defmethod print-object ((self sb-xc::complexnum) stream)
+  (defmethod print-object ((self complexnum) stream)
     (write-string "#.(COMPLEX " stream)
     (output-part (complexnum-real self) stream)
     (write-char #\Space stream)
