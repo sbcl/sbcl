@@ -1990,7 +1990,13 @@
 (!define-superclasses number ((number)) !cold-init-forms)
 
 ;;; If the high bound of LOW is adjacent to the low bound of HIGH,
-;;; then return true, otherwise NIL.
+;;; then return true, otherwise NIL. Adjacency of floating-point intervals
+;;; implies that exactly one is an open interval and exactly one is closed
+;;; at the adjacency point.
+;;; We never (as of now) get here in the cross-compiler with target
+;;; floating-point numbers. This seems legitimate as we seldom specify
+;;; anything as open intervals.  The few cases seem to be the fun-types
+;;; of %RANDOM-{SINGLE,DOUBLE}-FLOAT and HASH-TABLE-REHASH-mumble.
 (defun numeric-types-adjacent (low high)
   (let ((low-bound (numeric-type-high low))
         (high-bound (numeric-type-low high)))
@@ -1998,27 +2004,20 @@
     ;; If both intervals have the same sign of zero at the adjacency point,
     ;; then they intersect (as per NUMERIC-TYPES-INTESECT)
     ;; so it doesn't matter much what we say here.
-    (flet ((oppositely-signed-zeros-or-eql (x y)
+    (flet ((float-zeros-eqlish (x y)
              (or (eql x y)
                  ;; Calling (EQL (- X) Y) might cons. Using = would be almost the same
                  ;; but not cons, however I prefer not to assume that the caller has
                  ;; already checked for matching float formats. EQL enforces that.
-                 (let ((answer (and (fp-zero-p x) (fp-zero-p y) (eql (- x) y))))
-                   ;; KLUDGE: if the host does not support floating-point negative-zero,
-                   ;; then this function can never return T, which is fine unless T would
-                   ;; be the right answer. Let's assert that it isn't, which works on
-                   ;; a self-hosted build because we do support signed zeros.
-                   #+sb-xc-host (aver (eq answer nil))
-                   answer))))
+                 ;; Change to use SB-XC:- here if anything requires it.
+                 (and (fp-zero-p x) (fp-zero-p y) (eql (- x) y)))))
       (cond ((not (and low-bound high-bound)) nil)
             ((and (consp low-bound) (consp high-bound)) nil)
-            ((consp low-bound)
-             (oppositely-signed-zeros-or-eql (car low-bound) high-bound))
-            ((consp high-bound)
-             (oppositely-signed-zeros-or-eql low-bound (car high-bound)))
+            ((consp low-bound) (float-zeros-eqlish (car low-bound) high-bound))
+            ((consp high-bound) (float-zeros-eqlish low-bound (car high-bound)))
             ((and (eq (numeric-type-class low) 'integer)
                   (eq (numeric-type-class high) 'integer))
-             (eql (1+ low-bound) high-bound))
+             (eql (1+ low-bound) high-bound)) ; Integer intervals are never open
             (t
              nil)))))
 
