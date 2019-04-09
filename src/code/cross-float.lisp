@@ -221,13 +221,13 @@
   (make-flonum :-infinity format))
 
 (defun float-ops-cache-insert (key values table)
+  ;; Verify results (when possible) prior to inserting into the hash-table.
+  ;; If we were to support different floating-point formats across the various
+  ;; backends, this check should confined to the scenarios where the host's
+  ;; precision is at least as much as the target's precision.
+  #+host-quirks-sbcl
   (let ((fun (car key))
         (args (cdr key)))
-    ;; Verify results (when possible) prior to inserting into the hash-table.
-    ;; If we were to support different floating-point formats across the various
-    ;; backends, this check should confined to the scenarios where the host's
-    ;; precision is at least as much as the target's precision.
-    #+host-quirks-sbcl
     (flet ((native-flonum-value (x &aux (bits (flonum-%bits x)))
              (ecase (flonum-format x)
                (single-float (host-sb-kernel:make-single-float bits))
@@ -244,9 +244,8 @@
         (assert (eql authoritative-answer
                      (if (floatp (first values))
                          (native-flonum-value (first values))
-                         (first values))))))
-    (setf (gethash key table)
-          (if (singleton-p values) (car values) values))))
+                         (first values)))))))
+  (setf (gethash key table) (if (singleton-p values) (car values) values)))
 
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
   (when (atom cache)

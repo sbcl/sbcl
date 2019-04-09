@@ -341,6 +341,7 @@
 (defun count-symbols (pkg)
   (let ((n 0))
     (do-external-symbols (s pkg n)
+      (declare (ignorable s))
       (incf n))))
 
 ;;; Build a new package that exports a not-necessarily-strict subset of

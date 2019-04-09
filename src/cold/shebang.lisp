@@ -134,7 +134,8 @@
 (set-dispatch-macro-character #\# #\- #'read-targ-feature-expr *xc-readtable*)
 ;;; The reader will be defined during compilation. CLISP does not permit assignment
 ;;; of a symbol that currently has no functional definition, so wrap it in lambda.
-(set-macro-character #\$ (lambda (stream char) (read-target-float stream char))
+(set-macro-character #\$ (lambda (stream char)
+                           (funcall 'read-target-float stream char))
                      t ; non-terminating so that symbols may contain a dollar sign
                      *xc-readtable*)
 

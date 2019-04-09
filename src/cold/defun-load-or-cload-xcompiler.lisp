@@ -147,7 +147,7 @@
          (unless (find :not-host flags)
            (funcall load-or-cload-stem stem flags)
            (when (member :sb-show sb-xc:*features*)
-             (warn-when-cl-snapshot-diff *cl-snapshot*))))))
+             (funcall 'warn-when-cl-snapshot-diff *cl-snapshot*))))))
 
   ;; If the cross-compilation host is SBCL itself, we can use the
   ;; PURIFY extension to freeze everything in place, reducing the

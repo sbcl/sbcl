@@ -112,7 +112,7 @@
 ;;; Actually compile
 (let ((sb-xc:*compile-print* nil))
   (if (make-host-2-parallelism)
-      (parallel-make-host-2 (make-host-2-parallelism))
+      (funcall 'parallel-make-host-2 (make-host-2-parallelism))
       (let ((total
              (count-if (lambda (x) (not (find :not-target (cdr x))))
                        (get-stems-and-flags 2)))

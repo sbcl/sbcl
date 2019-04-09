@@ -20,30 +20,34 @@
 ;;; alists representing the dispatching off each arg (in order). The
 ;;; leaf is the body to be executed in that case.
 (defun parse-number-dispatch (vars result types var-types body)
-  (cond ((null vars)
-         (unless (null types) (error "More types than vars."))
-         (when (cdr result)
-           (error "Duplicate case: ~S." body))
-         (setf (cdr result)
-               (sublis var-types body :test #'equal)))
-        ((null types)
-         (error "More vars than types."))
-        (t
-         (flet ((frob (var type)
-                  (parse-number-dispatch
-                   (rest vars)
-                   (or (assoc type (cdr result) :test #'equal)
-                       (car (setf (cdr result)
-                                  (acons type nil (cdr result)))))
-                   (rest types)
-                   (acons `(dispatch-type ,var) type var-types)
-                   body)))
-           (let ((type (first types))
-                 (var (first vars)))
-             (if (and (consp type) (eq (first type) 'foreach))
-                 (dolist (type (rest type))
-                   (frob var type))
-                 (frob var type)))))))
+  ;; Shouldn't be necessary, but avoids a warning in certain lisps that
+  ;; seem to like to warn about self-calls in :COMPILE-TOPLEVEL situation.
+  (named-let parse-number-dispatch ((vars vars) (result result) (types types)
+                                    (var-types var-types) (body body))
+    (cond ((null vars)
+           (unless (null types) (error "More types than vars."))
+           (when (cdr result)
+             (error "Duplicate case: ~S." body))
+           (setf (cdr result)
+                 (sublis var-types body :test #'equal)))
+          ((null types)
+           (error "More vars than types."))
+          (t
+           (flet ((frob (var type)
+                    (parse-number-dispatch
+                     (rest vars)
+                     (or (assoc type (cdr result) :test #'equal)
+                         (car (setf (cdr result)
+                                    (acons type nil (cdr result)))))
+                     (rest types)
+                     (acons `(dispatch-type ,var) type var-types)
+                     body)))
+             (let ((type (first types))
+                   (var (first vars)))
+               (if (and (consp type) (eq (first type) 'foreach))
+                   (dolist (type (rest type))
+                     (frob var type))
+                   (frob var type))))))))
 
 ;;; our guess for the preferred order in which to do type tests
 ;;; (cheaper and/or more probable first.)
@@ -83,41 +87,44 @@
 ;;; even though the second clause matches this signature. To catch
 ;;; this earlier than runtime we throw an error already here.
 (defun generate-number-dispatch (vars error-tags cases)
-  (if vars
-      (let ((var (first vars))
-            (cases (sort cases #'type-test-order :key #'car)))
-        (flet ((error-if-sub-or-supertype (type1 type2)
-                 (when (or (sb-xc:subtypep type1 type2)
-                           (sb-xc:subtypep type2 type1))
-                   (error "Types not disjoint: ~S ~S." type1 type2)))
-               (error-if-supertype (type1 type2)
-                 (when (sb-xc:subtypep type2 type1)
-                   (error "Type ~S ordered before subtype ~S."
-                          type1 type2)))
-               (test-type-pairs (fun)
-                 ;; Apply FUN to all (ordered) pairs of types from the
-                 ;; cases.
-                 (mapl (lambda (cases)
-                         (when (cdr cases)
-                           (let ((type1 (caar cases)))
-                             (dolist (case (cdr cases))
-                               (funcall fun type1 (car case))))))
-                       cases)))
-          ;; For the last variable throw an error if a type is followed
-          ;; by a subtype, for all other variables additionally if a
-          ;; type is followed by a supertype.
-          (test-type-pairs (if (cdr vars)
-                               #'error-if-sub-or-supertype
-                               #'error-if-supertype)))
-        `((typecase ,var
-            ,@(mapcar (lambda (case)
-                        `(,(first case)
-                          ,@(generate-number-dispatch (rest vars)
-                                                      (rest error-tags)
-                                                      (cdr case))))
-                      cases)
-            (t (go ,(first error-tags))))))
-      cases))
+  ;; Shouldn't be necessary, but avoids a warning in certain lisps that
+  ;; seem to like to warn about self-calls in :COMPILE-TOPLEVEL situation.
+  (named-let generate-number-dispatch ((vars vars) (error-tags error-tags) (cases cases))
+    (if vars
+        (let ((var (first vars))
+              (cases (sort cases #'type-test-order :key #'car)))
+          (flet ((error-if-sub-or-supertype (type1 type2)
+                   (when (or (sb-xc:subtypep type1 type2)
+                             (sb-xc:subtypep type2 type1))
+                     (error "Types not disjoint: ~S ~S." type1 type2)))
+                 (error-if-supertype (type1 type2)
+                   (when (sb-xc:subtypep type2 type1)
+                     (error "Type ~S ordered before subtype ~S."
+                            type1 type2)))
+                 (test-type-pairs (fun)
+                   ;; Apply FUN to all (ordered) pairs of types from the
+                   ;; cases.
+                   (mapl (lambda (cases)
+                           (when (cdr cases)
+                             (let ((type1 (caar cases)))
+                               (dolist (case (cdr cases))
+                                 (funcall fun type1 (car case))))))
+                         cases)))
+            ;; For the last variable throw an error if a type is followed
+            ;; by a subtype, for all other variables additionally if a
+            ;; type is followed by a supertype.
+            (test-type-pairs (if (cdr vars)
+                                 #'error-if-sub-or-supertype
+                                 #'error-if-supertype)))
+          `((typecase ,var
+              ,@(mapcar (lambda (case)
+                          `(,(first case)
+                            ,@(generate-number-dispatch (rest vars)
+                                                        (rest error-tags)
+                                                        (cdr case))))
+                        cases)
+              (t (go ,(first error-tags))))))
+        cases)))
 
 ) ; EVAL-WHEN
 
