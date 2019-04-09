@@ -28,6 +28,18 @@
   (declare (type (unsigned-byte 21) first second third))
   (sb-c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
 
+(defun unpack-3-codepoints (codepoints)
+  (declare (type (signed-byte 63) codepoints))
+  (cond ((< codepoints (ash 1 21))
+         (list (code-char codepoints)))
+        ((< codepoints (ash 1 (* 21 2)))
+         (list (code-char (ldb (byte 21 0) codepoints))
+               (code-char (ldb (byte 21 21) codepoints))))
+        (t
+         (list (code-char (ldb (byte 21 0) codepoints))
+               (code-char (ldb (byte 21 21) codepoints))
+               (code-char (ldb (byte 21 (* 21 2)) codepoints))))))
+
 (macrolet ((frob ()
              (flet ((coerce-it (array)
                       (sb-xc:coerce array '(simple-array (unsigned-byte 8) 1)))

@@ -745,10 +745,23 @@ Length should be adjusted when the standard changes.")
 
 ;;; Other properties
 (defparameter *confusables*
-  (with-input-txt-file (s "ConfusablesEdited")
-    (loop for line = (read-line s nil nil) while line
-       unless (eql 0 (position #\# line))
-       collect (mapcar #'parse-codepoints (split-string line #\<))))
+  (with-input-txt-file (stream "ConfusablesEdited")
+    (read-line stream)
+    (loop for line = (read-line stream nil nil)
+          while line
+          when (and (not (equal line ""))
+                    (char/= (char line 0) #\#))
+          collect
+          (flet ((parse (x)
+                   (mapcar (lambda (x)
+                             (parse-integer x :radix 16))
+                           (split-string x #\Space))))
+            (let* ((semicolon (position #\; line))
+                   (semicolon2 (position #\; line :start (1+ semicolon)))
+                   (from (parse (subseq line 0 (1- semicolon))))
+                   (to (parse (subseq line (+ semicolon 2) (1- semicolon2)))))
+              (assert (= (length from) 1))
+              (list* (car from) to)))))
   "List of confusable codepoint sets")
 
 (defparameter *bidi-mirroring-glyphs*

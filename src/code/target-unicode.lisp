@@ -41,31 +41,27 @@
                             do (setf (gethash symbol hash)
                                      (coerce ranges '(vector (unsigned-byte 32))))))
                     ;;
-
-                    (let ((hash (make-hash-table :test #'equal
-                                                 #+sb-unicode :size #+sb-unicode 6772)))
-                      (loop for set in ',confusable-sets
-                            for items = (mapcar #'(lambda (item)
-                                                    (map 'simple-string
-                                                         #'code-char item))
-                                                #+sb-unicode set
-                                                #-sb-unicode
-                                                (remove-if-not
-                                                 #'(lambda (item)
-                                                     (every
-                                                      #'(lambda (x)
-                                                          (< x sb-xc:char-code-limit))
-                                                      item)) set))
+                    (let* ((data ',confusable-sets)
+                           (hash (make-hash-table :test #'equal
+                                                  #+sb-unicode :size #+sb-unicode (length data))))
+                      (loop for (source . target) in data
+                            when (and #-sb-unicode
+                                      (< source sb-xc:char-code-limit))
                             do (flet ((minimize (x)
-                                        (if (= (length x) 1)
-                                            (schar x 0)
-                                            (logically-readonlyize (possibly-base-stringize x)))))
-                                 (dolist (i items)
-                                   (unless (equal i (first items))
-                                     (setf (gethash (minimize i) hash)
-                                           (minimize (first items)))))))
-                      #+sb-unicode
-                      (assert (= (hash-table-count hash) 6772))
+                                        (case (length x)
+                                          (1
+                                           (elt x 0))
+                                          (2
+                                           (pack-3-codepoints (elt x 0) (elt x 1)))
+                                          (3
+                                           (pack-3-codepoints (elt x 0) (elt x 1) (elt x 2)))
+                                          (t
+                                           (logically-readonlyize
+                                            (possibly-base-stringize
+                                             (map 'string #'code-char x)))))))
+
+                                 (setf (gethash (code-char source) hash)
+                                       (minimize target))))
                       (setf **confusables** hash))
                     ;;
                     (let* ((list ',bidi-mirroring-list)
@@ -1624,23 +1620,17 @@ with variable-weight characters, as described in UTS #10"
 ;;; Confusable detection
 
 (defun canonically-deconfuse (string)
-  (let (ret (i 0) new-i (len (length string))
-            best-node)
-    (loop while (< i len) do
-          (loop for offset from 1 to 5
-                while (<= (+ i offset) len)
-                do
-                (let ((node (gethash (if (= offset 1)
-                                         (char string i)
-                                         (subseq string i (+ i offset)))
-                                     **confusables**)))
-                  (when node (setf best-node (string node)
-                                   new-i (+ i offset)))))
-          (cond
-            (best-node (push best-node ret) (setf i new-i))
-            (t (push (subseq string i (1+ i)) ret) (incf i)))
-          (setf best-node nil new-i nil))
-    (apply #'concatenate 'string (nreverse ret))))
+  (let (result)
+    (loop for char across string
+          for deconfused = (gethash char **confusables**)
+          do (cond ((not deconfused)
+                    (push (string char) result))
+                   ((integerp deconfused)
+                    (push (sb-impl::unpack-3-codepoints deconfused)
+                          result))
+                   (t
+                    (push deconfused result))))
+    (apply #'concatenate 'string (nreverse result))))
 
 (defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Determines whether STRING1 and STRING2 could be visually confusable
