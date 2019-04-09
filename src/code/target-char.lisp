@@ -161,7 +161,11 @@
                                   for page = (aref **character-case-pages** (ash key -6))
                                   for i = (+ (ash page 6) (ldb (byte 6 0) key))
                                   do
-                                  (setf (aref unicode-table i) (cons upper lower))
+                                  (setf (aref unicode-table i)
+                                        (if (or (consp upper)
+                                                (consp lower))
+                                            (cons upper lower)
+                                            (dpb upper (byte 21 21) lower)))
                                   when
                                   (flet (#+sb-unicode
                                          (both-case-p (code)
