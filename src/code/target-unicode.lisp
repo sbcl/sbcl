@@ -23,15 +23,15 @@
 
 (macrolet ((unicode-property-init ()
              (let ((confusable-sets
-                    (sb-cold:read-from-file "output/confusables.lisp-expr"))
+                     (sb-cold:read-from-file "output/confusables.lisp-expr"))
                    (bidi-mirroring-list
-                    (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
+                     (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
                `(progn
                   (sb-ext:define-load-time-global **proplist-properties** nil)
                   (sb-ext:define-load-time-global **confusables**
-                    ',confusable-sets)
+                      ',confusable-sets)
                   (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-                    ',bidi-mirroring-list)
+                      ',bidi-mirroring-list)
                   (defun !unicode-properties-cold-init ()
                     ;;
                     (let ((hash (make-hash-table :test 'eq))
@@ -44,27 +44,30 @@
                     ;;
                     (let ((hash (make-hash-table :test #'equal)))
                       (loop for set in ',confusable-sets
-                         for items = (mapcar #'(lambda (item)
-                                                 (map 'simple-string
-                                                      #'code-char item))
-                                             #+sb-unicode set
-                                             #-sb-unicode
-                                             (remove-if-not
-                                              #'(lambda (item)
-                                                  (every
-                                                   #'(lambda (x)
-                                                       (< x sb-xc:char-code-limit))
-                                                   item)) set))
-                         do (dolist (i items)
-                              (setf (gethash (logically-readonlyize (possibly-base-stringize i))
-                                             hash)
-                                    (logically-readonlyize
-                                     (possibly-base-stringize (first items))))))
+                            for items = (mapcar #'(lambda (item)
+                                                    (map 'simple-string
+                                                         #'code-char item))
+                                                #+sb-unicode set
+                                                #-sb-unicode
+                                                (remove-if-not
+                                                 #'(lambda (item)
+                                                     (every
+                                                      #'(lambda (x)
+                                                          (< x sb-xc:char-code-limit))
+                                                      item)) set))
+                            do (flet ((minimize (x)
+                                        (if (= (length x) 1)
+                                            (schar x 0)
+                                            (logically-readonlyize (possibly-base-stringize x)))))
+                                 (dolist (i items)
+                                   (unless (equal i (first items))
+                                     (setf (gethash (minimize i) hash)
+                                           (minimize (first items)))))))
                       (setf **confusables** hash))
                     ;;
                     (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
                       (loop for (k v) in list do
-                           (setf (gethash k hash) v))
+                            (setf (gethash k hash) v))
                       (setf **bidi-mirroring-glyphs** hash)))))))
   (unicode-property-init))
 
@@ -1619,16 +1622,19 @@ with variable-weight characters, as described in UTS #10"
   (let (ret (i 0) new-i (len (length string))
             best-node)
     (loop while (< i len) do
-         (loop for offset from 1 to 5
-            while (<= (+ i offset) len)
-            do
-              (let ((node (gethash (subseq string i (+ i offset))
-                                   **confusables**)))
-                (when node (setf best-node node new-i (+ i offset)))))
-         (cond
-           (best-node (push best-node ret) (setf i new-i))
-           (t (push (subseq string i (1+ i)) ret) (incf i)))
-         (setf best-node nil new-i nil))
+          (loop for offset from 1 to 5
+                while (<= (+ i offset) len)
+                do
+                (let ((node (gethash (if (= offset 1)
+                                         (char string i)
+                                         (subseq string i (+ i offset)))
+                                     **confusables**)))
+                  (when node (setf best-node (string node)
+                                   new-i (+ i offset)))))
+          (cond
+            (best-node (push best-node ret) (setf i new-i))
+            (t (push (subseq string i (1+ i)) ret) (incf i)))
+          (setf best-node nil new-i nil))
     (apply #'concatenate 'string (nreverse ret))))
 
 (defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
