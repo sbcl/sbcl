@@ -44,7 +44,7 @@
                     ;;
 
                     (let ((hash (make-hash-table :test #'equal
-                                                 :size 6772)))
+                                                 #+sb-unicode :size #+sb-unicode 6772)))
                       (loop for set in ',confusable-sets
                             for items = (mapcar #'(lambda (item)
                                                     (map 'simple-string
@@ -65,6 +65,7 @@
                                    (unless (equal i (first items))
                                      (setf (gethash (minimize i) hash)
                                            (minimize (first items)))))))
+                      #+sb-unicode
                       (assert (= (hash-table-count hash) 6772))
                       (setf **confusables** hash))
                     ;;
