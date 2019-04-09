@@ -178,9 +178,7 @@
                                       (let* ((entry-head (aref info index))
                                              (cp-length (ldb (byte 4 28) entry-head))
                                              (key-length (ldb (byte 5 23) entry-head))
-                                             (key (make-array
-                                                   key-length
-                                                   :element-type '(unsigned-byte 32)))
+                                             (key 0)
                                              (codepoints nil))
                                         (aver (and (/= cp-length 0) (/= key-length 0)))
                                         (loop repeat cp-length do
@@ -189,11 +187,10 @@
                                               (incf index))
                                         (setf codepoints (nreverse codepoints))
                                         (dotimes (i key-length)
-                                          (setf (aref key i) (aref info index))
+                                          (setf (ldb (byte 32 (* i 32)) key) (aref info index))
                                           (incf index))
-                                        (setf (gethash
-                                               (apply #'pack-3-codepoints codepoints)
-                                               table) (logically-readonlyize key))))
+                                        (setf (gethash (apply #'pack-3-codepoints codepoints) table)
+                                              key)))
                                 (assert (= (hash-table-count table) 27978))
                                 table))))
 

@@ -1452,12 +1452,13 @@ it defaults to 80 characters"
   #.(sb-cold:read-from-file "output/other-collation-info.lisp-expr"))
 
 (defun unpack-collation-key (key)
-  (declare (type (simple-array (unsigned-byte 32) (*)) key))
-  (loop for value across key
-        collect
-        (list (ldb (byte 16 16) value)
-              (ldb (byte 11 5) value)
-              (ldb (byte 5 0) value))))
+  (flet ((unpack (value)
+           (list (ldb (byte 16 16) value)
+                 (ldb (byte 11 5) value)
+                 (ldb (byte 5 0) value))))
+    (declare (inline unpack))
+    (loop for i by 32 below (max (integer-length key) 1)
+          collect (unpack (ldb (byte 32 i) key)))))
 
 (declaim (inline variable-p))
 (defun variable-p (x)
