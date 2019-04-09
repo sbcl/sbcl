@@ -1158,9 +1158,9 @@
 (in-package "SB-IMPL")
 
 (defun extern-alien-name (name)
- (handler-case (coerce name 'base-string)
-   (error ()
-     (error "invalid external alien name: ~S" name))))
+  (handler-case (cl:coerce name 'base-string)
+    (error ()
+      (error "invalid external alien name: ~S" name))))
 
 (declaim (ftype (sfunction (string hash-table) (or integer null))
                 find-foreign-symbol-in-table))
