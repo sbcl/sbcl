@@ -320,7 +320,7 @@ sb_nanosleep(time_t sec, int nsec) {
     mach_timespec_t current_time;
     mach_timespec_t start_time;
 
-    if (sec < 0 || nsec >= NSEC_PER_SEC) {
+    if (sec < 0 || nsec >= (int)NSEC_PER_SEC) {
         errno = EINVAL;
         return -1;
     }
