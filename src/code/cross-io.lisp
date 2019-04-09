@@ -45,3 +45,29 @@
   (def-stub line/col-from-charpos)
   (def-stub (setf form-tracking-stream-form-start-char-pos))
   (def-stub (setf form-tracking-stream-observer)))
+
+;;; Write bytes of VECTOR to stream as if VECTOR's storage representation
+;;; were such that exactly BITS-PER-ELT were used per element
+;;; regardless of how the host actually represents the vector.
+;;; START and END are byte indices, which we can't directly support in general.
+;;; As such, START must be 0 and END must be a multiple of the element size.
+(defun sb-impl::buffer-output (stream vector start end bits-per-elt)
+  (declare (type (simple-array * 1) vector))
+  (assert (zerop start))
+  (unless (zerop end) ; don't care how we should dump no data
+    (multiple-value-bind (bytes-per-elt remainder) (floor bits-per-elt 8)
+      (declare (type (integer 1 8) bytes-per-elt)) ; allow 3, 5, 6, 7 why not
+      (assert (zerop remainder))
+      (multiple-value-bind (n-elements remainder) (floor end bytes-per-elt)
+        (assert (zerop remainder))
+        (loop for i from 0 below n-elements
+              do (let ((int (aref vector i)))
+                   #+big-endian
+                   (let ((right-shift (* 8 (1- bytes-per-elt))))
+                     (dotimes (j bytes-per-elt)
+                       (write-byte (logand (ash int (- right-shift)) #xff) stream)
+                       (decf right-shift 8)))
+                   #+little-endian
+                   (dotimes (j bytes-per-elt)
+                     (write-byte (logand int #xff) stream)
+                     (setq int (ash int -8)))))))))

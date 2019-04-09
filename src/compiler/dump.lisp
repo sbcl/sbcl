@@ -128,6 +128,7 @@
 ;;; for either signed or unsigned integers. There's no range checking
 ;;; -- if you don't specify enough bytes for the number to fit, this
 ;;; function cheerfully outputs the low bytes.
+;;; Multi-byte integers written by this function are always little-endian.
 (defun dump-integer-as-n-bytes (num bytes fasl-output)
   (declare (integer num) (type index bytes))
   (declare (type fasl-output fasl-output))
@@ -751,65 +752,19 @@
             (t
              (sub-dump-object obj file))))))
 
-;;; In the grand scheme of things I don't pretend to understand any
-;;; more how this works, or indeed whether.  But to write out specialized
-;;; vectors in the same format as fop-spec-vector expects to read them
-;;; we need to be target-endian.  dump-integer-as-n-bytes always writes
-;;; little-endian (which is correct for all other integers) so for a bigendian
-;;; target we need to swap octets -- CSR, after DB
-;;; We sanity-check that VECTOR was registered as a specializd array.
-;;; Slight problem: if the host upgraded an array to T and we wanted it
-;;; more specialized, this would be undetected because the check is that
-;;; _if_ the array is specialized, _then_ it must have been registered.
-;;; The reverse is always true. But we wouldn't get here at all for (array T).
-;;; As a practical matter, silent failure is unlikely because
-;;; when building SBCL in SBCL, the needed specializations exist,
-;;; so the sanity-check will be triggered, and we can fix the source.
-#+sb-xc-host
-(defun dump-specialized-vector (vector file
-                                &key data-only) ; basically unused now
-  (aver (not data-only))
-  (labels ((octet-swap (word bits)
-             "BITS must be a multiple of 8"
-             (do ((input word (ash input -8))
-                  (output 0 (logior (ash output 8) (logand input #xff)))
-                  (bits bits (- bits 8)))
-                 ((<= bits 0) output)))
-           (dump-unsigned-vector (widetag bytes bits)
-             (unless data-only
-               (dump-fop 'fop-spec-vector file (length vector))
-               (dump-byte widetag file))
-             (dovector (i vector)
-               (dump-integer-as-n-bytes
-                (ecase sb-c:*backend-byte-order*
-                  (:little-endian i)
-                  (:big-endian (octet-swap i bits))) ; signed or unsigned OK
-                bytes file))))
-    (cond ((typep vector '(simple-bit-vector 0))
-           ;; BIT-VECTOR is a type that is always recognizable without need of
-           ;; our specialized array registry.
-           ;; However we can't actually dump a non-zero-length bit vector!
-           ;; NIL bits+bytes are ok- DUMP-INTEGER-AS-N-BYTES is unreachable.
-           ;; Otherwise we'd need to fill up octets using an ash/logior loop.
-           (dump-unsigned-vector sb-vm:simple-bit-vector-widetag nil nil))
-          (t
-           (let ((type (sb-xc:array-element-type vector)))
-             (destructuring-bind (atom bits) type
-               (aver (member atom '(signed-byte unsigned-byte)))
-               ;; 2 or 4 bits per element would be tricky to handle
-               (aver (zerop (rem bits sb-vm:n-byte-bits)))
-               (let* ((saetp (find type sb-vm:*specialized-array-element-type-properties*
-                                   :key #'sb-vm:saetp-specifier :test #'equal))
-                      (widetag (sb-vm:saetp-typecode saetp)))
-                 (dump-unsigned-vector widetag
-                                       (/ bits sb-vm:n-byte-bits)
-                                       bits))))))))
+(macrolet (#+sb-xc-host
+           (%other-pointer-widetag (x)
+             `(if (bit-vector-p ,x)
+                  sb-vm:simple-bit-vector-widetag
+                  (sb-vm:saetp-typecode
+                   (find (sb-xc:array-element-type ,x)
+                         sb-vm:*specialized-array-element-type-properties*
+                         :key #'sb-vm:saetp-specifier :test #'equal)))))
 
-#-sb-xc-host
 (defun dump-specialized-vector (vector file &key data-only)
   ;; The DATA-ONLY option was for the now-obsolete trace-table,
   ;; but it seems like a good option to keep around.
-  (declare (type (simple-unboxed-array (*)) vector))
+  #-sb-xc-host (declare (type (simple-unboxed-array (*)) vector))
   (let* ((length (length vector))
          (widetag (%other-pointer-widetag vector))
          (bits-per-length (aref **saetp-bits-per-length** widetag)))
@@ -817,9 +772,12 @@
     (unless data-only
       (dump-fop 'fop-spec-vector file length)
       (dump-byte widetag file))
-    (dump-raw-bytes vector
-                    (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
-                    file)))
+    ;; cross-io doesn't know about fasl streams, so use actual stream.
+    (sb-impl::buffer-output (fasl-output-stream file)
+                            vector
+                            0
+                            (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
+                            #+sb-xc-host bits-per-length))))
 
 ;;; Dump characters and string-ish things.
 
