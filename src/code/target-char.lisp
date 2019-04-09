@@ -107,8 +107,8 @@
                               (make-ubn-vector ,decompositions 3))
 
                         (setf **character-primary-compositions**
-                              (let ((table (make-hash-table))
-                                    (info (make-ubn-vector ,primary-compositions 3)))
+                              (let* ((info (make-ubn-vector ,primary-compositions 3))
+                                     (table (make-hash-table :size (/ (length info) 3))))
                                 (dotimes (i (/ (length info) 3))
                                   (setf (gethash (dpb (aref info (* 3 i)) (byte 21 21)
                                                       (aref info (1+ (* 3 i))))
@@ -170,7 +170,7 @@
                           (setf **character-cases** table))
 
                         (setf **character-collations**
-                              (let* ((table (make-hash-table))
+                              (let* ((table (make-hash-table :size 27978))
                                      (index 0)
                                      (info (make-ubn-vector ,collations 4))
                                      (len (length info)))
@@ -194,6 +194,7 @@
                                         (setf (gethash
                                                (apply #'pack-3-codepoints codepoints)
                                                table) (logically-readonlyize key))))
+                                (assert (= (hash-table-count table) 27978))
                                 table))))
 
                     ,(with-open-file

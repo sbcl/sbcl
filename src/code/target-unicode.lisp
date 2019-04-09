@@ -42,7 +42,9 @@
                             do (setf (gethash symbol hash)
                                      (coerce ranges '(vector (unsigned-byte 32))))))
                     ;;
-                    (let ((hash (make-hash-table :test #'equal)))
+
+                    (let ((hash (make-hash-table :test #'equal
+                                                 :size 6772)))
                       (loop for set in ',confusable-sets
                             for items = (mapcar #'(lambda (item)
                                                     (map 'simple-string
@@ -63,9 +65,11 @@
                                    (unless (equal i (first items))
                                      (setf (gethash (minimize i) hash)
                                            (minimize (first items)))))))
+                      (assert (= (hash-table-count hash) 6772))
                       (setf **confusables** hash))
                     ;;
-                    (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
+                    (let* ((list ',bidi-mirroring-list)
+                           (hash (make-hash-table :size (length list))))
                       (loop for (k v) in list do
                             (setf (gethash k hash) v))
                       (setf **bidi-mirroring-glyphs** hash)))))))
