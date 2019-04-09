@@ -42,7 +42,7 @@
                                      (coerce ranges '(vector (unsigned-byte 32))))))
                     ;;
                     (let* ((data ',confusable-sets)
-                           (hash (make-hash-table :test #'equal
+                           (hash (make-hash-table :test #'eq
                                                   #+sb-unicode :size #+sb-unicode (length data))))
                       (loop for (source . target) in data
                             when (and #-sb-unicode
