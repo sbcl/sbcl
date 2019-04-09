@@ -56,7 +56,11 @@
                                    (initial-contents nil contentsp))
   ;; Expressed type must be _exactly_ one of the supported ones.
   (assert (and element-type
-               (find element-type sb-vm:*specialized-array-element-type-properties*
+               (find (case element-type
+                       #-sb-unicode
+                       (base-char 'character)
+                       (t element-type))
+                     sb-vm:*specialized-array-element-type-properties*
                      :key #'sb-vm::saetp-specifier :test 'equal)
                (neq element-type 't)))
   (let ((array (cl:make-array dims
