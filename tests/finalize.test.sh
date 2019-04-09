@@ -43,7 +43,9 @@ echo //entering finalize.test.sh
     (with-open-file (f "finalize-test-passed" :direction :output)
       (write-line "OK" f))
     (with-open-file (f "finalize-test-failed" :direction :output)
-      (format f "OOPS: ~A~%" *count*)))
+      (format f "OOPS: ~A~%" *count*)
+      (sb-kernel:run-pending-finalizers)
+      (format f "After sb-kernel:run-pending-finalizers: ~A~%" *count*)))
 
 (sb-ext:quit)
 EOF
