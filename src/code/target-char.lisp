@@ -120,7 +120,8 @@
 
                         (setf **character-primary-compositions**
                               (let* ((info (make-ubn-vector ,primary-compositions 3))
-                                     (table (make-hash-table :size (/ (length info) 3))))
+                                     (table (make-hash-table #+64-bit :test #+64-bit #'eq
+                                                             :size (/ (length info) 3))))
                                 (dotimes (i (/ (length info) 3))
                                   (setf (gethash (dpb (aref info (* 3 i)) (byte 21 21)
                                                       (aref info (1+ (* 3 i))))
@@ -186,7 +187,8 @@
                           (setf **character-cases** table))
 
                         (setf **character-collations**
-                              (let* ((table (make-hash-table :size 27978))
+                              (let* ((table (make-hash-table :size 27978
+                                                             #+64-bit :test #+64-bit #'eq))
                                      (index 0)
                                      (info (make-ubn-vector ,collations 4))
                                      (len (length info)))

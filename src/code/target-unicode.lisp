@@ -65,7 +65,7 @@
                       (setf **confusables** hash))
                     ;;
                     (let* ((list ',bidi-mirroring-list)
-                           (hash (make-hash-table :size (length list))))
+                           (hash (make-hash-table :test #'eq :size (length list))))
                       (loop for (k v) in list do
                             (setf (gethash k hash) v))
                       (setf **bidi-mirroring-glyphs** hash)))))))
