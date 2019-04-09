@@ -88,12 +88,11 @@
         (when (and (arrayp obj) (eq (array-type-complexp type) t))
           (bug "Should not call cross-typep with definitely-non-simple array type"))
         ;; This is essentially just the ARRAY-TYPE case of %%TYPEP
-        ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE,
+        ;; using SB-XC:ARRAY-ELEMENT-TYPE, not CL:ARRAY-ELEMENT-TYPE,
         ;; and disregarding simple-ness.
         (values (and (arrayp obj)
                      (or (eq (array-type-element-type type) *wild-type*)
-                         (type= (specifier-type
-                                 (!specialized-array-element-type obj))
+                         (type= (specifier-type (sb-xc:array-element-type obj))
                                 (array-type-specialized-element-type type)))
                      (or (eq (array-type-dimensions type) '*)
                          (and (= (length (array-type-dimensions type))
@@ -293,7 +292,7 @@
      (ctype-of-number x))
     (array
      ;; It is critical not to inquire of the host for the array's element type.
-     (let ((etype (specifier-type (!specialized-array-element-type x))))
+     (let ((etype (specifier-type (sb-xc:array-element-type x))))
        (make-array-type (array-dimensions x)
                         ;; complexp relies on the host implementation,
                         ;; but in practice any array for which we need to

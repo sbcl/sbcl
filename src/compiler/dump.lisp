@@ -697,13 +697,13 @@
       #+sb-xc-host (bug "Can't dump multi-dim array")))
 
 ;;; Dump the vector object. If it's not simple, then actually dump a
-;;; simple version of it. But we enter the original in the EQ or EQUAL
+;;; simple realization of it. But we enter the original in the EQ or EQUAL
 ;;; tables.
 (defun dump-vector (x file)
   (let ((simple-version (if (array-header-p x)
-                            (coerce x `(simple-array
-                                        ,(array-element-type x)
-                                        (*)))
+                            (sb-xc:coerce x `(simple-array
+                                              ,(array-element-type x)
+                                              (*)))
                             x)))
     (typecase simple-version
       ;; On the host, take all strings to be simple-base-string.
@@ -720,22 +720,13 @@
          (dump-fop 'fop-character-string file (length simple-version))
          (dump-chars simple-version file nil)
          (string-save-object x file)))
-      (simple-vector
-       ;; xc-host may upgrade anything to T, so pre-check that it
-       ;; wasn't actually supposed to be a specialized array,
-       ;; and in case a copy was made, tell DUMP-S-V the original type.
-       (cond #+sb-xc-host
-             ((neq (!specialized-array-element-type x) t)
-              (dump-specialized-vector (!specialized-array-element-type x)
-                                       simple-version file))
-             (t
-              (dump-simple-vector simple-version file)))
+      ;; SB-XC:SIMPLE-VECTOR will not match an array whose element type
+      ;; the host upgraded to T but whose expressed type was not T.
+      (sb-xc:simple-vector
+       (dump-simple-vector simple-version file)
        (eq-save-object x file))
       (t
-       ;; Host may have a different specialization, which is ok in itself,
-       ;; but again we might have have copied the vector, losing the type.
-       (dump-specialized-vector
-        #+sb-xc-host (!specialized-array-element-type x) simple-version file)
+       (dump-specialized-vector simple-version file)
        (eq-save-object x file)))))
 
 ;;; Dump a SIMPLE-VECTOR, handling any circularities.
@@ -775,8 +766,9 @@
 ;;; when building SBCL in SBCL, the needed specializations exist,
 ;;; so the sanity-check will be triggered, and we can fix the source.
 #+sb-xc-host
-(defun dump-specialized-vector (element-type vector file
+(defun dump-specialized-vector (vector file
                                 &key data-only) ; basically unused now
+  (aver (not data-only))
   (labels ((octet-swap (word bits)
              "BITS must be a multiple of 8"
              (do ((input word (ash input -8))
@@ -793,40 +785,25 @@
                   (:little-endian i)
                   (:big-endian (octet-swap i bits))) ; signed or unsigned OK
                 bytes file))))
-    (cond
-        ((listp element-type)
-         (destructuring-bind (type-id bits) element-type
-           (dump-unsigned-vector
-            (ecase type-id
-              (signed-byte
-               (ecase bits
-                 (8  sb-vm:simple-array-signed-byte-8-widetag)
-                 (16 sb-vm:simple-array-signed-byte-16-widetag)
-                 (32 sb-vm:simple-array-signed-byte-32-widetag)
-                 #+64-bit
-                 (64 sb-vm:simple-array-signed-byte-64-widetag)))
-              (unsigned-byte
-               (ecase bits
-                 (8  sb-vm:simple-array-unsigned-byte-8-widetag)
-                 (16 sb-vm:simple-array-unsigned-byte-16-widetag)
-                 (32 sb-vm:simple-array-unsigned-byte-32-widetag)
-                 #+64-bit
-                 (64 sb-vm:simple-array-unsigned-byte-64-widetag))))
-            (/ bits sb-vm:n-byte-bits)
-            bits)))
-        ((typep vector '(simple-bit-vector 0))
-         ;; NIL bits+bytes are ok- DUMP-INTEGER-AS-N-BYTES is unreachable.
-         ;; Otherwise we'd need to fill up octets using an ash/logior loop.
-         (dump-unsigned-vector sb-vm:simple-bit-vector-widetag nil nil))
-        ((and (typep vector '(vector * 0)) data-only)
-         nil) ; empty vector and data-only => nothing to do
-        ((typep vector '(vector (unsigned-byte 8)))
-         ;; FIXME: eliminate this case, falling through to ERROR.
-         (compiler-style-warn
-          "Unportably dumping (ARRAY (UNSIGNED-BYTE 8)) ~S" vector)
-         (dump-unsigned-vector sb-vm:simple-array-unsigned-byte-8-widetag 1 8))
-        (t
-         (error "Won't dump specialized array ~S" vector)))))
+    (cond ((typep vector '(simple-bit-vector 0))
+           ;; BIT-VECTOR is a type that is always recognizable without need of
+           ;; our specialized array registry.
+           ;; However we can't actually dump a non-zero-length bit vector!
+           ;; NIL bits+bytes are ok- DUMP-INTEGER-AS-N-BYTES is unreachable.
+           ;; Otherwise we'd need to fill up octets using an ash/logior loop.
+           (dump-unsigned-vector sb-vm:simple-bit-vector-widetag nil nil))
+          (t
+           (let ((type (sb-xc:array-element-type vector)))
+             (destructuring-bind (atom bits) type
+               (aver (member atom '(signed-byte unsigned-byte)))
+               ;; 2 or 4 bits per element would be tricky to handle
+               (aver (zerop (rem bits sb-vm:n-byte-bits)))
+               (let* ((saetp (find type sb-vm:*specialized-array-element-type-properties*
+                                   :key #'sb-vm:saetp-specifier :test #'equal))
+                      (widetag (sb-vm:saetp-typecode saetp)))
+                 (dump-unsigned-vector widetag
+                                       (/ bits sb-vm:n-byte-bits)
+                                       bits))))))))
 
 #-sb-xc-host
 (defun dump-specialized-vector (vector file &key data-only)

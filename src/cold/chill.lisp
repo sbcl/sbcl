@@ -50,18 +50,10 @@
       (macro-function 'sb-ext:define-load-time-global))
 
 (export '(sb-int::!cold-init-forms
-          sb-int::!coerce-to-specialized
           sb-int::/show sb-int::/noshow sb-int::/show0 sb-int::/noshow0)
         'sb-int)
 
 (defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms))
-
-;; This macro is never defined for the target Lisp,
-;; only the cross-compilation host (see "src/code/specializable-array")
-;; but it is needed to read x86-64/insts.lisp and other things.
-(defmacro sb-int:!coerce-to-specialized (a type)
-  (declare (ignore type))
-  a)
 
 ;; If :sb-show is present, then these symbols are fboundp.
 ;; Otherwise define them as no-ops.

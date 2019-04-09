@@ -275,12 +275,8 @@
     (when elsewhere-locations
       (dolist (loc (nreverse elsewhere-locations))
         (dump-location-from-info loc var-locs)))
-    (let ((compressed
-           (lz-compress (coerce byte-buffer
-                                '(simple-array (unsigned-byte 8) (*))))))
-      (logically-readonlyize
-       (!make-specialized-array (length compressed) '(unsigned-byte 8)
-                                compressed)))))
+    ;; lz-compress accept any array of octets and returns a simple-array
+    (logically-readonlyize (lz-compress byte-buffer))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -349,16 +345,16 @@
       (if (zerop length)
           #()
           (logically-readonlyize
-           (!make-specialized-array length
-                                    (smallest-element-type (max max-positive
-                                                                (1- max-negative))
-                                                           (plusp max-negative))
-                                    seq))))))
+           (sb-xc:coerce seq
+                         `(simple-array
+                            ,(smallest-element-type (max max-positive
+                                                         (1- max-negative))
+                                                    (plusp max-negative))
+                            1)))))))
 
 (defun compact-vector (sequence)
   (cond ((and (= (length sequence) 1)
-              (not (typep (elt sequence 0) '(and vector
-                                             (not string)))))
+              (not (typep (elt sequence 0) '(and vector (not string)))))
          (elt sequence 0))
         (t
          (coerce-to-smallest-eltype sequence))))

@@ -30,7 +30,7 @@
 
 (macrolet ((frob ()
              (flet ((coerce-it (array)
-                      (!coerce-to-specialized array '(unsigned-byte 8)))
+                      (sb-xc:coerce array '(simple-array (unsigned-byte 8) 1)))
                     (file (name type)
                       (let ((dir (sb-cold:prepend-genfile-path "output/")))
                         (make-pathname :directory (pathname-directory (merge-pathnames dir))
@@ -39,10 +39,10 @@
                       (with-open-file (stream pathname
                                               :element-type '(unsigned-byte 8))
                         (let* ((length (file-length stream))
-                               (array (make-array
+                               (array (sb-xc:make-array
                                        length :element-type '(unsigned-byte 8))))
                           (read-sequence array stream)
-                          (!coerce-to-specialized array '(unsigned-byte 8)))))
+                          array)))
                     (init-global (name type &optional length)
                       `(progn
                          (define-load-time-global ,name
@@ -86,7 +86,7 @@
                                (let ((new-array
                                        (make-array
                                         (/ (length raw-bytes) n)
-                                        :element-type (list 'unsigned-byte (* 8 n)))))
+                                        :element-type `(unsigned-byte ,(* 8 n)))))
                                  (loop for i from 0 below (length raw-bytes) by n
                                        for element = 0 do
                                        (loop for offset from 0 below n do

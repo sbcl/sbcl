@@ -1461,12 +1461,6 @@ possibly temporarily, because it might be used internally."
                ;; catch tags
                "TOPLEVEL-CATCHER"
 
-               ;; Constructors for arrays whose element-type is recoverable
-               ;; even if the host Lisp upgrades it to something unexpected.
-               "!MAKE-SPECIALIZED-ARRAY"
-               "!COERCE-TO-SPECIALIZED"
-               "!SPECIALIZED-ARRAY-ELEMENT-TYPE"
-
                ;; hooks for contrib/ stuff we're insufficiently sure
                ;; about to add to SB-EXT
                "*REPL-PROMPT-FUN*"

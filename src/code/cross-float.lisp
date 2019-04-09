@@ -417,9 +417,19 @@
   ;; CL:FLOAT or something else in CL as the type, NUMBER would return NIL because host
   ;; floats do NOT satisfy "our" NUMBERP. But we want this to fail, not succeed.
   (validate-args object)
-  (when (or (not (numberp object))
-            (member type '(vector simple-vector simple-string simple-base-string list))
-            (typep type '(cons (eql simple-array))))
+  (when (or (arrayp object) (listp object))
+    (when (or (member type '(vector simple-vector simple-string simple-base-string list))
+              (equal type '(simple-array character (*))))
+      (return-from coerce (cl:coerce object type))) ; string or unspecialized array
+    (let ((et (ecase (car type)
+                (simple-array (destructuring-bind (et &optional dims) (cdr type)
+                                (assert (or (eql dims 1) (equal dims '(*))))
+                                et))
+                (vector (destructuring-bind (et) (cdr type) et)))))
+      (return-from coerce
+        (sb-xc:make-array (length object) :element-type et
+                          :initial-contents object))))
+  (unless (numberp object)
     (return-from coerce (cl:coerce object type)))
   (when (member type '(integer rational real))
     ;; This branch won't accept (coerce x 'real) if X is one of our

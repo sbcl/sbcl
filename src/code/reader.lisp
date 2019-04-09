@@ -171,7 +171,8 @@
 ;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
 ;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
 (defconstant +constituent-trait-table+
-  #.(let ((a (!make-specialized-array base-char-code-limit '(unsigned-byte 8))))
+  #.(let ((a (sb-xc:make-array base-char-code-limit
+                               :element-type '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
       (flet ((!set-constituent-trait (char trait)
                (aver (typep char 'base-char))
@@ -1646,8 +1647,8 @@ extended <package-name>::<form-in-package> syntax."
            (inline token-buf-getchar)) ; makes for smaller code
   (let* ((fixnum-max-digits
           (macrolet ((maxdigits ()
-                       (!coerce-to-specialized  (integer-reader-safe-digits)
-                                                '(unsigned-byte 8))))
+                       (sb-xc:coerce (integer-reader-safe-digits)
+                                     '(vector (unsigned-byte 8)))))
             (aref (maxdigits) (- base 2))))
          (base-power
           (macrolet ((base-powers ()

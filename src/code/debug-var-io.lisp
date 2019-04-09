@@ -186,7 +186,7 @@
 ;;; A somewhat bad (slow and not-very-squishy) compressor
 ;;; that gets between 15% and 20% space savings in debug blocks.
 ;;; Lengthy input may be compressible by as much as 3:1.
-(declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+(declaim (ftype (sfunction ((array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
                 lz-compress))
 (defun lz-compress (input)
   (let ((output (make-array (length input)
@@ -240,13 +240,15 @@
                        (vector-push-extend 0 output)))))))))
     (let ((result
            #+sb-xc-host
-           (coerce output '(simple-array (unsigned-byte 8) (*)))
+           (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
            #-sb-xc-host
            (%shrink-vector (%array-data output) (fill-pointer output))))
       #+(or)
       (aver (equalp input (lz-decompress result)))
       result)))
 
+#-sb-xc-host
+(progn
 (declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
                 lz-decompress))
 (defun lz-decompress (input)
@@ -284,7 +286,4 @@
                            (copy offset 3))))
                     (t
                      (vector-push-extend byte output))))))
-    #+sb-xc-host
-    (coerce output '(simple-array (unsigned-byte 8) (*)))
-    #-sb-xc-host
-    (%shrink-vector (%array-data output) (fill-pointer output))))
+    (%shrink-vector (%array-data output) (fill-pointer output)))))

@@ -218,13 +218,13 @@ variable: an unreadable object representing the error is printed instead.")
   ;; This is exact for bases which are exactly a power-of-2, or an overestimate
   ;; otherwise, as mandated by the finite output stream.
   (let ((bits-per-char
-         (aref #.(!coerce-to-specialized
+         (aref #.(sb-xc:coerce
                   ;; base 2 or base 3  = 1 bit per character
                   ;; base 4 .. base 7  = 2 bits per character
                   ;; base 8 .. base 15 = 3 bits per character, etc
                   #(1 1 2 2 2 2 3 3 3 3 3 3 3 3
                     4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 5 5 5 5 5)
-                  '(unsigned-byte 8))
+                  '(vector (unsigned-byte 8)))
                (- *print-base* 2))))
     (+ (if (minusp object) 1 0) ; leading sign
        (if *print-radix* 4 0) ; #rNN or trailing decimal

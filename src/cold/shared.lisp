@@ -373,6 +373,9 @@
     ;; just to avoid that ugly mess.
     nil))
 
+;;; The specialized array registry has file-wide scope. Hacking that aspect
+;;; into the xc build scaffold seemed slightly easier than hacking the
+;;; compiler (i.e. making the registry a slot of the fasl-output struct)
 (defvar *array-to-specialization* (make-hash-table :test #'eq))
 
 (defmacro do-stems-and-flags ((stem flags build-phase) &body body)

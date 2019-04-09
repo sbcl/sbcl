@@ -49,7 +49,7 @@
   (let ((et (sb-vm:saetp-specifier x)))
     ;; Test the numeric array specializations.
     (unless (member et '(nil t base-char character))
-      (let ((a (!make-specialized-array 11 et)))
+      (let ((a (make-array 11 :element-type et)))
         (assert (type= (ctype-of a) (specifier-type `(simple-array ,et (11)))))
         (assert (typep a '(and array (not (array t)))))
         (assert (typep a `(simple-array ,et (11))))
@@ -63,7 +63,9 @@
 ;;; Here it doesn't matter what we specify as element-type to MAKE-ARRAY
 ;;; because it introspects as if it were SIMPLE-VECTOR due to
 ;;; non-use of make-specialized-array.
-(assert (type= (ctype-of (make-array 11 :element-type '(signed-byte 8)))
+;;; (Note use of CL:MAKE-ARRAY. This file of tests causes symbol lookup
+;;; to default to using the SB-XC symbol otherwise)
+(assert (type= (ctype-of (cl:make-array 11 :element-type '(signed-byte 8)))
                (specifier-type '(simple-vector 11))))
 
 (assert (typep #(1 2 3) 'simple-vector))

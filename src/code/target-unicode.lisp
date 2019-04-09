@@ -17,9 +17,8 @@
 
 (declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
 (sb-ext:define-load-time-global **block-ranges**
-  #.(!coerce-to-specialized
-     (sb-cold:read-from-file "output/blocks.lisp-expr")
-     '(unsigned-byte 32)))
+  #.(sb-xc:coerce (sb-cold:read-from-file "output/blocks.lisp-expr")
+                  '(vector (unsigned-byte 32))))
 
 (macrolet ((unicode-property-init ()
              (let ((confusable-sets
@@ -451,7 +450,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
 
 (eval-when (:compile-toplevel)
   (sb-xc:defmacro coerce-to-ordered-ranges (array)
-    (!coerce-to-specialized array '(unsigned-byte 32))))
+    (sb-xc:coerce array '(vector (unsigned-byte 32)))))
 
 (defun default-ignorable-p (character)
   "Returns T if CHARACTER is a Default_Ignorable_Code_Point"
