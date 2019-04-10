@@ -1073,79 +1073,55 @@ core and return a descriptor to it."
                    (error "~S is not the descriptor of a cold-layout" cold-layout)))
        (vector-from-core x)))
 
-;;; COLD-DD-SLOTS is a cold descriptor for the list of slots
-;;; in a cold defstruct-description. INDEX is a DSD-INDEX.
-;;; Return the host's accessor name for the host image of that slot.
-(defun dsd-accessor-from-cold-slots (cold-dd-slots desired-index)
-  (let* ((bits-slot (get-dsd-index defstruct-slot-description sb-kernel::bits))
-         (accessor-fun-name-slot
-          (get-dsd-index defstruct-slot-description sb-kernel::accessor-name)))
-    (do ((list cold-dd-slots (cold-cdr list)))
-        ((cold-null list))
-      (when (= (ash (descriptor-fixnum
-                     (read-wordindexed (cold-car list)
-                                       (+ sb-vm:instance-slots-offset bits-slot)))
-                    (- sb-kernel::+dsd-index-shift+))
-               desired-index)
-        (return
-         (warm-symbol
-          (read-wordindexed (cold-car list)
-                            (+ sb-vm:instance-slots-offset
-                               accessor-fun-name-slot))))))))
-
-(defun cold-dsd-index (cold-dsd dsd-layout)
-  (ash (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits))
-       (- sb-kernel::+dsd-index-shift+)))
-
-(defun cold-dsd-raw-type (cold-dsd dsd-layout)
-  (1- (ldb (byte 3 0) (descriptor-fixnum (read-slot cold-dsd dsd-layout :bits)))))
+(defun type-dd-slots-or-lose (type)
+  (or (get type 'dd-slots) (error "NO DD-SLOTS: ~S" type)))
 
 (declaim (ftype function read-slot write-slots))
 (flet ((get-slots (host-layout-or-type)
          (etypecase host-layout-or-type
            (layout (dd-slots (layout-info host-layout-or-type)))
-           (symbol (dd-slots-from-core host-layout-or-type))))
-       (get-slot-index (slots initarg)
-         (+ sb-vm:instance-slots-offset
-            (if (descriptor-p slots)
-                (do ((dsd-layout (find-layout 'defstruct-slot-description))
-                     (slots slots (cold-cdr slots)))
-                    ((cold-null slots) (error "No slot for ~S" initarg))
-                  (let* ((dsd (cold-car slots))
-                         (slot-name (read-slot dsd dsd-layout :name)))
-                    (when (eq (keywordicate (warm-symbol slot-name)) initarg)
-                      ;; Untagged slots are not accessible during cold-load
-                      (aver (eql (cold-dsd-raw-type dsd dsd-layout) -1))
-                      (return (cold-dsd-index dsd dsd-layout)))))
-                (let ((dsd (find initarg slots
-                                 :test (lambda (x y)
-                                         (eq x (keywordicate (dsd-name y)))))))
-                  (aver (eq (dsd-raw-type dsd) t)) ; Same as above: no can do.
-                  (dsd-index dsd))))))
+           (symbol (type-dd-slots-or-lose host-layout-or-type))))
+       (find-slot (slots initarg)
+         (let ((dsd (find initarg slots
+                          :test (lambda (x y) (eq x (keywordicate (dsd-name y)))))))
+           (values (+ sb-vm:instance-slots-offset (dsd-index dsd))
+                   (dsd-raw-type dsd)))))
+
   (defun write-slots (cold-object host-layout-or-type &rest assignments)
     (aver (evenp (length assignments)))
     (let ((slots (get-slots host-layout-or-type)))
       (loop for (initarg value) on assignments by #'cddr
-            do (write-wordindexed
-                cold-object (get-slot-index slots initarg) value)))
+            do (multiple-value-bind (index repr) (find-slot slots initarg)
+                 (ecase repr
+                   ((t) (write-wordindexed cold-object index value))
+                   ((word sb-vm:signed-word)
+                    (write-wordindexed/raw cold-object index value))))))
     cold-object)
 
   ;; For symmetry, the reader takes an initarg, not a slot name.
   (defun read-slot (cold-object host-layout-or-type slot-initarg)
-    (let ((slots (get-slots host-layout-or-type)))
-      (read-wordindexed cold-object (get-slot-index slots slot-initarg)))))
+    (multiple-value-bind (index repr)
+        (find-slot (get-slots host-layout-or-type) slot-initarg)
+      (ecase repr
+        ((t) (read-wordindexed cold-object index))
+        (word (read-bits-wordindexed cold-object index))
+        (sb-vm:signed-word
+         (sb-vm::sign-extend (read-bits-wordindexed cold-object index)
+                             sb-vm:n-word-bits))))))
 
-;; Given a TYPE-NAME of a structure-class, find its defstruct-description
-;; as a target descriptor, and return the slot list as a target descriptor.
-(defun dd-slots-from-core (type-name)
-  (let* ((host-dd-layout (find-layout 'defstruct-description))
-         (target-dd
-          ;; This is inefficient, but not enough so to worry about.
-          (or (car (assoc (cold-intern type-name) *known-structure-classoids*
-                          :key (lambda (x) (read-slot x host-dd-layout :name))
-                          :test #'descriptor=))
-              (error "No known layout for ~S" type-name))))
-    (read-slot target-dd host-dd-layout :slots)))
+(defun extract-dd-slots-from-core (cold-dd) ; descriptor to a defstruct-description
+  (let* ((name (read-slot cold-dd (find-layout 'defstruct-description) :name))
+         (slots (read-slot cold-dd (find-layout 'defstruct-description) :slots))
+         (host-dsd-layout (find-layout 'defstruct-slot-description))
+         (result))
+    (loop while (not (cold-null slots))
+          do (let* ((dsd (cold-car slots))
+                    (name (warm-symbol (read-slot dsd host-dsd-layout :name)))
+                    (acc (warm-symbol (read-slot dsd host-dsd-layout :accessor-name)))
+                    (bits (descriptor-fixnum (read-slot dsd host-dsd-layout :bits))))
+               (push (sb-kernel::make-dsd name nil acc bits nil) result)
+               (setq slots (cold-cdr slots))))
+    (setf (get (warm-symbol name) 'dd-slots) (nreverse result))))
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
@@ -1290,21 +1266,20 @@ core and return a descriptor to it."
            (ctype
             `((,(get-dsd-index ctype sb-kernel::class-info) . nil)))))
          (result (allocate-struct *dynamic* target-layout))
-         (cold-dd-slots (dd-slots-from-core host-type)))
+         (dd-slots (type-dd-slots-or-lose host-type)))
     (aver (eql (layout-bitmap (find-layout host-type))
                sb-kernel::+layout-all-tagged+))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
          (index sb-vm:instance-data-start (1+ index)))
         ((= index len) result)
-      (write-wordindexed
-       result
-       (+ sb-vm:instance-slots-offset index)
-       (acond ((assq index simple-slots) (or (cdr it) *nil-descriptor*))
-              (t (host-constant-to-core
-                  (funcall (dsd-accessor-from-cold-slots cold-dd-slots index)
-                           obj)
-                  obj-to-core-helper)))))))
+      (let* ((dsd (find index dd-slots :key #'dsd-index))
+             (slot-val (funcall (dsd-accessor-name dsd) obj)))
+        (write-wordindexed
+         result
+         (+ sb-vm:instance-slots-offset index)
+         (acond ((assq index simple-slots) (or (cdr it) *nil-descriptor*))
+                (t (host-constant-to-core slot-val obj-to-core-helper))))))))
 
 ;; This is called to backpatch two small sets of objects:
 ;;  - layouts created before layout-of-layout is made (3 counting LAYOUT itself)
@@ -2554,6 +2529,7 @@ core and return a descriptor to it."
             (sb-impl::%defun (apply #'cold-fset args))
             (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
             (sb-kernel::%defstruct
+             (extract-dd-slots-from-core (car args)) ; "Learn" the metadata
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
