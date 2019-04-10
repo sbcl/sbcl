@@ -88,13 +88,13 @@
                       `(sb-alien::alien-value-typep object ',alien-type)))
                    #+(vop-translates sb-int:fixnump-instance-ref)
                    ((and (type= type (specifier-type 'fixnum))
-                         (let ((use (lvar-uses object)) index)
+                         (let ((use (lvar-uses object)))
                            (and (combination-p use)
                                 (almost-immediately-used-p object use)
                                 (or (and (eq (lvar-fun-name (combination-fun use))
                                              '%instance-ref)
                                          (constant-lvar-p
-                                          (setf index (second (combination-args use)))))
+                                          (second (combination-args use))))
                                     (member (lvar-fun-name (combination-fun use))
                                             '(car cdr))))))
                     ;; This is a disturbing trend, but it's the best way to
