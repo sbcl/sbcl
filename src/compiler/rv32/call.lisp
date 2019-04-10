@@ -911,10 +911,11 @@
       ;; allocation) into the stack pointer.
       (cond ((zerop fixed)
              (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                    (inst add csp-tn result nargs-tn))
+                    (inst add dest result nargs-tn))
                    (t
                     (inst slli dest nargs-tn (- word-shift n-fixnum-tag-bits))
-                    (inst add csp-tn result dest)))
+                    (inst add dest result dest)))
+             (move csp-tn dest)
              (inst beq nargs-tn zero-tn done))
             (t
              (inst subi count nargs-tn (fixnumize fixed))
@@ -924,17 +925,18 @@
                (inst j done)
                (emit-label skip))
              (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                    (inst add csp-tn result count))
+                    (inst add dest result count))
                    (t
                     (inst slli dest count (- word-shift n-fixnum-tag-bits))
-                    (inst add csp-tn result dest)))))
+                    (inst add dest result dest)))
+             ;; Don't leave the arguments unprotected when moving below the stack pointer
+             (when (>= delta 0)
+               (move csp-tn dest))))
       ;; Allocate the space on the stack.
       (when (< fixed register-arg-count)
         ;; We must stop when we run out of stack args, not when we run
         ;; out of more args.
         (inst addi result result (* (- register-arg-count fixed) n-word-bytes)))
-      ;; Initialize dest to be end of stack.
-      (move dest csp-tn)
 
       ;; We are copying at most (- NARGS FIXED) values, from last to
       ;; first, in order to shift them out of the allocated part of
