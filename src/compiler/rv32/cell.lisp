@@ -283,11 +283,16 @@
 
 ;;;; raw instance slot accessors
 
-(define-full-reffer raw-instance-ref/word * instance-slots-offset
-  instance-pointer-lowtag (unsigned-reg) unsigned-num %raw-instance-ref/word)
-
-(define-full-setter raw-instance-set/word * instance-slots-offset
-  instance-pointer-lowtag (unsigned-reg) unsigned-num %raw-instance-set/word)
+(macrolet ((define-raw-slot-word-vops (name value-sc value-primtype)
+             `(progn
+                (define-full-reffer ,(symbolicate "RAW-INSTANCE-REF/" name) * instance-slots-offset
+                  instance-pointer-lowtag (,value-sc) ,value-primtype
+                  ,(symbolicate "%RAW-INSTANCE-REF/" name))
+                (define-full-setter ,(symbolicate "RAW-INSTANCE-SET/" name) * instance-slots-offset
+                  instance-pointer-lowtag (,value-sc) ,value-primtype
+                  ,(symbolicate "%RAW-INSTANCE-SET/" name)))))
+  (define-raw-slot-word-vops word unsigned-reg unsigned-num)
+  (define-raw-slot-word-vops signed-word signed-reg signed-num))
 
 (macrolet ((define-raw-slot-float-vops (name value-primtype value-sc size format &optional complexp)
              (let ((ref-vop (symbolicate "RAW-INSTANCE-REF/" name))

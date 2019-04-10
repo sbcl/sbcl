@@ -171,7 +171,7 @@
               (slots (sb-kernel:dd-slots (sb-kernel:find-defstruct-description 'foo)))
               (valtype (sb-kernel:dsd-raw-type
                         (find 'sword slots :key #'sb-kernel:dsd-name))))
-         #+(or arm arm64 mips ppc x86 x86-64) (assert (eq valtype 'sb-vm:signed-word))
+         #+(or arm arm64 mips ppc rv32 x86 x86-64) (assert (eq valtype 'sb-vm:signed-word))
          (assert (= -9 (if (eq valtype 'sb-vm:signed-word)
                            (sb-sys:signed-sap-ref-word sap 0)
                            (sb-sys:sap-ref-lispobj sap 0))))))))
