@@ -193,8 +193,7 @@
   (:info label)
   (:temporary (:scs (any-reg)) dst)
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (interior-reg)) lip)
-  (:temporary (:scs (descriptor-reg)) count-words)
+  (:temporary (:scs (any-reg) :from (:argument 2)) count-words)
   (:results (result :scs (any-reg) :from (:argument 0))
             (num :scs (any-reg) :from (:argument 0)))
   (:save-p :force-to-stack)
@@ -208,26 +207,25 @@
 
       ;; Setup results, and test for the zero value case.
       (load-stack-tn result top)
-      (inst li num 0)
-      (inst slli count-words count (- word-shift n-fixnum-tag-bits))
-      (inst beq count-words zero-tn done)
-      ;; Compute dst as one slot down from result, because we inc the index
-      ;; before we use it.
-      (inst subi dst result n-word-bytes)
-
-      ;; Copy stuff down the stack
-      (emit-label loop)
-      (inst add lip src num)
-      (loadw temp lip)
-      (inst addi num num n-word-bytes)
-      (inst add lip dst num)
-      (storew temp lip)
-      (inst bne num count-words loop)
-
+      (move num count)
       ;; Reset the CSP.
-      (emit-label done)
-      (inst add csp-tn result num)
-      (inst srli num num (- word-shift n-fixnum-tag-bits)))))
+      (cond ((= word-shift n-fixnum-tag-bits)
+             (inst add csp-tn result count))
+            (t
+             (inst slli count-words count (- word-shift n-fixnum-tag-bits))
+             (inst add csp-tn result count-words)))
+      (inst beq count zero-tn done)
+
+      (move dst result)
+      ;; Copy stuff on the stack
+      (emit-label loop)
+      (loadw temp src)
+      (inst addi src src n-word-bytes)
+      (storew temp dst)
+      (inst addi dst dst n-word-bytes)
+      (inst bne dst csp-tn loop)
+
+      (emit-label done))))
 
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
