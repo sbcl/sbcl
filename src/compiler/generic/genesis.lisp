@@ -120,6 +120,14 @@
         (setf (bvref bigvec i)
               (read-byte stream))))
 
+(defun read-n-bytes (stream vector start end)
+  (aver (zerop start))
+  (let* ((start (+ (descriptor-byte-offset vector)
+                   (ash sb-vm:vector-data-offset sb-vm:word-shift)))
+         (end (+ start end)))
+    (read-bigvec-as-sequence-or-die (descriptor-mem vector)
+                                    stream :start start :end end)))
+
 ;;; Grow BIGVEC (exponentially, so that large increases in size have
 ;;; asymptotic logarithmic cost per byte).
 (defun expand-bigvec (bigvec required-length)
@@ -662,16 +670,14 @@
               (make-page-attributes nil 0))))
     (write-header-data+tag des length widetag)
     des))
-(defun allocate-vector-object (gspace element-bits length widetag)
-  "Allocate LENGTH units of ELEMENT-BITS size plus a header plus a length slot in
-  GSPACE and return an ``other-pointer'' descriptor to them. Initialize the
-  header word with WIDETAG and the length slot with LENGTH."
-  ;; ALLOCATE-COLD-DESCRIPTOR will take any rational number of bytes
-  ;; and round up to a double-word. This doesn't need to use CEILING.
-  (let* ((bytes (/ (* element-bits length) sb-vm:n-byte-bits))
-         (des (allocate-cold-descriptor gspace
-                                        (+ bytes (* 2 sb-vm:n-word-bytes))
-                                        sb-vm:other-pointer-lowtag)))
+(defun allocate-vector (widetag length words &optional (gspace *dynamic*))
+  ;; Allocate a vector with WORDS payload words (excluding the header+length).
+  ;; WORDS may be an odd number.
+  ;; Store WIDETAG in the header and LENGTH in the length slot.
+  (let ((des (allocate-cold-descriptor gspace
+                                       (sb-vm:pad-data-block
+                                        (+ words sb-vm:vector-data-offset))
+                                       sb-vm:other-pointer-lowtag)))
     (write-header-data+tag des 0 widetag)
     (write-wordindexed des
                        sb-vm:vector-length-slot
@@ -714,16 +720,12 @@ core and return a descriptor to it."
   ;; (Remember that the system convention for storage of strings leaves an
   ;; extra null byte at the end to aid in call-out to C.)
   (let* ((length (length string))
-         (des (allocate-vector-object gspace
-                                      sb-vm:n-byte-bits
-                                      (1+ length)
-                                      sb-vm:simple-base-string-widetag))
+         (des (allocate-vector sb-vm:simple-base-string-widetag
+                               length (ceiling (1+ length) sb-vm:n-word-bytes)
+                               gspace))
          (bytes (gspace-data gspace))
          (offset (+ (* sb-vm:vector-data-offset sb-vm:n-word-bytes)
                     (descriptor-byte-offset des))))
-    (write-wordindexed des
-                       sb-vm:vector-length-slot
-                       (make-fixnum-descriptor length))
     (dotimes (i length)
       (setf (bvref bytes (+ offset i))
             (sb-xc:char-code (aref string i))))
@@ -897,8 +899,7 @@ core and return a descriptor to it."
 ;;; so historically it was "vector-in-core" which is a fine name.
 (defun vector-in-core (objects &optional (gspace *dynamic*))
   (let* ((size (length objects))
-         (result (allocate-vector-object gspace sb-vm:n-word-bits size
-                                         sb-vm:simple-vector-widetag)))
+         (result (allocate-vector sb-vm:simple-vector-widetag size size gspace)))
     (dotimes (index size result)
       (write-wordindexed result (+ index sb-vm:vector-data-offset)
                          (pop objects)))))
@@ -2467,10 +2468,8 @@ core and return a descriptor to it."
 (define-cold-fop (fop-vector (size))
   (if (zerop size)
       *simple-vector-0-descriptor*
-      (let ((result (allocate-vector-object *dynamic*
-                                            sb-vm:n-word-bits
-                                            size
-                                            sb-vm:simple-vector-widetag)))
+      (let ((result (allocate-vector sb-vm:simple-vector-widetag
+                                     size size *dynamic*)))
         (do ((index (1- size) (1- index)))
             ((minusp index))
           (declare (fixnum index))
@@ -2478,22 +2477,6 @@ core and return a descriptor to it."
                              (+ index sb-vm:vector-data-offset)
                              (pop-stack)))
         (set-readonly result))))
-
-(define-cold-fop (fop-spec-vector (len))
-  (let* ((type (read-byte-arg (fasl-input-stream)))
-         (sizebits (aref **saetp-bits-per-length** type))
-         (result (progn (aver (< sizebits 255))
-                        (allocate-vector-object *dynamic* sizebits len type)))
-         (start (+ (descriptor-byte-offset result)
-                   (ash sb-vm:vector-data-offset sb-vm:word-shift)))
-         (end (+ start
-                 (ceiling (* len sizebits)
-                          sb-vm:n-byte-bits))))
-    (read-bigvec-as-sequence-or-die (descriptor-mem result)
-                                    (fasl-input-stream)
-                                    :start start
-                                    :end end)
-    (set-readonly result)))
 
 ; (not-cold-fop fop-array) ; the syntax doesn't work
 #+nil
@@ -2594,10 +2577,9 @@ core and return a descriptor to it."
 
 (defun finalize-load-time-value-noise ()
   (cold-set '*!load-time-values*
-            (allocate-vector-object *dynamic*
-                                    sb-vm:n-word-bits
-                                    *load-time-value-counter*
-                                    sb-vm:simple-vector-widetag)))
+            (allocate-vector sb-vm:simple-vector-widetag
+                             *load-time-value-counter*
+                             *load-time-value-counter*)))
 
 
 ;;;; cold fops for fixing up circularities
@@ -3667,6 +3649,10 @@ III. initially undefined function references (alphabetically):
       ;; Create SB-KERNEL::*TYPE-CLASSES* as an array of NIL
       (cold-set (cold-intern 'sb-kernel::*type-classes*)
                 (vector-in-core (make-list (length sb-kernel::*type-classes*))))
+
+      ;; Make LOGICALLY-READONLYIZE no longer a no-op
+      (setf (symbol-function 'logically-readonlyize)
+            (symbol-function 'set-readonly))
 
       ;; Cold load.
       (dolist (file-name object-file-names)

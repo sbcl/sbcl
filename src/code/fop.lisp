@@ -438,19 +438,17 @@
 (declaim (type (simple-array (unsigned-byte 8) (#.(1+ sb-vm:widetag-mask)))
                **saetp-bits-per-length**))
 
-;; No ALLOCATE-VECTOR on host (nor READ-N-BYTES)
-(!define-fop 43 :not-host (fop-spec-vector  ((:operands length)))
+(!define-fop 43 (fop-spec-vector  ((:operands length)))
   (let* ((widetag (read-byte-arg (fasl-input-stream)))
          (bits-per-length (aref **saetp-bits-per-length** widetag))
          (bits (progn (aver (< bits-per-length 255))
                       (* length bits-per-length)))
          (bytes (ceiling bits sb-vm:n-byte-bits))
          (words (ceiling bytes sb-vm:n-word-bytes))
-         (vector (if (and (= widetag sb-vm:simple-vector-widetag)
-                          (= words 0))
-                     #()
-                     (logically-readonlyize
-                      (allocate-vector widetag length words)))))
+         (vector
+          (progn (aver (/= widetag sb-vm:simple-vector-widetag))
+                 (logically-readonlyize
+                  (allocate-vector widetag length words)))))
     (declare (type index length bytes words)
              (type word bits))
     (read-n-bytes (fasl-input-stream) vector 0 bytes)
