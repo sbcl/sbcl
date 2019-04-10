@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes in sbcl-1.5.2 relative to sbcl-1.5.1:
+  * new feature: decimal reader syntax for rationals, using the R exponent
+    marker and/or *READ-DEFAULT-FLOAT-FORMAT* of RATIONAL.
+
 changes in sbcl-1.5.1 relative to sbcl-1.5.0:
   * enhancement: restarts for missing package errors.
   * optimization: FIND-PACKAGE should be faster even when run in the context

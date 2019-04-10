@@ -71,6 +71,36 @@ Symbols created by
 @code{sb-ext:readtable-normalization} is @code{t}, symbols that are not
 normalized are escaped during printing.
 
+@subsection Decimal Syntax for Rationals
+@cindex Decimal Syntax for Rationals
+@cindex Rational, decimal syntax for
+@tindex @cl{float}
+
+SBCL supports a decimal syntax for rationals, modelled after the
+standard syntax for floating-point numbers.  If a number with
+floating-point syntax has an exponent marker of @code{r} or @code{R}
+(rather than one of the standard exponent markers), it is read as the
+rational with the exact value of the decimal number expressed as a
+float.
+
+@vindex @cl{@earmuffs{read-default-float-format}}
+@tindex @cl{rational}
+@findex @cl{read}
+@findex @cl{read-from-string}
+In addition, setting or binding the value of
+@code{*read-default-float-format*} to @code{rational} around a call to
+@code{read} or @code{read-from-string} has the effect that
+floating-point numbers without exponent markers are read as rational
+numbers, as if there had been an explicit @code{r} or @code{R} marker.
+
+@vindex @cl{@earmuffs{read-default-float-format}}
+@tindex @cl{rational}
+Floating point numbers of all types are printed with an exponent
+marker while the value of @code{*read-default-float-format*} is
+@code{rational}; however, rational numbers are printed in their
+standard syntax, irrespective of the value of
+@code{*read-default-float-format*}.
+
 @node  Package-Local Nicknames
 @comment  node-name,  next,  previous,  up
 @section Package-Local Nicknames
