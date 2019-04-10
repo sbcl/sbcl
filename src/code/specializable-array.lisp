@@ -53,7 +53,17 @@
 ;; If no contents given, explicitly 0-fill in case element-type upgrades to T
 ;; and would get a default of NIL where we would use 0 in our specialization.
 (defun sb-xc:make-array (dims &key (element-type (missing-arg))
-                                   (initial-contents nil contentsp))
+                                   (initial-contents nil contentsp)
+                                   (initial-element 0))
+  ;; ECL fails to compile MAKE-ARRAY when keyword args are not literal keywords. e.g.:
+  ;; (DEFUN TRY (DIMS SELECT VAL)
+  ;;   (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)) ->
+  ;; "The macro form (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)
+  ;;  was not expanded successfully.
+  ;;  Error detected:
+  ;;  The key (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) is not allowed"
+  #+host-quirks-ecl (declare (notinline cl:make-array))
+
   ;; Expressed type must be _exactly_ one of the supported ones.
   (assert (and element-type
                (find (case element-type
@@ -66,7 +76,7 @@
   (let ((array (cl:make-array dims
                               :element-type element-type
                               (if contentsp :initial-contents :initial-element)
-                              (if contentsp initial-contents 0))))
+                              (if contentsp initial-contents initial-element))))
     (setf (gethash array sb-cold::*array-to-specialization*) element-type)
     array))
 (defun sb-xc:array-element-type (array)
