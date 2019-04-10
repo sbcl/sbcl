@@ -458,14 +458,8 @@ variable: an unreadable object representing the error is printed instead.")
 ;;;
 ;;; For each character, the value of the corresponding element is a
 ;;; fixnum with bits set corresponding to attributes that the
-;;; character has. At characters have at least one bit set, so we can
+;;; character has. All characters have at least one bit set, so we can
 ;;; search for any character with a positive test.
-(define-load-time-global *character-attributes*
-  (make-array 160 ; FIXME
-              :element-type '(unsigned-byte 16)
-              :initial-element 0))
-(declaim (type (simple-array (unsigned-byte 16) (#.160)) ; FIXME
-               *character-attributes*))
 
 ;;; constants which are a bit-mask for each interesting character attribute
 (defconstant other-attribute            (ash 1 0)) ; Anything else legal.
@@ -490,57 +484,48 @@ variable: an unreadable object representing the error is printed instead.")
 
 ;;; For each character, the value of the corresponding element is the
 ;;; lowest base in which that character is a digit.
-(declaim (type (simple-array (unsigned-byte 8) (128)) ; FIXME: range?
-               *digit-bases*))
-(define-load-time-global *digit-bases*
-  (make-array 128 ; FIXME
-              :element-type '(unsigned-byte 8)))
+(defconstant +digit-bases+
+  #.(let ((a (sb-xc:make-array 128 ; FIXME
+                               :element-type '(unsigned-byte 8)
+                               :initial-element 36)))
+      (dotimes (i 36 a)
+        (let ((char (digit-char i 36)))
+          (setf (aref a (sb-xc:char-code char)) i)))))
 
-(defun !printer-cold-init ()
-;; The dispatch table will be changed later, so this doesn't really matter
-;; except if a full call to WRITE wants to read the current binding.
-(setq *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table))
-(setq *digit-bases* (make-array 128 ; FIXME
-                                :element-type '(unsigned-byte 8)
-                                :initial-element 36)
-      *character-attributes* (make-array 160 ; FIXME
-                                         :element-type '(unsigned-byte 16)
-                                         :initial-element 0))
-(dotimes (i 36)
-  (let ((char (digit-char i 36)))
-    (setf (aref *digit-bases* (char-code char)) i)))
+(defconstant +character-attributes+
+  #.(let ((a (sb-xc:make-array 160 ; FIXME
+                               :element-type '(unsigned-byte 16)
+                               :initial-element 0)))
+      (flet ((set-bit (char bit)
+               (let ((code (sb-xc:char-code char)))
+                 (setf (aref a code) (logior bit (aref a code))))))
 
-(flet ((set-bit (char bit)
-         (let ((code (char-code char)))
-           (setf (aref *character-attributes* code)
-                 (logior bit (aref *character-attributes* code))))))
+        (dolist (char '(#\! #\@ #\$ #\% #\& #\* #\= #\~ #\[ #\] #\{ #\}
+                        #\? #\< #\>))
+          (set-bit char other-attribute))
 
-  (dolist (char '(#\! #\@ #\$ #\% #\& #\* #\= #\~ #\[ #\] #\{ #\}
-                  #\? #\< #\>))
-    (set-bit char other-attribute))
+        (dotimes (i 10)
+          (set-bit (digit-char i) number-attribute))
 
-  (dotimes (i 10)
-    (set-bit (digit-char i) number-attribute))
+        (do ((code (sb-xc:char-code #\A) (1+ code))
+             (end (sb-xc:char-code #\Z)))
+            ((> code end))
+          (declare (fixnum code end))
+          (set-bit (sb-xc:code-char code) uppercase-attribute)
+          (set-bit (char-downcase (sb-xc:code-char code)) lowercase-attribute))
 
-  (do ((code (char-code #\A) (1+ code))
-       (end (char-code #\Z)))
-      ((> code end))
-    (declare (fixnum code end))
-    (set-bit (code-char code) uppercase-attribute)
-    (set-bit (char-downcase (code-char code)) lowercase-attribute))
+        (set-bit #\- sign-attribute)
+        (set-bit #\+ sign-attribute)
+        (set-bit #\^ extension-attribute)
+        (set-bit #\_ extension-attribute)
+        (set-bit #\. dot-attribute)
+        (set-bit #\/ slash-attribute)
 
-  (set-bit #\- sign-attribute)
-  (set-bit #\+ sign-attribute)
-  (set-bit #\^ extension-attribute)
-  (set-bit #\_ extension-attribute)
-  (set-bit #\. dot-attribute)
-  (set-bit #\/ slash-attribute)
-
-  ;; Mark anything not explicitly allowed as funny.
-  (dotimes (i 160) ; FIXME
-    (when (zerop (aref *character-attributes* i))
-      (setf (aref *character-attributes* i) funny-attribute))))
-) ; end !COLD-PRINT-INIT
+        ;; Mark anything not explicitly allowed as funny.
+        (dotimes (i 160) ; FIXME
+          (when (zerop (aref a i))
+            (setf (aref a i) funny-attribute))))
+      a))
 
 ;;; A FSM-like thingie that determines whether a symbol is a potential
 ;;; number or has evil characters in it.
@@ -575,8 +560,8 @@ variable: an unreadable object representing the error is printed instead.")
                      (< (the fixnum (aref bases code)) base))))
 
     (prog ((len (length name))
-           (attributes *character-attributes*)
-           (bases *digit-bases*)
+           (attributes +character-attributes+)
+           (bases +digit-bases+)
            (base *print-base*)
            (letter-attribute
             (case (%readtable-case readtable)
