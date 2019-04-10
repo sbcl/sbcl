@@ -31,6 +31,10 @@ it still has quite a few.  @xref{Contributed Modules}.
 @section Reader Extensions
 @cindex Reader Extensions
 
+@subsection Extended Package Prefix Syntax
+@cindex Extended Package Prefix Syntax
+@cindex Package Prefix Syntax, extended
+
 SBCL supports extended package prefix syntax, which allows specifying
 an alternate package instead of @code{*package*} for the reader to use
 as the default package for interning symbols:
@@ -45,8 +49,15 @@ Example:
   'foo::(bar quux zot) == '(foo::bar foo::quux foo::zot)
 @end lisp
 
-Doesn't alter @code{*package*}: if @code{foo::bar} would cause a
+@code{*package*} is not rebound during the course of reading a form
+with extended package prefix syntax; if @code{foo::bar} would cause a
 read-time package lock violation, so does @code{foo::(bar)}.
+
+@subsection Symbol Name Normalization
+@cindex Symbol Name Normalization
+@cindex Normalization, Symbol Name
+@cindex Unicode
+@cindex NFKC
 
 SBCL also extends the reader to normalize all symbols to Normalization
 Form KC in builds with Unicode enabled. Whether symbols are normalized
@@ -74,8 +85,9 @@ has been specified. Different packages can use same local nickname for
 different global names, or different local nickname for same global
 name.
 
-Symbol @code{:package-local-nicknames} in @code{*features*} denotes the
-support for this feature.
+@vindex @cl{@earmuffs{features}}
+Symbol @code{:package-local-nicknames} in @code{*features*} denotes
+the support for this feature.
 
 @findex @cl{defpackage}
 @defmac @cl{defpackage} name [[option]]* @result{} package
