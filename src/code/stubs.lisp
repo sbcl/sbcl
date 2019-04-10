@@ -104,6 +104,9 @@
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
   #+(and compact-instance-header x86-64) (def layout-of)
+  ;; lists
+  (def %rplaca (x val))
+  (def %rplacd (x val))
 
   #+compare-and-swap-vops
   (def* (%array-atomic-incf/word (array index diff))

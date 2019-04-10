@@ -35,9 +35,9 @@
 (!define-primitive-object (cons :type cons
                                :lowtag list-pointer-lowtag
                                :alloc-trans cons)
-  (car :ref-trans car :set-trans sb-c::%rplaca :init :arg
+  (car :ref-trans car :set-trans %rplaca :init :arg
        :cas-trans %compare-and-swap-car)
-  (cdr :ref-trans cdr :set-trans sb-c::%rplacd :init :arg
+  (cdr :ref-trans cdr :set-trans %rplacd :init :arg
        :cas-trans %compare-and-swap-cdr))
 
 (!define-primitive-object (instance :lowtag instance-pointer-lowtag

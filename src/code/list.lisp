@@ -582,12 +582,6 @@
   "Change the CDR of CONS to X and return the CONS."
   (rplacd cons x))
 
-;;; The following are for use by SETF.
-
-(defun %rplaca (x val) (rplaca x val) val)
-
-(defun %rplacd (x val) (rplacd x val) val)
-
 ;;; Set the Nth element of LIST to NEWVAL.
 (defun %setnth (n list newval)
   (typecase n
