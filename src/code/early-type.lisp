@@ -43,7 +43,7 @@
 ;; But in practice there's nothing that can be done with this information,
 ;; because we don't call random predicates when performing operations on types
 ;; as objects, only when checking for inclusion of something in the type.
-(!define-type-class hairy :enumerable t :might-contain-other-types t)
+(define-type-class hairy :enumerable t :might-contain-other-types t)
 
 ;;; Without some special HAIRY cases, we massively pollute the type caches
 ;;; with objects that are all equivalent to *EMPTY-TYPE*. e.g.
@@ -98,7 +98,7 @@
 ;;   FIXME: is this right?  It's what they had before, anyway
 ;; But I think the reason it's right is that "enumerable :t" is equivalent
 ;; to "maybe" which is actually the conservative assumption, same as HAIRY.
-(!define-type-class negation :enumerable t :might-contain-other-types t)
+(define-type-class negation :enumerable t :might-contain-other-types t)
 
 (defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
@@ -208,10 +208,10 @@
           (t (make-values-type-cached required optional
                                       rest allowp)))))
 
-(!define-type-class values :enumerable nil
+(define-type-class values :enumerable nil
                     :might-contain-other-types nil)
 
-(!define-type-class function :enumerable nil
+(define-type-class function :enumerable nil
                     :might-contain-other-types nil)
 
 #+sb-xc-host
@@ -262,7 +262,7 @@
   ;; specifier to win.
   (type (missing-arg) :type ctype :read-only t))
 
-(!define-type-class number :enumerable #'numeric-type-enumerable
+(define-type-class number :enumerable #'numeric-type-enumerable
                     :might-contain-other-types nil)
 
 (defun interned-numeric-type (specifier &rest args)
@@ -487,7 +487,7 @@
                         (sb-vm::saetp-index-or-lose 'base-char)))))))
     (%make-character-set-type pairs)))
 
-(!define-type-class array :enumerable nil
+(define-type-class array :enumerable nil
                     :might-contain-other-types nil)
 
 ;; For all ctypes which are the element types of specialized arrays,
@@ -577,7 +577,7 @@
       (%make-array-type dimensions
                         complexp element-type specialized-element-type)))
 
-(!define-type-class member :enumerable t
+(define-type-class member :enumerable t
                     :might-contain-other-types nil)
 
 (declaim (ftype (sfunction (xset list) ctype) make-member-type))
@@ -682,7 +682,7 @@
       *universal-type*
       type))
 
-(!define-type-class cons :enumerable nil :might-contain-other-types nil)
+(define-type-class cons :enumerable nil :might-contain-other-types nil)
 
 #+sb-xc-host
 (declaim (ftype (sfunction (ctype ctype) (values t t)) type=))

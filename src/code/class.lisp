@@ -673,7 +673,7 @@ between the ~A definition and the ~A definition"
   ;; Perhaps a better definition of this function would be
   ;;   (if (classoid-translation x) (bug "enumerable-p classoid?") nil)
   (defun classoid-enumerable-p (x) (eq (classoid-name x) 'character)))
-(!define-type-class classoid :enumerable #'classoid-enumerable-p
+(define-type-class classoid :enumerable #'classoid-enumerable-p
                     :might-contain-other-types nil)
 
 (defun classoid-inherits-from (sub super-or-name)
@@ -737,11 +737,11 @@ between the ~A definition and the ~A definition"
 ;;; Simple methods for TYPE= and SUBTYPEP should never be called when
 ;;; the two classes are equal, since there are EQ checks in those
 ;;; operations.
-(!define-type-method (classoid :simple-=) (type1 type2)
+(define-type-method (classoid :simple-=) (type1 type2)
   (aver (not (eq type1 type2)))
   (values nil t))
 
-(!define-type-method (classoid :simple-subtypep) (class1 class2)
+(define-type-method (classoid :simple-subtypep) (class1 class2)
   (aver (not (eq class1 class2)))
   (with-world-lock ()
     (if (%ensure-both-classoids-valid class1 class2)
@@ -777,7 +777,7 @@ between the ~A definition and the ~A definition"
           (res))
         *empty-type*)))
 
-(!define-type-method (classoid :simple-intersection2) (class1 class2)
+(define-type-method (classoid :simple-intersection2) (class1 class2)
   (declare (type classoid class1 class2))
   (with-world-lock ()
     (%ensure-both-classoids-valid class1 class2 "type intersection")
@@ -841,15 +841,15 @@ between the ~A definition and the ~A definition"
 ;;; use INVOKE-COMPLEX-SUBTYPEP-ARG1-METHOD, in HAIRY methods and the
 ;;; like, classes are in their own hierarchy with no possibility of
 ;;; mixtures with other type classes.
-(!define-type-method (classoid :complex-subtypep-arg2) (type1 class2)
+(define-type-method (classoid :complex-subtypep-arg2) (type1 class2)
   (if (and (intersection-type-p type1)
            (> (count-if #'classoid-p (intersection-type-types type1)) 1))
       (values nil nil)
       (invoke-complex-subtypep-arg1-method type1 class2 nil t)))
 
-(!define-type-method (classoid :negate) (type) (make-negation-type type))
+(define-type-method (classoid :negate) (type) (make-negation-type type))
 
-(!define-type-method (classoid :unparse) (type)
+(define-type-method (classoid :unparse) (type)
   (classoid-proper-name type))
 
 ;;;; built-in classes

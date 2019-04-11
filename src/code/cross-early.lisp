@@ -91,7 +91,7 @@
 
 ;;; Unlike for type FLOAT, where we don't in practice need lists as specifiers,
 ;;; we do use (COMPLEX foo) specifiers all over the place. But this deftype
-;;; need not be as complete as (!def-type-translator complex).
+;;; need not be as complete as (def-type-translator complex).
 ;;; It's just enough to handle all cases parsed by the host.
 (deftype complex (&optional spec)
   (cond ((member spec '(* real)) 'complexnum)

@@ -350,7 +350,7 @@
       (warn "Undefined type-class method ~S" name))
     (symbolicate "TYPE-CLASS-" name)))
 
-(defmacro !define-type-method ((class method &rest more-methods)
+(defmacro define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
   (let ((name (symbolicate class "-" method "-TYPE-METHOD")))
     `(progn
@@ -377,7 +377,7 @@
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
 
-(defmacro !define-type-class (name &key inherits
+(defmacro define-type-class (name &key inherits
                                      (enumerable (unless inherits (must-supply-this))
                                                  enumerable-supplied-p)
                                      (might-contain-other-types
@@ -438,7 +438,7 @@
 ;;; Semantics are slightly different though: DEFTYPE causes the default
 ;;; for missing &OPTIONAL arguments to be '* but a translator requires
 ;;; an explicit default of '*, or else it assumes a default of NIL.
-(defmacro !def-type-translator (name &rest stuff)
+(defmacro def-type-translator (name &rest stuff)
   (declare (type symbol name))
   (let* ((allow-atom (if (eq (car stuff) :list) (progn (pop stuff) nil) t))
          (lambda-list (pop stuff))
@@ -835,6 +835,6 @@
 ;; So in case it wasn't clear already ENUMERABLE-P does not mean
 ;;  "possibly a MEMBER type in the Lisp-theoretic sense",
 ;; but means "could be implemented in SBCL as a MEMBER type".
-(!define-type-class character-set :enumerable nil
+(define-type-class character-set :enumerable nil
                     :might-contain-other-types nil)
 (!defun-from-collected-cold-init-forms !type-class-cold-init)

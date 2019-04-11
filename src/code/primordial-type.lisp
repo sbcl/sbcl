@@ -11,7 +11,7 @@
 
 (!begin-collecting-cold-init-forms)
 
-(!define-type-class named :enumerable nil :might-contain-other-types nil)
+(define-type-class named :enumerable nil :might-contain-other-types nil)
 
 (macrolet ((frob (type global-sym)
             `(progn
