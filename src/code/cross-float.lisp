@@ -76,6 +76,17 @@
       (values (cl:ldb (cl:byte (1- nbits) 0) significand)
               (+ exponent (1- nbits))))))
 
+#+host-quirks-sbcl
+(defun get-float-bits (x)
+  (etypecase x
+    (cl:double-float
+     ;; DOUBLE-FLOAT-BITS didn't exist as a thing until recently,
+     ;; and even then it only exists if the host is 64-bit.
+     (logior (ash (host-sb-kernel:double-float-high-bits x) 32)
+             (host-sb-kernel:double-float-low-bits x)))
+    (cl:single-float
+     (host-sb-kernel:single-float-bits x))))
+
 ;;; Convert host float X to target representation.
 ;;; TOTAL-BITS is the size in bits.
 ;;; PRECISION includes the hidden bit.
@@ -120,15 +131,9 @@
             ;; assuming the host doesn't have a counteracting bug.
             #+host-quirks-sbcl
             (let ((authoritative-answer
-                   (ecase total-bits
-                     (32
-                      (host-sb-kernel:single-float-bits (cl:coerce x 'cl:single-float)))
-                     (64
-                      ;; DOUBLE-FLOAT-BITS exists only for 64-bit builds,
-                      ;; so combine the separate high and low halves to test against.
-                      (let ((f (cl:coerce x 'cl:double-float)))
-                        (logior (ash (host-sb-kernel:double-float-high-bits f) 32)
-                                (host-sb-kernel:double-float-low-bits f)))))))
+                   (get-float-bits (ecase total-bits
+                                    (32 (cl:coerce x 'cl:single-float))
+                                    (64 (cl:coerce x 'cl:double-float))))))
               (unless (= answer authoritative-answer)
                 (error "discrepancy in float-bits ~s:~% ~v,'0b expect~% ~v,'0b got~%"
                        x
@@ -241,10 +246,16 @@
                                 (rational x)
                                 (symbol (intern (string x) "CL"))))
                             (ensure-list args)))))
-        (assert (eql authoritative-answer
+        (unless (eql authoritative-answer
                      (if (floatp (first values))
                          (native-flonum-value (first values))
-                         (first values)))))))
+                       (first values)))
+          (format t "~&//CROSS-FLOAT DISCREPANCY!
+// CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
+                  key values
+                  (when (cl:floatp authoritative-answer)
+                    (get-float-bits authoritative-answer))
+                  authoritative-answer)))))
   (setf (gethash key table) (if (singleton-p values) (car values) values)))
 
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
