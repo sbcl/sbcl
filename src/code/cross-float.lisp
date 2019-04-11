@@ -249,8 +249,10 @@
         (unless (eql authoritative-answer
                      (if (floatp (first values))
                          (native-flonum-value (first values))
-                       (first values)))
-          (format t "~&//CROSS-FLOAT DISCREPANCY!
+                         (first values)))
+          (#+sb-devel error
+           #-sb-devel format #-sb-devel t
+           "~&//CROSS-FLOAT DISCREPANCY!
 // CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
                   key values
                   (when (cl:floatp authoritative-answer)
