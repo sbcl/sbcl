@@ -174,15 +174,10 @@
             (incf ptr)))))
     res))
 
-(!define-fop 45 :not-host (fop-layout (name inherits depthoid length bitmap))
-  (let ((flags
-         (case (and (>= (length (the simple-vector inherits)) 2)
-                    (elt inherits 1))
-           (#.(find-layout 'structure-object) +structure-layout-flag+)
-           (#.(find-layout 'condition) +condition-layout-flag+)
-           ;; DUMP-LAYOUT avers that +pcl-object-flag+ layouts are never dumped
-           (t 0))))
-    (find-and-init-or-check-layout name length flags inherits depthoid bitmap)))
+(!define-fop 45 :not-host (fop-layout ((:operands depthoid flags length)
+                                       name bitmap inherits))
+  (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
+  (find-and-init-or-check-layout name depthoid flags length bitmap inherits))
 
 ;; Allocate a CLOS object. This is used when the compiler detects that
 ;; MAKE-LOAD-FORM returned a simple use of MAKE-LOAD-FORM-SAVING-SLOTS,

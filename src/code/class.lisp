@@ -293,10 +293,7 @@ between the ~A definition and the ~A definition"
 ;;; Used by the loader to forward-reference layouts for classes whose
 ;;; definitions may not have been loaded yet. This allows type tests
 ;;; to be loaded when the type definition hasn't been loaded yet.
-(declaim (ftype (function (symbol index fixnum simple-vector layout-depthoid layout-bitmap)
-                          layout)
-                find-and-init-or-check-layout))
-(defun find-and-init-or-check-layout (name length flags inherits depthoid bitmap)
+(defun find-and-init-or-check-layout (name depthoid flags length bitmap inherits)
   (truly-the ; avoid an "assertion too complex to check" optimizer note
    (values layout &optional)
    (with-world-lock ()
@@ -1184,11 +1181,11 @@ between the ~A definition and the ~A definition"
                            -1)))
           (register-layout
            (find-and-init-or-check-layout name
-                                          0
-                                          0
-                                          inherits-vector
                                           depthoid
-                                          +layout-all-tagged+)
+                                          0 ; flags
+                                          0 ; length
+                                          +layout-all-tagged+
+                                          inherits-vector)
            :invalidate nil)))))
   (/show0 "done with loop over +!BUILT-IN-CLASSES+"))
 

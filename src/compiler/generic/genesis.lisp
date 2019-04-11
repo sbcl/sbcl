@@ -692,6 +692,8 @@
   (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
 (defun cold-layout-depthoid (layout)
   (descriptor-fixnum (read-slot layout *host-layout-of-layout* :depthoid)))
+(defun cold-layout-flags (layout)
+  (descriptor-fixnum (read-slot layout *host-layout-of-layout* :%flags)))
 
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
@@ -1126,53 +1128,44 @@ core and return a descriptor to it."
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
 (defvar *cold-layout-gspace* (or #+immobile-space '*immobile-fixedobj* '*dynamic*))
-(declaim (ftype (function (symbol descriptor descriptor descriptor descriptor)
+(declaim (ftype (function (symbol layout-depthoid integer index descriptor descriptor)
                           descriptor)
                 make-cold-layout))
-(defun make-cold-layout (name length inherits depthoid bitmap)
-  (let ((flags (let* ((inherit-names (listify-cold-inherits inherits))
-                      (second (second inherit-names)))
-                 ;; Note similarity to FOP-LAYOUT here, but with extra
-                 ;; test for the subtree roots.
-                 (cond ((or (eq second 'structure-object) (eq name 'structure-object))
-                        +structure-layout-flag+)
-                       ((or (eq second 'condition) (eq name 'condition))
-                        +condition-layout-flag+)
-                       (t 0))))
-        (result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
+(defun make-cold-layout (name depthoid flags length bitmap inherits)
+  (let ((result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
                                  target-layout-length t)))
     ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
     ;; Set other slot values.
     ;;
     ;; leave CLASSOID uninitialized for now
-    (multiple-value-call
-     #'write-slots result *host-layout-of-layout*
+    (write-slots result *host-layout-of-layout*
      :invalid *nil-descriptor*
      :inherits inherits
-     :depthoid depthoid
-     :length length
+     :depthoid (make-fixnum-descriptor depthoid)
+     :length (make-fixnum-descriptor length)
      :%flags (make-fixnum-descriptor flags)
      :info *nil-descriptor*
      :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
       ;; but for type-correctness this slot needs to be a simple-vector.
      :equalp-tests *simple-vector-0-descriptor*
-     :slot-list *nil-descriptor*
-     (if (member name '(null list symbol))
+     :slot-list *nil-descriptor*)
+
+    (when (member name '(null list symbol))
       ;; Assign an empty slot-table.  Why this is done only for three
       ;; classoids is ... too complicated to explain here in a few words,
       ;; but revision 18c239205d9349abc017b07e7894a710835c5205 broke it.
       ;; Keep this in sync with MAKE-SLOT-TABLE in pcl/slots-boot.
-         (values :slot-table (if (boundp '*vacuous-slot-table*)
+      (write-slots result *host-layout-of-layout*
+                 :slot-table (if (boundp '*vacuous-slot-table*)
                                  *vacuous-slot-table*
                                  (setq *vacuous-slot-table*
-                                       (host-constant-to-core '#(1 nil)))))
-         (values)))
-    (when (and (logtest flags +structure-layout-flag+)
-               (> (descriptor-fixnum depthoid) 2))
-      (loop with dsd-index = (get-dsd-index sb-kernel::layout sb-kernel::depth2-ancestor)
-            for i from 2 to (min (1- (descriptor-fixnum depthoid)) 4)
+                                       (host-constant-to-core '#(1 nil))))))
+
+    (when (and (logtest flags +structure-layout-flag+) (> depthoid 2))
+      (loop with dsd-index = (get-dsd-index sb-kernel:layout sb-kernel::depth2-ancestor)
+            for i from 2 to (min (1- depthoid)  4)
             do (write-wordindexed result
                                   (+ sb-vm:instance-slots-offset dsd-index)
                                   (cold-svref inherits i))
@@ -1306,12 +1299,12 @@ core and return a descriptor to it."
            (let ((warm-layout (info :type :compiler-layout name)))
              (assert (eql (length (layout-inherits warm-layout))
                           (length inherits)))
-             (make-cold-layout
-              name
-              (number-to-core (layout-length warm-layout))
-              (vector-in-core inherits)
-              (number-to-core (layout-depthoid warm-layout))
-              (number-to-core (layout-bitmap warm-layout))))))
+             (make-cold-layout name
+                               (layout-depthoid warm-layout)
+                               (layout-%flags warm-layout)
+                               (layout-length warm-layout)
+                               (number-to-core (layout-bitmap warm-layout))
+                               (vector-in-core inherits)))))
     (let* ((t-layout   (chill-layout 't))
            (s-o-layout (chill-layout 'structure-object t-layout)))
       (setf *layout-layout* (chill-layout 'layout t-layout s-o-layout))
@@ -2324,54 +2317,41 @@ core and return a descriptor to it."
                                     (descriptor-word-sized-integer val))))
     result))
 
-(define-cold-fop (fop-layout)
-  (let* ((bitmap-des (pop-stack))
-         (length-des (pop-stack))
-         (depthoid-des (pop-stack))
-         (cold-inherits (pop-stack))
+(define-cold-fop (fop-layout (depthoid flags length))
+  (decf depthoid) ; was bumped by 1 since non-stack args can't encode negatives
+  (let* ((inherits (pop-stack))
+         (bitmap (pop-stack))
          (name (pop-stack))
-         (old-layout-descriptor (gethash name *cold-layouts*)))
-    (declare (type descriptor length-des depthoid-des cold-inherits))
+         (existing-layout (gethash name *cold-layouts*)))
+    (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
-    ;; If a layout of this name has been defined already
-    (if old-layout-descriptor
-      ;; Enforce consistency between the previous definition and the
-      ;; current definition, then return the previous definition.
-      (flet ((get-slot (keyword)
-               (read-slot old-layout-descriptor *host-layout-of-layout* keyword)))
-        (let ((old-length (descriptor-fixnum (get-slot :length)))
-              (old-depthoid (descriptor-fixnum (get-slot :depthoid)))
-              (old-bitmap (host-object-from-core (get-slot :bitmap)))
-              (length (descriptor-fixnum length-des))
-              (depthoid (descriptor-fixnum depthoid-des))
-              (bitmap (host-object-from-core bitmap-des)))
-          (unless (= length old-length)
-            (error "cold loading a reference to class ~S when the compile~%~
-                    time length was ~S and current length is ~S"
-                   name
-                   length
-                   old-length))
-          (unless (cold-vector-elements-eq cold-inherits (get-slot :inherits))
-            (error "cold loading a reference to class ~S when the compile~%~
-                    time inherits were ~S~%~
-                    and current inherits are ~S"
-                   name
-                   (listify-cold-inherits cold-inherits)
-                   (listify-cold-inherits (get-slot :inherits))))
-          (unless (= depthoid old-depthoid)
-            (error "cold loading a reference to class ~S when the compile~%~
-                    time inheritance depthoid was ~S and current inheritance~%~
-                    depthoid is ~S"
-                   name
-                   depthoid
-                   old-depthoid))
-          (unless (= bitmap old-bitmap)
-            (error "cold loading a reference to class ~S when the compile~%~
-                    time raw-slot-bitmap was ~S and is currently ~S"
-                   name bitmap old-bitmap)))
-        old-layout-descriptor)
-      ;; Make a new definition from scratch.
-      (make-cold-layout name length-des cold-inherits depthoid-des bitmap-des))))
+    (if existing-layout
+        ;; If a layout of this name has been defined already, then
+        ;; enforce consistency between the existing and current definition,
+        ;; and return the existing.
+        (let ((old-flags (cold-layout-flags existing-layout))
+              (old-depthoid (cold-layout-depthoid existing-layout))
+              (old-length (cold-layout-length existing-layout))
+              (old-bitmap (host-object-from-core
+                           (read-slot existing-layout *host-layout-of-layout*
+                                      :bitmap)))
+              (old-inherits (read-slot existing-layout *host-layout-of-layout*
+                                       :inherits)))
+          (cond ((and (= flags old-flags)
+                      (= depthoid old-depthoid)
+                      (= length old-length)
+                      (= (host-object-from-core bitmap) old-bitmap)
+                      (cold-vector-elements-eq inherits old-inherits))
+                 existing-layout)
+                (t
+                 ;; Users will never see this.
+                 (format t "old=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
+                         old-flags old-depthoid old-length old-bitmap old-inherits)
+                 (format t "new=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
+                         flags depthoid length (descriptor-fixnum bitmap) inherits)
+                 (bug "can't alter layout of ~s" name))))
+        ;; Make a new definition from scratch.
+        (make-cold-layout name depthoid flags length bitmap inherits))))
 
 ;;;; cold fops for loading symbols
 

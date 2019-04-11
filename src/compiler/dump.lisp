@@ -1132,8 +1132,9 @@
       (when fop
         (return-from dump-layout (dump-byte fop file))))
     (dump-object name file))
-  (sub-dump-object (layout-inherits obj) file)
-  (sub-dump-object (layout-depthoid obj) file)
-  (sub-dump-object (layout-length obj) file)
   (sub-dump-object (layout-bitmap obj) file)
-  (dump-fop 'fop-layout file))
+  (sub-dump-object (layout-inherits obj) file)
+  (dump-fop 'fop-layout file
+            (1+ (layout-depthoid obj)) ; non-stack args can't be negative
+            (layout-%flags obj)
+            (layout-length obj)))
