@@ -686,10 +686,10 @@
                     (do-next-filler)
                     (insert-step-instrumenting function)))
                  (:direct
-                  `((typecase (static-fun-offset fun)
+                  `((etypecase (static-fun-offset fun)
                       (short-immediate
                        (inst #-64-bit lw #+64-bit ld function null-tn (static-fun-offset fun)))
-                      (t
+                      (u+i-immediate
                        (multiple-value-bind (u i)
                            (u-and-i-inst-immediate (static-fun-offset fun))
                          ;; FIXME: Looks bad, try to have this case

@@ -591,7 +591,6 @@ and
              (short-immediate
               (inst subi result-tn result-tn size))
              ((signed-byte 32)
-              (inst li temp-tn size)
               (inst sub result-tn result-tn temp-tn))
              (tn
               (inst sub result-tn result-tn size)))

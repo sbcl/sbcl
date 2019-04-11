@@ -15,6 +15,15 @@
   (let ((hi (ash (+ value (expt 2 11)) -12)))
     (values hi (- value (ash hi 12)))))
 
+(def!type short-immediate () `(signed-byte 12))
+(def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
+
+(def!type u+i-immediate ()
+  #-64-bit `(and (signed-byte 32) (unsigned-byte 32))
+  #+64-bit `(or (integer #x-80000800 #x7ffff7ff)
+                (integer ,(+ (ash 1 64) #x-80000800)
+                         ,(1- (ash 1 64)))))
+
 (!with-bigvec-or-sap
   (defun fixup-code-object (code offset fixup kind flavor)
     (declare (type index offset))
@@ -22,8 +31,8 @@
     (unless (zerop (rem offset sb-assem:+inst-alignment-bytes+))
       (error "Unaligned instruction?  offset=#x~X." offset))
     #+64-bit
-    (unless (typep fixup '(signed-byte 31))
-      (error "Tried to fixup with ~a" fixup))
+    (unless (typep fixup 'u+i-immediate)
+      (error "Tried to fixup with ~a." fixup))
     (let ((sap (code-instructions code)))
       (multiple-value-bind (u i) (u-and-i-inst-immediate fixup)
         (ecase kind

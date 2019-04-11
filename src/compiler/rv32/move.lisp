@@ -45,7 +45,7 @@
     (etypecase offset
       (short-immediate
        (loadw y code-tn (tn-offset x) other-pointer-lowtag))
-      ((signed-byte 32)
+      (u+i-immediate
        (multiple-value-bind (u i)
            (u-and-i-inst-immediate offset)
          ;; Should be GC safe.

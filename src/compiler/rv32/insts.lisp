@@ -13,17 +13,14 @@
 (in-package "SB-RV32-ASM")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (import '(short-immediate
-            short-immediate-fixnum)
-          "SB-VM")
   ;; Imports from SB-VM into this package
   (import '(sb-vm::u-and-i-inst-immediate
             sb-vm::lip-tn
             sb-vm::zero-tn
-            sb-vm::null-tn)))
-
-(def!type short-immediate () `(signed-byte 12))
-(def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
+            sb-vm::null-tn
+            sb-vm::short-immediate
+            sb-vm::short-immediate-fixnum
+            sb-vm::u+i-immediate)))
 
 
 ;;;; disassembler field definitions
@@ -430,23 +427,33 @@
 
 (defun %li (reg value)
   (etypecase value
-    ((signed-byte #-64-bit 32 #+64-bit 31)
-     (load-signed-byte-32-immediate reg value))
-    #-64-bit
-    ((unsigned-byte 32)
-     (let ((value (coerce-signed value 32)))
-       (load-signed-byte-32-immediate reg value)))
+    (u+i-immediate
+     (load-signed-byte-32-immediate reg (coerce-signed value n-word-bits)))
     #+64-bit
     ((or (signed-byte 64) (unsigned-byte 64))
+     ;; It would be better to use a dynamic programming approach here.
      (let* ((value (coerce-unsigned value 64))
             (integer-length (integer-length value))
             (2^k (ash 1 integer-length))
-            (2^.k-1 (ash 1 (1- integer-length))))
-       (cond ((and (= value (1- (ash 1 integer-length)))
-                   (/= integer-length 64))
+            (2^.k-1 (ash 1 (1- integer-length)))
+            (complement (mod (lognot value) (ash 1 64))))
+       (cond ((zerop (logand (1+ value) value))
               ;; Common special case: the immediate is of the form #xfff...
               (inst addi reg zero-tn -1)
+              (unless (= integer-length 64)
+                (inst srli reg reg (- 64 integer-length))))
+             ((let ((delta (- 2^k value)))
+                (and (typep (ash delta (- 64 integer-length)) 'short-immediate)
+                     (logand delta (1- delta))))
+              ;; Common special case: the immediate is of the form
+              ;; #x00fff...00, where there are a small number of
+              ;; zeroes at the end.
+              (inst addi reg zero-tn (ash (- value 2^k) (- 64 integer-length)))
               (inst srli reg reg (- 64 integer-length)))
+             ((zerop (logand complement (1+ complement)))
+              ;; #xfffffff...00000
+              (inst addi reg zero-tn -1)
+              (inst slli reg reg (integer-length complement)))
              ((typep (- value 2^k) 'short-immediate)
               ;; Common special case: loading an immediate which is a
               ;; signed 12 bit constant away from a power of 2.
@@ -487,8 +494,6 @@
                 (inst slli reg reg 11)
                 (inst addi reg reg (ldb (byte 11 (- i 11)) value)))))))
     (fixup
-     ;; FIXME: Potential to cause problems on 64 bit if address is
-     ;; >#x4000000 becuase of lui sign extension.
      (inst lui reg value)
      (inst addi reg reg value))))
 
