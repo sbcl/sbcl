@@ -424,6 +424,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                       x)
              t))))
 
+(declaim (inline instance-equalp))
 (defun instance-equalp (x y)
   (let ((layout-x (%instance-layout x)))
     (and
