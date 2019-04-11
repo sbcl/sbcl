@@ -721,7 +721,7 @@ unless :NAMED is also specified.")))
            (proto-classoid
             (if (dd-class-p dd)
                 (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                       (layout (make-layout :classoid classoid :inherits inherits)))
+                       (layout (make-layout classoid :inherits inherits)))
                   (setf (layout-invalid layout) nil
                         (classoid-layout classoid) layout)
                   classoid))))
@@ -1492,7 +1492,7 @@ or they must be declared locally notinline at each call site.~@:>"
             (when (or (not old-layout) *type-system-initialized*)
               (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
                 (let ((depthoid (length inherits)))
-                  (make-layout :classoid classoid
+                  (make-layout classoid
                                :%flags flags
                                :inherits inherits
                                :depthoid depthoid

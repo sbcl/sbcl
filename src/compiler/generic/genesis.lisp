@@ -2322,7 +2322,14 @@ core and return a descriptor to it."
   (let* ((inherits (pop-stack))
          (bitmap (pop-stack))
          (name (pop-stack))
-         (existing-layout (gethash name *cold-layouts*)))
+         (existing-layout (gethash name *cold-layouts*))
+         (flags
+          ;; This layout flag would have to plumbed all the way through
+          ;; DEFSTRUCT-WITH-ALTERNATE-METACLASS and ENSURE-STRUCTURE-CLASS
+          ;; in order to set it pedantically correctly for the root CONDITION
+          ;; type. Nothing tests the flag at cross-compile time, so it's ok to
+          ;; set it just-in-time in the cold core.
+          (if (eq name 'condition) +condition-layout-flag+ flags)))
     (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
     (if existing-layout

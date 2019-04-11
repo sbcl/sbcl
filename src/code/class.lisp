@@ -118,7 +118,6 @@
         (or (and classoid (classoid-layout classoid))
             (values (ensure-gethash name table
                                     (make-layout
-                                     :classoid
                                      (or classoid
                                          (make-undefined-classoid name))))))))))
 

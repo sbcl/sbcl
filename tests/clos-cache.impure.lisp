@@ -13,8 +13,8 @@
 
 (with-test (:name :probe-cache-smoke-test)
   (let ((layout
-         (sb-kernel::make-layout :clos-hash #xAd00d
-                                 :classoid (sb-kernel::make-undefined-classoid 'x)))
+         (sb-kernel::make-layout (sb-kernel::make-undefined-classoid 'x)
+                                 :clos-hash #xAd00d))
         (cache (sb-pcl::make-cache :key-count 1 :value t :size 10)))
     (sb-pcl::try-update-cache cache (list layout) 'win)
     (assert (eq (nth-value 1 (sb-pcl::probe-cache cache (list layout))) 'win))

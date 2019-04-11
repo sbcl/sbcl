@@ -31,7 +31,7 @@
 
 (declaim (inline make-wrapper-internal))
 (defun make-wrapper-internal (&key (bitmap -1) length classoid)
-  (make-layout :length length :classoid classoid :invalid nil
+  (make-layout classoid :length length :invalid nil
                :%flags +pcl-object-layout-flag+ :bitmap bitmap))
 
 ;;; With compact-instance-header and immobile-code, the primitive object has

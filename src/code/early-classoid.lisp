@@ -117,9 +117,9 @@
 ;;; FIXME: ...it would be better to automate this, of course...
 (def!struct (layout (:constructor make-layout
                         ;; Accept a specific subset of keywords
-                        (&key %flags clos-hash classoid invalid
-                              inherits depthoid length info bitmap
-                              depth2-ancestor depth3-ancestor depth4-ancestor))
+                        (classoid &key %flags clos-hash invalid
+                                  inherits depthoid length info bitmap
+                                  depth2-ancestor depth3-ancestor depth4-ancestor))
                     (:copier nil))
   ;; one +something-LAYOUT-FLAG+ bit or none of them
   (%flags 0 :type fixnum :read-only nil)
