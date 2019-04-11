@@ -27,9 +27,6 @@
 
 ;;; An &AUX variable in a boa-constructor without a default value
 ;;; means "do not initialize slot" and does not cause type error
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x) x)
-
 (defstruct (boa-saux (:constructor make-boa-saux (&aux a (b 3) (c))))
   (a #\! :type (integer 1 2))
   (b #\? :type (integer 3 4))

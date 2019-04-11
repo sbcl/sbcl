@@ -32,8 +32,6 @@
 ;;; some extra sanity checks
 (compile (defun compiled-vector-t-p (x) (typep x '(vector t))))
 (compile (defun compiled-simple-vector-p (x) (typep x 'simple-vector)))
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x) x)
 (defun evaluated-vector-t-p (x) (typep x (opaque-identity '(vector t))))
 (defun evaluated-simple-vector-p (x)
   (typep x (opaque-identity 'simple-vector)))

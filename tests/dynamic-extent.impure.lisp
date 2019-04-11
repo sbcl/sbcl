@@ -49,10 +49,6 @@
          (apply #',debug-name args)
          (apply #',default-name args)))))
 
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x)
-  x)
-
 ;;; &REST lists
 
 (defun-with-dx dxlength (&rest rest)

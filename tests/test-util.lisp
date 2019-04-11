@@ -32,6 +32,7 @@
 
            #:scratch-file-name
            #:with-scratch-file
+           #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
 (in-package :test-util)
@@ -813,6 +814,9 @@
 
 (defmacro runtime (form &key (repetitions 5) (precision 30))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
+
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x) x)
 
 (defun split-string (string delimiter)
   (loop for begin = 0 then (1+ end)

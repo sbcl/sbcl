@@ -1823,8 +1823,6 @@
       (test-minimal-debug-info-for-unstored-but-used-parameter (1- n) a)))
 
 ;;; &KEY arguments with non-constant defaults.
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x) x)
 (defstruct tricky-defaults
   (fun #'identity :type function)
   (num (opaque-identity 3) :type fixnum))
@@ -1838,7 +1836,7 @@
 
 (test-util:with-test (:name (compile &key :non-constant :default))
   (let ((fun (test-util:checked-compile
-              '(lambda (&key (key (opaque-identity 3)))
+              '(lambda (&key (key (test-util:opaque-identity 3)))
                  (declare (optimize safety) (type integer key))
                  key))))
     (assert (= (funcall fun) 3))
