@@ -1050,8 +1050,8 @@ informational, that is, user code should not depend on any of its
 specific properties.  The method used has been chosen because it is
 common, conceptually simple and fast.
 
-@findex{expt}
-@findex{random}
+@findex @cl{expt}
+@findex @cl{random}
 To generate random floats, SBCL evaluates code that has an equivalent
 effect as
 @lisp
