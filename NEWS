@@ -1,6 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes in sbcl-1.5.2 relative to sbcl-1.5.1:
+changes relative to sbcl-1.5.1:
+  * enhancement: RISC-V support.
   * new feature: decimal reader syntax for rationals, using the R exponent
     marker and/or *READ-DEFAULT-FLOAT-FORMAT* of RATIONAL.
 
