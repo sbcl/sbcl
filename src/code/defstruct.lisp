@@ -1493,7 +1493,7 @@ or they must be declared locally notinline at each call site.~@:>"
               (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
                 (let ((depthoid (length inherits)))
                   (make-layout classoid
-                               :%flags flags
+                               :flags flags
                                :inherits inherits
                                :depthoid depthoid
                                :depth2-ancestor (inherit 2)

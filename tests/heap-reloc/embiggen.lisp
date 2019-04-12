@@ -30,7 +30,7 @@
        (declare (ignore type size))
        (when (and (typep obj 'sb-kernel:layout)
                   (typep (sb-kernel:layout-bitmap obj) 'fixnum))
-         (let ((flags (sb-kernel:layout-%flags obj)))
+         (let ((flags (sb-kernel:layout-%bits obj)))
            (setf (sb-kernel:layout-bitmap obj)
                  (if (logtest (logior sb-kernel:+condition-layout-flag+
                                       sb-kernel:+pcl-object-layout-flag+)

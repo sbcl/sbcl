@@ -21,7 +21,7 @@
            (dynamic-extent arguments))
   (cond ((and (%instancep datum)
               (let ((layout (%instance-layout datum)))
-                (and (logtest +condition-layout-flag+ (layout-%flags layout))
+                (and (logtest +condition-layout-flag+ (layout-%bits layout))
                      ;; An invalid layout will drop into the (MAKE-CONDITION) branch
                      ;; which rightly fails because ALLOCATE-CONDITION asserts that
                      ;; the first argument is a condition-designator, which it won't be.

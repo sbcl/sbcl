@@ -74,7 +74,7 @@
              (not (mismatch (layout-inherits olayout) new-inherits)))
         olayout
         (make-layout (make-undefined-classoid name)
-                     :%flags +condition-layout-flag+
+                     :flags +condition-layout-flag+
                      :inherits new-inherits
                      :depthoid -1
                      :length (layout-length cond-layout)))))

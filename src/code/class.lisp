@@ -130,9 +130,9 @@
 ;;; preexisting class slot value is OK, and if it's not initialized,
 ;;; its class slot value is set to an UNDEFINED-CLASS. -- FIXME: This
 ;;; is no longer true, :UNINITIALIZED used instead.
-(declaim (ftype (function (layout classoid index fixnum simple-vector
-                           layout-depthoid layout-bitmap)
-                          layout) %init-or-check-layout))
+(declaim (ftype (sfunction (layout classoid layout-length fixnum simple-vector
+                            layout-depthoid layout-bitmap) layout)
+                %init-or-check-layout))
 (defun %init-or-check-layout (layout classoid length flags inherits depthoid bitmap)
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
@@ -143,7 +143,7 @@
            (let ((struct-depth
                   (if (logtest +structure-layout-flag+ flags) depthoid 0)))
              (setf (layout-length layout) length
-                   (layout-%flags layout) flags
+                   (layout-flags layout) flags
                    (layout-inherits layout) inherits
                    (layout-depthoid layout) depthoid
                    (layout-depth2-ancestor layout) (inherit 2)
@@ -179,7 +179,7 @@
                           (layout-classoid layout)))
   (let* ((classoid (layout-classoid layout))
          (name (classoid-name classoid)))
-    (aver (= (layout-%flags layout)
+    (aver (= (layout-flags layout)
              (typecase classoid
                (structure-classoid +structure-layout-flag+)
                (condition-classoid +condition-layout-flag+)
@@ -200,7 +200,7 @@
      `(%init-or-check-layout ',layout
                              ',(layout-classoid layout)
                              ',(layout-length layout)
-                             ',(layout-%flags layout)
+                             ',(layout-flags layout)
                              ',(layout-inherits layout)
                              ',(layout-depthoid layout)
                              ',(layout-bitmap layout)))))
@@ -351,7 +351,7 @@ between the ~A definition and the ~A definition"
           ;; Use at your own risk (interactive use only).
           (let ((inherits (layout-inherits layout))
                 (depthoid (layout-depthoid layout)))
-            (aver (logtest +structure-layout-flag+ (layout-%flags layout)))
+            (aver (logtest +structure-layout-flag+ (layout-%bits layout)))
             (aver (= (length inherits) depthoid))
             (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
               (setf (layout-invalid destruct-layout) nil

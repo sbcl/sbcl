@@ -51,8 +51,11 @@
 ;;;; somewhere else, not "early-c", since they're after all not part
 ;;;; of the compiler.
 
-;;; the type of LAYOUT-DEPTHOID slot values
-(def!type layout-depthoid () '(or index (integer -1 -1)))
+;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
+;;; Each occupies two bytes of the %BITS slot when possible,
+;;; otherwise a slot unto itself.
+(def!type layout-depthoid () '(integer -1 #x7FFF))
+(def!type layout-length () '(integer 0 #xFFFF))
 (def!type layout-bitmap ()
   ;; FIXME: Probably should exclude negative bignum
   #+compact-instance-header 'integer

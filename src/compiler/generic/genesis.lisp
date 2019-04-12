@@ -688,12 +688,25 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *host-layout-of-layout* (find-layout 'layout)))
 
-(defun cold-layout-length (layout)
-  (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
-(defun cold-layout-depthoid (layout)
-  (descriptor-fixnum (read-slot layout *host-layout-of-layout* :depthoid)))
-(defun cold-layout-flags (layout)
-  (descriptor-fixnum (read-slot layout *host-layout-of-layout* :%flags)))
+#+64-bit
+(progn
+  (defun cold-layout-depthoid (layout)
+    (let ((bits (read-slot layout *host-layout-of-layout* :%bits)))
+      (sb-kernel::unpack-layout-bits bits :depthoid)))
+  (defun cold-layout-length (layout)
+    (let ((bits (read-slot layout *host-layout-of-layout* :%bits)))
+      (sb-kernel::unpack-layout-bits bits :length)))
+  (defun cold-layout-flags (layout)
+    (let ((bits (read-slot layout *host-layout-of-layout* :%bits)))
+      (sb-kernel::unpack-layout-bits bits :flags))))
+#-64-bit
+(progn
+  (defun cold-layout-depthoid (layout)
+    (descriptor-fixnum (read-slot layout *host-layout-of-layout* :depthoid)))
+  (defun cold-layout-length (layout)
+    (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
+  (defun cold-layout-flags (layout)
+    (descriptor-fixnum (read-slot layout *host-layout-of-layout* :flags))))
 
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
@@ -1112,8 +1125,9 @@ core and return a descriptor to it."
                              sb-vm:n-word-bits))))))
 
 (defun extract-dd-slots-from-core (cold-dd) ; descriptor to a defstruct-description
-  (let* ((name (read-slot cold-dd (find-layout 'defstruct-description) :name))
-         (slots (read-slot cold-dd (find-layout 'defstruct-description) :slots))
+  (let* ((host-dd-layout (find-layout 'defstruct-description))
+         (name (read-slot cold-dd host-dd-layout :name))
+         (slots (read-slot cold-dd host-dd-layout :slots))
          (host-dsd-layout (find-layout 'defstruct-slot-description))
          (result))
     (loop while (not (cold-null slots))
@@ -1134,6 +1148,15 @@ core and return a descriptor to it."
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
   (let ((result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
                                  target-layout-length t)))
+    #+64-bit
+    (write-slots result *host-layout-of-layout*
+     :%bits (sb-kernel::pack-layout-bits depthoid length flags))
+    #-64-bit
+    (write-slots result *host-layout-of-layout*
+     :depthoid (make-fixnum-descriptor depthoid)
+     :length (make-fixnum-descriptor length)
+     :flags (make-fixnum-descriptor flags))
+
     ;; Don't set the CLOS hash value: done in cold-init instead.
     ;;
     ;; Set other slot values.
@@ -1142,9 +1165,6 @@ core and return a descriptor to it."
     (write-slots result *host-layout-of-layout*
      :invalid *nil-descriptor*
      :inherits inherits
-     :depthoid (make-fixnum-descriptor depthoid)
-     :length (make-fixnum-descriptor length)
-     :%flags (make-fixnum-descriptor flags)
      :info *nil-descriptor*
      :bitmap bitmap
       ;; Nothing in cold-init needs to call EQUALP on a structure with raw slots,
@@ -1260,19 +1280,23 @@ core and return a descriptor to it."
             `((,(get-dsd-index ctype sb-kernel::class-info) . nil)))))
          (result (allocate-struct *dynamic* target-layout))
          (dd-slots (type-dd-slots-or-lose host-type)))
-    (aver (eql (layout-bitmap (find-layout host-type))
-               sb-kernel::+layout-all-tagged+))
     ;; Dump the slots.
     (do ((len (cold-layout-length target-layout))
          (index sb-vm:instance-data-start (1+ index)))
         ((= index len) result)
       (let* ((dsd (find index dd-slots :key #'dsd-index))
-             (slot-val (funcall (dsd-accessor-name dsd) obj)))
-        (write-wordindexed
-         result
-         (+ sb-vm:instance-slots-offset index)
-         (acond ((assq index simple-slots) (or (cdr it) *nil-descriptor*))
-                (t (host-constant-to-core slot-val obj-to-core-helper))))))))
+             (host-val (funcall (dsd-accessor-name dsd) obj))
+             (override (assq index simple-slots)))
+        (ecase (dsd-raw-type dsd)
+         ((t)
+          (write-wordindexed result
+                             (+ sb-vm:instance-slots-offset index)
+                             (if override
+                                 (or (cdr override) *nil-descriptor*)
+                                 (host-constant-to-core host-val obj-to-core-helper))))
+         ((word sb-vm:signed-word)
+          (write-wordindexed/raw result (+ sb-vm:instance-slots-offset index)
+                                 (or (cdr override) host-val))))))))
 
 ;; This is called to backpatch two small sets of objects:
 ;;  - layouts created before layout-of-layout is made (3 counting LAYOUT itself)
@@ -1288,10 +1312,6 @@ core and return a descriptor to it."
 
 (defun initialize-layouts ()
   (clrhash *cold-layouts*)
-  ;; This assertion is due to the fact that MAKE-COLD-LAYOUT does not
-  ;; know how to set any raw slots.
-  (aver (eql (layout-bitmap *host-layout-of-layout*)
-             sb-kernel::+layout-all-tagged+))
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1301,7 +1321,7 @@ core and return a descriptor to it."
                           (length inherits)))
              (make-cold-layout name
                                (layout-depthoid warm-layout)
-                               (layout-%flags warm-layout)
+                               (layout-flags warm-layout)
                                (layout-length warm-layout)
                                (number-to-core (layout-bitmap warm-layout))
                                (vector-in-core inherits)))))

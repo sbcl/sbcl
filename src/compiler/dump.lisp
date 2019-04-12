@@ -1119,7 +1119,7 @@
                     (layout-classoid obj)))
   ;; STANDARD-OBJECT could in theory be dumpable, but nothing else,
   ;; because all its subclasses can evolve to have new layouts.
-  (aver (not (logtest (layout-%flags obj) +pcl-object-layout-flag+)))
+  (aver (not (logtest (layout-%bits obj) +pcl-object-layout-flag+)))
   (let ((name (layout-classoid-name obj)))
     ;; Q: Shouldn't we aver that NAME is the proper name for its classoid?
     (unless name
@@ -1136,5 +1136,5 @@
   (sub-dump-object (layout-inherits obj) file)
   (dump-fop 'fop-layout file
             (1+ (layout-depthoid obj)) ; non-stack args can't be negative
-            (layout-%flags obj)
+            (layout-flags obj)
             (layout-length obj)))

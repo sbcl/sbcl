@@ -27,7 +27,7 @@
                  ',name ',direct-supers
                  ,(make-layout
                    (make-undefined-classoid name)
-                   :%flags +condition-layout-flag+
+                   :flags +condition-layout-flag+
                    :inherits (map 'vector #'find-layout (cons t inherits))
                    :depthoid -1
                    ;; 2 declared slots, plus the layout if it takes a slot

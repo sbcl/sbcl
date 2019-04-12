@@ -32,7 +32,7 @@
 (declaim (inline make-wrapper-internal))
 (defun make-wrapper-internal (&key (bitmap -1) length classoid)
   (make-layout classoid :length length :invalid nil
-               :%flags +pcl-object-layout-flag+ :bitmap bitmap))
+               :flags +pcl-object-layout-flag+ :bitmap bitmap))
 
 ;;; With compact-instance-header and immobile-code, the primitive object has
 ;;; 2 descriptor slots (fin-fun and CLOS slot vector) and 2 non-desriptor slots

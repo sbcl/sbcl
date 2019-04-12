@@ -46,6 +46,29 @@
     (inst movzx '(:byte :dword) result object)
     DONE))
 
+(macrolet ((read-depthoid ()
+             `(ea (- (+ 4 (ash (+ instance-slots-offset
+                                  (get-dsd-index layout sb-kernel::%bits))
+                               word-shift))
+                     instance-pointer-lowtag)
+                  layout)))
+  (define-vop (layout-depthoid)
+    (:translate layout-depthoid)
+    (:policy :fast-safe)
+    (:args (layout :scs (descriptor-reg)))
+    (:results (res :scs (any-reg)))
+    (:result-types fixnum)
+    (:generator 1 (inst movsx '(:dword :qword) res (read-depthoid))))
+  #+nil ; trying to combine the load + compare, not working yet
+  (define-vop (sb-c::layout-depthoid-gt)
+    (:translate sb-c::layout-depthoid-gt)
+    (:policy :fast-safe)
+    (:args (layout :scs (descriptor-reg)))
+    (:info k)
+    (:arg-types * (:constant (unsigned-byte 16)))
+    (:conditional :gt)
+    (:generator 1 (inst cmp :dword (read-depthoid) k))))
+
 #+compact-instance-header
 ;; ~20 instructions vs. 35
 (define-vop (layout-of) ; no translation

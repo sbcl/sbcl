@@ -104,6 +104,7 @@
   (def %funcallable-instance-info (fin i))
   (def %set-funcallable-instance-info (fin i new-value))
   #+(and compact-instance-header x86-64) (def layout-of)
+  #+64-bit (def layout-depthoid)
   ;; lists
   (def %rplaca (x val))
   (def %rplacd (x val))
