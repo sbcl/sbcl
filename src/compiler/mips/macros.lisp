@@ -250,7 +250,7 @@ placed inside the PSEUDO-ATOMIC, and presumably initializes the object."
 
 ;;;; memory accessor vop generators
 
-(def!type load/store-index (scale lowtag min-offset
+(sb-xc:deftype load/store-index (scale lowtag min-offset
                                   &optional (max-offset min-offset))
   `(integer ,(- (truncate (+ (ash 1 16)
                              (* min-offset n-word-bytes)
