@@ -282,7 +282,7 @@
   ;; Save Lisp state.
   (pseudo-atomic (pa-temp)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
-    (store-foreign-symbol-value ocfp-tn "current_control_frame_pointer" temp)
+    (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
     (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
     #-gencgc
     (progn
