@@ -1,5 +1,5 @@
 /*
- * This is the RV32 Linux incarnation of arch-dependent OS-dependent
+ * This is the RISC-V Linux incarnation of arch-dependent OS-dependent
  * routines. See also "linux-os.c".
  */
 

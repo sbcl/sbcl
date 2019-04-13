@@ -176,7 +176,7 @@ _ldso_stub__ ## fct ## $lazy_ptr:                @\\
 
 #+ppc64 ""
 
-#+rv32 "
+#+riscv "
 #define LDSO_STUBIFY(fct)                \\
   .global ldso_stub__ ## fct           ; \\
   .type ldso_stub__ ## fct, @function  ; \\

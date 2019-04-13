@@ -1,4 +1,4 @@
-;;;; the RV32 definitions of some general purpose memory reference VOPs
+;;;; the RISC-V definitions of some general purpose memory reference VOPs
 ;;;; inherited by basic memory reference operations
 
 ;;;; This software is part of the SBCL system. See the README file for

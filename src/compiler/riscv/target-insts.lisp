@@ -11,7 +11,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-RV32-ASM")
+(in-package "SB-RISCV-ASM")
 
 (defun current-instruction (dstate &optional (offset 0))
   (sap-ref-int (dstate-segment-sap dstate)

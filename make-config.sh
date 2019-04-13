@@ -715,7 +715,7 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     # (Sufficiently new glibc uses the correct definition, which is the same as
     # 2.3.1, so define our constant for that)
     echo '#define GLIBC231_STYLE_UCONTEXT 1' > src/runtime/ppc-linux-mcontext.h
-elif [ "$sbcl_arch" = "rv32" ]; then
+elif [ "$sbcl_arch" = "riscv" ]; then
     printf ' :64-bit :64-bit-registers' >> $ltf
     printf ' :gencgc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf

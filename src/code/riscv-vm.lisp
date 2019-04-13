@@ -1,11 +1,11 @@
-;;; This file contains the RV32-specific runtime stuff.
+;;; This file contains the RISC-V-specific runtime stuff.
 
 (in-package "SB-VM")
 
 #-sb-xc-host
 (defun machine-type ()
   "Return a string describing the type of the local machine."
-  "RV32")
+  #-64-bit "RV32G" #+64-bit "RV64G")
 
 ;;; FIXUP-CODE-OBJECT
 

@@ -1,4 +1,4 @@
-;;;; that part of the description of the RV32 instruction set which
+;;;; that part of the description of the RISC-V instruction set which
 ;;;; can live on the cross-compilation host
 
 ;;;; This software is part of the SBCL system. See the README file for
@@ -10,7 +10,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(in-package "SB-RV32-ASM")
+(in-package "SB-RISCV-ASM")
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   ;; Imports from SB-VM into this package
@@ -380,22 +380,22 @@
      (:emitter
       (emit-r-inst segment ,funct7 rs2 rs1 ,funct3 rd ,opcode))))
 
-(macrolet ((define-rv32i-arith-instruction (name funct7 funct3 &optional word-variant)
+(macrolet ((define-riscvi-arith-instruction (name funct7 funct3 &optional word-variant)
              `(progn
                 (define-register-arith-instruction ,name ,funct7 ,funct3 #b0110011)
                 ,(when word-variant
                    #+64-bit
                   `(define-register-arith-instruction ,word-variant ,funct7 ,funct3 #b0111011)))))
-  (define-rv32i-arith-instruction add #b0000000 #b000 addw)
-  (define-rv32i-arith-instruction sub #b0100000 #b000 subw)
-  (define-rv32i-arith-instruction sll #b0000000 #b001 sllw)
-  (define-rv32i-arith-instruction slt #b0000000 #b010)
-  (define-rv32i-arith-instruction sltu #b0000000 #b011)
-  (define-rv32i-arith-instruction xor #b0000000 #b100)
-  (define-rv32i-arith-instruction srl #b0000000 #b101 srlw)
-  (define-rv32i-arith-instruction sra #b0100000 #b101 sraw)
-  (define-rv32i-arith-instruction or #b0000000 #b110)
-  (define-rv32i-arith-instruction and #b0000000 #b111))
+  (define-riscvi-arith-instruction add #b0000000 #b000 addw)
+  (define-riscvi-arith-instruction sub #b0100000 #b000 subw)
+  (define-riscvi-arith-instruction sll #b0000000 #b001 sllw)
+  (define-riscvi-arith-instruction slt #b0000000 #b010)
+  (define-riscvi-arith-instruction sltu #b0000000 #b011)
+  (define-riscvi-arith-instruction xor #b0000000 #b100)
+  (define-riscvi-arith-instruction srl #b0000000 #b101 srlw)
+  (define-riscvi-arith-instruction sra #b0100000 #b101 sraw)
+  (define-riscvi-arith-instruction or #b0000000 #b110)
+  (define-riscvi-arith-instruction and #b0000000 #b111))
 
 (define-instruction-format (fence 32)
   (funct4 :field (byte 4 28) :value #b0000)
@@ -587,16 +587,16 @@
 (define-instruction-macro csrsi (csr imm) `(inst csrrs zero-tn ,csr ,imm))
 (define-instruction-macro csrci (csr imm) `(inst csrrc zero-tn ,csr ,imm))
 
-(macrolet ((define-rv32m-arith-instruction (name funct3)
+(macrolet ((define-riscvm-arith-instruction (name funct3)
              `(define-register-arith-instruction ,name #b0000001 ,funct3 #b0110011)))
-  (define-rv32m-arith-instruction mul #b000)
-  (define-rv32m-arith-instruction mulh #b001)
-  (define-rv32m-arith-instruction mulhsu #b010)
-  (define-rv32m-arith-instruction mulhu #b011)
-  (define-rv32m-arith-instruction div #b100)
-  (define-rv32m-arith-instruction divu #b101)
-  (define-rv32m-arith-instruction rem #b110)
-  (define-rv32m-arith-instruction remu #b111))
+  (define-riscvm-arith-instruction mul #b000)
+  (define-riscvm-arith-instruction mulh #b001)
+  (define-riscvm-arith-instruction mulhsu #b010)
+  (define-riscvm-arith-instruction mulhu #b011)
+  (define-riscvm-arith-instruction div #b100)
+  (define-riscvm-arith-instruction divu #b101)
+  (define-riscvm-arith-instruction rem #b110)
+  (define-riscvm-arith-instruction remu #b111))
 
 ;;; Floating point
 (defconstant-eqx r-float-printer
@@ -639,7 +639,7 @@
   (or (position rm #(:rne :rtz :rdn :rup :rmm :unused1 :unused2 :dynamic))
       (error "Invalid rounding mode mnemonic ~a." rm)))
 
-(macrolet ((define-rv32-float-arith-instruction
+(macrolet ((define-riscv-float-arith-instruction
                (name funct5 &key rm rs2)
              `(define-instruction ,name
                   (segment fmt rd rs1
@@ -655,36 +655,36 @@
                                     ,(if rs2 rs2 'rs2) rs1
                                     ,(if rm rm '(rm-encoding rm))
                                     rd #b1010011)))))
-  (define-rv32-float-arith-instruction fadd     #b00000)
-  (define-rv32-float-arith-instruction fsub     #b00001)
-  (define-rv32-float-arith-instruction fmul     #b00010)
-  (define-rv32-float-arith-instruction fdiv     #b00011)
-  (define-rv32-float-arith-instruction fsqrt    #b01011 :rs2 #b00000)
-  (define-rv32-float-arith-instruction fsgnj    #b00100 :rm  #b000)
-  (define-rv32-float-arith-instruction fsgnjn   #b00100 :rm  #b001)
-  (define-rv32-float-arith-instruction fsgnjx   #b00100 :rm  #b010)
-  (define-rv32-float-arith-instruction fmin     #b00101 :rm  #b000)
-  (define-rv32-float-arith-instruction fmax     #b00101 :rm  #b001)
-  (define-rv32-float-arith-instruction fcvtw<-  #b11000 :rs2 #b00000)
-  (define-rv32-float-arith-instruction fcvtwu<- #b11000 :rs2 #b00001)
+  (define-riscv-float-arith-instruction fadd     #b00000)
+  (define-riscv-float-arith-instruction fsub     #b00001)
+  (define-riscv-float-arith-instruction fmul     #b00010)
+  (define-riscv-float-arith-instruction fdiv     #b00011)
+  (define-riscv-float-arith-instruction fsqrt    #b01011 :rs2 #b00000)
+  (define-riscv-float-arith-instruction fsgnj    #b00100 :rm  #b000)
+  (define-riscv-float-arith-instruction fsgnjn   #b00100 :rm  #b001)
+  (define-riscv-float-arith-instruction fsgnjx   #b00100 :rm  #b010)
+  (define-riscv-float-arith-instruction fmin     #b00101 :rm  #b000)
+  (define-riscv-float-arith-instruction fmax     #b00101 :rm  #b001)
+  (define-riscv-float-arith-instruction fcvtw<-  #b11000 :rs2 #b00000)
+  (define-riscv-float-arith-instruction fcvtwu<- #b11000 :rs2 #b00001)
   #+64-bit
-  (define-rv32-float-arith-instruction fcvtl<-  #b11000 :rs2 #b00010)
+  (define-riscv-float-arith-instruction fcvtl<-  #b11000 :rs2 #b00010)
   #+64-bit
-  (define-rv32-float-arith-instruction fcvtlu<- #b11000 :rs2 #b00011)
-  (define-rv32-float-arith-instruction fmvx<-   #b11100 :rs2 #b00000 :rm #b000)
-  (define-rv32-float-arith-instruction feq      #b10100 :rm  #b010)
-  (define-rv32-float-arith-instruction flt      #b10100 :rm  #b001)
-  (define-rv32-float-arith-instruction fle      #b10100 :rm  #b000)
-  (define-rv32-float-arith-instruction fclass   #b11100 :rs2 #b00000 :rm #b001)
-  (define-rv32-float-arith-instruction fcvtw->  #b11010 :rs2 #b00000)
-  (define-rv32-float-arith-instruction fcvtwu-> #b11010 :rs2 #b00001)
+  (define-riscv-float-arith-instruction fcvtlu<- #b11000 :rs2 #b00011)
+  (define-riscv-float-arith-instruction fmvx<-   #b11100 :rs2 #b00000 :rm #b000)
+  (define-riscv-float-arith-instruction feq      #b10100 :rm  #b010)
+  (define-riscv-float-arith-instruction flt      #b10100 :rm  #b001)
+  (define-riscv-float-arith-instruction fle      #b10100 :rm  #b000)
+  (define-riscv-float-arith-instruction fclass   #b11100 :rs2 #b00000 :rm #b001)
+  (define-riscv-float-arith-instruction fcvtw->  #b11010 :rs2 #b00000)
+  (define-riscv-float-arith-instruction fcvtwu-> #b11010 :rs2 #b00001)
   #+64-bit
-  (define-rv32-float-arith-instruction fcvtl->  #b11010 :rs2 #b00010)
+  (define-riscv-float-arith-instruction fcvtl->  #b11010 :rs2 #b00010)
   #+64-bit
-  (define-rv32-float-arith-instruction fcvtlu-> #b11010 :rs2 #b00011)
-  (define-rv32-float-arith-instruction fmvx->   #b11110 :rs2 #b00000 :rm #b000)
-  (define-rv32-float-arith-instruction fcvtd->  #b01000 :rs2 #b00001)
-  (define-rv32-float-arith-instruction fcvts->  #b01000 :rs2 #b00000))
+  (define-riscv-float-arith-instruction fcvtlu-> #b11010 :rs2 #b00011)
+  (define-riscv-float-arith-instruction fmvx->   #b11110 :rs2 #b00000 :rm #b000)
+  (define-riscv-float-arith-instruction fcvtd->  #b01000 :rs2 #b00001)
+  (define-riscv-float-arith-instruction fcvts->  #b01000 :rs2 #b00000))
 
 (macrolet ((define-3-arg-float-arith-instruction (name opcode)
              `(define-instruction ,name (segment fmt rd rs1 rs2 rs3 &optional (rm :rne))

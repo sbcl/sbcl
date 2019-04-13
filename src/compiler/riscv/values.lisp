@@ -1,4 +1,4 @@
-;;;; unknown-values VOPs for the RV32 VM
+;;;; unknown-values VOPs for the RISC-V VM
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

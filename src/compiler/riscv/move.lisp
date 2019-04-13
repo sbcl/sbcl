@@ -1,4 +1,4 @@
-;;;; the RV32 VM definition of operand loading/saving and the MOVE vop
+;;;; the RISC-V VM definition of operand loading/saving and the MOVE vop
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

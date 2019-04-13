@@ -1,4 +1,4 @@
-;;;; allocation VOPs for the RV32
+;;;; allocation VOPs for the RISC-V
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

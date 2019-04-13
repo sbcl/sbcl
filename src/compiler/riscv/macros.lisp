@@ -1,4 +1,4 @@
-;;;; various useful macros for generating RV32 code
+;;;; various useful macros for generating RISC-V code
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -156,7 +156,7 @@ extern void globals_init(void);
 #  define POINTERSIZE 4
 # endif
 
-# if defined(LISP_FEATURE_RV32)
+# if defined(LISP_FEATURE_RISCV)
 #   define EXTERN(name,bytes) .globl name
 # endif
 

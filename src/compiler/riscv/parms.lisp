@@ -1,5 +1,5 @@
 ;;;; This file contains some parameterizations of various VM
-;;;; attributes for the RV32.  This file is separate from other stuff so
+;;;; attributes for the RISC-V.  This file is separate from other stuff so
 ;;;; that it can be compiled and loaded earlier.
 
 ;;;; This software is part of the SBCL system. See the README file for

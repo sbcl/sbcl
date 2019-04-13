@@ -1,4 +1,4 @@
-;;;; RV32 support for the debugger
+;;;; RISC-V support for the debugger
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

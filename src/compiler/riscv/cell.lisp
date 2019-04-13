@@ -1,4 +1,4 @@
-;;;; various primitive memory access VOPs for the RV32 VM
+;;;; various primitive memory access VOPs for the RISC-V VM
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

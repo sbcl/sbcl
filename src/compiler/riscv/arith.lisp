@@ -1,4 +1,4 @@
-;;;; the VM definition of arithmetic VOPs for the RV32
+;;;; the VM definition of arithmetic VOPs for the RISC-V
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

@@ -1,4 +1,4 @@
-;;;; RV32 VM definitions of various system hacking operations
+;;;; RISC-V VM definitions of various system hacking operations
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.

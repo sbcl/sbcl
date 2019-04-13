@@ -1,7 +1,7 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.5.1:
-  * enhancement: RISC-V support.
+  * enhancement: RISC-V support with the generational garbage collector.
   * new feature: decimal reader syntax for rationals, using the R exponent
     marker and/or *READ-DEFAULT-FLOAT-FORMAT* of RATIONAL.
 

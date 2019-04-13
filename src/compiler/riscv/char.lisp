@@ -1,4 +1,4 @@
-;;;; RV32 definition of character operations
+;;;; RISC-V definition of character operations
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
