@@ -53,6 +53,21 @@
     (load-type result lip)
     DONE))
 
+#+64-bit
+(define-vop (layout-depthoid)
+  (:translate layout-depthoid)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:results (values :scs (any-reg)))
+  (:result-types fixnum)
+  (:generator 1
+    (inst lw values object
+          (- (+ (ash (+ instance-slots-offset
+                        (get-dsd-index layout sb-kernel::%bits))
+                     word-shift)
+                4)
+             instance-pointer-lowtag))))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)
