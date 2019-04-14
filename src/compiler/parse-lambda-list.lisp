@@ -1129,6 +1129,11 @@
                       (when whole `((,(car whole) ,ll-whole)))))
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
+             #-sb-xc-host
+             (*lexenv* (process-muffle-decls decls
+                                             (if (boundp '*lexenv*)
+                                                 *lexenv*
+                                                 (make-null-lexenv))))
              (parse (parse-ds-lambda-list new-ll))
              ((declared-lambda-list decls)
               (let ((ll
