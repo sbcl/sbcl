@@ -190,6 +190,7 @@
 ;;; Inlining functions with non-trivial lambda-lists.
 (declaim (inline inline/3))
 (defun inline/3 (a &optional b &key c d)
+  (declare (sb-ext:muffle-conditions sb-kernel:&optional-and-&key-in-lambda-list))
   (list a b c d))
 (defun inline/3-user/1 (a)
   (inline/3 a))

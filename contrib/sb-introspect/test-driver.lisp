@@ -242,6 +242,7 @@
     (matchp-name :function 'cl-user::compile-time-too-fun 28)
   t)
 
+(load "load-test.lisp")
 (deftest find-source-stuff.32
     (matchp-name :function 'cl-user::loaded-as-source-fun 3)
   t)
@@ -293,7 +294,8 @@
 ;;;; Check correctness of DEFTYPE-LAMBDA-LIST.
 (deftype foobar-type
     (&whole w &environment e r1 r2 &optional o &rest rest &key k1 k2 k3)
-  (declare (ignore w e r1 r2 o rest k1 k2 k3))
+  (declare (ignore w e r1 r2 o rest k1 k2 k3)
+           (sb-ext:muffle-conditions sb-kernel:&optional-and-&key-in-lambda-list))
   nil)
 
 (deftest deftype-lambda-list.1

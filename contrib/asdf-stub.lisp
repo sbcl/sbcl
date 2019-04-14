@@ -7,9 +7,10 @@ sb-ext::(declaim (muffle-conditions compiler-note))
 (defun keywordize (x)
   (intern (string-upcase x) :keyword))
 
+sb-ext::(declaim (muffle-conditions sb-kernel:redefinition-warning))
 (defun wrapping-source-registry ()
   '(:source-registry (:tree #p"SYS:CONTRIB;") :ignore-inherited-configuration))
-
+sb-ext::(declaim (unmuffle-conditions sb-kernel:redefinition-warning))
 
 (defun setup-asdf-contrib ()
   ;;(setf *resolve-symlinks* nil)
@@ -38,7 +39,7 @@ sb-ext::(declaim (muffle-conditions compiler-note))
                    (srcpats (&rest types) (mapcar #'srcpat types)))
             `(,@(srcpats :lisp :asd)
               ,@(outpats :fasl :sbcl-warnings :build-report
-                         :out :exe :lisp-temp :o :c :test-report :html)
+                               :out :exe :lisp-temp :o :c :test-report :html)
               ("CONTRIB;**;" ,src.dir.pat)
               #|("CONTRIB;**;*.*.*" ,src.pat)|#)))
     (setf *central-registry* nil)))
