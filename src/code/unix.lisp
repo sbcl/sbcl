@@ -542,7 +542,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; This is like getrusage(2), except it returns only the system and
 ;;; user time, and returns the seconds and microseconds as separate
 ;;; values.
-#-sb-fluid (declaim (inline unix-fast-getrusage))
+#-win32 (declaim (inline unix-fast-getrusage))
 #-win32
 (defun unix-fast-getrusage (who)
   (declare (values (member t)

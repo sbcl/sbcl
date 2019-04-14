@@ -573,8 +573,6 @@
                (addr ,kernel-time)
                (addr ,user-time))))
 
-(declaim (inline system-internal-real-time))
-
 (let ((epoch 0))
   (declare (unsigned-byte epoch))
   ;; FIXME: For optimization ideas see the unix implementation.
@@ -588,6 +586,7 @@
                   (addr system-time)))
        epoch)))
 
+(declaim (inline system-internal-run-time))
 (defun system-internal-run-time ()
   (with-process-times (creation-time exit-time kernel-time user-time)
     (values (floor (+ user-time kernel-time) 100ns-per-internal-time-unit))))
