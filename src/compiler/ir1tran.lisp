@@ -1694,6 +1694,17 @@
     (values lexenv result-type (cdr post-binding-lexenv)
             lambda-list explicit-check)))
 
+(defun process-muffle-decls (decls lexenv)
+  (flet ((process-it (spec)
+           (cond ((atom spec))
+                 ((member (car spec) '(muffle-conditions unmuffle-conditions))
+                  (setq lexenv
+                        (process-1-decl spec lexenv nil nil nil nil))))))
+    (dolist (decl decls)
+      (dolist (spec (rest decl))
+        (process-it spec))))
+  lexenv)
+
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
   (multiple-value-bind (*lexenv* result-type post-binding-lexenv)
       (process-decls decls vars fvars :binding-form-p binding-form-p)
