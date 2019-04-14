@@ -189,7 +189,8 @@
                                   ;; scope, and I can't find anything under PROCLAIM or
                                   ;; COMPILE-FILE or LOAD or OPTIMIZE which justifies this
                                   ;; behavior. Hmm. -- WHN 2001-04-06
-                                  (sb-c::*policy* sb-c::*policy*))
+                                  (sb-c::*policy* sb-c::*policy*)
+                                  (sb-c::*handled-conditions* sb-c::*handled-conditions*))
                               (if faslp
                                   (load-as-fasl stream verbose print)
                                   (sb-c:with-compiler-error-resignalling

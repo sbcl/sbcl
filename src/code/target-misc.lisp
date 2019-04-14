@@ -171,8 +171,11 @@ the file system."
   (aver (legal-fun-name-p name))
   ;; If a warning handler decides to disallow this redefinition
   ;; by nonlocally exiting, then we'll skip the rest of this stuff.
-  (when (fboundp name)
-    (warn 'redefinition-with-defun :name name :new-function def))
+  (when (and (fboundp name)
+             *type-system-initialized*)
+    (handler-bind (((satisfies sb-c::handle-condition-p)
+                     #'sb-c::handle-condition-handler))
+      (warn 'redefinition-with-defun :name name :new-function def)))
   (sb-c:%compiler-defun name nil inline-lambda extra-info)
   (setf (fdefinition name) def)
   ;; %COMPILER-DEFUN doesn't do this except at compile-time, when it

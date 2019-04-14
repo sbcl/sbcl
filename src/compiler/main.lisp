@@ -1656,19 +1656,21 @@ necessary, since type inference may take arbitrarily long to converge.")
 
 (declaim (ftype function handle-condition-p))
 (flet ((get-handled-conditions ()
-         (let ((ctxt *compiler-error-context*))
-           (lexenv-handled-conditions
-            (etypecase ctxt
-              (node (node-lexenv ctxt))
-              (lvar-annotation
-               (lvar-annotation-lexenv ctxt))
-             (compiler-error-context
-              (let ((lexenv (compiler-error-context-lexenv ctxt)))
-                (aver lexenv)
-                lexenv))
-             ;; Is this right? I would think that if lexenv is null
-             ;; we should look at *HANDLED-CONDITIONS*.
-             (null *lexenv*)))))
+         (if (boundp '*lexenv*)
+             (let ((ctxt *compiler-error-context*))
+               (lexenv-handled-conditions
+                (etypecase ctxt
+                  (node (node-lexenv ctxt))
+                  (lvar-annotation
+                   (lvar-annotation-lexenv ctxt))
+                  (compiler-error-context
+                   (let ((lexenv (compiler-error-context-lexenv ctxt)))
+                     (aver lexenv)
+                     lexenv))
+                  ;; Is this right? I would think that if lexenv is null
+                  ;; we should look at *HANDLED-CONDITIONS*.
+                  (null *lexenv*))))
+             *handled-conditions*))
        (handle-p (condition ctype)
          #+sb-xc-host (typep condition (type-specifier ctype))
          #-sb-xc-host (%%typep condition ctype)))
