@@ -35,7 +35,9 @@ echo //loading and running GENESIS to create cold-sbcl.core
 echo '(load "loader.lisp") (load-sbcl-file "make-genesis-2.lisp")' | $SBCL_XC_HOST
 
 echo //testing for consistency of first and second GENESIS passes
-if diff -r src/runtime/genesis output/genesis-2; then
+if ! command -v diff > /dev/null ; then
+    echo //no diffutils, not testing
+elif diff -r src/runtime/genesis output/genesis-2; then
     echo //header files match between first and second GENESIS -- good
 else
     echo error: header files do not match between first and second GENESIS
