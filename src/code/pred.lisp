@@ -434,24 +434,21 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                   `(let ((x-el (%instance-ref x i))
                          (y-el (%instance-ref y i)))
                      (or (eq x-el y-el) (equalp x-el y-el)))))
+       (let ((n (%instance-length x)))
          (if (eql (layout-bitmap layout-x) sb-kernel::+layout-all-tagged+)
-             (loop for i of-type index from sb-vm:instance-data-start
-                   below (layout-length layout-x)
+             (loop for i downfrom (1- n) to sb-vm:instance-data-start
                    always (slot-ref-equalp))
              (let ((comparators (layout-equalp-tests layout-x)))
-               (unless (= (length comparators)
-                          (- (layout-length layout-x) sb-vm:instance-data-start))
+               (unless (= (length comparators) (- n sb-vm:instance-data-start))
                  (bug "EQUALP got incomplete instance layout"))
                ;; See remark at the source code for %TARGET-DEFSTRUCT
                ;; explaining how to use the vector of comparators.
-               (loop for i of-type index from sb-vm:instance-data-start
-                     below (layout-length layout-x)
+               (loop for i downfrom (1- n) to sb-vm:instance-data-start
                      for test = (data-vector-ref
                                  comparators (- i sb-vm:instance-data-start))
                      always (cond ((eql test 0) (slot-ref-equalp))
-                                  ((functionp test)
-                                   (funcall test i x y))
-                                  (t)))))))))
+                                  ((functionp test) (funcall test i x y))
+                                  (t))))))))))
 
 ;;; Doesn't work on simple vectors
 (defun array-equal-p (x y)
