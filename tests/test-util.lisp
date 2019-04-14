@@ -817,6 +817,7 @@
 
 (declaim (notinline opaque-identity))
 (defun opaque-identity (x) x)
+(compile 'opaque-identity) ; in case this file was loaded as interpreted code
 
 (defun split-string (string delimiter)
   (loop for begin = 0 then (1+ end)
