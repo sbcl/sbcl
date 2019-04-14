@@ -398,27 +398,34 @@ Examples:
 ;;; - once for compiling to fasl. *COMPILE-OBJECT* is a fasl.
 ;;; I'd have liked the data to be associated with the fasl, except that
 ;;; as indicated above, the second line hides some information.
-(defun style-warn-once (thing fmt &rest args)
+(defun style-warn-once (thing fmt-or-condition &rest args)
   (declare (notinline style-warn)) ; See COMPILER-STYLE-WARN for rationale
   (let* ((source-info *source-info*)
          (file-info (and (source-info-p source-info)
                          (source-info-file-info source-info)))
          (file-compiling-p (file-info-p file-info)))
-    (flet ((match-p (entry &aux (rest (cdr entry)))
-             ;; THING is compared by EQ, FMT by STRING=.
-             (and (eq (car entry) thing)
-                  (string= (car rest) fmt)
-                  ;; We don't want to walk into default values,
-                  ;; e.g. (&optional (b #<insane-struct))
-                  ;; because #<insane-struct> might be circular.
-                  (equal-but-no-car-recursion (cdr rest) args))))
+    (flet ((match-p (entry)
+             (destructuring-bind (entry-thing entry-fmt &rest entry-args) entry
+               ;; THING is compared by EQ, FMT by STRING=.
+               (and (eq entry-thing thing)
+                    (cond ((typep entry-fmt 'condition)
+                           (and (typep fmt-or-condition 'condition)
+                                (string= (princ-to-string entry-fmt)
+                                         (princ-to-string fmt-or-condition))))
+                          ((typep fmt-or-condition 'condition)
+                           nil)
+                          ((string= entry-fmt fmt-or-condition)))
+                    ;; We don't want to walk into default values,
+                    ;; e.g. (&optional (b #<insane-struct))
+                    ;; because #<insane-struct> might be circular.
+                    (equal-but-no-car-recursion entry-args args)))))
       (unless (and file-compiling-p
                    (find-if #'match-p
                             (file-info-style-warning-tracker file-info)))
         (when file-compiling-p
-          (push (list* thing fmt args)
+          (push (list* thing fmt-or-condition args)
                 (file-info-style-warning-tracker file-info)))
-        (apply 'style-warn fmt args)))))
+        (apply 'style-warn fmt-or-condition args)))))
 
 ;;;; component compilation
 

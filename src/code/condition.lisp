@@ -1502,6 +1502,10 @@ the usual naming convention (names like *FOO*) for special variables"
     (dubious-asterisks-around-variable-name)
   ())
 
+(define-condition &optional-and-&key-in-lambda-list
+    (style-warning simple-condition)
+  ())
+
 ;; We call this UNDEFINED-ALIEN-STYLE-WARNING because there are some
 ;; subclasses of ERROR above having to do with undefined aliens.
 (define-condition undefined-alien-style-warning (style-warning)
