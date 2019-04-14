@@ -1663,6 +1663,50 @@ scavenge_pinned_ranges()
     }
 }
 
+/* visit_freed_objects() was designed to support post-GC actions such as
+ * recycling of unused symbol TLS indices. However, I could not make this work
+ * as claimed at the time that it gets called, so at best this is reserved
+ * for debugging, and only when you can tolerate some inaccuracy.
+ *
+ * The problem is that oldspace pages which were not pinned should eventually
+ * be scanned en masse using contiguous blocks as large as possible without
+ * encroaching on pinned pages. But we need to visit the dead objects on partially
+ * pinned pages prior to turning those objects into page-filling objects.
+ * Based on a real-life example, finding a correct approach is difficult.
+ * Consider three pages all having the same scan_start of 0x1008e78000,
+ * with the final page and only the final containing a pinned object:
+ *
+ *   start: 0x1008e78000       0x1008e80000       0x1008e88000
+ *                                                 pin: 0x1008e8bec0
+ *          ^------------------+------------------|
+ * There is a page-spanning (SIMPLE-ARRAY (UNSIGNED-BYTE 64) 8192)
+ * from 0x1008e78000 to 0x1008E88010 (exclusive). The penultimate word
+ * of that array appears to be a valid widetag:
+ *
+ *   0x1008e88000: 0x0000000000001df1
+ *   0x1008e88008: 0x0000000000000000
+ * followed by:
+ *   0x1008e88010: 0x0000001006c798c7  CONS
+ *   0x1008e88018: 0x0000001008e88447
+ *   0x1008e88020: 0x00000000000000ad  (SIMPLE-ARRAY (UNSIGNED-BYTE 64) 32)
+ *   0x1008e88028: 0x0000000000000040
+ *   ... pretty much anything in here ...
+ *   0x1008e8bec0:                     any valid pinned object
+ *
+ * Page wiping ignores the pages based at 0x1008e78000 and 0x1008e80000
+ * and it is only concerned with the range from 0x1008e88000..0x1008e8bec0
+ * which becomes filler. The question is how to traverse objects in the filled
+ * range. You can't start scanning dead objects at the page base address
+ * of the final page because that would parse these objects as:
+ *
+ *   0x1008e88000: 0x0000000000001df1 (complex-vector-nil) ; 30 words
+ *   0x1008e880f0: any random garbage
+ *
+ * But if you scan from the correct scan start of 0x1008e78000 then how do you
+ * know to skip that page later (in free_oldspace), as it is entirely in oldspace,
+ * but partially visited already? This what in malloc/free terms would be
+ * a "double free", and there is no obvious solution to that.
+ */
 void visit_freed_objects(char __attribute__((unused)) *start,
                          sword_t __attribute__((unused)) nbytes)
 {
