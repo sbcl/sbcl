@@ -877,7 +877,6 @@ Experimental: interface subject to change."
                  (t
                   ;; KLUDGE: INTERRUPT-THREAD is Not Nice (tm), but
                   ;; the alternative would be stopping the world...
-                  #+sb-thread
                   (let ((sem (sb-thread:make-semaphore))
                         (refs nil))
                     (handler-case

@@ -84,7 +84,6 @@
     (&key n-senders n-receivers n-messages interruptor)
   (let ((mbox    (make-mailbox))
         (counter (make-counter))
-        #-win32
         (+sleep+  0.0001)
         (+fin-token+ :finish) ; end token for receivers to stop
         (+blksize+ 5))        ; "block size" for RECEIVE-PENDING-MESSAGES
@@ -100,8 +99,7 @@
                            #'(lambda ()
                                (dotimes (i n-messages t)
                                  (send-message mbox i)
-                                 (sleep #-win32 (random +sleep+)
-                                        #+win32 0)))))
+                                 (sleep (random +sleep+))))))
             (receivers
              (flet ((process-msg (msg out)
                       (cond
@@ -114,23 +112,20 @@
                (append
                 (make-threads n-recv-msg "RECV-MSG"
                   #'(lambda ()
-                      (sleep  #-win32 (random +sleep+)
-                              #+win32 0)
+                      (sleep (random +sleep+))
                       (loop (process-msg (receive-message mbox)
                                          #'(lambda (x) (return x))))))
                 (make-threads n-recv-pend-msgs "RECV-PEND-MSGS"
                   #'(lambda ()
                       (loop
-                        (sleep #-win32 (random +sleep+)
-                              #+win32 0)
+                        (sleep (random +sleep+))
                         (mapc #'(lambda (msg)
                                   (process-msg msg #'(lambda (x) (return x))))
                               (receive-pending-messages mbox +blksize+)))))
                 (make-threads n-recv-msg-n-h "RECV-MSG-NO-HANG"
                   #'(lambda ()
                       (loop
-                        (sleep #-win32 (random +sleep+)
-                               #+win32 0)
+                        (sleep (random +sleep+))
                         (multiple-value-bind (msg ok)
                             (receive-message-no-hang mbox)
                           (when ok
@@ -223,8 +218,7 @@
                           (loop repeat 99
                                 for victim = (nth (random n) threads)
                                 do (kill-thread victim)
-                                   (sleep  #-win32 (random 0.0001)
-                                           #+win32 0))))
+                                   (sleep (random 0.0001)))))
       (values
        ;; We may have killed a receiver before it got to incrementing
        ;; the counter.

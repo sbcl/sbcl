@@ -203,7 +203,7 @@ where a is the intended low-order byte and d the high-order byte."
 #+lw-int32
 (defun int32>>logical (a s)
   (declare (type ub32 a) (type (unsigned-byte 5) s)
-           (optimize (speed 3) (safety 0) (space 0) (debug 0) #+lw-int32 (float 0)))
+           (optimize (speed 3) (safety 0) (space 0) (debug 0) (float 0)))
   (if (sys:int32-minusp a)
       (sys:int32-logandc2 (sys:int32>> a s) (sys:int32<< -1 (- 32 s)))
       (sys:int32>> a s)))
