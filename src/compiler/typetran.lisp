@@ -892,7 +892,11 @@
                        (layout-inherits ,n-layout) ,depthoid ,layout)
                      #-(and immobile-space x86-64)
                      `(eq ,get-ancestor ,layout))
-                   (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
+                   (deeper-p
+                    #+(vop-translates sb-c::layout-depthoid-gt)
+                    `(layout-depthoid-gt ,n-layout ,depthoid)
+                    #-(vop-translates sb-c::layout-depthoid-gt)
+                    `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
               ;; For shallow hierarchies, we can avoid reading the 'inherits'
               ;; because the layout has the ancestor layouts directly in it.

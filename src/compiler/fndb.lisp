@@ -99,10 +99,8 @@
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
-#+64-bit
-(progn
-(defknown layout-depthoid (layout) fixnum (flushable always-translatable))
-(defknown layout-depthoid-gt (layout integer) boolean (flushable)))
+#+64-bit (defknown layout-depthoid (layout) fixnum (flushable always-translatable))
+(defknown layout-depthoid-gt (layout integer) boolean (flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
   :derive-type #'result-type-first-arg)
