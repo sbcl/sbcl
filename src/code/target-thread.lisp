@@ -1483,6 +1483,7 @@ session."
 session."
   (first (interactive-threads session)))
 
+#-win32
 (defun make-listener-thread (tty-name)
   (aver (probe-file tty-name))
   (let* ((in (sb-unix:unix-open (namestring tty-name) sb-unix:o_rdwr #o666))
@@ -1491,18 +1492,18 @@ session."
     (labels ((thread-repl ()
                (sb-unix::unix-setsid)
                (let* ((sb-impl::*stdin*
-                       (make-fd-stream in :input t :buffering :line
-                                       :dual-channel-p t))
+                        (make-fd-stream in :input t :buffering :line
+                                           :dual-channel-p t))
                       (sb-impl::*stdout*
-                       (make-fd-stream out :output t :buffering :line
-                                              :dual-channel-p t))
+                        (make-fd-stream out :output t :buffering :line
+                                            :dual-channel-p t))
                       (sb-impl::*stderr*
-                       (make-fd-stream err :output t :buffering :line
-                                              :dual-channel-p t))
+                        (make-fd-stream err :output t :buffering :line
+                                            :dual-channel-p t))
                       (sb-impl::*tty*
-                       (make-fd-stream err :input t :output t
-                                              :buffering :line
-                                              :dual-channel-p t))
+                        (make-fd-stream err :input t :output t
+                                            :buffering :line
+                                            :dual-channel-p t))
                       (sb-impl::*descriptor-handlers* nil))
                  (with-new-session ()
                    (unwind-protect

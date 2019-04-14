@@ -1,7 +1,5 @@
 ;;; -*- lisp -*-
 
-sb-ext::(declaim (muffle-conditions sb-kernel:redefinition-warning))
-
 (defsystem "sb-simple-streams"
   :depends-on ("sb-bsd-sockets" "sb-posix")
   #+sb-building-contrib :pathname
