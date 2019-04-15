@@ -174,10 +174,8 @@ page_index_t page_table_pages;
 struct page *page_table;
 lispobj gc_object_watcher;
 int gc_traceroot_criterion;
-#ifdef PIN_GRANULARITY_LISPOBJ
 int gc_n_stack_pins;
 struct hopscotch_table pinned_objects;
-#endif
 
 /* This is always 0 except during gc_and_save() */
 lispobj lisp_init_function;
@@ -1639,7 +1637,6 @@ maybe_adjust_large_object(page_index_t first_page, sword_t nwords)
     bytes_allocated -= bytes_freed;
 }
 
-#ifdef PIN_GRANULARITY_LISPOBJ
 /* After scavenging of the roots is done, we go back to the pinned objects
  * and look within them for pointers. While heap_scavenge() could certainly
  * do this, it would potentially lead to extra work, since we can't know
@@ -1942,10 +1939,6 @@ pin_object(lispobj object)
             pin_object(next | INSTANCE_POINTER_LOWTAG);
     }
 }
-#else
-#  define scavenge_pinned_ranges()
-#  define wipe_nonpinned_words()
-#endif
 
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
@@ -3094,11 +3087,9 @@ garbage_collect_generation(generation_index_t generation, int raise)
          gc_assert(generations[SCRATCH_GENERATION].bytes_allocated == 0);
     }
 
-#ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_reset(&pinned_objects);
     // for traceroot, which reads n_stack_pins from the previous GC cycle
     gc_n_stack_pins = 0;;
-#endif
 
     /* Set the global src and dest. generations */
     if (generation < PSEUDO_STATIC_GENERATION) {
@@ -3367,9 +3358,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     sweep_immobile_space(raise);
 
     ASSERT_REGIONS_CLOSED();
-#ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_log_stats(&pinned_objects, "pins");
-#endif
 
     /* Free the pages in oldspace, but not those marked pinned. */
     free_oldspace();
@@ -3766,10 +3755,8 @@ static void gc_allocate_ptes()
     gc_assert(page_table);
 
     weakobj_init();
-#ifdef PIN_GRANULARITY_LISPOBJ
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
-#endif
 
     scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 

@@ -25,6 +25,10 @@
 #include "genesis/code.h"
 #include "hopscotch.h"
 
+#ifndef GENCGC_IS_PRECISE
+#error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
+#endif
+
 extern char *page_address(page_index_t);
 int gencgc_handle_wp_violation(void *);
 
@@ -51,13 +55,6 @@ int gencgc_handle_wp_violation(void *);
 # endif
 #else
   typedef unsigned short page_bytes_t;
-#endif
-
-/* Define this as 0 on the cc invocation if you need to test without it.
- * While the x86 requires object-based pins, the precise backends don't,
- * though should generally prefer object pinning over page pinning */
-#ifndef PIN_GRANULARITY_LISPOBJ
-#define PIN_GRANULARITY_LISPOBJ 1
 #endif
 
 /* Note that this structure is also used from Lisp-side in
@@ -197,10 +194,7 @@ find_page_index(void *addr)
 
 #define SINGLE_OBJECT_FLAG (1<<4)
 #define page_single_obj_p(page) ((page_table[page].type & SINGLE_OBJECT_FLAG)!=0)
-#ifdef PIN_GRANULARITY_LISPOBJ
-#ifndef GENCGC_IS_PRECISE
-#error "GENCGC_IS_PRECISE must be #defined as 0 or 1"
-#endif
+
 #define page_has_smallobj_pins(page) \
   (page_table[page].pinned && !page_single_obj_p(page))
 static inline boolean pinned_p(lispobj obj, page_index_t page)
@@ -223,9 +217,6 @@ static inline boolean pinned_p(lispobj obj, page_index_t page)
     return hopscotch_containsp(&pinned_objects, obj);
 #endif
 }
-#else
-#  define pinned_p(obj, page) (0)
-#endif
 
 // Return true only if 'obj' must be *physically* transported to survive gc.
 // Return false if obj is in the immobile space regardless of its generation.
