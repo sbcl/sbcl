@@ -388,8 +388,11 @@ during backtrace.
            :init :null)
   ;; 0 tls-index means no tls-index is allocated
   ;; 64-bit put the tls-index in the header word.
+  ;; For the 32-bit architectures, reading this slot as a descriptor
+  ;; makes it "off" by N-FIXNUM-TAG-BITS, which is bothersome,
+  ;; so there's a transform on SYMBOL-TLS-INDEX to make it sane.
   #+(and sb-thread (not 64-bit))
-  (tls-index :ref-known (flushable) :ref-trans symbol-tls-index))
+  (tls-index :ref-known (flushable) :ref-trans %symbol-tls-index))
 
 (define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag
@@ -571,7 +574,7 @@ during backtrace.
 ;;; that does not map onto a thread slot.
 ;;; Given N thread slots, the tls indices are 0..N-1 scaled by word-shift.
 ;;; This constant is the index prior to scaling.
-(defconstant sb-thread::tls-index-start primitive-thread-object-length)
+#+sb-thread (defconstant sb-thread::tls-index-start primitive-thread-object-length)
 
 (defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
 (declaim (inline code-object-size code-header-words %code-code-size))

@@ -236,12 +236,6 @@
 (defun prefilter-xmmreg/mem (dstate mod r/m)
   (decode-mod-r/m dstate mod r/m 'fpr))
 
-#+sb-thread
-(defun static-symbol-from-tls-index (index)
-  (dovector (sym +static-symbols+)
-    (when (= (symbol-tls-index sym) index)
-      (return sym))))
-
 ;;; Return contents of memory if either it refers to an unboxed code constant
 ;;; or is RIP-relative with a displacement of 0.
 (defun unboxed-constant-ref (dstate addr disp)
@@ -371,11 +365,11 @@
                    (return-from print-mem-ref
                      (note (lambda (stream) (format stream "thread.~(~A~)" it))
                            dstate)))))
-             (let* ((tls-index (ash disp (- n-fixnum-tag-bits)))
-                    (symbol (or (guess-symbol
-                                 (lambda (s) (= (symbol-tls-index s) tls-index)))
-                                ;; static symbols aren't in the code header
-                                (static-symbol-from-tls-index tls-index))))
+             (let ((symbol (or (guess-symbol
+                                (lambda (s) (= (symbol-tls-index s) disp)))
+                               ;; static symbols aren't in the code header
+                               (find disp +static-symbols+
+                                     :key #'symbol-tls-index))))
                (when symbol
                  (return-from print-mem-ref
                    (note (lambda (stream) (format stream "tls: ~S" symbol))

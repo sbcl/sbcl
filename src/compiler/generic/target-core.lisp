@@ -70,7 +70,7 @@
                    (:foreign (foreign-symbol-address sym))
                    (:foreign-dataref (foreign-symbol-address sym t))
                    (:code-object (get-lisp-obj-address code-obj))
-                   (:symbol-tls-index (ensure-symbol-tls-index sym))
+                   #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address
                              (if (symbolp sym) (find-layout sym) sym)))
                    (:immobile-symbol (get-lisp-obj-address sym))

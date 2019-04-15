@@ -945,11 +945,10 @@ core and return a descriptor to it."
 
 ;;;; symbol magic
 
-;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
-(defvar *genesis-tls-counter* sb-thread::tls-index-start)
-
 #+sb-thread
 (progn
+  ;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
+  (defvar *genesis-tls-counter* sb-thread::tls-index-start)
   ;; Assign SYMBOL the tls-index INDEX. SYMBOL must be a descriptor.
   ;; This is a backend support routine, but the style within this file
   ;; is to conditionalize by the target features.

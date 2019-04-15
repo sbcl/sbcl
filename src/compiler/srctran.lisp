@@ -5054,20 +5054,14 @@
                (locally (declare (notinline sleep)) (sleep seconds))
                (sb-unix:nanosleep ,seconds ,nano))))))
 
-;; On 64-bit architectures the TLS index is in the symbol header,
-;; !DEFINE-PRIMITIVE-OBJECT doesn't define an accessor for it.
-;; In the architectures where tls-index is an ordinary slot holding a tagged
-;; object, it represents the byte offset to an aligned object and looks
-;; in Lisp like a fixnum that is off by a factor of (EXPT 2 N-FIXNUM-TAG-BITS).
-;; We're reading with a raw SAP accessor, so must make it look equally "off".
-;; Also we don't get the defknown automatically.
-#+(and 64-bit sb-thread)
-(defknown symbol-tls-index (t) fixnum (flushable))
-#+(and 64-bit sb-thread)
+;;; Define SYMBOL-TLS-INDEX to return the byte offset of this symbol's
+;;; value cell in the lisp tls area.
+#+sb-thread
 (define-source-transform symbol-tls-index (sym)
-  `(ash (sap-ref-32 (int-sap (get-lisp-obj-address (the symbol ,sym)))
-                    (- 4 sb-vm:other-pointer-lowtag))
-        (- sb-vm:n-fixnum-tag-bits)))
+  #+64-bit `(ash (get-header-data ,sym) -24)
+  #-64-bit `(truly-the (and fixnum unsigned-byte)
+             (ash (sb-vm::%symbol-tls-index ,sym) sb-vm:n-fixnum-tag-bits)))
+
 
 (deftransform make-string-output-stream ((&key element-type))
   (let ((element-type (cond ((not element-type)

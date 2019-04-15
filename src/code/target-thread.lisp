@@ -1896,7 +1896,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     (with-all-threads-lock
       (if (thread-alive-p thread)
           (let ((val (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
-                                      (get-lisp-obj-address (symbol-tls-index symbol)))))
+                                      (symbol-tls-index symbol))))
             (case (get-lisp-obj-address val)
               (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
               (#.sb-vm:unbound-marker-widetag (values nil :unbound-in-thread))
@@ -1908,7 +1908,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     ;; area...
     (with-all-threads-lock
       (if (thread-alive-p thread)
-          (let ((offset (get-lisp-obj-address (symbol-tls-index symbol))))
+          (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
                   (t

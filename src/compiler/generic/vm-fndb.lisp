@@ -357,8 +357,11 @@
     system-area-pointer
     (flushable))
 
-(defknown ensure-symbol-tls-index (symbol) (and fixnum unsigned-byte))
-
+#+sb-thread
+(progn (defknown ensure-symbol-tls-index (symbol)
+         (and fixnum unsigned-byte)) ; not flushable
+       (defknown symbol-tls-index (symbol)
+         (and fixnum unsigned-byte) (flushable)))
 
 ;;;; debugger support
 
