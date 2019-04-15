@@ -179,6 +179,31 @@
 (defun collect-contrib-components ()
   (collect-components "../obj/sbcl-home/contrib/"))
 
+(defun split-string-on-spaces (list-string)
+  "Takes a string of space separated tokens and returns them as a list
+  of strings."
+  (let ((next-space (position #\Space list-string)))
+    (if next-space
+        (list* (subseq list-string 0 next-space)
+               (split-string-on-spaces (subseq list-string (1+ next-space))))
+        (list list-string))))
+
+(defun read-libsbcl-value-from-sbcl.mk ()
+  "Parse sbcl.mk, looking for the LIBSBCL= line and return its value."
+  (with-open-file (s "../src/runtime/sbcl.mk")
+    (loop for line = (read-line s nil nil)
+          while line
+          for match-location = (search "LIBSBCL=" line)
+          when (and match-location (zerop match-location))
+            do (return (subseq line 8)))))
+
+(defun collect-libsbcl-files ()
+  (let ((filenames (list* "sbcl.mk"
+                          (split-string-on-spaces (read-libsbcl-value-from-sbcl.mk)))))
+    (loop for filename in filenames
+          collecting `("File" ("Name" ,filename
+                               "Source" ,(concatenate 'string "../src/runtime/" filename))))))
+
 (defun make-extension (type mime)
   `("Extension" ("Id" ,type "ContentType" ,mime)
     ("Verb" ("Id" ,(format nil "load_~A" type)
@@ -274,6 +299,8 @@
             ;; ,(make-extension "lisp" "text/x-lisp-source")
             ("File" ("Name" "sbcl.core"
                      "Source" "sbcl.core"))
+            #+sb-linkable-runtime
+            ,@(collect-libsbcl-files)
             ("File" ("Name" "sbcl.exe"
                      "Source" "../src/runtime/sbcl.exe"
                      "KeyPath" "yes")
