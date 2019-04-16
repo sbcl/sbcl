@@ -1417,6 +1417,23 @@ We could try a few things to mitigate this:
                       (* 2 n-word-bytes)
                       word ok lispobj))))))))
 
+(defun show-tls-map ()
+  (let ((list
+         (sort (sb-vm::list-allocated-objects
+                :all
+                :type sb-vm:symbol-widetag
+                :test (lambda (x) (plusp (sb-kernel:symbol-tls-index x))))
+               #'<
+               :key #'sb-kernel:symbol-tls-index))
+        (prev 0))
+    (dolist (x list)
+      (let ((n  (ash (sb-kernel:symbol-tls-index x) (- sb-vm:word-shift))))
+        (when (and (> n sb-thread::tls-index-start)
+                   (> n (1+ prev)))
+          (format t "(unused)~%"))
+        (format t "~5d = ~s~%" n x)
+        (setq prev n)))))
+
 (in-package "SB-C")
 ;;; As soon as practical in warm build it makes sense to add
 ;;; cold-allocation-point-fixups into the weak hash-table.

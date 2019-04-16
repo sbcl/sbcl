@@ -93,7 +93,7 @@
        (inst push scratch-reg)
        (inst mov scratch-reg free-tls-index-ea)
        ;; Must ignore the semaphore bit in the register's high half.
-       (inst cmp :dword scratch-reg (* tls-size n-word-bytes))
+       (inst cmp :dword scratch-reg (thread-slot-ea thread-tls-size-slot))
        (inst jmp :ae tls-full)
        ;; scratch-reg goes into symbol's TLS and into the arg/result reg.
        (inst mov :dword (tls-index-of symbol) scratch-reg)

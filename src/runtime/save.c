@@ -54,9 +54,10 @@ write_memsize_options(FILE *file)
 {
     core_entry_elt_t optarray[RUNTIME_OPTIONS_WORDS] = {
       RUNTIME_OPTIONS_MAGIC,
-      4, // number of words in this core header entry
+      5, // number of words in this core header entry
       dynamic_space_size,
-      thread_control_stack_size
+      thread_control_stack_size,
+      dynamic_values_bytes
     };
 
     if (RUNTIME_OPTIONS_WORDS !=

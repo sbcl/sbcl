@@ -538,6 +538,7 @@ during backtrace.
   (state :c-type "lispobj")
 
   #+x86 (tls-cookie)                          ;  LDT index
+  #+sb-thread (tls-size)
   (interrupt-data :c-type "struct interrupt_data *"
                   :pointer t)
   ;; For various reasons related to pseudo-atomic and interrupt

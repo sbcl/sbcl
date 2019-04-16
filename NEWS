@@ -2,6 +2,8 @@
 
 changes relative to sbcl-1.5.1:
   * enhancement: RISC-V support with the generational garbage collector.
+  * enhancement: command-line option "--tls-limit" can be used to alter the
+    maximum number of thread-local symbols from its default of 4096.
   * new feature: decimal reader syntax for rationals, using the R exponent
     marker and/or *READ-DEFAULT-FLOAT-FORMAT* of RATIONAL.
 

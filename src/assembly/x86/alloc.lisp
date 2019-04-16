@@ -117,7 +117,14 @@
        (inst push scratch-reg)
        (inst mov scratch-reg free-tls-index-ea)
        (inst and scratch-reg #x7FFFFFFF) ; mask off the sign
-       (inst cmp scratch-reg (* tls-size n-word-bytes))
+       #+win32
+       (progn ; need to use another register
+         (inst push edx-tn)
+         (inst mov edx-tn (make-fixup "dynamic_values_bytes" :foreign-dataref))
+         (inst cmp scratch-reg (make-ea :dword :base edx-tn))
+         (inst pop edx-tn))
+       #-win32 (inst cmp scratch-reg
+                     (make-ea :dword :disp (ash thread-tls-size-slot word-shift)) :fs)
        (inst jmp :ae tls-full)
        ;; Assign the tls-index into the symbol
        (inst mov (tls-index-of symbol) scratch-reg)

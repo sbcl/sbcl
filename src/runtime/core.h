@@ -31,12 +31,14 @@ struct ndir_entry {
 #define NDIR_ENTRY_LENGTH (sizeof (struct ndir_entry)/sizeof (core_entry_elt_t))
 
 #define RUNTIME_OPTIONS_MAGIC 0x31EBF355
-/* 1 for magic, 1 for core entry size in words, 2 for struct runtime_options fields */
-#define RUNTIME_OPTIONS_WORDS (1 + 1 + 2)
+/* 1 for magic, 1 for core entry size in words, 3 for struct memsize_options fields
+ * excluding the 'present_in_core' field */
+#define RUNTIME_OPTIONS_WORDS (1 + 1 + 3)
 
 struct memsize_options {
     os_vm_size_t dynamic_space_size;
     os_vm_size_t thread_control_stack_size;
+    os_vm_size_t thread_tls_bytes;
     int present_in_core;
 };
 
