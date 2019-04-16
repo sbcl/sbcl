@@ -1416,7 +1416,7 @@ We could try a few things to mitigate this:
                       (+ addr (ash i word-shift))
                       (* 2 n-word-bytes)
                       word ok lispobj))))))))
-
+#+sb-thread
 (defun show-tls-map ()
   (let ((list
          (sort (sb-vm::list-allocated-objects
