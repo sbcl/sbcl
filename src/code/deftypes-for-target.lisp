@@ -285,4 +285,11 @@
                (and (not (complexp object))
                     (bound-test object))))))))
 
+(declaim (inline character-in-charset-p))
+(defun character-in-charset-p (char set &aux (code (sb-xc:char-code char)))
+  (dolist (pair (character-set-type-pairs set) nil)
+    (destructuring-bind (low . high) pair
+      (when (<= low code high)
+        (return t)))))
+
 (/show0 "deftypes-for-target.lisp end of file")

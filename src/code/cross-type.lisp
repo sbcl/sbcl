@@ -123,18 +123,8 @@
             #+sb-simd-pack-256 simd-pack-256-type)
         (values nil t))
        (character-set-type
-        (cond ((not (characterp obj)) (values nil t)) ; certainly no
-              ;; Return yes if the type is:
-              ;;  - BASE-CHAR, and SB-XC:CHAR-CODE is within BASE-CHAR-CODE-LIMIT
-              ;;  - STANDARD-CHAR and the host says that the char is standard
-              ;;  - the full set of characters
-              ((or (and (type= type (specifier-type 'base-char))
-                        (< (sb-xc:char-code obj) base-char-code-limit))
-                   (and (type= type (specifier-type 'standard-char))
-                        (cl:standard-char-p obj))
-                   (type= type (specifier-type 'character)))
-               (values t t)) ; certainly yes
-              (t (uncertain))))
+        ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
+        (values (and (characterp obj) (character-in-charset-p obj type)) t))
        (negation-type
         (multiple-value-bind (res win) (recurse obj (negation-type-type type))
           (if win

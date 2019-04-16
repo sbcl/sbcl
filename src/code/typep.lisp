@@ -119,12 +119,7 @@
             (not (not (member name (simd-pack-256-type-element-type type)))))))
     (character-set-type
      (and (characterp object)
-          (let ((code (char-code object))
-                (pairs (character-set-type-pairs type)))
-            (dolist (pair pairs nil)
-              (destructuring-bind (low . high) pair
-                (when (<= low code high)
-                  (return t)))))))
+          (character-in-charset-p object type)))
     (unknown-type
      ;; Parse it again to make sure it's really undefined.
      (let ((reparse (specifier-type (unknown-type-specifier type))))
