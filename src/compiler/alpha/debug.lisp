@@ -92,7 +92,7 @@
       (loadw temp thing 0 lowtag)
       (inst srl temp n-widetag-bits temp)
       (inst beq temp bogus)
-      (inst sll temp (1- (integer-length n-word-bytes)) temp)
+      (inst sll temp word-shift temp)
       (unless (= lowtag other-pointer-lowtag)
         (inst subq temp (- other-pointer-lowtag lowtag) temp))
       (inst subq thing temp code)

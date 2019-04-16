@@ -77,7 +77,7 @@
       (loadw temp thing 0 lowtag)
       (inst srl temp n-widetag-bits temp)
       (inst comb := zero-tn temp bogus)
-      (inst sll temp (1- (integer-length n-word-bytes)) temp)
+      (inst sll temp word-shift temp)
       (unless (= lowtag other-pointer-lowtag)
         (inst addi (- lowtag other-pointer-lowtag) temp temp))
       (inst sub thing temp code)
