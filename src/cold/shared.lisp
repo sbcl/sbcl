@@ -670,9 +670,22 @@
 ;;;; Floating-point number reader interceptor
 
 (defvar *choke-on-host-irrationals* t)
-(defun reader-intercept (f &optional stream (errp t) errval recursive)
-  (declare (ignorable f stream errp errval recursive))
-  #+sbcl
+(defun install-read-interceptor ()
+  ;; Intercept READ to catch inadvertent use of host floating-point literals.
+  ;; This prevents regressions in the portable float logic and allows passing
+  ;; characters to a floating-point library if we so choose.
+  ;; Only do this for new enough SBCL.
+  ;; DO-INSTANCE-TAGGED-SLOT was defined circa Nov 2014 and VERSION>= was defined
+  ;; ca. Nov 2013, but got moved from SB-IMPL or SB-C (inadvertently perhaps).
+  ;; It is not critical that this be enabled on all possible build hosts.
+  #+#.(cl:if (cl:and (cl:find-package "SB-C")
+                     (cl:find-symbol "SPLIT-VERSION-STRING" "SB-C")
+                     (cl:funcall (cl:find-symbol "VERSION>=" "SB-C")
+                                 (cl:funcall (cl:find-symbol "SPLIT-VERSION-STRING" "SB-C")
+                                             (cl:lisp-implementation-version))
+                                 '(1 4 6)))
+             '(and)
+             '(or))
   (labels ((contains-irrational (x)
              (typecase x
                (cons (or (contains-irrational (car x))
@@ -695,40 +708,26 @@
                     ;; This generalizes over any structure. I need it because we
                     ;; observe instances of SB-IMPL::COMMA and also HOST-SB-IMPL::COMMA.
                     ;; (primordial-extensions get compiled before 'backq' is installed)
-                    ;; DO-INSTANCE-TAGGED-SLOT was defined circa Nov 2014.
-                    ;; As explained futher below, it doesn't really matter
-                    ;; whether we catch erroneous forms using all possible
-                    ;; build hosts as long as *some* host can trap the bug.
-                    #+#.(cl:if (cl:eq (cl:nth-value
-                                       1 (cl:find-symbol "DO-INSTANCE-TAGGED-SLOT"
-                                                         "SB-KERNEL")) :external)
-                            '(and)
-                            '(or))
                     (sb-kernel:do-instance-tagged-slot (i x)
                       (when (contains-irrational (sb-kernel:%instance-ref x i))
                         (return-from contains-irrational t))))))
                ((or cl:complex cl:float)
-                x))))
-    (let* ((form (funcall f stream errp errval recursive))
-           (bad-atom (and (not recursive) ; avoid checking inner forms
-                          (not (eq form errval))
-                          *choke-on-host-irrationals*
-                          (contains-irrational form))))
-      (when bad-atom
-        (setq *choke-on-host-irrationals* nil) ; one shot, otherwise tough to debug
-        (error "Oops! didn't expect to read ~s containing ~s" form bad-atom))
-      form)))
-(compile 'reader-intercept)
-;;; Intercept READ to catch inadvertent use of host floating-point literals
-;;; without wrapping. This prevents regressions in the portable float logic
-;;; and allows passing characters to a floating-point library if we so choose.
-;;; Only SBCL uses the interceptor because we can't portably redefine READ.
-(defun install-read-interceptor ()
-  #+sbcl
-  (unless (sb-kernel:closurep (symbol-function 'read))
-    (sb-int:encapsulate 'read-preserving-whitespace 'protect #'reader-intercept)
-    (sb-int:encapsulate 'read 'protect #'reader-intercept)
-    (format t "~&; Installed READ interceptor~%")))
+                x)))
+           (reader-intercept (f &optional stream (errp t) errval recursive)
+             (let* ((form (funcall f stream errp errval recursive))
+                    (bad-atom (and (not recursive) ; avoid checking inner forms
+                                   (not (eq form errval))
+                                   *choke-on-host-irrationals*
+                                   (contains-irrational form))))
+               (when bad-atom
+                 (setq *choke-on-host-irrationals* nil) ; one shot, otherwise tough to debug
+                 (error "Oops! didn't expect to read ~s containing ~s" form bad-atom))
+               form)))
+    (unless (sb-kernel:closurep (symbol-function 'read))
+      (sb-int:encapsulate 'read-preserving-whitespace 'protect #'reader-intercept)
+      (sb-int:encapsulate 'read 'protect #'reader-intercept)
+      (format t "~&; Installed READ interceptor~%"))))
+(compile 'install-read-interceptor)
 
 (defvar *math-ops-memoization* (make-hash-table :test 'equal))
 (defmacro with-math-journal (&body body)
