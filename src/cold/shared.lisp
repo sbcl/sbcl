@@ -699,11 +699,14 @@
                     ;; As explained futher below, it doesn't really matter
                     ;; whether we catch erroneous forms using all possible
                     ;; build hosts as long as *some* host can trap the bug.
-                    #.(when (eq (nth-value 1 (find-symbol "DO-INSTANCE-TAGGED-SLOT"
-                                                          "SB-KERNEL")) :external)
-                        '(sb-kernel:do-instance-tagged-slot (i x)
-                          (when (contains-irrational (sb-kernel:%instance-ref x i))
-                            (return-from contains-irrational t)))))))
+                    #+#.(cl:if (cl:eq (cl:nth-value
+                                       1 (cl:find-symbol "DO-INSTANCE-TAGGED-SLOT"
+                                                         "SB-KERNEL")) :external)
+                            '(and)
+                            '(or))
+                    (sb-kernel:do-instance-tagged-slot (i x)
+                      (when (contains-irrational (sb-kernel:%instance-ref x i))
+                        (return-from contains-irrational t))))))
                ((or cl:complex cl:float)
                 x))))
     (let* ((form (funcall f stream errp errval recursive))
