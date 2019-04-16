@@ -88,11 +88,12 @@ run_sbcl <<EOF
     (exit :code 42))
   #+alien-callbacks
   (progn
+    (fmakunbound 'bar)
     (sb-alien::define-alien-callback foo int () 42)
     (defun bar () (exit :code (alien-funcall foo))))
   (save-lisp-and-die "$tmpcore")
 EOF
-run_sbcl_with_core "$tmpcore" --no-userinit --no-sysinit \
+run_sbcl_with_core "$tmpcore" --noinform --no-userinit --no-sysinit --noprint \
     --eval "(setf sb-ext:*evaluator-mode* :${TEST_SBCL_EVALUATOR_MODE:-compile})" \
     <<EOF
   (bar)
@@ -105,6 +106,7 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
+# FIXME: Shouldn't this test use "run_sbcl_with_core" ?
 ./"$tmpcore" > "$tmpoutput" --no-userinit --no-sysinit --noprint <<EOF
   (exit :code 71)
 EOF
@@ -130,11 +132,11 @@ run_sbcl <<EOF
   (save-lisp-and-die "$tmpcore" :executable t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit --no-sysinit <<EOF
+./"$tmpcore" --no-userinit --no-sysinit --noprint <<EOF
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit --no-sysinit --version --eval '(exit)' <<EOF
+./"$tmpcore" --no-userinit --no-sysinit --noprint --version --eval '(exit)' <<EOF
   (when (equal *posix-argv* '("./$tmpcore" "--version" "--eval" "(exit)"))
     (exit :code 42))
 EOF
@@ -152,14 +154,17 @@ run_sbcl_with_args --noinform --control-stack-size 160KB --dynamic-space-size 20
   (save-lisp-and-die "$tmpcore" :executable t :save-runtime-options t)
 EOF
 chmod u+x "$tmpcore"
-./"$tmpcore" --no-userinit --no-sysinit <<EOF
+./"$tmpcore" --no-userinit --no-sysinit --noprint <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 160 1024)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (assert (<= 0 (- (* 200 1048576) (dynamic-space-size)) 65536))
 EOF
 run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 200KB \
-    --dynamic-space-size 250MB --no-userinit --no-sysinit <<EOF
+    --tls-limit 5000 \
+    --dynamic-space-size 250MB --no-userinit --no-sysinit --noprint <<EOF
   (assert (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024)))
+  (assert (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
+               (* 5000 sb-vm:n-word-bytes)))
   ; allow slight shrinkage if heap relocation has to adjust for alignment
   (defun dynamic-space-size-good-p ()
     (<= 0 (- (* 250 1048576) (dynamic-space-size)) 65536))
@@ -167,8 +172,10 @@ run_sbcl_with_core "$tmpcore" --noinform --control-stack-size 200KB \
   (save-lisp-and-die "${tmpcore}2" :executable t :save-runtime-options t)
 EOF
 chmod u+x "${tmpcore}2"
-./"${tmpcore}2" --no-userinit --no-sysinit <<EOF
+./"${tmpcore}2" --no-userinit --no-sysinit --noprint <<EOF
   (when (and (eql (extern-alien "thread_control_stack_size" unsigned) (* 200 1024))
+             (eql (extern-alien "dynamic_values_bytes" (unsigned 32))
+                  (* 5000 sb-vm:n-word-bytes))
              (dynamic-space-size-good-p))
     (exit :code 42))
 EOF
