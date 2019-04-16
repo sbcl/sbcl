@@ -115,4 +115,4 @@
 
 ;;; Entry point
 
-(canonicalize-whitespace/directory)
+(when (<= cl:char-code-limit 256) (canonicalize-whitespace/directory))
