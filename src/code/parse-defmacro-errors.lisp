@@ -24,7 +24,7 @@
 ;;; Set up appropriate prettying and indentation on STREAM, print some
 ;;; boilerplate related to CONDITION (an instance of
 ;;; DEFMACRO-LAMBDA-LIST-BIND-ERROR), then execute BODY.
-(defmacro !printing-defmacro-lambda-list-bind-error ((condition stream)
+(defmacro printing-defmacro-lambda-list-bind-error ((condition stream)
                                                      &body body)
   `(%printing-defmacro-lambda-list-bind-error ,condition
                                               ,stream
@@ -49,7 +49,7 @@
    (maximum :reader arg-count-error-maximum :initarg :maximum))
   (:report
    (lambda (condition stream)
-    (!printing-defmacro-lambda-list-bind-error (condition stream)
+    (printing-defmacro-lambda-list-bind-error (condition stream)
       (let* ((min (arg-count-error-minimum condition))
              (max (arg-count-error-maximum condition))
              (actual (arg-count-error-args condition))
@@ -75,24 +75,16 @@
 
 (define-condition defmacro-lambda-list-broken-key-list-error
                   (defmacro-lambda-list-bind-error)
-  ((problem :reader defmacro-lambda-list-broken-key-list-error-problem
-            :initarg :problem)
-   (info :reader defmacro-lambda-list-broken-key-list-error-info
-         :initarg :info))
-  (:report (lambda (condition stream)
-             (!printing-defmacro-lambda-list-bind-error (condition stream)
+  ((problem :reader ds-bind-keyword-problem :initarg :problem)
+   (info :reader ds-bind-keyword-args :initarg :info))
+  (:report (lambda (condition stream &aux (args (ds-bind-keyword-args condition)))
+             (printing-defmacro-lambda-list-bind-error (condition stream)
                (format stream
-                       ;; FIXME: These should probably just be three
-                       ;; subclasses of the base class, so that we don't
-                       ;; need to maintain the set of tags both here and
-                       ;; implicitly wherever this macro is used. (This
-                       ;; might get easier once CLOS is initialized in
-                       ;; cold init.)
-                       (ecase
-                           (defmacro-lambda-list-broken-key-list-error-problem
-                             condition)
+                       (ecase (ds-bind-keyword-problem condition)
                          (:dotted-list
-                          "dotted keyword/value list: ~S")
+                          (if (listp args)
+                              "dotted keyword/value list: ~S"
+                              "~S is not a list"))
                          (:odd-length
                           "odd number of elements in keyword/value list: ~S")
                          (:unknown-keyword
@@ -101,5 +93,4 @@
                           ;;   expected one of ..."
                           "~{unknown keyword: ~S; expected one of ~
                            ~{~S~^, ~}~}"))
-                       (defmacro-lambda-list-broken-key-list-error-info
-                         condition))))))
+                       args)))))
