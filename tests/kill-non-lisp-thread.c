@@ -1,3 +1,6 @@
+#include <unistd.h>  // for sleep()
+#include <stdio.h>   // for perror()
+#include <stdlib.h>  // for exit()
 #include <pthread.h>
 #include <signal.h>
 
