@@ -571,10 +571,8 @@
        (:temporary (:scs (descriptor-reg) :to :eval) stepping)
 
        ,@(unless (eq return :tail)
-           '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)))
-       ,@(unless (and (eq return :tail)
-                      (not (eq named :direct)))
-           '((:temporary (:scs (interior-reg)) lip)))
+           '((:temporary (:sc control-stack :offset nfp-save-offset) nfp-save)
+             (:temporary (:scs (interior-reg)) lip)))
 
        (:generator ,(+ (if named 5 0)
                        (if variable 19 1)
@@ -686,17 +684,16 @@
                     (do-next-filler)
                     (insert-step-instrumenting function)))
                  (:direct
-                  `((etypecase (static-fun-offset fun)
-                      (short-immediate
-                       (inst #-64-bit lw #+64-bit ld function null-tn (static-fun-offset fun)))
-                      (u+i-immediate
-                       (multiple-value-bind (u i)
-                           (u-and-i-inst-immediate (static-fun-offset fun))
-                         ;; FIXME: Looks bad, try to have this case
-                         ;; never happen... Have nil be in the middle!
-                         (inst lui lr-tn u)
-                         (inst add lip null-tn lr-tn)
-                         (inst #-64-bit lw #+64-bit ld function lip i)))))))
+                  `((let ((offset (static-fun-offset fun)))
+                       (cond ((typep offset 'short-immediate)
+                              (inst #-64-bit lw #+64-bit ld function null-tn offset))
+                             ((typep (+ nil-value offset) 'u+i-immediate)
+                              (multiple-value-bind (u i)
+                                  (u-and-i-inst-immediate (+ nil-value offset))
+                                (inst lui function u)
+                                (inst #-64-bit lw #+64-bit ld function function i)))
+                             (t
+                              (error "Static function offset for ~a too far." fun)))))))
              (loop
                (if filler
                    (do-next-filler)
