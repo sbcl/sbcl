@@ -53,9 +53,12 @@ about function addresses and register values.")
                        value))
         (instruction (current-instruction dstate)))
     (case (instruction-opcode instruction)
-      ;; U-type
-      ((#b0110111 #b0010111)
-       (note-u-inst value (ldb (byte 20 12) instruction)))
+      ;; LUI
+      ((#b0110111)
+       (note-absolute-u-inst value (ldb (byte 20 12) instruction)))
+      ;; AUIPC
+      ((#b0010111)
+       (note-pc-relative-u-inst value (ldb (byte 20 12) instruction) dstate))
       (t
        ;; Delete any u-inst entry with the same target register.
        #+ (or)
@@ -64,8 +67,12 @@ about function addresses and register values.")
     (maybe-note-associated-storage-ref
      value 'registers regname dstate)))
 
-(defun note-u-inst (rd u-imm)
-  (setf (aref *note-u-inst* rd) u-imm))
+(defun note-absolute-u-inst (rd u-imm)
+  (setf (aref *note-u-inst* rd) (coerce-signed u-imm 12)))
+
+(defun note-pc-relative-u-inst (rd u-imm dstate)
+  (setf (aref *note-u-inst* rd) (+ (dstate-cur-addr dstate)
+                                   (coerce-signed u-imm 12))))
 
 (defconstant-eqx float-reg-symbols
   (coerce
@@ -134,6 +141,10 @@ about function addresses and register values.")
                value)
          stream))
 
+(defun maybe-augment (rd i-imm)
+  (+ (ash (or (aref *note-u-inst* rd) 0) 12)
+     (coerce-signed i-imm 12)))
+
 (defun annotate-load-store (register offset dstate)
   (case register
     (#.sb-vm::code-offset
@@ -155,7 +166,12 @@ about function addresses and register values.")
        (when slot
          (note (lambda (stream)
                  (format stream "thread.~(~A~)" (slot-name slot)))
-               dstate))))))
+               dstate))))
+    (t
+     (let ((offset (maybe-augment register offset)))
+       (maybe-note-assembler-routine offset nil dstate)
+       (maybe-note-static-symbol (logior offset other-pointer-lowtag)
+                                 dstate)))))
 
 (defun print-load-annotation (value stream dstate)
   (declare (ignore stream))
@@ -168,10 +184,6 @@ about function addresses and register values.")
   (annotate-load-store (first value)
                        (reconstruct-s-immediate (rest value))
                        dstate))
-
-(defun maybe-augment (rd i-imm)
-  (+ (ash (or (aref *note-u-inst* rd) 0) 12)
-     (coerce-signed i-imm 12)))
 
 (defun print-jalr-annotation (value stream dstate)
   (declare (ignore stream))
