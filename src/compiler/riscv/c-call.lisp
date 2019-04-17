@@ -175,7 +175,7 @@
     (loadw res addr)))
 
 (define-vop (call-out)
-  (:args (function :scs (sap-reg sap-stack))
+  (:args (function :scs (sap-reg) :target cfunc)
          (args :more t))
   (:results (results :more t))
   (:ignore args results)
@@ -188,10 +188,7 @@
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
-      (sc-case function
-        (sap-reg (move cfunc function))
-        (sap-stack
-         (loadw cfunc cur-nfp (tn-offset function))))
+      (move cfunc function)
       (invoke-asm-routine 'call-into-c nil)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
