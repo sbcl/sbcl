@@ -615,7 +615,8 @@
   (:results (hi-bits :scs (signed-reg)))
   (:arg-types double-float)
   (:result-types signed-num)
-  (:temporary (:sc non-descriptor-reg) pa-flag)
+  #+64-bit
+  (:temporary (:sc non-descriptor-reg) temp)
   (:translate double-float-high-bits)
   (:vop-var vop)
   (:policy :fast-safe)
@@ -628,8 +629,8 @@
          (loadw hi-bits nsp-tn -1))
        #+64-bit
        (progn
-         (inst fmvx<- :double pa-flag float)
-         (inst srli hi-bits pa-flag 32)))
+         (inst fmvx<- :double temp float)
+         (inst srli hi-bits temp 32)))
       (double-stack
        (inst lw hi-bits (current-nfp-tn vop) (+ (* (tn-offset float) n-word-bytes) 4)))
       (descriptor-reg
