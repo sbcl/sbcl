@@ -451,7 +451,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
                                   (t))))))))))
 
 ;;; Doesn't work on simple vectors
-(defun array-equal-p (x y)
+(defun array-equalp (x y)
   (declare (array x y))
   (let ((rank (array-rank x)))
     (and
@@ -517,15 +517,20 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
         ((%instancep x)
          (and (%instancep y)
               (instance-equalp x y)))
-        ((and (bit-vector-p x)
-              (bit-vector-p y))
+        ((and (simple-vector-p x) (simple-vector-p y))
+         (let ((len (length x)))
+           (and (= len (length y))
+                (loop for i below len ; somewhat faster than the generic loop
+                      always (let ((a (svref x i)) (b (svref y i)))
+                               (or (eq a b) (equalp a b)))))))
+        ((and (bit-vector-p x) (bit-vector-p y))
          (bit-vector-= x y))
         ((vectorp x)
          (and (vectorp y)
               (vector-equalp x y)))
         ((arrayp x)
          (and (arrayp y)
-              (array-equal-p x y)))
+              (array-equalp x y)))
         (t nil)))
 
 (let ((test-cases `(($0.0 $-0.0 t)
