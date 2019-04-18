@@ -38,6 +38,9 @@
       ;; problem, he selects RECOMPILE again... and discovers that
       ;; he's entered the *BREAK-ON-SIGNALS* hell with no escape,
       ;; unless we provide this restart.)
+      (reset ()
+        :report "Set *BREAK-ON-SIGNALS* to NIL and continue."
+        (setf *break-on-signals* nil))
       (reassign (new-value)
         :report
         (lambda (stream)
