@@ -1856,7 +1856,6 @@ function to be removed without further warning."
 
 (defun make-weak-vector (length &key (initial-contents nil contents-p)
                                      (initial-element nil element-p))
-  (declare (index length))
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   (let ((v (if contents-p

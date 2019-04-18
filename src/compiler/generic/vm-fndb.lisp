@@ -265,6 +265,13 @@
 (defknown make-weak-pointer (t) weak-pointer
   (flushable))
 
+(defknown make-weak-vector (index &key (:initial-element t)
+                                       (:initial-contents t))
+  simple-vector (flushable)
+  :derive-type (lambda (call)
+                 (derive-make-array-type (first (combination-args call))
+                                         't nil nil nil call)))
+
 (defknown %make-complex (real real) complex
   (flushable movable))
 (defknown %make-ratio (rational rational) ratio
