@@ -763,9 +763,10 @@ Example:
 
 See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
 REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
-  (find-package-using-package package-designator
-                              (when (boundp '*package*)
-                                *package*)))
+  ;: We had a BOUNDP check on *PACKAGE* here, but it's effectless due to the
+  ;; always-bound proclamation.
+  (truly-the (or null package) ; force elision of return value type check
+    (find-package-using-package package-designator *package*)))
 
 ;;; Perform (GETHASH NAME TABLE) and then unwrap the value if it is a list.
 ;;; List vs nonlist disambiguates a nickname from the primary name.
@@ -1251,13 +1252,13 @@ implementation it is ~S." *!default-package-use-list*)
     ;; INTERN2 will only receive a package object if it's one of the standard
     ;; ones. Hence no check for PACKAGE-%NAME validity (i.e. non-deleted)
     (find/intern %intern
-                 (if (packagep cell) cell (cached-find-package cell))
+                 (if (packagep cell) cell (cached-find-undeleted-package cell))
                  (if (base-string-p name) 'base-char 'character)
                  nil))
 
   (defun find-symbol2 (name cell)
     (find/intern %find-symbol ; likewise
-                 (if (packagep cell) cell (cached-find-package cell)))))
+                 (if (packagep cell) cell (cached-find-undeleted-package cell)))))
 
 ;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
 ;;; then create it, special-casing the keyword package.
@@ -2031,26 +2032,40 @@ PACKAGE."
 
 ;;; Given a cell containing memoization data for FIND-PACKAGE, perform that action
 ;;; with as little work as possible.
-(defun cached-find-package (cell)
-  (declare (optimize speed))
-  (let ((memo (car cell)))
-    (declare (type (simple-vector 3) memo)) ; #(cookie nick-id #<weak-ptr #<pkg>>)
-    (when (eq (aref memo 0) *package-names-cookie*) ; valid cache entry
-      (binding* ((nick-id (aref memo 1) :exit-if-null)
-                 (current-package *package*)
-                 (pkg (and (package-%local-nicknames current-package)
-                           (pkgnick-search-by-id nick-id current-package))
-                      :exit-if-null))
-        (return-from cached-find-package pkg))
-      (let ((pkg (weak-pointer-value (aref memo 2))))
-        (when (and (packagep pkg) (package-%name pkg))
-          (return-from cached-find-package pkg))))
-    (let* ((string (cdr cell))
-           (nick-id (info-gethash string (car *package-nickname-ids*)))
-           (pkg (find-undeleted-package-or-lose string)))
-      (setf (car cell)
-            (vector *package-names-cookie* nick-id (make-weak-pointer pkg)))
-      pkg)))
+(macrolet ((def-finder (name sub-finder validp)
+             `(defun ,name (cell)
+                (declare (optimize speed))
+                (let ((memo (cdr cell)))
+                  (declare (type (simple-vector 3) memo)) ; weak vector: #(cookie nick-id #<pkg>)
+                  (when (eq (aref memo 0) *package-names-cookie*) ; valid cache entry
+                    (binding* ((nick-id (aref memo 1) :exit-if-null)
+                               (current-package *package*)
+                               (pkg (and (package-%local-nicknames current-package)
+                                         (pkgnick-search-by-id nick-id current-package))
+                                    :exit-if-null))
+                      (return-from ,name pkg))
+                    (let ((pkg (aref memo 2)))
+                      (when ,validp
+                        (return-from ,name pkg))))
+                  (let* ((string (car cell))
+                         (pkg (,sub-finder string))
+                         (new (make-weak-vector 3 :initial-element 0)))
+                    (setf (elt new 0) *package-names-cookie*
+                          (elt new 1) (info-gethash string (car *package-nickname-ids*))
+                          (elt new 2) pkg)
+                    (sb-thread:barrier (:write))
+                    (setf (cdr cell) new)
+                    pkg)))))
+
+  (def-finder cached-find-undeleted-package find-undeleted-package-or-lose
+              (and (packagep pkg) (package-%name pkg)))
+  (def-finder cached-find-package find-package
+              ;; We can return a NIL as the cached answer. But NIL is also the value that
+              ;; the garbage collector stuffs in when the element is otherwise unreferenced.
+              ;; This is actually OK -  There is no way for the "correct" answer to become
+              ;; other than NIL without invalidating the cache line by incrementing the
+              ;; cookie. i.e. a cached NIL is correct until the next cache invalidation.
+              (or (null pkg) (and (packagep pkg) (package-%name pkg)))))
 
 ;;; We don't benefit from these transforms because any time we have a constant
 ;;; package in our code, we refer to it via #.(FIND-PACKAGE).
@@ -2070,9 +2085,11 @@ PACKAGE."
                         ((or (string= string "COMMON-LISP-USER")
                              (string= string "CL-USER"))
                          "CL-USER"))))
+    ;; the 2nd value return value of T means that this form's value is the
+    ;; package, otherwise this form is an argument to the finding function.
     (if std-pkg
-        `(load-time-value (find-package ,std-pkg) t)
-        `(load-time-value (cons (vector nil nil nil) ,string)))))
+        (values `(load-time-value (find-undeleted-package-or-lose ,std-pkg) t) t)
+        (values `(load-time-value (cons ,string (vector nil nil nil))) nil))))
 
 (deftransform intern ((name package-name) (t (constant-arg string-designator)))
   `(sb-impl::intern2 name ,(find-package-xform package-name)))
