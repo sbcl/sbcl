@@ -1142,14 +1142,11 @@
   (:args (x :scs (any-reg))
          (y :scs (unsigned-reg)))
   (:arg-types positive-fixnum unsigned-num)
-  (:temporary (:sc non-descriptor-reg :from :eval :to :result) temp)
-  (:temporary (:sc non-descriptor-reg :from :eval :to :result) mask)
   (:results (hi :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 15
-    (inst mulhwu temp x y)
-    (inst lr mask fixnum-tag-mask)
-    (inst andc hi temp mask)))
+    (inst mulhwu hi x y)
+    (inst clrrwi hi hi n-fixnum-tag-bits)))
 
 (define-vop (bignum-lognot lognot-mod32/unsigned=>unsigned)
   (:translate sb-bignum:%lognot))
