@@ -1130,11 +1130,14 @@
   (declare (ignore subchar arg))
   (let ((mpfr (make-mpfr-float)))
     (mpfr_set_str (mpfr-float-ref mpfr)
-                  (with-output-to-string (str)
-                    (loop for char = (peek-char nil stream nil nil t)
-                          while (and char
-                                     (not (sb-impl:token-delimiterp char)))
-                          do (write-char (read-char stream nil nil t) str)))
+                  (let ((peek (peek-char t stream nil nil t)))
+                    (if (char= peek #\") ;; The old lazy way
+                        (read stream nil nil t)
+                        (with-output-to-string (str)
+                          (loop for char = (peek-char nil stream nil nil t)
+                                while (and char
+                                           (not (sb-impl:token-delimiterp char)))
+                                do (write-char (read-char stream nil nil t) str)))))
                   *mpfr-base* *mpfr-rnd*)
     mpfr))
 
