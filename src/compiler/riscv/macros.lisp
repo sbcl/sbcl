@@ -533,8 +533,6 @@ and
                                               stack-allocate-p
                                               temp-tn)
   #-gencgc (declare (ignore temp-tn))
-  (when (integerp size)
-    (assert (zerop (logand size lowtag-mask))))
   (cond (stack-allocate-p
          ;; Stack allocation
          ;;
