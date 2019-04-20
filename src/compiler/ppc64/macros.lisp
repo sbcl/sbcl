@@ -246,9 +246,7 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         ;; FIXME: shouldn't this be "tw :lgt" ? otherwise we're saying
-         ;; that allocation fails if we exactly hit the end pointer
-         (inst tw :lge ,result-tn ,flag-tn)
+         (inst tw :lgt ,result-tn ,flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; #-sb-thread three #+sb-thread one machine instruction.

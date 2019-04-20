@@ -241,7 +241,7 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         (inst tw :lge ,result-tn ,flag-tn)
+         (inst tw :lgt ,result-tn ,flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; #-sb-thread three #+sb-thread one machine instruction.
