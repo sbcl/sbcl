@@ -1094,21 +1094,28 @@
   (multiple-value-bind (str exp sign)
       (mpfr-float-to-string obj)
     (declare (type (integer -1 1) sign))
-    (if *print-readably*
-        (if (minusp exp)
-            (format stream "#M~s" str)
-            (case sign
-              (0 (format stream "#M\"0\""))
-              (1 (format stream "#M\"~a@~s\"" str
-                         (- exp (length str))))
-              (-1 (format stream "#M\"~a@~s\"" str
-                          (- (1+ exp) (length str))))))
-        (if (minusp exp)
-            (format stream "~a" str)
-            (case sign
-              (0 (format stream "0"))
-              (1 (format stream ".~ae+~s" str exp))
-              (-1 (format stream "-.~ae+~s" (subseq str 1) exp)))))))
+    (cond (*print-readably*
+           (if (minusp exp)
+               (format stream "#M~s" str)
+               (case sign
+                 (0 (format stream "#M\"0\""))
+                 (1 (format stream "#M\"~a@~s\"" str
+                            (- exp (length str))))
+                 (-1 (format stream "#M\"~a@~s\"" str
+                             (- (1+ exp) (length str)))))))
+          (t
+           (case sign
+             (0
+              (write-char #\0 stream))
+             (1
+              (write-char #\. stream)
+              (write-string str stream))
+             (-1
+              (write-char #\- stream)
+              (write-char #\. stream)
+              (write-string str stream :start 1)))
+           (write-char #\e stream)
+           (princ exp stream)))))
 
 (defun mpfr-float-to-string (x &optional (rnd *mpfr-rnd*))
   (let ((xr (mpfr-float-ref x)))
