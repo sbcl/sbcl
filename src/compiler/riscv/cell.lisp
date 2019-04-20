@@ -311,6 +311,6 @@
                    instance-pointer-lowtag (,value-sc) ,value-primtype nil "raw instance store"
                    ,(symbolicate "%" set-vop))))))
   (define-raw-slot-float-vops single single-float single-reg 4 :single)
-  (define-raw-slot-float-vops double double-float double-reg 4 :single)
-  (define-raw-slot-float-vops complex-single complex-single-float complex-single-reg 8 :double t)
+  (define-raw-slot-float-vops double double-float double-reg 8 :double)
+  (define-raw-slot-float-vops complex-single complex-single-float complex-single-reg 4 :single t)
   (define-raw-slot-float-vops complex-double complex-double-float complex-double-reg 8 :double t))
