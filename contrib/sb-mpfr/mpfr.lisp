@@ -1095,14 +1095,13 @@
       (mpfr-float-to-string obj)
     (declare (type (integer -1 1) sign))
     (cond (*print-readably*
-           (if (minusp exp)
-               (format stream "#M~s" str)
-               (case sign
-                 (0 (format stream "#M\"0\""))
-                 (1 (format stream "#M\"~a@~s\"" str
-                            (- exp (length str))))
-                 (-1 (format stream "#M\"~a@~s\"" str
-                             (- (1+ exp) (length str)))))))
+           (write-char #\# stream)
+           (write-char #\M stream)
+           (write-string str stream)
+           (write-char #\@ stream)
+           (case sign
+             (1 (princ (- exp (length str)) stream))
+             (-1 (princ (- exp (1- (length str))) stream))))
           (t
            (case sign
              (0
@@ -1131,7 +1130,11 @@
   (declare (ignore subchar arg))
   (let ((mpfr (make-mpfr-float)))
     (mpfr_set_str (mpfr-float-ref mpfr)
-                  (read stream t nil t)
+                  (with-output-to-string (str)
+                    (loop for char = (peek-char nil stream nil nil t)
+                          while (and char
+                                     (not (sb-impl:token-delimiterp char)))
+                          do (write-char (read-char stream nil nil t) str)))
                   *mpfr-base* *mpfr-rnd*)
     mpfr))
 
