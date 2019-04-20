@@ -1048,8 +1048,8 @@
         (inst bne count zero-tn loop)
 
         ;; NIL out the last cons.
-        (storew null-tn dst 1 list-pointer-lowtag)
-        (emit-label done)))))
+        (storew null-tn dst 1 list-pointer-lowtag))
+      (emit-label done))))
 
 ;;; Return the location and size of the more arg glob created by Copy-More-Arg.
 ;;; Supplied is the total number of arguments supplied (originally passed in
