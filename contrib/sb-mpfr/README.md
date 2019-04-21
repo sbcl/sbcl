@@ -75,7 +75,7 @@ SB-MPFR:COERCE.
     CL-USER> (sb-mpfr:coerce 1/2 'sb-mpfr:mpfr-float)
     .50000000000000000e+0
 
-The second method uses the ready maco #M:
+The second method uses the reader maco #M:
 
     CL-USER> #M1.5
     .15000000000000000e+1
