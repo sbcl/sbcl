@@ -28,33 +28,6 @@
 
 (setq *physical-host* (make-unix-host))
 
-;;; Take a string and return a list of cons cells that mark the char
-;;; separated subseq. The first value is true if absolute directories
-;;; location.
-(defun split-at-slashes (namestr start end)
-  (declare (type simple-string namestr)
-           (type index start end))
-  (let ((absolute (and (/= start end)
-                       (char= (schar namestr start) #\/))))
-    (when absolute
-      (incf start))
-    ;; Next, split the remainder into slash-separated chunks.
-    (collect ((pieces))
-      (loop for i from start below end
-            for char = (char namestr i)
-            when (char= char (code-char 0))
-            do
-            (error 'namestring-parse-error
-                   :complaint "Can't embed #\\Nul in Unix namestring"
-                   :namestring namestr
-                   :offset i)
-            when (char= char #\/)
-            do
-            (pieces (cons start i))
-            (setf start (1+ i)))
-      (pieces (cons start end))
-      (values absolute (pieces)))))
-
 (defun parse-unix-namestring (namestring start end)
   (declare (type simple-string namestring)
            (type index start end))
@@ -115,43 +88,49 @@
 (defun parse-native-unix-namestring (namestring start end as-directory)
   (declare (type simple-string namestring)
            (type index start end))
-  (setf namestring (coerce namestring 'simple-string))
-  (multiple-value-bind (absolute ranges)
-      (split-at-slashes namestring start end)
-    (let* ((components (loop for ((start . end) . rest) on ranges
-                             for piece = (subseq namestring start end)
-                             collect (if (and (string= piece "..") rest)
-                                         :up
-                                         piece)))
-           (directory (remove ""
-                              (if (and as-directory
-                                       (string/= "" (car (last components))))
-                                  components
-                                  (butlast components))
-                              :test #'equal))
-           (name-and-type
-            (unless as-directory
-              (let* ((end (first (last components)))
-                     (dot (position #\. end :from-end t)))
-                ;; FIXME: can we get this dot-interpretation knowledge
-                ;; from existing code?  EXTRACT-NAME-TYPE-AND-VERSION
-                ;; does slightly more work than that.
-                (cond
-                  ((string= end "")
-                   (list nil nil))
-                  ((and dot (> dot 0))
-                   (list (subseq end 0 dot) (subseq end (1+ dot))))
-                  (t
-                   (list end nil)))))))
-      (values nil
-              nil
-              (cond (absolute
-                     (cons :absolute directory))
-                    (directory
-                     (cons :relative directory)))
-              (first name-and-type)
-              (second name-and-type)
-              nil))))
+  (if (= start end)
+      (values nil nil nil nil nil nil)
+      (let (absolute)
+        (cond ((char= (schar namestring start) #\/)
+               (setf absolute t)
+               (incf start)))
+        (collect ((dirs))
+          (flet ((dir (piece-start piece-end)
+                   (unless (= piece-start piece-end)
+                     (let ((length (- piece-end piece-start)))
+                       (dirs (cond ((and (= length 2)
+                                         (char= (char namestring piece-start) #\.)
+                                         (char= (char namestring (1+ piece-start)) #\.))
+                                    :up)
+                                   (t
+                                    (subseq namestring piece-start piece-end))))))))
+            (loop for i from start below end
+                  for char = (char namestring i)
+                  when (char= char #\/)
+                  do (dir start i)
+                     (setf start (1+ i)))
+            (multiple-value-bind (name type)
+                (cond (as-directory
+                       (dir start end)
+                       nil)
+                      ((/= start end)
+                       (let ((dot (loop for i from (1- end) downto (1+ start)
+                                        when (char= (char namestring i) #\.)
+                                        return i)))
+                         (cond
+                           ((and dot (> dot 0))
+                            (values (subseq namestring start dot)
+                                    (subseq namestring (1+ dot) end)))
+                           (t
+                            (values (subseq namestring start end) nil))))))
+              (values nil nil
+                      (cond (absolute
+                             (cons :absolute (dirs)))
+                            ((dirs)
+                             (cons :relative (dirs)))
+                            (t
+                             nil))
+                      name type nil)))))))
 
 (/show0 "filesys.lisp 300")
 
