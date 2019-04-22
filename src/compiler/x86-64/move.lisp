@@ -306,30 +306,28 @@
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly
 ;;; routine.
 (define-vop (move-from-unsigned)
-  (:args (x :scs (signed-reg unsigned-reg) :to :result))
-  (:results (y :scs (any-reg descriptor-reg) :from :argument))
+  ;; This sure seems wonky - how would this be selected for a signed arg?
+  (:args (arg :scs (signed-reg unsigned-reg signed-stack unsigned-stack)))
+  (:results (res :scs (any-reg descriptor-reg)))
   (:note "unsigned word to integer coercion")
   (:vop-var vop)
   ;; Worst case cost to make sure people know they may be number consing.
   (:generator 20
-              (aver (not (location= x y)))
-              (inst mov y #.(ash (1- (ash 1 (1+ n-fixnum-tag-bits)))
-                                 n-positive-fixnum-bits))
-              ;; The assembly routines test the sign flag from this one, so if
-              ;; you change stuff here, make sure the sign flag doesn't get
-              ;; overwritten before the CALL!
-              (inst test x y)
-              ;; Using LEA is faster but bigger than MOV+SHL; it also doesn't
-              ;; twiddle the sign flag.  The cost of doing this speculatively
-              ;; should be noise compared to bignum consing if that is needed
-              ;; and saves one branch.
-              (if (= n-fixnum-tag-bits 1)
-                  (inst lea y (ea x x))
-                  (inst lea y (ea nil x (ash 1 n-fixnum-tag-bits))))
-              (inst jmp :z done)
-              (inst mov y x)
-              (invoke-asm-routine 'call #.(bignum-from-reg 'y "UNSIGNED") vop)
-              DONE))
+    (move res arg)
+    ;; the number of high bits that need to be zero is the number of bits of
+    ;; precision lost due to fixnum tag, plus the sign bit.
+    ;; rotate those into the least significant bits.
+    (inst rol res (1+ n-fixnum-tag-bits))
+    (inst test :byte res (1- (ash 1 (1+ n-fixnum-tag-bits))))
+    ;; this could make use of the SHRX instruction which is only available with BMI2
+    ;; support- speculatively restore the fixnum value, test previous flags and jump,
+    ;; which would eliminate the 'jmp done' that jumps over the following SHR.
+    (inst jmp :z fixnum)
+    (invoke-asm-routine 'call #.(bignum-from-reg 'res "UNSIGNED") vop)
+    (inst jmp done)
+    FIXNUM
+    (inst shr res 1)
+    DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 
