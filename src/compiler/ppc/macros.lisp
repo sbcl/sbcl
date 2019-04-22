@@ -179,7 +179,7 @@
 ;;; because a temp register is needed to do inline allocation.
 ;;; TEMP-TN, in this case, can be any register, since it holds a
 ;;; double-word aligned address (essentially a fixnum).
-(defmacro allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
+(defun allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
   ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
   ;; set.  If the lowtag also has a 1 bit in the same position, we're all
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
@@ -188,45 +188,41 @@
   (declare (ignore stack-p node)
            #-gencgc
            (ignore temp-tn flag-tn))
-    #-gencgc
-    (let ((alloc-size (gensym)))
-      `(let ((,alloc-size ,size))
-         (if (logbitp (1- n-lowtag-bits) ,lowtag)
+  #-gencgc
+  (progn
+         (if (logbitp (1- n-lowtag-bits) lowtag)
              (progn
-               (inst ori ,result-tn alloc-tn ,lowtag))
+               (inst ori result-tn alloc-tn lowtag))
              (progn
-               (inst clrrwi ,result-tn alloc-tn n-lowtag-bits)
-               (inst ori ,result-tn ,result-tn ,lowtag)))
-         (if (numberp ,alloc-size)
-             (inst addi alloc-tn alloc-tn ,alloc-size)
-             (inst add alloc-tn alloc-tn ,alloc-size))))
-    #+gencgc
-    `(progn
-       ;; Make temp-tn be the size
-       (cond ((numberp ,size)
-              (inst lr ,temp-tn ,size))
-             (t
-              (move ,temp-tn ,size)))
+               (inst clrrwi result-tn alloc-tn n-lowtag-bits)
+               (inst ori result-tn result-tn lowtag)))
+         (if (numberp alloc-size)
+             (inst addi alloc-tn alloc-tn alloc-size)
+             (inst add alloc-tn alloc-tn alloc-size)))
+  #+gencgc
+  (let ((imm-size (typep size '(unsigned-byte 15))))
+    (unless imm-size ; Make temp-tn be the size
+      (if (numberp size)
+          (inst lr temp-tn size)
+          (move temp-tn size)))
 
-       #-sb-thread
-       (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
-       #-sb-thread
-       (inst lwz ,result-tn ,flag-tn 0)
-       #+sb-thread
-       (inst lwz ,result-tn thread-base-tn (* thread-alloc-region-slot
-                                              n-word-bytes))
+    #-sb-thread
+    (inst lr flag-tn (make-fixup "gc_alloc_region" :foreign))
+    #-sb-thread
+    (inst lwz result-tn flag-tn 0)
+    #+sb-thread
+    (inst lwz result-tn thread-base-tn (* thread-alloc-region-slot
+                                          n-word-bytes))
 
        ;; we can optimize this to only use one fixup here, once we get
        ;; it working
        ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
        ;; (inst lwz ,flag-tn ,flag-tn 0)
-       #-sb-thread
-       (inst lwz ,flag-tn ,flag-tn 4)
-       #+sb-thread
-       (inst lwz ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
-                                            n-word-bytes))
+    #-sb-thread (inst lwz flag-tn flag-tn 4)
+    #+sb-thread (inst lwz flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
+                                                    n-word-bytes))
 
-       (without-scheduling ()
+    (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
          ;; instructions here.  In particular, immediately before the
          ;; TW instruction must be an ADD or ADDI instruction, so it
@@ -236,23 +232,26 @@
 
          ;; Now make result-tn point at the end of the object, to
          ;; figure out if we overflowed the current region.
-         (inst add ,result-tn ,result-tn ,temp-tn)
+         (if imm-size
+             (inst addi result-tn result-tn size)
+             (inst add result-tn result-tn temp-tn))
+
          ;; result-tn points to the new end of the region.  Did we go past
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         (inst tw :lgt ,result-tn ,flag-tn)
+         (inst tw :lgt result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; #-sb-thread three #+sb-thread one machine instruction.
          ;; The lr of a fixup counts as two instructions.
          #-sb-thread
-         (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
+         (inst lr flag-tn (make-fixup "gc_alloc_region" :foreign))
          #-sb-thread
-         (inst stw ,result-tn ,flag-tn 0)
+         (inst stw result-tn flag-tn 0)
          #+sb-thread
-         (inst stw ,result-tn thread-base-tn (* thread-alloc-region-slot
-                                                n-word-bytes)))
+         (inst stw result-tn thread-base-tn (* thread-alloc-region-slot
+                                               n-word-bytes)))
 
        ;; Should the allocation trap above have fired, the runtime
        ;; arranges for execution to resume here, just after where we
@@ -260,9 +259,12 @@
 
        ;; At this point, result-tn points at the end of the object.
        ;; Adjust to point to the beginning.
-       (inst sub ,result-tn ,result-tn ,temp-tn)
-       ;; Set the lowtag appropriately
-       (inst ori ,result-tn ,result-tn ,lowtag)))
+    (cond (imm-size
+           (inst addi result-tn result-tn (+ (- size) lowtag)))
+          (t
+           (inst sub result-tn result-tn temp-tn)
+           ;; Set the lowtag appropriately
+           (inst ori result-tn result-tn lowtag)))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
                                             &key (lowtag other-pointer-lowtag)

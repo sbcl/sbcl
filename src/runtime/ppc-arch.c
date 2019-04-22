@@ -277,8 +277,8 @@ allocation_trap_p(os_context_t * context)
     /*
      * First, the instruction has to be a TWLGT temp, NL3, which has the
      * format.
-     * | 6| 5| 5 | 5 | 10|1|  width
-     * |31|5 |dst|src|  4|0|  field
+     * | 6| 5| 5 | 5 | 10|1|  field width
+     * |31| 1|dst|src|  4|0|  value
      */
     pc = (unsigned int *) (*os_context_pc_addr(context));
     inst = *pc;
