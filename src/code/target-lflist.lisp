@@ -20,6 +20,7 @@
   (:shadow "ENDP"))
 
 (in-package "SB-LOCKLESS")
+(setf (system-package-p *package*) t)
 
 ;;; The changes to GC to support this code were as follows:
 ;;; * One bit of the payload length in an instance header is reserved to signify

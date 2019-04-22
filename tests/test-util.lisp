@@ -226,9 +226,9 @@
            (typecase x
              (symbol (let ((package (symbol-package x)))
                        (or (null package)
+                           (sb-int:system-package-p package)
                            (eql package (find-package "CL"))
-                           (eql package (find-package "KEYWORD"))
-                           (eql (mismatch "SB-" (package-name package)) 3))))
+                           (eql package (find-package "KEYWORD")))))
              (integer t))))
     (unless (tree-equal name name :test #'name-ok)
       (error "test name must be all-keywords: ~S" name)))

@@ -1397,7 +1397,9 @@ core and return a descriptor to it."
                               :%name (set-readonly
                                       (base-string-to-core name))
                               :%nicknames (chill-nicknames name)
-                              :lock *nil-descriptor*
+                              :%bits (make-fixnum-descriptor
+                                      (if (system-package-p name)
+                                          sb-impl::+initial-package-bits+ 0))
                               :doc-string (if docstring
                                               (set-readonly
                                                (base-string-to-core docstring))
@@ -1590,6 +1592,7 @@ core and return a descriptor to it."
     (setf (gethash (descriptor-bits result) *cold-symbols*) nil
           (get nil 'cold-intern-info) result)))
 
+(defvar core-file-name)
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
 (defun initialize-static-space ()
@@ -1888,7 +1891,6 @@ core and return a descriptor to it."
                                           (gspace #+immobile-space *immobile-fixedobj*
                                                   #-immobile-space *dynamic*))
   (declare (type (or symbol descriptor) cold-name))
-  (declare (special core-file-name))
   (let ((warm-name (warm-fun-name cold-name)))
     (or (gethash warm-name *cold-fdefn-objects*)
         (let ((fdefn (allocate-header+object gspace (1- sb-vm:fdefn-size) sb-vm:fdefn-widetag)))
@@ -3513,7 +3515,6 @@ III. initially undefined function references (alphabetically):
                              core-file-name c-header-dir-name map-file-name
                              symbol-table-file-name (verbose t))
   (declare (ignorable symbol-table-file-name))
-  (declare (special core-file-name))
 
   (when verbose
     (format t

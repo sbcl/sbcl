@@ -25,7 +25,7 @@
 ;; Unlock all other SB- packages
 (dolist (package (list-all-packages))
   (let ((name (package-name package)))
-    (when (eql (mismatch name "SB-") 3)
+    (when (sb-int:system-package-p name)
       (sb-ext:unlock-package package))))
 
 ;;; Define this first to avoid a style-warning from 'shebang'

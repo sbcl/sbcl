@@ -140,15 +140,9 @@
     (symbol
      (or (eq '.anonymous. what)
          #-sb-xref-for-internals
-         (member (sb-xc:symbol-package what)
-                 (load-time-value
-                  (cons *cl-package*
-                        (remove-if-not
-                         (lambda (package)
-                           (= (mismatch "SB-" (package-name package))
-                              3))
-                         (list-all-packages)))
-                  t))))
+         (let ((pkg (sb-xc:symbol-package what)))
+           (or (and pkg (system-package-p pkg))
+               (eq pkg *cl-package*)))))
     (t t)))
 
 (defun record-xref (kind what context node path)

@@ -85,6 +85,7 @@
                 #:|push| #:|pop| #:|or| #:|call| #:|break|))
 
 (in-package #:sb-aprof)
+(setf (system-package-p *package*) t)
 
 (defstruct (alloc (:constructor make-alloc (bytes count type pc)))
   bytes count type pc)

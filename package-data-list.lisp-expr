@@ -1285,6 +1285,7 @@ possibly temporarily, because it might be used internally."
                "BOOTSTRAP-PACKAGE-NAME"
                "BOOTSTRAP-PACKAGE-NOT-FOUND"
                "DEBOOTSTRAP-PACKAGE"
+               "SYSTEM-PACKAGE-P"
 
                "REFERENCE-CONDITION" "REFERENCE-CONDITION-REFERENCES"
                "*PRINT-CONDITION-REFERENCES*"
