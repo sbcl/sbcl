@@ -26,7 +26,7 @@
       (move ptr object)
       (move count zero-tn)
 
-      (inst cmpw ptr null-tn)
+      (inst cmpd ptr null-tn)
       (inst beq done)
 
       (emit-label loop)
@@ -36,7 +36,7 @@
       (loadw ptr ptr cons-cdr-slot list-pointer-lowtag)
       (inst addi count count (fixnumize 1))
 
-      (inst cmpw ptr null-tn)
+      (inst cmpd ptr null-tn)
       (inst bne loop)
 
       (emit-label done)

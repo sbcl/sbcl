@@ -41,7 +41,7 @@ x:
 (NFPR_SAVE_BYTES(first_f)+ NGPR_SAVE_BYTES(first_g)+ FRAME_ARG_BYTES(out_arg_words))
 #define SAVE_FPR(n) stfd n,-8*(32-(n))(11)
 #define SAVE_GPR(n) std n,-8*(32-(n))(11)
-#define FULL_FRAME_SIZE 16000
+#define FULL_FRAME_SIZE 512
 #define RESTORE_FPR(n) lfd n,-8*(32-(n))(11)
 #define RESTORE_GPR(n) ld n,-8*(32-(n))(11)
 
@@ -114,7 +114,7 @@ Low Address
 	SAVE_GPR(30) ; \
 	SAVE_GPR(31) ; \
 	mfcr 0	; \
-	std 0,8(1) /* Save into CR save area */
+	std 0,8(1) /* Save into CR save area */ ; \
 	std 2,40(1) /* Save into TOC save area */
 
 #define C_FULL_EPILOG \

@@ -111,7 +111,7 @@
                            :n-words 1)
        ;; If this list of architectures is changed, then also change the test
        ;; for :DEFINE-STRUCTURE-SLOT-ADDRESSOR in raw-slots-interleaved.impure
-       #+(or arm arm64 mips ppc riscv x86 x86-64)
+       #-(or alpha hppa sparc)
        (make-raw-slot-data :raw-type 'sb-vm:signed-word
                            :accessor-name '%raw-instance-ref/signed-word
                            :init-vop 'sb-vm::raw-instance-init/signed-word

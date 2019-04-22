@@ -29,13 +29,12 @@
      (:temp vector descriptor-reg a3-offset)
      (:temp temp non-descriptor-reg nl2-offset))
   (pseudo-atomic (pa-flag)
-    ;; boxed words == unboxed bytes
-    (inst addi ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst clrrwi ndescr ndescr n-lowtag-bits)
+    (inst addi ndescr words (fixnumize (1+ vector-data-offset)))
+    (inst rldicr ndescr ndescr (- word-shift n-fixnum-tag-bits) (- 63 n-lowtag-bits))
     (allocation vector ndescr other-pointer-lowtag
                 :temp-tn temp
                 :flag-tn pa-flag)
-    (inst srwi ndescr type word-shift)
+    (inst srwi ndescr type n-fixnum-tag-bits)
     (storew ndescr vector 0 other-pointer-lowtag)
     (storew length vector vector-length-slot other-pointer-lowtag))
   ;; This makes sure the zero byte at the end of a string is paged in so
@@ -67,13 +66,12 @@
      (:temp vector descriptor-reg a3-offset)
      (:temp temp non-descriptor-reg nl2-offset))
   (pseudo-atomic (pa-flag)
-    ;; boxed words == unboxed bytes
-    (inst addi ndescr words (* (1+ vector-data-offset) n-word-bytes))
-    (inst clrrwi ndescr ndescr n-lowtag-bits)
+    (inst addi ndescr words (fixnumize (1+ vector-data-offset)))
+    (inst rldicr ndescr ndescr (- word-shift n-fixnum-tag-bits) (- 63 n-lowtag-bits))
     (align-csp temp)
     (inst ori vector csp-tn other-pointer-lowtag)
     (inst add csp-tn csp-tn ndescr)
-    (inst srwi temp type word-shift)
+    (inst srwi temp type n-fixnum-tag-bits)
     (storew temp vector 0 other-pointer-lowtag)
     ;; Our storage is allocated, but not initialized, and our contract
     ;; calls for it to be zero-fill.  Do so now.

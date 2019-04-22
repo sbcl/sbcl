@@ -33,13 +33,13 @@
   ; Clear the damned "sticky overflow" bit in :cr0 and :xer
   (inst mtxer zero-tn)
   (inst or temp x y)
-  (inst andi. temp temp 3)
+  (inst andi. temp temp fixnum-tag-mask)
   (inst bne DO-STATIC-FUN)
   (inst addo. temp x y)
   (inst bns done)
 
-  (inst srawi temp x 2)
-  (inst srawi temp2 y 2)
+  (inst sradi temp x n-fixnum-tag-bits)
+  (inst sradi temp2 y n-fixnum-tag-bits)
   (inst add temp2 temp2 temp)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))
@@ -82,14 +82,14 @@
   (inst mtxer zero-tn)
 
   (inst or temp x y)
-  (inst andi. temp temp 3)
+  (inst andi. temp temp fixnum-tag-mask)
   (inst bne DO-STATIC-FUN)
 
   (inst subo. temp x y)
   (inst bns done)
 
-  (inst srawi temp x 2)
-  (inst srawi temp2 y 2)
+  (inst sradi temp x n-fixnum-tag-bits)
+  (inst sradi temp2 y n-fixnum-tag-bits)
   (inst sub temp2 temp temp2)
   (with-fixed-allocation (res flag temp bignum-widetag (1+ bignum-digits-offset))
     (storew temp2 res bignum-digits-offset other-pointer-lowtag))

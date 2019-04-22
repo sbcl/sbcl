@@ -61,7 +61,7 @@
     (let ((bogus (gen-label))
           (done (gen-label)))
       (loadw temp thing 0 lowtag)
-      (inst srwi temp temp n-widetag-bits)
+      (inst srdi temp temp n-widetag-bits)
       (inst cmpwi temp 0)
       (inst slwi temp temp word-shift)
       (inst beq bogus)

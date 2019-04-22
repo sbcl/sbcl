@@ -24,14 +24,14 @@
   (:generator 1
     (inst mr dest last-nipped-ptr)
     (inst mr src last-preserved-ptr)
-    (inst cmplw csp-tn src)
+    (inst cmpld csp-tn src)
     (inst ble DONE)
     LOOP
     (loadw temp src)
     (inst addi dest dest n-word-bytes)
     (inst addi src src n-word-bytes)
     (storew temp dest -1)
-    (inst cmplw csp-tn src)
+    (inst cmpld csp-tn src)
     (inst bgt LOOP)
     DONE
     (inst mr csp-tn dest)
@@ -98,7 +98,7 @@
       (move start csp-tn)
 
       (emit-label loop)
-      (inst cmpw list null-tn)
+      (inst cmpd list null-tn)
       (loadw temp list cons-car-slot list-pointer-lowtag)
       (inst beq done)
       (loadw list list cons-cdr-slot list-pointer-lowtag)

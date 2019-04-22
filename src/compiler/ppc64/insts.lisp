@@ -552,13 +552,15 @@
 (define-bitfield-emitter emit-x-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 10 1) (byte 1 0))
 
+(define-bitfield-emitter emit-xs-form-inst 32
+  (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 9 2) (byte 1 1) (byte 1 0))
+
 (define-bitfield-emitter emit-xfx-form-inst 32
   (byte 6 26) (byte 5 21) (byte 10 11) (byte 10 1) (byte 1 0))
 
 (define-bitfield-emitter emit-xfl-form-inst 32
   (byte 6 26) (byte 10  16) (byte 5 11) (byte 10 1) (byte 1 0))
 
-; XS is 64-bit only
 (define-bitfield-emitter emit-xo-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 1 10) (byte 9 1) (byte 1 0))
 
@@ -1301,6 +1303,7 @@
 
   (define-4-xo-instructions subfc 31 8 :always-writes-xer t)
   (define-4-xo-instructions addc 31 10 :always-writes-xer t)
+  (define-2-xo-oe-instructions mulhdu 31 9 :cost 5)
   (define-2-xo-oe-instructions mulhwu 31 11 :cost 5)
 
   (define-instruction mfcr (segment rd)
@@ -1309,10 +1312,20 @@
     (:dependencies (reads :ccr) (writes rd))
     (:emitter (emit-x-form-inst segment 31 (reg-tn-encoding rd) 0 0 19 0)))
 
+  ;; This arrangement (or lack thereof) is an utter mess.
+  ;; Should it be alphabetical by mnemonic, or grouped by the lower bits
+  ;; of the subcode, or by the instruction format, or by the page number
+  ;; in the architecture reference manual, or random, or all of the above?
+  ;; This instruction set file is actually less understandable than x86-64
+  ;; given the propensity to name fields (such as 'xo') so cryptically.
+
   (define-x-instruction lwarx 31 20)
+  (define-x-instruction ldarx 31 84)
   (define-x-instruction lwzx 31 23)
   (define-2-x-5-instructions slw 31 24)
-  (define-2-x-5-instructions sld 31 27)
+  (define-2-x-5-instructions sld 31 27) ; (logical) shift left doubleword
+  (define-2-x-5-instructions srd 31 539) ; (logical) shift right doubleword
+  (define-2-x-5-instructions srad 31 794) ; shift right algebraic doubleword
   (define-2-x-10-instructions cntlzw 31 26)
   (define-2-x-5-instructions and 31 28)
 
@@ -1349,6 +1362,7 @@
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash mask 1) 144 0)))
 
   (define-x-5-st-instruction stwcx. 31 150 t :other-dependencies ((writes :ccr)))
+  (define-x-5-st-instruction stdcx. 31 214 t :other-dependencies ((writes :ccr)))
   (define-x-5-st-instruction stwx 31 151 nil)
   (define-x-5-st-instruction stwux 31 183 nil :other-dependencies ((writes ra)))
 
@@ -1362,6 +1376,7 @@
   (define-x-5-st-instruction stbx 31 215 nil)
   (define-4-xo-a-instructions subfme 31 232 :always-reads-xer t :always-writes-xer t)
   (define-4-xo-a-instructions addme 31 234 :always-reads-xer t :always-writes-xer t)
+  (define-4-xo-instructions mulld 31 233 :cost 5)
   (define-4-xo-instructions mullw 31 235 :cost 5)
   (define-x-5-st-instruction stbux 31 247 nil :other-dependencies ((writes ra)))
   (define-4-xo-instructions add 31 266)
@@ -1395,7 +1410,9 @@
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash 9 5) 339 0)))
 
 
+  (define-x-instruction lwax 31 341)
   (define-x-instruction lhax 31 343)
+  (define-x-instruction lwaux 31 373 :other-dependencies ((writes ra)))
   (define-x-instruction lhaux 31 375 :other-dependencies ((writes ra)))
   (define-x-5-st-instruction sthx 31 407 nil)
   (define-2-x-5-instructions orc 31 412)
@@ -1540,31 +1557,33 @@
   (define-x-instruction lhbrx 31 790)
   (define-2-x-5-instructions sraw 31 792)
 
-  (define-instruction srawi (segment ra rs rb)
-    (:printer x-9 ((op 31) (xo 824) (rc 0)))
-    (:cost 1)
-    (:delay 1)
-    (:dependencies (reads rs) (writes ra))
-    (:emitter
-     (emit-x-form-inst segment 31
-                       (reg-tn-encoding rs)
-                       (reg-tn-encoding ra)
-                       rb
-                       824
-                       0)))
-
-  (define-instruction srawi. (segment ra rs rb)
-    (:printer x-9 ((op 31) (xo 824) (rc 1)))
-    (:cost 1)
-    (:delay 1)
-    (:dependencies (reads rs) (writes ra) (writes :ccr))
-    (:emitter
-     (emit-x-form-inst segment 31
-                       (reg-tn-encoding rs)
-                       (reg-tn-encoding ra)
-                       rb
-                       824
-                        1)))
+  (macrolet ((def-sraw (mnemonic xo rc)
+               `(define-instruction ,mnemonic (segment ra rs sh)
+                  (:printer x-9 ((op 31) (xo ,xo) (rc ,rc)))
+                  (:cost 1)
+                  (:delay 1)
+                  (:dependencies (reads rs) (writes ra))
+                  (:emitter
+                   (emit-x-form-inst segment 31
+                                     (reg-tn-encoding rs)
+                                     (reg-tn-encoding ra)
+                                     sh ,xo ,rc)))))
+    (def-sraw srawi  824 0)
+    (def-sraw srawi. 824 1))
+  (macrolet ((def-srad (mnemonic xo rc)
+               `(define-instruction ,mnemonic (segment ra rs sh)
+                  (:printer x-9 ((op 31) (xo ,xo) (rc ,rc)))
+                  (:cost 1)
+                  (:delay 1)
+                  (:dependencies (reads rs) (writes ra))
+                  (:emitter
+                   (emit-xs-form-inst segment 31
+                                      (reg-tn-encoding rs)
+                                      (reg-tn-encoding ra)
+                                      (ldb (byte 5 0) sh) ,xo
+                                      (ldb (byte 1 5) sh) ,rc)))))
+    (def-srad sradi  413 0)
+    (def-srad sradi. 413 1))
 
   (define-instruction eieio (segment)
     (:printer x-27 ((op 31) (xo 854)))
@@ -1616,6 +1635,7 @@
 
   (define-ds-instruction ld 58  #b00)
   (define-ds-instruction ldu 58 #b01)
+  (define-ds-instruction lwa 58 #b10)
 
   (define-2-a-tab-instructions fdivs 59 18 :cost 17)
   (define-2-a-tab-instructions fsubs 59 20)
@@ -1765,6 +1785,9 @@
   (define-instruction-macro not. (ra rs)
     `(inst nor. ,ra ,rs ,rs))
 
+;; These can be temporarily commented out to find inadvertent
+;; use of 32-bit rlwinm and related macro instructions.
+(progn
   (define-instruction-macro extlwi (ra rs n b)
     `(inst rlwinm ,ra ,rs ,b 0 (1- ,n)))
 
@@ -1777,7 +1800,7 @@
   (define-instruction-macro extrwi. (ra rs n b)
     `(inst rlwinm. ,ra ,rs (mod (+ ,b ,n) 32) (- 32 ,n) 31))
 
-  (define-instruction-macro srwi (ra rs n)
+  (define-instruction-macro srwi (ra rs n) ; N < 32
     `(inst rlwinm ,ra ,rs (- 32 ,n) ,n 31))
 
   (define-instruction-macro srwi. (ra rs n)
@@ -1813,20 +1836,33 @@
   (define-instruction-macro rotrwi (ra rs n)
     `(inst rlwinm ,ra ,rs (- 32 ,n) 0 31))
 
-  (define-instruction-macro slwi (ra rs n)
+  (define-instruction-macro slwi (ra rs n) ; N < 32
     `(inst rlwinm ,ra ,rs ,n 0 (- 31 ,n)))
 
   (define-instruction-macro slwi. (ra rs n)
     `(inst rlwinm. ,ra ,rs ,n 0 (- 31 ,n)))
 
-  (define-instruction-macro sldi (ra rs n)
+) ; end PROGN
+
+  ;; found on page 104 of version 3.0B of the ISA
+  ;; and/or appendix C on page 797
+  (define-instruction-macro sldi (ra rs n) ; N < 64
     `(inst rldicr ,ra ,rs ,n (- 63 ,n)))
 
-  (define-instruction-macro srdi (ra rs n)
-    `(inst rldicr ,ra ,rs (- 64 ,n) ,n))
+  (define-instruction-macro sldi. (ra rs n)
+    `(inst rldicr. ,ra ,rs ,n (- 63 ,n)))
+
+  (define-instruction-macro srdi (ra rs n) ; N < 64
+    `(inst rldicl ,ra ,rs (- 64 ,n) ,n))
 
   (define-instruction-macro srdi. (ra rs n)
-    `(inst rldicr ,ra ,rs (- 64 ,n) ,n)))
+    `(inst rldicl. ,ra ,rs (- 64 ,n) ,n))
+
+  (define-instruction-macro clrrdi (ra rs n) ; N < 64
+    `(inst rldicr ,ra ,rs 0 (- 63 ,n)))
+  (define-instruction-macro clrrdi. (ra rs n) ; N < 64
+    `(inst rldicr. ,ra ,rs 0 (- 63 ,n)))
+  )
 
 #|
 (macrolet

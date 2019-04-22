@@ -48,7 +48,7 @@
     (inst li temp (- (* offset n-word-bytes) lowtag))
     LOOP
     (inst lwarx result temp object)
-    (inst cmpw result old)
+    (inst cmpd result old)
     (inst bne EXIT)
     (inst stwcx. new temp object)
     (inst bne LOOP)
@@ -74,7 +74,7 @@
       (loadw temp symbol symbol-tls-index-slot other-pointer-lowtag)
       ;; Thread-local area, no synchronization needed.
       (inst lwzx result thread-base-tn temp)
-      (inst cmpw result old)
+      (inst cmpd result old)
       (inst bne DONT-STORE-TLS)
       (inst stwx new thread-base-tn temp)
       DONT-STORE-TLS
@@ -86,7 +86,7 @@
                      other-pointer-lowtag))
     LOOP
     (inst lwarx result symbol temp)
-    (inst cmpw result old)
+    (inst cmpd result old)
     (inst bne CHECK-UNBOUND)
     (inst stwcx. new symbol temp)
     (inst bne LOOP)
@@ -228,7 +228,7 @@
     ;; it is a fixnum.  The lowtag selection magic that is required to
     ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst clrrwi res res n-fixnum-tag-bits)))
+    (inst clrrdi res res n-fixnum-tag-bits)))
 
 ;;;; Fdefinition (fdefn) objects.
 
@@ -246,7 +246,7 @@
   (:generator 10
     (move obj-temp object)
     (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
-    (inst cmpw value null-tn)
+    (inst cmpd value null-tn)
     (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
       (inst beq err-lab))))
 
@@ -393,12 +393,12 @@
           (skip (gen-label))
           (done (gen-label)))
       (move where arg)
-      (inst cmpw where bsp-tn)
+      (inst cmpd where bsp-tn)
       (inst beq done)
 
       (emit-label loop)
       (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
-      (inst cmpwi symbol 0)
+      (inst cmpdi symbol 0)
       (inst beq skip)
       (loadw value bsp-tn (- binding-value-slot binding-size))
       #+sb-thread
@@ -410,7 +410,7 @@
       (emit-label skip)
       (storew zero-tn bsp-tn (- binding-value-slot binding-size))
       (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
-      (inst cmpw where bsp-tn)
+      (inst cmpd where bsp-tn)
       (inst bne loop)
 
       (emit-label done))))
@@ -472,7 +472,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw temp struct 0 instance-pointer-lowtag)
-    (inst srwi res temp n-widetag-bits)))
+    (inst srdi res temp n-widetag-bits)))
 
 (define-vop (instance-index-ref word-index-ref)
   (:policy :fast-safe)
@@ -513,13 +513,34 @@
   (- (ash (+ index displacement instance-slots-offset) word-shift)
      instance-pointer-lowtag))
 
-(define-vop (raw-instance-init/word)
-  (:args (object :scs (descriptor-reg))
-         (value :scs (unsigned-reg)))
-  (:arg-types * unsigned-num)
-  (:info index)
-  (:generator 4
-    (inst stw value object (offset-for-raw-slot index))))
+(macrolet ((def (suffix sc primtype)
+             `(progn
+                (define-vop (,(symbolicate "RAW-INSTANCE-INIT/" suffix))
+                  (:args (object :scs (descriptor-reg))
+                         (value :scs (,sc)))
+                  (:arg-types * ,primtype)
+                  (:info index)
+                  (:temporary (:scs (non-descriptor-reg)) temp)
+                  (:generator 4
+                    (inst lr temp (offset-for-raw-slot index))
+                    (inst stdx value object temp)))
+                (define-vop (,(symbolicate "RAW-INSTANCE-REF/" suffix) word-index-ref)
+                  (:policy :fast-safe)
+                  (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
+                  (:variant instance-slots-offset instance-pointer-lowtag)
+                  (:arg-types instance positive-fixnum)
+                  (:results (value :scs (,sc)))
+                  (:result-types ,primtype))
+                (define-vop (,(symbolicate "RAW-INSTANCE-SET/" suffix) word-index-set)
+                  (:policy :fast-safe)
+                  (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
+                  (:variant instance-slots-offset instance-pointer-lowtag)
+                  (:arg-types instance positive-fixnum ,primtype)
+                  (:args (object) (index) (value :scs (,sc)))
+                  (:results (result :scs (,sc)))
+                  (:result-types ,primtype)))))
+  (def word unsigned-reg unsigned-num)
+  (def signed-word signed-reg signed-num))
 
 (define-vop (raw-instance-atomic-incf/word)
   (:translate %raw-instance-atomic-incf/word)

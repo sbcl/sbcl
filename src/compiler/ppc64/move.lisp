@@ -119,7 +119,7 @@
   (:arg-types tagged-num)
   (:note "fixnum untagging")
   (:generator 1
-    (inst srawi y x n-fixnum-tag-bits)))
+    (inst sradi y x n-fixnum-tag-bits)))
 (define-move-vop move-to-word/fixnum :move
   (any-reg descriptor-reg) (signed-reg unsigned-reg))
 
@@ -133,7 +133,7 @@
            (inst lr y (tn-value x)))
           (t
            (loadw y code-tn (tn-offset x) other-pointer-lowtag)
-           (inst srawi y y n-fixnum-tag-bits)))))
+           (inst sradi y y n-fixnum-tag-bits)))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))
 
@@ -146,7 +146,7 @@
   (:generator 4
     (let ((done (gen-label)))
       (inst andi. temp x fixnum-tag-mask)
-      (inst srawi y x n-fixnum-tag-bits)
+      (inst sradi y x n-fixnum-tag-bits)
 
       (inst beq done)
       (loadw y x bignum-digits-offset other-pointer-lowtag)
@@ -163,7 +163,7 @@
   (:result-types tagged-num)
   (:note "fixnum tagging")
   (:generator 1
-    (inst slwi y x n-fixnum-tag-bits)))
+    (inst sldi y x n-fixnum-tag-bits)))
 (define-move-vop move-from-word/fixnum :move
   (signed-reg unsigned-reg) (any-reg descriptor-reg))
 
@@ -199,7 +199,7 @@
     (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
     (inst addo temp x x)              ; set XER OV if top two bits differ
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
-    (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
+    (inst sldi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
     (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
                    y)
@@ -211,7 +211,7 @@
     (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
     (inst addo temp x x)              ; set XER OV if top two bits differ
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ
-    (inst slwi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
+    (inst sldi y x n-fixnum-tag-bits) ; assume fixnum (tagged ok, maybe lost some high bits)
     (inst bns done)
     (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
                    y)
@@ -228,22 +228,19 @@
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)
-    (let ((done (gen-label))
-          (one-word (gen-label)))
-      (inst srdi. temp x n-positive-fixnum-bits)
-      (inst sldi y x n-fixnum-tag-bits)
-      (inst beq done)
-
-      (with-fixed-allocation
-          (y pa-flag temp bignum-widetag (+ 2 bignum-digits-offset))
-        (inst cmpdi x 0)
-        (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
-        (inst bge one-word)
-        (inst li temp (logior (ash 2 n-widetag-bits) bignum-widetag))
-        (emit-label one-word)
-        (storew temp y 0 other-pointer-lowtag)
-        (storew x y bignum-digits-offset other-pointer-lowtag))
-      (emit-label done))))
+    (inst clrrdi. temp x (- n-word-bits n-positive-fixnum-bits))
+    (inst sldi y x n-fixnum-tag-bits)
+    (inst beq done)
+    (with-fixed-allocation
+        (y pa-flag temp bignum-widetag (+ 2 bignum-digits-offset))
+      ;; rotate the sign bit into the LSB of the size in the header
+      (inst rldicl temp x n-widetag-bits 0)
+      (inst andi. temp temp (ash 1 n-widetag-bits)) ; mask only that bit
+      ;; cause the size to be either 1 or 2 bigdigits, and add the widetag
+      (inst addi temp temp (logior (ash 1 n-widetag-bits) bignum-widetag))
+      (storew temp y 0 other-pointer-lowtag)
+      (storew x y bignum-digits-offset other-pointer-lowtag))
+    DONE))
 (define-move-vop move-from-unsigned :move
   (unsigned-reg) (descriptor-reg))
 

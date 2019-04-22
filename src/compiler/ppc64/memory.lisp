@@ -34,7 +34,32 @@
 ;;;; Indexed references:
 
 ;;; Define some VOPs for indexed memory reference.
-(defmacro define-indexer (name write-p ri-op rr-op shift &optional sign-extend-byte)
+
+;;; Due to the encoding restrictione that doubleword accesses can not displace
+;;; from the base register by an arbitrarily aligned value, but only an even
+;;; multiple of 4, it would behoove us to invent a different lowtag scheme,
+;;; something like:
+;;;    #b0110 function
+;;;    #b0100 instance
+;;;    #b1000 list
+;;;    #b1100 other
+;;; All lowtags except FUN-POINTER-LOWTAG become 4-byte-aligned.
+;;; We would need to increase N-FIXNUM-TAG-BITS to 4 for this to work, and it
+;;; may cause some breakage due to assumptions that lowtags are spaced evenly
+;;; and that N-FIXNUM-TAG-BITS is not more than WORD-SHIFT.
+;;; I think both those constraints can be lifted.
+;;; The alternatives are far worse - constantly computing into the LIP
+;;; register, or else allowing native pointers to pin objects.
+
+;;; NB: this macro uses an inverse of the 'shift' convention in the 32-bit file.
+;;; Here is the convention is that 'scale' how much to left-shift a natural
+;;; integer (an unsigned-reg) to produce a byte offset for the element size.
+;;; For 32-bits, the convention is that 'shift' is how much to right-shift
+;;; a tagged fixnum to produce a natural index into the data vector for the
+;;; element size. It works only because n-fixnum-tag-bits = word-shift,
+;;; and there is no case in which left-shift is required.
+(defmacro define-indexer (name shift write-p ri-op rr-op &optional sign-extend-byte
+                               &aux (net-shift (- shift n-fixnum-tag-bits)))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
             (index :scs (any-reg zero immediate))
@@ -52,21 +77,22 @@
          ((immediate zero)
           (let ((offset (- (+ (if (sc-is index zero)
                                   0
-                                  (ash (tn-value index)
-                                       (- word-shift ,shift)))
+                                  (ash (tn-value index) ,shift))
                               (ash offset word-shift))
                            lowtag)))
             (if (and (typep offset '(signed-byte 16))
-                     (or (> ,shift 0) ;; If it's not word-index
+                     (or (< ,shift 3) ;; If it's not word-index
                          (not (logtest offset #b11)))) ;; Or the displacement is a multiple of 4
                 (inst ,ri-op value object offset)
                 (progn
                   (inst lr temp offset)
                   (inst ,rr-op value object temp)))))
          (t
-          ,@(unless (zerop shift)
-              `((inst srdi temp index ,shift)))
-          (inst addi temp ,(if (zerop shift) 'index 'temp)
+          ,@(when (plusp net-shift)
+              `((inst sldi temp index ,net-shift)))
+          ,@(when (minusp net-shift)
+              `((inst srdi temp index ,net-shift)))
+          (inst addi temp ,(if (zerop net-shift) 'index 'temp)
                 (- (ash offset word-shift) lowtag))
           (inst ,rr-op value object temp)))
        ,@(when sign-extend-byte
@@ -74,16 +100,16 @@
        ,@(when write-p
            '((move result value))))))
 
-(define-indexer word-index-ref nil ld ldx 0) ;; Word means Lisp Word
-(define-indexer word-index-set t std stdx 0)
-(define-indexer 32-bits-index-ref nil lwz lwzx 1)
-(define-indexer 32-bits-index-set t stw stwx 1)
-(define-indexer 16-bits-index-ref nil lhz lhzx 2)
-(define-indexer signed-16-bits-index-ref nil lha lhax 2)
-(define-indexer 16-bits-index-set t sth sthx 2)
-(define-indexer byte-index-ref nil lbz lbzx 3)
-(define-indexer signed-byte-index-ref nil lbz lbzx 3 t)
-(define-indexer byte-index-set t stb stbx 3)
+(define-indexer word-index-ref           3 nil ld  ldx) ;; Word means Lisp Word
+(define-indexer word-index-set           3 t   std stdx)
+(define-indexer 32-bits-index-ref        2 nil lwz lwzx)
+(define-indexer 32-bits-index-set        2 t   stw stwx)
+(define-indexer 16-bits-index-ref        1 nil lhz lhzx)
+(define-indexer signed-16-bits-index-ref 1 nil lha lhax)
+(define-indexer 16-bits-index-set        1 t   sth sthx)
+(define-indexer byte-index-ref           0 nil lbz lbzx)
+(define-indexer signed-byte-index-ref    0 nil lbz lbzx t)
+(define-indexer byte-index-set           0 t   stb stbx)
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))
@@ -113,10 +139,10 @@
 
     (inst sync)
     LOOP
-    (inst lwarx result temp object)
-    (inst cmpw result old-value)
+    (inst ldarx result temp object)
+    (inst cmpd result old-value)
     (inst bne EXIT)
-    (inst stwcx. new-value temp object)
+    (inst stdcx. new-value temp object)
     (inst bne LOOP)
     EXIT
     (inst isync)))

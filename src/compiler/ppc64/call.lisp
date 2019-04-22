@@ -526,6 +526,7 @@ default-value-8
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
     (move cfp-tn old-fp-temp)
+    ;; FIXME: 4 ?
     (inst j return-pc-temp (- n-word-bytes other-pointer-lowtag))))
 
 
@@ -1089,7 +1090,7 @@ default-value-8
              ;; overwrite any elements before they're copied).
              (inst ld temp dst (- (* (1+ delta) n-word-bytes)))
              (inst stdu temp dst (- n-word-bytes))
-             (inst cmpw dst result)
+             (inst cmpd dst result)
              (inst bgt LOOP))
             (t
              ;; If DELTA is negative then the start of the MORE args
@@ -1099,7 +1100,7 @@ default-value-8
              (inst ld temp result (- (* delta n-word-bytes)))
              (inst stw temp result 0)
              (inst addi result result n-word-bytes)
-             (inst cmpw dst result)
+             (inst cmpd dst result)
              (inst bgt LOOP))))
 
     DO-REGS
@@ -1155,13 +1156,13 @@ default-value-8
       (if dx-p
           (progn
             (align-csp temp)
-            (inst clrrwi result csp-tn n-lowtag-bits)
+            (inst clrrdi result csp-tn n-lowtag-bits)
             (inst ori result result list-pointer-lowtag)
             (move dst result)
-            (inst slwi temp count 1)
+            (inst sldi temp count 1)
             (inst add csp-tn csp-tn temp))
           (progn
-            (inst slwi temp count 1)
+            (inst sldi temp count 1)
             (allocation result temp list-pointer-lowtag
                         :temp-tn dst
                         :flag-tn pa-flag)

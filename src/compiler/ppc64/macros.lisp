@@ -119,7 +119,8 @@
 (defmacro lisp-return (return-pc lip &key (offset 0))
   "Return to RETURN-PC."
   `(progn
-     (inst addi ,lip ,return-pc (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
+     (inst addi ,lip ,return-pc
+           (+ (- other-pointer-lowtag) n-word-bytes (* ,offset 4)))
      (inst mtlr ,lip)
      (inst blr)))
 
@@ -214,22 +215,17 @@
               (move ,temp-tn ,size)))
 
        #-sb-thread
-       (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
-       #-sb-thread
-       (inst ld ,result-tn ,flag-tn 0)
+       ;; thread-base-tn will point directly to the C variable
+       (progn (inst lr thread-base-tn (make-fixup "gc_alloc_region" :foreign-dataref))
+              (inst ld thread-base-tn thread-base-tn 0) ; because sb-dynamic-core
+              (inst ld ,result-tn thread-base-tn 0))
        #+sb-thread
        (inst ld ,result-tn thread-base-tn (* thread-alloc-region-slot
                                               n-word-bytes))
 
-       ;; we can optimize this to only use one fixup here, once we get
-       ;; it working
-       ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
-       ;; (inst lwz ,flag-tn ,flag-tn 0)
-       #-sb-thread
-       (inst ld ,flag-tn ,flag-tn n-word-bytes)
-       #+sb-thread
-       (inst ld ,flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
-                                            n-word-bytes))
+       (inst ld ,flag-tn thread-base-tn ; region->end_addr
+             #-sb-thread n-word-bytes
+             #+sb-thread(* (1+ thread-alloc-region-slot) n-word-bytes))
 
        (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
@@ -249,15 +245,10 @@
          (inst tw :lgt ,result-tn ,flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
-         ;; #-sb-thread three #+sb-thread one machine instruction.
-         ;; The lr of a fixup counts as two instructions.
-         #-sb-thread
-         (progn
-           (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign))
-           (inst std ,result-tn ,flag-tn 0))
-         #+sb-thread
-         (inst stw ,result-tn thread-base-tn (* thread-alloc-region-slot
-                                                n-word-bytes)))
+         ;; one machine instruction.
+         (inst std ,result-tn thread-base-tn
+               #-sb-thread 0
+               #+sb-thread (* thread-alloc-region-slot n-word-bytes)))
 
        ;; Should the allocation trap above have fired, the runtime
        ;; arranges for execution to resume here, just after where we

@@ -30,14 +30,14 @@
     (pseudo-atomic (pa-flag)
       (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                 lowtag-mask))
-      (inst clrrwi ndescr ndescr n-lowtag-bits)
+      (inst clrrdi ndescr ndescr n-lowtag-bits) ; or CLRRWI
       (allocation header ndescr other-pointer-lowtag
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
       (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
-      (inst slwi ndescr ndescr n-widetag-bits)
+      (inst sldi ndescr ndescr n-widetag-bits) ; or SLWI
       (inst or ndescr ndescr type)
-      (inst srwi ndescr ndescr n-fixnum-tag-bits)
+      (inst srdi ndescr ndescr n-fixnum-tag-bits) ; or SRDI
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
@@ -61,9 +61,9 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
     (loadw temp x 0 other-pointer-lowtag)
-    (inst srawi temp temp n-widetag-bits)
+    (inst sradi temp temp n-widetag-bits) ; or SRAWI
     (inst subi temp temp (1- array-dimensions-offset))
-    (inst slwi res temp n-fixnum-tag-bits)))
+    (inst sldi res temp n-fixnum-tag-bits))) ; or SLWI
 
 ;;;; Bounds checking routine.
 
@@ -81,7 +81,7 @@
     (let ((error (generate-error-code vop 'invalid-array-index-error
                                       array bound index)))
       (%test-fixnum index temp error t)
-      (inst cmplw index bound)
+      (inst cmpld index bound)
       (inst bge error))))
 
 
@@ -135,8 +135,6 @@
     unsigned-num unsigned-reg)
   (def-data-vector-frobs simple-array-unsigned-byte-64 word-index
     unsigned-num unsigned-reg)
-
-
   (def-data-vector-frobs simple-array-unsigned-fixnum word-index
     positive-fixnum any-reg)
   (def-data-vector-frobs simple-array-fixnum word-index
@@ -153,12 +151,24 @@
   (:translate %compare-and-swap-svref)
   (:arg-types simple-vector positive-fixnum * *))
 
-;;; Integer vectors whos elements are smaller than a byte.  I.e. bit, 2-bit,
+;;; Integer vectors whose elements are smaller than a byte.  I.e. bit, 2-bit,
 ;;; and 4-bit vectors.
 ;;;
 
 (macrolet ((def-small-data-vector-frobs (type bits)
-  (let* ((elements-per-word (floor n-word-bits bits))
+  ;; We're treating the read/writable quantum as 32 bits here
+  ;; rather than 64 so that the code is the same as for 32-bit ppc.
+  ;; It looks like we can get the single bit read access
+  ;; down a few instructions.
+  ;; This C code to access char array 'b' as bits compiles to 5 instructions:
+  ;;  { int index = bit >> shift; return (int8_t)(b[index]<<(bit & mask)) < 0; }
+  ;;        srdi 9,3,3
+  ;;        rlwinm 3,3,0,29,31
+  ;;        lbzx 9,4,9
+  ;;        slw 3,9,3
+  ;;        rldicl 3,3,57,63
+  ;; We of course have to add in vector-data-offset, and fixnumize the result.
+  (let* ((elements-per-word (floor 32 bits))
          (bit-shift (1- (integer-length elements-per-word))))
     `(progn
        (define-vop (,(symbolicate 'data-vector-ref/ type))
@@ -315,6 +325,27 @@
 ;;; And the float variants.
 ;;;
 
+(defmacro compute-lispword-offset () ; for {tagged word, double float, complex single}
+  '(progn
+     (unless (= word-shift n-fixnum-tag-bits)
+       (inst sldi offset index (- word-shift n-fixnum-tag-bits)))
+     (inst addi offset index (- (* vector-data-offset n-word-bytes)
+                                other-pointer-lowtag))))
+
+(macrolet ((compute-sfloat-offset ()
+             '(progn
+                (case n-fixnum-tag-bits
+                  (1 (inst sldi offset index 1))
+                  (3 (inst srdi offset index 1)))
+                (inst addi offset index (- (* vector-data-offset n-word-bytes)
+                                           other-pointer-lowtag))))
+           (compute-cplx-dfloat-offset ()
+             '(progn
+                (unless (= (1+ word-shift) n-fixnum-tag-bits)
+                  (inst sldi offset index (- (1+ word-shift) n-fixnum-tag-bits)))
+                (inst addi offset index (- (* vector-data-offset n-word-bytes)
+                                           other-pointer-lowtag)))))
+
 (define-vop (data-vector-ref/simple-array-single-float)
   (:note "inline array access")
   (:translate data-vector-ref)
@@ -326,10 +357,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types single-float)
   (:generator 5
-    (inst addi offset index (- (* vector-data-offset n-word-bytes)
-                              other-pointer-lowtag))
+    (compute-sfloat-offset)
     (inst lfsx value object offset)))
-
 
 (define-vop (data-vector-set/simple-array-single-float)
   (:note "inline array store")
@@ -343,9 +372,7 @@
   (:result-types single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (inst addi offset index
-          (- (* vector-data-offset n-word-bytes)
-             other-pointer-lowtag))
+    (compute-sfloat-offset)
     (inst stfsx value object offset)
     (unless (location= result value)
       (inst frsp result value))))
@@ -361,9 +388,7 @@
   (:result-types double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 7
-    (inst slwi offset index 1)
-    (inst addi offset offset (- (* vector-data-offset n-word-bytes)
-                                other-pointer-lowtag))
+    (compute-lispword-offset)
     (inst lfdx value object offset)))
 
 (define-vop (data-vector-set/simple-array-double-float)
@@ -378,9 +403,7 @@
   (:result-types double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 20
-    (inst slwi offset index 1)
-    (inst addi offset offset (- (* vector-data-offset n-word-bytes)
-                        other-pointer-lowtag))
+    (compute-lispword-offset)
     (inst stfdx value object offset)
     (unless (location= result value)
       (inst fmr result value))))
@@ -399,14 +422,10 @@
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:result-types complex-single-float)
   (:generator 5
-    (let ((real-tn (complex-single-reg-real-tn value)))
-      (inst slwi offset index 1)
-      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
-                                  other-pointer-lowtag))
-      (inst lfsx real-tn object offset))
-    (let ((imag-tn (complex-single-reg-imag-tn value)))
-      (inst addi offset offset n-word-bytes)
-      (inst lfsx imag-tn object offset))))
+    (compute-lispword-offset)
+    (inst lfsx (complex-single-reg-real-tn value) object offset)
+    (inst addi offset offset 4)
+    (inst lfsx (complex-single-reg-imag-tn value) object offset)))
 
 (define-vop (data-vector-set/simple-array-complex-single-float)
   (:note "inline array store")
@@ -421,21 +440,18 @@
   (:result-types complex-single-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 5
+    (compute-lispword-offset)
     (let ((value-real (complex-single-reg-real-tn value))
           (result-real (complex-single-reg-real-tn result)))
-      (inst slwi offset index 1)
-      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
-                                  other-pointer-lowtag))
       (inst stfsx value-real object offset)
       (unless (location= result-real value-real)
         (inst frsp result-real value-real)))
     (let ((value-imag (complex-single-reg-imag-tn value))
           (result-imag (complex-single-reg-imag-tn result)))
-      (inst addi offset offset n-word-bytes)
+      (inst addi offset offset 4)
       (inst stfsx value-imag object offset)
       (unless (location= result-imag value-imag)
         (inst frsp result-imag value-imag)))))
-
 
 (define-vop (data-vector-ref/simple-array-complex-double-float)
   (:note "inline array access")
@@ -448,14 +464,10 @@
   (:result-types complex-double-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 7
-    (let ((real-tn (complex-double-reg-real-tn value)))
-      (inst slwi offset index 2)
-      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
-                                  other-pointer-lowtag))
-      (inst lfdx real-tn object offset))
-    (let ((imag-tn (complex-double-reg-imag-tn value)))
-      (inst addi offset offset (* 2 n-word-bytes))
-      (inst lfdx imag-tn object offset))))
+    (compute-cplx-dfloat-offset)
+    (inst lfdx (complex-double-reg-real-tn value) object offset)
+    (inst addi offset offset 8)
+    (inst lfdx (complex-double-reg-imag-tn value) object offset)))
 
 (define-vop (data-vector-set/simple-array-complex-double-float)
   (:note "inline array store")
@@ -470,20 +482,18 @@
   (:result-types complex-double-float)
   (:temporary (:scs (non-descriptor-reg) :from (:argument 1)) offset)
   (:generator 20
+    (compute-cplx-dfloat-offset)
     (let ((value-real (complex-double-reg-real-tn value))
           (result-real (complex-double-reg-real-tn result)))
-      (inst slwi offset index 2)
-      (inst addi offset offset (- (* vector-data-offset n-word-bytes)
-                                  other-pointer-lowtag))
       (inst stfdx value-real object offset)
       (unless (location= result-real value-real)
         (inst fmr result-real value-real)))
     (let ((value-imag (complex-double-reg-imag-tn value))
           (result-imag (complex-double-reg-imag-tn result)))
-      (inst addi offset offset (* 2 n-word-bytes))
+      (inst addi offset offset 8)
       (inst stfdx value-imag object offset)
       (unless (location= result-imag value-imag)
-        (inst fmr result-imag value-imag)))))
+        (inst fmr result-imag value-imag))))))
 
 
 ;;; These vops are useful for accessing the bits of a vector irrespective of
@@ -563,16 +573,14 @@
   (:temporary (:sc unsigned-reg :from (:argument 1)) offset)
   (:temporary (:sc non-descriptor-reg) sum)
   (:generator 4
-    (inst addi offset index
-          (- (* vector-data-offset n-word-bytes)
-             other-pointer-lowtag))
+    (compute-lispword-offset)e
     ;; load the slot value, add DIFF, write the sum back, and return
     ;; the original slot value, atomically, and include a memory
     ;; barrier.
     (inst sync)
     LOOP
-    (inst lwarx result offset object)
+    (inst ldarx result offset object)
     (inst add sum result diff)
-    (inst stwcx. sum offset object)
+    (inst stdcx. sum offset object)
     (inst bne LOOP)
     (inst isync)))

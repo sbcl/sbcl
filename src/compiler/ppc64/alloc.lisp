@@ -48,7 +48,7 @@
                  (if dx-p
                      (progn
                        (align-csp res)
-                       (inst clrrwi res csp-tn n-lowtag-bits)
+                       (inst clrrdi res csp-tn n-lowtag-bits)
                        (inst ori res res list-pointer-lowtag)
                        (inst addi csp-tn csp-tn alloc))
                      (allocation res alloc list-pointer-lowtag :temp-tn alloc-temp
@@ -107,7 +107,7 @@
         (if stack-allocate-p
             (progn
               (align-csp result)
-              (inst clrrwi. result csp-tn n-lowtag-bits)
+              (inst clrrdi result csp-tn n-lowtag-bits)
               (inst addi csp-tn csp-tn alloc-size)
               (inst ori result result fun-pointer-lowtag)
               (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag)))
@@ -171,10 +171,19 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 6
-    (inst addi bytes extra (* (1+ words) n-word-bytes))
-    (inst slwi header bytes (- n-widetag-bits n-fixnum-tag-bits))
+    ;; 'extra' is a tagged fixnum expressing the word count
+    (cond ((= word-shift n-fixnum-tag-bits)
+           ;; 'extra' already looks like an unsigned-reg expressing a byte count
+           (inst addi bytes extra (* (1+ words) n-word-bytes)))
+          (t
+           ;; scale 'extra' to make it into an unsigned-reg byte count
+           (inst sldi bytes extra (- word-shift n-fixnum-tag-bits))
+           (inst addi bytes bytes (* (1+ words) n-word-bytes))))
+    ;; store 1+nwords into header-data, downscaling bytes to words
+    (inst sldi header bytes (- n-widetag-bits word-shift))
+    ;; subtract the excess length and add in the widetag
     (inst addi header header (+ (ash -2 n-widetag-bits) type))
-    (inst clrrwi bytes bytes n-lowtag-bits)
+    (inst clrrdi bytes bytes n-lowtag-bits) ; round down to even
     (pseudo-atomic (pa-flag)
       (allocation result bytes lowtag :temp-tn temp :flag-tn pa-flag)
       (storew header result 0 lowtag))))
