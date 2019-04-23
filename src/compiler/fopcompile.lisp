@@ -268,6 +268,10 @@
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
 ;;; In particular, pathnames are not trivially dumpable because the HOST slot
 ;;; might need to be dumped as a reference to the *PHYSICAL-HOST* symbol.
+;;; This function is nowhere near as OAOO-violating as it once was - it no
+;;; longer has local knowledge of the set of leaf types, nor how to test for
+;;; non-trivial instances. Sharing more code with MAYBE-EMIT-MAKE-LOAD-FORMS
+;;; might be a nice goal, but it seems relatively impossible to achieve.
 (defun constant-fopcompilable-p (constant)
   (declare (optimize (debug 1))) ;; TCO
   (let ((xset (alloc-xset))
@@ -300,12 +304,17 @@
            (dotimes (i (array-total-size value))
              (grovel (row-major-aref value i))))
           (instance
-           (multiple-value-bind (create init) (%make-load-form value)
-             (declare (ignore create))
-             (unless (eq init 'sb-fasl::fop-struct)
-               (return-from constant-fopcompilable-p nil))
-             (do-instance-tagged-slot (i value)
-               (grovel (%instance-ref value i))))
+           ;; Almost always, a make-load-form method will call
+           ;; MAKE-LOAD-FORM-SAVING-SLOTS for all slots. If so,
+           ;; then this structure is amenable to FOPCOMPILE.
+           ;; If not, then it isn't, which is not strictly true-
+           ;; the method might have returned a fopcompilable
+           ;; creation form and no init form. (Handling of
+           ;; circularity is best left to the main compiler.)
+           (unless (sb-fasl:load-form-is-default-mlfss-p value)
+             (return-from constant-fopcompilable-p nil))
+           (do-instance-tagged-slot (i value)
+             (grovel (%instance-ref value i)))
            (push value dumpable-instances))
           (t
            (return-from constant-fopcompilable-p nil)))))

@@ -501,7 +501,7 @@
 
 ;;; Note that the specified structure can just be dumped by
 ;;; enumerating the slots.
-(defun fasl-note-dumpable-instance (structure file)  
+(defun fasl-note-dumpable-instance (structure file)
   (setf (gethash structure (fasl-output-valid-structures file)) t)
   (values))
 

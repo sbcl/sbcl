@@ -237,7 +237,7 @@
   (let ((foo (make-foo :x 'x :y 'y)))
     (flet ((assert-canonical (slots)
              (let ((*foo-save-slots* slots))
-               (assert (sb-fasl::load-form-is-default-mlfss-p foo)))))
+               (assert (sb-fasl:load-form-is-default-mlfss-p foo)))))
       (assert-canonical :all)
       (assert-canonical '(x y)) ; specifying all slots explicitly is still canonical
       (assert-canonical '(y x)))
