@@ -242,6 +242,8 @@ the stack without triggering overflow protection.")
   (values))
 
 (defstruct (debug-name-marker (:print-function print-debug-name-marker)
+                              ;; make these satisfy SB-XC:INSTANCEP
+                              #+sb-xc-host (:include structure!object)
                               (:copier nil)))
 
 (defvar *debug-name-level* 4)
@@ -249,14 +251,6 @@ the stack without triggering overflow protection.")
 (defvar *debug-name-punt*)
 (define-load-time-global *debug-name-sharp* (make-debug-name-marker))
 (define-load-time-global *debug-name-ellipsis* (make-debug-name-marker))
-
-(defmethod make-load-form ((marker debug-name-marker) &optional env)
-  (declare (ignore env))
-  (cond ((eq marker *debug-name-sharp*) '*debug-name-sharp*)
-        ((eq marker *debug-name-ellipsis*) '*debug-name-ellipsis*)
-        (t
-         (warn "Dumping unknown debug-name marker.")
-         '(make-debug-name-marker))))
 
 (defun print-debug-name-marker (marker stream level)
   (declare (ignore level))

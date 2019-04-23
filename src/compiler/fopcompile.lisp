@@ -186,11 +186,13 @@
             (constant-fopcompilable-p (constant-form-value form)))
        (and (listp form)
             (let ((function (car form)))
-              ;; It is assumed that uses of these three recognized functions
-              ;; are carefully controlled, and recursion on fopcompilable-p
-              ;; would say "yes" for each argument.
-              (or (member function '(sb-impl::%defun
-                                     sb-pcl::!trivial-defmethod
+              ;; Certain known functions have a special way of checking
+              ;; their fopcompilability in the cross-compiler.
+              (or ;; allow %DEFUN, also ensuring that any inline lambda gets
+                  ;; its constant structures (possibly containing COMMAs) noted
+                  ;; as dumpable literals.
+                  (and (eq function 'sb-impl::%defun) (fopcompilable-p (fourth form)))
+                  (member function '(sb-pcl::!trivial-defmethod
                                      sb-kernel::%defstruct))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(%defconstant sb-impl::%defparameter))
@@ -254,6 +256,7 @@
 ;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
 (defun dumpable-leaflike-p (obj)
   (or (sb-xc:typep obj '(or symbol number character unboxed-array
+                            debug-name-marker
                             #+sb-simd-pack simd-pack
                             #+sb-simd-pack-256 simd-pack-256))
       ;; The cross-compiler wants to dump CTYPE instances as leaves,
@@ -267,7 +270,8 @@
 ;;; might need to be dumped as a reference to the *PHYSICAL-HOST* symbol.
 (defun constant-fopcompilable-p (constant)
   (declare (optimize (debug 1))) ;; TCO
-  (let ((xset (alloc-xset)))
+  (let ((xset (alloc-xset))
+        (dumpable-instances))
     (named-let grovel ((value constant))
       ;; Unless VALUE is an object which which obviously
       ;; can't contain other objects
@@ -296,22 +300,18 @@
            (dotimes (i (array-total-size value))
              (grovel (row-major-aref value i))))
           (instance
-           (case (%make-load-form value)
-             (sb-fasl::fop-struct
-                ;; FIXME: Why is this needed? If the constant
-                ;; is deemed fopcompilable, then when we dump
-                ;; it we bind *dump-only-valid-structures* to
-                ;; NIL.
-                (fasl-validate-structure value *compile-object*)
-                ;; The above FIXME notwithstanding,
-                ;; there's never a need to grovel a layout.
-                (do-instance-tagged-slot (i value)
-                  (grovel (%instance-ref value i))))
-             (:ignore-it)
-             (t (return-from constant-fopcompilable-p nil))))
+           (multiple-value-bind (create init) (%make-load-form value)
+             (declare (ignore create))
+             (unless (eq init 'sb-fasl::fop-struct)
+               (return-from constant-fopcompilable-p nil))
+             (do-instance-tagged-slot (i value)
+               (grovel (%instance-ref value i))))
+           (push value dumpable-instances))
           (t
-           (return-from constant-fopcompilable-p nil))))))
-    t)
+           (return-from constant-fopcompilable-p nil)))))
+    (dolist (instance dumpable-instances)
+      (fasl-note-dumpable-instance instance *compile-object*))
+    t))
 
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
 ;;; FOP stack), or NIL if any value will be discarded. FOPCOMPILABLE-P
@@ -534,9 +534,4 @@
 
 (defun fopcompile-constant (fasl form for-value-p)
   (when for-value-p
-    ;; FIXME: Without this binding the dumper chokes on unvalidated
-    ;; structures: CONSTANT-FOPCOMPILABLE-P validates the structure
-    ;; about to be dumped, not its load-form. Compare and contrast
-    ;; with EMIT-MAKE-LOAD-FORM.
-    (let ((sb-fasl::*dump-only-valid-structures* nil))
-      (dump-object form fasl))))
+    (dump-object form fasl)))

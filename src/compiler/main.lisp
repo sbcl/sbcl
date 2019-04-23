@@ -2090,9 +2090,9 @@ SPEED and COMPILATION-SPEED optimization values, and the
     (multiple-value-bind (creation-form init-form)
         (cond (namep (values `(symbol-global-value ',name) nil))
               (t (%make-load-form constant)))
-      (case creation-form
-        (sb-fasl::fop-struct
-         (fasl-validate-structure constant fasl)
+      (cond
+        ((eq init-form 'sb-fasl::fop-struct)
+         (fasl-note-dumpable-instance constant fasl)
          t)
         (t
          (let* ((name (write-to-string constant :level 1 :length 2))
