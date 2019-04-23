@@ -802,11 +802,12 @@
   (:args (x :scs (any-reg) :target hi)
          (y :scs (unsigned-reg)))
   (:arg-types positive-fixnum unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
   (:results (hi :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 15
-    (inst mulhu hi x y)
-    (inst andi hi hi (lognot fixnum-tag-mask))))
+    (inst mulhu temp x y)
+    (inst andi hi temp (lognot fixnum-tag-mask))))
 
 (define-vop (bignum-lognot #-64-bit lognot-mod32/unsigned=>unsigned
                            #+64-bit lognot-mod64/unsigned=>unsigned)

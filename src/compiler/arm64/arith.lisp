@@ -1114,11 +1114,12 @@
   (:args (x :scs (any-reg) :target hi)
          (y :scs (unsigned-reg)))
   (:arg-types positive-fixnum unsigned-num)
+  (:temporary (:sc unsigned-reg) temp)
   (:results (hi :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 15
-    (inst umulh hi x y)
-    (inst and hi hi (bic-mask fixnum-tag-mask))))
+    (inst umulh temp x y)
+    (inst and hi temp (bic-mask fixnum-tag-mask))))
 
 (define-vop (bignum-lognot lognot-mod64/unsigned=>unsigned)
   (:translate sb-bignum:%lognot))
