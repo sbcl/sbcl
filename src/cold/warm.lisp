@@ -68,7 +68,12 @@
         (dolist (expr (read stream))
           (destructuring-bind (fun args result) expr
             (let ((actual (apply fun (sb-int:ensure-list args))))
-              (assert (eql actual result)))))))))
+              (unless (eql actual result)
+                (#+sb-devel error
+                 #-sb-devel format #-sb-devel t
+                 "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
+                 expr actual)))))))))
+
 
 ;;;; compiling and loading more of the system
 
