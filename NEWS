@@ -4,8 +4,13 @@ changes relative to sbcl-1.5.1:
   * enhancement: RISC-V support with the generational garbage collector.
   * enhancement: command-line option "--tls-limit" can be used to alter the
     maximum number of thread-local symbols from its default of 4096.
+  * enhancement: better muffling of redefinition and lambda-list warnings
+  * platform support:
+    - OS X: use Grand Central Dispatch semaphores, rather than Mach semaphores
+    - Windows: remove non-functional definition of make-listener-thread
   * new feature: decimal reader syntax for rationals, using the R exponent
     marker and/or *READ-DEFAULT-FLOAT-FORMAT* of RATIONAL.
+  * optimization: various Unicode tables have been packed more efficiently
 
 changes in sbcl-1.5.1 relative to sbcl-1.5.0:
   * enhancement: restarts for missing package errors.
