@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.1:
+changes in sbcl-1.5.2 relative to sbcl-1.5.1:
   * enhancement: RISC-V support with the generational garbage collector.
   * enhancement: command-line option "--tls-limit" can be used to alter the
     maximum number of thread-local symbols from its default of 4096.
