@@ -1082,7 +1082,7 @@ and the number of 0 bits if INTEGER is negative."
 
 (defun ash (integer count)
   "Shifts integer left by count places preserving sign. - count shifts right."
-  (declare (integer integer count) (explicit-check))
+  (declare (explicit-check))
   (etypecase integer
     (fixnum
      (cond ((zerop integer)
