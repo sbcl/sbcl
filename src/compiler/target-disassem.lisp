@@ -952,7 +952,7 @@
              `(let ((*print-pretty* t)
                     (*print-lines* 2)
                     (*print-length* 4)
-                    (*print-level* 3))
+                    (*print-level* 4))
                 ,@body)))
 
 ;;; Print a newline to STREAM, inserting any pending notes in DSTATE
