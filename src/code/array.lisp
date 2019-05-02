@@ -1810,7 +1810,7 @@ function to be removed without further warning."
        ;; However when it comes to actually executing the toplevel forms
        ;; that were compiled into thunks of target code to invoke,
        ;; all the known good entries must be preserved.
-       (substitute #',error-name 0 ,table-name)
+       (nsubstitute #',error-name 0 ,table-name)
 
        ,@(loop for info across *specialized-array-element-type-properties*
                for typecode = (saetp-typecode info)
@@ -1828,11 +1828,12 @@ function to be removed without further warning."
          (check-type (first args) symbol)
          (let ((tag (gensym "TAG")))
            `(funcall
-             (the function
+             (truly-the function
                (let ((,tag 0))
                  (when (%other-pointer-p ,(first args))
                    (setf ,tag (%other-pointer-widetag ,(first args))))
-                 (svref ,',table-name ,tag)))
+                 (svref (truly-the (simple-vector 256) (load-time-value ,',table-name t))
+                        ,tag)))
              ,@args))))))
 
 (defun sb-kernel::check-array-shape (array dimensions)
