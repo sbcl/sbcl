@@ -1928,7 +1928,7 @@ scavenge_control_stack(struct thread *th)
                 gc_assert(n_words_scavenged == 1);
             }
         } else if (scavtab[header_widetag(object)] == scav_lose) {
-            lose("unboxed object in scavenge_control_stack: %p->%x, start=%p, end=%p",
+            lose("unboxed object in scavenge_control_stack: %p->%"OBJ_FMTX", start=%p, end=%p",
                  object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
         }
     }
