@@ -1047,16 +1047,6 @@ table itself."
       (setf (hash-table-number-entries hash-table) 0)))
   hash-table)
 
-;; Helper for atomic read/update of a synchronized table
-;; in a limited sort of way using a double-checked lock.
-;; You don't get to see the old value first.
-;; It wouldn't be too hard to add that feature.
-(defun puthash-if-absent (key table constructor)
-  (or (gethash key table)
-      (let ((val (funcall constructor)))
-        (with-locked-system-table (table)
-          ;; VAL is discarded if KEY is found this time.
-          (or (gethash key table) (setf (gethash key table) val))))))
 
 ;;;; methods on HASH-TABLE
 
