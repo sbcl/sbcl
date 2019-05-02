@@ -848,21 +848,15 @@ core and return a descriptor to it."
       (number-pair-to-core (number-to-core r) (number-to-core i) sb-vm:complex-widetag)
       (ecase (sb-impl::flonum-format r)
        (single-float
-        (let ((des (allocate-header+object *dynamic*
+        (let* ((des (allocate-header+object *dynamic*
                                             (1- sb-vm:complex-single-float-size)
-                                            sb-vm:complex-single-float-widetag)))
-          #-64-bit
-          (progn
-            (write-wordindexed/raw
-             des sb-vm:complex-single-float-real-slot (single-float-bits r))
-            (write-wordindexed/raw
-             des sb-vm:complex-single-float-imag-slot (single-float-bits i)))
-          #+64-bit
-          (write-wordindexed/raw
-           des sb-vm:complex-single-float-data-slot
-           ;; FIXME: we seem to be assuming a certain endianness here aren't we?
-           (logior (ldb (byte 32 0) (single-float-bits r))
-                   (ash (single-float-bits i) 32)))
+                                            sb-vm:complex-single-float-widetag))
+               (where (ash (+ #+64-bit sb-vm:complex-single-float-data-slot
+                              #-64-bit sb-vm:complex-single-float-real-slot
+                              (descriptor-word-offset des))
+                           sb-vm:word-shift)))
+          (setf (bvref-32 (descriptor-mem des) where) (single-float-bits r)
+                (bvref-32 (descriptor-mem des) (+ where 4)) (single-float-bits i))
           des))
        (double-float
         (let ((des (allocate-header+object *dynamic*
