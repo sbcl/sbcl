@@ -729,8 +729,8 @@
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
          (unless (location= real r)
-           (inst fstore :single real nfp (* n-word-bytes offset)))
-         (inst fstore :single imag nfp (+ (* n-word-bytes offset) 4)))))))
+           (inst fstore :single real nfp offset))
+         (inst fstore :single imag nfp (+ offset 4)))))))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -757,8 +757,8 @@
        (let ((nfp (current-nfp-tn vop))
              (offset (* (tn-offset r) n-word-bytes)))
          (unless (location= real r)
-           (inst fstore :double real nfp (* n-word-bytes offset)))
-         (inst fstore :double imag nfp (+ (* n-word-bytes offset) 8)))))))
+           (inst fstore :double real nfp offset))
+         (inst fstore :double imag nfp (+ offset 8)))))))
 
 (define-vop (complex-single-float-value)
   (:args (x :scs (complex-single-reg) :target r
