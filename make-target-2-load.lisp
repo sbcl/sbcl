@@ -1,5 +1,6 @@
 ;;; Do warm init without compiling files.
 
+(pushnew :sb-devel *features*)
 ;;; There's a fair amount of machinery which is needed only at cold
 ;;; init time, and should be discarded before freezing the final
 ;;; system. We discard it by uninterning the associated symbols.
