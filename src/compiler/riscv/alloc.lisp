@@ -41,7 +41,8 @@
                  (pseudo-atomic (pa-flag)
                    (allocation res alloc list-pointer-lowtag
                                :flag-tn pa-flag
-                               :stack-allocate-p (node-stack-allocate-p node))
+                               :stack-allocate-p (node-stack-allocate-p node)
+                               :temp-tn temp)
                    (move ptr res)
                    (dotimes (i (1- cons-cells))
                      (storew (maybe-load (tn-ref-tn things)) ptr
