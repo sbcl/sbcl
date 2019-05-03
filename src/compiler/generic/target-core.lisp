@@ -35,9 +35,7 @@
   ;; If somebody tries (TRACE LENGTH) for example, it should not cause
   ;; compilations to fail on account of LENGTH becoming a closure.
   (defun sb-vm::function-raw-address (name &aux (fun (fdefinition name)))
-    (cond ((not fun)
-           (error "Can't statically link to undefined function ~S" name))
-          ((not (immobile-space-obj-p fun))
+    (cond ((not (immobile-space-obj-p fun))
            (error "Can't statically link to ~S: code is movable" name))
           ((neq (fun-subtype fun) sb-vm:simple-fun-widetag)
            (error "Can't statically link to ~S: non-simple function" name))
