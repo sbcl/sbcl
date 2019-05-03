@@ -423,7 +423,8 @@
            (inst addi rd zero-tn immediate))
           (t
            (inst lui rd hi)
-           (inst addi rd rd lo)))))
+           (unless (zerop lo)
+             (inst addi rd rd lo))))))
 
 (defun %li (reg value)
   (etypecase value
