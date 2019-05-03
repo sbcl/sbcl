@@ -25,7 +25,7 @@
 ;; Unlock all other SB- packages
 (dolist (package (list-all-packages))
   (let ((name (package-name package)))
-    (when (sb-int:system-package-p name)
+    (when (sb-int:system-package-p (find-package name))
       (sb-ext:unlock-package package))))
 
 ;;; Define this first to avoid a style-warning from 'shebang'
