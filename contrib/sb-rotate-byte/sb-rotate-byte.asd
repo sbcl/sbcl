@@ -15,6 +15,7 @@
      (:file "arm64-vm" :if-feature :arm64)
      (:file "x86-vm" :if-feature :x86)
      (:file "x86-64-vm" :if-feature :x86-64)
+     (:file "riscv-vm" :if-feature :riscv)
      (:file "ppc-vm" :if-feature :ppc)))
    (:file "rotate-byte" :depends-on ("vm")))
   :perform (load-op :after (o c) (provide 'sb-rotate-byte))
