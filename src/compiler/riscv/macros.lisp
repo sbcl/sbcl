@@ -546,7 +546,7 @@ and
          (etypecase size
            (short-immediate
             (inst addi csp-tn csp-tn size))
-           ((signed-byte 32)
+           (u+i-immediate
             (inst li flag-tn size)
             (inst add csp-tn csp-tn flag-tn))
            (tn
@@ -559,7 +559,7 @@ and
          (etypecase size
            (short-immediate
             (inst addi flag-tn flag-tn size))
-           ((signed-byte 32)
+           (u+i-immediate
             (inst li flag-tn (- size lowtag))
             (inst add flag-tn flag-tn result-tn))
            (tn
@@ -578,9 +578,9 @@ and
            (etypecase size
              (short-immediate
               (inst addi result-tn result-tn size))
-             ((signed-byte 32)
+             (U+i-immediate
               (inst li temp-tn size)
-              (inst add result-tn result-tn size))
+              (inst add result-tn result-tn temp-tn))
              (tn
               (inst add result-tn result-tn size)))
            (inst blt flag-tn result-tn alloc)
@@ -588,7 +588,7 @@ and
            (etypecase size
              (short-immediate
               (inst subi result-tn result-tn size))
-             ((signed-byte 32)
+             (u+i-immediate
               (inst sub result-tn result-tn temp-tn))
              (tn
               (inst sub result-tn result-tn size)))
