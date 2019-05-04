@@ -374,6 +374,7 @@ case `uname -m` in
     parisc*) guessed_sbcl_arch=hppa ;;
     9000/800) guessed_sbcl_arch=hppa ;;
     mips*) guessed_sbcl_arch=mips ;;
+    arm64) guessed_sbcl_arch=arm64 ;;
     *arm*) guessed_sbcl_arch=arm ;;
     aarch64) guessed_sbcl_arch=arm64 ;;
     riscv32) guessed_sbcl_arch=riscv xlen=32;;

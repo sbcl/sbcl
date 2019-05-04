@@ -1,0 +1,111 @@
+/*
+ * This is the ARM BSD incarnation of arch-dependent OS-dependent
+ * routines. See also "bsd-os.c".
+ */
+
+/*
+ * This software is part of the SBCL system. See the README file for
+ * more information.
+ *
+ * This software is derived from the CMU CL system, which was
+ * written at Carnegie Mellon University and released into the
+ * public domain. The software is in the public domain and is
+ * provided with absolutely no warranty. See the COPYING and CREDITS
+ * files for more information.
+ */
+
+#include <stdio.h>
+#include <sys/param.h>
+#include <sys/file.h>
+#include "sbcl.h"
+#include "./signal.h"
+#include "os.h"
+#include "arch.h"
+#include "globals.h"
+#include "interrupt.h"
+#include "interr.h"
+#include "lispregs.h"
+#include <sys/socket.h>
+#include <sys/utsname.h>
+#include <machine/sysarch.h>
+
+#include <sys/types.h>
+#include <signal.h>
+#include <sys/time.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <errno.h>
+
+#include "validate.h"
+size_t os_vm_page_size;
+
+
+int arch_os_thread_init(struct thread *thread) {
+    stack_t sigstack;
+#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = thread;
+#else
+    pthread_setspecific(specials,thread);
+#endif
+#endif
+    /* Signal handlers are normally run on the main stack, but we've
+     * swapped stacks, require that the control stack contain only
+     * boxed data, and expands upwards while the C stack expands
+     * downwards. */
+    sigstack.ss_sp    = calc_altstack_base(thread);
+    sigstack.ss_flags = 0;
+    sigstack.ss_size  = calc_altstack_size(thread);
+    if(sigaltstack(&sigstack,0)<0)
+        lose("Cannot sigaltstack: %s\n",strerror(errno));
+
+    return 1;                   /* success */
+}
+int arch_os_thread_cleanup(struct thread *thread) {
+    return 1;                   /* success */
+}
+
+#if defined(LISP_FEATURE_OPENBSD)
+
+os_context_register_t   *
+os_context_register_addr(os_context_t *context, int regno)
+{
+    switch (regno) {
+        case reg_LR:    return (&context->sc_lr);
+        case reg_NSP:   return (&context->sc_sp);
+        default:        return (&context->sc_x[regno]);
+    }
+}
+
+os_context_register_t *
+os_context_pc_addr(os_context_t *context)
+{
+    return (&context->sc_elr);
+}
+
+os_context_register_t   *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    return NULL;
+}
+
+void
+os_restore_fp_control(os_context_t *context)
+{
+}
+
+#endif
+
+os_context_register_t *
+os_context_lr_addr(os_context_t *context)
+{
+    return os_context_register_addr(context, reg_LR);
+}
+
+void
+os_flush_icache(os_vm_address_t address, os_vm_size_t length)
+{
+    os_vm_address_t end_address
+        = (os_vm_address_t)(((uintptr_t) address) + length);
+    __clear_cache(address, end_address);
+}
