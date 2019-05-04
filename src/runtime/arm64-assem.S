@@ -49,7 +49,7 @@
 /* the CSP page sits right before the thread */
 # define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 #endif
-	.align
+	.align 2
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
 call_into_lisp:
@@ -174,7 +174,7 @@ no_args:
 
 	.align 4
 	.equ	.lra, .+OTHER_POINTER_LOWTAG
-	.dword	RETURN_PC_WIDETAG
+	.xword	RETURN_PC_WIDETAG
 
 	// Correct stack pointer for return processing.
         csel reg_CSP, reg_OCFP, reg_CSP, eq
@@ -220,7 +220,7 @@ no_args:
 	.size	call_into_lisp, .-call_into_lisp
 
 
-	.align
+	.align 2
 	.global	call_into_c
 	.type	call_into_c, %function
 call_into_c:
@@ -351,7 +351,7 @@ call_into_c:
         // FIXME-ARM: The following is random garbage, to make
         // code/debug-int compile. To get the debugger working, this
         // needs to be implemented.
-        .align
+        .align 2
         .global fun_end_breakpoint_guts
         .type   fun_end_breakpoint_guts, %object
 fun_end_breakpoint_guts:
@@ -362,7 +362,7 @@ fun_end_breakpoint_trap:
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
 
-        .align
+        .align 2
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
