@@ -19,7 +19,7 @@
 (defconstant +backend-fasl-file-implementation+ :arm)
 
   ;; Minumum observed value, not authoritative.
-(defconstant +backend-page-bytes+ #+linux 4096 #+netbsd 8192)
+(defconstant +backend-page-bytes+ #-netbsd 4096 #+netbsd 8192)
 
 ;;; The size in bytes of GENCGC cards, i.e. the granularity at which
 ;;; writes to old generations are logged.  With mprotect-based write
@@ -110,7 +110,11 @@
   (defconstant linkage-table-space-end   #x0b000000))
 
 #+gencgc
-(!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
+(progn
+  #+(or linux netbsd)
+  (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
+  #+openbsd
+  (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000))
 
 (defconstant linkage-table-growth-direction :down)
 (defconstant linkage-table-entry-size 16)
@@ -120,7 +124,7 @@
 (setq *linkage-space-predefined-entries* '(("alloc_tramp" t)
                                            ("list_alloc_tramp" t)))
 
-#+(or linux netbsd)
+#+(or linux netbsd openbsd)
 (progn
   #-gencgc
   (progn

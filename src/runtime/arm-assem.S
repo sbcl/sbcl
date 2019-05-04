@@ -345,7 +345,7 @@ DEFINE_TRAMPOLINE(list_alloc_tramp, alloc_list)
 do_pending_interrupt:
 #if defined(LISP_FEATURE_LINUX)
 	.word 0xe7f001f0
-#elif defined(LISP_FEATURE_NETBSD)
+#elif defined(LISP_FEATURE_NETBSD) || defined(LISP_FEATURE_OPENBSD)
 	.word 0xe7ffdefe
 #endif
         .byte trap_PendingInterrupt

@@ -2311,7 +2311,9 @@
            (type (member :little-endian :big-endian) byte-order))
   (if (or (eq length 1)
           (and (eq byte-order #+big-endian :big-endian #+little-endian :little-endian)
-               #-(or arm arm64 ppc ppc64 x86 x86-64) ; unaligned loads are ok for these
+               ;; unaligned loads are ok for these
+               #-(or (and arm (not openbsd)) ; openbsd enables alignment faults
+                     arm64 ppc ppc64 x86 x86-64)
                (not (logtest (1- length) (sap-int (sap+ sap offset))))))
       (locally
        (declare (optimize (safety 0))) ; disregard shadow memory for msan
