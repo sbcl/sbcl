@@ -16,10 +16,9 @@
     (let ((count (if (plusp count)
 		     count
 		     (+ 64 count))))
-      (inst slli result integer count)
-      (inst srli temp integer (- 64 count))
+      (inst slli temp integer count)
+      (inst srli result integer (- 64 count))
       (inst or result result temp))))
-
 
 (define-vop (%64bit-rotate-byte)
   (:policy :fast-safe)
@@ -36,9 +35,8 @@
     (inst slti count-temp count 0)
     (inst slli count-temp count-temp 6)
     (inst add count-temp count-temp count)
-    (inst sll result integer count-temp)
-    (inst addi temp sb-vm::zero-tn 64)
-    (inst sub count-temp temp count-temp)
-    (inst srl temp integer count-temp)
+    (inst sll temp integer count-temp)
+    (inst subi count-temp count-temp 64)
+    (inst sub count-temp zero-tn count-temp)
+    (inst srl result integer count-temp)
     (inst or result result temp)))
-
