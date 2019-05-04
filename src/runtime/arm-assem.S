@@ -28,7 +28,7 @@ call_into_lisp:
 	@@ All registers other than R0-R3 and R12 are callee-saves.
         @@ Save R3 to get 8-byte alignemnt.
 	stmfd	sp!, {r3-r11, lr}
-        fstmfdd sp!, {d8-d15}
+        vstmdb	sp!, {d8-d15}
 
 	@@ Start by finding NIL.
 	ldr	reg_NULL, .known_nil
@@ -128,7 +128,7 @@ call_into_lisp:
 	blxne   reg_OCFP
 
 	@@ Restore saved registers.
-        fldmfdd sp!, {d8-d15}
+        vldmia	sp!, {d8-d15}
 	ldmfd	sp!, {r3-r11, lr}
 	bx	lr
 	.size	call_into_lisp, .-call_into_lisp
@@ -315,12 +315,12 @@ name: \
         stmea   r4, {r0-reg_LEXENV, r8} ;\
 \
         ldr     r0,  [sp, #4*4] ;\
-        fstmfdd sp!, {d0-d7} ;\
+        vstmdb  sp!, {d0-d7} ;\
 \
         mov     lr, pc ;\
         ldr     pc,=entry ;\
 \
-        fldmfdd sp!, {d0-d7} ;\
+        vldmia sp!, {d0-d7} ;\
         str     r0,  [sp, #4*4] ;\
         ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
         ldmea   r4, {r0-reg_LEXENV, r8} ;\
