@@ -227,21 +227,23 @@
 
 (defun nthcdr (n list)
   "Performs the cdr function n times on a list."
+  (declare (explicit-check n))
   (flet ((fast-nthcdr (n list)
-           (declare (type index n))
            (do ((i n (1- i))
                 (result list (cdr result)))
-               ((not (plusp i)) result)
-             (declare (type index i)))))
+               ((not (plusp i)) result))))
     (typecase n
-      (index (fast-nthcdr n list))
+      ((and fixnum unsigned-byte)
+       (fast-nthcdr n list))
       ;; Such a large list can only be circular
-      (t (do ((i 0 (1+ i))
+      (t
+       (locally (declare (unsigned-byte n))
+         (do ((i 0 (1+ i))
               (r-i list (cdr r-i))
               (r-2i list (cddr r-2i)))
              ((and (eq r-i r-2i) (not (zerop i)))
               (fast-nthcdr (mod n i) r-i))
-           (declare (type index i)))))))
+           (declare (type fixnum i))))))))
 
 ;;; For [n]butlast
 (defun dotted-nthcdr (n list)

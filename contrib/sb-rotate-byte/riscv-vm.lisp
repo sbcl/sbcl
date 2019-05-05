@@ -14,8 +14,8 @@
   (:generator 5
     (aver (not (= count 0)))
     (let ((count (if (plusp count)
-		     count
-		     (+ 64 count))))
+                     count
+                     (+ 64 count))))
       (inst slli temp integer count)
       (inst srli result integer (- 64 count))
       (inst or result result temp))))
