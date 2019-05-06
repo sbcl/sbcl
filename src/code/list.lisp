@@ -248,23 +248,13 @@
 
 ;;; For [n]butlast
 (defun dotted-nthcdr (n list)
-  (flet ((fast-nthcdr (n list)
-           (declare (type index n))
-           (do ((i n (1- i))
-                (result list (cdr result)))
-               ((not (plusp i)) result)
-             (declare (type index i))
-             (when (atom result)
-               (return)))))
-    (typecase n
-      (index (fast-nthcdr n list))
-      ;; Such a large list can only be circular
-      (t (do ((i 0 (1+ i))
-              (r-i list (cdr r-i))
-              (r-2i list (cddr r-2i)))
-             ((and (eq r-i r-2i) (not (zerop i)))
-              (fast-nthcdr (mod n i) r-i))
-           (declare (type index i)))))))
+  (declare (fixnum n))
+  (do ((i n (1- i))
+       (result list (cdr result)))
+      ((not (plusp i)) result)
+    (declare (type fixnum i))
+    (when (atom result)
+      (return))))
 
 ;;; LAST
 ;;;
@@ -526,14 +516,17 @@
 
 
 (defun butlast (list &optional (n 1))
-  (cond ((zerop n)
-         (copy-list list))
-        ((not (typep n 'index))
+  (declare (optimize speed)
+           (explicit-check n))
+  (cond ((not (typep n '(and fixnum unsigned-byte)))
+         (the unsigned-byte n)
          nil)
+        ((zerop n)
+         (copy-list list))
         (t
          (let ((head (dotted-nthcdr (1- n) list)))
-           (and (consp head)      ; there are at least n
-                (collect ((copy)) ; conses; copy!
+           (and (consp head)            ; there are at least n
+                (collect ((copy))       ; conses; copy!
                   (do ((trail list (cdr trail))
                        (head head (cdr head)))
                       ;; HEAD is n-1 conses ahead of TRAIL;
@@ -544,14 +537,17 @@
                     (copy (car trail)))))))))
 
 (defun nbutlast (list &optional (n 1))
-  (cond ((zerop n)
-         list)
-        ((not (typep n 'index))
+  (declare (optimize speed)
+           (explicit-check n))
+  (cond ((not (typep n '(and fixnum unsigned-byte)))
+         (the unsigned-byte n)
          nil)
+        ((zerop n)
+         list)
         (t
          (let ((head (dotted-nthcdr (1- n) list)))
-           (and (consp head)       ; there are more than n
-                (consp (cdr head)) ; conses.
+           (and (consp head)            ; there are more than n
+                (consp (cdr head))      ; conses.
                 ;; TRAIL trails by n cons to be able to
                 ;; cut the list at the cons just before.
                 (do ((trail list (cdr trail))
