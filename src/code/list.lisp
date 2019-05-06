@@ -230,9 +230,11 @@
   (declare (explicit-check n)
            (optimize speed))
   (flet ((fast-nthcdr (n list)
+           (declare (fixnum n))
            (do ((i n (1- i))
                 (result list (cdr result)))
-               ((not (plusp i)) result))))
+               ((not (plusp i)) result)
+             (declare (fixnum i)))))
     (typecase n
       ((and fixnum unsigned-byte)
        (fast-nthcdr n list))
