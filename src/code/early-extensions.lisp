@@ -1073,20 +1073,16 @@ NOTE: This interface is experimental and subject to change."
 (deftype deprecation-state ()
   '(member :early :late :final))
 
-(deftype deprecation-software-and-version ()
-  '(or string (cons string (cons string null))))
-
 (defun normalize-deprecation-since (since)
-  (unless (typep since 'deprecation-software-and-version)
-    (error 'simple-type-error
+  (typecase since
+    (string (values nil since))
+    ((cons string (cons string null)) (values (car since) (cadr since)))
+    (t (error 'simple-type-error
            :datum since
-           :expected-type 'deprecation-software-and-version
+           :expected-type '(or string (cons string (cons string null)))
            :format-control "~@<The value ~S does not designate a ~
                             version or a software name and a version.~@:>"
-           :format-arguments (list since)))
-  (if (typep since 'string)
-      (values nil since)
-      (values-list since)))
+           :format-arguments (list since)))))
 
 (defun normalize-deprecation-replacements (replacements)
   (if (or (not (listp replacements))
