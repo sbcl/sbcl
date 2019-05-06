@@ -706,6 +706,10 @@
              (let ((name (lvar-fun-name
                           (basic-combination-fun use)))
                    (args (basic-combination-args use)))
+               #+sb-xc-host
+               (when (and (symbolp name)
+                          (get name :sb-xc-wrapper))
+                 (setf name (get name :sb-xc-wrapper)))
                (case name
                  ((%typep %instance-typep)
                   (let ((type (second args)))
