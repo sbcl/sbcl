@@ -15,22 +15,22 @@
 
 (define-move-fun (load-single 1) (vop x y)
   ((single-stack) (single-reg))
-  (inst flds y (@ (current-nfp-tn vop) (* (tn-offset x) n-word-bytes))))
+  (inst flds y (@ (current-nfp-tn vop) (tn-byte-offset x))))
 
 (define-move-fun (store-single 1) (vop x y)
   ((single-reg) (single-stack))
-  (inst fsts x (@ (current-nfp-tn vop) (* (tn-offset y) n-word-bytes))))
+  (inst fsts x (@ (current-nfp-tn vop) (tn-byte-offset y))))
 
 (define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (inst fldd y (@ nfp offset))))
 
 (define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (inst fstd x (@ nfp offset))))
 
 ;;;; Move VOPs:
@@ -104,7 +104,7 @@
                       (,sc
                        (,(if double-p 'move-double 'move-single) y x))
                       (,stack-sc
-                       (let ((offset (* (tn-offset y) n-word-bytes)))
+                       (let ((offset (tn-byte-offset y)))
                          (inst ,(if double-p 'fstd 'fsts) x (@ nfp offset)))))))
                 (define-move-vop ,name :move-arg
                   (,sc descriptor-reg) (,sc)))))
@@ -131,28 +131,28 @@
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (inst add lr-tn nfp offset)
     (inst load-complex-single y (@ lr-tn))))
 
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (inst add lr-tn nfp offset)
     (inst store-complex-single x (@ lr-tn))))
 
 (define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (inst add lr-tn nfp offset)
     (inst load-complex-double y (@ lr-tn))))
 
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (inst add lr-tn nfp offset)
     (inst store-complex-double x (@ lr-tn))))
 
@@ -260,7 +260,7 @@
       (complex-single-reg
        (move-complex-single y x))
       (complex-single-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (inst add lip nfp offset)
          (inst store-complex-single x (@ lip)))))))
 (define-move-vop move-complex-single-float-arg :move-arg
@@ -277,7 +277,7 @@
       (complex-double-reg
        (move-complex-double y x))
       (complex-double-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (inst add lip nfp offset)
          (inst store-complex-double x (@ lip)))))))
 (define-move-vop move-complex-double-float-arg :move-arg
@@ -550,7 +550,7 @@
          (single-reg
           (inst flds res
                 (@ (current-nfp-tn vop)
-                   (* (tn-offset bits) n-word-bytes))))
+                   (tn-byte-offset bits))))
          (single-stack
           (unless (location= bits res)
             (loadw temp (current-nfp-tn vop) (tn-offset bits))
@@ -604,7 +604,7 @@
        (sc-case float
          (single-reg
           (inst fsts float (@ (current-nfp-tn vop)
-                              (* (tn-offset bits) n-word-bytes))))
+                              (tn-byte-offset bits))))
          ((single-stack descriptor-reg)
           ;; Fun and games: This also affects PPC, silently.
           ;; Hopefully it's a non-issue, but I'd rather have the
@@ -708,7 +708,7 @@
          (move-single r-imag imag)))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst fsts real (@ nfp offset)))
          (inst fsts imag (@ nfp (+ offset n-word-bytes))))))))
@@ -734,7 +734,7 @@
          (move-double r-imag imag)))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst fstd real (@ nfp offset)))
          (inst fstd imag (@ nfp (+ offset (* 2 n-word-bytes)))))))))

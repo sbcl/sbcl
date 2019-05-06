@@ -18,6 +18,10 @@
       (ash num n-fixnum-tag-bits)
       (error "~W is too big for a fixnum." num)))
 
+(declaim (inline tn-byte-offset))
+(defun tn-byte-offset (tn)
+  (ash (tn-offset tn) word-shift))
+
 ;;; Determining whether a constant offset fits in an addressing mode.
 #+(or x86 x86-64)
 (defun foldable-constant-offset-p (element-size lowtag data-offset offset)

@@ -285,7 +285,7 @@
                        (move y x))
                       (,stack-sc
                        (if (= (tn-offset fp) esp-offset)
-                           (let* ((offset (* (tn-offset y) n-word-bytes))
+                           (let* ((offset (tn-byte-offset y))
                                   (ea (ea offset fp)))
                              ,@(ecase format
                                       (:single '((inst movss ea x)))

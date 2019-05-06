@@ -70,7 +70,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 22
-    (inst ldo (* (tn-offset tn) n-word-bytes) cfp-tn block)
+    (inst ldo (tn-byte-offset tn) cfp-tn block)
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
@@ -90,7 +90,7 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 44
-    (inst ldo (* (tn-offset tn) n-word-bytes) cfp-tn result)
+    (inst ldo (tn-byte-offset tn) cfp-tn result)
     (load-symbol-value temp *current-unwind-protect-block*)
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)

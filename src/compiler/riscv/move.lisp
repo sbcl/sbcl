@@ -41,7 +41,7 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (any-reg descriptor-reg))
-  (let ((offset (- (* (tn-offset x) n-word-bytes) other-pointer-lowtag)))
+  (let ((offset (- (tn-byte-offset x) other-pointer-lowtag)))
     (etypecase offset
       (short-immediate
        (loadw y code-tn (tn-offset x) other-pointer-lowtag))

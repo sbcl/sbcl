@@ -582,7 +582,7 @@
       (double-stack
         (inst ldr bits
               (@ (current-nfp-tn vop)
-                 (load-store-offset (* (tn-offset float) n-word-bytes)))))
+                 (load-store-offset (tn-byte-offset float)))))
       (descriptor-reg
        (inst ldr bits
              (@ float (- (* double-float-value-slot n-word-bytes)
@@ -605,7 +605,7 @@
         (inst ldr (32-bit-reg hi-bits)
               (@ (current-nfp-tn vop)
                  (load-store-offset
-                  (+ (* (tn-offset float) n-word-bytes)
+                  (+ (tn-byte-offset float)
                      (if (eq *backend-byte-order* :big-endian)
                          0
                          4))))))
@@ -636,7 +636,7 @@
        (inst ldr (32-bit-reg lo-bits)
              (@ (current-nfp-tn vop)
                 (load-store-offset
-                 (+ (* (tn-offset float) n-word-bytes)
+                 (+ (tn-byte-offset float)
                     (if (eq *backend-byte-order* :big-endian)
                         4
                         0))))))

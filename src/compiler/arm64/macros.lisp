@@ -124,7 +124,7 @@
 
 ;;; Move a stack TN to a register and vice-versa.
 (defun load-stack-offset (reg stack stack-tn)
-  (inst ldr reg (@ stack (load-store-offset (* (tn-offset stack-tn) n-word-bytes)))))
+  (inst ldr reg (@ stack (load-store-offset (tn-byte-offset stack-tn)))))
 
 (defmacro load-stack-tn (reg stack)
   `(let ((reg ,reg)
@@ -134,7 +134,7 @@
         (load-stack-offset reg cfp-tn stack)))))
 
 (defun store-stack-offset (reg stack stack-tn)
-  (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
+  (let ((offset (tn-byte-offset stack-tn)))
     (inst str reg (@ stack (load-store-offset offset)))))
 
 (defmacro store-stack-tn (stack reg)

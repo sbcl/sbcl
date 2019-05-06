@@ -41,7 +41,7 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg any-reg))
-  (let ((offset (- (ash (tn-offset x) word-shift) other-pointer-lowtag)))
+  (let ((offset (- (tn-byte-offset x) other-pointer-lowtag)))
     (cond
       ((typep offset '(signed-byte 11))
        (inst ldw offset code-tn y))

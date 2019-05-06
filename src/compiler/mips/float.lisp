@@ -15,12 +15,12 @@
 ;;;; Move functions:
 (define-move-fun (load-single 1) (vop x y)
   ((single-stack) (single-reg))
-  (inst lwc1 y (current-nfp-tn vop) (* (tn-offset x) n-word-bytes))
+  (inst lwc1 y (current-nfp-tn vop) (tn-byte-offset x))
   (inst nop))
 
 (define-move-fun (store-single 1) (vop x y)
   ((single-reg) (single-stack))
-  (inst swc1 x (current-nfp-tn vop) (* (tn-offset y) n-word-bytes)))
+  (inst swc1 x (current-nfp-tn vop) (tn-byte-offset y)))
 
 (defun ld-double (r base offset)
   (ecase *backend-byte-order*
@@ -34,7 +34,7 @@
 (define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (ld-double y nfp offset))
   (inst nop))
 
@@ -50,7 +50,7 @@
 (define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (str-double x nfp offset)))
 
 ;;;; Move VOPs:
@@ -139,7 +139,7 @@
                        (unless (location= x y)
                          (inst fmove ,format y x)))
                       (,stack-sc
-                       (let ((offset (* (tn-offset y) n-word-bytes)))
+                       (let ((offset (tn-byte-offset y)))
                          ,@(ecase *backend-byte-order*
                              (:big-endian
                               (cond
@@ -177,7 +177,7 @@
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (let ((real-tn (complex-single-reg-real-tn y)))
       (inst lwc1 real-tn nfp offset))
     (let ((imag-tn (complex-single-reg-imag-tn y)))
@@ -187,7 +187,7 @@
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (let ((real-tn (complex-single-reg-real-tn x)))
       (inst swc1 real-tn nfp offset))
     (let ((imag-tn (complex-single-reg-imag-tn x)))
@@ -196,7 +196,7 @@
 (define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (let ((real-tn (complex-double-reg-real-tn y)))
       (ld-double real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
@@ -206,7 +206,7 @@
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (let ((real-tn (complex-double-reg-real-tn x)))
       (str-double real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn x)))
@@ -339,7 +339,7 @@
                (y-imag (complex-single-reg-imag-tn y)))
            (inst fmove :single y-imag x-imag))))
       (complex-single-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-single-reg-real-tn x)))
            (inst swc1 real-tn nfp offset))
          (let ((imag-tn (complex-single-reg-imag-tn x)))
@@ -363,7 +363,7 @@
                (y-imag (complex-double-reg-imag-tn y)))
            (inst fmove :double y-imag x-imag))))
       (complex-double-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-double-reg-real-tn x)))
            (str-double real-tn nfp offset))
          (let ((imag-tn (complex-double-reg-imag-tn x)))
@@ -719,7 +719,7 @@
            (inst fmove :single r-imag imag))))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (inst swc1 real nfp offset)
          (inst swc1 imag nfp (+ offset n-word-bytes)))))))
 
@@ -745,7 +745,7 @@
            (inst fmove :double r-imag imag))))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (str-double real nfp offset)
          (str-double imag nfp (+ offset (* 2 n-word-bytes))))))))
 

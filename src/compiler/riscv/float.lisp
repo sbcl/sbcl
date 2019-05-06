@@ -15,19 +15,19 @@
 ;;;; Move functions:
 (define-move-fun (load-single 1) (vop x y)
   ((single-stack) (single-reg))
-  (inst fload :single y (current-nfp-tn vop) (* (tn-offset x) n-word-bytes)))
+  (inst fload :single y (current-nfp-tn vop) (tn-byte-offset x)))
 
 (define-move-fun (store-single 1) (vop x y)
   ((single-reg) (single-stack))
-  (inst fstore :single x (current-nfp-tn vop) (* (tn-offset y) n-word-bytes)))
+  (inst fstore :single x (current-nfp-tn vop) (tn-byte-offset y)))
 
 (define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
-  (inst fload :double y (current-nfp-tn vop) (* (tn-offset x) n-word-bytes)))
+  (inst fload :double y (current-nfp-tn vop) (tn-byte-offset x)))
 
 (define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
-  (inst fstore :double x (current-nfp-tn vop) (* (tn-offset y) n-word-bytes)))
+  (inst fstore :double x (current-nfp-tn vop) (tn-byte-offset y)))
 
 ;;;; Move VOPs:
 
@@ -126,7 +126,7 @@
                        (unless (location= x y)
                          (inst fmove ,format y x)))
                       (,stack-sc
-                       (inst fstore ,format x nfp (* (tn-offset y) n-word-bytes))))))
+                       (inst fstore ,format x nfp (tn-byte-offset y))))))
                 (define-move-vop ,name :move-arg
                   (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack :single)
@@ -146,7 +146,7 @@
              `(define-move-fun (,name ,cost) (vop x y)
                 ((,stack-sc) (,sc))
                 (let ((nfp (current-nfp-tn vop))
-                      (offset (* (tn-offset ,b) n-word-bytes)))
+                      (offset (tn-byte-offset ,b)))
                   (let ((real-tn (complex-reg-real-tn ,format ,a)))
                     (inst ,op ,format real-tn nfp offset))
                   (let ((imag-tn (complex-reg-imag-tn ,format ,a)))
@@ -163,7 +163,7 @@
              `(define-move-fun (,name ,cost) (vop x y)
                                ((,stack-sc) (,sc))
                 (let ((nfp (current-nfp-tn vop))
-                      (offset (* (tn-offset ,b) n-word-bytes)))
+                      (offset (tn-byte-offset ,b)))
                   (inst ,op :double ,a nfp offset)))))
   (def load-complex-single 2 complex-single-stack complex-single-reg fload y x)
   (def store-complex-single 2 complex-single-reg complex-single-stack fstore x y))
@@ -320,7 +320,7 @@
       (complex-single-reg
        (move-complex :single y x))
       (complex-single-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          #-64-bit
          (progn
            (let ((real-tn (complex-reg-real-tn :single x)))
@@ -342,7 +342,7 @@
       (complex-double-reg
        (move-complex :double y x))
       (complex-double-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-reg-real-tn :double x)))
            (inst fstore :double real-tn nfp offset))
          (let ((imag-tn (complex-reg-imag-tn :double x)))
@@ -584,7 +584,7 @@
       (single-reg
        (inst fmvx<- :single bits float))
       (single-stack
-       (inst lw bits (current-nfp-tn vop) (ash (tn-offset float) word-shift)))
+       (inst lw bits (current-nfp-tn vop) (tn-byte-offset float)))
       (descriptor-reg
        #+64-bit
        (inst srai bits float 32)
@@ -606,7 +606,7 @@
       (double-reg
        (inst fmvx<- :double bits float))
       (double-stack
-       (loadw bits (current-nfp-tn vop) (* (tn-offset float) n-word-bytes)))
+       (loadw bits (current-nfp-tn vop) (tn-byte-offset float)))
       (descriptor-reg
        (loadw bits float double-float-value-slot other-pointer-lowtag)))))
 
@@ -632,7 +632,7 @@
          (inst fmvx<- :double temp float)
          (inst srli hi-bits temp 32)))
       (double-stack
-       (inst lw hi-bits (current-nfp-tn vop) (+ (* (tn-offset float) n-word-bytes) 4)))
+       (inst lw hi-bits (current-nfp-tn vop) (+ (tn-byte-offset float) 4)))
       (descriptor-reg
        (inst lw hi-bits float (- (+ (* double-float-value-slot n-word-bytes) 4)
                                  other-pointer-lowtag))))))
@@ -657,7 +657,7 @@
          (inst srli lo-bits lo-bits 32)))
       (double-stack
        (inst #-64-bit lw #+64-bit lwu lo-bits (current-nfp-tn vop)
-             (* (tn-offset float) n-word-bytes)))
+             (tn-byte-offset float)))
       (descriptor-reg
        (inst #-64-bit lw #+64-bit lwu lo-bits float
              (- (* double-float-value-slot n-word-bytes)
@@ -727,7 +727,7 @@
          (inst fmvx-> :double r t2)))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst fstore :single real nfp offset))
          (inst fstore :single imag nfp (+ offset 4)))))))
@@ -755,7 +755,7 @@
            (inst fmove :double r-imag imag))))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst fstore :double real nfp offset))
          (inst fstore :double imag nfp (+ offset 8)))))))
@@ -827,7 +827,7 @@
              (+ (ecase slot
                   (:real 0)
                   (:imag 8))
-                (* (tn-offset x) n-word-bytes)))))))
+                (tn-byte-offset x)))))))
 
 (define-vop (realpart/complex-double-float complex-double-float-value)
   (:translate realpart)

@@ -15,23 +15,23 @@
 
 (define-move-fun (load-single 1) (vop x y)
   ((single-stack) (single-reg))
-  (inst lfs y (current-nfp-tn vop) (* (tn-offset x) n-word-bytes)))
+  (inst lfs y (current-nfp-tn vop) (tn-byte-offset x)))
 
 (define-move-fun (store-single 1) (vop x y)
   ((single-reg) (single-stack))
-  (inst stfs x (current-nfp-tn vop) (* (tn-offset y) n-word-bytes)))
+  (inst stfs x (current-nfp-tn vop) (tn-byte-offset y)))
 
 
 (define-move-fun (load-double 2) (vop x y)
   ((double-stack) (double-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (inst lfd y nfp offset)))
 
 (define-move-fun (store-double 2) (vop x y)
   ((double-reg) (double-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (inst stfd x nfp offset)))
 
 
@@ -108,7 +108,7 @@
                        (unless (location= x y)
                          (inst fmr y x)))
                       (,stack-sc
-                       (let ((offset (* (tn-offset y) n-word-bytes)))
+                       (let ((offset (tn-byte-offset y)))
                          (inst ,(if double-p 'stfd 'stfs) x nfp offset))))))
                 (define-move-vop ,name :move-arg
                   (,sc descriptor-reg) (,sc)))))
@@ -137,7 +137,7 @@
 (define-move-fun (load-complex-single 2) (vop x y)
   ((complex-single-stack) (complex-single-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (let ((real-tn (complex-single-reg-real-tn y)))
       (inst lfs real-tn nfp offset))
     (let ((imag-tn (complex-single-reg-imag-tn y)))
@@ -146,7 +146,7 @@
 (define-move-fun (store-complex-single 2) (vop x y)
   ((complex-single-reg) (complex-single-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (let ((real-tn (complex-single-reg-real-tn x)))
       (inst stfs real-tn nfp offset))
     (let ((imag-tn (complex-single-reg-imag-tn x)))
@@ -156,7 +156,7 @@
 (define-move-fun (load-complex-double 4) (vop x y)
   ((complex-double-stack) (complex-double-reg))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset x) n-word-bytes)))
+        (offset (tn-byte-offset x)))
     (let ((real-tn (complex-double-reg-real-tn y)))
       (inst lfd real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
@@ -165,7 +165,7 @@
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
   (let ((nfp (current-nfp-tn vop))
-        (offset (* (tn-offset y) n-word-bytes)))
+        (offset (tn-byte-offset y)))
     (let ((real-tn (complex-double-reg-real-tn x)))
       (inst stfd real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn x)))
@@ -312,7 +312,7 @@
                (y-imag (complex-single-reg-imag-tn y)))
            (inst fmr y-imag x-imag))))
       (complex-single-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-single-reg-real-tn x)))
            (inst stfs real-tn nfp offset))
          (let ((imag-tn (complex-single-reg-imag-tn x)))
@@ -336,7 +336,7 @@
                (y-imag (complex-double-reg-imag-tn y)))
            (inst fmr y-imag x-imag))))
       (complex-double-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-double-reg-real-tn x)))
            (inst stfd real-tn nfp offset))
          (let ((imag-tn (complex-double-reg-imag-tn x)))
@@ -462,7 +462,7 @@
                 (:save-p :compute-only)
                 (:generator 5
                   (let* ((nfp-tn (current-nfp-tn vop))
-                         (temp-offset-high (* (tn-offset temp) n-word-bytes))
+                         (temp-offset-high (tn-byte-offset temp))
                          (temp-offset-low (+ temp-offset-high n-word-bytes)))
                     (inst lis rtemp #x4330) ; High word of magic constant
                     (inst stw rtemp nfp-tn temp-offset-high)
@@ -493,7 +493,7 @@
                (:save-p :compute-only)
                (:generator 5
                  (let* ((nfp-tn (current-nfp-tn vop))
-                        (temp-offset-high (* (tn-offset temp) n-word-bytes))
+                        (temp-offset-high (tn-byte-offset temp))
                         (temp-offset-low (+ temp-offset-high n-word-bytes)))
                     (inst lis rtemp #x4330)   ; High word of magic constant
                     (inst stw rtemp nfp-tn temp-offset-high)
@@ -542,9 +542,9 @@
                   (note-this-location vop :internal-error)
                   (inst ,inst temp x)
                   (inst stfd temp (current-nfp-tn vop)
-                        (* (tn-offset stack-temp) n-word-bytes))
+                        (tn-byte-offset stack-temp))
                   (inst lwz y (current-nfp-tn vop)
-                        (+ 4 (* (tn-offset stack-temp) n-word-bytes)))))))
+                        (+ 4 (tn-byte-offset stack-temp)))))))
   (frob %unary-truncate/single-float single-reg single-float fctiwz)
   (frob %unary-truncate/double-float double-reg double-float fctiwz)
   (frob %unary-round single-reg single-float fctiw)
@@ -568,23 +568,23 @@
        (sc-case res
          (single-reg
           (inst stw bits (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes))
+                (tn-byte-offset stack-temp))
           (inst lfs res (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes)))
+                (tn-byte-offset stack-temp)))
          (single-stack
           (inst stw bits (current-nfp-tn vop)
-                (* (tn-offset res) n-word-bytes)))))
+                (tn-byte-offset res)))))
       (signed-stack
        (sc-case res
          (single-reg
           (inst lfs res (current-nfp-tn vop)
-                (* (tn-offset bits) n-word-bytes)))
+                (tn-byte-offset bits)))
          (single-stack
           (unless (location= bits res)
             (inst lwz temp (current-nfp-tn vop)
-                  (* (tn-offset bits) n-word-bytes))
+                  (tn-byte-offset bits))
             (inst stw temp (current-nfp-tn vop)
-                  (* (tn-offset res) n-word-bytes)))))))))
+                  (tn-byte-offset res)))))))))
 
 (define-vop (make-double-float)
   (:args (hi-bits :scs (signed-reg))
@@ -602,12 +602,12 @@
                       (double-stack res)
                       (double-reg temp))))
       (inst stw hi-bits (current-nfp-tn vop)
-            (* (tn-offset stack-tn) n-word-bytes))
+            (tn-byte-offset stack-tn))
       (inst stw lo-bits (current-nfp-tn vop)
             (* (1+ (tn-offset stack-tn)) n-word-bytes)))
     (when (sc-is res double-reg)
       (inst lfd res (current-nfp-tn vop)
-            (* (tn-offset temp) n-word-bytes)))))
+            (tn-byte-offset temp)))))
 
 (define-vop (single-float-bits)
   (:args (float :scs (single-reg)
@@ -628,17 +628,17 @@
        (sc-case float
          (single-reg
           (inst stfs float (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes))
+                (tn-byte-offset stack-temp))
           (inst lwz bits (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes)))
+                (tn-byte-offset stack-temp)))
          (single-stack
           (inst lwz bits (current-nfp-tn vop)
-                (* (tn-offset float) n-word-bytes)))
+                (tn-byte-offset float)))
          (descriptor-reg
           (loadw bits float single-float-value-slot other-pointer-lowtag))))
       (signed-stack
        (inst stfs float (current-nfp-tn vop)
-                (* (tn-offset bits) n-word-bytes))))))
+                (tn-byte-offset bits))))))
 
 (define-vop (double-float-high-bits)
   (:args (float :scs (double-reg descriptor-reg)
@@ -654,12 +654,12 @@
     (sc-case float
       (double-reg
         (inst stfd float (current-nfp-tn vop)
-              (* (tn-offset stack-temp) n-word-bytes))
+              (tn-byte-offset stack-temp))
         (inst lwz hi-bits (current-nfp-tn vop)
-              (* (tn-offset stack-temp) n-word-bytes)))
+              (tn-byte-offset stack-temp)))
       (double-stack
         (inst lwz hi-bits (current-nfp-tn vop)
-              (* (tn-offset float) n-word-bytes)))
+              (tn-byte-offset float)))
       (descriptor-reg
         (loadw hi-bits float double-float-value-slot
                other-pointer-lowtag)))))
@@ -678,7 +678,7 @@
     (sc-case float
       (double-reg
         (inst stfd float (current-nfp-tn vop)
-              (* (tn-offset stack-temp) n-word-bytes))
+              (tn-byte-offset stack-temp))
         (inst lwz lo-bits (current-nfp-tn vop)
               (* (1+ (tn-offset stack-temp)) n-word-bytes)))
       (double-stack
@@ -752,7 +752,7 @@
            (inst fmr r-imag imag))))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst stfs real nfp offset))
          (inst stfs imag nfp (+ offset n-word-bytes)))))))
@@ -780,7 +780,7 @@
            (inst fmr r-imag imag))))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst stfd real nfp offset))
          (inst stfd imag nfp (+ offset (* 2 n-word-bytes))))))))
@@ -869,16 +869,16 @@
     (sc-case float
       (double-reg
        (inst stfd float (current-nfp-tn vop)
-             (* (tn-offset stack-temp) n-word-bytes))
+             (tn-byte-offset stack-temp))
        (sc-case hi-bits
          (signed-reg
           (inst lwz hi-bits (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes)))
+                (tn-byte-offset stack-temp)))
          (signed-stack
           (inst lwz temp (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes))
+                (tn-byte-offset stack-temp))
           (inst stw temp nsp-tn
-                (* (tn-offset hi-bits) n-word-bytes))))
+                (tn-byte-offset hi-bits))))
        (sc-case lo-bits
          (unsigned-reg
           (inst lwz lo-bits (current-nfp-tn vop)
@@ -887,7 +887,7 @@
           (inst lwz temp (current-nfp-tn vop)
                 (* (1+ (tn-offset stack-temp)) n-word-bytes))
           (inst stw temp nsp-tn
-                (* (tn-offset lo-bits) n-word-bytes))))))))
+                (tn-byte-offset lo-bits))))))))
 
 #+darwin
 (define-vop (move-single-to-int-arg)
@@ -903,14 +903,14 @@
     (sc-case float
       (single-reg
        (inst stfs float (current-nfp-tn vop)
-             (* (tn-offset stack-temp) n-word-bytes))
+             (tn-byte-offset stack-temp))
        (sc-case bits
          (signed-reg
           (inst lwz bits (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes)))
+                (tn-byte-offset stack-temp)))
          (signed-stack
           (inst lwz temp (current-nfp-tn vop)
-                (* (tn-offset stack-temp) n-word-bytes))
+                (tn-byte-offset stack-temp))
           (inst stw temp nsp-tn
-                (* (tn-offset bits) n-word-bytes))))))))
+                (tn-byte-offset bits))))))))
 

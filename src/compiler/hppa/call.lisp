@@ -769,11 +769,11 @@ default-value-8
                 `((sc-case name
                     (descriptor-reg (move name name-pass))
                     (control-stack
-                     (inst ldw (ash (tn-offset name) word-shift)
+                     (inst ldw (tn-byte-offset name)
                            cfp-tn name-pass)
                      (do-next-filler))
                     (constant
-                     (inst ldw (- (ash (tn-offset name) word-shift)
+                     (inst ldw (- (tn-byte-offset name)
                                   other-pointer-lowtag)
                            code-tn name-pass)
                      (do-next-filler)))
@@ -790,12 +790,12 @@ default-value-8
                     (descriptor-reg
                      (move arg-fun lexenv))
                     (control-stack
-                     (inst ldw (ash (tn-offset arg-fun) word-shift)
+                     (inst ldw (tn-byte-offset arg-fun)
                            cfp-tn lexenv)
                      (do-next-filler))
                     (constant
                      (inst ldw
-                           (- (ash (tn-offset arg-fun) word-shift)
+                           (- (tn-byte-offset arg-fun)
                               other-pointer-lowtag) code-tn lexenv)
                      (do-next-filler)))
                   (inst ldw (- (ash closure-fun-slot word-shift)

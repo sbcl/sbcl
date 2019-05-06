@@ -21,7 +21,7 @@
   ;; Imports from SB-VM into this package
   #+sb-simd-pack-256
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
-  (import '(sb-vm::tn-reg sb-vm::reg-name
+  (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
             #+avx2 sb-vm::avx2-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
@@ -1259,7 +1259,7 @@
         ;; word index -1 from the origin label, and so on.
         (emit-ea segment
                  (rip-relative-ea (segment-origin segment) ; = word index 0
-                                  (- (* (tn-offset thing) n-word-bytes)
+                                  (- (tn-byte-offset thing)
                                      (component-header-length)))
                  reg :remaining-bytes remaining-bytes))))
     (ea

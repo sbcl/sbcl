@@ -18,7 +18,7 @@
             register-p ; FIXME: rename to GPR-P
             make-ea ea-disp width-bits) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb-vm::frame-byte-offset sb-vm::ebp-tn
+  (import '(sb-vm::tn-byte-offset sb-vm::frame-byte-offset sb-vm::ebp-tn
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
 (deftype reg () '(unsigned-byte 3))
@@ -618,7 +618,7 @@
         (emit-absolute-fixup segment
                              (make-fixup nil
                                          :code-object
-                                         (- (* (tn-offset thing) n-word-bytes)
+                                         (- (tn-byte-offset thing)
                                             other-pointer-lowtag))))))
     (ea
      (let* ((base (ea-base thing))

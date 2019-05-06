@@ -132,7 +132,7 @@
 
 ;;; Move a stack TN to a register and vice-versa.
 (defun load-stack-offset (reg stack stack-tn &optional (predicate :al))
-  (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
+  (let ((offset (tn-byte-offset stack-tn)))
     (cond ((or (tn-p offset)
                (typep offset '(unsigned-byte 12)))
            (inst ldr predicate reg (@ stack offset)))
@@ -148,7 +148,7 @@
         (load-stack-offset reg cfp-tn stack ,predicate)))))
 
 (defun store-stack-offset (reg stack stack-tn &optional (predicate :al))
-  (let ((offset (* (tn-offset stack-tn) n-word-bytes)))
+  (let ((offset (tn-byte-offset stack-tn)))
     (cond ((or (typep offset '(unsigned-byte 12))
                (tn-p offset))
            (inst str predicate reg (@ stack offset)))

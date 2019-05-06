@@ -30,7 +30,7 @@
 (define-move-fun (load-float 1) (vop x y)
   ((single-stack) (single-reg)
    (double-stack) (double-reg))
-  (let ((offset (* (tn-offset x) n-word-bytes)))
+  (let ((offset (tn-byte-offset x)))
     (ld-float offset (current-nfp-tn vop) y)))
 
 (defun str-float (x offset base)
@@ -49,7 +49,7 @@
 (define-move-fun (store-float 1) (vop x y)
   ((single-reg) (single-stack)
    (double-reg) (double-stack))
-  (let ((offset (* (tn-offset y) n-word-bytes)))
+  (let ((offset (tn-byte-offset y)))
     (str-float x offset (current-nfp-tn vop))))
 
 ;;;; Move VOPs
@@ -117,7 +117,7 @@
        (unless (location= x y)
          (inst funop :copy x y)))
       ((single-stack double-stack)
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (str-float x offset nfp))))))
 (define-move-vop move-float-arg :move-arg
   (single-reg descriptor-reg) (single-reg))
@@ -286,7 +286,7 @@
                (y-imag (complex-single-reg-imag-tn y)))
            (inst funop :copy x-imag y-imag))))
       (complex-single-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-single-reg-real-tn x)))
            (str-float real-tn offset nfp))
          (let ((imag-tn (complex-single-reg-imag-tn x)))
@@ -310,7 +310,7 @@
                (y-imag (complex-double-reg-imag-tn y)))
            (inst funop :copy x-imag y-imag))))
       (complex-double-stack
-       (let ((offset (* (tn-offset y) n-word-bytes)))
+       (let ((offset (tn-byte-offset y)))
          (let ((real-tn (complex-double-reg-real-tn x)))
            (str-float real-tn offset nfp))
          (let ((imag-tn (complex-double-reg-imag-tn x)))
@@ -365,7 +365,7 @@
                (stack-tn (sc-case y
                            (double-stack y)
                            (double-int-carg-reg temp)))
-               (offset (* (tn-offset stack-tn) n-word-bytes)))
+               (offset (tn-byte-offset stack-tn)))
           ;; save 8 bytes of stack to two register,
           ;; write down float in stack and load it back
           ;; into result register. Notice the result hack,
@@ -506,7 +506,7 @@
                                                           :offset (tn-offset reg-temp))))
                     (inst li -1 reg-temp)
                     (storew reg-temp nfp (tn-offset stack-temp))
-                    (ld-float (* (tn-offset stack-temp) n-word-bytes) nfp short-float-temp)
+                    (ld-float (tn-byte-offset stack-temp) nfp short-float-temp)
                     (inst fcnvxf short-float-temp float-temp)
                     (inst fbinop :mpy x float-temp y))
                   (inst b DONE :nullify t)
@@ -613,7 +613,7 @@
                             (signed-reg
                              (storew x nfp (tn-offset stack-temp))
                              stack-temp)))
-                         (offset (* (tn-offset stack-tn) n-word-bytes)))
+                         (offset (tn-byte-offset stack-tn)))
                     (cond ((< offset (ash 1 4))
                            (inst flds offset nfp fp-temp))
                           ((and (< offset (ash 1 13))
@@ -653,7 +653,7 @@
                           (sc-case y
                             (signed-stack y)
                             (signed-reg stack-temp)))
-                         (offset (* (tn-offset stack-tn) n-word-bytes)))
+                         (offset (tn-byte-offset stack-tn)))
                     (inst ,inst x fp-temp)
                     (cond ((< offset (ash 1 4))
                            (note-next-instruction vop :internal-error)
@@ -694,7 +694,7 @@
         (signed-reg
          (sc-case res
            (single-reg
-            (let ((offset (* (tn-offset temp) n-word-bytes)))
+            (let ((offset (tn-byte-offset temp)))
               (inst stw bits offset nfp)
               (cond ((< offset (ash 1 4))
                      (inst flds offset nfp res))
@@ -705,11 +705,11 @@
                     (t
                      (error "make-single-float error, ldo offset too large")))))
            (single-stack
-            (inst stw bits (* (tn-offset res) n-word-bytes) nfp))))
+            (inst stw bits (tn-byte-offset res) nfp))))
         (signed-stack
          (sc-case res
            (single-reg
-            (let ((offset (* (tn-offset bits) n-word-bytes)))
+            (let ((offset (tn-byte-offset bits)))
               (cond ((< offset (ash 1 4))
                      (inst flds offset nfp res))
                     ((and (< offset (ash 1 13))
@@ -736,7 +736,7 @@
            (stack-tn (sc-case res
                        (double-stack res)
                        (double-reg temp)))
-           (offset (* (tn-offset stack-tn) n-word-bytes)))
+           (offset (tn-byte-offset stack-tn)))
       (inst stw hi-bits offset nfp)
       (inst stw lo-bits (+ offset n-word-bytes) nfp)
       (cond ((eq stack-tn res))
@@ -770,7 +770,7 @@
           (,reg
            (sc-case bits
              (,rreg
-              (let ((offset (* (tn-offset temp) n-word-bytes)))
+              (let ((offset (tn-byte-offset temp)))
                 (cond ((< offset (ash 1 4))
                        ,@(if side
                            `((inst fsts float offset nfp :side ,side))
@@ -786,7 +786,7 @@
                                        name rreg))))
                 (inst ldw offset nfp bits)))
              (,rstack
-              (let ((offset (* (tn-offset bits) n-word-bytes)))
+              (let ((offset (tn-byte-offset bits)))
                 (cond ((< offset (ash 1 4))
                        ,@(if side
                          `((inst fsts float offset nfp :side ,side))
@@ -832,7 +832,7 @@
                      (stack-tn (sc-case res
                                         (unsigned-stack res)
                                         (unsigned-reg temp)))
-                     (offset (* (tn-offset stack-tn) n-word-bytes)))
+                     (offset (tn-byte-offset stack-tn)))
                 (cond ((< offset (ash 1 4))
                        (inst fsts fp-double-zero-tn offset nfp))
                       ((and (< offset (ash 1 13))
@@ -859,7 +859,7 @@
             (:vop-var vop)
   (:generator 3
               (let* ((nfp (current-nfp-tn vop))
-                     (offset (* (tn-offset stack-tn) n-word-bytes)))
+                     (offset (tn-byte-offset stack-tn)))
                 (ecase *backend-byte-order*
                   (:big-endian
                    (inst stw new offset nfp)
@@ -901,7 +901,7 @@
            (inst funop :copy imag r-imag))))
       (complex-single-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (str-float real offset nfp)
          (str-float imag (+ offset n-word-bytes) nfp))))))
 
@@ -927,7 +927,7 @@
            (inst funop :copy imag r-imag))))
       (complex-double-stack
        (let ((nfp (current-nfp-tn vop))
-             (offset (* (tn-offset r) n-word-bytes)))
+             (offset (tn-byte-offset r)))
          (str-float real offset nfp)
          (str-float imag (+ offset (* 2 n-word-bytes)) nfp))))))
 

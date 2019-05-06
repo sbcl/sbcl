@@ -1050,7 +1050,11 @@
   (sc nil :type (or storage-class null))
   ;; the offset within the SB that this TN is packed into. This is what
   ;; indicates that the TN is packed
-  (offset nil :type (or index null))
+  ;; The integer bound ensures that TN-BYTE-OFFSET remains a fixnum.
+  ;; The default stack size is 2MB, so this is plenty big.
+  (offset nil :type (or null
+                        (unsigned-byte #.(- sb-vm:n-positive-fixnum-bits
+                                            sb-vm:word-shift))))
   ;; some kind of info about how important this TN is
   (cost 0 :type fixnum)
   ;; If a :ENVIRONMENT or :DEBUG-ENVIRONMENT TN, this is the

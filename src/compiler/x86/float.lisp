@@ -611,7 +611,7 @@
                       (,stack-sc
                        (if (= (tn-offset fp) esp-offset)
                            ;; C-call
-                           (let* ((offset (* (tn-offset y) n-word-bytes))
+                           (let* ((offset (tn-byte-offset y))
                                   (ea (make-ea :dword :base fp :disp offset)))
                              (with-tn@fp-top(x)
                                 ,@(ecase format
