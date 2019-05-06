@@ -227,7 +227,8 @@
 
 (defun nthcdr (n list)
   "Performs the cdr function n times on a list."
-  (declare (explicit-check n))
+  (declare (explicit-check n)
+           (optimize speed))
   (flet ((fast-nthcdr (n list)
            (do ((i n (1- i))
                 (result list (cdr result)))
