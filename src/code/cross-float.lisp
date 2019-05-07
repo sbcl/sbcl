@@ -630,13 +630,9 @@
 
 (macrolet ((intercept (symbols lambda-list body-form)
              `(progn ,@(mapcar (lambda (symbol)
-                                 (let ((from (intern (string symbol) "CL"))
-                                       (to (intern (string symbol) "SB-XC")))
-                                   `(progn
-                                      (setf (get ',to :sb-xc-wrapper) ',from)
-                                      (defun ,to ,lambda-list
-                                        (declare (dynamic-extent args))
-                                        ,(subst from :me body-form)))))
+                                 `(defun ,(intern (string symbol) "SB-XC") ,lambda-list
+                                    (declare (dynamic-extent args))
+                                    ,(subst (intern (string symbol) "CL") :me body-form)))
                                symbols)))
            (dispatch (f irrational)
              `(if (every #'rationalp args)
