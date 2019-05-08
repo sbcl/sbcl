@@ -30,14 +30,14 @@
     (pseudo-atomic (pa-flag)
       (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                 lowtag-mask))
-      (inst clrrdi ndescr ndescr n-lowtag-bits) ; or CLRRWI
+      (inst clrrwi ndescr ndescr n-lowtag-bits)
       (allocation header ndescr other-pointer-lowtag
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
       (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))
-      (inst sldi ndescr ndescr n-widetag-bits) ; or SLWI
+      (inst slwi ndescr ndescr n-widetag-bits)
       (inst or ndescr ndescr type)
-      (inst srdi ndescr ndescr n-fixnum-tag-bits) ; or SRDI
+      (inst srwi ndescr ndescr n-fixnum-tag-bits)
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
@@ -61,9 +61,9 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 6
     (loadw temp x 0 other-pointer-lowtag)
-    (inst sradi temp temp n-widetag-bits) ; or SRAWI
+    (inst srawi temp temp n-widetag-bits)
     (inst subi temp temp (1- array-dimensions-offset))
-    (inst sldi res temp n-fixnum-tag-bits))) ; or SLWI
+    (inst slwi res temp n-fixnum-tag-bits)))
 
 ;;;; Bounds checking routine.
 
@@ -115,7 +115,7 @@
   (def-data-vector-frobs simple-base-string byte-index
     character character-reg)
   #+sb-unicode
-  (def-data-vector-frobs simple-character-string word-index
+  (def-data-vector-frobs simple-character-string 32-bits-index
     character character-reg)
   (def-data-vector-frobs simple-vector word-index
     * descriptor-reg any-reg)
@@ -573,7 +573,7 @@
   (:temporary (:sc unsigned-reg :from (:argument 1)) offset)
   (:temporary (:sc non-descriptor-reg) sum)
   (:generator 4
-    (compute-lispword-offset)e
+    (compute-lispword-offset)
     ;; load the slot value, add DIFF, write the sum back, and return
     ;; the original slot value, atomically, and include a memory
     ;; barrier.

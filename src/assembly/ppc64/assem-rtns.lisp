@@ -70,7 +70,8 @@
   ;; Clear the stack.
   (move ocfp-tn cfp-tn)
   (move cfp-tn ocfp)
-  (inst add csp-tn ocfp-tn nvals)
+  (inst sldi temp nvals (- word-shift n-fixnum-tag-bits))
+  (inst add csp-tn ocfp-tn temp)
 
   ;; Return.
   (lisp-return lra lip))
@@ -107,6 +108,7 @@
 
   ;; Calculate NARGS (as a fixnum)
   (inst sub nargs csp-tn args)
+  (inst srdi nargs nargs (- word-shift n-fixnum-tag-bits))
 
   ;; Load the argument regs (must do this now, 'cause the blt might
   ;; trash these locations)
@@ -154,12 +156,12 @@
   (declare (ignore start count))
 
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
-    (inst cmpwi block 0)
+    (inst cmpdi block 0)
     (inst beq error))
 
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw target-uwp block unwind-block-uwp-slot)
-  (inst cmpw cur-uwp target-uwp)
+  (inst cmpd cur-uwp target-uwp)
   (inst bne do-uwp)
 
   (move cur-uwp block)
@@ -192,11 +194,11 @@
   loop
 
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
-    (inst cmpwi catch 0)
+    (inst cmpdi catch 0)
     (inst beq error))
 
   (loadw tag catch catch-block-tag-slot)
-  (inst cmpw tag target)
+  (inst cmpd tag target)
   (inst beq exit)
   (loadw catch catch catch-block-previous-catch-slot)
   (inst b loop)

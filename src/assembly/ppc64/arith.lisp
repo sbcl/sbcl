@@ -137,22 +137,20 @@
   (inst mtxer zero-tn)
 
   (inst or temp x y)
-  (inst andi. temp temp 3)
+  (inst andi. temp temp fixnum-tag-mask)
   ;; Remove the tag from both args, so I don't get so confused.
-  (inst srawi temp x 2)
-  (inst srawi nargs y 2)
+  (inst sradi temp x n-fixnum-tag-bits)
+  (inst sradi nargs y n-fixnum-tag-bits)
   (inst bne DO-STATIC-FUN)
 
-
-  (inst mullwo. lo nargs temp)
-  (inst srawi hi lo 31)                 ; hi = 32 copies of lo's sign bit
+  (inst mulldo. lo nargs temp)
+  (inst sradi hi lo 63)                 ; hi = 64 copies of lo's sign bit
   (inst bns ONE-WORD-ANSWER)
-  (inst mulhw hi nargs temp)
+  (inst mulhd hi nargs temp)
   (inst b CONS-BIGNUM)
 
   ONE-WORD-ANSWER                       ; We know that all of the overflow bits are clear.
-  (inst addo temp lo lo)
-  (inst addo. res temp temp)
+  (inst addo. res lo lo)
   (inst bns GO-HOME)
 
   CONS-BIGNUM
@@ -161,7 +159,7 @@
                               (+ bignum-digits-offset 2))
     (let ((one-word (gen-label)))
       ;; We start out assuming that we need one word.  Is that correct?
-      (inst srawi temp lo 31)
+      (inst sradi temp lo 63)
       (inst xor. temp temp hi)
       (inst li temp (logior (ash 1 n-widetag-bits) bignum-widetag))
       (inst beq one-word)
@@ -199,8 +197,8 @@
                                   (:arg y ,sc nl1-offset)
                                   (:res res ,sc nl0-offset))
           ,@(when (eq type 'tagged-num)
-              `((inst srawi x x 2)))
-          (inst mullw res x y))))
+              `((inst sradi x x n-fixnum-tag-bits)))
+          (inst mulld res x y))))
   (frob unsigned-* "unsigned *" 40 unsigned-num unsigned-reg)
   (frob signed-* "signed *" 41 signed-num signed-reg)
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
@@ -208,7 +206,6 @@
 
 
 ;;;; Division.
-
 
 (define-assembly-routine (positive-fixnum-truncate
                           (:note "unsigned fixnum truncate")
@@ -225,14 +222,12 @@
   (aver (location= rem dividend))
   (let ((error (generate-error-code nil 'division-by-zero-error
                                     dividend divisor)))
-    (inst cmpwi divisor 0)
+    (inst cmpdi divisor 0)
     (inst beq error))
-    (inst divwu quo dividend divisor)
-    (inst mullw divisor quo divisor)
+    (inst divdu quo dividend divisor)
+    (inst mulld divisor quo divisor)
     (inst sub rem dividend divisor)
-    (inst slwi quo quo 2))
-
-
+    (inst sldi quo quo n-fixnum-tag-bits))
 
 (define-assembly-routine (fixnum-truncate
                           (:note "fixnum truncate")
@@ -250,17 +245,15 @@
   (aver (location= rem dividend))
   (let ((error (generate-error-code nil 'division-by-zero-error
                                     dividend divisor)))
-    (inst cmpwi divisor 0)
+    (inst cmpdi divisor 0)
     (inst beq error))
-
-    (inst divw quo dividend divisor)
-    (inst mullw divisor quo divisor)
+    (inst divd quo dividend divisor)
+    (inst mulld divisor quo divisor)
     (inst subf rem divisor dividend)
-    (inst slwi quo quo 2))
-
+    (inst sldi quo quo n-fixnum-tag-bits))
 
 (define-assembly-routine (signed-truncate
-                          (:note "(signed-byte 32) truncate")
+                          (:note "(signed-byte 64) truncate")
                           (:cost 60)
                           (:policy :fast-safe)
                           (:translate truncate)
@@ -275,18 +268,17 @@
 
   (let ((error (generate-error-code nil 'division-by-zero-error
                                     dividend divisor)))
-    (inst cmpwi divisor 0)
+    (inst cmpdi divisor 0)
     (inst beq error))
-
-    (inst divw quo dividend divisor)
-    (inst mullw divisor quo divisor)
+    (inst divd quo dividend divisor)
+    (inst mulld divisor quo divisor)
     (inst subf rem divisor dividend))
 
 
 ;;;; Comparison
 
 (macrolet
-    ((define-cond-assem-rtn (name translate static-fn cmp)
+    ((define-cond-assem-rtn (name translate static-fn inst)
        `(define-assembly-routine
           (,name
            (:cost 10)
@@ -303,12 +295,10 @@
            (:temp nargs any-reg nargs-offset)
            (:temp ocfp any-reg ocfp-offset))
 
-          (inst or nargs x y)
-          (inst andi. nargs nargs 3)
-          (inst cmpw :cr1 x y)
-          (inst beq DO-COMPARE)
+          (inst or nargs x y) ; (x|y) tag is 0 if both are fixnums
+          (inst andi. nargs nargs fixnum-tag-mask)
+          (inst beq FIXNUM)
 
-          DO-STATIC-FN
           (inst addi lexenv-tn null-tn (static-fdefn-offset ',static-fn))
           (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
           (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
@@ -317,17 +307,18 @@
           (inst mr cfp-tn csp-tn)
           (inst j lip 0)
 
-          DO-COMPARE
+          FIXNUM
+          (inst cmpd x y) ; RES and X are the same register, so do this first
           (load-symbol res t)
-          (inst b? :cr1 ,cmp done)
-          (inst mr res null-tn)
+          ,inst
           DONE)))
 
-  (define-cond-assem-rtn generic-< < two-arg-< :lt)
-  (define-cond-assem-rtn generic-<= <= two-arg-<= :le)
-  (define-cond-assem-rtn generic-> > two-arg-> :gt)
-  (define-cond-assem-rtn generic->= >= two-arg->= :ge))
-
+  (define-cond-assem-rtn generic-= = two-arg-=    (inst isel res res null-tn :eq))
+  (define-cond-assem-rtn generic-/= /= two-arg-/= (inst isel res null-tn res :eq))
+  (define-cond-assem-rtn generic-< < two-arg-<    (inst isel res res null-tn :lt))
+  (define-cond-assem-rtn generic-<= <= two-arg-<= (inst isel res null-tn res :gt))
+  (define-cond-assem-rtn generic-> > two-arg->    (inst isel res res null-tn :gt))
+  (define-cond-assem-rtn generic->= >= two-arg->= (inst isel res null-tn res :lt)))
 
 (define-assembly-routine (generic-eql
                           (:cost 10)
@@ -344,18 +335,10 @@
                           (:temp lip interior-reg lip-offset)
                           (:temp nargs any-reg nargs-offset)
                           (:temp ocfp any-reg ocfp-offset))
-  (inst cmpw :cr1 x y)
-  (inst andi. nargs x 3)
-  (inst beq :cr1 RETURN-T)
-  (inst beq RETURN-NIL)                 ; x was fixnum, not eq y
-  (inst andi. nargs y 3)
-  (inst bne DO-STATIC-FN)
+  (inst and nargs x y) ; (x&y) tag is 0 if at least one is fixnum
+  (inst andi. nargs nargs fixnum-tag-mask)
+  (inst beq FIXNUM)
 
-  RETURN-NIL
-  (inst mr res null-tn)
-  (lisp-return lra lip :offset 2)
-
-  DO-STATIC-FN
   (inst addi lexenv-tn null-tn (static-fdefn-offset 'eql))
   (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
   (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
@@ -364,80 +347,7 @@
   (inst mr cfp-tn csp-tn)
   (inst j lip 0)
 
-  RETURN-T
-  (load-symbol res t))
-
-(define-assembly-routine
-  (generic-=
-   (:cost 10)
-   (:return-style :full-call)
-   (:policy :safe)
-   (:translate =)
-   (:save-p t))
-  ((:arg x (descriptor-reg any-reg) a0-offset)
-   (:arg y (descriptor-reg any-reg) a1-offset)
-
-   (:res res descriptor-reg a0-offset)
-
-   (:temp lip interior-reg lip-offset)
-   (:temp lra descriptor-reg lra-offset)
-   (:temp nargs any-reg nargs-offset)
-   (:temp ocfp any-reg ocfp-offset))
-
-  (inst or nargs x y)
-  (inst andi. nargs nargs 3)
-  (inst cmpw :cr1 x y)
-  (inst bne DO-STATIC-FN)
-  (inst beq :cr1 RETURN-T)
-
-  (inst mr res null-tn)
-  (lisp-return lra lip :offset 2)
-
-  DO-STATIC-FN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-=))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst mr cfp-tn csp-tn)
-  (inst j lip 0)
-
-  RETURN-T
-  (load-symbol res t))
-
-(define-assembly-routine (generic-/=
-                          (:cost 10)
-                          (:return-style :full-call)
-                          (:policy :safe)
-                          (:translate /=)
-                          (:save-p t))
-                         ((:arg x (descriptor-reg any-reg) a0-offset)
-                          (:arg y (descriptor-reg any-reg) a1-offset)
-
-                          (:res res descriptor-reg a0-offset)
-
-                          (:temp lra descriptor-reg lra-offset)
-                          (:temp lip interior-reg lip-offset)
-
-                          (:temp nargs any-reg nargs-offset)
-                          (:temp ocfp any-reg ocfp-offset))
-  (inst or nargs x y)
-  (inst andi. nargs nargs 3)
-  (inst cmpw :cr1 x y)
-  (inst bne DO-STATIC-FN)
-  (inst beq :cr1 RETURN-NIL)
-
+  FIXNUM
+  (inst cmpd x y)
   (load-symbol res t)
-  (lisp-return lra lip :offset 2)
-
-  DO-STATIC-FN
-  (inst addi lexenv-tn null-tn (static-fdefn-offset 'two-arg-/=))
-  (loadw code-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
-  (loadw lip lexenv-tn fdefn-raw-addr-slot other-pointer-lowtag)
-  (inst li nargs (fixnumize 2))
-  (inst mr ocfp cfp-tn)
-  (inst j lip 0)
-  (inst mr cfp-tn csp-tn)
-
-  RETURN-NIL
-  (inst mr res null-tn))
+  (inst isel res res null-tn :eq))

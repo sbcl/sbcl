@@ -41,7 +41,7 @@
 
   (defreg zero 0)
   (defreg nsp 1)
-  (defreg rtoc 2)                         ; May be "NULL" someday.
+  (defreg rtoc 2)
   (defreg nl0 3)
   (defreg nl1 4)
   (defreg nl2 5)
@@ -73,7 +73,7 @@
   (defreg lip 31)
 
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 nl5 nl6 cfunc nargs nfp)
+      nl0 nl1 nl2 nl3 nl4 nl5 #| nl6 |# cfunc nargs nfp)
 
   (defregset descriptor-regs
       fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1)
@@ -129,7 +129,6 @@
   (any-reg
    registers
    :locations #.(append non-descriptor-regs descriptor-regs)
-   :reserve-locations (#.nl6-offset)
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (control-stack))
@@ -158,7 +157,6 @@
   ;; Non-Descriptor characters
   (character-reg registers
    :locations #.non-descriptor-regs
-   :reserve-locations (#.nl6-offset)
    :constant-scs (immediate)
    :save-p t
    :alternate-scs (character-stack))
@@ -166,7 +164,6 @@
   ;; Non-Descriptor SAP's (arbitrary pointers into address space)
   (sap-reg registers
    :locations #.non-descriptor-regs
-   :reserve-locations (#.nl6-offset)
    :constant-scs (immediate)
    :save-p t
    :alternate-scs (sap-stack))
@@ -174,13 +171,11 @@
   ;; Non-Descriptor (signed or unsigned) numbers.
   (signed-reg registers
    :locations #.non-descriptor-regs
-   :reserve-locations (#.nl6-offset)
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (signed-stack))
   (unsigned-reg registers
    :locations #.non-descriptor-regs
-   :reserve-locations (#.nl6-offset)
    :constant-scs (zero immediate)
    :save-p t
    :alternate-scs (unsigned-stack))
@@ -199,8 +194,6 @@
   ;; Non-Descriptor single-floats.
   (single-reg float-registers
    :locations #.(loop for i from 0 to 31 collect i)
-   ;; ### Note: We really should have every location listed, but then we
-   ;; would have to make load-tns work with element-sizes other than 1.
    :constant-scs ()
    :save-p t
    :alternate-scs (single-stack))
@@ -208,8 +201,6 @@
   ;; Non-Descriptor double-floats.
   (double-reg float-registers
    :locations #.(loop for i from 0 to 31 collect i)
-   ;; ### Note: load-tns don't work with an element-size other than 1.
-   ;; :element-size 2 :alignment 2
    :constant-scs ()
    :save-p t
    :alternate-scs (double-stack))
@@ -389,7 +380,9 @@
 ;;; or store instruction of 8 bytes.
 ;;; Those instructions require the displacement be a multiple of 4 bytes
 ;;; which precludes subtracting a lowtag in the same instruction.
-;;; See ld instruction for reference
-(defglobal nl6-tn (make-random-tn :kind :normal
-                                  :sc (sc-or-lose 'unsigned-reg)
-                                  :offset nl6-offset))
+;;; See ld instruction for reference.
+;;; See also the comments above DEFINE-INDEXER for some thoughts on how to
+;;; regain the ability to subtract lowtags "for free".
+(defglobal temp-reg-tn (make-random-tn :kind :normal
+                                       :sc (sc-or-lose 'unsigned-reg)
+                                       :offset nl6-offset))

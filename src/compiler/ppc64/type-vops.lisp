@@ -154,7 +154,7 @@
               (values target not-target))
         ;; Is it a fixnum?
         (inst andi. temp value fixnum-tag-mask)
-        (inst cmpwi :cr1 value 0) ; is this really necessary?
+        (inst cmpdi :cr1 value 0)
         (inst beq fixnum)
 
         ;; If not, is it an other pointer?

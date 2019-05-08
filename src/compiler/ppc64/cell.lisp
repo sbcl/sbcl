@@ -47,10 +47,10 @@
     (inst sync)
     (inst li temp (- (* offset n-word-bytes) lowtag))
     LOOP
-    (inst lwarx result temp object)
+    (inst ldarx result temp object)
     (inst cmpd result old)
     (inst bne EXIT)
-    (inst stwcx. new temp object)
+    (inst stdcx. new temp object)
     (inst bne LOOP)
     EXIT
     (inst isync)))
@@ -85,10 +85,10 @@
     (inst li temp (- (* symbol-value-slot n-word-bytes)
                      other-pointer-lowtag))
     LOOP
-    (inst lwarx result symbol temp)
+    (inst ldarx result symbol temp)
     (inst cmpd result old)
     (inst bne CHECK-UNBOUND)
-    (inst stwcx. new symbol temp)
+    (inst stdcx. new symbol temp)
     (inst bne LOOP)
 
     CHECK-UNBOUND
@@ -554,16 +554,17 @@
   (:results (result :scs (unsigned-reg) :from :load))
   (:result-types unsigned-num)
   (:generator 4
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
-                               instance-pointer-lowtag))
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))              
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
+                                instance-pointer-lowtag))
     ;; load the slot value, add DIFF, write the sum back, and return
     ;; the original slot value, atomically, and include a memory
     ;; barrier.
     (inst sync)
     LOOP
-    (inst lwarx result offset object)
+    (inst ldarx result offset object)
     (inst add sum result diff)
-    (inst stwcx. sum offset object)
+    (inst stdcx. sum offset object)
     (inst bne LOOP)
     (inst isync)))
 

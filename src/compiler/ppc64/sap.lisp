@@ -136,8 +136,7 @@
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 (macrolet ((def-system-ref-and-set
                (ref-name set-name sc type size &optional signed)
-               (let ((ref-name-c (symbolicate ref-name "-C"))
-                     (set-name-c (symbolicate set-name "-C")))
+             (let ()
                  `(progn
                    (define-vop (,ref-name)
                        (:translate ,ref-name)
@@ -151,13 +150,16 @@
                       (inst ,(ecase size
                                     (:byte 'lbzx)
                                     (:short (if signed 'lhax 'lhzx))
-                                    (:long 'lwzx)
+                                    (:word (if signed 'lwax 'lwzx))
+                                    (:long 'ldx)
                                     (:single 'lfsx)
                                     (:double 'lfdx))
                             result sap offset)
                       ,@(when (and (eq size :byte) signed)
-                              '((inst extsb result result)))))
-                   (define-vop (,ref-name-c)
+                          '((inst extsb result result)))))
+;;; FIXME: need to add a constraint on the offset alignment for doubleword
+                   #+nil
+                   (define-vop (,(symbolicate ref-name "-C"))
                        (:translate ,ref-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg)))
@@ -169,7 +171,7 @@
                       (inst ,(ecase size
                                     (:byte 'lbz)
                                     (:short (if signed 'lha 'lhz))
-                                    (:long 'lwz)
+                                    (:word (if signed 'lwa 'lwz))
                                     (:single 'lfs)
                                     (:double 'lfd))
                             result sap offset)
@@ -188,7 +190,8 @@
                       (inst ,(ecase size
                                     (:byte 'stbx)
                                     (:short 'sthx)
-                                    (:long 'stwx)
+                                    (:word 'stwx)
+                                    (:long 'stdx)
                                     (:single 'stfsx)
                                     (:double 'stfdx))
                             value sap offset)
@@ -200,7 +203,8 @@
                                  '((inst fmr result value)))
                                 (t
                                  '((inst mr result value)))))))
-                   (define-vop (,set-name-c)
+                   #+nil
+                   (define-vop (,(symbolicate set-name "-C"))
                        (:translate ,set-name)
                      (:policy :fast-safe)
                      (:args (sap :scs (sap-reg))
@@ -234,8 +238,12 @@
   (def-system-ref-and-set signed-sap-ref-16 %set-signed-sap-ref-16
     signed-reg tagged-num :short t)
   (def-system-ref-and-set sap-ref-32 %set-sap-ref-32
-    unsigned-reg unsigned-num :long nil)
+    unsigned-reg unsigned-num :word nil)
   (def-system-ref-and-set signed-sap-ref-32 %set-signed-sap-ref-32
+    signed-reg signed-num :word t)
+  (def-system-ref-and-set sap-ref-64 %set-sap-ref-64
+    unsigned-reg unsigned-num :long)
+  (def-system-ref-and-set signed-sap-ref-64 %set-signed-sap-ref-64
     signed-reg signed-num :long t)
   (def-system-ref-and-set sap-ref-sap %set-sap-ref-sap
     sap-reg system-area-pointer :long)

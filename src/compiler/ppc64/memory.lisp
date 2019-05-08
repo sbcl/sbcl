@@ -47,9 +47,21 @@
 ;;; We would need to increase N-FIXNUM-TAG-BITS to 4 for this to work, and it
 ;;; may cause some breakage due to assumptions that lowtags are spaced evenly
 ;;; and that N-FIXNUM-TAG-BITS is not more than WORD-SHIFT.
-;;; I think both those constraints can be lifted.
+;;; Both those constraints may be impossible to remove - I don't know.
 ;;; The alternatives are far worse - constantly computing into the LIP
 ;;; register, or else allowing native pointers to pin objects.
+;;;
+;;; Potentially it will much simpler to have N-FIXNUM-TAG-BITS be 3,
+;;; and then we have two lowtags that allow use of single-instruction load/store
+;;; forms, and two that do not; something like this:
+;;;    #b0110 function
+;;;    #b0100 instance - good
+;;;    #b1100 list     - good
+;;;    #b1111 other
+;;; The misalignment of OTHER is not a huge problem, because array access requires
+;;; calculating the displacement anyway, and the remaining OTHER pointer types
+;;; like VALUE-CELL are not as prevalent. SYMBOL remains a bit of a problem.
+;;; Also, we can't load static symbol values using the NULL register as a base.
 
 ;;; NB: this macro uses an inverse of the 'shift' convention in the 32-bit file.
 ;;; Here is the convention is that 'scale' how much to left-shift a natural
@@ -88,10 +100,10 @@
                   (inst lr temp offset)
                   (inst ,rr-op value object temp)))))
          (t
-          ,@(when (plusp net-shift)
-              `((inst sldi temp index ,net-shift)))
-          ,@(when (minusp net-shift)
-              `((inst srdi temp index ,net-shift)))
+          ,@(cond ((plusp net-shift)
+                   `((inst sldi temp index ,net-shift)))
+                  ((minusp net-shift)
+                   `((inst srdi temp index (- ,net-shift)))))
           (inst addi temp ,(if (zerop net-shift) 'index 'temp)
                 (- (ash offset word-shift) lowtag))
           (inst ,rr-op value object temp)))
@@ -127,16 +139,13 @@
       ((immediate zero)
        (let ((offset (- (+ (if (sc-is index zero)
                                0
-                             (ash (tn-value index) word-shift))
+                               (ash (tn-value index) word-shift))
                            (ash offset word-shift))
                         lowtag)))
          (inst lr temp offset)))
       (t
-       ;; KLUDGE: This relies on N-FIXNUM-TAG-BITS being the same as
-       ;; WORD-SHIFT.  I know better than to do this.  --AB, 2010-Jun-16
-       (inst addi temp index
-             (- (ash offset word-shift) lowtag))))
-
+       (inst sldi temp index (- word-shift n-fixnum-tag-bits))
+       (inst addi temp temp (- (ash offset word-shift) lowtag))))
     (inst sync)
     LOOP
     (inst ldarx result temp object)

@@ -238,14 +238,14 @@
 
       ;; Compute dst as one slot down from result, because we inc the index
       ;; before we use it.
-      (inst subi dst result 4)
+      (inst subi dst result n-word-bytes)
 
       ;; Copy stuff down the stack.
       (emit-label loop)
-      (inst lwzx temp src num)
+      (inst ldx temp src num)
       (inst addi num num (fixnumize 1))
       (inst cmpw num count)
-      (inst stwx temp dst num)
+      (inst stdx temp dst num)
       (inst bne loop)
 
       ;; Reset the CSP.

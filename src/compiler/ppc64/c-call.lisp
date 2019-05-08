@@ -17,11 +17,12 @@
 ;;; restrictive).  On linux, two words are reserved for the stack
 ;;; backlink and saved LR (see SB-VM::NUMBER-STACK-DISPLACEMENT).
 
-(defconstant +stack-alignment-bytes+
-  ;; Duh.  PPC Linux (and VxWorks) adhere to the EABI.
-  #-darwin 7
-  ;; But Darwin doesn't
-  #+darwin 15)
+;;;; 2.2.2.1 General Stack Frame Requirements
+;;;; The following general requirements apply to all stack frames:
+;;;; * The stack shall be quadword aligned.
+;;;; * The minimum stack frame size shall be 32 bytes.
+
+(defconstant +stack-alignment-mask+ 31)
 
 (defstruct arg-state
   (gpr-args 0)
@@ -205,166 +206,6 @@
                (make-result-state))))))
 
 
-;;; Sort out long longs, by splitting them up.  However, need to take
-;;; care about register/stack alignment and whether they will fully
-;;; fit into registers or must go on the stack.
-#-darwin
-(deftransform %alien-funcall ((function type &rest args))
-  (aver (sb-c::constant-lvar-p type))
-  (let* ((type (sb-c::lvar-value type))
-         (arg-types (alien-fun-type-arg-types type))
-         (result-type (alien-fun-type-result-type type))
-         (gprs 0)
-         (fprs 0)
-         (stack 0))
-    (aver (= (length arg-types) (length args)))
-    ;; We need to do something special for 64-bit integer arguments
-    ;; and results.
-    (if (or (some #'(lambda (type)
-                      (and (alien-integer-type-p type)
-                           (> (sb-alien::alien-integer-type-bits type) 32)))
-                  arg-types)
-            (and (alien-integer-type-p result-type)
-                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
-        (collect ((new-args) (lambda-vars) (new-arg-types))
-          (dolist (type arg-types)
-            (let ((arg (gensym)))
-              (lambda-vars arg)
-              (cond ((and (alien-integer-type-p type)
-                          (> (sb-alien::alien-integer-type-bits type) 32))
-                     (when (or
-                            (oddp gprs)
-                            (and
-                             (oddp stack)
-                             (> gprs 7)))
-                       ;; Need to pad for alignment.
-                       (if (oddp gprs)
-                           (incf gprs)
-                           (incf stack))
-                       (new-args 0)
-                       (new-arg-types (parse-alien-type
-                                       '(unsigned 32) nil)))
-                     (if (< gprs 8)
-                         (incf gprs 2)
-                         (incf stack 2))
-                     (new-args `(ash ,arg -32))
-                     (new-args `(logand ,arg #xffffffff))
-                     (if (alien-integer-type-signed type)
-                         (new-arg-types (parse-alien-type
-                                         '(signed 32) nil))
-                         (new-arg-types (parse-alien-type
-                                         '(unsigned 32) nil)))
-                     (new-arg-types (parse-alien-type
-                                     '(unsigned 32) nil)))
-                    ((alien-single-float-type-p type)
-                     (if (< fprs 8)
-                         (incf fprs)
-                         (incf stack))
-                     (new-args arg)
-                     (new-arg-types type))
-                    ((alien-double-float-type-p type)
-                     (if (< fprs 8)
-                         (incf fprs)
-                         (if (oddp stack)
-                             (incf stack 3)   ; Doubles are aligned on
-                             (incf stack 2))) ; the stack.
-                     (new-args arg)
-                     (new-arg-types type))
-                    (t ;; integer or SAP
-                     (if (< gprs 8)
-                         (incf gprs 1)
-                         (incf stack 1))
-                     (new-args arg)
-                     (new-arg-types type)))))
-                 (cond ((and (alien-integer-type-p result-type)
-                             (> (sb-alien::alien-integer-type-bits result-type) 32))
-                        (let ((new-result-type
-                               (let ((sb-alien::*values-type-okay* t))
-                                 (parse-alien-type
-                                  (if (alien-integer-type-signed result-type)
-                                      '(values (signed 32) (unsigned 32))
-                                      '(values (unsigned 32) (unsigned 32)))
-                                  nil))))
-                          `(lambda (function type ,@(lambda-vars))
-                            (declare (ignore type))
-                            (multiple-value-bind (high low)
-                                (%alien-funcall function
-                                                ',(make-alien-fun-type
-                                                   :arg-types (new-arg-types)
-                                                   :result-type new-result-type)
-                                                ,@(new-args))
-                              (logior low (ash high 32))))))
-                       (t
-                        `(lambda (function type ,@(lambda-vars))
-                          (declare (ignore type))
-                          (%alien-funcall function
-                           ',(make-alien-fun-type
-                              :arg-types (new-arg-types)
-                              :result-type result-type)
-                           ,@(new-args))))))
-        (sb-c::give-up-ir1-transform))))
-
-#+darwin
-(deftransform %alien-funcall ((function type &rest args))
-  (aver (sb-c::constant-lvar-p type))
-  (let* ((type (sb-c::lvar-value type))
-         (arg-types (alien-fun-type-arg-types type))
-         (result-type (alien-fun-type-result-type type)))
-    (aver (= (length arg-types) (length args)))
-    ;; We need to do something special for 64-bit integer arguments
-    ;; and results.
-    (if (or (some #'(lambda (type)
-                      (and (alien-integer-type-p type)
-                           (> (sb-alien::alien-integer-type-bits type) 32)))
-                  arg-types)
-            (and (alien-integer-type-p result-type)
-                 (> (sb-alien::alien-integer-type-bits result-type) 32)))
-        (collect ((new-args) (lambda-vars) (new-arg-types))
-                 (dolist (type arg-types)
-                   (let ((arg (gensym)))
-                     (lambda-vars arg)
-                     (cond ((and (alien-integer-type-p type)
-                                 (> (sb-alien::alien-integer-type-bits type) 32))
-                            ;; 64-bit long long types are stored in
-                            ;; consecutive locations, most significant word
-                            ;; first (big-endian).
-                            (new-args `(ash ,arg -32))
-                            (new-args `(logand ,arg #xffffffff))
-                            (if (alien-integer-type-signed type)
-                                (new-arg-types (parse-alien-type '(signed 32) nil))
-                                (new-arg-types (parse-alien-type '(unsigned 32) nil)))
-                            (new-arg-types (parse-alien-type '(unsigned 32) nil)))
-                           (t
-                            (new-args arg)
-                            (new-arg-types type)))))
-                 (cond ((and (alien-integer-type-p result-type)
-                             (> (sb-alien::alien-integer-type-bits result-type) 32))
-                        (let ((new-result-type
-                               (let ((sb-alien::*values-type-okay* t))
-                                 (parse-alien-type
-                                  (if (alien-integer-type-signed result-type)
-                                      '(values (signed 32) (unsigned 32))
-                                      '(values (unsigned 32) (unsigned 32)))
-                                  nil))))
-                          `(lambda (function type ,@(lambda-vars))
-                            (declare (ignore type))
-                            (multiple-value-bind (high low)
-                                (%alien-funcall function
-                                                ',(make-alien-fun-type
-                                                   :arg-types (new-arg-types)
-                                                   :result-type new-result-type)
-                                                ,@(new-args))
-                              (logior low (ash high 32))))))
-                       (t
-                        `(lambda (function type ,@(lambda-vars))
-                          (declare (ignore type))
-                          (%alien-funcall function
-                           ',(make-alien-fun-type
-                              :arg-types (new-arg-types)
-                              :result-type result-type)
-                           ,@(new-args))))))
-        (sb-c::give-up-ir1-transform))))
-
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
   (:policy :fast-safe)
@@ -412,7 +253,6 @@
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
-
 (define-vop (alloc-number-stack-space)
   (:info amount)
   (:results (result :scs (sap-reg any-reg)))
@@ -424,9 +264,9 @@
       ;; NUMBER-STACK-DISPLACEMENT twice here.  Weird.  -- CSR,
       ;; 2003-08-20
       (let ((delta (- (logandc2 (+ amount number-stack-displacement
-                                   +stack-alignment-bytes+)
-                                +stack-alignment-bytes+))))
-        (cond ((>= delta (ash -1 16))
+                                   +stack-alignment-mask+)
+                                +stack-alignment-mask+))))
+        (cond ((typep delta '(signed-byte 16))
                (inst stdu nsp-tn nsp-tn delta))
               (t
                (inst lr temp delta)
@@ -443,9 +283,9 @@
   (:generator 0
     (unless (zerop amount)
       (let ((delta (logandc2 (+ amount number-stack-displacement
-                                +stack-alignment-bytes+)
-                             +stack-alignment-bytes+)))
-        (cond ((< delta (ash 1 16))
+                                +stack-alignment-mask+)
+                             +stack-alignment-mask+)))
+        (cond ((typep delta '(signed-byte 16))
                (inst addi nsp-tn nsp-tn delta))
               (t
                (inst ld nsp-tn nsp-tn 0)))))))
@@ -517,8 +357,8 @@
                                  n-return-area-bytes
                                  args-size
                                  number-stack-displacement
-                                 +stack-alignment-bytes+)
-                              +stack-alignment-bytes+))
+                                 +stack-alignment-mask+)
+                              +stack-alignment-mask+))
                  (return-area-pos (- frame-size
                                      number-stack-displacement
                                      args-size))
@@ -768,8 +608,8 @@
                  (frame-size (logandc2 (+ n-foreign-linkage-area-bytes
                                           n-return-area-bytes
                                           args-size
-                                          +stack-alignment-bytes+)
-                                       +stack-alignment-bytes+)))
+                                          +stack-alignment-mask+)
+                                       +stack-alignment-mask+)))
             (destructuring-bind (sp r0 arg1 arg2 arg3 arg4)
                 (mapcar #'make-gpr '(1 0 3 4 5 6))
               ;; FIXME: This is essentially the same code as LR in

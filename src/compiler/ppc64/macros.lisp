@@ -25,8 +25,8 @@
        `(defun ,op (object base &optional (offset 0) (lowtag 0))
           (let ((displacement (- (ash offset word-shift) lowtag)))
             (cond ((logtest displacement #b11) ; not directly encodable in ld/std
-                   (inst li nl6-tn displacement)
-                   (inst ,inst-indexed object base nl6-tn))
+                   (inst li temp-reg-tn displacement)
+                   (inst ,inst-indexed object base temp-reg-tn))
                   (t
                    (inst ,inst object base displacement)))))))
   (def loadw ld ldx)
@@ -50,15 +50,20 @@
                              (find-package "SB-VM"))))
          `(progn
             (defmacro ,loader (reg symbol)
-              `(inst lwz ,reg null-tn
-                     (+ (static-symbol-offset ',symbol)
-                        (ash ,',offset word-shift)
-                        (- other-pointer-lowtag))))
+              `(progn
+                 ;; Work around the usual lowtag subtraction problem.
+                 (inst li temp-reg-tn
+                       (+ (static-symbol-offset ',symbol)
+                          (ash ,',offset word-shift)
+                          (- other-pointer-lowtag)))
+                 (inst ldx ,reg null-tn temp-reg-tn)))
             (defmacro ,storer (reg symbol)
-              `(inst stw ,reg null-tn
-                     (+ (static-symbol-offset ',symbol)
-                        (ash ,',offset word-shift)
-                        (- other-pointer-lowtag))))))))
+              `(progn
+                 (inst li temp-reg-tn
+                       (+ (static-symbol-offset ',symbol)
+                          (ash ,',offset word-shift)
+                          (- other-pointer-lowtag)))
+                 (inst stdx ,reg null-tn temp-reg-tn)))))))
   (frob value)
   (frob function)
 
@@ -185,49 +190,62 @@
 ;;; because a temp register is needed to do inline allocation.
 ;;; TEMP-TN, in this case, can be any register, since it holds a
 ;;; double-word aligned address (essentially a fixnum).
-(defmacro allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
+;;;
+;;; Using trap instructions for not-very-exceptional situations, such as
+;;; allocating, is clever but not very convenient when using gdb to debug.
+;;; So at the expense of speed and code size, we can use a call/return.
+;;; In such case, we never actually try to perform allocations inline.
+;;;
+(defun allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
   ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
   ;; set.  If the lowtag also has a 1 bit in the same position, we're all
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
-  (declare (ignore stack-p node)
-           #-gencgc
-           (ignore temp-tn flag-tn))
-    #-gencgc
-    (let ((alloc-size (gensym)))
-      `(let ((,alloc-size ,size))
-         (if (logbitp (1- n-lowtag-bits) ,lowtag)
-             (progn
-               (inst ori ,result-tn alloc-tn ,lowtag))
-             (progn
-               (inst clrrwi ,result-tn alloc-tn n-lowtag-bits)
-               (inst ori ,result-tn ,result-tn ,lowtag)))
-         (if (numberp ,alloc-size)
-             (inst addi alloc-tn alloc-tn ,alloc-size)
-             (inst add alloc-tn alloc-tn ,alloc-size))))
-    #+gencgc
-    `(progn
-       ;; Make temp-tn be the size
-       (cond ((numberp ,size)
-              (inst lr ,temp-tn ,size))
-             (t
-              (move ,temp-tn ,size)))
+  (declare (ignore stack-p node))
 
-       #-sb-thread
-       ;; thread-base-tn will point directly to the C variable
-       (progn (inst lr thread-base-tn (make-fixup "gc_alloc_region" :foreign-dataref))
-              (inst ld thread-base-tn thread-base-tn 0) ; because sb-dynamic-core
-              (inst ld ,result-tn thread-base-tn 0))
-       #+sb-thread
-       (inst ld ,result-tn thread-base-tn (* thread-alloc-region-slot
-                                              n-word-bytes))
+  #-alloc-use-sigtrap ; sigtrap is not working
+  (let ((lip (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
+                             :offset lip-offset)))
+    (inst lr lip (make-fixup 'alloc-tramp :assembly-routine))
+    (if (numberp size)
+        (inst lr temp-tn size)
+        (move temp-tn size))
+    (inst std temp-tn lip -8)
+    ;; the asm routine is not allowed to mess up the link register - it has to
+    ;; be truly "invisible", like the trap signal. Obviously it's impossible
+    ;; to avoid messing up LR, which means we need to save it now because we don't
+    ;; know whether we're inside a context that needs it saved.
+    (inst mflr temp-tn)
+    (inst std temp-tn lip -16)    
+    (inst mtctr lip)
+    (inst bctrl)
+    ;; LIP once again points to the static spill area from which we can
+    ;; recover the LR
+    (inst ld temp-tn lip -16)
+    (inst mtlr temp-tn)
+    ;; asm routine returns its result in the count register.
+    (inst mfctr result-tn)
+    (inst ori result-tn result-tn lowtag)
+    (return-from allocation))
+    
+  (let ((imm-size (typep size '(unsigned-byte 15)))
+        (region (+ #+sb-thread (* thread-alloc-region-slot n-word-bytes))))
 
-       (inst ld ,flag-tn thread-base-tn ; region->end_addr
-             #-sb-thread n-word-bytes
-             #+sb-thread(* (1+ thread-alloc-region-slot) n-word-bytes))
+    (unless imm-size ; Make temp-tn be the size
+      (if (numberp size)
+          (inst lr temp-tn size)
+          (move temp-tn size)))
+      
+    ;; thread-base-tn will point directly to the C variable if no thread
+    #-sb-thread
+    (progn (inst lr thread-base-tn (make-fixup "gc_alloc_region" :foreign-dataref))
+           (inst ld thread-base-tn thread-base-tn 0)) ; because sb-dynamic-core
 
-       (without-scheduling ()
+    (inst ld result-tn thread-base-tn region)
+    (inst ld flag-tn thread-base-tn (+ region n-word-bytes)) ; region->end_addr
+
+    (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
          ;; instructions here.  In particular, immediately before the
          ;; TW instruction must be an ADD or ADDI instruction, so it
@@ -237,18 +255,19 @@
 
          ;; Now make result-tn point at the end of the object, to
          ;; figure out if we overflowed the current region.
-         (inst add ,result-tn ,result-tn ,temp-tn)
+         (if imm-size
+             (inst addi result-tn result-tn size)
+             (inst add result-tn result-tn temp-tn))
+
          ;; result-tn points to the new end of the region.  Did we go past
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         (inst tw :lgt ,result-tn ,flag-tn)
+         (inst tw :lgt result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; one machine instruction.
-         (inst std ,result-tn thread-base-tn
-               #-sb-thread 0
-               #+sb-thread (* thread-alloc-region-slot n-word-bytes)))
+         (inst std result-tn thread-base-tn region))
 
        ;; Should the allocation trap above have fired, the runtime
        ;; arranges for execution to resume here, just after where we
@@ -256,9 +275,12 @@
 
        ;; At this point, result-tn points at the end of the object.
        ;; Adjust to point to the beginning.
-       (inst sub ,result-tn ,result-tn ,temp-tn)
-       ;; Set the lowtag appropriately
-       (inst ori ,result-tn ,result-tn ,lowtag)))
+    (cond (imm-size
+           (inst addi result-tn result-tn (+ (- size) lowtag)))
+          (t
+           (inst sub result-tn result-tn temp-tn)
+           ;; Set the lowtag appropriately
+           (inst ori result-tn result-tn lowtag)))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code size
                                             &key (lowtag other-pointer-lowtag)

@@ -91,25 +91,22 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 0
-    (let ((loop (gen-label))
-          (done (gen-label)))
+    (move list arg)
+    (move start csp-tn)
 
-      (move list arg)
-      (move start csp-tn)
+    LOOP
+    (inst cmpd list null-tn)
+    (loadw temp list cons-car-slot list-pointer-lowtag)
+    (inst beq done)
+    (loadw list list cons-cdr-slot list-pointer-lowtag)
+    (inst addi csp-tn csp-tn n-word-bytes)
+    (storew temp csp-tn -1)
+    (test-type list ndescr loop nil (list-pointer-lowtag))
+    (cerror-call vop 'bogus-arg-to-values-list-error list)
 
-      (emit-label loop)
-      (inst cmpd list null-tn)
-      (loadw temp list cons-car-slot list-pointer-lowtag)
-      (inst beq done)
-      (loadw list list cons-cdr-slot list-pointer-lowtag)
-      (inst addi csp-tn csp-tn n-word-bytes)
-      (storew temp csp-tn -1)
-      (test-type list ndescr loop nil (list-pointer-lowtag))
-      (cerror-call vop 'bogus-arg-to-values-list-error list)
-
-      (emit-label done)
-      (inst sub count csp-tn start))))
-
+    DONE
+    (inst sub count csp-tn start)
+    (inst sradi count count (- word-shift n-fixnum-tag-bits))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
@@ -132,17 +129,25 @@
       (immediate
        (inst addi src context (* (tn-value skip) n-word-bytes)))
       (any-reg
-       (inst add src context skip)))
+       (let ((delta (cond ((= n-fixnum-tag-bits word-shift) skip)
+                          (t (inst slwi temp-reg-tn skip
+                                   (- word-shift n-fixnum-tag-bits))
+                             temp-reg-tn))))
+         (inst add src context delta))))
     (inst mr. count num)
     (inst mr start csp-tn)
     (inst beq done)
     (inst mr dst csp-tn)
-    (inst add csp-tn csp-tn count)
-    (inst mr i count)
+    (let ((delta (cond ((= n-fixnum-tag-bits word-shift) count)
+                       (t (inst slwi temp-reg-tn count
+                                (- word-shift n-fixnum-tag-bits))
+                          temp-reg-tn))))
+      (inst add csp-tn csp-tn delta)
+      (inst mr i delta))
     LOOP
-    (inst cmpwi i 4)
-    (inst subi i i 4)
-    (inst lwzx temp src i)
-    (inst stwx temp dst i)
+    (inst cmpwi i n-word-bytes)
+    (inst subi i i n-word-bytes)
+    (inst ldx temp src i)
+    (inst stdx temp dst i)
     (inst bne loop)
     DONE))
