@@ -46,6 +46,13 @@
 ;;; :trace-file as a flag.
 (setf *stems-and-flags* (read-from-file "build-order.lisp-expr" nil))
 
+;;; Don't care about deftransforms that get redefined.
+;;; The target condition is defined in 'condition' which is a :not-host file.
+;;; Without this, the host would complain about no such condition class
+;;; if we try to signal it when executing the cross-compiler.
+(define-condition sb-kernel:redefinition-with-deftransform (style-warning)
+  ((transform :initarg :transform)))
+
 (do-stems-and-flags (stem flags 2)
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
