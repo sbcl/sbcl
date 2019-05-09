@@ -282,6 +282,22 @@
                    'l
                    `(cdr ,(frob (1- n))))))
       (frob n))))
+
+(deftransform nth ((n l) (unsigned-byte t) * :node node)
+  "convert NTH to CAxxR"
+  (unless (constant-lvar-p n)
+    (give-up-ir1-transform))
+  (let ((n (lvar-value n)))
+    (when (> n
+             (if (policy node (and (= speed 3) (= space 0)))
+                 *extreme-nthcdr-open-code-limit*
+                 *default-nthcdr-open-code-limit*))
+      (give-up-ir1-transform))
+    (labels ((frob (n)
+               (if (zerop n)
+                   'l
+                   `(cdr ,(frob (1- n))))))
+      `(car ,(frob n)))))
 
 ;;;; arithmetic and numerology
 
@@ -4419,7 +4435,7 @@
   (multiple-value-bind (context count) (possible-rest-arg-context list)
     (if context
         `(%rest-ref ,n ,list ,context ,count)
-        `(car (nthcdr ,n ,list)))))
+        (values nil t))))
 (define-source-transform fast-&rest-nth (n list)
   (multiple-value-bind (context count) (possible-rest-arg-context list)
     (if context

@@ -18,7 +18,7 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-          tree-equal %setnth nthcdr
+          tree-equal %setnth nthcdr nth
           tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
@@ -188,8 +188,23 @@
 
 (defun nth (n list)
   "Return the nth object in a list where the car is the zero-th element."
-  (declare (explicit-check))
-  (car (nthcdr n list)))
+  (declare (explicit-check)
+           (optimize speed))
+  (typecase n
+    ((and fixnum unsigned-byte)
+     (block nil
+       (let ((i n)
+             (result list))
+         (tagbody
+          loop
+            (the list result)
+            (if (plusp i)
+                (psetq i (1- i)
+                       result (cdr result))
+                (return (car result)))
+            (go loop)))))
+    (t
+     (car (nthcdr n list)))))
 
 (defun first (list)
   "Return the 1st object in a list or NIL if the list is empty."
