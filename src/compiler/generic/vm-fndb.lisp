@@ -565,8 +565,11 @@
   (movable foldable flushable))
 
 #+64-bit
+(progn
+(defknown %make-double-float ((signed-byte 64)) double-float
+  (movable flushable))
 (defknown double-float-bits (double-float) (signed-byte 64)
-  (movable foldable flushable))
+  (movable foldable flushable)))
 
 (defknown double-float-high-bits (double-float) (signed-byte 32)
   (movable foldable flushable))

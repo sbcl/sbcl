@@ -217,7 +217,7 @@
     ;; to avoid messing up LR, which means we need to save it now because we don't
     ;; know whether we're inside a context that needs it saved.
     (inst mflr temp-tn)
-    (inst std temp-tn lip -16)    
+    (inst std temp-tn lip -16)
     (inst mtctr lip)
     (inst bctrl)
     ;; LIP once again points to the static spill area from which we can
@@ -228,7 +228,7 @@
     (inst mfctr result-tn)
     (inst ori result-tn result-tn lowtag)
     (return-from allocation))
-    
+
   (let ((imm-size (typep size '(unsigned-byte 15)))
         (region (+ #+sb-thread (* thread-alloc-region-slot n-word-bytes))))
 
@@ -236,7 +236,7 @@
       (if (numberp size)
           (inst lr temp-tn size)
           (move temp-tn size)))
-      
+
     ;; thread-base-tn will point directly to the C variable if no thread
     #-sb-thread
     (progn (inst lr thread-base-tn (make-fixup "gc_alloc_region" :foreign-dataref))

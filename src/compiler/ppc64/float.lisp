@@ -299,12 +299,11 @@
   (:results (y :scs (complex-single-reg)))
   (:note "pointer to complex float coercion")
   (:generator 2
-    (let ((real-tn (complex-single-reg-real-tn y)))
-      (inst lfs real-tn x (- (* complex-single-float-data-slot n-word-bytes)
-                             other-pointer-lowtag)))
-    (let ((imag-tn (complex-single-reg-imag-tn y)))
-      (inst lfs imag-tn x (- (* (1+ complex-single-float-data-slot) n-word-bytes)
-                             other-pointer-lowtag)))))
+    (let ((offset (- (* complex-single-float-data-slot n-word-bytes)
+                     other-pointer-lowtag)))
+      (inst lfs (complex-single-reg-real-tn y) x offset)
+      (inst lfs (complex-single-reg-imag-tn y) x (+ offset 4)))))
+
 (define-move-vop move-to-complex-single :move
   (descriptor-reg) (complex-single-reg))
 
@@ -713,7 +712,7 @@
     (let ((nfp (current-nfp-tn vop)))
       (storew new nfp (1+ (tn-offset temp)))
       (inst lfd fp-temp nfp (* n-word-bytes (tn-offset temp)))
-      (inst mtfsf 255 fp-temp)
+      ;; (inst mtfsf 255 fp-temp) ; FIXME: gets sigfpe
       (move res new))))
 
 
@@ -779,7 +778,7 @@
                       &aux (name (symbolicate part "PART"))
                            (arg-reg-sc (symbolicate "COMPLEX-" fmt "-REG"))
                            (arg-stack-sc (symbolicate "COMPLEX-" fmt "-REG")))
-             `(define-vop (,(symbolicate name "/COMPLEX" fmt "-FLOAT"))
+             `(define-vop (,(symbolicate name "/COMPLEX-" fmt "-FLOAT"))
                 (:args (x :scs (,arg-reg-sc) :target r
                           :load-if (not (sc-is x ,arg-stack-sc))))
                 (:arg-types ,(symbolicate "COMPLEX-" fmt "-FLOAT"))

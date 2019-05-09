@@ -764,7 +764,7 @@
            (define-x-21-instruction (name op xo rc-p &key (cost 4) other-dependencies)
                (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
                  `(define-instruction ,name (segment frt frb)
-                   (:printer x-21 ((op ,op) (xo ,xo) (rc ,(if rc-p 1 0))))
+                   ;; (:printer x-21 ((op ,op) (xo ,xo) (rc ,(if rc-p 1 0))))
                    (:cost ,cost)
                    (:delay ,cost)
                    (:dependencies (reads frb) ,@other-reads
@@ -884,7 +884,9 @@
            (define-ds-instruction (name op subop)
              `(define-instruction ,name (segment rt ra si)
                 (:declare (type (signed-byte 16) si))
-                (:printer d ((op ,op)))
+                ;; Todo: add an instruction field to match 'subop' to the
+                ;;       the low two bits of the DS field.
+                ;; (:printer d ((op ,op)))
                 (:emitter
                  (if (= (mod si 4) 0)
                      (emit-ds-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) (ash si -2) ,subop)
@@ -990,9 +992,9 @@
   (define-d-si-instruction mulli 7 :cost 5)
   (define-d-si-instruction subfic 8)
 
-  (macrolet ((def (mnemonic op L)
-                  `(define-instruction ,mnemonic (segment crf ra &optional (imm nil imm-p))
-                  (:printer d-crf-si ((op ,op) (l ,L)) '(:name :tab bf "," ra "," imm))
+  (macrolet ((def (mnemonic op L fmt imm-arg-field)
+               `(define-instruction ,mnemonic (segment crf ra &optional (imm nil imm-p))
+                  (:printer ,fmt ((op ,op) (l ,L)) '(:name :tab bf "," ra "," ,imm-arg-field))
                   (:dependencies (if imm-p (reads ra) (reads crf)) (writes :ccr))
                   (:delay 1)
                   (:emitter
@@ -1003,10 +1005,10 @@
                                      (logior (valid-cr-field-encoding crf) ,L)
                                      (reg-tn-encoding ra)
                                      (ldb (byte 16 0) imm))))))
-    (def cmpwi 11 0)
-    (def cmpdi 11 1)
-    (def cmplwi 10 0)
-    (def cmpldi 10 1))
+    (def cmpwi  11 0 d-crf-si si)
+    (def cmpdi  11 1 d-crf-si si)
+    (def cmplwi 10 0 d-crf-ui ui)
+    (def cmpldi 10 1 d-crf-ui ui))
 
   (define-d-si-instruction addic 12 :other-dependencies ((writes :xer)))
   (define-d-si-instruction addic. 13 :other-dependencies ((writes :xer) (writes :ccr)))
@@ -1259,7 +1261,9 @@
 
   (macrolet ((def (mnemonic op Rc)
                `(define-instruction ,mnemonic (segment ra rs sh m)
-                  (:printer m ((op 30) (rc 0) (rb nil :type 'reg)))
+                  ;; This is problematic because 1 bit of the 'sh' value
+                  ;; is stored in the 5-bit RC field.
+                  ;; (:printer m ((op 30) (rc ,rc) (rb nil :type 'reg)))
                   (:emitter
                    (emit-md-form-inst
                     segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra)
@@ -1688,13 +1692,13 @@
   (define-2-x-21-instructions fctid 63 814)
   ;; floating convert with truncate double-precision to signed-doubleword
   (define-2-x-21-instructions fctidz 63 815)
-  ;; floating convert with round signed-doubleword to double-precision 
+  ;; floating convert with round signed-doubleword to double-precision
   (define-2-x-21-instructions fcfid 63 846)
-  ;; floating convert with round unsigned-doubleword to double-precision 
+  ;; floating convert with round unsigned-doubleword to double-precision
   (define-2-x-21-instructions fcfidu 63 846)
-  ;; floating convert with round signed-doubleword to single-precision 
+  ;; floating convert with round signed-doubleword to single-precision
   (define-2-x-21-instructions fcfids 63 846)
-  ;; floating convert with round unsigned-doubleword to single-precision 
+  ;; floating convert with round unsigned-doubleword to single-precision
   (define-2-x-21-instructions fcfidus 63 846)
 
   (define-2-a-tab-instructions fdiv 63 18 :cost 31)

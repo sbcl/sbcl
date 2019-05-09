@@ -589,6 +589,11 @@
            (type (unsigned-byte 32) lo))
   (make-flonum (logior (ash hi 32) lo) 'double-float))
 
+;;; This is the preferred constructor for 64-bit machines
+(defun %make-double-float (bits)
+  (declare (type (signed-byte 64) bits))
+  (make-flonum bits 'double-float))
+
 (defun float-infinity-p (x)
   (member (flonum-%value x) '(:-infinity :+infinity)))
 

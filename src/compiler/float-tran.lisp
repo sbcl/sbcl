@@ -129,6 +129,15 @@
   (let ((float (make-double-float (lvar-value hi) (lvar-value lo))))
     (if (float-nan-p float) (give-up-ir1-transform) float)))
 
+;;; I'd like to transition all the 64-bit backends to use the single-arg
+;;; %MAKE-DOUBLE-FLOAT constructor instead of the 2-arg MAKE-DOUBLE-FLOAT.
+;;; So we need a transform to fold constant calls for either.
+#+64-bit
+(deftransform %make-double-float ((bits) ((constant-arg t)))
+  "Conditional constant folding"
+  (let ((float (%make-double-float (lvar-value bits))))
+    (if (float-nan-p float) (give-up-ir1-transform) float)))
+
 ;;; On the face of it, these transforms are ridiculous because if we're going
 ;;; to express (MINUSP X) as (MINUSP (foo-FLOAT-BITS X)), then why not _always_
 ;;; transform MINUSP of a float into an integer comparison instead of a

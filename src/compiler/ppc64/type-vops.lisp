@@ -169,7 +169,7 @@
         (inst bne nope)
         ;; Get the second digit.
         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        ;; All zeros, its an (unsigned-byte 32).
+        ;; All zeros, its an (unsigned-byte 64).
         (inst cmpdi temp 0)
         (inst beq yep)
         ;; Otherwise, it isn't.
