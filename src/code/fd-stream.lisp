@@ -1885,7 +1885,7 @@
                 ((subtypep output-type input-type)
                  output-type)
                 (t
-                 (error "Input type (~/sb-impl:print-type-specifier/) and
+                 (error "Input type (~/sb-impl:print-type-specifier/) and ~
                          output type (~/sb-impl:print-type-specifier/) ~
                          are unrelated?"
                         input-type output-type))))))
