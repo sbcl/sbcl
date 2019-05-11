@@ -353,7 +353,7 @@
         (map nil
              (lambda (entry)
                (let* ((canon-type (car entry))
-                      (bucket (mod (sxhash canon-type) (length hashtable))))
+                      (bucket (mod (cl:sxhash canon-type) (length hashtable))))
                  (push entry (svref hashtable bucket))))
              entries)
       hashtable))
@@ -400,7 +400,7 @@
   (let ((table **type-spec-interr-symbols**))
     (if (typep spec '(cons (eql or)))
         (%interr-symbol-for-union-type-spec spec)
-        (cdr (assoc spec (svref table (rem (sxhash spec) (length table)))
+        (cdr (assoc spec (svref table (rem (cl:sxhash spec) (length table)))
                     :test #'equal)))))
 #+nil ; some meta-analysis to decide what types should be in "generic/interr"
 (progn

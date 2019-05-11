@@ -191,6 +191,8 @@
     "ZEROP" "ABS" "SIGNUM" "FLOAT-SIGN"
     "CEILING" "FLOOR" "ROUND" "TRUNCATE" "MOD" "REM"
     ;;
+    "SXHASH" ; must package-qualify if you mean CL:SXHASH
+    ;;
     "BYTE" "BYTE-POSITION" "BYTE-SIZE"
     "DPB" "LDB" "LDB-TEST"
     "DEPOSIT-FIELD" "MASK-FIELD"))

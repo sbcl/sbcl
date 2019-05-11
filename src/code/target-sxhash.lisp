@@ -556,12 +556,8 @@
                             ((float-infinity-p key)
                              ;; {single,double}-float infinities are EQUALP
                              (if (minusp key)
-                                 (load-time-value
-                                  (sxhash (symbol-value 'sb-ext:single-float-negative-infinity))
-                                  t)
-                                 (load-time-value
-                                  (sxhash (symbol-value 'sb-ext:single-float-positive-infinity))
-                                  t)))
+                                 (sxhash sb-ext:single-float-negative-infinity)
+                                 (sxhash sb-ext:single-float-positive-infinity)))
                             (t
                              (multiple-value-bind (q r) (floor key)
                                (if (zerop (the ,type r))
