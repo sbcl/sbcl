@@ -1119,7 +1119,7 @@ possibly temporarily, because it might be used internally."
                "*KEYWORD-PACKAGE*" "*CL-PACKAGE*"
 
                ;; hash mixing operations
-               "MIX" "MIXF"
+               "MIX" "MIXF" "WORD-MIX"
 
                ;; Macroexpansion that doesn't touch special forms
                "%MACROEXPAND"

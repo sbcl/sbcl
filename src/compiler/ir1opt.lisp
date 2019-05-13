@@ -1014,7 +1014,7 @@
                                (fname (lvar-fun-name lvar t)))
                           (format *trace-output*
                                   "~&trying transform ~s for ~s"
-                                  (transform-function x) fname)))
+                                  (transform-type x) fname)))
                       (unless (ir1-transform node x)
                         (when (eq *show-transforms-p* :all)
                           (format *trace-output*

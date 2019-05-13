@@ -142,45 +142,28 @@
 
 ;;; SXHASH of SIMPLE-BIT-VECTOR values is defined as a DEFTRANSFORM
 ;;; because it is endian-dependent.
+;;; ("because it is endian-dependent" is not a reason to define
+;;; a transform. This is probably better off as an asm routine)
 (deftransform sxhash ((x) (simple-bit-vector))
-  `(let ((result 410823708)
-         (length (length x)))
-    (declare (type fixnum result))
-    (cond
-      ((zerop length)
-       (mix result (sxhash 0)))
-      (t
-       (mixf result (sxhash length))
-       (multiple-value-bind (n-full-words n-bits-remaining)
-           (floor length sb-vm:n-word-bits)
-         (flet ((mix-into-result (num)
-                  (mixf result
-                        ,(ecase sb-c:*backend-byte-order*
-                                (:little-endian
-                                 '(logand num sb-xc:most-positive-fixnum))
-                                ;; FIXME: I'm not certain that
-                                ;; N-LOWTAG-BITS is the clearest way of
-                                ;; expressing this: it's essentially the
-                                ;; difference between `(UNSIGNED-BYTE
-                                ;; ,SB-VM:N-WORD-BITS) and (AND FIXNUM
-                                ;; UNSIGNED-BYTE).
-                                (:big-endian
-                                 '(ash num (- sb-vm:n-lowtag-bits)))))))
-           (declare (inline mix-into-result))
-           ;; FIXME: should we respect DEPTHOID?  SXHASH on strings
-           ;; doesn't seem to...
-           (dotimes (i n-full-words)
-             (mix-into-result (%vector-raw-bits x i)))
-           (if (zerop n-bits-remaining)
-               result
-               (mix-into-result
-                (logand (ash (1- (ash 1 n-bits-remaining))
-                             ,(ecase sb-c:*backend-byte-order*
-                                     (:little-endian 0)
-                                     (:big-endian
-                                      '(- sb-vm:n-word-bits
-                                        n-bits-remaining))))
-                        (%vector-raw-bits x n-full-words))))))))))
+  `(let* ((length (length x))
+          (result (word-mix 410823708 length)))
+    (declare (type unsigned-byte result))
+     (multiple-value-bind (n-full-words n-bits-remaining)
+         (floor length sb-vm:n-word-bits)
+       (dotimes (i n-full-words)
+         (setq result (word-mix (%vector-raw-bits x i) result)))
+       (when (plusp n-bits-remaining)
+         ;; FIXME: Do we really have to mask off bits of the final word?
+         ;; I don't think so, given that remaining bits are invariantly zero.
+         (setq result
+               (word-mix (logand (ash (1- (ash 1 n-bits-remaining))
+                                      ,(ecase sb-c:*backend-byte-order*
+                                         (:little-endian 0)
+                                         (:big-endian
+                                          '(- sb-vm:n-word-bits n-bits-remaining))))
+                                 (%vector-raw-bits x n-full-words))
+                         result)))
+       (logand result sb-xc:most-positive-fixnum))))
 
 ;;; Some other common SXHASH cases are defined as DEFTRANSFORMs in
 ;;; order to avoid having to do TYPECASE at runtime.
