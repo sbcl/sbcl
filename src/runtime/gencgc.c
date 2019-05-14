@@ -2324,7 +2324,7 @@ static void gc_close_all_regions()
 
 /* Do a complete scavenge of the newspace generation. */
 static void
-scavenge_newspace_generation(generation_index_t generation)
+scavenge_newspace(generation_index_t generation)
 {
     /* Flush the current regions updating the page table. */
     gc_close_all_regions();
@@ -2402,9 +2402,6 @@ scavenge_newspace_generation(generation_index_t generation)
     new_areas = NULL;
     new_areas_index = 0;
 
-    /* Return private-use pages to the general pool so that Lisp can have them */
-    gc_dispose_private_pages();
-
 #ifdef SC_NS_GEN_CK
     {
         page_index_t i;
@@ -2415,7 +2412,7 @@ scavenge_newspace_generation(generation_index_t generation)
                 && (page_table[i].gen == generation)
                 && (page_table[i].write_protected_cleared != 0)
                 && (page_table[i].pinned == 0)) {
-                lose("write protected page %d written to in scavenge_newspace_generation\ngeneration=%d pin=%d\n",
+                lose("write protected page %d written to in scavenge_newspace\ngeneration=%d pin=%d\n",
                      i, generation, page_table[i].pinned);
             }
         }
@@ -3346,11 +3343,14 @@ garbage_collect_generation(generation_index_t generation, int raise)
 
     /* Finally scavenge the new_space generation. Keep going until no
      * more objects are moved into the new generation */
-    scavenge_newspace_generation(new_space);
+    scavenge_newspace(new_space);
 
     scan_binding_stack();
+    smash_weak_pointers();
+    /* Return private-use pages to the general pool so that Lisp can have them */
+    gc_dispose_private_pages();
     cull_weak_hash_tables(weak_ht_alivep_funs);
-    scan_weak_pointers();
+
     wipe_nonpinned_words();
     // Do this last, because until wipe_nonpinned_words() happens,
     // not all page table entries have the 'gen' value updated,

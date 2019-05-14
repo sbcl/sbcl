@@ -969,7 +969,7 @@ trans_weak_pointer(lispobj object)
         if (immobile_obj_gen_bits(native) == from_space) cell = broken; \
     }
 
-void scan_weak_pointers(void)
+void smash_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {

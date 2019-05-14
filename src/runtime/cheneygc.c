@@ -178,17 +178,10 @@ collect_garbage(generation_index_t ignore)
 #endif
 
     scan_binding_stack();
-    /* Scan the weak pointers. */
-#ifdef PRINTNOISE
-    printf("Scanning weak hash tables ...\n");
-#endif
-    cull_weak_hash_tables(weak_ht_alivep_funs);
 
-    /* Scan the weak pointers. */
-#ifdef PRINTNOISE
-    printf("Scanning weak pointers ...\n");
-#endif
-    scan_weak_pointers();
+    smash_weak_pointers();
+    gc_dispose_private_pages();
+    cull_weak_hash_tables(weak_ht_alivep_funs);
 
     /* Flip spaces. */
 #ifdef PRINTNOISE
@@ -268,7 +261,6 @@ scavenge_newspace(void)
         here = next;
     } while (new_space_free_pointer > here ||
              (test_weak_triggers(0, 0) && new_space_free_pointer > here));
-    gc_dispose_private_pages();
     /* printf("done with newspace\n"); */
 }
 

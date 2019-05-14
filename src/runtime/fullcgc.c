@@ -392,7 +392,7 @@ void execute_full_mark_phase()
     } while (scav_queue.head_block->count ||
              (test_weak_triggers(pointer_survived_gc_yet, gc_mark_obj) &&
               scav_queue.head_block->count));
-    gc_dispose_private_pages();
+
 #if HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
 #define timediff(b,a,field) \
@@ -406,7 +406,7 @@ void execute_full_mark_phase()
 #endif
 }
 
-static void smash_weak_pointers()
+static void local_smash_weak_pointers()
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
@@ -559,8 +559,9 @@ void execute_full_sweep_phase()
 {
     long words_zeroed[1+PSEUDO_STATIC_GENERATION]; // One count per generation
 
+    local_smash_weak_pointers();
+    gc_dispose_private_pages();
     cull_weak_hash_tables(alivep_funs);
-    smash_weak_pointers();
 
     memset(words_zeroed, 0, sizeof words_zeroed);
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
