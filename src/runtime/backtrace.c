@@ -32,7 +32,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "thread.h"
-#include "gc-internal.h"
+#include "gc.h"
 #include "code.h"
 #include "var-io.h"
 
