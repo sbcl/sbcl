@@ -76,6 +76,7 @@
 (defun word-mix (x y)
   (declare (optimize (speed 3)))
   (declare (type word x y))
+  (declare (muffle-conditions compiler-note))
   (let* ((mul (logand 3622009729038463111 most-positive-word))
          (xor (logand 608948948376289905 most-positive-word))
          (xy (logand (+ (* x mul) y) most-positive-word)))
