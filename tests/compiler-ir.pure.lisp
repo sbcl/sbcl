@@ -20,7 +20,7 @@
           sb-c::do-blocks
           sb-c::do-nodes
           sb-c::%check-bound
-          sb-kernel:%bit-position/1))
+          sb-kernel:%bit-pos-fwd/1))
 
 (defun inspect-ir (form fun &rest checked-compile-args)
   (let ((*compile-component-hook* fun))
@@ -49,12 +49,12 @@
              (push node calls))))))
     calls))
 
-(test-util:with-test (:name :%bit-position/1-tail-called)
+(test-util:with-test (:name :%bit-pos-fwd/1-tail-called)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda (x)
                         (declare (optimize (debug 2)))
                         (position 1 (the simple-bit-vector x))))
-    (assert (eql (combination-fun-debug-name combination) '%bit-position/1))
+    (assert (eql (combination-fun-debug-name combination) '%bit-pos-fwd/1))
     (assert (node-tail-p combination))))
 
 (test-util:with-test (:name :bounds-check-constants)
