@@ -2142,9 +2142,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "COPY-UB64-TO-SYSTEM-AREA" "COPY-UB64-FROM-SYSTEM-AREA"
 
                ;; Bit bashing position for bit-vectors
-               "%BIT-POSITION"
-               "%BIT-POSITION/0"
-               "%BIT-POSITION/1"
+               "%BIT-POSITION" "%BIT-POS-FWD" "%BIT-POS-REV"
+               "%BIT-POSITION/0" "%BIT-POS-FWD/0" "%BIT-POS-REV/0"
+               "%BIT-POSITION/1" "%BIT-POS-FWD/1" "%BIT-POS-REV/1"
 
                ;; SIMPLE-FUN type and accessors
                "SIMPLE-FUN"

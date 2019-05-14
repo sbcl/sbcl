@@ -2053,20 +2053,27 @@
   (when (or test key)
     (delay-ir1-transform node :optimize)
     (give-up-ir1-transform "non-trivial :KEY or :TEST"))
-  (catch 'not-a-bit
+  (block not-a-bit
     `(with-array-data ((bits sequence :offset-var offset)
                        (start start)
                        (end end)
                        :check-fill-pointer t)
-       (let ((p ,(if (constant-lvar-p item)
-                     (case (lvar-value item)
-                       (0 `(%bit-position/0 bits from-end start end))
-                       (1 `(%bit-position/1 bits from-end start end))
-                       (otherwise (throw 'not-a-bit `(values nil nil))))
-                     `(%bit-position item bits from-end start end))))
-         (if p
-             (values item (the index (- (truly-the index p) offset)))
-             (values nil nil))))))
+       (let ((p ,(let* ((dir (cond ((not (constant-lvar-p from-end)) 0) ; unknown
+                                   ((lvar-value from-end) 2) ; reverse
+                                   (t 1))) ; forward
+                        (from-end-arg (if (eql dir 0) '(from-end) '())))
+                   (if (constant-lvar-p item)
+                       (case (lvar-value item)
+                         (0 `(,(elt #(%bit-position/0 %bit-pos-fwd/0 %bit-pos-rev/0) dir)
+                              bits ,@from-end-arg start end))
+                         (1 `(,(elt #(%bit-position/1 %bit-pos-fwd/1 %bit-pos-rev/1) dir)
+                              bits ,@from-end-arg start end))
+                         (otherwise (return-from not-a-bit `(values nil nil))))
+                       `(,(elt #(%bit-position %bit-pos-fwd %bit-pos-rev) dir)
+                         item bits ,@from-end-arg start end)))))
+           (if p
+               (values item (the index (- (truly-the index p) offset)))
+               (values nil nil))))))
 
 (deftransform %find-position ((item sequence from-end start end key test)
                               (character string t t t function function)
