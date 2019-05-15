@@ -196,9 +196,9 @@
              (progn
                (inst clrrwi result-tn alloc-tn n-lowtag-bits)
                (inst ori result-tn result-tn lowtag)))
-         (if (numberp alloc-size)
-             (inst addi alloc-tn alloc-tn alloc-size)
-             (inst add alloc-tn alloc-tn alloc-size)))
+         (if (numberp size)
+             (inst addi alloc-tn alloc-tn size)
+             (inst add alloc-tn alloc-tn size)))
   #+gencgc
   (let ((imm-size (typep size '(unsigned-byte 15))))
     (unless imm-size ; Make temp-tn be the size
