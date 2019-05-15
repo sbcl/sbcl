@@ -62,7 +62,15 @@
              head)))
       (list head tail))))
 
-(defun init-indices (strings)
+(defvar *slurped-random-constants*
+  (with-open-file (f (make-pathname :name "more-ucd-consts" :type "lisp-expr"
+                                    :defaults *unicode-character-database*))
+    (read f)))
+
+(defun init-indices (symbol &aux (strings
+                                  (or (cadr (assoc symbol *slurped-random-constants*))
+                                      (error "Missing entry in more-ucd-consts for ~S"
+                                             symbol))))
   (let ((hash (make-hash-table :test #'equal)))
     (loop for string in strings
        for index from 0
@@ -140,46 +148,11 @@ Length should be adjusted when the standard changes.")
 
 (defparameter *ucd-entries* (make-hash-table))
 
-;; Mappings of the general categories and bidi classes to integers
-;; Letter classes go first to optimize certain cl character type checks
-;; BN is the first BIDI class so that unallocated characters are BN
-;; Uppercase in the CL sense must have GC = 0, lowercase must GC = 1
-(defparameter *general-categories*
-  (init-indices '("Lu" "Ll" "Lt" "Lm" "Lo" "Cc" "Cf" "Co" "Cs" "Cn"
-                  "Mc" "Me" "Mn" "Nd" "Nl" "No" "Pc" "Pd" "Pe" "Pf"
-                  "Pi" "Po" "Ps" "Sc" "Sk" "Sm" "So" "Zl" "Zp" "Zs")))
-(defparameter *bidi-classes*
-  (init-indices '("BN" "AL" "AN" "B" "CS" "EN" "ES" "ET" "L" "LRE" "LRO"
-                  "NSM" "ON" "PDF" "R" "RLE" "RLO" "S" "WS" "LRI" "RLI"
-                  "FSI" "PDI")))
-(defparameter *east-asian-widths* (init-indices '("N" "A" "H" "W" "F" "Na")))
-(defparameter *scripts*
-  (init-indices
-   '("Unknown" "Common" "Latin" "Greek" "Cyrillic" "Armenian" "Hebrew" "Arabic"
-     "Syriac" "Thaana" "Devanagari" "Bengali" "Gurmukhi" "Gujarati" "Oriya"
-     "Tamil" "Telugu" "Kannada" "Malayalam" "Sinhala" "Thai" "Lao" "Tibetan"
-     "Myanmar" "Georgian" "Hangul" "Ethiopic" "Cherokee" "Canadian_Aboriginal"
-     "Ogham" "Runic" "Khmer" "Mongolian" "Hiragana" "Katakana" "Bopomofo" "Han"
-     "Yi" "Old_Italic" "Gothic" "Deseret" "Inherited" "Tagalog" "Hanunoo" "Buhid"
-     "Tagbanwa" "Limbu" "Tai_Le" "Linear_B" "Ugaritic" "Shavian" "Osmanya"
-     "Cypriot" "Braille" "Buginese" "Coptic" "New_Tai_Lue" "Glagolitic"
-     "Tifinagh" "Syloti_Nagri" "Old_Persian" "Kharoshthi" "Balinese" "Cuneiform"
-     "Phoenician" "Phags_Pa" "Nko" "Sundanese" "Lepcha" "Ol_Chiki" "Vai"
-     "Saurashtra" "Kayah_Li" "Rejang" "Lycian" "Carian" "Lydian" "Cham"
-     "Tai_Tham" "Tai_Viet" "Avestan" "Egyptian_Hieroglyphs" "Samaritan" "Lisu"
-     "Bamum" "Javanese" "Meetei_Mayek" "Imperial_Aramaic" "Old_South_Arabian"
-     "Inscriptional_Parthian" "Inscriptional_Pahlavi" "Old_Turkic" "Kaithi"
-     "Batak" "Brahmi" "Mandaic" "Chakma" "Meroitic_Cursive"
-     "Meroitic_Hieroglyphs" "Miao" "Sharada" "Sora_Sompeng" "Takri"
-     "Bassa_Vah" "Mahajani" "Pahawh_Hmong" "Caucasian_Albanian" "Manichaean"
-     "Palmyrene" "Duployan" "Mende_Kikakui" "Pau_Cin_Hau" "Elbasan" "Modi"
-     "Psalter_Pahlavi" "Grantha" "Mro" "Siddham" "Khojki" "Nabataean" "Tirhuta"
-     "Khudawadi" "Old_North_Arabian" "Warang_Citi" "Linear_A" "Old_Permic")))
-(defparameter *line-break-classes*
-  (init-indices
-   '("XX" "AI" "AL" "B2" "BA" "BB" "BK" "CB" "CJ" "CL" "CM" "CP" "CR" "EX" "GL"
-     "HL" "HY" "ID" "IN" "IS" "LF" "NL" "NS" "NU" "OP" "PO" "PR" "QU" "RI" "SA"
-     "SG" "SP" "SY" "WJ" "ZW")))
+(defparameter *general-categories* (init-indices '*general-categories*))
+(defparameter *bidi-classes* (init-indices '*bidi-classes*))
+(defparameter *east-asian-widths* (init-indices '*east-asian-widths*))
+(defparameter *scripts* (init-indices '*scripts*))
+(defparameter *line-break-classes* (init-indices '*line-break-classes*))
 
 (defparameter *east-asian-width-table*
   (with-input-txt-file (s "EastAsianWidth")

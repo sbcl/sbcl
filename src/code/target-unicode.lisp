@@ -117,45 +117,14 @@ with underscores replaced by dashes."
   (ordered-ranges-member (char-code character)
                          (gethash property **proplist-properties**)))
 
-;; WARNING: These have to be manually kept in sync with the values in ucd.lisp
-(declaim (type simple-vector *general-categories* *bidi-classes* *east-asian-widths*
-               *scripts* *line-break-classes*))
-(sb-ext:define-load-time-global *general-categories*
-  #(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
-    :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
-    :Zp :Zs))
-
-(sb-ext:define-load-time-global *bidi-classes*
-  #(:BN :AL :AN :B :CS :EN :ES :ET :L :LRE :LRO :NSM :ON
-    :PDF :R :RLE :RLO :S :WS :LRI :RLI :FSI :PDI))
-
-(sb-ext:define-load-time-global *east-asian-widths*
-  #(:N :A :H :W :F :Na))
-
-(sb-ext:define-load-time-global *scripts*
-  #(:Unknown :Common :Latin :Greek :Cyrillic :Armenian :Hebrew :Arabic :Syriac
-    :Thaana :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil :Telugu
-    :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian :Hangul
-    :Ethiopic :Cherokee :Canadian-Aboriginal :Ogham :Runic :Khmer :Mongolian
-    :Hiragana :Katakana :Bopomofo :Han :Yi :Old-Italic :Gothic :Deseret
-    :Inherited :Tagalog :Hanunoo :Buhid :Tagbanwa :Limbu :Tai-Le :Linear-B
-    :Ugaritic :Shavian :Osmanya :Cypriot :Braille :Buginese :Coptic :New-Tai-Lue
-    :Glagolitic :Tifinagh :Syloti-Nagri :Old-Persian :Kharoshthi :Balinese
-    :Cuneiform :Phoenician :Phags-Pa :Nko :Sundanese :Lepcha :Ol-Chiki :Vai
-    :Saurashtra :Kayah-Li :Rejang :Lycian :Carian :Lydian :Cham :Tai-Tham
-    :Tai-Viet :Avestan :Egyptian-Hieroglyphs :Samaritan :Lisu :Bamum :Javanese
-    :Meetei-Mayek :Imperial-Aramaic :Old-South-Arabian :Inscriptional-Parthian
-    :Inscriptional-Pahlavi :Old-Turkic :Kaithi :Batak :Brahmi :Mandaic :Chakma
-    :Meroitic-Cursive :Meroitic-Hieroglyphs :Miao :Sharada :Sora-Sompeng
-    :Takri :Bassa-Vah :Mahajani :Pahawh-Hmong :Caucasian-Albanian :Manichaean
-    :Palmyrene :Duployan :Mende-Kikakui :Pau-Cin-Hau :Elbasan :Modi
-    :Psalter-Pahlavi :Grantha :Mro :Siddham :Khojki :Nabataean :Tirhuta
-    :Khudawadi :Old-North-Arabian :Warang-Citi :Linear-A :Old-Permic))
-
-(sb-ext:define-load-time-global *line-break-classes*
-    #(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
-      :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
-      :SG :SP :SY :WJ :ZW))
+(eval-when (:compile-toplevel)
+  (defvar *slurped-random-constants*
+    (sb-cold:read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))
+  (defun read-ucd-constant (symbol)
+    (map 'vector
+         (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
+         (or (cadr (assoc symbol *slurped-random-constants*))
+             (error "Missing entry in more-ucd-consts for ~S" symbol)))))
 
 (declaim (inline svref-or-null))
 (defun svref-or-null (vector index)
@@ -164,7 +133,8 @@ with underscores replaced by dashes."
 
 (defun general-category (character)
   "Returns the general category of CHARACTER as it appears in UnicodeData.txt"
-  (svref-or-null *general-categories* (sb-impl::ucd-general-category character)))
+  (svref-or-null #.(read-ucd-constant '*general-categories*)
+                 (sb-impl::ucd-general-category character)))
 
 (defun bidi-class (character)
   "Returns the bidirectional class of CHARACTER"
@@ -172,7 +142,7 @@ with underscores replaced by dashes."
            (default-ignorable-p character))
       :Bn
       (svref-or-null
-       *bidi-classes*
+       #.(read-ucd-constant '*bidi-classes*)
        (aref **character-misc-database** (1+ (misc-index character))))))
 
 (declaim (inline combining-class))
@@ -227,7 +197,7 @@ Otherwise, returns NIL."
   "Returns the East Asian Width property of CHARACTER as
 one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
 :W (Wide), :F (Fullwidth), or :NA (Not applicable)"
-  (svref-or-null *east-asian-widths*
+  (svref-or-null #.(read-ucd-constant '*east-asian-widths*)
                  (ldb (byte 3 0)
                       (aref **character-misc-database**
                             (+ 5 (misc-index character))))))
@@ -235,7 +205,7 @@ one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
 (defun script (character)
   "Returns the Script property of CHARACTER as a keyword.
 If CHARACTER does not have a known script, returns :UNKNOWN"
-  (svref-or-null *scripts*
+  (svref-or-null #.(read-ucd-constant '*scripts*)
                  (aref **character-misc-database** (+ 6 (misc-index character)))))
 
 (defun char-block (character)
@@ -298,7 +268,7 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
   (when (and resolve (listp character)) (setf character (car character)))
   (when (and resolve (not character)) (return-from line-break-class :nil))
   (let ((raw-class
-         (svref-or-null *line-break-classes*
+         (svref-or-null #.(read-ucd-constant '*line-break-classes*)
                         (aref **character-misc-database** (+ 7 (misc-index character)))))
         (syllable-type (hangul-syllable-type character)))
     (when syllable-type
