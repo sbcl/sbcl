@@ -89,7 +89,8 @@
                 "tools-for-build/PropList.txt"
                 "tools-for-build/DerivedNormalizationProps.txt"))
       (outputs '("output/bidi-mirrors.lisp-expr"
-                 "output/blocks.lisp-expr"
+                 "output/block-ranges.lisp-expr"
+                 "output/block-names.lisp-expr"
                  "output/case.dat"
                  "output/casepages.dat"
                  "output/casepages.lisp-expr"

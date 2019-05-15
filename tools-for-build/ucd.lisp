@@ -775,15 +775,20 @@ Length should be adjusted when the standard changes.")
            (split-string (subseq line 0 (position #\# line)) #\;))))
   "List of BIDI mirroring glyph pairs")
 
-(defparameter *block-ranges*
-  (with-input-txt-file (stream "Blocks")
-    (loop with result = (make-array (* 252 2) :fill-pointer 0)
-       for line = (read-line stream nil nil) while line
-       unless (or (string= line "") (position #\# line))
-       do
-         (map nil #'(lambda (x) (vector-push x result))
-              (parse-codepoint-range (car (split-string line #\;))))
-       finally (return result)))
+(defparameter *blocks*
+  (let (ranges names)
+    (with-input-txt-file (stream "Blocks")
+      (loop
+       (let ((line (read-line stream nil nil)))
+         (cond ((not line) (return))
+               ((or (string= line "") (position #\# line))) ; ignore
+               (t (let* ((split (split-string line #\;))
+                         (range (parse-codepoint-range (car split))))
+                    (setq ranges (list* (cadr range) (car range) ranges))
+                    (push (nsubstitute #\- #\Space
+                                       (string-left-trim " " (cadr split)))
+                          names)))))))
+    (cons (nreverse (coerce ranges 'vector)) (nreverse names)))
   "Vector of block starts and ends in a form acceptable to `ordered-ranges-position`.
 Used to look up block data.")
 
@@ -976,6 +981,8 @@ Used to look up block data.")
     (prin1 *confusables*))
   (with-output-lisp-expr-file (*standard-output* "bidi-mirrors")
     (prin1 *bidi-mirroring-glyphs*))
-  (with-output-lisp-expr-file (*standard-output* "blocks")
-    (prin1 *block-ranges*))
+  (with-output-lisp-expr-file (*standard-output* "block-ranges")
+    (prin1 (car *blocks*)))
+  (with-output-lisp-expr-file (*standard-output* "block-names")
+    (format t "#(~{:~A~^~%  ~})" (cdr *blocks*)))
   (values))

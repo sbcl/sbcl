@@ -15,11 +15,6 @@
 (sb-ext:define-load-time-global **special-numerics**
   #.(sb-cold:read-from-file "output/numerics.lisp-expr"))
 
-(declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
-(sb-ext:define-load-time-global **block-ranges**
-  #.(sb-xc:coerce (sb-cold:read-from-file "output/blocks.lisp-expr")
-                  '(vector (unsigned-byte 32))))
-
 (macrolet ((unicode-property-init ()
              (let ((confusable-sets
                      (sb-cold:read-from-file "output/confusables.lisp-expr"))
@@ -124,7 +119,7 @@ with underscores replaced by dashes."
 
 ;; WARNING: These have to be manually kept in sync with the values in ucd.lisp
 (declaim (type simple-vector *general-categories* *bidi-classes* *east-asian-widths*
-               *scripts* *line-break-classes* *blocks*))
+               *scripts* *line-break-classes*))
 (sb-ext:define-load-time-global *general-categories*
   #(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
     :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
@@ -161,74 +156,6 @@ with underscores replaced by dashes."
     #(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
       :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
       :SG :SP :SY :WJ :ZW))
-
-(sb-ext:define-load-time-global *blocks*
-  #(:Basic-Latin :Latin-1-Supplement :Latin-Extended-A :Latin-Extended-B
-    :IPA-Extensions :Spacing-Modifier-Letters :Combining-Diacritical-Marks
-    :Greek-and-Coptic :Cyrillic :Cyrillic-Supplement :Armenian :Hebrew :Arabic
-    :Syriac :Arabic-Supplement :Thaana :NKo :Samaritan :Mandaic
-    :Arabic-Extended-A :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil
-    :Telugu :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian
-    :Hangul-Jamo :Ethiopic :Ethiopic-Supplement :Cherokee
-    :Unified-Canadian-Aboriginal-Syllabics :Ogham :Runic :Tagalog :Hanunoo
-    :Buhid :Tagbanwa :Khmer :Mongolian
-    :Unified-Canadian-Aboriginal-Syllabics-Extended :Limbu :Tai-Le :New-Tai-Lue
-    :Khmer-Symbols :Buginese :Tai-Tham :Combining-Diacritical-Marks-Extended
-    :Balinese :Sundanese :Batak :Lepcha :Ol-Chiki :Sundanese-Supplement
-    :Vedic-Extensions :Phonetic-Extensions :Phonetic-Extensions-Supplement
-    :Combining-Diacritical-Marks-Supplement :Latin-Extended-Additional
-    :Greek-Extended :General-Punctuation :Superscripts-and-Subscripts
-    :Currency-Symbols :Combining-Diacritical-Marks-for-Symbols
-    :Letterlike-Symbols :Number-Forms :Arrows :Mathematical-Operators
-    :Miscellaneous-Technical :Control-Pictures :Optical-Character-Recognition
-    :Enclosed-Alphanumerics :Box-Drawing :Block-Elements :Geometric-Shapes
-    :Miscellaneous-Symbols :Dingbats :Miscellaneous-Mathematical-Symbols-A
-    :Supplemental-Arrows-A :Braille-Patterns :Supplemental-Arrows-B
-    :Miscellaneous-Mathematical-Symbols-B :Supplemental-Mathematical-Operators
-    :Miscellaneous-Symbols-and-Arrows :Glagolitic :Latin-Extended-C :Coptic
-    :Georgian-Supplement :Tifinagh :Ethiopic-Extended :Cyrillic-Extended-A
-    :Supplemental-Punctuation :CJK-Radicals-Supplement :Kangxi-Radicals
-    :Ideographic-Description-Characters :CJK-Symbols-and-Punctuation :Hiragana
-    :Katakana :Bopomofo :Hangul-Compatibility-Jamo :Kanbun :Bopomofo-Extended
-    :CJK-Strokes :Katakana-Phonetic-Extensions :Enclosed-CJK-Letters-and-Months
-    :CJK-Compatibility :CJK-Unified-Ideographs-Extension-A
-    :Yijing-Hexagram-Symbols :CJK-Unified-Ideographs :Yi-Syllables :Yi-Radicals
-    :Lisu :Vai :Cyrillic-Extended-B :Bamum :Modifier-Tone-Letters
-    :Latin-Extended-D :Syloti-Nagri :Common-Indic-Number-Forms :Phags-pa
-    :Saurashtra :Devanagari-Extended :Kayah-Li :Rejang :Hangul-Jamo-Extended-A
-    :Javanese :Myanmar-Extended-B :Cham :Myanmar-Extended-A :Tai-Viet
-    :Meetei-Mayek-Extensions :Ethiopic-Extended-A :Latin-Extended-E
-    :Meetei-Mayek :Hangul-Syllables :Hangul-Jamo-Extended-B :High-Surrogates
-    :High-Private-Use-Surrogates :Low-Surrogates :Private-Use-Area
-    :CJK-Compatibility-Ideographs :Alphabetic-Presentation-Forms
-    :Arabic-Presentation-Forms-A :Variation-Selectors :Vertical-Forms
-    :Combining-Half-Marks :CJK-Compatibility-Forms :Small-Form-Variants
-    :Arabic-Presentation-Forms-B :Halfwidth-and-Fullwidth-Forms :Specials
-    :Linear-B-Syllabary :Linear-B-Ideograms :Aegean-Numbers
-    :Ancient-Greek-Numbers :Ancient-Symbols :Phaistos-Disc :Lycian :Carian
-    :Coptic-Epact-Numbers :Old-Italic :Gothic :Old-Permic :Ugaritic :Old-Persian
-    :Deseret :Shavian :Osmanya :Elbasan :Caucasian-Albanian :Linear-A
-    :Cypriot-Syllabary :Imperial-Aramaic :Palmyrene :Nabataean :Phoenician
-    :Lydian :Meroitic-Hieroglyphs :Meroitic-Cursive :Kharoshthi
-    :Old-South-Arabian :Old-North-Arabian :Manichaean :Avestan
-    :Inscriptional-Parthian :Inscriptional-Pahlavi :Psalter-Pahlavi :Old-Turkic
-    :Rumi-Numeral-Symbols :Brahmi :Kaithi :Sora-Sompeng :Chakma :Mahajani
-    :Sharada :Sinhala-Archaic-Numbers :Khojki :Khudawadi :Grantha :Tirhuta
-    :Siddham :Modi :Takri :Warang-Citi :Pau-Cin-Hau :Cuneiform
-    :Cuneiform-Numbers-and-Punctuation :Egyptian-Hieroglyphs :Bamum-Supplement
-    :Mro :Bassa-Vah :Pahawh-Hmong :Miao :Kana-Supplement :Duployan
-    :Shorthand-Format-Controls :Byzantine-Musical-Symbols :Musical-Symbols
-    :Ancient-Greek-Musical-Notation :Tai-Xuan-Jing-Symbols
-    :Counting-Rod-Numerals :Mathematical-Alphanumeric-Symbols :Mende-Kikakui
-    :Arabic-Mathematical-Alphabetic-Symbols :Mahjong-Tiles :Domino-Tiles
-    :Playing-Cards :Enclosed-Alphanumeric-Supplement
-    :Enclosed-Ideographic-Supplement :Miscellaneous-Symbols-and-Pictographs
-    :Emoticons :Ornamental-Dingbats :Transport-and-Map-Symbols
-    :Alchemical-Symbols :Geometric-Shapes-Extended :Supplemental-Arrows-C
-    :CJK-Unified-Ideographs-Extension-B :CJK-Unified-Ideographs-Extension-C
-    :CJK-Unified-Ideographs-Extension-D :CJK-Compatibility-Ideographs-Supplement
-    :Tags :Variation-Selectors-Supplement :Supplementary-Private-Use-Area-A
-    :Supplementary-Private-Use-Area-B))
 
 (declaim (inline svref-or-null))
 (defun svref-or-null (vector index)
@@ -315,9 +242,13 @@ If CHARACTER does not have a known script, returns :UNKNOWN"
   "Returns the Unicode block in which CHARACTER resides as a keyword.
 If CHARACTER does not have a known block, returns :NO-BLOCK"
   (let* ((code (char-code character))
-         (block-index (ordered-ranges-position code **block-ranges**)))
+         (block-index (ordered-ranges-position
+                       code
+                       #.(sb-xc:coerce (sb-cold:read-from-file "output/block-ranges.lisp-expr")
+                                       '(vector (unsigned-byte 32))))))
     (if block-index
-        (aref *blocks* block-index) :no-block)))
+        (aref #.(sb-cold:read-from-file "output/block-names.lisp-expr") block-index)
+        :no-block)))
 
 (defun unicode-1-name (character)
   "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
