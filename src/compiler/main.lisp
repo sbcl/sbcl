@@ -1135,7 +1135,11 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
-      (if (fopcompilable-p form expand)
+      (if (and (policy *policy*
+                   ;; FOP-compiled code is harder do debug.
+                   (or (< debug 2)
+                       (> space debug)))
+               (fopcompilable-p form expand))
           (let ((*fopcompile-label-counter* 0))
             (fopcompile form path nil expand))
           (with-ir1-namespace
