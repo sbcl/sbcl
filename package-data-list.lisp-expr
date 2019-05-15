@@ -229,7 +229,9 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
       :use ("CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM"
                  #+sb-dyncount "SB-DYNCOUNT" "SB-EXT" "SB-FASL" "SB-INT"
                  "SB-KERNEL" "SB-SYS")
-      :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
+      ;; "flushable" is an assembly instruction attribute and a fun-info attribute.
+      ;; But why do we need SLOT re-exported?
+      :reexport ("SLOT" "FLUSHABLE")
       :export ("%ALIEN-FUNCALL"
                "%CATCH-BREAKUP" "%CONTINUE-UNWIND"
                "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
