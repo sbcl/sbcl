@@ -37,7 +37,9 @@
     ((def (reg)
        `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
+          (inst ror number (1+ n-fixnum-tag-bits)) ; restore unrotated value
           (inst push number)
+          (inst test number number) ; rotates do not update SF
           (inst jmp :ns one-word-bignum)
           ;; Two word bignum
           (fixed-alloc number bignum-widetag (+ bignum-digits-offset 2) nil)
