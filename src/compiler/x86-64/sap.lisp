@@ -159,7 +159,7 @@
 
 (defun emit-sap-set (size sap ea-index ea-disp value result)
   #+linux
-  (when sb-c::*msan-unpoison*
+  (when (sb-c:msan-unpoison sb-c:*compilation*)
     (let ((offset (or ea-index ea-disp)))
       (unless (eql offset 0)
         (inst add sap offset))

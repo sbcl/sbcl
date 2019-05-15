@@ -1258,7 +1258,7 @@
         (note-inlining (optional-dispatch-more-entry fun))
         (mapc #'note-inlining (optional-dispatch-entry-points fun))))
     ;; substitute for any old references
-    (unless (or (not *block-compile*)
+    (unless (or (not (block-compile *compilation*))
                 (and info
                      (or (fun-info-transforms info)
                          (fun-info-templates info)
@@ -1352,9 +1352,9 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
                          (lambda (second inline-lambda)))))))
       (when (boundp '*lexenv*)
         (aver (producing-fasl-file))
-        (if (member name *fun-names-in-this-file* :test #'equal)
+        (if (member name (fun-names-in-this-file *compilation*) :test #'equal)
             (warn 'duplicate-definition :name name)
-            (push name *fun-names-in-this-file*)))
+            (push name (fun-names-in-this-file *compilation*))))
       ;; I don't know why this is guarded by (WHEN compile-toplevel),
       ;; because regular old %DEFUN is going to call this anyway.
       (%set-inline-expansion name defined-fun inline-lambda extra-info))
@@ -1392,9 +1392,10 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
   (let ((name-key `(,kind ,name)))
     (when (boundp '*lexenv*)
       (aver (producing-fasl-file))
-      (if (member name-key *fun-names-in-this-file* :test #'equal)
+      ;; a slight OAOO issue here wrt %COMPILER-DEFUN
+      (if (member name-key (fun-names-in-this-file *compilation*) :test #'equal)
           (compiler-style-warn 'same-file-redefinition-warning :name name)
-          (push name-key *fun-names-in-this-file*)))))
+          (push name-key (fun-names-in-this-file *compilation*))))))
 
 
 ;;; Entry point utilities

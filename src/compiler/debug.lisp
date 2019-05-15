@@ -850,7 +850,7 @@
 (macrolet ((def (array-getter fto ffrom) ; "to" = to number/id, resp. "from"
              `(progn
                 (defun ,fto (x)
-                  (let* ((map *compiler-ir-obj-map*)
+                  (let* ((map *compilation*)
                          (ht (objmap-obj-to-id map)))
                     (or (values (gethash x ht))
                         (let ((array (,array-getter map))
@@ -863,7 +863,7 @@
                           (setf (gethash x ht) num)))))
 
                 (defun ,ffrom (num)
-                  (let ((array (,array-getter *compiler-ir-obj-map*)))
+                  (let ((array (,array-getter *compilation*)))
                     (and (< num (length array)) (svref array num)))))))
   (def objmap-id-to-cont cont-num num-cont)
   (def objmap-id-to-tn tn-id id-tn)

@@ -357,7 +357,7 @@
         ;; It would also be good to skip zero-fill of specialized vectors
         ;; perhaps in a policy-dependent way. At worst you'd see random
         ;; bits, and CLHS says consequences are undefined.
-        (when sb-c::*msan-unpoison*
+        (when (sb-c:msan-unpoison sb-c:*compilation*)
           ;; Unpoison all DX vectors regardless of widetag.
           ;; Mark the header and length as valid, not just the payload.
           #+linux ; unimplemented for others

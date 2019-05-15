@@ -303,7 +303,7 @@
     (inst lea rax (rip-relative-ea label))
     (emit-label label)
     (move pc-save rax))
-  (when sb-c::*msan-unpoison*
+  (when (sb-c:msan-unpoison sb-c:*compilation*)
     (inst mov rax (thread-slot-ea thread-msan-param-tls-slot))
     ;; Unpoison parameters
     (do ((n 0 (+ n n-word-bytes))

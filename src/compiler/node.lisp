@@ -12,9 +12,6 @@
 
 (in-package "SB-C")
 
-(declaim (type fixnum *compiler-sset-counter*))
-(defvar *compiler-sset-counter* 0)
-
 ;;; The front-end data structure (IR1) is composed of nodes,
 ;;; representing actual evaluations. Linear sequences of nodes in
 ;;; control-flow order are combined into blocks (but see
@@ -69,7 +66,7 @@
 
 (defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (when (boundp '*compiler-ir-obj-map*)
+    (when (boundp '*compilation*)
       (format stream "~D" (cont-num x)))))
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
@@ -150,7 +147,7 @@
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (when (boundp '*compiler-ir-obj-map*)
+    (when (boundp '*compilation*)
       (format stream "~D" (cont-num x)))))
 
 #-sb-fluid (declaim (inline lvar-has-single-use-p))
@@ -171,8 +168,8 @@
 
 (def!struct (node (:constructor nil)
                   (:include sset-element
-                            (number (unless (eql *compiler-sset-counter* 0)
-                                      (incf *compiler-sset-counter*))))
+                            (number (when (boundp '*compilation*)
+                                      (incf (sset-counter *compilation*)))))
                   (:copier nil))
   ;; unique ID for debugging
   #+sb-show (id (new-object-id) :read-only t)
@@ -391,7 +388,7 @@
   ;; no cached value has been stored yet.
   (physenv-cache :none :type (or null physenv (member :none))))
 (defmethod print-object ((cblock cblock) stream)
-  (if (boundp '*compiler-ir-obj-map*)
+  (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)
         (format stream "~W :START c~W"
             (block-number cblock)
@@ -728,8 +725,8 @@
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
 (def!struct (leaf (:include sset-element
-                            (number (unless (eql *compiler-sset-counter* 0)
-                                      (incf *compiler-sset-counter*))))
+                            (number (when (boundp '*compilation*)
+                                      (incf (sset-counter *compilation*)))))
                   (:copier nil)
                   (:constructor nil))
   ;; unique ID for debugging

@@ -1065,7 +1065,7 @@
 
 (declaim (freeze-type tn))
 (defmethod print-object ((tn tn) stream)
-  (cond ((not (boundp 'sb-c::*compiler-ir-obj-map*))
+  (cond ((not (boundp '*compilation*))
          (print-unreadable-object (tn stream :type t :identity t)))
         (t
          (print-unreadable-object (tn stream :type t)

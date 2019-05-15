@@ -137,8 +137,10 @@
            (make-condition 'undefined-function
                            :name name
                            :not-yet-loaded
-                           (cond ((member name sb-c::*fun-names-in-this-file*
-                                          :test #'equal)
+                           (cond ((and (boundp 'sb-c:*compilation*)
+                                       (member name (sb-c::fun-names-in-this-file
+                                                     sb-c:*compilation*)
+                                               :test #'equal))
                                   t)
                                  ((and (boundp 'sb-c:*lexenv*)
                                        (sb-c::fun-locally-defined-p

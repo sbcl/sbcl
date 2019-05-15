@@ -137,7 +137,6 @@
 (defvar *lambda-conversions*)
 (defvar *compile-object* nil)
 (defvar *location-context* nil)
-(defvar *msan-unpoison* nil)
 
 (defvar *stack-allocate-dynamic-extent* t
   "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
@@ -349,6 +348,38 @@ the stack without triggering overflow protection.")
   (define-load-time-global *code-coverage-info*
     (list (make-hash-table :test 'equal :synchronized t)))
   (declaim (type (cons hash-table) *code-coverage-info*)))
+
+(defstruct (compilation (:copier nil)
+                        (:predicate nil)
+                        (:conc-name ""))
+  (fun-names-in-this-file)
+  (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
+  (msan-unpoison nil :read-only t)
+  (sset-counter 1 :type fixnum)
+  ;; Bidrectional map between IR1/IR2/assembler abstractions
+  ;; and a corresponding small integer identifier. One direction could be done
+  ;; by adding the integer ID as an object slot, but we want both directions.
+  ;; These could just as well be scoped by WITH-IR1-NAMESPACE, but
+  ;; since it's primarily a debugging tool, it's nicer to have
+  ;; a wider unique scope by ID.
+  (objmap-obj-to-id   (make-hash-table :test 'eq) :read-only t)
+  (objmap-id-to-cont  (make-array 10) :type simple-vector) ; number -> CTRAN or LVAR
+  (objmap-id-to-tn    (make-array 10) :type simple-vector) ; number -> TN
+  (objmap-id-to-label (make-array 10) :type simple-vector) ; number -> LABEL
+  (objmap-cont-num    0 :type fixnum)
+  (objmap-tn-id       0 :type fixnum)
+  (objmap-label-id    0 :type fixnum)
+  ;; if emitting a cfasl, the fasl stream to that
+  (compile-toplevel-object nil :read-only t)
+  ;; these are all historical baggage from here down,
+  ;; unused unless we ever decide to fix block compilation
+  (block-compile nil :type (member nil t :specified))
+  ;; When block compiling, used by PROCESS-FORM to accumulate top level
+  ;; lambdas resulting from compiling subforms. (In reverse order.)
+  (toplevel-lambdas nil :type list))
+
+(defvar *compilation*)
+(declaim (type compilation *compilation*))
 
 (in-package "SB-ALIEN")
 
