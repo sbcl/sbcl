@@ -43,50 +43,38 @@ size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread)
 {
-    {
-        void *top_exception_frame;
-        void *cur_stack_end;
-        void *cur_stack_start;
-        MEMORY_BASIC_INFORMATION stack_memory;
 
-        asm volatile ("mov %%gs:0,%0": "=r" (top_exception_frame));
-        asm volatile ("mov %%gs:8,%0": "=r" (cur_stack_end));
+    void *cur_stack_end;
+    MEMORY_BASIC_INFORMATION stack_memory;
 
-        /* Can't pull stack start from fs:4 or fs:8 or whatever,
-         * because that's only what currently has memory behind
-         * it from being used, so do a quick VirtualQuery() and
-         * grab the AllocationBase. -AB 2006/11/25
-         */
+    asm volatile ("mov %%gs:8,%0": "=r" (cur_stack_end));
 
-        if (!VirtualQuery(&stack_memory, &stack_memory, sizeof(stack_memory))) {
-            fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
-            lose("Could not query stack memory information.");
-        }
+    /* Can't pull stack start from fs:4 or fs:8 or whatever,
+     * because that's only what currently has memory behind
+     * it from being used, so do a quick VirtualQuery() and
+     * grab the AllocationBase. -AB 2006/11/25
+     */
 
-        cur_stack_start = stack_memory.AllocationBase
-            /* OS provides its own guard page at the stack start,
-               and we have ours. Do you really want to see how they interact? */
-            + os_vm_page_size;
+    if (!VirtualQuery(&stack_memory, &stack_memory, sizeof(stack_memory))) {
+        fprintf(stderr, "VirtualQuery: 0x%lx.\n", GetLastError());
+        lose("Could not query stack memory information.");
+    }
 
-        /* We use top_exception_frame rather than cur_stack_end to
-         * elide the last few (boring) stack entries at the bottom of
-         * the backtrace.
-         */
-        thread->control_stack_start = cur_stack_start;
-        thread->control_stack_end = cur_stack_end;
+    thread->control_stack_start = stack_memory.AllocationBase;
+    thread->control_stack_end = cur_stack_end;
 
 #ifndef LISP_FEATURE_SB_THREAD
-        /*
-         * Theoretically, threaded SBCL binds directly against
-         * the thread structure for these values. We don't do
-         * threads yet, but we'll probably do the same. We do
-         * need to reset these, though, because they were
-         * initialized based on the wrong stack space.
-         */
-        SetSymbolValue(CONTROL_STACK_START,(lispobj)thread->control_stack_start,thread);
-        SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
+    /*
+     * Theoretically, threaded SBCL binds directly against
+     * the thread structure for these values. We don't do
+     * threads yet, but we'll probably do the same. We do
+     * need to reset these, though, because they were
+     * initialized based on the wrong stack space.
+     */
+    SetSymbolValue(CONTROL_STACK_START,(lispobj)thread->control_stack_start,thread);
+    SetSymbolValue(CONTROL_STACK_END,(lispobj)thread->control_stack_end,thread);
 #endif
-    }
+
 
 #ifdef LISP_FEATURE_SB_THREAD
     pthread_setspecific(specials,thread);

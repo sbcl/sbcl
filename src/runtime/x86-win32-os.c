@@ -62,13 +62,7 @@ int arch_os_thread_init(struct thread *thread)
             lose("Could not query stack memory information.");
         }
 
-        cur_stack_start = stack_memory.AllocationBase
-            /* Kludge: Elide SBCL's guard page from the range.  (The
-             * real solution is to not establish SBCL's guard page in
-             * the first place.  The trick will be to find a good time
-             * at which to re-enable the Windows guard page when
-             * returning from it though.) */
-            + os_vm_page_size;
+        cur_stack_start = stack_memory.AllocationBase;
 
         /* We use top_exception_frame rather than cur_stack_end to
          * elide the last few (boring) stack entries at the bottom of
