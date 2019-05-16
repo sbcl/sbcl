@@ -264,6 +264,10 @@
                    (null (null form))
                    ((eql ?) (push form results) t) ; match and store anything
                    ((eql :ignore) t) ; match anything and disregard
+                   ((cons (eql :or))
+                    (some (lambda (template)
+                            (recurse form template))
+                          (cdr template)))
                    (cons (and (consp form)
                               (and (recurse (car form) (car template))
                                    (recurse (cdr form) (cdr template)))))
@@ -288,7 +292,7 @@
               `(defparameter ,symbol ,value)))
            (sb-impl::%defvar
             (destructuring-bind (symbol value) ; always occurs with a value
-                (matchp '((quote ?) (source-location) (unless (%boundp :ignore) ?))
+                (matchp '((quote ?) (source-location) (:or (unless (%boundp :ignore) ?) ?))
                         (cdr form))
               `(defvar ,symbol ,value)))
            (sb-c::%defconstant
