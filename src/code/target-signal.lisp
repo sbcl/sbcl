@@ -210,7 +210,7 @@
 ;;; the handler for SIGCHLD signals for RUN-PROGRAM
 (defun sigchld-handler  (signal code context)
   (declare (ignore signal code context))
-  (sb-impl::get-processes-status-changes-sigchld))
+  (sb-impl::get-processes-status-changes))
 
 (defun sb-kernel:signal-cold-init-or-reinit ()
   "Enable all the default signals that Lisp knows how to deal with."

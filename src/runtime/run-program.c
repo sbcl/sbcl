@@ -97,15 +97,51 @@ set_pty(char *pty_name)
 
 #endif /* !LISP_FEATURE_OPENBSD */
 
+int wait_for_exec(int pid, int channel[2]) {
+    if ((-1 != pid) && (-1 != channel[1])) {
+        int child_errno = 0;
+        int bytes = sizeof(int);
+        int n;
+        char *p = (char*)&child_errno;
+        close(channel[1]);
+        /* Try to read child errno from channel. */
+        while ((bytes > 0) &&
+               (n = read(channel[0], p, bytes))) {
+            if (-1 == n) {
+                if (EINTR == errno) {
+                    continue;
+                } else {
+                    break;
+                }
+            } else {
+                bytes -= n;
+                p += n;
+            }
+        }
+        close(channel[0]);
+        if (child_errno) {
+            int status;
+            waitpid(pid, &status, 0);
+            /* Our convention to tell Lisp that it was the exec or
+               chdir that failed, not the fork. */
+            /* FIXME: there are other values waitpid(2) can return. */
+            if (WIFEXITED(status)) {
+                pid = -WEXITSTATUS(status);
+            }
+            errno = child_errno;
+        }
+    }
+    return pid;
+}
+
 extern char **environ;
 int spawn(char *program, char *argv[], int sin, int sout, int serr,
           int search, char *envp[], char *pty_name,
-          int __attribute__((unused)) wait,
+          int channel[2],
           char *pwd)
 {
     pid_t pid;
     int fd;
-    int channel[2];
     sigset_t sset;
     int failure_code = 2;
 
@@ -120,39 +156,6 @@ int spawn(char *program, char *argv[], int sin, int sout, int serr,
 
     pid = fork();
     if (pid) {
-        if ((-1 != pid) && (-1 != channel[1])) {
-            int child_errno = 0;
-            int bytes = sizeof(int);
-            int n;
-            char *p = (char*)&child_errno;
-            close(channel[1]);
-            /* Try to read child errno from channel. */
-            while ((bytes > 0) &&
-                   (n = read(channel[0], p, bytes))) {
-                if (-1 == n) {
-                    if (EINTR == errno) {
-                        continue;
-                    } else {
-                        break;
-                    }
-                } else {
-                    bytes -= n;
-                    p += n;
-                }
-            }
-            close(channel[0]);
-            if (child_errno) {
-                int status;
-                waitpid(pid, &status, 0);
-                /* Our convention to tell Lisp that it was the exec or
-                   chdir that failed, not the fork. */
-                /* FIXME: there are other values waitpid(2) can return. */
-                if (WIFEXITED(status)) {
-                  pid = -WEXITSTATUS(status);
-                }
-                errno = child_errno;
-            }
-        }
         return pid;
     }
     close (channel[0]);
