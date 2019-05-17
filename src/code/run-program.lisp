@@ -864,7 +864,7 @@ Users Manual for details about the PROCESS structure.
                  ;; Make sure we are not notified about the child
                  ;; death before we have installed the PROCESS
                  ;; structure in *ACTIVE-PROCESSES*.
-                 (let (child #+win32 handle)
+                 (let (child errno #+win32 handle)
                    (with-environment (environment-vec environment
                                       :null (not (or environment environment-p)))
                      (with-alien (#-win32 (channel (array int 2)))
@@ -902,24 +902,31 @@ Users Manual for details about the PROCESS structure.
                            (with-active-processes-lock ()
                              (push proc *active-processes*))
                            #-win32
-                           (progn
-                             (setf child (wait-for-exec child channel))
-                             (when (minusp child)
+                           (let ((exec (wait-for-exec child channel)))
+                             (when (minusp exec)
+                               (setf errno (get-errno))
                                (with-active-processes-lock ()
                                  (setf *active-processes*
                                        (delete proc *active-processes*)))
+                               (let ((exit (process-exit-code proc)))
+                                 (setf child
+                                       (- (or exit
+                                              (ldb (byte 8 8)
+                                                   (nth-value 1 (c-waitpid child 0)))))))
                                (setf proc nil)))))))
                    ;; Report the error outside the lock.
-                   (case child
-                     (-1
-                      (error "Couldn't fork child process: ~A"
-                             (strerror)))
-                     (-2
-                      (error "Couldn't execute ~S: ~A"
-                             progname (strerror)))
-                     (-3
-                      (error "Couldn't change directory to ~S: ~A"
-                             directory (strerror)))))))))
+                   (let ((errno (or errno
+                                    (get-errno))))
+                    (case child
+                      (-1
+                       (error "Couldn't fork child process: ~A"
+                              (strerror errno)))
+                      (-2
+                       (error "Couldn't execute ~S: ~A"
+                              progname (strerror errno)))
+                      (-3
+                       (error "Couldn't change directory to ~S: ~A"
+                              directory (strerror errno))))))))))
       (dolist (fd *close-in-parent*)
         (sb-unix:unix-close fd))
       (unless proc
