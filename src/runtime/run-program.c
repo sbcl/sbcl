@@ -120,8 +120,15 @@ int wait_for_exec(int pid, int channel[2]) {
         }
         close(channel[0]);
         if (child_errno) {
+            int status;
+            waitpid(pid, &status, 0);
+            /* Our convention to tell Lisp that it was the exec or
+               chdir that failed, not the fork. */
+            /* FIXME: there are other values waitpid(2) can return. */
+            if (WIFEXITED(status)) {
+                pid = -WEXITSTATUS(status);
+            }
             errno = child_errno;
-            pid = -1;
         }
     }
     return pid;
