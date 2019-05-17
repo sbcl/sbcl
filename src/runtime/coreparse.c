@@ -381,8 +381,10 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 
 #include "var-io.h"
 #include "unaligned.h"
-static void __attribute__((unused))
-adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_vaddr)
+static void
+adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
+                 struct code __attribute__((unused)) *code,
+                 lispobj __attribute__((unused)) original_vaddr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Dynamic space always gets relocated before immobile space does,
@@ -424,7 +426,8 @@ adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_va
 #endif
 }
 
-static inline void fix_fun_header_layout(lispobj* fun, struct heap_adjust* adj)
+static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
+                                         struct heap_adjust __attribute__((unused)) *adj)
 {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER) && defined(LISP_FEATURE_64_BIT)
     lispobj ptr = function_layout(fun);

@@ -109,7 +109,7 @@ extern boolean immobile_card_protected_p(void*);
 
 #else
 
-static inline boolean immobile_space_p(lispobj obj) { return 0; }
+static inline boolean immobile_space_p(lispobj __attribute__((unused)) obj) { return 0; }
 #define immobile_obj_gen_bits(dummy) 0
 #define prepare_immobile_space_for_final_gc()
 #define prepare_immobile_space_for_save(dummy1,dummy2)
