@@ -256,8 +256,8 @@
        (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
        (sc-case type
          (immediate
-          (aver (typep (tn-value type) '(unsigned-byte 8)))
-          (storeb (tn-value type) result 0 other-pointer-lowtag))
+          (aver (typep (tn-value type) '(unsigned-byte 9)))
+          (store-widetag (tn-value type) result 0 other-pointer-lowtag))
          (t
           (storew type result 0 other-pointer-lowtag)))
        (sc-case length
@@ -265,7 +265,7 @@
           (let ((fixnum-length (fixnumize (tn-value length))))
             (typecase fixnum-length
               ((unsigned-byte 8)
-               (storeb fixnum-length result
+               (store-widetag fixnum-length result
                        vector-length-slot other-pointer-lowtag))
               (t
                (storew fixnum-length result
@@ -302,7 +302,7 @@
     (sc-case type
       (immediate
        (aver (typep (tn-value type) '(unsigned-byte 8)))
-       (storeb (tn-value type) result 0 other-pointer-lowtag))
+       (store-widetag (tn-value type) result 0 other-pointer-lowtag))
       (t
        (storew type result 0 other-pointer-lowtag)))
     (storew length result vector-length-slot other-pointer-lowtag)

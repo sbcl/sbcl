@@ -240,7 +240,8 @@
 ;;; Allocate an unboxed, non-fancy vector with type code TYPE, length LENGTH,
 ;;; and WORDS words long. Note: it is your responsibility to ensure that the
 ;;; relation between LENGTH and WORDS is correct.
-(defknown allocate-vector ((unsigned-byte 8) index
+;;; The extra bit beyond N_WIDETAG_BITS is for the vector weakness flag.
+(defknown allocate-vector ((unsigned-byte 9) index
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.
                            (and index

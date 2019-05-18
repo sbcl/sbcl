@@ -1859,15 +1859,24 @@ function to be removed without further warning."
                                      (initial-element nil element-p))
   (when (and element-p contents-p)
     (error "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
-  (let ((v (if contents-p
-               (make-array length :initial-contents initial-contents)
-               (make-array length :initial-element
-                           ;; 0 is the usual default, but NIL makes more sense
-                           ;; for weak vectors because it's the value assigned
-                           ;; when a pointer is broken by GC.
-                           (if element-p initial-element nil)))))
-    (set-header-data v vector-weak-subtype)
-    v))
+  ;; Explicitly compute a widetag with the weakness bit ORed in.
+  (let ((type (logior (ash vector-weak-subtype sb-vm:n-widetag-bits)
+                      sb-vm:simple-vector-widetag)))
+    ;; These allocation calls are the transforms of MAKE-ARRAY for a vector with
+    ;; the respective initializing keyword arg. This is badly OAOO-violating and
+    ;; almost makes me want to cry, but not quite enough for me to improve it.
+    (if contents-p
+        (let ((contents-length (length initial-contents)))
+          (if (= (truly-the index length) contents-length)
+              (replace (truly-the simple-vector (allocate-vector type length length))
+                       initial-contents)
+              (error "~S has ~D elements, vector length is ~D."
+                     :initial-contents contents-length length)))
+        (fill (truly-the simple-vector
+                         (allocate-vector type (truly-the index length) length))
+              ;; 0 is the usual default, but NIL makes more sense for weak vectors
+              ;; as it is the value assigned to broken hearts.
+              (if element-p initial-element nil)))))
 
 (defun weak-vector-p (x)
   (and (simple-vector-p x)
