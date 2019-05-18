@@ -163,7 +163,7 @@
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
-(defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p)
+(defun alloc-other (result-tn widetag size node &optional stack-allocate-p)
   (pseudo-atomic (:elide-if stack-allocate-p)
       (allocation result-tn (pad-data-block size) node stack-allocate-p
                   other-pointer-lowtag)
@@ -318,7 +318,7 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   (:node-var node)
   (:generator 37
-    (fixed-alloc result fdefn-widetag fdefn-size node)
+    (alloc-other result fdefn-widetag fdefn-size node)
     (storew name result fdefn-name-slot other-pointer-lowtag)
     (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup 'undefined-tramp :assembly-routine)
@@ -351,7 +351,7 @@
   (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
-    (fixed-alloc result value-cell-widetag value-cell-size node stack-allocate-p)
+    (alloc-other result value-cell-widetag value-cell-size node stack-allocate-p)
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects

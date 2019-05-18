@@ -29,7 +29,7 @@
        `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst push number)
-          (fixed-alloc number bignum-widetag (+ bignum-digits-offset 1) nil)
+          (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
           (popw number bignum-digits-offset other-pointer-lowtag))))
   (define-per-register-allocation-routines))
 
@@ -42,11 +42,11 @@
           (inst test number number) ; rotates do not update SF
           (inst jmp :ns one-word-bignum)
           ;; Two word bignum
-          (fixed-alloc number bignum-widetag (+ bignum-digits-offset 2) nil)
+          (alloc-other number bignum-widetag (+ bignum-digits-offset 2) nil)
           (popw number bignum-digits-offset other-pointer-lowtag)
           (inst ret)
           ONE-WORD-BIGNUM
-          (fixed-alloc number bignum-widetag (+ bignum-digits-offset 1) nil)
+          (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
           (popw number bignum-digits-offset other-pointer-lowtag))))
   (define-per-register-allocation-routines))
 

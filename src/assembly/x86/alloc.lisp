@@ -24,7 +24,7 @@
              (let ((tn (symbolicate reg "-TN")))
                `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg)) ()
                   (inst push ,tn)
-                  (fixed-alloc ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
+                  (alloc-other ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
                   (popw ,tn bignum-digits-offset other-pointer-lowtag)))))
   (def eax)
   (def ebx)
@@ -43,11 +43,11 @@
                   ;; here we minimize garbage.
                   (inst jmp :ns one-word-bignum)
                   ;; Two word bignum
-                  (fixed-alloc ,tn bignum-widetag (+ bignum-digits-offset 2) nil)
+                  (alloc-other ,tn bignum-widetag (+ bignum-digits-offset 2) nil)
                   (popw ,tn bignum-digits-offset other-pointer-lowtag)
                   (inst ret)
                   ONE-WORD-BIGNUM
-                  (fixed-alloc ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
+                  (alloc-other ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
                   (popw ,tn bignum-digits-offset other-pointer-lowtag)))))
   (def eax)
   (def ebx)

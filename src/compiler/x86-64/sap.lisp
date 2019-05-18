@@ -30,7 +30,7 @@
   (:note "SAP to pointer coercion")
   (:node-var node)
   (:generator 20
-    (fixed-alloc res sap-widetag sap-size node)
+    (alloc-other res sap-widetag sap-size node)
     (storew sap res sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
