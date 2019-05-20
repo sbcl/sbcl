@@ -641,6 +641,8 @@
              (cdf-encode-locs
               (label-position (ir2-physenv-environment-start 2env))
               (label-position (ir2-physenv-elsewhere-start 2env))
+              (source-path-form-number (node-source-path (lambda-bind fun)))
+              (label-position (block-label (lambda-block fun)))
               (when (ir2-physenv-closure-save-tn 2env)
                 (tn-sc+offset (ir2-physenv-closure-save-tn 2env)))
               #+unwind-to-frame-and-call-vop
@@ -675,8 +677,6 @@
                  (compute-vars fun level var-locs))
            (setf (compiled-debug-fun-arguments dfun)
                  (compute-args fun var-locs))))
-    (setf (compiled-debug-fun-form-number dfun)
-          (source-path-form-number (node-source-path (lambda-bind fun))))
     (when (>= level 1)
       (setf (compiled-debug-fun-blocks dfun)
             (compute-debug-blocks fun var-locs)))
@@ -697,10 +697,9 @@
 ;;; Compute the full form function map.
 (defun compute-debug-fun-map (sorted)
   (declare (list sorted))
-  (loop for ((start . fun) (nil . next)) on sorted
-        do (setf (compiled-debug-fun-next fun) next
-                 (compiled-debug-fun-offset fun) start))
-  (cdar sorted))
+  (loop for (fun next) on sorted
+        do (setf (compiled-debug-fun-next fun) next))
+  (car sorted))
 
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.
@@ -723,10 +722,8 @@
         (if component-tlf-num
             (aver (= component-tlf-num tlf-num))
             (setf component-tlf-num tlf-num))
-        (push (cons (label-position (block-label (lambda-block lambda)))
-                    (compute-1-debug-fun lambda var-locs))
-              dfuns)))
-    (let* ((sorted (sort dfuns #'< :key #'car))
+        (push (compute-1-debug-fun lambda var-locs) dfuns)))
+    (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
        ;; COMPONENT-NAME is often not useful, and sometimes completely fubar.

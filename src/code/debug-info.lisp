@@ -128,7 +128,6 @@
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
-  (form-number nil :type (or index null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The
@@ -186,27 +185,32 @@
   (return-pc-pass (missing-arg) :type sc+offset)
   #-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc+offset)
-  ;; An integer which contains between 2 and 4 varint-encoded fields:
+  ;; An integer which contains between 4 and 6 varint-encoded fields:
   ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
   ;; ELSEWHERE-PC -
+  ;; FORM-NUMBER
+  ;; OFFSET
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
   (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
-  (offset 0 :type fixnum)
   (next))
 
-(defun cdf-encode-locs (start-pc elsewhere-pc closure-save
+(defun cdf-encode-locs (start-pc elsewhere-pc
+                        form-number offset
+                        closure-save
                         #+unwind-to-frame-and-call-vop bsp-save
                         #-fp-and-pc-standard-save lra-saved-pc
                         #-fp-and-pc-standard-save cfp-saved-pc)
-  (dx-let ((bytes (make-array (* 5 4) :fill-pointer 0
+  (dx-let ((bytes (make-array (* 8 4) :fill-pointer 0
                                       :element-type '(unsigned-byte 8))))
     ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
     ;; which does not need access to any of the subsequent fields.
     (write-var-integer elsewhere-pc bytes)
     (write-var-integer start-pc bytes)
+    (write-var-integer form-number bytes)
+    (write-var-integer offset bytes)
     #+unwind-to-frame-and-call-vop
     (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
     #-fp-and-pc-standard-save
@@ -231,6 +235,8 @@
                 (unless (logtest byte #x80) (return accumulator))))))
       (let ((elsewhere-pc (decode-varint))
             (start-pc (decode-varint))
+            (form-number (decode-varint))
+            (offset (decode-varint))
             #+unwind-to-frame-and-call-vop
             ;; 0 -> NULL, 1 -> 0, ...
             (bsp-save (let ((i (decode-varint))) (unless (zerop i) (1- i))))
@@ -239,7 +245,9 @@
             #-fp-and-pc-standard-save
             (cfp-saved-pc (decode-varint))
             (closure-save (let ((i (decode-varint))) (unless (zerop i) (1- i)))))
-        (values start-pc elsewhere-pc closure-save
+        (values start-pc elsewhere-pc
+                form-number offset
+                closure-save
                 #-fp-and-pc-standard-save lra-saved-pc
                 #-fp-and-pc-standard-save cfp-saved-pc
                 #+unwind-to-frame-and-call-vop bsp-save)))))
@@ -255,6 +263,8 @@
   (def
     compiled-debug-fun-start-pc
     compiled-debug-fun-elsewhere-pc
+    compiled-debug-fun-form-number
+    compiled-debug-fun-offset
     ;; Most compiled-debug-funs don't need these
     compiled-debug-fun-closure-save
     #-fp-and-pc-standard-save compiled-debug-fun-lra-saved-pc

@@ -2862,7 +2862,7 @@ bootstrapping.
                         (sb-c::compiled-debug-info-tlf-number debug-info)
                         (sb-c::compiled-debug-fun-form-number debug-fun))))
                    (debug-info-debug-function (function debug-info)
-                     
+
                      (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
                            (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
                        (or (loop for fmap-entry = map then next

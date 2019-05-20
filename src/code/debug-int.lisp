@@ -1703,7 +1703,10 @@ register."
 (defun parse-debug-blocks (debug-fun)
   (etypecase debug-fun
     (compiled-debug-fun
-     (parse-compiled-debug-blocks debug-fun))
+     (let ((parsed (parse-compiled-debug-blocks debug-fun)))
+       (if (equalp parsed #())
+           (debug-signal 'no-debug-blocks :debug-fun debug-fun)
+           parsed)))
     (bogus-debug-fun
      (debug-signal 'no-debug-blocks :debug-fun debug-fun))))
 
