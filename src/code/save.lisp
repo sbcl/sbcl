@@ -459,28 +459,29 @@ sb-c::
             (compiled-debug-info
              (let ((source (compiled-debug-info-source obj)))
                (typecase source
-                 (core-debug-source) ; skip
+                 (core-debug-source)    ; skip
                  (debug-source
                   (let* ((namestring (debug-source-namestring source))
                          (canonical-repr
-                          (find-if (lambda (x) (debug-source= x source))
-                                   (gethash namestring source-ht))))
+                           (find-if (lambda (x) (debug-source= x source))
+                                    (gethash namestring source-ht))))
                     (cond ((not canonical-repr)
                            (push source (gethash namestring source-ht)))
                           ((neq source canonical-repr)
                            (setf (compiled-debug-info-source obj)
                                  canonical-repr)))))))
-             (let ((fun-map (compiled-debug-info-fun-map obj)))
-               (loop for i from 0 below (length fun-map) by 2
-                     do (binding* ((debug-fun (svref fun-map i))
-                                   (name (compiled-debug-fun-name debug-fun))
-                                   ((new foundp) (gethash name name-ht)))
-                          (cond ((not foundp)
-                                 (setf (gethash name name-ht) name))
-                                ((neq name new)
-                                 (setf (%instance-ref debug-fun
-                                        (get-dsd-index compiled-debug-fun name))
-                                       new)))))))
+             (loop for debug-fun = (compiled-debug-info-fun-map obj) then next
+                   for next = (sb-c::compiled-debug-fun-next debug-fun)
+                   do
+                   (binding* ((name (compiled-debug-fun-name debug-fun))
+                              ((new foundp) (gethash name name-ht)))
+                     (cond ((not foundp)
+                            (setf (gethash name name-ht) name))
+                           ((neq name new)
+                            (setf (%instance-ref debug-fun
+                                                 (get-dsd-index compiled-debug-fun name))
+                                  new))))
+                   while next))
             (sb-lockless::linked-list
              ;; In the normal course of execution, incompletely deleted nodes
              ;; exist only for a brief moment, as the next operation on the list by

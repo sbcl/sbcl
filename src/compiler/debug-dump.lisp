@@ -694,20 +694,13 @@
 
 ;;;; full component dumping
 
-;;; Compute the full form (simple-vector) function map.
+;;; Compute the full form function map.
 (defun compute-debug-fun-map (sorted)
   (declare (list sorted))
-  (let* ((len (1- (* (length sorted) 2)))
-         (funs-vec (make-array len)))
-    (do ((i -1 (+ i 2))
-         (sorted sorted (cdr sorted)))
-        ((= i len))
-      (declare (fixnum i))
-      (let ((dfun (car sorted)))
-        (unless (minusp i)
-          (setf (svref funs-vec i) (car dfun)))
-        (setf (svref funs-vec (1+ i)) (cdr dfun))))
-    funs-vec))
+  (loop for ((start . fun) (nil . next)) on sorted
+        do (setf (compiled-debug-fun-next fun) next
+                 (compiled-debug-fun-offset fun) start))
+  (cdar sorted))
 
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.

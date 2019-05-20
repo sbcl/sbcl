@@ -193,7 +193,9 @@
   ;; ELSEWHERE-PC -
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
-  (encoded-locs (missing-arg) :type unsigned-byte :read-only t))
+  (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
+  (next)
+  (offset 0 :type fixnum))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc closure-save
                         #+unwind-to-frame-and-call-vop bsp-save
@@ -390,14 +392,8 @@
              (:include debug-info)
              (:copier nil)
              #-sb-xc-host (:pure t))
-  ;; a SIMPLE-VECTOR of alternating DEBUG-FUN objects and fixnum
-  ;; PCs, used to map PCs to functions, so that we can figure out what
-  ;; function we were running in. Each function is valid between the
-  ;; PC before it (inclusive) and the PC after it (exclusive). The PCs
-  ;; are in sorted order, to allow binary search. We omit the first
-  ;; and last PC, since their values are 0 and the length of the code
-  ;; vector.
-  (fun-map (missing-arg) :type simple-vector :read-only t)
+  ;; COMPILED-DEBUG-FUNs linked through COMPILED-DEBUG-FUN-NEXT
+  (fun-map (missing-arg) :type compiled-debug-fun)
   ;; Location contexts
   ;; A (simple-array * (*)) or a context if there's only one context.
   (contexts nil :type t :read-only t)

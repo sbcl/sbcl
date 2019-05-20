@@ -1155,37 +1155,31 @@ register."
 ;;;; frame utilities
 
 (defun compiled-debug-fun-from-pc (debug-info pc &optional escaped)
-  (let* ((fun-map (sb-c::compiled-debug-info-fun-map debug-info))
-         (len (length fun-map)))
-    (declare (type simple-vector fun-map))
-    (if (= len 1)
-        (svref fun-map 0)
-        (let* ((i 1)
-               (first-elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc
-                                    (svref fun-map 0)))
+  (let* ((fun-map (sb-c::compiled-debug-info-fun-map debug-info)))
+    (if (sb-c::compiled-debug-fun-next fun-map)
+        (let* ((first-elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc fun-map))
                (elsewhere-p
                  (if escaped ;; See the comment below
                      (>= pc first-elsewhere-pc)
                      (> pc first-elsewhere-pc))))
-          (declare (type index i))
-          (loop
-           (when (or (= i len)
-                     (let ((next-pc (if elsewhere-p
-                                        (sb-c::compiled-debug-fun-elsewhere-pc
-                                         (svref fun-map (1+ i)))
-                                        (svref fun-map i))))
-                       (if escaped
-                           (< pc next-pc)
-                           ;; Non-escaped frame means that this frame calls something.
-                           ;; And the PC points to where something should return.
-                           ;; The return adress may be in the next
-                           ;; function, e.g. in local tail calls the
-                           ;; function will be entered just after the
-                           ;; CALL.
-                           ;; See debug.impure.lisp/:local-tail-call for a test-case
-                           (<= pc next-pc))))
-             (return (svref fun-map (1- i))))
-           (incf i 2))))))
+          (loop for fun = fun-map then next
+                for next = (sb-c::compiled-debug-fun-next fun)
+                when (or (not next)
+                         (let ((next-pc (if elsewhere-p
+                                            (sb-c::compiled-debug-fun-elsewhere-pc next)
+                                            (sb-c::compiled-debug-fun-offset next))))
+                           (if escaped
+                               (< pc next-pc)
+                               ;; Non-escaped frame means that this frame calls something.
+                               ;; And the PC points to where something should return.
+                               ;; The return adress may be in the next
+                               ;; function, e.g. in local tail calls the
+                               ;; function will be entered just after the
+                               ;; CALL.
+                               ;; See debug.impure.lisp/:local-tail-call for a test-case
+                               (<= pc next-pc))))
+                return fun))
+        fun-map)))
 
 ;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB-C::DEBUG-INFO and run down its FUN-MAP to get a
@@ -1424,13 +1418,14 @@ register."
   (let ((simple-fun (%fun-fun fun)))
     (let* ((name (%simple-fun-name simple-fun))
            (component (fun-code-header simple-fun))
-           (res (find-if
-                 (lambda (x)
-                   (and (sb-c::compiled-debug-fun-p x)
-                        (eq (sb-c::compiled-debug-fun-name x) name)
-                        (eq (sb-c::compiled-debug-fun-kind x) nil)))
-                 (sb-c::compiled-debug-info-fun-map
-                  (%code-debug-info component)))))
+           (res (loop for fmap-entry = (sb-c::compiled-debug-info-fun-map
+                                        (%code-debug-info component))
+                      then next
+                      for next = (sb-c::compiled-debug-fun-next fmap-entry)
+                      when (and (eq (sb-c::compiled-debug-fun-name fmap-entry) name)
+                                (eq (sb-c::compiled-debug-fun-kind fmap-entry) nil))
+                      return fmap-entry
+                      while next)))
       (if res
           (make-compiled-debug-fun res component)
           ;; KLUDGE: comment from CMU CL:
