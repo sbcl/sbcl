@@ -529,11 +529,11 @@ describe_thread_state(void)
     printf("Pending handler = %p\n", data->pending_handler);
 }
 
-static void print_backtrace_frame(void *pc, void *fp, int i, FILE *f) {
+static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
     lispobj *p;
     fprintf(f, "%4d: ", i);
 
-    p = component_ptr_from_pc((lispobj *) pc);
+    p = component_ptr_from_pc(pc);
 
     if (p) {
         struct code *cp = (struct code *) p;

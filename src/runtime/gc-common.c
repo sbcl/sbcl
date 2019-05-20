@@ -1562,7 +1562,7 @@ lispobj *search_all_gc_spaces(void *pointer)
 /* Find the code object for the given pc, or return NULL on
    failure. */
 lispobj *
-component_ptr_from_pc(lispobj *pc)
+component_ptr_from_pc(char *pc)
 {
     lispobj *object = search_all_gc_spaces(pc);
 

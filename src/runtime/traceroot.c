@@ -415,7 +415,7 @@ static inline lispobj decode_pointer(uint32_t encoding)
 
 static struct simple_fun* simple_fun_from_pc(char* pc)
 {
-    struct code* code = (struct code*)component_ptr_from_pc((lispobj*)pc);
+    struct code* code = (struct code*)component_ptr_from_pc(pc);
     if (!code) return 0;
     struct simple_fun* prev_fun = 0;
     for_each_simple_fun(i, fun, code, 1, {
