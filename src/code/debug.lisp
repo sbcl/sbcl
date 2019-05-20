@@ -162,7 +162,6 @@ Other commands:
                       (return loc))))
         (cond ((and (not (debug-block-elsewhere-p block))
                     start)
-               (format *debug-io* "~%unknown location: using block start~%")
                start)
               (t
                loc)))
