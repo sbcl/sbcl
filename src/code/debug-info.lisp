@@ -212,7 +212,8 @@
     (write-var-integer form-number bytes)
     (write-var-integer offset bytes)
     #+unwind-to-frame-and-call-vop
-    (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
+    (write-var-integer (if bsp-save (1+ (sc+offset-offset bsp-save)) 0)
+                       bytes)
     #-fp-and-pc-standard-save
     (progn
       (write-var-integer lra-saved-pc bytes)
@@ -220,7 +221,7 @@
     ;; More often the BSP-SAVE is non-null than CLOSURE-SAVE is non-null,
     ;; so the encoding is potentially smaller with CLOSURE-SAVE being last.
     (when closure-save
-      (write-var-integer (1+ closure-save) bytes))
+      (write-var-integer (1+ (sc+offset-offset closure-save)) bytes))
     (integer-from-octets bytes)))
 
 (defun cdf-decode-locs (cdf)
@@ -239,12 +240,16 @@
             (offset (decode-varint))
             #+unwind-to-frame-and-call-vop
             ;; 0 -> NULL, 1 -> 0, ...
-            (bsp-save (let ((i (decode-varint))) (unless (zerop i) (1- i))))
+            (bsp-save (let ((i (decode-varint)))
+                        (unless (zerop i)
+                          (make-sc+offset sb-vm:control-stack-sc-number (1- i)))))
             #-fp-and-pc-standard-save
             (lra-saved-pc (decode-varint))
             #-fp-and-pc-standard-save
             (cfp-saved-pc (decode-varint))
-            (closure-save (let ((i (decode-varint))) (unless (zerop i) (1- i)))))
+            (closure-save (let ((i (decode-varint)))
+                            (unless (zerop i)
+                              (make-sc+offset sb-vm:control-stack-sc-number (1- i))))))
         (values start-pc elsewhere-pc
                 form-number offset
                 closure-save
