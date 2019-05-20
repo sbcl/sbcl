@@ -603,7 +603,7 @@ static unsigned int claim_index(int qty)
     return 0; // use the overflow bin(s)
 }
 
-static boolean instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
+static boolean instrumentp(uword_t* sp, char** pc, uword_t* old_word)
 {
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
@@ -623,14 +623,14 @@ static boolean instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
     // one of them would already have patched the call site.
     if (opcode == LOCK_PREFIX)
         return 0;
-    *pc = (uword_t*)return_pc;
+    *pc = (char*)return_pc;
     *old_word = word;
     return 1;
 }
 
 // logical index 'index' in the metadata array stores the code component
 // and pc-offset relative to the component base address
-static void record_pc(uword_t* pc, unsigned int index, boolean sizedp)
+static void record_pc(char* pc, unsigned int index, boolean sizedp)
 {
     lispobj *code = component_ptr_from_pc(pc);
     if (!code) {
@@ -671,7 +671,8 @@ static void record_pc(uword_t* pc, unsigned int index, boolean sizedp)
 void AMD64_SYSV_ABI
 allocation_tracker_counted(uword_t* sp)
 {
-    uword_t *pc, word_at_pc;
+    char *pc;
+    uword_t word_at_pc;
     if (instrumentp(sp, &pc, &word_at_pc)) {
         unsigned int index = claim_index(1);
         if (index == 0)
@@ -694,7 +695,8 @@ allocation_tracker_counted(uword_t* sp)
 void AMD64_SYSV_ABI
 allocation_tracker_sized(uword_t* sp)
 {
-    uword_t *pc, word_at_pc;
+    char *pc;
+    uword_t word_at_pc;
     if (instrumentp(sp, &pc, &word_at_pc)) {
         int index = claim_index(2);
         uword_t word_after_pc = pc[1];
