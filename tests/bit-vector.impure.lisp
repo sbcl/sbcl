@@ -134,7 +134,8 @@
       (declare (ignore widetag))
       (assert (simple-bit-vector-p object))
       (assert (= size n-bytes))
-      (assert (not (sb-kernel:%bit-position/1 object nil 0 n-bits))))))
+      (assert (not (sb-kernel:%bit-position/1 object nil 0 n-bits)))
+      (assert (not (sb-kernel:%bit-position/1 object nil n-bits n-bits))))))
 
 ;;; Shamelessly piggybacking on the approach above to grab a page
 ;;; which adjoins an unreadable page for testing the disassembler.

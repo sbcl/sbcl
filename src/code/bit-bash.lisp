@@ -644,13 +644,14 @@
                       ;; Both masks pertain to a single word. This also catches
                       ;; START = END. In that case the masks have no bits in common.
                       (return-from ,name
-                        (let* ((word-index first-word)
-                               (word (logand (logand start-mask end-mask)
-                                             (get-word first-word))))
-                          (unless (zerop word)
-                            ,(if from-end
-                                 `(calc-index (end-bit word))
-                                 `(calc-index (start-bit word)))))))
+                        (let ((mask (logand start-mask end-mask)))
+                          (unless (zerop mask)
+                            (let ((word (logand mask (get-word first-word))))
+                              (unless (zerop word)
+                                (let ((word-index first-word)) ; for the macro to see
+                                  ,(if from-end
+                                       `(calc-index (end-bit word))
+                                       `(calc-index (start-bit word))))))))))
 
                     ;; Since the start and end words differ, there is no word
                     ;; to which both masks pertain.
