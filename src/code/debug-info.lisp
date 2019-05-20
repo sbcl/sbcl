@@ -208,9 +208,9 @@
     ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
     ;; which does not need access to any of the subsequent fields.
     (write-var-integer elsewhere-pc bytes)
-    (write-var-integer start-pc bytes)
-    (write-var-integer form-number bytes)
     (write-var-integer offset bytes)
+    (write-var-integer form-number bytes)
+    (write-var-integer (- start-pc offset) bytes)
     #+unwind-to-frame-and-call-vop
     (write-var-integer (if bsp-save (1+ (sc+offset-offset bsp-save)) 0)
                        bytes)
@@ -234,22 +234,22 @@
                 (setf accumulator (logior accumulator (ash (logand byte #x7f) shift)))
                 (incf shift 7)
                 (unless (logtest byte #x80) (return accumulator))))))
-      (let ((elsewhere-pc (decode-varint))
-            (start-pc (decode-varint))
-            (form-number (decode-varint))
-            (offset (decode-varint))
-            #+unwind-to-frame-and-call-vop
-            ;; 0 -> NULL, 1 -> 0, ...
-            (bsp-save (let ((i (decode-varint)))
-                        (unless (zerop i)
-                          (make-sc+offset sb-vm:control-stack-sc-number (1- i)))))
-            #-fp-and-pc-standard-save
-            (lra-saved-pc (decode-varint))
-            #-fp-and-pc-standard-save
-            (cfp-saved-pc (decode-varint))
-            (closure-save (let ((i (decode-varint)))
-                            (unless (zerop i)
-                              (make-sc+offset sb-vm:control-stack-sc-number (1- i))))))
+      (let* ((elsewhere-pc (decode-varint))
+             (offset (decode-varint))
+             (form-number (decode-varint))
+             (start-pc (+ offset (decode-varint)))
+             #+unwind-to-frame-and-call-vop
+             ;; 0 -> NULL, 1 -> 0, ...
+             (bsp-save (let ((i (decode-varint)))
+                         (unless (zerop i)
+                           (make-sc+offset sb-vm:control-stack-sc-number (1- i)))))
+             #-fp-and-pc-standard-save
+             (lra-saved-pc (decode-varint))
+             #-fp-and-pc-standard-save
+             (cfp-saved-pc (decode-varint))
+             (closure-save (let ((i (decode-varint)))
+                             (unless (zerop i)
+                               (make-sc+offset sb-vm:control-stack-sc-number (1- i))))))
         (values start-pc elsewhere-pc
                 form-number offset
                 closure-save
