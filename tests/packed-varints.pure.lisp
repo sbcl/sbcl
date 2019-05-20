@@ -13,7 +13,8 @@
   (flet ((test (a b)
            (let ((cdi
                   (sb-c::make-compiled-debug-info
-                   :name "test" :fun-map #()
+                   :name "test" :fun-map (sb-c::make-compiled-debug-fun :name 'test
+                                                                        :encoded-locs 0)
                    :tlf-num+offset (let ((sb-c::*adjustable-vectors* nil))
                                      (sb-c::pack-tlf-num+offset a b)))))
              (assert (eql a (sb-c::compiled-debug-info-tlf-number cdi)))

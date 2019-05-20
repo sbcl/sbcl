@@ -194,8 +194,8 @@
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
   (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
-  (next)
-  (offset 0 :type fixnum))
+  (offset 0 :type fixnum)
+  (next))
 
 (defun cdf-encode-locs (start-pc elsewhere-pc closure-save
                         #+unwind-to-frame-and-call-vop bsp-save
