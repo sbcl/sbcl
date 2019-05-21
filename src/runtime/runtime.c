@@ -461,7 +461,8 @@ sbcl_main(int argc, char *argv[], char *envp[])
 
     lispobj initial_function;
     int merge_core_pages = -1;
-    struct memsize_options memsize_options = {0, 0, 0};
+    struct memsize_options memsize_options;
+    memsize_options.present_in_core = 0;
 
     boolean have_hardwired_spaces = os_preinit(argv, envp);
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
