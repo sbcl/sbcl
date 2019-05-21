@@ -1,4 +1,4 @@
-/*
+ /*
  * This software is part of the SBCL system. See the README file for
  * more information.
  *
@@ -603,7 +603,7 @@ static unsigned int claim_index(int qty)
     return 0; // use the overflow bin(s)
 }
 
-static boolean instrumentp(uword_t* sp, char** pc, uword_t* old_word)
+static boolean instrumentp(uword_t* sp, uword_t** pc, uword_t* old_word)
 {
     int __attribute__((unused)) ret = thread_mutex_lock(&alloc_profiler_lock);
     gc_assert(ret == 0);
@@ -623,7 +623,7 @@ static boolean instrumentp(uword_t* sp, char** pc, uword_t* old_word)
     // one of them would already have patched the call site.
     if (opcode == LOCK_PREFIX)
         return 0;
-    *pc = (char*)return_pc;
+    *pc = (uword_t*)return_pc;
     *old_word = word;
     return 1;
 }
@@ -649,7 +649,7 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
         ensure_region_closed(code_region);
         int ret = thread_mutex_unlock(&free_pages_lock);
         gc_assert(ret == 0);
-        code = component_ptr_from_pc((lispobj*)pc);
+        code = component_ptr_from_pc(pc);
     }
 #endif
     struct vector* v = VECTOR(alloc_profile_data);
@@ -671,8 +671,7 @@ static void record_pc(char* pc, unsigned int index, boolean sizedp)
 void AMD64_SYSV_ABI
 allocation_tracker_counted(uword_t* sp)
 {
-    char *pc;
-    uword_t word_at_pc;
+    uword_t *pc, word_at_pc;
     if (instrumentp(sp, &pc, &word_at_pc)) {
         unsigned int index = claim_index(1);
         if (index == 0)
@@ -686,7 +685,7 @@ allocation_tracker_counted(uword_t* sp)
         if (!__sync_bool_compare_and_swap(pc, word_at_pc, new_inst))
             lose("alloc profiler failed to rewrite instruction @ %p", pc);
         if (index != 2)
-            record_pc(pc, index, 0);
+            record_pc((char*)pc, index, 0);
     }
     int __attribute__((unused)) ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
@@ -695,8 +694,7 @@ allocation_tracker_counted(uword_t* sp)
 void AMD64_SYSV_ABI
 allocation_tracker_sized(uword_t* sp)
 {
-    char *pc;
-    uword_t word_at_pc;
+    uword_t *pc, word_at_pc;
     if (instrumentp(sp, &pc, &word_at_pc)) {
         int index = claim_index(2);
         uword_t word_after_pc = pc[1];
@@ -726,7 +724,7 @@ allocation_tracker_sized(uword_t* sp)
             !__sync_bool_compare_and_swap(pc,   word_at_pc,    new_inst1))
             lose("alloc profiler failed to rewrite instructions @ %p", pc);
         if (index != 0) // can't record a PC for the overflow counts
-            record_pc(pc, index, 1);
+            record_pc((char*)pc, index, 1);
     }
     int __attribute__((unused)) ret = thread_mutex_unlock(&alloc_profiler_lock);
     gc_assert(ret == 0);
