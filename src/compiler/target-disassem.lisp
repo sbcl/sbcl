@@ -1128,7 +1128,8 @@
                                  (sap-int (funcall sap-maker)))
            :hooks hooks
            :code code
-           :initial-offset initial-offset))) ; an offset into CODE
+           :initial-offset initial-offset ; an offset into CODE
+           :debug-fun debug-fun)))
     (add-debugging-hooks segment debug-fun source-form-cache)
     (when code
       (add-fun-header-hooks segment))
@@ -1405,22 +1406,8 @@
     (setf (seg-storage-info segment)
           (storage-info-for-debug-fun debug-fun))
     (when *disassemble-annotate*
-      (add-source-tracking-hooks segment debug-fun sfcache))
-    (let ((kind (debug-fun-kind debug-fun)))
-      (flet ((add-new-hook (n)
-               (push (make-offs-hook
-                      :offset 0
-                      :fun (lambda (stream dstate)
-                             (declare (ignore stream))
-                             (note n dstate)))
-                     (seg-hooks segment))))
-        (case kind
-          (:external)
-          ((nil)
-           (add-new-hook "no-arg-parsing entry point"))
-          (t
-           (add-new-hook (lambda (stream)
-                           (format stream "~S entry point" kind)))))))))
+      (add-source-tracking-hooks segment debug-fun sfcache))))
+
 
 ;;; Return a list of the segments of memory containing machine code
 ;;; instructions for FUNCTION.
@@ -1583,25 +1570,40 @@
     (let ((n-segments (length segments))
           (first (car segments))
           (last (car (last segments))))
-      ;; One origin per segment is printed. As with the per-line display,
-      ;; the segment is thought of as immovable for rendering of addresses,
-      ;; though in fact the disassembler transiently allows movement.
-      (format stream "~&; Size: ~a bytes. Origin: #x~x~@[ (segment 1 of ~D)~]"
-              (reduce #'+ segments :key #'seg-length)
-              (seg-virtual-location first)
-              (if (> n-segments 1) n-segments))
-      (set-location-printing-range dstate
-                                   (seg-virtual-location first)
-                                   (- (+ (seg-virtual-location last)
-                                         (seg-length last))
-                                      (seg-virtual-location first)))
-      (setf (dstate-output-state dstate) :beginning)
-      (let ((i 0))
-        (dolist (seg segments)
-          (when (> (incf i) 1)
-            (format stream "~&; Origin #x~x (segment ~D of ~D)"
-                    (seg-virtual-location seg) i n-segments))
-          (disassemble-segment seg stream dstate))))))
+      (flet ((print-segment-name (segment)
+               (let* ((debug-fun (seg-debug-fun segment))
+                      (name (and debug-fun (debug-fun-name debug-fun))))
+                 (when name
+                   (format stream " ~Vt ; " *disassem-note-column*)
+                   (typecase (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun)
+                     (sb-c::compiled-debug-fun-external 
+                      (format stream "(XEP ~s)" name))
+                     (sb-c::compiled-debug-fun-optional 
+                      (format stream "(&OPTIONAL ~s)" name))
+                     (sb-c::compiled-debug-fun-more
+                      (format stream "(&MORE ~s)" name))
+                     (t (prin1 name stream)))))))
+        ;; One origin per segment is printed. As with the per-line display,
+        ;; the segment is thought of as immovable for rendering of addresses,
+        ;; though in fact the disassembler transiently allows movement.
+        (format stream "~&; Size: ~a bytes. Origin: #x~x~@[ (segment 1 of ~D)~]"
+                (reduce #'+ segments :key #'seg-length)
+                (seg-virtual-location first)
+                (if (> n-segments 1) n-segments))
+        (print-segment-name (first segments))
+        (set-location-printing-range dstate
+                                     (seg-virtual-location first)
+                                     (- (+ (seg-virtual-location last)
+                                           (seg-length last))
+                                        (seg-virtual-location first)))
+        (setf (dstate-output-state dstate) :beginning)
+        (let ((i 0))
+          (dolist (seg segments)
+            (when (> (incf i) 1)
+              (format stream "~&; Origin #x~x (segment ~D of ~D)"
+                      (seg-virtual-location seg) i n-segments)
+              (print-segment-name seg))
+            (disassemble-segment seg stream dstate)))))))
 
 
 ;;;; top level functions
