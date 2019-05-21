@@ -204,7 +204,7 @@ void __mark_obj(lispobj pointer)
                 return; // already marked
             *base |= MARK_BIT;
         }
-        if (unboxed_obj_widetag_p(header_widetag(header)))
+        if (leaf_obj_widetag_p(header_widetag(header)))
             return;
     } else {
         uword_t key = compute_page_key(pointer);
@@ -341,7 +341,7 @@ static void trace_object(lispobj* where)
             add_to_weak_pointer_chain(weakptr);
         return;
     default:
-        if (unboxed_obj_widetag_p(widetag)) return;
+        if (leaf_obj_widetag_p(widetag)) return;
     }
     for(i=scan_from; i<scan_to; ++i)
         gc_mark_obj(where[i]);

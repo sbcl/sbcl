@@ -70,7 +70,7 @@
 
 ;;; Means the previous live-set is the same. Since -live is implied,
 ;;; the -live bit is repurposed to mean that the form-number is also
-;;; the same.   
+;;; the same.
 (defconstant compiled-code-location-equal-live       (ash #b10000 3))
 
 (defconstant debug-info-var-deleted -1)

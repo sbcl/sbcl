@@ -2725,7 +2725,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         } else if (!(other_immediate_lowtag_p(widetag)
                      && lowtag_for_widetag[widetag>>2])) {
             lose("Unhandled widetag %d at %p", widetag, where);
-        } else if (unboxed_obj_widetag_p(widetag)) {
+        } else if (leaf_obj_widetag_p(widetag)) {
             count = sizetab[widetag](where);
             if (strict_containment && gencgc_verbose
                 && widetag == SAP_WIDETAG && where[1])

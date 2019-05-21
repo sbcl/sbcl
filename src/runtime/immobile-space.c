@@ -442,7 +442,7 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
     if (widetag_of(ptr) == SIMPLE_FUN_WIDETAG)
         ptr = fun_code_header(ptr);
     gc_assert(__immobile_obj_gen_bits(ptr) == from_space);
-    int pointerish = !unboxed_obj_widetag_p(widetag_of(ptr));
+    int pointerish = !leaf_obj_widetag_p(widetag_of(ptr));
     int bits = (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG);
     // enlivening makes the object appear as if written, so that
     // scav_code_header won't skip it, thus ensuring we transitively
@@ -860,7 +860,7 @@ varyobj_points_to_younger_p(lispobj* obj, int gen, int keep_gen, int new_gen,
         sword_t length = fixnum_value(((struct vector *)obj)->length);
         begin = obj + 2; // skip the header and length
         end = obj + ALIGN_UP(length + 2, 2);
-    } else if (unboxed_obj_widetag_p(widetag)) {
+    } else if (leaf_obj_widetag_p(widetag)) {
         return 0;
     } else {
         lose("Unexpected widetag %x @ %p", widetag, obj);
@@ -1669,7 +1669,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         size = sizetab[widetag](where);
         switch (widetag) {
         default:
-          if (!unboxed_obj_widetag_p(widetag))
+          if (!leaf_obj_widetag_p(widetag))
             lose("Unhandled widetag in fixup_space: %p\n", (void*)header_word);
           break;
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER

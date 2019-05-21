@@ -142,7 +142,7 @@
     (dolist (entry *scav/trans/size*)
       (when (string= (second entry) "unboxed")
         (setf bits (logior bits (ash 1 (ash (car entry) -2))))))
-    (format stream "static inline boolean unboxed_obj_widetag_p(unsigned char widetag) {~%")
+    (format stream "static inline boolean leaf_obj_widetag_p(unsigned char widetag) {~%")
     #+64-bit (format stream "  return (0x~XLU >> (widetag>>2)) & 1;" bits)
     #-64-bit (format stream "  int bit = widetag>>2;
   return (bit<32 ? 0x~XU >> bit : 0x~XU >> (bit-32)) & 1;"
