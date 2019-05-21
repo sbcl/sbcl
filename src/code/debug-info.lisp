@@ -56,18 +56,22 @@
 
 (defconstant-eqx +compiled-code-location-kinds+
     #(:unknown-return :known-return :internal-error :non-local-exit
-      :block-start :call-site :single-value-return :non-local-entry
-      :step-before-vop)
+      :block-start :call-site :single-value-return :non-local-entry)
   #'equalp)
 
 (eval-when (:compile-toplevel)
-  (assert (<= (integer-length (1- (length +compiled-code-location-kinds+))) 4)))
+  (assert (<= (integer-length (1- (length +compiled-code-location-kinds+))) 3)))
 
 ;;; Location flags, encoded in the low 4 bits of loction kind byte
-(defconstant compiled-code-location-stepping         (ash #b0001 4))
-(defconstant compiled-code-location-context          (ash #b0010 4))
-(defconstant compiled-code-location-live             (ash #b0100 4))
-(defconstant compiled-code-location-zero-form-number (ash #b1000 4))
+(defconstant compiled-code-location-stepping         (ash #b00001 3))
+(defconstant compiled-code-location-context          (ash #b00010 3))
+(defconstant compiled-code-location-live             (ash #b00100 3))
+(defconstant compiled-code-location-zero-form-number (ash #b01000 3))
+
+;;; Means the previous live-set is the same. Since -live is implied,
+;;; the -live bit is repurposed to mean that the form-number is also
+;;; the same.   
+(defconstant compiled-code-location-equal-live       (ash #b10000 3))
 
 (defconstant debug-info-var-deleted -1)
 (defconstant debug-info-var-rest -2)

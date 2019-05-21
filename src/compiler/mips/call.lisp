@@ -766,7 +766,7 @@ default-value-8
                     (inst nop)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the BREAK.
-                    (note-this-location vop :step-before-vop)
+                    (note-this-location vop :internal-error)
                     (inst break (reg-tn-encoding callable-tn)
                           single-step-around-trap)
                     (emit-label step-done-label))))
@@ -1255,7 +1255,7 @@ default-value-8
     (inst nop)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
     (inst break 0 single-step-before-trap)

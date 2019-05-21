@@ -1211,4 +1211,4 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     ;; Stub! See the PPC backend for an example.
-    (note-this-location vop :step-before-vop)))
+    (note-this-location vop :internal-error)))

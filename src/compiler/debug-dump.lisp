@@ -23,8 +23,7 @@
 
 (deftype location-kind ()
   '(member :unknown-return :known-return :internal-error :non-local-exit
-           :block-start :call-site :single-value-return :non-local-entry
-           :step-before-vop))
+           :block-start :call-site :single-value-return :non-local-entry))
 
 ;;; The LOCATION-INFO structure holds the information what we need
 ;;; about locations which code generation decided were "interesting".
@@ -136,6 +135,8 @@
 ;;; The PC for the location most recently dumped.
 (defvar *previous-location*)
 (declaim (type index *previous-location*))
+(defvar *previous-live*)
+(defvar *previous-form-number*)
 
 (defun encode-restart-location (location x)
   (typecase x
@@ -169,7 +170,6 @@
            (type (or label index) label)
            (type location-kind kind)
            (type hash-table var-locs) (type (or vop null) vop))
-
   (let* ((byte-buffer *byte-buffer*)
          (stepping (and (combination-p node)
                         (combination-step-info node)))
@@ -177,8 +177,12 @@
                     (compute-live-vars live node block var-locs vop)))
          (anything-alive (and live
                               (find 1 live)))
+         (equal-live (and anything-alive
+                          (equal live *previous-live*)))
+
          (path (node-source-path node))
-         (loc (if (fixnump label) label (label-position label))))
+         (loc (if (fixnump label) label (label-position label)))
+         (form-number (source-path-form-number path)))
     (vector-push-extend
      (logior
       (if context
@@ -187,22 +191,37 @@
       (if stepping
           compiled-code-location-stepping
           0)
-      (if anything-alive
-          compiled-code-location-live
-          0)
-      (if (zerop (source-path-form-number path))
+      (if (zerop form-number)
           compiled-code-location-zero-form-number
+          0)
+      (cond (equal-live
+             (cond ((eql form-number *previous-form-number*)
+                    ;; Repurpose this bit for equal-form-number since
+                    ;; -equal-live and -live don't need to appear at the
+                    ;; same time.
+                    (setf form-number 0)
+                    compiled-code-location-live)
+                   (t
+                    0)))
+            (anything-alive
+             compiled-code-location-live)
+            (t
+             0))
+      (if equal-live
+          compiled-code-location-equal-live
           0)
       (position-or-lose kind +compiled-code-location-kinds+))
      byte-buffer)
-
     (write-var-integer (- loc *previous-location*) byte-buffer)
     (setq *previous-location* loc)
 
-    (unless (zerop (source-path-form-number path))
-      (write-var-integer (source-path-form-number path) byte-buffer))
+    (unless (zerop form-number)
+      (setf *previous-form-number* form-number)
+      (write-var-integer form-number byte-buffer))
 
-    (when anything-alive
+    (when (and anything-alive
+               (not equal-live))
+      (setf *previous-live* live)
       (write-packed-bit-vector live byte-buffer))
     (when stepping
       (write-var-string stepping byte-buffer))
@@ -251,6 +270,8 @@
 (defun compute-debug-blocks (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let ((*previous-location* 0)
+        *previous-live*
+        *previous-form-number*
         (physenv (lambda-physenv fun))
         (byte-buffer *byte-buffer*)
         prev-block

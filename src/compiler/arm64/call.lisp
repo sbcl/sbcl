@@ -934,7 +934,7 @@
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the
                       ;; DEBUG-TRAP.
-                      (note-this-location vop :step-before-vop)
+                      (note-this-location vop :internal-error)
                       (inst brk single-step-around-trap)
                       STEP-DONE-LABEL))))
            (declare (ignorable #'insert-step-instrumenting))
@@ -1176,7 +1176,7 @@
     (inst cbz tmp-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; A best-guess effort at a debug trap suitable for a
     ;; single-step-before-trap.
     (inst brk single-step-before-trap)

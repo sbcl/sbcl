@@ -650,7 +650,7 @@
                       (inst beq stepping zero-tn STEP-DONE-LABEL)
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the EBREAK.
-                      (note-this-location vop :step-before-vop)
+                      (note-this-location vop :internal-error)
                       (inst ebreak single-step-around-trap)
                       (inst byte (tn-offset callable-tn))
                       (emit-alignment 2)
@@ -1117,7 +1117,7 @@
     (inst beq stepping zero-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the EBREAK.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
     (inst ebreak single-step-before-trap)

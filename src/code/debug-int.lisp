@@ -1731,7 +1731,9 @@ register."
            (last-pc 0)
            result-blocks
            (block (make-compiled-debug-block))
-           locations)
+           locations
+           prev-live
+           prev-form-number)
       (flet ((new-block ()
                (when locations
                  (setf (compiled-debug-block-code-locations block)
@@ -1747,17 +1749,27 @@ register."
            (return))
          (let* ((flags (aref+ blocks i))
                 (kind (svref sb-c::+compiled-code-location-kinds+
-                             (ldb (byte 4 0) flags)))
+                             (ldb (byte 3 0) flags)))
                 (pc (+ last-pc
                        (sb-c:read-var-integerf blocks i)))
+                (equal-live (logtest sb-c::compiled-code-location-equal-live flags))
                 (form-number
-                  (if (logtest sb-c::compiled-code-location-zero-form-number flags)
-                      0
-                      (sb-c:read-var-integerf blocks i)))
+                  (cond ((logtest sb-c::compiled-code-location-zero-form-number flags)
+                         0)
+                        ((and equal-live
+                              (logtest sb-c::compiled-code-location-live flags))
+                         prev-form-number)
+                        (t
+                         (setf prev-form-number
+                               (sb-c:read-var-integerf blocks i)))))
                 (live-set
-                  (if (logtest sb-c::compiled-code-location-live flags)
-                      (sb-c:read-packed-bit-vector live-set-len blocks i)
-                      (make-array (* live-set-len 8) :element-type 'bit)))
+                  (cond (equal-live
+                         prev-live)
+                        ((logtest sb-c::compiled-code-location-live flags)
+                         (setf prev-live
+                               (sb-c:read-packed-bit-vector live-set-len blocks i)))
+                        (t
+                         (make-array (* live-set-len 8) :element-type 'bit))))
                 (step-info
                   (if (logtest sb-c::compiled-code-location-stepping flags)
                       (sb-c:read-var-string blocks i)
