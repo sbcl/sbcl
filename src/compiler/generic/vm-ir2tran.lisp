@@ -323,7 +323,7 @@
      (member (lvar-value type)
              '#.(list (sb-vm:saetp-typecode (find-saetp 't))
                       (sb-vm:saetp-typecode (find-saetp 'fixnum))))
-     (or (eq dx :always-dynamic)
+     (or (eq dx 'truly-dynamic-extent)
          (zerop (policy node safety))
          ;; a vector object should fit in one page -- otherwise it might go past
          ;; stack guard pages.
@@ -386,7 +386,7 @@
 (progn
   (defoptimizer (%make-list stack-allocate-result) ((length element) node dx)
     (declare (ignore element))
-    (or (eq dx :always-dynamic)
+    (or (eq dx 'truly-dynamic-extent)
         (zerop (policy node safety))
         ;; At most one page (this is more paranoid than %listify-rest-args).
         ;; Really what you want to do is decrement the stack pointer by one page

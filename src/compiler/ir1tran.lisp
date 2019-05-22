@@ -1478,13 +1478,11 @@
 (defun process-extent-decl (names vars fvars kind)
   (let ((extent
           (ecase kind
-            (truly-dynamic-extent
-             :always-dynamic)
             (dynamic-extent
              (when *stack-allocate-dynamic-extent*
-               :maybe-dynamic))
-            (indefinite-extent
-             :indefinite))))
+               kind))
+            ((indefinite-extent truly-dynamic-extent)
+             kind))))
     (if extent
         (dolist (name names)
           (cond
@@ -1512,7 +1510,7 @@
                   (eq (car name) 'function)
                   (null (cddr name))
                   (valid-function-name-p (cadr name))
-                  (neq :indefinite extent))
+                  (neq extent 'indefinite-extent))
              (let* ((fname (cadr name))
                     (bound-fun (find fname fvars
                                      :key (lambda (x)

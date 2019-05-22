@@ -868,7 +868,7 @@
             (when (and (ref-p use)
                        (lambda-p (ref-leaf use))
                        (neq (leaf-extent (lambda-parent (ref-leaf use)))
-                            :always-dynamic))
+                            'truly-dynamic-extent))
               (unless received-args
                 (setq received-args
                       (make-gensym-list (length (combination-args node))))

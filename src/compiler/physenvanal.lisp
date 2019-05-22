@@ -265,7 +265,7 @@
              (policy exit (zerop check-tag-existence))
              ;; Dynamic extent is a promise things won't escape --
              ;; and an explicit request to avoid heap consing.
-             (member (lambda-extent exit-lambda) '(:always-dynamic :maybe-dynamic))
+             (member (lambda-extent exit-lambda) '(truly-dynamic-extent dynamic-extent))
              ;; If the exit lambda cannot escape, then we should be safe.
              ;; ...since the escape analysis is kinda new, and not particularly
              ;; exhaustively tested, let alone proven, disable it for SAFETY 3.

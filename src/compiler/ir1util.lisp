@@ -887,7 +887,7 @@
        (let ((var (ref-leaf use)))
          ;; lambda-var, no SETS, not explicitly indefinite-extent.
          (when (and (lambda-var-p var) (not (lambda-var-sets var))
-                    (neq :indefinite (lambda-var-extent var)))
+                    (neq (lambda-var-extent var) 'indefinite-extent))
            (let ((home (lambda-var-home var))
                  (refs (lambda-var-refs var)))
              ;; bound by a non-XEP system lambda, no other REFS that aren't
