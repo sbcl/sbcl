@@ -287,9 +287,9 @@ appear."
     (values binding
             localp
             (nconc (ecase inlinep
-                     ((:inline :maybe-inline)
+                     ((inline sb-ext:maybe-inline)
                       (list '(inline . inline)))
-                     (:notinline
+                     (notinline
                       (list '(inline . notinline)))
                      ((nil)))
                    (list-cons-when (and ftype (neq *universal-fun-type* ftype))

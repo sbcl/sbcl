@@ -170,7 +170,7 @@
                                (leaf-type leaf))
                               ((:defined :defined-here)
                                (if (or (and (defined-fun-p leaf)
-                                            (eq (defined-fun-inlinep leaf) :notinline))
+                                            (eq (defined-fun-inlinep leaf) 'notinline))
                                        declared-only
                                        (and defined-here
                                             (eq (leaf-where-from leaf) :defined))

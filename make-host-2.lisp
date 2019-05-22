@@ -64,7 +64,7 @@
     (sb-int:call-with-each-globaldb-name
      (lambda (name)
        (let* ((cell (sb-int:info :function :emitted-full-calls name))
-              (inlinep (eq (sb-int:info :function :inlinep name) :inline))
+              (inlinep (eq (sb-int:info :function :inlinep name) 'inline))
               (source-xform (sb-int:info :function :source-transform name))
               (info (sb-int:info :function :info name)))
          (if (and cell

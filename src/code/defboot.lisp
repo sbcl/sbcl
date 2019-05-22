@@ -174,7 +174,7 @@ evaluated as a PROGN."
   (or
    ;; the normal reason for saving the inline expansion
    (let ((inlinep (info :function :inlinep name)))
-     (member inlinep '(:inline :maybe-inline)))
+     (member inlinep '(inline maybe-inline)))
    ;; another reason for saving the inline expansion: If the
    ;; ANSI-recommended idiom
    ;;   (DECLAIM (INLINE FOO))

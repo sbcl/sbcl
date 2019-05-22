@@ -107,10 +107,9 @@
               ;; FIXME: this seems to omit FUNCTIONAL
               (when (defined-fun-p fun)
                 (return-from fun-lexically-notinline-p
-                  (eq (defined-fun-inlinep fun) :notinline))))))))
+                  (eq (defined-fun-inlinep fun) 'notinline))))))))
     ;; If ANSWER is NIL, go for the global value
-    (eq (or answer (info :function :inlinep name))
-        :notinline)))
+    (eq (or answer (info :function :inlinep name)) 'notinline)))
 
 (defun maybe-defined-here (name where)
   (if (and (eq :defined where)
@@ -233,10 +232,10 @@
                           :%source-name name
                           :inline-expansion expansion
                           :inlinep inlinep
-                          :where-from (if (eq inlinep :notinline)
+                          :where-from (if (eq inlinep 'notinline)
                                           where
                                           (maybe-defined-here name where))
-                          :type (if (and (eq inlinep :notinline)
+                          :type (if (and (eq inlinep 'notinline)
                                          (neq where :declared))
                                     (specifier-type 'function)
                                     (global-ftype name))))
@@ -621,15 +620,14 @@
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as
 ;;; needed. If LEAF represents a defined function which has already
-;;; been converted, and is not :NOTINLINE, then reference the
+;;; been converted, and is not NOTINLINE, then reference the
 ;;; functional instead.
 (defun reference-leaf (start next result leaf &optional (name '.anonymous.))
   (declare (type ctran start next) (type (or lvar null) result) (type leaf leaf))
   (assure-leaf-live-p leaf)
   (let* ((type (lexenv-find leaf type-restrictions))
          (leaf (or (and (defined-fun-p leaf)
-                        (not (eq (defined-fun-inlinep leaf)
-                                 :notinline))
+                        (not (eq (defined-fun-inlinep leaf) 'notinline))
                         (let ((functional (defined-fun-functional leaf)))
                           (when (and functional (not (functional-kind functional)))
                             (maybe-reanalyze-functional functional))))
@@ -1071,9 +1069,9 @@
   (let ((*print-right-margin* 100))
     (format *trace-output* "~&xform (~a) ~S~% -> ~S~%"
             kind name new-form)))
-;;; Convert a call to a global function. If not :NOTINLINE, then we do
+;;; Convert a call to a global function. If not NOTINLINE, then we do
 ;;; source transforms and try out any inline expansion. If there is no
-;;; expansion, but is :INLINE, then give an efficiency note (unless a
+;;; expansion, but is INLINE, then give an efficiency note (unless a
 ;;; known function which will quite possibly be open-coded.) Next, we
 ;;; go to ok-combination conversion.
 (defun ir1-convert-srctran (start next result var form)
@@ -1082,7 +1080,7 @@
   (let ((name (leaf-source-name var))
         (inlinep (when (defined-fun-p var)
                    (defined-fun-inlinep var))))
-    (if (eq inlinep :notinline)
+    (if (eq inlinep 'notinline)
         (ir1-convert-combination start next result form var)
         (let ((transform (info :function :source-transform name)))
           (if transform
@@ -1355,7 +1353,7 @@
 ;;; (and TYPE if notinline), plus type-restrictions from the lexenv.
 (defun make-new-inlinep (var inlinep local-type)
   (declare (type global-var var) (type inlinep inlinep))
-  (let* ((type (if (and (eq inlinep :notinline)
+  (let* ((type (if (and (eq inlinep 'notinline)
                         (not (eq (leaf-where-from var) :declared)))
                    (specifier-type 'function)
                    (leaf-type var)))
@@ -1378,7 +1376,7 @@
 ;;; Parse an inline/notinline declaration. If it's a local function we're
 ;;; defining, set its INLINEP. If a global function, add a new FENV entry.
 (defun process-inline-decl (spec res fvars)
-  (let ((sense (cdr (assoc (first spec) +inlinep-translations+ :test #'eq)))
+  (let ((sense (first spec))
         (new-fenv ()))
     (dolist (name (rest spec))
       (let ((fvar (find name fvars

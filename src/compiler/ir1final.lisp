@@ -104,7 +104,7 @@
 (defun note-assumed-types (component name var)
   (when (and (eq (leaf-where-from var) :assumed)
              (not (and (defined-fun-p var)
-                       (eq (defined-fun-inlinep var) :notinline)))
+                       (eq (defined-fun-inlinep var) 'notinline)))
              (eq (info :function :where-from name) :assumed)
              (eq (info :function :kind name) :function))
     (let ((atype (info :function :assumed-type name)))

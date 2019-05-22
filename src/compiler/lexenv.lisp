@@ -79,8 +79,7 @@
                   (global-var
                    (unless (defined-fun-p what)
                      (return-from reconstruct-lexenv))
-                   (push `(,(car (rassoc (defined-fun-inlinep what)
-                                         +inlinep-translations+))
+                   (push `(,(car (defined-fun-inlinep what))
                            ,name)
                          declarations))
                   (t

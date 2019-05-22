@@ -1041,7 +1041,7 @@
              (assert-global-function-definition-type name res)
              (push res (defined-fun-functionals defined-fun-res))
              (unless (or
-                      (eq (defined-fun-inlinep defined-fun-res) :notinline)
+                      (eq (defined-fun-inlinep defined-fun-res) 'notinline)
                       ;; Don't treat recursive stubs like CAR as self-calls
                       ;; Maybe just use the fact that it is a known function?
                       ;; Though a known function may be used
@@ -1223,10 +1223,10 @@
 ;;; used by %DEFUN too. FIXME: And now it's probably worth rethinking
 ;;; whether this function is a good idea at all.
 (defun ir1-convert-inline-expansion (name expansion var inlinep info)
-  ;; Unless a :INLINE function, we temporarily clobber the inline
+  ;; Unless a INLINE function, we temporarily clobber the inline
   ;; expansion. This prevents recursive inline expansion of
   ;; opportunistic pseudo-inlines.
-  (unless (eq inlinep :inline)
+  (unless (eq inlinep 'inline)
     (setf (defined-fun-inline-expansion var) nil))
   (let ((fun (ir1-convert-inline-lambda expansion
                                         :source-name name

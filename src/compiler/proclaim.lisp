@@ -183,17 +183,11 @@
       (seal-class class))))
 
 (defun process-inline-declaration (name kind)
+  (declare (type (and inlinep (not null)) kind))
   ;; since implicitly it is a function, also scrubs *FREE-FUNS*
   (proclaim-as-fun-name name)
-  ;; Check for problems before touching globaldb,
-  ;; so that the report function can see the old value.
-  (let ((newval
-         (ecase kind
-          (inline :inline)
-          (notinline :notinline)
-          (maybe-inline :maybe-inline))))
-    (warn-if-inline-failed/proclaim name newval)
-    (setf (info :function :inlinep name) newval)))
+  (warn-if-inline-failed/proclaim name kind)
+  (setf (info :function :inlinep name) kind))
 
 (defun check-deprecation-declaration (state since form)
   (unless (typep state 'deprecation-state)

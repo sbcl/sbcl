@@ -1142,7 +1142,7 @@ Test case.
   ;; For user-defined functions declared inline, don't bother
   ;; checking for being redefined as a macro.
   ;; The globaldb cookie will take care of redefinition.
-  ;;  (neq (info :function :inlinep fname) :inline))
+  ;;  (neq (info :function :inlinep fname) 'inline))
 
   (when (symbolp fname)
     (when (eq (info :function :kind fname) :special-form)

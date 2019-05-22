@@ -1092,7 +1092,7 @@
 ;;; or known:
 ;;; -- If a DEFINED-FUN should be inline expanded, then convert
 ;;;    the expansion and change the call to call it. Expansion is
-;;;    enabled if :INLINE or if SPACE=0. If the FUNCTIONAL slot is
+;;;    enabled if INLINE or if SPACE=0. If the FUNCTIONAL slot is
 ;;;    true, we never expand, since this function has already been
 ;;;    converted. Local call analysis will duplicate the definition
 ;;;    if necessary. We claim that the parent form is LABELS for
@@ -1109,12 +1109,12 @@
          (leaf (when (ref-p ref) (ref-leaf ref)))
          (inlinep (if (defined-fun-p leaf)
                       (defined-fun-inlinep leaf)
-                      :no-chance)))
+                      'no-chance)))
     (cond
       (unknown-keys
        (setf (basic-combination-kind call) :unknown-keys)
        (values leaf nil))
-      ((eq inlinep :notinline)
+      ((eq inlinep 'notinline)
        (let ((info (info :function :info (leaf-source-name leaf))))
          (when info
            (setf (basic-combination-fun-info call) info))
@@ -1123,9 +1123,9 @@
                  (eq (global-var-kind leaf) :global-function)))
        (values leaf nil))
       ((and (ecase inlinep
-              (:inline t)
-              (:no-chance nil)
-              ((nil :maybe-inline) (policy call (zerop space))))
+              (inline t)
+              (no-chance nil)
+              ((nil maybe-inline) (policy call (zerop space))))
             (defined-fun-p leaf)
             (defined-fun-inline-expansion leaf)
             (inline-expansion-ok call))
@@ -1133,16 +1133,16 @@
        ;; site in this component, we point this REF to the functional. If not,
        ;; we convert the expansion.
        ;;
-       ;; For :INLINE case local call analysis will copy the expansion later,
-       ;; but for :MAYBE-INLINE and NIL cases we only get one copy of the
+       ;; For INLINE case local call analysis will copy the expansion later,
+       ;; but for MAYBE-INLINE and NIL cases we only get one copy of the
        ;; expansion per component.
        ;;
-       ;; FIXME: We also convert in :INLINE & FUNCTIONAL-KIND case below. What
+       ;; FIXME: We also convert in INLINE & FUNCTIONAL-KIND case below. What
        ;; is it for?
        (with-ir1-environment-from-node call
          (let ((fun (defined-fun-functional leaf)))
            (if (or (not fun)
-                   (and (eq inlinep :inline) (functional-kind fun)))
+                   (and (eq inlinep 'inline) (functional-kind fun)))
                ;; Convert.
                (let* ((name (leaf-source-name leaf))
                       (res (ir1-convert-inline-expansion
@@ -1826,7 +1826,7 @@
       (lambda-var
        (null (lambda-var-sets leaf)))
       (defined-fun
-       (not (eq (defined-fun-inlinep leaf) :notinline)))
+       (not (eq (defined-fun-inlinep leaf) 'notinline)))
       (global-var
        (case (global-var-kind leaf)
          (:global-function

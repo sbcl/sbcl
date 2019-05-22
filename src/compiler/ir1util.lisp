@@ -2580,7 +2580,7 @@ is :ANY, the function name is not checked."
           (if (and (global-var-p leaf)
                    (eq (global-var-kind leaf) :global-function)
                    (or (not (defined-fun-p leaf))
-                       (not (eq (defined-fun-inlinep leaf) :notinline))
+                       (not (eq (defined-fun-inlinep leaf) 'notinline))
                        notinline-ok))
               (leaf-source-name leaf)
               nil))

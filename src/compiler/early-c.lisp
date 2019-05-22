@@ -65,22 +65,17 @@
 ;;; have these meanings:
 ;;;     NIL     No declaration seen: do whatever you feel like, but don't
 ;;;             dump an inline expansion.
-;;; :NOTINLINE  NOTINLINE declaration seen: always do full function call.
-;;;    :INLINE  INLINE declaration seen: save expansion, expanding to it
+;;; NOTINLINE  NOTINLINE declaration seen: always do full function call.
+;;;    INLINE  INLINE declaration seen: save expansion, expanding to it
 ;;;             if policy favors.
-;;; :MAYBE-INLINE
+;;; MAYBE-INLINE
 ;;;             Retain expansion, but only use it opportunistically.
-;;;             :MAYBE-INLINE is quite different from :INLINE. As explained
+;;;             MAYBE-INLINE is quite different from INLINE. As explained
 ;;;             by APD on #lisp 2005-11-26: "MAYBE-INLINE lambda is
 ;;;             instantiated once per component, INLINE - for all
 ;;;             references (even under #'without FUNCALL)."
 (def!type inlinep ()
-  '(member :inline :maybe-inline :notinline nil))
-(defconstant-eqx +inlinep-translations+
-  '((inline . :inline)
-    (notinline . :notinline)
-    (maybe-inline . :maybe-inline))
-  #'equal)
+  '(member inline maybe-inline notinline nil))
 
 (defstruct (dxable-args (:constructor make-dxable-args (list))
                         (:predicate nil)

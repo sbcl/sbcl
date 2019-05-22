@@ -1190,9 +1190,7 @@
                    (setf (sb-c::lambda-var-flags var) 1)))))
             ((inline notinline)
              ;; This is just enough to get sb-cltl2 tests to pass.
-             (let ((inlinep (case (car spec)
-                              (inline :inline)
-                              (notinline :notinline))))
+             (let ((inlinep (car spec)))
                (dolist (fname (cdr spec))
                  (let ((fun (cdr (assoc fname funs :test 'equal))))
                    (typecase fun
@@ -1273,7 +1271,7 @@
     (unless (setq env (env-parent env))
       (return (car guts)))))
 
-;;; Return :INLINE or :NOTINLINE if FNAME has a lexical declaration,
+;;; Return INLINE or NOTINLINE if FNAME has a lexical declaration,
 ;;; otherwise NIL for no information.
 ;;; FIXME: obviously this does nothing
 (defun fun-lexically-notinline-p (fname env)

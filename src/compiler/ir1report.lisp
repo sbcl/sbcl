@@ -656,7 +656,7 @@ has written, having proved that it is unreachable."))
 ;; it would have been used, unless the expansion limit was hit.
 ;;
 (defun warn-if-inline-failed/proclaim (name new-inlinep)
-  (when (eq new-inlinep :inline)
+  (when (eq new-inlinep 'inline)
     (let ((warning-count (emitted-full-call-count name)))
       (when (and warning-count
                  ;; Warn only if the the compiler did not have the expansion.
@@ -707,12 +707,12 @@ and defining the function before its first potential use.~@:>"
     ;; This function is only called by PONDER-FULL-CALL when NAME
     ;; is not lexically NOTINLINE, so therefore if it is globally INLINE,
     ;; there was no local declaration to the contrary.
-    (when (or (eq (info :function :inlinep name) :inline)
+    (when (or (eq (info :function :inlinep name) 'inline)
               (let ((fun (let ((*lexenv* lexenv))
                            (lexenv-find name funs :test #'equal))))
                 (and fun
                      (defined-fun-p fun)
-                     (eq (defined-fun-inlinep fun) :inline))))
+                     (eq (defined-fun-inlinep fun) 'inline))))
       ;; Set a bit saying that a warning about the call was generated,
       ;; which suppresses the warning about either a later
       ;; call or a later proclamation.
