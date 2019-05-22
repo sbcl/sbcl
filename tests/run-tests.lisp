@@ -214,7 +214,8 @@
             (exit-code (run-impure-in-child-sbcl file test-fun)))
         (log-file-elapsed-time file start log)
         (if (= exit-code 104)
-            (with-open-file (stream "test-status.lisp-expr"
+            (with-open-file (stream #.(merge-pathnames "test-status.lisp-expr"
+                                                       *load-pathname*)
                                     :direction :input
                                     :if-does-not-exist :error)
               (append-failures (read stream)))

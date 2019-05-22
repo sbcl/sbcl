@@ -21,7 +21,8 @@
       (format t "~6d TOTAL TIME (~a)~%" actual-total file))))
 
 (defun clear-test-status ()
-  (with-open-file (stream "test-status.lisp-expr"
+  (with-open-file (stream #.(merge-pathnames "test-status.lisp-expr"
+                                             *load-pathname*)
                           :direction :output
                           :if-exists :supersede)
     (write-line "NIL" stream)))
