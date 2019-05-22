@@ -284,7 +284,7 @@
                                                *load-pathname*)
                             :direction :output
                             :if-exists :supersede)
-        (format stream "~s~%" *failures*))))
+        (format stream "~s~%" *results*))))
 
 (defun start-test ()
   (unless (eq *test-file* *load-pathname*)
