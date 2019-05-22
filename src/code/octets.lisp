@@ -174,17 +174,7 @@
          ;; Create the lookup table.
          (sorted-lookup-table
           (reduce #'append sorted-pairs :from-end t :initial-value nil)))
-    (flet ((pick-type (vector &optional missing-points-p)
-             (if missing-points-p
-                 (let ((max (reduce #'max (remove nil vector))))
-                   (cond ((<= max #x7F) '(signed-byte 8))
-                         ((<= max #x7FFF) '(signed-byte 16))
-                         (t '(signed-byte 32))))
-                 (let ((max (reduce #'max vector)))
-                   (cond ((<= max #xFF) '(unsigned-byte 8))
-                         ((<= max #xFFFF) '(unsigned-byte 16))
-                         (t '(unsigned-byte 32)))))))
-      `(progn
+    `(progn
          ;; We *could* inline this, but it's not obviously the right thing,
          ;; because each use of the inlined function in a different file
          ;; would be forced to dump the large-ish array. To do things like
@@ -205,14 +195,12 @@
                   ;; We could use a single otherwise-unused point to mean NIL,
                   ;; but it would be confusing if in one table #xFFFF represents
                   ;; NIL and another #xF00D represents NIL.
-                  `(let ((code (aref ,(!make-specialized-array
-                                       256 (pick-type byte-to-code t)
+                  `(let ((code (aref ,(sb-c::coerce-to-smallest-eltype
                                        (substitute -1 nil byte-to-code))
                                      byte)))
                      (if (>= code 0) code))
                   ;; Every byte has a translation
-                  `(aref ,(!make-specialized-array
-                           256 (pick-type byte-to-code) byte-to-code)
+                  `(aref ,(sb-c::coerce-to-smallest-eltype byte-to-code)
                          byte))))
          (defun ,code-byte-name (code)
            (declare (optimize speed (safety 0))
@@ -220,10 +208,7 @@
            (if (< code ,lowest-non-equivalent-code)
                code
                (loop with code-to-byte-table =
-                    ,(!make-specialized-array
-                      (length sorted-lookup-table)
-                      (pick-type sorted-lookup-table)
-                      sorted-lookup-table)
+                    ,(sb-c::coerce-to-smallest-eltype sorted-lookup-table)
                   with low = 0
                   with high = (- (length code-to-byte-table) 2)
                   while (< low high)
@@ -233,7 +218,7 @@
                            (setf low mid)))
                   finally (return (if (eql code (aref code-to-byte-table low))
                                       (aref code-to-byte-table (1+ low))
-                                      nil)))))))))
+                                      nil))))))))
 
 (declaim (inline get-latin-bytes))
 (defun get-latin-bytes (mapper external-format string pos)

@@ -450,6 +450,10 @@
                     (end-1 (floor (1- length) sb-vm:n-word-bits)))
                    ((>= i end-1)
                     (let* ((extra (1+ (mod (1- length) sb-vm:n-word-bits)))
+                           ;; Why do we need to mask anything? Do we allow use of
+                           ;; the extra bits to record data steganographically?
+                           ;; Or maybe we didn't zero-fill trailing bytes of stack-allocated
+                           ;; bit-vectors?
                            (mask (ash sb-ext:most-positive-word (- extra sb-vm:n-word-bits)))
                            (numx
                             (logand

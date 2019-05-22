@@ -157,7 +157,9 @@
   (declare (float float1 float2) (explicit-check))
   (* (if (etypecase float1
            (single-float (minusp (single-float-bits float1)))
-           (double-float (minusp (double-float-high-bits float1)))
+           ;; If 64-bits words, use all the bits. No need to right-shift them.
+           (double-float (minusp #+64-bit (double-float-bits float1)
+                                 #-64-bit (double-float-high-bits float1)))
            #+long-float
            (long-float (minusp (long-float-exp-bits float1))))
          (float -1 float1)

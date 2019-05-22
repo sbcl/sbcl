@@ -176,6 +176,14 @@ _ldso_stub__ ## fct ## $lazy_ptr:                @\\
 
 #+ppc64 ""
 
+#+riscv "
+#define LDSO_STUBIFY(fct)                \\
+  .global ldso_stub__ ## fct           ; \\
+  .type ldso_stub__ ## fct, @function  ; \\
+ldso_stub__ ## fct:                    ; \\
+  j fct                                ; \\
+  .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
+
 ;;; darwin x86 assembler is weird and follows the ppc assembler syntax
 #+(and darwin x86) "
 #define LDSO_STUBIFY(fct)                       \\

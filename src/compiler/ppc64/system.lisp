@@ -48,6 +48,19 @@
 
     DONE))
 
+(define-vop (layout-depthoid)
+  (:translate layout-depthoid)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:results (res :scs (any-reg)))
+  (:result-types fixnum)
+  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:generator 1
+    (inst lr temp (- (ash (+ instance-slots-offset
+                             (get-dsd-index layout sb-kernel::%bits))
+                          word-shift) instance-pointer-lowtag))
+    (inst lwax res object temp)))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)
@@ -74,7 +87,7 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 fun-pointer-lowtag)
-    (inst srwi res res n-widetag-bits)))
+    (inst srdi res res n-widetag-bits)))
 
 (define-vop (get-header-data)
   (:translate get-header-data)
@@ -84,34 +97,22 @@
   (:result-types positive-fixnum)
   (:generator 6
     (loadw res x 0 other-pointer-lowtag)
-    (inst srwi res res n-widetag-bits)))
+    (inst srdi res res n-widetag-bits)))
 
 (define-vop (set-header-data)
   (:translate set-header-data)
   (:policy :fast-safe)
   (:args (x :scs (descriptor-reg) :target res)
-         (data :scs (any-reg immediate zero)))
+         (data :scs (any-reg)))
   (:arg-types * positive-fixnum)
   (:results (res :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) t1 t2)
   (:generator 6
-    (loadw t1 x 0 other-pointer-lowtag)
-    (inst andi. t1 t1 widetag-mask)
-    (sc-case data
-      (any-reg
-       (inst slwi t2 data (- n-widetag-bits n-fixnum-tag-bits))
-       (inst or t1 t1 t2))
-      (immediate
-       (let ((val (ash (tn-value data) n-widetag-bits)))
-         (cond ((typep val '(unsigned-byte 16))
-                (inst ori t1 t1 val))
-               (t
-                (inst lr t2 val)
-                (inst or t1 t1 t2)))))
-      (zero))
+    (load-type t1 x (- other-pointer-lowtag))
+    (inst sldi t2 data (- n-widetag-bits n-fixnum-tag-bits))
+    (inst or t1 t1 t2)
     (storew t1 x 0 other-pointer-lowtag)
     (move res x)))
-
 
 (define-vop (pointer-hash)
   (:translate pointer-hash)
@@ -160,8 +161,9 @@
   (:results (sap :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 10
-    ;; FIXME: should be zero-extending 4 byte load
-    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
+    (inst lwz ndescr code
+          (- (+ (ash code-boxed-size-slot word-shift) #+big-endian 4)
+             other-pointer-lowtag))
     (inst subi ndescr ndescr other-pointer-lowtag)
     (inst add sap code ndescr)))
 
@@ -172,8 +174,9 @@
   (:results (func :scs (descriptor-reg)))
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 10
-    ;; FIXME: should be zero-extending 4 byte load
-    (loadw ndescr code code-boxed-size-slot other-pointer-lowtag)
+    (inst lwz ndescr code
+          (- (+ (ash code-boxed-size-slot word-shift) #+big-endian 4)
+             other-pointer-lowtag))
     (inst add ndescr ndescr offset)
     (inst addi ndescr ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst add func code ndescr)))

@@ -64,7 +64,7 @@
       (inst srl temp n-widetag-bits)
       (inst cmp temp)
       (inst b :eq bogus)
-      (inst sll temp (1- (integer-length n-word-bytes)))
+      (inst sll temp word-shift)
       (unless (= lowtag other-pointer-lowtag)
         (inst add temp (- lowtag other-pointer-lowtag)))
       (inst sub code thing temp)

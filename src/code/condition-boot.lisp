@@ -26,7 +26,8 @@
                 (%compiler-define-condition
                  ',name ',direct-supers
                  ,(make-layout
-                   :classoid (make-undefined-classoid name)
+                   (make-undefined-classoid name)
+                   :flags +condition-layout-flag+
                    :inherits (map 'vector #'find-layout (cons t inherits))
                    :depthoid -1
                    ;; 2 declared slots, plus the layout if it takes a slot

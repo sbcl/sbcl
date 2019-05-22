@@ -9,6 +9,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(eval-when (:compile-toplevel)
+  (load "compiler-test-util.lisp"))
+
 ;;; Prior to the change that allowed forward-references to slot types,
 ;;; the MAKE-S1 constructor would have used a "cached typep" placeholder
 ;;; for structure types S2 and S3; and MAKE-S2 would have used one for S3.

@@ -301,7 +301,10 @@
                       (unsupplied-or-nil fill-pointer)))
          (spec
            (or `(,(if simple 'simple-array 'array)
-                 ,(cond ((not element-type) t)
+                 ;; element-type is usually an LVAR or nil,
+                 ;; but MAKE-WEAK-VECTOR derive-type passes in 'T.
+                 ,(cond ((or (not element-type) (eq element-type 't))
+                         t)
                         ((ctype-p element-type)
                          (type-specifier element-type))
                         ((constant-lvar-p element-type)

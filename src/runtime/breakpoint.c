@@ -77,7 +77,7 @@ lispobj find_code(os_context_t *context)
         return code - HeaderValue(header)*sizeof(lispobj);
 #else
     lispobj codeptr =
-        (lispobj)component_ptr_from_pc((lispobj *)(*os_context_pc_addr(context)));
+        (lispobj)component_ptr_from_pc((char *)(*os_context_pc_addr(context)));
 
     if (codeptr == 0)
         return NIL;

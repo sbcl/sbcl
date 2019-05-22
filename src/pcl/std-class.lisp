@@ -300,7 +300,7 @@
   (let ((table (specializer-method-table self))
         (object (specializer-object self)))
     (if create
-        (sb-impl::puthash-if-absent object table (lambda () (cons nil nil)))
+        (ensure-gethash object table (cons nil nil) t)
         (gethash object table))))
 
 (defun map-specializers (function)

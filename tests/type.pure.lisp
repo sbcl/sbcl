@@ -560,7 +560,17 @@
 (with-test (:name :typep-satisfies-boolean)
   (assert (eq (eval '(typep 1 '(satisfies eval))) t)))
 
-(in-package "SB-KERNEL")
+(import '(sb-kernel:specifier-type
+          sb-kernel:type-specifier
+          sb-kernel:type-intersection
+          #+sb-unicode sb-kernel::character-string
+          sb-kernel:simple-character-string
+          sb-kernel:type=
+          sb-kernel:find-classoid
+          sb-kernel:make-numeric-type
+          sb-kernel::numeric-types-adjacent
+          sb-kernel::numeric-types-intersect
+          sb-kernel:*empty-type*))
 
 (test-util:with-test (:name :partition-array-into-simple/hairy)
   ;; Some tests that (simple-array | hairy-array) = array

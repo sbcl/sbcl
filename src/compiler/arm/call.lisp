@@ -922,7 +922,7 @@
                       ;; CONTEXT-PC will be pointing here when the
                       ;; interrupt is handled, not after the
                       ;; DEBUG-TRAP.
-                      (note-this-location vop :step-before-vop)
+                      (note-this-location vop :internal-error)
                       ;; Best-guess at a usable trap.  x86oids don't
                       ;; have much more than this, SPARC, MIPS, PPC
                       ;; and HPPA encode (TN-OFFSET CALLABLE-TN),
@@ -1167,7 +1167,7 @@
     (inst b :eq DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; A best-guess effort at a debug trap suitable for a
     ;; single-step-before-trap.
     (inst debug-trap)

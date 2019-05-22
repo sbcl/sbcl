@@ -30,7 +30,8 @@
 
       ;; Allocate a new tls-index.
       (inst ldr (32-bit-reg result) (@ free-tls-index #+little-endian -4 #+big-endian 4))
-      (inst cmp (32-bit-reg result) (* tls-size n-word-bytes))
+      (loadw tmp-tn thread-tn thread-tls-size-slot)
+      (inst cmp (32-bit-reg result) (32-bit-reg tmp-tn))
       (inst b :hs tls-full)
 
       (inst add (32-bit-reg tmp-tn) (32-bit-reg result) n-word-bytes)
@@ -42,4 +43,6 @@
   (inst ret)
   TLS-FULL
   (inst stlr (32-bit-reg zr-tn) free-tls-index) ;; release the lock
+  ;; FIXME: this gets "maximum interrupt nesting depth (1024) exceeded"
+  ;; instead of doing what it should.
   (error-call nil 'tls-exhausted-error))

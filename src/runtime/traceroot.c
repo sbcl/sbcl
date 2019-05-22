@@ -415,7 +415,7 @@ static inline lispobj decode_pointer(uint32_t encoding)
 
 static struct simple_fun* simple_fun_from_pc(char* pc)
 {
-    struct code* code = (struct code*)component_ptr_from_pc((lispobj*)pc);
+    struct code* code = (struct code*)component_ptr_from_pc(pc);
     if (!code) return 0;
     struct simple_fun* prev_fun = 0;
     for_each_simple_fun(i, fun, code, 1, {
@@ -770,7 +770,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             if (!(other_immediate_lowtag_p(widetag) && lowtag_for_widetag[widetag>>2]))
               lose("Unknown widetag %x\n", widetag);
             // Skip irrelevant objects.
-            if (unboxed_obj_widetag_p(widetag) ||
+            if (leaf_obj_widetag_p(widetag) ||
                 (widetag == WEAK_POINTER_WIDETAG) || /* do not follow! */
                 // These numeric types contain pointers, but are uninteresting.
                 (widetag == COMPLEX_WIDETAG) ||

@@ -12,9 +12,6 @@
 
 (in-package "SB-C")
 
-(declaim (type fixnum *compiler-sset-counter*))
-(defvar *compiler-sset-counter* 0)
-
 ;;; The front-end data structure (IR1) is composed of nodes,
 ;;; representing actual evaluations. Linear sequences of nodes in
 ;;; control-flow order are combined into blocks (but see
@@ -69,7 +66,7 @@
 
 (defmethod print-object ((x ctran) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (when (boundp '*compiler-ir-obj-map*)
+    (when (boundp '*compilation*)
       (format stream "~D" (cont-num x)))))
 
 ;;; Linear VARiable. Multiple-value (possibly of unknown number)
@@ -96,7 +93,6 @@
   (dependent-casts nil)
   (annotations nil)
   (dependent-annotations nil))
-(!set-load-form-method lvar (:xc :target) :ignore-it)
 
 ;;; These are used for annottating a LVAR with information that can't
 ;;; be expressed using types.
@@ -151,7 +147,7 @@
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
-    (when (boundp '*compiler-ir-obj-map*)
+    (when (boundp '*compilation*)
       (format stream "~D" (cont-num x)))))
 
 #-sb-fluid (declaim (inline lvar-has-single-use-p))
@@ -172,8 +168,8 @@
 
 (def!struct (node (:constructor nil)
                   (:include sset-element
-                            (number (unless (eql *compiler-sset-counter* 0)
-                                      (incf *compiler-sset-counter*))))
+                            (number (when (boundp '*compilation*)
+                                      (incf (sset-counter *compilation*)))))
                   (:copier nil))
   ;; unique ID for debugging
   #+sb-show (id (new-object-id) :read-only t)
@@ -392,7 +388,7 @@
   ;; no cached value has been stored yet.
   (physenv-cache :none :type (or null physenv (member :none))))
 (defmethod print-object ((cblock cblock) stream)
-  (if (boundp '*compiler-ir-obj-map*)
+  (if (boundp '*compilation*)
       (print-unreadable-object (cblock stream :type t :identity t)
         (format stream "~W :START c~W"
             (block-number cblock)
@@ -717,7 +713,6 @@
   (safe-p nil :type boolean)
   ;; some kind of info used by the back end
   info)
-(!set-load-form-method nlx-info (:xc :target) :ignore-it)
 (defprinter (nlx-info :identity t)
   block
   target
@@ -730,8 +725,8 @@
 ;;; allows us to easily substitute one for the other without actually
 ;;; hacking the flow graph.
 (def!struct (leaf (:include sset-element
-                            (number (unless (eql *compiler-sset-counter* 0)
-                                      (incf *compiler-sset-counter*))))
+                            (number (when (boundp '*compilation*)
+                                      (incf (sset-counter *compilation*)))))
                   (:copier nil)
                   (:constructor nil))
   ;; unique ID for debugging
@@ -783,7 +778,6 @@
   (extent nil :type (member nil :maybe-dynamic :always-dynamic :indefinite))
   ;; some kind of info used by the back end
   (info nil))
-(!set-load-form-method leaf (:xc :target) :ignore-it)
 
 (defun leaf-dynamic-extent (leaf)
   (let ((extent (leaf-extent leaf)))

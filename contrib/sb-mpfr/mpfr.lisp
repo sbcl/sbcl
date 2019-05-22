@@ -1094,21 +1094,27 @@
   (multiple-value-bind (str exp sign)
       (mpfr-float-to-string obj)
     (declare (type (integer -1 1) sign))
-    (if *print-readably*
-        (if (minusp exp)
-            (format stream "#M~s" str)
-            (case sign
-              (0 (format stream "#M\"0\""))
-              (1 (format stream "#M\"~a@~s\"" str
-                         (- exp (length str))))
-              (-1 (format stream "#M\"~a@~s\"" str
-                          (- (1+ exp) (length str))))))
-        (if (minusp exp)
-            (format stream "~a" str)
-            (case sign
-              (0 (format stream "0"))
-              (1 (format stream ".~ae+~s" str exp))
-              (-1 (format stream "-.~ae+~s" (subseq str 1) exp)))))))
+    (cond (*print-readably*
+           (write-char #\# stream)
+           (write-char #\M stream)
+           (write-string str stream)
+           (write-char #\@ stream)
+           (case sign
+             (1 (princ (- exp (length str)) stream))
+             (-1 (princ (- exp (1- (length str))) stream))))
+          (t
+           (case sign
+             (0
+              (write-char #\0 stream))
+             (1
+              (write-char #\. stream)
+              (write-string str stream))
+             (-1
+              (write-char #\- stream)
+              (write-char #\. stream)
+              (write-string str stream :start 1)))
+           (write-char #\e stream)
+           (princ exp stream)))))
 
 (defun mpfr-float-to-string (x &optional (rnd *mpfr-rnd*))
   (let ((xr (mpfr-float-ref x)))
@@ -1124,7 +1130,14 @@
   (declare (ignore subchar arg))
   (let ((mpfr (make-mpfr-float)))
     (mpfr_set_str (mpfr-float-ref mpfr)
-                  (read stream t nil t)
+                  (let ((peek (peek-char t stream nil nil t)))
+                    (if (char= peek #\") ;; The old lazy way
+                        (read stream nil nil t)
+                        (with-output-to-string (str)
+                          (loop for char = (peek-char nil stream nil nil t)
+                                while (and char
+                                           (not (sb-impl:token-delimiterp char)))
+                                do (write-char (read-char stream nil nil t) str)))))
                   *mpfr-base* *mpfr-rnd*)
     mpfr))
 

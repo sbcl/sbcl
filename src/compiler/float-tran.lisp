@@ -129,6 +129,15 @@
   (let ((float (make-double-float (lvar-value hi) (lvar-value lo))))
     (if (float-nan-p float) (give-up-ir1-transform) float)))
 
+;;; I'd like to transition all the 64-bit backends to use the single-arg
+;;; %MAKE-DOUBLE-FLOAT constructor instead of the 2-arg MAKE-DOUBLE-FLOAT.
+;;; So we need a transform to fold constant calls for either.
+#+64-bit
+(deftransform %make-double-float ((bits) ((constant-arg t)))
+  "Conditional constant folding"
+  (let ((float (%make-double-float (lvar-value bits))))
+    (if (float-nan-p float) (give-up-ir1-transform) float)))
+
 ;;; On the face of it, these transforms are ridiculous because if we're going
 ;;; to express (MINUSP X) as (MINUSP (foo-FLOAT-BITS X)), then why not _always_
 ;;; transform MINUSP of a float into an integer comparison instead of a
@@ -1642,3 +1651,49 @@
             '(,fun x))))
   (def single-float %unary-ftruncate/single)
   (def double-float %unary-ftruncate/double))
+
+;;;; TESTS
+
+;;; Dumping of double-float literals in genesis got some bits messed up,
+;;; but only if the double-float was the value of a slot in a ctype instance.
+;;; It was broken for either endianness, but miraculously didn't crash
+;;; for little-endian builds even though it could have.
+;;; (The dumped constants were legal normalalized float bit patterns, albeit wrong)
+;;; For 32-bit big-endian machines, the bit patterns were those of subnormals.
+;;; So thank goodness for that - it allowed detection of the problem.
+(defun test-ctype-involving-double-float ()
+  (specifier-type '(double-float #.sb-xc:pi)))
+(assert (sb-xc:= (numeric-type-low (test-ctype-involving-double-float)) sb-xc:pi))
+
+;;; Dummy functions to test that complex number are dumped correctly in genesis.
+(defun try-folding-complex-single ()
+  (let ((re (make-single-float #x4E000000))
+        (im (make-single-float #x-21800000)))
+    (values (complex re im)
+            (locally (declare (notinline complex)) (complex re im)))))
+
+(defun try-folding-complex-double ()
+  (let ((re (make-double-float #X3FE62E42 #xFEFA39EF))
+        (im (make-double-float #X43CFFFFF #XFFFFFFFF)))
+    (values (complex re im)
+            (locally (declare (notinline complex)) (complex re im)))))
+
+#-sb-xc-host
+(dolist (test '(try-folding-complex-single try-folding-complex-double))
+  (multiple-value-bind (a b) (funcall test)
+    (assert (eql a b)))
+  (let ((code (fun-code-header (symbol-function test))))
+    (aver (loop for index from sb-vm:code-constants-offset
+                below (code-header-words code)
+                thereis (typep (code-header-ref code index) 'complex))))
+  (fmakunbound test))
+
+;;; An example that we can't cross-compile: CTYPE-OF-NUMBER tries to compute
+;;; low/high bounds so that it can return (COMPLEX (SINGLE-FLOAT <LOW> <HIGH>))
+;;; but we haven't taught the MIN,MAX interceptors how to operate on infinity.
+#+nil
+(defun more-folding ()
+  (values (complex single-float-positive-infinity single-float-positive-infinity)
+          (complex single-float-negative-infinity single-float-positive-infinity)
+          (complex single-float-negative-infinity single-float-negative-infinity)
+          (complex single-float-positive-infinity single-float-negative-infinity)))

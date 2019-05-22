@@ -35,9 +35,7 @@
   ;; If somebody tries (TRACE LENGTH) for example, it should not cause
   ;; compilations to fail on account of LENGTH becoming a closure.
   (defun sb-vm::function-raw-address (name &aux (fun (fdefinition name)))
-    (cond ((not fun)
-           (error "Can't statically link to undefined function ~S" name))
-          ((not (immobile-space-obj-p fun))
+    (cond ((not (immobile-space-obj-p fun))
            (error "Can't statically link to ~S: code is movable" name))
           ((neq (fun-subtype fun) sb-vm:simple-fun-widetag)
            (error "Can't statically link to ~S: non-simple function" name))
@@ -70,7 +68,7 @@
                    (:foreign (foreign-symbol-address sym))
                    (:foreign-dataref (foreign-symbol-address sym t))
                    (:code-object (get-lisp-obj-address code-obj))
-                   (:symbol-tls-index (ensure-symbol-tls-index sym))
+                   #+sb-thread (:symbol-tls-index (ensure-symbol-tls-index sym))
                    (:layout (get-lisp-obj-address
                              (if (symbolp sym) (find-layout sym) sym)))
                    (:immobile-symbol (get-lisp-obj-address sym))
@@ -125,10 +123,10 @@
          #-(or x86 x86-64)
          (sb-vm:sanctify-for-execution code-obj)))
 
-  (defun apply-fasl-fixups (fop-stack code-obj &aux (top (svref fop-stack 0)))
+  (defun apply-fasl-fixups (fop-stack code-obj n-fixups &aux (top (svref fop-stack 0)))
     (dx-let ((preserved (make-array 4 :initial-element nil)))
       (macrolet ((pop-fop-stack () `(prog1 (svref fop-stack top) (decf top))))
-        (dotimes (i (pop-fop-stack) (setf (svref fop-stack 0) top))
+        (dotimes (i n-fixups (setf (svref fop-stack 0) top))
           (multiple-value-bind (offset kind flavor)
               (sb-fasl::!unpack-fixup-info (pop-fop-stack))
             (fixup code-obj offset (pop-fop-stack) kind flavor

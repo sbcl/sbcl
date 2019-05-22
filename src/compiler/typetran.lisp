@@ -88,13 +88,13 @@
                       `(sb-alien::alien-value-typep object ',alien-type)))
                    #+(vop-translates sb-int:fixnump-instance-ref)
                    ((and (type= type (specifier-type 'fixnum))
-                         (let ((use (lvar-uses object)) index)
+                         (let ((use (lvar-uses object)))
                            (and (combination-p use)
                                 (almost-immediately-used-p object use)
                                 (or (and (eq (lvar-fun-name (combination-fun use))
                                              '%instance-ref)
                                          (constant-lvar-p
-                                          (setf index (second (combination-args use)))))
+                                          (second (combination-args use))))
                                     (member (lvar-fun-name (combination-fun use))
                                             '(car cdr))))))
                     ;; This is a disturbing trend, but it's the best way to
@@ -892,7 +892,11 @@
                        (layout-inherits ,n-layout) ,depthoid ,layout)
                      #-(and immobile-space x86-64)
                      `(eq ,get-ancestor ,layout))
-                   (deeper-p `(> (layout-depthoid ,n-layout) ,depthoid)))
+                   (deeper-p
+                    #+(vop-translates sb-c::layout-depthoid-gt)
+                    `(layout-depthoid-gt ,n-layout ,depthoid)
+                    #-(vop-translates sb-c::layout-depthoid-gt)
+                    `(> (layout-depthoid ,n-layout) ,depthoid)))
               (aver (equal pred '(%instancep object)))
               ;; For shallow hierarchies, we can avoid reading the 'inherits'
               ;; because the layout has the ancestor layouts directly in it.

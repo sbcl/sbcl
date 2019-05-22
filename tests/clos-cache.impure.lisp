@@ -13,8 +13,7 @@
 
 (with-test (:name :probe-cache-smoke-test)
   (let ((layout
-         (sb-kernel::make-layout :clos-hash #xAd00d
-                                 :classoid (sb-kernel::make-undefined-classoid 'x)))
+          (sb-kernel::make-layout (sb-kernel::make-undefined-classoid 'x)))
         (cache (sb-pcl::make-cache :key-count 1 :value t :size 10)))
     (sb-pcl::try-update-cache cache (list layout) 'win)
     (assert (eq (nth-value 1 (sb-pcl::probe-cache cache (list layout))) 'win))
@@ -68,16 +67,13 @@
         (write-line string)))))
 
 (defun test-loop ()
-  (note "/~S waiting for permission to run" sb-thread:*current-thread*)
   (loop until *run-cache-test* do (sb-thread:thread-yield))
-  (note "/~S joining the thundering herd" sb-thread:*current-thread*)
   (handler-case
       (loop repeat 1024 do (test-cache))
     (error (e)
       (note "~&Error in cache test in ~S:~%~A~%...aborting"
             sb-thread:*current-thread* e)
-      (sb-ext:exit :code 1)))
-  (note "/~S done" sb-thread:*current-thread*))
+      (sb-ext:exit :code 1))))
 
 (with-test (:name :clos-cache-test
             :broken-on :sb-safepoint)

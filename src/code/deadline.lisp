@@ -43,7 +43,9 @@
     ;;
     ;; doesn't go beyond the INTERNAL-TIME range due to rounding
     ;; errors.
-    (floor (ash 1 (1- sb-kernel::internal-time-bits))
+  ;; #. is needed to make the value constant per se as opposed to
+  ;; constant by decree, otherwise genesis runs into a problem.
+  #.(floor (ash 1 (1- sb-kernel::internal-time-bits))
            sb-xc:internal-time-units-per-second)))
 
 (declaim (inline seconds-to-maybe-internal-time))

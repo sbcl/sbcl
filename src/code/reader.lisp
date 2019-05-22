@@ -171,7 +171,8 @@
 ;;; FIXME: this initform is considered too hairy to assign (a constant array, really?)
 ;;; if changed to DEFCONSTANT-EQX, which makes this file unslammable as-is. Oh well.
 (defconstant +constituent-trait-table+
-  #.(let ((a (!make-specialized-array base-char-code-limit '(unsigned-byte 8))))
+  #.(let ((a (sb-xc:make-array base-char-code-limit
+                               :element-type '(unsigned-byte 8))))
       (fill a +char-attr-constituent+)
       (flet ((!set-constituent-trait (char trait)
                (aver (typep char 'base-char))
@@ -189,11 +190,13 @@
         (!set-constituent-trait #\D +char-attr-constituent-expt+)
         (!set-constituent-trait #\S +char-attr-constituent-expt+)
         (!set-constituent-trait #\L +char-attr-constituent-expt+)
+        (!set-constituent-trait #\R +char-attr-constituent-expt+) ; extension
         (!set-constituent-trait #\e +char-attr-constituent-expt+)
         (!set-constituent-trait #\f +char-attr-constituent-expt+)
         (!set-constituent-trait #\d +char-attr-constituent-expt+)
         (!set-constituent-trait #\s +char-attr-constituent-expt+)
         (!set-constituent-trait #\l +char-attr-constituent-expt+)
+        (!set-constituent-trait #\r +char-attr-constituent-expt+) ; extension
         (!set-constituent-trait #\Space +char-attr-invalid+)
         (!set-constituent-trait #\Newline +char-attr-invalid+)
         (dolist (c (list backspace-char-code tab-char-code form-feed-char-code
@@ -1646,8 +1649,8 @@ extended <package-name>::<form-in-package> syntax."
            (inline token-buf-getchar)) ; makes for smaller code
   (let* ((fixnum-max-digits
           (macrolet ((maxdigits ()
-                       (!coerce-to-specialized  (integer-reader-safe-digits)
-                                                '(unsigned-byte 8))))
+                       (sb-xc:coerce (integer-reader-safe-digits)
+                                     '(vector (unsigned-byte 8)))))
             (aref (maxdigits) (- base 2))))
          (base-power
           (macrolet ((base-powers ()
@@ -1742,7 +1745,8 @@ extended <package-name>::<form-in-package> syntax."
                                   (#\S 'short-float)
                                   (#\F 'single-float)
                                   (#\D 'double-float)
-                                  (#\L 'long-float)))
+                                  (#\L 'long-float)
+                                  (#\R 'rational)))
                   (exponent (truncate-exponent exponent number divisor))
                   (result (make-float-aux (* (expt 10 exponent) number)
                                           divisor float-format stream)))

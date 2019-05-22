@@ -49,7 +49,7 @@
 (do-all-symbols (s)
   (when (and (sb-int:info :function :inlinep s)
              (eq (sb-int:info :function :where-from s) :assumed))
-      (warn "Did you forget to define ~S?" s)))
+      (error "INLINE declaration for an undefined function: ~S?" s)))
 
 ;; enable this too see which vops were or weren't used
 #+nil

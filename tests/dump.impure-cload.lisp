@@ -235,11 +235,12 @@
       (make-load-form-saving-slots self :slot-names *foo-save-slots*)))
 (with-test (:name :load-form-canonical-p)
   (let ((foo (make-foo :x 'x :y 'y)))
-    (assert (eq (let ((*foo-save-slots* :all)) (sb-c::%make-load-form foo))
-                'sb-fasl::fop-struct))
-    ;; specifying all slots is still canonical
-    (assert (eq (let ((*foo-save-slots* '(y x))) (sb-c::%make-load-form foo))
-                'sb-fasl::fop-struct))
+    (flet ((assert-canonical (slots)
+             (let ((*foo-save-slots* slots))
+               (assert (sb-fasl:load-form-is-default-mlfss-p foo)))))
+      (assert-canonical :all)
+      (assert-canonical '(x y)) ; specifying all slots explicitly is still canonical
+      (assert-canonical '(y x)))
     ;; specifying only one slot is not canonical
     (assert (equal (let ((*foo-save-slots* '(x))) (sb-c::%make-load-form foo))
                    '(sb-kernel::new-instance foo)))))
@@ -397,3 +398,8 @@
 ;; This tests the edge case: that we DO call slot-makunbound.
 (with-test (:name :mlfss-slot-makunbound)
   (assert (not (slot-boundp *fool1* 'a-slot))))
+
+(defun try-literal-layout () #.(sb-kernel:find-layout 'class-with-shared-slot))
+(with-test (:name :dump-std-obj-literal-layout)
+  (assert (eq (try-literal-layout)
+              (sb-kernel:find-layout 'class-with-shared-slot))))

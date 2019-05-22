@@ -5238,19 +5238,19 @@
     ;; a vop by its name in a place that would otherwise be agnostic of the
     ;; backend were it not for my inability to test all platforms.
     (assert (< (approx-lines-of-assembly-code
-                '(simple-array * (*))) 25))
+                '(simple-array * (*))) (+ 25 #+sb-safepoint 1)))
     ;; this tested all possible widetags one at a time, e.g. in VECTOR-SAP
     (assert (< (approx-lines-of-assembly-code
-                '(sb-kernel:simple-unboxed-array (*))) 25))
+                '(sb-kernel:simple-unboxed-array (*))) (+ 25 #+sb-safepoint 1)))
     ;; This is actually a strange type but it's what ANSI-STREAM-READ-N-BYTES
     ;; declares as its buffer, which would choke in %BYTE-BLT if you gave it
     ;; (simple-array t (*)). But that's a different problem.
     (assert (< (approx-lines-of-assembly-code
-                '(or system-area-pointer (simple-array * (*)))) 29))
+                '(or system-area-pointer (simple-array * (*)))) (+ 29 #+sb-safepoint 1)))
     ;; And this was used by %BYTE-BLT which tested widetags one-at-a-time.
     (assert (< (approx-lines-of-assembly-code
                 '(or system-area-pointer (sb-kernel:simple-unboxed-array (*))))
-               29))))
+               (+ 29 #+sb-safepoint 1)))))
 
 (with-test (:name :local-argument-mismatch-error-string)
   (multiple-value-bind (fun failurep warnings)

@@ -82,7 +82,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 22
-    (inst add block cfp-tn (add-sub-immediate (* (tn-offset tn) n-word-bytes)))
+    (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     #.(assert (and (= unwind-block-uwp-slot 0)
                    (= unwind-block-cfp-slot 1)))
@@ -103,7 +103,7 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (interior-reg)) lip)
   (:generator 44
-    (inst add result cfp-tn (add-sub-immediate (* (tn-offset tn) n-word-bytes)))
+    (inst add result cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     #.(assert (and (= catch-block-uwp-slot 0)
                    (= catch-block-cfp-slot 1)))

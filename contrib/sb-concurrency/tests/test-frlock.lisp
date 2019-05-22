@@ -88,7 +88,7 @@
 #+sb-thread
 (deftest* (frlock.1)
     (handler-case
-        (sb-ext:with-timeout 10
+        (sb-ext:with-timeout 20
           (test-frlocks #+win32 :outer-write-pause #+win32 t ))
       (sb-ext:timeout (c)
         (error "~A" c)))

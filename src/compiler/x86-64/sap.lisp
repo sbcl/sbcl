@@ -30,7 +30,7 @@
   (:note "SAP to pointer coercion")
   (:node-var node)
   (:generator 20
-    (fixed-alloc res sap-widetag sap-size node)
+    (alloc-other res sap-widetag sap-size node)
     (storew sap res sap-pointer-slot other-pointer-lowtag)))
 (define-move-vop move-from-sap :move
   (sap-reg) (descriptor-reg))
@@ -159,7 +159,7 @@
 
 (defun emit-sap-set (size sap ea-index ea-disp value result)
   #+linux
-  (when sb-c::*msan-unpoison*
+  (when (sb-c:msan-unpoison sb-c:*compilation*)
     (let ((offset (or ea-index ea-disp)))
       (unless (eql offset 0)
         (inst add sap offset))

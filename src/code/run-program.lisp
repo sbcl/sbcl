@@ -161,8 +161,6 @@
 (define-load-time-global *spawn-lock*
   (sb-thread:make-mutex :name "Around spawn()."))
 
-(defglobal *sigchld-delayed* nil)
-
 ;;; *ACTIVE-PROCESSES* can be accessed from multiple threads so a
 ;;; mutex is needed. More importantly the sigchld signal handler also
 ;;; accesses it, that's why we need without-interrupts.
@@ -358,16 +356,6 @@ status slot."
           (sb-win32::win32-error 'process-close))))
   process)
 
-(defun get-processes-status-changes-sigchld ()
-  (cond
-    ;; Avoid waiting on *active-processes-lock* as we may be
-    ;; interrupting a lock on which fork() is waiting.
-    ((sb-thread:with-recursive-lock (*spawn-lock* :wait-p nil)
-       (setf *sigchld-delayed* nil)
-       (get-processes-status-changes)))
-    (t
-     (setf *sigchld-delayed* t))))
-
 (defun get-processes-status-changes ()
   (let (changed)
     (with-active-processes-lock ()
@@ -499,22 +487,24 @@ status slot."
 #-win32
 (defun open-pty (pty cookie &key (external-format :default))
   (when pty
-    (multiple-value-bind
-          (master slave name)
-        (find-a-pty)
-      (push master *close-on-error*)
-      (push slave *close-in-parent*)
-      (when (streamp pty)
-        (multiple-value-bind (new-fd errno) (sb-unix:unix-dup master)
-          (unless new-fd
-            (error "couldn't SB-UNIX:UNIX-DUP ~W: ~A" master (strerror errno)))
-          (push new-fd *close-on-error*)
-          (copy-descriptor-to-stream new-fd pty cookie external-format)))
-      (values name
-              (make-fd-stream master :input t :output t
-                                     :external-format external-format
-                                     :element-type :default
-                                     :dual-channel-p t)))))
+    ;; ptsname is not thread-safe, ptsname_r is.
+    (with-active-processes-lock ()
+      (multiple-value-bind
+            (master slave name)
+          (find-a-pty)
+        (push master *close-on-error*)
+        (push slave *close-in-parent*)
+        (when (streamp pty)
+          (multiple-value-bind (new-fd errno) (sb-unix:unix-dup master)
+            (unless new-fd
+              (error "couldn't SB-UNIX:UNIX-DUP ~W: ~A" master (strerror errno)))
+            (push new-fd *close-on-error*)
+            (copy-descriptor-to-stream new-fd pty cookie external-format)))
+        (values name
+                (make-fd-stream master :input t :output t
+                                       :external-format external-format
+                                       :element-type :default
+                                       :dual-channel-p t))))))
 
 ;; Null terminate strings only C-side: otherwise we can run into
 ;; A-T-S-L even for simple encodings like ASCII.  Multibyte encodings
@@ -598,8 +588,14 @@ status slot."
   (search int)
   (envp (* c-string))
   (pty-name c-string)
-  (wait int)
+  (channel (array int 2))
   (dir c-string))
+
+#-win32
+(define-alien-routine wait-for-exec
+  int
+  (pid int)
+  (channel (array int 2)))
 
 #+win32
 (defun escape-arg (arg stream)
@@ -869,26 +865,30 @@ Users Manual for details about the PROCESS structure.
                  ;; death before we have installed the PROCESS
                  ;; structure in *ACTIVE-PROCESSES*.
                  (let (child #+win32 handle)
-                   (sb-thread:with-mutex (*spawn-lock*)
-                     ;; ptsname() is not thread safe, ptsname_r() is, but there's already a lock here
-                     (with-open-pty ((pty-name pty-stream) (pty cookie))
-                       (with-active-processes-lock ()
-                         (with-environment (environment-vec environment
-                                            :null (not (or environment environment-p)))
-                           (setf (values child #+win32 handle)
-                                 #+win32
+                   (with-environment (environment-vec environment
+                                      :null (not (or environment environment-p)))
+                     (with-alien (#-win32 (channel (array int 2)))
+                       (with-open-pty ((pty-name pty-stream) (pty cookie))
+                         (setf (values child #+win32 handle)
+                               #+win32
+                               (sb-thread::with-system-mutex (*spawn-lock*)
                                  (sb-win32::mswin-spawn
                                   progname
                                   args
                                   stdin stdout stderr
-                                  search environment-vec directory)
-                                 #-win32
-                                 (with-args (args-vec args)
+                                  search environment-vec directory))
+                               #-win32
+                               (with-args (args-vec args)
+                                 (sb-thread::with-system-mutex (*spawn-lock*)
                                    (spawn progname args-vec
                                           stdin stdout stderr
                                           (if search 1 0)
                                           environment-vec pty-name
-                                          (if wait 1 0) directory)))
+                                          channel
+                                          directory))))
+                         (unless (minusp child)
+                           #-win32
+                           (setf child (wait-for-exec child channel))
                            (unless (minusp child)
                              (setf proc
                                    (make-process
@@ -902,7 +902,13 @@ Users Manual for details about the PROCESS structure.
                                     :pid child
                                     #+win32 :copiers #+win32 *handlers-installed*
                                     #+win32 :handle #+win32 handle))
-                             (push proc *active-processes*))))))
+                             (with-active-processes-lock ()
+                               (push proc *active-processes*))
+                             ;; In case a sigchld signal was missed
+                             ;; when the process wasn't on
+                             ;; *active-processes*
+                             (unless wait
+                               (get-processes-status-changes)))))))
                    ;; Report the error outside the lock.
                    (case child
                      (-1
@@ -914,8 +920,6 @@ Users Manual for details about the PROCESS structure.
                      (-3
                       (error "Couldn't change directory to ~S: ~A"
                              directory (strerror)))))))))
-      (when *sigchld-delayed*
-        (get-processes-status-changes))
       (dolist (fd *close-in-parent*)
         (sb-unix:unix-close fd))
       (unless proc

@@ -57,6 +57,23 @@
     (inst ldrb result (@ object result))
     done))
 
+(define-vop (layout-depthoid)
+  (:translate layout-depthoid)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg)))
+  (:results (value :scs (any-reg)))
+  (:result-types fixnum)
+  (:generator 1
+   ;; I have not tested this for big-endian aarch but it looks right.
+   (inst ldrsw value
+         (@ object
+            (load-store-offset
+             (- (+ #+little-endian 4
+                   (ash (+ instance-slots-offset
+                           (get-dsd-index layout sb-kernel::%bits))
+                        word-shift))
+                instance-pointer-lowtag))))))
+
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)
   (:policy :fast-safe)

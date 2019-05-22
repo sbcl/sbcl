@@ -41,6 +41,21 @@
     (inst and result #xFF)
     DONE))
 
+(macrolet ((read-depthoid ()
+             `(make-ea :dword
+                       :disp (- (ash (+ instance-slots-offset
+                                         (get-dsd-index layout sb-kernel::depthoid))
+                                      word-shift)
+                                 instance-pointer-lowtag)
+                       :base layout)))
+  (define-vop (sb-c::layout-depthoid-gt)
+    (:translate sb-c::layout-depthoid-gt)
+    (:policy :fast-safe)
+    (:args (layout :scs (descriptor-reg)))
+    (:info k)
+    (:arg-types * (:constant (unsigned-byte 16)))
+    (:conditional :g)
+    (:generator 1 (inst cmp (read-depthoid) (fixnumize k)))))
 
 (define-vop (%other-pointer-widetag)
   (:translate %other-pointer-widetag)

@@ -23,8 +23,7 @@
 
 (deftype location-kind ()
   '(member :unknown-return :known-return :internal-error :non-local-exit
-           :block-start :call-site :single-value-return :non-local-entry
-           :step-before-vop))
+           :block-start :call-site :single-value-return :non-local-entry))
 
 ;;; The LOCATION-INFO structure holds the information what we need
 ;;; about locations which code generation decided were "interesting".
@@ -44,7 +43,6 @@
             (:copier nil))
   (label nil :type (or null label))
   (tn nil :type (or null tn) :read-only t))
-(!set-load-form-method restart-location (:xc :target) :ignore-it)
 
 ;;; This is called during code generation in places where there is an
 ;;; "interesting" location: someplace where we are likely to end up
@@ -137,6 +135,8 @@
 ;;; The PC for the location most recently dumped.
 (defvar *previous-location*)
 (declaim (type index *previous-location*))
+(defvar *previous-live*)
+(defvar *previous-form-number*)
 
 (defun encode-restart-location (location x)
   (typecase x
@@ -170,7 +170,6 @@
            (type (or label index) label)
            (type location-kind kind)
            (type hash-table var-locs) (type (or vop null) vop))
-
   (let* ((byte-buffer *byte-buffer*)
          (stepping (and (combination-p node)
                         (combination-step-info node)))
@@ -178,8 +177,12 @@
                     (compute-live-vars live node block var-locs vop)))
          (anything-alive (and live
                               (find 1 live)))
+         (equal-live (and anything-alive
+                          (equal live *previous-live*)))
+
          (path (node-source-path node))
-         (loc (if (fixnump label) label (label-position label))))
+         (loc (if (fixnump label) label (label-position label)))
+         (form-number (source-path-form-number path)))
     (vector-push-extend
      (logior
       (if context
@@ -188,22 +191,37 @@
       (if stepping
           compiled-code-location-stepping
           0)
-      (if anything-alive
-          compiled-code-location-live
-          0)
-      (if (zerop (source-path-form-number path))
+      (if (zerop form-number)
           compiled-code-location-zero-form-number
+          0)
+      (cond (equal-live
+             (cond ((eql form-number *previous-form-number*)
+                    ;; Repurpose this bit for equal-form-number since
+                    ;; -equal-live and -live don't need to appear at the
+                    ;; same time.
+                    (setf form-number 0)
+                    compiled-code-location-live)
+                   (t
+                    0)))
+            (anything-alive
+             compiled-code-location-live)
+            (t
+             0))
+      (if equal-live
+          compiled-code-location-equal-live
           0)
       (position-or-lose kind +compiled-code-location-kinds+))
      byte-buffer)
-
     (write-var-integer (- loc *previous-location*) byte-buffer)
     (setq *previous-location* loc)
 
-    (unless (zerop (source-path-form-number path))
-      (write-var-integer (source-path-form-number path) byte-buffer))
+    (unless (zerop form-number)
+      (setf *previous-form-number* form-number)
+      (write-var-integer form-number byte-buffer))
 
-    (when anything-alive
+    (when (and anything-alive
+               (not equal-live))
+      (setf *previous-live* live)
       (write-packed-bit-vector live byte-buffer))
     (when stepping
       (write-var-string stepping byte-buffer))
@@ -252,6 +270,8 @@
 (defun compute-debug-blocks (fun var-locs)
   (declare (type clambda fun) (type hash-table var-locs))
   (let ((*previous-location* 0)
+        *previous-live*
+        *previous-form-number*
         (physenv (lambda-physenv fun))
         (byte-buffer *byte-buffer*)
         prev-block
@@ -276,12 +296,8 @@
     (when elsewhere-locations
       (dolist (loc (nreverse elsewhere-locations))
         (dump-location-from-info loc var-locs)))
-    (let ((compressed
-           (lz-compress (coerce byte-buffer
-                                '(simple-array (unsigned-byte 8) (*))))))
-      (logically-readonlyize
-       (!make-specialized-array (length compressed) '(unsigned-byte 8)
-                                compressed)))))
+    ;; lz-compress accept any array of octets and returns a simple-array
+    (logically-readonlyize (lz-compress byte-buffer))))
 
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
@@ -350,16 +366,16 @@
       (if (zerop length)
           #()
           (logically-readonlyize
-           (!make-specialized-array length
-                                    (smallest-element-type (max max-positive
-                                                                (1- max-negative))
-                                                           (plusp max-negative))
-                                    seq))))))
+           (sb-xc:coerce seq
+                         `(simple-array
+                            ,(smallest-element-type (max max-positive
+                                                         (1- max-negative))
+                                                    (plusp max-negative))
+                            1)))))))
 
 (defun compact-vector (sequence)
   (cond ((and (= (length sequence) 1)
-              (not (typep (elt sequence 0) '(and vector
-                                             (not string)))))
+              (not (typep (elt sequence 0) '(and vector (not string)))))
          (elt sequence 0))
         (t
          (coerce-to-smallest-eltype sequence))))
@@ -646,6 +662,8 @@
              (cdf-encode-locs
               (label-position (ir2-physenv-environment-start 2env))
               (label-position (ir2-physenv-elsewhere-start 2env))
+              (source-path-form-number (node-source-path (lambda-bind fun)))
+              (label-position (block-label (lambda-block fun)))
               (when (ir2-physenv-closure-save-tn 2env)
                 (tn-sc+offset (ir2-physenv-closure-save-tn 2env)))
               #+unwind-to-frame-and-call-vop
@@ -680,8 +698,6 @@
                  (compute-vars fun level var-locs))
            (setf (compiled-debug-fun-arguments dfun)
                  (compute-args fun var-locs))))
-    (setf (compiled-debug-fun-form-number dfun)
-          (source-path-form-number (node-source-path (lambda-bind fun))))
     (when (>= level 1)
       (setf (compiled-debug-fun-blocks dfun)
             (compute-debug-blocks fun var-locs)))
@@ -699,20 +715,12 @@
 
 ;;;; full component dumping
 
-;;; Compute the full form (simple-vector) function map.
+;;; Compute the full form function map.
 (defun compute-debug-fun-map (sorted)
   (declare (list sorted))
-  (let* ((len (1- (* (length sorted) 2)))
-         (funs-vec (make-array len)))
-    (do ((i -1 (+ i 2))
-         (sorted sorted (cdr sorted)))
-        ((= i len))
-      (declare (fixnum i))
-      (let ((dfun (car sorted)))
-        (unless (minusp i)
-          (setf (svref funs-vec i) (car dfun)))
-        (setf (svref funs-vec (1+ i)) (cdr dfun))))
-    funs-vec))
+  (loop for (fun next) on sorted
+        do (setf (compiled-debug-fun-next fun) next))
+  (car sorted))
 
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.
@@ -735,10 +743,8 @@
         (if component-tlf-num
             (aver (= component-tlf-num tlf-num))
             (setf component-tlf-num tlf-num))
-        (push (cons (label-position (block-label (lambda-block lambda)))
-                    (compute-1-debug-fun lambda var-locs))
-              dfuns)))
-    (let* ((sorted (sort dfuns #'< :key #'car))
+        (push (compute-1-debug-fun lambda var-locs) dfuns)))
+    (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
        ;; COMPONENT-NAME is often not useful, and sometimes completely fubar.

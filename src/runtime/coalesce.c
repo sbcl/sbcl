@@ -184,7 +184,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                 nwords = code_header_words((struct code*)where);
                 break;
             default:
-                if (unboxed_obj_widetag_p(widetag))
+                if (leaf_obj_widetag_p(widetag))
                     continue; // Ignore this object.
             }
             for(i=1; i<nwords; ++i)

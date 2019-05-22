@@ -339,6 +339,7 @@
                 ,@(when use-lip '((:temporary (:scs (interior-reg)) lip)))
                 (:generator 5 ,@(emit-generator set-inst t))))))))
   (define-raw-slot-vops word ldr str unsigned-num unsigned-reg)
+  (define-raw-slot-vops signed-word ldr str signed-num signed-reg)
   (define-raw-slot-vops single flds fsts single-float single-reg
                         :use-lip t :move-macro move-single)
   (define-raw-slot-vops double fldd fstd double-float double-reg

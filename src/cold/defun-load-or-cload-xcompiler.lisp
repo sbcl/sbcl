@@ -94,14 +94,7 @@
   ;; So wipe everything out that causes problems down the line.
   ;; (Or perhaps we could make their effects idempotent)
   (format t "~&; Parallel build: Clearing globaldb~%")
-  (do-all-symbols (s)
-    (when (get s :sb-xc-globaldb-info)
-      (remf (symbol-plist s) :sb-xc-globaldb-info)))
-  (fill (symbol-value 'sb-impl::*info-types*) nil)
-  (clrhash (symbol-value 'sb-kernel::*forward-referenced-layouts*))
-  (setf (symbol-value 'sb-kernel:*type-system-initialized*) nil)
-  (makunbound 'sb-c::*backend-primitive-type-names*)
-  (makunbound 'sb-c::*backend-primitive-type-aliases*)
+  (funcall (intern "ANNIHILATE-GLOBALDB" "SB-C"))
 
   (format t "~&; Parallel build: Reloading compilation artifacts~%")
   ;; Now it works to load fasls.
@@ -154,7 +147,7 @@
          (unless (find :not-host flags)
            (funcall load-or-cload-stem stem flags)
            (when (member :sb-show sb-xc:*features*)
-             (warn-when-cl-snapshot-diff *cl-snapshot*))))))
+             (funcall 'warn-when-cl-snapshot-diff *cl-snapshot*))))))
 
   ;; If the cross-compilation host is SBCL itself, we can use the
   ;; PURIFY extension to freeze everything in place, reducing the

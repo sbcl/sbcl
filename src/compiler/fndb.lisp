@@ -99,6 +99,8 @@
   (or classoid null) ())
 (defknown classoid-of (t) classoid (flushable))
 (defknown layout-of (t) layout (flushable))
+#+64-bit (defknown layout-depthoid (layout) fixnum (flushable always-translatable))
+(defknown layout-depthoid-gt (layout integer) boolean (flushable))
 (defknown copy-structure (structure-object) structure-object
   (flushable)
   :derive-type #'result-type-first-arg)
@@ -762,7 +764,14 @@
 (defknown (%bit-position/0 %bit-position/1) (simple-bit-vector t index index)
   (or (mod #.(1- sb-xc:array-dimension-limit)) null)
   (foldable flushable))
+(defknown (%bit-pos-fwd/0 %bit-pos-fwd/1 %bit-pos-rev/0 %bit-pos-rev/1)
+  (simple-bit-vector index index)
+  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (foldable flushable))
 (defknown %bit-position (t simple-bit-vector t index index)
+  (or (mod #.(1- sb-xc:array-dimension-limit)) null)
+  (foldable flushable))
+(defknown (%bit-pos-fwd %bit-pos-rev) (t simple-bit-vector index index)
   (or (mod #.(1- sb-xc:array-dimension-limit)) null)
   (foldable flushable))
 
@@ -1053,8 +1062,8 @@
   (foldable flushable))
 (defknown hash-table-size (hash-table) index (flushable))
 (defknown hash-table-test (hash-table) symbol (foldable flushable))
-(defknown sxhash (t) hash (#-sb-xc-host foldable flushable))
-(defknown psxhash (t &optional t) hash (#-sb-xc-host foldable flushable))
+(defknown sxhash (t) hash (foldable flushable))
+(defknown psxhash (t &optional t) hash (foldable flushable))
 (defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
 
 ;;;; from the "Arrays" chapter

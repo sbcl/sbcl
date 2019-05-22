@@ -22,22 +22,9 @@
 (defvar *compiler-trace-output* nil)
 (defvar *compile-trace-targets* '(:ir1 :ir2 :vop :disassemble))
 
-;;; The current block compilation state. These are initialized to the
-;;; :BLOCK-COMPILE and :ENTRY-POINTS arguments that COMPILE-FILE was
-;;; called with.
-;;;
 ;;; *BLOCK-COMPILE-ARG* holds the original value of the :BLOCK-COMPILE
 ;;; argument, which overrides any internal declarations.
-(defvar *block-compile*)
 (defvar *block-compile-arg*)
-(declaim (type (member nil t :specified) *block-compile* *block-compile-arg*))
-(defvar *entry-points*)
-(declaim (list *entry-points*))
-
-;;; When block compiling, used by PROCESS-FORM to accumulate top level
-;;; lambdas resulting from compiling subforms. (In reverse order.)
-(defvar *toplevel-lambdas*)
-(declaim (list *toplevel-lambdas*))
 
 ;;; The current non-macroexpanded toplevel form as printed when
 ;;; *compile-print* is true.
@@ -87,14 +74,11 @@
 
 (deftype object () '(or fasl-output core-object null))
 (declaim (type object *compile-object*))
-(defvar *compile-toplevel-object* nil)
 
 (defvar *emit-cfasl* nil)
 
 (defvar *fopcompile-label-counter*)
 
-(defvar *compiler-coverage-metadata*)
-(declaim (type (or (cons hash-table hash-table) null) *compiler-coverage-metadata*))
 (declaim (inline code-coverage-records code-coverage-blocks))
 ;; Used during compilation to map code paths to the matching
 ;; instrumentation conses.
@@ -336,33 +320,11 @@ Examples:
       (terpri *error-output*)
       (force-output *error-output*))))
 
-;; Bidrectional map between IR1/IR2/assembler abstractions
-;; and a corresponding small integer identifier. One direction could be done
-;; by adding the integer ID as an object slot, but we want both directions.
-(defstruct (compiler-ir-obj-map (:conc-name objmap-)
-                                (:constructor make-compiler-ir-obj-map ())
-                                (:copier nil)
-                                (:predicate nil))
-  (obj-to-id   (make-hash-table :test 'eq) :read-only t)
-  (id-to-cont  (make-array 10) :type simple-vector) ; number -> CTRAN or LVAR
-  (id-to-tn    (make-array 10) :type simple-vector) ; number -> TN
-  (id-to-label (make-array 10) :type simple-vector) ; number -> LABEL
-  (cont-num    0 :type fixnum)
-  (tn-id       0 :type fixnum)
-  (label-id    0 :type fixnum))
-
-(declaim (type compiler-ir-obj-map *compiler-ir-obj-map*))
-(defvar *compiler-ir-obj-map*)
-
 ;;; Evaluate BODY, then return (VALUES BODY-VALUE WARNINGS-P
 ;;; FAILURE-P), where BODY-VALUE is the first value of the body, and
 ;;; WARNINGS-P and FAILURE-P are as in CL:COMPILE or CL:COMPILE-FILE.
 (defmacro with-compilation-values (&body body)
-  ;; This binding could just as well be in WITH-IR1-NAMESPACE, but
-  ;; since it's primarily a debugging tool, it's nicer to have
-  ;; a wider unique scope by ID.
-  `(let ((*compiler-ir-obj-map* (make-compiler-ir-obj-map))
-         (*finite-sbs*
+  `(let ((*finite-sbs*
           (vector
            ,@(loop for sb across *backend-sbs*
                    unless (eq (sb-kind sb) :non-packed)
@@ -372,18 +334,12 @@ Examples:
                        :conflicts (make-array ,size :initial-element #())
                        :always-live (make-array ,size :initial-element #*)
                        :live-tns (make-array ,size :initial-element nil)))))))
-     (unwind-protect
-         (let ((*warnings-p* nil)
-               (*failure-p* nil))
-           (handler-bind ((compiler-error #'compiler-error-handler)
-                          (style-warning #'compiler-style-warning-handler)
-                          (warning #'compiler-warning-handler))
-             (values (progn ,@body) *warnings-p* *failure-p*)))
-       (let ((map *compiler-ir-obj-map*))
-         (clrhash (objmap-obj-to-id map))
-         (fill (objmap-id-to-cont map) nil)
-         (fill (objmap-id-to-tn map) nil)
-         (fill (objmap-id-to-label map) nil)))))
+     (let ((*warnings-p* nil)
+           (*failure-p* nil))
+       (handler-bind ((compiler-error #'compiler-error-handler)
+                      (style-warning #'compiler-style-warning-handler)
+                      (warning #'compiler-warning-handler))
+         (values (progn ,@body) *warnings-p* *failure-p*)))))
 
 ;;; THING is a kind of thing about which we'd like to issue a warning,
 ;;; but showing at most one warning for a given set of <THING,FMT,ARGS>.
@@ -398,27 +354,34 @@ Examples:
 ;;; - once for compiling to fasl. *COMPILE-OBJECT* is a fasl.
 ;;; I'd have liked the data to be associated with the fasl, except that
 ;;; as indicated above, the second line hides some information.
-(defun style-warn-once (thing fmt &rest args)
+(defun style-warn-once (thing fmt-or-condition &rest args)
   (declare (notinline style-warn)) ; See COMPILER-STYLE-WARN for rationale
   (let* ((source-info *source-info*)
          (file-info (and (source-info-p source-info)
                          (source-info-file-info source-info)))
          (file-compiling-p (file-info-p file-info)))
-    (flet ((match-p (entry &aux (rest (cdr entry)))
-             ;; THING is compared by EQ, FMT by STRING=.
-             (and (eq (car entry) thing)
-                  (string= (car rest) fmt)
-                  ;; We don't want to walk into default values,
-                  ;; e.g. (&optional (b #<insane-struct))
-                  ;; because #<insane-struct> might be circular.
-                  (equal-but-no-car-recursion (cdr rest) args))))
+    (flet ((match-p (entry)
+             (destructuring-bind (entry-thing entry-fmt &rest entry-args) entry
+               ;; THING is compared by EQ, FMT by STRING=.
+               (and (eq entry-thing thing)
+                    (cond ((typep entry-fmt 'condition)
+                           (and (typep fmt-or-condition 'condition)
+                                (string= (princ-to-string entry-fmt)
+                                         (princ-to-string fmt-or-condition))))
+                          ((typep fmt-or-condition 'condition)
+                           nil)
+                          ((string= entry-fmt fmt-or-condition)))
+                    ;; We don't want to walk into default values,
+                    ;; e.g. (&optional (b #<insane-struct))
+                    ;; because #<insane-struct> might be circular.
+                    (equal-but-no-car-recursion entry-args args)))))
       (unless (and file-compiling-p
                    (find-if #'match-p
                             (file-info-style-warning-tracker file-info)))
         (when file-compiling-p
-          (push (list* thing fmt args)
+          (push (list* thing fmt-or-condition args)
                 (file-info-style-warning-tracker file-info)))
-        (apply 'style-warn fmt args)))))
+        (apply 'style-warn fmt-or-condition args)))))
 
 ;;;; component compilation
 
@@ -1114,9 +1077,9 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;;; processing of top level forms
 
 ;;; This is called by top level form processing when we are ready to
-;;; actually compile something. If *BLOCK-COMPILE* is T, then we still
-;;; convert the form, but delay compilation, pushing the result on
-;;; *TOPLEVEL-LAMBDAS* instead.
+;;; actually compile something. If (BLOCK-COMPILE *COMPILATION*) is T,
+;;; then we still convert the form, but delay compilation, pushing the result
+;;; on (TOPLEVEL-LAMBDAS *COMPILATION*) instead.
 (defun convert-and-maybe-compile (form path &optional (expand t))
   (declare (list path))
   #+sb-xc-host
@@ -1128,7 +1091,11 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
-      (if (fopcompilable-p form expand)
+      (if (and (policy *policy*
+                   ;; FOP-compiled code is harder do debug.
+                   (or (< debug 2)
+                       (> space debug)))
+               (fopcompilable-p form expand))
           (let ((*fopcompile-label-counter* 0))
             (fopcompile form path nil expand))
           (with-ir1-namespace
@@ -1137,8 +1104,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                              :handled-conditions *handled-conditions*
                              :disabled-package-locks *disabled-package-locks*))
                   (tll (ir1-toplevel form path nil)))
-              (if (eq *block-compile* t)
-                  (push tll *toplevel-lambdas*)
+              (if (eq (block-compile *compilation*) t)
+                  (push tll (toplevel-lambdas *compilation*))
                   (compile-toplevel (list tll) nil))
               nil))))))
 
@@ -1325,7 +1292,6 @@ necessary, since type inference may take arbitrarily long to converge.")
                       :policy *policy*
                       :handled-conditions *handled-conditions*
                       :disabled-package-locks *disabled-package-locks*))
-           (*compiler-sset-counter* 1)
            (fun (make-functional-from-toplevel-lambda lambda-expression
                                                       :name name
                                                       :path path)))
@@ -1373,7 +1339,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (compiler-mumble
                   #-sb-xc-host "~&; ~:[compiling~;converting~] ~S"
                   #+sb-xc-host "~&; ~:[x-compiling~;x-converting~] ~S"
-                  *block-compile* form)))
+                  (block-compile *compilation*) form)))
              form)
           ((and finalp
                 (eq :top-level-forms sb-xc:*compile-print*)
@@ -1396,8 +1362,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*compile-time-eval* t))
     (flet ((frob ()
              (eval-tlf `(progn ,@body) (source-path-tlf-number path) *lexenv*)
-             (when *compile-toplevel-object*
-               (let ((*compile-object* *compile-toplevel-object*))
+             (awhen (compile-toplevel-object *compilation*)
+               (let ((*compile-object* it))
                  (convert-and-maybe-compile `(progn ,@body) path)))))
       (if (null *macro-policy*)
           (frob)
@@ -1525,9 +1491,9 @@ necessary, since type inference may take arbitrarily long to converge.")
               (if (eq form 'sb-pcl:+slot-unbound+)
                   (dump-fop 'sb-fasl::fop-misc-trap fasl)
                   (dump-object (pop values) fasl)))
-            (dump-object (cons (length slot-names) slot-names) fasl)
+            (dump-object slot-names fasl)
             (dump-object instance fasl)
-            (dump-fop 'sb-fasl::fop-set-slot-values fasl)
+            (dump-fop 'sb-fasl::fop-set-slot-values fasl (length slot-names))
             (return-from compile-make-load-form-init-forms))))))
   (let ((lambda (compile-load-time-stuff `(progn ,@forms) nil)))
     (fasl-dump-toplevel-lambda-call lambda *compile-object*)))
@@ -1638,30 +1604,31 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;; Actually compile any stuff that has been queued up for block
 ;;; compilation.
 (defun finish-block-compilation ()
-  (when *block-compile*
+  (when (block-compile *compilation*)
     (when sb-xc:*compile-print*
       (compiler-mumble "~&; block compiling converted top level forms..."))
-    (when *toplevel-lambdas*
-      (compile-toplevel (nreverse *toplevel-lambdas*) nil)
-      (setq *toplevel-lambdas* ()))
-    (setq *block-compile* nil)
-    (setq *entry-points* nil)))
+    (when (toplevel-lambdas *compilation*)
+      (compile-toplevel (nreverse (toplevel-lambdas *compilation*)) nil)
+      (setf (toplevel-lambdas *compilation*) nil))
+    (setf (block-compile *compilation*) nil)))
 
 (declaim (ftype function handle-condition-p))
 (flet ((get-handled-conditions ()
-         (let ((ctxt *compiler-error-context*))
-           (lexenv-handled-conditions
-            (etypecase ctxt
-              (node (node-lexenv ctxt))
-              (lvar-annotation
-               (lvar-annotation-lexenv ctxt))
-             (compiler-error-context
-              (let ((lexenv (compiler-error-context-lexenv ctxt)))
-                (aver lexenv)
-                lexenv))
-             ;; Is this right? I would think that if lexenv is null
-             ;; we should look at *HANDLED-CONDITIONS*.
-             (null *lexenv*)))))
+         (if (boundp '*lexenv*)
+             (let ((ctxt *compiler-error-context*))
+               (lexenv-handled-conditions
+                (etypecase ctxt
+                  (node (node-lexenv ctxt))
+                  (lvar-annotation
+                   (lvar-annotation-lexenv ctxt))
+                  (compiler-error-context
+                   (let ((lexenv (compiler-error-context-lexenv ctxt)))
+                     (aver lexenv)
+                     lexenv))
+                  ;; Is this right? I would think that if lexenv is null
+                  ;; we should look at *HANDLED-CONDITIONS*.
+                  (null *lexenv*))))
+             *handled-conditions*))
        (handle-p (condition ctype)
          #+sb-xc-host (typep condition (type-specifier ctype))
          #-sb-xc-host (%%typep condition ctype)))
@@ -1696,11 +1663,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                          (lexenv-handled-conditions *lexenv*))))
       (and ctype (handle-p condition (car ctype))))))
 
-(defvar *fun-names-in-this-file* nil)
-
 ;;; Read all forms from INFO and compile them, with output to
 ;;; *COMPILE-OBJECT*. Return (VALUES ABORT-P WARNINGS-P FAILURE-P).
-(defun sub-compile-file (info)
+(defun sub-compile-file (info cfasl)
   (declare (type source-info info))
   (let ((*package* (sane-package))
         (*readtable* *readtable*)
@@ -1708,27 +1673,29 @@ necessary, since type inference may take arbitrarily long to converge.")
         (sb-xc:*compile-file-truename* nil) ; "
         (*policy* *policy*)
         (*macro-policy* *macro-policy*)
-        (*compiler-coverage-metadata* (cons (make-hash-table :test 'equal)
-                                            (make-hash-table :test 'equal)))
-        ;; Whether to emit msan unpoisoning code depends on the runtime
-        ;; value of the feature, not "#+msan", because we can use the target
-        ;; compiler to compile code for itself which isn't sanitized,
-        ;; *or* code for another image which is sanitized.
-        ;; And we can also cross-compile assuming msan.
-        (*msan-unpoison* (member :msan sb-xc:*features*))
+
+        (*compilation*
+         (make-compilation
+          :coverage-metadata (cons (make-hash-table :test 'equal)
+                                   (make-hash-table :test 'equal))
+          ;; Whether to emit msan unpoisoning code depends on the runtime
+          ;; value of the feature, not "#+msan", because we can use the target
+          ;; compiler to compile code for itself which isn't sanitized,
+          ;; *or* code for another image which is sanitized.
+          ;; And we can also cross-compile assuming msan.
+          :msan-unpoison (member :msan sb-xc:*features*)
+          :block-compile *block-compile-arg*
+          :compile-toplevel-object cfasl))
+
         (*handled-conditions* *handled-conditions*)
         (*disabled-package-locks* *disabled-package-locks*)
         (*lexenv* (make-null-lexenv))
-        (*block-compile* *block-compile-arg*)
-        (*toplevel-lambdas* ())
-        (*fun-names-in-this-file* ())
         (*allow-instrumenting* nil)
         (*compiler-error-bailout*
          (lambda (&optional error)
            (declare (ignore error))
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
-        (*compiler-sset-counter* 1)
         (sb-xc:*gensym-counter* 0))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
@@ -1746,7 +1713,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                       form `(original-source-start 0 ,current-index) nil))))
                 (let ((*source-info* info))
                   (process-queued-tlfs))
-                (let ((code-coverage-records (code-coverage-records *compiler-coverage-metadata*)))
+                (let ((code-coverage-records
+                       (code-coverage-records (coverage-metadata *compilation*))))
                   (unless (zerop (hash-table-count code-coverage-records))
                   ;; Dump the code coverage records into the fasl.
                    (with-source-paths
@@ -1940,10 +1908,9 @@ SPEED and COMPILATION-SPEED optimization values, and the
           (when sb-xc:*compile-verbose*
             (print-compile-start-note source-info))
 
-          (let ((*compile-object* fasl-output)
-                (*compile-toplevel-object* cfasl-output))
+          (let ((*compile-object* fasl-output))
             (setf (values abort-p warnings-p failure-p)
-                  (sub-compile-file source-info))))
+                  (sub-compile-file source-info cfasl-output))))
 
       (close-source-info source-info)
 
@@ -2081,12 +2048,10 @@ SPEED and COMPILATION-SPEED optimization values, and the
     (multiple-value-bind (creation-form init-form)
         (cond (namep (values `(symbol-global-value ',name) nil))
               (t (%make-load-form constant)))
-      (case creation-form
-        (sb-fasl::fop-struct
-         (fasl-validate-structure constant fasl)
+      (cond
+        ((eq init-form 'sb-fasl::fop-struct)
+         (fasl-note-dumpable-instance constant fasl)
          t)
-        (:ignore-it
-         nil)
         (t
          (let* ((name (write-to-string constant :level 1 :length 2))
                 (info (if init-form

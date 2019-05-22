@@ -14,7 +14,7 @@
 (defun maybe-add-notes (regno dstate)
   (let* ((inst (sap-ref-int (dstate-segment-sap dstate)
                             (dstate-cur-offs dstate)
-                n-word-bytes
+                4
                 (dstate-byte-order dstate)))
          (op (ldb (byte 6 26) inst)))
     (case op

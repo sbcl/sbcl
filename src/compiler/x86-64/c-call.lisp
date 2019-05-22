@@ -217,12 +217,6 @@
     (16 (sign-extend x size))
     (32 (sign-extend x size))))
 
-#+sb-xc-host
-(defun sign-extend (x size)
-  (if (logbitp (1- size) x)
-      (dpb x (byte size 0) -1)
-      x))
-
 (define-vop (foreign-symbol-sap)
   (:translate foreign-symbol-sap)
   (:policy :fast-safe)
@@ -309,7 +303,7 @@
     (inst lea rax (rip-relative-ea label))
     (emit-label label)
     (move pc-save rax))
-  (when sb-c::*msan-unpoison*
+  (when (sb-c:msan-unpoison sb-c:*compilation*)
     (inst mov rax (thread-slot-ea thread-msan-param-tls-slot))
     ;; Unpoison parameters
     (do ((n 0 (+ n n-word-bytes))

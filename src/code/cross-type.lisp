@@ -88,12 +88,11 @@
         (when (and (arrayp obj) (eq (array-type-complexp type) t))
           (bug "Should not call cross-typep with definitely-non-simple array type"))
         ;; This is essentially just the ARRAY-TYPE case of %%TYPEP
-        ;; using !SPECIALIZED-ARRAY-ELEMENT-TYPE, not ARRAY-ELEMENT-TYPE,
+        ;; using SB-XC:ARRAY-ELEMENT-TYPE, not CL:ARRAY-ELEMENT-TYPE,
         ;; and disregarding simple-ness.
         (values (and (arrayp obj)
                      (or (eq (array-type-element-type type) *wild-type*)
-                         (type= (specifier-type
-                                 (!specialized-array-element-type obj))
+                         (type= (specifier-type (sb-xc:array-element-type obj))
                                 (array-type-specialized-element-type type)))
                      (or (eq (array-type-dimensions type) '*)
                          (and (= (length (array-type-dimensions type))
@@ -124,18 +123,8 @@
             #+sb-simd-pack-256 simd-pack-256-type)
         (values nil t))
        (character-set-type
-        (cond ((not (characterp obj)) (values nil t)) ; certainly no
-              ;; Return yes if the type is:
-              ;;  - BASE-CHAR, and SB-XC:CHAR-CODE is within BASE-CHAR-CODE-LIMIT
-              ;;  - STANDARD-CHAR and the host says that the char is standard
-              ;;  - the full set of characters
-              ((or (and (type= type (specifier-type 'base-char))
-                        (< (sb-xc:char-code obj) base-char-code-limit))
-                   (and (type= type (specifier-type 'standard-char))
-                        (cl:standard-char-p obj))
-                   (type= type (specifier-type 'character)))
-               (values t t)) ; certainly yes
-              (t (uncertain))))
+        ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
+        (values (and (characterp obj) (character-in-charset-p obj type)) t))
        (negation-type
         (multiple-value-bind (res win) (recurse obj (negation-type-type type))
           (if win
@@ -293,7 +282,7 @@
      (ctype-of-number x))
     (array
      ;; It is critical not to inquire of the host for the array's element type.
-     (let ((etype (specifier-type (!specialized-array-element-type x))))
+     (let ((etype (specifier-type (sb-xc:array-element-type x))))
        (make-array-type (array-dimensions x)
                         ;; complexp relies on the host implementation,
                         ;; but in practice any array for which we need to
@@ -308,6 +297,7 @@
            (t
             ;; Beyond this, there seems to be no portable correspondence.
             (error "can't map host Lisp CHARACTER ~S to target Lisp" x))))
+    (sb-c::opaque-box (find-classoid 'structure-object))
     (instance (find-classoid (type-of x)))
     (t
      ;; There might be more cases which we could handle with

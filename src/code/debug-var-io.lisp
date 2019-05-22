@@ -136,6 +136,9 @@
                            :element-type '(unsigned-byte 8))))
     (flet ((pack (list &aux (prev 0))
              (dolist (x list)
+               ;; two fixups at the same location have to be wrong,
+               ;; and a delta of 0 would mark the end of the list.
+               (aver (> x prev))
                (write-var-integer (- x prev) bytes)
                (setq prev x))))
       (pack (setq abs-fixups (sort abs-fixups #'<)))
@@ -143,10 +146,9 @@
         (write-var-integer 0 bytes)
         (pack (setq rel-fixups (sort rel-fixups #'<)))))
     ;; Stuff octets into an integer
-    (let ((result (integer-from-octets bytes)))
-      (multiple-value-bind (abs rel) (unpack-code-fixup-locs result)
-        (aver (and (equal abs-fixups abs) (equal rel-fixups rel))))
-      result)))
+    ;; It would be quite possible in the target to do something clever here
+    ;; by creating a bignum directly from the ub8 vector.
+    (integer-from-octets bytes)))
 
 (defmacro do-packed-varints ((loc locs &optional (bytepos nil bytepos-sup-p))
                              &body body)
@@ -186,7 +188,7 @@
 ;;; A somewhat bad (slow and not-very-squishy) compressor
 ;;; that gets between 15% and 20% space savings in debug blocks.
 ;;; Lengthy input may be compressible by as much as 3:1.
-(declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+(declaim (ftype (sfunction ((array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
                 lz-compress))
 (defun lz-compress (input)
   (let ((output (make-array (length input)
@@ -240,13 +242,15 @@
                        (vector-push-extend 0 output)))))))))
     (let ((result
            #+sb-xc-host
-           (coerce output '(simple-array (unsigned-byte 8) (*)))
+           (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
            #-sb-xc-host
            (%shrink-vector (%array-data output) (fill-pointer output))))
       #+(or)
       (aver (equalp input (lz-decompress result)))
       result)))
 
+#-sb-xc-host
+(progn
 (declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
                 lz-decompress))
 (defun lz-decompress (input)
@@ -284,7 +288,4 @@
                            (copy offset 3))))
                     (t
                      (vector-push-extend byte output))))))
-    #+sb-xc-host
-    (coerce output '(simple-array (unsigned-byte 8) (*)))
-    #-sb-xc-host
-    (%shrink-vector (%array-data output) (fill-pointer output))))
+    (%shrink-vector (%array-data output) (fill-pointer output)))))

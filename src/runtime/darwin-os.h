@@ -38,8 +38,8 @@ void darwin_init(void);
 
 #ifdef LISP_FEATURE_SB_THREAD
 #define CANNOT_USE_POSIX_SEM_T
-#include <mach/semaphore.h>
-typedef semaphore_t os_sem_t;
+#include <dispatch/dispatch.h>
+typedef dispatch_semaphore_t os_sem_t;
 #endif
 
 #endif /* _DARWIN_OS_H */

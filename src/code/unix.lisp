@@ -387,16 +387,16 @@ corresponds to NAME, or NIL if there is none."
   ;;
   ;; Signal an error at compile-time, since it's needed for the
   ;; runtime to start up
-  #-(or android linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
+  #-(or android linux openbsd freebsd netbsd sunos darwin hpux dragonfly)
   #.(error "POSIX-GETCWD is not implemented.")
   (or
-   #+(or linux openbsd freebsd netbsd sunos darwin hpux win32 dragonfly)
+   #+(or linux openbsd freebsd netbsd sunos darwin hpux dragonfly)
    (newcharstar-string (alien-funcall (extern-alien "getcwd"
                                                     (function (* char)
                                                               (* char)
                                                               size-t))
                                       nil
-                                      #+(or linux openbsd freebsd netbsd darwin win32 dragonfly) 0
+                                      #+(or linux openbsd freebsd netbsd darwin dragonfly) 0
                                       #+(or sunos hpux) 1025))
    #+android
    (with-alien ((ptr (array char #.path-max)))
@@ -542,7 +542,7 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 ;;; This is like getrusage(2), except it returns only the system and
 ;;; user time, and returns the seconds and microseconds as separate
 ;;; values.
-#-sb-fluid (declaim (inline unix-fast-getrusage))
+#-win32 (declaim (inline unix-fast-getrusage))
 #-win32
 (defun unix-fast-getrusage (who)
   (declare (values (member t)

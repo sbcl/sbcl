@@ -20,8 +20,8 @@
   ;; by the cross-compiler. In reality this type isn't technically helpful to have,
   ;; because both its uses are in an LDB expression whose type is trivially derivable.
   ;; However I'm keeping it as a minimal example of a tricky cross-compilation issue.
-  (deftype bit-offset () `(integer 0 (,sb-vm:n-word-bits))))
-(deftype bit-offset () `(integer 0 (,sb-vm:n-word-bits)))
+  (deftype bit-offset () `(integer 0 (,n-word-bits))))
+(deftype bit-offset () `(integer 0 (,n-word-bits)))
 
 ;;;; support routines
 
@@ -49,14 +49,14 @@
 ;;; is a right-shift.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun shift-towards-start (number countoid)
-    (declare (type sb-vm:word number) (fixnum countoid))
-    (let ((count (ldb (byte (1- (integer-length sb-vm:n-word-bits)) 0) countoid)))
+    (declare (type word number) (fixnum countoid))
+    (let ((count (ldb (byte (1- (integer-length n-word-bits)) 0) countoid)))
       (declare (type bit-offset count))
       (if (zerop count)
           number
           (ecase sb-c:*backend-byte-order*
             (:big-endian
-               (ash (ldb (byte (- sb-vm:n-word-bits count) 0) number) count))
+               (ash (ldb (byte (- n-word-bits count) 0) number) count))
             (:little-endian
                (ash number (- count))))))))
 
@@ -65,8 +65,8 @@
 ;;; right-shift and on little-endian machines this is a left-shift.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun shift-towards-end (number count)
-    (declare (type sb-vm:word number) (fixnum count))
-    (let ((count (ldb (byte (1- (integer-length sb-vm:n-word-bits)) 0) count)))
+    (declare (type word number) (fixnum count))
+    (let ((count (ldb (byte (1- (integer-length n-word-bits)) 0) count)))
       (declare (type bit-offset count))
       (if (zerop count)
           number
@@ -74,7 +74,7 @@
             (:big-endian
                (ash number (- count)))
             (:little-endian
-               (ash (ldb (byte (- sb-vm:n-word-bits count) 0) number) count)))))))
+               (ash (ldb (byte (- n-word-bits count) 0) number) count)))))))
 
 #-sb-fluid (declaim (inline start-mask end-mask))
 
@@ -98,18 +98,16 @@
 (defun word-sap-ref (sap offset)
   (declare (type system-area-pointer sap)
            (type index offset)
-           (values sb-vm:word)
            (muffle-conditions compiler-note) ; "unsigned word to integer coercion"
            (optimize (speed 3) (safety 0)))
-  (sap-ref-word sap (the index (ash offset sb-vm:word-shift))))
+  (sap-ref-word sap (the index (ash offset word-shift))))
 (defun %set-word-sap-ref (sap offset value)
   (declare (type system-area-pointer sap)
            (type index offset)
-           (type sb-vm:word value)
-           (values sb-vm:word)
+           (type word value)
            (muffle-conditions compiler-note) ; "unsigned word to integer coercion"
            (optimize (speed 3) (safety 0)))
-  (setf (sap-ref-word sap (the index (ash offset sb-vm:word-shift)))
+  (setf (sap-ref-word sap (the index (ash offset word-shift)))
         value))
 
 
@@ -157,7 +155,7 @@
 
 ;;; We cheat a little bit by using TRULY-THE in the copying function to
 ;;; force the compiler to generate good code in the (= BITSIZE
-;;; SB-VM:N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
+;;; N-WORD-BITS) case.  We don't use TRULY-THE in the other cases
 ;;; to give the compiler freedom to generate better code.
 (defmacro !define-byte-bashers (bitsize)
   (let* ((bytes-per-word (/ n-word-bits bitsize))
@@ -584,7 +582,7 @@
 #.(loop for i = 1 then (* i 2)
         collect `(!define-sap-fixer ,i) into fixers
         collect `(!define-byte-bashers ,i) into bashers
-        until (= i sb-vm:n-word-bits)
+        until (= i n-word-bits)
         ;; FIXERS must come first so their inline expansions are available
         ;; for the bashers.
         finally (return `(progn ,@fixers ,@bashers)))
@@ -597,134 +595,163 @@
 ;;;; as much on them.)
 (defconstant +bit-position-base-mask+ (1- n-word-bits))
 (defconstant +bit-position-base-shift+ (integer-length +bit-position-base-mask+))
-(macrolet ((def (name frob)
-             `(defun ,name (vector from-end start end)
+(macrolet ((compute-start-mask (index)
+             `(let ((first-bits (logand ,index +bit-position-base-mask+)))
+                #+little-endian (ash -1 first-bits)
+                #+big-endian (lognot (ash -1 (- n-word-bits first-bits)))))
+           (compute-end-mask (index)
+             `(let ((last-bits (logand ,index +bit-position-base-mask+)))
+                #+little-endian (lognot (ash -1 last-bits))
+                #+big-endian (logand (ash -1 (- n-word-bits last-bits))
+                                     most-positive-word)))
+           (calc-index (bit-index)
+             `(logior (the index ,bit-index)
+                      (truly-the fixnum
+                                 (ash word-index +bit-position-base-shift+))))
+           (def (name from-end frob)
+             `(defun ,name (vector start end)
                 (declare (simple-bit-vector vector)
                          (index start end)
                          (optimize (speed 3) (safety 0)))
-                (unless (= start end)
-                  ;; We use the traditional approach of scanning:
-                  ;;  (1) some number of bits (<= n-word-bits) initially,
-                  ;;  (2) then a whole number of intervening words,
-                  ;;  (3) then some number of trailing bits.
-                  ;; We combine two of the three scans, depending on FROM-END.
-                  ;; If FROM-END is true, we do (3) as one step, then (1) and (2).
-                  ;; If FROM-END is false, we do (1) as one step, then (2) and (3).
-                  ;; So first we calculate FIRST-BITS and LAST-BITS as the number
-                  ;; of "boundary" bits on each end. These values will never
-                  ;; be exactly N-WORD-BITS, though logically they should allow that.
-                  ;; Instead the convention is slightly odd. It does exactly the
-                  ;; right thing for START-MASK: compute a bit mask having anywhere
-                  ;; between 1 and N-WORD-BITS (inclusive) consecutive 1s, starting
-                  ;; from the appropriate end. END-MASK is weird: instead of getting
-                  ;; all 1s in the limiting case, it gets all 0s, and a LAST-WORD
-                  ;; value that is 1 too high.  Perhaps somebody smarter than I could
-                  ;; do this "correctly" with FLOOR and CEILING, but this code
-                  ;; compiles very efficiently and I don't want to disturb it much.
-                  (let* ((last-word (ash end (- +bit-position-base-shift+)))
-                         (last-bits (logand end +bit-position-base-mask+))
-                         (first-word (ash start (- +bit-position-base-shift+)))
-                         (first-bits (logand start +bit-position-base-mask+))
-                         ;; These mask out everything but the interesting parts.
-                         (end-mask #+little-endian (lognot (ash -1 last-bits))
-                                   #+big-endian (ash -1 (- sb-vm:n-word-bits last-bits)))
-                         (start-mask #+little-endian (ash -1 first-bits)
-                                     #+big-endian (lognot (ash -1 (- sb-vm:n-word-bits first-bits)))))
-                    (declare (index last-word first-word))
-                    (flet ((#+little-endian start-bit
-                            #+big-endian end-bit (x)
-                             (declare (word x))
-                             #+(or x86-64 x86)
-                             (truly-the (mod #.n-word-bits)
-                                 (%primitive unsigned-word-find-first-bit x))
-                             #-(or x86-64 x86)
-                             (- #+big-endian sb-vm:n-word-bits
-                                (integer-length (logand x (- x)))
-                                #+little-endian 1))
-                           (#+little-endian end-bit
-                            #+big-endian start-bit (x)
-                             (declare (word x))
-                             (- #+big-endian sb-vm:n-word-bits
-                                (integer-length x)
-                                #+little-endian 1))
-                           (found (i word-offset)
-                             (declare (index i word-offset))
-                             (return-from ,name
-                               (logior i (truly-the
-                                          fixnum
-                                          (ash word-offset +bit-position-base-shift+)))))
-                           (get-word (offset)
-                             (,@frob (%vector-raw-bits vector offset))))
-                      ;; Inline FOUND makes the code smaller, as well as faster,
-                      ;; because it becomes clear that there is no establishing
-                      ;; of an exit point and hence no call to UNWIND.
-                      (declare (inline start-bit end-bit found get-word))
-                      (if from-end
-                          ;; Back to front
-                          ;; When the upper bound aligns exactly to a word, END-MASK
-                          ;; is 0, and LAST-WORD is 1 higher than the number of words
-                          ;; to scan. Reading it could overrun the vector's bound,
-                          ;; so detect and avoid that case.
-                          ;; This is actually simpler and clearer than adjusting
-                          ;; the loop indices, because the remainder of the loop
-                          ;; is right in the backwards scan, and the termination
-                          ;; condition is always FIRST-WORD inclusive.
-                          (let* ((word-offset last-word)
-                                 (word (if (eql end-mask 0)
-                                           0
-                                           (logand end-mask (get-word word-offset)))))
-                            (declare (word word)
-                                     (index word-offset))
-                            (unless (zerop word)
-                              (when (= word-offset first-word)
-                                (setf word (logand word start-mask)))
+                ;; The END parameter is an exclusive limit as is customary.
+                ;; It's somewhat subjective whether the algorithm below
+                ;; would become simpler by subtracting 1 from END initially.
+                (let* ((first-word (ash start (- +bit-position-base-shift+)))
+                       (last-word (ash end (- +bit-position-base-shift+)))
+                       ;; These mask out everything but the interesting parts.
+                       (start-mask (compute-start-mask start))
+                       (end-mask (compute-end-mask end)))
+                  (declare (index last-word first-word))
+                  (flet ((#+little-endian start-bit #+big-endian end-bit (x)
+                          (declare (word x))
+                          #+(or x86-64 x86)
+                          (truly-the (mod #.n-word-bits)
+                                     (%primitive unsigned-word-find-first-bit x))
+                          #-(or x86-64 x86)
+                          (- #+big-endian n-word-bits
+                             (integer-length (logand x (- x)))
+                             #+little-endian 1))
+                         (#+little-endian end-bit #+big-endian start-bit (x)
+                          (declare (word x))
+                          (- #+big-endian n-word-bits
+                             (integer-length x)
+                             #+little-endian 1))
+                         (get-word (offset)
+                           (,@frob (%vector-raw-bits vector offset))))
+                    (declare (inline start-bit end-bit get-word))
+
+                    (unless (< first-word last-word)
+                      ;; Both masks pertain to a single word. This also catches
+                      ;; START = END. In that case the masks have no bits in common.
+                      (return-from ,name
+                        (let ((mask (logand start-mask end-mask)))
+                          (unless (zerop mask)
+                            (let ((word (logand mask (get-word first-word))))
                               (unless (zerop word)
-                                (found (end-bit word) word-offset)))
-                            (decf word-offset)
-                            (loop
-                              (when (< word-offset first-word)
-                                (return-from ,name nil))
-                              (setf word (get-word word-offset))
-                              (unless (zerop word)
-                                (when (= word-offset first-word)
-                                  (setf word (logand word start-mask)))
+                                (let ((word-index first-word)) ; for the macro to see
+                                  ,(if from-end
+                                       `(calc-index (end-bit word))
+                                       `(calc-index (start-bit word))))))))))
+
+                    ;; Since the start and end words differ, there is no word
+                    ;; to which both masks pertain.
+                    ;; We use a fairly traditional algorithm:
+                    ;;  (1) scan some number (0 <= N <= n-word-bits) of bits initially,
+                    ;;  (2) then a whole number of intervening words,
+                    ;;  (3) then some number (0 < N < n-word-bits) of trailing bits
+                    ;; Steps (1) and (3) use the START and END masks respectively.
+                    ;; The START mask has between 1 and N-WORD-BITS (inclusive) consecutive
+                    ;; 1s, starting from the appropriate end.
+                    ;; END-MASK instead of getting all 1s in the limiting case,
+                    ;; gets all 0s, and a LAST-WORD value that is 1 too high
+                    ;; which is semantically correct - it is an "inclusive" limit
+                    ;; of a word in which no bits should be examined.
+                    ;; When that occurs, we avoid reading the final word
+                    ;; to avoid a buffer overrun bug.
+                    ,(if from-end
+
+                         ;; Reverse scan:
+                         `(let ((word-index last-word)) ; trailing chunk
+                            (declare (index word-index))
+                            (unless (zerop end-mask)
+                              ;; If no bits are set, then this is off the end of the subsequence.
+                              ;; Do not read the word at all.
+                              (let ((word (logand end-mask (get-word word-index))))
                                 (unless (zerop word)
-                                  (found (end-bit word) word-offset)))
-                              (decf word-offset)))
-                          ;; Front to back
-                          (let* ((word-offset first-word)
-                                 (word (logand start-mask (get-word word-offset))))
-                            (declare (word word)
-                                     (index word-offset))
+                                  (return-from ,name (calc-index (end-bit word))))))
+                            (decf word-index)
+                            ;; middle chunks
+                            (loop while (> word-index first-word) ; might execute 0 times
+                                  do (let ((word (get-word word-index)))
+                                       (unless (zerop word)
+                                         (return-from ,name (calc-index (end-bit word)))))
+                                     (decf word-index))
+                            ;; leading chunk - always executed
+                            (let ((word (logand start-mask (get-word first-word))))
+                              (unless (zerop word)
+                                (calc-index (end-bit word)))))
+
+                         ;; Forward scan:
+                         `(let* ((word-index first-word)
+                                 (word (logand start-mask (get-word word-index))))
+                            (declare (index word-index))
                             (unless (zerop word)
-                              (when (= word-offset last-word)
-                                (setf word (logand word end-mask)))
-                              (unless (zerop word)
-                                (found (start-bit word) word-offset)))
-                            (incf word-offset)
-                            ;; Boundary condition: if END-MASK is zero, then LAST-WORD
-                            ;; is an exclusive bound on word index to read. Otherwise,
-                            ;; when nonzero, LAST-WORD is the *inclusive* bound.
-                            ;; The loop works correctly with this assignment to END-MASK,
-                            ;; and it doesn't upset the compiler in the least -
-                            ;; it still uses unboxed reads and compares throughout.
-                            (when (eql end-mask 0)
-                              (setq end-mask sb-ext:most-positive-word)
-                              (decf last-word)) ; make it an inclusive bound
-                            (loop
-                              (when (> word-offset last-word)
-                                (return-from ,name nil))
-                              (setf word (get-word word-offset))
-                              (unless (zerop word)
-                                (when (= word-offset last-word)
-                                  (setf word (logand word end-mask)))
+                              (return-from ,name (calc-index (start-bit word))))
+                            (incf word-index)
+                            ;; Scan full words up to but excluding LAST-WORD
+                            (loop while (< word-index last-word) ; might execute 0 times
+                                  do (let ((word (get-word word-index)))
+                                       (unless (zerop word)
+                                         (return-from ,name (calc-index (start-bit word)))))
+                                     (incf word-index))
+                            ;; Scan last word unless no bits in mask
+                            (unless (zerop end-mask)
+                              (let ((word (logand end-mask (get-word word-index))))
                                 (unless (zerop word)
-                                  (found (start-bit word) word-offset)))
-                              (incf word-offset))))))))))
-  (def %bit-position/0 (logandc2 #.(1- (expt 2 n-word-bits))))
-  (def %bit-position/1 (identity)))
+                                  (calc-index (start-bit word))))))))))))
+
+  (defun run-bit-position-assertions ()
+    ;; Check the claim in the comment at "(unless (< first-word last-word)"
+    (loop for i from 0 to (* 2 n-word-bits)
+          do (let ((start-mask (compute-start-mask i))
+                   (end-mask (compute-end-mask i)))
+               (assert (= (logand start-mask end-mask) 0)))))
+
+  (def %bit-pos-fwd/1 nil (identity))
+  (def %bit-pos-rev/1   t (identity))
+  (def %bit-pos-fwd/0 nil (logandc2 most-positive-word))
+  (def %bit-pos-rev/0   t (logandc2 most-positive-word)))
+
+;; Known direction, unknown item to find
+(defun %bit-pos-fwd (bit vector start end)
+  (case bit
+    (0 (%bit-pos-fwd/0 vector start end))
+    (1 (%bit-pos-fwd/1 vector start end))
+    (otherwise nil)))
+(defun %bit-pos-rev (bit vector start end)
+  (case bit
+    (0 (%bit-pos-rev/0 vector start end))
+    (1 (%bit-pos-rev/1 vector start end))
+    (otherwise nil)))
+
+;; Known item to find, unknown direction
+(declaim (maybe-inline %bit-position/0 %bit-position/1))
+(defun %bit-position/0 (vector from-end start end)
+  (if from-end
+      (%bit-pos-rev/0 vector start end)
+      (%bit-pos-fwd/0 vector start end)))
+(defun %bit-position/1 (vector from-end start end)
+  (if from-end
+      (%bit-pos-rev/1 vector start end)
+      (%bit-pos-fwd/1 vector start end)))
+
 (defun %bit-position (bit vector from-end start end)
+  (declare (inline %bit-position/0 %bit-position/1))
   (case bit
     (0 (%bit-position/0 vector from-end start end))
     (1 (%bit-position/1 vector from-end start end))
     (otherwise nil)))
+(clear-info :function :inlinep '%bit-position/0)
+(clear-info :function :inlinep '%bit-position/1)
+
+(run-bit-position-assertions)

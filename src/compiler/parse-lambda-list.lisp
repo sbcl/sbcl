@@ -275,9 +275,11 @@
 
       #-sb-xc-host ;; Supress &OPTIONAL + &KEY syle-warning on xc host
       (when (and (logtest (bits &key) seen) optional (not silent))
-        ;; FIXME: add a condition class for this
         (style-warn-once
-         list "&OPTIONAL and &KEY found in the same lambda list: ~S" list))
+         list
+         (make-condition '&optional-and-&key-in-lambda-list
+                         :format-control "&OPTIONAL and &KEY found in the same lambda list: ~S"
+                         :format-arguments (list list))))
 
       ;; For CONTEXT other than :VALUES-TYPE/:FUNCTION-TYPE we reject
       ;; illegal list elements. Type specifiers have arbitrary shapes,
@@ -1127,6 +1129,11 @@
                       (when whole `((,(car whole) ,ll-whole)))))
              ;; Drop &WHOLE and &ENVIRONMENT
              (new-ll (make-lambda-list llks nil req opt rest keys aux))
+             #-sb-xc-host
+             (*lexenv* (process-muffle-decls decls
+                                             (if (boundp '*lexenv*)
+                                                 *lexenv*
+                                                 (make-null-lexenv))))
              (parse (parse-ds-lambda-list new-ll))
              ((declared-lambda-list decls)
               (let ((ll

@@ -328,3 +328,6 @@
          (make-thing :x 1) (make-thing :x "hi"))
     (try '(car obj) '(1) '("hi"))
     (try '(cdr obj) '("hi" . 1) '("hi"))))
+
+(with-test (:name :huge-code :skipped-on (not :immobile-code))
+  (sb-vm::allocate-code-object :immobile 4 (* 2 1024 1024)))

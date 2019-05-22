@@ -186,7 +186,6 @@
   (define-call "sync" void never-fails)
   (define-call ("truncate" :options :largefile)
       int minusp (pathname filename) (length off-t))
-  #-win32
   (macrolet ((def-mk*temp (lisp-name c-name result-type errorp dirp values)
                (declare (ignore dirp))
                (if (sb-sys:find-foreign-symbol-address c-name)
@@ -478,9 +477,8 @@ not supported."
  (define-call "munmap" int minusp
    (start sb-sys:system-area-pointer) (length unsigned))
 
-#-win32
-(define-call "msync" int minusp
-  (addr sb-sys:system-area-pointer) (length unsigned) (flags int)))
+ (define-call "msync" int minusp
+   (addr sb-sys:system-area-pointer) (length unsigned) (flags int)))
 #+win32
 (progn
   ;; No attempt is made to offer a full mmap-like interface on Windows.

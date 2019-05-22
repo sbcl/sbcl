@@ -89,66 +89,68 @@
           (any-quotes nil)
           (last-regular-char nil)
           (index start))
-      (flet ((flush-pending-regulars ()
-               (when last-regular-char
-                 (pattern (if any-quotes
-                              (remove-escape-characters
-                               namestr last-regular-char
-                               index escape-char)
-                              (subseq namestr last-regular-char index)))
-                 (setf any-quotes nil)
-                 (setf last-regular-char nil))))
+      (labels ((regulars ()
+                 (if any-quotes
+                     (remove-escape-characters namestr last-regular-char
+                                               index escape-char)
+                     (subseq namestr last-regular-char index)))
+               (flush-pending-regulars ()
+                 (when last-regular-char
+                   (pattern (regulars))
+                   (setf any-quotes nil)
+                   (setf last-regular-char nil))))
         (loop
-          (when (>= index end)
-            (return))
-          (let ((char (schar namestr index)))
-            (cond (quoted
-                   (incf index)
-                   (setf quoted nil))
-                  ((char= char escape-char)
-                   (setf quoted t)
-                   (setf any-quotes t)
-                   (unless last-regular-char
-                     (setf last-regular-char index))
-                   (incf index))
-                  ((char= char #\?)
-                   (flush-pending-regulars)
-                   (pattern :single-char-wild)
-                   (incf index))
-                  ((char= char #\*)
-                   (flush-pending-regulars)
-                   (pattern :multi-char-wild)
-                   (incf index))
-                  ((char= char #\[)
-                   (flush-pending-regulars)
-                   (let ((close-bracket
+         (when (>= index end)
+           (return))
+         (let ((char (schar namestr index)))
+           (cond (quoted
+                  (incf index)
+                  (setf quoted nil))
+                 ((char= char escape-char)
+                  (setf quoted t)
+                  (setf any-quotes t)
+                  (unless last-regular-char
+                    (setf last-regular-char index))
+                  (incf index))
+                 ((char= char #\?)
+                  (flush-pending-regulars)
+                  (pattern :single-char-wild)
+                  (incf index))
+                 ((char= char #\*)
+                  (flush-pending-regulars)
+                  (pattern :multi-char-wild)
+                  (incf index))
+                 ((char= char #\[)
+                  (flush-pending-regulars)
+                  (let ((close-bracket
                           (position #\] namestr :start index :end end)))
-                     (unless close-bracket
-                       (error 'namestring-parse-error
-                              :complaint "#\\[ with no corresponding #\\]"
-                              :namestring namestr
-                              :offset index))
-                     (pattern (cons :character-set
-                                    (subseq namestr
-                                            (1+ index)
-                                            close-bracket)))
-                     (setf index (1+ close-bracket))))
-                  (t
-                   (unless last-regular-char
-                     (setf last-regular-char index))
-                   (incf index)))))
-        (flush-pending-regulars)))
-    (cond ((null (pattern))
-           "")
-          ((null (cdr (pattern)))
-           (let ((piece (first (pattern))))
-             (typecase piece
-               ((member :multi-char-wild) :wild)
-               (simple-string piece)
-               (t
-                (make-pattern (pattern))))))
-          (t
-           (make-pattern (pattern))))))
+                    (unless close-bracket
+                      (error 'namestring-parse-error
+                             :complaint "#\\[ with no corresponding #\\]"
+                             :namestring namestr
+                             :offset index))
+                    (pattern (cons :character-set
+                                   (subseq namestr
+                                           (1+ index)
+                                           close-bracket)))
+                    (setf index (1+ close-bracket))))
+                 (t
+                  (unless last-regular-char
+                    (setf last-regular-char index))
+                  (incf index)))))
+        (cond ((null (pattern))
+               (if last-regular-char
+                   (regulars)
+                   ""))
+              ((progn
+                 (flush-pending-regulars)
+                 (null (cdr (pattern))))
+               (let ((piece (first (pattern))))
+                 (if (eq piece :multi-char-wild)
+                     :wild
+                     (make-pattern (pattern)))))
+              (t
+               (make-pattern (pattern))))))))
 
 (declaim (ftype (sfunction ((or (eql :wild) simple-string pattern) character &key (:escape-dot t))
                            simple-string)

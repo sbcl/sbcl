@@ -67,7 +67,7 @@
 
 (defvar *!late-primitive-object-forms* nil)
 
-(defmacro !define-primitive-object
+(defmacro define-primitive-object
           ((name &key lowtag widetag alloc-trans (type t)
                       (size (symbolicate name "-SIZE")))
            &rest slot-specs)

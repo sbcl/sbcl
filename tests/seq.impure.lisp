@@ -464,8 +464,6 @@
         (declare (ignorable #'reset))
           ,@(cdr body))))))
 
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x) x)
 ;;; Accessor SUBSEQ
 (sequence-bounding-indices-test
  (format t "~&/Accessor SUBSEQ")

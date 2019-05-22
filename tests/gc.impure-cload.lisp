@@ -115,8 +115,7 @@
   (flet ((copy-layout (layout)
            ;; don't just COPY-STRUCTURE - that would place it in dynamic space
            (let ((new-layout
-                  (sb-kernel:make-layout
-                   :classoid (sb-kernel:layout-classoid layout))))
+                  (sb-kernel:make-layout (sb-kernel:layout-classoid layout))))
              (sb-kernel:%byte-blt
               (sb-sys:int-sap
                (- (sb-kernel:get-lisp-obj-address layout)

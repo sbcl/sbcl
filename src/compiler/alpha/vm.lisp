@@ -290,13 +290,6 @@
       (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
 
-;;; A predicate to see if a character can be used as an inline
-;;; constant (the immediate field in the instruction used is eight
-;;; bits wide, which is not the same as any defined subtype of
-;;; CHARACTER, as BASE-CHAR is seven bits wide).
-(defun inlinable-character-constant-p (char)
-  (and (characterp char)
-       (< (char-code char) #x100)))
 
 ;;;; function call parameters
 

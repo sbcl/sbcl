@@ -742,7 +742,7 @@ default-value-8
                     (inst beq step-done-label)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the UNIMP.
-                    (note-this-location vop :step-before-vop)
+                    (note-this-location vop :internal-error)
                     ;; Construct a trap code with the low bits from
                     ;; SINGLE-STEP-AROUND-TRAP and the high bits from
                     ;; the register number of CALLABLE-TN.
@@ -1242,7 +1242,7 @@ default-value-8
     (inst beq DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the UNIMP.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
     (inst unimp single-step-before-trap)

@@ -174,7 +174,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (fixed-alloc y double-float-widetag double-float-size node)
+     (alloc-other y double-float-widetag double-float-size node)
      (inst movsd (ea-for-df-desc y) x)))
 (define-move-vop move-from-double :move
   (double-reg) (descriptor-reg))
@@ -228,7 +228,7 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (fixed-alloc y complex-single-float-widetag complex-single-float-size node)
+     (alloc-other y complex-single-float-widetag complex-single-float-size node)
      (inst movlps (ea-for-csf-data-desc y) x)))
 (define-move-vop move-from-complex-single :move
   (complex-single-reg) (descriptor-reg))
@@ -239,7 +239,7 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (fixed-alloc y complex-double-float-widetag complex-double-float-size node)
+     (alloc-other y complex-double-float-widetag complex-double-float-size node)
      (inst movapd (ea-for-cdf-data-desc y) x)))
 (define-move-vop move-from-complex-double :move
   (complex-double-reg) (descriptor-reg))
@@ -285,7 +285,7 @@
                        (move y x))
                       (,stack-sc
                        (if (= (tn-offset fp) esp-offset)
-                           (let* ((offset (* (tn-offset y) n-word-bytes))
+                           (let* ((offset (tn-byte-offset y))
                                   (ea (ea offset fp)))
                              ,@(ecase format
                                       (:single '((inst movss ea x)))

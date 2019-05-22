@@ -3,7 +3,7 @@
 ;;; Set to T to always print summary, or :SLOW to print only if > 1 second.
 ;;; (Additionally the summary will be printed if the overhead exceeds
 ;;; 1 microsecond, so that I might figure out where it's occuring)
-(defvar *summarize-test-times* :slow-tests)
+(defvar *summarize-test-times* nil)
 
 (defun summarize-within-file-elapsed-times (file start-time)
   (let* ((actual-total (- (get-internal-real-time) start-time))
@@ -13,16 +13,16 @@
       (push (cons unaccounted-total "(overhead)") test-util:*elapsed-times*))
     (when (or (eq *summarize-test-times* t)
               (and (eq *summarize-test-times* :slow-tests)
-                   (> actual-total internal-time-units-per-second))
-              (> unaccounted-total 1))
+                   (> actual-total internal-time-units-per-second)))
       (format t "~2&Tests ordered by descending elapsed time:~%")
       (dolist (x (sort test-util:*elapsed-times* #'> :key #'car))
         (let ((*print-pretty* nil))
-          (format t "~6d ~a~%" (car x) (cdr x)))))
-    (format t "~6d TOTAL TIME (~a)~%" actual-total file)))
+          (format t "~6d ~a~%" (car x) (cdr x))))
+      (format t "~6d TOTAL TIME (~a)~%" actual-total file))))
 
 (defun clear-test-status ()
-  (with-open-file (stream "test-status.lisp-expr"
+  (with-open-file (stream #.(merge-pathnames "test-status.lisp-expr"
+                                             *load-pathname*)
                           :direction :output
                           :if-exists :supersede)
     (write-line "NIL" stream)))

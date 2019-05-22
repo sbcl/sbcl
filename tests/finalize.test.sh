@@ -43,7 +43,9 @@ echo //entering finalize.test.sh
     (with-open-file (f "finalize-test-passed" :direction :output)
       (write-line "OK" f))
     (with-open-file (f "finalize-test-failed" :direction :output)
-      (format f "OOPS: ~A~%" *count*)))
+      (format f "OOPS: ~A~%" *count*)
+      (sb-kernel:run-pending-finalizers)
+      (format f "After sb-kernel:run-pending-finalizers: ~A~%" *count*)))
 
 (sb-ext:quit)
 EOF
@@ -58,7 +60,7 @@ while true; do
         rm finalize-test-passed
         exit $EXIT_TEST_WIN
     elif [ -f finalize-test-failed ]; then
-        echo "Failed"
+        cat finalize-test-failed
         rm finalize-test-failed
         exit $EXIT_LOSE
     fi

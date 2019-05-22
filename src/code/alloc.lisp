@@ -61,8 +61,7 @@
 
 (define-alien-variable "varyobj_holes" long)
 (define-alien-variable "varyobj_page_touched_bits" (* (unsigned 32)))
-(define-alien-variable "varyobj_page_scan_start_offset" (* (unsigned 16)))
-(define-alien-variable "varyobj_page_gens" (* (unsigned 8)))
+(define-alien-variable "varyobj_pages" (* (unsigned 32)))
 (define-alien-routine "find_preceding_object" long (where long))
 
 ;;; Lazily created freelist, used only when unallocate is called:
@@ -82,10 +81,22 @@
 (defun varyobj-page-address (index)
   (+ varyobj-space-start (* index immobile-card-bytes)))
 
+(declaim (inline (setf varyobj-page-scan-start-offset)))
+(defun (setf varyobj-page-scan-start-offset) (newval index)
+  ;; NEWVAL is passed in as a byte count but we want to store it as doublewords
+  ;; so it needs right-shifting by 1+ word-shift. However because it is a field
+  ;; of a packed word, it needs left-shifting by 8. We can shift by the net amount
+  ;; provided that no zero bits would be right-shifted out.
+  (aver (zerop (logand newval lowtag-mask)))
+  (setf (deref varyobj-pages index)
+        (logior (ash newval (- 8 (1+ sb-vm:word-shift)))
+                (logand (deref varyobj-pages index) #xFF)))
+  newval)
+
 ;;; Convert a zero-based varyobj page index into a scan start address.
 (defun varyobj-page-scan-start (index)
   (- (+ varyobj-space-start (* (1+ index) immobile-card-bytes))
-     (* 2 n-word-bytes (deref varyobj-page-scan-start-offset index))))
+     (* 2 n-word-bytes (ash (deref varyobj-pages index) -8))))
 
 (declaim (inline hole-p))
 (defun hole-p (raw-address)
@@ -210,9 +221,9 @@
           (last-page (varyobj-page-index (1- hole-end))))
       (when (and (eql (varyobj-page-scan-start first-page) hole)
                  (< first-page last-page))
-        (setf (deref varyobj-page-scan-start-offset first-page) 0))
+        (setf (varyobj-page-scan-start-offset first-page) 0))
       (loop for page from (1+ first-page) below last-page
-            do (setf (deref varyobj-page-scan-start-offset page) 0))
+            do (setf (varyobj-page-scan-start-offset page) 0))
       ;; Only touch the offset for the last page if it pointed to this hole.
       ;; If the following object is a hole that is in the pending free list,
       ;; it's ok, but if it's a hole that is already in the freelist,
@@ -225,10 +236,10 @@
                                      ((freed-hole-p hole-end)
                                       (hole-end-address hole-end))
                                      (t hole-end))))
-          (setf (deref varyobj-page-scan-start-offset last-page)
+          (setf (varyobj-page-scan-start-offset last-page)
                 (if (< new-scan-start page-end)
                     ;; Compute new offset backwards relative to the page end.
-                    (/ (- page-end new-scan-start) (* 2 n-word-bytes))
+                    (- page-end new-scan-start)
                     0))))) ; Page becomes empty
 
     (unless *immobile-freelist*
@@ -317,16 +328,14 @@
             (index (varyobj-page-index addr))
             (obj-end (+ addr n-bytes)))
        ;; Mark the page as being used by a nursery object.
-       (setf (deref varyobj-page-gens index)
-             (logior (deref varyobj-page-gens index) 1))
+       (setf (deref varyobj-pages index) (logior (deref varyobj-pages index) 1))
        ;; On the object's first page, set the scan start only if addr
        ;; is lower than the current page-scan-start object.
        ;; Note that offsets are expressed in doublewords backwards from
        ;; page end, so that we can direct the scan start to any doubleword
-       ;; on the page or in the preceding 1MiB (approximately).
+       ;; on the page or in the preceding 256MiB (approximately).
        (when (< addr (varyobj-page-scan-start index))
-         (setf (deref varyobj-page-scan-start-offset index)
-               (ash (- page-end addr) (- (1+ word-shift)))))
+         (setf (varyobj-page-scan-start-offset index) (- page-end addr)))
        ;; On subsequent pages, always set the scan start, since there can not
        ;; be a lower-addressed object touching those pages.
        (loop
@@ -334,8 +343,7 @@
         (incf page-end immobile-card-bytes)
         (incf index)
         (when (>= page-start obj-end) (return))
-        (setf (deref varyobj-page-scan-start-offset index)
-              (ash (- page-end addr) (- (1+ word-shift))))))
+        (setf (varyobj-page-scan-start-offset index) (- page-end addr))))
      #+immobile-space-debug ; "address sanitizer"
      (awhen *in-use-bits* (mark-range it addr n-bytes t))
      (setf (sap-ref-word (int-sap addr) 0) word0
@@ -470,39 +478,39 @@
 (defun allocate-code-object (space boxed unboxed)
   (declare (ignorable space))
   (let* ((total-words
-          (the (unsigned-byte 22) ; Enforce limit on total words as well
-               (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
+           (the (unsigned-byte 22) ; Enforce limit on total words as well
+                (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
          (code
-          #+gencgc
-          (or #+immobile-code
-              (when (member space '(:immobile :auto))
-                ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
-                ;; Indicate that there are initially 2 boxed words, otherwise
-                ;; immobile space GC thinks this object is freeable.
-                (allocate-immobile-obj (ash total-words word-shift)
-                                       (logior (ash total-words code-header-size-shift)
-                                               code-header-widetag)
-                                       (ash 2 n-fixnum-tag-bits)
-                                       other-pointer-lowtag
-                                       (eq space :immobile)))
+           #+gencgc
+           (or #+immobile-code
+               (when (member space '(:immobile :auto))
+                 ;; We don't need to inhibit GC here - ALLOCATE-IMMOBILE-OBJ does it.
+                 ;; Indicate that there are initially 2 boxed words, otherwise
+                 ;; immobile space GC thinks this object is freeable.
+                 (allocate-immobile-obj (ash total-words word-shift)
+                                        (logior (ash total-words code-header-size-shift)
+                                                code-header-widetag)
+                                        (ash 2 n-fixnum-tag-bits)
+                                        other-pointer-lowtag
+                                        (eq space :immobile)))
               ;;; x86-64 has a vop which is nothing more than wrapping
-              ;; pseudo-atomic around a call to alloc_code_object() in the C runtime.
-              ;; The vop is defined in such a way that it can't be inserted into
-              ;; this fuction, but instead needs an out-of-line call to a helper function
-              ;; (because it clobbers all registers and doesn't indicate that)
-              #+(and x86-64 (not win32))
-              (alloc-dynamic-space-code total-words)
-              #-(and x86-64 (not win32))
-              (without-gcing
-               (%make-lisp-obj
-                (alien-funcall (extern-alien "alloc_code_object"
-                                             (function unsigned (unsigned 32)))
-                               total-words))))
-          #+cheneygc
-          (%primitive var-alloc total-words 'alloc-code
-                      ;; subtract 1 because var-alloc always adds 1 word
-                      ;; for the header, which is not right for code objects.
-                      -1 code-header-widetag other-pointer-lowtag)))
+               ;; pseudo-atomic around a call to alloc_code_object() in the C runtime.
+               ;; The vop is defined in such a way that it can't be inserted into
+               ;; this fuction, but instead needs an out-of-line call to a helper function
+               ;; (because it clobbers all registers and doesn't indicate that)
+               #+(and x86-64 (not win32))
+               (alloc-dynamic-space-code total-words)
+               #-(and x86-64 (not win32))
+               (without-gcing
+                 (%make-lisp-obj
+                  (alien-funcall (extern-alien "alloc_code_object"
+                                               (function unsigned (unsigned 32)))
+                                 total-words))))
+           #+cheneygc
+           (%primitive var-alloc total-words 'alloc-code
+                       ;; subtract 1 because var-alloc always adds 1 word
+                       ;; for the header, which is not right for code objects.
+                       -1 code-header-widetag other-pointer-lowtag)))
     ;; The 1st slot beyond the header stores the boxed header size in bytes
     ;; as an untagged number, which has the same representation as a tagged
     ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
@@ -515,6 +523,13 @@
     ;; if there are several threads allocating code.
     ;; TODO: this unnecessarily calls CODE-HEADER-SET if code cards use soft
     ;; marking. Maybe pin the object and use (SETF SAP-REF-WORD) instead.
+
+    ;; FIXME: Sort out 64-bit and cheneygc.
+    #+(and 64-bit cheneygc)
+    (setf (code-header-ref code 0)
+          (%make-lisp-obj
+           (logior (ash total-words 32)
+                   sb-vm:code-header-widetag)))
     (setf (code-header-ref code code-boxed-size-slot)
           (%make-lisp-obj
            (logior (ash boxed word-shift)

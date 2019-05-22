@@ -721,7 +721,7 @@ unless :NAMED is also specified.")))
            (proto-classoid
             (if (dd-class-p dd)
                 (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                       (layout (make-layout :classoid classoid :inherits inherits)))
+                       (layout (make-layout classoid :inherits inherits)))
                   (setf (layout-invalid layout) nil
                         (classoid-layout classoid) layout)
                   classoid))))
@@ -1492,8 +1492,8 @@ or they must be declared locally notinline at each call site.~@:>"
             (when (or (not old-layout) *type-system-initialized*)
               (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
                 (let ((depthoid (length inherits)))
-                  (make-layout :classoid classoid
-                               :%flags flags
+                  (make-layout classoid
+                               :flags flags
                                :inherits inherits
                                :depthoid depthoid
                                :depth2-ancestor (inherit 2)
@@ -2109,8 +2109,7 @@ or they must be declared locally notinline at each call site.~@:>"
 
 ;;; We require that MAKE-LOAD-FORM-SAVING-SLOTS produce deterministic output
 ;;; and that its output take a particular recognizable form so that it can
-;;; be optimized into a sequence of fasl ops. MAKE-LOAD-FORM no longer returns
-;;; a magic keyword except for the special case of :IGNORE-IT.
+;;; be optimized into a sequence of fasl ops.
 ;;; The cross-compiler depends critically on optimizing the resulting sexprs
 ;;; so that the host can load cold objects, which it could not do
 ;;; if constructed by machine code for the target.
@@ -2159,10 +2158,10 @@ or they must be declared locally notinline at each call site.~@:>"
                                   'sb-pcl:+slot-unbound+) into vals
                       finally (return `(sb-pcl::set-slots ,object ,names ,@vals)))))))
 
-;;; Call MAKE-LOAD-FORM inside a condition handler in case the method fails.
+;;; Call MAKE-LOAD-FORM inside a condition handler in case the method fails,
+;;; returning its two values on success.
 ;;; If the resulting CREATION-FORM and INIT-FORM are equivalent to those
-;;; returned from MAKE-LOAD-FORM-SAVING-SLOTS, return 'SB-FASL::FOP-STRUCT.
-;;; If the object can be ignored, return :IGNORE-IT and NIL.
+;;; returned from MAKE-LOAD-FORM-SAVING-SLOTS, return NIL and 'SB-FASL::FOP-STRUCT.
 (defun sb-c::%make-load-form (constant)
   (flet ((canonical-p (inits dsds object &aux reader)
            ;; Return T if (but not only-if) INITS came from M-L-F-S-S.
@@ -2188,8 +2187,7 @@ or they must be declared locally notinline at each call site.~@:>"
     (multiple-value-bind (creation-form init-form)
         (handler-case (sb-xc:make-load-form constant (make-null-lexenv))
           (error (condition) (sb-c:compiler-error condition)))
-      (cond ((eq creation-form :ignore-it) (values :ignore-it nil))
-            ((and (listp creation-form)
+      (cond ((and (listp creation-form)
                   (typep constant 'structure-object)
                   (typep creation-form
                          '(cons (eql new-instance) (cons symbol null)))
@@ -2198,7 +2196,7 @@ or they must be declared locally notinline at each call site.~@:>"
                   (canonical-p (cdr init-form)
                                (dd-slots (layout-info (%instance-layout constant)))
                                constant))
-             (values 'sb-fasl::fop-struct nil))
+             (values nil 'sb-fasl::fop-struct))
             (t
              (values creation-form init-form))))))
 

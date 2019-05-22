@@ -512,7 +512,7 @@
   (let ((temps (vop-parse-temps parse))
         (element-type '(unsigned-byte 16)))
     (when temps
-      (let ((results (!make-specialized-array (length temps) element-type))
+      (let ((results (sb-xc:make-array (length temps) :element-type element-type))
             (index 0))
         (dolist (temp temps)
           (declare (type operand-parse temp))
@@ -594,7 +594,7 @@
              ;; not correspond to the definition in
              ;; src/compiler/vop.lisp.
              (te-type '(unsigned-byte 16))
-             (ordering (!make-specialized-array (length sorted) oe-type)))
+             (ordering (sb-xc:make-array (length sorted) :element-type oe-type)))
         (let ((index 0))
           (dolist (ref sorted)
             (setf (aref ordering index) (cdr ref))
@@ -603,8 +603,7 @@
           :num-results ,num-results
           :ref-ordering ,ordering
           ,@(when (targets)
-              `(:targets ,(!make-specialized-array
-                           (length (targets)) te-type (targets)))))))))
+              `(:targets ,(sb-xc:coerce (targets) `(vector ,te-type)))))))))
 
 (defun make-emit-function-and-friends (parse)
   `(:temps ,(compute-temporaries-description parse)

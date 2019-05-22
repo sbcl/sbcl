@@ -793,7 +793,7 @@ static lispobj trans_bignum(lispobj object)
 
 /* Note: on the sparc we don't have to do anything special for fdefns, */
 /* 'cause the raw-addr has a function lowtag. */
-#if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM)
+#if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_RISCV)
 static sword_t
 scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 {
@@ -969,7 +969,7 @@ trans_weak_pointer(lispobj object)
         if (immobile_obj_gen_bits(native) == from_space) cell = broken; \
     }
 
-void scan_weak_pointers(void)
+void smash_weak_pointers(void)
 {
     struct weak_pointer *wp, *next_wp;
     for (wp = weak_pointer_chain; wp != WEAK_POINTER_CHAIN_END; wp = next_wp) {
@@ -1562,7 +1562,7 @@ lispobj *search_all_gc_spaces(void *pointer)
 /* Find the code object for the given pc, or return NULL on
    failure. */
 lispobj *
-component_ptr_from_pc(lispobj *pc)
+component_ptr_from_pc(char *pc)
 {
     lispobj *object = search_all_gc_spaces(pc);
 
@@ -1928,7 +1928,7 @@ scavenge_control_stack(struct thread *th)
                 gc_assert(n_words_scavenged == 1);
             }
         } else if (scavtab[header_widetag(object)] == scav_lose) {
-            lose("unboxed object in scavenge_control_stack: %p->%x, start=%p, end=%p",
+            lose("unboxed object in scavenge_control_stack: %p->%"OBJ_FMTX", start=%p, end=%p",
                  object_ptr, object, th->control_stack_start, access_control_stack_pointer(th));
         }
     }

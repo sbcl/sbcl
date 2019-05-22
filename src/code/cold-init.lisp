@@ -96,10 +96,7 @@
   ;; Printing of symbols requires that packages be filled in, because
   ;; OUTPUT-SYMBOL calls FIND-SYMBOL to determine accessibility.
   (show-and-call !package-cold-init)
-  ;; Fill in the printer's character attribute tables now.
-  ;; If Genesis could write constant arrays into a target core,
-  ;; that would be nice, and would tidy up some other things too.
-  (show-and-call !printer-cold-init)
+  (setq *print-pprint-dispatch* (sb-pretty::make-pprint-dispatch-table))
   ;; Because L-T-V forms have not executed, CHOOSE-SYMBOL-OUT-FUN doesn't work.
   (setf (symbol-function 'choose-symbol-out-fun)
         (lambda (&rest args) (declare (ignore args)) #'output-preserve-symbol))
@@ -125,6 +122,7 @@
   (show-and-call !type-class-cold-init)
   (show-and-call sb-kernel::!primordial-type-cold-init)
   (show-and-call !classes-cold-init)
+  (show-and-call !pred-cold-init)
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)
   (show-and-call !alien-type-cold-init)

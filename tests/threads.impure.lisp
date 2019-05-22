@@ -727,18 +727,12 @@
            (sleep 4))
       (mapc #'terminate-thread threads))))
 
-;; No interpreter stub
-(defun symbol-tls-index (symbol)
-  (sb-kernel:symbol-tls-index symbol))
-(compile 'symbol-tls-index)
-
 (with-test (:name :test-%thread-local-references)
-
   (let ((mysym (gensym))
         (fool1 (cons 1 2))
         (fool2 (cons 2 3)))
     (progv (list mysym) '(nil)
-      (let* ((i (sb-kernel:get-lisp-obj-address (symbol-tls-index mysym)))
+      (let* ((i (sb-kernel:symbol-tls-index mysym))
              (j (+ i sb-vm:n-word-bytes)))
         (assert (eql (sap-ref-word (sb-thread::current-thread-sap) j)
                      sb-vm:no-tls-value-marker-widetag))

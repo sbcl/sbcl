@@ -739,11 +739,11 @@ default-value-8
                     (descriptor-reg (move name name-pass))
                     (control-stack
                      (inst ldl name-pass
-                           (ash (tn-offset name) word-shift) cfp-tn)
+                           (tn-byte-offset name) cfp-tn)
                      (do-next-filler))
                     (constant
                      (inst ldl name-pass
-                           (- (ash (tn-offset name) word-shift)
+                           (- (tn-byte-offset name)
                               other-pointer-lowtag) code-tn)
                      (do-next-filler)))
                   (inst ldl entry-point
@@ -755,11 +755,11 @@ default-value-8
                     (descriptor-reg (move arg-fun lexenv))
                     (control-stack
                      (inst ldl lexenv
-                           (ash (tn-offset arg-fun) word-shift) cfp-tn)
+                           (tn-byte-offset arg-fun) cfp-tn)
                      (do-next-filler))
                     (constant
                      (inst ldl lexenv
-                           (- (ash (tn-offset arg-fun) word-shift)
+                           (- (tn-byte-offset arg-fun)
                               other-pointer-lowtag) code-tn)
                      (do-next-filler)))
                   #-gengc
@@ -1211,4 +1211,4 @@ default-value-8
   (:vop-var vop)
   (:generator 3
     ;; Stub! See the PPC backend for an example.
-    (note-this-location vop :step-before-vop)))
+    (note-this-location vop :internal-error)))

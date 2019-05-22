@@ -36,7 +36,7 @@
 ;;; Therefore a host-reflection-based mechanism would be almost certain to fail.
 
 ;;; In case anyone wants to rewrite this yet again, here's an alternate way
-;;; that was deemed unworkable: in cross-compilation, all specialized arrays
+;;; that was deemed elegant but difficult: in cross-compilation, all arrays
 ;;; were wrapped in an XC-ARRAY-WRAPPER struct consisting of one slot for
 ;;; the desired element-type and one slot with the real array.  All affected
 ;;; uses of AREF and (SETF AREF) had to be macroized so that the cross-compiler
@@ -52,31 +52,40 @@
 ;; Because this is not performance-critical, we can just punt to a function.
 ;; If no contents given, explicitly 0-fill in case element-type upgrades to T
 ;; and would get a default of NIL where we would use 0 in our specialization.
-(defun !make-specialized-array (dims element-type &optional (contents nil contentsp))
-  (register-specialized-array
-   (apply #'make-array dims
-          :element-type element-type
-          (if contentsp `(:initial-contents ,contents) `(:initial-element 0)))
-   element-type))
-(defun !coerce-to-specialized (data element-type)
-  (register-specialized-array (coerce data `(simple-array ,element-type 1))
-                              element-type))
-;; The specialized array registry has file-wide scope. Hacking that aspect
-;; into the xc build scaffold seemed preferable to hacking the compiler.
-(defun register-specialized-array (array element-type)
-  (setf (gethash array sb-cold::*array-to-specialization*) element-type)
-  array)
-(defun !specialized-array-element-type (array)
+(defun sb-xc:make-array (dims &key (element-type (missing-arg))
+                                   (initial-contents nil contentsp)
+                                   (initial-element 0))
+  ;; ECL fails to compile MAKE-ARRAY when keyword args are not literal keywords. e.g.:
+  ;; (DEFUN TRY (DIMS SELECT VAL)
+  ;;   (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)) ->
+  ;; "The macro form (MAKE-ARRAY DIMS (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) VAL)
+  ;;  was not expanded successfully.
+  ;;  Error detected:
+  ;;  The key (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) is not allowed"
+  #+host-quirks-ecl (declare (notinline cl:make-array))
+
+  ;; Expressed type must be _exactly_ one of the supported ones.
+  (assert (and element-type
+               (find (case element-type
+                       #-sb-unicode
+                       (base-char 'character)
+                       (t element-type))
+                     sb-vm:*specialized-array-element-type-properties*
+                     :key #'sb-vm::saetp-specifier :test 'equal)
+               (neq element-type 't)))
+  (let ((array (cl:make-array dims
+                              :element-type element-type
+                              (if contentsp :initial-contents :initial-element)
+                              (if contentsp initial-contents initial-element))))
+    (setf (gethash array sb-cold::*array-to-specialization*) element-type)
+    array))
+(defun sb-xc:array-element-type (array)
   (cond ((gethash array sb-cold::*array-to-specialization*))
         ((bit-vector-p array) 'bit)
         ((stringp array) 'base-char)
         (t t)))
 
-;; Just transform to make-array for normal target code.  This macro does not
-;; persist into the target as there is no use of it after cross-compilation.
-(setf (sb-xc:compiler-macro-function '!make-specialized-array)
-      (lambda (form env)
-        (declare (ignore env))
-        (destructuring-bind (length element-type &optional contents) (cdr form)
-          `(make-array ,length :element-type ,element-type
-                       ,@(if contents `(:initial-contents ,contents))))))
+(defun target-specialized-array-p (array)
+  (gethash array sb-cold::*array-to-specialization*))
+(deftype sb-xc:simple-vector ()
+  '(and cl:simple-vector (not (satisfies target-specialized-array-p))))

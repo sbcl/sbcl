@@ -8,7 +8,7 @@ set -e
 # since we don't assume the presence of either a C cross-compiler
 # or a host machine on which to run its native compiler.
 
-for arch in alpha arm arm64 hppa mips ppc ppc64 sparc x86 x86-64
+for arch in alpha arm arm64 hppa mips ppc ppc64 sparc x86 x86-64 riscv
 do
   echo TESTING $arch
   ltf=local-target-features.lisp-expr

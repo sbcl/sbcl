@@ -1014,7 +1014,7 @@
                                (fname (lvar-fun-name lvar t)))
                           (format *trace-output*
                                   "~&trying transform ~s for ~s"
-                                  (transform-function x) fname)))
+                                  (transform-type x) fname)))
                       (unless (ir1-transform node x)
                         (when (eq *show-transforms-p* :all)
                           (format *trace-output*
@@ -1656,6 +1656,39 @@
                   (reoptimize-lvar lvar)))))))
       (values))))
 
+;;; Turn (or (integer 1 1) (integer 3 3)) to (integer 1 3)
+(defun weaken-numeric-union-type (type)
+  (if (union-type-p type)
+      (let ((low  nil)
+            (high nil)
+            class
+            (format :no))
+        (dolist (part (union-type-types type)
+                      (make-numeric-type :class class
+                                         :format format
+                                         :low low
+                                         :high high))
+          (unless (and (numeric-type-real-p part)
+                       (if class
+                           (eql (numeric-type-class part) class)
+                           (setf class (numeric-type-class part)))
+                       (cond ((eq format :no)
+                              (setf format (numeric-type-format part))
+                              t)
+                             ((eql (numeric-type-format part) format))))
+            (return type))
+          (let ((this-low (numeric-type-low part))
+                (this-high (numeric-type-high part)))
+            (unless (and this-low this-high)
+              (return type))
+            (when (consp this-low)
+              (setf this-low (car this-low)))
+            (when (consp this-high)
+              (setf this-high (car this-high)))
+            (setf low  (min this-low  (or low  this-low))
+                  high (max this-high (or high this-high))))))
+      type))
+
 ;;; Iteration variable: exactly one SETQ of the form:
 ;;;
 ;;; (let ((var initial))
@@ -1683,7 +1716,8 @@
                              (eq (ref-leaf first) var))))
               :exit-if-null)
              (step-type (lvar-type (second +-args)))
-             (set-type (lvar-type (set-value set))))
+             (set-type (lvar-type (set-value set)))
+             (initial-type (weaken-numeric-union-type initial-type)))
     (when (and (numeric-type-p initial-type)
                (numeric-type-p step-type)
                (or (numeric-type-equal initial-type step-type)

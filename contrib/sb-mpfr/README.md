@@ -75,14 +75,14 @@ SB-MPFR:COERCE.
     CL-USER> (sb-mpfr:coerce 1/2 'sb-mpfr:mpfr-float)
     .50000000000000000e+0
 
-The second method uses the ready maco #M:
+The second method uses the reader macro #M:
 
-    CL-USER> #M"1.5"
+    CL-USER> #M1.5
     .15000000000000000e+1
     CL-USER> (setf *print-readably* t)
     T
-    CL-USER> #M"1.5"
-    #M"15000000000000000@-16"
+    CL-USER> #M1.5
+    #M15000000000000000@-16
 
 Exports and Functions
 ---------------------

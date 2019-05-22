@@ -41,7 +41,7 @@
     (write-string "#." stream)
     (output-part self stream))
 
-  (defmethod print-object ((self sb-xc::complexnum) stream)
+  (defmethod print-object ((self complexnum) stream)
     (write-string "#.(COMPLEX " stream)
     (output-part (complexnum-real self) stream)
     (write-char #\Space stream)
@@ -75,6 +75,17 @@
       ;;   of the LSB, but IEEE format has it to the left of the MSB.
       (values (cl:ldb (cl:byte (1- nbits) 0) significand)
               (+ exponent (1- nbits))))))
+
+#+host-quirks-sbcl
+(defun get-float-bits (x)
+  (etypecase x
+    (cl:double-float
+     ;; DOUBLE-FLOAT-BITS didn't exist as a thing until recently,
+     ;; and even then it only exists if the host is 64-bit.
+     (logior (ash (host-sb-kernel:double-float-high-bits x) 32)
+             (host-sb-kernel:double-float-low-bits x)))
+    (cl:single-float
+     (host-sb-kernel:single-float-bits x))))
 
 ;;; Convert host float X to target representation.
 ;;; TOTAL-BITS is the size in bits.
@@ -120,15 +131,9 @@
             ;; assuming the host doesn't have a counteracting bug.
             #+host-quirks-sbcl
             (let ((authoritative-answer
-                   (ecase total-bits
-                     (32
-                      (host-sb-kernel:single-float-bits (cl:coerce x 'cl:single-float)))
-                     (64
-                      ;; DOUBLE-FLOAT-BITS exists only for 64-bit builds,
-                      ;; so combine the separate high and low halves to test against.
-                      (let ((f (cl:coerce x 'cl:double-float)))
-                        (logior (ash (host-sb-kernel:double-float-high-bits f) 32)
-                                (host-sb-kernel:double-float-low-bits f)))))))
+                   (get-float-bits (ecase total-bits
+                                    (32 (cl:coerce x 'cl:single-float))
+                                    (64 (cl:coerce x 'cl:double-float))))))
               (unless (= answer authoritative-answer)
                 (error "discrepancy in float-bits ~s:~% ~v,'0b expect~% ~v,'0b got~%"
                        x
@@ -221,13 +226,13 @@
   (make-flonum :-infinity format))
 
 (defun float-ops-cache-insert (key values table)
+  ;; Verify results (when possible) prior to inserting into the hash-table.
+  ;; If we were to support different floating-point formats across the various
+  ;; backends, this check should confined to the scenarios where the host's
+  ;; precision is at least as much as the target's precision.
+  #+host-quirks-sbcl
   (let ((fun (car key))
         (args (cdr key)))
-    ;; Verify results (when possible) prior to inserting into the hash-table.
-    ;; If we were to support different floating-point formats across the various
-    ;; backends, this check should confined to the scenarios where the host's
-    ;; precision is at least as much as the target's precision.
-    #+host-quirks-sbcl
     (flet ((native-flonum-value (x &aux (bits (flonum-%bits x)))
              (ecase (flonum-format x)
                (single-float (host-sb-kernel:make-single-float bits))
@@ -241,12 +246,19 @@
                                 (rational x)
                                 (symbol (intern (string x) "CL"))))
                             (ensure-list args)))))
-        (assert (eql authoritative-answer
+        (unless (eql authoritative-answer
                      (if (floatp (first values))
                          (native-flonum-value (first values))
-                         (first values))))))
-    (setf (gethash key table)
-          (if (singleton-p values) (car values) values))))
+                         (first values)))
+          (#+sb-devel error
+           #-sb-devel format #-sb-devel t
+           "~&//CROSS-FLOAT DISCREPANCY!
+// CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
+                  key values
+                  (when (cl:floatp authoritative-answer)
+                    (get-float-bits authoritative-answer))
+                  authoritative-answer)))))
+  (setf (gethash key table) (if (singleton-p values) (car values) values)))
 
 (defun get-float-ops-cache (&aux (cache sb-cold::*math-ops-memoization*))
   (when (atom cache)
@@ -418,9 +430,19 @@
   ;; CL:FLOAT or something else in CL as the type, NUMBER would return NIL because host
   ;; floats do NOT satisfy "our" NUMBERP. But we want this to fail, not succeed.
   (validate-args object)
-  (when (or (not (numberp object))
-            (member type '(vector simple-vector simple-string simple-base-string list))
-            (typep type '(cons (eql simple-array))))
+  (when (or (arrayp object) (listp object))
+    (when (or (member type '(vector simple-vector simple-string simple-base-string list))
+              (equal type '(simple-array character (*))))
+      (return-from coerce (cl:coerce object type))) ; string or unspecialized array
+    (let ((et (ecase (car type)
+                (simple-array (destructuring-bind (et &optional dims) (cdr type)
+                                (assert (or (eql dims 1) (equal dims '(*))))
+                                et))
+                (vector (destructuring-bind (et) (cdr type) et)))))
+      (return-from coerce
+        (sb-xc:make-array (length object) :element-type et
+                          :initial-contents object))))
+  (unless (numberp object)
     (return-from coerce (cl:coerce object type)))
   (when (member type '(integer rational real))
     ;; This branch won't accept (coerce x 'real) if X is one of our
@@ -555,11 +577,22 @@
         ((double-float-p x) $0d0)
         (t (complexnum-imag x))))
 
+(defun sb-vm::sign-extend (x size)
+  (if (logbitp (1- size) x) (cl:dpb x (cl:byte size 0) -1) x))
+
 (defun make-single-float (bits)
+  (declare (type (signed-byte 32) bits))
   (make-flonum bits 'single-float))
 
 (defun make-double-float (hi lo)
- (make-flonum (logior (ash hi 32) lo) 'double-float))
+  (declare (type (signed-byte 32) hi)
+           (type (unsigned-byte 32) lo))
+  (make-flonum (logior (ash hi 32) lo) 'double-float))
+
+;;; This is the preferred constructor for 64-bit machines
+(defun %make-double-float (bits)
+  (declare (type (signed-byte 64) bits))
+  (make-flonum bits 'double-float))
 
 (defun float-infinity-p (x)
   (member (flonum-%value x) '(:-infinity :+infinity)))

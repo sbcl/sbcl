@@ -676,7 +676,7 @@
 
 (defun walk-binding-stack (symbol function)
   (let* (#+sb-thread
-         (tls-index (get-lisp-obj-address (symbol-tls-index symbol)))
+         (tls-index (symbol-tls-index symbol))
          (current-value
            #+sb-thread
            (sap-ref-lispobj (sb-thread::current-thread-sap) tls-index)
@@ -1155,37 +1155,31 @@ register."
 ;;;; frame utilities
 
 (defun compiled-debug-fun-from-pc (debug-info pc &optional escaped)
-  (let* ((fun-map (sb-c::compiled-debug-info-fun-map debug-info))
-         (len (length fun-map)))
-    (declare (type simple-vector fun-map))
-    (if (= len 1)
-        (svref fun-map 0)
-        (let* ((i 1)
-               (first-elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc
-                                    (svref fun-map 0)))
+  (let* ((fun-map (sb-c::compiled-debug-info-fun-map debug-info)))
+    (if (sb-c::compiled-debug-fun-next fun-map)
+        (let* ((first-elsewhere-pc (sb-c::compiled-debug-fun-elsewhere-pc fun-map))
                (elsewhere-p
                  (if escaped ;; See the comment below
                      (>= pc first-elsewhere-pc)
                      (> pc first-elsewhere-pc))))
-          (declare (type index i))
-          (loop
-           (when (or (= i len)
-                     (let ((next-pc (if elsewhere-p
-                                        (sb-c::compiled-debug-fun-elsewhere-pc
-                                         (svref fun-map (1+ i)))
-                                        (svref fun-map i))))
-                       (if escaped
-                           (< pc next-pc)
-                           ;; Non-escaped frame means that this frame calls something.
-                           ;; And the PC points to where something should return.
-                           ;; The return adress may be in the next
-                           ;; function, e.g. in local tail calls the
-                           ;; function will be entered just after the
-                           ;; CALL.
-                           ;; See debug.impure.lisp/:local-tail-call for a test-case
-                           (<= pc next-pc))))
-             (return (svref fun-map (1- i))))
-           (incf i 2))))))
+          (loop for fun = fun-map then next
+                for next = (sb-c::compiled-debug-fun-next fun)
+                when (or (not next)
+                         (let ((next-pc (if elsewhere-p
+                                            (sb-c::compiled-debug-fun-elsewhere-pc next)
+                                            (sb-c::compiled-debug-fun-offset next))))
+                           (if escaped
+                               (< pc next-pc)
+                               ;; Non-escaped frame means that this frame calls something.
+                               ;; And the PC points to where something should return.
+                               ;; The return adress may be in the next
+                               ;; function, e.g. in local tail calls the
+                               ;; function will be entered just after the
+                               ;; CALL.
+                               ;; See debug.impure.lisp/:local-tail-call for a test-case
+                               (<= pc next-pc))))
+                return fun))
+        fun-map)))
 
 ;;; This returns a COMPILED-DEBUG-FUN for COMPONENT and PC. We fetch the
 ;;; SB-C::DEBUG-INFO and run down its FUN-MAP to get a
@@ -1424,13 +1418,14 @@ register."
   (let ((simple-fun (%fun-fun fun)))
     (let* ((name (%simple-fun-name simple-fun))
            (component (fun-code-header simple-fun))
-           (res (find-if
-                 (lambda (x)
-                   (and (sb-c::compiled-debug-fun-p x)
-                        (eq (sb-c::compiled-debug-fun-name x) name)
-                        (eq (sb-c::compiled-debug-fun-kind x) nil)))
-                 (sb-c::compiled-debug-info-fun-map
-                  (%code-debug-info component)))))
+           (res (loop for fmap-entry = (sb-c::compiled-debug-info-fun-map
+                                        (%code-debug-info component))
+                      then next
+                      for next = (sb-c::compiled-debug-fun-next fmap-entry)
+                      when (and (eq (sb-c::compiled-debug-fun-name fmap-entry) name)
+                                (eq (sb-c::compiled-debug-fun-kind fmap-entry) nil))
+                      return fmap-entry
+                      while next)))
       (if res
           (make-compiled-debug-fun res component)
           ;; KLUDGE: comment from CMU CL:
@@ -1708,7 +1703,10 @@ register."
 (defun parse-debug-blocks (debug-fun)
   (etypecase debug-fun
     (compiled-debug-fun
-     (parse-compiled-debug-blocks debug-fun))
+     (let ((parsed (parse-compiled-debug-blocks debug-fun)))
+       (if (equalp parsed #())
+           (debug-signal 'no-debug-blocks :debug-fun debug-fun)
+           parsed)))
     (bogus-debug-fun
      (debug-signal 'no-debug-blocks :debug-fun debug-fun))))
 
@@ -1733,7 +1731,9 @@ register."
            (last-pc 0)
            result-blocks
            (block (make-compiled-debug-block))
-           locations)
+           locations
+           prev-live
+           prev-form-number)
       (flet ((new-block ()
                (when locations
                  (setf (compiled-debug-block-code-locations block)
@@ -1749,17 +1749,27 @@ register."
            (return))
          (let* ((flags (aref+ blocks i))
                 (kind (svref sb-c::+compiled-code-location-kinds+
-                             (ldb (byte 4 0) flags)))
+                             (ldb (byte 3 0) flags)))
                 (pc (+ last-pc
                        (sb-c:read-var-integerf blocks i)))
+                (equal-live (logtest sb-c::compiled-code-location-equal-live flags))
                 (form-number
-                  (if (logtest sb-c::compiled-code-location-zero-form-number flags)
-                      0
-                      (sb-c:read-var-integerf blocks i)))
+                  (cond ((logtest sb-c::compiled-code-location-zero-form-number flags)
+                         0)
+                        ((and equal-live
+                              (logtest sb-c::compiled-code-location-live flags))
+                         prev-form-number)
+                        (t
+                         (setf prev-form-number
+                               (sb-c:read-var-integerf blocks i)))))
                 (live-set
-                  (if (logtest sb-c::compiled-code-location-live flags)
-                      (sb-c:read-packed-bit-vector live-set-len blocks i)
-                      (make-array (* live-set-len 8) :element-type 'bit)))
+                  (cond (equal-live
+                         prev-live)
+                        ((logtest sb-c::compiled-code-location-live flags)
+                         (setf prev-live
+                               (sb-c:read-packed-bit-vector live-set-len blocks i)))
+                        (t
+                         (make-array (* live-set-len 8) :element-type 'bit))))
                 (step-info
                   (if (logtest sb-c::compiled-code-location-stepping flags)
                       (sb-c:read-var-string blocks i)

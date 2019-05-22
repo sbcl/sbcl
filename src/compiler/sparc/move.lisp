@@ -48,7 +48,7 @@
   ;; there.
   (let ((nbits 12))
     (cond
-      ((<= (- (ash (tn-offset x) word-shift) other-pointer-lowtag)
+      ((<= (- (tn-byte-offset x) other-pointer-lowtag)
            (1- (ash 1 nbits)))
        (loadw y code-tn (tn-offset x) other-pointer-lowtag))
       (t
@@ -62,7 +62,7 @@
        ;; to add in word-sized steps, so that the LIP remains valid.
        (let ((stepsize (logandc2 (1- (ash 1 nbits)) (1- (ash 1 word-shift)))))
          (multiple-value-bind (q r)
-             (truncate (ash (tn-offset x) word-shift) stepsize)
+             (truncate (tn-byte-offset x) stepsize)
            (dotimes (x q) (inst add lip-tn stepsize))
            (when (plusp r) (inst add lip-tn r))))
        (loadw y lip-tn 0 other-pointer-lowtag)))))

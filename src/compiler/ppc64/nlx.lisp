@@ -84,7 +84,7 @@
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 22
-    (inst addi block cfp-tn (* (tn-offset tn) n-word-bytes))
+    (inst addi block cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
@@ -105,7 +105,7 @@
   (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (non-descriptor-reg)) ndescr)
   (:generator 44
-    (inst addi result cfp-tn (* (tn-offset tn) n-word-bytes))
+    (inst addi result cfp-tn (tn-byte-offset tn))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
@@ -238,14 +238,14 @@
 
       ;; Compute dst as one slot down from result, because we inc the index
       ;; before we use it.
-      (inst subi dst result 4)
+      (inst subi dst result n-word-bytes)
 
       ;; Copy stuff down the stack.
       (emit-label loop)
-      (inst lwzx temp src num)
+      (inst ldx temp src num)
       (inst addi num num (fixnumize 1))
       (inst cmpw num count)
-      (inst stwx temp dst num)
+      (inst stdx temp dst num)
       (inst bne loop)
 
       ;; Reset the CSP.

@@ -9,49 +9,30 @@
 
 (in-package "SB-KERNEL")
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; The following macros expand into either constructor calls,
-  ;; if building the cross-compiler, or forms which reference
-  ;; previously constructed objects, if running the cross-compiler.
-  #+sb-xc-host
-  (progn
-    (defmacro literal-ctype (constructor &optional specifier)
-      (declare (ignore specifier))
-      ;; Technically the instances are not read-only,
-      ;; because the hash-value slot is rewritten.
-      `(load-time-value ,constructor nil))
+;; The following macros expand into either constructor calls,
+;; if building the cross-compiler, or forms which reference
+;; previously constructed objects, if running the cross-compiler.
+#+sb-xc-host
+(progn
+  (defmacro literal-ctype (constructor &optional specifier)
+    (declare (ignore specifier))
+    `(load-time-value ,constructor))
 
-    (defmacro literal-ctype-vector (var)
-      `(load-time-value ,var nil)))
+  (defmacro literal-ctype-vector (var)
+    `(load-time-value ,var nil)))
 
-  #-sb-xc-host
-  (progn
-    ;; Omitting the specifier works only if the unparser method has been
-    ;; defined in time to use it, and you're sure that constructor's result
-    ;; can be unparsed - some unparsers may be confused if called on a
-    ;; non-canonical object, such as an instance of (CONS T T) that is
-    ;; not EQ to the interned instance.
-    (sb-xc:defmacro literal-ctype (constructor
-                                   &optional (specifier nil specifier-p))
-      ;; The source-transform for SPECIFIER-TYPE turns this call into
-      ;; (LOAD-TIME-VALUE (!SPECIFIER-TYPE ',specifier)).
-      ;; It's best to go through the transform rather than expand directly
-      ;; into that, because the transform canonicalizes the spec,
-      ;; ensuring correctness of the hash lookups performed during genesis.
-      `(specifier-type ',(if specifier-p
-                             specifier
-                             (type-specifier (symbol-value constructor)))))
+;; Omitting the specifier works only if the unparser method has been
+;; defined in time to use it, and you're sure that constructor's result
+;; can be unparsed - some unparsers may be confused if called on a
+;; non-canonical object, such as an instance of (CONS T T) that is
+;; not EQ to the interned instance.
+#-sb-xc-host
+(progn
+  (defmacro literal-ctype (constructor &optional (specifier nil specifier-p))
+    (if specifier-p (specifier-type specifier) (symbol-value constructor)))
 
-    (sb-xc:defmacro literal-ctype-vector (var &aux (vector (symbol-value var)))
-      `(truly-the (simple-vector ,(length vector))
-         (load-time-value
-           (vector ,@(map 'list
-                          (lambda (x)
-                            (if (ctype-p x)
-                                `(!specifier-type ',(type-specifier x))
-                                x)) ; allow NIL or 0 in the vector
-                          vector))
-           t)))))
+  (defmacro literal-ctype-vector (var)
+    (symbol-value var)))
 
 (!begin-collecting-cold-init-forms)
 
@@ -62,7 +43,7 @@
 ;; But in practice there's nothing that can be done with this information,
 ;; because we don't call random predicates when performing operations on types
 ;; as objects, only when checking for inclusion of something in the type.
-(!define-type-class hairy :enumerable t :might-contain-other-types t)
+(define-type-class hairy :enumerable t :might-contain-other-types t)
 
 ;;; Without some special HAIRY cases, we massively pollute the type caches
 ;;; with objects that are all equivalent to *EMPTY-TYPE*. e.g.
@@ -117,7 +98,7 @@
 ;;   FIXME: is this right?  It's what they had before, anyway
 ;; But I think the reason it's right is that "enumerable :t" is equivalent
 ;; to "maybe" which is actually the conservative assumption, same as HAIRY.
-(!define-type-class negation :enumerable t :might-contain-other-types t)
+(define-type-class negation :enumerable t :might-contain-other-types t)
 
 (defun canonicalize-args-type-args (required optional rest &optional keyp)
   (when (eq rest *empty-type*)
@@ -227,10 +208,10 @@
           (t (make-values-type-cached required optional
                                       rest allowp)))))
 
-(!define-type-class values :enumerable nil
+(define-type-class values :enumerable nil
                     :might-contain-other-types nil)
 
-(!define-type-class function :enumerable nil
+(define-type-class function :enumerable nil
                     :might-contain-other-types nil)
 
 #+sb-xc-host
@@ -281,7 +262,7 @@
   ;; specifier to win.
   (type (missing-arg) :type ctype :read-only t))
 
-(!define-type-class number :enumerable #'numeric-type-enumerable
+(define-type-class number :enumerable #'numeric-type-enumerable
                     :might-contain-other-types nil)
 
 (defun interned-numeric-type (specifier &rest args)
@@ -506,7 +487,7 @@
                         (sb-vm::saetp-index-or-lose 'base-char)))))))
     (%make-character-set-type pairs)))
 
-(!define-type-class array :enumerable nil
+(define-type-class array :enumerable nil
                     :might-contain-other-types nil)
 
 ;; For all ctypes which are the element types of specialized arrays,
@@ -596,7 +577,7 @@
       (%make-array-type dimensions
                         complexp element-type specialized-element-type)))
 
-(!define-type-class member :enumerable t
+(define-type-class member :enumerable t
                     :might-contain-other-types nil)
 
 (declaim (ftype (sfunction (xset list) ctype) make-member-type))
@@ -701,7 +682,7 @@
       *universal-type*
       type))
 
-(!define-type-class cons :enumerable nil :might-contain-other-types nil)
+(define-type-class cons :enumerable nil :might-contain-other-types nil)
 
 #+sb-xc-host
 (declaim (ftype (sfunction (ctype ctype) (values t t)) type=))
@@ -994,12 +975,10 @@ expansion happened."
 (!defun-from-collected-cold-init-forms !early-type-cold-init)
 
 ;;; When cross-compiling SPECIFIER-TYPE with a quoted argument,
-;;; it can be rendered as a literal object unless it:
-;;;  - mentions a classoid or unknown type
-;;;  - uses a floating-point literal (perhaps positive zero could be allowed?)
+;;; it can be rendered as a literal object unless it mentions
+;;; certain classoids.
 ;;;
-;;; This is important for type system initialization, but it will also
-;;; apply to hand-written calls and make-load-form expressions.
+;;; This is important for type system initialization.
 ;;;
 ;;; After the target is built, we remove this transform, both because calls
 ;;; to SPECIFIER-TYPE do not arise organically through user code,
@@ -1007,58 +986,23 @@ expansion happened."
 ;;; return a different thing, e.g. changing a DEFTYPE to a DEFCLASS.
 ;;;
 #+sb-xc-host
-(progn
-(sb-c::define-source-transform specifier-type (type-spec &environment env)
-  (or (and (sb-xc:constantp type-spec env)
-           (let ((parse (specifier-type (constant-form-value type-spec env))))
-             (cond
-              ((contains-unknown-type-p parse)
-               (bug "SPECIFIER-TYPE transform parsed an unknown type"))
-              ((cold-dumpable-type-p parse)
-               ;; Obtain a canonical form by unparsing so that TYPE= specs
-               ;; coalesce in presence of DEFTYPEs. LOAD-TIME-VALUE in the
-               ;; cross-compiler has a special-case to turn !SPECIFIER-TYPE
-               ;; into a fop-funcall, which is handled by genesis.
-               `(load-time-value (!specifier-type ',(type-specifier parse))
-                                 t)))))
-      (values nil t)))
-
-(defun cold-dumpable-type-p (ctype)
-  (named-let recurse ((ctype ctype))
-    (typecase ctype
-      (args-type
-       (and (every #'recurse (args-type-required ctype))
-            (every #'recurse (args-type-optional ctype))
-            (acond ((args-type-rest ctype) (recurse it)) (t))
-            (every (lambda (x) (recurse (key-info-type x)))
-                   (args-type-keywords ctype))
-            (if (fun-type-p ctype) (recurse (fun-type-returns ctype)) t)))
-      (compound-type (every #'recurse (compound-type-types ctype)))
-      (negation-type (recurse (negation-type-type ctype)))
-      (array-type (recurse (array-type-element-type ctype)))
-      (cons-type (and (recurse (cons-type-car-type ctype))
-                      (recurse (cons-type-cdr-type ctype))))
-      (member-type
-       (and (listp (xset-data (member-type-xset ctype))) ; can't dump hashtable
-            (not (member-type-fp-zeroes ctype)))) ; nor floats
-      (numeric-type
-       ;; Floating-point constants are not dumpable. (except maybe +0.0)
-       (if (or (typep (numeric-type-low ctype) '(or float (cons float)))
-               (typep (numeric-type-high ctype) '(or float (cons float))))
-           nil
+(labels ((xform (type-spec env parser)
+           (if (not (sb-xc:constantp type-spec env))
+               (values nil t)
+               (let* ((expr (constant-form-value type-spec env))
+                      (parse (funcall parser expr)))
+                 (if (cold-dumpable-type-p parse)
+                     parse
+                     (values nil t)))))
+         (cold-dumpable-type-p (ctype)
+           (when (contains-unknown-type-p ctype)
+             (bug "SPECIFIER-TYPE transform parsed an unknown type: ~S" ctype))
+           (map-type (lambda (type)
+                       (when (and (classoid-p type) (eq (classoid-name type) 'class))
+                         (return-from cold-dumpable-type-p nil)))
+                     ctype)
            t))
-      (built-in-classoid t)
-      (classoid nil)
-      ;; HAIRY is just an s-expression, so it's dumpable. Same for simd-pack
-      ((or named-type character-set-type hairy-type #+sb-simd-pack simd-pack-type
-                                                    #+sb-simd-pack-256 simd-pack-256-type)
-       t))))
-
-(setf (get '!specifier-type :sb-cold-funcall-handler/for-value)
-      (lambda (arg)
-        (let ((specifier
-               (if (symbolp arg) arg (sb-fasl::host-object-from-core arg))))
-          (sb-fasl::ctype-to-core specifier (specifier-type specifier)))))
-
-(setf (info :function :where-from '!specifier-type) :declared) ; lie
-) ; end PROGN
+  (sb-c::define-source-transform specifier-type (type-spec &environment env)
+    (xform type-spec env #'specifier-type))
+  (sb-c::define-source-transform values-specifier-type (type-spec &environment env)
+    (xform type-spec env #'values-specifier-type)))

@@ -99,17 +99,6 @@
       `(with-fast-read-byte ((unsigned-byte 8) ,fasl-input-stream)
          (fast-read-u-integer ,n))))
 
-(defun read-varint-arg (fasl-input)
-  (let ((accumulator 0)
-        (shift 0))
-    (declare (fixnum shift) (type word accumulator))
-    (with-fast-read-byte ((unsigned-byte 8) (%fasl-input-stream fasl-input))
-      (loop
-       (let ((octet (fast-read-byte)))
-         (setq accumulator (logior accumulator (ash (logand octet #x7F) shift)))
-         (incf shift 7)
-         (unless (logbitp 7 octet) (return accumulator)))))))
-
 ;; FIXME: on x86-64, these functions exceed 600, 900, and 1200 bytes of code
 ;; respectively. Either don't inline them, or make a "really" fast inline case
 ;; that punts if inapplicable. e.g. if the fast-read-byte buffer will not be
@@ -287,7 +276,8 @@
 ;;; Signal an error if we encounter garbage.
 (defun check-fasl-header (stream)
   (maybe-skip-shebang-line stream)
-  (let ((byte (read-byte stream nil)))
+  (let ((byte (read-byte stream nil))
+        (results))
     (when byte
       ;; Read and validate constant string prefix in fasl header.
       (let* ((fhsss *fasl-header-string-start-string*)
@@ -315,6 +305,7 @@
                (let* ((length (read-unsigned-byte-32-arg stream))
                       (result (make-string length)))
                  (read-string-as-bytes stream result)
+                 (push result results)
                  result)))
         ;; Read and validate implementation and version.
         (let ((implementation (string-from-stream))
@@ -332,6 +323,7 @@
                                  "1.0.11.18"
                                  (string-from-stream)))
                (expected-version (sb-xc:lisp-implementation-version)))
+          (push fasl-version results)
           (unless (string= expected-version sbcl-version)
             (restart-case
                 (error 'invalid-fasl-version
@@ -348,12 +340,45 @@
                    :expected expected
                    :features faff-in-this-file)))
         ;; success
-        t))))
+        (nreverse results)))))
 
 ;; Setting this variable gives you a trace of fops as they are loaded and
 ;; executed.
-#+sb-show
 (defvar *show-fops-p* nil)
+
+;;; Return byte, function, pushp, n-operands, arg1, arg2, arg3
+(defun decode-fop (fasl-input &aux (stream (%fasl-input-stream fasl-input)))
+  (with-fast-read-byte ((unsigned-byte 8) stream)
+    (flet ((read-varint ()
+             (let ((accumulator 0)
+                   (shift 0))
+               (declare (fixnum shift) (type word accumulator))
+               (loop
+                 (let ((octet (fast-read-byte)))
+                   (setq accumulator (logior accumulator (ash (logand octet #x7F) shift)))
+                   (incf shift 7)
+                   (unless (logbitp 7 octet) (return accumulator)))))))
+      (let ((byte (fast-read-byte)))
+        (if (< byte n-ordinary-fops)
+            (let ((n-operands (aref (car **fop-signatures**) byte)))
+              (values byte
+                      (svref **fop-funs** byte)
+                      (plusp (sbit (cdr **fop-signatures**) byte))
+                      n-operands
+                      (when (>= n-operands 1) (read-varint))
+                      (when (>= n-operands 2) (read-varint))
+                      (when (>= n-operands 3) (read-varint))))
+            (let* ((operand (logand byte #x7f))
+                   (nconses (logand operand #b1111)))
+              (aver (not (logtest #b1100000 operand)))
+              ;; Decode as per TERMINATE-[UN]DOTTED-LIST in src/compiler/dump
+              (values byte
+                      (if (logbitp 4 operand) #'fop-list* #'fop-list)
+                      t
+                      1
+                      (if (zerop nconses) (+ (read-varint) 16) nconses)
+                      nil
+                      nil)))))))
 
 ;;;
 ;;; a helper function for LOAD-AS-FASL
@@ -361,79 +386,77 @@
 ;;; Return true if we successfully load a group from the stream, or
 ;;; NIL if EOF was encountered while trying to read from the stream.
 ;;; Dispatch to the right function for each fop.
+;;;
+;;; When true, PRINT causes most tlf-equivalent forms to print their primary value.
+;;; This differs from loading of Lisp source, which prints all values of
+;;; only truly-toplevel forms.  This is permissible per CLHS -
+;;;  "If print is true, load incrementally prints information to standard
+;;;   output showing the progress of the loading process. [...]
+;;;   For a compiled file, what is printed might not reflect precisely the
+;;;   contents of the source file, but some information is generally printed."
+;;;
 (defun load-fasl-group (fasl-input print)
-  ;;
-  ;; PRINT causes most tlf-equivalent forms to print their primary value.
-  ;; This differs from loading of Lisp source, which prints all values of
-  ;; only truly-toplevel forms.  This is permissible per CLHS -
-  ;;  "If print is true, load incrementally prints information to standard
-  ;;   output showing the progress of the loading process. [...]
-  ;;   For a compiled file, what is printed might not reflect precisely the
-  ;;   contents of the source file, but some information is generally printed."
-  ;;
   (declare (ignorable print))
   (let ((stream (%fasl-input-stream fasl-input))
-        (trace #+sb-show *show-fops-p*))
+        (trace *show-fops-p*))
     (unless (check-fasl-header stream)
       (return-from load-fasl-group))
     (catch 'fasl-group-end
-     (setf (svref (%fasl-input-table fasl-input) 0) 0)
-     (macrolet ((tracing (&body forms) `(when trace ,@forms)))
+      (setf (svref (%fasl-input-table fasl-input) 0) 0)
       (loop
-       (let* ((byte (the (unsigned-byte 8) (read-byte stream)))
-              (function (svref **fop-funs** byte))
-              (n-operands (aref (car **fop-signatures**) byte)))
-         ;; Do some debugging output.
-         (tracing
-          (format *trace-output* "~&~6x : [~D,~D] ~2,'0x(~A)"
-                  (1- (file-position stream))
-                  (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
-                  (svref (%fasl-input-table fasl-input) 0) ; table pointer
-                  byte (and (functionp function) (%fun-name function))))
-         ;; Actually execute the fop.
-         (let ((result
-                 (cond ((not (functionp function))
-                        (error "corrupt fasl file: FOP code #x~x" byte))
-                       ((zerop n-operands)
-                        (funcall function fasl-input))
-                       (t
-                        (let ((arg1 (read-varint-arg fasl-input))
-                              (arg2 (when (>= n-operands 2)
-                                      (read-varint-arg fasl-input)))
-                              (arg3 (when (>= n-operands 3)
-                                      (read-varint-arg fasl-input))))
-                          (tracing (format *trace-output* "{~D~@[,~D~@[,~D~]~]}"
-                                           arg1 arg2 arg3))
-                          (case n-operands
-                            (3 (funcall function fasl-input arg1 arg2 arg3))
-                            (2 (funcall function fasl-input arg1 arg2))
-                            (1 (funcall function fasl-input arg1))))))))
-           (when (plusp (sbit (cdr **fop-signatures**) byte))
-             (push-fop-stack result fasl-input))
-           (let ((stack (%fasl-input-stack fasl-input)))
-             (declare (ignorable stack)) ; not used in xc-host
-             (tracing
-              (let ((ptr (svref stack 0)))
-                (format *trace-output* " -- ~[<empty>,~D~:;[~:*~D,~D] ~S~]"
-                        ptr (svref (%fasl-input-table fasl-input) 0)
-                        (unless (eql ptr 0) (aref stack ptr)))
-                (terpri *trace-output*)))
-             #-sb-xc-host
-             (macrolet ((terminator-opcode ()
-                          (or (get 'fop-funcall-for-effect 'opcode)
-                              (error "Missing FOP definition?"))))
-               (when (and (eq byte (terminator-opcode))
-                          (fop-stack-empty-p stack)) ; (presumed) end of TLF
-                 (awhen (%fasl-input-deprecated-stuff fasl-input)
-                   ;; Delaying this message rather than printing it
-                   ;; in fop-fdefn makes it more informative (usually).
-                   (setf (%fasl-input-deprecated-stuff fasl-input) nil)
-                   (loader-deprecation-warn
-                    it
-                    (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2))))
-                 (when print
-                   (load-fresh-line)
-                   (prin1 result))))))))))))
+       (binding* ((pos (when trace (file-position stream)))
+                  ((byte function pushp n-operands arg1 arg2 arg3)
+                   (decode-fop fasl-input))
+                  (result
+                   (if (functionp function)
+                       (case n-operands
+                         (0 (funcall function fasl-input))
+                         (1 (funcall function fasl-input arg1))
+                         (2 (funcall function fasl-input arg1 arg2))
+                         (3 (funcall function fasl-input arg1 arg2 arg3)))
+                       (error "corrupt fasl file: FOP code #x~x" byte))))
+         (when pushp
+           (push-fop-stack result fasl-input))
+         (when trace
+           ;; show file pos prior to decoding the fop,
+           ;; table and stack ptrs *after* executing it
+           (format *trace-output* "~&~6x : [~D,~D] ~2,'0x~v@{ ~x~}"
+                   pos
+                   (svref (%fasl-input-table fasl-input) 0) ; table pointer
+                   (svref (%fasl-input-stack fasl-input) 0) ; stack pointer
+                   byte
+                   n-operands arg1 arg2 arg3)
+           (when (functionp function)
+             (format *trace-output* " ~35t~(~a~)" (%fun-name function))))
+         (let ((stack (%fasl-input-stack fasl-input)))
+           (declare (ignorable stack)) ; not used in xc-host
+           (when (and (eq byte #.(get 'fop-funcall-for-effect 'opcode))
+                      (fop-stack-empty-p stack)) ; (presumed) end of TLF
+             (awhen (%fasl-input-deprecated-stuff fasl-input)
+               ;; Delaying this message rather than printing it
+               ;; in fop-fdefn makes it more informative (usually).
+               (setf (%fasl-input-deprecated-stuff fasl-input) nil)
+               (loader-deprecation-warn
+                it
+                (and (eq (svref stack 1) 'sb-impl::%defun) (svref stack 2))))
+             (when print
+               (load-fresh-line)
+               (prin1 result)))))))))
+
+;; This is the moral equivalent of a warning from /usr/bin/ld that
+;; "gets() is dangerous." You're informed by both the compiler and linker.
+(defun loader-deprecation-warn (stuff whence)
+  ;; Stuff is a list: ((<state> name . category) ...)
+  ;; For now we only deal with category = :FUNCTION so we ignore it.
+  (let ((warning-class
+         ;; We're only going to warn once (per toplevel form),
+         ;; so pick the most stern warning applicable.
+         (if (every (lambda (x) (eq (car x) :early)) stuff)
+             'simple-style-warning 'simple-warning)))
+    (warn warning-class
+          :format-control "Reference to deprecated function~P ~S~@[ from ~S~]"
+          :format-arguments
+          (list (length stuff) (mapcar #'second stuff) whence))))
 
 (defun load-as-fasl (stream verbose print)
   (when (zerop (file-length stream))

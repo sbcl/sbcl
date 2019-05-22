@@ -229,7 +229,9 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
       :use ("CL" "SB-ALIEN-INTERNALS" "SB-ALIEN" "SB-ASSEM" "SB-BIGNUM"
                  #+sb-dyncount "SB-DYNCOUNT" "SB-EXT" "SB-FASL" "SB-INT"
                  "SB-KERNEL" "SB-SYS")
-      :reexport ("SLOT" "CODE-INSTRUCTIONS" "FLUSHABLE")
+      ;; "flushable" is an assembly instruction attribute and a fun-info attribute.
+      ;; But why do we need SLOT re-exported?
+      :reexport ("SLOT" "FLUSHABLE")
       :export ("%ALIEN-FUNCALL"
                "%CATCH-BREAKUP" "%CONTINUE-UNWIND"
                "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
@@ -244,6 +246,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "*BACKEND-T-PRIMITIVE-TYPE*"
 
                "*CODE-SEGMENT*"
+               "*COMPILATION*"
                "*ELSEWHERE*" "*FREE-FUNS*"
                "*LEXENV*"
                "*SUPPRESS-VALUES-DECLARATION*"
@@ -267,6 +270,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "CLOSURE-INIT" "CLOSURE-REF" "CLOSURE-INIT-FROM-FP"
                "COMPARE-AND-SWAP-SLOT"
                "COMPILE-IN-LEXENV"
+               "COMPILED-DEBUG-FUN-FORM-NUMBER"
                "%COMPILER-DEFUN" "COMPILER-ERROR" "FATAL-COMPILER-ERROR"
                "COMPILER-NOTIFY"
                "COMPILER-STYLE-WARN" "COMPILER-WARN"
@@ -331,6 +335,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "MAKE-STACK-POINTER-TN" "MAKE-TN-REF" "MAKE-UNWIND-BLOCK"
                "MAKE-WIRED-TN" "MAYBE-COMPILER-NOTIFY"
                "MAYBE-INLINE-SYNTACTIC-CLOSURE"
+               "MSAN-UNPOISON"
                "MORE-ARG-CONTEXT" "MOVABLE" "MOVE" "MULTIPLE-CALL"
                "MULTIPLE-CALL-LOCAL" "MULTIPLE-CALL-NAMED"
                "MULTIPLE-CALL-VARIABLE"
@@ -604,6 +609,7 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "CLOSE-FASL-OUTPUT"
                "DUMP-ASSEMBLER-ROUTINES"
                "DUMP-FOP" "DUMP-OBJECT"
+               "DUMPABLE-LAYOUT-P"
                "FASL-CONSTANT-ALREADY-DUMPED-P"
                "+FASL-FILE-VERSION+"
                "FASL-DUMP-COMPONENT"
@@ -613,7 +619,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "FASL-NOTE-HANDLE-FOR-CONSTANT"
                "FASL-OUTPUT" "FASL-OUTPUT-P"
                "FASL-OUTPUT-ENTRY-TABLE" "FASL-OUTPUT-STREAM"
-               "FASL-VALIDATE-STRUCTURE"
+               "FASL-NOTE-DUMPABLE-INSTANCE"
+               "LOAD-FORM-IS-DEFAULT-MLFSS-P"
                "*!LOAD-TIME-VALUES*"
                "OPEN-FASL-OUTPUT"
                "*!COLD-DEFSYMBOLS*" "*!COLD-DEFUNS*"
@@ -1117,7 +1124,7 @@ possibly temporarily, because it might be used internally."
                "*KEYWORD-PACKAGE*" "*CL-PACKAGE*"
 
                ;; hash mixing operations
-               "MIX" "MIXF"
+               "MIX" "MIXF" "WORD-MIX"
 
                ;; Macroexpansion that doesn't touch special forms
                "%MACROEXPAND"
@@ -1284,6 +1291,7 @@ possibly temporarily, because it might be used internally."
                "BOOTSTRAP-PACKAGE-NAME"
                "BOOTSTRAP-PACKAGE-NOT-FOUND"
                "DEBOOTSTRAP-PACKAGE"
+               "SYSTEM-PACKAGE-P"
 
                "REFERENCE-CONDITION" "REFERENCE-CONDITION-REFERENCES"
                "*PRINT-CONDITION-REFERENCES*"
@@ -1459,12 +1467,6 @@ possibly temporarily, because it might be used internally."
 
                ;; catch tags
                "TOPLEVEL-CATCHER"
-
-               ;; Constructors for arrays whose element-type is recoverable
-               ;; even if the host Lisp upgrades it to something unexpected.
-               "!MAKE-SPECIALIZED-ARRAY"
-               "!COERCE-TO-SPECIALIZED"
-               "!SPECIALIZED-ARRAY-ELEMENT-TYPE"
 
                ;; hooks for contrib/ stuff we're insufficiently sure
                ;; about to add to SB-EXT
@@ -1822,7 +1824,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "HAIRY-DATA-VECTOR-REF/CHECK-BOUNDS"  "HAIRY-DATA-VECTOR-SET"
                "HAIRY-DATA-VECTOR-SET/CHECK-BOUNDS"
                "HAIRY-TYPE" "HAIRY-TYPE-P" "HAIRY-TYPE-SPECIFIER"
-               "HANDLE-CIRCULARITY" "HOST" "IGNORE-IT" "ILL-BIN"
+               "HANDLE-CIRCULARITY" "HOST" "ILL-BIN"
                "ILL-BOUT" "ILL-IN" "ILL-OUT" "INDEX-OR-MINUS-1"
                "INDEX-TOO-LARGE-ERROR" "*!INITIAL-ASSEMBLER-ROUTINES*"
                "*!INITIAL-DEBUG-SOURCES*"
@@ -1870,6 +1872,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "LRA" "LRA-CODE-HEADER" "LRA-P"
                "MAKE-ALIEN-TYPE-TYPE"
                "MAKE-ARRAY-HEADER" "MAKE-ARRAY-TYPE" "MAKE-CONS-TYPE"
+               "%MAKE-DOUBLE-FLOAT"
                "MAKE-DOUBLE-FLOAT" "MAKE-FUN-TYPE" "MAKE-KEY-INFO"
                "MAKE-LISP-OBJ"
                #+long-float "MAKE-LONG-FLOAT"
@@ -2144,9 +2147,9 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "COPY-UB64-TO-SYSTEM-AREA" "COPY-UB64-FROM-SYSTEM-AREA"
 
                ;; Bit bashing position for bit-vectors
-               "%BIT-POSITION"
-               "%BIT-POSITION/0"
-               "%BIT-POSITION/1"
+               "%BIT-POSITION" "%BIT-POS-FWD" "%BIT-POS-REV"
+               "%BIT-POSITION/0" "%BIT-POS-FWD/0" "%BIT-POS-REV/0"
+               "%BIT-POSITION/1" "%BIT-POS-FWD/1" "%BIT-POS-REV/1"
 
                ;; SIMPLE-FUN type and accessors
                "SIMPLE-FUN"
@@ -2202,7 +2205,8 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "DD-SLOTS" "DD-INCLUDE" "SLOT-SETTER-LAMBDA-FORM"
                "SLOT-ACCESS-TRANSFORM"
                "%IMAGPART" "DSD-ACCESSOR-NAME" "%CODE-DEBUG-INFO"
-               "LAYOUT-CLASSOID" "LAYOUT-INVALID" "LAYOUT-%FLAGS"
+               "LAYOUT-CLASSOID" "LAYOUT-INVALID"
+               "LAYOUT-FLAGS" "LAYOUT-%BITS"
                "DSD-TYPE" "%INSTANCEP" "DEFSTRUCT-SLOT-DESCRIPTION"
                "DD-PREDICATE-NAME"
                "CLASSOID-PROPER-NAME" "%NOTE-TYPE-DEFINED" "LAYOUT-INFO"
@@ -2304,6 +2308,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "DUBIOUS-ASTERISKS-AROUND-VARIABLE-NAME"
                "ASTERISKS-AROUND-LEXICAL-VARIABLE-NAME"
                "ASTERISKS-AROUND-CONSTANT-VARIABLE-NAME"
+               "&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST"
                "UNDEFINED-ALIEN-STYLE-WARNING"
                #+(or sb-eval sb-fasteval)
                "LEXICAL-ENVIRONMENT-TOO-COMPLEX"
@@ -2339,7 +2344,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "!LATE-PROCLAIM-COLD-INIT" "!CLASS-FINALIZE"
                "!CONSTANTP-COLD-INIT" "!CONSTANTP2-COLD-INIT"
                "!WORLD-LOCK-COLD-INIT"
-               "!SPECIFIER-TYPE"
 
                "FLOAT-COLD-INIT-OR-REINIT"
                "GC-REINIT"
@@ -3598,7 +3602,7 @@ SBCL itself"
  (sb-debug::find-interrupted-name-and-frame
   sb-impl::encapsulate-generic-function
   sb-impl::encapsulated-generic-function-p
-  sb-impl::get-processes-status-changes-sigchld
+  sb-impl::get-processes-status-changes
   sb-impl::step-form
   sb-impl::step-values
   sb-impl::stringify-package-designator

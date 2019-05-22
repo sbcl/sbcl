@@ -731,7 +731,7 @@ default-value-8
                     (inst b :eq step-done-label)
                     (inst nop)
                     ;; FIXME: this doesn't look right.
-                    (note-this-location vop :step-before-vop)
+                    (note-this-location vop :internal-error)
                     ;; Construct a trap code with the low bits from
                     ;; SINGLE-STEP-AROUND-TRAP and the high bits from
                     ;; the register number of CALLABLE-TN.
@@ -1182,6 +1182,6 @@ default-value-8
     (inst cmp stepping zero-tn)
     (inst b :eq DONE)
     (inst nop)
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     (inst unimp single-step-before-trap)
     DONE))

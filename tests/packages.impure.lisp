@@ -695,6 +695,26 @@ if a restart was invoked."
                     (* 2 (length plns)))))
        (when plns (go iterate)))))
 
+(defun intern-in-fixed-pkg-designator (x) (intern x "PWELN"))
+(compile 'intern-in-fixed-pkg-designator)
+
+(with-test (:name :cached-find-package)
+  (with-tmp-packages
+      ((p1 (make-package "PKG-WITH-EXCEEDINGLY-LONG-NAME"))
+       (p2 (make-package "PKG-WHICH-EVERYONE-LOVES-NOW" :nicknames '("PWELN")))
+       (p3 (defpackage "USERPKG"
+             (:local-nicknames ("PWELN" "PKG-WITH-EXCEEDINGLY-LONG-NAME")
+                               ("FOOCL" "COMMON-LISP")))))
+      (let ((s (intern-in-fixed-pkg-designator "A")))
+        (assert (eq (symbol-package s) p2))) ; global PWELN package
+      (let ((s (let ((*package* p3))
+                 (intern-in-fixed-pkg-designator "A"))))
+        (assert (eq (symbol-package s) p1))) ; local PWELN package
+      (delete-package p1) ; will lazily delete "inbound" nicknames
+      (let ((s (let ((*package* p3))
+                 (intern-in-fixed-pkg-designator "A"))))
+        (assert (eq (symbol-package s) p2))))) ; global PWELN package
+
 (with-test (:name :delete-package-restart)
   (let* (ok
          (result
@@ -973,7 +993,7 @@ if a restart was invoked."
       (assert (not (search "symbols:SILLY"
                            (write-to-string c :pretty nil :escape nil)))))
     (condition () (error "Should not get here"))
-    (:no-error () (error "Should not get here"))))
+    (:no-error (c) (declare (ignore c)) (error "Should not get here"))))
 
 ;; git revision f7d1550c0e16262f28213c9e3c048f42e3f0b476 broke find-all-symbols
 (with-test (:name :find-all-symbols)

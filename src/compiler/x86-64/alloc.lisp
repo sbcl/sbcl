@@ -171,7 +171,7 @@
 ;;; Allocate an other-pointer object of fixed SIZE with a single word
 ;;; header having the specified WIDETAG value. The result is placed in
 ;;; RESULT-TN.
-(defun fixed-alloc (result-tn widetag size node &optional stack-allocate-p
+(defun alloc-other (result-tn widetag size node &optional stack-allocate-p
                     &aux (bytes (pad-data-block size)))
   (let ((header (logior (ash (1- size) n-widetag-bits) widetag)))
     (cond (stack-allocate-p
@@ -357,7 +357,7 @@
         ;; It would also be good to skip zero-fill of specialized vectors
         ;; perhaps in a policy-dependent way. At worst you'd see random
         ;; bits, and CLHS says consequences are undefined.
-        (when sb-c::*msan-unpoison*
+        (when (sb-c:msan-unpoison sb-c:*compilation*)
           ;; Unpoison all DX vectors regardless of widetag.
           ;; Mark the header and length as valid, not just the payload.
           #+linux ; unimplemented for others
@@ -503,7 +503,7 @@
   (:results (result :scs (descriptor-reg) :from :argument))
   (:node-var node)
   (:generator 37
-    (fixed-alloc result fdefn-widetag fdefn-size node)
+    (alloc-other result fdefn-widetag fdefn-size node)
     (storew name result fdefn-name-slot other-pointer-lowtag)
     (storew nil-value result fdefn-fun-slot other-pointer-lowtag)
     (storew (make-fixup 'undefined-tramp :assembly-routine)
@@ -542,7 +542,7 @@
   (:info stack-allocate-p)
   (:node-var node)
   (:generator 10
-    (fixed-alloc result value-cell-widetag value-cell-size node stack-allocate-p)
+    (alloc-other result value-cell-widetag value-cell-size node stack-allocate-p)
     (storew value result value-cell-value-slot other-pointer-lowtag)))
 
 ;;;; automatic allocators for primitive objects

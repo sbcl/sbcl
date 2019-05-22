@@ -28,16 +28,17 @@
 (defun %test-fixnum-immediate-and-headers (value temp target not-p immediate headers
                                             &key value-tn-ref)
   (let ((drop-through (gen-label)))
-    (inst andi. temp value widetag-mask)
-    (inst b? (if not-p :ne :eq) target)
+    (inst andi. temp value fixnum-tag-mask)
+    (inst b? :eq (if not-p drop-through target))
     (%test-immediate-and-headers value temp target not-p immediate headers
                                  :drop-through drop-through
                                  :value-tn-ref value-tn-ref)))
 
 (defun %test-immediate-and-headers (value temp target not-p immediate headers
                                     &key (drop-through (gen-label)) value-tn-ref)
+  (inst andi. temp value widetag-mask)
   (inst cmpwi temp immediate)
-  (inst b? (if not-p :ne :eq) target)
+  (inst b? :eq (if not-p drop-through target))
   (%test-headers value temp target not-p nil headers
                  :drop-through drop-through :value-tn-ref value-tn-ref))
 
@@ -153,7 +154,7 @@
               (values target not-target))
         ;; Is it a fixnum?
         (inst andi. temp value fixnum-tag-mask)
-        (inst cmpwi :cr1 value 0) ; is this really necessary?
+        (inst cmpdi :cr1 value 0)
         (inst beq fixnum)
 
         ;; If not, is it an other pointer?
@@ -168,7 +169,7 @@
         (inst bne nope)
         ;; Get the second digit.
         (loadw temp value (1+ bignum-digits-offset) other-pointer-lowtag)
-        ;; All zeros, its an (unsigned-byte 32).
+        ;; All zeros, its an (unsigned-byte 64).
         (inst cmpdi temp 0)
         (inst beq yep)
         ;; Otherwise, it isn't.
@@ -195,7 +196,7 @@
   (:generator 12
     (let* ((drop-thru (gen-label))
            (is-symbol-label (if not-p drop-thru target)))
-      (inst cmpw value null-tn)
+      (inst cmpd value null-tn)
       (inst beq is-symbol-label)
       (test-type value temp target not-p (symbol-widetag))
       (emit-label drop-thru))))
@@ -205,7 +206,7 @@
   (:generator 8
     (let* ((drop-thru (gen-label))
            (is-not-cons-label (if not-p target drop-thru)))
-      (inst cmpw value null-tn)
+      (inst cmpd value null-tn)
       (inst beq is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag))
       (emit-label drop-thru))))

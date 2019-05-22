@@ -56,18 +56,22 @@
 
 (defconstant-eqx +compiled-code-location-kinds+
     #(:unknown-return :known-return :internal-error :non-local-exit
-      :block-start :call-site :single-value-return :non-local-entry
-      :step-before-vop)
+      :block-start :call-site :single-value-return :non-local-entry)
   #'equalp)
 
 (eval-when (:compile-toplevel)
-  (assert (<= (integer-length (1- (length +compiled-code-location-kinds+))) 4)))
+  (assert (<= (integer-length (1- (length +compiled-code-location-kinds+))) 3)))
 
 ;;; Location flags, encoded in the low 4 bits of loction kind byte
-(defconstant compiled-code-location-stepping         (ash #b0001 4))
-(defconstant compiled-code-location-context          (ash #b0010 4))
-(defconstant compiled-code-location-live             (ash #b0100 4))
-(defconstant compiled-code-location-zero-form-number (ash #b1000 4))
+(defconstant compiled-code-location-stepping         (ash #b00001 3))
+(defconstant compiled-code-location-context          (ash #b00010 3))
+(defconstant compiled-code-location-live             (ash #b00100 3))
+(defconstant compiled-code-location-zero-form-number (ash #b01000 3))
+
+;;; Means the previous live-set is the same. Since -live is implied,
+;;; the -live bit is repurposed to mean that the form-number is also
+;;; the same.
+(defconstant compiled-code-location-equal-live       (ash #b10000 3))
 
 (defconstant debug-info-var-deleted -1)
 (defconstant debug-info-var-rest -2)
@@ -128,7 +132,6 @@
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
   (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
-  (form-number nil :type (or index null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The
@@ -186,27 +189,35 @@
   (return-pc-pass (missing-arg) :type sc+offset)
   #-fp-and-pc-standard-save
   (old-fp (missing-arg) :type sc+offset)
-  ;; An integer which contains between 2 and 4 varint-encoded fields:
+  ;; An integer which contains between 4 and 6 varint-encoded fields:
   ;; START-PC -
   ;; The earliest PC in this function at which the environment is properly
   ;; initialized (arguments moved from passing locations, etc.)
   ;; ELSEWHERE-PC -
+  ;; FORM-NUMBER
+  ;; OFFSET
   ;; The start of elsewhere code for this function (if any.)
   ;; CLOSURE-SAVE, and BSP-SAVE.
-  (encoded-locs (missing-arg) :type unsigned-byte :read-only t))
+  (encoded-locs (missing-arg) :type unsigned-byte :read-only t)
+  (next))
 
-(defun cdf-encode-locs (start-pc elsewhere-pc closure-save
+(defun cdf-encode-locs (start-pc elsewhere-pc
+                        form-number offset
+                        closure-save
                         #+unwind-to-frame-and-call-vop bsp-save
                         #-fp-and-pc-standard-save lra-saved-pc
                         #-fp-and-pc-standard-save cfp-saved-pc)
-  (dx-let ((bytes (make-array (* 5 4) :fill-pointer 0
+  (dx-let ((bytes (make-array (* 8 4) :fill-pointer 0
                                       :element-type '(unsigned-byte 8))))
     ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
     ;; which does not need access to any of the subsequent fields.
     (write-var-integer elsewhere-pc bytes)
-    (write-var-integer start-pc bytes)
+    (write-var-integer offset bytes)
+    (write-var-integer form-number bytes)
+    (write-var-integer (- start-pc offset) bytes)
     #+unwind-to-frame-and-call-vop
-    (write-var-integer (if bsp-save (1+ bsp-save) 0) bytes)
+    (write-var-integer (if bsp-save (1+ (sc+offset-offset bsp-save)) 0)
+                       bytes)
     #-fp-and-pc-standard-save
     (progn
       (write-var-integer lra-saved-pc bytes)
@@ -214,7 +225,7 @@
     ;; More often the BSP-SAVE is non-null than CLOSURE-SAVE is non-null,
     ;; so the encoding is potentially smaller with CLOSURE-SAVE being last.
     (when closure-save
-      (write-var-integer (1+ closure-save) bytes))
+      (write-var-integer (1+ (sc+offset-offset closure-save)) bytes))
     (integer-from-octets bytes)))
 
 (defun cdf-decode-locs (cdf)
@@ -227,17 +238,25 @@
                 (setf accumulator (logior accumulator (ash (logand byte #x7f) shift)))
                 (incf shift 7)
                 (unless (logtest byte #x80) (return accumulator))))))
-      (let ((elsewhere-pc (decode-varint))
-            (start-pc (decode-varint))
-            #+unwind-to-frame-and-call-vop
-            ;; 0 -> NULL, 1 -> 0, ...
-            (bsp-save (let ((i (decode-varint))) (unless (zerop i) (1- i))))
-            #-fp-and-pc-standard-save
-            (lra-saved-pc (decode-varint))
-            #-fp-and-pc-standard-save
-            (cfp-saved-pc (decode-varint))
-            (closure-save (let ((i (decode-varint))) (unless (zerop i) (1- i)))))
-        (values start-pc elsewhere-pc closure-save
+      (let* ((elsewhere-pc (decode-varint))
+             (offset (decode-varint))
+             (form-number (decode-varint))
+             (start-pc (+ offset (decode-varint)))
+             #+unwind-to-frame-and-call-vop
+             ;; 0 -> NULL, 1 -> 0, ...
+             (bsp-save (let ((i (decode-varint)))
+                         (unless (zerop i)
+                           (make-sc+offset sb-vm:control-stack-sc-number (1- i)))))
+             #-fp-and-pc-standard-save
+             (lra-saved-pc (decode-varint))
+             #-fp-and-pc-standard-save
+             (cfp-saved-pc (decode-varint))
+             (closure-save (let ((i (decode-varint)))
+                             (unless (zerop i)
+                               (make-sc+offset sb-vm:control-stack-sc-number (1- i))))))
+        (values start-pc elsewhere-pc
+                form-number offset
+                closure-save
                 #-fp-and-pc-standard-save lra-saved-pc
                 #-fp-and-pc-standard-save cfp-saved-pc
                 #+unwind-to-frame-and-call-vop bsp-save)))))
@@ -253,6 +272,8 @@
   (def
     compiled-debug-fun-start-pc
     compiled-debug-fun-elsewhere-pc
+    compiled-debug-fun-form-number
+    compiled-debug-fun-offset
     ;; Most compiled-debug-funs don't need these
     compiled-debug-fun-closure-save
     #-fp-and-pc-standard-save compiled-debug-fun-lra-saved-pc
@@ -390,14 +411,8 @@
              (:include debug-info)
              (:copier nil)
              #-sb-xc-host (:pure t))
-  ;; a SIMPLE-VECTOR of alternating DEBUG-FUN objects and fixnum
-  ;; PCs, used to map PCs to functions, so that we can figure out what
-  ;; function we were running in. Each function is valid between the
-  ;; PC before it (inclusive) and the PC after it (exclusive). The PCs
-  ;; are in sorted order, to allow binary search. We omit the first
-  ;; and last PC, since their values are 0 and the length of the code
-  ;; vector.
-  (fun-map (missing-arg) :type simple-vector :read-only t)
+  ;; COMPILED-DEBUG-FUNs linked through COMPILED-DEBUG-FUN-NEXT
+  (fun-map (missing-arg) :type compiled-debug-fun)
   ;; Location contexts
   ;; A (simple-array * (*)) or a context if there's only one context.
   (contexts nil :type t :read-only t)

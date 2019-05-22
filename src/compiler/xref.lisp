@@ -11,8 +11,8 @@
 
 (in-package "SB-C")
 
-(declaim (type list *xref-kinds*))
-(defglobal *xref-kinds* '(:binds :calls :sets :references :macroexpands))
+(defconstant-eqx +xref-kinds+ #(:binds :calls :sets :references :macroexpands)
+  #'equalp)
 
 (defun record-component-xrefs (component)
   (declare (type component component))
@@ -140,15 +140,9 @@
     (symbol
      (or (eq '.anonymous. what)
          #-sb-xref-for-internals
-         (member (sb-xc:symbol-package what)
-                 (load-time-value
-                  (cons *cl-package*
-                        (remove-if-not
-                         (lambda (package)
-                           (= (mismatch "SB-" (package-name package))
-                              3))
-                         (list-all-packages)))
-                  t))))
+         (let ((pkg (sb-xc:symbol-package what)))
+           (or (and pkg (system-package-p pkg))
+               (eq pkg *cl-package*)))))
     (t t)))
 
 (defun record-xref (kind what context node path)
@@ -192,7 +186,7 @@
 ;;;; XREF-KIND-AND-ENTRY-COUNT is a variable-width integer cc...kkk
 ;;;; where c bits encode the number of integers (encoded entries)
 ;;;; following this integer and k bits encode the xref kind (index
-;;;; into *XREF-KINDS*) of the entries following the integer,
+;;;; into +XREF-KINDS+) of the entries following the integer,
 ;;;;
 ;;;; NAME-INDEX-AND-FORM-NUMBER is a (name-bits+number-bits)-bit integer
 ;;;; ii...nn... where i bits encode a name index (see below) and n
@@ -268,7 +262,7 @@
       ;; largest name index and form number respectively, occurring in
       ;; XREF-DATA.
       (labels ((collect-entries-for-kind (kind records)
-                 (let* ((kind-number (position kind *xref-kinds* :test #'eq))
+                 (let* ((kind-number (position kind +xref-kinds+ :test #'eq))
                         (kind-entries (cons kind-number '())))
                    (push kind-entries entries)
                    (mapc
@@ -304,8 +298,8 @@
              (loop for (index . numbers) in kind-entries
                 do (dolist (number numbers)
                      (write-var-integer (funcall encoder index number) vector))))
-        (setf (aref result 0) (!make-specialized-array
-                               (length vector) '(unsigned-byte 8) vector)))
+        (setf (aref result 0)
+              (sb-xc:coerce vector '(simple-array (unsigned-byte 8) 1))))
       ;; RESULT is adjustable. Make it simple.
       (coerce result 'simple-vector)))
 
@@ -314,7 +308,7 @@
   ;;;
   ;;;   (kind name form-number)
   ;;;
-  ;;; where KIND is the xref kind (see *XREF-KINDS*), NAME is the name
+  ;;; where KIND is the xref kind (see +XREF-KINDS+), NAME is the name
   ;;; of the referenced thing and FORM-NUMBER is the number of the
   ;;; form in which the reference occurred.
   (defun map-packed-xref-data (function xref-data)
@@ -328,7 +322,7 @@
       (loop while (< offset (length packed))
          do (binding* (((kind-number record-count)
                         (decode-kind-and-count (read-var-integerf packed offset)))
-                       (kind (nth kind-number *xref-kinds*)))
+                       (kind (elt +xref-kinds+ kind-number)))
               (loop repeat record-count
                  do (binding* (((index number)
                                 (funcall decoder (read-var-integerf packed offset)))

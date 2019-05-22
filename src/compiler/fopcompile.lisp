@@ -163,13 +163,6 @@
                              (not (eq operator 'declare))
                              (not (special-operator-p operator))
                              (not (macro-function operator)) ; redundant check
-                             ;; We can't FOP-FUNCALL with more than 255
-                             ;; parameters. (We could theoretically use
-                             ;; APPLY, but then we'd need to construct
-                             ;; the parameter list for APPLY without
-                             ;; calling LIST, which is probably more
-                             ;; trouble than it's worth).
-                             (<= (length args) 255)
                              (every #'fopcompilable-p args)))))))))))
 
  ;; Special version of FOPCOMPILABLE-P which recognizes toplevel calls
@@ -182,15 +175,24 @@
    (declare (ignore expand))
    (or (and (self-evaluating-p form)
             (constant-fopcompilable-p form))
+       ;; Arbitrary computed constants aren't supported because we don't know
+       ;; where in FOPCOMPILE's recursion it should stop recursing and just dump
+       ;; whatever the constant piece is. For example in (cons `(a ,(+ 1 2)) (f))
+       ;; the CAR is built wholly from foldable operators but the CDR is not.
+       ;; Constant symbols and QUOTE forms are generally fine to use though.
+       (and (symbolp form)
+            (eq (info :variable :kind form) :constant))
        (and (typep form '(cons (eql quote) (cons t null)))
             (constant-fopcompilable-p (constant-form-value form)))
        (and (listp form)
             (let ((function (car form)))
-              ;; It is assumed that uses of these three recognized functions
-              ;; are carefully controlled, and recursion on fopcompilable-p
-              ;; would say "yes" for each argument.
-              (or (member function '(sb-impl::%defun
-                                     sb-pcl::!trivial-defmethod
+              ;; Certain known functions have a special way of checking
+              ;; their fopcompilability in the cross-compiler.
+              (or ;; allow %DEFUN, also ensuring that any inline lambda gets
+                  ;; its constant structures (possibly containing COMMAs) noted
+                  ;; as dumpable literals.
+                  (and (eq function 'sb-impl::%defun) (fopcompilable-p (fourth form)))
+                  (member function '(sb-pcl::!trivial-defmethod
                                      sb-kernel::%defstruct))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(%defconstant sb-impl::%defparameter))
@@ -249,61 +251,75 @@
        (member (car form)
                '(lambda named-lambda lambda-with-lexenv))))
 
+;;; Return T if and only if OBJ's nature as an externalizable thing renders
+;;; it a leaf for dumping purposes. Symbols are leaflike despite havings slots
+;;; containing pointers; similarly (COMPLEX RATIONAL) and RATIO.
+(defun dumpable-leaflike-p (obj)
+  (or (sb-xc:typep obj '(or symbol number character unboxed-array
+                            debug-name-marker
+                            #+sb-simd-pack simd-pack
+                            #+sb-simd-pack-256 simd-pack-256))
+      ;; The cross-compiler wants to dump CTYPE instances as leaves,
+      ;; but CLASSOIDs are excluded since they have a MAKE-LOAD-FORM method.
+      #+sb-xc-host (cl:typep obj '(and ctype (not classoid)))
+      (sb-fasl:dumpable-layout-p obj)))
+
 ;;; Check that a literal form is fopcompilable. It would not be, for example,
 ;;; when the form contains structures with funny MAKE-LOAD-FORMS.
+;;; In particular, pathnames are not trivially dumpable because the HOST slot
+;;; might need to be dumped as a reference to the *PHYSICAL-HOST* symbol.
+;;; This function is nowhere near as OAOO-violating as it once was - it no
+;;; longer has local knowledge of the set of leaf types, nor how to test for
+;;; non-trivial instances. Sharing more code with MAYBE-EMIT-MAKE-LOAD-FORMS
+;;; might be a nice goal, but it seems relatively impossible to achieve.
 (defun constant-fopcompilable-p (constant)
   (declare (optimize (debug 1))) ;; TCO
-  (let ((xset (alloc-xset)))
-    (labels ((grovel (value)
-               ;; Unless VALUE is an object which which obviously
-               ;; can't contain other objects
-               ;; FIXME: OAOOM. See MAYBE-EMIT-MAKE-LOAD-FORMS.
-               (unless (sb-xc:typep value
-                              '(or #-sb-xc-host unboxed-array
-                                symbol
-                                number
-                                character
-                                string))
-                 (if (xset-member-p value xset)
-                     (return-from grovel nil)
-                     (add-to-xset value xset))
-                 (typecase value
-                   (cons
-                    (grovel (car value))
-                    (grovel (cdr value)))
-                   (simple-vector
-                    (dotimes (i (length value))
-                      (grovel (svref value i))))
-                   ((vector t)
-                    (dotimes (i (length value))
-                      (grovel (aref value i))))
-                   ((simple-array t)
-                    ;; Even though the (ARRAY T) branch does the exact
-                    ;; same thing as this branch we do this separately
-                    ;; so that the compiler can use faster versions of
-                    ;; array-total-size and row-major-aref.
-                    (dotimes (i (array-total-size value))
-                      (grovel (row-major-aref value i))))
-                   ((array t)
-                    (dotimes (i (array-total-size value))
-                      (grovel (row-major-aref value i))))
-                   (instance
-                    (case (%make-load-form value)
-                      (sb-fasl::fop-struct
-                         ;; FIXME: Why is this needed? If the constant
-                         ;; is deemed fopcompilable, then when we dump
-                         ;; it we bind *dump-only-valid-structures* to
-                         ;; NIL.
-                         (fasl-validate-structure value *compile-object*)
-                         ;; The above FIXME notwithstanding,
-                         ;; there's never a need to grovel a layout.
-                         (do-instance-tagged-slot (i value)
-                           (grovel (%instance-ref value i))))
-                      (:ignore-it)
-                      (t (return-from constant-fopcompilable-p nil))))
-                   (t
-                    (return-from constant-fopcompilable-p nil))))))
-      (grovel constant))
+  (let ((xset (alloc-xset))
+        (dumpable-instances))
+    (named-let grovel ((value constant))
+      ;; Unless VALUE is an object which which obviously
+      ;; can't contain other objects
+      (unless (dumpable-leaflike-p value)
+        (if (xset-member-p value xset)
+            (return-from grovel nil)
+            (add-to-xset value xset))
+        (typecase value
+          (cons
+           (grovel (car value))
+           (grovel (cdr value)))
+          (simple-vector
+           (dotimes (i (length value))
+             (grovel (svref value i))))
+          ((vector t)
+           (dotimes (i (length value))
+             (grovel (aref value i))))
+          ((simple-array t)
+           ;; Even though the (ARRAY T) branch does the exact
+           ;; same thing as this branch we do this separately
+           ;; so that the compiler can use faster versions of
+           ;; array-total-size and row-major-aref.
+           (dotimes (i (array-total-size value))
+             (grovel (row-major-aref value i))))
+          ((array t)
+           (dotimes (i (array-total-size value))
+             (grovel (row-major-aref value i))))
+          (instance
+           ;; Almost always, a make-load-form method will call
+           ;; MAKE-LOAD-FORM-SAVING-SLOTS for all slots. If so,
+           ;; then this structure is amenable to FOPCOMPILE.
+           ;; If not, then it isn't, which is not strictly true-
+           ;; the method might have returned a fopcompilable
+           ;; creation form and no init form. (Handling of
+           ;; circularity is best left to the main compiler.)
+           (unless (sb-fasl:load-form-is-default-mlfss-p value)
+             (return-from constant-fopcompilable-p nil))
+           (do-instance-tagged-slot (i value)
+             (grovel (%instance-ref value i)))
+           (push value dumpable-instances))
+          (t
+           (return-from constant-fopcompilable-p nil)))))
+    (dolist (instance dumpable-instances)
+      (fasl-note-dumpable-instance instance *compile-object*))
     t))
 
 ;;; FOR-VALUE-P is true if the value will be used (i.e., pushed onto
@@ -470,18 +486,14 @@
                           (when (eq (info :function :where-from operator) :assumed)
                             (note-undefined-reference operator :function))
                           (fopcompile-constant fasl operator t)
-                          (dolist (arg args)
-                            (fopcompile arg path t))
-                          (if for-value-p
-                              (dump-fop 'sb-fasl::fop-funcall fasl)
-                              (dump-fop 'sb-fasl::fop-funcall-for-effect fasl))
-                          (let ((n-args (length args)))
-                            ;; stub: FOP-FUNCALL isn't going to be usable
-                            ;; to compile more than this, since its count
-                            ;; is a single byte. Maybe we should just punt
-                            ;; to the ordinary compiler in that case?
-                            (aver (<= n-args 255))
-                            (sb-fasl::dump-byte n-args fasl))))))))))
+                          (let ((n 0))
+                            (dolist (arg args)
+                              (incf n)
+                              (fopcompile arg path t))
+                            (if for-value-p
+                                (dump-fop 'sb-fasl::fop-funcall fasl n)
+                                (dump-fop 'sb-fasl::fop-funcall-for-effect
+                                          fasl n)))))))))))
            (t
             (bug "looks unFOPCOMPILEable: ~S" form))))))
 
@@ -498,14 +510,12 @@
          (compiler-error "~S is not a legal function name." form))))
 
 (defun fopcompile-if (fasl args path for-value-p)
-  (destructuring-bind (condition then &optional else)
-      args
+  (destructuring-bind (condition then &optional else) args
     (let ((else-label (incf *fopcompile-label-counter*))
           (end-label (incf *fopcompile-label-counter*)))
-      (sb-fasl::dump-integer else-label fasl)
       (fopcompile condition path t)
       ;; If condition was false, skip to the ELSE
-      (dump-fop 'sb-fasl::fop-skip-if-false fasl)
+      (dump-fop 'sb-fasl::fop-skip-if-false fasl else-label)
       (fopcompile then path for-value-p)
       ;; The THEN branch will have produced a value even if we were
       ;; currently skipping to the ELSE branch (or over this whole
@@ -516,18 +526,15 @@
       (when for-value-p
         (dump-fop 'sb-fasl::fop-drop-if-skipping fasl))
       ;; Now skip to the END
-      (sb-fasl::dump-integer end-label fasl)
-      (dump-fop 'sb-fasl::fop-skip fasl)
+      (dump-fop 'sb-fasl::fop-skip fasl end-label)
       ;; Start of the ELSE branch
-      (sb-fasl::dump-integer else-label fasl)
-      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl)
+      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl else-label)
       (fopcompile else path for-value-p)
       ;; As before
       (when for-value-p
         (dump-fop 'sb-fasl::fop-drop-if-skipping fasl))
       ;; End of IF
-      (sb-fasl::dump-integer end-label fasl)
-      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl)
+      (dump-fop 'sb-fasl::fop-maybe-stop-skipping fasl end-label)
       ;; If we're still skipping, we must've triggered both of the
       ;; drop-if-skipping fops. To keep the stack balanced, push a
       ;; dummy value if needed.
@@ -536,9 +543,4 @@
 
 (defun fopcompile-constant (fasl form for-value-p)
   (when for-value-p
-    ;; FIXME: Without this binding the dumper chokes on unvalidated
-    ;; structures: CONSTANT-FOPCOMPILABLE-P validates the structure
-    ;; about to be dumped, not its load-form. Compare and contrast
-    ;; with EMIT-MAKE-LOAD-FORM.
-    (let ((sb-fasl::*dump-only-valid-structures* nil))
-      (dump-object form fasl))))
+    (dump-object form fasl)))

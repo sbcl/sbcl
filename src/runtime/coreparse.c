@@ -159,6 +159,7 @@ search_for_embedded_core(char *filename, struct memsize_options *memsize_options
             && optarray[0] == RUNTIME_OPTIONS_MAGIC) {
             memsize_options->dynamic_space_size = optarray[2];
             memsize_options->thread_control_stack_size = optarray[3];
+            memsize_options->thread_tls_bytes = optarray[4];
             memsize_options->present_in_core = 1;
         }
     }
@@ -380,8 +381,10 @@ static void adjust_pointers(lispobj *where, sword_t n_words, struct heap_adjust*
 
 #include "var-io.h"
 #include "unaligned.h"
-static void __attribute__((unused))
-adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_vaddr)
+static void
+adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
+                 struct code __attribute__((unused)) *code,
+                 lispobj __attribute__((unused)) original_vaddr)
 {
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Dynamic space always gets relocated before immobile space does,
@@ -423,7 +426,8 @@ adjust_code_refs(struct heap_adjust* adj, struct code* code, lispobj original_va
 #endif
 }
 
-static inline void fix_fun_header_layout(lispobj* fun, struct heap_adjust* adj)
+static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
+                                         struct heap_adjust __attribute__((unused)) *adj)
 {
 #if defined(LISP_FEATURE_COMPACT_INSTANCE_HEADER) && defined(LISP_FEATURE_64_BIT)
     lispobj ptr = function_layout(fun);
@@ -1095,6 +1099,12 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
         case END_CORE_ENTRY_TYPE_CODE:
             free(header);
             close(fd);
+#ifdef LISP_FEATURE_SB_THREAD
+            if ((int)SymbolValue(FREE_TLS_INDEX,0) >= dynamic_values_bytes) {
+                dynamic_values_bytes = (int)SymbolValue(FREE_TLS_INDEX,0) * 2;
+                // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
+            }
+#endif
             return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:

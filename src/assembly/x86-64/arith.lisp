@@ -128,7 +128,7 @@
     (inst cmp x rcx)
     (inst jmp :e SINGLE-WORD-BIGNUM)
 
-    (fixed-alloc res bignum-widetag (+ bignum-digits-offset 2) nil)
+    (alloc-other res bignum-widetag (+ bignum-digits-offset 2) nil)
     (storew rax res bignum-digits-offset other-pointer-lowtag)
     (storew rcx res (1+ bignum-digits-offset) other-pointer-lowtag)
     (inst clc) (inst ret)

@@ -1449,4 +1449,4 @@
      (inst jmp :eq DONE)
      (inst break single-step-before-trap)
      DONE
-     (note-this-location vop :step-before-vop)))
+     (note-this-location vop :internal-error)))

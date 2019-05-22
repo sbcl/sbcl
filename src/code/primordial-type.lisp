@@ -11,7 +11,7 @@
 
 (!begin-collecting-cold-init-forms)
 
-(!define-type-class named :enumerable nil :might-contain-other-types nil)
+(define-type-class named :enumerable nil :might-contain-other-types nil)
 
 (macrolet ((frob (type global-sym)
             `(progn
@@ -51,11 +51,6 @@
    ;; extended sequence hierarchy.  (Might be removed later if we use
    ;; a dedicated FUNDAMENTAL-SEQUENCE class for this.)
    (frob extended-sequence *extended-sequence-type*))
-
-;;; a vector that maps widetags to layouts, used for quickly finding
-;;; the layouts of built-in classes
-(defglobal **primitive-object-layouts** (make-array 256))
-(declaim (type simple-vector **primitive-object-layouts**))
 
 (!defun-from-collected-cold-init-forms !primordial-type-cold-init)
 

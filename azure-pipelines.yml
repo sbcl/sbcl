@@ -19,7 +19,7 @@ jobs:
 
   steps:
   - script: |
-     sudo apt-get -qq -y install sbcl
+     sudo apt-get -qq -y install sbcl libcapstone-dev
     displayName: 'install host sbcl'
 
   - script: |

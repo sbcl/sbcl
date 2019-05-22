@@ -31,6 +31,14 @@ it still has quite a few.  @xref{Contributed Modules}.
 @section Reader Extensions
 @cindex Reader Extensions
 
+@subsection Extended Package Prefix Syntax
+@cindex Extended Package Prefix Syntax
+@cindex Package Prefix Syntax, extended
+
+@vindex @cl{@earmuffs{package}}
+@cindex Interning Symbols
+@cindex Symbols, interning
+@findex @cl{intern}
 SBCL supports extended package prefix syntax, which allows specifying
 an alternate package instead of @code{*package*} for the reader to use
 as the default package for interning symbols:
@@ -45,8 +53,17 @@ Example:
   'foo::(bar quux zot) == '(foo::bar foo::quux foo::zot)
 @end lisp
 
-Doesn't alter @code{*package*}: if @code{foo::bar} would cause a
+@cindex Package Locks
+@vindex @cl{@earmuffs{package}}
+@code{*package*} is not rebound during the course of reading a form
+with extended package prefix syntax; if @code{foo::bar} would cause a
 read-time package lock violation, so does @code{foo::(bar)}.
+
+@subsection Symbol Name Normalization
+@cindex Symbol Name Normalization
+@cindex Normalization, Symbol Name
+@cindex Unicode
+@cindex NFKC
 
 SBCL also extends the reader to normalize all symbols to Normalization
 Form KC in builds with Unicode enabled. Whether symbols are normalized
@@ -60,10 +77,41 @@ Symbols created by
 @code{sb-ext:readtable-normalization} is @code{t}, symbols that are not
 normalized are escaped during printing.
 
+@subsection Decimal Syntax for Rationals
+@cindex Decimal Syntax for Rationals
+@cindex Rational, decimal syntax for
+@tindex @cl{float}
+
+SBCL supports a decimal syntax for rationals, modelled after the
+standard syntax for floating-point numbers.  If a number with
+floating-point syntax has an exponent marker of @code{r} or @code{R}
+(rather than one of the standard exponent markers), it is read as the
+rational with the exact value of the decimal number expressed as a
+float.
+
+@vindex @cl{@earmuffs{read-default-float-format}}
+@tindex @cl{rational}
+@findex @cl{read}
+@findex @cl{read-from-string}
+In addition, setting or binding the value of
+@code{*read-default-float-format*} to @code{rational} around a call to
+@code{read} or @code{read-from-string} has the effect that
+floating-point numbers without exponent markers are read as rational
+numbers, as if there had been an explicit @code{r} or @code{R} marker.
+
+@vindex @cl{@earmuffs{read-default-float-format}}
+@tindex @cl{rational}
+Floating point numbers of all types are printed with an exponent
+marker while the value of @code{*read-default-float-format*} is
+@code{rational}; however, rational numbers are printed in their
+standard syntax, irrespective of the value of
+@code{*read-default-float-format*}.
+
 @node  Package-Local Nicknames
 @comment  node-name,  next,  previous,  up
 @section Package-Local Nicknames
 @cindex Package-Local Nicknames
+@cindex Nicknames, Package-local
 
 SBCL allows giving packages local nicknames: they allow short and
 easy-to-use names to be used without fear of name conflict associated
@@ -74,8 +122,9 @@ has been specified. Different packages can use same local nickname for
 different global names, or different local nickname for same global
 name.
 
-Symbol @code{:package-local-nicknames} in @code{*features*} denotes the
-support for this feature.
+@vindex @cl{@earmuffs{features}}
+Symbol @code{:package-local-nicknames} in @code{*features*} denotes
+the support for this feature.
 
 @findex @cl{defpackage}
 @defmac @cl{defpackage} name [[option]]* @result{} package
@@ -92,6 +141,9 @@ actual packages.
 
 Example:
 
+@findex @cl{find-symbol}
+@findex @cl{find-package}
+@vindex @cl{@earmuffs{package}}
 @lisp
 (defpackage :bar (:intern "X"))
 (defpackage :foo (:intern "X"))
@@ -417,6 +469,10 @@ to the symbol-macro @code{+slot-unbound+}.
 * Simple Iterator Protocol::
 @end menu
 
+@tindex @cl{sequence}
+@tindex @cl{vector}
+@findex @cl{find}
+@findex @cl{subseq}
 ANSI Common Lisp has a class @code{sequence} with subclasses @code{list} and
 @code{vector} on which the ``sequence functions'' like @code{find},
 @code{subseq}, etc. operate. As an extension to the ANSI specification,
@@ -426,11 +482,11 @@ of this extension can be found in the paper @cite{Rhodes, Christophe
 (2007): User-extensible sequences in Common Lisp} available for download
 at
 @url{http://www.doc.gold.ac.uk/~mas01cr/papers/ilc2007/sequences-20070301.pdf}.}.
-@tindex @cl{sequence}
-@tindex @cl{vector}
-@findex @cl{find}
-@findex @cl{subseq}
 
+@findex @cl{coerce}
+@findex @cl{subseq}
+@findex @cl{make-instance}
+@tindex @cl{list}
 Users of this extension just make instances of @code{sequence} subclasses
 and transparently operate on them using sequence functions:
 @lisp
@@ -438,21 +494,17 @@ and transparently operate on them using sequence functions:
 @end lisp
 From this perspective, no distinction between builtin and user-defined
 @code{sequence} subclasses should be necessary.
-@findex @cl{coerce}
-@findex @cl{subseq}
-@findex @cl{make-instance}
-@tindex @cl{list}
 
 Providers of the extension, that is of user-defined @code{sequence}
 subclasses, have to adhere to a ``sequence protocol'' which consists of
 a set of generic functions in the @code{sequence} package.
 
+@tindex @cl{sequence}
+@tindex @cl{standard-object}
 A minimal @code{sequence} subclass has to specify @code{standard-object} and
 @code{sequence} as its superclasses and has to be the specializer of the
 @code{sequence} parameter of methods on at least the following generic
 functions:
-@tindex @cl{sequence}
-@tindex @cl{standard-object}
 
 @include fun-sb-sequence-length.texinfo
 @include fun-sb-sequence-elt.texinfo
@@ -460,6 +512,11 @@ functions:
 @include fun-sb-sequence-adjust-sequence.texinfo
 @include fun-sb-sequence-make-sequence-like.texinfo
 
+@tindex @cl{sequence}
+@findex @sequence{make-sequence-like}
+@findex @cl{subseq}
+@findex @cl{copy-seq}
+@findex @sequence{adjust-sequence}
 @code{make-sequence-like} is needed for functions returning
 freshly-allocated sequences such as @code{subseq} or
 @code{copy-seq}. @code{adjust-sequence} is needed for functions which
@@ -469,11 +526,6 @@ functions and actually are, if no additional methods are
 defined. However, relying on these generic implementations, in
 particular not implementing the iterator protocol can incur a high
 performance penalty @xref{Iterator Protocol}.
-@tindex @cl{sequence}
-@findex @sequence{make-sequence-like}
-@findex @cl{subseq}
-@findex @cl{copy-seq}
-@findex @sequence{adjust-sequence}
 
 When the sequence protocol is only partially implemented for a given
 @code{sequence} subclass, an attempt to apply one of the missing
@@ -561,9 +613,9 @@ first argument. However, the corresponding generic functions
 @include fun-sb-sequence-merge.texinfo
 @end itemize
 
+@findex @cl{dolist}
 In the spirit of @code{dolist}, generic sequences can be traversed using
 the macro
-@findex @cl{dolist}
 
 @include macro-sb-sequence-dosequence.texinfo
 
@@ -608,13 +660,13 @@ An iterator is created by calling:
 
 @include fun-sb-sequence-make-sequence-iterator.texinfo
 
+@findex @sequence{make-sequence-iterator}
+@findex @sequence{make-simple-sequence-iterator}
+@tindex @cl{sequence}
 Note that @code{make-sequence-iterator} calls
 @code{make-simple-sequence-iterator} when there is no specialized
 method for a particular @code{sequence} subclass. @xref{Simple Iterator
 Protocol}.
-@findex @sequence{make-sequence-iterator}
-@findex @sequence{make-simple-sequence-iterator}
-@tindex @cl{sequence}
 
 The following convenience macros simplify traversing sequences using
 iterators:
@@ -715,11 +767,16 @@ following functions are available for use with processes:
 @node  Unicode Support
 @comment  node-name,  next,  previous,  up
 @section Unicode Support
+@cindex Unicode
 
 SBCL provides support for working with Unicode text and querying the
 standard Unicode database for information about individual codepoints.
 Unicode-related functions are located in the @code{sb-unicode} package.
 
+@cindex Character Names
+@cindex Name, of character
+@findex @cl{name-char}
+@findex @cl{char-name}
 SBCL also extends ANSI character literal syntax to support Unicode
 codepoints. You can either specify a character by its Unicode name, with
 spaces replaced by underscores, if a unique name exists @footnote{Please
@@ -818,6 +875,7 @@ codepoint.
 @include fun-sb-unicode-line-break-class.texinfo
 
 @subsection String operations
+@cindex Normalization, String
 
 SBCL can normalize strings using:
 
@@ -836,13 +894,12 @@ functions
 
 @include fun-sb-unicode-casefold.texinfo
 
-It also extends standard Common Lisp case functions such as
 @findex @cl{string-upcase}
-@code{string-upcase} and
 @findex @cl{char-downcase}
-@code{string-downcase} to support a subset of Unicode's casing behavior.
-Specifically, a character is
 @findex @cl{both-case-p}
+It also extends standard Common Lisp case functions such as
+@code{string-upcase} and @code{string-downcase} to support a subset of
+Unicode's casing behavior.  Specifically, a character is
 @code{both-case-p} if its case mapping in Unicode is one-to-one and
 invertable.
 
@@ -959,6 +1016,8 @@ arguments to @code{make-hash-table}.
 @section Random Number Generation
 @cindex Random Number Generation
 
+@vindex @cl{@earmuffs{random-state}}
+@findex @cl{make-random-state}
 The initial value of @code{*random-state*} is the same each time SBCL
 is started. This makes it possible for user code to obtain repeatable
 pseudo random numbers using only standard-provided functionality. See
@@ -967,6 +1026,7 @@ seed the random number generator from given data for an additional
 possibility to achieve this. Non-repeatable random numbers can always
 be obtained using @code{(make-random-state t)}.
 
+@findex @cl{random}
 The sequence of numbers produced by repeated calls to @code{random}
 starting with the same random state and using the same sequence of
 @code{limit} arguments is guaranteed to be reproducible only in the
@@ -982,13 +1042,16 @@ under 32-bit word size.
 
 @include fun-sb-ext-seed-random-state.texinfo
 
+@tindex @cl{float}
 Some notes on random floats: The standard doesn't prescribe a specific
 method of generating random floats. The following paragraph describes
-SBCL's current implementation and should be taken purely informational,
-that is, user code should not depend on any of its specific properties.
-The method used has been chosen because it is common, conceptually
-simple and fast.
+SBCL's current implementation and should be taken as purely
+informational, that is, user code should not depend on any of its
+specific properties.  The method used has been chosen because it is
+common, conceptually simple and fast.
 
+@findex @cl{expt}
+@findex @cl{random}
 To generate random floats, SBCL evaluates code that has an equivalent
 effect as
 @lisp
@@ -1043,6 +1106,7 @@ Some operations such as thread synchronization primitives accept a
 @code{:timeout} parameter. @xref{Timeout Parameters}.
 
 @item Synchronous Timeouts (Deadlines)
+@findex @cl{sleep}
 Certain operations that may suspend execution for extended periods of
 time such as @code{cl:sleep}, thread synchronization primitives, IO and
 waiting for external processes respect deadlines established for a part
@@ -1066,15 +1130,14 @@ somewhat unsafe. @xref{Asynchronous Timeouts}.
 @subsection Timeout Parameters
 @cindex Timeout
 
-Certain operations accept @code{:timeout} keyword arguments. These only
-affect the specific operation and must be specified at each call site by
-passing a @code{:timeout} keyword argument and a corresponding timeout
-value to the respective operation. Expiration of the timeout before the
-operation completes results in either a normal return with a return
-value indicating the timeout or in the signaling of a specialized
-condition such as
 @tindex @sbthread{join-thread-error}
-@code{sb-thread:join-thread-error}.
+Certain operations accept @code{:timeout} keyword arguments. These
+only affect the specific operation and must be specified at each call
+site by passing a @code{:timeout} keyword argument and a corresponding
+timeout value to the respective operation. Expiration of the timeout
+before the operation completes results in either a normal return with
+a return value indicating the timeout or in the signaling of a
+specialized condition such as @code{sb-thread:join-thread-error}.
 
 Example:
 
@@ -1087,12 +1150,12 @@ Example:
     value))
 @end lisp
 
-The above code attempts to join the specified thread for up to five
-seconds, returning its value in case of success. If the thread is still
-running after the five seconds have elapsed,
 @findex @sbthread{join-thread}
-@code{sb-thread:join-thread} indicates the timeout in its second return
-value. If a @code{:default} value was not provided,
+The above code attempts to join the specified thread for up to five
+seconds, returning its value in case of success. If the thread is
+still running after the five seconds have elapsed,
+@code{sb-thread:join-thread} indicates the timeout in its second
+return value. If a @code{:default} value was not provided,
 @code{sb-thread:join-thread} would signal a
 @code{sb-thread:join-thread-error} instead.
 
@@ -1146,6 +1209,9 @@ Example:
     (sb-ext:run-program "my-program"))
 @end lisp
 
+@findex @cl{read-line}
+@findex @cl{sleep}
+@findex @sbext{run-program}
 The above code establishes a deadline of five seconds within which the
 body of the @code{do-it} function should execute. All calls of
 deadline-aware functions in the dynamic scope, in this case two
@@ -1212,6 +1278,7 @@ stale code, and their interface might need to be cleaned up. If you
 have urgent need of them, look at the code in @file{src/code/gc.lisp}
 and bring it up on the developers' mailing list.
 
+@findex @sbext{float-denormalized-p}
 SBCL has various hooks inherited from CMUCL, like
 @code{sb-ext:float-denormalized-p}, to allow a program to take
 advantage of IEEE floating point arithmetic properties which aren't
@@ -1228,6 +1295,7 @@ list.
 @comment  node-name,  next,  previous,  up
 @section Efficiency Hacks
 
+@findex @sbext{purify}
 The @code{sb-ext:purify} function causes SBCL first to collect all
 garbage, then to mark all uncollected objects as permanent, never again
 attempting to collect them as garbage. This can cause a large increase
@@ -1247,6 +1315,8 @@ not checked. In short: don't use it.
 
 @include special-operator-sb-ext-truly-the.texinfo
 
+@cindex @code{freeze-type} declaration
+@cindex Declaration, @code{freeze-type}
 The @code{sb-ext:freeze-type} declaration declares that a
 type will never change, which can make type testing
 (@code{typep}, etc.) more efficient for structure types.

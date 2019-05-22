@@ -34,6 +34,7 @@
 
            #:scratch-file-name
            #:with-scratch-file
+           #:opaque-identity
            #:runtime #:split-string #:integer-sequence #:shuffle))
 
 (in-package :test-util)
@@ -96,8 +97,9 @@
 
 ;;; Thread tools
 
-#+sb-thread
 (defun make-kill-thread (&rest args)
+  #-sb-thread (error "can't make-kill-thread ~s" args)
+  #+sb-thread
   (let ((thread (apply #'sb-thread:make-thread args)))
     #-win32 ;; poor thread interruption on safepoints
     (when (boundp '*threads-to-kill*)
@@ -247,9 +249,9 @@
            (typecase x
              (symbol (let ((package (symbol-package x)))
                        (or (null package)
+                           (sb-int:system-package-p package)
                            (eql package (find-package "CL"))
-                           (eql package (find-package "KEYWORD"))
-                           (eql (mismatch "SB-" (package-name package)) 3))))
+                           (eql package (find-package "KEYWORD")))))
              (integer t))))
     (unless (tree-equal name name :test #'name-ok)
       (error "test name must be all-keywords: ~S" name)))
@@ -278,10 +280,11 @@
 
 (defun report-test-status ()
   (with-standard-io-syntax
-    (with-open-file (stream "test-status.lisp-expr"
+    (with-open-file (stream #.(merge-pathnames "test-status.lisp-expr"
+                                               *load-pathname*)
                             :direction :output
                             :if-exists :supersede)
-      (format stream "~s~%" *results*))))
+        (format stream "~s~%" *failures*))))
 
 (defun start-test ()
   (unless (eq *test-file* *load-pathname*)
@@ -838,6 +841,10 @@
 
 (defmacro runtime (form &key (repetitions 5) (precision 30))
   `(runtime* (lambda () ,form) ,repetitions ,precision))
+
+(declaim (notinline opaque-identity))
+(defun opaque-identity (x) x)
+(compile 'opaque-identity) ; in case this file was loaded as interpreted code
 
 (defun split-string (string delimiter)
   (loop for begin = 0 then (1+ end)

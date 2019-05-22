@@ -755,7 +755,7 @@ default-value-8
                     (inst comb := stepping zero-tn step-done-label :nullify t)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the BREAK.
-                    (note-this-location vop :step-before-vop)
+                    (note-this-location vop :internal-error)
                     ;; Construct a trap code with the low bits from
                     ;; SINGLE-STEP-AROUND-TRAP and the high bits from
                     ;; the register number of CALLABLE-TN.
@@ -769,11 +769,11 @@ default-value-8
                 `((sc-case name
                     (descriptor-reg (move name name-pass))
                     (control-stack
-                     (inst ldw (ash (tn-offset name) word-shift)
+                     (inst ldw (tn-byte-offset name)
                            cfp-tn name-pass)
                      (do-next-filler))
                     (constant
-                     (inst ldw (- (ash (tn-offset name) word-shift)
+                     (inst ldw (- (tn-byte-offset name)
                                   other-pointer-lowtag)
                            code-tn name-pass)
                      (do-next-filler)))
@@ -790,12 +790,12 @@ default-value-8
                     (descriptor-reg
                      (move arg-fun lexenv))
                     (control-stack
-                     (inst ldw (ash (tn-offset arg-fun) word-shift)
+                     (inst ldw (tn-byte-offset arg-fun)
                            cfp-tn lexenv)
                      (do-next-filler))
                     (constant
                      (inst ldw
-                           (- (ash (tn-offset arg-fun) word-shift)
+                           (- (tn-byte-offset arg-fun)
                               other-pointer-lowtag) code-tn lexenv)
                      (do-next-filler)))
                   (inst ldw (- (ash closure-fun-slot word-shift)
@@ -1219,7 +1219,7 @@ default-value-8
     (inst comb := stepping zero-tn DONE :nullify t)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the BREAK.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
     (inst break 0 single-step-before-trap)

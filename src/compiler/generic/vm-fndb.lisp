@@ -187,7 +187,7 @@
   ())
 (defknown %set-funcallable-instance-layout (funcallable-instance layout) layout
   ())
-(defknown %instance-length (instance) index
+(defknown %instance-length (instance) (integer 0 #.sb-vm:short-header-max-words)
   (foldable flushable))
 (defknown %instance-cas (instance index t t) t ())
 (defknown %instance-ref (instance index) t
@@ -240,7 +240,8 @@
 ;;; Allocate an unboxed, non-fancy vector with type code TYPE, length LENGTH,
 ;;; and WORDS words long. Note: it is your responsibility to ensure that the
 ;;; relation between LENGTH and WORDS is correct.
-(defknown allocate-vector ((unsigned-byte 8) index
+;;; The extra bit beyond N_WIDETAG_BITS is for the vector weakness flag.
+(defknown allocate-vector ((unsigned-byte 9) index
                            ;; The number of words is later converted
                            ;; to bytes, make sure it fits.
                            (and index
@@ -264,6 +265,13 @@
 
 (defknown make-weak-pointer (t) weak-pointer
   (flushable))
+
+(defknown make-weak-vector (index &key (:initial-element t)
+                                       (:initial-contents t))
+  simple-vector (flushable)
+  :derive-type (lambda (call)
+                 (derive-make-array-type (first (combination-args call))
+                                         't nil nil nil call)))
 
 (defknown %make-complex (real real) complex
   (flushable movable))
@@ -357,8 +365,11 @@
     system-area-pointer
     (flushable))
 
-(defknown ensure-symbol-tls-index (symbol) (and fixnum unsigned-byte))
-
+#+sb-thread
+(progn (defknown ensure-symbol-tls-index (symbol)
+         (and fixnum unsigned-byte)) ; not flushable
+       (defknown symbol-tls-index (symbol)
+         (and fixnum unsigned-byte) (flushable)))
 
 ;;;; debugger support
 
@@ -555,8 +566,11 @@
   (movable foldable flushable))
 
 #+64-bit
+(progn
+(defknown %make-double-float ((signed-byte 64)) double-float
+  (movable flushable))
 (defknown double-float-bits (double-float) (signed-byte 64)
-  (movable foldable flushable))
+  (movable foldable flushable)))
 
 (defknown double-float-high-bits (double-float) (signed-byte 32)
   (movable foldable flushable))

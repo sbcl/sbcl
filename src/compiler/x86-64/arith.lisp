@@ -1749,16 +1749,15 @@ constant shift greater than word length")))
     (inst test digit digit)))
 
 
-;;; For add and sub with carry the sc of carry argument is any-reg so
-;;; that it may be passed as a fixnum or word and thus may be 0, 1, or
-;;; 8. This is easy to deal with and may save a fixnum-word
-;;; conversion.
+;;; For add and sub with carry, the sc of carry argument is unsigned-reg
+;;; or any-reg so that it may be passed either as tagged or untagged.
+;;; This is easy to deal with and may save a fixnum-word conversion.
 (define-vop (add-w/carry)
   (:translate sb-bignum:%add-with-carry)
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg) :target result)
          (b :scs (unsigned-reg unsigned-stack) :to :eval)
-         (c :scs (any-reg) :target temp))
+         (c :scs (any-reg unsigned-reg control-stack) :target temp))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 2) :to :eval) temp)
   (:results (result :scs (unsigned-reg) :from (:argument 0))
@@ -1769,8 +1768,8 @@ constant shift greater than word length")))
     (move temp c)
     (inst neg temp) ; Set the carry flag to 0 if c=0 else to 1
     (inst adc result b)
-    (inst mov carry 0)
-    (inst adc carry carry)))
+    (inst set carry :c)
+    (inst and :dword carry 1)))
 
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86-64 convention.
@@ -1779,7 +1778,7 @@ constant shift greater than word length")))
   (:policy :fast-safe)
   (:args (a :scs (unsigned-reg) :to :eval :target result)
          (b :scs (unsigned-reg unsigned-stack) :to :result)
-         (c :scs (any-reg control-stack)))
+         (c :scs (any-reg unsigned-reg control-stack)))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:results (result :scs (unsigned-reg) :from :eval)
             (borrow :scs (unsigned-reg)))
@@ -1789,7 +1788,7 @@ constant shift greater than word length")))
     (move result a)
     (inst sbb result b)
     (inst mov borrow 1)
-    (inst sbb borrow 0)))
+    (inst sbb :dword borrow 0)))
 
 
 (define-vop (bignum-mult-and-add-3-arg)

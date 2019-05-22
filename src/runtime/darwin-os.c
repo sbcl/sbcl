@@ -220,52 +220,26 @@ void darwin_init(void)
 inline void
 os_sem_init(os_sem_t *sem, unsigned int value)
 {
-    if (KERN_SUCCESS!=semaphore_create(mach_task_self(), sem, SYNC_POLICY_FIFO, (int)value))
+    if (!(*sem = dispatch_semaphore_create(value)))
         lose("os_sem_init(%p): %s", sem, strerror(errno));
 }
 
 inline void
 os_sem_wait(os_sem_t *sem, char *what)
 {
-    kern_return_t ret;
-  restart:
-    FSHOW((stderr, "%s: os_sem_wait(%p)\n", what, sem));
-    ret = semaphore_wait(*sem);
-    FSHOW((stderr, "%s: os_sem_wait(%p) => %s\n", what, sem,
-           KERN_SUCCESS==ret ? "ok" : strerror(errno)));
-    switch (ret) {
-    case KERN_SUCCESS:
-        return;
-        /* It is unclear just when we can get this, but a sufficiently
-         * long wait seems to do that, at least sometimes.
-         *
-         * However, a wait that long is definitely abnormal for the
-         * GC, so we complain before retrying.
-         */
-    case KERN_OPERATION_TIMED_OUT:
-        fprintf(stderr, "%s: os_sem_wait(%p): %s", what, sem, strerror(errno));
-        /* This is analogous to POSIX EINTR. */
-    case KERN_ABORTED:
-        goto restart;
-    default:
-        lose("%s: os_sem_wait(%p): %lu, %s",
-             what, sem, (long unsigned)ret, strerror(errno));
-    }
+    dispatch_semaphore_wait(*sem, DISPATCH_TIME_FOREVER);
 }
 
 void
 os_sem_post(os_sem_t *sem, char *what)
 {
-    if (KERN_SUCCESS!=semaphore_signal(*sem))
-        lose("%s: os_sem_post(%p): %s", what, sem, strerror(errno));
-    FSHOW((stderr, "%s: os_sem_post(%p) ok\n", what, sem));
+    dispatch_semaphore_signal(*sem);
 }
 
 void
 os_sem_destroy(os_sem_t *sem)
 {
-    if (-1==semaphore_destroy(mach_task_self(), *sem))
-        lose("os_sem_destroy(%p): %s", sem, strerror(errno));
+    dispatch_release(*sem);
 }
 
 #endif
@@ -346,7 +320,7 @@ sb_nanosleep(time_t sec, int nsec) {
     mach_timespec_t current_time;
     mach_timespec_t start_time;
 
-    if (sec < 0 || nsec >= NSEC_PER_SEC) {
+    if (sec < 0 || nsec >= (int)NSEC_PER_SEC) {
         errno = EINVAL;
         return -1;
     }

@@ -273,10 +273,11 @@
 ;; If optional OUTPUT is supplied, it is used, otherwise output is allocated.
 ;; For efficiency the OUTPUT should be provided as a dynamic-extent array.
 ;;
-(defun unpackify-infos (input &optional (output nil output-supplied-p))
-  (declare (simple-vector input))
-  (unless output-supplied-p
-    (setq output (make-array (compute-unpackified-info-size input))))
+(defun unpackify-infos (input &optional (output
+                                         (make-array
+                                          (compute-unpackified-info-size input))
+                                         output-supplied-p))
+  (declare (simple-vector input output))
   (let ((i (length input)) (j -1))  ; input index and output index respectively
     (declare (type index-or-minus-1 i j))
     (!with-packed-info-iterator (next-field input :descriptor-index desc-idx)

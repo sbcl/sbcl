@@ -63,7 +63,7 @@
       (loadw temp thing 0 lowtag)
       (inst srwi temp temp n-widetag-bits)
       (inst cmpwi temp 0)
-      (inst slwi temp temp (1- (integer-length n-word-bytes)))
+      (inst slwi temp temp word-shift)
       (inst beq bogus)
       (unless (= lowtag other-pointer-lowtag)
         (inst addi temp temp (- lowtag other-pointer-lowtag)))

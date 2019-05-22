@@ -703,8 +703,9 @@
           (combination
            (unless (eq (combination-kind use)
                        :error)
-             (let ((name (lvar-fun-name
-                          (basic-combination-fun use)))
+             (let ((name (uncross
+                          (lvar-fun-name
+                           (basic-combination-fun use))))
                    (args (basic-combination-args use)))
                (case name
                  ((%typep %instance-typep)

@@ -24,7 +24,7 @@
              (let ((tn (symbolicate reg "-TN")))
                `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg)) ()
                   (inst push ,tn)
-                  (fixed-alloc ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
+                  (alloc-other ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
                   (popw ,tn bignum-digits-offset other-pointer-lowtag)))))
   (def eax)
   (def ebx)
@@ -43,11 +43,11 @@
                   ;; here we minimize garbage.
                   (inst jmp :ns one-word-bignum)
                   ;; Two word bignum
-                  (fixed-alloc ,tn bignum-widetag (+ bignum-digits-offset 2) nil)
+                  (alloc-other ,tn bignum-widetag (+ bignum-digits-offset 2) nil)
                   (popw ,tn bignum-digits-offset other-pointer-lowtag)
                   (inst ret)
                   ONE-WORD-BIGNUM
-                  (fixed-alloc ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
+                  (alloc-other ,tn bignum-widetag (+ bignum-digits-offset 1) nil)
                   (popw ,tn bignum-digits-offset other-pointer-lowtag)))))
   (def eax)
   (def ebx)
@@ -117,7 +117,14 @@
        (inst push scratch-reg)
        (inst mov scratch-reg free-tls-index-ea)
        (inst and scratch-reg #x7FFFFFFF) ; mask off the sign
-       (inst cmp scratch-reg (* tls-size n-word-bytes))
+       #+win32
+       (progn ; need to use another register
+         (inst push edx-tn)
+         (inst mov edx-tn (make-fixup "dynamic_values_bytes" :foreign-dataref))
+         (inst cmp scratch-reg (make-ea :dword :base edx-tn))
+         (inst pop edx-tn))
+       #-win32 (inst cmp scratch-reg
+                     (make-ea :dword :disp (ash thread-tls-size-slot word-shift)) :fs)
        (inst jmp :ae tls-full)
        ;; Assign the tls-index into the symbol
        (inst mov (tls-index-of symbol) scratch-reg)

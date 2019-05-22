@@ -42,5 +42,5 @@
   (:policy :fast-safe)
   (:translate eq)
   (:generator 3
-    (inst cmpw x y)
+    (inst cmpd x y)
     (inst b? (if not-p :ne :eq) target)))

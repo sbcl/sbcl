@@ -43,7 +43,8 @@
   ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
   ;; corresponds to offset 0 in this segment
   (initial-offset 0 :type index)
-  (hooks nil :type list))
+  (hooks nil :type list)
+  debug-fun)
 
 ;;; All state during disassembly. We store some seemingly redundant
 ;;; information so that we can allow garbage collect during disassembly and

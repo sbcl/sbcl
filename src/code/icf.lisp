@@ -273,7 +273,7 @@
                            (plusp (code-n-entries obj)))
                   (incf count)))
               :all)
-             (make-weak-vector count)))
+             (make-array count)))
           (referenced-objects
            (make-hash-table :test #'eq)))
       ;; Pass 2: collect them.

@@ -114,7 +114,8 @@
 
 (defun maybe-defined-here (name where)
   (if (and (eq :defined where)
-           (member name *fun-names-in-this-file* :test #'equal))
+           (boundp '*compilation*)
+           (member name (fun-names-in-this-file *compilation*) :test #'equal))
       :defined-here
       where))
 
@@ -315,22 +316,10 @@
 ;;; any subparts) are dumpable at all.
 (defun maybe-emit-make-load-forms (constant &optional (name nil namep))
   (let ((xset (alloc-xset)))
-    (labels ((trivialp (value)
-               (sb-xc:typep value
-                      '(or
-                        #-sb-xc-host
-                        (or unboxed-array #+sb-simd-pack simd-pack
-                                          #+sb-simd-pack-256 simd-pack-256)
-                        #+sb-xc-host
-                        (and array (not (array t)))
-                        symbol
-                        number
-                        character
-                        string))) ; subsumed by UNBOXED-ARRAY
-             (grovel (value)
+    (labels ((grovel (value)
                ;; Unless VALUE is an object which which obviously
                ;; can't contain other objects
-               (unless (trivialp value)
+               (unless (dumpable-leaflike-p value)
                  (if (xset-member-p value xset)
                      (return-from grovel nil)
                      (add-to-xset value xset))
@@ -378,12 +367,7 @@
                        can't be dumped into fasl files."
                      (type-of value)))))))
       ;; Dump all non-trivial named constants using the name.
-      (if (and namep (not (typep constant '(or symbol character
-                                            ;; FIXME: Cold init breaks if we
-                                            ;; try to reference FP constants
-                                            ;; thru their names.
-                                            #+sb-xc-host number
-                                            #-sb-xc-host fixnum))))
+      (if (and namep (not (sb-xc:typep constant '(or symbol character fixnum))))
           (emit-make-load-form constant name)
           (grovel constant))))
   (values))
@@ -944,7 +928,7 @@
 ;;; ctran. Otherwise insert code coverage instrumentation after
 ;;; START, and return the new ctran.
 (defun instrument-coverage (start mode form
-                            &aux (metadata *compiler-coverage-metadata*))
+                            &aux (metadata (coverage-metadata *compilation*)))
   ;; We don't actually use FORM for anything, it's just convenient to
   ;; have around when debugging the instrumentation.
   (declare (ignore form))
@@ -1710,6 +1694,17 @@
     (warn-repeated-optimize-qualities (lexenv-policy lexenv) optimize-qualities)
     (values lexenv result-type (cdr post-binding-lexenv)
             lambda-list explicit-check)))
+
+(defun process-muffle-decls (decls lexenv)
+  (flet ((process-it (spec)
+           (cond ((atom spec))
+                 ((member (car spec) '(muffle-conditions unmuffle-conditions))
+                  (setq lexenv
+                        (process-1-decl spec lexenv nil nil nil nil))))))
+    (dolist (decl decls)
+      (dolist (spec (rest decl))
+        (process-it spec))))
+  lexenv)
 
 (defun %processing-decls (decls vars fvars ctran lvar binding-form-p fun)
   (multiple-value-bind (*lexenv* result-type post-binding-lexenv)

@@ -13,6 +13,29 @@
 
 (defvar *tmp-filename* "load-test.tmp")
 
+;;; These tests are essentially the same as in compiler.pure.lisp
+;;; They have to be run before we mess up *DEFAULT-PATHNAME-DEFAULTS*
+(with-test (:name :load-as-source-error-position-reporting)
+  ;; These test errors that occur during READ
+  (dolist (input '("data/wonky1.lisp" "data/wonky2.lisp" "data/wonky3.lisp"))
+    (let ((expect (with-open-file (f input) (read f))))
+      (assert (stringp expect))
+      (let ((err-string
+             (block foo
+               ;; you can't query the stream position with HANDLER-CASE
+               ;; because it closes before the condition is formatted.
+               (handler-bind ((error (lambda (c)
+                                       (return-from foo
+                                         (write-to-string c :escape nil)))))
+                 (load input)))))
+        (assert (search expect err-string)))))
+
+  ;; This tests an error that occur during EVAL
+  (let ((s (with-output-to-string (*error-output*)
+             (handler-bind ((error #'abort)) (load "data/wonky4.lisp")))))
+    (assert (search "While evaluating the form starting at line 16, column 1"
+                    s))))
+
 ;;; Save this because we're going to mess up the path in the following SETQ.
 (defvar *parallel-load-source-file* (truename "parallel-fasl-load-test.lisp"))
 

@@ -62,9 +62,33 @@
   ;; keys ... data ...
   )
 
+;;; Is X is a positive prime integer?
+(defun positive-primep (x)
+  ;; This happens to be called only from one place in sbcl-0.7.0, and
+  ;; only for fixnums, we can limit it to fixnums for efficiency. (And
+  ;; if we didn't limit it to fixnums, we should use a cleverer
+  ;; algorithm, since this one scales pretty badly for huge X.)
+  (declare (fixnum x))
+  (if (<= x 5)
+      (and (>= x 2) (/= x 4))
+      (and (not (evenp x))
+           (not (zerop (rem x 3)))
+           (do ((q 6)
+                (r 1)
+                (inc 2 (logxor inc 6)) ;; 2,4,2,4...
+                (d 5 (+ d inc)))
+               ((or (= r 0) (> d q)) (/= r 0))
+             (declare (fixnum inc))
+             (multiple-value-setq (q r) (truncate x d))))))
+
+;;; Given any non-negative integer, return a prime number >= to it.
 (declaim (ftype (sfunction (unsigned-byte)
                            (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
                 primify))
+(defun primify (x)
+  (do ((n (logior x 1) (+ n 2)))
+      ((positive-primep n) n)))
+
 (defun make-info-storage (n-cells-min &optional (load-factor $.7))
   ;; If you ask for 40 entries at 50% load, you get (PRIMIFY 80) entries.
   (let* ((n-cells (primify (ceiling n-cells-min load-factor)))

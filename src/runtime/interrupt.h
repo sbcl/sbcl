@@ -14,6 +14,7 @@
 
 #include "runtime.h"
 #include <string.h>
+#include "genesis/static-symbols.h"
 
 extern void get_current_sigmask(sigset_t *sigset);
 
@@ -119,7 +120,10 @@ extern boolean handle_guard_page_triggered(os_context_t *,os_vm_address_t);
 extern boolean maybe_defer_handler(void *handler, struct interrupt_data *data,
                                    int signal, siginfo_t *info,
                                    os_context_t *context);
-#if defined LISP_FEATURE_GENCGC
+
+#ifdef DO_PENDING_INTERRUPT
+#define do_pending_interrupt ((void(*)(void))SYMBOL(DO_PENDING_INTERRUPT)->value)
+#elif defined(LISP_FEATURE_GENCGC)
 /* assembly language stub that executes trap_PendingInterrupt */
 extern void do_pending_interrupt(void);
 #endif

@@ -1823,22 +1823,22 @@
       (test-minimal-debug-info-for-unstored-but-used-parameter (1- n) a)))
 
 ;;; &KEY arguments with non-constant defaults.
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x) x)
 (defstruct tricky-defaults
   (fun #'identity :type function)
-  (num (opaque-identity 3) :type fixnum))
-(macrolet ((frob (form expected-expected-type)
-             `(handler-case ,form
-               (type-error (c) (assert (eq (type-error-expected-type c)
-                                           ',expected-expected-type)))
-               (:no-error (&rest vals) (error "~S returned values: ~S" ',form vals)))))
-  (frob (make-tricky-defaults :fun 3) function)
-  (frob (make-tricky-defaults :num #'identity) fixnum))
+  (num (test-util:opaque-identity 3) :type fixnum))
+
+(test-util:with-test (:name :defstruct-tricky-defaults)
+  (macrolet ((frob (form expected-expected-type)
+               `(handler-case ,form
+                  (type-error (c) (assert (eq (type-error-expected-type c)
+                                              ',expected-expected-type)))
+                  (:no-error (&rest vals) (error "~S returned values: ~S" ',form vals)))))
+    (frob (make-tricky-defaults :fun 3) function)
+    (frob (make-tricky-defaults :num #'identity) fixnum)))
 
 (test-util:with-test (:name (compile &key :non-constant :default))
   (let ((fun (test-util:checked-compile
-              '(lambda (&key (key (opaque-identity 3)))
+              '(lambda (&key (key (test-util:opaque-identity 3)))
                  (declare (optimize safety) (type integer key))
                  key))))
     (assert (= (funcall fun) 3))

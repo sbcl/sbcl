@@ -22,14 +22,14 @@
 
 (!begin-collecting-cold-init-forms)
 
-(!define-type-class alien :enumerable nil :might-contain-other-types nil)
+(define-type-class alien :enumerable nil :might-contain-other-types nil)
 
-(!define-type-method (alien :negate) (type) (make-negation-type type))
+(define-type-method (alien :negate) (type) (make-negation-type type))
 
-(!define-type-method (alien :unparse) (type)
+(define-type-method (alien :unparse) (type)
   `(alien ,(unparse-alien-type (alien-type-type-alien-type type))))
 
-(!define-type-method (alien :simple-subtypep) (type1 type2)
+(define-type-method (alien :simple-subtypep) (type1 type2)
   (values (alien-subtype-p (alien-type-type-alien-type type1)
                            (alien-type-type-alien-type type2))
           t))
@@ -40,14 +40,14 @@
 ;;; late.
 (!define-superclasses alien ((alien-value)) progn)
 
-(!define-type-method (alien :simple-=) (type1 type2)
+(define-type-method (alien :simple-=) (type1 type2)
   (let ((alien-type-1 (alien-type-type-alien-type type1))
         (alien-type-2 (alien-type-type-alien-type type2)))
     (values (or (eq alien-type-1 alien-type-2)
                 (alien-type-= alien-type-1 alien-type-2))
             t)))
 
-(!def-type-translator alien (&optional (alien-type nil))
+(def-type-translator alien (&optional (alien-type nil))
   (typecase alien-type
     (null
      (make-alien-type-type))

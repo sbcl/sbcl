@@ -2862,16 +2862,15 @@ bootstrapping.
                         (sb-c::compiled-debug-info-tlf-number debug-info)
                         (sb-c::compiled-debug-fun-form-number debug-fun))))
                    (debug-info-debug-function (function debug-info)
+
                      (let ((map (sb-c::compiled-debug-info-fun-map debug-info))
                            (name (sb-kernel:%simple-fun-name (sb-kernel:%fun-fun function))))
-                       (or
-                        (find-if
-                         (lambda (x)
-                           (and
-                            (sb-c::compiled-debug-fun-p x)
-                            (eq (sb-c::compiled-debug-fun-name x) name)))
-                         map)
-                        (elt map 0))))
+                       (or (loop for fmap-entry = map then next
+                                 for next = (sb-c::compiled-debug-fun-next fmap-entry)
+                                 when (eq (sb-c::compiled-debug-fun-name fmap-entry) name)
+                                 return fmap-entry
+                                 while next)
+                           map)))
                    (make-method (spec)
                      (destructuring-bind
                          (lambda-list specializers qualifiers fun-name) spec

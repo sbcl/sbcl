@@ -32,7 +32,7 @@
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
 #include "thread.h"
-#include "gc-internal.h"
+#include "gc.h"
 #include "code.h"
 #include "var-io.h"
 
@@ -255,7 +255,9 @@ struct call_info {
     int pc; /* Note: this is the trace file offset, not the actual pc. */
 };
 
-#define HEADER_LENGTH(header) ((header)>>8)
+// simple-fun headers have a pointer to layout-of-function in the
+// upper bytes if words are 8 bytes, so mask off those bytes.
+#define HEADER_LENGTH(header) (((header)>>8) & FUN_HEADER_NWORDS_MASK)
 
 static int previous_info(struct call_info *info);
 
@@ -375,19 +377,14 @@ previous_info(struct call_info *info)
         }
     } else if (fixnump(lra)) {
         info->code = (struct code*)native_pointer(this_frame->code);
+        // FIXME: is this right? fixnumish LRAs are based off the object base address
+        // and not the code text start?
         info->pc = (uword_t)(info->code + lra);
         info->lra = NIL;
     } else {
         info->code = code_pointer(lra);
-
         if (info->code != NULL)
-            info->pc = (uword_t)native_pointer(info->lra) -
-                (uword_t)info->code -
-#ifndef LISP_FEATURE_ALPHA
-                (HEADER_LENGTH(info->code->header) * sizeof(lispobj));
-#else
-        (HEADER_LENGTH(((struct code *)info->code)->header) * sizeof(lispobj));
-#endif
+            info->pc = (char*)native_pointer(info->lra) - code_text_start(info->code);
         else
             info->pc = 0;
     }
@@ -426,7 +423,7 @@ lisp_backtrace(int nframes)
             printf(" <no LRA>");
 
         if (info.pc)
-            printf(" pc = %p", (void*)(long)info.pc);
+            printf(" pc_ofs = %p", (void*)(long)info.pc);
         putchar('\n');
 
     } while (i++ < nframes && previous_info(&info));
@@ -532,11 +529,11 @@ describe_thread_state(void)
     printf("Pending handler = %p\n", data->pending_handler);
 }
 
-static void print_backtrace_frame(void *pc, void *fp, int i, FILE *f) {
+static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
     lispobj *p;
     fprintf(f, "%4d: ", i);
 
-    p = component_ptr_from_pc((lispobj *) pc);
+    p = component_ptr_from_pc(pc);
 
     if (p) {
         struct code *cp = (struct code *) p;

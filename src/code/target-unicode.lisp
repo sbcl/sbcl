@@ -15,62 +15,61 @@
 (sb-ext:define-load-time-global **special-numerics**
   #.(sb-cold:read-from-file "output/numerics.lisp-expr"))
 
-(declaim (type (simple-array (unsigned-byte 32) (*)) **block-ranges**))
-(sb-ext:define-load-time-global **block-ranges**
-  #.(!coerce-to-specialized
-     (sb-cold:read-from-file "output/blocks.lisp-expr")
-     '(unsigned-byte 32)))
-
 (macrolet ((unicode-property-init ()
-             (let ((proplist-dump
-                    (sb-cold:read-from-file "output/misc-properties.lisp-expr"))
-                   (confusable-sets
-                    (sb-cold:read-from-file "output/confusables.lisp-expr"))
+             (let ((confusable-sets
+                     (sb-cold:read-from-file "output/confusables.lisp-expr"))
                    (bidi-mirroring-list
-                    (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
+                     (sb-cold:read-from-file "output/bidi-mirrors.lisp-expr")))
                `(progn
-                  (sb-ext:define-load-time-global **proplist-properties**
-                    ',proplist-dump)
+                  (sb-ext:define-load-time-global **proplist-properties** nil)
                   (sb-ext:define-load-time-global **confusables**
-                    ',confusable-sets)
+                      ',confusable-sets)
                   (sb-ext:define-load-time-global **bidi-mirroring-glyphs**
-                    ',bidi-mirroring-list)
+                      ',bidi-mirroring-list)
                   (defun !unicode-properties-cold-init ()
-                    (let ((hash (make-hash-table)) (list ',proplist-dump))
-                      (do ((k (car list) (car list)) (v (cadr list) (cadr list)))
-                          ((not list) hash)
-                        (setf (gethash k hash) v)
-                        (setf list (cddr list)))
-                      (setf **proplist-properties** hash))
-                    (let ((hash (make-hash-table :test #'equal)))
-                      (loop for set in ',confusable-sets
-                         for items = (mapcar #'(lambda (item)
-                                                 (map 'simple-string
-                                                      #'code-char item))
-                                             #+sb-unicode set
-                                             #-sb-unicode
-                                             (remove-if-not
-                                              #'(lambda (item)
-                                                  (every
-                                                   #'(lambda (x)
-                                                       (< x sb-xc:char-code-limit))
-                                                   item)) set))
-                         do (dolist (i items)
-                              (setf (gethash (logically-readonlyize (possibly-base-stringize i))
-                                             hash)
-                                    (logically-readonlyize
-                                     (possibly-base-stringize (first items))))))
+                    ;;
+                    (let ((hash (make-hash-table :test 'eq))
+                          (list ',(sb-cold:read-from-file
+                                   "output/misc-properties.lisp-expr")))
+                      (setq **proplist-properties** hash)
+                      (loop for (symbol ranges) on list by #'cddr
+                            do (setf (gethash symbol hash)
+                                     (coerce ranges '(vector (unsigned-byte 32))))))
+                    ;;
+                    (let* ((data ',confusable-sets)
+                           (hash (make-hash-table :test #'eq
+                                                  #+sb-unicode :size #+sb-unicode (length data))))
+                      (loop for (source . target) in data
+                            when (and #-sb-unicode
+                                      (< source sb-xc:char-code-limit))
+                            do (flet ((minimize (x)
+                                        (case (length x)
+                                          (1
+                                           (elt x 0))
+                                          (2
+                                           (pack-3-codepoints (elt x 0) (elt x 1)))
+                                          (3
+                                           (pack-3-codepoints (elt x 0) (elt x 1) (elt x 2)))
+                                          (t
+                                           (logically-readonlyize
+                                            (possibly-base-stringize
+                                             (map 'string #'code-char x)))))))
+
+                                 (setf (gethash (code-char source) hash)
+                                       (minimize target))))
                       (setf **confusables** hash))
-                    (let ((hash (make-hash-table)) (list ',bidi-mirroring-list))
+                    ;;
+                    (let* ((list ',bidi-mirroring-list)
+                           (hash (make-hash-table :test #'eq :size (length list))))
                       (loop for (k v) in list do
-                           (setf (gethash k hash) v))
+                            (setf (gethash k hash) v))
                       (setf **bidi-mirroring-glyphs** hash)))))))
   (unicode-property-init))
 
 ;;; Unicode property access
 (defun ordered-ranges-member (item vector)
-  (declare (type simple-vector vector)
-           (type fixnum item)
+  (declare (type (simple-array (unsigned-byte 32) 1) vector)
+           (type char-code item)
            (optimize speed))
   (labels ((recurse (start end)
              (declare (type index start end)
@@ -78,8 +77,8 @@
              (when (< start end)
                (let* ((i (+ start (truncate (the index (- end start)) 2)))
                       (index (* 2 i))
-                      (elt1 (svref vector index))
-                      (elt2 (svref vector (1+ index))))
+                      (elt1 (aref vector index))
+                      (elt2 (aref vector (1+ index))))
                  (declare (type index i)
                           (fixnum elt1 elt2))
                  (cond ((< item elt1)
@@ -118,113 +117,14 @@ with underscores replaced by dashes."
   (ordered-ranges-member (char-code character)
                          (gethash property **proplist-properties**)))
 
-;; WARNING: These have to be manually kept in sync with the values in ucd.lisp
-(declaim (type simple-vector *general-categories* *bidi-classes* *east-asian-widths*
-               *scripts* *line-break-classes* *blocks*))
-(sb-ext:define-load-time-global *general-categories*
-  #(:Lu :Ll :Lt :Lm :Lo :Cc :Cf :Co :Cs :Cn :Mc :Me :Mn :Nd
-    :Nl :No :Pc :Pd :Pe :Pf :Pi :Po :Ps :Sc :Sk :Sm :So :Zl
-    :Zp :Zs))
-
-(sb-ext:define-load-time-global *bidi-classes*
-  #(:BN :AL :AN :B :CS :EN :ES :ET :L :LRE :LRO :NSM :ON
-    :PDF :R :RLE :RLO :S :WS :LRI :RLI :FSI :PDI))
-
-(sb-ext:define-load-time-global *east-asian-widths*
-  #(:N :A :H :W :F :Na))
-
-(sb-ext:define-load-time-global *scripts*
-  #(:Unknown :Common :Latin :Greek :Cyrillic :Armenian :Hebrew :Arabic :Syriac
-    :Thaana :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil :Telugu
-    :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian :Hangul
-    :Ethiopic :Cherokee :Canadian-Aboriginal :Ogham :Runic :Khmer :Mongolian
-    :Hiragana :Katakana :Bopomofo :Han :Yi :Old-Italic :Gothic :Deseret
-    :Inherited :Tagalog :Hanunoo :Buhid :Tagbanwa :Limbu :Tai-Le :Linear-B
-    :Ugaritic :Shavian :Osmanya :Cypriot :Braille :Buginese :Coptic :New-Tai-Lue
-    :Glagolitic :Tifinagh :Syloti-Nagri :Old-Persian :Kharoshthi :Balinese
-    :Cuneiform :Phoenician :Phags-Pa :Nko :Sundanese :Lepcha :Ol-Chiki :Vai
-    :Saurashtra :Kayah-Li :Rejang :Lycian :Carian :Lydian :Cham :Tai-Tham
-    :Tai-Viet :Avestan :Egyptian-Hieroglyphs :Samaritan :Lisu :Bamum :Javanese
-    :Meetei-Mayek :Imperial-Aramaic :Old-South-Arabian :Inscriptional-Parthian
-    :Inscriptional-Pahlavi :Old-Turkic :Kaithi :Batak :Brahmi :Mandaic :Chakma
-    :Meroitic-Cursive :Meroitic-Hieroglyphs :Miao :Sharada :Sora-Sompeng
-    :Takri :Bassa-Vah :Mahajani :Pahawh-Hmong :Caucasian-Albanian :Manichaean
-    :Palmyrene :Duployan :Mende-Kikakui :Pau-Cin-Hau :Elbasan :Modi
-    :Psalter-Pahlavi :Grantha :Mro :Siddham :Khojki :Nabataean :Tirhuta
-    :Khudawadi :Old-North-Arabian :Warang-Citi :Linear-A :Old-Permic))
-
-(sb-ext:define-load-time-global *line-break-classes*
-    #(:XX :AI :AL :B2 :BA :BB :BK :CB :CJ :CL :CM :CP :CR :EX :GL
-      :HL :HY :ID :IN :IS :LF :NL :NS :NU :OP :PO :PR :QU :RI :SA
-      :SG :SP :SY :WJ :ZW))
-
-(sb-ext:define-load-time-global *blocks*
-  #(:Basic-Latin :Latin-1-Supplement :Latin-Extended-A :Latin-Extended-B
-    :IPA-Extensions :Spacing-Modifier-Letters :Combining-Diacritical-Marks
-    :Greek-and-Coptic :Cyrillic :Cyrillic-Supplement :Armenian :Hebrew :Arabic
-    :Syriac :Arabic-Supplement :Thaana :NKo :Samaritan :Mandaic
-    :Arabic-Extended-A :Devanagari :Bengali :Gurmukhi :Gujarati :Oriya :Tamil
-    :Telugu :Kannada :Malayalam :Sinhala :Thai :Lao :Tibetan :Myanmar :Georgian
-    :Hangul-Jamo :Ethiopic :Ethiopic-Supplement :Cherokee
-    :Unified-Canadian-Aboriginal-Syllabics :Ogham :Runic :Tagalog :Hanunoo
-    :Buhid :Tagbanwa :Khmer :Mongolian
-    :Unified-Canadian-Aboriginal-Syllabics-Extended :Limbu :Tai-Le :New-Tai-Lue
-    :Khmer-Symbols :Buginese :Tai-Tham :Combining-Diacritical-Marks-Extended
-    :Balinese :Sundanese :Batak :Lepcha :Ol-Chiki :Sundanese-Supplement
-    :Vedic-Extensions :Phonetic-Extensions :Phonetic-Extensions-Supplement
-    :Combining-Diacritical-Marks-Supplement :Latin-Extended-Additional
-    :Greek-Extended :General-Punctuation :Superscripts-and-Subscripts
-    :Currency-Symbols :Combining-Diacritical-Marks-for-Symbols
-    :Letterlike-Symbols :Number-Forms :Arrows :Mathematical-Operators
-    :Miscellaneous-Technical :Control-Pictures :Optical-Character-Recognition
-    :Enclosed-Alphanumerics :Box-Drawing :Block-Elements :Geometric-Shapes
-    :Miscellaneous-Symbols :Dingbats :Miscellaneous-Mathematical-Symbols-A
-    :Supplemental-Arrows-A :Braille-Patterns :Supplemental-Arrows-B
-    :Miscellaneous-Mathematical-Symbols-B :Supplemental-Mathematical-Operators
-    :Miscellaneous-Symbols-and-Arrows :Glagolitic :Latin-Extended-C :Coptic
-    :Georgian-Supplement :Tifinagh :Ethiopic-Extended :Cyrillic-Extended-A
-    :Supplemental-Punctuation :CJK-Radicals-Supplement :Kangxi-Radicals
-    :Ideographic-Description-Characters :CJK-Symbols-and-Punctuation :Hiragana
-    :Katakana :Bopomofo :Hangul-Compatibility-Jamo :Kanbun :Bopomofo-Extended
-    :CJK-Strokes :Katakana-Phonetic-Extensions :Enclosed-CJK-Letters-and-Months
-    :CJK-Compatibility :CJK-Unified-Ideographs-Extension-A
-    :Yijing-Hexagram-Symbols :CJK-Unified-Ideographs :Yi-Syllables :Yi-Radicals
-    :Lisu :Vai :Cyrillic-Extended-B :Bamum :Modifier-Tone-Letters
-    :Latin-Extended-D :Syloti-Nagri :Common-Indic-Number-Forms :Phags-pa
-    :Saurashtra :Devanagari-Extended :Kayah-Li :Rejang :Hangul-Jamo-Extended-A
-    :Javanese :Myanmar-Extended-B :Cham :Myanmar-Extended-A :Tai-Viet
-    :Meetei-Mayek-Extensions :Ethiopic-Extended-A :Latin-Extended-E
-    :Meetei-Mayek :Hangul-Syllables :Hangul-Jamo-Extended-B :High-Surrogates
-    :High-Private-Use-Surrogates :Low-Surrogates :Private-Use-Area
-    :CJK-Compatibility-Ideographs :Alphabetic-Presentation-Forms
-    :Arabic-Presentation-Forms-A :Variation-Selectors :Vertical-Forms
-    :Combining-Half-Marks :CJK-Compatibility-Forms :Small-Form-Variants
-    :Arabic-Presentation-Forms-B :Halfwidth-and-Fullwidth-Forms :Specials
-    :Linear-B-Syllabary :Linear-B-Ideograms :Aegean-Numbers
-    :Ancient-Greek-Numbers :Ancient-Symbols :Phaistos-Disc :Lycian :Carian
-    :Coptic-Epact-Numbers :Old-Italic :Gothic :Old-Permic :Ugaritic :Old-Persian
-    :Deseret :Shavian :Osmanya :Elbasan :Caucasian-Albanian :Linear-A
-    :Cypriot-Syllabary :Imperial-Aramaic :Palmyrene :Nabataean :Phoenician
-    :Lydian :Meroitic-Hieroglyphs :Meroitic-Cursive :Kharoshthi
-    :Old-South-Arabian :Old-North-Arabian :Manichaean :Avestan
-    :Inscriptional-Parthian :Inscriptional-Pahlavi :Psalter-Pahlavi :Old-Turkic
-    :Rumi-Numeral-Symbols :Brahmi :Kaithi :Sora-Sompeng :Chakma :Mahajani
-    :Sharada :Sinhala-Archaic-Numbers :Khojki :Khudawadi :Grantha :Tirhuta
-    :Siddham :Modi :Takri :Warang-Citi :Pau-Cin-Hau :Cuneiform
-    :Cuneiform-Numbers-and-Punctuation :Egyptian-Hieroglyphs :Bamum-Supplement
-    :Mro :Bassa-Vah :Pahawh-Hmong :Miao :Kana-Supplement :Duployan
-    :Shorthand-Format-Controls :Byzantine-Musical-Symbols :Musical-Symbols
-    :Ancient-Greek-Musical-Notation :Tai-Xuan-Jing-Symbols
-    :Counting-Rod-Numerals :Mathematical-Alphanumeric-Symbols :Mende-Kikakui
-    :Arabic-Mathematical-Alphabetic-Symbols :Mahjong-Tiles :Domino-Tiles
-    :Playing-Cards :Enclosed-Alphanumeric-Supplement
-    :Enclosed-Ideographic-Supplement :Miscellaneous-Symbols-and-Pictographs
-    :Emoticons :Ornamental-Dingbats :Transport-and-Map-Symbols
-    :Alchemical-Symbols :Geometric-Shapes-Extended :Supplemental-Arrows-C
-    :CJK-Unified-Ideographs-Extension-B :CJK-Unified-Ideographs-Extension-C
-    :CJK-Unified-Ideographs-Extension-D :CJK-Compatibility-Ideographs-Supplement
-    :Tags :Variation-Selectors-Supplement :Supplementary-Private-Use-Area-A
-    :Supplementary-Private-Use-Area-B))
+(eval-when (:compile-toplevel)
+  (defvar *slurped-random-constants*
+    (sb-cold:read-from-file "tools-for-build/more-ucd-consts.lisp-expr"))
+  (defun read-ucd-constant (symbol)
+    (map 'vector
+         (lambda (x) (keywordicate (substitute #\- #\_ (string-upcase x))))
+         (or (cadr (assoc symbol *slurped-random-constants*))
+             (error "Missing entry in more-ucd-consts for ~S" symbol)))))
 
 (declaim (inline svref-or-null))
 (defun svref-or-null (vector index)
@@ -233,7 +133,8 @@ with underscores replaced by dashes."
 
 (defun general-category (character)
   "Returns the general category of CHARACTER as it appears in UnicodeData.txt"
-  (svref-or-null *general-categories* (sb-impl::ucd-general-category character)))
+  (svref-or-null #.(read-ucd-constant '*general-categories*)
+                 (sb-impl::ucd-general-category character)))
 
 (defun bidi-class (character)
   "Returns the bidirectional class of CHARACTER"
@@ -241,7 +142,7 @@ with underscores replaced by dashes."
            (default-ignorable-p character))
       :Bn
       (svref-or-null
-       *bidi-classes*
+       #.(read-ucd-constant '*bidi-classes*)
        (aref **character-misc-database** (1+ (misc-index character))))))
 
 (declaim (inline combining-class))
@@ -296,7 +197,7 @@ Otherwise, returns NIL."
   "Returns the East Asian Width property of CHARACTER as
 one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
 :W (Wide), :F (Fullwidth), or :NA (Not applicable)"
-  (svref-or-null *east-asian-widths*
+  (svref-or-null #.(read-ucd-constant '*east-asian-widths*)
                  (ldb (byte 3 0)
                       (aref **character-misc-database**
                             (+ 5 (misc-index character))))))
@@ -304,16 +205,20 @@ one of the keywords :N (Narrow), :A (Ambiguous), :H (Halfwidth),
 (defun script (character)
   "Returns the Script property of CHARACTER as a keyword.
 If CHARACTER does not have a known script, returns :UNKNOWN"
-  (svref-or-null *scripts*
+  (svref-or-null #.(read-ucd-constant '*scripts*)
                  (aref **character-misc-database** (+ 6 (misc-index character)))))
 
 (defun char-block (character)
   "Returns the Unicode block in which CHARACTER resides as a keyword.
 If CHARACTER does not have a known block, returns :NO-BLOCK"
   (let* ((code (char-code character))
-         (block-index (ordered-ranges-position code **block-ranges**)))
+         (block-index (ordered-ranges-position
+                       code
+                       #.(sb-xc:coerce (sb-cold:read-from-file "output/block-ranges.lisp-expr")
+                                       '(vector (unsigned-byte 32))))))
     (if block-index
-        (aref *blocks* block-index) :no-block)))
+        (aref #.(sb-cold:read-from-file "output/block-names.lisp-expr") block-index)
+        :no-block)))
 
 (defun unicode-1-name (character)
   "Returns the name assigned to CHARACTER in Unicode 1.0 if it is distinct
@@ -363,7 +268,7 @@ Ideographic (:ID) class instead of Alphabetic (:AL)."
   (when (and resolve (listp character)) (setf character (car character)))
   (when (and resolve (not character)) (return-from line-break-class :nil))
   (let ((raw-class
-         (svref-or-null *line-break-classes*
+         (svref-or-null #.(read-ucd-constant '*line-break-classes*)
                         (aref **character-misc-database** (+ 7 (misc-index character)))))
         (syllable-type (hangul-syllable-type character)))
     (when syllable-type
@@ -440,6 +345,10 @@ are excluded."
 disappears when accents are placed on top of it. and NIL otherwise"
   (proplist-p character :soft-dotted))
 
+(eval-when (:compile-toplevel)
+  (sb-xc:defmacro coerce-to-ordered-ranges (array)
+    (sb-xc:coerce array '(vector (unsigned-byte 32)))))
+
 (defun default-ignorable-p (character)
   "Returns T if CHARACTER is a Default_Ignorable_Code_Point"
   (and
@@ -450,8 +359,9 @@ disappears when accents are placed on top of it. and NIL otherwise"
     (or (whitespace-p character)
         (ordered-ranges-member
          (char-code character)
-         #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
-           #x110BD #x110BD))))))
+         (coerce-to-ordered-ranges
+          #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
+            #x110BD #x110BD)))))))
 
 
 ;;; Implements UAX#15: Normalization Forms
@@ -719,14 +629,24 @@ only characters for which it returns T are collected."
 
 (defun char-uppercase (char)
   (if (has-case-p char)
-      (let ((cp (car (char-case-info char))))
-        (if (atom cp) (list (code-char cp)) (mapcar #'code-char cp)))
+      (let ((cp (char-case-info char)))
+        (if (consp cp)
+            (let ((cp (car cp)))
+              (if (atom cp)
+                  (list (code-char cp))
+                  (mapcar #'code-char cp)))
+            (list (code-char (ldb (byte 21 21) cp)))))
       (list char)))
 
 (defun char-lowercase (char)
   (if (has-case-p char)
-      (let ((cp (cdr (char-case-info char))))
-        (if (atom cp) (list (code-char cp)) (mapcar #'code-char cp)))
+      (let ((cp (char-case-info char)))
+        (if (consp cp)
+            (let ((cp (cdr cp)))
+              (if (atom cp)
+                  (list (code-char cp))
+                  (mapcar #'code-char cp)))
+            (list (code-char (ldb (byte 21 0) cp)))))
       (list char)))
 
 (defun char-titlecase (char)
@@ -1000,11 +920,13 @@ grapheme breaking rules specified in UAX #29, returning a list of strings."
   (when (listp char) (setf char (car char)))
   (let ((cp (when char (char-code char)))
         (gc (when char (general-category char)))
-        (newlines #(#xB #xC #x0085 #x0085 #x2028 #x2029))
+        (newlines
+         (coerce-to-ordered-ranges #(#xB #xC #x0085 #x0085 #x2028 #x2029)))
         (also-katakana
-         #(#x3031 #x3035 #x309B #x309C
-           #x30A0 #x30A0 #x30FC #x30FC
-           #xFF70 #xFF70))
+         (coerce-to-ordered-ranges
+          #(#x3031 #x3035 #x309B #x309C
+            #x30A0 #x30A0 #x30FC #x30FC
+            #xFF70 #xFF70)))
         (midnumlet #(#x002E #x2018 #x2019 #x2024 #xFE52 #xFF07 #xFF0E))
         (midletter
          #(#x003A #x00B7 #x002D7 #x0387 #x05F4 #x2027 #xFE13 #xFE55 #xFF1A))
@@ -1437,12 +1359,13 @@ it defaults to 80 characters"
   #.(sb-cold:read-from-file "output/other-collation-info.lisp-expr"))
 
 (defun unpack-collation-key (key)
-  (declare (type (simple-array (unsigned-byte 32) (*)) key))
-  (loop for value across key
-        collect
-        (list (ldb (byte 16 16) value)
-              (ldb (byte 11 5) value)
-              (ldb (byte 5 0) value))))
+  (flet ((unpack (value)
+           (list (ldb (byte 16 16) value)
+                 (ldb (byte 11 5) value)
+                 (ldb (byte 5 0) value))))
+    (declare (inline unpack))
+    (loop for i by 32 below (max (integer-length key) 1)
+          collect (unpack (ldb (byte 32 i) key)))))
 
 (declaim (inline variable-p))
 (defun variable-p (x)
@@ -1608,20 +1531,17 @@ with variable-weight characters, as described in UTS #10"
 ;;; Confusable detection
 
 (defun canonically-deconfuse (string)
-  (let (ret (i 0) new-i (len (length string))
-            best-node)
-    (loop while (< i len) do
-         (loop for offset from 1 to 5
-            while (<= (+ i offset) len)
-            do
-              (let ((node (gethash (subseq string i (+ i offset))
-                                   **confusables**)))
-                (when node (setf best-node node new-i (+ i offset)))))
-         (cond
-           (best-node (push best-node ret) (setf i new-i))
-           (t (push (subseq string i (1+ i)) ret) (incf i)))
-         (setf best-node nil new-i nil))
-    (apply #'concatenate 'string (nreverse ret))))
+  (let (result)
+    (loop for char across string
+          for deconfused = (gethash char **confusables**)
+          do (cond ((not deconfused)
+                    (push (string char) result))
+                   ((integerp deconfused)
+                    (push (sb-impl::unpack-3-codepoints deconfused)
+                          result))
+                   (t
+                    (push deconfused result))))
+    (apply #'concatenate 'string (nreverse result))))
 
 (defun confusable-p (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Determines whether STRING1 and STRING2 could be visually confusable

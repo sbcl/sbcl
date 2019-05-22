@@ -227,8 +227,8 @@
     (unless (eq (tn-kind num) :unused)
       (move num count))
     (move rcx count)
-    (inst jrcxz DONE)
     (zeroize loop-index)
+    (inst jrcxz DONE)
     LOOP
     (inst sub loop-index n-word-bytes)
     (inst mov temp (ea source loop-index))

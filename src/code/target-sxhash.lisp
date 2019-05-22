@@ -71,6 +71,17 @@
          (xy (logand (+ (* x mul) y) sb-xc:most-positive-fixnum)))
     (logand (logxor xor xy (ash xy -5)) sb-xc:most-positive-fixnum)))
 
+;;; Same as above, but don't mask computations to n-positive-fixnum-bits.
+(declaim (inline word-mix))
+(defun word-mix (x y)
+  (declare (optimize (speed 3)))
+  (declare (type word x y))
+  (declare (muffle-conditions compiler-note))
+  (let* ((mul (logand 3622009729038463111 most-positive-word))
+         (xor (logand 608948948376289905 most-positive-word))
+         (xy (logand (+ (* x mul) y) most-positive-word)))
+    (logand (logxor xor xy (ash xy -5)) most-positive-word)))
+
 ;; Return a number that increments by 1 for each word-pair allocation,
 ;; barring complications such as exhaustion of the current page.
 ;; The result is guaranteed to be a positive fixnum.
@@ -556,12 +567,8 @@
                             ((float-infinity-p key)
                              ;; {single,double}-float infinities are EQUALP
                              (if (minusp key)
-                                 (load-time-value
-                                  (sxhash (symbol-value 'sb-ext:single-float-negative-infinity))
-                                  t)
-                                 (load-time-value
-                                  (sxhash (symbol-value 'sb-ext:single-float-positive-infinity))
-                                  t)))
+                                 (sxhash sb-ext:single-float-negative-infinity)
+                                 (sxhash sb-ext:single-float-positive-infinity)))
                             (t
                              (multiple-value-bind (q r) (floor key)
                                (if (zerop (the ,type r))

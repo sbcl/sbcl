@@ -191,6 +191,8 @@
     "ZEROP" "ABS" "SIGNUM" "FLOAT-SIGN"
     "CEILING" "FLOOR" "ROUND" "TRUNCATE" "MOD" "REM"
     ;;
+    "SXHASH" ; must package-qualify if you mean CL:SXHASH
+    ;;
     "BYTE" "BYTE-POSITION" "BYTE-SIZE"
     "DPB" "LDB" "LDB-TEST"
     "DEPOSIT-FIELD" "MASK-FIELD"))
@@ -308,6 +310,7 @@
                   "SINGLE-FLOAT-NEGATIVE-EPSILON"
                   "*READ-DEFAULT-FLOAT-FORMAT*"
 
+                  "ARRAY-ELEMENT-TYPE"
                   "CHAR-CODE"
                   "CODE-CHAR"
                   "COMPILE-FILE"
@@ -327,9 +330,11 @@
                   "LISP-IMPLEMENTATION-TYPE" "LISP-IMPLEMENTATION-VERSION"
                   "MACRO-FUNCTION"
                   "MACROEXPAND" "MACROEXPAND-1" "*MACROEXPAND-HOOK*"
+                  "MAKE-ARRAY"
                   "MAKE-LOAD-FORM"
                   "MAKE-LOAD-FORM-SAVING-SLOTS"
                   "PROCLAIM"
+                  "SIMPLE-VECTOR"
                   "SPECIAL-OPERATOR-P"
                   "SUBTYPEP"
                   "TYPE-OF" "TYPEP"
@@ -341,6 +346,7 @@
 (defun count-symbols (pkg)
   (let ((n 0))
     (do-external-symbols (s pkg n)
+      (declare (ignorable s))
       (incf n))))
 
 ;;; Build a new package that exports a not-necessarily-strict subset of

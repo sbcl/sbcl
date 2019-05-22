@@ -13,14 +13,6 @@
 
 (in-package "SB-FASL")
 
-;;; Dump the first N bytes of VEC out to FILE. VEC is some sort of unboxed
-;;; vector-like thing that we can BLT from.
-(defun dump-raw-bytes (vec n fasl-output)
-  (declare (type index n) (type fasl-output fasl-output))
-  ;; FIXME: Why not WRITE-SEQUENCE?
-  (sb-impl::buffer-output (fasl-output-stream fasl-output) vec 0 n)
-  (values))
-
 ;;; Dump a multi-dimensional array. Note: any displacements are folded out.
 ;;;
 ;;; This isn't needed at cross-compilation time because SBCL doesn't
@@ -38,8 +30,7 @@
       (if (and (= start 0) (= end (length vector)))
           (sub-dump-object vector file)
           (sub-dump-object (subseq vector start end) file)))
-    (dump-fop 'fop-array file)
-    (dump-word rank file)
+    (dump-fop 'fop-array file rank)
     (eq-save-object array file)))
 
 #+(and long-float x86)

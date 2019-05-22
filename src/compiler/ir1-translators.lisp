@@ -464,7 +464,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
       (bug "%PRIMITIVE was used with an unknown values template."))
 
     (ir1-convert start next result
-                 `(%%primitive ',template
+                 `(%%primitive ',name
                                ',(eval-info-args
                                   (subseq args required min))
                                ,@(subseq args 0 required)
@@ -574,7 +574,9 @@ Return VALUE without evaluating it."
 (def-ir1-translator %%allocate-closures ((&rest leaves) start next result)
   (aver (eq result 'nil))
   (let ((lambdas leaves))
-    (ir1-convert start next result `(%allocate-closures ',lambdas))
+    ;; Opaquely quoting this list avoids recursing in find-constant
+    ;; to check for dumpability of sub-parts as it would otherwise do.
+    (ir1-convert start next result `(%allocate-closures ,(opaquely-quote lambdas)))
     (let ((allocator (node-dest (ctran-next start))))
       (dolist (lambda lambdas)
         (setf (functional-allocator lambda) allocator)))))

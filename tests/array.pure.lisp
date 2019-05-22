@@ -197,8 +197,7 @@
   (checked-compile `(lambda () (make-array 0 :element-type 'string)))
   (checked-compile `(lambda () (make-array '(0 2) :element-type 'string))))
 
-(flet ((opaque-identity (x) x))
-  (declare (notinline opaque-identity))
+(with-test (:name :big-array)
   ;; we used to have leakage from cross-compilation hosts of the INDEX
   ;; type, which prevented us from actually using all the large array
   ;; dimensions that we promised.  Let's make sure that we can create
@@ -535,9 +534,6 @@
               (error (c) (search (format nil "bad size specified for ~A" atom)
                                  (princ-to-string c)))
               (:no-error (obj) obj nil)))))
-
-(declaim (notinline opaque-identity))
-(defun opaque-identity (x) x) ; once and only, uh 6 times?
 
 (with-test (:name (make-array :strange-type-specifiers))
   (assert (stringp (make-array 10 :element-type (opaque-identity '(base-char)))))

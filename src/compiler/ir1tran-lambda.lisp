@@ -207,7 +207,7 @@
           (bind-ctran (make-ctran))
           (cleanup-ctran (make-ctran)))
       (ir1-convert start bind-ctran nil
-                   `(%special-bind ',(lambda-var-specvar var) ,var))
+                   `(%special-bind ',(leaf-source-name (lambda-var-specvar var)) ,var))
       (setf (cleanup-mess-up cleanup) (ctran-use bind-ctran))
       (let ((*lexenv* (make-lexenv :cleanup cleanup)))
         (ir1-convert bind-ctran cleanup-ctran nil '(%cleanup-point))
@@ -923,55 +923,56 @@
     (bug "Both SYSTEM-LAMBDA and MAYBE-ADD-DEBUG-CATCH specified"))
   (unless (or debug-name (neq '.anonymous. source-name))
     (setf debug-name (name-lambdalike form)))
-  (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
-      (make-lambda-vars (cadr form))
-    (multiple-value-bind (forms decls doc) (parse-body (cddr form) t)
-      (binding* (((*lexenv* result-type post-binding-lexenv
-                   lambda-list explicit-check)
-                  (process-decls decls (append aux-vars vars) nil
-                                 :binding-form-p t :allow-lambda-list t))
-                 (debug-catch-p (and maybe-add-debug-catch
-                                     *allow-instrumenting*
-                                     (policy *lexenv*
-                                             (>= insert-debug-catch 2))))
-                 (forms (if debug-catch-p
-                            (wrap-forms-in-debug-catch forms)
-                            forms))
-                 (forms (if (eq result-type *wild-type*)
-                            forms
-                            `((the ,(type-specifier result-type) (progn ,@forms)))))
-                 (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*))
-                 (res (cond ((or (find-if #'lambda-var-arg-info vars) keyp)
-                             (ir1-convert-hairy-lambda forms vars keyp
-                                                       allow-other-keys
-                                                       aux-vars aux-vals
-                                                       :post-binding-lexenv post-binding-lexenv
-                                                       :source-name source-name
-                                                       :debug-name debug-name
-                                                       :system-lambda system-lambda))
-                            (t
-                             (ir1-convert-lambda-body forms vars
-                                                      :aux-vars aux-vars
-                                                      :aux-vals aux-vals
-                                                      :post-binding-lexenv post-binding-lexenv
-                                                      :source-name source-name
-                                                      :debug-name debug-name
-                                                      :system-lambda system-lambda)))))
-        (when explicit-check
-          (setf (getf (functional-plist res) 'explicit-check) explicit-check))
-        (setf (functional-inline-expansion res) form)
-        (setf (functional-arg-documentation res)
-              (if (eq lambda-list :unspecified)
-                  (strip-lambda-list (cadr form) :arglist)
-                  lambda-list))
-        (setf (functional-documentation res) doc)
-        (when (boundp '*lambda-conversions*)
-          ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
-          ;; keeps things less confusing to users of TIME, where this
-          ;; count gets used.
-          (unless (and (consp debug-name) (eq 'tl-xep (car debug-name)))
-            (incf *lambda-conversions*)))
-        res))))
+  (multiple-value-bind (forms decls doc) (parse-body (cddr form) t)
+    (let ((*lexenv* (process-muffle-decls decls *lexenv*)))
+      (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
+          (make-lambda-vars (cadr form))
+        (binding* (((*lexenv* result-type post-binding-lexenv
+                              lambda-list explicit-check)
+                    (process-decls decls (append aux-vars vars) nil
+                                   :binding-form-p t :allow-lambda-list t))
+                   (debug-catch-p (and maybe-add-debug-catch
+                                       *allow-instrumenting*
+                                       (policy *lexenv*
+                                           (>= insert-debug-catch 2))))
+                   (forms (if debug-catch-p
+                              (wrap-forms-in-debug-catch forms)
+                              forms))
+                   (forms (if (eq result-type *wild-type*)
+                              forms
+                              `((the ,(type-specifier result-type) (progn ,@forms)))))
+                   (*allow-instrumenting* (and (not system-lambda) *allow-instrumenting*))
+                   (res (cond ((or (find-if #'lambda-var-arg-info vars) keyp)
+                               (ir1-convert-hairy-lambda forms vars keyp
+                                                         allow-other-keys
+                                                         aux-vars aux-vals
+                                                         :post-binding-lexenv post-binding-lexenv
+                                                         :source-name source-name
+                                                         :debug-name debug-name
+                                                         :system-lambda system-lambda))
+                              (t
+                               (ir1-convert-lambda-body forms vars
+                                                        :aux-vars aux-vars
+                                                        :aux-vals aux-vals
+                                                        :post-binding-lexenv post-binding-lexenv
+                                                        :source-name source-name
+                                                        :debug-name debug-name
+                                                        :system-lambda system-lambda)))))
+          (when explicit-check
+            (setf (getf (functional-plist res) 'explicit-check) explicit-check))
+          (setf (functional-inline-expansion res) form)
+          (setf (functional-arg-documentation res)
+                (if (eq lambda-list :unspecified)
+                    (strip-lambda-list (cadr form) :arglist)
+                    lambda-list))
+          (setf (functional-documentation res) doc)
+          (when (boundp '*lambda-conversions*)
+            ;; KLUDGE: Not counting TL-XEPs is a lie, of course, but
+            ;; keeps things less confusing to users of TIME, where this
+            ;; count gets used.
+            (unless (and (consp debug-name) (eq 'tl-xep (car debug-name)))
+              (incf *lambda-conversions*)))
+          res)))))
 
 (defun wrap-forms-in-debug-catch (forms)
   #+unwind-to-frame-and-call-vop
@@ -1257,7 +1258,7 @@
         (note-inlining (optional-dispatch-more-entry fun))
         (mapc #'note-inlining (optional-dispatch-entry-points fun))))
     ;; substitute for any old references
-    (unless (or (not *block-compile*)
+    (unless (or (not (block-compile *compilation*))
                 (and info
                      (or (fun-info-transforms info)
                          (fun-info-templates info)
@@ -1351,9 +1352,9 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
                          (lambda (second inline-lambda)))))))
       (when (boundp '*lexenv*)
         (aver (producing-fasl-file))
-        (if (member name *fun-names-in-this-file* :test #'equal)
+        (if (member name (fun-names-in-this-file *compilation*) :test #'equal)
             (warn 'duplicate-definition :name name)
-            (push name *fun-names-in-this-file*)))
+            (push name (fun-names-in-this-file *compilation*))))
       ;; I don't know why this is guarded by (WHEN compile-toplevel),
       ;; because regular old %DEFUN is going to call this anyway.
       (%set-inline-expansion name defined-fun inline-lambda extra-info))
@@ -1391,9 +1392,10 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
   (let ((name-key `(,kind ,name)))
     (when (boundp '*lexenv*)
       (aver (producing-fasl-file))
-      (if (member name-key *fun-names-in-this-file* :test #'equal)
+      ;; a slight OAOO issue here wrt %COMPILER-DEFUN
+      (if (member name-key (fun-names-in-this-file *compilation*) :test #'equal)
           (compiler-style-warn 'same-file-redefinition-warning :name name)
-          (push name-key *fun-names-in-this-file*)))))
+          (push name-key (fun-names-in-this-file *compilation*))))))
 
 
 ;;; Entry point utilities

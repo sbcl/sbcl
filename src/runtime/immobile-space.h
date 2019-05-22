@@ -44,18 +44,27 @@ varyobj_page_address(low_page_index_t page_num)
     return (void*)(VARYOBJ_SPACE_START + (page_num * IMMOBILE_CARD_BYTES));
 }
 
-// Array of offsets backwards in double-lispwords from the page end
-// to the lowest-addressed object touching the page. This offset can
-// point to a hole, but we prefer that it not. If the offset is zero,
-// the page has no object other than possibly a hole resulting
-// from a freed object.
-extern unsigned short* varyobj_page_scan_start_offset;
+struct varyobj_page {
+    // Generation mask for objects which start on this page.
+    // An object which ends on but does not start on this page
+    // does not set the respective bit.
+    unsigned int generations: 8,
+    // Offset backwards in double-lispwords from the page end to the
+    // lowest-addressed object touching the page. This offset can point to
+    // a hole, but we prefer that it not. If the offset is zero, the page
+    // has no object other than possibly a hole resulting from a freed object.
+    // The entire space size defaults to just over 100MiB,
+    // so 24 bits is more than adequate to point back to any word.
+                 scan_start_offset: 24;
+};
+
+extern struct varyobj_page *varyobj_pages;
 /* Calculate the address where the first object touching this page starts. */
 static inline lispobj*
 varyobj_scan_start(low_page_index_t page_index)
 {
     return (lispobj*)((char*)varyobj_page_address(page_index+1)
-                      - varyobj_page_scan_start_offset[page_index] * (2 * N_WORD_BYTES));
+                      - varyobj_pages[page_index].scan_start_offset * (2 * N_WORD_BYTES));
 }
 
 static inline low_page_index_t find_fixedobj_page_index(void *addr)
@@ -100,7 +109,7 @@ extern boolean immobile_card_protected_p(void*);
 
 #else
 
-static inline boolean immobile_space_p(lispobj obj) { return 0; }
+static inline boolean immobile_space_p(lispobj __attribute__((unused)) obj) { return 0; }
 #define immobile_obj_gen_bits(dummy) 0
 #define prepare_immobile_space_for_final_gc()
 #define prepare_immobile_space_for_save(dummy1,dummy2)

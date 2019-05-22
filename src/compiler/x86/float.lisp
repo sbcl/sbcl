@@ -412,7 +412,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (fixed-alloc y single-float-widetag single-float-size node)
+     (alloc-other y single-float-widetag single-float-size node)
      (with-tn@fp-top(x)
        (inst fst (ea-for-sf-desc y)))))
 (define-move-vop move-from-single :move
@@ -424,7 +424,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (fixed-alloc y double-float-widetag double-float-size node)
+     (alloc-other y double-float-widetag double-float-size node)
      (with-tn@fp-top(x)
        (inst fstd (ea-for-df-desc y)))))
 (define-move-vop move-from-double :move
@@ -437,7 +437,7 @@
   (:node-var node)
   (:note "float to pointer coercion")
   (:generator 13
-     (fixed-alloc y long-float-widetag long-float-size node)
+     (alloc-other y long-float-widetag long-float-size node)
      (with-tn@fp-top(x)
        (store-long-float (ea-for-lf-desc y)))))
 #+long-float
@@ -510,7 +510,7 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-    (fixed-alloc y complex-single-float-widetag complex-single-float-size node)
+    (alloc-other y complex-single-float-widetag complex-single-float-size node)
     (let ((real-tn (complex-single-reg-real-tn x)))
       (with-tn@fp-top(real-tn)
         (inst fst (ea-for-csf-real-desc y))))
@@ -526,7 +526,7 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (fixed-alloc y complex-double-float-widetag complex-double-float-size node)
+     (alloc-other y complex-double-float-widetag complex-double-float-size node)
      (let ((real-tn (complex-double-reg-real-tn x)))
        (with-tn@fp-top(real-tn)
          (inst fstd (ea-for-cdf-real-desc y))))
@@ -543,7 +543,7 @@
   (:node-var node)
   (:note "complex float to pointer coercion")
   (:generator 13
-     (fixed-alloc y complex-long-float-widetag complex-long-float-size node)
+     (alloc-other y complex-long-float-widetag complex-long-float-size node)
      (let ((real-tn (complex-long-reg-real-tn x)))
        (with-tn@fp-top(real-tn)
          (store-long-float (ea-for-clf-real-desc y))))
@@ -611,7 +611,7 @@
                       (,stack-sc
                        (if (= (tn-offset fp) esp-offset)
                            ;; C-call
-                           (let* ((offset (* (tn-offset y) n-word-bytes))
+                           (let* ((offset (tn-byte-offset y))
                                   (ea (make-ea :dword :base fp :disp offset)))
                              (with-tn@fp-top(x)
                                 ,@(ecase format

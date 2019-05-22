@@ -760,7 +760,7 @@ fake_foreign_function_call(os_context_t *context)
     check_blockables_blocked_or_lose(0);
 
     /* Get current Lisp state from context. */
-#if defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_GENCGC)
+#if (defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)) && !defined(LISP_FEATURE_GENCGC)
     dynamic_space_free_pointer = SymbolValue(ALLOCATION_POINTER, thread);
 #endif
 #ifdef reg_ALLOC
@@ -875,7 +875,7 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
      * not updating them. */
     thread->pseudo_atomic_bits = 0;
 #endif
-#if defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_GENCGC)
+#if (defined(LISP_FEATURE_ARM) || defined (LISP_FEATURE_RISCV)) && !defined(LISP_FEATURE_GENCGC)
     SetSymbolValue(ALLOCATION_POINTER, dynamic_space_free_pointer, thread);
 #endif
 }
@@ -1459,7 +1459,11 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
 extern int *context_eflags_addr(os_context_t *context);
 #endif
 
+#ifdef CALL_INTO_LISP
+#define call_into_lisp ((lispobj(*)(lispobj fun, lispobj *args, int nargs))SYMBOL(CALL_INTO_LISP)->value)
+#else
 extern lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs);
+#endif
 extern void post_signal_tramp(void);
 extern void call_into_lisp_tramp(void);
 
@@ -1646,7 +1650,7 @@ arrange_return_to_c_function(os_context_t *context,
     *os_context_npc_addr(context) =
         4 + *os_context_pc_addr(context);
 #endif
-#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64)
+#if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_ARM64) || defined(LISP_FEATURE_RISCV)
     *os_context_register_addr(context,reg_CODE) =
         (os_context_register_t)((char*)fun + FUN_POINTER_LOWTAG);
 #endif

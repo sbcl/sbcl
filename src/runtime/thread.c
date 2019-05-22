@@ -66,7 +66,7 @@ static struct thread *postmortem_thread;
 
 #endif
 
-int dynamic_values_bytes=TLS_SIZE*sizeof(lispobj);  /* same for all threads */
+int dynamic_values_bytes = 4096 * sizeof(lispobj);  // same for all threads
 struct thread *all_threads;
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -716,8 +716,9 @@ create_thread_struct(lispobj initial_function) {
 
 #ifdef LISP_FEATURE_SB_THREAD
     lispobj* tls = (lispobj*)th;
-    for(i = 0; i < TLS_SIZE; i++)
+    for(i = 0; i < (unsigned int)(dynamic_values_bytes/N_WORD_BYTES); i++)
         tls[i] = NO_TLS_VALUE_MARKER_WIDETAG;
+    th->tls_size = dynamic_values_bytes;
 #endif
     uword_t* __attribute__((__unused__)) constants = (uword_t*)th;
 #ifdef LISP_FEATURE_GENCGC

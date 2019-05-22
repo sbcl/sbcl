@@ -61,9 +61,9 @@
 ;;; this is the first function in this file that differs materially from
 ;;; ../alpha/call.lisp
 (defun bytes-needed-for-non-descriptor-stack-frame ()
-  (logandc2 (+ +stack-alignment-bytes+ number-stack-displacement
+  (logandc2 (+ +stack-alignment-mask+ number-stack-displacement
                (* (sb-allocated-size 'non-descriptor-stack) n-word-bytes))
-            +stack-alignment-bytes+))
+            +stack-alignment-mask+))
 
 
 ;;; Used for setting up the Old-FP in local call.
@@ -323,9 +323,9 @@ default-value-8
       (inst nop))
 
     (inst compute-code-from-lra code-tn lra-tn lra-label temp)
-    (inst addi csp-tn csp-tn 4)
+    (inst addi csp-tn csp-tn n-word-bytes)
     (storew (first *register-arg-tns*) csp-tn -1)
-    (inst subi start csp-tn 4)
+    (inst subi start csp-tn n-word-bytes)
     (inst li count (fixnumize 1))
 
     (emit-label done)
@@ -526,6 +526,7 @@ default-value-8
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
     (move cfp-tn old-fp-temp)
+    ;; return to the instruction immediately following the LRA header
     (inst j return-pc-temp (- n-word-bytes other-pointer-lowtag))))
 
 
@@ -690,6 +691,8 @@ default-value-8
                       (:load-nargs
                        ,@(if variable
                              `((inst sub nargs-pass csp-tn new-fp)
+                               (inst sradi nargs-pass nargs-pass
+                                     (- word-shift n-fixnum-tag-bits))
                                ,@(let ((index -1))
                                    (mapcar #'(lambda (name)
                                                `(loadw ,name new-fp
@@ -742,7 +745,7 @@ default-value-8
                     (inst beq step-done-label)
                     ;; CONTEXT-PC will be pointing here when the
                     ;; interrupt is handled, not after the UNIMP.
-                    (note-this-location vop :step-before-vop)
+                    (note-this-location vop :internal-error)
                     ;; Construct a trap code with the low bits from
                     ;; SINGLE-STEP-AROUND-TRAP and the high bits from
                     ;; the register number of CALLABLE-TN.
@@ -802,8 +805,8 @@ default-value-8
                 ;; Load fdefn-raw-address using NIL as the base pointer.
                 ;; This has the usual problem that the displacement in
                 ;; the DS instruction form isn't a multiple of 4.
-                `((inst li nl6-tn (static-fun-offset fun))
-                  (inst ldx entry-point null-tn nl6-tn))))
+                `((inst li temp-reg-tn (static-fun-offset fun))
+                  (inst ldx entry-point null-tn temp-reg-tn))))
            (loop
              (if filler
                  (do-next-filler)
@@ -1047,8 +1050,12 @@ default-value-8
     ;; if we take an asynchronous interrupt before they are copied to
     ;; their proper location.
     (cond ((zerop fixed)
+           (let ((delta (cond ((= n-fixnum-tag-bits word-shift) nargs-tn)
+                              (t (inst slwi temp-reg-tn nargs-tn
+                                       (- word-shift n-fixnum-tag-bits))
+                                 temp-reg-tn))))
+             (inst add csp-tn result delta))
            (inst cmpwi nargs-tn 0)
-           (inst add csp-tn result nargs-tn)
            (inst beq DONE))
           (t
            (inst addic. count nargs-tn (- (fixnumize fixed)))
@@ -1063,7 +1070,8 @@ default-value-8
                        ;; VALUES here to prevent ASSEMBLE from
                        ;; emitting it as a label (again).
                        (values FIX-CSP)))
-           (inst add csp-tn result count)))
+           (inst slwi temp-reg-tn count (- word-shift n-fixnum-tag-bits))
+           (inst add csp-tn result temp-reg-tn)))
     (when (< fixed register-arg-count)
       ;; We must stop when we run out of stack args, not when we run out of
       ;; more args.
@@ -1089,7 +1097,7 @@ default-value-8
              ;; overwrite any elements before they're copied).
              (inst ld temp dst (- (* (1+ delta) n-word-bytes)))
              (inst stdu temp dst (- n-word-bytes))
-             (inst cmpw dst result)
+             (inst cmpd dst result)
              (inst bgt LOOP))
             (t
              ;; If DELTA is negative then the start of the MORE args
@@ -1097,9 +1105,9 @@ default-value-8
              ;; need to copy the list from the start in order to close
              ;; the gap.
              (inst ld temp result (- (* delta n-word-bytes)))
-             (inst stw temp result 0)
+             (inst std temp result 0)
              (inst addi result result n-word-bytes)
-             (inst cmpw dst result)
+             (inst cmpd dst result)
              (inst bgt LOOP))))
 
     DO-REGS
@@ -1155,13 +1163,13 @@ default-value-8
       (if dx-p
           (progn
             (align-csp temp)
-            (inst clrrwi result csp-tn n-lowtag-bits)
+            (inst clrrdi result csp-tn n-lowtag-bits)
             (inst ori result result list-pointer-lowtag)
             (move dst result)
-            (inst slwi temp count 1)
+            (inst sldi temp count (1+ (- word-shift n-fixnum-tag-bits)))
             (inst add csp-tn csp-tn temp))
           (progn
-            (inst slwi temp count 1)
+            (inst sldi temp count (1+ (- word-shift n-fixnum-tag-bits)))
             (allocation result temp list-pointer-lowtag
                         :temp-tn dst
                         :flag-tn pa-flag)
@@ -1180,8 +1188,7 @@ default-value-8
 
       ;; Dec count, and if != zero, go back for more.
       (inst addic. count count (- (fixnumize 1)))
-      ;; Store the value into the car of the current cons (in the delay
-      ;; slot).
+      ;; Store the value into the car of the current cons
       (storew temp dst 0 list-pointer-lowtag)
       (inst bgt loop)
 
@@ -1208,11 +1215,16 @@ default-value-8
   (:info fixed)
   (:results (context :scs (descriptor-reg))
             (count :scs (any-reg)))
+  (:temporary (:sc non-descriptor-reg) temp)
   (:result-types t tagged-num)
   (:note "more-arg-context")
   (:generator 5
     (inst subi count supplied (fixnumize fixed))
-    (inst sub context csp-tn count)))
+    (let ((delta (cond ((= n-fixnum-tag-bits word-shift) count)
+                       (t
+                        (inst slwi temp count (- word-shift n-fixnum-tag-bits))
+                        temp))))
+      (inst sub context csp-tn delta))))
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
@@ -1246,7 +1258,7 @@ default-value-8
     (inst beq DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,
     ;; not after the UNIMP.
-    (note-this-location vop :step-before-vop)
+    (note-this-location vop :internal-error)
     ;; CALLEE-REGISTER-OFFSET isn't needed for before-traps, so we
     ;; can just use a bare SINGLE-STEP-BEFORE-TRAP as the code.
     (inst unimp single-step-before-trap)

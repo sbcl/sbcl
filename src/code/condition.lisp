@@ -73,8 +73,8 @@
     (if (and olayout
              (not (mismatch (layout-inherits olayout) new-inherits)))
         olayout
-        (make-layout :classoid (make-undefined-classoid name)
-                     :%flags +condition-layout-flag+
+        (make-layout (make-undefined-classoid name)
+                     :flags +condition-layout-flag+
                      :inherits new-inherits
                      :depthoid -1
                      :length (layout-length cond-layout)))))
@@ -1500,6 +1500,10 @@ the usual naming convention (names like *FOO*) for special variables"
 
 (define-condition asterisks-around-constant-variable-name
     (dubious-asterisks-around-variable-name)
+  ())
+
+(define-condition &optional-and-&key-in-lambda-list
+    (style-warning simple-condition)
   ())
 
 ;; We call this UNDEFINED-ALIEN-STYLE-WARNING because there are some

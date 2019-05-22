@@ -151,3 +151,12 @@
 (with-test (:name :sxhash-signed-floating-point-zeros)
   (assert (not (eql (sxhash -0f0) (sxhash 0f0))))
   (assert (not (eql (sxhash -0d0) (sxhash 0d0)))))
+
+(with-test (:name :sxhash-simple-bit-vector)
+  (let (hashes)
+    (let ((v (make-array sb-vm:n-word-bits :element-type 'bit)))
+      (dotimes (i sb-vm:n-word-bits)
+        (setf (aref v i) 1)
+        (push (sxhash v) hashes)
+        (setf (aref v i) 0)))
+    (assert (= (length (remove-duplicates hashes)) sb-vm:n-word-bits))))

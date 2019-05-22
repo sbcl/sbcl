@@ -18,7 +18,7 @@
 ;;;; -- WHN 20000127
 
 (declaim (maybe-inline
-          tree-equal %setnth nthcdr
+          tree-equal %setnth nthcdr nth
           tailp union
           nunion intersection nintersection set-difference nset-difference
           set-exclusive-or nset-exclusive-or subsetp acons
@@ -188,8 +188,23 @@
 
 (defun nth (n list)
   "Return the nth object in a list where the car is the zero-th element."
-  (declare (explicit-check))
-  (car (nthcdr n list)))
+  (declare (explicit-check)
+           (optimize speed))
+  (typecase n
+    ((and fixnum unsigned-byte)
+     (block nil
+       (let ((i n)
+             (result list))
+         (tagbody
+          loop
+            (the list result)
+            (if (plusp i)
+                (psetq i (1- i)
+                       result (cdr result))
+                (return (car result)))
+            (go loop)))))
+    (t
+     (car (nthcdr n list)))))
 
 (defun first (list)
   "Return the 1st object in a list or NIL if the list is empty."
@@ -227,41 +242,34 @@
 
 (defun nthcdr (n list)
   "Performs the cdr function n times on a list."
+  (declare (explicit-check n)
+           (optimize speed))
   (flet ((fast-nthcdr (n list)
-           (declare (type index n))
            (do ((i n (1- i))
                 (result list (cdr result)))
-               ((not (plusp i)) result)
-             (declare (type index i)))))
+               ((not (plusp i)) result))))
     (typecase n
-      (index (fast-nthcdr n list))
+      ((and fixnum unsigned-byte)
+       (fast-nthcdr n list))
       ;; Such a large list can only be circular
-      (t (do ((i 0 (1+ i))
+      (t
+       (locally (declare (unsigned-byte n))
+         (do ((i 0 (1+ i))
               (r-i list (cdr r-i))
               (r-2i list (cddr r-2i)))
              ((and (eq r-i r-2i) (not (zerop i)))
               (fast-nthcdr (mod n i) r-i))
-           (declare (type index i)))))))
+           (declare (type fixnum i))))))))
 
 ;;; For [n]butlast
 (defun dotted-nthcdr (n list)
-  (flet ((fast-nthcdr (n list)
-           (declare (type index n))
-           (do ((i n (1- i))
-                (result list (cdr result)))
-               ((not (plusp i)) result)
-             (declare (type index i))
-             (when (atom result)
-               (return)))))
-    (typecase n
-      (index (fast-nthcdr n list))
-      ;; Such a large list can only be circular
-      (t (do ((i 0 (1+ i))
-              (r-i list (cdr r-i))
-              (r-2i list (cddr r-2i)))
-             ((and (eq r-i r-2i) (not (zerop i)))
-              (fast-nthcdr (mod n i) r-i))
-           (declare (type index i)))))))
+  (declare (fixnum n))
+  (do ((i n (1- i))
+       (result list (cdr result)))
+      ((not (plusp i)) result)
+    (declare (type fixnum i))
+    (when (atom result)
+      (return))))
 
 ;;; LAST
 ;;;
@@ -523,14 +531,17 @@
 
 
 (defun butlast (list &optional (n 1))
-  (cond ((zerop n)
-         (copy-list list))
-        ((not (typep n 'index))
+  (declare (optimize speed)
+           (explicit-check n))
+  (cond ((not (typep n '(and fixnum unsigned-byte)))
+         (the unsigned-byte n)
          nil)
+        ((zerop n)
+         (copy-list list))
         (t
          (let ((head (dotted-nthcdr (1- n) list)))
-           (and (consp head)      ; there are at least n
-                (collect ((copy)) ; conses; copy!
+           (and (consp head)            ; there are at least n
+                (collect ((copy))       ; conses; copy!
                   (do ((trail list (cdr trail))
                        (head head (cdr head)))
                       ;; HEAD is n-1 conses ahead of TRAIL;
@@ -541,14 +552,17 @@
                     (copy (car trail)))))))))
 
 (defun nbutlast (list &optional (n 1))
-  (cond ((zerop n)
-         list)
-        ((not (typep n 'index))
+  (declare (optimize speed)
+           (explicit-check n))
+  (cond ((not (typep n '(and fixnum unsigned-byte)))
+         (the unsigned-byte n)
          nil)
+        ((zerop n)
+         list)
         (t
          (let ((head (dotted-nthcdr (1- n) list)))
-           (and (consp head)       ; there are more than n
-                (consp (cdr head)) ; conses.
+           (and (consp head)            ; there are more than n
+                (consp (cdr head))      ; conses.
                 ;; TRAIL trails by n cons to be able to
                 ;; cut the list at the cons just before.
                 (do ((trail list (cdr trail))
@@ -581,12 +595,6 @@
 (defun rplacd (cons x)
   "Change the CDR of CONS to X and return the CONS."
   (rplacd cons x))
-
-;;; The following are for use by SETF.
-
-(defun %rplaca (x val) (rplaca x val) val)
-
-(defun %rplacd (x val) (rplacd x val) val)
 
 ;;; Set the Nth element of LIST to NEWVAL.
 (defun %setnth (n list newval)

@@ -1,8 +1,36 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+changes relative to sbcl-1.5.2:
+  * enhancement: better run-program performance when used from multiple
+    threads.
+  * enhancement: (declaim (optimize (debug 2))) ensures compilation of
+    top-level forms, providing better debugging for simple forms that are
+    otherwise "byte-code interpreted" when compiled into FASLs.
+  * optimize: reduced overhead of calling NTH/NTHCDR.
 
-changes relative to sbcl-1.5.0:
-  * bug fix: thread-safety problems in RUN-PROGRAM with :PTY.
+changes in sbcl-1.5.2 relative to sbcl-1.5.1:
+  * enhancement: RISC-V support with the generational garbage collector.
+  * enhancement: command-line option "--tls-limit" can be used to alter the
+    maximum number of thread-local symbols from its default of 4096.
+  * enhancement: better muffling of redefinition and lambda-list warnings
+  * platform support:
+    - OS X: use Grand Central Dispatch semaphores, rather than Mach semaphores
+    - Windows: remove non-functional definition of make-listener-thread
+  * new feature: decimal reader syntax for rationals, using the R exponent
+    marker and/or *READ-DEFAULT-FLOAT-FORMAT* of RATIONAL.
+  * optimization: various Unicode tables have been packed more efficiently
+
+changes in sbcl-1.5.1 relative to sbcl-1.5.0:
   * enhancement: restarts for missing package errors.
+  * optimization: FIND-PACKAGE should be faster even when run in the context
+    of a package with local package-nicknames.
+  * optimization: fix TRUNCATE deftransform's results to have well-defined
+    signs
+  * bug fix: thread-safety problems in RUN-PROGRAM with :PTY.
+  * bug fix: SLEEP transform could never fire.
+  * build enhancement: defend against quirky host floating point
+    implementation
+  * test enhancement: allow more parallelism in running the
+    regression test suite
 
 changes in sbcl-1.5.0 relative to sbcl-1.4.16:
   * enhancement: SB-COVER emulates IN-PACKAGE when recording source maps;

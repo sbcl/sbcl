@@ -199,13 +199,11 @@
 
 (defmethod make-load-form ((object layout) &optional env)
   (declare (ignore env))
-  (if (layout-for-std-class-p object)
-      (let ((pname (classoid-proper-name (layout-classoid object))))
-        (unless pname
-          (error "can't dump wrapper for anonymous class:~%  ~S"
-                 (layout-classoid object)))
-        `(classoid-layout (find-classoid ',pname)))
-      :ignore-it))
+  (let ((pname (classoid-proper-name (layout-classoid object))))
+    (unless pname
+      (error "can't dump wrapper for anonymous class:~%  ~S"
+             (layout-classoid object)))
+    `(classoid-layout (find-classoid ',pname))))
 
 ;; FIXME: this seems wrong. NO-APPLICABLE-METHOD should be signaled.
 (defun dont-know-how-to-dump (object)

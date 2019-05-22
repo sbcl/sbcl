@@ -364,8 +364,9 @@
                                       (t (return (- -10 errno)))))
                                ((zerop count) (return -1))
                                (t (return count)))))))))))
-        (t (%read-vector buffer fd start end :byte-8
-                         (if blocking :bnb nil)))))))
+        (t ;; (%read-vector buffer fd start end :byte-8
+           ;;               (if blocking :bnb nil))
+         )))))
 
 (defun write-octets (stream buffer start end blocking)
   (declare (type simple-stream stream)
@@ -700,3 +701,4 @@
 
 (define-filespec pathname (string)
   (pathname string))
+

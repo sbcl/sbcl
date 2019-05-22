@@ -272,8 +272,13 @@
   (flet ((start-vop (block)
            (do ((block block (ir2-block-next block)))
                ((null block) nil)
-             (when (ir2-block-start-vop block)
-               (return (ir2-block-start-vop block)))))
+             (let ((vop (ir2-block-start-vop block)))
+               (when vop
+                 (if (eq (vop-name vop) 'sb-c:note-environment-start)
+                     (let ((next (vop-next vop)))
+                       (when next
+                         (return next)))
+                     (return vop))))))
          (next-label (block)
            (do ((block (ir2-block-next block)
                   (ir2-block-next block)))

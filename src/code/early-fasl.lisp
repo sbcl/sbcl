@@ -131,21 +131,26 @@
 
 ;;;; the FOP database
 
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  ;; The bottom 5 bits of the opcodes above 128 encode an implicit operand.
+  (defconstant n-ordinary-fops 128))
+
 ;;; a vector indexed by a FaslOP that yields a function which performs
 ;;; the operation. Most functions take 0 arguments - they only manipulate
 ;;; the fop stack. But if the fop is defined to receive an argument (or two)
 ;;; then loader's main loop is responsible for supplying it.
-(defglobal **fop-funs** (make-array 256 :initial-element 0))
-(declaim (simple-vector **fop-funs**))
+(defglobal **fop-funs** (make-array n-ordinary-fops :initial-element 0))
+(declaim (type (simple-vector #.n-ordinary-fops) **fop-funs**))
 
 ;;; Two arrays indicate fop function signature.
 ;;; The first array indicates how many integer operands follow the opcode.
 ;;; The second tells whether the fop wants its result pushed on the stack.
-(declaim (type (cons (simple-array (mod 4) (256)) (simple-bit-vector 256))
+(declaim (type (cons (simple-array (mod 4) (#.n-ordinary-fops))
+                     (simple-bit-vector #.n-ordinary-fops))
                **fop-signatures**))
 (defglobal **fop-signatures**
-    (cons (make-array 256 :element-type '(mod 4) :initial-element 0)
-          (make-array 256 :element-type 'bit :initial-element 0)))
+    (cons (make-array n-ordinary-fops :element-type '(mod 4) :initial-element 0)
+          (make-array n-ordinary-fops :element-type 'bit :initial-element 0)))
 
 ;;;; variables
 

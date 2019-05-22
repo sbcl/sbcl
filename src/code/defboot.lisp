@@ -304,8 +304,13 @@ evaluated as a PROGN."
        (%compiler-defvar ',var))
      (%defvar ',var
               (sb-c:source-location)
-              ,@(and valp
-                     `((unless (%boundp ',var) ,val)))
+              ,@(cond ((not valp)
+                       nil)
+                      ((constantp val)
+                       ;; No need to avoid evaluation if it's a constant.
+                       `(',(constant-form-value val)))
+                      (val
+                       `((unless (%boundp ',var) ,val))))
               ,@(and docp
                      `(',doc)))))
 

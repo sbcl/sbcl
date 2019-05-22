@@ -1301,6 +1301,7 @@ on this semaphore, then N of them is woken up."
   (with-session-lock (session)
     (let ((was-foreground (eq thread (foreground-thread session))))
       (setf (session-threads session)
+            ;; FIXME: I assume these could use DELQ1.
             ;; DELQ never conses, but DELETE does. (FIXME)
             (delq thread (session-threads session))
             (session-interactive-threads session)
@@ -1482,6 +1483,7 @@ session."
 session."
   (first (interactive-threads session)))
 
+#-win32
 (defun make-listener-thread (tty-name)
   (aver (probe-file tty-name))
   (let* ((in (sb-unix:unix-open (namestring tty-name) sb-unix:o_rdwr #o666))
@@ -1490,18 +1492,18 @@ session."
     (labels ((thread-repl ()
                (sb-unix::unix-setsid)
                (let* ((sb-impl::*stdin*
-                       (make-fd-stream in :input t :buffering :line
-                                       :dual-channel-p t))
+                        (make-fd-stream in :input t :buffering :line
+                                           :dual-channel-p t))
                       (sb-impl::*stdout*
-                       (make-fd-stream out :output t :buffering :line
-                                              :dual-channel-p t))
+                        (make-fd-stream out :output t :buffering :line
+                                            :dual-channel-p t))
                       (sb-impl::*stderr*
-                       (make-fd-stream err :output t :buffering :line
-                                              :dual-channel-p t))
+                        (make-fd-stream err :output t :buffering :line
+                                            :dual-channel-p t))
                       (sb-impl::*tty*
-                       (make-fd-stream err :input t :output t
-                                              :buffering :line
-                                              :dual-channel-p t))
+                        (make-fd-stream err :input t :output t
+                                            :buffering :line
+                                            :dual-channel-p t))
                       (sb-impl::*descriptor-handlers* nil))
                  (with-new-session ()
                    (unwind-protect
@@ -1894,7 +1896,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     (with-all-threads-lock
       (if (thread-alive-p thread)
           (let ((val (sap-ref-lispobj (int-sap (thread-primitive-thread thread))
-                                      (get-lisp-obj-address (symbol-tls-index symbol)))))
+                                      (symbol-tls-index symbol))))
             (case (get-lisp-obj-address val)
               (#.sb-vm:no-tls-value-marker-widetag (values nil :no-tls-value))
               (#.sb-vm:unbound-marker-widetag (values nil :unbound-in-thread))
@@ -1906,7 +1908,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
     ;; area...
     (with-all-threads-lock
       (if (thread-alive-p thread)
-          (let ((offset (get-lisp-obj-address (symbol-tls-index symbol))))
+          (let ((offset (symbol-tls-index symbol)))
             (cond ((zerop offset)
                    (values nil :no-tls-value))
                   (t

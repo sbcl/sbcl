@@ -65,18 +65,3 @@ use as a BLOCK name in the function in question."
 ;; 'cas.lisp' doesn't need to know this technique for sharing the parser,
 ;; so the name syntax is defined here instead of there.
 (%define-fun-name-syntax 'cas #'%check-setf-fun-name)
-
-(defun macro-function-name (name)
-  (when (and (cdr name)
-             (consp (cdr name)))
-    (destructuring-bind (fun &rest rest) (cdr name)
-      (when (null rest)
-        (typecase fun
-          ;; (DEFMACRO FOO)
-          (symbol (values t fun))
-          ;; (DEFMACRO (SETF FOO))
-          (cons (when (eq (car fun) 'setf)
-                  (valid-function-name-p fun))))))))
-
-(define-function-name-syntax defmacro (name)
-  (macro-function-name name))

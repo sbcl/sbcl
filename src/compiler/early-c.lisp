@@ -15,6 +15,16 @@
 
 (in-package "SB-C")
 
+;;; An OPAQUE-BOX instance is used to pass data from IR1 to IR2 as
+;;; a quoted object in a "source form" (not user-written) such that the
+;;; contained object is in a for-evaluation position but ignored by
+;;; the compiler's constant-dumping logic. In addition to this structure
+;;; type, a few other IR1 object types are implicitly opaque.
+(defstruct (opaque-box (:constructor opaquely-quote (value))
+                       (:copier nil)
+                       (:predicate opaque-box-p))
+  value)
+
 ;;; ANSI limits on compilation
 (defconstant sb-xc:call-arguments-limit sb-xc:most-positive-fixnum
   "The exclusive upper bound on the number of arguments which may be passed
@@ -41,8 +51,11 @@
 ;;;; somewhere else, not "early-c", since they're after all not part
 ;;;; of the compiler.
 
-;;; the type of LAYOUT-DEPTHOID slot values
-(def!type layout-depthoid () '(or index (integer -1 -1)))
+;;; the type of LAYOUT-DEPTHOID and LAYOUT-LENGTH values.
+;;; Each occupies two bytes of the %BITS slot when possible,
+;;; otherwise a slot unto itself.
+(def!type layout-depthoid () '(integer -1 #x7FFF))
+(def!type layout-length () '(integer 0 #xFFFF))
 (def!type layout-bitmap ()
   ;; FIXME: Probably should exclude negative bignum
   #+compact-instance-header 'integer
@@ -124,7 +137,6 @@
 (defvar *lambda-conversions*)
 (defvar *compile-object* nil)
 (defvar *location-context* nil)
-(defvar *msan-unpoison* nil)
 
 (defvar *stack-allocate-dynamic-extent* t
   "If true (the default), the compiler respects DYNAMIC-EXTENT declarations
@@ -229,6 +241,8 @@ the stack without triggering overflow protection.")
   (values))
 
 (defstruct (debug-name-marker (:print-function print-debug-name-marker)
+                              ;; make these satisfy SB-XC:INSTANCEP
+                              #+sb-xc-host (:include structure!object)
                               (:copier nil)))
 
 (defvar *debug-name-level* 4)
@@ -236,14 +250,6 @@ the stack without triggering overflow protection.")
 (defvar *debug-name-punt*)
 (define-load-time-global *debug-name-sharp* (make-debug-name-marker))
 (define-load-time-global *debug-name-ellipsis* (make-debug-name-marker))
-
-(defmethod make-load-form ((marker debug-name-marker) &optional env)
-  (declare (ignore env))
-  (cond ((eq marker *debug-name-sharp*) '*debug-name-sharp*)
-        ((eq marker *debug-name-ellipsis*) '*debug-name-ellipsis*)
-        (t
-         (warn "Dumping unknown debug-name marker.")
-         '(make-debug-name-marker))))
 
 (defun print-debug-name-marker (marker stream level)
   (declare (ignore level))
@@ -342,6 +348,38 @@ the stack without triggering overflow protection.")
   (define-load-time-global *code-coverage-info*
     (list (make-hash-table :test 'equal :synchronized t)))
   (declaim (type (cons hash-table) *code-coverage-info*)))
+
+(defstruct (compilation (:copier nil)
+                        (:predicate nil)
+                        (:conc-name ""))
+  (fun-names-in-this-file)
+  (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
+  (msan-unpoison nil :read-only t)
+  (sset-counter 1 :type fixnum)
+  ;; Bidrectional map between IR1/IR2/assembler abstractions
+  ;; and a corresponding small integer identifier. One direction could be done
+  ;; by adding the integer ID as an object slot, but we want both directions.
+  ;; These could just as well be scoped by WITH-IR1-NAMESPACE, but
+  ;; since it's primarily a debugging tool, it's nicer to have
+  ;; a wider unique scope by ID.
+  (objmap-obj-to-id   (make-hash-table :test 'eq) :read-only t)
+  (objmap-id-to-cont  (make-array 10) :type simple-vector) ; number -> CTRAN or LVAR
+  (objmap-id-to-tn    (make-array 10) :type simple-vector) ; number -> TN
+  (objmap-id-to-label (make-array 10) :type simple-vector) ; number -> LABEL
+  (objmap-cont-num    0 :type fixnum)
+  (objmap-tn-id       0 :type fixnum)
+  (objmap-label-id    0 :type fixnum)
+  ;; if emitting a cfasl, the fasl stream to that
+  (compile-toplevel-object nil :read-only t)
+  ;; these are all historical baggage from here down,
+  ;; unused unless we ever decide to fix block compilation
+  (block-compile nil :type (member nil t :specified))
+  ;; When block compiling, used by PROCESS-FORM to accumulate top level
+  ;; lambdas resulting from compiling subforms. (In reverse order.)
+  (toplevel-lambdas nil :type list))
+
+(defvar *compilation*)
+(declaim (type compilation *compilation*))
 
 (in-package "SB-ALIEN")
 

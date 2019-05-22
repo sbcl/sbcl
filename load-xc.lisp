@@ -8,10 +8,10 @@
 (load "src/cold/set-up-cold-packages.lisp")
 (load "src/cold/defun-load-or-cload-xcompiler.lisp")
 
-(load-or-cload-xcompiler #'host-cload-stem)
-;; (load-or-cload-xcompiler #'host-load-stem) ;; if the FASLs are already compiled
+(load-or-cload-xcompiler #'host-load-stem) ;; if the FASLs are already compiled
 
 (defun xc-compile-file (file)
+  (sb-c::init-xc-policy)
   (sb-xc:with-compilation-unit ()
     (sb-xc:compile-file file :trace-file *standard-output*)
     (setf sb-c::*undefined-warnings* nil)))

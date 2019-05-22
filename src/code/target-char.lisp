@@ -28,9 +28,21 @@
   (declare (type (unsigned-byte 21) first second third))
   (sb-c::mask-signed-field 63 (logior first (ash second 21) (ash third 42))))
 
+(defun unpack-3-codepoints (codepoints)
+  (declare (type (signed-byte 63) codepoints))
+  (cond ((< codepoints (ash 1 21))
+         (list (code-char codepoints)))
+        ((< codepoints (ash 1 (* 21 2)))
+         (list (code-char (ldb (byte 21 0) codepoints))
+               (code-char (ldb (byte 21 21) codepoints))))
+        (t
+         (list (code-char (ldb (byte 21 0) codepoints))
+               (code-char (ldb (byte 21 21) codepoints))
+               (code-char (ldb (byte 21 (* 21 2)) codepoints))))))
+
 (macrolet ((frob ()
              (flet ((coerce-it (array)
-                      (!coerce-to-specialized array '(unsigned-byte 8)))
+                      (sb-xc:coerce array '(simple-array (unsigned-byte 8) 1)))
                     (file (name type)
                       (let ((dir (sb-cold:prepend-genfile-path "output/")))
                         (make-pathname :directory (pathname-directory (merge-pathnames dir))
@@ -39,7 +51,7 @@
                       (with-open-file (stream pathname
                                               :element-type '(unsigned-byte 8))
                         (let* ((length (file-length stream))
-                               (array (make-array
+                               (array (sb-xc:make-array
                                        length :element-type '(unsigned-byte 8))))
                           (read-sequence array stream)
                           array)))
@@ -52,14 +64,14 @@
                          (declaim (type ,(if (eql type 'hash-table)
                                              'hash-table
                                              `(simple-array ,type (,length))) ,name)))))
-               (let ((misc-database (coerce-it (read-ub8-vector (file "ucdmisc" "dat"))))
-                     (ucd-high-pages (coerce-it (read-ub8-vector (file "ucdhigh" "dat"))))
-                     (ucd-low-pages (coerce-it (read-ub8-vector (file "ucdlow" "dat"))))
-                     (decompositions (coerce-it (read-ub8-vector (file "decomp" "dat"))))
-                     (primary-compositions (coerce-it (read-ub8-vector (file "comp" "dat"))))
-                     (case-data (coerce-it (read-ub8-vector (file "case" "dat"))))
-                     (case-pages (coerce-it (read-ub8-vector (file "casepages" "dat"))))
-                     (collations (coerce-it (read-ub8-vector (file "collation" "dat")))))
+               (let ((misc-database (read-ub8-vector (file "ucdmisc" "dat")))
+                     (ucd-high-pages (read-ub8-vector (file "ucdhigh" "dat")))
+                     (ucd-low-pages (read-ub8-vector (file "ucdlow" "dat")))
+                     (decompositions (read-ub8-vector (file "decomp" "dat")))
+                     (primary-compositions (read-ub8-vector (file "comp" "dat")))
+                     (case-data (read-ub8-vector (file "case" "dat")))
+                     (case-pages (read-ub8-vector (file "casepages" "dat")))
+                     (collations (read-ub8-vector (file "collation" "dat"))))
                  `(progn
                     ;; KLUDGE: All temporary values, fixed up in cold-load
                     ,(init-global '**character-misc-database** '(unsigned-byte 8)
@@ -86,7 +98,7 @@
                                (let ((new-array
                                        (make-array
                                         (/ (length raw-bytes) n)
-                                        :element-type (list 'unsigned-byte (* 8 n)))))
+                                        :element-type `(unsigned-byte ,(* 8 n)))))
                                  (loop for i from 0 below (length raw-bytes) by n
                                        for element = 0 do
                                        (loop for offset from 0 below n do
@@ -107,8 +119,9 @@
                               (make-ubn-vector ,decompositions 3))
 
                         (setf **character-primary-compositions**
-                              (let ((table (make-hash-table))
-                                    (info (make-ubn-vector ,primary-compositions 3)))
+                              (let* ((info (make-ubn-vector ,primary-compositions 3))
+                                     (table (make-hash-table #+64-bit :test #+64-bit #'eq
+                                                             :size (/ (length info) 3))))
                                 (dotimes (i (/ (length info) 3))
                                   (setf (gethash (dpb (aref info (* 3 i)) (byte 21 21)
                                                       (aref info (1+ (* 3 i))))
@@ -149,7 +162,11 @@
                                   for page = (aref **character-case-pages** (ash key -6))
                                   for i = (+ (ash page 6) (ldb (byte 6 0) key))
                                   do
-                                  (setf (aref unicode-table i) (cons upper lower))
+                                  (setf (aref unicode-table i)
+                                        (if (or (consp upper)
+                                                (consp lower))
+                                            (cons upper lower)
+                                            (dpb upper (byte 21 21) lower)))
                                   when
                                   (flet (#+sb-unicode
                                          (both-case-p (code)
@@ -170,7 +187,8 @@
                           (setf **character-cases** table))
 
                         (setf **character-collations**
-                              (let* ((table (make-hash-table))
+                              (let* ((table (make-hash-table :size 27978
+                                                             #+64-bit :test #+64-bit #'eq))
                                      (index 0)
                                      (info (make-ubn-vector ,collations 4))
                                      (len (length info)))
@@ -178,9 +196,7 @@
                                       (let* ((entry-head (aref info index))
                                              (cp-length (ldb (byte 4 28) entry-head))
                                              (key-length (ldb (byte 5 23) entry-head))
-                                             (key (make-array
-                                                   key-length
-                                                   :element-type '(unsigned-byte 32)))
+                                             (key 0)
                                              (codepoints nil))
                                         (aver (and (/= cp-length 0) (/= key-length 0)))
                                         (loop repeat cp-length do
@@ -189,11 +205,11 @@
                                               (incf index))
                                         (setf codepoints (nreverse codepoints))
                                         (dotimes (i key-length)
-                                          (setf (aref key i) (aref info index))
+                                          (setf (ldb (byte 32 (* i 32)) key) (aref info index))
                                           (incf index))
-                                        (setf (gethash
-                                               (apply #'pack-3-codepoints codepoints)
-                                               table) (logically-readonlyize key))))
+                                        (setf (gethash (apply #'pack-3-codepoints codepoints) table)
+                                              key)))
+                                (assert (= (hash-table-count table) 27978))
                                 table))))
 
                     ,(with-open-file

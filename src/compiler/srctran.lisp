@@ -282,6 +282,22 @@
                    'l
                    `(cdr ,(frob (1- n))))))
       (frob n))))
+
+(deftransform nth ((n l) (unsigned-byte t) * :node node)
+  "convert NTH to CAxxR"
+  (unless (constant-lvar-p n)
+    (give-up-ir1-transform))
+  (let ((n (lvar-value n)))
+    (when (> n
+             (if (policy node (and (= speed 3) (= space 0)))
+                 *extreme-nthcdr-open-code-limit*
+                 *default-nthcdr-open-code-limit*))
+      (give-up-ir1-transform))
+    (labels ((frob (n)
+               (if (zerop n)
+                   'l
+                   `(cdr ,(frob (1- n))))))
+      `(car ,(frob n)))))
 
 ;;;; arithmetic and numerology
 
@@ -4303,7 +4319,7 @@
   (source-transform-transitive 'logxor args 0 'integer))
 (define-source-transform logand (&rest args)
   (source-transform-transitive 'logand args -1 'integer))
-#-(or arm arm64 hppa mips x86 x86-64) ; defined in compiler/target/arith.lisp
+#-(or arm arm64 hppa mips x86 x86-64 riscv) ; defined in compiler/target/arith.lisp
 (define-source-transform logeqv (&rest args)
   (source-transform-transitive 'logeqv args -1 'integer))
 (define-source-transform gcd (&rest args)
@@ -4419,7 +4435,7 @@
   (multiple-value-bind (context count) (possible-rest-arg-context list)
     (if context
         `(%rest-ref ,n ,list ,context ,count)
-        `(car (nthcdr ,n ,list)))))
+        (values nil t))))
 (define-source-transform fast-&rest-nth (n list)
   (multiple-value-bind (context count) (possible-rest-arg-context list)
     (if context
@@ -5054,20 +5070,14 @@
                (locally (declare (notinline sleep)) (sleep seconds))
                (sb-unix:nanosleep ,seconds ,nano))))))
 
-;; On 64-bit architectures the TLS index is in the symbol header,
-;; !DEFINE-PRIMITIVE-OBJECT doesn't define an accessor for it.
-;; In the architectures where tls-index is an ordinary slot holding a tagged
-;; object, it represents the byte offset to an aligned object and looks
-;; in Lisp like a fixnum that is off by a factor of (EXPT 2 N-FIXNUM-TAG-BITS).
-;; We're reading with a raw SAP accessor, so must make it look equally "off".
-;; Also we don't get the defknown automatically.
-#+(and 64-bit sb-thread)
-(defknown symbol-tls-index (t) fixnum (flushable))
-#+(and 64-bit sb-thread)
+;;; Define SYMBOL-TLS-INDEX to return the byte offset of this symbol's
+;;; value cell in the lisp tls area.
+#+sb-thread
 (define-source-transform symbol-tls-index (sym)
-  `(ash (sap-ref-32 (int-sap (get-lisp-obj-address (the symbol ,sym)))
-                    (- 4 sb-vm:other-pointer-lowtag))
-        (- sb-vm:n-fixnum-tag-bits)))
+  #+64-bit `(ash (get-header-data ,sym) -24)
+  #-64-bit `(truly-the (and fixnum unsigned-byte)
+             (ash (sb-vm::%symbol-tls-index ,sym) sb-vm:n-fixnum-tag-bits)))
+
 
 (deftransform make-string-output-stream ((&key element-type))
   (let ((element-type (cond ((not element-type)
@@ -5145,3 +5155,6 @@
 
 (deftransforms (prin1-to-string princ-to-string) ((object) (number))
   `(stringify-object object))
+
+(deftransform princ ((object &optional stream) (string &optional t))
+  `(write-string object stream))

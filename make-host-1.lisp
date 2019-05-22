@@ -57,13 +57,64 @@
 
     #-(or clisp sbcl) `(with-compilation-unit () ,@forms)))
 
+;;; Return T if we can skip rebuild of unicode data when re-running make-host-1.
+(defun outputs-up-to-date (inputs outputs)
+  (let ((min-output-stamp))
+    (dolist (name outputs)
+      (unless (probe-file name)
+        (return-from outputs-up-to-date nil))
+      (let ((time (file-write-date name)))
+        (when (or (null min-output-stamp) (< time min-output-stamp))
+          (setq min-output-stamp time))))
+    (> min-output-stamp
+       (reduce #'max inputs :key #'file-write-date))))
+
 ;;; Build the unicode database now. It depends on nothing in the cross-compiler
 ;;; (and let's keep it that way). This code is slow to run, so compile it.
-(let ((object (compile-file "tools-for-build/ucd.lisp")))
-  (load object :verbose t)
-  (delete-file object))
-(dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
-  (funcall s))
+(let ((inputs '("tools-for-build/ucd.lisp"
+                "tools-for-build/UnicodeData.txt"
+                "tools-for-build/NormalizationCorrections.txt"
+                "tools-for-build/CompositionExclusions.txt"
+                "tools-for-build/SpecialCasing.txt"
+                "tools-for-build/EastAsianWidth.txt"
+                "tools-for-build/Scripts.txt"
+                "tools-for-build/LineBreakProperty.txt"
+                "tools-for-build/DerivedAge.txt"
+                "tools-for-build/Allkeys70.txt"
+                "tools-for-build/ConfusablesEdited.txt"
+                "tools-for-build/BidiMirroring.txt"
+                "tools-for-build/Blocks.txt"
+                "tools-for-build/Jamo.txt"
+                "tools-for-build/CaseFolding.txt"
+                "tools-for-build/PropList.txt"
+                "tools-for-build/DerivedNormalizationProps.txt"))
+      (outputs '("output/bidi-mirrors.lisp-expr"
+                 "output/block-ranges.lisp-expr"
+                 "output/block-names.lisp-expr"
+                 "output/case.dat"
+                 "output/casepages.dat"
+                 "output/casepages.lisp-expr"
+                 "output/collation.dat"
+                 "output/comp.dat"
+                 "output/confusables.lisp-expr"
+                 "output/decomp.dat"
+                 "output/foldcases.lisp-expr"
+                 "output/misc-properties.lisp-expr"
+                 "output/numerics.lisp-expr"
+                 "output/other-collation-info.lisp-expr"
+                 "output/titlecases.lisp-expr"
+                 "output/ucd1-names.lisp-expr"
+                 "output/ucdhigh.dat"
+                 "output/ucdlow.dat"
+                 "output/ucdmisc.dat"
+                 "output/ucd-names.lisp-expr")))
+  (unless (outputs-up-to-date inputs outputs)
+    (format t "~&; Building Unicode data~%")
+    (let ((object (compile-file "tools-for-build/ucd.lisp")))
+      (load object :verbose t)
+      (delete-file object))
+    (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
+      (funcall s))))
 
 ;;; I don't know the best combination of OPTIMIZE qualities to produce a correct
 ;;; and reasonably fast cross-compiler in ECL. At over half an hour to complete
