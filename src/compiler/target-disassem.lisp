@@ -1576,9 +1576,9 @@
                  (when name
                    (format stream " ~Vt ; " *disassem-note-column*)
                    (typecase (sb-di::compiled-debug-fun-compiler-debug-fun debug-fun)
-                     (sb-c::compiled-debug-fun-external 
+                     (sb-c::compiled-debug-fun-external
                       (format stream "(XEP ~s)" name))
-                     (sb-c::compiled-debug-fun-optional 
+                     (sb-c::compiled-debug-fun-optional
                       (format stream "(&OPTIONAL ~s)" name))
                      (sb-c::compiled-debug-fun-more
                       (format stream "(&MORE ~s)" name))

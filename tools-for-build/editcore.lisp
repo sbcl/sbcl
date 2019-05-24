@@ -312,35 +312,37 @@
 ;;; Return a list of ((NAME START . END) ...)
 ;;; for each C symbol that should be emitted for this code object.
 ;;; Start and and are relative to the object's base address,
-;;; not the start of its instructions.
+;;; not the start of its instructions. Hence we add HEADER-BYTES
+;;; too all the PC offsets.
 (defun code-symbols (code core &aux (spaces (core-spaces core)))
-  (let ((fun-map (translate
+  (let ((cdf (translate
                   (sb-c::compiled-debug-info-fun-map
                    (truly-the sb-c::compiled-debug-info
                               (translate (sb-kernel:%code-debug-info code) spaces)))
                   spaces))
         (header-bytes (* (sb-kernel:code-header-words code) sb-vm:n-word-bytes))
+        (start-pc 0)
         (blobs))
-    (do ((i 0 (+ i 2)))
-        ((>= i (length fun-map)))
-      (let ((name (fun-name-from-core
-                   (sb-c::compiled-debug-fun-name
-                    (truly-the sb-c::compiled-debug-fun
-                               (translate (aref fun-map i) spaces)))
-                   core))
-            (start-pc (if (= i 0)
-                          0
-                          (+ header-bytes (aref fun-map (1- i)))))
-            (end-pc (if (< (1+ i) (length fun-map))
-                        (+ header-bytes (aref fun-map (1+ i)))
-                        (code-object-size code))))
+    (loop
+      (let* ((name (fun-name-from-core
+                    (sb-c::compiled-debug-fun-name
+                     (truly-the sb-c::compiled-debug-fun cdf))
+                    core))
+             (next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
+                     (translate (sb-c::compiled-debug-fun-next cdf) spaces)))
+             (end-pc (if next
+                         (+ header-bytes (sb-c::compiled-debug-fun-offset next))
+                         (code-object-size code))))
         (unless (= end-pc start-pc)
           ;; Collapse adjacent address ranges named the same.
           ;; Use EQUALP instead of EQUAL to compare names
           ;; because instances of CORE-SYMBOL are not interned objects.
           (if (and blobs (equalp (caar blobs) name))
               (setf (cddr (car blobs)) end-pc)
-              (push (list* name start-pc end-pc) blobs)))))
+              (push (list* name start-pc end-pc) blobs)))
+        (if next
+            (setq cdf next start-pc end-pc)
+            (return))))
     (nreverse blobs)))
 
 (defstruct (descriptor (:constructor make-descriptor (bits)))
@@ -715,7 +717,7 @@
 ;;; the contents into the assembly file.
 ;;;   ({:data | :padding} . N) | (start-pc . end-pc)
 (defun get-text-ranges (code spaces)
-    (let ((map (translate (sb-c::compiled-debug-info-fun-map
+    (let ((cdf (translate (sb-c::compiled-debug-info-fun-map
                            (truly-the sb-c::compiled-debug-info
                                       (translate (%code-debug-info code) spaces)))
                           spaces))
@@ -727,11 +729,12 @@
       (when (plusp start-pc)
         (aver (zerop (rem start-pc n-word-bytes)))
         (push `(:data . ,(ash start-pc (- word-shift))) blobs))
-      (do ((i 0 (+ i 2)))
-          ((>= i (length map)) (nreverse blobs))
-        (let ((end-pc (if (< (1+ i) (length map))
-                          (svref map (1+ i))
-                          (%code-text-size code))))
+      (loop
+        (let* ((next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
+                       (translate (sb-c::compiled-debug-fun-next cdf) spaces)))
+               (end-pc (if next
+                           (sb-c::compiled-debug-fun-offset next)
+                           (%code-text-size code))))
           (cond
             ((= start-pc end-pc)) ; crazy shiat. do not add to blobs
             ((<= start-pc next-simple-fun-pc-offs (1- end-pc))
@@ -757,7 +760,9 @@
             (t
              (let ((current-blob (car blobs)))
                (setf (cdr current-blob) end-pc)))) ; extend this blob
-          (setq start-pc end-pc)))))
+          (unless next
+            (return (nreverse blobs)))
+          (setq cdf next start-pc end-pc)))))
 
 (defun c-symbol-quote (name)
   (concatenate 'string '(#\") name '(#\")))
