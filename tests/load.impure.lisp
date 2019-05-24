@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defvar *tmp-filename* "load-test.tmp")
+(defvar *tmp-filename* (scratch-file-name "tmp"))
 
 ;;; These tests are essentially the same as in compiler.pure.lisp
 ;;; They have to be run before we mess up *DEFAULT-PATHNAME-DEFAULTS*
