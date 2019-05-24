@@ -856,8 +856,8 @@
               (if dir
                   (namestring
                    (merge-pathnames
-                    file (parse-native-namestring dir nil *default-pathname-defaults*
-                                                  :as-directory t)))
+                    file (truename (parse-native-namestring dir nil *default-pathname-defaults*
+                                                            :as-directory t))))
                   (concatenate 'string "/tmp/" file)))))
 
 (defmacro with-scratch-file ((var &optional extension) &body forms)

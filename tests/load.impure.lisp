@@ -167,14 +167,14 @@
 
 ;; file-stream associated with a source file
 (with-test (:name :load-lisp-file-stream)
-  (let ((source (pathname "load-impure-test.lisp")))
+  (let ((source (scratch-file-name "lisp")))
     (with-test-program source nil
       (with-open-file (stream source)
         (load-and-assert stream source source)))))
 
 ;; file-stream associated with a fasl file
 (with-test (:name :load-fasl-file-stream)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source (scratch-file-name "lisp"))
          (fasl (compile-file-pathname source)))
     (with-test-program source fasl
       (with-open-file (stream fasl :element-type 'unsigned-byte)
@@ -352,8 +352,7 @@
     (stimulate-sbcl)))
 
 (defun load-empty-file (type)
-  (let ((pathname (make-pathname :name "load-impure-lisp-empty-temp"
-                                 :type type)))
+  (let ((pathname (scratch-file-name type)))
       (unwind-protect
            (progn
              (with-open-file (f pathname
