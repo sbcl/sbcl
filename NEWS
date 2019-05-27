@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.5.2:
+changes in sbcl-1.5.3 relative to sbcl-1.5.2:
   * platform support:
     - RISC-V: numerous bug fixes and improvements
     - all platforms: better run-program performance when used from multiple
