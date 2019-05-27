@@ -1,11 +1,18 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 changes relative to sbcl-1.5.2:
-  * enhancement: better run-program performance when used from multiple
-    threads.
+  * platform support:
+    - RISC-V: numerous bug fixes and improvements
+    - all platforms: better run-program performance when used from multiple
+      threads.
   * enhancement: (declaim (optimize (debug 2))) ensures compilation of
     top-level forms, providing better debugging for simple forms that are
     otherwise "byte-code interpreted" when compiled into FASLs.
-  * optimize: reduced overhead of calling NTH/NTHCDR.
+  * bug fix: use of finalizers could in rare circumstances cause a crash in
+    the garbage collector.
+  * bug fix: show extended function designators, e.g. (setf foo), in the
+    disassembler
+  * optimization: reduced overhead of calling NTH/NTHCDR.
+  * optimization: improved FLOAT-SIGN on DOUBLE-FLOATs on 64-bit platforms
 
 changes in sbcl-1.5.2 relative to sbcl-1.5.1:
   * enhancement: RISC-V support with the generational garbage collector.
