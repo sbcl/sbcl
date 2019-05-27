@@ -304,6 +304,7 @@
                          (1- length))))
     (error 'index-too-large-error
            :datum index
+           :sequence sequence
            :expected-type (if max-index
                               `(integer 0 ,max-index)
                               ;; This seems silly, is there something better?

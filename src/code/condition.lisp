@@ -1085,12 +1085,26 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
       (list '(:ansi-cl :function adjust-array))))
 
 (define-condition index-too-large-error (type-error)
-  ()
+  ((sequence :initarg :sequence))
   (:report
    (lambda (condition stream)
-     (format stream
-             "The index ~S is too large."
-             (type-error-datum condition)))))
+     (let ((sequence (slot-value condition 'sequence))
+           (index (type-error-datum condition)))
+       (if (vectorp sequence)
+           (format stream "Invalid index ~W for ~S ~@[with fill-pointer ~a~], ~
+                           should be a non-negative integer below ~W."
+                   index
+                   (type-of sequence)
+                   (and (array-has-fill-pointer-p sequence)
+                        (fill-pointer sequence))
+                   (length sequence))
+           (format stream
+                   "The index ~S is too large for a ~a of length ~s."
+                   index
+                   (if (listp sequence)
+                       "list"
+                       "sequence")
+                   (length sequence)))))))
 
 (define-condition bounding-indices-bad-error (reference-condition type-error)
   ((object :reader bounding-indices-bad-object :initarg :object))
