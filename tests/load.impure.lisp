@@ -205,16 +205,19 @@
 
 ;;; Loading from things named by pathname designators.
 
+(defvar *tmp-lisp-filename* (scratch-file-name "lisp"))
+
 ;; Test loading a source file by supplying a complete pathname.
 (with-test (:name :load-source-file-full-pathname)
-  (let ((source (pathname "load-impure-test.lisp")))
+  (let ((source *tmp-lisp-filename*))
     (with-test-program source nil
       (load-and-assert source source source))))
 
 ;; Test loading a source file when supplying a partial pathname.
 (with-test (:name :load-source-file-partial-pathname)
-  (let ((source (pathname "load-impure-test.lisp"))
-        (partial (pathname "load-impure-test")))
+  (let ((source *tmp-lisp-filename*)
+        (partial (make-pathname :defaults *tmp-lisp-filename*
+                                 :type nil)))
     (with-test-program source nil
       (load-and-assert partial source source))))
 
@@ -222,39 +225,42 @@
 ;; partial pathname.
 (with-test (:name :load-source-file-default-type)
   (let ((source (make-pathname :type :unspecific
-                               :defaults (pathname "load-impure-test")))
-        (partial (pathname "load-impure-test")))
+                               :defaults *tmp-lisp-filename*))
+        (partial (make-pathname :defaults *tmp-lisp-filename*
+                                :type nil)))
     (with-test-program source nil
       (load-and-assert partial partial partial))))
 
 ;; Test loading a fasl
 (with-test (:name :load-fasl-file)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source)))
     (with-test-program source fasl
       (load-and-assert fasl fasl fasl))))
 
 ;; Test loading a fasl when supplying a partial pathname.
 (with-test (:name :load-fasl-file-partial-pathname)
-  (let* ((source  (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source))
-         (partial (pathname "load-impure-test")))
+         (partial (make-pathname :defaults *tmp-lisp-filename*
+                                 :type nil)))
     (with-test-program source fasl
       (load-and-assert partial fasl fasl))))
 
 ;; Test loading a fasl whose name lacks a type when supplying a
 ;; partial pathname.
 (with-test (:name :load-fasl-file-defaut-type)
-  (let* ((source  (pathname "load-impure-test.lisp"))
+  (let* ((source  *tmp-lisp-filename*)
          (fasl (make-pathname :type :unspecific
                               :defaults (compile-file-pathname source)))
-         (partial (pathname "load-impure-test")))
+         (partial (make-pathname :defaults *tmp-lisp-filename*
+                                 :type nil)))
     (with-test-program source fasl
       (load-and-assert partial partial partial))))
 
 ;; Test loading a fasl with a strange type
 (with-test (:name :load-fasl-file-strange-type)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (make-pathname :defaults (compile-file-pathname source)
                               :type "compiled-lisp")))
     (with-test-program source fasl
@@ -265,7 +271,7 @@
 ;; Ensure that loading a fasl specified with a type checks for the
 ;; header.
 (with-test (:name :load-fasl-header-missing-1)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source)))
     (with-test-program source fasl
       (with-open-file (f fasl :direction :io :if-exists :overwrite
@@ -280,7 +286,7 @@
 ;; or so).  If target-load.lisp is reverted to that state eventually,
 ;; this test should be removed (or that definition of LOAD altered).
 (with-test (:name :load-fasl-header-missing-2)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source))
          (fasl-spec (make-pathname :type nil
                                    :defaults (compile-file-pathname source))))
@@ -294,7 +300,7 @@
 ;; Ensure that we get an error when the source file is newer than the
 ;; fasl and the supplied argument is an incomplete pathname.
 (with-test (:name :load-default-obsolete-fasl)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source))
          (spec (make-pathname :type nil :defaults source)))
     (with-test-program source fasl
@@ -309,7 +315,7 @@
 
 ;; Ensure that we can invoke the restart SOURCE in the above case.
 (with-test (:name :load-default-obsolete-fasl-restart-source)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source))
          (spec (make-pathname :type nil :defaults source)))
     (with-test-program source fasl
@@ -325,7 +331,7 @@
 
 ;; Ensure that we can invoke the restart OBJECT in the above case.
 (with-test (:name :load-defaulted-obsolete-fasl-restart-object)
-  (let* ((source (pathname "load-impure-test.lisp"))
+  (let* ((source *tmp-lisp-filename*)
          (fasl (compile-file-pathname source))
          (spec (make-pathname :type nil :defaults source)))
     (with-test-program source fasl
