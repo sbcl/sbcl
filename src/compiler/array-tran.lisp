@@ -1236,15 +1236,17 @@
              ;; Might as well catch some easy negation cases.
              (typecase x
                (array-type
-                (let ((dims (array-type-dimensions x)))
-                  (cond ((eql dims '*)
-                         '*)
-                        ((every (lambda (dim)
-                                  (eql dim '*))
-                                dims)
-                         (list (length dims)))
-                        (t
-                         '()))))
+                (and (eq (array-type-complexp x) :maybe)
+                     (eq (array-type-element-type x) *wild-type*)
+                     (let ((dims (array-type-dimensions x)))
+                       (cond ((eql dims '*)
+                              '*)
+                             ((every (lambda (dim)
+                                       (eql dim '*))
+                                     dims)
+                              (list (length dims)))
+                             (t
+                              '())))))
                (t '()))))
       (declare (dynamic-extent #'over #'under))
       (multiple-value-bind (not-p ranks)

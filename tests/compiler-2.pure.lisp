@@ -2290,4 +2290,24 @@
       `(lambda (a)
          (let ((v4 (the (or (single-float (1.0) (3.0)) (single-float 4.0 5.0)) a)))
            (incf v4 1.0)))
-    ((4.0) 5.0)))
+      ((4.0) 5.0)))
+
+(with-test (:name :derive-array-rank-negation)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((not (simple-array * (* *))) a))
+      (eql (array-rank a) 2))
+   (((make-array '(2 2) :adjustable t)) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((not (simple-array fixnum (* *))) a))
+      (eql (array-rank a) 2))
+   (((make-array '(2 2))) t))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a)
+      (declare ((not (and (array * (* *)) (not simple-array))) a))
+      (eql (array-rank a) 2))
+      (((make-array '(2 2))) t)))
