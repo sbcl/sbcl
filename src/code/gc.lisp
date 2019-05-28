@@ -464,11 +464,6 @@ Experimental: interface subject to change."
                                  (function double generation-index-t))
                    generation))
 
-(declaim (inline sb-vm:is-lisp-pointer))
-(defun sb-vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
-  #-64-bit (oddp addr)
-  #+64-bit (not (logtest (logxor addr 3) 3)))
-
 ;;; Return true if X is in any non-stack GC-managed space.
 ;;; (Non-stack implies not TLS nor binding stack)
 ;;; This assumes a single contiguous dynamic space, which is of course a

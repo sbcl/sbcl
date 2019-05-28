@@ -160,3 +160,10 @@
         (push (sxhash v) hashes)
         (setf (aref v i) 0)))
     (assert (= (length (remove-duplicates hashes)) sb-vm:n-word-bits))))
+
+(with-test (:name :eq-hash-nonpointers-not-address-sensitive)
+  (let ((tbl (make-hash-table :test 'eq)))
+    (setf (gethash #\a tbl) 1)
+    #+64-bit (setf (gethash 1.0f0 tbl) 1) ; single-float is a nonpointer
+    (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-table tbl))))
+      (assert (zerop data))))) ; not sb-vm:vector-valid-hashing-subtype

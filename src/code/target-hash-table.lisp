@@ -101,11 +101,16 @@
                    (setf (,thread-slot-accessor ,hash-table) nil)))
                (body-fun)))))))
 
+(declaim (inline sb-vm:is-lisp-pointer))
+(defun sb-vm:is-lisp-pointer (addr) ; Same as is_lisp_pointer() in C
+  #-64-bit (oddp addr)
+  #+64-bit (not (logtest (logxor addr 3) 3)))
+
 #-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values hash (member t nil)))
   (values (pointer-hash key)
-          (oddp (get-lisp-obj-address key))))
+          (sb-vm:is-lisp-pointer (get-lisp-obj-address key))))
 
 #-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)

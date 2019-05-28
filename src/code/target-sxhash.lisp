@@ -11,9 +11,6 @@
 
 (in-package "SB-IMPL")
 
-(defun pointer-hash (key)
-  (pointer-hash key))
-
 ;;; the depthoid explored when calculating hash values
 ;;;
 ;;; "Depthoid" here is a sort of mixture of what Common Lisp ordinarily calls
