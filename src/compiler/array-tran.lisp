@@ -1244,7 +1244,8 @@
                          '*)
                         ((not (every (lambda (dim)
                                        (eql dim '*))
-                                     dims)))
+                                     dims))
+                         nil)
                         ((not
                           (case (array-type-complexp x)
                             ((t)
