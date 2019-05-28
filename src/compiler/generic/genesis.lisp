@@ -800,13 +800,12 @@ core and return a descriptor to it."
     (32
      (let ((high-bits (double-float-high-bits x))
            (low-bits (double-float-low-bits x)))
-       (ecase sb-c:*backend-byte-order*
-         (:little-endian
-          (write-wordindexed/raw address index low-bits)
-          (write-wordindexed/raw address (1+ index) high-bits))
-         (:big-endian
-          (write-wordindexed/raw address index high-bits)
-          (write-wordindexed/raw address (1+ index) low-bits)))))
+       #+little-endian
+       (progn (write-wordindexed/raw address index low-bits)
+              (write-wordindexed/raw address (1+ index) high-bits))
+       #+big-endian
+       (progn (write-wordindexed/raw address index high-bits)
+              (write-wordindexed/raw address (1+ index) low-bits))))
     (64
      (write-wordindexed/raw address index (double-float-bits x))))
   address)
@@ -838,9 +837,8 @@ core and return a descriptor to it."
                                  des sb-vm:double-float-value-slot))
                          (word1 (read-bits-wordindexed
                                  des (1+ sb-vm:double-float-value-slot))))
-                    (ecase sb-c:*backend-byte-order*
-                     (:little-endian (logior (ash word1 32) word0))
-                     (:big-endian    (logior (ash word0 32) word1))))))
+                    #+little-endian (logior (ash word1 32) word0)
+                    #+big-endian    (logior (ash word0 32) word1))))
     (sb-impl::make-flonum (sb-vm::sign-extend bits 64) 'double-float)))
 
 (defun complexnum-to-core (num &aux (r (realpart num)) (i (imagpart num)))
