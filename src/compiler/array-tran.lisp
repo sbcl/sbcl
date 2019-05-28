@@ -1236,17 +1236,29 @@
              ;; Might as well catch some easy negation cases.
              (typecase x
                (array-type
-                (and (eq (array-type-complexp x) :maybe)
-                     (eq (array-type-element-type x) *wild-type*)
-                     (let ((dims (array-type-dimensions x)))
-                       (cond ((eql dims '*)
-                              '*)
-                             ((every (lambda (dim)
+                (let ((dims (array-type-dimensions x))
+                      (et (array-type-element-type x)))
+                  ;; Need to check if the whole type has the same specialization and simplicity,
+                  ;; otherwise it's not clear which part of the type is negated.
+                  (cond ((eql dims '*)
+                         '*)
+                        ((not (every (lambda (dim)
                                        (eql dim '*))
-                                     dims)
-                              (list (length dims)))
-                             (t
-                              '())))))
+                                     dims)))
+                        ((not
+                          (case (array-type-complexp x)
+                            ((t)
+                             (csubtypep ctype (specifier-type '(not simple-array))))
+                            ((nil)
+                             (csubtypep ctype (specifier-type 'simple-array)))
+                            (t t)))
+                         nil)
+                        ((not (or (eq et *wild-type*)
+                                  (csubtypep ctype
+                                             (specifier-type `(array ,(type-specifier et))))))
+                         nil)
+                        (t
+                         (list (length dims))))))
                (t '()))))
       (declare (dynamic-extent #'over #'under))
       (multiple-value-bind (not-p ranks)

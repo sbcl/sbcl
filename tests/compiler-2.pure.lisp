@@ -2310,4 +2310,16 @@
    `(lambda (a)
       (declare ((not (and (array * (* *)) (not simple-array))) a))
       (eql (array-rank a) 2))
-      (((make-array '(2 2))) t)))
+   (((make-array '(2 2))) t)))
+
+(with-test (:name :derive-array-rank-negation.2)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (declare ((and simple-array
+                         (not (simple-array * (* *))))
+                        x))
+              (eql (array-rank x) 2))))
+          '(function ((and simple-array (not (simple-array * (* *)))))
+            (values null &optional)))))
