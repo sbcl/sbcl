@@ -325,10 +325,6 @@ static void trace_object(lispobj* where)
         break; // scan slots normally
 #endif
     case CODE_HEADER_WIDETAG:
-        for_each_simple_fun(i, fun, (struct code*)where, 0, {
-            gc_mark_range(SIMPLE_FUN_SCAV_START(fun),
-                          SIMPLE_FUN_SCAV_NWORDS(fun));
-        })
         scan_to = code_header_words((struct code*)where);
         break;
     case FDEFN_WIDETAG:

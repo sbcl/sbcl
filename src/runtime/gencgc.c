@@ -2785,9 +2785,6 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                         function_layout((lispobj*)fheaderp);
                     gc_assert(!layout || layout == LAYOUT_OF_FUNCTION);
 #endif
-                    verify_range(SIMPLE_FUN_SCAV_START(fheaderp),
-                                 SIMPLE_FUN_SCAV_NWORDS(fheaderp),
-                                 state);
                 });
 #if CODE_PAGES_USE_SOFT_PROTECTION
                 generation_index_t my_gen = gen_of((lispobj)where);
@@ -4379,12 +4376,6 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         sword_t n_header_words = code_header_words((struct code *)object);
         scavenge(object + 2, n_header_words - 2);
 
-        /* Scavenge the boxed section of each function object in the
-         * code data block. */
-        for_each_simple_fun(i, function_ptr, (struct code *)object, 1, {
-            scavenge(SIMPLE_FUN_SCAV_START(function_ptr),
-                     SIMPLE_FUN_SCAV_NWORDS(function_ptr));
-        })
         /* If my_gen is other than newspace, then scan for old->young
          * pointers. If my_gen is newspace, there can be no such pointers
          * because newspace is the lowest numbered generation post-GC
@@ -4394,12 +4385,6 @@ sword_t scav_code_header(lispobj *object, lispobj header)
             for (where= object + 2; where < end; ++where)
                 if (is_lisp_pointer(ptr = *where) && obj_gen_lessp(ptr, my_gen))
                     goto done;
-            for_each_simple_fun(i, function_ptr, (struct code *)object, 0, {
-                end = (lispobj*)function_ptr->code;
-                for (where = SIMPLE_FUN_SCAV_START(function_ptr); where < end; ++where)
-                    if (is_lisp_pointer(ptr = *where) && obj_gen_lessp(ptr, my_gen))
-                        goto done;
-            })
         }
         CLEAR_WRITTEN_FLAG(object);
     } else {

@@ -383,14 +383,13 @@
 
 ;;; Print the fun-header (entry-point) pseudo-instruction at the
 ;;; current location in DSTATE to STREAM.
-(defun fun-header-hook (stream dstate)
+(defun fun-header-hook (fun-index stream dstate)
   (declare (type (or null stream) stream)
            (type disassem-state dstate))
   (unless (null stream)
     (let* ((seg (dstate-segment dstate))
            (code (seg-code seg))
-           (woffs (ash (segment-offs-to-code-offs (dstate-cur-offs dstate) seg)
-                       (- sb-vm:word-shift))) ; bytes -> words
+           (woffs (+ sb-vm:code-constants-offset (* fun-index 4)))
            (name (code-header-ref code (+ woffs sb-vm:simple-fun-name-slot)))
            (args (code-header-ref code (+ woffs sb-vm:simple-fun-arglist-slot)))
            (type (code-header-ref code (+ woffs sb-vm:simple-fun-type-slot))))
@@ -1049,7 +1048,10 @@
                           (incf (dstate-next-offs dstate) offset))
                  :offset 0) ; at 0 bytes into this seg, skip OFFSET bytes
                 (seg-hooks segment)))
-        (push (make-offs-hook :offset offset :fun #'fun-header-hook)
+        (push (make-offs-hook
+               :offset offset
+               :fun (let ((i i)) ; capture the _current_ I, not the final value
+                      (lambda (stream dstate) (fun-header-hook i stream dstate))))
               (seg-hooks segment))))))
 
 ;;; A SAP-MAKER is a no-argument function that returns a SAP.

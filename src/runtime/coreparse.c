@@ -562,9 +562,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #if FUN_SELF_FIXNUM_TAGGED
                 if (f->self != (lispobj)f->code)
                     FIXUP(f->self = (lispobj)f->code, &f->self);
-                adjust_pointers(SIMPLE_FUN_SCAV_START(f), SIMPLE_FUN_SCAV_NWORDS(f), adj);
 #else
-                adjust_pointers(&f->self, (lispobj*)f->code - &f->self, adj);
+                adjust_pointers(&f->self, 1, adj);
 #endif
             });
             {

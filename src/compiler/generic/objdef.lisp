@@ -239,28 +239,6 @@ during backtrace.
   ;; of x86, or the Lisp function to jump to, for everybody else.
   (self :set-known ()
         :set-trans (setf %simple-fun-self))
-  (name :ref-known (flushable)
-        :ref-trans %simple-fun-name
-        :set-known ()
-        :set-trans (setf %simple-fun-name))
-  (arglist :type list
-           :ref-known (flushable)
-           :ref-trans %simple-fun-arglist
-           :set-known ()
-           :set-trans (setf %simple-fun-arglist))
-  (type :ref-known (flushable)
-        ;; %%SIMPLE-FUN-TYPE is used only by %SIMPLE-FUN-TYPE.
-        ;; Nobody should care that %SIMPLE-FUN-TYPE isn't open-coded.
-        :ref-trans %%simple-fun-type
-        :set-known ()
-        :set-trans (setf %simple-fun-type))
-  ;; NIL for empty, STRING for a docstring, SIMPLE-VECTOR for XREFS, and (CONS
-  ;; STRING SIMPLE-VECTOR) for both.
-  (info :init :null
-        :ref-trans %simple-fun-info
-        :ref-known (flushable)
-        :set-trans (setf %simple-fun-info)
-        :set-known ())
   ;; FIXME: This is a poor name for this slot, because SIMPLE-FUN-CODE
   ;; ought to mean the code object in which this simple-fun is contained.
   ;; Probably a better name would be INSTS, especially as SIMPLE-FUN-CODE-OFFSET
@@ -268,6 +246,15 @@ during backtrace.
   ;; the fun, but it ought to mean how far this fun is from the code header.
   ;; This will be quite disastrous to clean up and not make mistakes about it.
   (code :rest-p t :c-type "unsigned char"))
+
+;;; These are word numbers beyond the base of the simple-fun's metadata
+;;; in the code header. The mnemonic device here is that the first 3 slots
+;;; essentially comprise the function-lambda-expression,
+;;; and the last is a derived piece of information.
+(defconstant simple-fun-name-slot    0)
+(defconstant simple-fun-arglist-slot 1)
+(defconstant simple-fun-info-slot    2)
+(defconstant simple-fun-type-slot    3)
 
 #-(or x86 x86-64)
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)

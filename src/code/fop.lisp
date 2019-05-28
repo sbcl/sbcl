@@ -557,14 +557,8 @@
     (setf (code-header-ref code index) value)
     (values)))
 
-(define-fop 20 :not-host (fop-fun-entry ((:operands fun-index)
-                                           code-object name arglist type info))
-  (let ((fun (%code-entry-point code-object fun-index)))
-    (setf (%simple-fun-name fun) name)
-    (setf (%simple-fun-arglist fun) arglist)
-    (setf (%simple-fun-type fun) type)
-    (apply #'set-simple-fun-info fun info)
-    fun))
+(define-fop 20 :not-host (fop-fun-entry ((:operands fun-index) code-object))
+  (%code-entry-point code-object fun-index))
 
 ;;;; assemblerish fops
 

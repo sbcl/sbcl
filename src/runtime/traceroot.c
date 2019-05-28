@@ -130,7 +130,7 @@ static lispobj canonical_obj(lispobj obj)
 static int find_ref(lispobj* source, lispobj target)
 {
     lispobj layout, bitmap;
-    int scan_limit, i, j;
+    int scan_limit, i;
 
     lispobj header = *source;
     if (is_cons_half(header)) {
@@ -162,10 +162,6 @@ static int find_ref(lispobj* source, lispobj target)
         break;
 #endif
     case CODE_HEADER_WIDETAG:
-        for_each_simple_fun(i, function_ptr, (struct code*)source, 0, {
-            int wordindex = &function_ptr->name - source;
-            for (j=0; j<4; ++j) check_ptr(wordindex+j, source[wordindex+j]);
-        })
         scan_limit = code_header_words((struct code*)source);
         break;
     case FDEFN_WIDETAG:
@@ -602,11 +598,13 @@ static int trace1(lispobj object,
             struct simple_fun* fun = simple_fun_from_pc(thread_pc);
             if (fun) {
                 fprintf(file, "fun=%p", (void*)make_lispobj(fun, FUN_POINTER_LOWTAG));
+#if 0 // TODO: implement simple_fun_name()
                 if (is_lisp_pointer(fun->name) &&
                     widetag_of(native_pointer(fun->name)) == SYMBOL_WIDETAG) {
                     fprintf(file, "=");
                     show_lstring(VECTOR(SYMBOL(fun->name)->name), 0, file);
                 }
+#endif
             } else if (thread_pc)
                 fprintf(file, "pc=%p", thread_pc);
         }
@@ -695,7 +693,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                           struct scan_state* ss)
 {
     lispobj layout, bitmap;
-    sword_t nwords, scan_limit, i, j;
+    sword_t nwords, scan_limit, i;
     uword_t n_objects = 0, n_scanned_words = 0,
             n_immediates = 0, n_pointers = 0;
 
@@ -733,10 +731,6 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             break;
 #endif
         case CODE_HEADER_WIDETAG:
-            for_each_simple_fun(i, function_ptr, (struct code*)where, 0, {
-                int wordindex = &function_ptr->name - where;
-                for (j=0; j<4; ++j) check_ptr(where[wordindex+j]);
-            })
             scan_limit = code_header_words((struct code*)where);
             break;
         case FDEFN_WIDETAG:

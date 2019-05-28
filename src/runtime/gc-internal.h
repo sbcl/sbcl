@@ -96,9 +96,6 @@ do {                                                                   \
      | SIMPLE_VECTOR_WIDETAG)); \
   v->header ^= subtype_VectorWeakVisited << N_WIDETAG_BITS
 
-#define SIMPLE_FUN_SCAV_START(fun_ptr) &fun_ptr->name
-#define SIMPLE_FUN_SCAV_NWORDS(fun_ptr) ((lispobj*)fun_ptr->code - &fun_ptr->name)
-
 /* values for the *_alloc_* parameters, also see the commentary for
  * struct page in gencgc-internal.h. These constants are used in gc-common,
  * so they can't easily be made gencgc-only */

@@ -435,10 +435,5 @@
   (and (listp fun-name)
        (eq (car fun-name) 'setf)
        (member (cadr fun-name)
-               '(%code-debug-info
-                 %code-fixups
-                 %simple-fun-name
-                 %simple-fun-arglist
-                 %simple-fun-type
-                 %simple-fun-info))
+               '(%code-debug-info %code-fixups))
        t))

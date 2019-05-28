@@ -272,6 +272,9 @@ ptrans_code(lispobj thing)
     pscav_later(&new->debug_info, 1);
 
     /* Scavenge the constants. */
+    // TODO: some of the constants - ones corresponding to former slots
+    // of simple-fun objects - are supposed to be pscav_later()'ed.
+    // It's not a terribly important consideration.
     pscav(new->constants,
           code_header_words(new) - (offsetof(struct code, constants) >> WORD_SHIFT),
           1);
@@ -280,7 +283,7 @@ ptrans_code(lispobj thing)
     for_each_simple_fun(i, func, new, 1, {
         gc_assert(!dynamic_pointer_p((lispobj)func));
         pscav(&func->self, 1, 1);
-        pscav_later(&func->name, 4);
+        // pscav_later(&func->name, 4);
     })
 
     return result;

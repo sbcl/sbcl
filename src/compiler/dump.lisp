@@ -947,6 +947,8 @@
              (dump-object (sb-c::constant-value entry) fasl-output))
             (cons
              (ecase (car entry)
+               (:constant ; anything that has not been wrapped in a #<CONSTANT>
+                (dump-object (cdr entry) fasl-output))
                (:entry
                 (let* ((info (sb-c::leaf-info (cdr entry)))
                        (handle (gethash info
@@ -1041,15 +1043,27 @@
          (entries (sb-c::ir2-component-entries 2comp))
          (nfuns (length entries))
          (code-handle
-          (dump-code-object component code-segment code-length fixups file))
+          ;; fill in the placeholder elements of constants
+          ;; with the NAME, ARGLIST, TYPE, INFO slots of each simple-fun.
+          (let ((constants (sb-c::ir2-component-constants 2comp))
+                (wordindex (+ sb-vm:code-constants-offset (* 4 nfuns))))
+            (dolist (entry entries)
+              ;; Process in reverse order of ENTRIES.
+              ;; See also MAKE-CORE-COMPONENT which does the same thing.
+              (decf wordindex 4)
+              (setf (aref constants (+ wordindex 0))
+                    `(:constant . ,(sb-c::entry-info-name entry))
+                    (aref constants (+ wordindex 1))
+                    `(:constant . ,(sb-c::entry-info-arguments entry))
+                    (aref constants (+ wordindex 2))
+                    `(:constant . ,(sb-c::entry-info-form/doc/xrefs entry))
+                    (aref constants (+ wordindex 3))
+                    `(:constant . ,(sb-c::entry-info-type entry))))
+            (dump-code-object component code-segment code-length fixups file)))
          (fun-index nfuns))
 
     (dolist (entry entries)
       (dump-push code-handle file)
-      (dump-object (sb-c::entry-info-name entry) file)
-      (dump-object (sb-c::entry-info-arguments entry) file)
-      (dump-object (sb-c::entry-info-type entry) file)
-      (dump-object (sb-c::entry-info-form/doc/xrefs entry) file)
       (dump-fop 'fop-fun-entry file (decf fun-index))
       (let ((entry-handle (dump-pop file)))
         (setf (gethash entry (fasl-output-entry-table file)) entry-handle)

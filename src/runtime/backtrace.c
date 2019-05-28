@@ -217,7 +217,7 @@ print_entry_points (struct code *code, FILE *f)
             fprintf(f, "%p: bogus function entry", fun);
             return;
         }
-        print_entry_name(fun->name, f);
+        print_entry_name(code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index], f);
         if ((index + 1) < n_funs) fprintf(f, ", ");
     });
 }

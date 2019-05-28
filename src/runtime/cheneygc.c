@@ -463,12 +463,5 @@ sword_t scav_code_header(lispobj *where, lispobj header)
     /* Scavenge the boxed section of the code data block. */
     scavenge(where + 2, n_header_words - 2);
 
-    /* Scavenge the boxed section of each function object in the
-     * code data block. */
-    for_each_simple_fun(i, function_ptr, code, 1, {
-        scavenge(SIMPLE_FUN_SCAV_START(function_ptr),
-                 SIMPLE_FUN_SCAV_NWORDS(function_ptr));
-    })
-
     return code_total_nwords(code);
 }

@@ -149,9 +149,11 @@
 ;;; additional noise in the code object header.
 (defun select-component-format (component)
   (declare (type component component))
-  (dotimes (i code-constants-offset)
-    (vector-push-extend nil
-                        (ir2-component-constants (component-info component))))
+  (let* ((2comp (component-info component))
+         (n-entries (length (sb-c::ir2-component-entries 2comp)))
+         (consts (ir2-component-constants 2comp)))
+    (dotimes (i (+ code-constants-offset (* 4 n-entries)))
+      (vector-push-extend nil consts)))
   (values))
 
 (defun error-call (vop error-code &rest values)

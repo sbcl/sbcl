@@ -1155,11 +1155,7 @@ We could try a few things to mitigate this:
           :extend
           (dotimes (i (code-n-entries this))
             (let ((f (%code-entry-point this i)))
-              (when (or (eq f that)
-                        (eq (%simple-fun-name f) that)
-                        (eq (%simple-fun-arglist f) that)
-                        (eq (%%simple-fun-type f) that)
-                        (eq (%simple-fun-info f) that))
+              (when (eq f that)
                 (go win)))))
          (t
           :extend

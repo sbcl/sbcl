@@ -1110,6 +1110,8 @@ possibly temporarily, because it might be used internally."
                "UPDATE-SYMBOL-INFO"
                "WITH-GLOBALDB-NAME"
                "%BOUNDP"
+               "FUN-SRC" "FUN-SRC-DOC" "FUN-SRC-FORM" "FUN-SRC-XREFS"
+               "MAKE-FUN-SRC"
 
                ;; Calling a list of hook functions, plus error handling.
                "CALL-HOOKS"

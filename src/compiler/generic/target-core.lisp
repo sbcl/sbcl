@@ -200,12 +200,12 @@
       (let* ((entries (ir2-component-entries 2comp))
              (fun-index (length entries)))
         (dolist (entry-info entries)
-          (let ((fun (%code-entry-point code-obj (decf fun-index))))
-            (setf (%simple-fun-name fun) (entry-info-name entry-info))
-            (setf (%simple-fun-arglist fun) (entry-info-arguments entry-info))
-            (setf (%simple-fun-type fun) (entry-info-type entry-info))
-            (apply #'set-simple-fun-info fun
-                   (entry-info-form/doc/xrefs entry-info))
+          (let ((fun (%code-entry-point code-obj (decf fun-index)))
+                (w (+ sb-vm:code-constants-offset (* 4 fun-index))))
+            (setf (code-header-ref code-obj (+ w 0)) (entry-info-name entry-info)
+                  (code-header-ref code-obj (+ w 1)) (entry-info-arguments entry-info)
+                  (code-header-ref code-obj (+ w 2)) (entry-info-form/doc/xrefs entry-info)
+                  (code-header-ref code-obj (+ w 3)) (entry-info-type entry-info))
             (note-fun entry-info fun object))))
 
       (push debug-info (core-object-debug-info object))

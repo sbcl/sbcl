@@ -244,9 +244,27 @@
      (setf (%simple-fun-arglist (%fun-fun function)) new-value)))
   new-value)
 
-;;; Extract the type from the function header FUNC.
-(defun %simple-fun-type (func)
-  (let ((internal-type (sb-vm::%%simple-fun-type func)))
+(macrolet ((access-slot (index)
+             `(code-header-ref
+               (fun-code-header fun)
+               (+ sb-vm:code-constants-offset ,index (* 4 (%simple-fun-index fun)))))
+           (def (accessor index)
+             `(progn
+                (defun (setf ,accessor) (newval fun)
+                  (setf (access-slot ,index) newval))
+                (defun ,accessor (fun)
+                  (access-slot ,index)))))
+  ;; possible FIXME for the backends which treat the assembly trampolines
+  ;; as tagged functions (with fun-pointer-lowtag) - we might need to ensure
+  ;; that the code object reserves space for 4 NILs just in case a simple-fun
+  ;; accessor is called on it. I'm not entirely sure whether that's necessary.
+  (def %simple-fun-name    sb-vm:simple-fun-name-slot)
+  (def %simple-fun-arglist sb-vm:simple-fun-arglist-slot)
+  (def %simple-fun-info    sb-vm:simple-fun-info-slot)
+  (def %%simple-fun-type   sb-vm:simple-fun-type-slot))
+
+(defun %simple-fun-type (fun)
+  (let ((internal-type (%%simple-fun-type fun)))
     ;; For backward-compatibility we expand SFUNCTION -> FUNCTION.
     (if (and (listp internal-type) (eq (car internal-type) 'sfunction))
         (sb-ext:typexpand-1 internal-type)
@@ -260,30 +278,8 @@
     (interpreted-function (sb-interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-;;; A FUN-SRC structure appears in %SIMPLE-FUN-INFO of any function for
-;;; which a source form is retained via COMPILE or LOAD and for which it was
-;;; required to store all three of these pieces of data.
-(defstruct (fun-src (:constructor make-fun-src (form doc xrefs))
-                    (:predicate nil)
-                    (:copier nil))
-  form
-  doc
-  xrefs)
-;;; Assign %SIMPLE-FUN-INFO given the three possible things that
-;;; we stash there.
 (defun set-simple-fun-info (fun form doc xrefs)
-  (setf (%simple-fun-info fun)
-        (if form
-            ;; If form starts with a string, we can't store it by itself
-            ;; because it's confusable with (CONS STRING *)
-            ;; Lambda expressions start with LAMBDA, obviously,
-            ;; so this really shouldn't happen. Just being defensive here.
-            (if (or doc xrefs (typep form '(cons string)))
-                (make-fun-src form doc xrefs)
-                form)
-            (if (and doc xrefs)
-                (cons doc xrefs)
-                (or doc xrefs)))))
+  (setf (%simple-fun-info fun) (sb-c::pack-simple-fun-info form doc xrefs)))
 
 ;;; Define readers for parts of SIMPLE-FUN-INFO, which holds:
 ;;;  - a string if documentation only,
@@ -328,6 +324,7 @@
             ((cons string)
              (if doc (rplaca info doc) (cdr info)))
             (fun-src
+             ;; FIXME: should we consider these objects immutable?
              (setf (fun-src-doc info) doc)
              info)
             ((cons (not string))

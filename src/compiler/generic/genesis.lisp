@@ -2662,9 +2662,8 @@ core and return a descriptor to it."
       (make-descriptor (logior fun sb-vm:fun-pointer-lowtag)))))
 
 (define-cold-fop (fop-fun-entry (fun-index))
-  (binding* (((info type arglist name code-object)
-                (values (pop-stack) (pop-stack) (pop-stack) (pop-stack) (pop-stack)))
-             (fn (compute-fun code-object fun-index)))
+  (let* ((code-object (pop-stack))
+         (fn (compute-fun code-object fun-index)))
     #+compact-instance-header
     (write-wordindexed/raw
      fn 0 (logior (descriptor-bits (cold-symbol-value 'sb-vm:function-layout))
@@ -2676,20 +2675,6 @@ core and return a descriptor to it."
                               (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))
     #-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
     (write-wordindexed fn sb-vm:simple-fun-self-slot fn)
-    (write-wordindexed fn sb-vm:simple-fun-name-slot name)
-    (write-wordindexed fn sb-vm:simple-fun-arglist-slot arglist)
-    (write-wordindexed fn sb-vm:simple-fun-type-slot type)
-    ;; Emulate SET-SIMPLE-FUN-INFO
-    (aver (cold-null (cold-car info))) ; no source form
-    (let* ((doc (cold-car (cold-cdr info)))
-           (docp (not (cold-null doc)))
-           (xref (cold-car (cold-cdr (cold-cdr info))))
-           (xrefp (not (cold-null xref))))
-      (write-wordindexed fn sb-vm:simple-fun-info-slot
-                         (cond ((and docp xrefp) (cold-cons doc xref))
-                               (docp doc)
-                               (xrefp xref)
-                               (t *nil-descriptor*))))
     fn))
 
 (define-cold-fop (fop-assembler-code)
@@ -3769,6 +3754,7 @@ III. initially undefined function references (alphabetically):
       (#.sb-vm:fun-pointer-lowtag
        (if strictp
            (error "Can't map cold-fun -> warm-fun")
+           #+nil ; FIXME: not done, but only needed for debugging genesis
            (let ((name (read-wordindexed x sb-vm:simple-fun-name-slot)))
              `(function ,(recurse name)))))
       (#.sb-vm:other-pointer-lowtag

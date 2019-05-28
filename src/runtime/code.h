@@ -76,6 +76,9 @@ static inline int code_text_size(struct code* c) {
     return N_WORD_BYTES * code_total_nwords(c) - code_boxed_len(c) - code_trailer_len(c);
 }
 
+// How many elements in 'code->constants[]' are taken by each simple-fun
+#define CODE_SLOTS_PER_SIMPLE_FUN 4
+
 // Iterate over the native pointers to each function in 'code_var'
 // offsets are stored as the number of bytes into the instructions
 // portion of the code object at which the simple-fun object resides.

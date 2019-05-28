@@ -449,10 +449,10 @@ sb-c::
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let* ((fun (sb-kernel:%code-entry-point obj i))
                     (arglist (%simple-fun-arglist fun))
-                    (type (sb-vm::%%simple-fun-type fun)))
+                    (type (sb-impl::%%simple-fun-type fun)))
                (setf (%simple-fun-arglist fun)
                      (ensure-gethash arglist arglist-hash arglist))
-               (setf (sb-kernel:%simple-fun-type fun)
+               (setf (sb-impl::%%simple-fun-type fun)
                      (ensure-gethash type type-hash type)))))
           (#.sb-vm:instance-widetag
            (typecase obj

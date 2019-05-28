@@ -152,7 +152,7 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
 {
     struct hopscotch_table* ht = (struct hopscotch_table*)arg;
     lispobj layout, bitmap, *next;
-    sword_t nwords, i, j;
+    sword_t nwords, i;
 
     for ( ; where < limit ; where = next ) {
         lispobj header = *where;
@@ -176,11 +176,6 @@ static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)
                         coalesce_obj(where+i, ht);
                 continue;
             case CODE_HEADER_WIDETAG:
-                for_each_simple_fun(i, fun, (struct code*)where, 0, {
-                    lispobj* fun_slots = SIMPLE_FUN_SCAV_START(fun);
-                    for (j=0; j<SIMPLE_FUN_SCAV_NWORDS(fun); ++j)
-                        coalesce_obj(fun_slots+j, ht);
-                })
                 nwords = code_header_words((struct code*)where);
                 break;
             default:
