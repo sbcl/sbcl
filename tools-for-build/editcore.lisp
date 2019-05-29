@@ -309,6 +309,23 @@
 (defun fun-name-from-core (name core)
   (remove-name-junk (%fun-name-from-core name core)))
 
+;;; A problem: COMPILED-DEBUG-FUN-ENCODED-LOCS (a packed integer) might be a
+;;; bignum - in fact probably is. If so, it points into the target core.
+;;; So we have to produce a new instance with an ENCODED-LOCS that
+;;; is the translation of the bignum, and call the accessor on that.
+;;; The accessors for its sub-fields are abstract - we don't know where the
+;;; fields are so we can't otherwise unpack them. (See CDF-DECODE-LOCS if
+;;; you really need to know)
+(defun cdf-offset (compiled-debug-fun spaces)
+  ;; (Note that on precisely GC'd platforms, this operation is dangerous,
+  ;; but no more so than everything else in this file)
+  (let ((locs (sb-c::compiled-debug-fun-encoded-locs compiled-debug-fun)))
+    (sb-c::compiled-debug-fun-offset
+     (if (fixnump locs)
+         compiled-debug-fun
+         (sb-c::make-compiled-debug-fun
+          :name nil :encoded-locs (translate locs spaces))))))
+
 ;;; Return a list of ((NAME START . END) ...)
 ;;; for each C symbol that should be emitted for this code object.
 ;;; Start and and are relative to the object's base address,
@@ -331,7 +348,7 @@
              (next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
                      (translate (sb-c::compiled-debug-fun-next cdf) spaces)))
              (end-pc (if next
-                         (+ header-bytes (sb-c::compiled-debug-fun-offset next))
+                         (+ header-bytes (cdf-offset next spaces))
                          (code-object-size code))))
         (unless (= end-pc start-pc)
           ;; Collapse adjacent address ranges named the same.
@@ -733,7 +750,7 @@
         (let* ((next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
                        (translate (sb-c::compiled-debug-fun-next cdf) spaces)))
                (end-pc (if next
-                           (sb-c::compiled-debug-fun-offset next)
+                           (cdf-offset next spaces)
                            (%code-text-size code))))
           (cond
             ((= start-pc end-pc)) ; crazy shiat. do not add to blobs
