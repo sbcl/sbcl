@@ -1685,6 +1685,10 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Fixup the constant pool.
           code = (struct code*)where;
           adjust_words(where+2, code_header_words(code)-2, 0);
+          // Fixup all embedded simple-funs
+          for_each_simple_fun(i, f, code, 1, {
+              f->self = adjust_fun_entrypoint(f->self);
+          });
           apply_absolute_fixups(code->fixups, code);
           break;
         case CLOSURE_WIDETAG:
