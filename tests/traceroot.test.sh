@@ -93,3 +93,25 @@ t3=`awk 'NR==3 && /bindings:\*FRED/{print "PASS\n"}' $tmpfilename`
 t4=`awk 'NR==4 && /C stack.+->#x[^0]/{print "PASS\n"}' $tmpfilename`
 
 test z$t1 = zPASS -a z$t2 = zPASS -a z$t3 = zPASS -a z$t4 = zPASS && exit $EXIT_TEST_WIN
+
+
+if [ "$t1" != "PASS" ]; then
+    echo T1 failed
+fi
+
+
+if [ "$t2" != "PASS" ]; then
+    echo T2 failed
+fi
+
+
+if [ "$t3" != "PASS" ]; then
+    echo T3 failed
+fi
+
+
+if [ "$t4" != "PASS" ]; then
+    echo T4 failed
+fi
+echo
+cat $tmpfilename
