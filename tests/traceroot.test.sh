@@ -81,7 +81,8 @@ EOF
 #      ->(g5,simple vector)0x1002c83b9f[3]->(g5,cons)0x1002c84377[0]->0x1002c848c7.
 
 # Can find the function name only for x86
-func=`run_sbcl --eval '(princ (or #+(or x86 x86-64) "TEST1" ""))' --quit`
+# FIXME: not for now
+func=`run_sbcl --eval '(princ (or #+(and (not sbcl) (or x86 x86-64)) "TEST1" ""))' --quit`
 
 # Should be able to identify a specific Lisp thread
 thread=`run_sbcl --eval '(princ (or #+sb-thread "\"main thread\":TLS:"
