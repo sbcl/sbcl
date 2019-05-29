@@ -209,10 +209,10 @@
                         #-fp-and-pc-standard-save cfp-saved-pc)
   (dx-let ((bytes (make-array (* 8 4) :fill-pointer 0
                                       :element-type '(unsigned-byte 8))))
-    ;; ELSEWHERE is encoded first to simplify the C backtrace logic,
-    ;; which does not need access to any of the subsequent fields.
-    (write-var-integer elsewhere-pc bytes)
+    ;; OFFSET and ELSEWHERE are encoded first so that the C backtrace logic
+    ;; need not skip over all the other packed fields.
     (write-var-integer offset bytes)
+    (write-var-integer elsewhere-pc bytes)
     (write-var-integer form-number bytes)
     (write-var-integer (- start-pc offset) bytes)
     #+unwind-to-frame-and-call-vop
@@ -238,8 +238,8 @@
                 (setf accumulator (logior accumulator (ash (logand byte #x7f) shift)))
                 (incf shift 7)
                 (unless (logtest byte #x80) (return accumulator))))))
-      (let* ((elsewhere-pc (decode-varint))
-             (offset (decode-varint))
+      (let* ((offset (decode-varint))
+             (elsewhere-pc (decode-varint))
              (form-number (decode-varint))
              (start-pc (+ offset (decode-varint)))
              #+unwind-to-frame-and-call-vop

@@ -54,23 +54,18 @@ sbcl_putwc(wchar_t c, FILE *file)
 #endif
 }
 
-unsigned int decode_elsewhere_pc(lispobj packed_integer)
+static int decode_locs(lispobj packed_integer, int *offset, int *elsewhere)
 {
     struct varint_unpacker unpacker;
-    int value;
     varint_unpacker_init(&unpacker, packed_integer);
-    varint_unpack(&unpacker, &value);
-    return value;
+    return varint_unpack(&unpacker, offset) && varint_unpack(&unpacker, elsewhere);
 }
 
 struct compiled_debug_fun *
 debug_function_from_pc (struct code* code, void *pc)
 {
-    uword_t offset = (char*)pc - code_text_start(code);
-    struct compiled_debug_fun *df;
+    sword_t offset = (char*)pc - code_text_start(code);
     struct compiled_debug_info *di;
-    struct vector *v;
-    int i, len;
 
     if (!instancep(code->debug_info))
         return NULL;
@@ -80,33 +75,26 @@ debug_function_from_pc (struct code* code, void *pc)
     if (!instancep(di->fun_map))
         return NULL;
 
-    v = VECTOR(di->fun_map);
-
-    len = fixnum_value(v->length);
-
-    if (!instancep(v->data[0]))
+    struct compiled_debug_fun *df = (struct compiled_debug_fun*)native_pointer(di->fun_map);
+    int begin, end, elsewhere_begin, elsewhere_end;
+    if (!decode_locs(df->encoded_locs, &begin, &elsewhere_begin))
         return NULL;
-
-    df = (struct compiled_debug_fun *) native_pointer(v->data[0]);
-
-    if (len == 1)
-        return df;
-
-    for (i = 1;; i += 2) {
-        unsigned next_pc;
-
-        if (i == len)
-            return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
-
-        if (offset >= (uword_t)decode_elsewhere_pc(df->encoded_locs)) {
-            struct compiled_debug_fun *p
-                = ((struct compiled_debug_fun *) native_pointer(v->data[i + 1]));
-            next_pc = decode_elsewhere_pc(p->encoded_locs);
-        } else
-            next_pc = fixnum_value(v->data[i]);
-
-        if (offset < next_pc)
-            return ((struct compiled_debug_fun *) native_pointer(v->data[i - 1]));
+    while (df) {
+        struct compiled_debug_fun *next;
+        if (df->next != NIL) {
+            next = (struct compiled_debug_fun*) native_pointer(df->next);
+            if (!decode_locs(next->encoded_locs, &end, &elsewhere_end))
+                return NULL;
+        } else {
+            next = 0;
+            end = elsewhere_end = code_text_size(code);
+        }
+        if ((begin <= offset && offset < end) ||
+            (elsewhere_begin <= offset && offset < elsewhere_end))
+            return df;
+        begin = end;
+        elsewhere_begin = elsewhere_end;
+        df = next;
     }
 
     return NULL;

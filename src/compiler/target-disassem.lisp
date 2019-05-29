@@ -1147,7 +1147,29 @@
            (type offset offset))
   (apply #'make-segment code
          (code-sap-maker code offset) length
+         ;; For displaying PCs as if the code object's instruction area
+         ;; had an origin address of 0, uncomment this next line:
+         ;; :virtual-location offset
          :code code :initial-offset offset args))
+
+;;; Show the compiled debug function chain
+(defun show-cdf-chain (code)
+  (let* ((cdf
+          (sb-c::compiled-debug-info-fun-map
+           (sb-kernel:%code-debug-info (sb-kernel:fun-code-header #'open))))
+         (ct 0))
+    (format t "begin      end   startPC  elsewhere~%")
+    (loop
+      (incf ct)
+      (let ((begin (sb-c::compiled-debug-fun-offset cdf))
+            (end (1- (acond ((sb-c::compiled-debug-fun-next cdf)
+                             (sb-c::compiled-debug-fun-offset it))
+                            (t
+                             (%code-text-size code)))))
+            (elsewhere (sb-c::compiled-debug-fun-elsewhere-pc cdf))
+            (start-pc (sb-c::compiled-debug-fun-start-pc cdf)))
+        (format t "~5x .. ~5x     ~5x      ~5x~%" begin end start-pc elsewhere)
+        (unless (setq cdf (sb-c::compiled-debug-fun-next cdf)) (return ct))))))
 
 (defun make-memory-segment (code address &rest args)
   (declare (type address address))
