@@ -251,13 +251,37 @@
            (def (accessor index)
              `(progn
                 (defun (setf ,accessor) (newval fun)
-                  (setf (access-slot ,index) newval))
+                  ;; Prevent wild pointers due to 'purify' moving all code to
+                  ;; readonly space. (Can't have read-only pointing to dynamic)
+                  ;; There are a number of things we could do to "fix" this, none
+                  ;; particularly interesting or meritorious imho, e.g.:
+                  ;;   - Copy the name to static space
+                  ;;   - Use an external hash-table (a la named closures),
+                  ;;   - Implement some other notion of "forwarded" names
+                  ;;   - Track which pages of read-only [sic] space have been written
+                  ;;   - Scavenge all of read-only space always
+                  ;;   - Write-protect read-only space to completely prevent this
+                  (if #+cheneygc (and (eq (heap-allocated-p fun) :read-only)
+                                      (eq (heap-allocated-p newval) :dynamic))
+                      #-cheneygc nil
+                      (progn (warn ,(format nil "Can't assign ~A of ~~A" accessor) fun)
+                             newval)
+                      (setf (access-slot ,index) newval)))
                 (defun ,accessor (fun)
                   (access-slot ,index)))))
   ;; possible FIXME for the backends which treat the assembly trampolines
   ;; as tagged functions (with fun-pointer-lowtag) - we might need to ensure
   ;; that the code object reserves space for 4 NILs just in case a simple-fun
   ;; accessor is called on it. I'm not entirely sure whether that's necessary.
+
+  ;; FIXME: instead of 1 thing in the TYPE slot and (up to) 3 things
+  ;; in the INFO slot, these should be replaced with 2 new slots:
+  ;;  SIMPLE-FUN-SOURCE - the docstring (just a string),
+  ;;    or the form (a cons whose car is LAMBDA),
+  ;;    or both (a cons whose car is a string)
+  ;;  SIMPLE-FUN-INFO - the xrefs (a vector), fun-type (a cons),
+  ;;    or both (a cons whose car is a vector)
+  ;; so that the INFO slot never contains user-alterable data.
   (def %simple-fun-name    sb-vm:simple-fun-name-slot)
   (def %simple-fun-arglist sb-vm:simple-fun-arglist-slot)
   (def %simple-fun-info    sb-vm:simple-fun-info-slot)

@@ -8,6 +8,7 @@
 # SSH is invoked to compile the C runtime.
 # Passwordless login to the target machine is required.
 
+config_options="--without-gencgc --with-cheneygc"
 if [ $1 = -p ]
 then
   ssh_port_opt="-p $2"
