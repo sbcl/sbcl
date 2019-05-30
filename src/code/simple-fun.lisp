@@ -363,7 +363,6 @@
 
 ;;; Return the number of bytes to subtract from the untagged address of SIMPLE-FUN
 ;;; to obtain the untagged address of its code component.
-;;; Not to be confused with SIMPLE-FUN-CODE-OFFSET which is a constant.
 ;;; See also CODE-FROM-FUNCTION.
 (declaim (inline %fun-code-offset))
 (defun %fun-code-offset (simple-fun)
@@ -485,7 +484,7 @@
   #-(or x86 x86-64)
   (int-sap (+ (get-lisp-obj-address fun)
               (- sb-vm:fun-pointer-lowtag)
-              (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))
+              (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
   ;; The preceding case would actually work, but I'm anticipating a change
   ;; in which simple-fun headers are all contiguous in their code component,
   ;; followed by all the machine instructions for all the simple-funs.
@@ -533,7 +532,7 @@
                     (setq index (%simple-fun-index simple-fun)))
                 (%code-fun-offset code (1+ index))))
          (%code-fun-offset code index)
-         (ash sb-vm:simple-fun-code-offset sb-vm:word-shift))))
+         (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
 
 (defun code-n-unboxed-data-bytes (code-obj)
   ;; If the number of boxed words (from the header) is not the same as

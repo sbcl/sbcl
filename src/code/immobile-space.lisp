@@ -27,7 +27,7 @@
             (let* ((,fun-var (%code-entry-point ,code-var fun-index))
                    (,addr-var (+ (get-lisp-obj-address ,fun-var)
                                  (- fun-pointer-lowtag)
-                                 (ash simple-fun-code-offset word-shift))))
+                                 (ash simple-fun-insts-offset word-shift))))
               (with-pinned-objects (sap) ; Mutate SAP to point to fun
                 (setf (sap-ref-word (int-sap (get-lisp-obj-address sap))
                                     (- n-word-bytes other-pointer-lowtag))

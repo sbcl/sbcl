@@ -402,7 +402,7 @@
               (format stream "~:S" type)) ; use format to print NIL as ()
             dstate)))
   (incf (dstate-next-offs dstate)
-        (words-to-bytes sb-vm:simple-fun-code-offset)))
+        (words-to-bytes sb-vm:simple-fun-insts-offset)))
 
 ;;; Return ADDRESS aligned *upward* to a SIZE byte boundary.
 ;;; KLUDGE: should be ALIGN-UP but old Slime uses it

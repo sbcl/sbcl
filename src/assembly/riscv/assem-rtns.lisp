@@ -267,7 +267,7 @@
   ;; Indirect closure.
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   ;; Call into Lisp!
-  (inst jalr zero-tn code-tn (- (* simple-fun-code-offset n-word-bytes)
+  (inst jalr zero-tn code-tn (- (* simple-fun-insts-offset n-word-bytes)
                                 fun-pointer-lowtag))
   (emit-alignment n-lowtag-bits)
   LRA-LABEL

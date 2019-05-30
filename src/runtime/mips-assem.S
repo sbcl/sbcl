@@ -176,7 +176,7 @@ symbol:
 	/* Indirect closure */
 	lw	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
 
-	addu	reg_LIP, reg_CODE, SIMPLE_FUN_CODE_OFFSET
+	addu	reg_LIP, reg_CODE, SIMPLE_FUN_INSTS_OFFSET
 
 	/* Mark us as in Lisp land. */
 	sw	zero, foreign_function_call_active

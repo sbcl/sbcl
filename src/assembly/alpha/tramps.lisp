@@ -19,7 +19,7 @@
   (inst lword simple-fun-widetag) ;; header
   (inst lword (make-fixup 'undefined-tramp-tagged
                           :assembly-routine)) ;; self
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst lword nil-value))
 
   ;; If we are called with stack arguments (or in a tail-call
@@ -30,7 +30,7 @@
   UNDEFINED-TRAMP
   (inst lda code-tn
         (- fun-pointer-lowtag
-                       (ash simple-fun-code-offset word-shift))
+                       (ash simple-fun-insts-offset word-shift))
         lip-tn)
 
   (inst cmpule nargs-tn (fixnumize register-arg-count) nl0-tn)
@@ -53,7 +53,7 @@
      (:temp lexenv-tn descriptor-reg lexenv-offset))
   (loadw lexenv-tn fdefn-tn fdefn-fun-slot other-pointer-lowtag)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst lda lip-tn (- (ash simple-fun-code-offset word-shift)
+  (inst lda lip-tn (- (ash simple-fun-insts-offset word-shift)
                       fun-pointer-lowtag)
         code-tn)
   (inst jsr zero-tn lip-tn 1))
@@ -69,12 +69,12 @@
   (inst lword simple-fun-widetag)
   (inst lword (make-fixup 'funcallable-instance-tramp
                           :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst lword nil-value))
 
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst lda lip-tn (- (ash simple-fun-code-offset word-shift)
+  (inst lda lip-tn (- (ash simple-fun-insts-offset word-shift)
                       fun-pointer-lowtag)
         code-tn)
   (inst jsr zero-tn lip-tn 1))

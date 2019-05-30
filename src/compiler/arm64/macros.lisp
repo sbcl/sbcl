@@ -92,7 +92,7 @@
          (lip ,lip))
      (aver (sc-is lip interior-reg))
      (inst add lip function
-           (- (ash simple-fun-code-offset word-shift)
+           (- (ash simple-fun-insts-offset word-shift)
               fun-pointer-lowtag))
      (inst br lip)))
 

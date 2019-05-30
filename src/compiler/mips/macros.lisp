@@ -79,7 +79,7 @@ byte-ordering issues."
 (defmacro lisp-jump (function lip)
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
-     (inst addu ,lip ,function (- (ash simple-fun-code-offset word-shift)
+     (inst addu ,lip ,function (- (ash simple-fun-insts-offset word-shift)
                                    fun-pointer-lowtag))
      (inst j ,lip)
      (move code-tn ,function t)))

@@ -294,7 +294,7 @@
   (:generator 3
     (loadw result function closure-fun-slot fun-pointer-lowtag)
     (inst lea result
-          (ea  (- fun-pointer-lowtag (* simple-fun-code-offset n-word-bytes))
+          (ea  (- fun-pointer-lowtag (* simple-fun-insts-offset n-word-bytes))
                result))))
 
 ;;;; symbol frobbing

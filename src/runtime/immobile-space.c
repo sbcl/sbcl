@@ -2322,7 +2322,7 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
                     goto fix;
                 lose("Expected fdefn @ %p", header_addr);
             }
-            header_addr = (lispobj*)(ptr - offsetof(struct simple_fun, code));
+            header_addr = (lispobj*)(ptr - offsetof(struct simple_fun, insts));
             if (forwarding_pointer_p(header_addr)) {
                 fpval = forwarding_pointer_value(header_addr);
                 if (widetag_of(tempspace_addr(native_pointer(fpval))) == SIMPLE_FUN_WIDETAG)

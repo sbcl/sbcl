@@ -123,7 +123,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     (inst compute-code code-tn lip start-lab temp)))
 
 (define-vop (xep-setup-sp)

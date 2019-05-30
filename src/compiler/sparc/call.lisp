@@ -118,7 +118,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Fix CODE, cause the function object was passed in.
     (inst compute-code-from-fn code-tn code-tn start-lab temp)))
@@ -778,7 +778,7 @@ default-value-8
 
            (note-this-location vop :call-site)
            (inst j function
-                 (- (ash simple-fun-code-offset word-shift)
+                 (- (ash simple-fun-insts-offset word-shift)
                     fun-pointer-lowtag))
            (inst move code-tn function))
 

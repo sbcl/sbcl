@@ -1399,7 +1399,7 @@ We could try a few things to mitigate this:
                    ;; Display up through the first fun header
                    (+ (code-header-words thing)
                       (ash (%code-fun-offset thing 0) (- word-shift))
-                      simple-fun-code-offset)
+                      simple-fun-insts-offset)
                    ;; at most 16 words
                    (min 16 (ash (primitive-object-size thing) (- word-shift)))))))
     (with-pinned-objects (obj)

@@ -101,7 +101,7 @@ call_into_lisp:
 
 	/* Indirect the closure */
 	ldl	reg_CODE, CLOSURE_FUN_OFFSET(reg_LEXENV)
-	addl	reg_CODE, SIMPLE_FUN_CODE_OFFSET, reg_LIP
+	addl	reg_CODE, SIMPLE_FUN_INSTS_OFFSET, reg_LIP
 
 	/* And into lisp we go. */
 	jsr	reg_ZERO,(reg_LIP)

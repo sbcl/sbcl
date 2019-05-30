@@ -103,7 +103,7 @@
 (defmacro lisp-jump (function)
   "Jump to the lisp function FUNCTION."
   `(inst add pc-tn ,function
-         (- (ash simple-fun-code-offset word-shift)
+         (- (ash simple-fun-insts-offset word-shift)
             fun-pointer-lowtag)))
 
 (defmacro lisp-return (return-pc return-style)

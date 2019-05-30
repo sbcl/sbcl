@@ -736,6 +736,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
     write_protect_immobile_space();
 #endif
 #ifdef LISP_FEATURE_HPUX
+    // FIXME: obvious bitrot here. 23 isn't the offset to anything.
     /* -1 = CLOSURE_FUN_OFFSET, 23 = SIMPLE_FUN_CODE_OFFSET, we are
      * not in __ASSEMBLER__ so we cant reach them. */
     return_from_lisp_stub = (void *) ((char *)*((unsigned long *)

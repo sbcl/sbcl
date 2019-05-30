@@ -112,7 +112,7 @@ call_into_lisp:
 
 	/* Indirect the closure */
 	ldw	CLOSURE_FUN_OFFSET(0,reg_LEXENV),reg_CODE
-  addi  SIMPLE_FUN_CODE_OFFSET,reg_CODE,reg_LIP
+  addi  SIMPLE_FUN_INSTS_OFFSET,reg_CODE,reg_LIP
 
 #ifdef LISP_FEATURE_HPUX
   /*  Get the stub address, ie assembly-routine return-from-lisp */

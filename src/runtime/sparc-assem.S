@@ -87,7 +87,7 @@ call_into_lisp:
         /* Indirect closure */
         ld      [reg_LEXENV+CLOSURE_FUN_OFFSET], reg_CODE
 
-        jmp     reg_CODE+SIMPLE_FUN_CODE_OFFSET
+        jmp     reg_CODE+SIMPLE_FUN_INSTS_OFFSET
         nop
 
         .align  8

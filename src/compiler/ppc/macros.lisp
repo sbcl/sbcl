@@ -107,7 +107,7 @@
   `(progn
     ;; something is deeply bogus.  look at this
     ;; (loadw ,lip ,function function-code-offset function-pointer-type)
-    (inst addi ,lip ,function (- (* n-word-bytes simple-fun-code-offset) fun-pointer-lowtag))
+    (inst addi ,lip ,function (- (* n-word-bytes simple-fun-insts-offset) fun-pointer-lowtag))
     (inst mtctr ,lip)
     (inst bctr)))
 

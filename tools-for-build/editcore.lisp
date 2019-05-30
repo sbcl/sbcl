@@ -803,10 +803,10 @@
     (loop
       (destructuring-bind (start . end) (pop ranges)
         (setq max-end end)
-        (funcall dumpwords (+ text start) simple-fun-code-offset output
-                 #(nil #.(format nil ".+~D" (* (1- simple-fun-code-offset)
+        (funcall dumpwords (+ text start) simple-fun-insts-offset output
+                 #(nil #.(format nil ".+~D" (* (1- simple-fun-insts-offset)
                                              n-word-bytes))))
-        (incf start (* simple-fun-code-offset n-word-bytes))
+        (incf start (* simple-fun-insts-offset n-word-bytes))
         ;; Pass the current physical address at which to disassemble,
         ;; the notional core address (which changes after linker relocation),
         ;; and the length.

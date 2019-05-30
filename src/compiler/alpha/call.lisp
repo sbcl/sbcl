@@ -109,7 +109,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Compute CODE from the address of this entry point.
     (let ((entry-point (gen-label)))
@@ -770,7 +770,7 @@ default-value-8
                   (do-next-filler)
                   #-gengc
                   (inst addq function
-                        (- (ash simple-fun-code-offset word-shift)
+                        (- (ash simple-fun-insts-offset word-shift)
                            fun-pointer-lowtag) entry-point)
                   #+gengc
                   (inst ldl entry-point

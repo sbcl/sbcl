@@ -258,7 +258,7 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (inst add-sub lip function (- (* simple-fun-code-offset n-word-bytes)
+    (inst add-sub lip function (- (* simple-fun-insts-offset n-word-bytes)
                                   fun-pointer-lowtag))
     (load-type type function (- fun-pointer-lowtag))
     (inst cmp type simple-fun-widetag)

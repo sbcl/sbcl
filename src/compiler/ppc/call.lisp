@@ -115,7 +115,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     (let ((entry-point (gen-label)))
       (emit-label entry-point)
       ;; FIXME alpha port has a ### note here saying we should "save it
@@ -796,7 +796,7 @@ default-value-8
                   ;; is calculated.
                   (insert-step-instrumenting function)
                   (inst addi entry-point function
-                        (- (ash simple-fun-code-offset word-shift)
+                        (- (ash simple-fun-insts-offset word-shift)
                            fun-pointer-lowtag))))
                (:direct
                 `((inst lwz entry-point null-tn (static-fun-offset fun)))))

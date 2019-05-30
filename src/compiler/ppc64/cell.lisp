@@ -264,7 +264,7 @@
       (inst cmpwi type simple-fun-widetag)
       ;;(inst mr lip function)
       (inst addi lip function
-            (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag))
+            (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
       (inst beq normal-fn)
       (inst lr lip (make-fixup 'closure-tramp :assembly-routine))
       (emit-label normal-fn)

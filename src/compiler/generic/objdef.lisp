@@ -239,13 +239,11 @@ during backtrace.
   ;; of x86, or the Lisp function to jump to, for everybody else.
   (self :set-known ()
         :set-trans (setf %simple-fun-self))
-  ;; FIXME: This is a poor name for this slot, because SIMPLE-FUN-CODE
-  ;; ought to mean the code object in which this simple-fun is contained.
-  ;; Probably a better name would be INSTS, especially as SIMPLE-FUN-CODE-OFFSET
-  ;; is the constant naming the displacement of this slot from the beginning of
-  ;; the fun, but it ought to mean how far this fun is from the code header.
-  ;; This will be quite disastrous to clean up and not make mistakes about it.
-  (code :rest-p t :c-type "unsigned char"))
+  ;; This slot used to be named CODE, but that was misleaing because the
+  ;; generated constant SIMPLE-FUN-CODE-OFFSET did not mean the offset from here
+  ;; back to the containing object (which isn't constant), but instead the offset
+  ;; forward to the first instruction, i.e. what is now SIMPLE-FUN-INSTS-OFFSET.
+  (insts :rest-p t :c-type "unsigned char"))
 
 ;;; These are word numbers beyond the base of the simple-fun's metadata
 ;;; in the code header. The mnemonic device here is that the first 3 slots

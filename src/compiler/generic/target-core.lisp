@@ -109,7 +109,7 @@
                    #+(or x86 x86-64)
                    (%make-lisp-obj
                     (truly-the word (+ (get-lisp-obj-address fun)
-                                       (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)
+                                       (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)
                                        (- sb-vm:fun-pointer-lowtag))))
                    ;; non-x86 backends store the function itself (what else?) in 'self'
                    #-(or x86 x86-64) fun)

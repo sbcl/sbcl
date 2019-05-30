@@ -282,7 +282,7 @@ indirect_ptr(specials)
 	/* Function is an indirect closure */
 	addi reg_NL0,reg_LEXENV,SIMPLE_FUN_SELF_OFFSET
 	ld reg_CODE,0(reg_NL0)
-	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
+	addi reg_LIP,reg_CODE,SIMPLE_FUN_INSTS_OFFSET
 	mtctr reg_LIP
 	sldi reg_NARGS, reg_NL2, N_FIXNUM_TAG_BITS
 	bctr

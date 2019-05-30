@@ -119,7 +119,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Compute CODE from the address of this entry point.
     (let ((entry-point (gen-label)))
@@ -813,7 +813,7 @@ default-value-8
                   ;; is calculated.
                   (insert-step-instrumenting function)
                   (inst addu entry-point function
-                        (- (ash simple-fun-code-offset word-shift)
+                        (- (ash simple-fun-insts-offset word-shift)
                            fun-pointer-lowtag))))
                (:direct
                 `((inst lw entry-point null-tn (static-fun-offset fun)))))

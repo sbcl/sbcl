@@ -50,7 +50,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   DONE
@@ -94,7 +94,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   DONE
@@ -197,7 +197,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   LOW-FITS-IN-FIXNUM
@@ -419,7 +419,7 @@
           (inst li nargs (fixnumize 2))
           (inst move ocfp cfp-tn)
           (inst j code-tn
-                (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+                (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
           (inst move cfp-tn csp-tn)
 
           DO-COMPARE
@@ -465,7 +465,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   RETURN-T
@@ -501,7 +501,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   RETURN-T
@@ -537,7 +537,7 @@
   (inst li nargs (fixnumize 2))
   (inst move ocfp cfp-tn)
   (inst j code-tn
-        (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag))
+        (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag))
   (inst move cfp-tn csp-tn)
 
   RETURN-NIL

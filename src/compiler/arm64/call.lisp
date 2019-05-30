@@ -121,7 +121,7 @@
     (emit-label start-lab)
     ;; Allocate function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     (inst compute-code code-tn lip start-lab)))
 
 (define-vop (xep-setup-sp)
@@ -979,7 +979,7 @@
                 `((inst ldr lip (@ null-tn (load-store-offset (static-fun-offset fun))))))
                ((nil)
                 `((inst add lip function
-                        (- (ash simple-fun-code-offset word-shift)
+                        (- (ash simple-fun-insts-offset word-shift)
                            fun-pointer-lowtag)))))
 
            (note-this-location vop :call-site)

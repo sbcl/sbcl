@@ -96,7 +96,7 @@
              (entry (+ (sap-ref-word (int-sap fun-addr)
                                      (- (ash simple-fun-self-slot word-shift)
                                         fun-pointer-lowtag))
-                       (- (ash simple-fun-code-offset word-shift)
+                       (- (ash simple-fun-insts-offset word-shift)
                           fun-pointer-lowtag))))
         (when arg-count
           (setf (context-register context nargs-offset)

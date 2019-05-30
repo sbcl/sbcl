@@ -135,7 +135,7 @@
       (load-type type function (- fun-pointer-lowtag))
       (inst addi (- simple-fun-widetag) type type)
       (inst comb := type zero-tn normal-fn)
-      (inst addi (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
+      (inst addi (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag)
             function lip)
       (inst li (make-fixup 'closure-tramp :assembly-routine) lip)
       (emit-label normal-fn)

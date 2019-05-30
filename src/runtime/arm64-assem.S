@@ -175,7 +175,7 @@ no_args:
         ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	// And, finally, call into Lisp!
-	add	reg_LR, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_LR, reg_CODE, #SIMPLE_FUN_INSTS_OFFSET
         br      reg_LR
 
 	.align 4

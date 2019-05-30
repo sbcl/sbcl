@@ -17,7 +17,7 @@
   (inst word simple-fun-widetag) ;; header
   (inst word (make-fixup 'undefined-tramp-tagged
                          :assembly-routine)) ;; self
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
 
   UNDEFINED-TRAMP
@@ -26,7 +26,7 @@
   ;; point to a code object as undefined function.  This is (BACKTRACE
   ;; UNDEFINED-FUNCTION BUG-353) in the test suite.
   (inst addi (- fun-pointer-lowtag
-                (ash simple-fun-code-offset word-shift))
+                (ash simple-fun-insts-offset word-shift))
         lip-tn code-tn)
 
   ;; If we are called with stack arguments (or in a tail-call
@@ -72,7 +72,7 @@
   (inst ldw (- (* closure-fun-slot n-word-bytes)
                   fun-pointer-lowtag)
             lexenv-tn nl0)
-  (inst addi (- (* simple-fun-code-offset n-word-bytes)
+  (inst addi (- (* simple-fun-insts-offset n-word-bytes)
                 fun-pointer-lowtag)
         nl0 lip)
   (inst bv lip :nullify t))
@@ -87,7 +87,7 @@
   nil
   (inst word simple-fun-widetag) ;;header
   (inst word (make-fixup 'funcallable-instance-tramp :assembly-routine)) ;; self
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst word nil-value))
   (loadw lexenv-tn lexenv-tn
          funcallable-instance-function-slot
@@ -95,6 +95,6 @@
   (loadw code-tn lexenv-tn
          closure-fun-slot
          fun-pointer-lowtag)
-  (inst addi (- (* simple-fun-code-offset n-word-bytes)
+  (inst addi (- (* simple-fun-insts-offset n-word-bytes)
                 fun-pointer-lowtag) code-tn lip-tn)
   (inst bv lip-tn :nullify t))

@@ -105,7 +105,7 @@ call_into_lisp:
         ldr     reg_CODE, [reg_LEXENV, #CLOSURE_FUN_OFFSET]
 
 	@@ And, finally, call into Lisp!
-	add	reg_PC, reg_CODE, #SIMPLE_FUN_CODE_OFFSET
+	add	reg_PC, reg_CODE, #SIMPLE_FUN_INSTS_OFFSET
 
 	.align 3
 	.equ	.lra, .+OTHER_POINTER_LOWTAG

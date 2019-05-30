@@ -148,7 +148,7 @@
       (inst xor type simple-fun-widetag)
       (inst beq type normal-fn)
       (inst addu lip function
-            (- (ash simple-fun-code-offset word-shift)
+            (- (ash simple-fun-insts-offset word-shift)
                fun-pointer-lowtag))
       (inst li lip (make-fixup 'closure-tramp :assembly-routine))
       (emit-label normal-fn)

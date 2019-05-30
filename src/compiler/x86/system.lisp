@@ -215,7 +215,7 @@
     (inst lea result
           (make-ea :byte :base result
                    :disp (- fun-pointer-lowtag
-                            (* simple-fun-code-offset n-word-bytes))))))
+                            (* simple-fun-insts-offset n-word-bytes))))))
 
 ;;;; symbol frobbing
 

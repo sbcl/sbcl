@@ -84,7 +84,7 @@ byte-ordering issues."
 (defmacro lisp-jump (function)
   "Jump to the lisp function FUNCTION."
   `(progn
-     (inst addi (- (ash simple-fun-code-offset word-shift)
+     (inst addi (- (ash simple-fun-insts-offset word-shift)
                    fun-pointer-lowtag) ,function lip-tn)
      (inst bv lip-tn)
      (move ,function code-tn t)))

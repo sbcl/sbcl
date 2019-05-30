@@ -425,7 +425,7 @@ x:
 
 	/* Function is an indirect closure */
 	lwz reg_CODE,SIMPLE_FUN_SELF_OFFSET(reg_LEXENV)
-	addi reg_LIP,reg_CODE,SIMPLE_FUN_CODE_OFFSET
+	addi reg_LIP,reg_CODE,SIMPLE_FUN_INSTS_OFFSET
 	mtctr reg_LIP
 	slwi reg_NARGS,reg_NL2,2
 	bctr

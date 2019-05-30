@@ -178,7 +178,7 @@
     (emit-label start-lab)
     ;; Skip space for the function header.
     (inst simple-fun-header-word)
-    (inst .skip (* (1- simple-fun-code-offset) n-word-bytes))
+    (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Save the return-pc.
     (popw rbp-tn (frame-word-offset return-pc-save-offset))))

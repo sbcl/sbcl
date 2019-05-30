@@ -1908,7 +1908,7 @@ core and return a descriptor to it."
   (aver (= (descriptor-lowtag fun) sb-vm:fun-pointer-lowtag))
   (+ (descriptor-bits fun)
      (- sb-vm:fun-pointer-lowtag)
-     (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))
+     (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
 
 ;;; Handle a DEFUN in cold-load.
 (defun cold-fset (name function &optional inline-expansion dxable-args)
@@ -1927,7 +1927,7 @@ core and return a descriptor to it."
     (write-wordindexed fdefn sb-vm:fdefn-fun-slot function)
     (let ((fun-entry-addr
             (+ (logandc2 (descriptor-bits function) sb-vm:lowtag-mask)
-               (ash sb-vm:simple-fun-code-offset sb-vm:word-shift))))
+               (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift))))
       (declare (ignorable fun-entry-addr)) ; sparc and arm don't need
       (write-wordindexed/raw
        fdefn sb-vm:fdefn-raw-addr-slot
@@ -2672,7 +2672,7 @@ core and return a descriptor to it."
     ;; note that the bit pattern looks like fixnum due to alignment
     (write-wordindexed/raw fn sb-vm:simple-fun-self-slot
                            (+ (- (descriptor-bits fn) sb-vm:fun-pointer-lowtag)
-                              (ash sb-vm:simple-fun-code-offset sb-vm:word-shift)))
+                              (ash sb-vm:simple-fun-insts-offset sb-vm:word-shift)))
     #-(or x86 x86-64) ; store a pointer back to the function itself in 'self'
     (write-wordindexed fn sb-vm:simple-fun-self-slot fn)
     fn))

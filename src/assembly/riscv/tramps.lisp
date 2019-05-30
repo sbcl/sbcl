@@ -79,7 +79,7 @@
     ((:temp lra descriptor-reg lra-offset))
   (inst machine-word simple-fun-widetag)
   (inst machine-word (make-fixup 'undefined-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst machine-word nil-value))
 
   ;; Point reg_CODE to the header and tag it as function, since
@@ -98,12 +98,12 @@
     ()
   (inst machine-word simple-fun-widetag)
   (inst machine-word (make-fixup 'closure-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst machine-word nil-value))
 
   (loadw lexenv-tn lexenv-tn fdefn-fun-slot other-pointer-lowtag)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst jalr zero-tn code-tn (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag)))
+  (inst jalr zero-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))
 
 (define-assembly-routine
     (xfuncallable-instance-tramp (:return-style :none)
@@ -113,9 +113,9 @@
     ()
   (inst machine-word simple-fun-widetag)
   (inst machine-word (make-fixup 'funcallable-instance-tramp :assembly-routine))
-  (dotimes (i (- simple-fun-code-offset 2))
+  (dotimes (i (- simple-fun-insts-offset 2))
     (inst machine-word nil-value))
 
   (loadw lexenv-tn lexenv-tn funcallable-instance-function-slot fun-pointer-lowtag)
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
-  (inst jalr zero-tn code-tn (- (* simple-fun-code-offset n-word-bytes) fun-pointer-lowtag)))
+  (inst jalr zero-tn code-tn (- (* simple-fun-insts-offset n-word-bytes) fun-pointer-lowtag)))

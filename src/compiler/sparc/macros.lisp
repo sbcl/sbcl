@@ -76,7 +76,7 @@
   "Jump to the lisp function FUNCTION.  LIP is an interior-reg temporary."
   `(progn
      (inst j ,fun
-           (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag))
+           (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
      (move code-tn ,fun)))
 
 (defmacro lisp-return (return-pc &key (offset 0) (frob-code t))

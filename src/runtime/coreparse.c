@@ -560,8 +560,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             for_each_simple_fun(i, f, code, 1, {
                 fix_fun_header_layout((lispobj*)f, adj);
 #if FUN_SELF_FIXNUM_TAGGED
-                if (f->self != (lispobj)f->code)
-                    FIXUP(f->self = (lispobj)f->code, &f->self);
+                if (f->self != (lispobj)f->insts)
+                    FIXUP(f->self = (lispobj)f->insts, &f->self);
 #else
                 adjust_pointers(&f->self, 1, adj);
 #endif

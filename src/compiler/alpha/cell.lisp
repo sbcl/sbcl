@@ -146,7 +146,7 @@
       (load-type type function (- fun-pointer-lowtag))
       (inst xor type simple-fun-widetag type)
       (inst addq function
-            (- (ash simple-fun-code-offset word-shift) fun-pointer-lowtag)
+            (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag)
             lip)
       (inst beq type normal-fn)
       (inst li (make-fixup 'closure-tramp :assembly-routine) lip)

@@ -58,7 +58,7 @@ byte-ordering issues."
 
 (defun lisp-jump (function)
   "Jump to the lisp function FUNCTION."
-  (inst jalr zero-tn function (- (ash simple-fun-code-offset word-shift)
+  (inst jalr zero-tn function (- (ash simple-fun-insts-offset word-shift)
                                  fun-pointer-lowtag)))
 
 (defun lisp-return (return-pc return-style)

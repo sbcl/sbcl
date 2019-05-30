@@ -340,7 +340,7 @@
        (storew (logior (ash (1- size) n-widetag-bits) closure-widetag)
                result 0 fun-pointer-lowtag)))
    ;; Done with pseudo-atomic
-   (inst lea temp (make-ea-for-object-slot function simple-fun-code-offset
+   (inst lea temp (make-ea-for-object-slot function simple-fun-insts-offset
                                            fun-pointer-lowtag))
    (storew temp result closure-fun-slot fun-pointer-lowtag)))
 
