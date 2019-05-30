@@ -490,7 +490,7 @@ ldb_monitor()
 {
     jmp_buf oldbuf;
 
-    bcopy(curbuf, oldbuf, sizeof(oldbuf));
+    memcpy(oldbuf, curbuf, sizeof(oldbuf));
 
     printf("Welcome to LDB, a low-level debugger for the Lisp runtime environment.\n");
 
@@ -500,7 +500,7 @@ ldb_monitor()
 
     done = 0;
 
-    bcopy(oldbuf, curbuf, sizeof(curbuf));
+    memcpy(curbuf, oldbuf, sizeof(curbuf));
 }
 
 void

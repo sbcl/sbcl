@@ -140,7 +140,7 @@ ptrans_boxed(lispobj thing, lispobj header, boolean constant)
     lispobj *new = newspace_alloc(nwords,constant);
 
     /* Copy it. */
-    bcopy(old, new, nwords * sizeof(lispobj));
+    memcpy(new, old, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
     lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -180,7 +180,7 @@ ptrans_fdefn(lispobj thing, lispobj header)
     lispobj *new = newspace_alloc(nwords, 0);    /* inconstant */
 
     /* Copy it. */
-    bcopy(old, new, nwords * sizeof(lispobj));
+    memcpy(new, old, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
     lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -205,7 +205,7 @@ ptrans_unboxed(lispobj thing, lispobj header)
     lispobj *new = newspace_alloc(nwords, 1);     /* always constant */
 
     /* copy it. */
-    bcopy(old, new, nwords * sizeof(lispobj));
+    memcpy(new, old, nwords * sizeof(lispobj));
 
     /* Deposit forwarding pointer. */
     lispobj result = make_lispobj(new, lowtag_of(thing));
@@ -221,7 +221,7 @@ ptrans_vector(lispobj thing, boolean boxed, boolean constant)
     long nwords = sizetab[header_widetag(vector->header)]((lispobj*)vector);
 
     lispobj *new = newspace_alloc(nwords, (constant || !boxed));
-    bcopy(vector, new, nwords * sizeof(lispobj));
+    memcpy(new, vector, nwords * sizeof(lispobj));
 
     lispobj result = make_lispobj(new, lowtag_of(thing));
     vector->header = result;
@@ -240,7 +240,7 @@ ptrans_code(lispobj thing)
 
     struct code *new = (struct code *)newspace_alloc(nwords,1); /* constant */
 
-    bcopy(code, new, nwords * sizeof(lispobj));
+    memcpy(new, code, nwords * sizeof(lispobj));
 
     lispobj result = make_lispobj(new, OTHER_POINTER_LOWTAG);
 
@@ -305,7 +305,7 @@ ptrans_func(lispobj thing, lispobj header)
             (nwords,(header_widetag(header)!=FUNCALLABLE_INSTANCE_WIDETAG));
 
         /* Copy it. */
-        bcopy(old, new, nwords * sizeof(lispobj));
+        memcpy(new, old, nwords * sizeof(lispobj));
 
         /* Deposit forwarding pointer. */
         lispobj result = make_lispobj(new, lowtag_of(thing));
