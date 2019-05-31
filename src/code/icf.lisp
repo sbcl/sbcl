@@ -185,8 +185,11 @@
          (= (%code-code-size code1) (%code-code-size code2))
          (= (code-n-unboxed-data-bytes code1)
             (code-n-unboxed-data-bytes code2))
-         ;; Compare boxed constants. (Ignore debug-info and fixups)
-         (loop for i from code-constants-offset
+         ;; Compare boxed constants. Ignore debug-info, fixups, and all
+         ;; the simple-fun metadata (name, args, type, info) which will be compared
+         ;; later based on how similar we require them to be.
+         (loop for i from (+ code-constants-offset
+                             (* code-slots-per-simple-fun (code-n-entries code1)))
                below (code-header-words code1)
                always (eq (code-header-ref code1 i) (code-header-ref code2 i)))
          ;; Compare unboxed constants
@@ -231,11 +234,12 @@
              (dotimes (i (code-n-entries code) (offs))
                (offs (%code-fun-offset code i)
                      (%simple-fun-text-len (%code-entry-point code i) i))))
-           (collect ((consts))
-             ;; Ignore the fixups and the debug info
-             (do ((i (1- (code-header-words code)) (1- i)))
-                 ((< i code-constants-offset) (consts))
-               (consts (code-header-ref code i)))))))
+           ;; Ignore the debug-info, fixups, and simple-fun metadata.
+           ;; (Same things that are ignored by the CODE-EQUIVALENT-P predicate)
+           (loop for i from (+ code-constants-offset
+                               (* code-slots-per-simple-fun (code-n-entries code)))
+                   below (code-header-words code)
+                   collect (code-header-ref code i)))))
 
 (declaim (inline default-allow-icf-p))
 (defun default-allow-icf-p (code)

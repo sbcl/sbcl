@@ -247,7 +247,8 @@
 (macrolet ((access-slot (index)
              `(code-header-ref
                (fun-code-header fun)
-               (+ sb-vm:code-constants-offset ,index (* 4 (%simple-fun-index fun)))))
+               (+ (* sb-vm:code-slots-per-simple-fun (%simple-fun-index fun))
+                  sb-vm:code-constants-offset ,index)))
            (def (accessor index)
              `(progn
                 (defun (setf ,accessor) (newval fun)

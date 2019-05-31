@@ -201,7 +201,8 @@
              (fun-index (length entries)))
         (dolist (entry-info entries)
           (let ((fun (%code-entry-point code-obj (decf fun-index)))
-                (w (+ sb-vm:code-constants-offset (* 4 fun-index))))
+                (w (+ sb-vm:code-constants-offset
+                      (* sb-vm:code-slots-per-simple-fun fun-index))))
             (setf (code-header-ref code-obj (+ w 0)) (entry-info-name entry-info)
                   (code-header-ref code-obj (+ w 1)) (entry-info-arguments entry-info)
                   (code-header-ref code-obj (+ w 2)) (entry-info-form/doc/xrefs entry-info)

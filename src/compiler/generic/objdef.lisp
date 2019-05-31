@@ -245,6 +245,7 @@ during backtrace.
   ;; forward to the first instruction, i.e. what is now SIMPLE-FUN-INSTS-OFFSET.
   (insts :rest-p t :c-type "unsigned char"))
 
+(defconstant code-slots-per-simple-fun 4)
 ;;; These are word numbers beyond the base of the simple-fun's metadata
 ;;; in the code header. The mnemonic device here is that the first 3 slots
 ;;; essentially comprise the function-lambda-expression,

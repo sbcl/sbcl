@@ -152,7 +152,7 @@
   (let* ((2comp (component-info component))
          (n-entries (length (sb-c::ir2-component-entries 2comp)))
          (consts (ir2-component-constants 2comp)))
-    (dotimes (i (+ code-constants-offset (* 4 n-entries)))
+    (dotimes (i (+ code-constants-offset (* sb-vm:code-slots-per-simple-fun n-entries)))
       (vector-push-extend nil consts)))
   (values))
 

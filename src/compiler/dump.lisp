@@ -1046,7 +1046,8 @@
           ;; fill in the placeholder elements of constants
           ;; with the NAME, ARGLIST, TYPE, INFO slots of each simple-fun.
           (let ((constants (sb-c::ir2-component-constants 2comp))
-                (wordindex (+ sb-vm:code-constants-offset (* 4 nfuns))))
+                (wordindex (+ sb-vm:code-constants-offset
+                              (* sb-vm:code-slots-per-simple-fun nfuns))))
             (dolist (entry entries)
               ;; Process in reverse order of ENTRIES.
               ;; See also MAKE-CORE-COMPONENT which does the same thing.

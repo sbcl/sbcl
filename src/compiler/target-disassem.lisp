@@ -389,7 +389,7 @@
   (unless (null stream)
     (let* ((seg (dstate-segment dstate))
            (code (seg-code seg))
-           (woffs (+ sb-vm:code-constants-offset (* fun-index 4)))
+           (woffs (+ sb-vm:code-constants-offset (* fun-index sb-vm:code-slots-per-simple-fun)))
            (name (code-header-ref code (+ woffs sb-vm:simple-fun-name-slot)))
            (args (code-header-ref code (+ woffs sb-vm:simple-fun-arglist-slot)))
            (type (code-header-ref code (+ woffs sb-vm:simple-fun-type-slot))))
