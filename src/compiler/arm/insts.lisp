@@ -18,7 +18,7 @@
             composite-immediate-instruction encodable-immediate
             lsl lsr asr ror cpsr @) "SB-VM")
   ;; Imports from SB-VM into this package
-  (import '(sb-vm::nil-value sb-vm::registers sb-vm::null-tn sb-vm::null-offset
+  (import '(sb-vm:nil-value sb-vm::registers sb-vm::null-tn sb-vm::null-offset
             sb-vm::pc-tn sb-vm::pc-offset sb-vm::code-offset)))
 
 

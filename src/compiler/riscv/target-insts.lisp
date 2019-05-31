@@ -150,7 +150,7 @@ about function addresses and register values.")
     (#.sb-vm::code-offset
      (note-code-constant offset dstate))
     (#.sb-vm::null-offset
-     (let ((offset (+ sb-vm::nil-value offset)))
+     (let ((offset (+ sb-vm:nil-value offset)))
        (maybe-note-assembler-routine offset nil dstate)
        (maybe-note-static-symbol (logior offset other-pointer-lowtag)
                                  dstate)))

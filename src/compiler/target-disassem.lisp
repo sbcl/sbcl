@@ -1830,12 +1830,12 @@
 ;;; access function.
 (defun grok-nil-indexed-symbol-slot-ref (byte-offset)
   (declare (type offset byte-offset))
-  (grok-symbol-slot-ref (+ sb-vm::nil-value byte-offset)))
+  (grok-symbol-slot-ref (+ sb-vm:nil-value byte-offset)))
 
 ;;; Return the Lisp object located BYTE-OFFSET from NIL.
 (defun get-nil-indexed-object (byte-offset)
   (declare (type offset byte-offset))
-  (make-lisp-obj (+ sb-vm::nil-value byte-offset)))
+  (make-lisp-obj (+ sb-vm:nil-value byte-offset)))
 
 ;;; Return two values; the Lisp object located at BYTE-OFFSET in the
 ;;; constant area of the code-object in the current segment and T, or
@@ -1893,7 +1893,7 @@
     (loop for name across sb-vm::+all-static-fdefns+
           for address =
           #+immobile-code (sb-vm::function-raw-address name)
-          #-immobile-code (+ sb-vm::nil-value (sb-vm::static-fun-offset name))
+          #-immobile-code (+ sb-vm:nil-value (sb-vm::static-fun-offset name))
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #+sb-safepoint
@@ -2112,7 +2112,7 @@
     (return-from maybe-note-static-symbol))
   (let ((symbol
          (block found
-           (when (eq address sb-vm::nil-value)
+           (when (eq address sb-vm:nil-value)
              (return-from found nil))
            (when (< address (sap-int sb-vm:*static-space-free-pointer*))
              (dovector (symbol sb-vm:+static-symbols+)

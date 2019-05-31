@@ -215,7 +215,7 @@
   (defvar *sxhash-crosscheck* nil)
   (defun sxhash (x)
     (let ((answer (etypecase x ; croak on anything but these
-                    (null         (ash sb-vm::nil-value (- sb-vm:n-fixnum-tag-bits)))
+                    (null         (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
                     (fixnum       #.+sxhash-fixnum-expr+)
                     (single-float #.+sxhash-single-float-expr+)
                     (double-float #.+sxhash-double-float-expr+))))
