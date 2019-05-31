@@ -140,12 +140,13 @@ static void coalesce_obj(lispobj* where, struct hopscotch_table* ht)
  * (4) fullcgc's trace_object()
  * (5) coreparse's relocate_space()
  * (6) traceroot's find_ref() and build_refs() which itself has two modes
- * (7) cheneygc's print_garbage()
+ * (7) sanity_check_loaded_core() which is quite possibly the prettiest yet
  * (8) purify()
  * (9) coalesce_range()
  * plus the Lisp variant:
  * (10) do-referenced-object which thank goodness is common to 2 uses
  * and if you want to count 'print.c' as another, there's that.
+ * There's also cheneygc's print_garbage() which uses the dispatch tables.
  */
 
 static uword_t coalesce_range(lispobj* where, lispobj* limit, uword_t arg)

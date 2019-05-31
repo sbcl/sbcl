@@ -1031,6 +1031,8 @@ extern void gc_load_corefile_ptes(core_entry_elt_t, core_entry_elt_t,
 #define gc_load_corefile_ptes(dummy1,dummy2,dummy3,dummy4)
 #endif
 
+static void sanity_check_loaded_core(lispobj);
+
 /* 'merge_core_pages': Tri-state flag to determine whether we attempt to mark
  * pages as targets for virtual memory deduplication via MADV_MERGEABLE.
  * 1: Yes
@@ -1104,6 +1106,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
 #endif
+            sanity_check_loaded_core(initial_function);
             return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed
         default:
@@ -1142,3 +1145,199 @@ void asm_routine_poke(const char* routine, int offset, char byte)
     if (address)
         address[offset] = byte;
 }
+
+// Caution: use at your own risk
+#undef DEBUG_CORE_LOADING
+#ifdef DEBUG_CORE_LOADING
+#ifdef LISP_FEATURE_CHENEYGC
+#  error "Can't define DEBUG_CORE_LOADING for cheneygc"
+#endif
+#include "hopscotch.h"
+#include "genesis/cons.h"
+#include "genesis/layout.h"
+#include "genesis/gc-tables.h"
+#include "code.h"
+#include "gc-private.h"
+
+struct visitor {
+    // one item per value of widetag>>2
+    // element 0 is for conses, element 64 is for totals.
+    struct {
+        int count;
+        int bytes;
+    } headers[65];
+    struct hopscotch_table *reached;
+};
+
+#define RECURSE(x) if(is_lisp_pointer(x))graph_visit(ptr,x,seen)
+static void graph_visit(lispobj __attribute__((unused)) referer,
+                        lispobj ptr,
+                        struct hopscotch_table* seen)
+{
+    if (lowtag_of(ptr) == FUN_POINTER_LOWTAG
+        && widetag_of((lispobj*)(ptr-FUN_POINTER_LOWTAG)) == SIMPLE_FUN_WIDETAG)
+        ptr = make_lispobj(fun_code_header(ptr-FUN_POINTER_LOWTAG),
+                           OTHER_POINTER_LOWTAG);
+    if (hopscotch_get(seen, ptr, 0))
+        return;
+    hopscotch_insert(seen, ptr, 1);
+    lispobj layout, bitmap, *obj;
+    int nwords, i;
+    if (lowtag_of(ptr) == LIST_POINTER_LOWTAG) {
+        RECURSE(CONS(ptr)->car);
+        RECURSE(CONS(ptr)->cdr);
+    } else switch (widetag_of(obj = native_pointer(ptr))) {
+        case SIMPLE_VECTOR_WIDETAG:
+            nwords = fixnum_value(obj[1]); // vector length
+            for(i=0; i<nwords; ++i) RECURSE(obj[i+2]);
+            break;
+        // In all the following cases except for CODE, 'nwords' is the count
+        // of payload words (following the header), so we iterate up to and
+        // including that word index. For example, if there are 2 payload words,
+        // then we scan word indices 1 and 2 off the object base address.
+        case INSTANCE_WIDETAG:
+            layout = instance_layout(obj);
+            graph_visit(ptr, layout, seen);
+            nwords = instance_length(*obj);
+            bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+            for(i=1; i<=nwords; ++i)
+                if (layout_bitmap_logbitp(i-1, bitmap)) RECURSE(obj[i]);
+            break;
+        case FUNCALLABLE_INSTANCE_WIDETAG:
+            layout = funinstance_layout(obj);
+            graph_visit(ptr, layout, seen);
+            bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+            nwords = SHORT_BOXED_NWORDS(*obj);
+            // We don't need to scan the word at index 1 (the trampoline pointer)
+            // because it either points to the FIN itself or to readonly space.
+            for(i=2; i<=nwords; ++i)
+                if (layout_bitmap_logbitp(i-1, bitmap)) RECURSE(obj[i]);
+            break;
+        case CLOSURE_WIDETAG:
+            // We must scan the closure's trampoline word.
+            // Closures can utilize one payload word beyond what the header
+            // indicates. This is quite sucky and I don't know why I did that.
+            // However, it is correctly accounted for by SHORT_BOXED_NWORDS
+            // which gives you the right number of words to scan.
+            graph_visit(ptr, obj[1] - FUN_RAW_ADDR_OFFSET, seen);
+            nwords = SHORT_BOXED_NWORDS(*obj);
+            for(i=2; i<=nwords; ++i) RECURSE(obj[i]);
+            break;
+        case SYMBOL_WIDETAG:
+        case WEAK_POINTER_WIDETAG:
+            nwords = TINY_BOXED_NWORDS(*obj);
+            for(i=1; i<=nwords; ++i) RECURSE(obj[i]);
+            break;
+        case FDEFN_WIDETAG:
+            RECURSE(obj[1]);
+            RECURSE(obj[2]);
+            RECURSE(fdefn_callee_lispobj((struct fdefn*)obj));
+            break;
+        case CODE_HEADER_WIDETAG:
+            nwords = code_header_words((struct code*)obj);
+            for(i=2; i<nwords; ++i) RECURSE(obj[i]);
+            break;
+        default:
+            if (!leaf_obj_widetag_p(widetag_of(obj))) {
+                nwords = BOXED_NWORDS(*obj);
+                for(i=1; i<=nwords; ++i) RECURSE(obj[i]);
+            }
+      }
+}
+
+static void tally(lispobj ptr, struct visitor* v)
+{
+    if (lowtag_of(ptr) == LIST_POINTER_LOWTAG)
+        ++v->headers[0].count;
+    else {
+        lispobj* obj = native_pointer(ptr);
+        int header_index = widetag_of(obj)>>2;
+        ++v->headers[header_index].count;
+        v->headers[header_index].bytes += OBJECT_SIZE(*obj, obj);
+    }
+}
+
+static uword_t visit(lispobj* where, lispobj* limit, uword_t arg)
+{
+    struct visitor* v = (struct visitor*)arg;
+    lispobj* obj = where;
+    while (obj < limit) {
+        lispobj ptr = compute_lispobj(obj);
+        tally(ptr, v);
+        // Weird stuff happens in genesis where this logic thinks that the
+        // cold core holds a ton of unreachable objects. I have no idea why.
+        if (!hopscotch_get(v->reached, ptr, 0))
+            printf("object not reached: %p\n", (void*)ptr);
+        obj += OBJECT_SIZE(*obj, obj);
+    }
+    return 0;
+}
+
+#ifdef LISP_FEATURE_GENCGC
+#define dynamic_space_pointer_p(ptr) (find_page_index((void*)ptr) >= 0)
+#endif
+
+static void sanity_check_loaded_core(lispobj initial_function)
+{
+    struct visitor v[2];
+    struct hopscotch_table reached;
+    memset(v, 0, sizeof v);
+    // Pass 1: Count objects reachable from known roots.
+    hopscotch_create(&reached, HOPSCOTCH_HASH_FUN_DEFAULT,
+                     0, // no values
+                     1<<18, /* initial size */
+                     0);
+    {
+      lispobj* where = (lispobj*)STATIC_SPACE_START;
+      lispobj* end = static_space_free_pointer;
+      while (where<end) {
+        // This falsely treats NIL as 4 conses but it doesn't really matter.
+        // The garbage collectors do too.
+        graph_visit(0, compute_lispobj(where), &reached);
+        where += OBJECT_SIZE(*where, where);
+      }
+    }
+    graph_visit(0, initial_function, &reached); // not otherwise reachable
+    // having computed the reaching graph, tally up the dynamic space objects
+    int key_index;
+    lispobj ptr;
+    for_each_hopscotch_key(key_index, ptr, reached)
+        if (dynamic_space_pointer_p(ptr))
+            tally(ptr, &v[0]);
+    // Pass 2: Count all heap objects
+    v[1].reached = &reached;
+    walk_generation(visit, -1, (uword_t)&v[1]);
+    // Pass 3: Compare
+    // Start with the conses
+    v[0].headers[0].bytes = v[0].headers[0].count * N_WORD_BYTES * 2;
+    v[1].headers[0].bytes = v[1].headers[0].count * N_WORD_BYTES * 2;
+    printf("-----------------------------------------------|\n");
+    printf("       Graph walk     |         Actual         |\n");
+    printf("----------------------+------------------------|\n");
+    int i;
+    for(i=0; i<=64; ++i) {
+        // print all valid widetags (not unknown) that aren't for immediates,
+        // but always print if nonzero.
+        if (v[1].headers[i].count ||
+            ((strncmp(widetag_names[i], "unk", 3)
+              && (i != CHARACTER_WIDETAG>>2)
+              && (i != SIMPLE_FUN_WIDETAG>>2)
+              && (i != NO_TLS_VALUE_MARKER_WIDETAG>>2)
+              && (i != UNBOUND_MARKER_WIDETAG>>2)))) {
+            int mismatch = v[0].headers[i].count != v[1].headers[i].count;
+            printf("%8d %11d  | %8d %11d   | %s%s\n",
+                   v[0].headers[i].count, v[0].headers[i].bytes,
+                   v[1].headers[i].count, v[1].headers[i].bytes,
+                   i<64 ? (i ? widetag_names[i] : "cons") : "TOTAL",
+                   mismatch ? " <<<<" : "");
+            v[0].headers[64].count += v[0].headers[i].count;
+            v[1].headers[64].count += v[1].headers[i].count;
+            v[0].headers[64].bytes += v[0].headers[i].bytes;
+            v[1].headers[64].bytes += v[1].headers[i].bytes;
+        }
+    }
+    hopscotch_destroy(&reached);
+}
+#else
+static void sanity_check_loaded_core(lispobj __attribute__((unused)) initial_function) {}
+#endif
