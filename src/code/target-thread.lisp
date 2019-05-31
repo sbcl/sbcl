@@ -262,6 +262,8 @@ created and old ones may exit at any time."
 
 (defun init-initial-thread ()
   (/show0 "Entering INIT-INITIAL-THREAD")
+  ;;; FIXME: is it purposeful or accidental that we recreate some of
+  ;;; the global mutexes but not *ALL-THREADS-LOCKS* ?
   (setf sb-impl::*exit-lock* (make-mutex :name "Exit Lock")
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread :name "main thread"

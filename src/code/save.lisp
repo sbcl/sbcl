@@ -64,6 +64,19 @@
                        (length interactive) (list interactive)
                        (length other) (list other))))))
 
+;;; This variable is accessed by C code when saving. Export it to survive tree-shaker.
+;;; The symbols in this set are clobbered just in time to avoid saving them to the core
+;;; but not so early that we kill the running image. (Though in fact if SAVE-ERROR
+;;; and hence REINIT is reached, we reassign them all anyway)
+(export 'sb-kernel::*save-lisp-clobbered-globals* 'sb-kernel)
+(define-load-time-global sb-kernel::*save-lisp-clobbered-globals*
+    '#(sb-impl::*exit-lock*
+       sb-thread::*make-thread-lock*
+       sb-thread::*initial-thread*
+       sb-thread::*all-threads*
+       sb-thread::*session*
+       sb-kernel::*gc-epoch*))
+
 (defun save-lisp-and-die (core-file-name &key
                                          (toplevel #'toplevel-init)
                                          (executable nil)

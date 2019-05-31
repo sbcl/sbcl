@@ -38,7 +38,9 @@
 #include "pseudo-atomic.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
+#include "genesis/vector.h"
 #include "immobile-space.h"
+#include "search.h"
 
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 # include <zlib.h>
@@ -223,6 +225,15 @@ void unwind_binding_stack()
     unbind_to_here((lispobj *)th->binding_stack_start,th);
     write_TLS(CURRENT_CATCH_BLOCK, 0, th); // If set to 0 on start, why here too?
     write_TLS(CURRENT_UNWIND_PROTECT_BLOCK, 0, th);
+    unsigned int hint = 0;
+    char symbol_name[] = "*SAVE-LISP-CLOBBERED-GLOBALS*";
+    lispobj* sym = find_symbol(symbol_name, "SB-KERNEL", &hint);
+    lispobj value;
+    int i;
+    if (!sym || !simple_vector_p(value = ((struct symbol*)sym)->value))
+        fprintf(stderr, "warning: bad value in %s\n", symbol_name);
+    else for(i=fixnum_value(VECTOR(value)->length)-1; i>=0; --i)
+        SYMBOL(VECTOR(value)->data[i])->value = UNBOUND_MARKER_WIDETAG;
     if (verbose) printf("done]\n");
 }
 
