@@ -1478,7 +1478,7 @@ arrange_return_to_c_function(os_context_t *context,
 #endif
 #if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
     void * fun=native_pointer(function);
-    void *code = &(((struct simple_fun *) fun)->code);
+    void *code = &(((struct simple_fun *) fun)->insts);
 #endif
 
     /* Build a stack frame showing `interrupted' so that the
