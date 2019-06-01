@@ -207,15 +207,8 @@
 
 ;;; This takes three digits and returns the FLOOR'ed result of
 ;;; dividing the first two as a 2*digit-size integer by the third.
-;;;
-;;; Do weird LET and SETQ stuff to bamboozle the compiler into allowing
-;;; the %BIGFLOOR transform to expand into pseudo-assembler for which the
-;;; compiler can later correctly allocate registers.
 (defun %bigfloor (a b c)
-  (let ((a a) (b b) (c c))
-    (declare (type bignum-element-type a b c))
-    (setq a a b b c c)
-    (%bigfloor a b c)))
+  (%bigfloor a b c))
 
 ;;; Convert the digit to a regular integer assuming that the digit is signed.
 (defun %fixnum-digit-with-correct-sign (digit)
