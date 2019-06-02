@@ -250,6 +250,7 @@
                                    (format t "~a ~a~%" process
                                            (when stream
                                              (get-output-stream-string stream))))))
+                     (trace sb-impl::find-a-pty)
                      (with-timeout 2
                        (subseq
                         (with-output-to-string (s)
