@@ -1122,15 +1122,8 @@ We could try a few things to mitigate this:
                  (alien-funcall (extern-alien "fdefn_callee_lispobj" (function unsigned unsigned))
                                 (logandc2 (get-lisp-obj-address ,obj) lowtag-mask))))
             ,.(make-case* 'code-component
-               `(,functoid (%code-debug-info ,obj) ,@more)
-               #+(or x86 immobile-code) `(,functoid (%code-fixups ,obj) ,@more)
-               `(loop for .i. from code-constants-offset below (code-header-words ,obj)
-                      do (,functoid (code-header-ref ,obj .i.) ,@more))
-               ;; Caller should extend behavior for embedded objects, like:
-               ;; `(loop for .i. below (code-n-entries ,obj)
-               ;;        do (,functoid (%code-entry-point ,obj .i.) ,@more)))
-               ;; and/or visit the slots of each simple-fun but not the fun per se.
-               )
+               `(loop for .i. from 2 below (code-header-words ,obj)
+                      do (,functoid (code-header-ref ,obj .i.) ,@more)))
             ,.(make-case '(or float (complex float) bignum
                            #+sb-simd-pack simd-pack
                            #+sb-simd-pack-256 simd-pack-256
