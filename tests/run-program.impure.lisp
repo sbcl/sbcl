@@ -250,13 +250,7 @@
                                    (format t "~a ~a~%" process
                                            (when stream
                                              (get-output-stream-string stream))))))
-                     #-win32
-                     (trace sb-impl::find-a-pty
-                            sb-impl::spawn sb-impl::wait-for-exec
-                            sb-impl::get-processes-status-changes
-                            sb-impl::waitpid
-                            sb-sys:serve-event)
-                     (with-timeout 2
+                     (with-timeout 60
                        (subseq
                         (with-output-to-string (s)
                           (setf stream s)
@@ -268,7 +262,6 @@
                           s)
                         0
                         2)))))))
-(untrace)
 
 ;; Check whether RUN-PROGRAM puts its child process into the foreground
 ;; when stdin is inherited. If it fails to do so we will receive a SIGTTIN.
