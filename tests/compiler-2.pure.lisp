@@ -2323,3 +2323,8 @@
               (eql (array-rank x) 2))))
           '(function ((and simple-array (not (simple-array * (* *)))))
             (values null &optional)))))
+
+(with-test (:name :known-fun-no-fdefn)
+  (assert (not (ctu:find-named-callees
+                (checked-compile
+                 '(lambda () #'+))))))

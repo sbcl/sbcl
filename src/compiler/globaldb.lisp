@@ -251,8 +251,7 @@
       (values answer nil))))
 
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
-
-(define-info-type (:function :definition) :type-spec (or #-sb-xc-host fdefn null))
+(define-info-type (:function :definition) :type-spec #-sb-xc-host (or fdefn null) #+sb-xc-host t)
 
 ;;; the kind of functional object being described. If null, NAME isn't
 ;;; a known functional object.
