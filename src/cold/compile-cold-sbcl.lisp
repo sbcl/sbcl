@@ -85,28 +85,37 @@
 #+#.(cl:if (cl:find-package "HOST-SB-POSIX") '(and) '(or))
 (defun parallel-make-host-2 (max-jobs)
   (let ((subprocess-count 0)
-        (subprocess-list nil))
+        (subprocess-list nil)
+        stop)
     (flet ((wait ()
              (multiple-value-bind (pid status) (host-sb-posix:wait)
                (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
+               (unless (zerop status)
+                 (setf stop t))
                (setq subprocess-list (delete pid subprocess-list)))
              (decf subprocess-count)))
-      (do-stems-and-flags (stem flags 2)
-        (unless (position :not-target flags)
-          (when (>= subprocess-count max-jobs)
-            (wait))
-          (let ((pid (host-sb-posix:fork)))
-            (when (zerop pid)
-              (target-compile-stem stem flags)
-              ;; FIXME: convey exit code based on COMPILE result.
-              (sb-cold::exit-process 0))
-            (push pid subprocess-list))
-          (incf subprocess-count)
-          ;; Cause the compile-time effects from this file
-          ;; to appear in subsequently forked children.
-          (let ((*compile-for-effect-only* t))
-            (target-compile-stem stem flags))))
-      (loop (if (plusp subprocess-count) (wait) (return)))
+      (host-sb-ext:disable-debugger)
+      (unwind-protect
+           (do-stems-and-flags (stem flags 2)
+             (unless (position :not-target flags)
+               (when (>= subprocess-count max-jobs)
+                 (wait))
+               (when stop
+                 (return))
+               (let ((pid (host-sb-posix:fork)))
+                 (when (zerop pid)
+                   (target-compile-stem stem flags)
+                   ;; FIXME: convey exit code based on COMPILE result.
+                   (sb-cold::exit-process 0))
+                 (push pid subprocess-list))
+               (incf subprocess-count)
+               ;; Cause the compile-time effects from this file
+               ;; to appear in subsequently forked children.
+               (let ((*compile-for-effect-only* t))
+                 (target-compile-stem stem flags))))
+        (loop (if (plusp subprocess-count) (wait) (return)))
+        (when stop
+          (sb-cold::exit-process 1)))
       (values))))
 
 ;;; Actually compile
