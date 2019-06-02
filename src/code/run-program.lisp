@@ -424,11 +424,10 @@ status slot."
 
   (defun find-a-pty ()
     ;; First try to use the Unix98 pty api.
-    (let* ((master-name (coerce (format nil "/dev/ptmx") 'base-string))
-           (master-fd (sb-unix:unix-open master-name
-                                         (logior sb-unix:o_rdwr
-                                                 sb-unix:o_noctty)
-                                         #o666)))
+    (let ((master-fd (sb-unix:unix-open "/dev/ptmx"
+                                        (logior sb-unix:o_rdwr
+                                                sb-unix:o_noctty)
+                                        #o666)))
       (when master-fd
         (grantpt master-fd)
         (unlockpt master-fd)
@@ -447,15 +446,15 @@ status slot."
     ;; No dice, try using the old-school method.
     (dolist (char '(#\p #\q))
       (dotimes (digit 16)
-        (let* ((master-name (coerce (format nil "/dev/pty~C~X" char digit)
-                                    'base-string))
+        (let* ((master-name (with-simple-output-to-string (str nil base-char)
+                              (format str "/dev/pty~C~X" char digit)))
                (master-fd (sb-unix:unix-open master-name
                                              (logior sb-unix:o_rdwr
                                                      sb-unix:o_noctty)
                                              #o666)))
           (when master-fd
-            (let* ((slave-name (coerce (format nil "/dev/tty~C~X" char digit)
-                                       'base-string))
+            (let* ((slave-name (with-simple-output-to-string (str nil base-char)
+                                 (format str "/dev/tty~C~X" char digit)))
                    (slave-fd (sb-unix:unix-open slave-name
                                                 (logior sb-unix:o_rdwr
                                                         sb-unix:o_noctty)
@@ -1105,7 +1104,7 @@ Users Manual for details about the PROCESS structure.
                  (sb-unix:unix-close fd)
                  (fail "failed to unlink ~A" name/errno))
                fd)))
-    (let ((dev-null #.(coerce #-win32 "/dev/null" #+win32 "nul" 'base-string)))
+    (let ((dev-null #-win32 "/dev/null" #+win32 "nul"))
       (cond ((eq object t)
              ;; No new descriptor is needed.
              (values -1 nil))
