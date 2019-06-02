@@ -1164,8 +1164,8 @@ struct visitor {
     // element 0 is for conses, element 64 is for totals.
     struct {
         int count;
-        int bytes;
-    } headers[65];
+        int words;
+    } headers[65], sv_subtypes[3];
     struct hopscotch_table *reached;
 };
 
@@ -1251,9 +1251,20 @@ static void tally(lispobj ptr, struct visitor* v)
         ++v->headers[0].count;
     else {
         lispobj* obj = native_pointer(ptr);
-        int header_index = widetag_of(obj)>>2;
+        int widetag = widetag_of(obj);
+        int header_index = widetag>>2;
+        int words = OBJECT_SIZE(*obj, obj);
         ++v->headers[header_index].count;
-        v->headers[header_index].bytes += OBJECT_SIZE(*obj, obj);
+        v->headers[header_index].words += words;
+        if (widetag == SIMPLE_VECTOR_WIDETAG) {
+            int st = 0;
+            switch ((*obj >> N_WIDETAG_BITS) & 7) {
+            case subtype_VectorWeak: st = 1; break;
+            case subtype_VectorValidHashing: st = 2; break;
+            }
+            ++v->sv_subtypes[st].count;
+            v->sv_subtypes[st].words += words;
+        }
     }
 }
 
@@ -1309,8 +1320,8 @@ static void sanity_check_loaded_core(lispobj initial_function)
     walk_generation(visit, -1, (uword_t)&v[1]);
     // Pass 3: Compare
     // Start with the conses
-    v[0].headers[0].bytes = v[0].headers[0].count * N_WORD_BYTES * 2;
-    v[1].headers[0].bytes = v[1].headers[0].count * N_WORD_BYTES * 2;
+    v[0].headers[0].words = v[0].headers[0].count * 2;
+    v[1].headers[0].words = v[1].headers[0].count * 2;
     printf("-----------------------------------------------|\n");
     printf("       Graph walk     |         Actual         |\n");
     printf("----------------------+------------------------|\n");
@@ -1326,14 +1337,23 @@ static void sanity_check_loaded_core(lispobj initial_function)
               && (i != UNBOUND_MARKER_WIDETAG>>2)))) {
             int mismatch = v[0].headers[i].count != v[1].headers[i].count;
             printf("%8d %11d  | %8d %11d   | %s%s\n",
-                   v[0].headers[i].count, v[0].headers[i].bytes,
-                   v[1].headers[i].count, v[1].headers[i].bytes,
+                   v[0].headers[i].count, v[0].headers[i].words,
+                   v[1].headers[i].count, v[1].headers[i].words,
                    i<64 ? (i ? widetag_names[i] : "cons") : "TOTAL",
                    mismatch ? " <<<<" : "");
+            if (i == SIMPLE_VECTOR_WIDETAG>>2) {
+                int j;
+                for(j=1; j <= 2; ++j)
+                    printf("%8d %11d  | %8d %11d   |   %s\n",
+                           v[0].sv_subtypes[j].count, v[0].sv_subtypes[j].words,
+                           v[1].sv_subtypes[j].count, v[1].sv_subtypes[j].words,
+                           j==1 ? "weak" : "hashing");
+
+            }
             v[0].headers[64].count += v[0].headers[i].count;
             v[1].headers[64].count += v[1].headers[i].count;
-            v[0].headers[64].bytes += v[0].headers[i].bytes;
-            v[1].headers[64].bytes += v[1].headers[i].bytes;
+            v[0].headers[64].words += v[0].headers[i].words;
+            v[1].headers[64].words += v[1].headers[i].words;
         }
     }
     hopscotch_destroy(&reached);
