@@ -255,7 +255,8 @@
                         (with-output-to-string (s)
                           (setf stream s)
                           (setf process
-                                (run-program "/bin/sh" '("-c" "echo OK; exit 42") :pty s))
+                                (run-program "/bin/sh" '("-c" "echo OK; exit 42") :pty s
+                                                                                  :wait nil))
                           (process-wait process)
                           (assert (= (process-exit-code process) 42))
                           s)
