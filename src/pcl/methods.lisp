@@ -52,11 +52,9 @@
                `(defmethod ,name ,args
                  (declare (ignore initargs))
                  (error 'metaobject-initialization-violation
-                  ;; FIXME: I'm pretty sure this wants to be "~~@<~A~~@:>"
-                  :format-control ,(coerce (format nil "~@<~A~@:>" control)
-                                           'base-string)
-                  :format-arguments (list ',name)
-                  :references '((:amop :initialization method))))))
+                        :format-control ,(format nil "~~@<~A~~@:>" control)
+                        :format-arguments (list ',name)
+                        :references '((:amop :initialization method))))))
   (def reinitialize-instance ((method method) &rest initargs)
     "Method objects cannot be redefined by ~S.")
   (def change-class ((method method) new &rest initargs)
