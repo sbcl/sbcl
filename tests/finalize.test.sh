@@ -60,6 +60,7 @@ while true; do
         rm finalize-test-passed
         exit $EXIT_TEST_WIN
     elif [ -f finalize-test-failed ]; then
+        wait
         cat finalize-test-failed
         rm finalize-test-failed
         exit $EXIT_LOSE
