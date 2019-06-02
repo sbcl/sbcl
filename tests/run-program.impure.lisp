@@ -242,17 +242,19 @@
 
 (with-test (:name (run-program :pty-stream) :fails-on :win32)
   (assert (equal "OK"
-                 (handler-case
-                  (with-timeout 6
-                    (subseq
-                     (with-output-to-string (s)
-                       (assert (= 42 (process-exit-code
-                                      (run-program "/bin/sh" '("-c" "echo OK; exit 42") :wait t
-                                                                                        :pty s))))
-                       s)
-                     0
-                     2))
-                  (timeout () "timeout")))))
+                 (handler-bind
+                     ((timeout (lambda (c)
+                                 c)))
+                   (with-timeout 2
+                     (subseq
+                      (with-output-to-string (s)
+                        (assert (= (process-exit-code
+                                    (run-program "/bin/sh" '("-c" "echo OK; exit 42") :wait t
+                                                                                      :pty s))
+                                   42))
+                        s)
+                      0
+                      2))))))
 
 ;; Check whether RUN-PROGRAM puts its child process into the foreground
 ;; when stdin is inherited. If it fails to do so we will receive a SIGTTIN.
