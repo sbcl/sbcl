@@ -265,10 +265,10 @@ lowtag_of(lispobj obj)
 static inline int
 widetag_of(lispobj* obj)
 {
-#ifdef LISP_FEATURE_LITTLE_ENDIAN
-    return *(unsigned char*)obj;
+#ifdef LISP_FEATURE_BIG_ENDIAN
+    return ((unsigned char*)obj)[N_WORD_BYTES-1];
 #else
-    return *obj & WIDETAG_MASK;
+    return *(unsigned char*)obj;
 #endif
 }
 static inline int
