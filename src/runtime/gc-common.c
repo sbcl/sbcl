@@ -1558,6 +1558,37 @@ gc_search_space3(void *pointer, lispobj *start, void *limit)
     return NULL;
 }
 
+
+// Binary-search the simple-funs in 'code' looking for an exact
+// match to 'fun'. ('fun' can not be greater than or equal to the start
+// of instructions for the returned function - it must be exactly
+// an untagged pointer to the base address). Return -1 if not found.
+// We don't actually need this to be fast, because it's used only
+// when debugging. (Conservative stack scan relaxes the exactness
+// contraint, and precise stack scan does not use this at all)
+int simple_fun_index(struct code* code, struct simple_fun *fun)
+{
+    int min = 0;
+    int max = code_n_funs(code) - 1;
+    char *instruction_area = code_text_start(code);
+    unsigned int* offsets = code_fun_table(code) - 1;
+    while (min <= max) {
+        int midpoint = (min + max) >> 1;
+        char *guess = instruction_area + offsets[-midpoint];
+        if (guess == (char*)fun) return midpoint;
+        if (guess > (char*)fun) max = midpoint - 1; else min = midpoint + 1;
+    }
+    return -1;
+}
+
+lispobj simple_fun_name(struct simple_fun* fun)
+{
+    struct code* code = (struct code*)fun_code_header(fun);
+    int index = simple_fun_index(code, fun);
+    if (index < 0) return 0;
+    return code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index];
+}
+
 /* Helper for valid_lisp_pointer_p (below) and
  * conservative_root_p (gencgc).
  *
@@ -1593,14 +1624,19 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
         return 1; // instant win
 
     if (widetag == CODE_HEADER_WIDETAG) {
-        // Check for RETURN_PC_HEADER first since it's quicker.
-        // Then consider the embedded simple-funs.
-#if !defined(LISP_FEATURE_X86) && !defined(LISP_FEATURE_X86_64)
-        /* The all-architecture test below is good as far as it goes,
-         * but an LRA object is similar to a FUN-POINTER: It is
-         * embedded within a CODE-OBJECT pointed to by start_addr, and
-         * cannot be found by simply walking the heap, therefore we
-         * need to check for it. -- AB, 2010-Jun-04 */
+        if (functionp(pointer)) {
+            lispobj* potential_fun = (lispobj*)(pointer-FUN_POINTER_LOWTAG);
+            if (widetag_of(potential_fun) == SIMPLE_FUN_WIDETAG &&
+                simple_fun_index((struct code*)start_addr,
+                                 (struct simple_fun*)potential_fun) >= 0)
+                return 1;
+        }
+#ifdef RETURN_PC_WIDETAG
+        /* LRA objects are similar to simple-funs in that they are
+         * embedded objects. We can't actually do as precise a test
+         * as for simple-funs, since we don't know where the LRAs are.
+         * Nonetheless, the check of header validity should produce
+         * very few false positives */
         if (lowtag_of(pointer) == OTHER_POINTER_LOWTAG) {
             lispobj *potential_lra = native_pointer(pointer);
             if ((widetag_of(potential_lra) == RETURN_PC_WIDETAG) &&
@@ -1609,13 +1645,6 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
             }
         }
 #endif
-        if (functionp(pointer)) {
-            struct simple_fun *pfun =
-                (struct simple_fun*)(pointer-FUN_POINTER_LOWTAG);
-            for_each_simple_fun(i, function, (struct code*)start_addr, 0, {
-                if (pfun == function) return 1;
-            })
-        }
     }
     return 0; // no good
 }

@@ -421,16 +421,6 @@ static struct simple_fun* simple_fun_from_pc(char* pc)
     return prev_fun;
 }
 
-static lispobj simple_fun_name(struct simple_fun* thefun)
-{
-    struct code* code = (struct code*)fun_code_header(thefun);
-    for_each_simple_fun(i, fun, code, 1, {
-        if (fun == thefun)
-            return code->constants[CODE_SLOTS_PER_SIMPLE_FUN*i];
-    })
-    return 0;
-}
-
 static void maybe_show_object_name(lispobj obj, FILE* stream)
 {
     extern void safely_show_lstring(lispobj* string, int quotes, FILE *s);

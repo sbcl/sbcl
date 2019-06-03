@@ -660,3 +660,37 @@
                            l)))
          '(error))))
     (assert (= count 1))))
+
+(with-test (:name :properly-tagged-p-internal)
+  ;; OPEN uses a boatload of simple-funs (~19) due to all its restarts and whatnot
+  (let* ((code (sb-kernel:fun-code-header #'open))
+         (n (sb-kernel:code-n-entries code)))
+    (sb-sys:with-pinned-objects (code)
+      (let* ((base (logandc2 (sb-kernel:get-lisp-obj-address code)
+                             sb-vm:lowtag-mask))
+             (limit (+ base (sb-vm::primitive-object-size code))))
+        (flet ((properly-tagged-p (ptr)
+                 (eql (alien-funcall (extern-alien "properly_tagged_p_internal"
+                                                   (function int unsigned unsigned))
+                                     ptr base)
+                      1)))
+          ;; Test that there are exactly n-entries properly tagged interior pointers.
+          (assert (= (loop for ptr from (+ base (* 2 sb-vm:n-word-bytes))
+                           below limit count (properly-tagged-p ptr))
+                     n))
+          ;; Verify that the binary search algorithm for simple-fun-index works.
+          (let ((count 0))
+            (loop for ptr from base below limit
+                  do
+               (let ((index (alien-funcall
+                             (extern-alien "simple_fun_index"
+                                           (function int unsigned unsigned))
+                             base ptr)))
+                 (unless (eql index -1)
+                   (let ((tagged-fun (logior ptr sb-vm:fun-pointer-lowtag)))
+                     (assert (properly-tagged-p tagged-fun))
+                     (incf count)
+                     #+nil
+                     (format t "~x -> ~d (~a)~%"
+                             ptr index (sb-kernel:make-lisp-obj tagged-fun))))))
+            (assert (= count n))))))))
