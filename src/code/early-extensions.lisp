@@ -1412,7 +1412,7 @@ NOTE: This interface is experimental and subject to change."
         `(let ((,var #+sb-xc-host (make-string-output-stream)
                      #-sb-xc-host (sb-impl::%make-string-output-stream
                                    ',element-type #'sb-impl::string-ouch)))
-           
+
            ,@decls
            ,@forms
            (get-output-stream-string ,var)))))

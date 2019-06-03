@@ -421,6 +421,16 @@ static struct simple_fun* simple_fun_from_pc(char* pc)
     return prev_fun;
 }
 
+static lispobj simple_fun_name(struct simple_fun* thefun)
+{
+    struct code* code = (struct code*)fun_code_header(thefun);
+    for_each_simple_fun(i, fun, code, 1, {
+        if (fun == thefun)
+            return code->constants[CODE_SLOTS_PER_SIMPLE_FUN*i];
+    })
+    return 0;
+}
+
 static void maybe_show_object_name(lispobj obj, FILE* stream)
 {
     extern void safely_show_lstring(lispobj* string, int quotes, FILE *s);
@@ -598,13 +608,12 @@ static int trace1(lispobj object,
             struct simple_fun* fun = simple_fun_from_pc(thread_pc);
             if (fun) {
                 fprintf(file, "fun=%p", (void*)make_lispobj(fun, FUN_POINTER_LOWTAG));
-#if 0 // TODO: implement simple_fun_name()
-                if (is_lisp_pointer(fun->name) &&
-                    widetag_of(native_pointer(fun->name)) == SYMBOL_WIDETAG) {
+                lispobj fun_name = simple_fun_name(fun);
+                if (is_lisp_pointer(fun_name) &&
+                    widetag_of(native_pointer(fun_name)) == SYMBOL_WIDETAG) {
                     fprintf(file, "=");
-                    show_lstring(VECTOR(SYMBOL(fun->name)->name), 0, file);
+                    show_lstring(VECTOR(SYMBOL(fun_name)->name), 0, file);
                 }
-#endif
             } else if (thread_pc)
                 fprintf(file, "pc=%p", thread_pc);
         }
