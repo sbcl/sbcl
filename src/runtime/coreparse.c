@@ -1175,9 +1175,8 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
                         struct hopscotch_table* seen)
 {
     if (lowtag_of(ptr) == FUN_POINTER_LOWTAG
-        && widetag_of((lispobj*)(ptr-FUN_POINTER_LOWTAG)) == SIMPLE_FUN_WIDETAG)
-        ptr = make_lispobj(fun_code_header(ptr-FUN_POINTER_LOWTAG),
-                           OTHER_POINTER_LOWTAG);
+        && widetag_of(FUNCTION(ptr)) == SIMPLE_FUN_WIDETAG)
+        ptr = fun_code_tagged(FUNCTION(ptr));
     if (hopscotch_get(seen, ptr, 0))
         return;
     hopscotch_insert(seen, ptr, 1);

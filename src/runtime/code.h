@@ -111,4 +111,22 @@ static inline int instruction_ptr_p(char *pointer, lispobj *start_addr)
            pointer >= code_text_start((struct code*)start_addr);
 }
 
+/// Maximum number of word backwards from a simple-fun
+/// to its containing code component - corresponds to ~128MB.
+/// The limit exists so that we can store the layout pointer
+/// in the header of any callable object if N_WORD_BITS = 64.
+/// This is not technically a restriction on the code size.
+#define FUN_HEADER_NWORDS_MASK 0xFFFFFF
+
+static inline lispobj* FUNCTION(lispobj obj) {
+  return (lispobj*)(obj - FUN_POINTER_LOWTAG);
+}
+
+static inline lispobj* fun_code_header(lispobj* fun) {
+    return fun - (HeaderValue(*fun) & FUN_HEADER_NWORDS_MASK);
+}
+static inline lispobj fun_code_tagged(lispobj* fun) {
+    return make_lispobj(fun_code_header(fun), OTHER_POINTER_LOWTAG);
+}
+
 #endif

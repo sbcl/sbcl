@@ -2090,7 +2090,7 @@ update_page_write_prot(page_index_t page)
             // underlying code object since the alleged header might not be one.
             int pointee_gen = gen; // Make comparison fail if we fall through
             if (functionp((lispobj)ptr) && header_widetag(header) == SIMPLE_FUN_WIDETAG) {
-                lispobj* code = fun_code_header((lispobj)ptr - FUN_POINTER_LOWTAG);
+                lispobj* code = fun_code_header(FUNCTION(ptr));
                 // This is a heuristic, since we're not actually looking for
                 // an object boundary. Precise scanning of 'page' would obviate
                 // the guard conditions here.

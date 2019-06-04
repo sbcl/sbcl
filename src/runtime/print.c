@@ -748,10 +748,7 @@ static void print_otherptr(lispobj obj)
         break;
 
     case SIMPLE_FUN_WIDETAG:
-        print_obj("code: ",
-                  make_lispobj(native_pointer((lispobj)(ptr-1))
-                               -(HeaderValue(header)&0xFFFF),
-                               OTHER_POINTER_LOWTAG));
+        print_obj("code: ", fun_code_tagged(ptr-1));
         print_slots(simple_fun_slots,
                     sizeof simple_fun_slots/sizeof(char*)-1, ptr);
         break;

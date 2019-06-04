@@ -1583,7 +1583,7 @@ int simple_fun_index(struct code* code, struct simple_fun *fun)
 
 lispobj simple_fun_name(struct simple_fun* fun)
 {
-    struct code* code = (struct code*)fun_code_header(fun);
+    struct code* code = (struct code*)fun_code_header((lispobj*)fun);
     int index = simple_fun_index(code, fun);
     if (index < 0) return 0;
     return code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index];
@@ -1625,7 +1625,7 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
 
     if (widetag == CODE_HEADER_WIDETAG) {
         if (functionp(pointer)) {
-            lispobj* potential_fun = (lispobj*)(pointer-FUN_POINTER_LOWTAG);
+            lispobj* potential_fun = FUNCTION(pointer);
             if (widetag_of(potential_fun) == SIMPLE_FUN_WIDETAG &&
                 simple_fun_index((struct code*)start_addr,
                                  (struct simple_fun*)potential_fun) >= 0)

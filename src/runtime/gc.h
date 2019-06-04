@@ -38,14 +38,4 @@ extern boolean gc_active_p;
 
 extern os_vm_size_t bytes_consed_between_gcs;
 
-/// Maximum number of word backwards from a simple-fun
-/// to its containing code component - corresponds to ~128MB.
-/// The limit exists so that we can store the layout pointer
-/// in the header of any callable object if N_WORD_BITS = 64.
-/// This is not technically a restriction on the code size.
-#define FUN_HEADER_NWORDS_MASK 0xFFFFFF
-
-#define fun_code_header(fun) \
-  ((lispobj*)(fun) - (HeaderValue(*(lispobj*)(fun))&FUN_HEADER_NWORDS_MASK))
-
 #endif /* _GC_H_ */

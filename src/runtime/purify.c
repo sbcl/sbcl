@@ -283,8 +283,7 @@ ptrans_func(lispobj thing, lispobj header)
          * would have been left behind for all the entry points. */
 
         struct simple_fun *function = (struct simple_fun *)native_pointer(thing);
-        lispobj code = make_lispobj(native_pointer(thing) - HeaderValue(function->header),
-                                    OTHER_POINTER_LOWTAG);
+        lispobj code = fun_code_tagged((lispobj*)function);
 
         /* This will cause the function's header to be replaced with a
          * forwarding pointer. */

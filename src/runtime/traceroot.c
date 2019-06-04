@@ -117,9 +117,8 @@ static void add_to_layer(lispobj* obj, int wordindex,
 /// otherwise return obj directly.
 static lispobj canonical_obj(lispobj obj)
 {
-    if (functionp(obj) && widetag_of((lispobj*)(obj-FUN_POINTER_LOWTAG)) == SIMPLE_FUN_WIDETAG)
-        return make_lispobj(fun_code_header(obj-FUN_POINTER_LOWTAG),
-                            OTHER_POINTER_LOWTAG);
+    if (functionp(obj) && widetag_of(FUNCTION(obj)) == SIMPLE_FUN_WIDETAG)
+        return fun_code_tagged(FUNCTION(obj));
     return obj;
 }
 
