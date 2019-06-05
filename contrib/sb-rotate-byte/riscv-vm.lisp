@@ -19,8 +19,8 @@
       (inst slliw temp integer count)
       (inst srliw result integer (- 32 count))
       (inst or result result temp)
-      (inst li temp (1- (expt 2 32)))
-      (inst and result result temp))))
+      (inst slli result result 32)
+      (inst srli result result 32))))
 
 (define-vop (%32bit-rotate-byte)
   (:policy :fast-safe)
@@ -42,8 +42,8 @@
     (inst sub count-temp sb-vm::zero-tn count-temp)
     (inst srlw result integer count-temp)
     (inst or result result temp)
-    (inst li temp (1- (expt 2 32)))
-    (inst and result result temp)))
+    (inst slli result result 32)
+    (inst srli result result 32)))
 
 ;;; 64-bit
 (define-vop (%64bit-rotate-byte/c)
