@@ -1250,8 +1250,8 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     if ((read_TLS(INTERRUPTS_ENABLED,thread) == NIL) ||
         in_leaving_without_gcing_race_p(thread)) {
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d): deferred (RACE=%d)\n",
-                      (unsigned int)handler,signal,
+                      "/maybe_defer_handler(%p,%d): deferred (RACE=%d)\n",
+                      handler,signal,
                       in_leaving_without_gcing_race_p(thread)));
         store_signal_data_for_later(data,handler,signal,info,context);
         write_TLS(INTERRUPT_PENDING, T,thread);
@@ -1263,8 +1263,8 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
      * may succeed even when context is null (gencgc alloc()) */
     if (arch_pseudo_atomic_atomic(context)) {
         FSHOW_SIGNAL((stderr,
-                      "/maybe_defer_handler(%x,%d): deferred(PA)\n",
-                      (unsigned int)handler,signal));
+                      "/maybe_defer_handler(%p,%d): deferred(PA)\n",
+                      handler,signal));
         store_signal_data_for_later(data,handler,signal,info,context);
         arch_set_pseudo_atomic_interrupted(context);
         check_interrupt_context_or_lose(context);
@@ -1274,8 +1274,8 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     check_interrupt_context_or_lose(context);
 
     FSHOW_SIGNAL((stderr,
-                  "/maybe_defer_handler(%x,%d): not deferred\n",
-                  (unsigned int)handler,signal));
+                  "/maybe_defer_handler(%p,%d): not deferred\n",
+                  handler,signal));
     return 0;
 }
 
