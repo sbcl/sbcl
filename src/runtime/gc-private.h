@@ -17,6 +17,7 @@
 
 #include "genesis/weak-pointer.h"
 #include "immobile-space.h"
+#include "code.h"
 
 // Gencgc distinguishes between "quick" and "ordinary" requests.
 // Even on cheneygc we need this flag, but it's actually just ignored.
