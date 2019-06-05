@@ -13,6 +13,7 @@
 (in-package "SB-IMPL")
 
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
+(sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
                                (test
@@ -65,17 +66,18 @@
   (cache nil :type (or null index))
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
-  (index-vector nil :type (simple-array sb-vm:word (*)))
+  (index-vector nil :type (simple-array hash-table-index (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets and the free list. A slot will only ever be in
   ;; one of these lists.
-  (next-vector nil :type (simple-array sb-vm:word (*)))
+  (next-vector nil :type (simple-array hash-table-index (*)))
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
   ;; respective key.
+  ;; TODO: consider reducing to 32 bits per item
   (hash-vector nil :type (or null (simple-array sb-vm:word (*))))
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb-thread:make-mutex :name "hash-table lock")

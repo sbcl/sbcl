@@ -1025,13 +1025,13 @@ static inline int pointer_survived_gc_yet(lispobj obj)
 /* Return the beginning of data in ARRAY (skipping the header and the
  * length) or NULL if it isn't an array of the specified widetag after
  * all. */
-static inline lispobj *
+static inline void *
 get_array_data (lispobj array, int widetag, uword_t *length)
 {
     if (is_lisp_pointer(array) && widetag_of(native_pointer(array)) == widetag) {
         if (length != NULL)
             *length = fixnum_value(native_pointer(array)[1]);
-        return native_pointer(array) + 2;
+        return &(VECTOR(array)->data[0]);
     } else {
         return NULL;
     }
@@ -1176,13 +1176,14 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
     if (kv_vector == NULL)
         lose("invalid kv_vector %"OBJ_FMTX, hash_table->table);
 
-    lispobj *index_vector = get_array_data(hash_table->index_vector,
-                                           SIMPLE_ARRAY_WORD_WIDETAG, &length);
+    uint32_t *index_vector = get_array_data(hash_table->index_vector,
+                                            SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                                            &length);
     if (index_vector == NULL)
         lose("invalid index_vector %"OBJ_FMTX, hash_table->index_vector);
 
     lispobj *next_vector = get_array_data(hash_table->next_vector,
-                                          SIMPLE_ARRAY_WORD_WIDETAG,
+                                          SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
                                           &next_vector_length);
     if (next_vector == NULL)
         lose("invalid next_vector %"OBJ_FMTX, hash_table->next_vector);
@@ -1330,19 +1331,18 @@ scav_vector (lispobj *where, lispobj header)
 /* Walk through the chain whose first element is *FIRST and remove
  * dead weak entries. */
 static inline void
-cull_weak_hash_table_bucket(struct hash_table *hash_table, lispobj *prev,
+cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
                             lispobj *kv_vector,
-                            lispobj __attribute__((unused)) *index_vector,
-                            lispobj *next_vector, lispobj *hash_vector,
+                            uint32_t *next_vector, lispobj *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
                             boolean save_culled_values,
                             boolean *rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
-    unsigned index = *prev;
+    uint32_t index = *prev;
     while (index) {
-        unsigned next = next_vector[index];
+        uint32_t next = next_vector[index];
         lispobj key = kv_vector[2 * index];
         lispobj value = kv_vector[2 * index + 1];
         gc_assert(key != empty_symbol);
@@ -1392,16 +1392,16 @@ cull_weak_hash_table (struct hash_table *hash_table,
                       void (*fix_pointers)(lispobj[2]))
 {
     uword_t length = 0; /* prevent warning */
-    uword_t next_vector_length = 0; /* prevent warning */
     uword_t i;
 
     lispobj *kv_vector = get_array_data(hash_table->table,
                                         SIMPLE_VECTOR_WIDETAG, NULL);
-    lispobj *index_vector = get_array_data(hash_table->index_vector,
-                                           SIMPLE_ARRAY_WORD_WIDETAG, &length);
-    lispobj *next_vector = get_array_data(hash_table->next_vector,
-                                          SIMPLE_ARRAY_WORD_WIDETAG,
-                                          &next_vector_length);
+    uint32_t *index_vector = get_array_data(hash_table->index_vector,
+                                            SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                                            &length);
+    uint32_t *next_vector = get_array_data(hash_table->next_vector,
+                                           SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                                           NULL);
     lispobj *hash_vector = get_array_data(hash_table->hash_vector,
                                           SIMPLE_ARRAY_WORD_WIDETAG, NULL);
 
@@ -1409,7 +1409,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
     boolean save_culled_values = (hash_table->flags & MAKE_FIXNUM(4)) != 0;
     for (i = 0; i < length; i++) {
         cull_weak_hash_table_bucket(hash_table, &index_vector[i],
-                                    kv_vector, index_vector, next_vector,
+                                    kv_vector, next_vector,
                                     hash_vector, alivep_test, fix_pointers,
                                     save_culled_values, &rehash);
     }
