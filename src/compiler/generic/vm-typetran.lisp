@@ -29,6 +29,7 @@
 ;;; can implement some primitive stuff in Lisp.)
 (define-type-predicate double-float-p double-float)
 (define-type-predicate fixnump fixnum)
+#+long-float
 (define-type-predicate long-float-p long-float)
 (define-type-predicate ratiop ratio)
 (define-type-predicate short-float-p short-float)

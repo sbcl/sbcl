@@ -2328,3 +2328,12 @@
   (assert (not (ctu:find-named-callees
                 (checked-compile
                  '(lambda () #'+))))))
+
+(with-test (:name :double-float-p-weakening)
+  (checked-compile-and-assert
+   (:optimize '(:speed 3 :safety 1))
+   '(lambda (x)
+     (declare (double-float x))
+     x)
+   ((0.0) (condition 'type-error))
+      ((1d0) 1d0)))
