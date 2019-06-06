@@ -43,6 +43,9 @@
          (when dom (sset-adjoin block dom))))
      (unless changed (return)))))
 
+(defun clear-dominators (component)
+  (do-blocks (block component)
+    (setf (block-dominators block) nil)))
 
 ;;; DOMINATES-P  --  Internal
 ;;;

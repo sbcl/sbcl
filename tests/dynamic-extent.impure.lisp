@@ -1546,4 +1546,17 @@
         (let ((v (list (vector 0 c 0 0) (catch 'ct5 (throw 'ct5 0)) 0)))
           (declare (dynamic-extent v))
           (elt (elt v 0) 1))))
-   ((33) 33)))
+    ((33) 33)))
+
+(with-test (:name :dominators-recomputation)
+  (let (sb-c::*check-consistency*)
+    (checked-compile-and-assert
+     ()
+     `(lambda (x)
+        (let ((m (if x
+                     (make-array 2 :initial-element 1)
+                     (make-array 2 :initial-element 2))))
+          (declare (dynamic-extent m))
+          (elt m 0)))
+     ((t) 1)
+     ((nil) 2))))

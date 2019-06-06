@@ -113,6 +113,7 @@
                                            (ir2-block-pushed 2block))))))
          (start-block (find-lowest-common-dominator
                        (list* block use-blocks))))
+    (aver start-block)
     (labels ((revisit-cycles (block)
                (dolist (succ (block-succ block))
                  (when (eq (block-flag succ) cycle)
