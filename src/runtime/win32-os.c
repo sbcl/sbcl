@@ -1369,9 +1369,17 @@ handle_exception(EXCEPTION_RECORD *exception_record,
         return ExceptionContinueSearch;
     }
 
+    DWORD code = exception_record->ExceptionCode;
+
+    if(code == 0x20474343 || /* GCC */
+       code == 0xE06D7363 || /* Emsc */
+       code == 0xE0434352)   /* ECCR */
+        /* Do not handle G++, VC++ and .NET exceptions */
+        return ExceptionContinueSearch;
+
     DWORD lastError = GetLastError();
     DWORD lastErrno = errno;
-    DWORD code = exception_record->ExceptionCode;
+
     struct thread* self = arch_os_get_current_thread();
 
     os_context_t context, *ctx = &context;
