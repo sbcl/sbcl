@@ -13,7 +13,7 @@
 #define _CODE_H_
 
 #include "genesis/code.h"
-#include "gc-internal.h" // for gc_assert()
+#include "gc-assert.h"
 
 static inline int code_total_nwords(struct code* c) {
 #ifdef LISP_FEATURE_64_BIT

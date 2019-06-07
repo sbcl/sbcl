@@ -27,37 +27,10 @@
 #include "genesis/simple-fun.h"
 #include "thread.h"
 #include "interr.h" /* for lose() */
-
+#include "gc-assert.h"
+#include "code.h"
 extern const char *widetag_names[];
 extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
-
-/// Enable extra debug-only checks if DEBUG
-#ifdef DEBUG
-# define gc_dcheck(ex) gc_assert(ex)
-#else
-# define gc_dcheck(ex) ((void)0)
-#endif
-
-/// Disable all assertions if NDEBUG
-#ifdef NDEBUG
-# define gc_assert(ex) ((void)0)
-# define gc_assert_verbose(ex, fmt, ...) ((void)0)
-#else
-# define gc_assert(ex)                                                 \
-do {                                                                   \
-    if (!(ex)) gc_abort();                                             \
-} while (0)
-# define gc_assert_verbose(ex, fmt, ...)                               \
-do {                                                                   \
-    if (!(ex)) {                                                       \
-        fprintf(stderr, fmt, ## __VA_ARGS__);                          \
-        gc_abort();                                                    \
-    }                                                                  \
-} while (0)
-#endif
-
-#define gc_abort()                                                     \
-  lose("GC invariant lost, file \"%s\", line %d\n", __FILE__, __LINE__)
 
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-internal.h"

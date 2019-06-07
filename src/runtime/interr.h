@@ -11,7 +11,7 @@
 
 #ifndef _INTERR_H_
 #define _INTERR_H_
-
+#include "os.h"
 extern void lose(char *fmt, ...)
 #ifndef LISP_FEATURE_WIN32
  __attribute__((format(printf,1,2))) // clang and gcc support this, MSVC doesn't

@@ -24,6 +24,7 @@
 #include "print.h"
 #include "runtime.h"
 #include "code.h"
+#include "gc-internal.h"
 #include <stdarg.h>
 #include "thread.h"              /* genesis/primitive-objects.h needs this */
 #include <errno.h>
