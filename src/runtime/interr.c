@@ -36,10 +36,16 @@
 #include "gc.h"
 
 /* the way that we shut down the system on a fatal error */
+void lisp_backtrace(int frames);
 
 static void
 default_lossage_handler(void)
 {
+    static int backtrace_invoked = 0;
+    if (!backtrace_invoked) {
+        backtrace_invoked = 1;
+        lisp_backtrace(100);
+    }
     exit(1);
 }
 static void (*lossage_handler)(void) = default_lossage_handler;
@@ -48,7 +54,6 @@ static void (*lossage_handler)(void) = default_lossage_handler;
 static void
 configurable_lossage_handler()
 {
-    void lisp_backtrace(int frames);
 
     if (dyndebug_config.dyndebug_backtrace_when_lost) {
         fprintf(stderr, "lose: backtrace follows as requested\n");
