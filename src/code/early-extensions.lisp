@@ -1402,16 +1402,19 @@ NOTE: This interface is experimental and subject to change."
 ;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
 ;;; producing more compact code.
 (defmacro with-simple-output-to-string
-    ((var &optional string (element-type (or #-sb-unicode 'character :default)))
+    ((var &optional string (element-type 'character))
      &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
     (if string
         `(let ((,var (sb-impl::make-fill-pointer-output-stream ,string)))
            ,@decls
            ,@forms)
-        `(let ((,var #+sb-xc-host (make-string-output-stream)
+        `(let ((,var #+sb-xc-host (make-string-output-stream :element-type ',element-type)
                      #-sb-xc-host (sb-impl::%make-string-output-stream
-                                   ',element-type #'sb-impl::string-ouch)))
+                                   ',element-type
+                                   #',(if (eq element-type 'base-char)
+                                          'sb-impl::string-ouch/base-char
+                                          'sb-impl::string-ouch))))
 
            ,@decls
            ,@forms
