@@ -2,6 +2,19 @@
 
 #-(and sb-thread (or arm64 ppc x86 x86-64)) (sb-ext:exit :code 104)
 
+;;; Make sure no promotions occur so that objects will be movable
+;;; throughout these tests.
+(setf (generation-number-of-gcs-before-promotion 0) 1000000)
+
+;;; Set up a list of 2 items for later use
+(defparameter *lll2* (make-ordered-list :key-type 'fixnum))
+(defparameter *5* (lfl-insert *lll2* 5 'five))
+(defparameter *10* (lfl-insert *lll2* 10 'ten))
+(defparameter *addr-of-10* (get-lisp-obj-address *10*))
+
+(defun check-next-is-10 (node)
+  (assert (eq (get-next node) *10*)))
+
 ;;;; These functions are for examining GC behavior.
 
 (defun lfl-nth (n list)
@@ -14,10 +27,19 @@
 (defun logical-delete (n list)
   (let* ((node (lfl-nth n list))
          (succ (%node-next node)))
+    ;; Ensure that the special GC strategy bit is set.
+    ;; We could set it as late as just prior to deletion
+    ;; and things should be fine.
+    (with-pinned-objects (node)
+      (let ((sap (int-sap (get-lisp-obj-address node))))
+        (assert (logtest (sap-ref-word sap (- sb-vm:instance-pointer-lowtag))
+                         special-gc-strategy-flag))))
     (unless (fixnump succ)
       (with-pinned-objects (succ)
         (cas (%node-next node) succ (make-marked-ref succ)))))
   list)
+
+(logical-delete 0 *lll2*)
 
 (defvar *lfl*)
 (defvar *l*)
@@ -43,7 +65,7 @@
     (when show (show (list-head *lfl*) #'get-next "GCed"))
     (logical-delete 1 *lfl*)
     (logical-delete 4 *lfl*)
-    (gc :gen 2)
+    (gc)
     (when show (show (list-head *lfl*) #'get-next "del "))))
 
 (test-util:with-test (:name :lockfree-list-gc-correctness)
@@ -162,3 +184,28 @@
                         sb-unix::sc-nprocessors-onln)
                #+win32 (sb-alien:extern-alien "os_number_of_processors" sb-alien:int))))
     (assert (> (primitive-benchmark) (min 2 (log cpus 2))))))
+
+(test-util:with-test (:name :lfl-next-implicit-pin-one-more-time)
+  (let* ((anode *5*)
+         (next (%node-next anode)))
+    (assert (fixnump next))
+    (with-pinned-objects (anode)
+      (gc)
+      ;; nowhere do we reference node *10* in this test,
+      ;; so there's no reason the GC should want not to move that node
+      ;; except for the implicit pin on account of node *5*.
+      ;; i.e. if we can reconstruct node 10 from its pointer
+      ;; as a fixnum, then the special GC strategy flag worked.
+      (check-next-is-10 anode)
+      (assert (eql (logandc2 (get-lisp-obj-address (get-next anode))
+                             sb-vm:lowtag-mask)
+                   (ash next sb-vm:n-fixnum-tag-bits))))))
+
+;; Show that nodes which are referenced only via a "fixnum" pointer
+;; can and do actually move via GC, which adjusts the fixnum accordingly.
+(test-util:with-test (:name :lfl-not-pinned)
+  (gc)
+  (assert (= (sb-kernel:generation-of *5*) 0))
+  (assert (= (sb-kernel:generation-of *10*) 0))
+  (assert (not (eql (get-lisp-obj-address *10*)
+                    *addr-of-10*))))

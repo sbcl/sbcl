@@ -180,7 +180,7 @@
 (define-vop (set-custom-gc-scavenge-bit)
   (:args (x :scs (descriptor-reg)))
   (:generator 1
-    (inst or :byte (ea (- 3 instance-pointer-lowtag) x) #x80)))
+    (inst or :byte (ea (- 2 instance-pointer-lowtag) x) #x80)))
 
 (define-vop (get-header-data-high)
   (:translate get-header-data-high)
