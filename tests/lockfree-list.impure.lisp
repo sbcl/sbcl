@@ -199,7 +199,8 @@
       (check-next-is-10 anode)
       (assert (eql (logandc2 (get-lisp-obj-address (get-next anode))
                              sb-vm:lowtag-mask)
-                   (ash next sb-vm:n-fixnum-tag-bits))))))
+                   (ldb (byte sb-vm:n-word-bits 0)
+                        (ash next sb-vm:n-fixnum-tag-bits)))))))
 
 ;; Show that nodes which are referenced only via a "fixnum" pointer
 ;; can and do actually move via GC, which adjusts the fixnum accordingly.
