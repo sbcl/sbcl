@@ -77,8 +77,7 @@
   ;; for EQ hash tables, and when present the value of
   ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
   ;; respective key.
-  ;; TODO: consider reducing to 32 bits per item
-  (hash-vector nil :type (or null (simple-array sb-vm:word (*))))
+  (hash-vector nil :type (or null (simple-array hash-table-index (*))))
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb-thread:make-mutex :name "hash-table lock")
         #-c-headers-only :type #-c-headers-only sb-thread:mutex
@@ -93,13 +92,14 @@
   #+sb-hash-table-debug
   (writing-thread nil))
 
-;; as explained by pmai on openprojects #lisp IRC 2002-07-30: #x80000000
-;; is bigger than any possible nonEQ hash value, and thus indicates an
-;; empty slot; and EQ hash tables don't use HASH-TABLE-HASH-VECTOR.
-;; The previous sentence was written when SBCL was 32-bit only. The value
-;; now depends on the word size. It is propagated to C in genesis because
-;; the generational garbage collector needs to know it.
-(defconstant +magic-hash-vector-value+ (ash 1 (1- sb-vm:n-word-bits)))
+;; Our hash-tables store precomputed hashes to speed rehash and to guard
+;; the call of the general comparator.
+;; i.e. we take the value from mumble-hash {SXHASH, EQ-HASH, etc}
+;; and fuzz the bits some more, then clip to 31 bits and store that.
+;; (As a practical matter, this limits tables to 2^31 bins.)
+;; Address-sensitive keys can't store a precomputed hash. They instead
+;; store this value that indicates address-sensitivity.
+(defconstant +magic-hash-vector-value+ #xFFFFFFFF)
 
 ;;; Return an association list representing the same data as HASH-TABLE.
 (defun %hash-table-alist (hash-table)

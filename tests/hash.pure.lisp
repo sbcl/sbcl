@@ -9,13 +9,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-;;; +MAGIC-HASH-VECTOR-VALUE+ is used to mark empty entries in the slot
-;;; HASH-VECTOR of hash tables. It must be a value outside of the range
-;;; of SXHASH. The range of SXHASH is the non-negative fixnums.
-(with-test (:name :magic-hash-vector-value)
-  (assert (not (typep sb-impl::+magic-hash-vector-value+
-                      '(and fixnum unsigned-byte)))))
-
 ;;; The return value of SXHASH on non-string/bitvector arrays should not
 ;;; change when the contents of the array change.
 (with-test (:name (sxhash array :independent-of-contents))

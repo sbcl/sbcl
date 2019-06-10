@@ -1182,15 +1182,14 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
     if (index_vector == NULL)
         lose("invalid index_vector %"OBJ_FMTX, hash_table->index_vector);
 
-    lispobj *next_vector = get_array_data(hash_table->next_vector,
-                                          SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
-                                          &next_vector_length);
-    if (next_vector == NULL)
+    if (get_array_data(hash_table->next_vector,
+                       SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                       &next_vector_length) == NULL)
         lose("invalid next_vector %"OBJ_FMTX, hash_table->next_vector);
 
-    lispobj *hash_vector = get_array_data(hash_table->hash_vector,
-                                          SIMPLE_ARRAY_WORD_WIDETAG,
-                                          &hash_vector_length);
+    uint32_t *hash_vector = get_array_data(hash_table->hash_vector,
+                                           SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                                           &hash_vector_length);
     if (hash_vector != NULL)
         gc_assert(hash_vector_length == next_vector_length);
 
@@ -1333,7 +1332,7 @@ scav_vector (lispobj *where, lispobj header)
 static inline void
 cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
                             lispobj *kv_vector,
-                            uint32_t *next_vector, lispobj *hash_vector,
+                            uint32_t *next_vector, uint32_t *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
                             void (*fix_pointers)(lispobj[2]),
                             boolean save_culled_values,
@@ -1402,8 +1401,8 @@ cull_weak_hash_table (struct hash_table *hash_table,
     uint32_t *next_vector = get_array_data(hash_table->next_vector,
                                            SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
                                            NULL);
-    lispobj *hash_vector = get_array_data(hash_table->hash_vector,
-                                          SIMPLE_ARRAY_WORD_WIDETAG, NULL);
+    uint32_t *hash_vector = get_array_data(hash_table->hash_vector,
+                                           SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG, NULL);
 
     boolean rehash = 0;
     boolean save_culled_values = (hash_table->flags & MAKE_FIXNUM(4)) != 0;

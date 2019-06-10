@@ -147,21 +147,24 @@
     (t
      (eq-hash key))))
 
-(declaim (inline index-for-hashing))
-(defun index-for-hashing (hash length)
-  (declare (type hash hash length))
+(declaim (inline prefuzz-hash))
+(defun prefuzz-hash (hash)
   ;; We're using power of two tables which obviously are very
   ;; sensitive to the exact values of the low bits in the hash
   ;; value. Do a little shuffling of the value to mix the high bits in
   ;; there too.
-  (truly-the index
-             (logand (1- length)
-                     (+ (logxor #b11100101010001011010100111
-                                hash)
-                        (ash hash -3)
-                        (ash hash -12)
-                        (ash hash -20)))))
-
+  (ldb (byte 31 0)
+       (+ (logxor #b11100101010001011010100111 hash)
+          (ash hash -3)
+          (ash hash -12)
+          (ash hash -20))))
+(declaim (inline mask-hash))
+(defun mask-hash (hash length)
+  (truly-the index (logand (1- length) hash)))
+(declaim (inline pointer-hash->index))
+(defun pointer-hash->index (hash length)
+  (declare (type hash hash length))
+  (truly-the index (logand (1- length) (prefuzz-hash hash))))
 
 ;;;; user-defined hash table tests
 
@@ -439,7 +442,7 @@ Examples:
                    index-vector
                    next-vector
                    (unless (eq test 'eq)
-                     (make-array size+1 :element-type 'word
+                     (make-array size+1 :element-type 'hash-table-index
                                  :initial-element +magic-hash-vector-value+))
                    (logior (if synchronized 2 0) weakness))))
       (declare (type index size+1 scaled-size length))
@@ -510,7 +513,7 @@ multiple threads accessing the same hash-table without locking."
          (new-hash-vector
            (when old-hash-vector
              (make-array new-size
-                         :element-type 'word
+                         :element-type 'hash-table-index
                          :initial-element +magic-hash-vector-value+)))
          (new-index-vector (make-array new-size :element-type 'hash-table-index
                                        :initial-element 0)))
@@ -523,7 +526,7 @@ multiple threads accessing the same hash-table without locking."
   (declare (type hash-table table)
            (type simple-vector new-kv-vector)
            (type (simple-array hash-table-index (*)) new-next-vector new-index-vector)
-           (type (or null (simple-array word (*))) new-hash-vector)
+           (type (or null (simple-array hash-table-index (*))) new-hash-vector)
            (type index new-size))
   (aver *gc-inhibit*)
   (let* ((old-kv-vector (hash-table-table table))
@@ -577,11 +580,9 @@ multiple threads accessing the same hash-table without locking."
                     (not (= (aref new-hash-vector i)
                             +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
-               (let* ((hashing (aref new-hash-vector i))
-                      (index (index-for-hashing hashing new-size))
+               (let* ((index (mask-hash (aref new-hash-vector i) new-size))
                       (next (aref new-index-vector index)))
-                 (declare (type index index)
-                          (type hash hashing))
+                 (declare (type index index))
                  ;; Push this slot into the next chain.
                  (setf (aref new-next-vector i) next)
                  (setf (aref new-index-vector index) i)))
@@ -590,11 +591,9 @@ multiple threads accessing the same hash-table without locking."
                ;; Enable GC tricks.
                (set-header-data new-kv-vector
                                 sb-vm:vector-valid-hashing-subtype)
-               (let* ((hashing (pointer-hash key))
-                      (index (index-for-hashing hashing new-size))
+               (let* ((index (pointer-hash->index (pointer-hash key) new-size))
                       (next (aref new-index-vector index)))
-                 (declare (type index index)
-                          (type hash hashing))
+                 (declare (type index index))
                  ;; Push this slot onto the next chain.
                  (setf (aref new-next-vector i) next)
                  (setf (aref new-index-vector index) i))))))
@@ -645,8 +644,7 @@ multiple threads accessing the same hash-table without locking."
               ((and hash-vector (not (= (aref hash-vector i)
                                         +magic-hash-vector-value+)))
                ;; Can use the existing hash value (not EQ based)
-               (let* ((hashing (aref hash-vector i))
-                      (index (index-for-hashing hashing length))
+               (let* ((index (mask-hash (aref hash-vector i) length))
                       (next (aref index-vector index)))
                  (declare (type index index))
                  ;; Push this slot into the next chain.
@@ -656,11 +654,9 @@ multiple threads accessing the same hash-table without locking."
                ;; EQ-based hash.
                ;; Enable GC tricks.
                (set-header-data kv-vector sb-vm:vector-valid-hashing-subtype)
-               (let* ((hashing (pointer-hash key))
-                      (index (index-for-hashing hashing length))
+               (let* ((index (pointer-hash->index (pointer-hash key) length))
                       (next (aref index-vector index)))
-                 (declare (type index index)
-                          (type hash hashing))
+                 (declare (type index index))
                  ;; Push this slot into the next chain.
                  (setf (aref next-vector i) next)
                  (setf (aref index-vector index) i))))))
@@ -780,12 +776,13 @@ if there is no such entry. Entries can be added using SETF."
                (let ((value (aref table (1+ cache))))
                  (result value t))
                ;; Search for key in the hash table.
-               (multiple-value-bind (hashing eq-based)
+               (multiple-value-bind (hash0 eq-based)
                    (funcall (hash-table-hash-fun hash-table) key)
-                 (declare (type hash hashing))
+                 (declare (type hash hash0))
                  (let* ((index-vector (hash-table-index-vector hash-table))
                         (length (length index-vector))
-                        (index (index-for-hashing hashing length))
+                        (hash (prefuzz-hash hash0))
+                        (index (mask-hash hash length))
                         (next (aref index-vector index))
                         (next-vector (hash-table-next-vector hash-table))
                         (hash-vector (hash-table-hash-vector hash-table))
@@ -809,7 +806,7 @@ if there is no such entry. Entries can be added using SETF."
                          (declare (type index/2 next i))
                          (when (> i length)
                            (overflow))
-                         (when (and (= hashing (aref hash-vector next))
+                         (when (and (= hash (aref hash-vector next))
                                     (funcall test-fun key
                                              (aref table (* 2 next))))
                            ;; Found.
@@ -838,12 +835,13 @@ if there is no such entry. Entries can be added using SETF."
   ;; needed if the key is already present.
   (maybe-rehash hash-table t)
   ;; Search for key in the hash table.
-  (multiple-value-bind (hashing eq-based)
+  (multiple-value-bind (hash0 eq-based)
       (funcall (hash-table-hash-fun hash-table) key)
-    (declare (type hash hashing))
+    (declare (type hash hash0))
     (let* ((index-vector (hash-table-index-vector hash-table))
            (length (length index-vector))
-           (index (index-for-hashing hashing length))
+           (hash (prefuzz-hash hash0))
+           (index (mask-hash hash length))
            (next (aref index-vector index))
            (kv-vector (hash-table-table hash-table))
            (next-vector (hash-table-next-vector hash-table))
@@ -876,7 +874,7 @@ if there is no such entry. Entries can be added using SETF."
                (declare (type index/2 next i))
                (when (> i length)
                  (signal-corrupt-hash-table hash-table))
-               (when (and (= hashing (aref hash-vector next))
+               (when (and (= hash (aref hash-vector next))
                           (funcall test-fun key
                                    (aref kv-vector (* 2 next))))
                  ;; Found, just replace the value.
@@ -894,10 +892,10 @@ if there is no such entry. Entries can be added using SETF."
         (update-hash-table-cache hash-table (* 2 free-kv-slot))
         (setf (aref kv-vector (* 2 free-kv-slot)) key)
         (setf (aref kv-vector (1+ (* 2 free-kv-slot))) value)
-        ;; Setup the hash-vector if necessary.
+        ;; Store the hash if necessary.
         (when hash-vector
           (if (not eq-based)
-              (setf (aref hash-vector free-kv-slot) hashing)
+              (setf (aref hash-vector free-kv-slot) hash)
               (aver (= (aref hash-vector free-kv-slot)
                        +magic-hash-vector-value+))))
         ;; Push this slot into the next chain.
@@ -941,12 +939,13 @@ if there is no such entry. Entries can be added using SETF."
   ;; with no writers.
   (maybe-rehash hash-table nil)
   ;; Search for key in the hash table.
-  (multiple-value-bind (hashing eq-based)
+  (multiple-value-bind (hash0 eq-based)
       (funcall (hash-table-hash-fun hash-table) key)
-    (declare (type hash hashing))
+    (declare (type hash hash0))
     (let* ((index-vector (hash-table-index-vector hash-table))
            (length (length index-vector))
-           (index (index-for-hashing hashing length))
+           (hash (prefuzz-hash hash0))
+           (index (mask-hash hash length))
            (next (aref index-vector index))
            (table (hash-table-table hash-table))
            (next-vector (hash-table-next-vector hash-table))
@@ -977,7 +976,7 @@ if there is no such entry. Entries can be added using SETF."
                nil)
               ((if (or eq-based (not hash-vector))
                    (eq key (aref table (* 2 next)))
-                   (and (= hashing (aref hash-vector next))
+                   (and (= hash (aref hash-vector next))
                         (funcall test-fun key (aref table (* 2 next)))))
                (clear-slot index-vector index next))
               ;; Search next-vector chain for a matching key.
@@ -1001,7 +1000,7 @@ if there is no such entry. Entries can be added using SETF."
                  (declare (type index/2 next))
                  (when (> i length)
                    (signal-corrupt-hash-table hash-table))
-                 (when (and (= hashing (aref hash-vector next))
+                 (when (and (= hash (aref hash-vector next))
                             (funcall test-fun key (aref table (* 2 next))))
                    (return-from %remhash
                      (clear-slot next-vector prior next))))))))))
@@ -1053,6 +1052,7 @@ table itself."
 
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE
 ;;; when reconstructing HASH-TABLE.
+;;; FIXME: synchronized? custom function?
 (defun %hash-table-ctor-args (hash-table)
   `(:test             ',(hash-table-test             hash-table)
     :size             ',(hash-table-size             hash-table)
