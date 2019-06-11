@@ -58,9 +58,6 @@
 /* Magic encoding for the instruction used for traps. */
 #define TRAP_INSTRUCTION(trap) ((3<<26) | (6 << 21) | (trap))
 
-void arch_init() {
-}
-
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {

@@ -28,11 +28,6 @@
 extern int linux_sparc_siginfo_bug;
 #endif
 
-void arch_init(void)
-{
-    return;
-}
-
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
 #if 1 /* New way. */

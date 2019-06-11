@@ -24,11 +24,6 @@
 #include "interr.h"
 #include "breakpoint.h"
 
-void arch_init(void)
-{
-    return;
-}
-
 static inline unsigned int
 os_context_pc(os_context_t *context)
 {

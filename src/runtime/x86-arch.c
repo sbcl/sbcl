@@ -41,9 +41,6 @@
 #define BREAKPOINT_WIDTH 2
 #endif
 
-void arch_init(void)
-{}
-
 #ifndef LISP_FEATURE_WIN32
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)

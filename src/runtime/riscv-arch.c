@@ -23,11 +23,6 @@
 #include "interr.h"
 #include "breakpoint.h"
 
-void arch_init(void)
-{
-    return;
-}
-
 os_vm_address_t
 arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
 {

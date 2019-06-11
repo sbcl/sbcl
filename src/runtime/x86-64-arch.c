@@ -73,7 +73,11 @@ static void xgetbv(unsigned *eax, unsigned *edx)
             : "c" (0));
 }
 
-void arch_init(void)
+#define VECTOR_FILL_T "VECTOR-FILL/T"
+
+// Poke in a byte that changes an opcode to enable faster vector fill.
+// Using fixed offsets and bytes is no worse than what we do elsewhere.
+void tune_asm_routines_for_microarch(void)
 {
     unsigned int eax, ebx, ecx, edx;
 
@@ -93,17 +97,9 @@ void arch_init(void)
             }
         }
     }
-}
-
-#define VECTOR_FILL_T "VECTOR-FILL/T"
-
-// Poke in a byte that changes an opcode to enable faster vector fill.
-// Using fixed offsets and bytes is no worse than what we do elsewhere.
-void tune_asm_routines_for_microarch(void)
-{
+    SetSymbolValue(CPUID_FN1_ECX, (lispobj)make_fixnum(cpuid_fn1_ecx), 0);
     // I don't know if this works on Windows
 #ifndef _MSC_VER
-    unsigned int eax, ebx, ecx, edx;
     cpuid(0, 0, &eax, &ebx, &ecx, &edx);
     if (eax >= 7) {
         cpuid(7, 0, &eax, &ebx, &ecx, &edx);

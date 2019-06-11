@@ -638,15 +638,17 @@ sbcl_main(int argc, char *argv[], char *envp[])
 #endif
     thread_control_stack_size &= ~(sword_t)(CONTROL_STACK_ALIGNMENT_BYTES-1);
 
-    /* KLUDGE: os_vm_page_size is set by os_init(), and on some
-     * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
-     * it must follow os_init(). -- WHN 2000-01-26 */
     os_init(argv, envp);
     if (debug_environment_p) {
         print_environment(argc, argv);
     }
     dyndebug_init();
+#ifdef LISP_FEATURE_ALPHA // When we remove Alpha, this #if can go away
+    /* KLUDGE: os_vm_page_size is set by os_init(), and on some
+     * systems (e.g. Alpha) arch_init() needs need os_vm_page_size, so
+     * it must follow os_init(). -- WHN 2000-01-26 */
     arch_init();
+#endif
     allocate_spaces(have_hardwired_spaces);
     gc_init();
 

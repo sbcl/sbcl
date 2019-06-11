@@ -25,11 +25,6 @@
 #include "monitor.h"
 #include "pseudo-atomic.h"
 
-void arch_init(void)
-{
-    return;
-}
-
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
     return (os_vm_address_t)code->si_addr;

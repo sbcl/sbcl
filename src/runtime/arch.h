@@ -18,7 +18,7 @@
 
 /* Do anything we need to do when starting up the runtime environment
  * on this architecture. */
-extern void arch_init(void);
+extern void arch_init(void); // Most architectures don't have this one
 extern void tune_asm_routines_for_microarch(void);
 extern void untune_asm_routines_for_microarch(void);
 extern void asm_routine_poke(const char*, int, char);

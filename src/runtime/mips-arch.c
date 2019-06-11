@@ -24,12 +24,6 @@
 
 #define INSN_LEN sizeof(unsigned int)
 
-void
-arch_init(void)
-{
-    return;
-}
-
 os_vm_address_t
 arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
 {
