@@ -3210,13 +3210,28 @@ garbage_collect_generation(generation_index_t generation, int raise)
 # endif
             if (!esp || esp == (void*) -1)
                 UNKNOWN_STACK_POINTER_ERROR("garbage_collect", th);
+
+            // Words on the stack which point into the stack are likely
+            // frame pointers or alien or DX object pointers. In any case
+            // there's no need to call preserve_pointer on them since
+            // they definitely don't point to the heap.
+            // See the picture at create_thread_struct() as a reminder.
+            lispobj exclude_from = (lispobj)th->control_stack_start;
+            lispobj exclude_to = (lispobj)th + dynamic_values_bytes;
+
             // This loop would be more naturally expressed as
             //  for (ptr = esp; ptr < th->control_stack_end; ++ptr)
             // However there is a very subtle problem with that: 'esp = &raise'
             // is not necessarily properly aligned to be a stack pointer!
             void **ptr;
             for (ptr = ((void **)th->control_stack_end)-1; ptr >= (void**)esp;  ptr--) {
-                preserve_pointer(*ptr);
+                lispobj word = (lispobj)*ptr;
+                // Also note that we can eliminate small fixnums from consideration
+                // since there is no memory on the 0th page.
+                // (most OSes don't let users map memory there, though they used to).
+                if (word >= BACKEND_PAGE_BYTES &&
+                    !(exclude_from <= word && word < exclude_to))
+                    preserve_pointer(*ptr);
             }
         }
     }
