@@ -494,8 +494,8 @@ new string COUNT long filled with the fill character."
                 (let ((code (aref cases (1+ case-index))))
                   (unless (zerop code)
                     (setf (schar string index)
-                          (code-char (truly-the char-code code))))))))
-          string))))
+                          (code-char (truly-the char-code code)))))))))
+        string)))
 (declaim (notinline nstring-upcase))
 
 (defun string-upcase (string &key (start 0) end)
@@ -530,8 +530,8 @@ new string COUNT long filled with the fill character."
                 (let ((code (aref cases case-index)))
                   (unless (zerop code)
                     (setf (schar string index)
-                          (code-char (truly-the char-code code))))))))
-          string))))
+                          (code-char (truly-the char-code code)))))))))
+        string)))
 (declaim (notinline nstring-downcase))
 
 (defun string-downcase (string &key (start 0) end)
