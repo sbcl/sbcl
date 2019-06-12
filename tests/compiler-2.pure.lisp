@@ -2338,6 +2338,7 @@
    ((0.0) (condition 'type-error))
       ((1d0) 1d0)))
 
+#+sb-unicode
 (with-test (:name :base-char-p-constraint-propagation)
   (assert
    (equal (sb-kernel:%simple-fun-type
