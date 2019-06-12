@@ -695,7 +695,7 @@ is either numeric or alphabetic."
     (cond ((eq c1 c2))
           #-sb-unicode
           (t
-           (base-char-equal-p))
+           (base-char-equal-p c1 c2))
           #+sb-unicode
           ((base-char-p c1)
            (cond ((base-char-p c2)
