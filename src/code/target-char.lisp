@@ -575,7 +575,9 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
   (< (ucd-general-category char) 5))
 
 (defmacro with-case-info ((char index-var cases-var
-                           &key miss-value)
+                           &key miss-value
+                                (cases '**character-cases**)
+                                (case-pages '**character-case-pages**))
                           &body body)
   (let ((code-var (gensym "CODE"))
         (shifted-var (gensym "SHIFTED"))
@@ -587,13 +589,13 @@ argument is an alphabetic character, A-Z or a-z; otherwise NIL."
            (let* ((,shifted-var (ash ,code-var -6))
                   (,page-var (if (>= ,shifted-var (length **character-case-pages**))
                                  (return ,miss-value)
-                                 (aref **character-case-pages** ,shifted-var))))
+                                 (aref ,case-pages ,shifted-var))))
              (if (= ,page-var 255)
                  ,miss-value
                  (let ((,index-var (* (+ (ash ,page-var 6)
                                          (ldb (byte 6 0) ,code-var))
                                       2))
-                       (,cases-var **character-cases**))
+                       (,cases-var ,cases))
                    ,@body))))))))
 
 (defun both-case-p (char)
