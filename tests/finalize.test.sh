@@ -38,6 +38,8 @@ echo //entering finalize.test.sh
 ;; but that isn't part of the contract with stopping. If this test fails,
 ;; try inserting a call to RUN-PENDING-FINALIZERS after this line]
 #+sb-thread (sb-impl::finalizer-thread-stop)
+;; FIXME: turns out, it does fail:
+(sb-kernel:run-pending-finalizers)
 
 (if (= *count* 10000)
     (with-open-file (f "finalize-test-passed" :direction :output)
