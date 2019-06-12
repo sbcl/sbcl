@@ -682,7 +682,7 @@ is either numeric or alphabetic."
 
 (declaim (inline two-arg-char-equal-inline))
 (defun two-arg-char-equal-inline (c1 c2)
-  (flet ((base-char-equal-p ()
+  (flet ((base-char-equal-p (c1 c2)
            (let* ((code1 (char-code c1))
                   (code2 (char-code c2))
                   (sum (logxor code1 code2)))
@@ -698,22 +698,28 @@ is either numeric or alphabetic."
            (base-char-equal-p))
           #+sb-unicode
           ((base-char-p c1)
-           (and (base-char-p c2)
-                (base-char-equal-p)))
+           (cond ((base-char-p c2)
+                  (base-char-equal-p c1 c2))
+                 (t
+                  (the character c2)
+                  nil)))
           #+sb-unicode
           ((base-char-p c2)
            nil)
           #+sb-unicode
           (t
            (with-case-info (c1 index cases)
-             (or (= (aref cases index) (char-code c2)) ;; lower case
-                 (= (aref cases (1+ index)) (char-code c2))))))))
+             (let ((code2 (char-code c2)))
+               (or (= (aref cases index) code2) ;; lower case
+                   (= (aref cases (1+ index)) code2))))))))
 
 ;;; There are transforms on two-arg-char-equal, don't make it inlinable itself.
 (defun two-arg-char-equal (c1 c2)
+  (declare (explicit-check))
   (two-arg-char-equal-inline c1 c2))
 
 (defun two-arg-char-not-equal (c1 c2)
+  (declare (explicit-check))
   (not (two-arg-char-equal-inline c1 c2)))
 
 (macrolet ((def (name test doc)
