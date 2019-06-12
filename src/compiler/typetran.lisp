@@ -201,7 +201,7 @@
   ; (The ATOM predicate is handled separately as (NOT CONS).)
   (define-type-predicate bit-vector-p bit-vector)
   (define-type-predicate characterp character)
-  #+sb-unicode
+  #+(and sb-unicode (not (or x86-64 arm64))) ;; others have a source-transform
   (define-type-predicate base-char-p base-char)
   (define-type-predicate compiled-function-p compiled-function)
   (define-type-predicate complexp complex)
