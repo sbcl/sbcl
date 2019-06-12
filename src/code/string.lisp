@@ -473,24 +473,29 @@ new string COUNT long filled with the fill character."
 (declaim (inline nstring-upcase))
 (defun nstring-upcase (string &key (start 0) end)
   (declare (explicit-check))
-  (declare ((or base-string
-                (array character (*)))
-            string))
-  (with-one-string (string start end)
-    (do ((index start (1+ index))
-         (cases **character-cases**)
-         (case-pages **character-case-pages**))
-        ((>= index end))
-      (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-      (let ((char (schar string index)))
-        (with-case-info (char case-index cases
-                         :cases cases
-                         :case-pages case-pages)
-          (let ((code (aref cases (1+ case-index))))
-            (unless (zerop code)
-              (setf (schar string index)
-                    (code-char (truly-the char-code code))))))))
-    string))
+  (if (typep string '(array nil (*)))
+      (if (zerop (length string))
+          string
+          (data-nil-vector-ref string 0))
+      (locally
+          (declare ((or base-string
+                        (array character (*)))
+                    string))
+        (with-one-string (string start end)
+          (do ((index start (1+ index))
+               (cases **character-cases**)
+               (case-pages **character-case-pages**))
+              ((>= index end))
+            (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+            (let ((char (schar string index)))
+              (with-case-info (char case-index cases
+                               :cases cases
+                               :case-pages case-pages)
+                (let ((code (aref cases (1+ case-index))))
+                  (unless (zerop code)
+                    (setf (schar string index)
+                          (code-char (truly-the char-code code))))))))
+          string))))
 (declaim (notinline nstring-upcase))
 
 (defun string-upcase (string &key (start 0) end)
@@ -501,27 +506,32 @@ new string COUNT long filled with the fill character."
 (declaim (inline nstring-downcase))
 (defun nstring-downcase (string &key (start 0) end)
   (declare (explicit-check))
-  (declare ((or base-string
-                (array character (*)))
-            string))
-  (with-one-string (string start end)
-    (do ((index start (1+ index))
-         (cases **character-cases**)
-         (case-pages **character-case-pages**))
-        ((>= index end))
-      (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-      (let ((char (schar (truly-the (or simple-base-string
-                                        simple-character-string)
-                                    string)
-                         index)))
-        (with-case-info (char case-index cases
-                         :cases cases
-                         :case-pages case-pages)
-          (let ((code (aref cases case-index)))
-            (unless (zerop code)
-              (setf (schar string index)
-                    (code-char (truly-the char-code code))))))))
-    string))
+  (if (typep string '(array nil (*)))
+      (if (zerop (length string))
+          string
+          (data-nil-vector-ref string 0))
+      (locally
+          (declare ((or base-string
+                        (array character (*)))
+                    string))
+        (with-one-string (string start end)
+          (do ((index start (1+ index))
+               (cases **character-cases**)
+               (case-pages **character-case-pages**))
+              ((>= index end))
+            (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+            (let ((char (schar (truly-the (or simple-base-string
+                                              simple-character-string)
+                                          string)
+                               index)))
+              (with-case-info (char case-index cases
+                               :cases cases
+                               :case-pages case-pages)
+                (let ((code (aref cases case-index)))
+                  (unless (zerop code)
+                    (setf (schar string index)
+                          (code-char (truly-the char-code code))))))))
+          string))))
 (declaim (notinline nstring-downcase))
 
 (defun string-downcase (string &key (start 0) end)
