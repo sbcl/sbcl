@@ -1198,6 +1198,77 @@ implementation it is ~S." *!default-package-use-list*)
     (do-packages (package) (push package result))
     result))
 
+;;; Check internal and external symbols, then scan down the list
+;;; of hashtables for inherited symbols.
+(defun %find-symbol (string length package)
+  (declare (simple-string string)
+           (type index length))
+  (let ((hash (compute-symbol-hash string length)))
+    (declare (type hash hash))
+    (with-symbol ((symbol) (package-internal-symbols package) string length hash)
+      (return-from %find-symbol (values symbol :internal)))
+    (with-symbol ((symbol) (package-external-symbols package) string length hash)
+      (return-from %find-symbol (values symbol :external)))
+    (let* ((tables (package-tables package))
+           (n (length tables)))
+      (unless (eql n 0)
+        ;; Try the most-recently-used table, then others.
+        ;; TABLES is treated as circular for this purpose.
+        (let* ((mru (package-mru-table-index package))
+               (start (if (< mru n) mru 0))
+               (i start))
+          (loop
+           (with-symbol ((symbol) (locally (declare (optimize (safety 0)))
+                                    (svref tables i))
+                         string length hash)
+             (setf (package-mru-table-index package) i)
+             (return-from %find-symbol (values symbol :inherited)))
+           (if (< (decf i) 0) (setq i (1- n)))
+           (if (= i start) (return)))))))
+  (values nil nil))
+
+;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
+;;; then create it, special-casing the keyword package.
+;;; If a new symbol is created, its print name will be an array of ELT-TYPE.
+;;; The fasloader always supplies NAME as a (SIMPLE-ARRAY <ELT-TYPE> 1),
+;;; but the reader uses a buffer of CHARACTER, which, based on a flag,
+;;; can be demoted to an array of BASE-CHAR.
+(defun %intern (name length package elt-type ignore-lock)
+  (declare (simple-string name) (index length))
+  (multiple-value-bind (symbol where) (%find-symbol name length package)
+    (if where
+        (values symbol where)
+        ;; Double-checked lock pattern: the common case has the symbol already interned,
+        ;; but in case another thread is interning in parallel we need to check after
+        ;; grabbing the lock.
+        (truly-the
+         (values t t &optional)
+         (with-package-graph ()
+           (setf (values symbol where) (%find-symbol name length package))
+           (if where
+               (values symbol where)
+               (let* ((symbol-name
+                        (logically-readonlyize
+                         (replace (make-string length :element-type elt-type) name)))
+                      ;; optimistically create the symbol
+                      (symbol ; Symbol kind: 1=keyword, 2=other interned
+                        (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))
+                      (table (cond ((eq package *keyword-package*)
+                                    (%set-symbol-value symbol symbol)
+                                    (package-external-symbols package))
+                                   (t
+                                    (package-internal-symbols package)))))
+                 ;; Set the symbol's package before storing it into the package
+                 ;; so that (symbol-package (intern x #<pkg>)) = #<pkg>.
+                 ;; This matters in the case of concurrent INTERN.
+                 (%set-symbol-package symbol package)
+                 (if ignore-lock
+                     (add-symbol table symbol)
+                     (with-single-package-locked-error
+                         (:package package "interning ~A" symbol-name)
+                       (add-symbol table symbol)))
+                 (values symbol nil))))))))
+
 (macrolet ((find/intern (function package-lookup &rest more-args)
              ;; Both %FIND-SYMBOL and %INTERN require a SIMPLE-STRING,
              ;; but accept a LENGTH. Given a non-simple string,
@@ -1259,75 +1330,6 @@ implementation it is ~S." *!default-package-use-list*)
   (defun find-symbol2 (name cell)
     (find/intern %find-symbol ; likewise
                  (if (packagep cell) cell (cached-find-undeleted-package cell)))))
-
-;;; If the symbol named by the first LENGTH characters of NAME doesn't exist,
-;;; then create it, special-casing the keyword package.
-;;; If a new symbol is created, its print name will be an array of ELT-TYPE.
-;;; The fasloader always supplies NAME as a (SIMPLE-ARRAY <ELT-TYPE> 1),
-;;; but the reader uses a buffer of CHARACTER, which, based on a flag,
-;;; can be demoted to an array of BASE-CHAR.
-(defun %intern (name length package elt-type ignore-lock)
-  (declare (simple-string name) (index length))
-  (multiple-value-bind (symbol where) (%find-symbol name length package)
-    (if where
-        (values symbol where)
-        ;; Double-checked lock pattern: the common case has the symbol already interned,
-        ;; but in case another thread is interning in parallel we need to check after
-        ;; grabbing the lock.
-        (with-package-graph ()
-         (setf (values symbol where) (%find-symbol name length package))
-         (if where
-             (values symbol where)
-             (let* ((symbol-name
-                     (logically-readonlyize
-                      (replace (make-string length :element-type elt-type) name)))
-                    ;; optimistically create the symbol
-                    (symbol ; Symbol kind: 1=keyword, 2=other interned
-                     (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))
-                    (table (cond ((eq package *keyword-package*)
-                                  (%set-symbol-value symbol symbol)
-                                  (package-external-symbols package))
-                                 (t
-                                  (package-internal-symbols package)))))
-               ;; Set the symbol's package before storing it into the package
-               ;; so that (symbol-package (intern x #<pkg>)) = #<pkg>.
-               ;; This matters in the case of concurrent INTERN.
-               (%set-symbol-package symbol package)
-               (if ignore-lock
-                   (add-symbol table symbol)
-                   (with-single-package-locked-error
-                       (:package package "interning ~A" symbol-name)
-                     (add-symbol table symbol)))
-               (values symbol nil)))))))
-
-;;; Check internal and external symbols, then scan down the list
-;;; of hashtables for inherited symbols.
-(defun %find-symbol (string length package)
-  (declare (simple-string string)
-           (type index length))
-  (let ((hash (compute-symbol-hash string length)))
-    (declare (type hash hash))
-    (with-symbol ((symbol) (package-internal-symbols package) string length hash)
-      (return-from %find-symbol (values symbol :internal)))
-    (with-symbol ((symbol) (package-external-symbols package) string length hash)
-      (return-from %find-symbol (values symbol :external)))
-    (let* ((tables (package-tables package))
-           (n (length tables)))
-      (unless (eql n 0)
-        ;; Try the most-recently-used table, then others.
-        ;; TABLES is treated as circular for this purpose.
-        (let* ((mru (package-mru-table-index package))
-               (start (if (< mru n) mru 0))
-               (i start))
-          (loop
-             (with-symbol ((symbol) (locally (declare (optimize (safety 0)))
-                                             (svref tables i))
-                           string length hash)
-               (setf (package-mru-table-index package) i)
-               (return-from %find-symbol (values symbol :inherited)))
-             (if (< (decf i) 0) (setq i (1- n)))
-             (if (= i start) (return)))))))
-  (values nil nil))
 
 ;;; Similar to FIND-SYMBOL, but only looks for an external symbol.
 ;;; Return the symbol if found, otherwise 0.
