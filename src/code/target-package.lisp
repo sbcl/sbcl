@@ -1234,7 +1234,7 @@ implementation it is ~S." *!default-package-use-list*)
 ;;; but the reader uses a buffer of CHARACTER, which, based on a flag,
 ;;; can be demoted to an array of BASE-CHAR.
 (defun %intern (name length package elt-type ignore-lock)
-  (declare (simple-string name) (index length))
+  ;; No type declarations, %find-symbol will perform the checks
   (multiple-value-bind (symbol where) (%find-symbol name length package)
     (if where
         (values symbol where)
