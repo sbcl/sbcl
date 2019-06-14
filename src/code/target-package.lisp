@@ -1242,7 +1242,7 @@ implementation it is ~S." *!default-package-use-list*)
         ;; but in case another thread is interning in parallel we need to check after
         ;; grabbing the lock.
         (truly-the
-         (values t t &optional)
+         (values symbol (member :internal :external :inherited nil) &optional)
          (with-package-graph ()
            (setf (values symbol where) (%find-symbol name length package))
            (if where
@@ -1293,9 +1293,7 @@ implementation it is ~S." *!default-package-use-list*)
                             (values name end)
                             (values (subseq name start end)
                                     (- end start)))))
-                (truly-the
-                 (values symbol (member :internal :external :inherited nil))
-                 (,function name length ,package-lookup ,@more-args)))))
+                (,function name length ,package-lookup ,@more-args))))
 
   (defun intern (name &optional (package (sane-package)))
   "Return a symbol in PACKAGE having the specified NAME, creating it
