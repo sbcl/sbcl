@@ -1052,13 +1052,13 @@
               ;; Process in reverse order of ENTRIES.
               ;; See also MAKE-CORE-COMPONENT which does the same thing.
               (decf wordindex 4)
-              (setf (aref constants (+ wordindex 0))
+              (setf (aref constants (+ wordindex sb-vm:simple-fun-name-slot))
                     `(:constant . ,(sb-c::entry-info-name entry))
-                    (aref constants (+ wordindex 1))
+                    (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))
                     `(:constant . ,(sb-c::entry-info-arguments entry))
-                    (aref constants (+ wordindex 2))
+                    (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
                     `(:constant . ,(sb-c::entry-info-form/doc/xrefs entry))
-                    (aref constants (+ wordindex 3))
+                    (aref constants (+ wordindex sb-vm:simple-fun-type-slot))
                     `(:constant . ,(sb-c::entry-info-type entry))))
             (dump-code-object component code-segment code-length fixups file)))
          (fun-index nfuns))

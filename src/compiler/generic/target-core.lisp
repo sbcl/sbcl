@@ -203,10 +203,14 @@
           (let ((fun (%code-entry-point code-obj (decf fun-index)))
                 (w (+ sb-vm:code-constants-offset
                       (* sb-vm:code-slots-per-simple-fun fun-index))))
-            (setf (code-header-ref code-obj (+ w 0)) (entry-info-name entry-info)
-                  (code-header-ref code-obj (+ w 1)) (entry-info-arguments entry-info)
-                  (code-header-ref code-obj (+ w 2)) (entry-info-form/doc/xrefs entry-info)
-                  (code-header-ref code-obj (+ w 3)) (entry-info-type entry-info))
+            (setf (code-header-ref code-obj (+ w sb-vm:simple-fun-name-slot))
+                  (entry-info-name entry-info)
+                  (code-header-ref code-obj (+ w sb-vm:simple-fun-arglist-slot))
+                  (entry-info-arguments entry-info)
+                  (code-header-ref code-obj (+ w sb-vm:simple-fun-info-slot))
+                  (entry-info-form/doc/xrefs entry-info)
+                  (code-header-ref code-obj (+ w sb-vm:simple-fun-type-slot))
+                  (entry-info-type entry-info))
             (note-fun entry-info fun object))))
 
       (push debug-info (core-object-debug-info object))
