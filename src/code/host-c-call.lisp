@@ -126,17 +126,17 @@
            `(null-error ',type)
            nil))
      ((alien (* char)) ,value)
-     (simple-base-string
-      ,(if (c-string-needs-conversion-p type)
-           ;; If the alien type is not ascii-compatible (+SB-UNICODE)
-           ;; or latin-1-compatible (-SB-UNICODE), we need to do
-           ;; external format conversion.
-           `(string-to-c-string ,value
-                                (c-string-external-format ,type))
-           ;; Otherwise we can just pass it uncopied.
-           value))
-     (simple-string
-      (string-to-c-string ,value
-                          (c-string-external-format ,type)))))
+     ;; If the alien type is not ascii-compatible (+SB-UNICODE)
+     ;; or latin-1-compatible (-SB-UNICODE), we need to do
+     ;; external format conversion.
+     ,@(if (c-string-needs-conversion-p type)
+           `((t
+              (string-to-c-string ,value
+                                  (c-string-external-format ,type))))
+           `((simple-base-string
+              ,value)
+             (simple-string
+              (string-to-c-string ,value
+                                  (c-string-external-format ,type)))))))
 
 (/show0 "host-c-call.lisp end of file")
