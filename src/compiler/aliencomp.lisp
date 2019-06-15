@@ -68,6 +68,14 @@
 
 (defknown alien-funcall (alien-value &rest *) *
   (any recursive))
+
+(defknown sb-alien::string-to-c-string (simple-string t) (or (simple-array (unsigned-byte 8) (*))
+                                                             simple-base-string)
+    (movable flushable))
+(defknown sb-alien::c-string-to-string (system-area-pointer t t) simple-string
+    (movable flushable))
+(defknown sb-alien::c-string-external-format * *
+        (movable flushable))
 
 ;;;; cosmetic transforms
 
