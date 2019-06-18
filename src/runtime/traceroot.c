@@ -972,7 +972,7 @@ static struct instance* find_thread(os_thread_t os_thread, lispobj tree)
 struct vector* lisp_thread_name(os_thread_t os_thread)
 {
     static unsigned int hint;
-    lispobj* sym = find_symbol("*ALL-THREADS*", "SB-THREAD", &hint);
+    lispobj* sym = find_symbol("*ALL-THREADS*", find_package("SB-THREAD"), &hint);
     if (sym) {
         struct instance* lisp_thread =
             find_thread(os_thread, ((struct symbol*)sym)->value);
