@@ -165,7 +165,9 @@
                     (inst cmp index bound)
                     (inst jmp :nb error))
                    (t
-                    (inst cmp bound index)
+                    (if (eql index 0)
+                        (inst test bound bound)
+                        (inst cmp bound index))
                     (inst jmp :be error))))))))
 (define-vop (check-bound/fast check-bound)
   (:policy :fast)
