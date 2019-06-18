@@ -662,8 +662,8 @@
     (assert (= count 1))))
 
 (with-test (:name :properly-tagged-p-internal)
-  ;; OPEN uses a boatload of simple-funs (~19) due to all its restarts and whatnot
-  (let* ((code (sb-kernel:fun-code-header #'open))
+  ;; Pick a code component that has a ton of restarts.
+  (let* ((code (sb-kernel:fun-code-header #'sb-impl::update-package-with-variance))
          (n (sb-kernel:code-n-entries code)))
     (sb-sys:with-pinned-objects (code)
       (let* ((base (logandc2 (sb-kernel:get-lisp-obj-address code)
