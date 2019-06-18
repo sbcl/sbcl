@@ -22,39 +22,10 @@
 
 ;;;; Check that we get debug arglists right.
 
-;;; FIXME: This should use some get-argslist like functionality that
-;;; we actually export.
-;;;
-;;; Return the debug arglist of the function object FUN as a list, or
-;;; punt with :UNKNOWN.
-(defun get-arglist (fun)
-  (declare (type function fun))
-  ;; The Lisp-level type FUNCTION can conceal a multitude of sins..
-  (case (sb-kernel:widetag-of fun)
-    (#.sb-vm:simple-fun-widetag
-      (sb-kernel:%simple-fun-arglist fun))
-    (#.sb-vm:closure-widetag
-     (get-arglist (sb-kernel:%closure-fun fun)))
-    ;; In code/describe.lisp, ll. 227 (%describe-fun), we use a scheme
-    ;; like above, and it seems to work. -- MNA 2001-06-12
-    ;;
-    ;; (There might be other cases with arglist info also.
-    ;; SIMPLE-FUN-WIDETAG and CLOSURE-WIDETAG just
-    ;; happen to be the two case that I had my nose rubbed in when
-    ;; debugging a GC problem caused by applying %SIMPLE-FUN-ARGLIST to
-    ;; a closure. -- WHN 2001-06-05)
-    (t
-     ;; FIXME: what about #+sb-fasteval ?
-     #+sb-eval
-     (if (typep fun 'sb-eval::interpreted-function)
-         (sb-eval::interpreted-function-lambda-list fun)
-         :unknown)
-     #-sb-eval
-     :unknown)))
-
 (defun zoop (zeep &key beep)
+  (declare (ignore zeep beep) (special blurp))
   blurp)
-(assert (equal (get-arglist #'zoop) '(zeep &key beep)))
+(assert (equal (sb-kernel:%fun-lambda-list #'zoop) '(zeep &key beep)))
 
 ;;; Check some predefined functions too.
 ;;;
@@ -63,17 +34,18 @@
 ;;; whatever. But we do know the general structure that a correct
 ;;; answer should have, so we can safely do a lot of checks.)
 (with-test (:name :predefined-functions-1)
-  (destructuring-bind (object-sym &optional-sym stream-sym) (get-arglist #'print)
+  (destructuring-bind (object-sym andoptional-sym stream-sym)
+      (sb-kernel:%fun-lambda-list #'print)
     (assert (symbolp object-sym))
-    (assert (eql &optional-sym '&optional))
+    (assert (eql andoptional-sym '&optional))
     (assert (symbolp stream-sym))))
 
 (with-test (:name :predefined-functions-2)
-  (destructuring-bind (dest-sym control-sym &rest-sym format-args-sym)
-      (get-arglist #'format)
+  (destructuring-bind (dest-sym control-sym andrest-sym format-args-sym)
+      (sb-kernel:%fun-lambda-list #'format)
     (assert (symbolp dest-sym))
     (assert (symbolp control-sym))
-    (assert (eql &rest-sym '&rest))
+    (assert (eql andrest-sym '&rest))
     (assert (symbolp format-args-sym))))
 
 ;;;; test TRACE
@@ -133,6 +105,9 @@
 (with-test (:name (trace fmakunbound :bug-667657))
   (trace trace-and-fmakunbound-this)
   (fmakunbound 'trace-and-fmakunbound-this)
+  ;; FIXME: this generates a pointless warning that we can't untrace a formerly
+  ;; traced function. Function redefinition knows to untrace/re-trace because of
+  ;; the setf-fdefn hook. fmakunbound can do something similar - drop the trace.
   (untrace)
   (assert (not (trace))))
 
@@ -152,8 +127,10 @@
 (with-test (:name :bug-414)
   (handler-bind ((warning #'error))
     (with-scratch-file (output "fasl")
-      (load (compile-file "bug-414.lisp" :output-file output)))
-    (disassemble 'bug-414)))
+      (load (compile-file "bug-414.lisp" :output-file output
+                                         :verbose nil :print nil)))
+    (with-output-to-string (s)
+      (disassemble 'bug-414 :stream s))))
 
 ;; A known function can be stored as a code constant in lieu of the
 ;; usual mode of storing an #<fdefn> and looking up the function from it.
