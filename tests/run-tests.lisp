@@ -143,6 +143,7 @@
                 (= (mismatch string "/dev/") 5) ; dev/null and dev/random
                 (= (mismatch string "/tmp/") 5)
                 (= (mismatch string "/var/tmp/") 9)
+                (eql (search "/private/var/folders/" string) 0)
                 (member (stem-of filename) '("compiler-test-util.lisp"
                                              "no-such-file")
                         :test #'string=)
