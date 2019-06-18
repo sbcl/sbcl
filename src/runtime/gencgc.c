@@ -3059,7 +3059,7 @@ move_pinned_pages_to_newspace()
 
 /* Garbage collect a generation. If raise is 0 then the remains of the
  * generation are not raised to the next generation. */
-static void NO_SANITIZE_ADDRESS
+static void NO_SANITIZE_ADDRESS NO_SANITIZE_MEMORY
 garbage_collect_generation(generation_index_t generation, int raise)
 {
     page_index_t i;
@@ -3231,7 +3231,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
                 // (most OSes don't let users map memory there, though they used to).
                 if (word >= BACKEND_PAGE_BYTES &&
                     !(exclude_from <= word && word < exclude_to))
-                    preserve_pointer(*ptr);
+                    preserve_pointer((void*)word);
             }
         }
     }
