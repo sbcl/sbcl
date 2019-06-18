@@ -215,7 +215,8 @@
     (dolist (slotd current-slotds)
       (when (and (eq (slot-definition-allocation slotd) :instance)
                  (not (member (slot-definition-name slotd) previous-slotds
-                              :key #'slot-definition-name)))
+                              :key #'slot-definition-name
+                              :test #'eq)))
         (push (slot-definition-name slotd) added-slots)))
     (when initargs
       (let ((call-list (list (list* 'update-instance-for-different-class previous current initargs)
