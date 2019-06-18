@@ -23,6 +23,9 @@
   "tests/symbol-macrolet-test.lisp")
  ("debug.impure.lisp" "tests/bug-414.lisp")
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
+ ("filesys.pure.lisp"
+  "tests/a.txt"
+  "tests/b.lisp")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
   "tests/custom-sysinit.lisp"
