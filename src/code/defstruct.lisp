@@ -792,8 +792,8 @@ unless :NAMED is also specified.")))
                               :key #'dsd-name
                               :test #'string=)))
         (if included?
-          (%program-error "slot name ~s duplicated via included ~a" 
-                          name 
+          (%program-error "slot name ~s duplicated via included ~a"
+                          name
                           (dd-name parent))
           (%program-error "duplicate slot name ~S" name))))
 
