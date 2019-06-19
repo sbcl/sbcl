@@ -52,15 +52,10 @@
     #.(sb-thread:make-mutex :name "Package Graph Lock"))
 
 (defmacro with-package-graph ((&key) &body forms)
-  `(flet ((thunk () ,@forms))
-     (declare (dynamic-extent #'thunk))
-     (call-with-package-graph #'thunk)))
-(defun call-with-package-graph (function)
-  (declare (function function))
   ;; FIXME: Since name conflicts can be signalled while holding the
   ;; mutex, user code can be run leading to lock ordering problems.
-  (sb-thread:with-recursive-lock (*package-graph-lock*)
-    (funcall function)))
+  `(sb-thread:with-recursive-lock (*package-graph-lock*)
+     ,@forms))
 
 ;;; a map from package names to packages
 (define-load-time-global *package-names* nil)
@@ -1241,33 +1236,31 @@ implementation it is ~S." *!default-package-use-list*)
         ;; Double-checked lock pattern: the common case has the symbol already interned,
         ;; but in case another thread is interning in parallel we need to check after
         ;; grabbing the lock.
-        (truly-the
-         (values symbol (member :internal :external :inherited nil) &optional)
-         (with-package-graph ()
-           (setf (values symbol where) (%find-symbol name length package))
-           (if where
-               (values symbol where)
-               (let* ((symbol-name
-                        (logically-readonlyize
-                         (replace (make-string length :element-type elt-type) name)))
-                      ;; optimistically create the symbol
-                      (symbol ; Symbol kind: 1=keyword, 2=other interned
-                        (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))
-                      (table (cond ((eq package *keyword-package*)
-                                    (%set-symbol-value symbol symbol)
-                                    (package-external-symbols package))
-                                   (t
-                                    (package-internal-symbols package)))))
-                 ;; Set the symbol's package before storing it into the package
-                 ;; so that (symbol-package (intern x #<pkg>)) = #<pkg>.
-                 ;; This matters in the case of concurrent INTERN.
-                 (%set-symbol-package symbol package)
-                 (if ignore-lock
-                     (add-symbol table symbol)
-                     (with-single-package-locked-error
-                         (:package package "interning ~A" symbol-name)
-                       (add-symbol table symbol)))
-                 (values symbol nil))))))))
+        (with-package-graph ()
+          (setf (values symbol where) (%find-symbol name length package))
+          (if where
+              (values symbol where)
+              (let* ((symbol-name
+                       (logically-readonlyize
+                        (replace (make-string length :element-type elt-type) name)))
+                     ;; optimistically create the symbol
+                     (symbol ; Symbol kind: 1=keyword, 2=other interned
+                       (%make-symbol (if (eq package *keyword-package*) 1 2) symbol-name))
+                     (table (cond ((eq package *keyword-package*)
+                                   (%set-symbol-value symbol symbol)
+                                   (package-external-symbols package))
+                                  (t
+                                   (package-internal-symbols package)))))
+                ;; Set the symbol's package before storing it into the package
+                ;; so that (symbol-package (intern x #<pkg>)) = #<pkg>.
+                ;; This matters in the case of concurrent INTERN.
+                (%set-symbol-package symbol package)
+                (if ignore-lock
+                    (add-symbol table symbol)
+                    (with-single-package-locked-error
+                        (:package package "interning ~A" symbol-name)
+                      (add-symbol table symbol)))
+                (values symbol nil)))))))
 
 (macrolet ((find/intern (function package-lookup &rest more-args)
              ;; Both %FIND-SYMBOL and %INTERN require a SIMPLE-STRING,
