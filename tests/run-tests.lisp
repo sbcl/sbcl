@@ -121,6 +121,23 @@
 ;;; because then we'd have to keep track of directory changes, when this is
 ;;; only a bare minimum of effort to make sure that the manifest stays in
 ;;; sync with reality for people who run tests in the ordinary way.
+;;;
+;;; If *allowed-inputs* is :ANY, then we at worst print a note, and don't
+;;; signal an error.  This was the simplest way I could imagine to get tests
+;;; to pass when truenames don't match source file names, as long as declared
+;;; input filtering has already happened.
+;;; If you're using something like https://bazel.build/ then it provides
+;;; the sandboxing, and the program under test shouldn't try to add another layer.
+;;; e.g. if you have two worker nodes, one of them is in a file tree which for
+;;; purposes of a test contains only the files named "run-tests.lisp" and
+;;; "foo.pure.lisp", and the other has only "run-tests.lisp" and "bar.pure.lisp",
+;;; - and perhaps they share storage - such that all of the files
+;;; are actually links:
+;;;   run-tests.lisp -> /blah/xyz12431/c984
+;;;   foo.pure.lisp  -> /blah/zyz23431/c134
+;;;   bar.pure.lisp  -> /blah/fr0bbotz/2344
+;;; then everything that the code below tries to do to determine acceptability
+;;; of filenames in pretty much broken.
 (defun check-manifest (filename)
   ;; We might see:
   ;;  - "data/compile-file-pos.lisp" or
@@ -145,20 +162,25 @@
                 (= (mismatch string "/var/tmp/") 9)
                 (eql (search "/private/var/folders/" string) 0)
                 (member (stem-of filename) '("compiler-test-util.lisp"
+                                             "a.txt" "b.lisp"
                                              "no-such-file")
                         :test #'string=)
                 (string= (pathname-name filename) "i-am-not") ; any extension
                 (and (boundp '*allowed-inputs*)
+                     (listp *allowed-inputs*)
                      (find filename *allowed-inputs* :test #'stem=)))
         (return-from check-manifest)))
-    (error "Missing input file in manifest: ~S~%" filename)))
+    (if (and (boundp '*allowed-inputs*) (eq *allowed-inputs* :any))
+        (format *error-output* "~&Assumed valid input file: ~S" filename)
+        (error "Missing input file in manifest: ~S~%" filename))))
 
 (defun pure-runner (files test-fun log)
   (unless files
     (return-from pure-runner))
   (unless (boundp '*input-manifest*)
-    (with-open-file (manifest "input-manifest.lisp-expr")
-      (setf *input-manifest* (read manifest))))
+    (with-open-file (manifest "input-manifest.lisp-expr" :if-does-not-exist nil)
+      (setf *input-manifest*
+            (if manifest (read manifest) :ignore))))
   (format t "// Running pure tests (~a)~%" test-fun)
   (let ((*failures* nil)
         ;; in case somebody corrupts CL-USER's use list, of course
@@ -177,10 +199,12 @@
                    :use (append packages-to-use standard-use-list))
                   (find-package "CL-USER")))
              (*allowed-inputs*
-              (append (cdr (assoc (namestring (make-pathname :name (pathname-name file)
-                                                             :type (pathname-type file)))
-                                  *input-manifest* :test #'string=))
-                      (list file))))
+              (if (eq *input-manifest* :ignore)
+                  :any
+                  (append (cdr (assoc (namestring (make-pathname :name (pathname-name file)
+                                                                 :type (pathname-type file)))
+                                      *input-manifest* :test #'string=))
+                          (list file)))))
         (sb-int:encapsulate
          'open 'open-guard
          (lambda (f filename &rest args &key direction &allow-other-keys)

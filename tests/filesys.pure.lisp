@@ -73,6 +73,8 @@
                          (directory "*/")))))
 
 (with-test (:name (directory *default-pathname-defaults* :bug-1740563))
+  ;; FIXME: this writes into the source directory depending on whether
+  ;; TEST_DIRECTORY has been made to point elsewhere or not.
   (let ((test-directory (concatenate 'string (sb-ext:posix-getenv "TEST_DIRECTORY") "/")))
     (ensure-directories-exist test-directory)
     (close (open (merge-pathnames "a.txt" test-directory) :if-does-not-exist :create))
