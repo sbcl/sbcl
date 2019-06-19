@@ -19,6 +19,11 @@ use_test_subdirectory
 
 tmpscript=$TEST_FILESTEM.lisp-script
 
+# Since we execute shell scripts with "set -u" by default
+# (as performed in "subr.sh") this would correctly exit with
+# an error if SBCL_MACHINE_TYPE were unset.
+# test-util.lisp performs the setenv.
+
 # bug 881445
 case "$SBCL_MACHINE_TYPE" in
     X86-64)

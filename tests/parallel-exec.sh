@@ -7,14 +7,20 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
 (let ((*evaluator-mode* :compile))
   (with-compilation-unit () (load"run-tests")))
 (in-package run-tests)
+(import '(sb-alien:alien-funcall sb-alien:extern-alien
+          sb-alien:int sb-alien:c-string sb-alien:unsigned))
 (setq *summarize-test-times* t)
 (defun parallel-execute-tests (max-jobs)
   (format t "Using ~D processes~%" max-jobs)
-  (let ((files (mapcar #'pathname-name
-                       (append (pure-load-files)
-                               (pure-cload-files)
-                               (impure-load-files)
-                               (impure-cload-files))))
+  ;; Interleave the order in which all tests are launched rather than
+  ;; starting them in the batches that filtering places them in.
+  (let ((files (sort (mapcar #'pathname-name
+                             (append (pure-load-files)
+                                     (pure-cload-files)
+                                     (impure-load-files)
+                                     (impure-cload-files)
+                                     (sh-files)))
+                     #'string<))
         (subprocess-count 0)
         (subprocess-list nil)
         (losing))
@@ -37,16 +43,25 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
           (when (zerop pid)
             (with-open-file (stream (format nil "/var/tmp/sbcl-test-logs/~a" file)
                                     :direction :output :if-exists :supersede)
-              sb-alien::(alien-funcall (extern-alien "dup2" (function int int int))
-                                       (sb-sys:fd-stream-fd stream) 1)
-              sb-alien::(alien-funcall (extern-alien "dup2" (function int int int)) 1 2))
+              (alien-funcall (extern-alien "dup2" (function int int int))
+                             (sb-sys:fd-stream-fd stream) 1)
+              (alien-funcall (extern-alien "dup2" (function int int int)) 1 2))
             ;; Send this to the log file, not the terminal
             (setq *debug-io* (make-two-way-stream (make-concatenated-stream)
                                                   *error-output*))
-            (pure-runner (list (concatenate 'string file ".lisp"))
-                         (if (search "-cload" file) 'cload-test 'load-test)
-                         (make-broadcast-stream))
-            (exit :code (if (unexpected-failures) 1 104)))
+            (cond ((string= (pathname-type file) "test")
+                   ;; exec /bin/sh with the test and we'll pick up its exit code
+                   (alien-funcall (extern-alien "execl" (function int c-string c-string
+                                                                  c-string unsigned))
+                                  "/bin/sh" "/bin/sh"
+                                  (concatenate 'string file ".sh") 0)
+                   ;; if exec fails, just exit with a wrong (not 104) status
+                   (alien-funcall (extern-alien "_exit" (function void int)) 0))
+                  (t
+                   (pure-runner (list (concatenate 'string file ".lisp"))
+                                (if (search "-cload" file) 'cload-test 'load-test)
+                                (make-broadcast-stream))
+                   (exit :code (if (unexpected-failures) 1 104)))))
           (format t "~A: pid ~d~%" file pid)
           (incf subprocess-count)
           (push (cons pid file) subprocess-list)))
