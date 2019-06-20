@@ -188,13 +188,3 @@ by ALLOW-WITH-INTERRUPTS."
   (declare (ignore body))
   (error "~S is valid only inside ~S."
          'with-local-interrupts 'without-interrupts))
-
-;;; A low-level operation that assumes that *INTERRUPTS-ENABLED* is
-;;; false, *ALLOW-WITH-INTERRUPTS* is true and deferrable signals are
-;;; unblocked.
-(defun %check-interrupts ()
-  ;; Here we check for pending interrupts first, because reading a
-  ;; special is faster then binding it!
-  (when (or *interrupt-pending* #+sb-thruption *thruption-pending*)
-    (let ((*interrupts-enabled* t))
-      (receive-pending-interrupt))))
