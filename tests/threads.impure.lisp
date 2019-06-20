@@ -642,7 +642,7 @@
 (with-test (:name :all-threads-have-abort-restart
                   :broken-on :win32)
   (loop repeat 100 do
-        (let ((thread (make-kill-thread (lambda () (sleep 0.1)))))
+        (let ((thread (make-kill-thread (lambda () (sleep 100000000)))))
           (interrupt-thread thread (lambda ()
                                      (assert (find-restart 'abort))))
           (process-all-interrupts thread))))
