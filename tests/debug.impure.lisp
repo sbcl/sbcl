@@ -638,7 +638,8 @@
          '(error))))
     (assert (= count 1))))
 
-(with-test (:name :properly-tagged-p-internal)
+(with-test (:name :properly-tagged-p-internal
+            :fails-on (not (or :x86 :x86-64)))
   ;; Pick a code component that has a ton of restarts.
   (let* ((code (sb-kernel:fun-code-header #'sb-impl::update-package-with-variance))
          (n (sb-kernel:code-n-entries code)))
