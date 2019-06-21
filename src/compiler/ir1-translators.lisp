@@ -1298,8 +1298,7 @@ due to normal completion or a non-local exit such as THROW)."
    start next result
    (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
      `(flet ((,cleanup-fun ()
-               ,@cleanup
-               (values)))
+               ,@cleanup))
         ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
         ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
         ;; and something can be done to make %ESCAPE-FUN have

@@ -65,3 +65,11 @@
                         (setf (aref v 0) (aref v 1))))
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
+
+(test-util:with-test (:name :uwp-cleanup-tail-call)
+  (destructuring-bind (combination)
+      (ir-full-calls `(lambda ()
+                        (unwind-protect 10
+                          (terpri))))
+    (assert (eql (combination-fun-debug-name combination) 'terpri))
+    (assert (node-tail-p combination))))
