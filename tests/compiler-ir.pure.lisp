@@ -66,10 +66,13 @@
                     :key (lambda (x) (combination-fun-source-name x nil)))
              1)))
 
-(test-util:with-test (:name :uwp-cleanup-tail-call)
+(test-util:with-test (:name :local-call-tail-call)
   (destructuring-bind (combination)
       (ir-full-calls `(lambda ()
-                        (unwind-protect 10
-                          (terpri))))
+                        (flet ((x ()
+                                 (terpri)))
+                          (declare (notinline x))
+                          (x)
+                          10)))
     (assert (eql (combination-fun-debug-name combination) 'terpri))
     (assert (node-tail-p combination))))
