@@ -74,7 +74,7 @@ echo //checking for leftover cold-init symbols
                              (sb-kernel:fdefn-name obj)))))
              (push obj l2)))
          :all)
-        (format t "Found ~D:~%~S~%" (length l1) l1)
+        (when l1 (format t "Found ~D:~%~S~%" (length l1) l1))
         (sb-int:awhen
           (mapcan (quote apropos-list)
            (quote ("DEFINE-INFO-TYPE" "LVAR-TYPE-USING"
@@ -85,7 +85,8 @@ echo //checking for leftover cold-init symbols
                    "SHIFT-RIGHT-UNALIGNED"
                    "STRING-LESS-GREATER-EQUAL-TESTS")))
          (format t "~&Leftover from [disabled?] tree-shaker:~%~S~%" sb-int:it))
-        (format t "Found ~D fdefns named by uninterned symbols:~%~S~%" (length l2) l2))
+        (when l2 
+           (format t "Found ~D fdefns named by uninterned symbols:~%~S~%" (length l2) l2)))
     (abort-build ()
       :report "Abort building SBCL."
       (sb-ext:exit :code 1)))' --quit

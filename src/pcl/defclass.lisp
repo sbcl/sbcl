@@ -430,14 +430,8 @@
 (defun !bootstrap-set-slot (type object slot-name new-value)
   (setf (!bootstrap-get-slot type object slot-name) new-value))
 
-(defun early-class-name (class)
-  (!bootstrap-get-slot 'class class 'name))
-
 (defun early-class-precedence-list (class)
   (!bootstrap-get-slot 'pcl-class class '%class-precedence-list))
-
-(defun early-class-name-of (instance)
-  (early-class-name (class-of instance)))
 
 (defun early-class-slotds (class)
   (!bootstrap-get-slot 'slot-class class 'slots))
@@ -450,14 +444,6 @@
 
 (defun early-slot-definition-info (slotd)
   (!bootstrap-get-slot 'standard-effective-slot-definition slotd 'info))
-
-(defun early-accessor-method-slot-name (method)
-  (!bootstrap-get-slot 'standard-accessor-method method 'slot-name))
-
-(unless (fboundp 'class-name-of)
-  (setf (symbol-function 'class-name-of)
-        (symbol-function 'early-class-name-of)))
-(unintern 'early-class-name-of)
 
 (defun early-class-direct-subclasses (class)
   (!bootstrap-get-slot 'class class 'direct-subclasses))
