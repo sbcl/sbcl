@@ -56,7 +56,7 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
                                   "/bin/sh" "/bin/sh"
                                   (concatenate 'string file ".sh") 0)
                    ;; if exec fails, just exit with a wrong (not 104) status
-                   (alien-funcall (extern-alien "_exit" (function void int)) 0))
+                   (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
                    (pure-runner (list (concatenate 'string file ".lisp"))
                                 (if (search "-cload" file) 'cload-test 'load-test)
