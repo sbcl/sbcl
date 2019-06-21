@@ -21,7 +21,6 @@
   (let ((funs (component-lambdas component)))
     (dolist (fun funs)
       (assign-ir2-physenv fun)
-      (assign-return-locations fun)
       (assign-ir2-nlx-info fun)
       (assign-lambda-var-tns fun nil)
       (dolist (let (lambda-lets fun))
@@ -136,11 +135,20 @@
             (dolist (ref (leaf-refs fun))
               (let* ((lvar (node-lvar ref))
                      (dest (and lvar (lvar-dest lvar))))
-                (when (and (basic-combination-p dest)
-                           (not (node-tail-p dest))
-                           (eq (basic-combination-fun dest) lvar)
-                           (eq (basic-combination-kind dest) :local))
-                  (return-from punt nil)))))))))
+                (flet ((all-returns-tail-calls-p (call)
+                         (let* ((lambda (combination-lambda call))
+                                (return (lambda-return lambda)))
+                           (when return
+                             (do-uses (node (return-result return) t)
+                               (unless (and (basic-combination-p node)
+                                            (eq (basic-combination-info node) :full))
+                                 (return)))))))
+                 (when (and (basic-combination-p dest)
+                            (not (node-tail-p dest))
+                            (eq (basic-combination-fun dest) lvar)
+                            (eq (basic-combination-kind dest) :local)
+                            (not (all-returns-tail-calls-p dest)))
+                   (return-from punt nil))))))))))
 
 ;;; If policy indicates, give an efficiency note about our inability to
 ;;; use the known return convention. We try to find a function in the
