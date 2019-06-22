@@ -99,9 +99,16 @@
 (def!type layout-clos-hash () `(integer 0 ,layout-clos-hash-limit))
 (declaim (ftype (sfunction () layout-clos-hash) random-layout-clos-hash))
 
-(defconstant +structure-layout-flag+  #b001)
-(defconstant +pcl-object-layout-flag+ #b010)
-(defconstant +condition-layout-flag+  #b100)
+;;; Careful here: if you add more bits, then adjust the bit packing for
+;;; 64-bit layouts which also store LENGTH + DEPTHOID in the same word.
+;;; When testing these, you usually want to use LAYOUT-%BITS rather than
+;;; LAYOUT-FLAGS, because the compiler will stupidly "unpack" the
+;;; flags by masking out the stuff that aren't the "bits" and then
+;;; mask again.
+(defconstant +structure-layout-flag+  #b0001)
+(defconstant +pcl-object-layout-flag+ #b0010)
+(defconstant +condition-layout-flag+  #b0100)
+(defconstant +pathname-layout-flag+   #b1000) ; ORed with structure-layout-flag
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
@@ -502,3 +509,13 @@
 (define-info-type (:function :type)
   :type-spec (or ctype (cons (eql function)) (member :generic-function))
   :default #'ftype-from-fdefn)
+
+(defun summarize-layouts ()
+  (let ((prev -1))
+    (dolist (layout (sort (sb-vm::list-allocated-objects :all :test #'sb-kernel::layout-p)
+                          #'< :key #'sb-kernel::layout-flags))
+      (let ((flags (sb-kernel::layout-flags layout)))
+        (unless (= flags prev)
+          (format t "Layout flags = ~d~%" flags)
+          (setq prev flags)))
+      (format t "  ~a~%" layout))))

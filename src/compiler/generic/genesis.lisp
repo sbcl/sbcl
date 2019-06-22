@@ -2345,6 +2345,8 @@ core and return a descriptor to it."
           (if (eq name 'condition) +condition-layout-flag+ flags)))
     (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
+    (when (member name '(pathname logical-pathname))
+      (setf flags (logior flags sb-kernel::+pathname-layout-flag+)))
     (if existing-layout
         ;; If a layout of this name has been defined already, then
         ;; enforce consistency between the existing and current definition,
