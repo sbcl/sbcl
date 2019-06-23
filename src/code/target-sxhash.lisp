@@ -347,8 +347,8 @@
                (symbol (sxhash x)) ; through DEFTRANSFORM
                (fixnum (sxhash x)) ; through DEFTRANSFORM
                (instance
-                (typecase x
-                  (pathname
+                (case (layout-flags (%instance-layout x))
+                  (#.(logior +pathname-layout-flag+ +structure-layout-flag+)
                    ;; Pathnames are EQUAL if all the components are EQUAL, so
                    ;; we hash all of the components of a pathname together.
                    (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
@@ -362,22 +362,14 @@
                                                       nil
                                                       version)
                                                   depthoid)))))
-                  (layout
-                   ;; LAYOUTs have an easily-accesible hash value: we
-                   ;; might as well use it.  It's not actually uniform
-                   ;; over the space of hash values (it excludes 0 and
-                   ;; some of the larger numbers) but it's better than
-                   ;; simply returning the same value for all LAYOUT
-                   ;; objects, as the next branch would do.
-                   (layout-clos-hash x))
-                  (structure-object
-                   (logxor 422371266
-                           ;; FIXME: why not (LAYOUT-CLOS-HASH ...) ?
-                           (sxhash      ; through DEFTRANSFORM
-                            (classoid-name
-                             (layout-classoid (%instance-layout x))))))
-                  (condition (!condition-hash x))
-                  (t (std-instance-hash x))))
+                  (#.+structure-layout-flag+
+                   (typecase x
+                     (layout (layout-clos-hash x))
+                     (t (logxor 422371266
+                                (layout-clos-hash (%instance-layout x))))))
+                  (#.+condition-layout-flag+ (!condition-hash x))
+                  (#.+pcl-object-layout-flag+ (std-instance-hash x))
+                  (t 0))) ; can't get here
                (array
                 (typecase x
                   ;; If we could do something smart for widetag-based jump tables,
