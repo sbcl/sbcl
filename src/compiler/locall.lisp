@@ -577,7 +577,8 @@
   (with-ir1-environment-from-node node
     (transform-call node lambda
                     (or (combination-fun-source-name node nil)
-                        default-name))))
+                        default-name)
+                    nil)))
 
 (defun warn-invalid-local-call (node count &rest warn-arguments)
   (declare (notinline warn)) ; See COMPILER-WARN for rationale

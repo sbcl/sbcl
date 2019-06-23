@@ -2349,3 +2349,15 @@
                   (characterp x)
                   t))))
           '(function (t) (values (member t) &optional)))))
+
+(declaim (inline inline-fun-arg-mismatch))
+(defun inline-fun-arg-mismatch (x)
+  (declare (optimize (debug 0)))
+  x)
+
+(with-test (:name :inline-fun-arg-mismatch)
+  (checked-compile-and-assert
+      (:allow-warnings 'sb-int:local-argument-mismatch)
+      '(lambda ()
+        (multiple-value-call #'inline-fun-arg-mismatch 1 2))
+    (() (condition 'program-error))))
