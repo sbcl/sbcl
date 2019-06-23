@@ -4,6 +4,33 @@
 (use-package "SB-THREAD")
 (use-package "SB-SYS")
 
+(defun is-address-sensitive (tbl)
+  (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-table tbl))))
+    (= data sb-vm:vector-valid-hashing-subtype)))
+
+(with-test (:name (hash-table :eql-hash-symbol-not-eq-based))
+  ;; If you ask for #'EQ as the test, then everything is address-sensitive,
+  ;; though this is not technically a requirement.
+  (let ((ht (make-hash-table :test 'eq)))
+    (setf (gethash (make-symbol "GOO") ht) 1)
+    (assert (is-address-sensitive ht)))
+  (dolist (test '(eql equal equalp))
+    (let ((ht (make-hash-table :test test)))
+      (setf (gethash (make-symbol "GOO") ht) 1)
+      (assert (not (is-address-sensitive ht))))))
+
+(defclass ship () ())
+
+(with-test (:name (hash-table :equal-hash-std-object-not-eq-based))
+  (dolist (test '(eq eql))
+    (let ((ht (make-hash-table :test test)))
+      (setf (gethash (make-instance 'ship) ht) 1)
+      (assert (is-address-sensitive ht))))
+  (dolist (test '(equal equalp))
+    (let ((ht (make-hash-table :test test)))
+      (setf (gethash (make-instance 'ship) ht) 1)
+      (assert (not (is-address-sensitive ht))))))
+
 (defvar *errors* nil)
 
 (defun oops (e)

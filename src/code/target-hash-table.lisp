@@ -109,23 +109,16 @@
 #-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
   (declare (values hash (member t nil)))
+  ;; I think it would be ok to pick off SYMBOL here and use its hash slot
+  ;; as far as semantics are concerned, but EQ-hash is supposed to be
+  ;; the lightest-weight in terms of speed, so I'm letting everything use
+  ;; address-based hashing, unlike the other standard hash-table hash functions
+  ;; which try use the hash slot of certain objects.
   (values (pointer-hash key)
           (sb-vm:is-lisp-pointer (get-lisp-obj-address key))))
 
-#-sb-fluid (declaim (inline equal-hash))
-(defun equal-hash (key)
-  (declare (values hash (member t nil)))
-  (typecase key
-    ;; For some types the definition of EQUAL implies a special hash
-    ((or string cons number bit-vector pathname)
-     (values (sxhash key) nil))
-    ;; Otherwise use an EQ hash, rather than SXHASH, since the values
-    ;; of SXHASH will be extremely badly distributed due to the
-    ;; requirements of the spec fitting badly with our implementation
-    ;; strategy.
-    (t
-     (eq-hash key))))
-
+;;; FIXME: INLINE seems to be a red herring. Storing a reference to #'EQL-HASH
+;;; obviously has to call it, and nothing calls it as the head of a form.
 #-sb-fluid (declaim (inline eql-hash))
 (defun eql-hash (key)
   (declare (values hash (member t nil)))
@@ -133,9 +126,47 @@
        key
        '#.(list sb-vm:bignum-widetag sb-vm:ratio-widetag sb-vm:double-float-widetag
                 sb-vm:single-float-widetag
-                sb-vm:complex-widetag sb-vm:complex-single-float-widetag sb-vm:complex-double-float-widetag))
+                sb-vm:complex-widetag sb-vm:complex-single-float-widetag sb-vm:complex-double-float-widetag
+                sb-vm:symbol-widetag))
+      ;; SYMBOL is listed here so that we can hash symbols address-insensitively.
+      ;; Given that we're already picking off a bunch of OTHER-POINTER objects
+      ;; and already calling SXHASH, the overhead is minimal. In fact, with suitably
+      ;; and rearranged widetags, this would be included in the numeric range.
       (values (sxhash key) nil)
+      ;; I don't want to add a case for INSTANCE-WITH-HASH-P here,
+      ;; but in the EQUAL and EQUAL hash functions, we do that.
       (eq-hash key)))
+
+;;; TODO: add another bit that says that layout pertains to an object
+;;; which is STANDARD-OBJECT and not just PCL-OBJECT, in case a user of the MOP
+;;; decides to implement PCL objects that do not have a hash-code in the
+;;; standard location (either the primitive object or the high header bits
+;;; of the slot vector depending on the backend)
+(declaim (inline instance-with-hash-p))
+(defun instance-with-hash-p (x)
+  (and (%instancep x)
+       (logtest (layout-flags (%instance-layout x)) +pcl-object-layout-flag+)))
+
+;;; FIXME: also a pointless INLINE here?
+#-sb-fluid (declaim (inline equal-hash))
+(defun equal-hash (key)
+  (declare (values hash (member t nil)))
+  (typecase key
+    ;; For some types the definition of EQUAL implies a special hash
+    ((or string cons number bit-vector pathname)
+     (values (sxhash key) nil))
+    ;; Certain objects have space in them wherein we can memoized a hash.
+    ;; For those objects, use that hash
+    ;; And wow, typecase isn't enough to get use to use the transform
+    ;; for (sxhash symbol) without an explicit THE form.
+    (symbol (values (sxhash (the symbol key)) nil)) ; transformed
+    ((satisfies instance-with-hash-p) (values (std-instance-hash key) nil))
+    ;; Otherwise use an EQ hash, rather than SXHASH, since the values
+    ;; of SXHASH will be extremely badly distributed due to the
+    ;; requirements of the spec fitting badly with our implementation
+    ;; strategy.
+    (t
+     (eq-hash key))))
 
 (defun equalp-hash (key)
   (declare (values hash (member t nil)))
@@ -144,6 +175,9 @@
     ;; HASH-TABLE are caught by the STRUCTURE-OBJECT test.
     ((or array cons number character structure-object)
      (values (psxhash key) nil))
+    ;; As with EQUAL-HASH, use memoized hashes when applicable.
+    (symbol (values (sxhash (the symbol key)) nil)) ; transformed
+    ((satisfies instance-with-hash-p) (values (std-instance-hash key) nil))
     (t
      (eq-hash key))))
 
@@ -1090,4 +1124,21 @@ table itself."
   (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
           `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
 
-
+#+nil
+(defun show-address-sensitivity (&optional tbl)
+  (flet ((show1 (tbl)
+           (let ((kv (hash-table-table tbl))
+                 (hashes (hash-table-hash-vector tbl))
+                 (eq-based 0))
+             (loop for i from 2 below (length kv) by 2
+                   do
+                (unless (unbound-marker-p (aref kv i))
+                  (when (eq (aref hashes (ash i -1)) +magic-hash-vector-value+)
+                    (incf eq-based))))
+             (when (plusp eq-based)
+               (format t "~3d ~s~%" eq-based tbl)))))
+    (if tbl
+        (show1 tbl)
+        (dolist (tbl (sb-vm::list-allocated-objects :all :test #'hash-table-p))
+          (when (and (plusp (hash-table-count tbl)) (hash-table-hash-vector tbl))
+            (show-address-sensitivity tbl))))))
