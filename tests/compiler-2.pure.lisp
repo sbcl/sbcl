@@ -2357,7 +2357,8 @@
 
 (with-test (:name :inline-fun-arg-mismatch)
   (checked-compile-and-assert
-      (:allow-warnings 'sb-int:local-argument-mismatch)
+      (:allow-warnings '(or sb-int:local-argument-mismatch
+                         #+interpreter simple-warning)) ;; why?
       '(lambda ()
         (multiple-value-call #'inline-fun-arg-mismatch 1 2))
     (() (condition 'program-error))))
