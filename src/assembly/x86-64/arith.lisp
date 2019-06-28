@@ -191,28 +191,6 @@
   (define-cond-assem-rtn generic-< < two-arg-< :l)
   (define-cond-assem-rtn generic-> > two-arg-> :g))
 
-(define-assembly-routine (generic-eql
-                          (:translate eql)
-                          (:policy :safe)
-                          (:save-p t)
-                          (:conditional :e)
-                          (:cost 10))
-                         ((:arg x (descriptor-reg any-reg) rdx-offset)
-                          (:arg y (descriptor-reg any-reg) rdi-offset)
-
-                          (:temp rcx unsigned-reg rcx-offset))
-
-  (!some-fixnum-p rcx x y)
-  (inst jmp :nz DO-STATIC-FUN)
-
-  ;; At least one fixnum
-  (inst cmp x y)
-  (inst ret)
-
-  DO-STATIC-FUN
-  (!call-static-fun 'eql 2)
-  (inst cmp x (+ nil-value (static-symbol-offset t))))
-
 (define-assembly-routine (generic-=
                           (:translate =)
                           (:policy :safe)

@@ -28,6 +28,8 @@
 #ifdef MEMORY_SANITIZER
 #include "genesis/symbol.h"
 #endif
+#include "genesis/ratio.h"
+#include "genesis/complex.h"
 	
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined LISP_FEATURE_FREEBSD || defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
@@ -472,3 +474,131 @@ ascs_check_loop:
 ascs_finished:
 	ret
 	SIZE(GNAME(arch_scrub_control_stack))
+
+/* Supporting code for the generic EQL vop.
+ * This ought to go in src/assembly, but without at least one new fixup flavor
+ * we can't encode jump tables. We'd have an issue with core relocation as well
+ * because immobile space (where asm routines reside) can move on startup */
+
+	.text
+	.global generic_eql
+generic_eql:
+	// widetags are spaced 4 apart, and we've subtracted BIGNUM_WIDETAG,
+	// so scaling by 2 gets a multiple of 8 with bignum at offset 0 etc.
+	// But the upper 3 bytes of EAX hold junk presently, so clear them.
+	and	$0x7f, %eax
+	jmp	*eql_dispatch(,%rax,2)
+
+eql_single_float:		 # This case should not happen
+	xorl	%eax, %eax
+flip_ZF_return:
+	xorb	$1, %al # ZF <- 0, i.e. not EQL
+	ret
+
+	.p2align 4
+eql_double_float:
+	movq	-7(%rsi), %rax
+	cmpq	-7(%rdi), %rax
+	ret	// if ZF set then EQL
+
+	.p2align 4
+eql_complex_double:
+	movq	1(%rsi), %rax
+	xorq	1(%rdi), %rax
+	// rsi,rdi are clobberable as they are vop :temps, not :args
+	movq	9(%rsi), %rsi
+	xorq	9(%rdi), %rsi
+	orq     %rsi, %rax
+	ret	// if ZF set then realpart and imagpart were each EQL
+
+	.p2align 4
+eql_ratio:
+	push	%rsi
+	push	%rdi
+	movq	RATIO_DENOMINATOR_OFFSET(%rdi), %rdi
+	movq	RATIO_DENOMINATOR_OFFSET(%rsi), %rsi
+	call	eql_integer
+	pop	%rdi	// restore the stack prior *before* the jne, obviously
+	pop	%rsi
+	jne	done
+	movq	RATIO_NUMERATOR_OFFSET(%rdi), %rdi
+	movq	RATIO_NUMERATOR_OFFSET(%rsi), %rsi
+	// fall into eql_integer
+eql_integer:
+	// Basically the same as %EQL/INTEGER in Lisp
+	cmpq	%rdi, %rsi
+	je	done
+	// both have to be non-fixnum to be EQL now. To test for that,
+	// it suffices to check that the AND has a 1 in the low bit.
+	movl	%edi, %eax
+	andl	%esi, %eax
+	and	$1, %al
+	// %al is 1 if they are both bignums, or 0 if not. 0 is failure (*not* EQL)
+	// so we have to do an operation that inverts the Z flag.
+	je	flip_ZF_return
+eql_bignum:
+	movq    -OTHER_POINTER_LOWTAG(%rdi), %rax
+	xorq    -OTHER_POINTER_LOWTAG(%rsi), %rax
+	// kill the GC mark bit by shifting out (as if we'd actually get fullcgc
+	// to concurrently mark the heap. Well, I can hope can't I?)
+	shlq	$1, %rax
+	jne     done # not equal
+	// Preserve rcx and compute the header length in words.
+	// Maybe we should deem that bignums have at most (2^32-1) payload words
+	// so that I can use an unaligned 'movl'. Or, maybe I should put the length
+	// in the high 4 bytes of the header so that the same GC mark bit would work
+	// as for all other objects (in byte index 3 of the header)
+	push	%rcx
+	movq	-OTHER_POINTER_LOWTAG(%rdi), %rcx
+	shlq	$1, %rcx
+	shrq    $(1+N_WIDETAG_BITS), %rcx
+	jrcxz	epilogue	 # Is this even possible?
+Lcmp:	movq	-OTHER_POINTER_LOWTAG(%rsi,%rcx,8), %rax
+	cmpq	-OTHER_POINTER_LOWTAG(%rdi,%rcx,8), %rax
+	jne	epilogue
+	decq    %rcx
+	jne	Lcmp		# exiting with ZF set means we win
+epilogue:
+	pop	%rcx
+done:	ret
+
+	.p2align 4
+eql_complex_rational:
+	push	%rsi
+	push	%rdi
+	movq	COMPLEX_REAL_OFFSET(%rdi), %rdi
+	movq	COMPLEX_REAL_OFFSET(%rsi), %rsi
+	call	eql_rational
+	pop	%rdi	// restore the stack prior to possibly returning
+	pop	%rsi
+	jne	done
+	movq	COMPLEX_IMAG_OFFSET(%rdi), %rdi
+	movq	COMPLEX_IMAG_OFFSET(%rsi), %rsi
+	// fall into eql_rational
+eql_rational:
+	// First pick off fixnums like in eql_integer
+	cmpq	%rdi, %rsi
+	je	done
+	movl	%edi, %eax
+	andl	%esi, %eax
+	andl	$1, %eax
+	// %eax is 1 if they are both other-pointer objects, 0 if not
+	je	flip_ZF_return
+	movl	-OTHER_POINTER_LOWTAG(%rsi), %eax
+	cmpl	-OTHER_POINTER_LOWTAG(%rdi), %eax
+	jne     done
+	// widetags matched, so they are both bignums or both ratios.
+	// Additionally, if bignums the lengths "probably" matched unless we
+	// allow massive payload - only 4 header bytes were compared so far.
+	jmp	*(eql_dispatch-BIGNUM_WIDETAG*2)(,%rax,2)
+
+	.section	.rodata
+	.p2align 3
+eql_dispatch:
+	.quad	eql_bignum
+	.quad	eql_ratio
+	.quad	eql_single_float
+	.quad	eql_double_float
+	.quad	eql_complex_rational
+	.quad	eql_double_float	# actually COMPLEX-SINGLE-FLOAT
+	.quad	eql_complex_double

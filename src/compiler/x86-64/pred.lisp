@@ -287,3 +287,68 @@
                        fixnum-tag-mask)))))
   (def-fixnump-cxr fixnump-car cons-car-slot)
   (def-fixnump-cxr fixnump-cdr cons-cdr-slot))
+
+;;; See comment below about ASSUMPTIONS
+(eval-when (:compile-toplevel)
+  (assert (eql other-pointer-lowtag #b1111))
+  ;; This is also assumed in src/runtime/x86-64-assem.S
+  (assert (eql (min bignum-widetag ratio-widetag single-float-widetag double-float-widetag
+                    complex-widetag complex-single-float-widetag complex-double-float-widetag)
+               bignum-widetag))
+  (assert (eql (max bignum-widetag ratio-widetag single-float-widetag double-float-widetag
+                    complex-widetag complex-single-float-widetag complex-double-float-widetag)
+               complex-double-float-widetag)))
+
+;;; Most uses of EQL are transformed into a non-generic form, but when we need
+;;; the general form, it's possible to make it nearly as efficient as EQ.
+;;; I think it's worth the extra 25 bytes or so per call site versus just
+;;; punting to an assembly routine always.
+(define-vop (if-eql)
+  (:args (x :scs (any-reg descriptor-reg) :target rdi)
+         (y :scs (any-reg descriptor-reg) :target rsi))
+  (:conditional :e)
+  (:policy :fast-safe)
+  (:translate eql)
+  (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
+  (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 1)) rsi)
+  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:generator 15
+    (inst cmp x y)
+    (inst jmp :e done) ; affirmative
+
+    ;; If they are not both OTHER-POINTER objects, return false.
+    ;; ASSUMPTION: other-pointer-lowtag = #b1111
+    ;; This ANDing trick would be wrong if, e.g., the OTHER-POINTER tag
+    ;; were #b0011 and the two inputs had lowtags #b0111 and #b1011
+    ;; which when ANDed look like #b0011.
+    ;; We use :BYTE rather than :DWORD here because byte-sized
+    ;; operations on the accumulator encode more compactly.
+    (inst mov :byte rax x)
+    (inst and :byte rax y) ; now AL = #x_F only if both lowtags were #xF
+    (inst not :byte rax)   ; now AL = #x_0 only if it was #x_F
+    (inst and :byte rax #b00001111) ; will be all 0 if ok
+    (inst jmp :ne done) ; negative
+
+    ;; If the widetags are not the same, return false.
+    ;; Using a :dword compare gets us the bignum length check almost for free
+    ;; unless the length's representation requires more than 3 bytes.
+    ;; It sounds like a :qword compare would be the right thing, but remember
+    ;; one header bit acts as a concurrent GC mark bit in all headered objects,
+    ;; though we're not really using it yet. (We are, but not concurrently)
+    (inst mov :dword rax (ea (- other-pointer-lowtag) x))
+    (inst cmp :dword rax (ea (- other-pointer-lowtag) y))
+    (inst jmp :ne done) ; negative
+
+    ;; If not a numeric widetag, return false. See ASSUMPTIONS re widetag order.
+    (inst sub :byte rax bignum-widetag)
+    (inst cmp :byte rax (- complex-double-float-widetag bignum-widetag))
+    ;; "above" means CF=0 and ZF=0 so we're returning the right thing here
+    (inst jmp :a done)
+
+    ;; The hand-written assembly code receives args in the C arg registers.
+    ;; It also receives AL holding the biased down widetag.
+    ;; Anything else it needs will be callee-saved.
+    (move rdi x) ; load the C call args
+    (move rsi y)
+    (inst call (make-fixup "generic_eql" :foreign)) ; result => ZF
+    DONE))
