@@ -1,5 +1,5 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
-changes relative to sbcl-1.5.3:
+changes in sbcl-1.5.4 relative to sbcl-1.5.3:
   * minor incompatible change: hash tables on 64-bit machines consume roughly
     20% less memory but can only grow to hold 2^31 entries (theoretically)
     due to use of 31-bit indices internally.
