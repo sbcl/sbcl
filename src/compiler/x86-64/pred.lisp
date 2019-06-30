@@ -312,6 +312,7 @@
   (:temporary (:sc unsigned-reg :offset rdi-offset :from (:argument 0)) rdi)
   (:temporary (:sc unsigned-reg :offset rsi-offset :from (:argument 1)) rsi)
   (:temporary (:sc unsigned-reg :offset rax-offset) rax)
+  (:vop-var vop)
   (:generator 15
     (inst cmp x y)
     (inst jmp :e done) ; affirmative
@@ -350,5 +351,12 @@
     ;; Anything else it needs will be callee-saved.
     (move rdi x) ; load the C call args
     (move rsi y)
-    (inst call (make-fixup "generic_eql" :foreign)) ; result => ZF
+
+    (let ((fixup (make-fixup "generic_eql" :foreign)))
+      #+immobile-code
+      (unless (sb-c::code-immobile-p vop)
+        (inst mov temp-reg-tn fixup)
+        (setf fixup temp-reg-tn))
+      (inst call fixup)) ; result => ZF
+
     DONE))
