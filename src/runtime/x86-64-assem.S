@@ -592,8 +592,9 @@ eql_rational:
 	// Additionally, if bignums the lengths "probably" matched unless we
 	// allow massive payload - only 4 header bytes were compared so far.
 	jmp	*(eql_dispatch-BIGNUM_WIDETAG*2)(,%rax,2)
-
+#ifdef __ELF__
 	.section	.rodata
+#endif        
 	.p2align 3
 eql_dispatch:
 	.quad	eql_bignum
