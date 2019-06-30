@@ -129,6 +129,7 @@ GNAME(funcall1_switching_stack):
 	.align	align_16byte,0x90
 	.cfi_startproc
 GNAME(call_into_lisp_first_time):
+GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 #ifdef MEMORY_SANITIZER // Presumes GCC_TLS and SB_THREAD
