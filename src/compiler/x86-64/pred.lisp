@@ -353,10 +353,10 @@
     (move rsi y)
 
     (let ((fixup (make-fixup "generic_eql" :foreign)))
-      #+immobile-code
-      (unless (sb-c::code-immobile-p vop)
-        (inst mov temp-reg-tn fixup)
-        (setf fixup temp-reg-tn))
+      (cond ((sb-c::code-immobile-p vop))
+            (t
+             (inst mov temp-reg-tn fixup)
+             (setf fixup temp-reg-tn)))
       (inst call fixup)) ; result => ZF
 
     DONE))
