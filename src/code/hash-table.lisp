@@ -12,11 +12,47 @@
 
 (in-package "SB-IMPL")
 
+;;; Our table representation is as illustrated below.
+;;; SIZE is always the exact number of K/V entries that can be stored,
+;;; and can be any number, not necessarily a power of 2.
+
+;;;            ______________________________________
+;;;  K/V       |                                    |
+;;;  vector    | * | * |  K | V | K | V | ......... |
+;;;            +____________________________________+
+;;;                    <---         SIZE          -->
+;;;
+;;;                      ^--- pair index 1 and so on
+;;;
+
+;;; The length of TABLE (the K/V vector) is the specified :SIZE * 2
+;;; plus 2 cells of overhead. There is a minimum of 16 k/v pairs,
+;;; therefore a minimum physical length of 34 (including the overhead).
+;;; Pair index 0 is not for user data. We index cell pairs by a physical
+;;; index, not logical pair index. ("logical" pair 0 would occupy
+;;; physical vector elements 2 and 3 as if the overhead didn't exist.)
+
+;;; The length of the HASH-VECTOR is in direct correspondence with the
+;;; physical k/v cells, so that we can store a hash per key and not worry
+;;; about one wasted cell. (i.e. the 0th k/v cell can't be used, so neither
+;;; can the 0th hash value. To avoid this 1 cell of waste would mean adding
+;;; and subtracting 1 here and there, needlessly complicating things)
+
+;;; The INDEX vector is the traditional power-of-2 sized vector mapping a hash
+;;; value to a pair. These are what you might calls the "bins" or "buckets" of
+;;; the table. The value in a bin is the pair index of the start of the chain
+;;; belonging to the bin. The value is 1..SIZE or 0 for an empty bin, which works
+;;; well because pair index 0 isn't usable. The NEXT vector is the pointer to
+;;; follow from a pair index to the next pair index in the same chain. As with
+;;; the hash vector, the NEXT vector is sized at 1 greater than minimally
+;;; necessary, to avoid adding and subtracting 1 from a pair index.
+
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
-                               (test
+                               (getter
+                                test
                                 test-fun
                                 hash-fun
                                 rehash-size
@@ -27,9 +63,39 @@
                                 next-vector
                                 hash-vector
                                 flags)))
-  ;; The type of hash table this is. Only used for printing and as
-  ;; part of the exported interface.
-  (test nil :type symbol :read-only t)
+
+  ;; All and only the slots that are needed for GETHASH come first.
+  (getter #'error :type function :read-only t)
+  ;; The index vector. This may be larger than the hash size to help
+  ;; reduce collisions.
+  (index-vector nil :type (simple-array hash-table-index (*)))
+  ;; This table parallels the KV vector, and is used to chain together
+  ;; the hash buckets and the free list. A slot will only ever be in
+  ;; one of these lists.
+  (next-vector nil :type (simple-array hash-table-index (*)))
+  ;; The Key-Value pair vector.
+  (table nil :type simple-vector)
+  ;; This table parallels the KV table, and can be used to store the
+  ;; hash associated with the key, saving recalculation. Could be
+  ;; useful for EQL, and EQUAL hash tables. This table is not needed
+  ;; for EQ hash tables, and when present the value of
+  ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
+  ;; respective key.
+  (hash-vector nil :type (or null (simple-array hash-table-index (*))))
+  ;; flags: WEAKNESS-KIND | FINALIZERSP | SYNCHRONIZEDP | WEAKP
+  ;; WEAKNESS-KIND is 2 bits, the rest are 1 bit each
+  (flags 0 :type (unsigned-byte 5) :read-only t)
+  ;; A potential index into the k/v vector. It should be checked first
+  ;; when searching. There's no reason to allow NIL here,
+  ;; because worst case there won't be a hit at this index.
+  (cache 0 :type index)
+  ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
+  (lock (sb-thread:make-mutex :name "hash-table lock")
+        #-c-headers-only :type #-c-headers-only sb-thread:mutex
+        :read-only t)
+
+  ;; The 4 standard tests functions don't need these next 2 slots:
+
   ;; The function used to compare two keys. Returns T if they are the
   ;; same and NIL if not.
   (test-fun nil :type function :read-only t)
@@ -37,6 +103,10 @@
   ;; values: the index hashing and T if that might change with the
   ;; next GC.
   (hash-fun nil :type function :read-only t)
+
+  ;; The type of hash table this is. Only used for printing and as
+  ;; part of the exported interface.
+  (test nil :type symbol :read-only t)
   ;; How much to grow the hash table by when it fills up. If an index,
   ;; then add that amount. If a floating point number, then multiply
   ;; it by that.
@@ -50,38 +120,12 @@
   (rehash-trigger nil :type index)
   ;; The current number of entries in the table.
   (number-entries 0 :type index)
-  ;; The Key-Value pair vector.
-  (table nil :type simple-vector)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
   (next-weak-hash-table nil :type null)
-  ;; flags: WEAKNESS-KIND | FINALIZERSP | SYNCHRONIZEDP | WEAKP
-  ;; WEAKNESS-KIND is 2 bits, the rest are 1 bit each
-  (flags 0 :type (unsigned-byte 5) :read-only t)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   (next-free-kv 0 :type index)
-  ;; A cache that is either nil or is an index into the hash table
-  ;; that should be checked first
-  (cache nil :type (or null index))
-  ;; The index vector. This may be larger than the hash size to help
-  ;; reduce collisions.
-  (index-vector nil :type (simple-array hash-table-index (*)))
-  ;; This table parallels the KV vector, and is used to chain together
-  ;; the hash buckets and the free list. A slot will only ever be in
-  ;; one of these lists.
-  (next-vector nil :type (simple-array hash-table-index (*)))
-  ;; This table parallels the KV table, and can be used to store the
-  ;; hash associated with the key, saving recalculation. Could be
-  ;; useful for EQL, and EQUAL hash tables. This table is not needed
-  ;; for EQ hash tables, and when present the value of
-  ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
-  ;; respective key.
-  (hash-vector nil :type (or null (simple-array hash-table-index (*))))
-  ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
-  (lock (sb-thread:make-mutex :name "hash-table lock")
-        #-c-headers-only :type #-c-headers-only sb-thread:mutex
-        :read-only t)
   ;; List of values culled out during GC of weak hash table.
   (culled-values nil :type list)
   ;; For detecting concurrent accesses.
