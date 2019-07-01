@@ -861,9 +861,9 @@ if there is no such entry. Entries can be added using SETF."
                         ;; Skip division by 2 since we can compensate by DECFing twice as much
                         ;; - see CHECK-FOR-OVERFLOW. Also don't worry about the unusable cells.
                         (probe-limit (length table))
-                        ;; Binding would be flushed for EQ tables automatically,
+                        ;; Binding would be flushed for EQ and EQL tables automatically,
                         ;; but we forcibly elide the code because "reasons".
-                        ,@(unless (eq std-fn 'eq)
+                        ,@(unless (member std-fn '(eq eql))
                             '((hash-vector (hash-table-hash-vector hash-table))))
                         ,@(when (null std-fn)
                             '((test-fun (hash-table-test-fun hash-table)))))
@@ -905,7 +905,8 @@ if there is no such entry. Entries can be added using SETF."
                        ,(unless (eq std-fn 'eq)
                        `(macrolet ((probe ()
                                      '(let ((i (* 2 next)))
-                                        (cond ((and (= hash (aref hash-vector next))
+                                        (cond ((and ,@(unless (eq std-fn 'eql)
+                                                        '((= hash (aref hash-vector next))))
                                                     ,(case std-fn
                                                        ;; Use the inline EQL function
                                                        (eql '(%eql key (aref table i)))
