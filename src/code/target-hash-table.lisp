@@ -285,7 +285,10 @@ Examples:
 
 ;;;; construction and simple accessors
 
-(defconstant +min-hash-table-size+ 16)
+;;; The smallest table holds 14 items distributed among 16 buckets.
+;;; So we allocate 14 k/v pairs = 28 cells + 2 overhead = 30 cells,
+;;; and at maximum load the table will have a load factor of 87.5%
+(defconstant +min-hash-table-size+ 14)
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
 
 ;; The GC will set this to 1 if it moves an EQ-based key. This used
@@ -424,11 +427,10 @@ Examples:
                     (declare (optimize (safety 0) (speed 3)))
                     (values (funcall actual object) nil))))))
     (let* ((size (max +min-hash-table-size+
-                      (min size
-                           ;; SIZE is just a hint, so if the user asks
-                           ;; for a SIZE which'd be too big for us to
-                           ;; easily implement, we bump it down.
-                           (floor sb-xc:array-dimension-limit 1024))))
+                      ;; Our table sizes are capped by the 32-bit integers used as indices
+                      ;; into the chains. Prevent our code from failing if the user specified
+                      ;; most-positive-fixnum here. (fndb says that size is 'unsigned-byte')
+                      (min size (ash 1 24)))) ; 16M key/value pairs
            (rehash-size (if (integerp rehash-size)
                             rehash-size
                             (float rehash-size $1.0))) ; always single-float
@@ -437,9 +439,8 @@ Examples:
            ;; boxing.
            (rehash-threshold (max +min-hash-table-rehash-threshold+
                                   (float rehash-threshold $1.0))) ; always single-float
-           (size+1 (1+ size))       ; The first element is not usable.
            ;; KLUDGE: The most natural way of expressing the below is
-           ;; (round (/ (float size+1) rehash-threshold)), and indeed
+           ;; (round (/ (float size) rehash-threshold)), and indeed
            ;; it was expressed like that until 0.7.0. However,
            ;; MAKE-HASH-TABLE is called very early in cold-init, and
            ;; the SPARC has no primitive instructions for rounding,
@@ -449,39 +450,37 @@ Examples:
            ;;
            ;; Note that this has not yet been audited for
            ;; correctness. It just seems to work. -- CSR, 2002-11-02
-           (scaled-size (truncate (/ (float size+1) rehash-threshold)))
-           (length (power-of-two-ceiling (max scaled-size
-                                              (1+ +min-hash-table-size+))))
-           (index-vector (make-array length :element-type 'hash-table-index
+           (scaled-size (truncate (/ (float size) rehash-threshold)))
+           (bucket-count (power-of-two-ceiling
+                          (max scaled-size +min-hash-table-size+)))
+           (index-vector (make-array bucket-count
+                                     :element-type 'hash-table-index
                                      :initial-element 0))
+           ;; Now compute *physical* sizes of the storage arrays.
+           (size+1 (1+ size))       ; The first element is not usable.
+           (kv-vector (make-array (* 2 size+1)
+                                  :initial-element +empty-ht-slot+))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indices at 2i and 2i+1 -
            ;; together.
-           (next-vector (make-array size+1 :element-type 'hash-table-index))
-           (kv-vector (make-array (* 2 size+1)
-                                  :initial-element +empty-ht-slot+))
+           (next-vector (make-array size+1 :element-type 'hash-table-index
+                                           :initial-element 0))
+           (hash-vector (unless (eq test 'eq)
+                          (make-array size+1
+                                      :element-type 'hash-table-index
+                                      :initial-element +magic-hash-vector-value+)))
            (weakness (if weakness
                          (or (loop for i below 4
                                    when (eq (decode-hash-table-weakness i) weakness)
                                    do (return (logior (ash i 3) 1)))
                              (bug "Unreachable"))
                          0))
-           (table (%make-hash-table
-                   (or getter #'%gethash3/any)
-                   test
-                   test-fun
-                   hash-fun
-                   rehash-size
-                   rehash-threshold
-                   size
-                   kv-vector
-                   index-vector
-                   next-vector
-                   (unless (eq test 'eq)
-                     (make-array size+1 :element-type 'hash-table-index
-                                 :initial-element +magic-hash-vector-value+))
-                   (logior (if synchronized 2 0) weakness))))
-      (declare (type index size+1 scaled-size length))
+           (table (%make-hash-table (or getter #'%gethash3/any)
+                                    test test-fun hash-fun
+                                    rehash-size rehash-threshold
+                                    kv-vector index-vector next-vector hash-vector
+                                    (logior (if synchronized 2 0) weakness))))
+      (declare (type index size+1 scaled-size))
       (setf (kv-vector-needs-rehash kv-vector) 0)
       ;; Set up the free list, all free. These lists are 0 terminated.
       (do ((i 1 (1+ i)))
@@ -511,7 +510,8 @@ Examples:
   "Return a size that can be used with MAKE-HASH-TABLE to create a hash
    table that can hold however many entries HASH-TABLE can hold without
    having to be grown."
-  (hash-table-rehash-trigger hash-table))
+  ;; First 2 cells are metadata, rest are entries that it can hold
+  (1- (ash (length (hash-table-table hash-table)) -1)))
 
 (setf (documentation 'hash-table-test 'function)
       "Return the test HASH-TABLE was created with.")
@@ -530,45 +530,57 @@ multiple threads accessing the same hash-table without locking."
 (defun hash-table-new-vectors (table)
   ;; Can at least some vectors be copied before entering WITHOUT-GCING
   ;; for REHASH?
-  ;; So that they don't have to be alive at the same time and be collected.
+  ;; Answer: yes, we can do that, but I will first need to implement the ability
+  ;; for both the old and new vector to be marked as address-sensitive so that
+  ;; GC can flag either/both as obsolete, while only the old vector contains
+  ;; a backpointer to the table.
   (let* ((old-next-vector (hash-table-next-vector table))
          (old-hash-vector (hash-table-hash-vector table))
-         (old-size (length old-next-vector))
-         (new-size
-           (power-of-two-ceiling
-            (let ((rehash-size (hash-table-rehash-size table)))
-              (etypecase rehash-size
-                (fixnum
-                 (+ rehash-size old-size))
-                (float
-                 (the index (truncate (* rehash-size old-size))))))))
-         (new-kv-vector (make-array (* 2 new-size)
+         ;; The NEXT vector's length is 1 greater than "size" - the number
+         ;; of k/v pairs at full capacity.
+         (old-size (1- (length old-next-vector)))
+         (new-size (let ((rehash-size (hash-table-rehash-size table)))
+                     (etypecase rehash-size
+                       (float (the index (truncate (* rehash-size old-size)))) ; usually
+                       (fixnum (+ rehash-size old-size))))) ; rarely, I image
+         (new-n-buckets
+          (let* ((pow2ceil (power-of-two-ceiling new-size))
+                 (full-lf (/ new-size pow2ceil)))
+            ;; Try to keep the load factor at full load within a reasonable band,
+            ;; otherwise we might do be absurdly wasteful by resizing to hold 1 more
+            ;; k/v pair while doubling the bucket count.
+            (cond ((> full-lf 9/10)   ; $.9 is unhappy in cross-float due to inexactness
+                   (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
+                  ((< full-lf 55/100) ; and $.55 is similarly unhappy
+                   (setq new-size (floor pow2ceil 100/65)))) ; target LF = 65%
+            pow2ceil))
+         ;; These vector lengths are exactly analogous to those in MAKE-HASH-TABLE,
+         ;; prompting the question of whether we can share some code.
+         (new-index-vector (make-array new-n-buckets
+                                       :element-type 'hash-table-index
+                                       :initial-element 0))
+         (size+1 (1+ new-size))       ; The first element is not usable.
+         (new-kv-vector (make-array (* 2 size+1)
                                     :initial-element +empty-ht-slot+))
-         (new-next-vector
-           (make-array new-size :element-type 'hash-table-index :initial-element 0))
+         (new-next-vector (make-array size+1 :element-type 'hash-table-index
+                                             :initial-element 0))
          (new-hash-vector
            (when old-hash-vector
-             (make-array new-size
+             (make-array size+1
                          :element-type 'hash-table-index
-                         :initial-element +magic-hash-vector-value+)))
-         (new-index-vector (make-array new-size :element-type 'hash-table-index
-                                       :initial-element 0)))
-    (values new-size
-            new-kv-vector new-next-vector new-hash-vector new-index-vector)))
+                         :initial-element +magic-hash-vector-value+))))
+    (values new-kv-vector new-next-vector new-hash-vector new-index-vector)))
 
-(defun rehash (table new-size
+(defun rehash (table
                new-kv-vector new-next-vector new-hash-vector
                new-index-vector)
   (declare (type hash-table table)
            (type simple-vector new-kv-vector)
            (type (simple-array hash-table-index (*)) new-next-vector new-index-vector)
-           (type (or null (simple-array hash-table-index (*))) new-hash-vector)
-           (type index new-size))
+           (type (or null (simple-array hash-table-index (*))) new-hash-vector))
   (aver *gc-inhibit*)
   (let* ((old-kv-vector (hash-table-table table))
-         (old-next-vector (hash-table-next-vector table))
-         (old-hash-vector (hash-table-hash-vector table))
-         (old-size (length old-next-vector)))
+         (old-hash-vector (hash-table-hash-vector table)))
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
     (set-header-data old-kv-vector sb-vm:vector-normal-subtype)
@@ -583,40 +595,42 @@ multiple threads accessing the same hash-table without locking."
     (when (and (hash-table-weak-p table) (plusp (hash-table-count table)))
       (set-header-data new-kv-vector sb-vm:vector-valid-hashing-subtype))
 
-    ;; FIXME: here and in several other places in the hash table code,
-    ;; loops like this one are used when FILL or REPLACE would be
-    ;; appropriate.  why are standard CL functions not used?
-    ;; Performance issues?  General laziness?  -- NJF, 2004-03-10
+    ;; Copy over the k/v pair vector. The first 2 elements are not a pair,
+    ;; but we need to copy them.
+    (replace new-kv-vector old-kv-vector)
 
-    ;; Copy over the kv-vector. The element positions should not move
-    ;; in case there are active scans.
-    (dotimes (i (* old-size 2))
-      (declare (type index i))
-      (setf (aref new-kv-vector i) (aref old-kv-vector i)))
-
-    ;; Copy over the hash-vector.
+    ;; Copy over the hash-vector. First element is not used.
     (when old-hash-vector
-      (dotimes (i old-size)
-        (setf (aref new-hash-vector i) (aref old-hash-vector i))))
+      (replace new-hash-vector old-hash-vector))
 
     (setf (hash-table-next-free-kv table) 0)
     ;; Rehash all the entries; last to first so that after the pushes
-    ;; the chains are first to last.
-    (do ((i (1- new-size) (1- i)))
-        ((zerop i))
+    ;; the chains are first to last. [We only really care about the freelist using
+    ;; up k/v cells from low to high. All other chains are order-insensitive]
+    ;; Also: While it's true that we're about to examine twice as many keys as we
+    ;; "should" (examining elements of NEW-KV-VECTOR beyond those which could have
+    ;; been in the old), we can't actually do significantly better than to visit as
+    ;; many pairs as there are in the new vector, because the empty cells have to be
+    ;; linked into the freelist anyway. The only possible optimization would be to
+    ;; execute the first stanza of the COND unconditionally for the totally unused
+    ;; section of the new vector, which is not really worth pulling into another loop
+    ;; since it doesn't improve the asymptotics.  We can, however, skip assigning
+    ;; HASH-TABLE-NEXT-FREE until the last possible moment.
+    (do ((i (1- (length new-next-vector)) (1- i))
+         (next-free 0)
+         (n-buckets (length new-index-vector)))
+        ((zerop i) ; pair index 0 is not used
+         (setf (hash-table-next-free-kv table) next-free))
       (declare (type index/2 i))
       (let ((key (aref new-kv-vector (* 2 i)))
             (value (aref new-kv-vector (1+ (* 2 i)))))
         (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
                ;; Slot is empty, push it onto the free list.
-               (setf (aref new-next-vector i)
-                     (hash-table-next-free-kv table))
-               (setf (hash-table-next-free-kv table) i))
+               (setf (aref new-next-vector i) next-free next-free i))
               ((and new-hash-vector
-                    (not (= (aref new-hash-vector i)
-                            +magic-hash-vector-value+)))
+                    (/= (aref new-hash-vector i) +magic-hash-vector-value+))
                ;; Can use the existing hash value (not EQ based)
-               (let* ((index (mask-hash (aref new-hash-vector i) new-size))
+               (let* ((index (mask-hash (aref new-hash-vector i) n-buckets))
                       (next (aref new-index-vector index)))
                  (declare (type index index))
                  ;; Push this slot into the next chain.
@@ -627,7 +641,7 @@ multiple threads accessing the same hash-table without locking."
                ;; Enable GC tricks.
                (set-header-data new-kv-vector
                                 sb-vm:vector-valid-hashing-subtype)
-               (let* ((index (pointer-hash->index (pointer-hash key) new-size))
+               (let* ((index (pointer-hash->index (pointer-hash key) n-buckets))
                       (next (aref new-index-vector index)))
                  (declare (type index index))
                  ;; Push this slot onto the next chain.
@@ -640,8 +654,7 @@ multiple threads accessing the same hash-table without locking."
     ;; Fill the old kv-vector with 0 to help the conservative GC. Even
     ;; if nothing else were zeroed, it's important to clear the
     ;; special first cell in old-kv-vector.
-    (fill old-kv-vector 0)
-    (setf (hash-table-rehash-trigger table) new-size))
+    (fill old-kv-vector 0))
   (values))
 
 ;;; Use the same size as before, re-using the vectors.
@@ -677,8 +690,7 @@ multiple threads accessing the same hash-table without locking."
                ;; Slot is empty, push it onto free list.
                (setf (aref next-vector i) (hash-table-next-free-kv table))
                (setf (hash-table-next-free-kv table) i))
-              ((and hash-vector (not (= (aref hash-vector i)
-                                        +magic-hash-vector-value+)))
+              ((and hash-vector (/= (aref hash-vector i) +magic-hash-vector-value+))
                ;; Can use the existing hash value (not EQ based)
                (let* ((index (mask-hash (aref hash-vector i) length))
                       (next (aref index-vector index)))
@@ -733,13 +745,13 @@ multiple threads accessing the same hash-table without locking."
       ;; Cons new vectors outside of WITHOUT-GCING (except
       ;; for weak hash-tables, GETHASH3 already uses
       ;; WITHOUT-GCING in that case)
-      (multiple-value-bind (new-size new-kv-vector new-next-vector new-hash-vector new-index-vector)
+      (multiple-value-bind (new-kv-vector new-next-vector new-hash-vector new-index-vector)
           (hash-table-new-vectors hash-table)
         (without-gcing
             ;; Rehash inside WITHOUT-GCING to avoid movement
             ;; and the keep GC from seeing half-initilizaed
             ;; hash vectors.
-            (rehash hash-table new-size new-kv-vector new-next-vector
+            (rehash hash-table new-kv-vector new-next-vector
                     new-hash-vector new-index-vector))))))
 
 (defun rehash-if-obsolete (hash-table)
@@ -1207,7 +1219,7 @@ table itself."
   (values `(make-hash-table ,@(%hash-table-ctor-args hash-table))
           `(%stuff-hash-table ,hash-table ',(%hash-table-alist hash-table))))
 
-#+nil
+#|
 (defun show-address-sensitivity (&optional tbl)
   (flet ((show1 (tbl)
            (let ((kv (hash-table-table tbl))
@@ -1237,3 +1249,125 @@ table itself."
           for i from 0
           do (show-chain (format nil "Bucket ~d:" i) x))
     (show-chain "Freelist:" (hash-table-next-free-kv tbl))))
+
+(defun show-load-factors ()
+  (let ((list (sort (sb-vm::list-allocated-objects
+                     :all :test #'hash-table-p)
+                    #'>
+                    :key #'hash-table-count)))
+    (dolist (ht list)
+      (format t "~,4f ~7d ~s~%"
+              (/ (hash-table-count ht) (length (hash-table-index-vector ht)))
+              (hash-table-mem-used ht)
+              ht))))
+
+(defun hash-table-mem-used (ht)
+  (+ (sb-vm::primitive-object-size (hash-table-table ht))
+     (sb-vm::primitive-object-size (hash-table-index-vector ht))
+     (sb-vm::primitive-object-size (hash-table-next-vector ht))
+     (acond ((hash-table-hash-vector ht) (sb-vm::primitive-object-size it))
+            (t 0))))
+
+(defun show-growth (&optional (factor 1.5))
+  (flet ((memused-str (x)
+           (cond ((>= x (expt 1024 4)) (format nil "~dG" (ceiling (/ x (expt 1024 3)))))
+                 ((>= x (expt 1024 3)) (format nil "~dM" (ceiling (/ x (expt 1024 2)))))
+                 ((>= x (expt 1024 2)) (format nil "~dK" (ceiling (/ x 1024))))
+                 (t x)))
+         (compute-memused (n-buckets n-cells) ; approximately right,
+           ;; disregarding overhead cells and padding words
+           (+ (* n-cells (* 2 sb-vm:n-word-bytes)) ; 2 words per cell
+              (* n-buckets  4)   ; INDEX-VECTOR = one 32-bit int per bucket
+              (* n-cells 4)   ; NEXT-VECTOR  = one 32-bit int per cell
+              (* n-cells 4))) ; HASH-VECTOR  = one 32-bit int per cell
+         (log2-buckets (n-buckets)
+           (integer-length (1- n-buckets))))
+  (let* ((size 14)
+         (n-buckets (power-of-two-ceiling size))
+         (memused (compute-memused n-buckets size)))
+    (format t "        size   bits        LF           mem~%")
+    (format t "~12d ~6d ~9,4f ~13d~%" size
+            (log2-buckets n-buckets) (/ size n-buckets) memused)
+    (loop
+      (let* ((new-size (truncate (* size factor)))
+             (new-n-buckets (power-of-two-ceiling new-size))
+             (full-LF (/ new-size new-n-buckets)))
+        (when (> (log2-buckets new-n-buckets) 31) (return))
+        ;; try to keep the load factor at full load within a certain range
+        (cond ((> full-lf .9)
+               (setq new-size (floor (* new-n-buckets 85/100))))
+              ((< full-lf .55)
+               (setq new-size (floor (* new-n-buckets 65/100)))))
+        (let ((new-memused (compute-memused new-n-buckets new-size)))
+          (format t "~12d ~6d ~9,4f ~13@a  (* ~f)~%"
+                  new-size (log2-buckets new-n-buckets)
+                  (/ new-size new-n-buckets)
+                  (memused-str new-memused) (/ new-memused memused))
+          (setq size new-size memused new-memused)))))))
+
+;;; You can't attain an arbitrary rehash size using power-of-2 tables
+;;; because all you can do is double the number of buckets.
+;;; However, by doubling the count only on alternate resizings, we can
+;;; approximate growing at rate slower than doubling in terms of space used.
+;;; This table shows that using the default resize factor of 1.5x we see
+;;; a fairly smooth increase in memory consumed at each resizing
+;;; (about 1.3x to 1.6x the usage at the old size) while bounding the LF
+;;; to between .6 and .85 if every k/v cell is in use at the new size.
+
+        size   bits        LF           mem
+          14      4    0.8750           400
+          21      5    0.6563           632  (* 1.58)
+          27      5    0.8438           776  (* 1.227848)
+          40      6    0.6250          1216  (* 1.5670103)
+          54      6    0.8438          1552  (* 1.2763158)
+          81      7    0.6328          2456  (* 1.5824742)
+         108      7    0.8438          3104  (* 1.2638437)
+         162      8    0.6328          4912  (* 1.5824742)
+         217      8    0.8477          6232  (* 1.2687297)
+         325      9    0.6348          9848  (* 1.5802311)
+         435      9    0.8496         12488  (* 1.2680748)
+         652     10    0.6367         19744  (* 1.5810378)
+         870     10    0.8496         24976  (* 1.2649919)
+        1305     11    0.6372         39512  (* 1.5819987)
+        1740     11    0.8496         49952  (* 1.2642236)
+        2610     12    0.6372         79024  (* 1.5819987)
+        3481     12    0.8499         99928  (* 1.2645272)
+        5221     13    0.6373        158072  (* 1.581859)
+        6963     13    0.8500        199880  (* 1.264487)
+       10444     14    0.6375        316192  (* 1.5819092)
+       13926     14    0.8500        399760  (* 1.2642951)
+       20889     15    0.6375        632408  (* 1.5819691)
+       27852     15    0.8500        799520  (* 1.2642472)
+       41778     16    0.6375         1236K  (* 1.5819691)
+       55705     16    0.8500         1562K  (* 1.2642661)
+       83557     17    0.6375         2471K  (* 1.5819604)
+      111411     17    0.8500         3124K  (* 1.2642636)
+      167116     18    0.6375         4941K  (* 1.5819635)
+      222822     18    0.8500         6247K  (* 1.2642516)
+      334233     19    0.6375         9882K  (* 1.5819674)
+      445644     19    0.8500        12493K  (* 1.2642486)
+      668466     20    0.6375        19764K  (* 1.5819674)
+      891289     20    0.8500        24986K  (* 1.2642498)
+     1336933     21    0.6375        39527K  (* 1.5819668)
+     1782579     21    0.8500        49972K  (* 1.2642497)
+     2673868     22    0.6375        79053K  (* 1.581967)
+     3565158     22    0.8500        99943K  (* 1.2642488)
+     5347737     23    0.6375       158106K  (* 1.5819672)
+     7130316     23    0.8500       199885K  (* 1.2642487)
+    10695474     24    0.6375       316212K  (* 1.5819672)
+    14260633     24    0.8500       399770K  (* 1.2642487)
+    21390950     25    0.6375       632423K  (* 1.5819672)
+    28521267     25    0.8500       799540K  (* 1.2642487)
+    42781904     26    0.6375         1236M  (* 1.5819674)
+    57042534     26    0.8500         1562M  (* 1.2642486)
+    85563808     27    0.6375         2471M  (* 1.5819674)
+   114085068     27    0.8500         3124M  (* 1.2642486)
+   171127616     28    0.6375         4941M  (* 1.5819674)
+   228170137     28    0.8500         6247M  (* 1.2642486)
+   342255232     29    0.6375         9882M  (* 1.5819674)
+   456340275     29    0.8500        12493M  (* 1.2642486)
+   684510464     30    0.6375        19764M  (* 1.5819674)
+   912680550     30    0.8500        24986M  (* 1.2642486)
+  1369020928     31    0.6375        39527M  (* 1.5819674)
+  1825361100     31    0.8500        49972M  (* 1.2642486)
+|#

@@ -57,7 +57,6 @@
                                 hash-fun
                                 rehash-size
                                 rehash-threshold
-                                rehash-trigger
                                 table
                                 index-vector
                                 next-vector
@@ -113,11 +112,13 @@
   (rehash-size nil :type (or index (single-float ($1.0)))
                :read-only t)
   ;; How full the hash table has to get before we rehash
+  ;; but only for the initial determination of how many buckets to make.
+  ;; Subsequent resizing is at our discretion. i.e. you might think that a
+  ;; deliberate choice of rehash size and threshold implies that you want the new
+  ;; table to be X amount larger *and* that you care at about what load factor the
+  ;; new table gets rehashed, but no, you don't get to pick both every time.
+  ;; (CLHS says that these are all just "hints" and we're free to ignore)
   (rehash-threshold nil :type (single-float ($0.0) $1.0) :read-only t)
-  ;; The number of entries before a rehash, just one less than the
-  ;; size of the next-vector, hash-vector, and half the size of the
-  ;; kv-vector.
-  (rehash-trigger nil :type index)
   ;; The current number of entries in the table.
   (number-entries 0 :type index)
   ;; This slot is used to link weak hash tables during GC. When the GC

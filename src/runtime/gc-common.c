@@ -1228,7 +1228,7 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
             fprintf(stderr,
                     "will skip rescan of weak ht: %d/%d items\n",
                     (int)fixnum_value(hash_table->number_entries),
-                    (int)fixnum_value(hash_table->rehash_trigger));
+                    (int)(next_vector_length - 1));
     } else { // The entries are always live
         SCAV_ENTRIES(1,);
     }
