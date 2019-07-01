@@ -482,13 +482,18 @@ ascs_finished:
  * because immobile space (where asm routines reside) can move on startup */
 
 	.text
-	.global generic_eql
-generic_eql:
+	.global GNAME(generic_eql)
+GNAME(generic_eql):
 	// widetags are spaced 4 apart, and we've subtracted BIGNUM_WIDETAG,
 	// so scaling by 2 gets a multiple of 8 with bignum at offset 0 etc.
 	// But the upper 3 bytes of EAX hold junk presently, so clear them.
 	and	$0x7f, %eax
+#ifdef LISP_FEATURE_DARWIN
+	lea	eql_dispatch(%rip), %r11
+	jmpq	*(%r11,%rax,2)
+#else
 	jmp	*eql_dispatch(,%rax,2)
+#endif
 
 eql_single_float:		 # This case should not happen
 	xorl	%eax, %eax
@@ -585,15 +590,23 @@ eql_rational:
 	andl	$1, %eax
 	// %eax is 1 if they are both other-pointer objects, 0 if not
 	je	flip_ZF_return
-	movl	-OTHER_POINTER_LOWTAG(%rsi), %eax
-	cmpl	-OTHER_POINTER_LOWTAG(%rdi), %eax
+	movb	-OTHER_POINTER_LOWTAG(%rsi), %al
+	cmpb	-OTHER_POINTER_LOWTAG(%rdi), %al
 	jne     done
 	// widetags matched, so they are both bignums or both ratios.
-	// Additionally, if bignums the lengths "probably" matched unless we
-	// allow massive payload - only 4 header bytes were compared so far.
+#ifdef LISP_FEATURE_DARWIN
+	lea	(eql_dispatch-BIGNUM_WIDETAG*2)(%rip), %r11
+	jmpq	*(%r11,%rax,2)
+#else
 	jmp	*(eql_dispatch-BIGNUM_WIDETAG*2)(,%rax,2)
+#endif
+
 #ifdef __ELF__
 	.section	.rodata
+#else
+	// can't store absolute reference from .text to .text apparently?
+	// (but _can_ store reference to .text from .data)
+        .data
 #endif        
 	.p2align 3
 eql_dispatch:
