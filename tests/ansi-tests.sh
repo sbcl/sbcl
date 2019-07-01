@@ -1,7 +1,7 @@
 #!/bin/sh -e
 
 git config --global core.autocrlf false
-git clone https://gitlab.common-lisp.net/ansi-test/ansi-test.git
+git clone https://github.com/sbcl/ansi-test.git
 
 cd ansi-test
 ../../run-sbcl.sh --lose-on-corruption --disable-ldb \
