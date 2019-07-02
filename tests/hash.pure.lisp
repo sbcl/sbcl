@@ -160,3 +160,11 @@
     #+64-bit (setf (gethash 1.0f0 tbl) 1) ; single-float is a nonpointer
     (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-table tbl))))
       (assert (zerop data))))) ; not sb-vm:vector-valid-hashing-subtype
+
+(with-test (:name (hash-table :small-rehash-size))
+  (let ((ht (make-hash-table :rehash-size 2)))
+    (dotimes (i 100)
+      (setf (gethash (gensym) ht) 10)))
+  (let ((ht (make-hash-table :rehash-size 1.0001)))
+    (dotimes (i 100)
+      (setf (gethash (gensym) ht) 10))))

@@ -288,7 +288,9 @@ Examples:
 ;;; The smallest table holds 14 items distributed among 16 buckets.
 ;;; So we allocate 14 k/v pairs = 28 cells + 2 overhead = 30 cells,
 ;;; and at maximum load the table will have a load factor of 87.5%
-(defconstant +min-hash-table-size+ 14)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defconstant +min-hash-table-size+ 14)
+  (defconstant default-rehash-size $1.5))
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
 
 ;; The GC will set this to 1 if it moves an EQ-based key. This used
@@ -309,8 +311,8 @@ Examples:
 
 (defun make-hash-table (&key
                         (test 'eql)
-                        (size +min-hash-table-size+)
-                        (rehash-size $1.5)
+                        (size #.+min-hash-table-size+)
+                        (rehash-size #.default-rehash-size)
                         (rehash-threshold 1)
                         (hash-function nil)
                         (weakness nil)
@@ -539,20 +541,43 @@ multiple threads accessing the same hash-table without locking."
          ;; The NEXT vector's length is 1 greater than "size" - the number
          ;; of k/v pairs at full capacity.
          (old-size (1- (length old-next-vector)))
-         (new-size (let ((rehash-size (hash-table-rehash-size table)))
-                     (etypecase rehash-size
-                       (float (the index (truncate (* rehash-size old-size)))) ; usually
-                       (fixnum (+ rehash-size old-size))))) ; rarely, I image
+         (rehash-size (hash-table-rehash-size table))
+         (new-size (typecase rehash-size
+                     ;; Ensure that if the user specifies a float that is so close
+                     ;; to 1.0 as to disappear in the TRUNCATE that we actually grow.
+                     ;; (TRUNCATE (* 14 1.01)) => 14
+                     (float (max (the index (truncate (* rehash-size old-size))) ; usually
+                                 (1+ old-size)))
+                     (fixnum (+ rehash-size old-size)))) ; rarely, I imagine
          (new-n-buckets
           (let* ((pow2ceil (power-of-two-ceiling new-size))
                  (full-lf (/ new-size pow2ceil)))
-            ;; Try to keep the load factor at full load within a reasonable band,
-            ;; otherwise we might do be absurdly wasteful by resizing to hold 1 more
-            ;; k/v pair while doubling the bucket count.
-            (cond ((> full-lf 9/10)   ; $.9 is unhappy in cross-float due to inexactness
-                   (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
-                  ((< full-lf 55/100) ; and $.55 is similarly unhappy
-                   (setq new-size (floor pow2ceil 100/65)))) ; target LF = 65%
+            ;; If the default rehash-size was employed, let's try to keep the
+            ;; load factor within a reasonable band. Otherwise don't bother.
+            ;; The motivation for this decision is twofold:
+            ;; - if using defaults, it would be ideal to attempt to be nominally
+            ;;   conscientious of the 1.5x resize amount.
+            ;; - we can't really accommodate arbitrary resize amounts, especially if small.
+            ;;   (power-of-2 sizing can't do that- doubling is the only possibility)
+            ;;   But we can produce the smallest table consistent with the request.
+            ;;   Say e.g. REHASH-SIZE was 2 using the default initial size of 14.
+            ;;   Resizing computes 16 k/v pairs which coincides exactly with
+            ;;   16 buckets (the nearest power of 2). But if we wish to avoid 100% load,
+            ;;   what can we do? Re-double the bin count to 32? Decrease the k/v pair count
+            ;;   to 15? Clearly neither of those make sense if the user is trying to say
+            ;;   that (s)he wants 2 entries more which means "don't increase by a lot".
+            ;;   Changing from 8 buckets (at the old size) to 32 buckets is a lot,
+            ;;   so why do that? Conversely, it makes no sense to reduce the k/v pair
+            ;;   limit just to keep the LF less than 100%. A similar problem occurs
+            ;;   if you specify 1.001 or other float near 1.
+            ;;   Anyway, chaining supports load factors in excess of 100%
+            (when (eql rehash-size default-rehash-size)
+              (cond ((> full-lf 9/10)   ; $.9 is unhappy in cross-float due to inexactness
+                     ;; If we're going to decrease the size, make sure we definitely
+                     ;; don't decrease below the old size.
+                     (setq new-size (floor pow2ceil 100/85)))  ; target LF = 85%
+                    ((< full-lf 55/100) ; and $.55 is similarly unhappy
+                     (setq new-size (floor pow2ceil 100/65))))) ; target LF = 65%
             pow2ceil))
          ;; These vector lengths are exactly analogous to those in MAKE-HASH-TABLE,
          ;; prompting the question of whether we can share some code.
