@@ -3054,18 +3054,6 @@ core and return a descriptor to it."
     ;; this -2 shift depends on every OTHER-IMMEDIATE-?-LOWTAG
     ;; ending with the same 2 bits. (#b10)
     (write-tags "" "-WIDETAG" (ash (1+ sb-vm:widetag-mask) -2) -2))
-  ;; Inform print_otherptr() of all array types that it's too dumb to print
-  (let ((array-type-bits (make-array 32 :initial-element 0)))
-    (flet ((toggle (b)
-             (multiple-value-bind (ofs bit) (floor b 8)
-               (setf (aref array-type-bits ofs) (ash 1 bit)))))
-      (dovector (saetp sb-vm:*specialized-array-element-type-properties*)
-        (unless (member (sb-vm:saetp-specifier saetp) '(character base-char t))
-          (toggle (sb-vm:saetp-typecode saetp))
-          (awhen (sb-vm:saetp-complex-typecode saetp) (toggle it)))))
-    (format out
-            "~%static unsigned char unprintable_array_types[32] =~% {~{~d~^,~}};~%"
-            (coerce array-type-bits 'list)))
   (dolist (prim-obj '(symbol ratio complex sb-vm::code simple-fun
                       closure funcallable-instance
                       weak-pointer fdefn sb-vm::value-cell))
