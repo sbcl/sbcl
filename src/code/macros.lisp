@@ -58,7 +58,8 @@
                                         place
                                         (with-unique-names (temp)
                                           (bindings `(,temp ,place))
-                                          (infos `(list ',place ,temp))
+                                          (infos `',place)
+                                          (infos temp)
                                           temp)))
                                   (rest test-form)))
                 ;; For all other cases, just evaluate TEST-FORM
@@ -76,9 +77,9 @@
               (go ,done))
 
             (assert-error ',test-form
-                          ,@(and (or (infos) places datum
-                                     arguments)
-                                 `((list ,@(infos))))
+                          ,@(and (infos)
+                                 `(,(/ (length (infos)) 2)))
+                          ,@(infos)
                           ,@(and (or places datum
                                      arguments)
                                  `(',places))

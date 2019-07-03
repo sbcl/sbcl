@@ -224,25 +224,32 @@ with that condition (or with no condition) will be returned."
           (funcall function condition)))))
 
 
-(defun assert-error (assertion &optional args-and-values places datum &rest arguments)
-  (let ((cond (if datum
-                  (apply #'coerce-to-condition
-                         datum 'simple-error 'error arguments)
-                  (make-condition
-                   'simple-error
-                   :format-control "~@<The assertion ~S failed~:[.~:; ~
-                                    with ~:*~{~{~S = ~S~}~^, ~}.~]~:@>"
-                   :format-arguments (list assertion args-and-values)))))
-    (restart-case
-        (error cond)
-      (continue ()
-        :report (lambda (stream)
-                  (format stream "Retry assertion")
-                  (if places
-                      (format stream " with new value~P for ~{~S~^, ~}."
-                              (length places) places)
-                      (format stream ".")))
-        nil))))
+(defun assert-error (assertion &rest rest)
+  (let* ((rest rest)
+         (n-args-and-values (if (fixnump (car rest))
+                                (* (pop rest) 2)
+                                0))
+         (args-and-values (subseq rest 0 n-args-and-values)))
+    (destructuring-bind (&optional places datum &rest arguments)
+        (subseq rest n-args-and-values)
+      (let ((cond (if datum
+                      (apply #'coerce-to-condition
+                             datum 'simple-error 'error arguments)
+                      (make-condition
+                       'simple-error
+                       :format-control "~@<The assertion ~S failed~:[.~:; ~
+                                           with ~:*~{~S = ~S~^, ~}.~]~:@>"
+                       :format-arguments (list assertion args-and-values)))))
+        (restart-case
+            (error cond)
+          (continue ()
+            :report (lambda (stream)
+                      (format stream "Retry assertion")
+                      (if places
+                          (format stream " with new value~P for ~{~S~^, ~}."
+                                  (length places) places)
+                          (format stream ".")))
+            nil))))))
 
 ;;; READ-EVALUATED-FORM is used as the interactive method for restart cases
 ;;; setup by the Common Lisp "casing" (e.g., CCASE and CTYPECASE) macros
