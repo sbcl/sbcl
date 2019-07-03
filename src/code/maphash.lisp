@@ -27,6 +27,7 @@
   (with-unique-names (fun table size i kv-vector key value)
     `(let* ((,fun (%coerce-callable-to-fun ,function-designator))
             (,table ,hash-table)
+            (,kv-vector (hash-table-table ,table))
             (,size (* 2 (length (hash-table-next-vector ,table)))))
        ;; Regarding this TRULY-THE: in the theoretical edge case of the largest
        ;; possible NEXT-VECTOR, it is not really true that the I+2 is an index.
@@ -42,8 +43,7 @@
         ;; :VALUE hash table it's possible that the GC hit after KEY
         ;; was read and now the entry is gone. So check if either the
         ;; key or the value is empty.
-         (let* ((,kv-vector (hash-table-table ,table))
-                (,value (aref ,kv-vector ,i)))
+         (let ((,value (aref ,kv-vector ,i)))
            (unless (empty-ht-slot-p ,value)
              (let ((,key
                     ;; I is bounded below by 3, and bounded above by INDEX max,
@@ -86,14 +86,11 @@ for."
   (let ((function (gensymify* name "-FUN")))
     `(let ((,function
             (let* ((table ,hash-table)
+                   (kv-vector (hash-table-table table))
                    (size (* 2 (length (hash-table-next-vector table))))
                    (index 3))
               (declare (fixnum index))
-              (labels
-                  ((,name ()
-                     ;; (We grab the table again on each iteration just in
-                     ;; case it was rehashed by a PUTHASH.)
-                     (let ((kv-vector (hash-table-table table)))
+              (flet ((,name ()
                        (loop
                         (when (>= index size) (return nil))
                         (let ((i index))
@@ -105,7 +102,7 @@ for."
                                       (declare (optimize (sb-c::insert-array-bounds-checks 0)))
                                       (aref kv-vector (1- i)))))
                                 (unless (empty-ht-slot-p key)
-                                  (return (values t key value)))))))))))
+                                  (return (values t key value))))))))))
                 #',name))))
        (macrolet ((,name () '(funcall ,function)))
          ,@body))))

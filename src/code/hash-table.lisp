@@ -51,7 +51,8 @@
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
-                               (getter
+                               (setter
+                                getter
                                 test
                                 test-fun
                                 hash-fun
@@ -63,17 +64,20 @@
                                 hash-vector
                                 flags)))
 
-  ;; All and only the slots that are needed for GETHASH come first.
+  ;; All and only the slots that are needed for PUTHASH,GETHASH come first.
   (getter #'error :type function :read-only t)
+  (setter #'error :type function :read-only t)
+  ;; The Key-Value pair vector.
+  (table nil :type simple-vector)
   ;; The index vector. This may be larger than the hash size to help
   ;; reduce collisions.
   (index-vector nil :type (simple-array hash-table-index (*)))
   ;; This table parallels the KV vector, and is used to chain together
   ;; the hash buckets and the free list. A slot will only ever be in
   ;; one of these lists.
+  ;; (I think that free k/v slots could be linked through the KV vector
+  ;; and not the next vector which affords some minor improvements)
   (next-vector nil :type (simple-array hash-table-index (*)))
-  ;; The Key-Value pair vector.
-  (table nil :type simple-vector)
   ;; This table parallels the KV table, and can be used to store the
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
