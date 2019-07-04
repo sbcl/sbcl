@@ -512,7 +512,7 @@ Examples:
 
 (declaim (inline hash-table-pairs-capacity))
 (defun hash-table-pairs-capacity (pairs) (ash (- (length pairs) kv-pairs-overhead-slots) -1))
-  
+
 (defun hash-table-size (hash-table)
   "Return a size that can be used with MAKE-HASH-TABLE to create a hash
    table that can hold however many entries HASH-TABLE can hold without
@@ -674,7 +674,7 @@ multiple threads accessing the same hash-table without locking."
     ;; The high-water-mark remains the same.
     (setf (hash-table-pairs-hwm new-kv-vector)
           (hash-table-pairs-hwm old-kv-vector))
-    
+
     ;; Copy over the k/v pair vector. The first 2 elements are not a pair,
     ;; but we need to copy them.
     ;; Don't copy trailing metadata slots though.
@@ -685,7 +685,7 @@ multiple threads accessing the same hash-table without locking."
     (when old-hash-vector
       (replace new-hash-vector old-hash-vector :start1 1 :start2 1))
 
-    (setf (hash-table-next-free-kv table)    
+    (setf (hash-table-next-free-kv table)
           (%rehash new-kv-vector new-hash-vector
                    new-index-vector new-next-vector))
 
@@ -720,7 +720,7 @@ multiple threads accessing the same hash-table without locking."
     ;; 'next' at the moment a slot is linked into a chain.
     (fill index-vector 0)
     (setf (hash-table-next-free-kv table)
-          (%rehash kv-vector (hash-table-hash-vector table) 
+          (%rehash kv-vector (hash-table-hash-vector table)
                    index-vector (hash-table-next-vector table)))
 
   ;; Clear the rehash bit only at the very end, otherwise another thread
@@ -1326,7 +1326,7 @@ table itself."
 
 (defun show-chains (tbl &aux (nv (hash-table-next-vector tbl))
                         (tot-len 0) (max-len 0) (n-chains 0))
-   
+
   (flet ((show-chain (label next &aux (len 0))
            (unless (eql next 0)
              (write-string label)

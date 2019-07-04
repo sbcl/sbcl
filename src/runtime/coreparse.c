@@ -590,9 +590,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
         case SIMPLE_VECTOR_WIDETAG:
           if (is_vector_subtype(*where, VectorValidHashing)) {
               struct vector* v = (struct vector*)where;
-              gc_assert(v->length > 0 &&
-                        !(v->length & make_fixnum(1)) && // length must be even
-                        instancep(v->data[0]));
+              gc_assert(v->length > 0 && instancep(v->data[0]));
               lispobj* data = (lispobj*)v->data;
               adjust_pointers(&data[0], 1, adj); // adjust the hash-table structure
               boolean needs_rehash = 0;
