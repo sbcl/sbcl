@@ -5,7 +5,7 @@
 (use-package "SB-SYS")
 
 (defun is-address-sensitive (tbl)
-  (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-table tbl))))
+  (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
     (= data sb-vm:vector-valid-hashing-subtype)))
 
 (with-test (:name (hash-table :eql-hash-symbol-not-eq-based))

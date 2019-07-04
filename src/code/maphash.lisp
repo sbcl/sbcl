@@ -20,15 +20,27 @@
 (define-symbol-macro +empty-ht-slot+ (make-unbound-marker))
 (defmacro empty-ht-slot-p (x) `(unbound-marker-p ,x))
 
+;;; like INDEX, but only up to half the maximum. Used by hash-table
+;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
+(deftype index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
+
+;;; The high water mark is an element of the pairs vector, and not
+;;; a slot in the table.
+;;; It is the number of logical pairs in use, so if HWM = 1, then
+;;; 1 pair is in use occupying physical element indices 2 and 3.
+(defmacro hash-table-pairs-hwm (pairs)
+  `(truly-the index/2 (svref ,pairs (1- (length ,pairs)))))
+
 (define-compiler-macro maphash (&whole form function-designator hash-table
                                 &environment env)
   (when (sb-c:policy env (> space speed))
     (return-from maphash form))
-  (with-unique-names (fun table size i kv-vector key value)
+  (with-unique-names (fun limit i kv-vector key value)
     `(let* ((,fun (%coerce-callable-to-fun ,function-designator))
-            (,table ,hash-table)
-            (,kv-vector (hash-table-table ,table))
-            (,size (* 2 (length (hash-table-next-vector ,table)))))
+            (,kv-vector (hash-table-pairs ,hash-table))
+            ;; The high water mark needs to be loaded only once due to the
+            ;; prohibition against adding keys during traversal.
+            (,limit (1+ (* 2 (hash-table-pairs-hwm ,kv-vector)))))
        ;; Regarding this TRULY-THE: in the theoretical edge case of the largest
        ;; possible NEXT-VECTOR, it is not really true that the I+2 is an index.
        ;; However, for all intents and purposes, it is an INDEX because if not,
@@ -38,7 +50,7 @@
        ;; And it doesn't matter anyway - the compiler uses unsigned word
        ;; arithmetic here on account of (* 2 length) exceeding a fixnum.
        (do ((,i 3 (truly-the index (+ ,i 2))))
-           ((>= ,i ,size))
+           ((> ,i ,limit))
         ;; We are running without locking or WITHOUT-GCING. For a weak
         ;; :VALUE hash table it's possible that the GC hit after KEY
         ;; was read and now the entry is gone. So check if either the
@@ -85,14 +97,13 @@ use eg. SB-EXT:WITH-LOCKED-HASH-TABLE to protect the WITH-HASH-TABLE-ITERATOR
 for."
   (let ((function (gensymify* name "-FUN")))
     `(let ((,function
-            (let* ((table ,hash-table)
-                   (kv-vector (hash-table-table table))
-                   (size (* 2 (length (hash-table-next-vector table))))
+            (let* ((kv-vector (hash-table-pairs ,hash-table))
+                   (limit (1+ (* 2 (hash-table-pairs-hwm kv-vector))))
                    (index 3))
               (declare (fixnum index))
               (flet ((,name ()
                        (loop
-                        (when (>= index size) (return nil))
+                        (when (> index limit) (return nil))
                         (let ((i index))
                           (incf (truly-the index index) 2)
                           (let ((value (aref kv-vector i)))

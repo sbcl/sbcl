@@ -746,12 +746,15 @@ static uword_t build_refs(lispobj* where, lispobj* end,
                 struct hash_table* hash_table =
                   (struct hash_table *)native_pointer(lhash_table);
                 int weakness = hashtable_weakness(hash_table);
+                lispobj* data = where + 2;
+                int kv_vector_length = fixnum_value(where[1]);
+                int high_water_mark = fixnum_value(data[kv_vector_length-1]);
                 if (hashtable_weakp(hash_table) &&
                     (weakness == 1 || weakness == 2)) { // 1=key, 2=value
-                    // Skip the first 4 words which are:
-                    //  header, length, vector->table backpointer, rehash-p
-                    int start = (weakness == 1) ? 5 : 4;
-                    for(i=start; i<scan_limit; i+=2) check_ptr(where[i]);
+                    // Skip the first 2 data words
+                    int start = (weakness == 1) ? 3 : 2;
+                    int end = 2 * (high_water_mark + 1);
+                    for(i=start; i<end; i+=2) check_ptr(data[i]);
                     continue;
                 }
             }

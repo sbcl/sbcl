@@ -37,7 +37,7 @@
   (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:|call|)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
-                #:hash-table-table #:hash-table-number-entries))
+                #:hash-table-pairs #:hash-table-n-entries))
 
 (in-package "SB-EDITCORE")
 
@@ -375,9 +375,9 @@
 
 (defun target-hash-table-alist (table spaces)
   (let ((table (truly-the hash-table (translate table spaces))))
-    (let ((cells (the simple-vector (translate (hash-table-table table) spaces))))
+    (let ((cells (the simple-vector (translate (hash-table-pairs table) spaces))))
       (collect ((pairs))
-        (do ((count (hash-table-number-entries table) (1- count))
+        (do ((count (hash-table-n-entries table) (1- count))
              (i 2 (+ i 2)))
             ((zerop count)
              (pairs))

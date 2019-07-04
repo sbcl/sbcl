@@ -1124,7 +1124,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
     lispobj ht = CONS(code->debug_info)->car;
     if (ht) {
         struct vector* table =
-            VECTOR(((struct hash_table*)native_pointer(ht))->table);
+            VECTOR(((struct hash_table*)native_pointer(ht))->pairs);
         lispobj sym;
         int i;
         for (i=2 ; i < fixnum_value(table->length) ; i += 2)

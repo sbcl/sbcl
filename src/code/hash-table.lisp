@@ -16,21 +16,24 @@
 ;;; SIZE is always the exact number of K/V entries that can be stored,
 ;;; and can be any number, not necessarily a power of 2.
 
-;;;            ______________________________________
-;;;  K/V       |                                    |
-;;;  vector    | * | * |  K | V | K | V | ......... |
-;;;            +____________________________________+
-;;;                    <---         SIZE          -->
+;;;            __________________________________________
+;;;  K/V       |                                    |   |
+;;;  vector    | * | * |  K | V | K | V | ......... | * |
+;;;            +________________________________________+
+;;;                    | <---       SIZE         -->|
 ;;;
 ;;;                      ^--- pair index 1 and so on
 ;;;
 
-;;; The length of TABLE (the K/V vector) is the specified :SIZE * 2
-;;; plus 2 cells of overhead. There is a minimum of 16 k/v pairs,
-;;; therefore a minimum physical length of 34 (including the overhead).
-;;; Pair index 0 is not for user data. We index cell pairs by a physical
-;;; index, not logical pair index. ("logical" pair 0 would occupy
-;;; physical vector elements 2 and 3 as if the overhead didn't exist.)
+;;; The length of PAIRS (the K/V vector) is the specified :SIZE * 2
+;;; plus 3 elements of overhead, 2 at the beginning and one at the end.
+;;; (It's slighly strange that extra cells are in two different places,
+;;; however there's a reason: we need an indicator for the end of a chain,
+;;; and/or unused bin, and we use 0 for that, which means that k/v pair 0
+;;; is unusable. But we can't keep indiscriminately adding overhead cells
+;;; to the front because that make even more k/v pairs unusable,
+;;; whereas adding at the end doesn't cause any such problem)
+;;; Pair index 1 is the first pair that stores user data.
 
 ;;; The length of the HASH-VECTOR is in direct correspondence with the
 ;;; physical k/v cells, so that we can store a hash per key and not worry
@@ -47,6 +50,13 @@
 ;;; the hash vector, the NEXT vector is sized at 1 greater than minimally
 ;;; necessary, to avoid adding and subtracting 1 from a pair index.
 
+;;; The PAIRS vector has an odd length with the following overhead elements:
+;;;
+;;; [0] = backpointer to hash-table
+;;; [1] = rehash-due-to-GC indicator
+;;; ...
+;;; [length-1] = high-water-mark
+
 ;;; HASH-TABLE is implemented as a STRUCTURE-OBJECT.
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
@@ -58,7 +68,7 @@
                                 hash-fun
                                 rehash-size
                                 rehash-threshold
-                                table
+                                pairs
                                 index-vector
                                 next-vector
                                 hash-vector
@@ -68,8 +78,12 @@
   (getter #'error :type function :read-only t)
   (setter #'error :type function :read-only t)
   ;; The Key-Value pair vector.
-  (table nil :type simple-vector)
-  ;; The index vector. This may be larger than the hash size to help
+  ;; Note: this vector has a "high water mark" which resembles a fill
+  ;; pointer, but unlike a fill pointer, GC can ignore elements
+  ;; above the high water mark.  If you store non-immediate data past
+  ;; that mark, you're sure to have problems.
+  (pairs nil :type simple-vector)
+  ;; The index vector. This may be larger than the capacity to help
   ;; reduce collisions.
   (index-vector nil :type (simple-array hash-table-index (*)))
   ;; This table parallels the KV vector, and is used to chain together
@@ -124,13 +138,15 @@
   ;; (CLHS says that these are all just "hints" and we're free to ignore)
   (rehash-threshold nil :type (single-float ($0.0) $1.0) :read-only t)
   ;; The current number of entries in the table.
-  (number-entries 0 :type index)
+  (%count 0 :type index)
   ;; This slot is used to link weak hash tables during GC. When the GC
   ;; isn't running it is always NIL.
   (next-weak-hash-table nil :type null)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
-  (next-free-kv 0 :type index)
+  ;; This index is allowed to exceed the high-water-mark by 1 unless
+  ;; the HWM is at its maximum in which case this must be 0.
+  (next-free-kv 1 :type index)
   ;; List of values culled out during GC of weak hash table.
   (culled-values nil :type list)
   ;; For detecting concurrent accesses.

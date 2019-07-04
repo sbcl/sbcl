@@ -136,10 +136,10 @@
       (setf (gethash (cons 'foo (gensym)) tbl) 1))
     (gc)
     ;; The need-to-rehash bit is set
-    (assert (eql 1 (svref (sb-impl::hash-table-table tbl) 1)))
+    (assert (eql 1 (svref (sb-impl::hash-table-pairs tbl) 1)))
     (clrhash tbl)
     ;; The need-to-rehash bit is not set
-    (assert (eql 0 (svref (sb-impl::hash-table-table tbl) 1)))))
+    (assert (eql 0 (svref (sb-impl::hash-table-pairs tbl) 1)))))
 
 (with-test (:name :sxhash-signed-floating-point-zeros)
   (assert (not (eql (sxhash -0f0) (sxhash 0f0))))
@@ -158,7 +158,7 @@
   (let ((tbl (make-hash-table :test 'eq)))
     (setf (gethash #\a tbl) 1)
     #+64-bit (setf (gethash 1.0f0 tbl) 1) ; single-float is a nonpointer
-    (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-table tbl))))
+    (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
       (assert (zerop data))))) ; not sb-vm:vector-valid-hashing-subtype
 
 (with-test (:name (hash-table :small-rehash-size))

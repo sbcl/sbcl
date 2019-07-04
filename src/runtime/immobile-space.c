@@ -1718,18 +1718,22 @@ static void fixup_space(lispobj* where, size_t n_words)
         // as needing rehash.
         case SIMPLE_VECTOR_WIDETAG:
           if (is_vector_subtype(header_word, VectorValidHashing)) {
-              struct vector* v = (struct vector*)where;
-              lispobj* data = v->data;
-              gc_assert(v->length > 0 && instancep(data[0]) &&
-                        !(fixnum_value(v->length) & 1));  // length must be even
+              struct vector* kv_vector = (struct vector*)where;
+              lispobj* data = kv_vector->data;
+              long kv_length = fixnum_value(kv_vector->length);
+              gc_assert(kv_vector->length > 0 && instancep(data[0]));
               boolean needs_rehash = 0;
-              int i;
-              for (i = fixnum_value(v->length)-1 ; i>=0 ; --i) {
-                  lispobj ptr = data[i];
+#define KV_PAIRS_HIGH_WATER_MARK fixnum_value(data[kv_length-1])
+              long i;
+              for (i = 1; i <= KV_PAIRS_HIGH_WATER_MARK; ++i) {
+                  lispobj ptr = data[2*i];
                   if (forwardable_ptr_p(ptr)) {
-                      data[i] = forwarding_pointer_value(native_pointer(ptr));
+                      data[2*i] = forwarding_pointer_value(native_pointer(ptr));
                       needs_rehash = 1;
                   }
+                  ptr = data[2*i+1];
+                  if (forwardable_ptr_p(ptr))
+                      data[2*i+1] = forwarding_pointer_value(native_pointer(ptr));
               }
               if (needs_rehash)
                   data[1] = make_fixnum(1);

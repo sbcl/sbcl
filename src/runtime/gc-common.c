@@ -1026,7 +1026,7 @@ static inline int pointer_survived_gc_yet(lispobj obj)
  * length) or NULL if it isn't an array of the specified widetag after
  * all. */
 static inline void *
-get_array_data (lispobj array, int widetag, uword_t *length)
+get_array_data (lispobj array, int widetag, sword_t *length)
 {
     if (is_lisp_pointer(array) && widetag_of(native_pointer(array)) == widetag) {
         if (length != NULL)
@@ -1164,17 +1164,17 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
                                 int (*predicate)(lispobj,lispobj),
                                 void (*scav_entry)(lispobj*))
 {
-    uword_t kv_length;
-    uword_t length;
-    uword_t next_vector_length;
-    uword_t hash_vector_length;
-    uword_t i;
+    sword_t kv_length;
+    sword_t length;
+    sword_t next_vector_length;
+    sword_t hash_vector_length;
+    sword_t i;
     boolean any_deferred = 0;
 
-    lispobj *kv_vector = get_array_data(hash_table->table,
+    lispobj *kv_vector = get_array_data(hash_table->pairs,
                                         SIMPLE_VECTOR_WIDETAG, &kv_length);
     if (kv_vector == NULL)
-        lose("invalid kv_vector %"OBJ_FMTX, hash_table->table);
+        lose("invalid kv_vector %"OBJ_FMTX, hash_table->pairs);
 
     uint32_t *index_vector = get_array_data(hash_table->index_vector,
                                             SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
@@ -1196,20 +1196,22 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
      /* These lengths could be different as the index_vector can be a
       * different length from the others, a larger index_vector could
       * help reduce collisions. */
-     gc_assert(next_vector_length*2 == kv_length);
+     gc_assert(next_vector_length == kv_length >> 1);
 
      if (kv_vector[1] && kv_vector[1] != make_fixnum(1))
         lose("unexpected need-to-rehash: %"OBJ_FMTX, kv_vector[1]);
 
     /* Work through the KV vector. */
     boolean rehash = 0;
+#define KV_PAIRS_HIGH_WATER_MARK fixnum_value(kv_vector[kv_length-1])
+
     // We can disregard any entry in which both key and value are immediates.
     // This effectively ignores empty pairs, as well as makes fixnum -> fixnum
     // mappings more efficient.
     // If the bitwise OR of two lispobjs satisfies is_lisp_pointer(),
     // then at least one is a pointer.
 #define SCAV_ENTRIES(entry_alivep, defer)                                      \
-    for (i = 1; i < next_vector_length; i++) {                                 \
+    for (i = 1; i <= KV_PAIRS_HIGH_WATER_MARK; i++) {                          \
         lispobj key = kv_vector[2*i], value = kv_vector[2*i+1];                \
         if (is_lisp_pointer(key|value)) {                                      \
           if (!entry_alivep) { defer; any_deferred = 1; } else {               \
@@ -1227,7 +1229,7 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
         if (!any_deferred && debug_weak_ht)
             fprintf(stderr,
                     "will skip rescan of weak ht: %d/%d items\n",
-                    (int)fixnum_value(hash_table->number_entries),
+                    (int)KV_PAIRS_HIGH_WATER_MARK,
                     (int)(next_vector_length - 1));
     } else { // The entries are always live
         SCAV_ENTRIES(1,);
@@ -1291,8 +1293,8 @@ scav_vector (lispobj *where, lispobj header)
     scav_instance((lispobj *)hash_table, hash_table->header);
 
     /* Cross-check the kv_vector. */
-    if (where != native_pointer(hash_table->table)) {
-        lose("hash_table table!=this table %"OBJ_FMTX, hash_table->table);
+    if (where != native_pointer(hash_table->pairs)) {
+        lose("hash_table table!=this table %"OBJ_FMTX, hash_table->pairs);
     }
 
     if (!hashtable_weakp(hash_table)) {
@@ -1347,9 +1349,9 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
         gc_assert(key != empty_symbol);
         gc_assert(value != empty_symbol);
         if (!alivep_test(key, value)) {
-            gc_assert(hash_table->number_entries > 0);
+            gc_assert(hash_table->_count > 0);
             *prev = next;
-            hash_table->number_entries -= make_fixnum(1);
+            hash_table->_count -= make_fixnum(1);
             next_vector[index] = fixnum_value(hash_table->next_free_kv);
             hash_table->next_free_kv = make_fixnum(index);
             kv_vector[2 * index] = empty_symbol;
@@ -1390,10 +1392,10 @@ cull_weak_hash_table (struct hash_table *hash_table,
                       int (*alivep_test)(lispobj,lispobj),
                       void (*fix_pointers)(lispobj[2]))
 {
-    uword_t length = 0; /* prevent warning */
-    uword_t i;
+    sword_t length = 0; /* prevent warning */
+    sword_t i;
 
-    lispobj *kv_vector = get_array_data(hash_table->table,
+    lispobj *kv_vector = get_array_data(hash_table->pairs,
                                         SIMPLE_VECTOR_WIDETAG, NULL);
     uint32_t *index_vector = get_array_data(hash_table->index_vector,
                                             SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,

@@ -14,10 +14,6 @@
 
 ;;;; utilities
 
-;;; like INDEX, but only up to half the maximum. Used by hash-table
-;;; code that does plenty to (aref v (* 2 i)) and (aref v (1+ (* 2 i))).
-(deftype index/2 () `(integer 0 (,(floor sb-xc:array-dimension-limit 2))))
-
 ;;; T if and only if table has non-null weakness kind.
 (declaim (inline hash-table-weak-p))
 (defun hash-table-weak-p (ht) (logbitp 0 (hash-table-flags ht)))
@@ -190,12 +186,12 @@
           (ash hash -12)
           (ash hash -20))))
 (declaim (inline mask-hash))
-(defun mask-hash (hash length)
-  (truly-the index (logand (1- length) hash)))
+(defun mask-hash (hash mask)
+  (truly-the index (logand mask hash)))
 (declaim (inline pointer-hash->index))
-(defun pointer-hash->index (hash length)
-  (declare (type hash hash length))
-  (truly-the index (logand (1- length) (prefuzz-hash hash))))
+(defun pointer-hash->index (hash mask)
+  (declare (type hash hash mask))
+  (truly-the index (logand mask (prefuzz-hash hash))))
 
 ;;;; user-defined hash table tests
 
@@ -286,14 +282,14 @@ Examples:
 ;;;; construction and simple accessors
 
 ;;; The smallest table holds 14 items distributed among 16 buckets.
-;;; So we allocate 14 k/v pairs = 28 cells + 2 overhead = 30 cells,
+;;; So we allocate 14 k/v pairs = 28 cells + 3 overhead = 31 cells,
 ;;; and at maximum load the table will have a load factor of 87.5%
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +min-hash-table-size+ 14)
   (defconstant default-rehash-size $1.5))
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
 
-;; The GC will set this to 1 if it moves an EQ-based key. This used
+;; The GC will set this to 1 if it moves an address-sensitive key. This used
 ;; to be signaled by a bit in the header of the kv vector, but that
 ;; implementation caused some concurrency issues when we stopped
 ;; inhibiting GC during hash-table lookup.
@@ -308,6 +304,14 @@ Examples:
 ;; We could do it with a single bit by implementing vops for atomic
 ;; read/modify/write on the header. In C there's sync_or_and_fetch, etc.
 (defmacro kv-vector-needs-rehash (vector) `(svref ,vector 1))
+
+(defconstant kv-pairs-overhead-slots 3)
+(defmacro new-kv-vector (size)
+  `(let ((v (make-array (+ (* 2 ,size) kv-pairs-overhead-slots)
+                        :initial-element +empty-ht-slot+)))
+     (setf (kv-vector-needs-rehash v) 0)
+     (setf (hash-table-pairs-hwm v) 0)
+     v))
 
 (defun make-hash-table (&key
                         (test 'eql)
@@ -462,19 +466,17 @@ Examples:
            (index-vector (make-array bucket-count
                                      :element-type 'hash-table-index
                                      :initial-element 0))
-           ;; Now compute *physical* sizes of the storage arrays.
-           (size+1 (1+ size))       ; The first element is not usable.
-           (kv-vector (make-array (* 2 size+1)
-                                  :initial-element +empty-ht-slot+))
+           (kv-vector (new-kv-vector size))
            ;; Needs to be the half the length of the KV vector to link
            ;; KV entries - mapped to indices at 2i and 2i+1 -
            ;; together.
-           (next-vector (make-array size+1 :element-type 'hash-table-index
-                                           :initial-element 0))
+           ;; We don't need this to be initially 0-filled, so don't specify
+           ;; an initial element (in case we ever meaningfully distinguish
+           ;; between don't-care and 0-fill)
+           (next-vector (make-array (1+ size) :element-type 'hash-table-index))
+           ;; same here - don't care about initial contents
            (hash-vector (unless (eq test 'eq)
-                          (make-array size+1
-                                      :element-type 'hash-table-index
-                                      :initial-element +magic-hash-vector-value+)))
+                          (make-array (1+ size) :element-type 'hash-table-index)))
            (weakness (if weakness
                          (or (loop for i below 4
                                    when (eq (decode-hash-table-weakness i) weakness)
@@ -487,22 +489,17 @@ Examples:
                                     rehash-size rehash-threshold
                                     kv-vector index-vector next-vector hash-vector
                                     (logior (if synchronized 2 0) weakness))))
-      (declare (type index size+1 scaled-size))
-      (setf (kv-vector-needs-rehash kv-vector) 0)
-      ;; Set up the free list, all free. These lists are 0 terminated.
-      (do ((i 1 (1+ i)))
-          ((>= i size))
-        (setf (aref next-vector i) (1+ i)))
-      (setf (aref next-vector size) 0)
-      (setf (hash-table-next-free-kv table) 1)
+      (declare (type index scaled-size))
       (setf (aref kv-vector 0) table)
       table)))
 
+;;; I guess we might have more than one representation of a table,
+;;; hence this small wrapper function. But why not for the others?
 (defun hash-table-count (hash-table)
   "Return the number of entries in the given HASH-TABLE."
   (declare (type hash-table hash-table)
            (values index))
-  (hash-table-number-entries hash-table))
+  (hash-table-%count hash-table))
 
 (setf (documentation 'hash-table-rehash-size 'function)
       "Return the rehash-size HASH-TABLE was created with.")
@@ -513,12 +510,14 @@ Examples:
 (setf (documentation 'hash-table-synchronized-p 'function)
       "Returns T if HASH-TABLE is synchronized.")
 
+(declaim (inline hash-table-pairs-capacity))
+(defun hash-table-pairs-capacity (pairs) (ash (- (length pairs) kv-pairs-overhead-slots) -1))
+  
 (defun hash-table-size (hash-table)
   "Return a size that can be used with MAKE-HASH-TABLE to create a hash
    table that can hold however many entries HASH-TABLE can hold without
    having to be grown."
-  ;; First 2 cells are metadata, rest are entries that it can hold
-  (1- (ash (length (hash-table-table hash-table)) -1)))
+  (hash-table-pairs-capacity (hash-table-pairs hash-table)))
 
 (setf (documentation 'hash-table-test 'function)
       "Return the test HASH-TABLE was created with.")
@@ -589,98 +588,112 @@ multiple threads accessing the same hash-table without locking."
          (new-index-vector (make-array new-n-buckets
                                        :element-type 'hash-table-index
                                        :initial-element 0))
-         (size+1 (1+ new-size))       ; The first element is not usable.
-         (new-kv-vector (make-array (* 2 size+1)
-                                    :initial-element +empty-ht-slot+))
-         (new-next-vector (make-array size+1 :element-type 'hash-table-index
-                                             :initial-element 0))
+         (new-kv-vector (new-kv-vector new-size))
+         (new-next-vector (make-array (1+ new-size) :element-type 'hash-table-index))
          (new-hash-vector
            (when old-hash-vector
-             (make-array size+1
-                         :element-type 'hash-table-index
-                         :initial-element +magic-hash-vector-value+))))
+             (make-array (1+ new-size) :element-type 'hash-table-index))))
     (values new-kv-vector new-next-vector new-hash-vector new-index-vector)))
 
-(defun rehash (table
-               new-kv-vector new-next-vector new-hash-vector
-               new-index-vector)
+(defun %rehash (kv-vector hash-vector index-vector next-vector
+                          &aux (mask (1- (length index-vector))) (next-free 0))
+  ;; Scan backwards so that emply cells are linked such that they will
+  ;; be re-consumed leftmost first, not that it matters much.
+  (if hash-vector
+      (do ((i (hash-table-pairs-hwm kv-vector) (1- i)))
+          ((zerop i) next-free)
+        (declare (type index/2 i))
+        (let* ((i*2 (* 2 i)) ; because compiler doesn't eliminate common subexpressions
+               (key (aref kv-vector i*2))
+               (value (aref kv-vector (1+ i*2))))
+          (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
+                 ;; Slot is empty, push it onto free list.
+                 (setf (aref next-vector i) next-free next-free i))
+                ((/= (aref hash-vector i) +magic-hash-vector-value+)
+                 ;; Can use the existing hash value (not EQ based)
+                 (let* ((index (mask-hash (aref hash-vector i) mask))
+                        (next (aref index-vector index)))
+                   (declare (type index index))
+                   ;; Push this slot into the next chain.
+                   (setf (aref next-vector i) next)
+                   (setf (aref index-vector index) i)))
+                (t
+                 ;; address-sensitive hash.
+                 ;; Enable GC tricks.
+                 (set-header-data kv-vector sb-vm:vector-valid-hashing-subtype)
+                 (let* ((index (pointer-hash->index (pointer-hash key) mask))
+                        (next (aref index-vector index)))
+                   (declare (type index index))
+                   ;; Push this slot into the next chain.
+                   (setf (aref next-vector i) next)
+                   (setf (aref index-vector index) i))))))
+      (do ((i (hash-table-pairs-hwm kv-vector) (1- i)))
+          ((zerop i) next-free)
+        (declare (type index/2 i))
+        (let* ((i*2 (* 2 i)) ; because compiler doesn't eliminate common subexpressions
+               (key (aref kv-vector i*2))
+               (value (aref kv-vector (1+ i*2))))
+          (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
+                 ;; Slot is empty, push it onto free list.
+                 (setf (aref next-vector i) next-free next-free i))
+                (t
+                 (let* ((index (pointer-hash->index (pointer-hash key) mask))
+                        (next (aref index-vector index)))
+                   (declare (type index index))
+                   (set-header-data kv-vector sb-vm:vector-valid-hashing-subtype)
+                   ;; Push this slot into the next chain.
+                   (setf (aref next-vector i) next)
+                   (setf (aref index-vector index) i)))))))
+  (if (= next-free 0)
+      (let ((hwm (hash-table-pairs-hwm kv-vector)))
+        (if (= hwm (hash-table-pairs-capacity kv-vector)) 0 (1+ hwm)))
+      next-free))
+
+(defun rehash (table new-kv-vector new-next-vector new-hash-vector new-index-vector)
   (declare (type hash-table table)
            (type simple-vector new-kv-vector)
            (type (simple-array hash-table-index (*)) new-next-vector new-index-vector)
            (type (or null (simple-array hash-table-index (*))) new-hash-vector))
   (aver *gc-inhibit*)
-  (let* ((old-kv-vector (hash-table-table table))
+  (let* ((old-kv-vector (hash-table-pairs table))
          (old-hash-vector (hash-table-hash-vector table)))
 
     ;; Disable GC tricks on the OLD-KV-VECTOR.
     (set-header-data old-kv-vector sb-vm:vector-normal-subtype)
 
-    ;; GC must never observe a value other than 0 or 1 in the 1st element
-    ;; of a vector marked as valid-hashing. The vector is initially filled
-    ;; with the unbound-marker, so rectify that. GC is inhibited (asserted
-    ;; on entry), so the store order here isn't terribly important.
-    (setf (kv-vector-needs-rehash new-kv-vector) 0)
-
     ;; Non-empty weak hash tables always need GC support.
     (when (and (hash-table-weak-p table) (plusp (hash-table-count table)))
       (set-header-data new-kv-vector sb-vm:vector-valid-hashing-subtype))
 
+    ;; Rehash + resize only occurs when:
+    ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
+    ;;  (2) no cells below HWM are available (so COUNT = SIZE)
+    ;; The latter can be violated if the table is weak I think.
+    (aver (= (hash-table-pairs-hwm old-kv-vector) (hash-table-size table)))
+
+    ;; The high-water-mark remains the same.
+    (setf (hash-table-pairs-hwm new-kv-vector)
+          (hash-table-pairs-hwm old-kv-vector))
+    
     ;; Copy over the k/v pair vector. The first 2 elements are not a pair,
     ;; but we need to copy them.
-    (replace new-kv-vector old-kv-vector)
+    ;; Don't copy trailing metadata slots though.
+    (replace new-kv-vector old-kv-vector
+             :end2 (* (1+ (hash-table-pairs-hwm old-kv-vector)) 2))
 
     ;; Copy over the hash-vector. First element is not used.
     (when old-hash-vector
-      (replace new-hash-vector old-hash-vector))
+      (replace new-hash-vector old-hash-vector :start1 1 :start2 1))
 
-    (setf (hash-table-next-free-kv table) 0)
-    ;; Rehash all the entries; last to first so that after the pushes
-    ;; the chains are first to last. [We only really care about the freelist using
-    ;; up k/v cells from low to high. All other chains are order-insensitive]
-    ;; Also: While it's true that we're about to examine twice as many keys as we
-    ;; "should" (examining elements of NEW-KV-VECTOR beyond those which could have
-    ;; been in the old), we can't actually do significantly better than to visit as
-    ;; many pairs as there are in the new vector, because the empty cells have to be
-    ;; linked into the freelist anyway. The only possible optimization would be to
-    ;; execute the first stanza of the COND unconditionally for the totally unused
-    ;; section of the new vector, which is not really worth pulling into another loop
-    ;; since it doesn't improve the asymptotics.  We can, however, skip assigning
-    ;; HASH-TABLE-NEXT-FREE until the last possible moment.
-    (do ((i (1- (length new-next-vector)) (1- i))
-         (next-free 0)
-         (n-buckets (length new-index-vector)))
-        ((zerop i) ; pair index 0 is not used
-         (setf (hash-table-next-free-kv table) next-free))
-      (declare (type index/2 i))
-      (let ((key (aref new-kv-vector (* 2 i)))
-            (value (aref new-kv-vector (1+ (* 2 i)))))
-        (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
-               ;; Slot is empty, push it onto the free list.
-               (setf (aref new-next-vector i) next-free next-free i))
-              ((and new-hash-vector
-                    (/= (aref new-hash-vector i) +magic-hash-vector-value+))
-               ;; Can use the existing hash value (not EQ based)
-               (let* ((index (mask-hash (aref new-hash-vector i) n-buckets))
-                      (next (aref new-index-vector index)))
-                 (declare (type index index))
-                 ;; Push this slot into the next chain.
-                 (setf (aref new-next-vector i) next)
-                 (setf (aref new-index-vector index) i)))
-              (t
-               ;; EQ-based hash.
-               ;; Enable GC tricks.
-               (set-header-data new-kv-vector
-                                sb-vm:vector-valid-hashing-subtype)
-               (let* ((index (pointer-hash->index (pointer-hash key) n-buckets))
-                      (next (aref new-index-vector index)))
-                 (declare (type index index))
-                 ;; Push this slot onto the next chain.
-                 (setf (aref new-next-vector i) next)
-                 (setf (aref new-index-vector index) i))))))
-    (setf (hash-table-table table) new-kv-vector)
-    (setf (hash-table-index-vector table) new-index-vector)
-    (setf (hash-table-next-vector table) new-next-vector)
-    (setf (hash-table-hash-vector table) new-hash-vector)
+    (setf (hash-table-next-free-kv table)    
+          (%rehash new-kv-vector new-hash-vector
+                   new-index-vector new-next-vector))
+
+    (setf (hash-table-pairs table)        new-kv-vector
+          (hash-table-hash-vector table)  new-hash-vector
+          (hash-table-index-vector table) new-index-vector
+          (hash-table-next-vector table)  new-next-vector)
+
     ;; Fill the old kv-vector with 0 to help the conservative GC. Even
     ;; if nothing else were zeroed, it's important to clear the
     ;; special first cell in old-kv-vector.
@@ -691,13 +704,8 @@ multiple threads accessing the same hash-table without locking."
 (defun rehash-without-growing (table)
   (declare (type hash-table table))
   (aver *gc-inhibit*)
-  (let* ((kv-vector (hash-table-table table))
-         (next-vector (hash-table-next-vector table))
-         (hash-vector (hash-table-hash-vector table))
-         (size (length next-vector))
-         (index-vector (hash-table-index-vector table))
-         (length (length index-vector)))
-    (declare (type index size length))
+  (let ((kv-vector (hash-table-pairs table))
+        (index-vector (hash-table-index-vector table)))
 
     ;; Non-empty weak hash tables always need GC support.
     (unless (and (hash-table-weak-p table) (plusp (hash-table-count table)))
@@ -705,39 +713,16 @@ multiple threads accessing the same hash-table without locking."
       ;; if necessary.
       (set-header-data kv-vector sb-vm:vector-normal-subtype))
 
-    ;; Rehash all the entries.
-    (setf (hash-table-next-free-kv table) 0)
-    (dotimes (i size)
-      (setf (aref next-vector i) 0))
-    (dotimes (i length)
-      (setf (aref index-vector i) 0))
-    (do ((i (1- size) (1- i)))
-        ((zerop i))
-      (declare (type index/2 i))
-      (let ((key (aref kv-vector (* 2 i)))
-            (value (aref kv-vector (1+ (* 2 i)))))
-        (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
-               ;; Slot is empty, push it onto free list.
-               (setf (aref next-vector i) (hash-table-next-free-kv table))
-               (setf (hash-table-next-free-kv table) i))
-              ((and hash-vector (/= (aref hash-vector i) +magic-hash-vector-value+))
-               ;; Can use the existing hash value (not EQ based)
-               (let* ((index (mask-hash (aref hash-vector i) length))
-                      (next (aref index-vector index)))
-                 (declare (type index index))
-                 ;; Push this slot into the next chain.
-                 (setf (aref next-vector i) next)
-                 (setf (aref index-vector index) i)))
-              (t
-               ;; EQ-based hash.
-               ;; Enable GC tricks.
-               (set-header-data kv-vector sb-vm:vector-valid-hashing-subtype)
-               (let* ((index (pointer-hash->index (pointer-hash key) length))
-                      (next (aref index-vector index)))
-                 (declare (type index index))
-                 ;; Push this slot into the next chain.
-                 (setf (aref next-vector i) next)
-                 (setf (aref index-vector index) i))))))
+    ;; We don't need to zero-fill the NEXT vector, just the INDEX vector.
+    ;; Unless a key slot can be reached by a chain starting from the index
+    ;; vector or the 'next' of a previous chain element, we don't read either
+    ;; the key or its corresponding 'next'. So we only need to assign a
+    ;; 'next' at the moment a slot is linked into a chain.
+    (fill index-vector 0)
+    (setf (hash-table-next-free-kv table)
+          (%rehash kv-vector (hash-table-hash-vector table) 
+                   index-vector (hash-table-next-vector table)))
+
   ;; Clear the rehash bit only at the very end, otherwise another thread
   ;; might see a partially rehashed table as a normal one.
     (setf (kv-vector-needs-rehash kv-vector) 0))
@@ -757,7 +742,7 @@ multiple threads accessing the same hash-table without locking."
            ;; the table's bucketing was rendered obsolete by GC.
            ;; So we should defer this check until seeing whether we care.
       (when (logtest (truly-the fixnum
-                      (kv-vector-needs-rehash (hash-table-table ,hash-table)))
+                      (kv-vector-needs-rehash (hash-table-pairs ,hash-table)))
                      1)
         (rehash-if-obsolete ,hash-table))))
 
@@ -786,7 +771,7 @@ multiple threads accessing the same hash-table without locking."
 
 (defun rehash-if-obsolete (hash-table)
   (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table) :without-gcing t)
-    (when (logtest (kv-vector-needs-rehash (hash-table-table hash-table)) 1)
+    (when (logtest (kv-vector-needs-rehash (hash-table-pairs hash-table)) 1)
       (rehash-without-growing hash-table))))
 
 (declaim (inline update-hash-table-cache))
@@ -862,8 +847,8 @@ if there is no such entry. Entries can be added using SETF."
       (hash (prefuzz-hash hash0))
       (next (let ((index-vector (hash-table-index-vector hash-table)))
               (aref index-vector
-                    (mask-hash hash (length index-vector)))))
-      (kv-vector (hash-table-table hash-table))
+                    (mask-hash hash (1- (length index-vector))))))
+      (kv-vector (hash-table-pairs hash-table))
       (next-vector (hash-table-next-vector hash-table))
       ;; Binding of HASH-VECTOR would be flushed for EQ and EQL tables
       ;; automatically, but we forcibly elide some code because "reasons"
@@ -873,9 +858,7 @@ if there is no such entry. Entries can be added using SETF."
           '((hash-vector (hash-table-hash-vector hash-table))))
       ,@(unless std-fn
           '((test-fun (hash-table-test-fun hash-table))))
-      ;; Skip division by 2 since we can compensate by DECFing twice as much
-      ;; - see CHECK-EXCESSIVE-PROBES. Also don't worry about the unusable cells.
-      (probe-limit (length kv-vector))))
+      (probe-limit (length next-vector))))
 
   (defun ht-probing-should-use-eq (std-fn)
     (case std-fn ; try to strength-reduce the test for this key
@@ -905,7 +888,7 @@ if there is no such entry. Entries can be added using SETF."
              (t `(,std-fn key (aref kv-vector (* 2 next))))))))
 
 (defmacro check-excessive-probes (n-probes)
-  `(when (minusp (decf (truly-the fixnum probe-limit) ,(* n-probes 2)))
+  `(when (minusp (decf (truly-the fixnum probe-limit) ,n-probes))
      ;; The next-vector chain is circular. This is caused
      ;; caused by thread-unsafe mutations of the table.
      (signal-corrupt-hash-table hash-table)))
@@ -915,7 +898,7 @@ if there is no such entry. Entries can be added using SETF."
 
 (defmacro define-ht-getter (name std-fn)
   `(defun ,name (key hash-table default
-                 &aux (kv-vector (hash-table-table hash-table)))
+                 &aux (kv-vector (hash-table-pairs hash-table)))
      (declare (type hash-table hash-table)
               (optimize speed)
               (values t (member t nil)))
@@ -1007,8 +990,8 @@ if there is no such entry. Entries can be added using SETF."
 (defun gethash3 (key hash-table default)
   (declare (type hash-table hash-table))
   (multiple-value-bind (value foundp)
-    (with-hash-table-locks (hash-table :operation :read :pin (key))
-      (funcall (hash-table-getter hash-table) key hash-table default))
+      (with-hash-table-locks (hash-table :operation :read :pin (key))
+        (funcall (hash-table-getter hash-table) key hash-table default))
     (values value foundp)))
 
 ;;; so people can call #'(SETF GETHASH)
@@ -1060,7 +1043,7 @@ if there is no such entry. Entries can be added using SETF."
 (define-ht-setter %puthash/equal equal)
 (define-ht-setter %puthash/equalp equalp)
 (define-ht-setter %puthash/any nil)
-  
+
 (declaim (maybe-inline %%puthash))
 (defun %%puthash (key hash-table value)
   (declare (optimize speed))
@@ -1081,10 +1064,23 @@ if there is no such entry. Entries can be added using SETF."
         (aver (not (zerop free-kv-slot))))
 
       ;; Grab the vectors AFTER possibly growing the table
-      (let ((kv-vector (hash-table-table hash-table))
+      (let ((kv-vector (hash-table-pairs hash-table))
             (next-vector (hash-table-next-vector hash-table)))
         (setf (hash-table-next-free-kv hash-table)
-              (aref next-vector free-kv-slot))
+              (let ((hwm (hash-table-pairs-hwm kv-vector))
+                    (cap (hash-table-pairs-capacity kv-vector)))
+                (cond ((< free-kv-slot hwm)
+                       (let ((next (aref next-vector free-kv-slot)))
+                         (cond ((/= next 0) next)
+                               ((= hwm cap) 0)
+                               (t (1+ hwm)))))
+                      (t
+                       ;; CPU must not reorder relative to stores to k/v
+                       ;; since GC will not scan past HWM
+                       (setf (hash-table-pairs-hwm kv-vector) free-kv-slot)
+                       (sb-thread:barrier (:write))
+                       (cond ((= free-kv-slot cap) 0)
+                             (t (1+ free-kv-slot)))))))
         ;;
         ;; It's worth noting here, since I forget every time and have to think
         ;; it through again, that although we've potentially created
@@ -1109,19 +1105,19 @@ if there is no such entry. Entries can be added using SETF."
           (setf (aref kv-vector (1+ i)) value)
           ;; Push this slot onto the front of the chain for its bucket.
           (let* ((index-vector (hash-table-index-vector hash-table))
-                 (bucket (mask-hash hash (length index-vector)))
+                 (bucket (mask-hash hash (1- (length index-vector))))
                  (next (aref index-vector bucket)))
             (setf (aref next-vector free-kv-slot) next
                   (aref index-vector bucket) free-kv-slot))
           (update-hash-table-cache hash-table i))
-        (incf (hash-table-number-entries hash-table)))))
+        (incf (hash-table-%count hash-table)))))
   value)
 
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
   (macrolet ((put-it (lockedp)
                `(let ((cache (hash-table-cache hash-table))
-                      (kv-vector (hash-table-table hash-table)))
+                      (kv-vector (hash-table-pairs hash-table)))
                   ;; Check the cache
                   (if (and (< cache (length kv-vector))
                            (eq (aref kv-vector cache) key)
@@ -1152,16 +1148,16 @@ if there is no such entry. Entries can be added using SETF."
   ;; with no writers.
   (maybe-rehash hash-table)
   ;; Search for key in the hash table.
-  (multiple-value-bind (hash0 eq-based)
+  (multiple-value-bind (hash0 address-sensitive)
       (funcall (hash-table-hash-fun hash-table) key)
     (declare (type hash hash0))
     (let* ((index-vector (hash-table-index-vector hash-table))
-           (length (length index-vector))
            (hash (prefuzz-hash hash0))
-           (index (mask-hash hash length))
+           (index (mask-hash hash (1- (length index-vector))))
            (next (aref index-vector index))
-           (table (hash-table-table hash-table))
+           (table (hash-table-pairs hash-table))
            (next-vector (hash-table-next-vector hash-table))
+           (probe-limit (length next-vector))
            (hash-vector (hash-table-hash-vector hash-table))
            (test-fun (hash-table-test-fun hash-table)))
       (declare (type index index)
@@ -1175,48 +1171,45 @@ if there is no such entry. Entries can be added using SETF."
                (setf (aref chain-vector prior-slot-location)
                      (aref next-vector slot-location))
                ;; Push KV slot onto free chain.
+               ;; Possible optimization: if we linked the free chain through
+               ;; the 'value' half of a pair, we could avoid rebuilding the
+               ;; free chain in %REHASH because rehashing won't affect it.
+               ;; (Maybe it already doesn't?)
                (setf (aref next-vector slot-location)
                      (hash-table-next-free-kv hash-table))
                (setf (hash-table-next-free-kv hash-table) slot-location)
-               (when hash-vector
-                 (setf (aref hash-vector slot-location)
-                       +magic-hash-vector-value+))
                ;; On parallel accesses this may turn out to be a
                ;; type-error, so don't turn down the safety!
-               (decf (hash-table-number-entries hash-table))
+               (decf (hash-table-%count hash-table))
                t))
         (cond ((zerop next)
                nil)
-              ((if (or eq-based (not hash-vector))
+              ((if (or address-sensitive (not hash-vector))
                    (eq key (aref table (* 2 next)))
                    (and (= hash (aref hash-vector next))
                         (funcall test-fun key (aref table (* 2 next)))))
                (clear-slot index-vector index next))
               ;; Search next-vector chain for a matching key.
-              ((or eq-based (not hash-vector))
+              ((or address-sensitive (not hash-vector))
                ;; EQ based
                (do ((prior next next)
-                    (i 0 (1+ i))
                     (next (aref next-vector next) (aref next-vector next)))
                    ((zerop next) nil)
                  (declare (type index next))
-                 (when (> i length)
-                   (signal-corrupt-hash-table hash-table))
                  (when (eq key (aref table (* 2 next)))
-                   (return-from %remhash (clear-slot next-vector prior next)))))
+                   (return-from %remhash (clear-slot next-vector prior next)))
+                 (check-excessive-probes 1)))
               (t
                ;; not EQ based
                (do ((prior next next)
-                    (i 0 (1+ i))
                     (next (aref next-vector next) (aref next-vector next)))
                    ((zerop next) nil)
                  (declare (type index/2 next))
-                 (when (> i length)
-                   (signal-corrupt-hash-table hash-table))
                  (when (and (= hash (aref hash-vector next))
                             (funcall test-fun key (aref table (* 2 next))))
                    (return-from %remhash
-                     (clear-slot next-vector prior next))))))))))
+                     (clear-slot next-vector prior next)))
+                 (check-excessive-probes 1))))))))
 
 (defun remhash (key hash-table)
   "Remove the entry in HASH-TABLE associated with KEY. Return T if
@@ -1231,33 +1224,42 @@ there was such an entry, or NIL if not."
 (defun clrhash (hash-table)
   "This removes all the entries from HASH-TABLE and returns the hash
 table itself."
-  (when (plusp (hash-table-number-entries hash-table))
-    (with-hash-table-locks (hash-table)
-      (let* ((kv-vector (hash-table-table hash-table))
-             (next-vector (hash-table-next-vector hash-table))
-             (hash-vector (hash-table-hash-vector hash-table))
-             (size (length next-vector))
-             (index-vector (hash-table-index-vector hash-table)))
+  ;; This used to do nothing at all for tables that has a COUNT of 0,
+  ;; but that wasn't quite right, because some steps below pertain to
+  ;; getting the initial state back to that of a freshly made table.
+  ;; In particular, the need-to-rehash flag should be cleared, and the freelist
+  ;; should be reset so that we start to consume k/v cells leftmost first
+  ;; instead of whatever random order they were left in.
+  ;;
+  ;; It is probably not strictly necessary for vectors marked as valid-hashing to
+  ;; be initialized with empty-ht-slot, because GC regards the portion of the vector
+  ;; beyond the HWM as unused.
+  ;; [Reusing those elements would be a two-step process: set them to 0,
+  ;; bump the HWM, set them to desired values - because you can't let GC
+  ;; observe junk, but you can't put good value at higher than the HWM]
+  ;; Also, we should mark *all* hash-table k/v vectors as valid-hashing and use
+  ;; a different bit to signify address-sensitive. This way we would benefit
+  ;; from the GC optimization for all hash-tables. It would even be possible
+  ;; for vectors that currently take advantage of the large simple vector
+  ;; optimization (to scan only touched pages) to bound the work below the HWM
+  ;; (unless the vector is address-sensitive or weak)
+  (let* ((kv-vector (hash-table-pairs hash-table))
+         (high-water-mark (hash-table-pairs-hwm kv-vector)))
+    (when (plusp high-water-mark)
+      (with-hash-table-locks (hash-table)
+        (aver (eq (aref kv-vector 0) hash-table))
         ;; Disable GC tricks.
         (set-header-data kv-vector sb-vm:vector-normal-subtype)
-        ;; Mark all slots as empty by setting all keys and values to magic
-        ;; tag.
-        (aver (eq (aref kv-vector 0) hash-table))
         (setf (kv-vector-needs-rehash kv-vector) 0)
-        (fill kv-vector +empty-ht-slot+ :start 2)
-        ;; Set up the free list, all free.
-        (do ((i 1 (1+ i)))
-            ((>= i (1- size)))
-          (setf (aref next-vector i) (1+ i)))
-        (setf (aref next-vector (1- size)) 0)
+        (setf (hash-table-pairs-hwm kv-vector) 0)
         (setf (hash-table-next-free-kv hash-table) 1)
-        ;; Clear the index-vector.
-        (fill index-vector 0)
-        ;; Clear the hash-vector.
-        (when hash-vector
-          (fill hash-vector +magic-hash-vector-value+)))
-      (setf (hash-table-cache hash-table) 0)
-      (setf (hash-table-number-entries hash-table) 0)))
+        (when (plusp (hash-table-%count hash-table))
+          (setf (hash-table-%count hash-table) 0)
+          ;; Fill all slots with the empty marker.
+          (fill kv-vector +empty-ht-slot+ :start 2 :end (* (1+ high-water-mark) 2))
+          ;; Clear the index-vector.
+          ;; Don't need to clear the hash-vector or the next-vector.
+          (fill (hash-table-index-vector hash-table) 0)))))
   hash-table)
 
 
@@ -1306,32 +1308,41 @@ table itself."
 #|
 (defun show-address-sensitivity (&optional tbl)
   (flet ((show1 (tbl)
-           (let ((kv (hash-table-table tbl))
+           (let ((kv (hash-table-pairs tbl))
                  (hashes (hash-table-hash-vector tbl))
-                 (eq-based 0))
+                 (address-sensitive 0))
              (loop for i from 2 below (length kv) by 2
                    do
                 (unless (unbound-marker-p (aref kv i))
                   (when (eq (aref hashes (ash i -1)) +magic-hash-vector-value+)
-                    (incf eq-based))))
-             (when (plusp eq-based)
-               (format t "~3d ~s~%" eq-based tbl)))))
+                    (incf address-sensitive))))
+             (when (plusp address-sensitive)
+               (format t "~3d ~s~%" address-sensitive tbl)))))
     (if tbl
         (show1 tbl)
         (dolist (tbl (sb-vm::list-allocated-objects :all :test #'hash-table-p))
           (when (and (plusp (hash-table-count tbl)) (hash-table-hash-vector tbl))
             (show-address-sensitivity tbl))))))
 
-(defun show-chains (tbl &aux (nv (hash-table-next-vector tbl)))
-  (flet ((show-chain (label next)
+(defun show-chains (tbl &aux (nv (hash-table-next-vector tbl))
+                        (tot-len 0) (max-len 0) (n-chains 0))
+   
+  (flet ((show-chain (label next &aux (len 0))
            (unless (eql next 0)
              (write-string label)
              (loop (format t " ~d" next)
+                   (incf len)
                    (when (zerop (setq next (aref nv next))) (return)))
-             (terpri))))
+             (terpri))
+           len))
     (loop for x across (hash-table-index-vector tbl)
           for i from 0
-          do (show-chain (format nil "Bucket ~d:" i) x))
+          do (let ((len (show-chain (format nil "Bucket ~d:" i) x)))
+               (when (plusp len)
+                 (incf tot-len len)
+                 (setf max-len (max len max-len))
+                 (incf n-chains))))
+    (format t "maxlen=~d avglen=~f~%" max-len (/ tot-len n-chains))
     (show-chain "Freelist:" (hash-table-next-free-kv tbl))))
 
 (defun show-load-factors ()
@@ -1346,7 +1357,7 @@ table itself."
               ht))))
 
 (defun hash-table-mem-used (ht)
-  (+ (sb-vm::primitive-object-size (hash-table-table ht))
+  (+ (sb-vm::primitive-object-size (hash-table-pairs ht))
      (sb-vm::primitive-object-size (hash-table-index-vector ht))
      (sb-vm::primitive-object-size (hash-table-next-vector ht))
      (acond ((hash-table-hash-vector ht) (sb-vm::primitive-object-size it))
