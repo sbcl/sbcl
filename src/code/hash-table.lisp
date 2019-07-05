@@ -61,8 +61,9 @@
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
-                               (setter
-                                getter
+                               (getter
+                                setter
+                                remover
                                 test
                                 test-fun
                                 hash-fun
@@ -74,9 +75,9 @@
                                 hash-vector
                                 flags)))
 
-  ;; All and only the slots that are needed for PUTHASH,GETHASH come first.
   (getter #'error :type function :read-only t)
   (setter #'error :type function :read-only t)
+  (remover #'error :type function :read-only t)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements

@@ -65,6 +65,7 @@
 
   (/show0 "entering !COLD-INIT")
   (setf (symbol-function '%failed-aver) #'!cold-failed-aver)
+  (!cold-init-hash-table-methods) ; needed by MAKE-READTABLE
   (setq *readtable* (make-readtable)
         *print-length* 6 *print-level* 3)
   (setq *error-output* (!make-cold-stderr-stream)

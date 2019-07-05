@@ -67,7 +67,7 @@
       (setf (elt (character-attribute-array rt) (char-code char)) newvalue)
       (if (= newvalue +char-attr-constituent+)
           ;; Default value for the C-A-HASH-TABLE is +CHAR-ATTR-CONSTITUENT+.
-          (%remhash char (character-attribute-hash-table rt))
+          (remhash char (character-attribute-hash-table rt))
           (setf (gethash char (character-attribute-hash-table rt)) newvalue)))
   (values))
 
