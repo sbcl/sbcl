@@ -90,13 +90,19 @@
     (plu lvar)))
 
 (defun principal-lvar-ref-use (lvar)
-  (labels ((recurse (lvar)
-             (when lvar
-               (let ((use (lvar-uses lvar)))
-                 (if (ref-p use)
-                     (recurse (lambda-var-ref-lvar use))
-                     use)))))
-    (recurse lvar)))
+  (let (seen)
+    (labels ((recurse (lvar)
+               (when lvar
+                 (let ((use (lvar-uses lvar)))
+                   (cond ((ref-p use)
+                          (push lvar seen)
+                          (let ((lvar (lambda-var-ref-lvar use)))
+                            (if (memq lvar seen)
+                                use
+                                (recurse lvar))))
+                         (t
+                          use))))))
+      (recurse lvar))))
 
 (defun principal-lvar-ref (lvar)
   (labels ((recurse (lvar ref)

@@ -2362,3 +2362,11 @@
       '(lambda ()
         (multiple-value-call #'inline-fun-arg-mismatch 1 2))
     (() (condition 'program-error))))
+
+(with-test (:name :principal-lvar-ref-use-loop)
+  (checked-compile-and-assert ()
+   '(lambda (vector)
+     (labels ((f (count)
+                (when (< (aref vector 0) count)
+                  (f count))))))
+   ((1) nil)))
