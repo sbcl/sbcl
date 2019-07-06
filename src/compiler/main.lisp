@@ -1092,7 +1092,8 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((*top-level-form-noted* (note-top-level-form form t)))
     ;; Don't bother to compile simple objects that just sit there.
     (when (and form (or (symbolp form) (consp form)))
-      (if (and (policy *policy*
+      (if (and #-sb-xc-host
+               (policy *policy*
                    ;; FOP-compiled code is harder do debug.
                    (or (< debug 2)
                        (> space debug)))

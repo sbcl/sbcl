@@ -36,7 +36,7 @@
   (sb-xc:proclaim
      `(optimize
        (compilation-speed 1)
-       (debug 1)
+       (debug ,(if (find :sb-show sb-xc:*features*) 2 1))
        (sb-ext:inhibit-warnings 2)
        ;; SAFETY = SPEED (and < 3) should provide reasonable safety,
        ;; but might skip some unreasonably expensive stuff
