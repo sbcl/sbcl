@@ -277,20 +277,19 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
 ;;; Evaluate EXPR in terms of the optimization policy associated with
 ;;; THING. EXPR is a form which accesses optimization qualities by
 ;;; referring to them by name, e.g. (> SPEED SPACE).
-(defmacro policy (thing expr &optional (coercion-fn '%coerce-to-policy))
-  (declare (notinline identity)) ; constant-folding-error otherwise. (FIXME)
+(defmacro policy (thing expr)
   (let* ((n-policy (make-symbol "P"))
-         (binds (loop for name across (identity +policy-primary-qualities+)
-                      for index downfrom -1
+         (binds (loop for index downfrom -1
+                      for name across +policy-primary-qualities+
                       collect `(,name (%policy-quality ,n-policy ,index))))
          (dependent-binds
-          (loop for info across **policy-dependent-qualities**
-                for name = (policy-dependent-quality-name info)
-               collect `(,name (let ((,name (policy-quality ,n-policy ',name)))
-                                 (if (= ,name 1)
-                                     ,(policy-dependent-quality-expression info)
-                                     ,name))))))
-    `(let ((,n-policy (,coercion-fn ,thing)))
+           (loop for info across **policy-dependent-qualities**
+                 for name = (policy-dependent-quality-name info)
+                 collect `(,name (let ((,name (policy-quality ,n-policy ',name)))
+                                   (if (= ,name 1)
+                                       ,(policy-dependent-quality-expression info)
+                                       ,name))))))
+    `(let ((,n-policy (%coerce-to-policy ,thing)))
        ;; FIXME: automatically inserted IGNORABLE decls are
        ;; often suggestive of poor style, as is this one.
        (declare (ignorable ,n-policy))
