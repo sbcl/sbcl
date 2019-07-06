@@ -1891,7 +1891,8 @@ see_if_sigaction_nodefer_works(void)
 #undef SA_NODEFER_TEST_KILL_SIGNAL
 
 extern void restore_sbcl_signals () {
-    for (int signal = 0; signal < NSIG; signal++) {
+    int signal;
+    for (signal = 0; signal < NSIG; signal++) {
         interrupt_handler_t handler = interrupt_low_level_handlers[signal];
         if (handler) {
             undoably_install_low_level_interrupt_handler(signal, handler);
