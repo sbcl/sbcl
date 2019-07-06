@@ -189,7 +189,7 @@
   (:policy :fast-safe)
   (:generator 3
     (inst vextracti128 tmp x 1)
-    (inst vpextrq dst x 1)))
+    (inst vpextrq dst tmp 1)))
 
 (define-vop (%make-simd-pack-256)
   (:translate %make-simd-pack-256)
