@@ -435,8 +435,8 @@ sufficiently motivated to do lengthy fixes."
             (sb-vm:do-referenced-object (obj examine)
               (simple-vector
                :extend
-               (when (and written (eql sb-vm:vector-valid-hashing-subtype
-                                       (get-header-data obj)))
+               (when (and written (logtest sb-vm:vector-addr-hashing-subtype
+                                           (get-header-data obj)))
                  (setf (svref obj 1) 1)))))))))) ; set need-to-rehash
 
 sb-c::

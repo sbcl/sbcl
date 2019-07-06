@@ -586,17 +586,24 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             adjust_word_at(where+1, adj);
 #endif
             break;
-        // Vectors require extra care because of EQ-based hashing.
+        // Vectors require extra care because of address-based hashing.
         case SIMPLE_VECTOR_WIDETAG:
-          if (is_vector_subtype(*where, VectorValidHashing)) {
+          if (is_vector_subtype(*where, VectorAddrHashing)) {
               struct vector* v = (struct vector*)where;
-              gc_assert(v->length > 0 && instancep(v->data[0]));
+              // If you could make a hash-table vector with space for exactly 1 k/v pair,
+              // it would have length 5.
+              gc_assert(v->length >= make_fixnum(5));
               lispobj* data = (lispobj*)v->data;
-              adjust_pointers(&data[0], 1, adj); // adjust the hash-table structure
+              adjust_pointers(&data[fixnum_value(v->length)-1], 1, adj);
+              int hwm = KV_PAIRS_HIGH_WATER_MARK(data);
               boolean needs_rehash = 0;
-              lispobj *where = &data[2], *end = &data[fixnum_value(v->length)];
+              lispobj *where = &data[2], *end = &data[2*(hwm+1)];
               // Adjust the elements, checking for need to rehash.
               for ( ; where < end ; where += 2) {
+                  // Really we should use the hash values to figure out which
+                  // keys were address-sensitive. This simply overapproximates
+                  // by assuming that any change forces rehash.
+                  // (Similar issue exists in 'fixup_space' in immobile-space.c)
                   lispobj ptr = *where; // key
                   if (is_lisp_pointer(ptr) && (delta = calc_adjustment(adj, ptr)) != 0) {
                       FIXUP(*where = ptr + delta, where);

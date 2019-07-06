@@ -275,14 +275,21 @@
     '#.(list funcallable-instance-widetag simple-fun-widetag closure-widetag)
   #'equal)
 
-;;; the different vector subtypes - these are flag bits, not an enumeration
-(defconstant vector-normal-subtype  0)
-;; If vector is weak but NOT a hash-table backing vector
-(defconstant vector-weak-subtype 1)
-(defconstant vector-weak-visited-subtype 2) ; weak + GC bit
-;; a valid-hashing vector might also be weak,
-;; but we set ONLY the hashing bit when it backs a hash-table
-(defconstant vector-valid-hashing-subtype 4)
+;;; the different vector subtypes, can be ORed together.
+(defconstant vector-normal-subtype       0)
+;; Weak vectors that are NOT hash-table backing vectors use this bit to track
+;; whether we've already recorded the vector for deferred scavenging.
+;; Hash-tables use an entirely different mechanism. Flag bit used only in C.
+(defconstant vector-weak-visited-subtype 8)
+;; All hash-table backing vectors are marked with this bit.
+;; Essentially it informs GC that the vector has a high-water mark.
+(defconstant vector-hashing-subtype      4)
+;; Set if hash-table contains address-sensitive keys and possibly
+;; an associated vector of 32-bit hashes.
+;; When upsizing a table, both the old and new vector may have this bit set.
+(defconstant vector-addr-hashing-subtype 2)
+;; Set if vector is weak. Weak hash tables have both this AND the hashing bit.
+(defconstant vector-weak-subtype         1)
 
 ;;; These next two constants must not occupy the same byte of a
 ;;; vector header word as the values in the preceding defenum.

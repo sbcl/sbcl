@@ -175,6 +175,28 @@
     (inst mov :byte temp (ea (- other-pointer-lowtag) x))
     (storew temp x 0 other-pointer-lowtag)
     (move res x)))
+(define-vop (set-header-bits)
+  (:translate set-header-bits)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types t (:constant t))
+  (:info bits)
+  (:generator 1
+    (if (typep bits '(unsigned-byte 8))
+        (inst or :byte (ea (- 1 other-pointer-lowtag) x) bits)
+        (inst or :dword (ea (- other-pointer-lowtag) x) (ash bits n-widetag-bits)))))
+(define-vop (unset-header-bits)
+  (:translate unset-header-bits)
+  (:policy :fast-safe)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types t (:constant t))
+  (:info bits)
+  (:generator 1
+    (if (typep bits '(unsigned-byte 8))
+        (inst and :byte (ea (- 1 other-pointer-lowtag) x) (lognot bits))
+        (inst and :dword (ea (- other-pointer-lowtag) x)
+              (lognot (ash bits n-widetag-bits))))))
+
 ;;; Set the bit indicating that instances of this type require
 ;;; special treatment of slot index 0.
 (define-vop (set-custom-gc-scavenge-bit)

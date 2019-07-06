@@ -740,17 +740,20 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             // a path from the root only if it does not involve whichever
             // object is definitely weak. This fails on weak key-OR-value
             // tables since we can't decide whether to allow the entry.
-            if (is_vector_subtype(*where, VectorValidHashing)) {
-                lispobj lhash_table = where[2];
+            // Disregard the address-sensitivity bit when checking whether
+            // this is a weak hash-table vector.
+            if ((vector_subtype(*where) & ~subtype_VectorAddrHashing)
+                == subtype_VectorHashing + subtype_VectorWeak) {
+                lispobj* data = where + 2;
+                int kv_vector_length = fixnum_value(where[1]);
+                lispobj lhash_table = data[kv_vector_length-1];
                 gc_assert(instancep(lhash_table));
                 struct hash_table* hash_table =
                   (struct hash_table *)native_pointer(lhash_table);
                 int weakness = hashtable_weakness(hash_table);
-                lispobj* data = where + 2;
-                int kv_vector_length = fixnum_value(where[1]);
-                int high_water_mark = fixnum_value(data[kv_vector_length-1]);
-                if (hashtable_weakp(hash_table) &&
-                    (weakness == 1 || weakness == 2)) { // 1=key, 2=value
+                int high_water_mark = fixnum_value(data[0]);
+                // FIXME: this is supposed to do what for weak-AND or weak-OR ?
+                if (weakness == 1 || weakness == 2) { // 1=key, 2=value
                     // Skip the first 2 data words
                     int start = (weakness == 1) ? 3 : 2;
                     int end = 2 * (high_water_mark + 1);

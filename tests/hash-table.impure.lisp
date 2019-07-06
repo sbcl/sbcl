@@ -6,7 +6,7 @@
 
 (defun is-address-sensitive (tbl)
   (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
-    (= data sb-vm:vector-valid-hashing-subtype)))
+    (logtest data sb-vm:vector-addr-hashing-subtype)))
 
 (with-test (:name (hash-table :eql-hash-symbol-not-eq-based))
   ;; If you ask for #'EQ as the test, then everything is address-sensitive,

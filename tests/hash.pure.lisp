@@ -159,7 +159,7 @@
     (setf (gethash #\a tbl) 1)
     #+64-bit (setf (gethash 1.0f0 tbl) 1) ; single-float is a nonpointer
     (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
-      (assert (zerop data))))) ; not sb-vm:vector-valid-hashing-subtype
+      (assert (not (logtest data sb-vm:vector-addr-hashing-subtype))))))
 
 (with-test (:name (hash-table :small-rehash-size))
   (let ((ht (make-hash-table :rehash-size 2)))

@@ -153,6 +153,11 @@
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data
     (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) t)
+;;; Perform a bitwise OR or AND-not of the existing header data with
+;;; the new bits and return no value.
+(defknown (set-header-bits unset-header-bits)
+  (t (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))) (values)
+  ())
 #+64-bit
 (progn
 (defknown sb-vm::get-header-data-high (t) (unsigned-byte 32) (flushable))

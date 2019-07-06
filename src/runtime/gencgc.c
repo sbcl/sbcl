@@ -2122,6 +2122,12 @@ static inline boolean large_simple_vector_p(page_index_t page) {
     if (!page_single_obj_p(page))
         return 0;
     lispobj header = *(lispobj *)page_address(page);
+    // For hash-table vectors which are neither weak nor address-sensitive,
+    // it certainly would be possible to treat the vector as VectorNormal,
+    // though we'd lose out on the optimization that scans only below the
+    // high-water mark which is in general a good thing.  Perhaps if the
+    // ratio of HWM to total size warrants it, we should prefer to use the
+    // large_simple_vector optimization instead.
     return header_widetag(header) == SIMPLE_VECTOR_WIDETAG &&
         is_vector_subtype(header, VectorNormal);
 }

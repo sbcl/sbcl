@@ -1157,23 +1157,70 @@ void weakobj_init()
                      32 /* logical bin count */, 0 /* default range */);
 }
 
-/* Only need to worry about scavenging the _real_ entries in the
- * table. The vector element at index 0 (the hash table itself)
- * was scavenged already. */
-boolean scav_hash_table_entries(struct hash_table *hash_table,
-                                int (*predicate)(lispobj,lispobj),
-                                void (*scav_entry)(lispobj*))
+/* Scavenge the "real" entries in the hash-table kv vector. The vector element
+ * at index 0 bounds the scan. The element at length-1 (the hash table itself)
+ * was scavenged already.
+ *
+ * We can disregard any entry in which both key and value are immediates.
+ * This effectively ignores empty pairs, as well as makes fixnum -> fixnum table
+ * more efficient. If the bitwise OR of two lispobjs satisfies is_lisp_pointer(),
+ * then at least one is a pointer.
+ */
+#define SCAV_ENTRIES(entry_alivep, defer)                                      \
+    boolean __attribute__((unused)) any_deferred = 0;                          \
+    boolean rehash = 0;                                                        \
+    if (data[1] && data[1] != make_fixnum(1))                                  \
+        lose("unexpected need-to-rehash: %"OBJ_FMTX, data[1]);                 \
+    unsigned hwm = KV_PAIRS_HIGH_WATER_MARK(data);                             \
+    unsigned i;                                                                \
+    for (i = 1; i <= hwm; i++) {                                               \
+        lispobj key = data[2*i], value = data[2*i+1];                          \
+        if (is_lisp_pointer(key|value)) {                                      \
+          if (!entry_alivep) { defer; any_deferred = 1; } else {               \
+            /* Scavenge the key and value. */                                  \
+            scav_entry(&data[2*i]);                                            \
+            /* mark the table for rehash if address-based key moves */         \
+            if (data[2*i] != key &&                                            \
+                (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
+                rehash = 1;                                                    \
+    }}}                                                                        \
+    /* Though at least partly writable, vector element 1 could be on a write-protected page. */ \
+    if (rehash) NON_FAULTING_STORE(data[1] = make_fixnum(1), &data[1])
+
+static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(lispobj*))
+{
+    lispobj* data = kv_vector->data;
+
+    if (is_vector_subtype(kv_vector->header, VectorAddrHashing)) { // address-sensitive
+        // If the table has address-based keys, then read the hash vector (or NIL)
+        // from the last element.
+        sword_t kv_length = fixnum_value(kv_vector->length);
+        sword_t hash_vector_length;
+        uint32_t *hash_vector = get_array_data(data[kv_length-1],
+                                               SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                                               &hash_vector_length);
+        if (hash_vector != NULL)
+            gc_assert(hash_vector_length == kv_length>>1);
+
+        /* Work through the KV vector. */
+        SCAV_ENTRIES(1,);
+    } else { // not address-sensitive
+        scavenge(data + 2, KV_PAIRS_HIGH_WATER_MARK(data) * 2);
+    }
+}
+
+boolean scan_weak_hashtable(struct hash_table *hash_table,
+                            int (*predicate)(lispobj,lispobj),
+                            void (*scav_entry)(lispobj*))
 {
     sword_t kv_length;
     sword_t length;
     sword_t next_vector_length;
     sword_t hash_vector_length;
-    sword_t i;
-    boolean any_deferred = 0;
 
-    lispobj *kv_vector = get_array_data(hash_table->pairs,
-                                        SIMPLE_VECTOR_WIDETAG, &kv_length);
-    if (kv_vector == NULL)
+    lispobj *data = get_array_data(hash_table->pairs,
+                                   SIMPLE_VECTOR_WIDETAG, &kv_length);
+    if (data == NULL)
         lose("invalid kv_vector %"OBJ_FMTX, hash_table->pairs);
 
     uint32_t *index_vector = get_array_data(hash_table->index_vector,
@@ -1198,72 +1245,49 @@ boolean scav_hash_table_entries(struct hash_table *hash_table,
       * help reduce collisions. */
      gc_assert(next_vector_length == kv_length >> 1);
 
-     if (kv_vector[1] && kv_vector[1] != make_fixnum(1))
-        lose("unexpected need-to-rehash: %"OBJ_FMTX, kv_vector[1]);
+     if (data[1] && data[1] != make_fixnum(1))
+        lose("unexpected need-to-rehash: %"OBJ_FMTX, data[1]);
 
+    int weakness = hashtable_weakness(hash_table);
     /* Work through the KV vector. */
-    boolean rehash = 0;
-#define KV_PAIRS_HIGH_WATER_MARK fixnum_value(kv_vector[kv_length-1])
+    SCAV_ENTRIES(predicate(key, value), add_kv_triggers(&data[2*i], weakness));
+    if (!any_deferred && debug_weak_ht)
+        fprintf(stderr,
+                "will skip rescan of weak ht: %d/%d items\n",
+                (int)KV_PAIRS_HIGH_WATER_MARK(data),
+                (int)(next_vector_length - 1));
 
-    // We can disregard any entry in which both key and value are immediates.
-    // This effectively ignores empty pairs, as well as makes fixnum -> fixnum
-    // mappings more efficient.
-    // If the bitwise OR of two lispobjs satisfies is_lisp_pointer(),
-    // then at least one is a pointer.
-#define SCAV_ENTRIES(entry_alivep, defer)                                      \
-    for (i = 1; i <= KV_PAIRS_HIGH_WATER_MARK; i++) {                          \
-        lispobj key = kv_vector[2*i], value = kv_vector[2*i+1];                \
-        if (is_lisp_pointer(key|value)) {                                      \
-          if (!entry_alivep) { defer; any_deferred = 1; } else {               \
-            /* Scavenge the key and value. */                                  \
-            scav_entry(&kv_vector[2*i]);                                       \
-            /* If an EQ-based key has moved, mark the hash-table for rehash */ \
-            if (kv_vector[2*i] != key &&                                       \
-                (!hash_vector || hash_vector[i] == MAGIC_HASH_VECTOR_VALUE))   \
-                rehash = 1;                                                    \
-    }}}
-    if (predicate) { // Call the predicate on each entry to decide liveness
-        int weakness = hashtable_weakness(hash_table);
-        SCAV_ENTRIES(predicate(key, value),
-                     add_kv_triggers(&kv_vector[2*i], weakness));
-        if (!any_deferred && debug_weak_ht)
-            fprintf(stderr,
-                    "will skip rescan of weak ht: %d/%d items\n",
-                    (int)KV_PAIRS_HIGH_WATER_MARK,
-                    (int)(next_vector_length - 1));
-    } else { // The entries are always live
-        SCAV_ENTRIES(1,);
-    }
-
-    // Though at least partly writable, the vector might have
-    // element 1 on a write-protected page.
-    if (rehash)
-        NON_FAULTING_STORE(kv_vector[1] = make_fixnum(1), &kv_vector[1]);
     return any_deferred;
 }
 
 sword_t
 scav_vector (lispobj *where, lispobj header)
 {
-    sword_t kv_length = fixnum_value(where[1]);
+    sword_t length = fixnum_value(where[1]);
 
-    /* SB-VM:VECTOR-VALID-HASHING-SUBTYPE is set for EQ-based and weak
-     * hash tables in the Lisp HASH-TABLE code to indicate need for
-     * special GC support. */
+    /* SB-VM:VECTOR-HASHING-SUBTYPE is set for all hash tables in the
+     * Lisp HASH-TABLE code to indicate need for special GC support. */
     if (is_vector_subtype(header, VectorNormal)) {
  normal:
-        scavenge(where + 2, kv_length);
+        scavenge(where + 2, length);
         goto done;
     }
 
-    if (is_vector_subtype(header, VectorWeak)) {
+    if (vector_subtype(header) == subtype_VectorWeak) { // specifically not weak + hashing
         add_to_weak_vector_list(where, header);
         goto done;
     }
 
-    /* Scavenge element 0, which may be a hash-table structure. */
-    scavenge(where+2, 1);
-    if (!is_lisp_pointer(where[2])) {
+    /* Scavenge element (length-1), which may be a hash-table structure. */
+    lispobj* data = where + 2;
+    scavenge(&data[length-1], 1);
+    if (!is_vector_subtype(header, VectorWeak)) {
+        scan_nonweak_kv_vector((struct vector*)where, gc_scav_pair);
+        goto done;
+    }
+
+    lispobj ltable = data[length-1];
+    if (!is_lisp_pointer(ltable)) {
         /* This'll happen when REHASH clears the header of old-kv-vector
          * and fills it with zero, but some other thread simulatenously
          * sets the header in %%PUTHASH.
@@ -1273,33 +1297,31 @@ scav_vector (lispobj *where, lispobj header)
                 "non-fatal corruption caused by concurrent access to a "
                 "hash-table from multiple threads. Any accesses to "
                 "hash-tables shared between threads should be protected "
-                "by locks.\n", (void*)&where[2]);
+                "by locks.\n", &data[length-1]);
         goto normal;
     }
-    struct hash_table *hash_table  = (struct hash_table *)native_pointer(where[2]);
+    struct hash_table *hash_table  = (struct hash_table *)native_pointer(ltable);
     if (widetag_of(&hash_table->header) != INSTANCE_WIDETAG) {
         lose("hash table not instance (%"OBJ_FMTX" at %p)\n",
              hash_table->header,
              hash_table);
     }
+    gc_assert(hashtable_weakp(hash_table));
 
     /* Verify that vector element 1 is as expected.
        Don't bother scavenging it, since we lose() if it's not an immediate. */
-    if (where[3] && where[3] != make_fixnum(1))
-        lose("unexpected need-to-rehash: %"OBJ_FMTX, where[3]);
+    if (data[1] && data[1] != make_fixnum(1))
+        lose("unexpected need-to-rehash: %"OBJ_FMTX, data[1]);
 
-    /* Scavenge hash table, which will fix the positions of the other
+    /* Scavenge slots of hash table, which will fix the positions of the other
      * needed objects. */
     scav_instance((lispobj *)hash_table, hash_table->header);
 
     /* Cross-check the kv_vector. */
-    if (where != native_pointer(hash_table->pairs)) {
+    if (where != native_pointer(hash_table->pairs))
         lose("hash_table table!=this table %"OBJ_FMTX, hash_table->pairs);
-    }
 
-    if (!hashtable_weakp(hash_table)) {
-        scav_hash_table_entries(hash_table, 0, gc_scav_pair);
-    } else if (hash_table->next_weak_hash_table == NIL) {
+    if (hash_table->next_weak_hash_table == NIL) {
         int weakness = hashtable_weakness(hash_table);
         boolean defer = 1;
         /* Key-AND-Value means that no scavenging can/will be performed as
@@ -1310,9 +1332,9 @@ scav_vector (lispobj *where, lispobj header)
          * we might be able to skip rescan depending on whether all entries
          * are actually live right now, as opposed to provisionally live */
         if (weakness != WEAKNESS_KEY_AND_VALUE)
-            defer = scav_hash_table_entries(hash_table,
-                                            weak_ht_alivep_funs[weakness],
-                                            gc_scav_pair);
+            defer = scan_weak_hashtable(hash_table,
+                                        weak_ht_alivep_funs[weakness],
+                                        gc_scav_pair);
         /* There is a down-side to *not* pushing the table into the list,
          * but it should not matter too much: if we attempt to scavenge more
          * than once (when and only when the newspace areas overflow),
@@ -1326,7 +1348,7 @@ scav_vector (lispobj *where, lispobj header)
         }
     }
  done:
-    return (ALIGN_UP(kv_length + 2, 2));
+    return (ALIGN_UP(length + 2, 2));
 }
 
 /* Walk through the chain whose first element is *FIRST and remove

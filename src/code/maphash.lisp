@@ -28,8 +28,8 @@
 ;;; a slot in the table.
 ;;; It is the number of logical pairs in use, so if HWM = 1, then
 ;;; 1 pair is in use occupying physical element indices 2 and 3.
-(defmacro hash-table-pairs-hwm (pairs)
-  `(truly-the index/2 (svref ,pairs (1- (length ,pairs)))))
+(defmacro kv-vector-high-water-mark (pairs)
+  `(truly-the index/2 (svref ,pairs 0)))
 
 (define-compiler-macro maphash (&whole form function-designator hash-table
                                 &environment env)
@@ -40,7 +40,7 @@
             (,kv-vector (hash-table-pairs ,hash-table))
             ;; The high water mark needs to be loaded only once due to the
             ;; prohibition against adding keys during traversal.
-            (,limit (1+ (* 2 (hash-table-pairs-hwm ,kv-vector)))))
+            (,limit (1+ (* 2 (kv-vector-high-water-mark ,kv-vector)))))
        ;; Regarding this TRULY-THE: in the theoretical edge case of the largest
        ;; possible NEXT-VECTOR, it is not really true that the I+2 is an index.
        ;; However, for all intents and purposes, it is an INDEX because if not,
@@ -98,7 +98,7 @@ for."
   (let ((function (gensymify* name "-FUN")))
     `(let ((,function
             (let* ((kv-vector (hash-table-pairs ,hash-table))
-                   (limit (1+ (* 2 (hash-table-pairs-hwm kv-vector))))
+                   (limit (1+ (* 2 (kv-vector-high-water-mark kv-vector))))
                    (index 3))
               (declare (fixnum index))
               (flet ((,name ()

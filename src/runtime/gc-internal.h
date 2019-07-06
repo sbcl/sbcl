@@ -61,6 +61,9 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 #define FUN_SELF_FIXNUM_TAGGED 0
 #endif
 
+// Return only the lisp-visible vector header flag bits bits,
+// masking out subtype_VectorWeakVisited.
+#define vector_subtype(header) (HeaderValue(header) & 7)
 // Test for presence of a bit in vector's header.
 // As a special case, if 'val' is 0, then test for all bits clear.
 #define is_vector_subtype(header, val) \

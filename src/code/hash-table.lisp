@@ -102,6 +102,8 @@
   (hash-vector nil :type (or null (simple-array hash-table-index (*))))
   ;; flags: WEAKNESS-KIND | FINALIZERSP | SYNCHRONIZEDP | WEAKP
   ;; WEAKNESS-KIND is 2 bits, the rest are 1 bit each
+  ;; If you change these, be sure to check the definition of hash_table_weakp()
+  ;; in 'gc-private.h'
   (flags 0 :type (unsigned-byte 5) :read-only t)
   ;; A potential index into the k/v vector. It should be checked first
   ;; when searching. There's no reason to allow NIL here,

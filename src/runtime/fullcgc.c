@@ -286,28 +286,28 @@ static void trace_object(lispobj* where)
                 __mark_obj(where[i]);
         return; // do not scan slots
     case SIMPLE_VECTOR_WIDETAG:
-        if (is_vector_subtype(header, VectorValidHashing)) {
-            lispobj lhash_table = where[2];
-            gc_dcheck(is_lisp_pointer(lhash_table));
+        // non-weak hashtable kv vectors are trivial in fullcgc. Keys don't move
+        // so the table will not need rehash as a result of gc.
+        if ((vector_subtype(header) & ~subtype_VectorAddrHashing)
+            == subtype_VectorHashing + subtype_VectorWeak) { // weak table
+            struct vector* v = (struct vector*)where;
+            lispobj lhash_table = v->data[fixnum_value(v->length)-1];
+            gc_dcheck(instancep(lhash_table));
             __mark_obj(lhash_table);
             struct hash_table* hash_table
               = (struct hash_table *)native_pointer(lhash_table);
-            if (!hashtable_weakp(hash_table)) {
-                scav_hash_table_entries(hash_table, 0, mark_pair);
-            } else {
-                // An object can only be removed from the queue once.
-                // Therefore the 'next' pointer has got to be nil.
-                gc_assert(hash_table->next_weak_hash_table == NIL);
-                int weakness = hashtable_weakness(hash_table);
-                boolean defer = 1;
-                if (weakness != WEAKNESS_KEY_AND_VALUE)
-                    defer = scav_hash_table_entries(hash_table,
-                                                    alivep_funs[weakness],
-                                                    mark_pair);
-                if (defer) {
-                    hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
-                    weak_hash_tables = hash_table;
-                }
+            gc_assert(hashtable_weakp(hash_table));
+            // An object can only be removed from the queue once.
+            // Therefore the 'next' pointer has got to be nil.
+            gc_assert(hash_table->next_weak_hash_table == NIL);
+            int weakness = hashtable_weakness(hash_table);
+            boolean defer = 1;
+            if (weakness != WEAKNESS_KEY_AND_VALUE)
+                defer = scan_weak_hashtable(hash_table, alivep_funs[weakness],
+                                            mark_pair);
+            if (defer) {
+                hash_table->next_weak_hash_table = (lispobj)weak_hash_tables;
+                weak_hash_tables = hash_table;
             }
             return;
         }
