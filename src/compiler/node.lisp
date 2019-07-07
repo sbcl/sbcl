@@ -1624,6 +1624,7 @@
     (policy thing)
     #+(and sb-fasteval (not sb-xc-host))
     (sb-interpreter:basic-env (sb-interpreter:env-policy thing))
+    ;; Why not *policy*?
     (null **baseline-policy**)
     (t (lexenv-policy (etypecase thing
                         (lexenv thing)
