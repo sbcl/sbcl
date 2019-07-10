@@ -166,3 +166,5 @@
 ;;; The offset from the fault address reported to the runtime to the
 ;;; END of the global safepoint page.
 (defconstant gc-safepoint-trap-offset n-word-bytes)
+
+#+sb-xc-host (deftype sb-xc:fixnum () `(signed-byte ,n-fixnum-bits))

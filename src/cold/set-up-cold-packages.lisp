@@ -212,7 +212,14 @@
 ;;;   (* 50 (hash-table-rehash-threshold (make-hash-table)))
 ;;; because we are not intercepting '*.
 (defparameter *dual-personality-math-symbols*
-  '("+" "-" "*" "/" "=" "/=" "<" "<=" ">" ">=" "MIN" "MAX"))
+  '("+" "-" "*" "/" "=" "/=" "<" "<=" ">" ">=" "MIN" "MAX"
+    ;; We've gotten along quite well without an alter-ego for FIXNUM,
+    ;; but now some s-expressions mentioning the type FIXNUM are fed
+    ;; to the host for evaluation, and a type-checking host (such as we are)
+    ;; croaks if an argument exceeds the host's notion of fixnum.
+    ;; Get around it by changing those uses of fixnum to SB-XC:FIXNUM.
+    "FIXNUM"
+    ))
 
 ;;; When playing such tricky package games, it's best to have the symbols that
 ;;; are visible by default, i.e. XC-STRICT-CL:NAME, have no definition,

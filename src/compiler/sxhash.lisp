@@ -100,10 +100,9 @@
 (defglobal +sxhash-single-float-expr+
   `(let ((bits (logand (single-float-bits x) ,(1- (ash 1 32)))))
      (logxor 66194023
-             (sxhash (the fixnum
+             (sxhash (the sb-xc:fixnum
                           (logand sb-xc:most-positive-fixnum
-                                  (logxor bits
-                                          (ash bits -7))))))))
+                                  (logxor bits (ash bits -7))))))))
 (deftransform sxhash ((x) (single-float)) '#.+sxhash-single-float-expr+)
 
 #-64-bit
@@ -216,7 +215,7 @@
   (defun sxhash (x)
     (let ((answer (etypecase x ; croak on anything but these
                     (null         (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
-                    (fixnum       #.+sxhash-fixnum-expr+)
+                    (sb-xc:fixnum #.+sxhash-fixnum-expr+)
                     (single-float #.+sxhash-single-float-expr+)
                     (double-float #.+sxhash-double-float-expr+))))
       (push (cons x answer) *sxhash-crosscheck*)
