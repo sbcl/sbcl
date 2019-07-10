@@ -9,7 +9,7 @@
 # provided with absolutely no warranty. See the COPYING and CREDITS
 # files for more information.
 
-CFLAGS += -marm -march=armv5
+CFLAGS += -marm -march=armv7
 NM = ./linux-nm
 
 ASSEM_SRC = arm-assem.S ldso-stubs.S
