@@ -97,14 +97,18 @@
   ;; hash associated with the key, saving recalculation. Could be
   ;; useful for EQL, and EQUAL hash tables. This table is not needed
   ;; for EQ hash tables, and when present the value of
-  ;; +MAGIC-HASH-VECTOR-VALUE+ represents EQ-based hashing on the
+  ;; +MAGIC-HASH-VECTOR-VALUE+ represents address-based hashing on the
   ;; respective key.
   (hash-vector nil :type (or null (simple-array hash-table-index (*))))
-  ;; flags: WEAKNESS-KIND | FINALIZERSP | SYNCHRONIZEDP | WEAKP
+  ;; flags: WEAKNESS-KIND | WEAKP | FINALIZERSP | USERFUNP | SYNCHRONIZEDP
   ;; WEAKNESS-KIND is 2 bits, the rest are 1 bit each
+  ;;   - WEAKP        : table is weak
+  ;;   - FINALIZERSP  : table is the global finalizer store
+  ;;   - USERFUNP     : table has a user-defined predicate
+  ;;   - SYCHRONIZEDP : all operations are automatically guarded by a mutex
   ;; If you change these, be sure to check the definition of hash_table_weakp()
   ;; in 'gc-private.h'
-  (flags 0 :type (unsigned-byte 5) :read-only t)
+  (flags 0 :type (unsigned-byte 6) :read-only t)
   ;; A potential index into the k/v vector. It should be checked first
   ;; when searching. There's no reason to allow NIL here,
   ;; because worst case there won't be a hit at this index.

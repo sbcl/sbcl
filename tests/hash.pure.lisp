@@ -168,3 +168,30 @@
   (let ((ht (make-hash-table :rehash-size 1.0001)))
     (dotimes (i 100)
       (setf (gethash (gensym) ht) 10))))
+
+(with-test (:name (hash-table :custom-hashfun-with-standard-test))
+  (flet ((kv-flag-bits (ht)
+           (sb-kernel:get-header-data (sb-impl::hash-table-pairs ht))))
+    ;; verify that EQ hashing on symbols is address-sensitive
+    (let ((h (make-hash-table :test 'eq)))
+      (setf (gethash 'foo h) 1)
+      (assert (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))
+    (let ((h (make-hash-table :test 'eq :hash-function 'sb-kernel:symbol-hash)))
+      (setf (gethash 'foo h) 1)
+      (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype))))
+
+    ;; Verify that any standard hash-function on a function is address-sensitive,
+    ;; but a custom hash function makes it not so.
+    ;; Require 64-bit since this uses %CODE-SERIALNO as the hash,
+    ;; and that function doesn't exist on 32-bit (but should!)
+    #+64-bit
+    (dolist (test '(eq eql equal equalp))
+      (let ((h (make-hash-table :test test)))
+        (setf (gethash #'car h) 1)
+        (assert (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))
+      (let ((h (make-hash-table :test test :hash-function
+                                (lambda (x)
+                                  (sb-kernel:%code-serialno
+                                   (sb-kernel:fun-code-header x))))))
+        (setf (gethash #'car h) 1)
+        (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))))))
