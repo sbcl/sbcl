@@ -1728,7 +1728,17 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * protection so the error handler has some headroom, protect the
          * previous page so that we can catch returns from the guard page
          * and restore it. */
-        if (lose_on_corruption_p || gc_active_p) {
+        if (gc_active_p) {
+            fake_foreign_function_call(context);
+            lose("Control stack exhausted with gc_active_p, fault: %p, PC: %p",
+                 addr, (void*)*os_context_pc_addr(context));
+        }
+        if (get_pseudo_atomic_atomic(th)) {
+            fake_foreign_function_call(context);
+            lose("Control stack exhausted while pseudo-atomic, fault: %p, PC: %p",
+                 addr, (void*)*os_context_pc_addr(context));
+        }
+        if (lose_on_corruption_p) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted, fault: %p, PC: %p",
                  addr, (void*)*os_context_pc_addr(context));
