@@ -4,7 +4,7 @@
   (let* ((type1 (random-type 500))
          (type2 (random-type 500))
          (wanted (subtypep type1 type2)))
-    (dotimes (i 100) ; 5 seconds of run time
+    (dotimes (i 50) ; 2.5 seconds (= 50 * .05) of run time
       (block foo
         (sb-ext:schedule-timer (sb-ext:make-timer
                                 (lambda ()
