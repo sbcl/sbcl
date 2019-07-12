@@ -215,6 +215,7 @@
   (assert (= (sb-impl::kv-vector-high-water-mark (sb-impl::hash-table-pairs *tbl*))
              20001))
   (loop for i from 10 by 10 repeat 20 do (remhash i *tbl*))
+  (sb-sys:scrub-control-stack)
   (gc)
   ;; There were 20 items REMHASHed plus the freelist contains a pointer
   ;; to a cell which is one past the high-water-mark, for 21 cells in all.
@@ -234,6 +235,7 @@
   ;; Now one item should have been popped
   (assert (= (length (hash-table-freelist *tbl*)) 20))
   ;; should have used up the smashed cell
+  (sb-sys:scrub-control-stack)
   (gc)
   ;; Should have smashed the uninterned symbol
   (assert (hash-table-smashed-cells *tbl*)))
