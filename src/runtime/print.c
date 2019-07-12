@@ -815,7 +815,7 @@ static void print_otherptr(lispobj obj)
         NEWLINE_OR_RETURN;
         if (type >= SIMPLE_ARRAY_UNSIGNED_BYTE_2_WIDETAG &&
             type <= SIMPLE_BIT_VECTOR_WIDETAG)
-            printf("length = %ld", fixnum_value(*ptr));
+            printf("length = %ld", (long)fixnum_value(*ptr));
         else
             printf("Unknown header object?");
         break;

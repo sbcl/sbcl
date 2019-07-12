@@ -195,3 +195,45 @@
                                    (sb-kernel:fun-code-header x))))))
         (setf (gethash #'car h) 1)
         (assert (not (logtest (kv-flag-bits h) sb-vm:vector-addr-hashing-subtype)))))))
+
+(defun hash-table-freelist (tbl)
+  (sb-int:named-let chain ((index (sb-impl::hash-table-next-free-kv tbl)))
+    (when (plusp index)
+      (nconc (list index)
+             (chain (aref (sb-impl::hash-table-next-vector tbl) index))))))
+
+(defvar *tbl* (make-hash-table :weakness :key))
+
+(import 'sb-impl::hash-table-smashed-cells)
+;;; We have a bunch of tests of weakness, but this is testing the new algorithm
+;;; which has two different freelists - one of cells that REMHASH has made available
+;;; and one of cells that GC has marked as empty. Since we no longer inhibit GC
+;;; during table operations, we need to give GC a list of its own to manipulate.
+(with-test (:name (hash-table :gc-smashed-cell-list))
+  (dotimes (i 20000) (setf (gethash i *tbl*) (- i)))
+  (setf (gethash (cons 1 2) *tbl*) 'foolz)
+  (assert (= (sb-impl::kv-vector-high-water-mark (sb-impl::hash-table-pairs *tbl*))
+             20001))
+  (loop for i from 10 by 10 repeat 20 do (remhash i *tbl*))
+  (gc)
+  ;; There were 20 items REMHASHed plus the freelist contains a pointer
+  ;; to a cell which is one past the high-water-mark, for 21 cells in all.
+  (assert (= (length (hash-table-freelist *tbl*)) 21))
+  ;; The (1 . 2) cons was removed
+  (assert (= (length (hash-table-smashed-cells *tbl*)) 1))
+  ;; And its representation in the list of smashed cells doesn't
+  ;; fit in a packed integer (because the cell index is 20001)
+  (assert (and (consp (hash-table-smashed-cells *tbl*))
+               (consp (car (hash-table-smashed-cells *tbl*)))))
+  (setf (gethash 'jeebus *tbl*) 9)
+  ;; Freelist should not have changed at all.
+  (assert (= (length (hash-table-freelist *tbl*)) 21))
+  ;; And the smashed cell was used.
+  (assert (null (hash-table-smashed-cells *tbl*)))
+  (setf (gethash (make-symbol "SANDWICH") *tbl*) 8)
+  ;; Now one item should have been popped
+  (assert (= (length (hash-table-freelist *tbl*)) 20))
+  ;; should have used up the smashed cell
+  (gc)
+  ;; Should have smashed the uninterned symbol
+  (assert (hash-table-smashed-cells *tbl*)))

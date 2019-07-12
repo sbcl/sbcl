@@ -61,9 +61,9 @@
 (sb-xc:deftype hash-table-index () '(unsigned-byte 32))
 (sb-xc:defstruct (hash-table (:copier nil)
                              (:constructor %make-hash-table
-                               (getter
-                                setter
-                                remover
+                               (gethash-impl
+                                puthash-impl
+                                remhash-impl
                                 test
                                 test-fun
                                 hash-fun
@@ -75,9 +75,10 @@
                                 hash-vector
                                 flags)))
 
-  (getter #'error :type function :read-only t)
-  (setter #'error :type function :read-only t)
-  (remover #'error :type function :read-only t)
+  (gethash-impl #'error :type function :read-only t)
+  (puthash-impl #'error :type function :read-only t)
+  (remhash-impl #'error :type function :read-only t)
+  (clrhash-impl #'error :type function :read-only t) ; not used (yet)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
@@ -146,15 +147,26 @@
   (rehash-threshold nil :type (single-float ($0.0) $1.0) :read-only t)
   ;; The current number of entries in the table.
   (%count 0 :type index)
-  ;; This slot is used to link weak hash tables during GC. When the GC
-  ;; isn't running it is always NIL.
-  (next-weak-hash-table nil :type null)
   ;; Index into the Next vector chaining together free slots in the KV
   ;; vector.
   ;; This index is allowed to exceed the high-water-mark by 1 unless
   ;; the HWM is at its maximum in which case this must be 0.
   (next-free-kv 1 :type index)
-  ;; List of values culled out during GC of weak hash table.
+
+  ;;; Supporting slots for weak hash-tables.
+  ;; List of (pair-index . bucket-number) which GC smashed and are almost
+  ;; equivalent to free cells, except that they are not yet unlinked from
+  ;; their chain. Skipping the removal in GC eliminates a race with REMHASH.
+  ;; Pushing onto the free list wouldn't actually be difficult,
+  ;; but removing from the bucket is impossible without implementing
+  ;; lock-free linked lists compatibly between C and Lisp.
+  (smashed-cells nil)
+  ;; This slot is used to link weak hash tables during GC. When the GC
+  ;; isn't running it is always NIL.
+  (next-weak-hash-table nil :type null)
+  ;; List of values (i.e. the second half of the k/v pair) culled out during
+  ;; GC, used only by the finalizer hash-table. This informs Lisp of the IDs
+  ;; (small fixnums) of the finalizers that need to run.
   (culled-values nil :type list)
   ;; For detecting concurrent accesses.
   #+sb-hash-table-debug

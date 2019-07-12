@@ -1292,7 +1292,10 @@ scav_vector (lispobj *where, lispobj header)
          * and fills it with zero, but some other thread simulatenously
          * sets the header in %%PUTHASH.
          */
-        fprintf(stderr,
+        /* And it's ok if the table backpointer hasn't been stored yet,
+         * if the high-water-mark is 0 */
+        if (KV_PAIRS_HIGH_WATER_MARK(data))
+            fprintf(stderr,
                 "Warning: no pointer at %p in hash table: this indicates "
                 "non-fatal corruption caused by concurrent access to a "
                 "hash-table from multiple threads. Any accesses to "
@@ -1354,7 +1357,8 @@ scav_vector (lispobj *where, lispobj header)
 /* Walk through the chain whose first element is *FIRST and remove
  * dead weak entries. */
 static inline void
-cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
+cull_weak_hash_table_bucket(struct hash_table *hash_table,
+                            uint32_t bucket, uint32_t index,
                             lispobj *kv_vector,
                             uint32_t *next_vector, uint32_t *hash_vector,
                             int (*alivep_test)(lispobj,lispobj),
@@ -1363,20 +1367,18 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
                             boolean *rehash)
 {
     const lispobj empty_symbol = UNBOUND_MARKER_WIDETAG;
-    uint32_t index = *prev;
-    while (index) {
-        uint32_t next = next_vector[index];
+    for ( ; index ; index = next_vector[index] ) {
         lispobj key = kv_vector[2 * index];
         lispobj value = kv_vector[2 * index + 1];
+        // Lisp might not have gotten around to pruning a chain
+        // containing previously culled items.
+        if (key == empty_symbol && value == empty_symbol) continue;
+        // If the pair doesn't have both halves empty,
+        // then it mustn't have either half empty.
         gc_assert(key != empty_symbol);
         gc_assert(value != empty_symbol);
         if (!alivep_test(key, value)) {
             gc_assert(hash_table->_count > 0);
-            *prev = next;
-            hash_table->_count -= make_fixnum(1);
-            next_vector[index] = fixnum_value(hash_table->next_free_kv);
-            hash_table->next_free_kv = make_fixnum(index);
-            kv_vector[2 * index] = empty_symbol;
             if (save_culled_values) {
                 lispobj val = kv_vector[2 * index + 1];
                 gc_assert(!is_lisp_pointer(val));
@@ -1392,9 +1394,35 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
                 // ensure this cons doesn't get smashed into (0 . 0) by full gc
                 if (!compacting_p()) gc_mark_obj(list);
             }
+            kv_vector[2 * index] = empty_symbol;
             kv_vector[2 * index + 1] = empty_symbol;
-            if (hash_vector)
-                hash_vector[index] = MAGIC_HASH_VECTOR_VALUE;
+            hash_table->_count -= make_fixnum(1);
+
+            // Push (index . bucket) onto the table's GC culled cell list.
+            // If each of 'index' and 'bucket' can be represented in 14 bits,
+            // then pack them in a fixnum. Otherwise a cons. This makes the code
+            // essentially identical regardless of word size while in most cases
+            // consuming only 1 cons per culled item.
+            struct cons *cons;
+            if ((index & ~0x3FFF) | (bucket & ~0x3FFF)) { // large values
+                cons = (struct cons*)
+                  gc_general_alloc(2 * sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+                cons->car = make_lispobj(cons + 1, LIST_POINTER_LOWTAG);
+                cons[1].car = make_fixnum(index);  // which cell became free
+                cons[1].cdr = make_fixnum(bucket); // which chain was it in
+                if (!compacting_p()) gc_mark_obj(cons->car);
+            } else { // small values
+                cons = (struct cons*)
+                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+                cons->car = ((index << 14) | bucket) << N_FIXNUM_TAG_BITS;
+            }
+            cons->cdr = hash_table->smashed_cells;
+            // Lisp code must atomically pop the list whereas this C code
+            // always wins and does not need compare-and-swap.
+            hash_table->smashed_cells = make_lispobj(cons, LIST_POINTER_LOWTAG);
+            // ensure this cons doesn't get smashed into (0 . 0) by full gc
+            if (!compacting_p()) gc_mark_obj(hash_table->smashed_cells);
+
         } else {
             if (fix_pointers) { // Follow FPs as necessary
                 lispobj key = kv_vector[2 * index];
@@ -1403,9 +1431,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table, uint32_t *prev,
                     (!hash_vector || hash_vector[index] == MAGIC_HASH_VECTOR_VALUE))
                     *rehash = 1;
             }
-            prev = &next_vector[index];
         }
-        index = next;
     }
 }
 
@@ -1431,9 +1457,9 @@ cull_weak_hash_table (struct hash_table *hash_table,
     boolean rehash = 0;
     boolean save_culled_values = (hash_table->flags & MAKE_FIXNUM(4)) != 0;
     for (i = 0; i < length; i++) {
-        cull_weak_hash_table_bucket(hash_table, &index_vector[i],
-                                    kv_vector, next_vector,
-                                    hash_vector, alivep_test, fix_pointers,
+        cull_weak_hash_table_bucket(hash_table, i, index_vector[i],
+                                    kv_vector, next_vector, hash_vector,
+                                    alivep_test, fix_pointers,
                                     save_culled_values, &rehash);
     }
     /* If an EQ-based key has moved, mark the hash-table for rehash */
