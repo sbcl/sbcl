@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(defun test-inspect (object control)
+(defun test-inspect (object &optional (control '("q")))
   (let* ((control (if (listp control)
                       (format nil "~{~A~%~}" control)
                       control))
@@ -30,10 +30,37 @@
 
 (with-test (:name (inspect :no-error print-object :lp-454682))
   (let ((class (find-class 'class-with-prototype-print-error)))
-    (flet ((test ()
-             (test-inspect class '("q"))))
-      ;; Prototype may not be initialized at this point.
-      (assert (search "PROTOTYPE: " (test)))
-      ;; Force protocol initialization and test again.
-      (sb-mop:class-prototype class)
-      (assert (search "PROTOTYPE: " (test))))))
+    ;; Prototype may not be initialized at this point.
+    (assert (search "PROTOTYPE: " (test-inspect class)))
+    ;; Force protocol initialization and test again.
+    (sb-mop:class-prototype class)
+    (assert (search "PROTOTYPE: " (test-inspect class)))))
+
+(with-test (:name (inspect array :element-type :lp-1835934))
+  (let* ((array (make-array '()))
+         (result (test-inspect array)))
+    (assert (search "an ARRAY of T" result))
+    (assert (search "dimensions are ()" result)))
+
+  (let ((array (make-array '() :element-type 'fixnum)))
+    (assert (search "an ARRAY of FIXNUM" (test-inspect array))))
+
+  (let ((array (let ((a (make-array ())))
+                 (make-array '() :displaced-to a))))
+    (assert (search "a displaced ARRAY of T" (test-inspect array)))))
+
+(with-test (:name (inspect vector :*inspect-length*))
+  (let* ((array (make-array 100 :initial-element t))
+         (result (test-inspect array)))
+    (assert (search "VECTOR of length 100." result))
+    (assert (search "0. T" result))
+    (assert (search "9. T" result))
+    (assert (not (search "10. T" result)))))
+
+(with-test (:name (inspect array :*inspect-length*))
+  (let* ((array (make-array '(100 100) :initial-element t))
+         (result (test-inspect array)))
+    (assert (search "dimensions are (100 100)." result))
+    (assert (search "0. [0,0] : T" result))
+    (assert (search "9. [0,9] : T" result))
+    (assert (not (search "10." result)))))

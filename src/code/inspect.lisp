@@ -236,15 +236,14 @@ evaluated expressions.
              (cons "Documentation" (documentation object t))))))
 
 (defmethod inspected-parts ((object vector))
-  (values (format nil
-                  "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
-                  (and (array-header-p object)
-                       (%array-displaced-p object))
-                  (length object))
-          nil
-          ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what
-          ;; does *INSPECT-LENGTH* mean?
-          (coerce object 'list)))
+  (let ((length (min (array-total-size object) *inspect-length*)))
+    (values (format nil
+                    "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
+                    (and (array-header-p object)
+                         (%array-displaced-p object))
+                    (length object))
+            nil
+            (coerce (subseq object 0 length) 'list))))
 
 (defun inspected-index-string (index rev-dimensions)
   (if (null rev-dimensions)
@@ -263,19 +262,17 @@ evaluated expressions.
                                       :displaced-to object))
          (dimensions (array-dimensions object))
          (reversed-elements nil))
-    ;; FIXME: Should we respect *INSPECT-LENGTH* here? If not, what does
-    ;; *INSPECT-LENGTH* mean?
     (dotimes (i length)
       (push (cons (format nil
                           "~A "
                           (inspected-index-string i (reverse dimensions)))
                   (aref reference-array i))
             reversed-elements))
-    (values (format nil "The object is ~:[a displaced~;an~] ARRAY of ~A.~%~
-                         Its dimensions are ~S.~%"
-                    (array-element-type object)
+    (values (format nil "The object is ~:[an~;a displaced~] ARRAY of ~A.~%~
+                         Its dimensions are ~:S.~%"
                     (and (array-header-p object)
                          (%array-displaced-p object))
+                    (array-element-type object)
                     dimensions)
             t
             (nreverse reversed-elements))))
