@@ -29,7 +29,7 @@
 ;;;;    on both the old and new so that the GC won't do anything to cull entries
 ;;;;    but will update the the need-to-rehash.
 ;;;;  - change recursive locks to nonrecursive.
-;;;;    This will, I fear, be immpossible because we've exposed and documented
+;;;;    This will, I fear, be impossible because we've exposed and documented
 ;;;;    an API that pretty much tells users that it's ok to create a synchronized
 ;;;;    table while *also* wrapping any random operation in the table lock.
 ;;;;    Hence recursion on the lock. (commit b9a1b17b079d315c)
