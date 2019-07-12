@@ -67,6 +67,7 @@
     (bug "%INSTANCEP test on ~S" x)))
 (deftype instance ()
   '(or structure!object package
+    sb-int:fun-src
     #+host-quirks-sbcl (and host-sb-kernel:instance ; optimizes out a call when false
                             (satisfies unsatisfiable-instancep))))
 (defun %instancep (x)

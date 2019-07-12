@@ -373,7 +373,7 @@
   form
   doc
   xrefs)
-(!set-load-form-method fun-src (:target))
+(!set-load-form-method fun-src (:xc :target))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO
