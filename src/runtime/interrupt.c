@@ -1733,7 +1733,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
             lose("Control stack exhausted with gc_active_p, fault: %p, PC: %p",
                  addr, (void*)*os_context_pc_addr(context));
         }
-        if (get_pseudo_atomic_atomic(th)) {
+        if (arch_pseudo_atomic_atomic(context)) {
             fake_foreign_function_call(context);
             lose("Control stack exhausted while pseudo-atomic, fault: %p, PC: %p",
                  addr, (void*)*os_context_pc_addr(context));
