@@ -1238,6 +1238,21 @@
     (inst mov value (ea object value
                         (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:arg-types * tagged-num)
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (inst mov value nil-value)
+    (inst cmp count (fixnumize index))
+    (inst jmp :be done)
+    (inst mov value (ea (- (* index n-word-bytes)) object))
+    done))
+
 ;;; Turn more arg (context, count) into a list.
 (define-vop (listify-rest-args)
   (:translate %listify-rest-args)

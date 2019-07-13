@@ -1745,7 +1745,15 @@ not stack-allocated LVAR ~S." source-lvar)))))
        ;;  -PK
        (loop for loc in (ir2-lvar-locs 2lvar)
              for idx upfrom 0
-             do (vop sb-vm::more-arg node block
+             unless (eq (tn-kind loc) :unused)
+             do #+(vop-named sb-vm::more-arg-or-nil)
+                (vop sb-vm::more-arg-or-nil node block
+                     (lvar-tn node block context)
+                     (lvar-tn node block count)
+                     idx
+                     loc)
+                #-(vop-named sb-vm::more-arg-or-nil)
+                (vop sb-vm::more-arg node block
                      (lvar-tn node block context)
                      (emit-constant idx)
                      loc)))

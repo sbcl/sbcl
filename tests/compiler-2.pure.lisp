@@ -2370,3 +2370,23 @@
                 (when (< (aref vector 0) count)
                   (f count))))))
    ((1) nil)))
+
+(with-test (:name (:mv-call :more-arg))
+  (checked-compile-and-assert
+   ()
+   '(lambda (&rest rest)
+     (multiple-value-bind (a b c) (values-list rest)
+       (declare (ignore c))
+       (list a b)))
+   ((1 3) '(1 3) :test #'equal)))
+
+(with-test (:name (:mv-call :more-arg-unused)
+            :skipped-on (not :x86-64)) ;; needs SB-VM::MORE-ARG-OR-NIL VOP
+  (checked-compile-and-assert
+   ()
+   '(lambda (&rest rest)
+     (multiple-value-bind (a b) (values-list rest)
+       (list a b)))
+   (() '(nil nil) :test #'equal)
+   ((1) '(1 nil) :test #'equal)
+   ((1 3) '(1 3) :test #'equal)))
