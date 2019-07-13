@@ -209,7 +209,8 @@
 ;;; which has two different freelists - one of cells that REMHASH has made available
 ;;; and one of cells that GC has marked as empty. Since we no longer inhibit GC
 ;;; during table operations, we need to give GC a list of its own to manipulate.
-(with-test (:name (hash-table :gc-smashed-cell-list))
+(with-test (:name (hash-table :gc-smashed-cell-list
+                              :skipped-on (and :x86-64 :win32))) ;; scrub-control-stack crashes...
   (flet ((f ()
            (dotimes (i 20000) (setf (gethash i *tbl*) (- i)))
            (setf (gethash (cons 1 2) *tbl*) 'foolz)
@@ -219,7 +220,6 @@
     ;; Ensure the values remain outside of the stack pointer for scrub-control-stack to work
     (declare (notinline f)) 
     (f))
-  #-(and win32 x86-64) ;; why does it crash?
   (sb-sys:scrub-control-stack)
   (gc)
   ;; There were 20 items REMHASHed plus the freelist contains a pointer
