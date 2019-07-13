@@ -1056,10 +1056,10 @@
                     `(:constant . ,(sb-c::entry-info-name entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))
                     `(:constant . ,(sb-c::entry-info-arguments entry))
+                    (aref constants (+ wordindex sb-vm:simple-fun-source-slot))
+                    `(:constant . ,(sb-c::entry-info-form/doc entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
-                    `(:constant . ,(sb-c::entry-info-form/doc/xrefs entry))
-                    (aref constants (+ wordindex sb-vm:simple-fun-type-slot))
-                    `(:constant . ,(sb-c::entry-info-type entry))))
+                    `(:constant . ,(sb-c::entry-info-type/xref entry))))
             (dump-code-object component code-segment code-length fixups file)))
          (fun-index nfuns))
 

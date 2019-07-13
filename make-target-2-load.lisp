@@ -175,10 +175,8 @@ Please check that all strings which were not recognizable to the compiler
        (dotimes (i (sb-kernel:code-n-entries obj))
          (let ((fun (sb-kernel:%code-entry-point obj i)))
            (when (sb-kernel:%simple-fun-lexpr fun)
-             (sb-kernel:set-simple-fun-info
-              fun nil
-              (sb-kernel:%simple-fun-doc fun)
-              (sb-kernel:%simple-fun-xrefs fun))))))))
+             (setf (sb-impl::%simple-fun-source fun)
+                   (sb-impl::%simple-fun-doc fun))))))))
    :all)
 
   ;; Disable the format-control optimizer for ERROR and WARN

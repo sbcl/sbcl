@@ -143,11 +143,11 @@
       (loop for (fun . unpacked) in all-unpacked do
            (let ((new-xrefs (pack-xref-data unpacked)))
              (incf new-size (xref-size new-xrefs))
-             (set-simple-fun-info
-              fun
-              (%simple-fun-lexpr fun)
-              (%simple-fun-doc fun)
-              new-xrefs))))
+             (aver (vectorp new-xrefs))
+             (let ((info (%simple-fun-info fun)))
+               (if (typep info '(cons t simple-vector))
+                   (rplacd info new-xrefs)
+                   (setf (%simple-fun-info fun) new-xrefs))))))
 
     (when (>= verbose 1)
       (format t ";   Old xref size ~11:D byte~:P~@

@@ -462,11 +462,16 @@ sb-c::
            (dotimes (i (sb-kernel:code-n-entries obj))
              (let* ((fun (sb-kernel:%code-entry-point obj i))
                     (arglist (%simple-fun-arglist fun))
-                    (type (sb-impl::%%simple-fun-type fun)))
+                    (info (%simple-fun-info fun))
+                    (type (typecase info
+                            ((cons t simple-vector) (car info))
+                            ((not simple-vector) info)))
+                    (type  (ensure-gethash type type-hash type))
+                    (xref (%simple-fun-xrefs fun)))
                (setf (%simple-fun-arglist fun)
                      (ensure-gethash arglist arglist-hash arglist))
-               (setf (sb-impl::%%simple-fun-type fun)
-                     (ensure-gethash type type-hash type)))))
+               (setf (sb-impl::%simple-fun-info fun)
+                     (if (and type xref) (cons type xref) (or type xref))))))
           (#.sb-vm:instance-widetag
            (typecase obj
             (compiled-debug-info

@@ -364,17 +364,6 @@
   #+sb-dyncount
   (dyncount-info nil :type (or null dyncount-info)))
 
-;;; A FUN-SRC structure appears in %SIMPLE-FUN-INFO of any function for
-;;; which a source form is retained via COMPILE or LOAD and for which it was
-;;; required to store all three of these pieces of data.
-(defstruct (fun-src (:constructor make-fun-src (form doc xrefs))
-                    (:predicate nil)
-                    (:copier nil))
-  form
-  doc
-  xrefs)
-(!set-load-form-method fun-src (:xc :target))
-
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO
 ;;; structures are sometimes created before they are initialized,
@@ -394,12 +383,16 @@
   (name "<not computed>" :type (or simple-string list symbol))
   ;; the argument list that the function was defined with.
   (arguments nil :type list)
+  ;; source form and/or docstring
+  (form/doc nil :type (or list string (cons t string)))
   ;; a function type specifier representing the arguments and results
   ;; of this function
   (type 'function :type (or list (member function)))
-  ;; source form and/or docstring and/or xref information for the XEP
-  ;; Refer to PACK-SIMPLE-FUN-INFO for more detail.
-  (form/doc/xrefs nil :type (or null simple-vector string cons fun-src)))
+  (xref))
+(defun entry-info-type/xref (entry)
+  (let ((type (entry-info-type entry))
+        (xref (entry-info-xref entry)))
+    (if (and type xref) (cons type xref) (or type xref))))
 
 ;;; An IR2-PHYSENV is used to annotate non-LET LAMBDAs with their
 ;;; passing locations. It is stored in the PHYSENV-INFO.

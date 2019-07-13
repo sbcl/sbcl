@@ -275,25 +275,26 @@
   ;; that the code object reserves space for 4 NILs just in case a simple-fun
   ;; accessor is called on it. I'm not entirely sure whether that's necessary.
 
-  ;; FIXME: instead of 1 thing in the TYPE slot and (up to) 3 things
-  ;; in the INFO slot, these should be replaced with 2 new slots:
-  ;;  SIMPLE-FUN-SOURCE - the docstring (just a string),
-  ;;    or the form (a cons whose car is LAMBDA),
-  ;;    or both (a cons whose car is a string)
-  ;;  SIMPLE-FUN-INFO - the xrefs (a vector), fun-type (a cons),
-  ;;    or both (a cons whose car is a vector)
-  ;; so that the INFO slot never contains user-alterable data.
   (def %simple-fun-name    sb-vm:simple-fun-name-slot)
   (def %simple-fun-arglist sb-vm:simple-fun-arglist-slot)
-  (def %simple-fun-info    sb-vm:simple-fun-info-slot)
-  (def %%simple-fun-type   sb-vm:simple-fun-type-slot))
+  (def %simple-fun-source  sb-vm:simple-fun-source-slot)
+  (def %simple-fun-info    sb-vm:simple-fun-info-slot))
 
 (defun %simple-fun-type (fun)
-  (let ((internal-type (%%simple-fun-type fun)))
+  (let* ((info (%simple-fun-info fun))
+         (internal-type (typecase info
+                          ((cons t simple-vector) (car info)) ; (type . xref)
+                          ((not simple-vector) info))))
     ;; For backward-compatibility we expand SFUNCTION -> FUNCTION.
     (if (and (listp internal-type) (eq (car internal-type) 'sfunction))
         (sb-ext:typexpand-1 internal-type)
         internal-type)))
+
+(defun %simple-fun-xrefs (fun)
+  (let ((info (%simple-fun-info fun)))
+    (typecase info
+      ((cons t simple-vector) (cdr info))
+      (simple-vector info))))
 
 (defun %fun-type (function)
   (typecase function
@@ -303,59 +304,29 @@
     (interpreted-function (sb-interpreter:%fun-type function))
     (t (%simple-fun-type (%fun-fun function)))))
 
-(defun set-simple-fun-info (fun form doc xrefs)
-  (setf (%simple-fun-info fun) (sb-c::pack-simple-fun-info form doc xrefs)))
-
-;;; Define readers for parts of SIMPLE-FUN-INFO, which holds:
-;;;  - a string if documentation only,
-;;;  - a SIMPLE-VECTOR if xrefs only
-;;;  - a (CONS STRING SIMPLE-VECTOR) if both
-;;;  - a CONS headed by LAMBDA if a source form only
-;;;  - a FUN-SRC if other combinations of the above
-;;;  - or NIL
-(macrolet ((def (name info-part if-simple-vector if-string if-struct)
-             `(defun ,name (simple-fun)
-                (declare (simple-fun simple-fun))
-                (let ((info (%simple-fun-info simple-fun)))
-                  (typecase info
-                    ;; (CONS (NOT STRING)) implies neither doc nor xref present
-                    (list (if (stringp (car info)) (,info-part info)))
-                    (simple-vector ,if-simple-vector)
-                    (string ,if-string)
-                    (fun-src ,if-struct)
-                    (t (bug "bogus INFO for ~S: ~S" simple-fun info)))))))
-  (def %simple-fun-doc   car nil info (fun-src-doc info))
-  (def %simple-fun-xrefs cdr info nil (fun-src-xrefs info)))
-
 ;;; Return the lambda expression for SIMPLE-FUN if compiled to memory
 ;;; and rentention of forms was enabled via the EVAL-STORE-SOURCE-FORM policy
 ;;; (as is the default).
 (defun %simple-fun-lexpr (simple-fun)
   (declare (simple-fun simple-fun))
-  (let ((info (%simple-fun-info simple-fun)))
-    (typecase info
-      (fun-src (fun-src-form info))
-      ((cons (not string)) info))))
+  (let ((source (%simple-fun-source simple-fun)))
+    (typecase source
+      ((cons t string) (car source))
+      ((not string) source))))
+
+(defun %simple-fun-doc (simple-fun)
+  (declare (simple-fun simple-fun))
+  (let ((source (%simple-fun-source simple-fun)))
+    (typecase source
+      ((cons t string) (cdr source))
+      (string source))))
 
 (defun (setf %simple-fun-doc) (doc simple-fun)
   (declare (type (or null string) doc)
            (simple-fun simple-fun))
-  (let ((info (%simple-fun-info simple-fun)))
-    (setf (%simple-fun-info simple-fun)
-          (typecase info
-            ((or null string) doc)
-            (simple-vector
-             (if doc (cons doc info) info))
-            ((cons string)
-             (if doc (rplaca info doc) (cdr info)))
-            (fun-src
-             ;; FIXME: should we consider these objects immutable?
-             (setf (fun-src-doc info) doc)
-             info)
-            ((cons (not string))
-             (if doc (make-fun-src info doc nil) info))
-            (t
-             (bug "bogus INFO for ~S: ~S" simple-fun info)))))
+  (setf (%simple-fun-source simple-fun)
+        (let ((form (%simple-fun-lexpr simple-fun)))
+          (if (and form doc) (cons form doc) (or form doc))))
   doc)
 
 (defun %simple-fun-next (simple-fun) ; DO NOT USE IN NEW CODE

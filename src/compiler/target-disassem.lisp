@@ -392,7 +392,10 @@
            (woffs (+ sb-vm:code-constants-offset (* fun-index sb-vm:code-slots-per-simple-fun)))
            (name (code-header-ref code (+ woffs sb-vm:simple-fun-name-slot)))
            (args (code-header-ref code (+ woffs sb-vm:simple-fun-arglist-slot)))
-           (type (code-header-ref code (+ woffs sb-vm:simple-fun-type-slot))))
+           (info (code-header-ref code (+ woffs sb-vm:simple-fun-info-slot)))
+           (type (typecase info
+                   ((cons t simple-vector) (car info))
+                   ((not simple-vector) info))))
       ;; if the function's name conveys its args, don't show ARGS too
       (format stream ".~A ~S~:[~:A~;~]" 'entry name
               (and (typep name '(cons (eql lambda) (cons list)))

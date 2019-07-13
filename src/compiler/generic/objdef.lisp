@@ -252,8 +252,8 @@ during backtrace.
 ;;; and the last is a derived piece of information.
 (defconstant simple-fun-name-slot    0)
 (defconstant simple-fun-arglist-slot 1)
-(defconstant simple-fun-info-slot    2)
-(defconstant simple-fun-type-slot    3)
+(defconstant simple-fun-source-slot  2) ; form and/or docstring
+(defconstant simple-fun-info-slot    3) ; type and possibly xref
 
 #-(or x86 x86-64)
 (define-primitive-object (return-pc :lowtag other-pointer-lowtag :widetag t)

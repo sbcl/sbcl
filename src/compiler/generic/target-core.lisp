@@ -207,10 +207,10 @@
                   (entry-info-name entry-info)
                   (code-header-ref code-obj (+ w sb-vm:simple-fun-arglist-slot))
                   (entry-info-arguments entry-info)
+                  (code-header-ref code-obj (+ w sb-vm:simple-fun-source-slot))
+                  (entry-info-form/doc entry-info)
                   (code-header-ref code-obj (+ w sb-vm:simple-fun-info-slot))
-                  (entry-info-form/doc/xrefs entry-info)
-                  (code-header-ref code-obj (+ w sb-vm:simple-fun-type-slot))
-                  (entry-info-type entry-info))
+                  (entry-info-type/xref entry-info))
             (note-fun entry-info fun object))))
 
       (push debug-info (core-object-debug-info object))

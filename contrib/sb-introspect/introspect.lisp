@@ -913,7 +913,7 @@ Experimental: interface subject to change."
            (call (fun-code-header object)))
          (call (%simple-fun-name object))
          (call (%simple-fun-arglist object))
-         (call (%simple-fun-type object))
+         (call (%simple-fun-source object))
          (call (%simple-fun-info object)))
         (symbol
          ;; We use :override here because (apparently) the intent is

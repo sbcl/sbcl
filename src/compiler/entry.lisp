@@ -51,25 +51,6 @@
            (or (not (lexenv-parent lexenv))
                (null-lexenv-p (lexenv-parent lexenv))))))
 
-;;; Return the value to place in %SIMPLE-FUN-INFO given any or all of
-;;; the three possible things that can be stashed there:
-;;;  - string        = just a docstring
-;;;  - simple-vector = just xrefs
-;;;  - cons          = either both of the above, or just a lambda expression
-;;;  - fun-src       = any other combination of the three pieces of data
-(defun pack-simple-fun-info (form doc xrefs)
-  (if form
-      ;; If form starts with a string, we can't store it by itself
-      ;; because it's confusable with (CONS STRING *)
-      ;; Lambda expressions start with LAMBDA, obviously,
-      ;; so this really shouldn't happen. Just being defensive here.
-      (if (or doc xrefs (typep form '(cons string)))
-          (make-fun-src form doc xrefs)
-          form)
-      (if (and doc xrefs)
-          (cons doc xrefs)
-          (or doc xrefs))))
-
 ;;; Initialize INFO structure to correspond to the XEP LAMBDA FUN.
 (defun compute-entry-info (fun info)
   (declare (type clambda fun) (type entry-info info))
@@ -82,12 +63,9 @@
     (setf (entry-info-offset info) (gen-label))
     (setf (entry-info-name info)
           (leaf-debug-name internal-fun))
-    (let ((form (functional-inline-expansion internal-fun))
-          (doc (functional-documentation internal-fun))
-          (xrefs (pack-xref-data (functional-xref internal-fun))))
-      (setf (entry-info-form/doc/xrefs info)
-            (pack-simple-fun-info
-                  (if (fasl-output-p *compile-object*)
+    (setf (entry-info-xref info) (pack-xref-data (functional-xref internal-fun)))
+    (let* ((inline-expansion (functional-inline-expansion internal-fun))
+           (form  (if (fasl-output-p *compile-object*)
                       (and (policy bind (= store-source-form 3))
                            ;; Downgrade the error to a warning if this was signaled
                            ;; by SB-PCL::DONT-KNOW-HOW-TO-DUMP.
@@ -112,11 +90,12 @@
                                         "Can't preserve function source - ~
 missing MAKE-LOAD-FORM methods?")
                                        (return nil)))))
-                               (constant-value (find-constant form)))))
+                               (constant-value (find-constant inline-expansion)))))
                       (and (policy bind (> store-source-form 0))
-                           form))
-                  doc
-                  xrefs)))
+                           inline-expansion)))
+           (doc (functional-documentation internal-fun)))
+      (setf (entry-info-form/doc info)
+            (if (and form doc) (cons form doc) (or form doc))))
     (when (policy bind (>= debug 1))
       (let ((args (functional-arg-documentation internal-fun)))
         ;; When the component is dumped, the arglists of the entry
