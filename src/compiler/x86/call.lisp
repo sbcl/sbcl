@@ -1312,6 +1312,22 @@
     (inst neg value)
     (inst mov value (make-ea :dword :base object :index value))))
 
+(define-vop (more-arg-or-nil)
+  (:policy :fast-safe)
+  (:args (object :scs (descriptor-reg) :to (:result 1))
+         (count :scs (any-reg) :to (:result 1)))
+  (:arg-types * tagged-num)
+  (:info index)
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:result-types *)
+  (:generator 3
+    (inst mov value nil-value)
+    (inst cmp count (fixnumize index))
+    (inst jmp :be done)
+    (inst mov value (make-ea :dword :base object
+                                    :disp (- (* index n-word-bytes))))
+    done))
+
 ;;; Turn more arg (context, count) into a list.
 (define-vop (listify-rest-args)
   (:translate %listify-rest-args)
@@ -1326,41 +1342,41 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
-    (let ((enter (gen-label))
-          (loop (gen-label))
-          (done (gen-label))
-          (stack-allocate-p (node-stack-allocate-p node)))
-      (move src context)
-      (move ecx count)
-      ;; Check to see whether there are no args, and just return NIL if so.
-      (inst mov result nil-value)
-      (inst jecxz done)
-      (inst lea dst (make-ea :dword :base ecx :index ecx))
-      (pseudo-atomic (:elide-if stack-allocate-p)
-       (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-       ;; Set decrement mode (successive args at lower addresses)
-       (inst std)
-       ;; Set up the result.
-       (move result dst)
-       ;; Jump into the middle of the loop, 'cause that's where we want
-       ;; to start.
-       (inst jmp enter)
-       (emit-label loop)
-       ;; Compute a pointer to the next cons.
-       (inst add dst (* cons-size n-word-bytes))
-       ;; Store a pointer to this cons in the CDR of the previous cons.
-       (storew dst dst -1 list-pointer-lowtag)
-       (emit-label enter)
-       ;; Grab one value and stash it in the car of this cons.
-       (inst lods eax)
-       (storew eax dst 0 list-pointer-lowtag)
-       ;; Go back for more.
-       (inst sub ecx n-word-bytes)
-       (inst jmp :nz loop)
-       ;; NIL out the last cons.
-       (storew nil-value dst 1 list-pointer-lowtag)
-       (inst cld))
-      (emit-label done))))
+              (let ((enter (gen-label))
+                    (loop (gen-label))
+                    (done (gen-label))
+                    (stack-allocate-p (node-stack-allocate-p node)))
+                (move src context)
+                (move ecx count)
+                ;; Check to see whether there are no args, and just return NIL if so.
+                (inst mov result nil-value)
+                (inst jecxz done)
+                (inst lea dst (make-ea :dword :base ecx :index ecx))
+                (pseudo-atomic (:elide-if stack-allocate-p)
+                               (allocation dst dst node stack-allocate-p list-pointer-lowtag)
+                               ;; Set decrement mode (successive args at lower addresses)
+                               (inst std)
+                               ;; Set up the result.
+                               (move result dst)
+                               ;; Jump into the middle of the loop, 'cause that's where we want
+                               ;; to start.
+                               (inst jmp enter)
+                               (emit-label loop)
+                               ;; Compute a pointer to the next cons.
+                               (inst add dst (* cons-size n-word-bytes))
+                               ;; Store a pointer to this cons in the CDR of the previous cons.
+                               (storew dst dst -1 list-pointer-lowtag)
+                               (emit-label enter)
+                               ;; Grab one value and stash it in the car of this cons.
+                               (inst lods eax)
+                               (storew eax dst 0 list-pointer-lowtag)
+                               ;; Go back for more.
+                               (inst sub ecx n-word-bytes)
+                               (inst jmp :nz loop)
+                               ;; NIL out the last cons.
+                               (storew nil-value dst 1 list-pointer-lowtag)
+                               (inst cld))
+                (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
 ;;; COPY-MORE-ARG. SUPPLIED is the total number of arguments supplied
