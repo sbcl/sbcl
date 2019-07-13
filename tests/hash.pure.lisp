@@ -209,13 +209,16 @@
 ;;; which has two different freelists - one of cells that REMHASH has made available
 ;;; and one of cells that GC has marked as empty. Since we no longer inhibit GC
 ;;; during table operations, we need to give GC a list of its own to manipulate.
-(with-test (:name (hash-table :gc-smashed-cell-list)
-                  :fails-on :ppc)
-  (dotimes (i 20000) (setf (gethash i *tbl*) (- i)))
-  (setf (gethash (cons 1 2) *tbl*) 'foolz)
-  (assert (= (sb-impl::kv-vector-high-water-mark (sb-impl::hash-table-pairs *tbl*))
-             20001))
-  (loop for i from 10 by 10 repeat 20 do (remhash i *tbl*))
+(with-test (:name (hash-table :gc-smashed-cell-list))
+  (flet ((f ()
+           (dotimes (i 20000) (setf (gethash i *tbl*) (- i)))
+           (setf (gethash (cons 1 2) *tbl*) 'foolz)
+           (assert (= (sb-impl::kv-vector-high-water-mark (sb-impl::hash-table-pairs *tbl*))
+                      20001))
+           (loop for i from 10 by 10 repeat 20 do (remhash i *tbl*))))
+    ;; Ensure the values remain outside of the stack pointer for scrub-control-stack to work
+    (declare (notinline f)) 
+    (f))
   #-(and win32 x86-64) ;; why does it crash?
   (sb-sys:scrub-control-stack)
   (gc)
