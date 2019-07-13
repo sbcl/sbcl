@@ -2382,7 +2382,7 @@
 
 (with-test (:name (:mv-call :more-arg-unused)
             ;; needs SB-VM::MORE-ARG-OR-NIL VOP
-            :skipped-on (not (or :x86-64 :x86 :ppc :arm :arm64)))
+            :skipped-on (not (or :x86-64 :x86 :ppc :arm :arm64 :riscv)))
   (checked-compile-and-assert
    ()
    '(lambda (&rest rest)
