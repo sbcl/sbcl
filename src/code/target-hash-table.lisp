@@ -1023,7 +1023,7 @@ if there is no such entry. Entries can be added using SETF."
                      (probed-key (svref kv-vector physical-index)))
                 ,@body)))
   (defun findhash-weak (key hash-table hash address-based-p)
-    (declare (hash-table hash-table) (optimize debug speed)
+    (declare (hash-table hash-table) (optimize speed)
              (type (unsigned-byte #-64-bit 29 #+64-bit 31) hash))
     (macrolet ((return-hit ()
                  '(return-from findhash-weak
@@ -1398,8 +1398,7 @@ if there is no such entry. Entries can be added using SETF."
                                 (setf (aref next-vector predecessor) successor)
                                 (let* ((iv (hash-table-index-vector hash-table))
                                        (bucket (mask-hash hash (1- (length iv)))))
-                                  (setf (aref (hash-table-index-vector hash-table) bucket)
-                                        successor)))
+                                  (setf (aref iv bucket) successor)))
                             ;; Push onto free chain
                             (setf (aref next-vector index) (hash-table-next-free-kv hash-table)
                                   (hash-table-next-free-kv hash-table) index)
