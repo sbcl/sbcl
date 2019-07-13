@@ -209,7 +209,8 @@
 ;;; which has two different freelists - one of cells that REMHASH has made available
 ;;; and one of cells that GC has marked as empty. Since we no longer inhibit GC
 ;;; during table operations, we need to give GC a list of its own to manipulate.
-(with-test (:name (hash-table :gc-smashed-cell-list))
+(with-test (:name (hash-table :gc-smashed-cell-list)
+                  :fails-on :ppc)
   (dotimes (i 20000) (setf (gethash i *tbl*) (- i)))
   (setf (gethash (cons 1 2) *tbl*) 'foolz)
   (assert (= (sb-impl::kv-vector-high-water-mark (sb-impl::hash-table-pairs *tbl*))
