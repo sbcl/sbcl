@@ -2381,7 +2381,8 @@
    ((1 3) '(1 3) :test #'equal)))
 
 (with-test (:name (:mv-call :more-arg-unused)
-            :skipped-on (not (or :x86-64 :x86))) ;; needs SB-VM::MORE-ARG-OR-NIL VOP
+            ;; needs SB-VM::MORE-ARG-OR-NIL VOP
+            :skipped-on (not (or :x86-64 :x86 :ppc :arm :arm64)))
   (checked-compile-and-assert
    ()
    '(lambda (&rest rest)

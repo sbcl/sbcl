@@ -1739,10 +1739,6 @@ not stack-allocated LVAR ~S." source-lvar)))))
              (2lvar (lvar-info lvar)))
     (ecase (ir2-lvar-kind 2lvar)
       (:fixed
-       ;; KLUDGE: this is very much unsafe, and can leak random stack values.
-       ;; OTOH, I think the :FIXED case can only happen with (safety 0) in the
-       ;; first place.
-       ;;  -PK
        (loop for loc in (ir2-lvar-locs 2lvar)
              for idx upfrom 0
              unless (eq (tn-kind loc) :unused)
