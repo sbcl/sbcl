@@ -2,7 +2,8 @@
 
 git_available_p() {
     # Check that (1) we have git (2) this is a git tree.
-    if ( command -v git >/dev/null && git describe >/dev/null 2>/dev/null )
+    if ( command -v git >/dev/null && git describe >/dev/null 2>/dev/null && \
+       test -f `git rev-parse --show-toplevel`/run-sbcl.sh)
     then
         echo "ok"
     else
@@ -17,7 +18,7 @@ then
     exit 0
 elif [ -z "$AVAILABLE" ]
 then
-    echo "Can't run 'git describe' and version.lisp-expr is missing." >&2
+    echo "Can't 'git describe' SBCL source and version.lisp-expr is missing." >&2
     echo "To fix this, either install git or create a fake version.lisp-expr file." >&2
     echo "You can create a fake version.lisp-expr file like this:" >&2
     echo "    \$ echo '\"1.0.99.999\"' > version.lisp-expr" >&2
