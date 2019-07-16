@@ -11,6 +11,8 @@
 #include "lispregs.h"
 #include <sys/socket.h>
 #include <sys/utsname.h>
+#include <sys/ucontext.h>
+#include <sys/mcontext.h>
 
 #include <sys/types.h>
 #include <signal.h>
@@ -90,4 +92,12 @@ unsigned long
 os_context_fp_control(os_context_t *context)
 {
   return context->uc_mcontext.fpregs.fp_reg_set.fpchip_state.cw;
+}
+
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
+    fpregset_t *fp = &context->uc_mcontext.fpregs;
+
+    return (os_context_register_t *)&fp->fp_reg_set.fpchip_state.xmm[offset];
 }

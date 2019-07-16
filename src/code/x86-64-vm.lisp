@@ -75,7 +75,7 @@
        (if (eq kind :relative) :relative))))
   nil) ; non-immobile-space builds never record code fixups
 
-#+(or darwin linux openbsd win32)
+#+(or darwin linux openbsd win32 sunos)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
 
@@ -84,11 +84,11 @@
 
 (defun context-float-register (context index format)
   (declare (ignorable context index))
-  #-(or darwin linux openbsd win32)
+  #-(or darwin linux openbsd win32 sunos)
   (progn
     (warn "stub CONTEXT-FLOAT-REGISTER")
     (coerce 0 format))
-  #+(or darwin linux openbsd win32)
+  #+(or darwin linux openbsd win32 sunos)
   (let ((sap (alien-sap (context-float-register-addr context index))))
     (ecase format
       (single-float
