@@ -217,7 +217,7 @@
                       20001))
            (loop for i from 10 by 10 repeat 20 do (remhash i *tbl*))))
     ;; Ensure the values remain outside of the stack pointer for scrub-control-stack to work
-    (declare (notinline f)) 
+    (declare (notinline f))
     (f))
   (sb-sys:scrub-control-stack)
   (gc)

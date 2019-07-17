@@ -1045,7 +1045,7 @@ if there is no such entry. Entries can be added using SETF."
              (declare (index/2 index))
              ;; Everything in an EQ table is address-based - though this is subject
              ;; to change, as we could stably hash symbols, because why not -
-             ;; but the hash fun's second value is NIL on immediates objects.
+             ;; but the hash fun's second value is NIL on immediate objects.
              (if (or address-based-p (not hash-vector))
                  (do ((next index (aref next-vector next)))
                      ((zerop next) (go miss))
@@ -1351,6 +1351,34 @@ if there is no such entry. Entries can be added using SETF."
                          (return (clear-slot this hash-table kv-vector next-vector)))
                        (check-excessive-probes 1))))))))))
 
+(defun remhash/weak (key hash-table)
+  (declare (type hash-table hash-table) (optimize speed))
+  (with-pinned-objects (key)
+    (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
+      (with-weak-hash-table-entry
+        (unless (eql physical-index 0)
+          ;; Mark slot as empty.
+          (if (or (empty-ht-slot-p (cas (svref kv-vector (1+ physical-index))
+                                        probed-value +empty-ht-slot+))
+                  (neq (cas (svref kv-vector physical-index)
+                            probed-key +empty-ht-slot+)
+                       probed-key))
+              (error "unsafe modification to ~S detected" hash-table)
+              (let* ((index (ash physical-index -1))
+                     (next-vector (hash-table-next-vector hash-table))
+                     (successor (aref next-vector index)))
+                ;; Unlink from bucket's chain
+                (if predecessor
+                    (setf (aref next-vector predecessor) successor)
+                    (let* ((iv (hash-table-index-vector hash-table))
+                           (bucket (mask-hash hash (1- (length iv)))))
+                      (setf (aref iv bucket) successor)))
+                ;; Push onto free chain
+                (setf (aref next-vector index) (hash-table-next-free-kv hash-table)
+                      (hash-table-next-free-kv hash-table) index)
+                (decf (hash-table-%count hash-table))
+                t)))))))
+
 (defun get-remhash-definitions ()
   (labels ((clear-slot (index hash-table kv-vector next-vector)
              (declare (type index/2 index))
@@ -1380,34 +1408,7 @@ if there is no such entry. Entries can be added using SETF."
                  (return (clear-slot this hash-table kv-vector next-vector)))
                (check-excessive-probes 1))))
 
-    (values (named-lambda remhash/weak (key hash-table)
-              (declare (type hash-table hash-table) (optimize speed))
-              (with-pinned-objects (key)
-                (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
-                  (with-weak-hash-table-entry
-                    (unless (eql physical-index 0)
-                      ;; Mark slot as empty.
-                      (if (or (empty-ht-slot-p (cas (svref kv-vector (1+ physical-index))
-                                                    probed-value +empty-ht-slot+))
-                              (neq (cas (svref kv-vector physical-index)
-                                        probed-key +empty-ht-slot+)
-                                   probed-key))
-                          (error "unsafe modification to ~S detected" hash-table)
-                          (let* ((index (ash physical-index -1))
-                                 (next-vector (hash-table-next-vector hash-table))
-                                 (successor (aref next-vector index)))
-                            ;; Unlink from bucket's chain
-                            (if predecessor
-                                (setf (aref next-vector predecessor) successor)
-                                (let* ((iv (hash-table-index-vector hash-table))
-                                       (bucket (mask-hash hash (1- (length iv)))))
-                                  (setf (aref iv bucket) successor)))
-                            ;; Push onto free chain
-                            (setf (aref next-vector index) (hash-table-next-free-kv hash-table)
-                                  (hash-table-next-free-kv hash-table) index)
-                            (decf (hash-table-%count hash-table))
-                            t)))))))
-            (define-remhash remhash/eq eq)
+    (values (define-remhash remhash/eq eq)
             (define-remhash remhash/eql eql)
             (define-remhash remhash/equal equal)
             (define-remhash remhash/equalp equalp)
@@ -1421,9 +1422,8 @@ if there is no such entry. Entries can be added using SETF."
           (symbol-function 'puthash/equal)  equal
           (symbol-function 'puthash/equalp) equalp
           (symbol-function 'puthash/any)    any))
-  (multiple-value-bind (weak eq eql equal equalp any) (get-remhash-definitions)
-    (setf (symbol-function 'remhash/weak)   weak
-          (symbol-function 'remhash/eq)     eq
+  (multiple-value-bind (eq eql equal equalp any) (get-remhash-definitions)
+    (setf (symbol-function 'remhash/eq)     eq
           (symbol-function 'remhash/eql)    eql
           (symbol-function 'remhash/equal)  equal
           (symbol-function 'remhash/equalp) equalp
