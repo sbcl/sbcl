@@ -1043,7 +1043,10 @@ if there is no such entry. Entries can be added using SETF."
            ;; GC epoch check will catch it.
            (binding* #.(ht-probe-setup '* '((predecessor nil)))
              (declare (index/2 index))
-             (if address-based-p
+             ;; Everything in an EQ table is address-based - though this is subject
+             ;; to change, as we could stably hash symbols, because why not -
+             ;; but the hash fun's second value is NIL on immediates objects.
+             (if (or address-based-p (not hash-vector))
                  (do ((next index (aref next-vector next)))
                      ((zerop next) (go miss))
                    (declare (type index/2 next))

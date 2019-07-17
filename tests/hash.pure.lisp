@@ -243,3 +243,12 @@
   (gc)
   ;; Should have smashed the uninterned symbol
   (assert (hash-table-smashed-cells *tbl*)))
+
+;;; Immediate values are address-based but not motion-sensitive.
+;;; The hash function returns address-based = NIL.
+;;; The specialized function GETHASH/EQ never compares hashes,
+;;; but the generalized FINDHASH-WEAK forgot to not compare them.
+(with-test (:name (hash-table :weak-eq-table-fixnum-key))
+  (let ((table (make-hash-table :test 'eq :weakness :key)))
+    (setf (gethash 42 table) t)
+    (gethash 42 table)))
