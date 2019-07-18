@@ -7,17 +7,6 @@
 ;;; Keep moving everything that can move during each GC
 #+gencgc (setf (generation-number-of-gcs-before-promotion 0) 1000000)
 
-;; These have to be global because rehash occurs in any thread
-(defglobal *rehash-count* 0)
-(defglobal *watched-table* nil)
-
-(sb-int:encapsulate 'sb-impl::rehash-without-growing 'count
-                    (compile nil
-                             '(lambda (f tbl)
-                               ;; Only count rehashes on the table of interest.
-                               (when (eq tbl *watched-table*) (incf *rehash-count*))
-                               (funcall f tbl))))
-
 (defun is-address-sensitive (tbl)
   (let ((data (sb-kernel:get-header-data (sb-impl::hash-table-pairs tbl))))
     (logtest data sb-vm:vector-addr-hashing-subtype)))
@@ -100,10 +89,9 @@
   ;; (but not under EQ) so let's use a bunch of cons cells.
   `(let* ((,array (coerce (loop for i from 0 repeat 100 collect (cons i i)) 'vector))
           (,table ,constructor))
-     (setq *watched-table* ,table)
      ,@body
-     (format t "~&::: INFO: Rehash count = ~D~%" *rehash-count*)
-     (setq *watched-table* nil *rehash-count* 0)))
+     (format t "~&::: INFO: Rehash count = ~D~%"
+             (sb-impl::hash-table-n-rehash+find ,table))))
 
 ;;; Do *NOT* use (gc :full) in the following tests - a full GC causes all objects
 ;;; to be promoted into the highest normal generation, which achieves nothing,
@@ -150,32 +138,41 @@
                   :broken-on :win32)
  (with-test-setup (keys (hash (make-hash-table)))
    (let ((*errors* nil)
-         (expected (make-array 100 :initial-element nil)))
+         (expected (make-array 100 :initial-element nil))
+         (actions (make-array 3 :element-type 'sb-ext:word :initial-element 0)))
     (loop repeat 50
           do (let ((i (random 100)))
                (setf (gethash (aref keys i) hash) i)
                (setf (aref expected i) t)))
-     (flet ((reader ()
+     (flet ((reader (n)
               (catch 'done
                 (handler-bind ((serious-condition 'oops))
                   (loop
                       (let* ((i (random 100))
                              (x (gethash (aref keys i) hash)))
+                        (atomic-incf (aref actions n))
                         (cond ((aref expected i) (assert (eq x i)))
                               (t (assert (not x))))))))))
-       (let ((threads (list (make-kill-thread #'reader :name "reader 1")
-                            (make-kill-thread #'reader :name "reader 2")
-                            (make-kill-thread #'reader :name "reader 3")
-                            (make-kill-thread
-                             (lambda ()
-                               (catch 'done
-                                 (handler-bind ((serious-condition 'oops))
-                                   (loop
-                                     (sleep (random *sleep-delay-max*))
-                                     (sb-ext:gc)))))
-                             :name "collector"))))
+       (let ((threads
+              (list (make-kill-thread #'reader :name "reader 1" :arguments 0)
+                    (make-kill-thread #'reader :name "reader 2" :arguments 1)
+                    (make-kill-thread #'reader :name "reader 3" :arguments 2)
+                    (make-kill-thread
+                     (lambda ()
+                       (catch 'done
+                         (handler-bind ((serious-condition 'oops))
+                           (loop (sleep (random *sleep-delay-max*))
+                                 (sb-ext:gc)))))
+                     :name "collector"))))
          (unwind-protect (sleep 5)
            (mapc #'terminate-thread threads))
+         (format t "~&::: INFO: GETHASH count = ~D = ~D, lsearch=~d~%"
+                 actions
+                 (reduce #'+ actions)
+                 ;; With the GC frequency as high as it is for this test,
+                 ;; we can get more than 1 lookup in 10^5 needing linear scan.
+                 ;; A "normal" amount of GCing often sees this as low as 0.
+                 (sb-impl::hash-table-n-lsearch hash))
          (assert (not *errors*)))))))
 
 (with-test (:name (hash-table :single-accessor :parallel-gc)

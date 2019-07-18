@@ -289,5 +289,6 @@ static inline int header_rememberedp(lispobj header) {
 #endif
 
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
+#define KV_PAIRS_REHASH(kvv) kvv[1]
 
 #endif /* _GC_PRIVATE_H_ */

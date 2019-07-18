@@ -1736,7 +1736,7 @@ static void fixup_space(lispobj* where, size_t n_words)
                       data[2*i+1] = forwarding_pointer_value(native_pointer(ptr));
               }
               if (needs_rehash)
-                  data[1] = make_fixnum(1);
+                  KV_PAIRS_REHASH(data) |= make_fixnum(1);
               break;
           } else {
             // FALLTHROUGH_INTENDED

@@ -85,6 +85,10 @@
   ;; above the high water mark.  If you store non-immediate data past
   ;; that mark, you're sure to have problems.
   (pairs nil :type simple-vector)
+  ;; A potential index into the k/v vector. It should be checked first
+  ;; when searching. There's no reason to allow NIL here,
+  ;; because worst case there won't be a hit at this index.
+  (cache 0 :type index)
   ;; The index vector. This may be larger than the capacity to help
   ;; reduce collisions.
   (index-vector nil :type (simple-array hash-table-index (*)))
@@ -110,10 +114,6 @@
   ;; If you change these, be sure to check the definition of hash_table_weakp()
   ;; in 'gc-private.h'
   (flags 0 :type (unsigned-byte 6) :read-only t)
-  ;; A potential index into the k/v vector. It should be checked first
-  ;; when searching. There's no reason to allow NIL here,
-  ;; because worst case there won't be a hit at this index.
-  (cache 0 :type index)
   ;; Used for locking GETHASH/(SETF GETHASH)/REMHASH
   (lock (sb-thread:make-mutex :name "hash-table lock")
         #-c-headers-only :type #-c-headers-only sb-thread:mutex
@@ -152,6 +152,14 @@
   ;; This index is allowed to exceed the high-water-mark by 1 unless
   ;; the HWM is at its maximum in which case this must be 0.
   (next-free-kv 1 :type index)
+
+  ;; Statistics gathering for new gethash algorithm that doesn't
+  ;; disable GC during rehash as a consequence of key movement.
+  (n-rehash+find 0 :type word)
+  (n-lsearch     0 :type word)
+  ;; only for debugging system bootstrap when hash-tables are completely
+  ;; broken (which seems to be quite often as I optimize them)
+  #+hash-table-simulate (%alist)
 
   ;;; Supporting slots for weak hash-tables.
   ;; List of (pair-index . bucket-number) which GC smashed and are almost

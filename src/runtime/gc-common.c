@@ -1169,8 +1169,6 @@ void weakobj_init()
 #define SCAV_ENTRIES(entry_alivep, defer)                                      \
     boolean __attribute__((unused)) any_deferred = 0;                          \
     boolean rehash = 0;                                                        \
-    if (data[1] && data[1] != make_fixnum(1))                                  \
-        lose("unexpected need-to-rehash: %"OBJ_FMTX, data[1]);                 \
     unsigned hwm = KV_PAIRS_HIGH_WATER_MARK(data);                             \
     unsigned i;                                                                \
     for (i = 1; i <= hwm; i++) {                                               \
@@ -1185,7 +1183,8 @@ void weakobj_init()
                 rehash = 1;                                                    \
     }}}                                                                        \
     /* Though at least partly writable, vector element 1 could be on a write-protected page. */ \
-    if (rehash) NON_FAULTING_STORE(data[1] = make_fixnum(1), &data[1])
+    if (rehash) \
+      NON_FAULTING_STORE(KV_PAIRS_REHASH(data) |= make_fixnum(1), &data[1])
 
 static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(lispobj*))
 {
@@ -1243,10 +1242,7 @@ boolean scan_weak_hashtable(struct hash_table *hash_table,
      /* These lengths could be different as the index_vector can be a
       * different length from the others, a larger index_vector could
       * help reduce collisions. */
-     gc_assert(next_vector_length == kv_length >> 1);
-
-     if (data[1] && data[1] != make_fixnum(1))
-        lose("unexpected need-to-rehash: %"OBJ_FMTX, data[1]);
+    gc_assert(next_vector_length == kv_length >> 1);
 
     int weakness = hashtable_weakness(hash_table);
     /* Work through the KV vector. */
@@ -1278,8 +1274,11 @@ scav_vector (lispobj *where, lispobj header)
         goto done;
     }
 
-    /* Scavenge element (length-1), which may be a hash-table structure. */
     lispobj* data = where + 2;
+    // Verify that the rehash epoch is a fixnum
+    gc_assert(fixnump(data[1]));
+
+    /* Scavenge element (length-1), which may be a hash-table structure. */
     scavenge(&data[length-1], 1);
     if (!is_vector_subtype(header, VectorWeak)) {
         scan_nonweak_kv_vector((struct vector*)where, gc_scav_pair);
@@ -1310,11 +1309,6 @@ scav_vector (lispobj *where, lispobj header)
              hash_table);
     }
     gc_assert(hashtable_weakp(hash_table));
-
-    /* Verify that vector element 1 is as expected.
-       Don't bother scavenging it, since we lose() if it's not an immediate. */
-    if (data[1] && data[1] != make_fixnum(1))
-        lose("unexpected need-to-rehash: %"OBJ_FMTX, data[1]);
 
     /* Scavenge slots of hash table, which will fix the positions of the other
      * needed objects. */
@@ -1464,7 +1458,7 @@ cull_weak_hash_table (struct hash_table *hash_table,
     }
     /* If an EQ-based key has moved, mark the hash-table for rehash */
     if (rehash)
-        NON_FAULTING_STORE(kv_vector[1] = make_fixnum(1), &kv_vector[1]);
+        NON_FAULTING_STORE(KV_PAIRS_REHASH(kv_vector) |= make_fixnum(1), &kv_vector[1]);
 }
 
 /* Fix one <k,v> pair in a weak hashtable.

@@ -614,7 +614,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
                       FIXUP(where[1] = ptr + delta, where+1);
               }
               if (needs_rehash) // set v->data[1], the need-to-rehash bit
-                  data[1] = make_fixnum(1);
+                  KV_PAIRS_REHASH(data) |= make_fixnum(1);
               continue;
           }
         // All the array header widetags.

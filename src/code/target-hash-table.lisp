@@ -18,16 +18,11 @@
 ;;;;  - optimistically assume that rehash=1 does not affect the key in question,
 ;;;;    even if it was hashed by address. (Surely a win for non-address-based hash)
 ;;;;    Only rehash if the lookup failed
-;;;;  - do not inhibit GC during rehash of any table
-;;;;    I believe that an approach to this is add 2 bits of state reflecting 4
-;;;;    possible states of the address-sensitive kv-vector and the epoch.
-;;;;      hashes valid
-;;;;      hashes invalidated (need-to-rehash)
-;;;;      rehash in progress (do not use the hashes)
-;;;;      rehash in progress + hashes invalidated (rehash was ineffective)
-;;;;    Also when rehashing weak vectors we can toggle the weakness bit off
-;;;;    on both the old and new so that the GC won't do anything to cull entries
-;;;;    but will update the the need-to-rehash.
+;;;;  - do not inhibit GC during rehash of table.
+;;;;    This works for non-weak tables during GETHASH so far,
+;;;;    but not yet PUTHASH nor REMHASH.
+;;;;    When rehashing weak vectors, can we can toggle the weakness bit off
+;;;;    to prevent any monkey business for the duration?
 ;;;;  - change recursive locks to nonrecursive.
 ;;;;    This will, I fear, be impossible because we've exposed and documented
 ;;;;    an API that pretty much tells users that it's ok to create a synchronized
@@ -221,8 +216,8 @@
 (declaim (inline mask-hash))
 (defun mask-hash (hash mask)
   (truly-the index (logand mask hash)))
-(declaim (inline pointer-hash->index))
-(defun pointer-hash->index (hash mask)
+(declaim (inline pointer-hash->bucket))
+(defun pointer-hash->bucket (hash mask)
   (declare (type hash hash mask))
   (truly-the index (logand mask (prefuzz-hash hash))))
 
@@ -319,6 +314,7 @@ Examples:
 ;;; and at maximum load the table will have a load factor of 87.5%
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defconstant +min-hash-table-size+ 14)
+  (defconstant kv-pairs-overhead-slots 3)
   (defconstant default-rehash-size $1.5))
 (defconstant +min-hash-table-rehash-threshold+ (float 1/16 $1.0))
 
@@ -342,7 +338,6 @@ Examples:
 ;;; or to the hash vector if the table is not weak.
 (defmacro kv-vector-table (pairs) `(svref ,pairs (1- (length ,pairs))))
 
-(defconstant kv-pairs-overhead-slots 3)
 (defmacro new-kv-vector (size weakp)
   `(let ((v (make-array (+ (* 2 ,size) kv-pairs-overhead-slots)
                         :initial-element +empty-ht-slot+)))
@@ -632,58 +627,141 @@ multiple threads accessing the same hash-table without locking."
                                          (lognot bits))))
     (values)))
 
+;;; We don't define +-MODFX for all backends, and I can't figure out
+;;; the rationale, nor how to detect this other than by trial and error.
+;;; Like why does 64-bit ARM have it but 32-bit not have?
+#-(or x86 x86-64 arm64 riscv)
+(progn
+(declaim (inline sb-vm::+-modfx))
+(defun sb-vm::+-modfx (x y)
+  (%make-lisp-obj (logand (+ (get-lisp-obj-address (the fixnum x))
+                             (get-lisp-obj-address (the fixnum y)))
+                          most-positive-word))))
+
+(macrolet
+    ((with-pair ((key-var &optional val-var) &body body)
+       `(let* ((key-index (* 2 i))
+               (,key-var (aref kv-vector key-index))
+               ,@(if val-var `((,val-var (aref kv-vector (1+ key-index))))))
+          ,@body))
+     (push-in-chain (bucket-index-expr)
+       `(let ((bucket (the index ,bucket-index-expr)))
+          (setf (aref next-vector i) (aref index-vector bucket)
+                (aref index-vector bucket) i))))
+
 (defun %rehash (kv-vector hash-vector index-vector next-vector
-                          &aux (mask (1- (length index-vector))) (next-free 0))
-  ;; Scan backwards so that emply cells are linked such that they will
-  ;; be re-consumed leftmost first, not that it matters much.
+                &aux (mask (1- (length index-vector)))
+                     (next-free 0)
+                     (hwm (kv-vector-high-water-mark kv-vector)))
   (if hash-vector
-      (do ((i (kv-vector-high-water-mark kv-vector) (1- i)))
-          ((zerop i) next-free)
+      ;; Scan backwards so that chains are in ascending index order.
+      (do ((i hwm (1- i))) ((zerop i))
         (declare (type index/2 i))
-        (let* ((i*2 (* 2 i)) ; because compiler doesn't eliminate common subexpressions
-               (key (aref kv-vector i*2))
-               (value (aref kv-vector (1+ i*2))))
-          (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
-                 ;; Slot is empty, push it onto free list.
-                 (setf (aref next-vector i) next-free next-free i))
-                ((/= (aref hash-vector i) +magic-hash-vector-value+)
-                 ;; Can use the existing hash value (not EQ based)
-                 (let* ((index (mask-hash (aref hash-vector i) mask))
-                        (next (aref index-vector index)))
-                   (declare (type index index))
-                   ;; Push this slot into the next chain.
-                   (setf (aref next-vector i) next)
-                   (setf (aref index-vector index) i)))
-                (t
-                 ;; address-sensitive hash.
-                 (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
-                 (let* ((index (pointer-hash->index (pointer-hash key) mask))
-                        (next (aref index-vector index)))
-                   (declare (type index index))
-                   ;; Push this slot into the next chain.
-                   (setf (aref next-vector i) next)
-                   (setf (aref index-vector index) i))))))
-      (do ((i (kv-vector-high-water-mark kv-vector) (1- i)))
-          ((zerop i) next-free)
+        (with-pair (pair-key pair-val)
+         ;; It's unclear why we check for key AND value being empty - a half
+         ;; empty cell could only appear mid-insertion, but concurrent
+         ;; insert is forbidden, so how could it happen?
+         ;; i.e. I would think KEY emptiness is an adequate test.
+         (cond ((and (empty-ht-slot-p pair-key) (empty-ht-slot-p pair-val))
+                ;; Slot is empty, push it onto free list.
+                (setf (aref next-vector i) next-free next-free i))
+               ((/= (aref hash-vector i) +magic-hash-vector-value+)
+                ;; Use the existing hash value (not address-based hash)
+                (push-in-chain (mask-hash (aref hash-vector i) mask)))
+               (t
+                ;; Set address-sensitivity BEFORE depending on the bits.
+                ;; Precise GC platforms can move any key except the ones which
+                ;; are explicitly pinned.
+                (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                (push-in-chain (pointer-hash->bucket
+                                (pointer-hash pair-key) mask))))))
+      (do ((i hwm (1- i))) ((zerop i))
         (declare (type index/2 i))
-        (let* ((i*2 (* 2 i)) ; because compiler doesn't eliminate common subexpressions
-               (key (aref kv-vector i*2))
-               (value (aref kv-vector (1+ i*2))))
-          (cond ((and (empty-ht-slot-p key) (empty-ht-slot-p value))
-                 ;; Slot is empty, push it onto free list.
-                 (setf (aref next-vector i) next-free next-free i))
-                (t
-                 (let* ((index (pointer-hash->index (pointer-hash key) mask))
-                        (next (aref index-vector index)))
-                   (declare (type index index))
-                   (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
-                   ;; Push this slot into the next chain.
-                   (setf (aref next-vector i) next)
-                   (setf (aref index-vector index) i)))))))
-  (if (= next-free 0)
-      (let ((hwm (kv-vector-high-water-mark kv-vector)))
-        (if (= hwm (hash-table-pairs-capacity kv-vector)) 0 (1+ hwm)))
-      next-free))
+        (with-pair (pair-key pair-val)
+         (cond ((and (empty-ht-slot-p pair-key) (empty-ht-slot-p pair-val))
+                (setf (aref next-vector i) next-free next-free i))
+               (t
+                (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                (push-in-chain (pointer-hash->bucket
+                                (pointer-hash pair-key) mask)))))))
+  ;; This is identical to the calculation of next-free-kv in INSERT-AT.
+  (cond ((/= next-free 0) next-free)
+        ((= hwm (hash-table-pairs-capacity kv-vector)) 0)
+        (t (1+ hwm))))
+
+;;; Rehash due to key movement, and find KEY at the same time.
+;;; Finding the key obviates the need for the rehashing thread to loop
+;;; testing whether to rehash. Imagine an unlucky schedule wherein each rehash
+;;; ends up invalid due to maximally bad timing of GC, and every reader sees
+;;; nothing but 'need-to-rehash', and the INDEX vector is repeatedly overwritten
+;;; with zeros. The -AND-FIND aspect of this ensures progress.
+(defun %rehash-and-find (table initial-epoch key
+                         &aux (kv-vector (hash-table-pairs table))
+                              (next-vector (hash-table-next-vector table))
+                              (hash-vector (hash-table-hash-vector table))
+                              (rehashing-state (1+ initial-epoch))
+                              result)
+  (declare (hash-table table) (fixnum initial-epoch))
+  (atomic-incf (hash-table-n-rehash+find table))
+  ;; Verify some invariants prior to disabling array bounds checking
+  (aver (>= (length kv-vector) #.(+ (* 2 +min-hash-table-size+)
+                                    kv-pairs-overhead-slots)))
+  (aver (= (ash (length kv-vector) -1) (length next-vector)))
+  (when hash-vector
+    (aver (= (length hash-vector) (length next-vector))))
+  ;; Empty cells must be in the free chain already, and no smashed cells exist.
+  (aver (null (hash-table-smashed-cells table)))
+  ;; Must not permit the rehashing state to stick due to a nonlocal exit.
+  ;; All further normal use of the table would be prevented.
+  (without-interrupts
+   ;; Transitioning from #b01 to #b10 clears the 'rehash' bit and sets the
+   ;; rehash-in-progress bit. It also gives this thread exclusive write access
+   ;; to the hashing vectors, since at most one thread can win this CAS.
+   (when (eq (cas (svref kv-vector 1) initial-epoch rehashing-state) initial-epoch)
+     ;; Remove address-sensitivity, preserving the other flags.
+     (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+     ;; Rehash in place. For the duration of the rehash, readers who otherwise
+     ;; might have seen intact chains (by which to find address-insensitive keys)
+     ;; can't. No big deal. If we were willing to cons new vectors, we could
+     ;; rehash into them and CAS them in, but the advantage would be minimal-
+     ;; obsolete chains could only work for a possibly-empty subset of keys.
+     (let* ((index-vector (fill (hash-table-index-vector table) 0))
+            (mask (1- (length index-vector)))
+            (hwm (kv-vector-high-water-mark kv-vector)))
+       (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+       (if hash-vector
+           (do ((i hwm (1- i))) ((zerop i))
+             (declare (type index/2 i))
+             (with-pair (pair-key)
+              ;; Leave the free cell chain untouched, since rehashing
+              ;; due to key movement can not possibly affect that chain.
+              (unless (empty-ht-slot-p pair-key)
+                (cond ((/= (aref hash-vector i) +magic-hash-vector-value+)
+                       (push-in-chain (mask-hash (aref hash-vector i) mask)))
+                      (t
+                       (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                       (push-in-chain (pointer-hash->bucket
+                                       (pointer-hash pair-key) mask))))
+                (when (eq pair-key key) (setq result key-index)))))
+           ;; No hash vector
+           (do ((i hwm (1- i))) ((zerop i))
+             (declare (type index/2 i))
+             (with-pair (pair-key)
+              (unless (empty-ht-slot-p pair-key)
+                (set-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+                (push-in-chain (pointer-hash->bucket
+                                (pointer-hash pair-key) mask))
+                (when (eq pair-key key) (setq result key-index))))))
+       ;; Clear rehash bit and bump the epoch, wrapping around to keep it a fixnum
+       (let ((new-epoch (sb-vm::+-modfx initial-epoch 3)))
+         ;; Setting the new epoch races with GC which might set 'rehash' again.
+         ;; At most 2 attempts are needed since no other state change can occur.
+         (let ((old (cas (svref kv-vector 1) rehashing-state new-epoch)))
+           (unless (eq rehashing-state old)
+             (aver (eq old (logior rehashing-state 1))) ; rehashed, but already obsolete
+             (cas (svref kv-vector 1) old (logior new-epoch 1)))))
+       result))))
+) ; end MACROLET
 
 (defun rehash (table new-kv-vector new-next-vector new-hash-vector new-index-vector)
   (declare (type hash-table table)
@@ -749,6 +827,7 @@ multiple threads accessing the same hash-table without locking."
 (defun rehash-without-growing (table)
   (declare (type hash-table table))
   (aver *gc-inhibit*)
+  (atomic-incf (hash-table-n-rehash+find table)) ; not really true, but close enough
   (let ((kv-vector (hash-table-pairs table))
         (index-vector (hash-table-index-vector table)))
 
@@ -862,7 +941,6 @@ if there is no such entry. Entries can be added using SETF."
       (bucket (mask-hash hash (1- (length index-vector))))
       ;; INDEX is the index into the pairs vector obtains from the index-vector
       (index (aref index-vector bucket))
-      (kv-vector (hash-table-pairs hash-table))
       (next-vector (hash-table-next-vector hash-table))
       ;; Binding of HASH-VECTOR would be flushed for EQ and EQL tables
       ;; automatically, but we forcibly elide some code because "reasons"
@@ -895,20 +973,29 @@ if there is no such entry. Entries can be added using SETF."
       ;; handled by the EQ comparator.
       (t '(or address-based-p (fixnump key) (non-null-symbol-p key)))))
 
-  (defun ht-key-compare (std-fn pair-index)
+  (defun ht-key-compare (std-fn pair-index &optional endp-test)
     ;; STD-FN = NIL says that's definitely a user-defined hash function,
     ;; and * says that it could be either standard or user-defined.
-    (let ((hashcompare
-           (case std-fn
-            ((equal equalp nil) `(= hash (aref hash-vector ,pair-index)))
-            ((*) `(or (null hash-vector) (= hash (aref hash-vector ,pair-index))))))
-          (keycompare
-           (case std-fn
-            ;; Use the inline EQL function
-            (eql `(%eql key (aref kv-vector (* 2 ,pair-index))))
-            ((nil *) `(funcall test-fun key (aref kv-vector (* 2 ,pair-index))))
-            (t `(,std-fn key (aref kv-vector (* 2 ,pair-index)))))))
-      (if hashcompare `(and ,hashcompare ,keycompare) keycompare))))
+    (let* ((hashcompare
+            (case std-fn
+              ((equal equalp nil) `(= hash (aref hash-vector ,pair-index)))
+              ((*) `(or (null hash-vector) (= hash (aref hash-vector ,pair-index))))))
+           (keycompare
+            (case std-fn
+              ;; Use the inline EQL function
+              (eql `(%eql key (aref kv-vector (* 2 ,pair-index))))
+              ((nil *) `(funcall test-fun key (aref kv-vector (* 2 ,pair-index))))
+              (t `(,std-fn key (aref kv-vector (* 2 ,pair-index))))))
+           (compare
+            (if hashcompare `(and ,hashcompare ,keycompare) keycompare)))
+      (cond ((not endp-test) compare)
+            ;; For standard general predicates, compare the key before checking
+            ;; whether probing must terminate (index = 0). For user predicates
+            ;; that might accept only strings, for example, check index first.
+            ;; This way, a hit on the first probe avoids one test for standard
+            ;; tests. Index is post-checked to deem it a hit or miss.
+            (std-fn `(or ,compare (eql ,pair-index 0)))
+            (t `(or (eql ,pair-index 0) ,compare))))))
 
 (defmacro check-excessive-probes (n-probes)
   `(when (minusp (decf (truly-the fixnum probe-limit) ,n-probes))
@@ -919,15 +1006,42 @@ if there is no such entry. Entries can be added using SETF."
 (defmacro ht-probe-advance (var)
   `(setq ,var (truly-the index/2 (aref next-vector ,var))))
 
+(defmacro kv-vector-rehash-epoch (vector) `(truly-the fixnum (svref ,vector 1)))
+(defconstant kv-vector-rehashing 2)
+
+#|
+bottom 2 bits of kv-vector-rehash-epoch:
+
+00 = valid hashes
+01 = an address-sensitive key moved
+10 = rehashing in progress
+11 = rehashing + an address-sensitive key moved
+
+'nnnn' is the timestamp ("epoch"). If it changed to MMMM then we can't
+reason about the status bits, so restart from the top.
+
+Pre-       Post-     Miss
+loookup    lookup    Action
+-------    -------   ------
+nnnn 00    nnnn 0_   valid (KEY is pinned, so don't care if hashes became invalid)
+nnnn 00    nnnn 1_   linear scan
+nnnn 00    MMMM __   restart
+
+nnnn 01    nnnn 01   valid if not address-sensitive, otherwise rehash and find
+nnnn 01    nnnn 1_   linear scan
+nnnn 01    MMMM __   restart
+
+nnnn 1_    any       linear scan
+|#
+
 (defmacro define-ht-getter (name std-fn)
-  ;; Note: this &aux binding eliminates a type check of table.
-  ;; Don't bind anything else in the &AUX until after lock acquisition
-  ;; (if relevant) so that the latest kv-vector (etc) is observed.
-  `(defun ,name (key table default &aux (hash-table (truly-the hash-table table)))
+  ;; For synchronized GETHASH we've already acquired the lock,
+  ;; so this KV-VECTOR is the most current one.
+  `(defun ,name (key table default
+                     &aux (hash-table (truly-the hash-table table))
+                          (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c::verify-arg-count 0)))
-     (block found
-       (let ((kv-vector (hash-table-pairs hash-table))
-             (cache (hash-table-cache hash-table)))
+     (let ((cache (hash-table-cache hash-table)))
        ;; First check the cache using EQ, not the test fun, for speed.
        ;; [we prefer to guard calls to the test fun by comparing hashes first,
        ;; but we haven't computed the hash yet]
@@ -935,64 +1049,35 @@ if there is no such entry. Entries can be added using SETF."
        ;; can be determined with only two comparisons, rather than all three.
        ;; Whereas if the '/=' guarded the EQ test, then either a hit or miss
        ;; would need all three tests. "possibly 2" beats "definitely 3" tests.
-         (when (and (< cache (length kv-vector))
-                    (eq (aref kv-vector cache) key)
-                    (/= cache 0)) ; don't falsely match the metadata cell
-           (return-from found (values (aref kv-vector (1+ cache)) t))))
-       (with-pinned-objects (key)
-            (let ((start-epoch sb-kernel::*gc-epoch*))
-             (tagbody
-                (go entry)
-              MISS
-                    ;; When the table has multiple concurrent readers,
-                    ;; it's possible that there was a GC after this
-                    ;; thread called MAYBE-REHASH from %GETHASH3, and
-                    ;; some other thread then rehashed the table. If
-                    ;; this happens, we might not find the key even if
-                    ;; it's in the table. To protect against this,
-                    ;; redo the lookup if the GC epoch counter has changed.
-                    ;; -- JES,  2007-09-30
-                (let ((current-epoch sb-kernel::*gc-epoch*))
-                  (when (eq start-epoch current-epoch)
-                    (return-from found (values default nil)))
-                  (setq start-epoch current-epoch))
-              ENTRY
-                (maybe-rehash hash-table)
-                ;; Note that it's OK for a GC + a REHASH-WITHOUT-GROWING to
-                ;; be triggered by another thread after this point, since the
-                ;; GC epoch check will catch it.
-                (binding* (,@(ht-hash-setup std-fn) ,@(ht-probe-setup std-fn))
-                  (declare (hash hash0) (index/2 index))
-                  (declare (ignorable address-based-p)) ; unused in gethash/{EQ,ANY}
+       (when (and (< cache (length kv-vector))
+                  (eq (aref kv-vector cache) key)
+                  (/= cache 0)) ; don't falsely match the metadata cell
+         (return-from ,name (values (aref kv-vector (1+ cache)) t))))
+     (with-pinned-objects (key)
+       (binding* (,@(ht-hash-setup std-fn)
+                  (eq-test ,(ht-probing-should-use-eq std-fn)))
+         (declare (hash hash0))
+         (flet ((hash-search (&aux ,@(ht-probe-setup std-fn))
+                  (declare (index/2 index))
                   ;; Search next-vector chain for a matching key.
-                  (if ,(ht-probing-should-use-eq std-fn)
+                  (if eq-test
                       (macrolet ((probe ()
-                                   '(cond ((zerop index) (go miss))
-                                          ((eq key (aref kv-vector (* 2 index))) (return))
-                                          (t (ht-probe-advance index)))))
-                 ;; I think there's an improvement possible here -
-                 ;; EQ is a cheap comparator, so we can execute 4 comparisons
-                 ;; without ever checking whether NEXT is 0 because NEXT of 0 is 0,
-                 ;; just like CDR of NIL is NIL. Then if we get a spurious "hit"
-                 ;; (as in: your KEY was the table itself for some bizarre reason),
-                 ;; just reject it later. So essentially only test for loop
-                 ;; termination once every 4 probes.
+                                   '(if ,(ht-key-compare 'eq 'index t)
+                                        (return index)
+                                        (ht-probe-advance index))))
                         (loop (probe) (probe) (probe) (probe)
                               ;; Optimistically assuming we hit the key, this check
                               ;; never executes. The exact boundary case doesn't matter
                               ;; (this might allow a few too many iterations),
                               ;; but as long as we can detect circularity, it's fine.
-                              (check-excessive-probes 4))
-                        (let ((i (* 2 index)))
-                          (setf (hash-table-cache hash-table) i)
-                          (return-from found (values (aref kv-vector (1+ i)) t))))
+                              (check-excessive-probes 4)))
                       ;; We get too many "unreachable code" notes for my liking,
                       ;; if this branch is unconditionally left in.
                       ,(unless (eq std-fn 'eq)
                          `(macrolet ((probe ()
-                                       '(cond ((zerop index) (go miss))
-                                              (,(ht-key-compare std-fn 'index) (return))
-                                              (t (ht-probe-advance index)))))
+                                       '(if ,(ht-key-compare std-fn 'index t)
+                                            (return index)
+                                            (ht-probe-advance index))))
                             ;; In the case of EQL, we get most bang-for-buck (performance per
                             ;; line of asm code) by inlining EQL, not by loop unrolling,
                             ;; but we might as well unroll a little bit to lessen the impact
@@ -1000,11 +1085,39 @@ if there is no such entry. Entries can be added using SETF."
                             ;; You can experiment with unrolling here easily enough.
                             ,(if (eq std-fn 'eql)
                                  '(loop (probe) (probe) (check-excessive-probes 2))
-                                 '(loop (probe) (check-excessive-probes 1)))
-                            (let ((i (* 2 index)))
-                              (setf (hash-table-cache hash-table) i)
-                              (return-from found
-                                (values (aref kv-vector (1+ i)) t)))))))))))))
+                                 '(loop (probe) (check-excessive-probes 1))))))))
+           (named-let retry ((initial-epoch (kv-vector-rehash-epoch kv-vector)))
+             (if (logtest initial-epoch kv-vector-rehashing)
+                 (truly-the (values t boolean &optional)
+                            (hash-table-lsearch hash-table eq-test key hash default))
+                 (let ((index (hash-search)))
+                   (if (not (eql index 0))
+                       (let ((key-index (* 2 (truly-the index/2 index))))
+                         (setf (hash-table-cache hash-table) key-index)
+                         (values (aref kv-vector (1+ key-index)) t))
+                       (let ((epoch (kv-vector-rehash-epoch kv-vector)))
+                         (cond ((and (evenp initial-epoch) ; valid hashes at start?
+                                     (zerop (logandc2 (logxor epoch initial-epoch) 1)))
+                                ;; Provided that the epoch didn't change, the 'rehash'
+                                ;; bit can be ignored since rehash did not occur.
+                                (values default nil))
+                               ((and (oddp initial-epoch) (= epoch initial-epoch))
+                                ;; Epoch didn't change, but address-based hashes were
+                                ;; not valid at the start of the lookup.
+                                ;; Stably hashed (address-insensitive) keys are ok.
+                                (if (not address-based-p)
+                                    (values default nil)
+                                    (let ((key-index (%rehash-and-find hash-table epoch key)))
+                                      (cond ((eql key-index 0) ; didn't find, again
+                                             (values default nil))
+                                            ((not (fixnump key-index))
+                                             ;; conflicted with other thread trying to rehash
+                                             (retry (kv-vector-rehash-epoch kv-vector)))
+                                            (t
+                                             (setf (hash-table-cache table) key-index)
+                                             (values (aref kv-vector (1+ key-index)) t))))))
+                               (t ; epoch changed
+                                (retry epoch)))))))))))))
 
 ;;;; Weak table variant.
 
@@ -1028,7 +1141,8 @@ if there is no such entry. Entries can be added using SETF."
     (macrolet ((return-hit ()
                  '(return-from findhash-weak
                     (values probed-val probed-key physical-index predecessor))))
-      (let ((start-epoch sb-kernel::*gc-epoch*))
+      (let ((start-epoch sb-kernel::*gc-epoch*)
+            (kv-vector (hash-table-pairs hash-table)))
         (tagbody
            (go entry)
           MISS
@@ -1103,6 +1217,46 @@ if there is no such entry. Entries can be added using SETF."
 (define-ht-getter gethash/equalp equalp)
 (define-ht-getter gethash/any nil)
 
+;;; In lieu of racing to rehash in multiple threads due to GC key movement,
+;;; or blocking on a mutex to rehash, threads can perform just the FIND
+;;; aspect of %REHASH-AND-FIND which is obviously less work than rehashing.
+;;; It has the same computational complexity but fewer instructions,
+;;; and allows forward progress in all threads.
+;;; But unlike %REHASH-AND-FIND which will only be called when the key
+;;; in question was hashed by its address, this search can be called for any
+;;; key and hash-table-test whenever some thread is rehashing. If hash-based
+;;; lookup uses EQ as the comparator for KEY, then linear search does too.
+(defun hash-table-lsearch (hash-table eq-test key hash default)
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (declare (type (and fixnum unsigned-byte) hash))
+  (atomic-incf (hash-table-n-lsearch hash-table))
+  (let* ((kv-vector (hash-table-pairs hash-table))
+         (key-index
+          (let ((hash-vector (hash-table-hash-vector hash-table))
+                (hwm (the index/2 (kv-vector-high-water-mark kv-vector))))
+            (cond ((or (not hash-vector) eq-test)
+                   (loop for i from (* hwm 2) downto 2 by 2
+                         when (eq key (aref kv-vector i)) return i))
+                  ((eq (hash-table-test hash-table) 'eql)
+                   (loop for i from (* hwm 2) downto 2 by 2
+                         when (%eql key (aref kv-vector i)) return i))
+                  (t
+                   ;; EQ and EQL are fine with unbound-marker as an argument,
+                   ;; but the general case checks the key for validity first.
+                   (let ((test-fun (hash-table-test-fun hash-table)))
+                     (aver (= (length hash-vector) (ash (length kv-vector) -1)))
+                     (loop for i from hwm downto 1
+                           when (and (= hash (aref hash-vector i))
+                                     (let ((pair-key (aref kv-vector (* 2 i))))
+                                       (and (not (empty-ht-slot-p pair-key))
+                                            (funcall test-fun key pair-key))))
+                           return i)))))))
+    (cond (key-index
+           (setf (hash-table-cache hash-table) key-index)
+           (values (aref kv-vector (1+ key-index)) t))
+          (t
+           (values default nil)))))
+
 (defun pick-table-methods (synchronized userp test)
    (macrolet ((gen-cases (wrapping)
                 `(case test
@@ -1130,7 +1284,7 @@ if there is no such entry. Entries can be added using SETF."
                                  ((hash-table-lock (truly-the hash-table table)))
                                (,remover key table))))))
               (methods (getter setter remover)
-                `(values #',getter #',setter #',remover t)))
+                `(values #',getter #',setter #',remover)))
     (if userp
         (if synchronized
             (locked-methods gethash/any puthash/any remhash/any)
@@ -1142,7 +1296,7 @@ if there is no such entry. Entries can be added using SETF."
 ;;; Three argument version of GETHASH
 (defun gethash3 (key hash-table default)
   (declare (type hash-table hash-table))
-  (funcall (truly-the (sfunction (t t t) (values t boolean &optional))
+  (funcall (truly-the (sfunction (t t t) (values t boolean))
                       (hash-table-gethash-impl hash-table))
            key hash-table default))
 
@@ -1188,11 +1342,11 @@ if there is no such entry. Entries can be added using SETF."
 ;;; because insertion can not co-occur with any other operation,
 ;;; unlike GETHASH which we allow to execute in multiple threads.
 (defmacro define-ht-setter (name std-fn)
-  `(named-lambda ,name (key table value &aux (hash-table (truly-the hash-table table)))
+  `(named-lambda ,name (key table value &aux (hash-table (truly-the hash-table table))
+                                             (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c::verify-arg-count 0)))
      (block done
-       (let ((cache (hash-table-cache hash-table))
-             (kv-vector (hash-table-pairs hash-table)))
+       (let ((cache (hash-table-cache hash-table)))
          ;; Check the cache
          (when (and (< cache (length kv-vector))
                     (eq (aref kv-vector cache) key)
@@ -1312,10 +1466,17 @@ if there is no such entry. Entries can be added using SETF."
 
 (defun %puthash (key hash-table value)
   (declare (type hash-table hash-table))
+  #+hash-table-simulate
+  (let ((cell (assoc key (hash-table-%alist hash-table)
+                     :test (hash-table-test-fun hash-table))))
+    (if cell
+        (rplacd cell value)
+        (push (cons key value) (hash-table-%alist hash-table))))
   (funcall (hash-table-puthash-impl hash-table) key hash-table value))
 
 (defmacro define-remhash (name std-fn)
-  `(named-lambda ,name (key table &aux (hash-table (truly-the hash-table table)))
+  `(named-lambda ,name (key table &aux (hash-table (truly-the hash-table table))
+                                       (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c::verify-arg-count 0)))
   ;; We need to rehash here so that a current key can be found if it
   ;; exists.
@@ -1432,6 +1593,11 @@ if there is no such entry. Entries can be added using SETF."
 (defun remhash (key hash-table)
   "Remove the entry in HASH-TABLE associated with KEY. Return T if
 there was such an entry, or NIL if not."
+  #+hash-table-simulate
+  (let ((cell (assoc key (hash-table-%alist hash-table)
+                     :test (hash-table-test-fun hash-table))))
+    (when cell
+      (setf (hash-table-%alist hash-table) (delq1 cell (hash-table-%alist hash-table)))))
   (funcall (truly-the (sfunction (t t) (values boolean &optional))
                       (hash-table-remhash-impl hash-table))
            key hash-table))
@@ -1453,6 +1619,7 @@ table itself."
   ;; [Reusing those elements would be a two-step process: set them to 0,
   ;; bump the HWM, set them to desired values - because you can't let GC
   ;; observe junk, but you can't put good value at higher than the HWM]
+  #+hash-table-simulate (setf (hash-table-%alist hash-table) nil)
   (when (plusp (kv-vector-high-water-mark (hash-table-pairs hash-table)))
     (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
       (let* ((kv-vector (hash-table-pairs hash-table))
