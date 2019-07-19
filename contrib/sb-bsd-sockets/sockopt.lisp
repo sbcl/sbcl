@@ -164,9 +164,12 @@ Code for options that not every system has should be conditionalised:
   (declare (ignore args))
   x)
 
-(define-socket-option sockopt-bind-to-device nil sockint::sol-socket
-  sockint::so-bindtodevice sb-alien:c-string identity identity-1 identity
-  :linux "Available only on Linux")
+(macrolet ((cast-to-pointer (local-alien)
+             `(sb-alien:deref (sb-alien:cast (sb-alien:addr ,local-alien) (* (* t))) 0)))
+
+  (define-socket-option sockopt-bind-to-device nil sockint::sol-socket
+    sockint::so-bindtodevice sb-alien:c-string nil identity-1 cast-to-pointer
+    :linux "Available only on Linux"))
 
 ;;; other kinds of socket option
 
