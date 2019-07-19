@@ -201,7 +201,7 @@
   (unless files
     (return-from pure-runner))
   (format t "// Running pure tests (~a)~%" test-fun)
-  (let ((*failures* nil)
+  (let ((*results* nil)
         ;; in case somebody corrupts CL-USER's use list, of course
         (standard-use-list (package-use-list "CL-USER")))
     (dolist (file files)
