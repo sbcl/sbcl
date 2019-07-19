@@ -228,7 +228,7 @@
     (test (foo () :interactive) '(:interactive) ())
     (test (foo () :test) '(:test) ())
     ;; Declarations should work normally as part of the restart body.
-    (test (foo (quux) :declare ()) '(nil))
+    (test (foo () :declare ()) '(nil) ())
     (test (foo () :declare () :report "quux") '("quux") ())))
 
 (with-test (:name (restart-case :malformed-clauses))

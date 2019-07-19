@@ -966,7 +966,7 @@
               (declare (sb-ext:unmuffle-conditions sb-ext:compiler-note))
             ;; this one gives a compiler note
             (* x -5)))))
-    (declare (ignore failure-p warnings))
+    (declare (ignore failure-p warnings style-warnings))
     (assert (= (length notes) 1))
     (assert (equal (multiple-value-list (funcall fun 1)) '(5 -5)))))
 
