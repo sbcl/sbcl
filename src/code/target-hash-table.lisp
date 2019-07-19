@@ -696,13 +696,12 @@ multiple threads accessing the same hash-table without locking."
 ;;; ends up invalid due to maximally bad timing of GC, and every reader sees
 ;;; nothing but 'need-to-rehash', and the INDEX vector is repeatedly overwritten
 ;;; with zeros. The -AND-FIND aspect of this ensures progress.
-(defun %rehash-and-find (table initial-epoch key
+(defun %rehash-and-find (table epoch key
                          &aux (kv-vector (hash-table-pairs table))
                               (next-vector (hash-table-next-vector table))
                               (hash-vector (hash-table-hash-vector table))
-                              (rehashing-state (1+ initial-epoch))
-                              result)
-  (declare (hash-table table) (fixnum initial-epoch))
+                              (rehashing-state (1+ epoch)))
+  (declare (hash-table table) (fixnum epoch))
   (atomic-incf (hash-table-n-rehash+find table))
   ;; Verify some invariants prior to disabling array bounds checking
   (aver (>= (length kv-vector) #.(+ (* 2 +min-hash-table-size+)
@@ -718,7 +717,7 @@ multiple threads accessing the same hash-table without locking."
    ;; Transitioning from #b01 to #b10 clears the 'rehash' bit and sets the
    ;; rehash-in-progress bit. It also gives this thread exclusive write access
    ;; to the hashing vectors, since at most one thread can win this CAS.
-   (when (eq (cas (svref kv-vector 1) initial-epoch rehashing-state) initial-epoch)
+   (when (eq (cas (svref kv-vector 1) epoch rehashing-state) epoch)
      ;; Remove address-sensitivity, preserving the other flags.
      (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
      ;; Rehash in place. For the duration of the rehash, readers who otherwise
@@ -728,7 +727,8 @@ multiple threads accessing the same hash-table without locking."
      ;; obsolete chains could only work for a possibly-empty subset of keys.
      (let* ((index-vector (fill (hash-table-index-vector table) 0))
             (mask (1- (length index-vector)))
-            (hwm (kv-vector-high-water-mark kv-vector)))
+            (hwm (kv-vector-high-water-mark kv-vector))
+            (result 0))
        (declare (optimize (sb-c::insert-array-bounds-checks 0)))
        (if hash-vector
            (do ((i hwm (1- i))) ((zerop i))
@@ -754,13 +754,15 @@ multiple threads accessing the same hash-table without locking."
                                 (pointer-hash pair-key) mask))
                 (when (eq pair-key key) (setq result key-index))))))
        ;; Clear rehash bit and bump the epoch, wrapping around to keep it a fixnum
-       (let ((new-epoch (sb-vm::+-modfx initial-epoch 3)))
+       (let ((new-epoch (sb-vm::+-modfx epoch 3)))
          ;; Setting the new epoch races with GC which might set 'rehash' again.
          ;; At most 2 attempts are needed since no other state change can occur.
          (let ((old (cas (svref kv-vector 1) rehashing-state new-epoch)))
            (unless (eq rehashing-state old)
              (aver (eq old (logior rehashing-state 1))) ; rehashed, but already obsolete
-             (cas (svref kv-vector 1) old (logior new-epoch 1)))))
+             (aver (eq old (cas (svref kv-vector 1) old (logior new-epoch 1)))))))
+       (unless (eql result 0)
+         (setf (hash-table-cache table) result))
        result))))
 ) ; end MACROLET
 
@@ -1115,7 +1117,6 @@ nnnn 1_    any       linear scan
                                              ;; conflicted with other thread trying to rehash
                                              (retry (kv-vector-rehash-epoch kv-vector)))
                                             (t
-                                             (setf (hash-table-cache table) key-index)
                                              (values (aref kv-vector (1+ key-index)) t))))))
                                (t ; epoch changed
                                 (retry epoch)))))))))))))
@@ -1355,40 +1356,49 @@ nnnn 1_    any       linear scan
            ;; If cached, just store here
            (return-from done (setf (aref kv-vector (1+ cache)) value))))
        (with-pinned-objects (key)
-            ;; We need to rehash here so that a current key can be found if it
-            ;; exists.
-            (maybe-rehash hash-table)
-            ;; Search for key in the hash table.
-            (binding* (,@(ht-hash-setup std-fn) ,@(ht-probe-setup std-fn))
-              (declare (hash hash0) (index/2 index))
-              ;address-based-p
-              ;; Search next-vector chain for a matching key.
-              (if ,(ht-probing-should-use-eq std-fn)
-                  ;; TODO: unroll a few times like in %GETHASH
-                  (do ((next index (aref next-vector next)))
-                      ((zerop next))
-                    (declare (type index/2 next))
-                    (let ((i (* 2 next)))
-                      (when (eq key (aref kv-vector i))
-                        ;; Found, just replace the value.
-                        (setf (aref kv-vector (1+ i)) value)
-                        (setf (hash-table-cache hash-table) i)
-                        (return-from done value)))
-                    (check-excessive-probes 1))
-                  ,(unless (eq std-fn 'eq)
-                     `(do ((next index (aref next-vector next)))
-                          ((zerop next))
-                        (declare (type index/2 next))
-                        (when ,(ht-key-compare std-fn 'next)
-                          ;; Found, just replace the value.
-                          (let ((i (* 2 next)))
-                            (setf (aref kv-vector (1+ i)) value)
-                            (setf (hash-table-cache hash-table) i))
-                          (return-from done value))
-                        (check-excessive-probes 1))))
-              ;; Pop a KV slot off the free list
-              (insert-at (hash-table-next-free-kv hash-table)
-                         hash-table key hash address-based-p value))))))
+         ;; Search for key in the hash table.
+         (binding* (,@(ht-hash-setup std-fn)
+                    ,@(ht-probe-setup std-fn)
+                    (eq-test ,(ht-probing-should-use-eq std-fn))
+                    (initial-epoch (kv-vector-rehash-epoch kv-vector)))
+           (declare (hash hash0) (index/2 index))
+           ;; Search next-vector chain for a matching key.
+           (if eq-test
+               ;; TODO: consider unrolling a few times like in %GETHASH
+               (do ((next index (aref next-vector next)))
+                   ((zerop next))
+                 (declare (type index/2 next))
+                 (let ((i (* 2 next)))
+                   (when (eq key (aref kv-vector i)) ; Found, just replace the value.
+                     (setf (hash-table-cache hash-table) i)
+                     (return-from done (setf (aref kv-vector (1+ i)) value))))
+                 (check-excessive-probes 1))
+               ,(unless (eq std-fn 'eq)
+                  `(do ((next index (aref next-vector next)))
+                       ((zerop next))
+                     (declare (type index/2 next))
+                     (when ,(ht-key-compare std-fn 'next) ; Found, just replace the value.
+                       (let ((i (* 2 next)))
+                         (setf (hash-table-cache hash-table) i)
+                         (return-from done (setf (aref kv-vector (1+ i)) value))))
+                     (check-excessive-probes 1))))
+           (let ((epoch (truly-the fixnum (kv-vector-rehash-epoch kv-vector))))
+             ;; Disregarding the rehash bit, the epoch must not have changed
+             ;; because we disallow PUTHASH concurrently with any other operation.
+             (aver (zerop (logandc2 (logxor epoch initial-epoch) 1)))
+             ;; Only the initial state of the 'rehash' bit is important.
+             ;; If the bit changed from 0 to 1, then KEY's hash was good because
+             ;; it was pinned at the time we observed the rehash status to be 0.
+             (when (and address-based-p (oddp initial-epoch))
+               (let ((key-index (%rehash-and-find hash-table epoch key)))
+                 ;; If we see NIL here, it means that some other operation is racing
+                 ;; to rehash. GETHASH can deal with that scenario, PUTHASH can't.
+                 (aver (fixnump key-index))
+                 (when (/= key-index 0)
+                   (return-from done (setf (aref kv-vector (1+ key-index)) value))))))
+           ;; Pop a KV slot off the free list
+           (insert-at (hash-table-next-free-kv hash-table)
+                      hash-table key hash address-based-p value))))))
 
 (defun get-puthash-definitions ()
   (flet ((insert-at (index hash-table key hash address-based-p value)

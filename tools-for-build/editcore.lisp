@@ -37,7 +37,7 @@
   (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:|call|)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
-                #:hash-table-pairs #:hash-table-n-entries))
+                #:hash-table-pairs #:hash-table-%count))
 
 (in-package "SB-EDITCORE")
 
@@ -377,7 +377,7 @@
   (let ((table (truly-the hash-table (translate table spaces))))
     (let ((cells (the simple-vector (translate (hash-table-pairs table) spaces))))
       (collect ((pairs))
-        (do ((count (hash-table-n-entries table) (1- count))
+        (do ((count (hash-table-%count table) (1- count))
              (i 2 (+ i 2)))
             ((zerop count)
              (pairs))
@@ -1438,7 +1438,7 @@
               (return-from scan-obj))
              (#.simple-vector-widetag
               (let ((len (length (the simple-vector obj))))
-                (when (eql (logand (get-header-data obj) #xFF) vector-valid-hashing-subtype)
+                (when (eql (logand (get-header-data obj) #xFF) vector-addr-hashing-subtype)
                   (do ((i 2 (+ i 2)) (needs-rehash))
                       ((= i len)
                        (when needs-rehash
