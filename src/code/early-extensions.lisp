@@ -1402,7 +1402,9 @@ NOTE: This interface is experimental and subject to change."
 ;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
 ;;; producing more compact code.
 (defmacro with-simple-output-to-string
-    ((var &optional string (element-type #+sb-xc-host 'character #-sb-xc-host :default))
+    ((var &optional string (element-type #+sb-xc-host 'character
+                                         #-(or sb-xc-host sb-unicode) 'base-char
+                                         #+(and (not sb-xc-host) sb-unicode) :default))
      &body body)
   (multiple-value-bind (forms decls) (parse-body body nil)
     (if string
