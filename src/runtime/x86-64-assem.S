@@ -488,7 +488,7 @@ GNAME(generic_eql):
 	// so scaling by 2 gets a multiple of 8 with bignum at offset 0 etc.
 	// But the upper 3 bytes of EAX hold junk presently, so clear them.
 	and	$0x7f, %eax
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN || defined POSITION_INDEPENDENT_ASM
 	lea	eql_dispatch(%rip), %r11
 	jmpq	*(%r11,%rax,2)
 #else
@@ -594,7 +594,7 @@ eql_rational:
 	cmpb	-OTHER_POINTER_LOWTAG(%rdi), %al
 	jne     done
 	// widetags matched, so they are both bignums or both ratios.
-#ifdef LISP_FEATURE_DARWIN
+#if defined LISP_FEATURE_DARWIN || defined POSITION_INDEPENDENT_ASM
 	lea	(eql_dispatch-BIGNUM_WIDETAG*2)(%rip), %r11
 	jmpq	*(%r11,%rax,2)
 #else
@@ -602,7 +602,11 @@ eql_rational:
 #endif
 
 #ifdef __ELF__
+# ifdef POSITION_INDEPENDENT_ASM
+	.section	.data.rel.ro
+# else
 	.section	.rodata
+# endif
 #else
 	// can't store absolute reference from .text to .text apparently?
 	// (but _can_ store reference to .text from .data)
