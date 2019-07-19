@@ -341,12 +341,13 @@ Examples:
 (defmacro new-kv-vector (size weakp)
   `(let ((v (make-array (+ (* 2 ,size) kv-pairs-overhead-slots)
                         :initial-element +empty-ht-slot+)))
+     (setf (kv-vector-high-water-mark v) 0)
+     (setf (kv-vector-needs-rehash v) 0)
      (set-header-data v (if ,weakp
                             (logior sb-vm:vector-weak-subtype
                                     sb-vm:vector-hashing-subtype)
                             sb-vm:vector-hashing-subtype))
-     (setf (kv-vector-high-water-mark v) 0)
-     (setf (kv-vector-needs-rehash v) 0)
+
      v))
 
 (defun make-hash-table (&key
