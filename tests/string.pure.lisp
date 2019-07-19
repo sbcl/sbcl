@@ -207,3 +207,8 @@
                        expected))))
     (check 'string-equal     t)
     (check 'string-not-equal nil)))
+
+(with-test (:name :write-to-string-base-stringize)
+  (let ((result (funcall (checked-compile `(lambda (x) (write-to-string x))) 33d0)))
+    (assert (equal result "33.0d0"))
+    (assert (typep result 'simple-base-string))))
