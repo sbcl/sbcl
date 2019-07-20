@@ -139,13 +139,15 @@ arch_get_bad_addr(int __attribute__((unused)) sig,
 os_context_register_t *
 context_eflags_addr(os_context_t *context)
 {
-#if defined __linux__ || defined __sun
+#if defined __linux__
     /* KLUDGE: As of kernel 2.2.14 on Red Hat 6.2, there's code in the
      * <sys/ucontext.h> file to define symbolic names for offsets into
      * gregs[], but it's conditional on __USE_GNU and not defined, so
      * we need to do this nasty absolute index magic number thing
      * instead. */
     return (os_context_register_t*)&context->uc_mcontext.gregs[17];
+#elif defined LISP_FEATURE_SUNOS
+    return &context->uc_mcontext.gregs[REG_RFL];
 #elif defined LISP_FEATURE_FREEBSD || defined(__DragonFly__)
     return &context->uc_mcontext.mc_rflags;
 #elif defined LISP_FEATURE_DARWIN

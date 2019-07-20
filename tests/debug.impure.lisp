@@ -84,15 +84,15 @@
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
             :fails-on (or (and :ppc (not :linux)) :sparc :arm64)
-            :broken-on (or :sunos :hppa))
+            :broken-on :hppa)
   (let ((output (with-traced-function (trace-this :encapsulate nil)
                   (assert (eq 'ok (trace-this))))))
     (assert (search "TRACE-THIS" output))
     (assert (search "returned OK" output))))
 
 (with-test (:name (:trace :encapsulate nil :recursive)
-            :fails-on (or (and :ppc (not :linux)) :sparc :sunos :arm64)
-            :broken-on (or (and :x86 :sunos) :hppa))
+            :fails-on (or (and :ppc (not :linux)) :sparc :arm64)
+            :broken-on :hppa)
   (let ((output (with-traced-function (trace-fact :encapsulate nil)
                   (assert (= 120 (trace-fact 5))))))
     (assert (search "TRACE-FACT" output))
