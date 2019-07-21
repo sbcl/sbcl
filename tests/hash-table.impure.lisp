@@ -102,17 +102,34 @@
 
 (defparameter *sleep-delay-max* .025)
 
+(defun shrink-buckets (table)
+  ;; To better test the algorithms, constrain the index vector to have a
+  ;; smaller number of buckets than would normally be used.
+  (when (> (length (sb-impl::hash-table-index-vector table)) 32)
+    (let ((index-vector (make-array 32 :initial-element 0
+                                       :element-type '(unsigned-byte 32))))
+      (sb-impl::%rehash (sb-impl::hash-table-pairs table)
+                        (sb-impl::hash-table-hash-vector table)
+                        index-vector
+                        (sb-impl::hash-table-next-vector table))
+      (setf (sb-impl::hash-table-index-vector table) index-vector))))
+
 (with-test (:name (hash-table :synchronized)
             :broken-on :win32)
- (with-test-setup (keys (hash (make-hash-table :synchronized t)))
-  (let* ((*errors* nil)
+  (dolist (shrinkp '(nil t))
+   (with-test-setup (keys (hash (make-hash-table :synchronized t)))
+    (let*
+        ((*errors* nil)
          (threads (list (make-join-thread
                          (lambda ()
                            (catch 'done
                              (handler-bind ((serious-condition 'oops))
                                (loop
                                  ;;(princ "1") (force-output)
-                                 (setf (gethash (aref keys (random 100)) hash) 'h)))))
+                                 (setf (gethash (aref keys (random 100)) hash) 'h)
+                                 (when shrinkp
+                                   (sb-ext:with-locked-hash-table (hash)
+                                     (shrink-buckets hash)))))))
                          :name "writer")
                         (make-join-thread
                          (lambda ()
@@ -130,30 +147,32 @@
                                  (sleep (random *sleep-delay-max*))
                                  (sb-ext:gc)))))
                          :name "collector"))))
-    (unwind-protect (sleep 5)
-      (mapc #'terminate-thread threads))
-    (assert (not *errors*)))))
+      (unwind-protect (sleep 2.5)
+        (mapc #'terminate-thread threads))
+      (assert (not *errors*))))))
 
 (with-test (:name (hash-table :parallel-readers)
                   :broken-on :win32)
- (with-test-setup (keys (hash (make-hash-table)))
-   (let ((*errors* nil)
-         (expected (make-array 100 :initial-element nil))
-         (actions (make-array 3 :element-type 'sb-ext:word :initial-element 0)))
-    (loop repeat 50
-          do (let ((i (random 100)))
-               (setf (gethash (aref keys i) hash) i)
-               (setf (aref expected i) t)))
-     (flet ((reader (n)
-              (catch 'done
-                (handler-bind ((serious-condition 'oops))
-                  (loop
+  (dolist (shrinkp '(nil t))
+    (with-test-setup (keys (hash (make-hash-table)))
+      (let ((*errors* nil)
+            (expected (make-array 100 :initial-element nil))
+            (actions (make-array 3 :element-type 'sb-ext:word :initial-element 0)))
+        (loop repeat 50
+              do (let ((i (random 100)))
+                   (setf (gethash (aref keys i) hash) i)
+                   (setf (aref expected i) t)))
+        (when shrinkp (shrink-buckets hash))
+        (flet ((reader (n)
+                 (catch 'done
+                   (handler-bind ((serious-condition 'oops))
+                     (loop
                       (let* ((i (random 100))
                              (x (gethash (aref keys i) hash)))
                         (atomic-incf (aref actions n))
                         (cond ((aref expected i) (assert (eq x i)))
                               (t (assert (not x))))))))))
-       (let ((threads
+          (let ((threads
               (list (make-kill-thread #'reader :name "reader 1" :arguments 0)
                     (make-kill-thread #'reader :name "reader 2" :arguments 1)
                     (make-kill-thread #'reader :name "reader 3" :arguments 2)
@@ -164,29 +183,37 @@
                            (loop (sleep (random *sleep-delay-max*))
                                  (sb-ext:gc)))))
                      :name "collector"))))
-         (unwind-protect (sleep 5)
-           (mapc #'terminate-thread threads))
-         (format t "~&::: INFO: GETHASH count = ~D = ~D, lsearch=~d~%"
-                 actions
-                 (reduce #'+ actions)
+            (unwind-protect (sleep 2.5)
+              (mapc #'terminate-thread threads))
+            (format t "~&::: INFO: GETHASH count = ~D = ~D, lsearch=~d~%"
+                    actions
+                    (reduce #'+ actions)
                  ;; With the GC frequency as high as it is for this test,
                  ;; we can get more than 1 lookup in 10^5 needing linear scan.
                  ;; A "normal" amount of GCing often sees this as low as 0.
-                 (sb-impl::hash-table-n-lsearch hash))
-         (assert (not *errors*)))))))
+                    (sb-impl::hash-table-n-lsearch hash))
+            (assert (not *errors*))))))))
 
 (with-test (:name (hash-table :single-accessor :parallel-gc)
-                  :broken-on :win32)
- (with-test-setup (keys (hash (make-hash-table)))
-  (let ((*errors* nil))
-    (let ((threads (list (make-kill-thread
+            :broken-on :win32)
+  (dolist (shrinkp '(nil t))
+    (with-test-setup (keys (hash (make-hash-table)))
+      (let ((*errors* nil))
+        (let ((threads
+               (list (make-kill-thread
                           (lambda ()
                             (handler-bind ((serious-condition 'oops))
                               (loop
-                                (let ((n (aref keys (random 100))))
-                                  (if (gethash n hash)
-                                      (remhash n hash)
-                                      (setf (gethash n hash) 'h))))))
+                                (let* ((i (random 100))
+                                       (k (aref keys i))
+                                       (val (gethash k hash)))
+                                  (cond (val
+                                         (assert (eq val i))
+                                         (assert (remhash k hash)))
+                                        (t
+                                         (setf (gethash k hash) i)
+                                         (when shrinkp
+                                           (shrink-buckets hash))))))))
                           :name "accessor")
                          (make-kill-thread
                           (lambda ()
@@ -195,6 +222,6 @@
                                 (sleep (random *sleep-delay-max*))
                                 (sb-ext:gc))))
                           :name "collector"))))
-      (unwind-protect (sleep 5)
-        (mapc #'terminate-thread threads))
-      (assert (not *errors*))))))
+          (unwind-protect (sleep 2.5)
+            (mapc #'terminate-thread threads))
+          (assert (not *errors*)))))))
