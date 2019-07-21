@@ -505,6 +505,8 @@ Examples:
                    rehash-size rehash-threshold
                    kv-vector index-vector next-vector hash-vector
                    (logior (if userfunp hash-table-userfun-flag 0)
+                           ;; FIXME: shouldn't weak tables always return
+                           ;; T from HASH-TABLE-SYNCHRONIZED-P ?
                            (if synchronized hash-table-synchronized-flag 0)
                            weakness-bits))))
       (declare (type index scaled-size))
@@ -828,49 +830,6 @@ multiple threads accessing the same hash-table without locking."
             (kv-vector-needs-rehash old-kv-vector) 0
             (kv-vector-table old-kv-vector) 0))))
 
-;;; Use the same size as before, re-using the vectors.
-(defun rehash-without-growing (table)
-  (declare (type hash-table table))
-  (aver *gc-inhibit*)
-  (atomic-incf (hash-table-n-rehash+find table)) ; not really true, but close enough
-  (let ((kv-vector (hash-table-pairs table))
-        (index-vector (hash-table-index-vector table)))
-
-    ;; Remove address-sensitivity, preserving the other flags.
-    (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
-
-    ;; We don't need to zero-fill the NEXT vector, just the INDEX vector.
-    ;; Unless a key slot can be reached by a chain starting from the index
-    ;; vector or the 'next' of a previous chain element, we don't read either
-    ;; the key or its corresponding 'next'. So we only need to assign a
-    ;; 'next' at the moment a slot is linked into a chain.
-    (fill index-vector 0)
-    (setf (hash-table-next-free-kv table)
-          (%rehash kv-vector (hash-table-hash-vector table)
-                   index-vector (hash-table-next-vector table)))
-
-    ;; We've already placed all empty cells into the free chain,
-    ;; so do not try to later remove them from a bucket.
-    (setf (hash-table-smashed-cells table) nil)
-
-  ;; Clear the rehash bit only at the very end, otherwise another thread
-  ;; might see a partially rehashed table as a normal one.
-    (setf (kv-vector-needs-rehash kv-vector) 0))
-  (values))
-
-;;; Since when did we start generating so many "unreachable code" warnings?
-;;; Oy, well, turning this from an inline function to a macro helps a little.
-(defmacro maybe-rehash (hash-table)
-  `(locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-           ;; There's actually a better algorithm - if and only if the current
-           ;; key was address-sensitively hashed do we actually care whether
-           ;; the table's bucketing was rendered obsolete by GC.
-           ;; So we should defer this check until seeing whether we care.
-      (when (logtest (truly-the fixnum
-                      (kv-vector-needs-rehash (hash-table-pairs ,hash-table)))
-                     1)
-        (rehash-if-obsolete ,hash-table))))
-
 (defun grow-hash-table (hash-table)
   ;; Use recursive locks since for weak tables the lock has
   ;; already been acquired. <--- WAAAAT? We don't support concurrent inserts,
@@ -893,11 +852,6 @@ multiple threads accessing the same hash-table without locking."
             (rehash hash-table new-kv-vector new-next-vector
                     new-hash-vector new-index-vector)))))
   (hash-table-next-free-kv hash-table))
-
-(defun rehash-if-obsolete (hash-table)
-  (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table) :without-gcing t)
-    (when (logtest (kv-vector-needs-rehash (hash-table-pairs hash-table)) 1)
-      (rehash-without-growing hash-table))))
 
 (defun gethash (key hash-table &optional default)
   "Finds the entry in HASH-TABLE whose key is KEY and returns the
@@ -1145,6 +1099,8 @@ nnnn 1_    any       linear scan
     (macrolet ((return-hit ()
                  '(return-from findhash-weak
                     (values probed-val probed-key physical-index predecessor))))
+      ;; FIXME: since a weak table is always synchronized, maybe get rid of
+      ;; this loop-over-epoch noise?
       (let ((start-epoch sb-kernel::*gc-epoch*)
             (kv-vector (hash-table-pairs hash-table)))
         (tagbody
@@ -1155,8 +1111,35 @@ nnnn 1_    any       linear scan
                (return-from findhash-weak (values +empty-ht-slot+ 0 0 0)))
              (setq start-epoch current-epoch))
           ENTRY
-           (maybe-rehash hash-table)
-           ;; Note that it's OK for a GC + a REHASH-WITHOUT-GROWING to
+           (when (oddp (truly-the fixnum
+                        (kv-vector-needs-rehash (hash-table-pairs hash-table))))
+             ;; Because it's tricky to deal with the smashed cell list while rehashing
+             ;; - we don't know whether GC has pushed a given kv-index there -
+             ;; juse use the traditional large hammer of GC inhibit.
+             ;; It might work to temporarily remove the weakness bit from the table,
+             ;; but I think the only way to make this truly robust is to detect smashed
+             ;; keys in the find operation per se, removing them from the chain
+             ;; and pushing them back on the freelist.
+             (without-gcing
+               ;; Remove address-sensitivity, preserving the other flags.
+               (unset-header-bits kv-vector sb-vm:vector-addr-hashing-subtype)
+               ;; We don't need to zero-fill the NEXT vector, just the INDEX vector.
+               ;; Unless a key slot can be reached by a chain starting from the index
+               ;; vector or the 'next' of a previous chain element, we don't read either
+               ;; the key or its corresponding 'next'. So we only need to assign a
+               ;; 'next' at the moment a slot is linked into a chain.
+               (setf (hash-table-next-free-kv hash-table)
+                     (%rehash kv-vector (hash-table-hash-vector hash-table)
+                              (fill (hash-table-index-vector hash-table) 0)
+                              (hash-table-next-vector hash-table)))
+               ;; We've already placed all empty cells into the free chain,
+               ;; so do not try to later remove them from a bucket.
+               (setf (hash-table-smashed-cells hash-table) nil)
+               ;; Clear the rehash bit only at the very end, otherwise another thread
+               ;; might see a partially rehashed table as valid. The fact that all weak
+               ;; tables are synchronized makes this point somewhat irrelevant though.
+               (setf (kv-vector-needs-rehash kv-vector) 0)))
+           ;; Note that it's OK for a GC + another rehash to
            ;; be triggered by another thread after this point, since the
            ;; GC epoch check will catch it.
            (binding* #.(ht-probe-setup '* '((predecessor nil)))
