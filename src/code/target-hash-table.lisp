@@ -559,12 +559,6 @@ multiple threads accessing the same hash-table without locking."
 ;;; Make new vectors for the table, extending the table based on the
 ;;; rehash-size.
 (defun hash-table-new-vectors (table)
-  ;; Can at least some vectors be copied before entering WITHOUT-GCING
-  ;; for REHASH?
-  ;; Answer: yes, we can do that, but I will first need to implement the ability
-  ;; for both the old and new vector to be marked as address-sensitive so that
-  ;; GC can flag either/both as obsolete, while only the old vector contains
-  ;; a backpointer to the table.
   (let* ((old-next-vector (hash-table-next-vector table))
          (old-hash-vector (hash-table-hash-vector table))
          ;; The NEXT vector's length is 1 greater than "size" - the number
@@ -770,48 +764,88 @@ multiple threads accessing the same hash-table without locking."
        result))))
 ) ; end MACROLET
 
-(defun rehash (table new-kv-vector new-next-vector new-hash-vector new-index-vector)
-  (declare (type hash-table table)
-           (type simple-vector new-kv-vector)
-           (type (simple-array hash-table-index (*)) new-next-vector new-index-vector)
-           (type (or null (simple-array hash-table-index (*))) new-hash-vector))
-  (aver *gc-inhibit*)
-  (let* ((old-kv-vector (hash-table-pairs table))
-         (old-hash-vector (hash-table-hash-vector table)))
+;;; TODO: Figure out a strategy for growing a weak hash-table kv-vector without
+;;; inhibiting GC. Some likely possibilties:
+;;; Strategy A:
+;;;  1. unset all header bits from the old kv-vector so that it is no longer
+;;;     a hashing vector. It therefore enlivens all k/v pairs.
+;;;  2. copy it and rehash as normal, knowing that we don't need to worry about
+;;;     k/v pairs being added to the smashed list
+;;; Strategy B:
+;;;  1. point the new kv-vector at the hash-table and vice-versa
+;;;  2. nil out the smashed cell list
+;;;  3. working backwards in the old vector, load each k/v pair at a time
+;;;     checking for whether it is <unbound,unbound>. Copy and insert into a
+;;;     chain if it is not an empty pair. At the moment of copy, the pair can't die,
+;;;     but as soon as we let go of that pair, it might.
+;;;     That's OK, GC can smash a pair and store it in the smashed cell list.
 
-    ;; Preserve the 'hashing' bit on the OLD-KV-VECTOR so that its high-water-mark
-    ;; can meaningfully be reduced to 0 when done; remove the other flag bits.
-    (set-header-data old-kv-vector sb-vm:vector-hashing-subtype)
+(defun grow-hash-table (table)
+  (declare (type hash-table table))
+  (binding* (((new-kv-vector new-next-vector new-hash-vector new-index-vector)
+              (hash-table-new-vectors table))
+             (old-kv-vector (hash-table-pairs table))
+             (hwm (kv-vector-high-water-mark old-kv-vector)))
+
+    (declare (type simple-vector new-kv-vector)
+             (type (simple-array hash-table-index (*)) new-next-vector new-index-vector)
+             (type (or null (simple-array hash-table-index (*))) new-hash-vector))
 
     ;; Rehash + resize only occurs when:
     ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
     ;;  (2) no cells below HWM are available (so COUNT = SIZE)
-    ;; The latter can be violated if the table is weak I think.
-    (aver (= (kv-vector-high-water-mark old-kv-vector) (hash-table-size table)))
+    (aver (= hwm (hash-table-size table)))
+    (unless (hash-table-weak-p table)
+      ;; Consider a GC that occurs after we've decided that the table
+      ;; is too small, but before getting here. There could be some smashed
+      ;; cells, and if so, the count will be less than the SIZE.
+      (aver (= (hash-table-count table) hwm)))
 
-    ;; Copy over the hash-vector. First element is not used.
-    (when old-hash-vector
-      (replace new-hash-vector old-hash-vector :start1 1 :start2 1))
+    ;; Copy over the hash-vector,
+    ;; This is done early because when GC scans the new vector, it needs to see
+    ;; each hash to know which keys were hashed address-sensitively.
+    (awhen (hash-table-hash-vector table)
+      (replace new-hash-vector it :start1 1 :start2 1)) ; 1st element not used
 
-    ;; The high-water-mark remains the same.
-    (let ((hwm (kv-vector-high-water-mark old-kv-vector)))
-      (setf (kv-vector-high-water-mark new-kv-vector) hwm)
-      (setf (kv-vector-table new-kv-vector)
-            (if (hash-table-weak-p table) table new-hash-vector))
-      ;; Copy the k/v pairs excluding leading and trailing metadata.
-      (replace new-kv-vector old-kv-vector :start1 2
-               :start2 2 :end2 (* 2 (1+ hwm)))
+    ;; The high-water-mark remains unchanged.
+    ;; Set this before copying pairs, otherwise they would not be seen
+    ;; in the new vector since GC scanning ignores elements below the HWM.
+    (setf (kv-vector-high-water-mark new-kv-vector) hwm)
 
-      (setf (hash-table-next-free-kv table)
-            (%rehash new-kv-vector new-hash-vector
-                     new-index-vector new-next-vector))
+    (flet ((rehash ()
+             ;; Preserve only the 'hashing' bit on the OLD-KV-VECTOR so that
+             ;; its high-water-mark can meaningfully be reduced to 0 when done.
+             ;; Clearing the address-sensitivity is a performance improvement
+             ;; since GC won't check on a per-key basis whether to flag the vector
+             ;; for rehash. (It's going to be zeroed out)
+             ;; Clearing the weakness is irrelevant due to the GC inhibit.
+             (set-header-data old-kv-vector sb-vm:vector-hashing-subtype)
+             ;; Looking up keys during PUTHASH is not allowed,
+             ;; but we might as well tidy up this slot.
+             (setf (kv-vector-needs-rehash old-kv-vector) 0)
 
-      (setf (hash-table-smashed-cells table) nil)
+             ;; Copy the k/v pairs excluding leading and trailing metadata.
+             (replace new-kv-vector old-kv-vector
+                      :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
 
-      (setf (hash-table-pairs table)        new-kv-vector
-            (hash-table-hash-vector table)  new-hash-vector
-            (hash-table-index-vector table) new-index-vector
-            (hash-table-next-vector table)  new-next-vector)
+             (setf (hash-table-next-free-kv table)
+                   (%rehash new-kv-vector new-hash-vector
+                            new-index-vector new-next-vector))
+
+             (setf (hash-table-pairs table)        new-kv-vector
+                   (hash-table-hash-vector table)  new-hash-vector
+                   (hash-table-index-vector table) new-index-vector
+                   (hash-table-next-vector table)  new-next-vector)))
+
+      (cond ((hash-table-weak-p table)
+             (without-gcing
+               (rehash)
+               (setf (kv-vector-table new-kv-vector) table)
+               (setf (hash-table-smashed-cells table) nil)))
+            (t
+             ;; Assign hash-vector into KV-VECTOR prior to rehashing
+             (setf (kv-vector-table new-kv-vector) new-hash-vector)
+             (rehash)))
 
       ;; We zero-fill the old kv-vector, but there is no technical reason, except
       ;; that it is slightly unsafe not to. GC will not scavenge past the high water
@@ -827,31 +861,8 @@ multiple threads accessing the same hash-table without locking."
       ;; if we didn't zero-fill.
       (fill old-kv-vector 0 :start 2 :end (* (1+ hwm) 2))
       (setf (kv-vector-high-water-mark old-kv-vector) 0
-            (kv-vector-needs-rehash old-kv-vector) 0
-            (kv-vector-table old-kv-vector) 0))))
-
-(defun grow-hash-table (hash-table)
-  ;; Use recursive locks since for weak tables the lock has
-  ;; already been acquired. <--- WAAAAT? We don't support concurrent inserts,
-  ;; so it's an error if you don't already have a lock when doing PUTHASH.
-  ;; So why are we acquiring a lock "again" anyway ?
-  (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
-    ;; Repeat the condition inside the lock to ensure that if
-    ;; two reader threads enter MAYBE-REHASH at the same time
-    ;; only one rehash is performed.
-    (when (zerop (hash-table-next-free-kv hash-table))
-      ;; Cons new vectors outside of WITHOUT-GCING (except
-      ;; for weak hash-tables, GETHASH3 already uses
-      ;; WITHOUT-GCING in that case)
-      (multiple-value-bind (new-kv-vector new-next-vector new-hash-vector new-index-vector)
-          (hash-table-new-vectors hash-table)
-        (without-gcing
-            ;; Rehash inside WITHOUT-GCING to avoid movement
-            ;; and the keep GC from seeing half-initilizaed
-            ;; hash vectors.
-            (rehash hash-table new-kv-vector new-next-vector
-                    new-hash-vector new-index-vector)))))
-  (hash-table-next-free-kv hash-table))
+            (kv-vector-table old-kv-vector) 0)))
+  (hash-table-next-free-kv table))
 
 (defun gethash (key hash-table &optional default)
   "Finds the entry in HASH-TABLE whose key is KEY and returns the
