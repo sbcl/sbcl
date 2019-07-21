@@ -543,8 +543,10 @@ Examples:
 (setf (documentation 'hash-table-test 'function)
       "Return the test HASH-TABLE was created with.")
 
-;;; Called when we detect circular chains in a hash-table.
 (defun signal-corrupt-hash-table (hash-table)
+  (error "Unsafe concurrent operations on ~A detected." hash-table))
+;;; Called when we detect circular chains in a hash-table.
+(defun signal-corrupt-hash-table-bucket (hash-table)
   (error "Corrupt NEXT-chain in ~A. This is probably caused by ~
 multiple threads accessing the same hash-table without locking."
          hash-table))
@@ -1004,7 +1006,7 @@ if there is no such entry. Entries can be added using SETF."
   `(when (minusp (decf (truly-the fixnum probe-limit) ,n-probes))
      ;; The next-vector chain is circular. This is caused
      ;; caused by thread-unsafe mutations of the table.
-     (signal-corrupt-hash-table hash-table)))
+     (signal-corrupt-hash-table-bucket hash-table)))
 
 (defmacro ht-probe-advance (var)
   `(setq ,var (truly-the index/2 (aref next-vector ,var))))
@@ -1356,11 +1358,27 @@ nnnn 1_    any       linear scan
            ;; If cached, just store here
            (return-from done (setf (aref kv-vector (1+ cache)) value))))
        (with-pinned-objects (key)
-         ;; Search for key in the hash table.
-         (binding* (,@(ht-hash-setup std-fn)
+         ;; Read the 'rehash' bit as soon as possible after pinning KEY,
+         ;; but not before.  The closer in time we observe the bit vs pinning,
+         ;; the more likely it is to reflect at most the moved status of KEY
+         ;; and not also the moved status of keys moved after KEY got pinned.
+         ;; To illustrate:
+         ;;
+         ;;   t0 .... t1 .... t2 .... t3 ....
+         ;;    ^      ^          ^       ^
+         ;;    |      |          | GC    |
+         ;;    Pin   Possible           Actual
+         ;;          observation        observation
+         ;;          of 'rehash'        of 'rehash'
+         ;;
+         ;; If GC causes the bit to become set, and we don't read the bit
+         ;; until t3, we're forced to conclude that KEY's hash might have been wrong.
+         ;; Granted that the bit might have been 1 at timestamp 't1',
+         ;; but it's best to read it at t1 and not later.
+         (binding* ((initial-epoch (kv-vector-rehash-epoch kv-vector))
+                    ,@(ht-hash-setup std-fn)
                     ,@(ht-probe-setup std-fn)
-                    (eq-test ,(ht-probing-should-use-eq std-fn))
-                    (initial-epoch (kv-vector-rehash-epoch kv-vector)))
+                    (eq-test ,(ht-probing-should-use-eq std-fn)))
            (declare (hash hash0) (index/2 index))
            ;; Search next-vector chain for a matching key.
            (if eq-test
@@ -1382,20 +1400,23 @@ nnnn 1_    any       linear scan
                          (setf (hash-table-cache hash-table) i)
                          (return-from done (setf (aref kv-vector (1+ i)) value))))
                      (check-excessive-probes 1))))
-           (let ((epoch (truly-the fixnum (kv-vector-rehash-epoch kv-vector))))
-             ;; Disregarding the rehash bit, the epoch must not have changed
-             ;; because we disallow PUTHASH concurrently with any other operation.
-             (aver (zerop (logandc2 (logxor epoch initial-epoch) 1)))
-             ;; Only the initial state of the 'rehash' bit is important.
-             ;; If the bit changed from 0 to 1, then KEY's hash was good because
-             ;; it was pinned at the time we observed the rehash status to be 0.
-             (when (and address-based-p (oddp initial-epoch))
-               (let ((key-index (%rehash-and-find hash-table epoch key)))
-                 ;; If we see NIL here, it means that some other operation is racing
-                 ;; to rehash. GETHASH can deal with that scenario, PUTHASH can't.
-                 (aver (fixnump key-index))
-                 (when (/= key-index 0)
-                   (return-from done (setf (aref kv-vector (1+ key-index)) value))))))
+           ;; Detect whether the failure to find was due to key movement.
+           ;; Only the initial state of the 'rehash' bit is important.
+           ;; If the bit changed from 0 to 1, then KEY's hash was good because
+           ;; it was pinned at the time we observed the rehash status to be 0.
+           (when (and address-based-p (oddp initial-epoch))
+             ;; The current epoch must be the same as initial-epoch, because
+             ;; PUTHASH is disallowed concurrently with any other operation,
+             ;; and the 'rehash' bit can't be cleared except by rehashing
+             ;; as part of such operation.
+             (unless (eq (kv-vector-rehash-epoch kv-vector) initial-epoch)
+               (signal-corrupt-hash-table hash-table))
+             (let ((key-index (%rehash-and-find hash-table initial-epoch key)))
+               ;; If we see NIL here, it means that some other operation is racing
+               ;; to rehash. GETHASH can deal with that scenario, PUTHASH can't.
+               (cond ((eql key-index 0)) ; fallthrough to insert
+                     ((not (fixnump key-index)) (signal-corrupt-hash-table hash-table))
+                     (t (return-from done (setf (aref kv-vector (1+ key-index)) value))))))
            ;; Pop a KV slot off the free list
            (insert-at (hash-table-next-free-kv hash-table)
                       hash-table key hash address-based-p value))))))
@@ -1489,39 +1510,46 @@ nnnn 1_    any       linear scan
   `(named-lambda ,name (key table &aux (hash-table (truly-the hash-table table))
                                        (kv-vector (hash-table-pairs hash-table)))
      (declare (optimize speed (sb-c::verify-arg-count 0)))
-  ;; We need to rehash here so that a current key can be found if it
-  ;; exists.
-  ;;
-  ;; Note that if a GC happens after MAYBE-REHASH returns and another
-  ;; thread the accesses the table (triggering a rehash), we might not
-  ;; find the key even if it is in the table. But that's ok, since the
-  ;; only concurrent case that we safely allow is multiple readers
-  ;; with no writers.
+     ;; The cache provides no benefit to REMHASH. A hit would just mean there is work
+     ;; to do in removing the item from a chain, whereas a miss means we don't know
+     ;; if there is work to do, so effectively there is work to do either way.
      (with-pinned-objects (key)
-      (maybe-rehash hash-table)
-      (binding* (,@(ht-hash-setup std-fn) ,@(ht-probe-setup std-fn))
-        (declare (hash hash0) (index/2 index))
-        (declare (ignorable address-based-p ; unused in gethash/{EQ,ANY}
-                            probe-limit))
-        (cond ((zerop index) nil) ; empty bucket
-              (,(ht-key-compare std-fn 'index)
-               ;; Removing the key at the header of the chain is exceptional
-               ;; because it has no predecessor,
-               (setf (aref index-vector bucket) (aref next-vector index))
-               (clear-slot index hash-table kv-vector next-vector))
-              (,(ht-probing-should-use-eq std-fn)
-               (%remhash/eq key hash-table kv-vector next-vector index))
-              ,@(unless (eq std-fn 'eq)
-                  `((t
-                     (do ((probe-limit (length next-vector))
-                          (predecessor index this)
-                          (this (aref next-vector index) (aref next-vector this)))
-                         ((zerop this) nil)
-                       (declare (type index/2 predecessor this))
-                       (when ,(ht-key-compare std-fn 'this)
-                         (setf (aref next-vector predecessor) (aref next-vector this))
-                         (return (clear-slot this hash-table kv-vector next-vector)))
-                       (check-excessive-probes 1))))))))))
+       ;; See comment in DEFINE-HT-SETTER about why to read initial-epoch
+       ;; as soon as possible after pinning KEY.
+       (binding* ((initial-epoch (kv-vector-rehash-epoch kv-vector))
+                  ,@(ht-hash-setup std-fn)
+                  ,@(ht-probe-setup std-fn)
+                  (eq-test ,(ht-probing-should-use-eq std-fn)))
+         (declare (hash hash0) (index/2 index) (ignore probe-limit))
+         (block done
+           (cond ((zerop index)) ; bucket is empty
+                 (,(ht-key-compare std-fn 'index)
+                  ;; Removing the key at the header of the chain is exceptional
+                  ;; because it has no predecessor,
+                  (setf (aref index-vector bucket) (aref next-vector index))
+                  (return-from done
+                    (clear-slot index hash-table kv-vector next-vector)))
+                 (eq-test
+                  (when (%remhash/eq key hash-table kv-vector next-vector index)
+                    (return-from done t)))
+                 ,@(unless (eq std-fn 'eq)
+                     `((t
+                        (do ((probe-limit (length next-vector))
+                             (predecessor index this)
+                             (this (aref next-vector index) (aref next-vector this)))
+                            ((zerop this) nil)
+                          (declare (type index/2 predecessor this))
+                          (when ,(ht-key-compare std-fn 'this)
+                            (setf (aref next-vector predecessor) (aref next-vector this))
+                            (return-from done
+                              (clear-slot this hash-table kv-vector next-vector)))
+                          (check-excessive-probes 1))))))
+           ;; Detect whether the failure to find was due to key movement.
+           ;; Only the initial state of the 'rehash' bit is important.
+           ;; If the bit changed from 0 to 1, then KEY's hash was good because
+           ;; it was pinned at the time we observed the rehash status to be 0.
+           (when (and address-based-p (oddp initial-epoch))
+             (remove-from-bucket key bucket hash-table initial-epoch)))))))
 
 (defun remhash/weak (key hash-table)
   (declare (type hash-table hash-table) (optimize speed))
@@ -1569,6 +1597,44 @@ nnnn 1_    any       linear scan
              ;; type-error, so don't turn down the safety!
              (decf (hash-table-%count hash-table))
              t)
+           (remove-from-bucket (key bucket hash-table initial-epoch
+                                &aux (kv-vector (hash-table-pairs hash-table)))
+             ;; Remove KEY from BUCKET which is based on the current address
+             ;; of key after pinning.  When the key was not found initially,
+             ;; the "problem" so to speak was that the bucket that was searched
+             ;; did not hold the key, and not that search was done on the wrong
+             ;; bucket. Rehashing will place the key into the expected bucket.
+             ;;
+             ;; The current epoch must be the same as initial-epoch, because
+             ;; REMHASH is disallowed concurrently with any other operation,
+             ;; and the 'rehash' bit can't be cleared except by rehashing
+             ;; as part of such operation.
+             (unless (eq (kv-vector-rehash-epoch kv-vector) initial-epoch)
+               (signal-corrupt-hash-table hash-table))
+             (let ((key-index (%rehash-and-find hash-table initial-epoch key)))
+               ;; If we see NIL here, it means that some other operation is racing
+               ;; to rehash. GETHASH can deal with that scenario, REMHASH can't.
+               (unless (fixnump key-index)
+                 (signal-corrupt-hash-table hash-table))
+               (when (/= key-index 0) ; found
+                 (let* ((index-vector (hash-table-index-vector hash-table))
+                        (start (aref index-vector bucket))
+                        (next-vector (hash-table-next-vector hash-table))
+                        (next (aref next-vector start))
+                        (pair-index (ash key-index -1)))
+                   (if (if (= start pair-index) ; remove head of chain
+                           (setf (aref index-vector bucket) next)
+                           (do ((probe-limit (length next-vector))
+                                (predecessor start this)
+                                (this next (aref next-vector this)))
+                               ((zerop this))
+                             (declare (type index/2 predecessor this))
+                             (when (eql this pair-index)
+                               (return (setf (aref next-vector predecessor)
+                                             (aref next-vector this))))
+                             (check-excessive-probes 1)))
+                       (clear-slot pair-index hash-table kv-vector next-vector)
+                       (signal-corrupt-hash-table hash-table))))))
            (%remhash/eq (key hash-table kv-vector next-vector start)
              (do ((probe-limit (length next-vector))
                   (predecessor start this)

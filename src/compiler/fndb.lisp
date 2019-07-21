@@ -1066,7 +1066,9 @@
 (defknown psxhash (t &optional t) hash (foldable flushable))
 (defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
 ;; To avoid emitting code to test for nil-function-returned
-(defknown sb-impl::signal-corrupt-hash-table (t) nil ())
+(defknown (sb-impl::signal-corrupt-hash-table
+           sb-impl::signal-corrupt-hash-table-bucket)
+ (t) nil ())
 
 ;;;; from the "Arrays" chapter
 
