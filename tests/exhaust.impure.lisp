@@ -31,7 +31,7 @@
 (defvar *count* 100)
 
 ;;; Base-case: detecting exhaustion
-(with-test (:name (:exhaust :basic) :broken-on (and :sunos :x86-64))
+(with-test (:name (:exhaust :basic))
   (assert (eq :exhausted
               (handler-case
                   (recurse)
@@ -43,7 +43,6 @@
 ;;; exhaustion checking after unwinding -- and that previous test
 ;;; didn't break it.
 (with-test (:name (:exhaust :non-local-control)
-                  :broken-on (and :sunos :x86-64)
                   :skipped-on :win32)
   (let ((exhaust-count 0)
         (recurse-count 0))
@@ -62,7 +61,6 @@
 ;;; Check that we can safely use user-provided restarts to
 ;;; unwind.
 (with-test (:name (:exhaust :restarts)
-                  :broken-on (and :sunos :x86-64)
                   :skipped-on :win32)
   (let ((exhaust-count 0)
         (recurse-count 0))

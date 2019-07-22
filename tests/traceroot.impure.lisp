@@ -55,7 +55,8 @@
           (:bindings
            (assert (typep (cdr path) '(cons (eql *fred*) (cons nil))))))))))
 
-(with-test (:name (sb-ext:search-roots :stack-indirect))
+(with-test (:name (sb-ext:search-roots :stack-indirect)
+            :fails-on :sunos)
   (let ((wp (make-weak-pointer (list 1 2 3 4))))
     (test1 wp (weak-pointer-value wp) :stack)
     (test1 wp (weak-pointer-value wp) :tls)
@@ -72,5 +73,6 @@
         (assert (and (sb-int:singleton-p nodes)
                      (string= "main thread" (caar nodes))))))
     c))
-(with-test (:name (sb-ext:search-roots :stack-direct))
+(with-test (:name (sb-ext:search-roots :stack-direct)
+            :fails-on :sunos)
   (f0))

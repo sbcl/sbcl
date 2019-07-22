@@ -1,5 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.5.6:
+  * enhancement: sb-thread support on x86-64 Sun OS (lp#1841280)
+
 changes in sbcl-1.5.6 relative to sbcl-1.5.5:
   * platform support:
     - experimental support for 64-bit PowerPC running Linux (extending Brian

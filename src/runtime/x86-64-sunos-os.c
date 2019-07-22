@@ -14,22 +14,39 @@
 #include <sys/ucontext.h>
 #include <sys/mcontext.h>
 
+#include <errno.h>
 #include <sys/types.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
-#ifdef LISP_FEATURE_SB_THREAD
-#error "Threading is not supported for Solaris running on x86-64."
-#endif
 
 #include "validate.h"
 
 
 int arch_os_thread_init(struct thread *thread) {
-  stack_t sigstack;
-     return 1;
+#ifdef LISP_FEATURE_SB_THREAD
+#ifdef LISP_FEATURE_GCC_TLS
+    current_thread = thread;
+#else
+    pthread_setspecific(specials,thread);
+#endif
+#endif
+
+#if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
+    /* Signal handlers are run on the control stack, so if it is exhausted
+     * we had better use an alternate stack for whatever signal tells us
+     * we've exhausted it */
+    stack_t sigstack;
+    sigstack.ss_sp    = calc_altstack_base(thread);
+    sigstack.ss_flags = 0;
+    sigstack.ss_size  = calc_altstack_size(thread);
+    if (sigaltstack(&sigstack,0) < 0) {
+        lose("Cannot sigaltstack: %s\n",strerror(errno));
+    }
+#endif
+    return 1;                  /* success */
 }
 
 int arch_os_thread_cleanup(struct thread *thread) {

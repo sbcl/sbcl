@@ -403,8 +403,7 @@ then
     # If --fancy, enable threads on platforms where they can be built.
     case $sbcl_arch in
         x86|x86-64|ppc|arm64)
-	    if ([ "$sbcl_os" = "sunos" ] && [ "$sbcl_arch" = "x86-64" ]) || \
-                [ "$sbcl_os" = "dragonfly" ]
+	    if [ "$sbcl_os" = "dragonfly" ]
 	    then
 		echo "No threads on this platform."
 	    else
