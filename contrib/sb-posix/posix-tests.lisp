@@ -813,16 +813,19 @@
 
 (defun parse-native-namestring (namestring &key as-directory)
   ;; XXXXXX can contain a dot changing pathname-type
-  (let* ((dot (and (not as-directory)
-                   (position #\. namestring)))
-         (type (and dot
-                    (subseq namestring (1+ dot)))))
-    (make-pathname :type type
-                   :defaults
-                   (sb-ext:parse-native-namestring namestring nil
-                                                   *default-pathname-defaults*
-                                                   :as-directory as-directory
-                                                   :end dot))))
+  (let ((parsed (sb-ext:parse-native-namestring namestring nil
+                                                *default-pathname-defaults*
+                                                :as-directory as-directory)))
+    (if as-directory
+        parsed
+        (let* ((name (pathname-name parsed))
+               (type (pathname-type parsed))
+               (dot (position #\. name)))
+          (if dot
+              (make-pathname :name (subseq name 0 dot)
+                             :type (format nil "~a.~a" (subseq name (1+ dot)) type)
+                             :defaults parsed)
+              parsed)))))
 
 #-win32
 (deftest mkstemp.1
