@@ -19,8 +19,8 @@
 
 ;; XXX something like clock_getres(CLOCK_REALTIME, ...) would be better
 (defvar *minimum-sleep*
-  #+openbsd 0.01
-  #-openbsd 0.0001)
+  #+(or openbsd sunos) 0.01
+  #-(or openbsd sunos) 0.0001)
 
 (defun test-frlocks (&key (reader-count (min (* 12 *cpus*) 200))
                           (read-count 1000000)
