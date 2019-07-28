@@ -44,8 +44,7 @@
 (defun buffer-copy (src soff dst doff length)
   (declare (type simple-stream-buffer src dst)
            (type fixnum soff doff length))
-  ;; FIXME: Should probably be with-pinned-objects
-  (sb-sys:without-gcing
+  (sb-sys:with-pinned-objects (src dst)
    (sb-kernel:system-area-ub8-copy (buffer-sap src) soff
                                    (buffer-sap dst) doff
                                    length)))
