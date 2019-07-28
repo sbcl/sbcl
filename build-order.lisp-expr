@@ -718,9 +718,12 @@
  )
 
 ;;; make-target-2 build steps
-(("src/code/warm-error"
-  "src/code/early-ntrace" ; lets PCL hook into tracing
+(("src/code/early-ntrace" ; lets PCL hook into tracing
   "src/code/room" ; for MAP-ALLOCATED-OBJECTS
+  #+immobile-code "src/code/immobile-space" ; needs src/code/room
+  ;; Delay (re)defining WARN until after remove-static-links works.
+  ;; The definition in cold-error is good enough for self-build.
+  "src/code/warm-error"
   "src/code/icf"
   ;; We re-nickname SB-SEQUENCE as SEQUENCE now.
   ;; It could be done in genesis, but not earlier,
@@ -822,7 +825,6 @@
   "src/code/run-program"
   #+gencgc "src/code/traceroot"
 
-  #+immobile-code "src/code/immobile-space"
   "src/code/repack-xref"
   #+cheneygc "src/code/purify"
   "src/code/module"

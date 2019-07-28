@@ -302,7 +302,6 @@
 ;;; it is impossible to distinguish fdefns that point to the same called function.
 ;;; FIXME: It would be a nice to remove the uniqueness constraint, either
 ;;; by recording ay ambiguous fdefns, or just recording all replacements.
-;;; Perhaps we could remove the static linker mutex as well?
 (defun call-direct-p (fun code-header-funs)
   #-immobile-code (declare (ignore fun code-header-funs))
   #+immobile-code
@@ -326,9 +325,6 @@
 ;;; Remove calls via fdefns from CODE when compiling into memory.
 (defun statically-link-code-obj (code fixups)
   (declare (ignorable fixups))
-  (unless (and (immobile-space-obj-p code)
-               (fboundp 'sb-vm::remove-static-links))
-    (return-from statically-link-code-obj))
   #+immobile-code
   (let ((insts (code-instructions code))
         (fdefns)) ; group by fdefn
