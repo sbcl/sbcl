@@ -338,8 +338,7 @@ happens. Server returns T if something happened and NIL otherwise. Timeout
                                     (addr read-fds)
                                     (addr write-fds)
                                     nil to-sec to-usec)
-        #+win32
-        (declare (ignore err))
+        (declare (ignorable err)) ; unused if win32
         ;; Now see what it was (if anything)
         (cond ((not value)
                ;; Interrupted or one of the file descriptors is bad.
