@@ -371,7 +371,7 @@ The commands are:
     (format stream "~A" (inspected-description object))
     (unless (or *skip-address-display*
                 (eq object *inspect-unbound-object-marker*)
-                (and (= sb-vm::n-word-bits 64) (typep object 'single-float))
+                (and (= sb-vm:n-word-bits 64) (typep object 'single-float))
                 (characterp object) (typep object 'fixnum))
       (write-string " at #x" stream)
       (format stream (n-word-bits-hex-format)
@@ -482,7 +482,7 @@ POSITION is NIL if the id is invalid or not found."
         (:array
          (aref (the array components) position))
         (:bignum
-         (bignum-component-at components position))
+         (sb-bignum:%bignum-ref components position))
         (t
          (elt components position))))))
 
@@ -676,16 +676,6 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
     (32 "~8,'0X")
     (t  "~X")))
 
-(defun ref32-hexstr (obj &optional (offset 0))
-  (format nil "~8,'0X" (ref32 obj offset)))
-
-(defun ref32 (obj &optional (offset 0))
-  (sb-sys::without-gcing
-   (sb-sys:sap-ref-32
-    (sb-sys:int-sap
-     (logand (sb-kernel:get-lisp-obj-address obj) (lognot sb-vm:lowtag-mask)))
-    offset)))
-
 (defun description-maybe-internals (fmt objects internal-fmt &rest args)
   (let ((base (apply #'format nil fmt objects)))
     (if *skip-address-display*
@@ -694,29 +684,25 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
                      base " " (apply #'format nil internal-fmt args)))))
 
 (defmethod inspected-description ((object double-float))
-  (let ((start (round (* 2 sb-vm::n-word-bits) 8)))
-    (description-maybe-internals "double-float ~W" (list object)
-                                 "[#~A ~A]"
-                                 (ref32-hexstr object (+ start 4))
-                                 (ref32-hexstr object start))))
+  (description-maybe-internals "double-float ~W" (list object)
+                               "[#x~16,'0x]"
+                               (ldb (byte 64 0)
+                                    #-64-bit
+                                    (logior (ash (sb-kernel:double-float-high-bits object) 32)
+                                            (sb-kernel:double-float-low-bits object))
+                                    #+64-bit (sb-kernel:double-float-bits object))))
 
 (defmethod inspected-description ((object single-float))
-  (ecase sb-vm::n-word-bits
-    (32
-     (description-maybe-internals "single-float ~W" (list object)
-                                  "[#x~A]"
-                                  (ref32-hexstr object (round sb-vm::n-word-bits 8))))
-    (64
-     ;; on 64-bit platform, single-floats are not boxed
-     (description-maybe-internals "single-float ~W" (list object)
-                                  "[#x~8,'0X]"
-                                  (ash (sb-kernel:get-lisp-obj-address object) -32)))))
+  (description-maybe-internals "single-float ~W" (list object)
+                               "[#x~8,'0x]"
+                               (ldb (byte 32 0)
+                                    (sb-kernel:single-float-bits object))))
 
 (defmethod inspected-description ((object fixnum))
   (description-maybe-internals
    "fixnum ~W" (list object)
    (concatenate 'string "[#x" (n-word-bits-hex-format) "]")
-   (ash object (1- sb-vm:n-lowtag-bits))))
+   (sb-kernel:get-lisp-obj-address object)))
 
 (defmethod inspected-description ((object complex))
   (format nil "complex number ~W" object))
@@ -724,25 +710,10 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defmethod inspected-description ((object simple-string))
   (format nil "a simple-string (~W) ~W" (length object) object))
 
-(defun bignum-words (bignum)
-  "Return the number of words in a bignum"
-  (ash
-   (logand (ref32 bignum) (lognot sb-vm:widetag-mask))
-   (- sb-vm:n-widetag-bits)))
-
-(defun bignum-component-at (bignum offset)
-  "Return the word at offset"
-  (case sb-vm::n-word-bits
-        (32
-         (ref32 bignum (* 4 (1+ offset))))
-        (64
-         (let ((start (* 8 (1+ offset))))
-           (+ (ref32 bignum start)
-              (ash (ref32 bignum (+ 4 start)) 32))))))
-
 (defmethod inspected-description ((object bignum))
   (format nil  "bignum ~W with ~D ~A-bit word~P" object
-          (bignum-words object) sb-vm::n-word-bits (bignum-words object)))
+          (sb-bignum:%bignum-length object) sb-vm:n-word-bits
+          (sb-bignum:%bignum-length object)))
 
 (defmethod inspected-description ((object ratio))
   (format nil "ratio ~W" object))
@@ -864,7 +835,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
     (list components (length components) :named nil)))
 
 (defmethod inspected-parts ((object bignum))
-    (list object (bignum-words object) :bignum nil))
+    (list object (sb-bignum:%bignum-length object) :bignum nil))
 
 (defmethod inspected-parts ((object t))
   (list nil 0 nil nil))
