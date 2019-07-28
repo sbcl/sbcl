@@ -67,6 +67,7 @@
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
+#include "genesis/vector.h"
 
 /*
  * This is a workaround for some slightly silly Linux/GNU Libc
@@ -1153,6 +1154,8 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
          * support decides to pass on it. */
         lose("no handler for signal %d in interrupt_handle_now(..)\n", signal);
 
+        // BUG: if a C function pointer can be misaligned such that it
+        // looks to satisfy functionp() then we do the wrong thing.
     } else if (functionp(handler.lisp)) {
         /* Once we've decided what to do about contexts in a
          * return-elsewhere world (the original context will no longer
@@ -2078,12 +2081,12 @@ undoably_install_low_level_interrupt_handler (int signal,
 /* This is called from Lisp. */
 uword_t
 install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
+                lispobj ohandler, // (SIMPLE-VECTOR 1) as a tagged pointer
                 int __attribute__((unused)) synchronous)
 {
 #ifndef LISP_FEATURE_WIN32
     struct sigaction sa;
     sigset_t old;
-    union interrupt_handler oldhandler;
 
     FSHOW((stderr, "/entering POSIX install_handler(%d, ..)\n", signal));
 
@@ -2092,9 +2095,10 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
     FSHOW((stderr, "/interrupt_low_level_handlers[signal]=%p\n",
            interrupt_low_level_handlers[signal]));
     if (interrupt_low_level_handlers[signal]==0) {
-        if (ARE_SAME_HANDLER(handler, SIG_DFL) ||
-            ARE_SAME_HANDLER(handler, SIG_IGN))
-            sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))handler;
+        if (handler == 0)
+            sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))SIG_DFL;
+        else if ((lispobj)handler == 1)
+            sa.sa_sigaction = (void (*)(int, siginfo_t*, void*))SIG_IGN;
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
         else if (signal == SIGPROF)
             sa.sa_sigaction = sigprof_handler_trampoline;
@@ -2115,14 +2119,37 @@ install_handler(int signal, void handler(int, siginfo_t*, os_context_t*),
         sigaction(signal, &sa, NULL);
     }
 
-    oldhandler = interrupt_handlers[signal];
+    // We can GC-safely read interrupt_low_level_handlers[signal] and assign
+    // into ohandler despite that the C stack and registers are not roots on
+    // precise GC. That is, if GC were to occur as depicted:
+    //   obj = old_handler
+    //   -- GC signal occurs here --
+    //   result = obj
+    // then the register or stack word holding 'obj' could be obsolete.
+    // But that won't happen- the STOP_FOR_GC signal is currently blocked
+    // due to the block_blockable_signals() at the top of this function.
+    // However, there is an unlikely other reason for a wrong result -
+    // if the C function address does not have at least N_FIXNUM_TAG_BITS
+    // of alignment, then we say that it was NIL instead of a fixnum.
+    lispobj obj = interrupt_handlers[signal].lisp;
+    uword_t result = -1;
+    if ((void*)obj == (void*)SIG_DFL)
+        result = 0;
+    else if ((void*)obj == (void*)SIG_IGN)
+        result = 1;
+    else if (ohandler) // only store into 'ohandler' when it was supplied
+        VECTOR(ohandler)->data[0] = (functionp(obj)||fixnump(obj)) ? obj : NIL;
+
     interrupt_handlers[signal].c = handler;
 
     thread_sigmask(SIG_SETMASK, &old, 0);
 
     FSHOW((stderr, "/leaving POSIX install_handler(%d, ..)\n", signal));
 
-    return (uword_t)oldhandler.lisp;
+    // After the thread's signal mask is restored to the mask in 'old',
+    // it is not possible to GC-safely refer to a Lisp function from C code,
+    // which is to say, naively utilizing "return obj;" would be wrong.
+    return result;
 #else
     /* Probably-wrong Win32 hack */
     return 0;

@@ -271,9 +271,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     printf("\n");
 
     printf(";;; signals\n");
-    defconstant("sig-dfl", (unsigned long)SIG_DFL);
-    defconstant("sig-ign", (unsigned long)SIG_IGN);
-
     defsignal("sigalrm", SIGALRM);
     defsignal("sigbus", SIGBUS);
     defsignal("sigchld", SIGCHLD);

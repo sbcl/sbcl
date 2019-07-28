@@ -51,6 +51,7 @@
   unsigned-long
   (signal int)
   (handler unsigned-long)
+  (ohandler unsigned-long)
   (synchronous boolean))
 
 ;;;; interface to enabling and disabling signal handlers
@@ -77,21 +78,33 @@
            (unblock-gc-signals)
            (in-interruption ()
              (apply handler args))))
-    (without-gcing
-      (let ((result (install-handler signal
-                                     (case handler
-                                       (:default sig-dfl)
-                                       (:ignore sig-ign)
-                                       (t
-                                        (sb-kernel:get-lisp-obj-address
-                                         #'run-handler)))
-                                     synchronous)))
-        (cond ((= result sig-dfl) :default)
-              ((= result sig-ign) :ignore)
-              (t ;; MAKE-LISP-OBJ returns 2 values, which gets
-                 ;; "too complex to check". We don't want the second value.
-               (values (the (or function fixnum)
-                         (sb-kernel:make-lisp-obj result)))))))))
+    (dx-let ((ohandler (make-array 1 :initial-element nil)))
+      ;; Pin OHANDLER in case the backend heap-allocates it
+      (with-pinned-objects (#'run-handler ohandler)
+        ;; 0 and 1 probably coincide with SIG_DFL and SIG_IGN, but those
+        ;; constants are opaque. We use our own explicit translation
+        ;; of them in the C install_handler() argument and return convention.
+        (let ((result (install-handler
+                       signal
+                       (case handler
+                         (:default 0)
+                         (:ignore 1)
+                         (t (sb-kernel:get-lisp-obj-address #'run-handler)))
+                       ;; VECTOR-SAP does not work on SIMPLE-VECTOR
+                       (sb-kernel:get-lisp-obj-address ohandler)
+                       synchronous)))
+          (cond ((= result 0) :default)
+                ((= result 1) :ignore)
+                (t
+                 ;; The value in OHANDLER, if a lisp function, is not the right thing to
+                 ;; return, but we do it anyway. It's always the RUN-HANDLER closure
+                 ;; instead of what was supplied before as HANDLER. We can only hope that
+                 ;; users don't pass the result of ENABLE-INTERRUPT as the argument to
+                 ;; another call, as that would create a chain of closures.
+                 ;; I wonder if the fact that we at some point decided that we need
+                 ;; to allow signal nesting to about 1024 levels deep had anything
+                 ;; to do with this bug?
+                 (the (or function fixnum) (aref ohandler 0)))))))))
 
 (defun default-interrupt (signal)
   (enable-interrupt signal :default))

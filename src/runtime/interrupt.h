@@ -137,6 +137,7 @@ extern void undoably_install_low_level_interrupt_handler (
                         interrupt_handler_t handler);
 extern uword_t install_handler(int signal,
                                interrupt_handler_t handler,
+                               lispobj ohandler,
                                int synchronous);
 
 /* The void* casting here avoids having to mess with the various types
