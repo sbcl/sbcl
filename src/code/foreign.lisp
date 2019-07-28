@@ -108,10 +108,13 @@ if the symbol isn't found."
                                (symbol-address unsigned)))
                  (dladdr (function unsigned unsigned (* (struct dl-info)))
                          :extern "dladdr"))
-      (let ((err (without-gcing
-                   ;; On eg. Darwin GC can could otherwise interrupt
-                   ;; the call while dladdr is holding a lock.
-                   (alien-funcall dladdr addr (addr info)))))
+      ;; A comment in rev 7143001bbe7d50c6 said: "Darwin GC could otherwise
+      ;; interrupt the call while dladdr is holding a lock." which makes little
+      ;; sense, as GC doesn't acquire locks other than its own allocator locks.
+      ;; How exactly was this deadlocking?  A reductio ad absurdum argument
+      ;; says that every call into a system API could potentially acquire
+      ;; a lock, and therefore every one should inhibit GC. But they don't.
+      (let ((err (alien-funcall dladdr addr (addr info))))
         (if (zerop err)
             nil
             (slot info 'symbol))))

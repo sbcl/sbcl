@@ -346,3 +346,66 @@
           (unless (sb-thread:thread-alive-p gc-thread)
             (return)))
     (sb-thread:join-thread gc-thread)))
+
+(defun get-shared-library-maps ()
+  (let (result)
+    #+linux
+    (with-open-file (f "/proc/self/maps")
+      (loop (let ((line (read-line f nil)))
+              (unless line (return))
+              (when (and (search "r-xp" line) (search ".so" line))
+                (let ((p (position #\- line)))
+                  (let ((start (parse-integer line :end p :radix 16))
+                        (end (parse-integer line :start (1+ p) :radix 16
+                                                 :junk-allowed t)))
+                    (push `(,start . ,end) result)))))))
+    #+darwin
+    (let ((p (run-program "/usr/bin/vmmap" (list (write-to-string (sb-unix:unix-getpid)))
+                          :output :stream
+                          :wait nil)))
+      (with-open-stream (s (process-output p))
+        (loop (let ((line (read-line s)))
+                (when (search "regions for" line) (return))))
+        (assert (search "REGION TYPE" (read-line s)))
+        (loop (let ((line (read-line s)))
+                (when (zerop (length line)) (return))
+                (when (search ".dylib" line)
+                  (let ((c (search "00-00" line)))
+                    (assert c)
+                    (let ((start (parse-integer line :start (+ c 2 (- 16)) :radix 16
+                                                     :junk-allowed t))
+                          (end (parse-integer line :start (+ c 3) :radix 16
+                                                   :junk-allowed t)))
+                      (push `(,start . ,end) result)))))))
+      (process-wait p))
+    result))
+
+;;; Change 7143001bbe7d50c6 contained little to no rationale for why Darwin could
+;;; deadlock, and how adding a WITHOUT-GCING to SAP-FOREIGN-SYMBOL fixed anything.
+;;; Verify that it works fine while invoking GC in another thread
+;;; despite removal of the mysterious WITHOUT-GCING.
+#+sb-thread
+(with-test (:name :sap-foreign-symbol-no-deadlock)
+  (let* ((worker-thread
+          (sb-thread:make-thread
+           (lambda (ranges)
+             (dolist (range ranges)
+               (let ((start (car range))
+                     (end (cdr range))
+                     (prevsym "")
+                     (nsyms 0))
+                 (loop for addr from start to end by 8
+                       do (let ((sym (sb-sys:sap-foreign-symbol (sb-sys:int-sap addr))))
+                            (when (and sym (string/= sym prevsym))
+                              (incf nsyms)
+                              (setq prevsym sym))))
+                 #+nil (format t "~x ~x: ~d~%" start end nsyms))))
+           :arguments (list (get-shared-library-maps))))
+         (working t)
+         (gc-thread
+          (sb-thread:make-thread
+           (lambda ()
+             (loop while working do (gc) (sleep .001))))))
+    (sb-thread:join-thread worker-thread)
+    (setq working nil)
+    (sb-thread:join-thread gc-thread)))
