@@ -1,4 +1,22 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
+
+changes relative to sbcl-1.5.4:
+  * platform support:
+    - SunOS: bug reports and patches from Richard Lowe in sb-posix tests
+      (lp#1837495), sb-concurrency tests (lp#1837817), unencapsulated tracing
+      (lp#1837307), float registers in interrupt contexts (lp#1837168)
+  * bug fix: do not generate version.lisp-expr from git describe if the git
+    repository is not sbcl's own.  (lp#1836663, thanks to Richard Lowe)
+  * bug fix: compiler crash related to VALUES-LIST on a &REST argument in some
+    contexts.  (lp#1836096, reported by Samuel Jimenez)
+  * bug fix: compiler hang related to constraint propagation.  (lp#1835599,
+    reported by Mark Cox)
+  * bug fix: the inspector showed the wrong array element type.  (lp#1835934,
+    reported by Richard M Kreuter)
+  * optimization: numerous improvements to hash table access and rehashing
+  * optimization: ASSERT compiles into substantially more compact code.
+    (lp#1835221)
+
 changes in sbcl-1.5.4 relative to sbcl-1.5.3:
   * minor incompatible change: hash tables on 64-bit machines consume roughly
     20% less memory but can only grow to hold 2^31 entries (theoretically)
