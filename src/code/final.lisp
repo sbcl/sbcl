@@ -29,7 +29,7 @@
   (let* ((v (make-array (the index array-length)))
          (ht (make-hash-table :test 'eq :weakness :key)))
     (setf (%instance-ref ht (get-dsd-index hash-table flags))
-          (logior (%instance-ref ht (get-dsd-index hash-table flags)) 4))
+          (logior (hash-table-flags ht) hash-table-finalizer-flag))
     ;; The recycle bin has a dummy item in front so that the simple-vector
     ;; is growable without messing up RUN-PENDING-FINALIZERS when it atomically
     ;; pushes items into the recycle bin - it is unaffected by looking at

@@ -1192,10 +1192,18 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
 
     if (is_vector_subtype(kv_vector->header, VectorAddrHashing)) { // address-sensitive
         // If the table has address-based keys, then read the hash vector (or NIL)
-        // from the last element.
+        // from the last element. If the last element satisfies instancep() then this
+        // vector belongs to a weak table and the vector has had
+        // its weakness removed temporarily to simplify rehashing.
         sword_t kv_length = fixnum_value(kv_vector->length);
+        lispobj table_or_hashes = data[kv_length-1];
+        lispobj lhash_vector;
+        if (instancep(table_or_hashes))
+            lhash_vector = ((struct hash_table*)native_pointer(table_or_hashes))->hash_vector;
+        else
+            lhash_vector = table_or_hashes;
         sword_t hash_vector_length;
-        uint32_t *hash_vector = get_array_data(data[kv_length-1],
+        uint32_t *hash_vector = get_array_data(lhash_vector,
                                                SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
                                                &hash_vector_length);
         if (hash_vector != NULL)
