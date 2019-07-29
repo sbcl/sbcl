@@ -4,6 +4,22 @@
 (use-package "SB-THREAD")
 (use-package "SB-SYS")
 
+(defvar *table-under-test* nil)
+
+;;; If *table-under-test* is bound to a hash-table, then cause it to have
+;;; half as many buckets as it would ordinarily get after enlarging.
+(sb-int:encapsulate
+ 'sb-impl::hash-table-new-vectors
+ 'test
+ (compile nil
+          '(lambda (fn tbl)
+            (if (eq tbl *table-under-test*)
+                (multiple-value-bind (kv-vect next-vect hash-vect bucket-vect)
+                    (funcall fn tbl)
+                  (values kv-vect next-vect hash-vect
+                          (subseq bucket-vect 0 (/ (length bucket-vect) 2))))
+                (funcall fn tbl)))))
+
 ;;; Keep moving everything that can move during each GC
 #+gencgc (setf (generation-number-of-gcs-before-promotion 0) 1000000)
 
@@ -88,7 +104,12 @@
   ;; Using symbols won't work either because they hash stably under EQL
   ;; (but not under EQ) so let's use a bunch of cons cells.
   `(let* ((,array (coerce (loop for i from 0 repeat 100 collect (cons i i)) 'vector))
-          (,table ,constructor))
+          (,table ,constructor)
+          (*table-under-test* (if shrinkp ,table nil)))
+     (when shrinkp
+       ;; start with half as many buckets as usual
+       (let ((v (sb-impl::hash-table-index-vector ,table)))
+         (setf (sb-impl::hash-table-index-vector ,table) (subseq v 0 (/ (length v) 2)))))
      ,@body
      (format t "~&::: INFO: Rehash count = ~D~%"
              (sb-impl::hash-table-n-rehash+find ,table))))
@@ -102,18 +123,6 @@
 
 (defparameter *sleep-delay-max* .025)
 
-(defun shrink-buckets (table)
-  ;; To better test the algorithms, constrain the index vector to have a
-  ;; smaller number of buckets than would normally be used.
-  (when (> (length (sb-impl::hash-table-index-vector table)) 32)
-    (let ((index-vector (make-array 32 :initial-element 0
-                                       :element-type '(unsigned-byte 32))))
-      (sb-impl::%rehash (sb-impl::hash-table-pairs table)
-                        (sb-impl::hash-table-hash-vector table)
-                        index-vector
-                        (sb-impl::hash-table-next-vector table))
-      (setf (sb-impl::hash-table-index-vector table) index-vector))))
-
 (with-test (:name (hash-table :synchronized)
             :broken-on :win32)
   (dolist (shrinkp '(nil t))
@@ -126,10 +135,7 @@
                              (handler-bind ((serious-condition 'oops))
                                (loop
                                  ;;(princ "1") (force-output)
-                                 (setf (gethash (aref keys (random 100)) hash) 'h)
-                                 (when shrinkp
-                                   (sb-ext:with-locked-hash-table (hash)
-                                     (shrink-buckets hash)))))))
+                                 (setf (gethash (aref keys (random 100)) hash) 'h)))))
                          :name "writer")
                         (make-join-thread
                          (lambda ()
@@ -162,7 +168,6 @@
               do (let ((i (random 100)))
                    (setf (gethash (aref keys i) hash) i)
                    (setf (aref expected i) t)))
-        (when shrinkp (shrink-buckets hash))
         (flet ((reader (n)
                  (catch 'done
                    (handler-bind ((serious-condition 'oops))
@@ -211,9 +216,7 @@
                                          (assert (eq val i))
                                          (assert (remhash k hash)))
                                         (t
-                                         (setf (gethash k hash) i)
-                                         (when shrinkp
-                                           (shrink-buckets hash))))))))
+                                         (setf (gethash k hash) i)))))))
                           :name "accessor")
                          (make-kill-thread
                           (lambda ()
