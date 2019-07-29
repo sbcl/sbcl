@@ -2522,10 +2522,17 @@
              ;; -0d0.  Ugh.  So force it in here, instead.
              (zero (make-numeric-type :class class :format format
                                       :low (sb-xc:- zero) :high zero)))
-        (case range-info
-          (+ (if contains-0-p (type-union plus zero) plus))
-          (- (if contains-0-p (type-union minus zero) minus))
-          (t (type-union minus zero plus))))))
+        (let ((result
+                (case range-info
+                  (+ (if contains-0-p (type-union plus zero) plus))
+                  (- (if contains-0-p (type-union minus zero) minus))
+                  (t (type-union minus zero plus)))))
+          (if (eq (numeric-type-complexp type) :real)
+              result
+              (type-union result (make-numeric-type :class 'float
+                                                    :complexp :complex
+                                                    :low -1
+                                                    :high 1)))))))
 
 (defoptimizer (signum derive-type) ((num))
   (one-arg-derive-type num #'signum-derive-type-aux nil))

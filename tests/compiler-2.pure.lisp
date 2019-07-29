@@ -2405,3 +2405,12 @@
              (multiple-value-call #'f (values))))
       3))
    ((0) (values 0 0))))
+
+(with-test (:name :signum-type-deriver)
+  (checked-compile-and-assert
+   ()
+   '(lambda (n)
+     (typep (signum n) 'complex))
+   ((#C(1 2)) t)
+   ((1d0) nil)
+   ((10) nil)))
