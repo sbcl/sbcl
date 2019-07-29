@@ -228,3 +228,29 @@
           (unwind-protect (sleep 2.5)
             (mapc #'terminate-thread threads))
           (assert (not *errors*)))))))
+
+;;; Invoke GC early and often. This would loop infinitely if we rehashed
+;;; the finalizer store after every GC, because post-GC actions include
+;;; invoking GETHASH on the finalizer store, which, being a weak table,
+;;; uses the regular REHASH algorithm which would get here and invoke GC
+;;; again, and so on and so on.
+(sb-int:encapsulate
+ 'sb-impl::rehash
+ 'force-gc-after-rehash
+ (compile nil '(lambda (f kvv hv iv nv)
+                (prog1 (funcall f kvv hv iv nv)
+                  (unless (eq kvv (sb-impl::hash-table-pairs
+                                   (aref sb-impl::**finalizer-store** 1)))
+                    (sb-ext:gc))))))
+
+;;; Check that when growing a weak hash-table we don't try to
+;;; reference kvv -> table -> hash-vector
+;;; until the hash-vector is correct with respect to the KV vector.
+;;; For this test, we need address-sensitive keys in a table with a
+;;; hash-vector. EQ tables don't have a hash-vector, so that's no good.
+;;; EQL tables don't hash symbols address-sensitively,
+;;; so use a bunch of cons cells.
+(with-test (:name :gc-while-growing-weak-hash-table)
+  (let ((h (make-hash-table :weakness :key)))
+    (dotimes (i 14) (setf (gethash (list (gensym)) h) i))
+    (setf (gethash (cons 1 2) h) 'foolz)))

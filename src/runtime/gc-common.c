@@ -1190,33 +1190,30 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
 {
     lispobj* data = kv_vector->data;
 
-    if (is_vector_subtype(kv_vector->header, VectorAddrHashing)) { // address-sensitive
-        // If the table has address-based keys, then read the hash vector (or NIL)
-        // from the last element. If the last element satisfies instancep() then this
-        // vector belongs to a weak table and the vector has had
-        // its weakness removed temporarily to simplify rehashing.
-        sword_t kv_length = fixnum_value(kv_vector->length);
-        lispobj table_or_hashes = data[kv_length-1];
-        lispobj lhash_vector;
-        if (instancep(table_or_hashes))
-            lhash_vector = ((struct hash_table*)native_pointer(table_or_hashes))->hash_vector;
-        else
-            lhash_vector = table_or_hashes;
-        sword_t hash_vector_length;
-        uint32_t *hash_vector = get_array_data(lhash_vector,
-                                               SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
-                                               &hash_vector_length);
-        if (hash_vector != NULL)
-            if (hash_vector_length != kv_length>>1)
-                lose("hash_vector_length: %ld kv_length: %ld", hash_vector_length, kv_length);
-        //gc_assert(hash_vector_length == kv_length>>1);
-
-
-                /* Work through the KV vector. */
-                SCAV_ENTRIES(1,);
-                } else { // not address-sensitive
-        scavenge(data + 2, KV_PAIRS_HIGH_WATER_MARK(data) * 2);
+    if (!is_vector_subtype(kv_vector->header, VectorAddrHashing)) {
+        // All keys were hashed address-insensitively
+        return (void)scavenge(data + 2, KV_PAIRS_HIGH_WATER_MARK(data) * 2);
     }
+    // Read the hash vector (or NIL) from the last element. If the last element
+    // satisfies instancep() then this vector belongs to a weak table,
+    // and the KV vector has had its weakness removed temporarily to simplify
+    // rehashing, which occurs only when rehashing without growing.
+    // When growing a weak table, the KV vector is not created as weak initially;
+    // its last element points to the hash-vector as for any strong KV vector.
+    sword_t kv_length = fixnum_value(kv_vector->length);
+    lispobj table_or_hashes = data[kv_length-1];
+    lispobj lhash_vector;
+    if (instancep(table_or_hashes))
+        lhash_vector = ((struct hash_table*)native_pointer(table_or_hashes))->hash_vector;
+    else
+        lhash_vector = table_or_hashes;
+    sword_t hash_vector_length;
+    uint32_t *hash_vector = get_array_data(lhash_vector,
+                                           SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
+                                           &hash_vector_length);
+    if (hash_vector != NULL)
+        gc_assert(hash_vector_length == kv_length>>1);
+    SCAV_ENTRIES(1, );
 }
 
 boolean scan_weak_hashtable(struct hash_table *hash_table,

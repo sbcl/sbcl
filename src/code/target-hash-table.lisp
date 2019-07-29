@@ -814,8 +814,16 @@ multiple threads accessing the same hash-table without locking."
     ;; Set this before copying pairs, otherwise they would not be seen
     ;; in the new vector since GC scanning ignores elements below the HWM.
     (setf (kv-vector-high-water-mark new-kv-vector) hwm)
-    (setf (kv-vector-table new-kv-vector)
-          (if (hash-table-weak-p table) table new-hash-vector))
+    ;; Reference the hash-vector from the KV vector.
+    ;; Normally a weak hash-table's KV vector would reference the table
+    ;; (because cull needs to examine the table bucket-by-bucket), and
+    ;; not the hash-vector directly. But we can't reference the table
+    ;; since using the table's hash-vector gets the OLD hash vector.
+    ;; It might be OK to point the table at the new hash-vector now,
+    ;; but I'd rather the table remain in a consistent state, in case we
+    ;; ever devise a way to allow concurrent reads with a single writer,
+    ;; for example.
+    (setf (kv-vector-table new-kv-vector) new-hash-vector)
 
     ;; Copy the k/v pairs excluding leading and trailing metadata.
     (replace new-kv-vector old-kv-vector
@@ -831,6 +839,9 @@ multiple threads accessing the same hash-table without locking."
 
       (when (hash-table-weak-p table)
         (setf (hash-table-smashed-cells table) nil)
+        ;; Now that the table points to the right hash-vector
+        ;; we can set the vector's backpointer and turn it weak.
+        (setf (kv-vector-table new-kv-vector) table)
         (set-header-bits new-kv-vector sb-vm:vector-weak-subtype))
 
       ;; Zero-fill the old kv-vector. For weak hash-tables this removes the
