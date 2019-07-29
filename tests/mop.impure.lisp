@@ -714,4 +714,28 @@
     (assert (equal (slot-definition-initargs slot) '(:a)))))
 
 
-;;;; success
+(defclass change-class-test-m (standard-class) ())
+(defmethod validate-superclass ((c1 change-class-test-m) (c2 standard-class))
+  t)
+
+(defmethod slot-value-using-class ((class change-class-test-m) object slot)
+  (call-next-method))
+
+(defclass change-class-test ()
+  ((a :initarg :a)
+   (b :initarg :b
+      :initform nil))
+  (:metaclass change-class-test-m))
+
+(defclass change-class-test-2 ()
+  ((a :initarg :a
+      :initform nil)
+   (b :initarg :b
+      :initform nil))
+  (:metaclass change-class-test-m))
+
+(with-test (:name :change-class-svuc)
+  (let ((new (change-class (make-instance 'change-class-test :b 20)
+                           'change-class-test-2)))
+    (assert (eql (slot-value new 'b) 20))
+    (assert (not (slot-boundp new 'a)))))

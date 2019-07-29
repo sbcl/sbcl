@@ -1652,9 +1652,14 @@
           (binding* ((cell (find-slot-cell old-wrapper (slot-definition-name new))
                            :exit-if-null)
                      (location (car cell))
-                     (value (if (fixnump location)
-                                (clos-slots-ref old-slots location)
-                                (cdr location))))
+                     (value (cond ((fixnump location)
+                                   (clos-slots-ref old-slots location))
+                                  ((not location)
+                                   (if (funcall (slot-info-boundp (cdr cell)) instance)
+                                       (funcall (slot-info-reader (cdr cell)) instance)
+                                       +slot-unbound+))
+                                  (t
+                                   (cdr location)))))
             (set-value value new)))))
 
     ;; Make the copy point to the old instance's storage, and make the
