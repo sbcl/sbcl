@@ -534,3 +534,13 @@
                (declare (unsigned-byte x))
                (values (truncate 1.0 x)))))
           '(function (unsigned-byte) (values unsigned-byte &optional)))))
+
+(with-test (:name :single-float-sign-stubs)
+  (checked-compile-and-assert
+   ()
+   '(lambda (p1)
+     (declare (type (eql -96088.234) p1))
+     (float-sign
+      (the single-float
+       (labels ((%f () (the real p1))) (%f)))))
+   ((-96088.234) -1.0)))

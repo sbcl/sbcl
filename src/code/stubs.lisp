@@ -137,7 +137,11 @@
   #+sb-thread (def sb-kernel:symbol-tls-index)
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
-  (def get-lisp-obj-address))
+  (def get-lisp-obj-address)
+  #+x86-64
+  (def single-float-copysign (float float2))
+  #+x86-64
+  (def single-float-sign))
 
 (defun spin-loop-hint ()
   "Hints the processor that the current thread is spin-looping."
