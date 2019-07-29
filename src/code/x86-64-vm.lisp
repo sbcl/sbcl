@@ -324,7 +324,7 @@
 
 ;;; Remove calls via fdefns from CODE when compiling into memory.
 (defun statically-link-code-obj (code fixups)
-  (declare (ignorable fixups))
+  (declare (ignorable code fixups))
   #+immobile-code
   (let ((insts (code-instructions code))
         (fdefns)) ; group by fdefn
