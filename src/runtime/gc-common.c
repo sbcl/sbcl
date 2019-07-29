@@ -1207,11 +1207,14 @@ static void scan_nonweak_kv_vector(struct vector *kv_vector, void (*scav_entry)(
                                                SIMPLE_ARRAY_UNSIGNED_BYTE_32_WIDETAG,
                                                &hash_vector_length);
         if (hash_vector != NULL)
-            gc_assert(hash_vector_length == kv_length>>1);
+            if (hash_vector_length != kv_length>>1)
+                lose("hash_vector_length: %ld kv_length: %ld", hash_vector_length, kv_length);
+        //gc_assert(hash_vector_length == kv_length>>1);
 
-        /* Work through the KV vector. */
-        SCAV_ENTRIES(1,);
-    } else { // not address-sensitive
+
+                /* Work through the KV vector. */
+                SCAV_ENTRIES(1,);
+                } else { // not address-sensitive
         scavenge(data + 2, KV_PAIRS_HIGH_WATER_MARK(data) * 2);
     }
 }
