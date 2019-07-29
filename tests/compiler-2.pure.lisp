@@ -2382,7 +2382,7 @@
 
 (with-test (:name (:mv-call :more-arg-unused)
             ;; needs SB-VM::MORE-ARG-OR-NIL VOP
-            :skipped-on (not (or :x86-64 :x86 :ppc :arm :arm64 :riscv)))
+            :broken-on (not (or :x86-64 :x86 :ppc :arm :arm64 :riscv)))
   (checked-compile-and-assert
    ()
    '(lambda (&rest rest)
@@ -2391,3 +2391,17 @@
    (() '(nil nil) :test #'equal)
    ((1) '(1 nil) :test #'equal)
    ((1 3) '(1 3) :test #'equal)))
+
+(with-test (:name :truncate-deriver-on-number-type)
+  (checked-compile-and-assert
+   ()
+   '(lambda (i)
+     (truncate
+      (labels ((f (&optional (o i))
+                 (declare (ignore o))
+                 (complex 0 0)))
+        (declare (dynamic-extent (function f)))
+        (the integer
+             (multiple-value-call #'f (values))))
+      3))
+   ((0) (values 0 0))))
