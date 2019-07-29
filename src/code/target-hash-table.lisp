@@ -501,12 +501,12 @@ Examples:
                           do (return (logior (ash i 4) hash-table-weak-flag)))
                     (bug "Unreachable"))
                 0))
-           ((getter setter remover) ; TODO: need a CLRHASH method
+           ((getter setter remover)
             (if weakness
                 (values #'gethash/weak #'puthash/weak #'remhash/weak)
                 (pick-table-methods synchronized userfunp test)))
            (table (%make-hash-table
-                   getter setter remover
+                   getter setter remover #'clrhash-impl
                    test test-fun hash-fun
                    rehash-size rehash-threshold
                    kv-vector index-vector next-vector hash-vector
@@ -1241,33 +1241,33 @@ nnnn 1_    any       linear scan
            (values default nil)))))
 
 (defun pick-table-methods (synchronized userp test)
-   (macrolet ((gen-cases (wrapping)
-                `(case test
+ (macrolet ((gen-cases (wrapping)
+              `(case test
                   (eq    (,wrapping gethash/eq puthash/eq remhash/eq))
                   (eql   (,wrapping gethash/eql puthash/eql remhash/eql))
                   (equal (,wrapping gethash/equal puthash/equal remhash/equal))
                   (t     (,wrapping gethash/equalp puthash/equalp remhash/equalp))))
-              (locked-methods (getter setter remover)
-                `(values (named-lambda ,(symbolicate getter "/LOCK") (key table default)
-                           (declare (optimize speed (sb-c::verify-arg-count 0)))
-                           (truly-the (values t t &optional)
-                             (sb-thread::with-recursive-system-lock
-                                 ((hash-table-lock (truly-the hash-table table)))
-                               (,getter key table default))))
-                         (named-lambda ,(symbolicate setter "/LOCK") (key table value)
-                           (declare (optimize speed (sb-c::verify-arg-count 0)))
-                           (truly-the (values t &optional)
-                             (sb-thread::with-recursive-system-lock
-                                 ((hash-table-lock (truly-the hash-table table)))
-                               (,setter key table value))))
-                         (named-lambda ,(symbolicate remover "/LOCK") (key table)
-                           (declare (optimize speed (sb-c::verify-arg-count 0)))
-                           (truly-the (values t &optional)
-                             (sb-thread::with-recursive-system-lock
-                                 ((hash-table-lock (truly-the hash-table table)))
-                               (,remover key table))))))
-              (methods (getter setter remover)
-                `(values #',getter #',setter #',remover)))
+            (locked-methods (getter setter remover)
+              `(values (named-lambda ,(symbolicate getter "/LOCK") (key table default)
+                         (declare (optimize speed (sb-c::verify-arg-count 0)))
+                         (truly-the (values t t &optional)
+                           (sb-thread::with-recursive-system-lock
+                               ((hash-table-lock (truly-the hash-table table)))
+                             (,getter key table default))))
+                       (named-lambda ,(symbolicate setter "/LOCK") (key table value)
+                         (declare (optimize speed (sb-c::verify-arg-count 0)))
+                         (truly-the (values t &optional)
+                           (sb-thread::with-recursive-system-lock
+                               ((hash-table-lock (truly-the hash-table table)))
+                             (,setter key table value))))
+                       (named-lambda ,(symbolicate remover "/LOCK") (key table)
+                         (declare (optimize speed (sb-c::verify-arg-count 0)))
+                         (truly-the (values t &optional)
+                           (sb-thread::with-recursive-system-lock
+                               ((hash-table-lock (truly-the hash-table table)))
+                             (,remover key table))))))
+            (methods (getter setter remover)
+              `(values #',getter #',setter #',remover)))
     (if userp
         (if synchronized
             (locked-methods gethash/any puthash/any remhash/any)
@@ -1311,7 +1311,7 @@ nnnn 1_    any       linear scan
           ;; Else, find the kv-index in the chain and snap it out.
           (do ((predecessor this)
                (this successor))
-              ((= this 0) (error "~S is corrupted" hash-table))
+              ((= this 0) (signal-corrupt-hash-table hash-table))
             (let ((successor (aref next-vector this)))
               (when (= kv-index this)
                 (return (setf (aref next-vector predecessor) successor)))
@@ -1657,6 +1657,10 @@ there was such an entry, or NIL if not."
 (defun clrhash (hash-table)
   "This removes all the entries from HASH-TABLE and returns the hash
 table itself."
+  (truly-the (values hash-table &optional)
+             (funcall (hash-table-clrhash-impl hash-table) hash-table)))
+
+(defun clrhash-impl (hash-table)
   ;; This used to do nothing at all for tables that has a COUNT of 0,
   ;; but that wasn't quite right, because some steps below pertain to
   ;; getting the initial state back to that of a freshly made table.

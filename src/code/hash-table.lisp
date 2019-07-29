@@ -64,6 +64,7 @@
                                (gethash-impl
                                 puthash-impl
                                 remhash-impl
+                                clrhash-impl
                                 test
                                 test-fun
                                 hash-fun
@@ -78,7 +79,7 @@
   (gethash-impl #'error :type function :read-only t)
   (puthash-impl #'error :type function :read-only t)
   (remhash-impl #'error :type function :read-only t)
-  (clrhash-impl #'error :type function :read-only t) ; not used (yet)
+  (clrhash-impl #'error :type function :read-only t)
   ;; The Key-Value pair vector.
   ;; Note: this vector has a "high water mark" which resembles a fill
   ;; pointer, but unlike a fill pointer, GC can ignore elements
