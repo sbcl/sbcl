@@ -686,6 +686,7 @@ sb-c::
 ;;; in the space, which should be better than leaving the
 ;;; organization to random chance.
 ;;; Note that these aren't roots in the GC sense, just a locality sense.
+#+immobile-code
 (defun choose-code-component-order (&optional roots)
   (declare (ignore roots))
   (let ((ordering (make-array 10000 :adjustable t :fill-pointer 0))
