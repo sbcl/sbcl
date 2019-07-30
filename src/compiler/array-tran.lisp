@@ -345,6 +345,18 @@
                           fill-pointer displaced-to
                           node))
 
+(defoptimizer (make-array-header* derive-type) ((&rest inits))
+  (let* ((data-position #.(sb-vm::slot-offset
+                           (find 'sb-vm::data (sb-vm:primitive-object-slots
+                                               (find 'array sb-vm:*primitive-objects*
+                                                     :key 'sb-vm:primitive-object-name))
+                                 :key 'sb-vm::slot-name)))
+         (data (nth data-position inits))
+         (type (lvar-type data)))
+    (when (array-type-p type)
+      (make-array-type '* :element-type (array-type-element-type type)
+                          :specialized-element-type (array-type-specialized-element-type type)))))
+
 (defoptimizer (%make-array derive-type)
     ((dims widetag n-bits &key adjustable fill-pointer displaced-to
            &allow-other-keys)

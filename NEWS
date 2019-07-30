@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.5.6:
+  * optimization: improved make-array type derivation for multi-dimensional
+    arrays. (lp#1838442)
+
 changes in sbcl-1.5.5 relative to sbcl-1.5.4:
   * platform support:
     - SunOS: bug reports and patches from Richard Lowe in sb-posix tests

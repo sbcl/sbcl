@@ -564,3 +564,15 @@
          (declare (fixnum y))
          (svref x (+ y 2)))
     ((#(1 2 3) 0) 3)))
+
+(with-test (:name :make-array-header*-type-derivation)
+  (let ((fun (checked-compile
+              '(lambda (a)
+                (declare ((simple-array (unsigned-byte 8) (*)) a))
+                (make-array '(10 20) :element-type (array-element-type a))))))
+    (assert (typep (funcall fun #A((1) (UNSIGNED-BYTE 8) 0))
+                   '(simple-array (unsigned-byte 8) (10 20))))
+    (assert
+     (equal (sb-kernel:%simple-fun-type fun)
+            '(function ((simple-array (unsigned-byte 8) (*)))
+              (values (simple-array (unsigned-byte 8) (10 20)) &optional))))))
