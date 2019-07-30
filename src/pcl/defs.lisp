@@ -372,12 +372,17 @@
 (defclass method-combination (metaobject)
   ((%documentation :initform nil :initarg :documentation)))
 
+(defun make-gf-hash-table ()
+  (make-hash-table :test 'eq
+                   :hash-function #'sb-impl::fsc-instance-hash ; stable hash
+                   :weakness :key
+                   :synchronized t))
+
 (defclass standard-method-combination (definition-source-mixin
                                        method-combination)
   ((type-name :reader method-combination-type-name :initarg :type-name)
    (options :reader method-combination-options :initarg :options)
-   (%generic-functions :initform (make-hash-table :weakness :key
-                                                   :synchronized t)
+   (%generic-functions :initform (make-gf-hash-table)
                        :reader method-combination-%generic-functions)))
 
 (defclass long-method-combination (standard-method-combination)

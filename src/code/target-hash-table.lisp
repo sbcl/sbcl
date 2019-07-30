@@ -492,7 +492,9 @@ Examples:
            ;; Rehashing would need to recompute hashes of numbers which is easy enough.
            ;; For GC to know whether to set the 'rehash' flag after moving a key,
            ;; it would need to know which pointer objects aren't hashed by address.
-           (hash-vector (unless (eq test 'eq)
+           ;; Conversely, we use a hash-vector for an EQ table if it has
+           ;; a user-supplied hash function.
+           (hash-vector (when (or hash-function (neq test 'eq))
                           (make-array (1+ size) :element-type 'hash-table-index)))
            (weakness-bits
             (if weakness
@@ -923,9 +925,7 @@ if there is no such entry. Entries can be added using SETF."
       ,@more-bindings))
 
   (defun ht-probing-should-use-eq (std-fn)
-    (case std-fn ; try to strength-reduce the test for this key
-      ((*) 'address-based-p) ; default
-      ((nil) 'nil) ; nonstandard function - never use EQ
+    (ecase std-fn ; try to strength-reduce the test for this key
       (eq 't) ; always use EQ
       ;; EQL vs EQ only matters for numbers which aren't immediate.
       ;; Not worth the trouble to get single-float in here for 64-bit.
@@ -940,7 +940,12 @@ if there is no such entry. Entries can be added using SETF."
       ;; and SYMBOLP uses more instructions. This is similar in philosophy to the
       ;; EQL branch where I don't care whether single float (on 64-bit) is or isn't
       ;; handled by the EQ comparator.
-      (t '(or address-based-p (fixnump key) (non-null-symbol-p key)))))
+      ((equal equalp)
+       '(or address-based-p (fixnump key) (non-null-symbol-p key)))
+      ((nil)
+       ;; If the hash-function is nonstandard, it's nonetheless possible
+       ;; to use EQ as the comparator.
+       '(eq (hash-table-test hash-table) 'eq))))
 
   (defun ht-key-compare (std-fn pair-index &optional endp-test)
     ;; STD-FN = NIL says that's definitely a user-defined hash function,
@@ -1154,7 +1159,7 @@ nnnn 1_    any       linear scan
              ;; Everything in an EQ table is address-based - though this is subject
              ;; to change, as we could stably hash symbols, because why not -
              ;; but the hash fun's second value is NIL on immediate objects.
-             (if (or address-based-p (not hash-vector))
+             (if (or address-based-p (eq (hash-table-test hash-table) 'eq))
                  (do ((next index (aref next-vector next)))
                      ((zerop next) (go miss))
                    (declare (type index/2 next))
@@ -1183,6 +1188,10 @@ nnnn 1_    any       linear scan
                  (unless (logtest (hash-table-flags hash-table) hash-table-userfun-flag)
                    address-sensitive-p))
                 (hash (prefuzz-hash (the hash hash0))))
+       ;; It would be ideal if we were consistent about all tables NOT having
+       ;; synchronization unless created with ":SYNCHRONIZED T".
+       ;; But removing the implicit synchronization from weak tables looks tricky
+       ;; and doesn't seem worth spending much time on.
        (sb-thread::with-recursive-system-lock ((hash-table-lock hash-table))
          ;; Receive the existing k,v pair to ensure liveness thereof because
          ;; otherwise we have no "certificate of existence" of the pair.
@@ -1228,7 +1237,7 @@ nnnn 1_    any       linear scan
          (key-index
           (let ((hash-vector (hash-table-hash-vector hash-table))
                 (hwm (the index/2 (kv-vector-high-water-mark kv-vector))))
-            (cond ((or (not hash-vector) eq-test)
+            (cond ((or eq-test (eq (hash-table-test hash-table) 'eq))
                    (loop for i from (* hwm 2) downto 2 by 2
                          when (eq key (aref kv-vector i)) return i))
                   ((eq (hash-table-test hash-table) 'eql)
@@ -1739,8 +1748,11 @@ table itself."
   (cond ((or (not *print-readably*) (not *read-eval*))
          (print-unreadable-object (hash-table stream :type t :identity t)
            (format stream
-                   ":TEST ~S :COUNT ~S~@[ :WEAKNESS ~S~]"
+                   ":TEST ~S~@[ :HASH-FUNCTION ~S~] :COUNT ~S~@[ :WEAKNESS ~S~]"
                    (hash-table-test hash-table)
+                   (when (and (eq (hash-table-test hash-table) 'eq)
+                              (neq (hash-table-hash-fun hash-table) #'eq-hash))
+                     (hash-table-hash-fun hash-table))
                    (hash-table-count hash-table)
                    (hash-table-weakness hash-table))))
         (t

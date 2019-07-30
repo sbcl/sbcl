@@ -289,7 +289,7 @@
         (funcall set-slot 'source nil)
         (funcall set-slot 'type-name 'standard)
         (funcall set-slot 'options '())
-        (funcall set-slot '%generic-functions (make-hash-table :weakness :key))
+        (funcall set-slot '%generic-functions (make-gf-hash-table))
         (funcall set-slot '%documentation "The standard method combination.")
         (setq *standard-method-combination* method-combination))
       ;; Create an OR method combination object.
@@ -299,7 +299,7 @@
         (funcall set-slot 'type-name 'or)
         (funcall set-slot 'operator 'or)
         (funcall set-slot 'identity-with-one-argument t)
-        (funcall set-slot '%generic-functions (make-hash-table :weakness :key))
+        (funcall set-slot '%generic-functions (make-gf-hash-table))
         (funcall set-slot '%documentation nil)
         (funcall set-slot 'options '(:most-specific-first))
         (setq *or-method-combination* method-combination)))))
