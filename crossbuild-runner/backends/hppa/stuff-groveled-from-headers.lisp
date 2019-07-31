@@ -95,8 +95,6 @@
 (defconstant tiocswinsz 2148037735) ; #x80087467
 
 ;;; signals
-(defconstant sig-dfl 0) ; #x0
-(defconstant sig-ign 1) ; #x1
 (defconstant sigalrm 14) ; #xe
 (defconstant sigbus 10) ; #xa
 (defconstant sigchld 18) ; #x12
