@@ -64,20 +64,22 @@ run_sbcl --eval "(defvar *exit-ok* $EXIT_LISP_WIN)" <<'EOF'
   ;; The default Unix environment for the subprocess is the same as
   ;; for the parent process. (I.e., we behave like perl and lots of
   ;; other programs, but not like CMU CL.)
-  (let ((string (with-output-to-string (stream)
+  (let* ((sb-impl::*default-external-format* :latin-1)
+         (sb-alien::*default-c-string-external-format* :latin-1)   
+         (string (with-output-to-string (stream)
                   (sb-ext:run-program "/usr/bin/env" ()
                                       :output stream)))
-        (expected (apply #'concatenate
+         (expected (apply #'concatenate
                          'string
                          (mapcar (lambda (environ-string)
                                    (concatenate 'string
                                                 environ-string
                                                 (string #\newline)))
                                  (sb-ext:posix-environ)))))
-    (assert (string= string expected)))
-  ;; That's not just because POSIX-ENVIRON is having a bad hair
-  ;; day and returning NIL, is it?
-  (assert (plusp (length (sb-ext:posix-environ))))
+    (assert (string= string expected))
+    ;; That's not just because POSIX-ENVIRON is having a bad hair
+    ;; day and returning NIL, is it?
+    (assert (plusp (length (sb-ext:posix-environ)))))
   ;; make sure that a stream input argument is basically reasonable.
   (let ((string (let ((i (make-string-input-stream "abcdef")))
                   (with-output-to-string (stream)
