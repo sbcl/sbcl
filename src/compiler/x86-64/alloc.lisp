@@ -173,7 +173,7 @@
 ;;; RESULT-TN.
 (defun alloc-other (result-tn widetag size node &optional stack-allocate-p
                     &aux (bytes (pad-data-block size)))
-  (let ((header (logior (ash (1- size) n-widetag-bits) widetag)))
+  (let ((header (compute-object-header size widetag)))
     (cond (stack-allocate-p
            (allocation result-tn bytes node t other-pointer-lowtag)
            (storew header result-tn 0 other-pointer-lowtag))

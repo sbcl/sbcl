@@ -153,35 +153,6 @@ void check_fixedobj_page(low_page_index_t, generation_index_t, generation_index_
 void check_varyobj_pages();
 #endif
 
-// Object header:  generation byte --|    |-- widetag
-//                                   v    v
-//                       0xzzzzzzzz GGzzzzww
-//         arbitrary data  --------   ---- length in words
-//
-// There is a hard constraint on NUM_GENERATIONS, which is currently 8.
-// (0..5=normal, 6=pseudostatic, 7=scratch)
-// It could be as high as 16 for 32-bit words (wherein scratch=gen15)
-// or 32 for 64-bits words (wherein scratch=gen31).
-// In each case, the VISITED flag bit weight would need to be modified.
-// Shifting a 1 bit left by the contents of the generation byte
-// must not overflow a register.
-
-#ifdef LISP_FEATURE_LITTLE_ENDIAN
-static inline void assign_generation(lispobj* obj, generation_index_t gen)
-{
-    generation_index_t* ptr = (generation_index_t*)obj + 3;
-    *ptr = (*ptr & OBJ_WRITTEN_FLAG) | gen; // preserve the 'written' flag
-}
-// Turn a grey node black.
-static inline void set_visited(lispobj* obj)
-{
-    gc_dcheck(__immobile_obj_gen_bits(obj) == new_space);
-    ((generation_index_t*)obj)[3] |= IMMOBILE_OBJ_VISITED_FLAG;
-}
-#else
-#error "Need to define assign_generation() for big-endian"
-#endif
-
 //// Variable-length utilities
 
 /* Return the generation mask for objects headers on 'page_index'

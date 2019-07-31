@@ -616,15 +616,17 @@
 
 (defun write-header-word (des header-word)
   ;; In immobile space, all objects start life as pseudo-static as if by 'save'.
-  (let ((gen #+gencgc (if (or #+immobile-space
-                              (let ((gspace (descriptor-intuit-gspace des)))
-                                (assert gspace)
-                                (or (eq gspace *immobile-fixedobj*)
-                                    (eq gspace *immobile-varyobj*))))
-                           sb-vm:+pseudo-static-generation+
-                           0)
-             #-gencgc 0))
-    (write-wordindexed/raw des 0 (logior (ash gen 24) header-word))))
+  (let* ((gen (or #+immobile-space
+                  (let ((gspace (descriptor-intuit-gspace des)))
+                    (assert gspace)
+                    (when (or (eq gspace *immobile-fixedobj*)
+                              (eq gspace *immobile-varyobj*))
+                      sb-vm:+pseudo-static-generation+))
+                  0))
+         (widetag (logand header-word sb-vm:widetag-mask))
+         ;; Refer to depiction of "Immobile object header word" in gc-private.h
+         (gen-shift (if (= widetag sb-vm:fdefn-widetag) 8 24)))
+    (write-wordindexed/raw des 0 (logior (ash gen gen-shift) header-word))))
 
 (defun write-code-header-words (descriptor boxed unboxed serialno)
   #-64-bit (setq serialno 0)
@@ -668,6 +670,9 @@
               gspace (ash (1+ length) sb-vm:word-shift)
               sb-vm:other-pointer-lowtag
               (make-page-attributes nil 0))))
+    ;; FDEFNs don't store a length, freeing up a header byte for other use
+    (when (= widetag sb-vm:fdefn-widetag)
+      (setq length 0))
     (write-header-data+tag des length widetag)
     des))
 (defun allocate-vector (widetag length words &optional (gspace *dynamic*))

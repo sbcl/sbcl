@@ -160,7 +160,7 @@
                                (format t "  @~x -> ~s [~x]~%"
                                        (dstate-cur-addr dstate) (fdefn-name fdefn) entry)))
                            ;; Set the statically-linked flag
-                           (setf (sb-vm::fdefn-has-static-callers fdefn) 1)
+                           (sb-vm::set-fdefn-has-static-callers fdefn 1)
                            ;; Change the machine instruction
                            (setf (signed-sap-ref-32 (int-sap (dstate-cur-addr dstate)) 1)
                                  (- entry (dstate-next-addr dstate)))))))))))
@@ -206,4 +206,4 @@
                                (int-sap (dstate-cur-addr dstate))
                                1 disp new-disp))))))
          seg dstate)))
-    (setf (sb-vm::fdefn-has-static-callers fdefn) 0))) ; Clear static link flag
+    (sb-vm::set-fdefn-has-static-callers fdefn 0))) ; Clear static link flag

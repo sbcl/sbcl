@@ -744,12 +744,15 @@ static lispobj trans_bignum(lispobj object)
                              UNBOXED_PAGE_FLAG);
 }
 
-/* Note: on the sparc we don't have to do anything special for fdefns, */
-/* 'cause the raw-addr has a function lowtag. */
-#if !defined(LISP_FEATURE_SPARC) && !defined(LISP_FEATURE_ARM) && !defined(LISP_FEATURE_RISCV)
 static sword_t
 scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 {
+#if defined LISP_FEATURE_SPARC || defined LISP_FEATURE_ARM || defined LISP_FEATURE_RISCV
+    // Note: on these architectures we don't have to do anything special for fdefns,
+    // because the raw-addr has a function lowtag. But the payload length is not
+    // computed from the header, so it's not quite an ordinary boxed object.
+    scavenge(where + 1, FDEFN_SIZE - 1);
+#else
     struct fdefn *fdefn = (struct fdefn *)where;
 
     /* FSHOW((stderr, "scav_fdefn, function = %p, raw_addr = %p\n",
@@ -775,9 +778,15 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
 #else
 #  error "Need to implement scav_fdefn"
 #endif
-    return 4;
-}
 #endif
+    return FDEFN_SIZE;
+}
+static lispobj trans_fdefn(lispobj object) {
+    return copy_object(object, FDEFN_SIZE);
+}
+static sword_t size_fdefn(lispobj __attribute__((unused)) *where) {
+    return FDEFN_SIZE;
+}
 
 static sword_t
 scav_unboxed(lispobj __attribute__((unused)) *where, lispobj object)

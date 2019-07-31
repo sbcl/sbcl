@@ -167,7 +167,7 @@
   (pseudo-atomic (:elide-if stack-allocate-p)
       (allocation result-tn (pad-data-block size) node stack-allocate-p
                   other-pointer-lowtag)
-      (storew (logior (ash (1- size) n-widetag-bits) widetag)
+      (storew (compute-object-header size widetag)
               result-tn 0 other-pointer-lowtag)))
 
 ;;;; CONS, LIST and LIST*

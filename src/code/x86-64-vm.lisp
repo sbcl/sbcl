@@ -167,7 +167,7 @@
 (defconstant trampoline-entry-offset n-word-bytes)
 (defun fun-immobilize (fun)
   (let ((code (truly-the (values code-component &optional)
-                         (sb-vm::alloc-immobile-trampoline))))
+                         (alloc-immobile-trampoline))))
     (setf (%code-debug-info code) fun)
     (let ((sap (sap+ (code-instructions code) trampoline-entry-offset))
           (ea (+ (logandc2 (get-lisp-obj-address code) lowtag-mask)
@@ -212,11 +212,24 @@
      (setf (sap-ref-word sap insts-offs) #xFFFFFFE9058B48 ; MOV RAX,[RIP-23]
            (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
 
+(defun fdefn-has-static-callers (fdefn)
+  (declare (type fdefn fdefn))
+  (with-pinned-objects (fdefn)
+    (logbitp 7 (sap-ref-8 (int-sap (get-lisp-obj-address fdefn))
+                          (- 1 other-pointer-lowtag)))))
+
+(defun set-fdefn-has-static-callers (fdefn newval)
+  (declare (type fdefn fdefn) (type bit newval))
+  (if (= newval 0)
+      (%primitive unset-fdefn-has-static-callers fdefn)
+      (%primitive set-fdefn-has-static-callers fdefn))
+  fdefn)
+
 (defun %set-fdefn-fun (fdefn fun)
   (declare (type fdefn fdefn) (type function fun)
            (values function))
-  (unless (eql (sb-vm::fdefn-has-static-callers fdefn) 0)
-    (sb-vm::remove-static-links fdefn))
+  (when (fdefn-has-static-callers fdefn)
+    (remove-static-links fdefn))
   (let ((trampoline (when (fun-requires-simplifying-trampoline-p fun)
                       (fun-immobilize fun)))) ; a newly made CODE object
     (with-pinned-objects (fdefn trampoline fun)
@@ -246,7 +259,7 @@
                       (ash jmp-operand 8)
                       (ash #xA890 40) ; "NOP ; TEST %AL, #xNN"
                       (ash tagged-ptr-bias 56))))
-        (%primitive sb-vm::set-fdefn-fun fdefn fun instruction))))
+        (%primitive set-fdefn-fun fdefn fun instruction))))
   fun)
 
 ) ; end PROGN
@@ -350,7 +363,7 @@
                   ;; A MOV will always load the address of the fdefn.
                   (when (eql (logior (sap-ref-8 insts (1- offset)) 1) #xE9)
                     ;; Set the statically-linked flag
-                    (setf (sb-vm::fdefn-has-static-callers fdefn) 1)
+                    (sb-vm::set-fdefn-has-static-callers fdefn 1)
                     ;; Change the machine instruction
                     (setf (signed-sap-ref-32 insts offset)
                           (- entry (+ (sap-int (sap+ insts offset)) 4)))))))))))))

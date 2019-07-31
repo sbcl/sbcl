@@ -34,8 +34,18 @@
 
 
 /* Most headered objects use MARK_BIT to record liveness.
- * Bignums always use the leftmost bit regardless of word size */
+ * Bignums always use the leftmost bit regardless of word size.
+ * Fdefns use 0x4000 which overlaps the 'written' bit in the generation byte,
+ * but 'written' is not used except for code objects, so this is fine.
+ *
+ * Bit 31 of the header is the mark bit for all remaining object types.
+ * This avoids clash with the layout pointer of instances and functions,
+ * the TLS index of symbols, and various other bits.
+ * The mark bit occupies the same byte as the generation number
+ * in immobile space, but doesn't conflict with that usage.
+ */
 #define MARK_BIT ((uword_t)1 << 31)
+#define FDEFN_MARK_BIT 0x4000
 #ifdef LISP_FEATURE_64_BIT
 #define BIGNUM_MARK_BIT ((uword_t)1 << 63)
 #else
@@ -171,9 +181,12 @@ static inline int pointer_survived_gc_yet(lispobj pointer)
     if (listp(pointer))
         return cons_markedp(pointer);
     lispobj header = *native_pointer(pointer);
-    if (header_widetag(header) == BIGNUM_WIDETAG)
-        return (header & BIGNUM_MARK_BIT) != 0;
-    if (embedded_obj_p(header_widetag(header)))
+    int widetag = header_widetag(header);
+    switch (widetag) {
+    case BIGNUM_WIDETAG: return (header & BIGNUM_MARK_BIT) != 0;
+    case FDEFN_WIDETAG : return (header & FDEFN_MARK_BIT) != 0;
+    }
+    if (embedded_obj_p(widetag))
         header = *fun_code_header(native_pointer(pointer));
     return (header & MARK_BIT) != 0;
 }
@@ -186,26 +199,21 @@ void __mark_obj(lispobj pointer)
     if (!listp(pointer)) {
         lispobj* base = native_pointer(pointer);
         lispobj header = *base;
-        if (header_widetag(header) == BIGNUM_WIDETAG) {
+        int widetag = header_widetag(header);
+        if (widetag == BIGNUM_WIDETAG) {
             *base |= BIGNUM_MARK_BIT;
             return; // don't enqueue - no pointers
         } else {
-            if (embedded_obj_p(header_widetag(header))) {
+            if (embedded_obj_p(widetag)) {
                 base = fun_code_header(base);
                 pointer = make_lispobj(base, OTHER_POINTER_LOWTAG);
                 header = *base;
             }
-            // Bit 31 of the header is the mark bit for all remaining object types.
-            // This avoids clash with the layout pointer of instances and functions,
-            // TLS index of symbols, and various other bits.
-            // The mark bit occupies the same byte as the generation number
-            // in immobile space, but doesn't conflict with that usage.
-            if (header & MARK_BIT)
-                return; // already marked
-            *base |= MARK_BIT;
+            uword_t markbit = (widetag == FDEFN_WIDETAG) ? FDEFN_MARK_BIT : MARK_BIT;
+            if (header & markbit) return; // already marked
+            *base |= markbit;
         }
-        if (leaf_obj_widetag_p(header_widetag(header)))
-            return;
+        if (leaf_obj_widetag_p(widetag)) return;
     } else {
         uword_t key = compute_page_key(pointer);
         int index = compute_dword_number(pointer);
@@ -472,9 +480,10 @@ static void sweep_fixedobj_pages(long *zeroed)
         lispobj *limit = (lispobj*)((char*)obj + IMMOBILE_CARD_BYTES - obj_spacing);
         for ( ; obj <= limit ; obj = (lispobj*)((char*)obj + obj_spacing) ) {
             lispobj header = *obj;
+            uword_t markbit = (header_widetag(header) == FDEFN_WIDETAG) ? FDEFN_MARK_BIT : MARK_BIT;
             if (fixnump(header)) { // is a hole
-            } else if (header & MARK_BIT) { // live object
-                *obj = header ^ MARK_BIT;
+            } else if (header & markbit) { // live object
+                *obj = header ^ markbit;
             } else {
                 NOTE_GARBAGE(__immobile_obj_gen_bits(obj), obj, nwords, zeroed,
                              memset(obj, 0, nwords * N_WORD_BYTES));
@@ -505,8 +514,11 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
             }
         } else {
             nwords = sizetab[header_widetag(header)](where);
-            lispobj markbit =
-              header_widetag(header) != BIGNUM_WIDETAG ? MARK_BIT : BIGNUM_MARK_BIT;
+            lispobj markbit = MARK_BIT;
+            switch (header_widetag(header)) {
+            case BIGNUM_WIDETAG: markbit = BIGNUM_MARK_BIT; break;
+            case FDEFN_WIDETAG : markbit = FDEFN_MARK_BIT; break;
+            }
             if (header & markbit)
                 *where = header ^ markbit;
             else {

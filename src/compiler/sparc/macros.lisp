@@ -266,7 +266,7 @@
     `(pseudo-atomic ()
        (allocation ,result-tn (pad-data-block ,size) other-pointer-lowtag
                    :temp-tn ,temp-tn)
-       (inst li ,temp-tn (logior (ash (1- ,size) n-widetag-bits) ,type-code))
+       (inst li ,temp-tn (compute-object-header ,size ,type-code))
        (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)
        ,@body)))
 

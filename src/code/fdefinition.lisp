@@ -423,12 +423,6 @@
   (let ((fdefn (find-fdefn name)))
     (and fdefn (fdefn-fun fdefn) t)))
 
-;; Byte index 2 of the fdefn's header is the statically-linked flag
-#+immobile-code
-(defmacro sb-vm::fdefn-has-static-callers (fdefn)
-  `(sap-ref-8 (int-sap (get-lisp-obj-address ,fdefn))
-              (- 2 sb-vm::other-pointer-lowtag)))
-
 (defun fmakunbound (name)
   "Make NAME have no global function definition."
   (declare (explicit-check))
@@ -437,7 +431,7 @@
     (let ((fdefn (find-fdefn name)))
       (when fdefn
         #+immobile-code
-        (unless (eql (sb-vm::fdefn-has-static-callers fdefn) 0)
+        (when (sb-vm::fdefn-has-static-callers fdefn)
           (sb-vm::remove-static-links fdefn))
         (fdefn-makunbound fdefn)))
     (undefine-fun-name name)

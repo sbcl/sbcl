@@ -619,7 +619,7 @@ and
                    :stack-allocate-p ,stack-allocate-p
                    ,@(when temp-tn `(:temp-tn ,temp-tn)))
        (when ,type-code
-         (inst li ,flag-tn (+ (ash (1- ,size) n-widetag-bits) ,type-code))
+         (inst li ,flag-tn (compute-object-header ,size ,type-code))
          (storew ,flag-tn ,result-tn 0 ,lowtag))
        ,@body)))
 

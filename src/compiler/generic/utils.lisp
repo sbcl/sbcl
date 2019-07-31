@@ -182,3 +182,9 @@
                                list
                                instance
                                character))))))
+
+(defun compute-object-header (size widetag)
+  (logior (case widetag
+            (#.fdefn-widetag 0)
+            (t (ash (1- size) n-widetag-bits)))
+          widetag))

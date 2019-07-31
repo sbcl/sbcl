@@ -24,7 +24,7 @@
     (name nil :type symbol :read-only t)
     ;; kind of type (how to reconstitute an object)
     (kind nil
-          :type (member :other :closure :instance :list :code)
+          :type (member :other :closure :instance :list :code :fdefn)
           :read-only t))
 
 (defun room-info-type-name (info)
@@ -43,10 +43,10 @@
         (when (and (eq lowtag 'other-pointer-lowtag)
                    (not (member widetag '(t nil))))
           (setf (svref infos (symbol-value widetag))
-                (make-room-info (if (member name '(fdefn symbol))
-                                    tiny-boxed-size-mask
-                                    default-size-mask)
-                                name :other)))))
+                (case name
+                 (fdefn  (make-room-info 0 name :fdefn))
+                 (symbol (make-room-info tiny-boxed-size-mask name :other))
+                 (t      (make-room-info default-size-mask name :other)))))))
 
     (let ((info (make-room-info default-size-mask 'array-header :other)))
       (dolist (code (list #+sb-unicode complex-character-string-widetag
@@ -210,29 +210,25 @@
                 ;; why these fudge factors are right, but they make the result
                 ;; equal to what MAP-ALLOCATED-OBJECTS reports.
                 (null (+ symbol-size 1 #+64-bit 1))
+                (code-component
+                 (return-from primitive-object-size (code-object-size object)))
+                (fdefn 4) ; no length stored in the header
                 ;; Anything else is an OTHER pointer.
-                ;; Use a sizing function when we have one,
-                ;; otherwise the general case is correct.
                 (t
                  (let ((room-info
                          (aref *room-info* (%other-pointer-widetag object))))
-                   (typecase object
-                     (array
-                      (cond ((array-header-p object)
-                             (+ array-dimensions-offset (array-rank object)))
-                            ((simple-array-nil-p object) 2)
-                            (t
-                             (return-from primitive-object-size
-                               (nth-value 2 (reconstitute-vector
-                                             object room-info))))))
-                     (code-component
-                      (return-from primitive-object-size (code-object-size object)))
-                     (t
-                      ;; Other things (symbol, fdefn, value-cell, etc)
-                      ;; don't have a sizer, so use GET-HEADER-DATA
-                      (1+ (logand (get-header-data object)
-                                  (logand (get-header-data object)
-                                          (room-info-mask room-info)))))))))))
+                   (if (arrayp object)
+                       (cond ((array-header-p object)
+                              (+ array-dimensions-offset (array-rank object)))
+                             ((simple-array-nil-p object) 2)
+                             (t
+                              (return-from primitive-object-size
+                                (nth-value 2 (reconstitute-vector object room-info)))))
+                       ;; Other things (symbol, value-cell, etc)
+                       ;; don't have a sizer, so use GET-HEADER-DATA
+                       (1+ (logand (get-header-data object)
+                                   (logand (get-header-data object)
+                                           (room-info-mask room-info))))))))))
         (* (align-up words 2) n-word-bytes))
       0))
 
@@ -287,6 +283,10 @@
              (values c
                      code-header-widetag
                      (code-object-size c))))
+
+          (:fdefn
+           (values (tagged-object other-pointer-lowtag) widetag
+                   (* fdefn-size n-word-bytes)))
 
           (:other
            (values (tagged-object other-pointer-lowtag)

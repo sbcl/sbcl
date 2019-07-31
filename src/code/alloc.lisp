@@ -406,13 +406,11 @@
 (defun alloc-immobile-fdefn ()
   (or (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
            (allocate-immobile-obj (* fdefn-size n-word-bytes)
-                                  (logior (ash (1- fdefn-size) n-widetag-bits) ; word 0
-                                          fdefn-widetag)
+                                  fdefn-widetag ; word 0
                                   0 other-pointer-lowtag nil)) ; word 1, lowtag, errorp
       (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag
                           fdefn-size
-                          (logior (ash (1- fdefn-size) n-widetag-bits) ; word 0
-                                  fdefn-widetag)))))
+                          fdefn-widetag)))) ; word 0
 
 #+immobile-code
 (progn
