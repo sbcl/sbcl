@@ -256,50 +256,25 @@
 
 ;;; This test works reliably on non-conservative platforms and
 ;;; somewhat reliably on conservative platforms with threads.
-(progn
-
-(defparameter *ht* nil)
-
-(defvar *cons-here*)
-
-(declaim (notinline take))
-(defun take (&rest args)
-  (declare (ignore args)))
+(defun call-and-scrub-stack (thunk &aux results)
+  ;; Start by giving ourselves some headroom via a
+  ;; DX allocation around the actual allocation...
+  (let ((*s* (make-array 25)))
+    (declare (special *s*)
+             (dynamic-extent *s*))
+    (assert (stack-allocated-p *s*))
+    (setq results (multiple-value-list (funcall thunk))))
+  ;; ... and then arrange to have the no-longer-used parts of the
+  ;; control stack cleared.
+  (sb-sys:scrub-control-stack)
+  (values-list results))
+(compile 'call-and-scrub-stack)
 
 (defmacro alloc (&body body)
   "Execute BODY and try to reduce the chance of leaking a conservative root."
-  #-sb-thread
-  `(multiple-value-prog1
-       (let ((*s* (make-array 25)))
-         (declare (special *s*)
-                  (dynamic-extent *s*))
-         ;; We can't "just" arrange to run the allocation on a separate
-         ;; thread stack, then deallocate the thread before doing
-         ;; whatever, so start by giving ourselves some headroom via a
-         ;; DX allocation around the actual allocation...
-         (multiple-value-prog1
-             (progn ,@body)
-           (loop repeat 20000 do (setq *cons-here* (cons nil nil)))
-           ;; KLUDGE: Clean the argument passing regs.
-           (apply #'take (loop repeat 36 collect #'cons))))
-     ;; ... and then arrange to have the no-longer-used parts of the
-     ;; control stack cleared.  Note that we still want the headroom
-     ;; above around the actual allocation because of the stack space
-     ;; required for alien call-out.
-     (sb-sys:scrub-control-stack))
-  #+sb-thread
-  (let ((values (gensym))
-        (sem (gensym)))
-    `(let ((,sem (sb-thread::make-semaphore))
-           ,values)
-       (make-join-thread (lambda ()
-                           (setq ,values
-                                 (multiple-value-list (progn ,@body)))
-                           (sb-thread::signal-semaphore ,sem)))
-       (sb-thread::wait-on-semaphore ,sem)
-       (values-list ,values))))
+  `(call-and-scrub-stack (lambda () ,@body)))
 
-(with-test (:name (:hash-table :weakness :eql :numbers) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :eql :numbers))
   (flet ((random-number ()
            (random 1000)))
     (loop for weakness in '(nil :key :value :key-and-value :key-or-value) do
@@ -338,13 +313,11 @@
   (format stream "Hash: ~S~%" (sb-impl::hash-table-hash-vector ht))
   (force-output stream))
 
-(with-test (:name (:hash-table :weakness :removal) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
-  (loop for test in '(eq eql equal equalp) do
-        ; (format t "test: ~A~%" test)
-        (loop for weakness in '(:key :value :key-and-value :key-or-value)
-              do
-              ; (format t "weakness: ~A~%" weakness)
-              (let ((ht (make-hash-table :test 'equal :weakness weakness)))
+(macrolet
+    ((test-weakness (weakness)
+       `(with-test (:name (:hash-table :weakness ,weakness :removal))
+          (loop for test in '(eq eql equal equalp) do
+            (let ((ht (make-hash-table :test 'equal :weakness ,weakness)))
                 (alloc (add-removable-stuff ht :n 117 :size 1))
                 (loop for i upfrom 0
                       do ; (format t "~A. count: ~A~%" i (hash-table-count ht))
@@ -352,20 +325,31 @@
                       until (zerop (hash-table-count ht))
                       do
                       (when (= i 10)
-                        (print-ht ht)
+                        ; (print-ht ht)
                         #-(or x86 x86-64)
                         (assert nil)
                         ;; With conservative gc the test may not be
                         ;; bullet-proof so it's not an outright
                         ;; failure but a warning.
                         #+(or x86 x86-64)
-                        (progn
-                          (warn "Weak hash removal test failed for weakness ~A"
-                                weakness)
-                          (return)))
-                      (gc :full t))))))
+                        (if (eq *evaluator-mode* :compile)
+                            (assert nil)
+                            (progn
+                              (warn "Weak hash removal test failed for weakness ~A"
+                                    ,weakness)
+                              (return))))
+                      (gc :full t)))))))
+  ;; I separated these into 4 named tests to see if I could figure something out-
+  ;; If the interpreted lambda itself it kept alive by call-and-scrub,
+  ;; as it must be, the most recent values of local variables could linger.
+  ;; So with x86 using the interpreter, :KEY weakness generates a failure warning
+  ;; but how does :KEY-OR-VALUE _not_ generate a warning?
+  (test-weakness :key)
+  (test-weakness :value)
+  (test-weakness :key-and-value)
+  (test-weakness :key-or-value))
 
-(with-test (:name (:hash-table :weakness :string-interning) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :string-interning))
   (let ((ht (make-hash-table :test 'equal :weakness :key))
         (s "a"))
     (setf (gethash s ht) s)
@@ -373,7 +357,7 @@
     (assert (eq (gethash (copy-seq s) ht) s))))
 
 ;;; see if hash_vector is not written when there is none ...
-(with-test (:name (:hash-table :weakness :eq) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :eq))
   (loop repeat 10 do
         (let ((index (random 2000)))
           (let ((first (+ most-positive-fixnum (mod (* index 31) 9)))
@@ -384,7 +368,7 @@
               hash-table)))))
 
 ;; used to crash in gc
-(with-test (:name (:hash-table :weakness :keep) :skipped-on (and :c-stack-is-control-stack (not :sb-thread)))
+(with-test (:name (:hash-table :weakness :keep))
   (loop repeat 2 do
         (let ((h1 (make-hash-table :weakness :key :test #'equal))
               (keep ()))
@@ -395,8 +379,6 @@
                 (push value keep)
                 (setf (gethash key h1) value))
           (sb-ext:gc :full t))))
-
-)
 
 ;;; DEFINE-HASH-TABLE-TEST
 
