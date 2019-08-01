@@ -199,8 +199,6 @@
 (defun system-area-pointer-p (x) x nil) ; nothing is a SAP
 ;;; Needed for DEFINE-MOVE-FUN LOAD-SYSTEM-AREA-POINTER
 (defun sap-int (x) (error "can't take SAP-INT ~S" x))
-;;; Needed for FIXUP-CODE-OBJECT
-(defmacro without-gcing (&body body) `(progn ,@body))
 
 (defun logically-readonlyize (x) x)
 
