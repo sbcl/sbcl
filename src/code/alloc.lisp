@@ -12,34 +12,39 @@
 
 (in-package "SB-VM")
 
-#-sb-fluid (declaim (inline store-word))
-(defun store-word (word base &optional (offset 0) (lowtag 0))
-  (declare (type word word base offset)
-           (type (unsigned-byte #.n-lowtag-bits) lowtag))
-  (setf (sap-ref-word (int-sap base) (- (ash offset word-shift) lowtag)) word))
+(!define-load-time-global *allocator-mutex*
+    #.(sb-thread:make-mutex :name "Allocator"))
 
 (defun allocate-static-vector (widetag length words)
   (declare (type (unsigned-byte #.n-widetag-bits) widetag)
            (type word words)
            (type index length))
-  ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS
-  (or
-   (without-gcing
-     (let* ((pointer (sap-int *static-space-free-pointer*))
-            (vector (logior pointer other-pointer-lowtag))
-            (nbytes (pad-data-block (+ words vector-data-offset)))
-            (new-pointer (+ pointer nbytes)))
-       (when (> static-space-end new-pointer)
-         (store-word widetag
-                     vector 0 other-pointer-lowtag)
-         (store-word (fixnumize length)
-                     vector vector-length-slot other-pointer-lowtag)
-         (store-word 0 new-pointer)
-         (setf *static-space-free-pointer* (int-sap new-pointer))
-         (%make-lisp-obj vector))))
-   (error 'simple-storage-condition
-          :format-control "Not enough memory left in static space to ~
-                           allocate vector.")))
+  ;; This does not need WITHOUT-GCING, but it will be implicitly wrapped
+  ;; in WITHOUT-INTERRUPTS due to the default behavior of system mutexes,
+  ;; which is important so that we don't leave an inconsistent state.
+  ;; To think about why it is OK to leave GC enabled, consider that
+  ;; neither GC nor another thread will examine static space above the
+  ;; current value of *STATIC-SPACE-FREE-POINTER*.
+  (or (sb-thread::with-system-mutex (*allocator-mutex*)
+        (let* ((pointer *static-space-free-pointer*)
+               (nbytes (pad-data-block (+ words vector-data-offset)))
+               (new-pointer (sap+ pointer nbytes)))
+          (when (sap<= new-pointer (int-sap static-space-end))
+            ;; By storing the length prior to the widetag, the word at the old
+            ;; free pointer decodes as a cons instead of a 0-length vector.
+            ;; Not that it should matter, but it seems slightly better to change
+            ;; the new object atomically to a correctly-sized vector rather than
+            ;; a cons changing into the wrong vector into the right vector.
+            (setf (sap-ref-word pointer (ash vector-length-slot word-shift))
+                  (fixnumize length))
+            ;; then store the widetag
+            (setf (sap-ref-word pointer 0) widetag)
+            ;; then the new free pointer
+            (setf *static-space-free-pointer* new-pointer)
+            (%make-lisp-obj (logior (sap-int pointer) other-pointer-lowtag)))))
+      (error 'simple-storage-condition
+             :format-control
+             "Not enough room left in static space to allocate vector.")))
 
 #+immobile-space
 (progn
@@ -51,9 +56,6 @@
   system-area-pointer)
 (define-alien-variable ("fixedobj_free_pointer" *fixedobj-space-free-pointer*)
   system-area-pointer)
-
-(!define-load-time-global *immobile-space-mutex*
-    #.(sb-thread:make-mutex :name "Immobile space"))
 
 (eval-when (:compile-toplevel)
   (assert (eql code-boxed-size-slot 1))
@@ -277,7 +279,7 @@
   (setq n-bytes (align-up n-bytes (* 2 n-word-bytes)))
   ;; Can't allocate fewer than 4 words due to min hole size.
   (aver (>= n-bytes (* 4 n-word-bytes)))
-  (sb-thread::with-system-mutex (*immobile-space-mutex* :without-gcing t)
+  (sb-thread::with-system-mutex (*allocator-mutex* :without-gcing t)
    (unless (zerop varyobj-holes)
      ;; If deferred sweep needs to happen, do so now.
      ;; Concurrency could potentially be improved here: at most one thread
