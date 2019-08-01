@@ -908,9 +908,8 @@ data into static or read-only areas such that it will never be moved
 @item
 @code{sb-sys:with-pinned-objects} is a macro which arranges for some
 set of objects to be pinned in memory for the dynamic extent of its
-body forms.  On ports which use the generational garbage collector (as
-of SBCL 0.8.3, only the x86) this has a page granularity - i.e. the
-entire 4k page or pages containing the objects will be locked down. On
+body forms.  On ports which use the generational garbage collector (most,
+as of this writing) this affects exactly the specified objects. On
 other ports it is implemented by turning off GC for the duration (so
 could be said to have a whole-world granularity).
 
