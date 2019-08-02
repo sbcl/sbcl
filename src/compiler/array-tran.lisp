@@ -1846,18 +1846,20 @@
 
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))
-  (let ((type (lvar-type array)))
-    (cond ((not (types-equal-or-intersect type (specifier-type 'simple-array)))
+  (let ((type (lvar-type array))
+        (array-type (specifier-type 'array)))
+    (cond ((or (not (types-equal-or-intersect type array-type))
+               (csubtypep type (specifier-type '(simple-array * (*)))))
+           (specifier-type 'null))
+          ((and (csubtypep type array-type)
+                (not (types-equal-or-intersect type (specifier-type 'simple-array))))
            (specifier-type '(eql t)))
           ((not (array-type-p type))
            ;; FIXME: use analogue of ARRAY-TYPE-DIMENSIONS-OR-GIVE-UP
            nil)
           (t
            (let ((dims (array-type-dimensions type)))
-             (cond ((csubtypep type (specifier-type '(simple-array * (*))))
-                    ;; no array header
-                    (specifier-type 'null))
-                   ((and (listp dims) (/= (length dims) 1))
+             (cond ((and (listp dims) (/= (length dims) 1))
                     ;; multi-dimensional array, will have a header
                     (specifier-type '(eql t)))
                    ((eql (array-type-complexp type) t)

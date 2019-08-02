@@ -2414,3 +2414,12 @@
    ((#C(1 2)) t)
    ((1d0) nil)
    ((10) nil)))
+
+(with-test (:name :array-header-p-derivation)
+  (checked-compile-and-assert
+   ()
+   '(lambda (q)
+     (and (typep q '(not simple-array))
+      (sb-kernel:array-header-p q)))
+   ((10) nil)
+   (((make-array 10 :adjustable t)) t)))
