@@ -396,6 +396,8 @@
                 (format stream "~@:_No subclasses.")))
           (unless (sb-mop:class-finalized-p class)
             (format stream "~@:_Not yet finalized."))
+          (when (eq :sealed (classoid-state (sb-pcl::class-classoid class)))
+            (format stream "~@:_Sealed."))
           (if (eq 'structure-class metaclass-name)
               (let* ((dd (find-defstruct-description name))
                      (slots (dd-slots dd)))
