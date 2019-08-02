@@ -68,9 +68,17 @@
               obj
               (compound-type-types type)))
     (fun-designator-type
-     (values (typep obj '(or function symbol)) t))
+     (typecase obj
+       (symbol (values nil nil))
+       (function
+        (csubtypep (specifier-type (%simple-fun-type (sb-kernel:%fun-fun obj)))
+                   type))
+       (t (values nil t))))
     (fun-type
-     (values (functionp obj) t))
+     (if (functionp obj)
+         (csubtypep (specifier-type (%simple-fun-type (sb-kernel:%fun-fun obj)))
+                    type)
+         (values nil t)))
     (unknown-type
      (values nil nil))
     (alien-type-type

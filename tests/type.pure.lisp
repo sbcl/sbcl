@@ -572,10 +572,10 @@
           sb-kernel::numeric-types-intersect
           sb-kernel:*empty-type*))
 
-(test-util:with-test (:name :partition-array-into-simple/hairy)
+(with-test (:name :partition-array-into-simple/hairy)
   ;; Some tests that (simple-array | hairy-array) = array
   ;; At present this works only for wild element-type.
-  (test-util:assert-tri-eq
+  (assert-tri-eq
    t t (type= (specifier-type '(not (and array (not simple-array))))
               (specifier-type '(or (not array) simple-array))))
 
@@ -607,30 +607,30 @@
                              (and array (not simple-array))))))
                  (specifier-type 'simple-string))))
 
-(test-util:with-test (:name :classoids-as-type-specifiers)
+(with-test (:name :classoids-as-type-specifiers)
   (dolist (classoid (list (find-classoid 'integer)
                           (find-class 'integer)))
     ;; Classoids and classes should work as type specifiers
     ;; in the atom form, not as lists.
     ;; Their legality or lack thereof is equivalent in all cases.
-    (test-util:checked-compile `(lambda (x) (declare (,classoid x)) x))
-    (test-util:checked-compile `(lambda (x) (declare (type ,classoid x)) x))
+    (checked-compile `(lambda (x) (declare (,classoid x)) x))
+    (checked-compile `(lambda (x) (declare (type ,classoid x)) x))
     ;; Negative tests come in two flavors:
     ;; In the case of (DECLARE (TYPE ...)), parsing the following thing
     ;; as a type should fail. But when 'TYPE is implied, "canonization"
     ;; should do nothing, because the following form is not a type,
     ;; so we get an error about an unrecognized declaration instead.
     (flet ((expect-lose (type)
-             (assert (nth-value 1 (test-util:checked-compile
+             (assert (nth-value 1 (checked-compile
                                    `(lambda (x) (declare (,type x)) x)
                                    :allow-warnings t)))
-             (assert (nth-value 1 (test-util:checked-compile
+             (assert (nth-value 1 (checked-compile
                                    `(lambda (x) (declare (,type x)) x)
                                    :allow-warnings t)))))
       (expect-lose `(,classoid))
       (expect-lose `(,classoid 1 100)))))
 
-(test-util:with-test (:name :classoid-type-kind)
+(with-test (:name :classoid-type-kind)
   (do-all-symbols (s)
     (let ((c (sb-kernel:find-classoid s nil)))
       ;; No classoid can have a :TYPE :KIND that is :DEFINED.
@@ -639,17 +639,17 @@
             (assert (eq (sb-int:info :type :kind s) :primitive))
             (assert (eq (sb-int:info :type :kind s) :instance)))))))
 
-(test-util:with-test (:name :make-numeric-type)
+(with-test (:name :make-numeric-type)
   (assert (eq (make-numeric-type :class 'integer :low '(4) :high '(5))
               *empty-type*)))
 
-(test-util:with-test (:name :unparse-string)
+(with-test (:name :unparse-string)
   (assert (equal (type-specifier (specifier-type '(string 10)))
                  '(string 10)))
   (assert (equal (type-specifier (specifier-type '(simple-string 10)))
                  '(simple-string 10))))
 
-(test-util:with-test (:name :numeric-types-adjacent)
+(with-test (:name :numeric-types-adjacent)
   (dolist (x '(-0s0 0s0))
     (dolist (y '(-0s0 0s0))
       (let ((a (specifier-type `(single-float -10s0 ,x)))
@@ -663,3 +663,6 @@
             (b (specifier-type `(single-float (,y) 20s0))))
         (assert (not (numeric-types-intersect a b)))
         (assert (numeric-types-adjacent a b))))))
+
+(with-test (:name :ctypep-function)
+  (assert (not (sb-kernel:ctypep #'+ (eval '(sb-kernel:specifier-type '(function (list))))))))
