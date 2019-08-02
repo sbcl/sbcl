@@ -810,23 +810,35 @@ We could try a few things to mitigate this:
            (objects-width (decimal-with-grouped-digits-width total-objects))
            (totals-label (format nil "~:(~A~) instance total" space))
            (types-width (reduce #'max interesting
-                                :key (lambda (x)
-                                       (length (symbol-name (classoid-name (first x)))))
+                                :key (lambda (info)
+                                       (let ((type (first info)))
+                                         (length
+                                          (typecase type
+                                            (string
+                                             type)
+                                            (classoid
+                                             (with-output-to-string (stream)
+                                               (sb-ext:print-symbol-with-prefix
+                                                stream (classoid-name type))))))))
                                 :initial-value (length totals-label)))
            (printed-bytes 0)
            (printed-objects 0))
       (declare (unsigned-byte printed-bytes printed-objects))
       (flet ((type-usage (type objects bytes)
-               (let ((name (etypecase type
-                             (string type)
-                             (classoid (symbol-name (classoid-name type))))))
-                 (format t "  ~V@<~A~> ~V:D bytes, ~V:D object~:P.~%"
-                         (1+ types-width) name bytes-width bytes
-                         objects-width objects))))
-        (loop for (type . (objects . bytes)) in interesting do
-             (incf printed-bytes bytes)
-             (incf printed-objects objects)
-             (type-usage type objects bytes))
+               (etypecase type
+                 (string
+                  (format t "  ~V@<~A~> ~V:D bytes, ~V:D object~:P.~%"
+                          (1+ types-width) type bytes-width bytes
+                          objects-width objects))
+                 (classoid
+                  (format t "  ~V@<~/sb-ext:print-symbol-with-prefix/~> ~
+                             ~V:D bytes, ~V:D object~:P.~%"
+                          (1+ types-width) (classoid-name type) bytes-width bytes
+                          objects-width objects)))))
+        (loop for (type . (objects . bytes)) in interesting
+              do (incf printed-bytes bytes)
+                 (incf printed-objects objects)
+                 (type-usage type objects bytes))
         (terpri)
         (let ((residual-objects (- total-objects printed-objects))
               (residual-bytes (- total-bytes printed-bytes)))
