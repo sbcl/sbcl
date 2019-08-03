@@ -13,37 +13,37 @@
 
 #-sb-assembling ; avoid redefinition warning
 (progn
-(defun !both-fixnum-p (temp x y)
+(defun both-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst or :dword temp y)
   (inst test :byte temp fixnum-tag-mask))
 
-(defun !some-fixnum-p (temp x y)
+(defun some-fixnum-p (temp x y)
   (inst mov :dword temp x)
   (inst and :dword temp y)
   (inst test :byte temp fixnum-tag-mask))
 
-(defun !static-fun-addr (name)
+(defun static-fun-addr (name)
   #+immobile-code (make-fixup name :static-call)
   #-immobile-code (ea (+ nil-value (static-fun-offset name))))
 
-(defun !call-static-fun (fun arg-count)
+(defun call-static-fun (fun arg-count)
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn (* n-word-bytes 2))
   (inst mov (ea rsp-tn) rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst mov rcx-tn (fixnumize arg-count))
-  (inst call (!static-fun-addr fun))
+  (inst call (static-fun-addr fun))
   (inst pop rbp-tn))
 
-(defun !tail-call-static-fun (fun arg-count)
+(defun tail-call-static-fun (fun arg-count)
   (inst push rbp-tn)
   (inst mov rbp-tn rsp-tn)
   (inst sub rsp-tn n-word-bytes)
   (inst push (ea (frame-byte-offset return-pc-save-offset) rbp-tn))
   (inst mov rcx-tn (fixnumize arg-count))
-  (inst jmp (!static-fun-addr fun))))
+  (inst jmp (static-fun-addr fun))))
 
 
 ;;;; addition, subtraction, and multiplication
@@ -74,7 +74,7 @@
 
                  (:temp rax unsigned-reg rax-offset)
                  (:temp rcx unsigned-reg rcx-offset))
-                (!both-fixnum-p rax x y)
+                (both-fixnum-p rax x y)
                 (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body
@@ -82,7 +82,7 @@
                 (inst ret)
 
                 DO-STATIC-FUN
-                (!tail-call-static-fun ',(symbolicate "TWO-ARG-" fun) 2))))
+                (tail-call-static-fun ',(symbolicate "TWO-ARG-" fun) 2))))
 
   (define-generic-arith-routine (+ 10)
     (move res x)
@@ -158,7 +158,7 @@
   (return-single-word-bignum res rcx res)
   (inst clc) (inst ret)
   GENERIC
-  (!tail-call-static-fun '%negate 1))
+  (tail-call-static-fun '%negate 1))
 
 ;;;; comparison
 
@@ -174,14 +174,14 @@
 
                    (:temp rcx unsigned-reg rcx-offset))
 
-                (!both-fixnum-p rcx x y)
+                (both-fixnum-p rcx x y)
                 (inst jmp :nz DO-STATIC-FUN)
 
                 (inst cmp x y)
                 (inst ret)
 
                 DO-STATIC-FUN
-                (!call-static-fun ',static-fn 2)
+                (call-static-fun ',static-fn 2)
                 ;; HACK: We depend on NIL having the lowest address of all
                 ;; static symbols (including T)
                 ,@(ecase test
@@ -201,7 +201,7 @@
                           (:arg y (descriptor-reg any-reg) rdi-offset)
 
                           (:temp rcx unsigned-reg rcx-offset))
-  (!both-fixnum-p rcx x y)
+  (both-fixnum-p rcx x y)
   (inst jmp :nz DO-STATIC-FUN)
 
   ;; Both fixnums
@@ -209,7 +209,7 @@
   (inst ret)
 
   DO-STATIC-FUN
-  (!call-static-fun 'two-arg-= 2)
+  (call-static-fun 'two-arg-= 2)
   (inst cmp x (+ nil-value (static-symbol-offset t))))
 
 #+sb-assembling
