@@ -207,3 +207,8 @@
   (assert-condition-source-paths
    (let* #())
    ()))
+
+(with-test (:name (:source-path typep :invalid-type-specifier))
+  (assert-condition-source-paths
+   (typep 1 'undefined-type)
+   (2)))

@@ -1062,7 +1062,8 @@
   ;; weird roundabout way. -- WHN 2001-03-18
   (if (and (not env)
            (typep spec '(cons (eql quote) (cons t null))))
-      (source-transform-typep object (cadr spec))
+      (with-current-source-form (spec)
+        (source-transform-typep object (cadr spec)))
       (values nil t)))
 
 ;;;; coercion
