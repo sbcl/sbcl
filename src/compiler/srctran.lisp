@@ -686,6 +686,15 @@
           (t
            nil))))
 
+(defun interval-range-info> (x &optional (point 0))
+  (declare (type interval x))
+  (let ((lo (interval-low x))
+        (hi (interval-high x)))
+    (cond ((and lo (signed-zero->= (type-bound-number lo) point))
+           '+)
+          ((and hi (signed-zero-> point (type-bound-number hi)))
+           '-))))
+
 ;;; Test to see whether the interval X is bounded. HOW determines the
 ;;; test, and should be either ABOVE, BELOW, or BOTH.
 (defun interval-bounded-p (x how)

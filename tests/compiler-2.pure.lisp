@@ -2423,3 +2423,12 @@
       (sb-kernel:array-header-p q)))
    ((10) nil)
    (((make-array 10 :adjustable t)) t)))
+
+(with-test (:name :phase-type-derivation)
+  (checked-compile-and-assert
+   ()
+   '(lambda (x)
+     (= (phase (the (integer -1 0) x))
+      (coerce pi 'single-float)))
+   ((-1) t)
+   ((0) nil)))

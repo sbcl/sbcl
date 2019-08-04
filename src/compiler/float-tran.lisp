@@ -1125,7 +1125,7 @@
                    (t (numeric-type-format arg))))
          (bound-type (or format 'float)))
     (cond ((numeric-type-real-p arg)
-           (case (interval-range-info (numeric-type->interval arg) $0.0)
+           (case (interval-range-info> (numeric-type->interval arg) $0.0)
              (+
               ;; The number is positive, so the phase is 0.
               (make-numeric-type :class 'float
