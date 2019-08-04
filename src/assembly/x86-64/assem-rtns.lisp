@@ -358,7 +358,6 @@
 
   (store-tl-symbol-value uwp *current-unwind-protect-block*)
 
-  
   (loadw rbp-tn block unwind-block-cfp-slot)
 
   (loadw uwp block unwind-block-current-catch-slot)

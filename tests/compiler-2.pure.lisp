@@ -2432,3 +2432,11 @@
       (coerce pi 'single-float)))
    ((-1) t)
    ((0) nil)))
+
+(with-test (:name :maybe-negate-check-fun-type)
+  (checked-compile-and-assert
+   ()
+   '(lambda (m)
+     (declare ((or (function (number)) (eql #.#'symbolp)) m))
+     (the (member 3/4 4/5 1/2 #.#'symbolp) m))
+   ((#'symbolp) #'symbolp)))

@@ -92,6 +92,7 @@
   (declare (type (or ctype null) ctype)
            (dynamic-extent function))
   (named-let %map ((type ctype))
+    (funcall function type)
     (typecase type
       (compound-type
        (mapc #'%map (compound-type-types type)))
@@ -109,9 +110,7 @@
        (mapc (lambda (x) (%map (key-info-type x)))
              (args-type-keywords type))
        (when (fun-type-p type)
-         (%map (fun-type-returns type))))
-      (t
-       (funcall function type))))
+         (%map (fun-type-returns type))))))
   nil)
 
 (defun contains-unknown-type-p (ctype)

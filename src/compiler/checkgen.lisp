@@ -204,6 +204,12 @@
        (2 (weaken-values-type type))
        (3 type)))))
 
+(defun type-contains-fun-type-p (type)
+  (sb-kernel::map-type (lambda (type)
+                         (when (fun-type-p type)
+                           (return-from type-contains-fun-type-p t)))
+                       type))
+
 ;;; LVAR is an lvar we are doing a type check on and TYPES is a list
 ;;; of types that we are checking its values against. If we have
 ;;; proven that LVAR generates a fixed number of values, then for each
@@ -221,6 +227,9 @@
                        c)
           for diff = (type-difference p cc)
           collect (if (and diff
+                           ;; FUN-TYPE is weakend to FUNCTION, can't
+                           ;; use that for invereted type testes
+                           (not (type-contains-fun-type-p diff))
                            (< (type-test-cost diff)
                               (type-test-cost cc)))
                       (list t diff a)
