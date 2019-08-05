@@ -1516,14 +1516,9 @@ session."
 
 ;;;; The beef
 
-;;; One must parse this name carefully: it is the initial "thread function trampoline",
-;;; and not the "initial thread" "function trampoline".
-;;; i.e. there is an initial thread, which DOES NOT start via this function.
-;;; All threads other than the initial thread DO start via this function.
-;;; The initial thread has its own way of doing things, which ends up calling
-;;; INIT-INITIAL-THREAD.  It might be nice to come up with some better naming.
+;;; All threads other than the initial thread start via this function.
 #+sb-thread
-(defun initial-thread-function-trampoline (thread setup-sem real-function arguments)
+(defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
   ;; Can't initiate GC before *current-thread* is set, otherwise the
   ;; locks grabbed by SUB-GC wouldn't function.
   ;; Other threads can GC with impunity.
@@ -1629,14 +1624,14 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
            (fp-modes (dpb 0 sb-vm:float-sticky-bits ;; clear accrued bits
                           (sb-vm:floating-point-modes))))
       (declare (dynamic-extent setup-sem))
-      (dx-flet ((initial-thread-function ()
+      (dx-flet ((start-routine ()
                   ;; Inherit parent thread's FP modes
                   #+(or win32 darwin)
                   (setf (sb-vm:floating-point-modes) fp-modes)
                   ;; As it is, this lambda must not cons until we are
                   ;; ready to run GC. Be careful.
-                  (initial-thread-function-trampoline thread setup-sem
-                                                      real-function arguments)))
+                  (new-lisp-thread-trampoline thread setup-sem
+                                              real-function arguments)))
         ;; Holding mutexes or waiting on sempahores inside WITHOUT-GCING will lock up
         (aver (not *gc-inhibit*))
         ;; Keep INITIAL-FUNCTION in the dynamic extent until the child
@@ -1645,8 +1640,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
         ;; INITIAL-FUNCTION to another thread.
         ;; (Does WITHOUT-INTERRUPTS really matter now that it's DXed?)
         (with-system-mutex (*make-thread-lock*)
-          (if (zerop
-               (%create-thread (get-lisp-obj-address #'initial-thread-function)))
+          (if (zerop (%create-thread (get-lisp-obj-address #'start-routine)))
               (setf thread nil)
               (wait-on-semaphore setup-sem)))))
     (or thread (error "Could not create a new thread."))))

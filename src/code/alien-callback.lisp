@@ -295,4 +295,4 @@ the alien callback for that function with the given alien type."
                         (make-foreign-thread :name "foreign callback")))))
     (dx-flet ((enter ()
                 (sb-alien::enter-alien-callback index return arguments)))
-      (initial-thread-function-trampoline thread nil #'enter nil))))
+      (new-lisp-thread-trampoline thread nil #'enter nil))))

@@ -521,7 +521,7 @@ attach_os_thread(init_thread_data *scribble)
     block_deferrable_signals(&scribble->oldset);
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-    /* initial-thread-function-trampoline doesn't like when the GC signal is blocked */
+    /* new-lisp-thread-trampoline doesn't like when the GC signal is blocked */
     /* FIXME: could be done using a single call to pthread_sigmask
        together with locking the deferrable signals above. */
     unblock_gc_signals(0, 0);
@@ -685,7 +685,7 @@ callback_wrapper_trampoline(
  */
 
 static struct thread *
-create_thread_struct(lispobj initial_function) {
+create_thread_struct(lispobj start_routine) {
 #if defined(LISP_FEATURE_SB_THREAD) || defined(LISP_FEATURE_WIN32)
     unsigned int i;
 #endif
@@ -863,7 +863,7 @@ create_thread_struct(lispobj initial_function) {
      * mess up th->no_tls_value_marker. Fail now if that happened. */
     gc_assert(th->no_tls_value_marker == NO_TLS_VALUE_MARKER_WIDETAG);
 #endif
-    th->no_tls_value_marker=initial_function;
+    th->no_tls_value_marker = start_routine;
 
 #if defined(LISP_FEATURE_WIN32)
     for (i = 0; i<sizeof(th->private_events.events)/
@@ -945,7 +945,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     return success;
 }
 
-os_thread_t create_thread(lispobj initial_function) {
+os_thread_t create_thread(lispobj start_routine) {
     struct thread *th, *thread = arch_os_get_current_thread();
     os_thread_t kid_tid = 0;
 
@@ -955,10 +955,10 @@ os_thread_t create_thread(lispobj initial_function) {
 
     /* Assuming that a fresh thread struct has no lisp objects in it,
      * linking it to all_threads can be left to the thread itself
-     * without fear of gc lossage. initial_function violates this
+     * without fear of gc lossage. 'start_routine' violates this
      * assumption and must stay pinned until the child starts up. */
-    th = create_thread_struct(initial_function);
-    if (th && !create_os_thread(th,&kid_tid)) {
+    th = create_thread_struct(start_routine);
+    if (th && !create_os_thread(th, &kid_tid)) {
         free_thread_struct(th);
         kid_tid = 0;
     }
