@@ -2440,3 +2440,12 @@
      (declare ((or (function (number)) (eql #.#'symbolp)) m))
      (the (member 3/4 4/5 1/2 #.#'symbolp) m))
    ((#'symbolp) #'symbolp)))
+
+(with-test (:name :lvar-fun-type-on-literal-funs)
+  (checked-compile-and-assert
+   ()
+   `(lambda (p)
+      (declare (type (or null string) p))
+      (locally (declare (optimize (space 0)))
+        (stable-sort p ,#'string<)))
+   (((copy-seq "acb")) "abc" :test #'equal)))
