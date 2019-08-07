@@ -288,6 +288,21 @@
                    (make-string-output-stream
                     ,@(when element-type-form
                         `(:element-type ,element-type-form)))))))
+    ;; If you pass NIL as element-type, note that there seems to be no requirement
+    ;; to produce a stream that can *accept* only characters of that type.
+    ;; We produce a BASE-STRING-OUTPUT-STREAM if you do something so pointless,
+    ;; and accept base characters written to that stream.
+    ;; However, we'll always return a (simple-array nil (0)) from such stream.
+    ;; For comparison -
+    ;; CCL: (type-of (get-output-stream-string (make-string-output-stream :element-type nil)))
+    ;;      => (SIMPLE-BASE-STRING 0)
+    ;; ABCL:
+    ;;      (let ((s (make-string-output-stream :element-type nil)))
+    ;;        (write-string "Hi" s)
+    ;;        (get-output-stream-string s)) => ""
+    ;; CLISP is more pedantic, refusing to accept characters and returning a NIL vector:
+    ;; (type-of (get-output-stream-string (make-string-output-stream :element-type nil)))
+    ;;      => (VECTOR NIL 0)
     (frob nil)
     (frob 'character)
     (frob 'base-char)
@@ -443,4 +458,26 @@
       (fresh-line stream))
     (assert (equal string ""))))
 
+#+sb-unicode
+(with-test (:name (:write-char-base-char-stream-reject-non-base-char))
+  (assert-error
+   (write-char (code-char 1000)
+               (make-string-output-stream :element-type 'base-char))))
 
+#+sb-unicode
+(with-test (:name (:write-string-base-char-stream-reject-non-base-char))
+  (assert-error
+   (write-string (make-string 1 :initial-element (code-char 1000))
+                 (make-string-output-stream :element-type 'base-char))))
+
+#+sb-unicode
+(with-test (:name (:default-char-stream-resets))
+  (let ((s (sb-impl::%make-default-string-ostream)))
+    (dotimes (i 2)
+      (write-char (code-char 1000) s)
+      (assert (equal (type-of (get-output-stream-string s))
+                     '(simple-array character (1))))
+      (write-char #\a s)
+      ;; result type reverts back to simple-base-string after get-output-stream-string
+      (assert (equal (type-of (get-output-stream-string s))
+                     '(simple-base-string 1))))))

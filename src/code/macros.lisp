@@ -475,6 +475,14 @@ invoked. In that case it will store into PLACE and start over."
              (unwind-protect
                   (progn ,@forms)
                (close ,var))))
+        ;; I don't see why we need the unwind-protect.
+        ;; CLHS says: "The output string stream to which the variable /var/
+        ;; is bound has dynamic extent; its extent ends when the form is exited."
+        ;; So technically you can't reference the stream after the string
+        ;; is returned. And since the implication is that we can legally DXify
+        ;; the stream, what difference does it make whether it's open or closed?
+        ;; Certainly in code that is compiled in SAFETY < 3 we should
+        ;; just not bother with the unwind-protect or the close.
         `(let ((,var (make-string-output-stream
                       ;; CHARACTER is the default element-type of
                       ;; string-ouput-stream, save a few bytes when passing it

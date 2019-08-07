@@ -5092,20 +5092,18 @@
 
 
 (deftransform make-string-output-stream ((&key element-type))
-  (let ((element-type (cond ((not element-type)
-                             'character)
-                            ((constant-lvar-p element-type)
-                             (let ((specifier (ir1-transform-specifier-type
-                                               (lvar-value element-type))))
-                               (and (csubtypep specifier (specifier-type 'character))
-                                    (type-specifier specifier)))))))
-   (if element-type
-       `(sb-impl::%make-string-output-stream
-         ',element-type
-         (function ,(case element-type
-                      (base-char 'sb-impl::string-ouch/base-char)
-                      (t 'sb-impl::string-ouch))))
-       (give-up-ir1-transform))))
+  (case (cond ((not element-type) #+sb-unicode 'character #-sb-unicode 'base-char)
+              ((not (constant-lvar-p element-type)) nil)
+              (t (let ((requested-type
+                        (ir1-transform-specifier-type (lvar-value element-type))))
+                   (cond ((eq requested-type *empty-type*) nil) ; what a loser
+                         ((csubtypep requested-type (specifier-type 'base-char))
+                          'base-char)
+                         ((csubtypep requested-type (specifier-type 'character))
+                          'character)))))
+    (character `(sb-impl::%make-character-string-ostream))
+    (base-char `(sb-impl::%make-base-string-ostream))
+    (t (give-up-ir1-transform))))
 
 (flet ((xform (symbol match-kind fallback)
          (when (constant-lvar-p symbol)

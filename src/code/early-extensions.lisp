@@ -1363,6 +1363,33 @@ NOTE: This interface is experimental and subject to change."
                                 (length cache))))
                   short-name))))))
 
+;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
+;;; producing more compact code.
+(defmacro with-simple-output-to-string
+    ((var &optional string (element-type :default)) &body body)
+  ;; Don't need any fancy type-specifier parsing. Uses of this macro
+  ;; are confined to our own code. So the element-type is literally
+  ;; either :DEFAULT or BASE-CHAR.
+  (aver (member element-type '(base-char :default)))
+  (multiple-value-bind (forms decls) (parse-body body nil)
+    (if string
+        `(let ((,var (make-fill-pointer-output-stream ,string)))
+           ,@decls
+           ,@forms)
+        ;; Why not dxify this stream?
+        `(let ((,var #+sb-xc-host (make-string-output-stream)
+                     #-sb-xc-host
+                     ,(case element-type
+                        ;; Non-unicode doesn't have %MAKE-DEFAULT-STRING-OSTREAM
+                        #+sb-unicode
+                        (:default '(%make-default-string-ostream))
+                        ;; and this macro is never employed to make streams
+                        ;; that can only return CHARACTER string.
+                        (t '(%make-base-string-ostream)))))
+           ,@decls
+           ,@forms
+           (get-output-stream-string ,var)))))
+
 (in-package "SB-KERNEL")
 
 (defun fp-zero-p (x)
@@ -1398,29 +1425,6 @@ NOTE: This interface is experimental and subject to change."
                            vector))
              (sorted (stable-sort wrapped comparator :key #'cdr)))
         (map-into sorted #'car sorted))))
-
-;;; Just like WITH-OUTPUT-TO-STRING but doesn't close the stream,
-;;; producing more compact code.
-(defmacro with-simple-output-to-string
-    ((var &optional string (element-type #+sb-xc-host 'character
-                                         #-(or sb-xc-host sb-unicode) 'base-char
-                                         #+(and (not sb-xc-host) sb-unicode) :default))
-     &body body)
-  (multiple-value-bind (forms decls) (parse-body body nil)
-    (if string
-        `(let ((,var (sb-impl::make-fill-pointer-output-stream ,string)))
-           ,@decls
-           ,@forms)
-        `(let ((,var #+sb-xc-host (make-string-output-stream :element-type ',element-type)
-                     #-sb-xc-host (sb-impl::%make-string-output-stream
-                                   ',element-type
-                                   #',(if (eq element-type 'base-char)
-                                          'sb-impl::string-ouch/base-char
-                                          'sb-impl::string-ouch))))
-
-           ,@decls
-           ,@forms
-           (get-output-stream-string ,var)))))
 
 ;;; Ensure basicness if possible, and simplicity always
 (defun possibly-base-stringize (s)
