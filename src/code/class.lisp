@@ -899,19 +899,21 @@ between the ~A definition and the ~A definition"
      (system-area-pointer :codes (,sb-vm:sap-widetag)
                           :prototype-form (int-sap 0))
      (weak-pointer :codes (,sb-vm:weak-pointer-widetag)
-      :prototype-form (make-weak-pointer (find-package "CL")))
-     (code-component :codes (,sb-vm:code-header-widetag))
+      :prototype-form (make-weak-pointer 0))
+     (code-component :codes (,sb-vm:code-header-widetag)
+                     :prototype-form (fun-code-header #'identity))
      #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag))
      (fdefn :codes (,sb-vm:fdefn-widetag)
-            :prototype-form (make-fdefn nil))
-     (random-class) ; used for unknown type codes
-
+            :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))
+     (random-class ; used for unknown type codes
+            ;; Make the PROTOTYPE slot unbound.
+            :prototype-form sb-pcl:+slot-unbound+)
      (function
       :codes (,sb-vm:closure-widetag ,sb-vm:simple-fun-widetag)
       :state :read-only
-      :prototype-form (function (lambda () 42)))
+      :prototype-form #'identity)
 
-     (number :translation number)
+     (number :translation number :prototype-form 0)
      (complex
       :translation complex
       :inherits (number)
@@ -945,11 +947,9 @@ between the ~A definition and the ~A definition"
       :prototype-form
       ;; KLUDGE: doesn't work without AVX2 support from the CPU
       ;; (%make-simd-pack-256-ub64 42 42 42 42)
-      42)
-     (real :translation real :inherits (number))
-     (float
-      :translation float
-      :inherits (real number))
+      sb-pcl:+slot-unbound+)
+     (real :translation real :inherits (number) :prototype-form 0)
+     (float :translation float :inherits (real number) :prototype-form $0f0)
      (single-float
       :translation single-float
       :inherits (float real number)
@@ -967,16 +967,14 @@ between the ~A definition and the ~A definition"
       :codes (,sb-vm:long-float-widetag)
       :prototype-form $0L0)
      (rational
-      :translation rational
-      :inherits (real number))
+      :translation rational :inherits (real number) :prototype-form 0)
      (ratio
       :translation (and rational (not integer))
       :inherits (rational real number)
       :codes (,sb-vm:ratio-widetag)
       :prototype-form 1/42)
      (integer
-      :translation integer
-      :inherits (rational real number))
+      :translation integer :inherits (rational real number) :prototype-form 0)
      (fixnum
       :translation (integer ,sb-xc:most-negative-fixnum ,sb-xc:most-positive-fixnum)
       :inherits (integer rational real number)
@@ -1002,7 +1000,8 @@ between the ~A definition and the ~A definition"
      (vector
       :translation vector :codes (,sb-vm:complex-vector-widetag)
       :direct-superclasses (array sequence)
-      :inherits (array sequence))
+      :inherits (array sequence)
+      :prototype-form (make-array 0 :adjustable t))
      (simple-vector
       :translation simple-vector :codes (,sb-vm:simple-vector-widetag)
       :direct-superclasses (vector simple-array)
@@ -1017,15 +1016,17 @@ between the ~A definition and the ~A definition"
       :direct-superclasses (bit-vector simple-array)
       :inherits (bit-vector vector simple-array
                  array sequence)
-      :prototype-form (make-array 0 :element-type 'bit))
+      :prototype-form #*)
      (string
       :translation string
       :direct-superclasses (vector)
-      :inherits (vector array sequence))
+      :inherits (vector array sequence)
+      :prototype-form "")
      (simple-string
       :translation simple-string
       :direct-superclasses (string simple-array)
-      :inherits (string vector simple-array array sequence))
+      :inherits (string vector simple-array array sequence)
+      :prototype-form "")
      (vector-nil
       :translation (vector nil)
       :codes (,sb-vm:complex-vector-nil-widetag)
@@ -1069,7 +1070,8 @@ between the ~A definition and the ~A definition"
       :prototype-form (make-array 0 :element-type 'character))
      (list
       :translation (or cons (member nil))
-      :inherits (sequence))
+      :inherits (sequence)
+      :prototype-form 'nil)
      (cons
       :codes (,sb-vm:list-pointer-lowtag)
       :translation cons
@@ -1141,7 +1143,10 @@ between the ~A definition and the ~A definition"
                                      (list (car inherits))
                                      '(t))))
         x
-      (declare (ignore codes state translation prototype-form))
+      (declare (ignore codes state translation))
+      ;; instance metatypes and T don't need a prototype, everything else does
+      (unless (or prototype-form depth (eq name 't))
+        (error "Missing prototype in ~S" x))
       (let ((inherits-list (if (eq name t)
                                ()
                                (cons t (reverse inherits))))

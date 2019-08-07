@@ -26,3 +26,10 @@
 (precompile-random-code-segments pcl)
 
 (push '("SB-PCL" *pcl-package* *built-in-classes*) *!removable-symbols*)
+
+(dolist (c (sb-vm:list-allocated-objects
+            :all
+            :test (compile nil '(lambda (x) (typep x 'sb-pcl::system-class)))))
+  (when (slot-boundp c 'sb-pcl::prototype)
+    (let ((val (slot-value c 'sb-pcl::prototype)))
+      (assert (typep val c)))))
