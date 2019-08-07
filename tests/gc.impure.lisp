@@ -163,6 +163,12 @@
       (sleep 1)
       (assert gc-happend))))
 
+
+#+immobile-space
+(with-test (:name :generation-of-fdefn)
+  (assert (= (sb-kernel:generation-of (sb-kernel::find-fdefn 'car))
+             sb-vm:+pseudo-static-generation+)))
+
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
 (with-test (:name :bug-529014 :skipped-on (not :gencgc))
   (loop for i from 0 to sb-vm:+pseudo-static-generation+

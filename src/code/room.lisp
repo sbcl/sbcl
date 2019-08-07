@@ -1334,7 +1334,9 @@ We could try a few things to mitigate this:
            ;; SIMPLE-FUNs don't contain a generation byte
            (when (simple-fun-p object)
              (setq addr (get-lisp-obj-address (fun-code-header object))))
-           (logand #xF (sap-ref-8 (int-sap (logandc2 addr lowtag-mask)) 3))))))
+           (let ((sap (int-sap (logandc2 addr lowtag-mask))))
+             (logand (if (fdefn-p object) (sap-ref-8 sap 1) (sap-ref-8 sap 3))
+                     #xF))))))
 
 ;;; Show objects in a much simpler way than print-allocated-objects.
 ;;; Probably don't use this for generation 0 of dynamic space. Other spaces are ok.
