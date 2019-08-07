@@ -902,7 +902,9 @@ between the ~A definition and the ~A definition"
       :prototype-form (make-weak-pointer 0))
      (code-component :codes (,sb-vm:code-header-widetag)
                      :prototype-form (fun-code-header #'identity))
-     #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag))
+     #-(or x86 x86-64) (lra :codes (,sb-vm:return-pc-widetag)
+                            ;; Make the PROTOTYPE slot unbound.
+                            :prototype-form sb-pcl:+slot-unbound+)
      (fdefn :codes (,sb-vm:fdefn-widetag)
             :prototype-form (find-or-create-fdefn 'sb-mop:class-prototype))
      (random-class ; used for unknown type codes
