@@ -331,9 +331,11 @@
 (defvar *foo*)
 #+gencgc
 (with-test (:name :traceroot-simple-fun)
+  ;; Tracing a path to a simple fun wasn't working at some point
+  ;; because of failure to employ fun_code_header in the right place.
   (setq *foo* (compile nil '(lambda () 42)))
   (let ((wp (sb-ext:make-weak-pointer *foo*)))
-    (assert (eql (sb-ext:search-roots wp) 1))))
+    (assert (sb-ext:search-roots wp :oldest nil))))
 
 #+gencgc
 (with-test (:name :traceroot-ignore-immediate)

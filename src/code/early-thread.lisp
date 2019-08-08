@@ -13,7 +13,7 @@
                    (:copier nil))
   "Thread type. Do not rely on threads being structs as it may change
 in future versions."
-  (name          nil :type (or null simple-string)) ; some C code reads this
+  (name          nil :type (or null simple-string)) ; C code could read this
   (%alive-p      nil :type boolean)
   (%ephemeral-p  nil :type boolean)
   ;; 0 is used on thread-less builds
