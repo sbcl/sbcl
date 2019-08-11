@@ -16,7 +16,7 @@
   (export 'sb-kernel::profile-deinit "SB-KERNEL"))
 
 (in-package "SB-PROFILE")
-
+
 
 ;;;; COUNTER object
 ;;;;
@@ -64,7 +64,7 @@
 (defun counter-count (counter)
   (+ (counter-word counter)
      (* (counter-overflow counter) (1+ most-positive-word))))
-
+
 ;;;; High resolution timer
 
 ;;; FIXME: High resolution this is not. Build a microsecond-accuracy version
@@ -75,7 +75,7 @@
 (declaim (inline get-internal-ticks))
 (defun get-internal-ticks ()
   (get-internal-run-time))
-
+
 ;;;; global data structures
 
 ;;; We associate a PROFILE-INFO structure with each profiled function
@@ -137,7 +137,7 @@
 (defvar *overhead*)
 (declaim (type overhead *overhead*))
 (makunbound '*overhead*) ; in case we reload this file when tweaking
-
+
 ;;;; profile encapsulations
 
 ;;; Return a collection of closures over the same lexical context,
@@ -236,7 +236,7 @@
              consing (make-counter)
              profiles (make-counter)
              gc-run-time (make-counter))))))
-
+
 ;;;; interfaces
 
 ;;; A symbol or (SETF FOO) list names a function, a string names all
@@ -337,7 +337,7 @@
   (dohash ((name profile-info) *profiled-fun-name->info* :locked t)
     (declare (ignore name))
     (funcall (profile-info-clear-stats-fun profile-info))))
-
+
 ;;;; reporting results
 
 (defstruct (time-info (:copier nil))
@@ -483,7 +483,7 @@ uncalled profiled functions are listed."
               (overhead-total *overhead*)
               (overhead-internal *overhead*)))))
 
-
+
 ;;;; overhead estimation
 
 ;;; We average the timing overhead over this many iterations.

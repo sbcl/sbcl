@@ -14,7 +14,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-
+
 ;;;; Pathname accessors
 
 (with-test (:name (pathname :accessors :stream-not-associated-to-file type-error))
@@ -128,7 +128,7 @@
        (,#P"n.Foo" :common "Foo")
        (,#P"n.a*b" :common ("A" :multi-char-wild "B"))))))
 
-
+
 ;;;; Logical pathnames
 
 (setf (logical-pathname-translations "demo0")
@@ -298,7 +298,7 @@
                               "test0:foo;bar;baz;mum.quux.3"))
                  "/library/foo/foo/bar/baz/mum.quux")))
 
-
+
 ;;;; MERGE-PATHNAME tests
 ;;;;
 ;;;; There are some things we don't bother testing, just because they're
@@ -407,7 +407,7 @@
                (frob pathname-directory)
                (frob pathname-name)
                (frob pathname-type)))))
-
+
 ;;; host-namestring testing
 (with-test (:name host-namestring)
   (assert (string=
@@ -419,14 +419,14 @@
   (assert-error
    (setf (logical-pathname-translations "")
          (list '("**;*.*.*" "/**/*.*")))))
-
+
 ;;; Bug 200: translate-logical-pathname is according to the spec supposed
 ;;; not to give errors if asked to translate a namestring for a valid
 ;;; physical pathname.  Failed in 0.7.7.28 and before
 (with-test (:name (:logical-pathname 16))
   (assert (string= (namestring (translate-logical-pathname "/")) "/")))
 
-
+
 ;;; Not strictly pathname logic testing, but until sbcl-0.7.6.19 we
 ;;; had difficulty with non-FILE-STREAM stream arguments to pathname
 ;;; functions (they would cause memory protection errors).  Make sure
@@ -441,7 +441,7 @@
              (assert-error (funcall fun) type-error))))
     (test '(pathname (make-string-input-stream "FOO")))
     (test '(merge-pathnames (make-string-output-stream)))))
-
+
 ;;; ensure print-read consistency (or print-not-readable-error) on
 ;;; pathnames:
 (with-test (:name :print/read-consistency)
@@ -473,7 +473,7 @@
                  (pathname-host new) (pathname-device new)
                  (pathname-directory new) (pathname-name new)
                  (pathname-type new) (pathname-version new)))))))
-
+
 ;;; BUG 330: "PARSE-NAMESTRING should accept namestrings as the
 ;;; default argument" ...and streams as well
 (with-test (:name (parse-namestring stream))
@@ -488,12 +488,12 @@
           ;; opposed to eg. #P"/path/to/current/foo"), which is
           ;; possibly mildly surprising but probably conformant.
           (assert (parse-namestring "foo" nil f)))))
-
+
 ;;; ENOUGH-NAMESTRING should probably not fail when the namestring in
 ;;; question has a :RELATIVE pathname.
 (with-test (:name enough-namestring)
   (assert (equal (enough-namestring #p"foo" #p"./") "foo")))
-
+
 ;;;; NAMESTRING
 
 ;;; bug reported by Artem V. Andreev: :WILD not handled in unparsing
@@ -602,14 +602,14 @@
                    (list* 'write-to-string pathname vars)
                    expected
                    actual)))
-
+
 ;;; we got (truename "/") wrong for about 6 months.  Check that it's
 ;;; still right.
 (with-test (:name :root-truename)
   (let ((pathname (truename "/")))
     (assert (equalp pathname (merge-pathnames #p"/")))
     (assert (equal (pathname-directory pathname) '(:absolute)))))
-
+
 ;;; we failed to unparse logical pathnames with :NAME :WILD :TYPE NIL.
 ;;; (Reported by Pascal Bourguignon.
 (with-test (:name (namestring :unparse-logical-wild))
@@ -624,7 +624,7 @@
              (assert-error (namestring pathname) file-error))))
     (test :name "")
     (test :type "foo")))
-
+
 ;;; reported by James Y Knight on sbcl-devel 2006-05-17
 (with-test (:name :merge-back)
   (let ((p1 (make-pathname :directory '(:relative "bar")))
@@ -676,10 +676,10 @@
   (assert (equal #p"quux/bar.fasl"
                  (let ((*default-pathname-defaults* #p"quux/"))
                    (compile-file-pathname "bar.lisp")))))
-
+
 (with-test (:name :wild-enough)
   (enough-namestring #p".a*"))
-
+
 
 (with-test (:name :translated-wild-version)
   (assert (eq 99
@@ -699,7 +699,7 @@
 ;;; enough-namestring relative to root
 (with-test (:name :enough-relative-to-root)
   (assert (equal "foo" (enough-namestring "/foo" "/"))))
-
+
 ;;; Check the handling of NIL, :UNSPECIFIC, the empty string, and
 ;;; non-NIL strings in NATIVE-NAMESTRING implementations.  Revised by
 ;;; RMK 2007-11-28, attempting to preserve the apparent intended

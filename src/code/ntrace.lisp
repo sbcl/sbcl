@@ -14,7 +14,7 @@
 ;;; FIXME: Why, oh why, doesn't the SB-DEBUG package use the SB-DI
 ;;; package? That would let us get rid of a whole lot of stupid
 ;;; prefixes..
-
+
 ;;;; utilities
 
 ;;; Given a function name, a function or a macro name, return the raw
@@ -151,7 +151,7 @@
                     (sb-di:fun-end-cookie-valid-p frame cookie))))
       (return))
     (pop *traced-entries*)))
-
+
 ;;;; hook functions
 
 ;;; Return a closure that can be used for a function start breakpoint
@@ -242,7 +242,7 @@
           (finish-output *trace-output*))
         (apply #'trace-maybe-break info (trace-info-break-after info) "after"
                frame values)))))
-
+
 ;;; This function is called by the trace encapsulation. It calls the
 ;;; breakpoint hook functions with NIL for the breakpoint and cookie,
 ;;; which we have cleverly contrived to work for our hook functions.
@@ -272,7 +272,7 @@
           (let ((vals (multiple-value-list (apply function args))))
             (funcall (trace-end-breakpoint-fun info) frame nil vals nil)
             (values-list vals)))))))
-
+
 ;;; Trace one function according to the specified options. We copy the
 ;;; trace info (it was a quoted constant), fill in the functions, and
 ;;; then install the breakpoints or encapsulation.
@@ -378,7 +378,7 @@
               (trace-1 (sb-pcl::%method-function-fast-function mf) info)))))
 
       function-or-name)))
-
+
 ;;;; the TRACE macro
 
 ;;; Parse leading trace options off of SPECS, modifying INFO
@@ -569,7 +569,7 @@ The -AFTER and -ALL forms can use SB-DEBUG:ARG."
   (if specs
       (expand-trace specs)
       '(%list-traced-funs)))
-
+
 ;;;; untracing
 
 ;;; Untrace one function.

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (defun %test-fixnum (value temp target not-p)
   (assemble ()
     (inst andi. temp value fixnum-tag-mask)
@@ -101,7 +101,7 @@
                           (inst b? (if not-p :gt :le) target)
                           (inst ble when-true))))))))))
         (emit-label drop-through)))))
-
+
 ;;;; Other integer ranges.
 
 ;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
@@ -173,7 +173,7 @@
         (inst b?  :cr1 (if not-p :lt :ge) target)
 
         (emit-label not-target)))))
-
+
 ;;;; List/symbol types:
 ;;;
 ;;; symbolp (or symbol (eq nil))

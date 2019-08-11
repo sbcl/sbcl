@@ -22,14 +22,14 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;; methods
 ;;;
 ;;; Methods themselves are simple inanimate objects. Most properties of
 ;;; methods are immutable, methods cannot be reinitialized. The following
 ;;; properties of methods can be changed:
 ;;;   METHOD-GENERIC-FUNCTION
-
+
 ;;; initialization
 ;;;
 ;;; Error checking is done in before methods. Because of the simplicity of
@@ -164,10 +164,10 @@
                                      &rest initargs &key ((method-cell method-cell)))
   (declare (ignore slot-names method-cell))
   (initialize-method-function initargs method))
-
+
 (define-load-time-global *the-class-standard-generic-function*
   (find-class 'standard-generic-function))
-
+
 (defmethod shared-initialize :before
            ((generic-function standard-generic-function)
             slot-names
@@ -211,7 +211,7 @@
            (initarg-error :method-combination
                           "not supplied"
                           "a method combination object")))))
-
+
 (defun find-generic-function (name &optional (errorp t))
   (let ((fun (and (fboundp name) (fdefinition name))))
     (cond
@@ -298,7 +298,7 @@
    ;; That one must be supplied as a pre-parsed #<EQL-SPECIALIZER> because if
    ;; not, we'd parse it into a specializer whose object is :X.
    (parse-specializers generic-function specializers) errorp t))
-
+
 ;;; Compute various information about a generic-function's arglist by looking
 ;;; at the argument lists of the methods. The hair for trying not to use
 ;;; &REST arguments lives here.
@@ -372,7 +372,7 @@
          (when restp
                `(&rest ,(format-symbol *package*
                                        "Discriminating Function &rest Arg")))))
-
+
 (defmethod generic-function-argument-precedence-order
     ((gf standard-generic-function))
   (aver (eq **boot-state** 'complete))
@@ -645,7 +645,7 @@
                             (update-dependent generic-function
                                               dep 'remove-method method)))))))
   generic-function)
-
+
 (defun compute-applicable-methods-function (generic-function arguments)
   (values (compute-applicable-methods-using-types
            generic-function
@@ -701,7 +701,7 @@
    (cons null)                          ; direct subclasses of list
    (string bit-vector)                  ; direct subclasses of vector
    ))
-
+
 (defmethod same-specializer-p ((specl1 specializer) (specl2 specializer))
   (eql specl1 specl2))
 
@@ -1464,7 +1464,7 @@
                                               types))
            (emf (get-effective-method-function generic-function smethods)))
       (invoke-emf emf args))))
-
+
 ;;; The value returned by compute-discriminating-function is a function
 ;;; object. It is called a discriminating function because it is called
 ;;; when the generic function is called and its role is to discriminate
@@ -1657,7 +1657,7 @@
 (defmethod compute-discriminating-function :around ((gf standard-generic-function))
   (maybe-encapsulate-discriminating-function
    gf (generic-function-encapsulations gf) (call-next-method)))
-
+
 (defmethod (setf class-name) (new-value class)
   (let ((classoid (layout-classoid (class-wrapper class))))
     (if (and new-value (symbolp new-value))
@@ -1669,7 +1669,7 @@
 (defmethod (setf generic-function-name) (new-value generic-function)
   (reinitialize-instance generic-function :name new-value)
   new-value)
-
+
 (defmethod function-keywords ((method standard-method))
   (multiple-value-bind (llks nreq nopt keywords)
       (analyze-lambda-list (if (consp method)
@@ -1677,7 +1677,7 @@
                                (method-lambda-list method)))
     (declare (ignore nreq nopt))
     (values keywords (ll-kwds-allowp llks))))
-
+
 ;;; This is based on the rules of method lambda list congruency
 ;;; defined in the spec. The lambda list it constructs is the pretty
 ;;; union of the lambda lists of the generic function and of all its

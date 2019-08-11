@@ -224,7 +224,7 @@
                #'delegate-complex-subtypep-arg2)
          (setf (type-class-complex-intersection2 type-class)
                #'delegate-complex-intersection2))))))
-
+
 ;;;; FUNCTION and VALUES types
 ;;;;
 ;;;; Pretty much all of the general type operations are illegal on
@@ -543,7 +543,7 @@
         (if (plusp llks)
             (make-values-type :required required :optional optional :rest rest)
             (make-short-values-type required)))))
-
+
 ;;;; VALUES types interfaces
 ;;;;
 ;;;; We provide a few special operations that can be meaningfully used
@@ -920,7 +920,7 @@
                             (return (values nil nil)))
                           (unless res
                             (return (values nil t))))))))))))
-
+
 ;;;; type method interfaces
 
 ;;; like SUBTYPEP, only works on CTYPE structures
@@ -1210,7 +1210,7 @@
         (setf (info :type :builtin spec) res)
         (setf (info :type :kind spec) :primitive))))
   (values))
-
+
 ;;;; general TYPE-UNION and TYPE-INTERSECTION operations
 ;;;;
 ;;;; These are fully general operations on CTYPEs: they'll always
@@ -1289,7 +1289,7 @@
       (t (make-union-type
           (every #'type-enumerable simplified-types)
           simplified-types)))))
-
+
 ;;;; built-in types
 
 (define-type-method (named :simple-=) (type1 type2)
@@ -1519,7 +1519,7 @@
 
 (define-type-method (named :unparse) (x)
   (named-type-name x))
-
+
 ;;;; hairy and unknown types
 ;;;; DEFINE-TYPE-CLASS HAIRY is in 'early-type'
 
@@ -1615,7 +1615,7 @@
    (keywordp (literal-ctype *satisfies-keywordp-type*))
    (legal-fun-name-p (literal-ctype *fun-name-type*))
    (t (%make-hairy-type whole))))
-
+
 ;;;; negation types
 
 (define-type-method (negation :negate) (x)
@@ -1791,7 +1791,7 @@
 
 (def-type-translator not :list ((:context context) typespec)
   (type-negation (specifier-type-r context typespec)))
-
+
 ;;;; numeric types
 
 (declaim (inline numeric-type-equal))
@@ -2513,7 +2513,7 @@ used for a COMPLEX component.~:@>"
               (t
                (specifier-type 'number))))
       (specifier-type 'number)))
-
+
 ;;;; array types
 
 (define-type-method (array :simple-=) (type1 type2)
@@ -2884,7 +2884,7 @@ used for a COMPLEX component.~:@>"
      dims)
     (t
      (error "Array dimensions is not a list, integer or *:~%  ~S" dims))))
-
+
 ;;;; MEMBER types
 
 (define-type-method (member :negate) (type)
@@ -3018,7 +3018,7 @@ used for a COMPLEX component.~:@>"
                                                 (sort char-codes #'<)))
                (nreverse numbers)))
       *empty-type*))
-
+
 ;;;; intersection types
 ;;;;
 ;;;; Until version 0.6.10.6, SBCL followed the original CMU CL approach
@@ -3177,7 +3177,7 @@ used for a COMPLEX component.~:@>"
   (apply #'type-intersection
          (mapcar (lambda (x) (specifier-type-r context x))
                  type-specifiers)))
-
+
 ;;;; union types
 
 (define-type-class union
@@ -3439,7 +3439,7 @@ used for a COMPLEX component.~:@>"
     (if (union-type-p type)
         (sb-kernel::simplify-array-unions type)
         type)))
-
+
 ;;;; CONS types
 
 (def-type-translator cons ((:context context)
@@ -3583,7 +3583,7 @@ used for a COMPLEX component.~:@>"
                  cdr-int2)))))
 
 (!define-superclasses cons ((cons)) !cold-init-forms)
-
+
 ;;;; CHARACTER-SET types
 
 (def-type-translator character-set
@@ -3732,12 +3732,12 @@ used for a COMPLEX component.~:@>"
         (nreverse res))
     nil))
 
-
+
 ;;; Return the type that describes all objects that are in X but not
 ;;; in Y.
 (defun type-difference (x y)
   (type-intersection x (type-negation y)))
-
+
 (def-type-translator array ((:context context)
                              &optional (element-type '*)
                                        (dimensions '*))
@@ -3761,7 +3761,7 @@ used for a COMPLEX component.~:@>"
                     :element-type eltype
                     :specialized-element-type (%upgraded-array-element-type
                                                eltype))))
-
+
 ;;;; SIMD-PACK types
 #+sb-simd-pack
 (progn
@@ -3878,7 +3878,7 @@ used for a COMPLEX component.~:@>"
            *empty-type*)))
 
   (!define-superclasses simd-pack-256 ((simd-pack-256)) !cold-init-forms))
-
+
 ;;;; utilities shared between cross-compiler and target system
 
 ;;; Does the type derived from compilation of an actual function
@@ -3937,7 +3937,7 @@ used for a COMPLEX component.~:@>"
                          :complexp complexp
                          :low low
                          :high high))))
-
+
 ;;; The following function is a generic driver for approximating
 ;;; set-valued functions over types.  Putting this here because it'll
 ;;; probably be useful for a lot of type analyses.
@@ -4140,7 +4140,7 @@ used for a COMPLEX component.~:@>"
    #'union #'intersection #'set-difference
    '* nil
    over under))
-
+
 (!defun-from-collected-cold-init-forms !late-type-cold-init)
 
 (/show0 "late-type.lisp end of file")

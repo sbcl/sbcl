@@ -8,7 +8,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; the DEF!TYPE macro
 
 ;;; DEF!TYPE = cold DEFTYPE, a version of DEFTYPE which at

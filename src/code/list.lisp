@@ -112,7 +112,7 @@
 (defun cons (se1 se2)
   "Return a list with SE1 as the CAR and SE2 as the CDR."
   (cons se1 se2))
-
+
 (declaim (maybe-inline tree-equal-test tree-equal-test-not))
 
 (defun tree-equal-test-not (x y test-not)
@@ -391,7 +391,7 @@
        (result '() (cons initial-element result)))
       ((<= count 0) result)
     (declare (type index count))))
-
+
 (defun append (&rest lists)
   "Construct a new list by concatenating the list arguments"
   (let* ((result (list nil))
@@ -430,7 +430,7 @@
              result)
                     (rplacd (truly-the cons tail) (list (car more)))))))
 
-
+
 ;;;; list copying functions
 
 (defun copy-list (list)
@@ -475,7 +475,7 @@
         result)
       object))
 
-
+
 ;;;; more commonly-used list functions
 
 (defun revappend (x y)
@@ -528,7 +528,7 @@
        (3rd y 2nd))             ;3rd follows 2nd down the list.
       ((atom 2nd) 3rd)
     (rplacd 2nd 3rd)))
-
+
 
 (defun butlast (list &optional (n 1))
   (declare (optimize speed)
@@ -585,7 +585,7 @@
     (if (eql list object)
         (return (cdr result))
         (setq splice (cdr (rplacd splice (list (car list))))))))
-
+
 ;;;; functions to alter list structure
 
 (defun rplaca (cons x)
@@ -613,7 +613,7 @@
            (error "~S is too large an index for SETF of NTH." n))
          (rplaca cons newval)
          newval))))
-
+
 ;;;; :KEY arg optimization to save funcall of IDENTITY
 
 ;;; APPLY-KEY saves us a function call sometimes.
@@ -628,7 +628,7 @@
   `(if ,key
        (funcall (truly-the function ,key) ,element)
        ,element))
-
+
 ;;;; macros for (&KEY (KEY #'IDENTITY) (TEST #'EQL TESTP) (TEST-NOT NIL NOTP))
 
 ;;; Use these with the following &KEY args:
@@ -643,7 +643,7 @@
       (cond (testp (funcall test ,item ,key-tmp))
             (notp (not (funcall test-not ,item ,key-tmp)))
             (t (funcall test ,item ,key-tmp))))))
-
+
 ;;;; substitution of expressions
 
 (defun subst (new old tree &key key (test #'eql testp) (test-not #'eql notp))
@@ -758,7 +758,7 @@
                               (setf (car subtree) (s (car subtree)))))
                         subtree))))
       (s tree))))
-
+
 (defun sublis (alist tree &key key (test #'eql testp) (test-not #'eql notp))
   "Substitute from ALIST into TREE nondestructively."
   (declare (dynamic-extent key test test-not))
@@ -818,7 +818,7 @@
                                 (setf (car subtree) (s (car subtree)))))
                           subtree))))
         (s tree)))))
-
+
 ;;;; functions for using lists as sets
 
 (defun member (item list &key key (test nil testp) (test-not nil notp))
@@ -1185,7 +1185,7 @@
       (unless (funcall member-test elt list2 key test)
         (return-from subsetp nil)))
     t))
-
+
 ;;;; functions that operate on association lists
 
 (defun acons (key datum alist)
@@ -1290,7 +1290,7 @@
     (if key
         (%rassoc-if-not-key predicate alist key)
         (%rassoc-if-not predicate alist))))
-
+
 ;;;; mapping functions
 
 ;;; a helper function for implementation of MAPC, MAPCAR, MAPCAN,

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 
 (defconstant-eqx c-saved-registers
     (list* lr-offset
@@ -212,7 +212,7 @@
       (let ((delta (logandc2 (+ amount +number-stack-alignment-mask+)
                              +number-stack-alignment-mask+)))
         (inst addi nsp-tn nsp-tn delta)))))
-
+
 ;;; Callback
 #-sb-xc-host
 (defun alien-callback-accessor-form (type sap offset)

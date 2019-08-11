@@ -160,7 +160,7 @@
   (unless (internal-name-p what)
     (push (list :calls what path) (block-xrefs block))))
 
-
+
 ;;;; Packing of xref tables
 ;;;;
 ;;;; xref information can be transformed into the following "packed"

@@ -2,12 +2,12 @@
 ;;;
 (in-package "SB-VM")
 
-
+
 #-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "MIPS")
-
+
 ;;;; FIXUP-CODE-OBJECT
 
 (defconstant-eqx +fixup-kinds+ #(:absolute :jmp :lui :addi) #'equalp)
@@ -33,7 +33,7 @@
               (ldb (byte 16 0) value)))))
   nil))
 
-
+
 #-sb-xc-host (progn
 
 (define-alien-routine ("os_context_bd_cause" context-bd-cause-int)

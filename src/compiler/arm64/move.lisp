@@ -120,7 +120,7 @@
    (unsigned-reg) (unsigned-stack))
   (store-stack-offset x (current-nfp-tn vop) y))
 
-
+
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
@@ -300,7 +300,7 @@
                    cfp-tn)
                (tn-ref-load-tn (tn-ref-across (sb-c::vop-args vop1)))))))))))
 
-
+
 ;;;; ILLEGAL-MOVE
 
 ;;; This VOP exists just to begin the lifetime of a TN that couldn't
@@ -315,7 +315,7 @@
   (:save-p :compute-only)
   (:generator 666
     (error-call vop 'object-not-type-error x type)))
-
+
 ;;;; Moves and coercions:
 
 ;;; These MOVE-TO-WORD VOPs move a tagged integer to a raw full-word

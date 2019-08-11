@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (macrolet ((ea-for-xf-desc (tn slot)
              `(make-ea-for-object-slot ,tn ,slot other-pointer-lowtag)))
   (defun ea-for-sf-desc (tn)
@@ -125,7 +125,7 @@
 (defun store-long-float (ea)
    (inst fstpl ea)
    (inst fldl ea))
-
+
 ;;;; move functions
 
 ;;; X is source, Y is destination.
@@ -222,7 +222,7 @@
          (inst fldd value))))))
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'cl:single-float))
-
+
 ;;;; complex float move functions
 
 (defun complex-single-reg-real-tn (x)
@@ -320,7 +320,7 @@
     (store-long-float (ea-for-clf-imag-stack y))
     (inst fxch imag-tn)))
 
-
+
 ;;;; move VOPs
 
 ;;; float register to register moves
@@ -403,7 +403,7 @@
 #+long-float
 (define-move-vop complex-long-move :move
   (complex-long-reg) (complex-long-reg))
-
+
 ;;; Move from float to a descriptor reg. allocating a new float
 ;;; object in the process.
 (define-vop (move-from-single)
@@ -501,7 +501,7 @@
        (inst fldl (ea-for-lf-desc x)))))
 #+long-float
 (define-move-vop move-to-long :move (descriptor-reg) (long-reg))
-
+
 ;;; Move from complex float to a descriptor reg. allocating a new
 ;;; complex float object in the process.
 (define-vop (move-from-complex-single)
@@ -581,7 +581,7 @@
           (frob move-to-complex-double complex-double-reg :double)
           #+long-float
           (frob move-to-complex-double complex-long-reg :long))
-
+
 ;;;; the move argument vops
 ;;;;
 ;;;; Note these are also used to stuff fp numbers onto the c-call
@@ -724,7 +724,7 @@
    complex-single-reg complex-double-reg #+long-float complex-long-reg)
   (descriptor-reg))
 
-
+
 ;;;; arithmetic VOPs
 
 ;;; dtc: the floating point arithmetic vops
@@ -1142,7 +1142,7 @@
           fdiv fdivr //single-float 12
           fdivd fdivrd //double-float 12
           //long-float 12))
-
+
 (macrolet ((frob (name inst translate sc type)
              `(define-vop (,name)
                (:args (x :scs (,sc) :target fr0))
@@ -1175,7 +1175,7 @@
   (frob %negate/double-float fchs %negate double-reg double-float)
   #+long-float
   (frob %negate/long-float fchs %negate long-reg long-float))
-
+
 ;;;; comparison
 
 (define-vop (=/float)
@@ -1577,7 +1577,7 @@
   `(and (= (long-float-low-bits x) (long-float-low-bits y))
         (= (long-float-high-bits x) (long-float-high-bits y))
         (= (long-float-exp-bits x) (long-float-exp-bits y))))
-
+
 ;;;; conversion
 
 (macrolet ((frob (name translate to-sc to-type)
@@ -2039,7 +2039,7 @@
        (descriptor-reg
         (loadw lo-bits float long-float-value-slot
                other-pointer-lowtag)))))
-
+
 ;;;; float mode hackery
 
 (sb-xc:deftype float-modes () '(unsigned-byte 32)) ; really only 16
@@ -2092,7 +2092,7 @@
    (inst fldenv (make-ea :dword :base esp-tn))
    (inst add esp-tn npx-env-size)       ; Pop stack.
    (move res new)))
-
+
 #-long-float
 (progn
 
@@ -3100,7 +3100,7 @@
        ((0 1))
        (t (inst fstd r)))))
 ) ; PROGN #-LONG-FLOAT
-
+
 #+long-float
 (progn
 
@@ -4076,7 +4076,7 @@
        (t (inst fstd r)))))
 
 ) ; PROGN #+LONG-FLOAT
-
+
 ;;;; complex float VOPs
 
 (define-vop (make-complex-single-float)
@@ -4334,7 +4334,7 @@
   (:result-types long-float)
   (:note "complex float imagpart")
   (:variant 1))
-
+
 ;;; hack dummy VOPs to bias the representation selection of their
 ;;; arguments towards a FP register, which can help avoid consing at
 ;;; inappropriate locations

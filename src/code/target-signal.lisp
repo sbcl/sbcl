@@ -45,7 +45,7 @@
     (alien-funcall %unblock-gc-signals 0 0)
     nil))
 
-
+
 ;;;; C routines that actually do all the work of establishing signal handlers
 (define-alien-routine ("install_handler" install-handler)
   unsigned-long
@@ -111,7 +111,7 @@
 
 (defun ignore-interrupt (signal)
   (enable-interrupt signal :ignore))
-
+
 ;;;; Support for signal handlers which aren't.
 ;;;;
 ;;;; On safepoint builds, user-defined Lisp signal handlers do not run
@@ -134,7 +134,7 @@
                 (funcall run-handler signal info context)))
       (sb-thread::new-lisp-thread-trampoline thread nil #'callback nil))))
 
-
+
 ;;;; default LISP signal handlers
 ;;;;
 ;;;; Most of these just call ERROR to report the presence of the signal.
@@ -247,7 +247,7 @@
   #-sb-safepoint (unblock-gc-signals)
   (unblock-deferrable-signals)
   (values))
-
+
 ;;;; etc.
 
 ;;; extract si_code from siginfo_t

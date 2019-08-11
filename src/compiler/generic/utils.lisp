@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;; Make a fixnum out of NUM. (I.e. shift by two bits if it will fit.)
 (defun fixnumize (num)
   (if (fixnump num)
@@ -31,7 +31,7 @@
           (displacement-bounds lowtag element-size data-offset)
         (<= min offset max))))
 
-
+
 ;;;; routines for dealing with static symbols
 
 (defun static-symbol-p (symbol)
@@ -76,7 +76,7 @@
   (+ (static-fdefn-offset name)
      (- other-pointer-lowtag)
      (* fdefn-raw-addr-slot n-word-bytes)))
-
+
 ;;;; interfaces to IR2 conversion
 
 ;;; Return a wired TN describing the N'th full call argument passing

@@ -57,7 +57,7 @@ are running on, or NIL if we can't find any useful information."
 (defun long-site-name ()
   "Return a string with the long form of the site name, or NIL if not known."
   *long-site-name*)
-
+
 ;;;; ED
 (declaim (type list *ed-functions*))
 (defvar *ed-functions* '()
@@ -76,7 +76,7 @@ the file system."
                   :references '((:sbcl :variable *ed-functions*))))
     (when (funcall fun x)
       (return t))))
-
+
 ;;;; dribble stuff
 
 ;;; Each time we start dribbling to a new stream, we put it in

@@ -41,7 +41,7 @@
   (assert (string= (with-output-to-string (*standard-output*)
                      (assert (= (run-test) 42)))
                    "42")))
-
+
 ;;; Slightly more complex test cases, from Bruno Haible (sbcl-devel
 ;;; 2004-06-11).  First the setup.
 (defclass user-method (standard-method) (myslot))

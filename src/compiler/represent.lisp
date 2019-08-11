@@ -14,7 +14,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; error routines
 ;;;;
 ;;;; Problems in the VM definition often show up here, so we try to be
@@ -179,7 +179,7 @@
           ~S (SC ~S)"
          val (sc-name (tn-sc val))
          pass (sc-name (tn-sc pass))))
-
+
 ;;;; VM consistency checking
 ;;;;
 ;;;; We do some checking of the consistency of the VM definition at
@@ -206,7 +206,7 @@
               (warn "no move function defined to save SC ~S to alternate ~
                      SC ~S"
                     (sc-name sc) (sc-name alt)))))))))
-
+
 ;;;; representation selection
 
 ;;; VOPs that we ignore in initial cost computation. We ignore SET in

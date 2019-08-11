@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (defun %test-fixnum (value temp target not-p)
   (declare (ignore temp))
   (assemble ()
@@ -128,7 +128,7 @@
                           (inst b (if not-p :gt :le) target)
                           (inst b :le when-true))))))))))
         (emit-label drop-through)))))
-
+
 ;;;; Other integer ranges.
 
 ;;; A (signed-byte 64) can be represented with either fixnum or a bignum with
@@ -214,7 +214,7 @@
   (:translate fixnump)
   (:generator 3
     (inst adds temp value value)))
-
+
 ;;; MOD type checks
 (defun power-of-two-limit-p (x)
   (and (fixnump x)

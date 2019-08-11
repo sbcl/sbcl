@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-
+
 ;;;; Registers
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -242,7 +242,7 @@
 ;                       :element-size 2
                        ))
 
-
+
 ;;;; Make some random tns for important registers.
 
 ;;; how can we address reg L0 through L0-offset when it is not
@@ -290,7 +290,7 @@
                   :sc (sc-or-lose 'double-reg)
                   :offset 0))
 
-
+
 ;;; If VALUE can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -320,7 +320,7 @@
   (or (eql sc zero-sc-number)
       (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
-
+
 ;;;; Function Call Parameters
 
 ;;; The SC numbers for register and stack arguments/return values.
@@ -357,7 +357,7 @@
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 4)
-
+
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.
 (defun location-print-name (tn)

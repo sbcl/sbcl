@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; types
 
 (eval-when (:compile-toplevel)
@@ -110,7 +110,7 @@
   (setf (sap-ref-word sap (the index (ash offset word-shift)))
         value))
 
-
+
 ;;; the actual bashers and common uses of same
 
 ;;; This is a little ugly.  Fixing bug 188 would bring the ability to
@@ -586,7 +586,7 @@
         ;; FIXERS must come first so their inline expansions are available
         ;; for the bashers.
         finally (return `(progn ,@fixers ,@bashers)))
-
+
 ;;;; Bashing-Style search for bits
 ;;;;
 ;;;; Similar search would work well for base-strings as well.

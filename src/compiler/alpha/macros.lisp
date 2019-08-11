@@ -19,7 +19,7 @@
          ((,gensym ()
             ,expr))
        (,gensym))))
-
+
 ;;; instruction-like macros
 
 ;;; c.f. x86 backend:
@@ -112,7 +112,7 @@
      (inst lra-header-word)))
 
 
-
+
 ;;;; stack TN's
 
 ;;;    Move a stack TN to a register and vice-versa.
@@ -157,7 +157,7 @@
             (loadw ,n-reg cfp-tn (tn-offset ,n-stack))
             (inst mskll nsp-tn 0 ,temp)
             (inst bis ,temp ,n-reg ,n-reg))))))))
-
+
 ;;;; storage allocation
 
 ;;; Do stuff to allocate an other-pointer object of fixed SIZE with a
@@ -185,7 +185,7 @@
     (inst addq csp-tn n-word-bytes csp-tn)
     (storew zero-tn csp-tn -1)
     (emit-label aligned)))
-
+
 ;;;; error code
 (defun emit-error-break (vop kind code values)
   (assemble ()
@@ -204,7 +204,7 @@
       (emit-label start-lab)
       (apply #'error-call vop error-code values)
       start-lab)))
-
+
 ;;; a handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((&key (extra 0)) &rest forms)
   `(progn
@@ -212,7 +212,7 @@
      ,@forms
      (inst lda alloc-tn (1- ,extra) alloc-tn)
      (inst stl zero-tn 0 alloc-tn)))
-
+
 ;;;; memory accessor vop generators
 
 (sb-xc:deftype load/store-index (scale lowtag min-offset

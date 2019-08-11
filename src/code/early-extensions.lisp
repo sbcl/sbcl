@@ -65,7 +65,7 @@
 (defconstant return-char-code 13)
 (defconstant escape-char-code 27) ; unused
 (defconstant rubout-char-code 127)
-
+
 ;;;; type-ish predicates
 
 ;;; This is used for coalescing constants, check that the tree doesn't
@@ -133,7 +133,7 @@
   (or (consp x)
       (%instancep x)
       (typep x '(array t *))))
-
+
 ;;;; the COLLECT macro
 ;;;;
 ;;;; comment from CMU CL: "the ultimate collection macro..."
@@ -202,7 +202,7 @@
          ;; Since we don't know, all the -n-tail variable are ignorable.
          ,@(if ignores `((declare (ignorable ,@ignores))))
          ,@body))))
-
+
 ;;;; some old-fashioned functions. (They're not just for old-fashioned
 ;;;; code, they're also used as optimized forms of the corresponding
 ;;;; general functions when the compiler can prove that they're
@@ -270,7 +270,7 @@
           ((> old-length length)
            (subseq list 0 length))
           (t list))))
-
+
 ;;;; miscellaneous iteration extensions
 
 (defun filter-dolist-declarations (decls)
@@ -395,7 +395,7 @@
                   listp nil
                   decls nil))
       body)))
-
+
 ;;;; macro writing utilities
 
 (defmacro with-current-source-form ((&rest forms) &body body)
@@ -416,7 +416,7 @@ NOTE: This interface is experimental and subject to change."
   #-sb-xc-host `(sb-c::call-with-current-source-form
                  (lambda () ,@body) ,@forms)
   #+sb-xc-host `(progn (list ,@forms) ,@body))
-
+
 ;;;; hash cache utility
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -726,7 +726,7 @@ NOTE: This interface is experimental and subject to change."
                 (eql (pop x) (pop y))))
           (t
            (return)))))
-
+
 ;;;; various operations on names
 
 ;;; Is NAME a legal variable/function name?
@@ -775,7 +775,7 @@ NOTE: This interface is experimental and subject to change."
          (and (> (length name) 2) ; to exclude '* and '**
               (char= #\* (aref name 0))
               (char= #\* (aref name (1- (length name))))))))
-
+
 ;;;; ONCE-ONLY
 ;;;;
 ;;;; "The macro ONCE-ONLY has been around for a long time on various
@@ -807,7 +807,7 @@ NOTE: This interface is experimental and subject to change."
                    (,name (sb-xc:gensym ,(symbol-name name))))
                `(let ((,,name ,,exp-temp))
                   ,,(frob (rest specs) body))))))))
-
+
 ;;;; various error-checking utilities
 
 ;;; This function can be used as the default value for keyword
@@ -840,7 +840,7 @@ NOTE: This interface is experimental and subject to change."
   (error 'bug
          :format-control format-control
          :format-arguments format-arguments))
-
+
 ;;; Return a function like FUN, but expecting its (two) arguments in
 ;;; the opposite order that FUN does.
 (declaim (inline swapped-args-fun))
@@ -875,7 +875,7 @@ NOTE: This interface is experimental and subject to change."
           (list (c (car bound)))
           (c bound)))))
 
-
+
 ;;;; utilities for two-VALUES predicates
 
 (defmacro not/type (x)
@@ -918,7 +918,7 @@ NOTE: This interface is experimental and subject to change."
         (if sub-certain?
             (unless sub-value (return (values nil t)))
             (setf certain? nil))))))
-
+
 ;;;; DEFPRINTER
 
 ;;; These functions are called by the expansion of the DEFPRINTER
@@ -1067,7 +1067,7 @@ NOTE: This interface is experimental and subject to change."
 (defun print-type (stream type &optional colon at)
   (print-type-specifier stream (type-specifier type) colon at)))
 
-
+
 ;;;; Deprecating stuff
 
 (deftype deprecation-state ()
@@ -1276,7 +1276,7 @@ NOTE: This interface is experimental and subject to change."
                      decls)))
         (values (awhen (binding-decls) `(declare ,@it))
                 (mapcan (lambda (x) (if x (list `(declare ,@x)))) filtered))))))
-
+
 ;;; Delayed evaluation
 (defmacro delay (form)
   `(cons nil (lambda () ,form)))
@@ -1290,7 +1290,7 @@ NOTE: This interface is experimental and subject to change."
 (defun promise-ready-p (promise)
   (or (not (consp promise))
       (car promise)))
-
+
 ;;; Bind a few "potentially dangerous" printer control variables to
 ;;; safe values, respecting current values if possible.
 (defmacro with-sane-io-syntax (&body forms)
@@ -1452,5 +1452,5 @@ NOTE: This interface is experimental and subject to change."
               (eq (symbol-value x) x))))
     (cons nil)
     (t t)))
-
+
 (defvar *top-level-form-p* nil)

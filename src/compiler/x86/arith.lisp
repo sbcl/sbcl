@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; unary operations
 
 (define-vop (fast-safe-arith-op)
@@ -69,7 +69,7 @@
   (:generator 2
     (move res x)
     (inst not res)))
-
+
 ;;;; binary fixnum operations
 
 ;;; Assume that any constant operand is the second arg...
@@ -357,7 +357,7 @@
     DONE
     (unless (= mask most-positive-word)
       (inst and r mask))))
-
+
 
 (define-vop (fast-+-c/signed=>signed fast-safe-arith-op)
   (:translate +)
@@ -420,7 +420,7 @@
            (if (= y 1)
                (inst inc r)
              (inst add r y))))))
-
+
 ;;;; multiplication and division
 
 (define-vop (fast-*/fixnum=>fixnum fast-safe-arith-op)
@@ -651,7 +651,7 @@
     (move rem edx)))
 
 
-
+
 ;;;; Shifting
 (define-vop (fast-ash-c/fixnum=>fixnum)
   (:translate ash)
@@ -1033,7 +1033,7 @@ constant shift greater than word length")))
     (inst shl result :cl)
 
     DONE))
-
+
 (define-vop (signed-byte-32-len)
   (:translate integer-length)
   (:note "inline (signed-byte 32) integer-length")
@@ -1140,7 +1140,7 @@ constant shift greater than word length")))
     (inst shr result 16)
     (inst add result temp)
     (inst and result #xff)))
-
+
 ;;;; binary conditional VOPs
 
 (define-vop (fast-conditional)
@@ -1347,7 +1347,7 @@ constant shift greater than word length")))
   (:args (x :scs (any-reg descriptor-reg control-stack)))
   (:arg-types * (:constant (signed-byte 30)))
   (:variant-cost 6))
-
+
 ;;;; 32-bit logical operations
 
 ;;; Only the lower 5 bits of the shift amount are significant.
@@ -1375,7 +1375,7 @@ constant shift greater than word length")))
     (move r num)
     (move ecx amount)
     (inst shl r :cl)))
-
+
 ;;;; Modular functions
 (defmacro define-mod-binop ((name prototype) function)
   `(define-vop (,name ,prototype)
@@ -1584,7 +1584,7 @@ constant shift greater than word length")))
   `(lognot (logior ,x ,y)))
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
-
+
 ;;;; bignum stuff
 
 (define-vop (bignum-length get-header-data)
@@ -1852,7 +1852,7 @@ constant shift greater than word length")))
     (move result digit)
     (move ecx count)
     (inst shl result :cl)))
-
+
 ;;; Support for the Mersenne Twister, MT19937, random number generator
 ;;; due to Matsumoto and Nishimura.
 ;;;

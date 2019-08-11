@@ -1066,7 +1066,7 @@
      (ir1-convert-inline-lambda thing
                                 :source-name source-name
                                 :debug-name debug-name))))
-
+
 ;;; Convert the forms produced by RECONSTRUCT-LEXENV to LEXENV
 (defun process-inline-lexenv (inline-lexenv)
   (labels ((recurse (inline-lexenv lexenv)
@@ -1397,7 +1397,7 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
           (compiler-style-warn 'same-file-redefinition-warning :name name)
           (push name-key (fun-names-in-this-file *compilation*))))))
 
-
+
 ;;; Entry point utilities
 
 ;;; Return a function for the Nth entry point.

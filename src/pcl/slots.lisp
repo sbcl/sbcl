@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;;; ANSI CL condition for unbound slots
 
 (define-condition unbound-slot (cell-error)
@@ -87,7 +87,7 @@
            (setf (fsc-instance-slots i2) s1)))
         (t
          (error "unrecognized instance type"))))
-
+
 ;;;; STANDARD-INSTANCE-ACCESS
 
 (declaim (inline standard-instance-access
@@ -116,7 +116,7 @@
 (defun (cas funcallable-standard-instance-access) (old-value new-value instance location)
   ;; FIXME: Maybe get rid of CLOS-SLOTS-REF entirely?
   (cas (svref (fsc-instance-slots instance) location) old-value new-value))
-
+
 ;;;; SLOT-VALUE, (SETF SLOT-VALUE), SLOT-BOUNDP, SLOT-MAKUNBOUND
 
 (declaim (ftype (sfunction (t symbol) t) slot-value))
@@ -422,7 +422,7 @@
             (object structure-object)
             (slotd structure-effective-slot-definition))
   (error "Structure slots can't be unbound."))
-
+
 (defmethod slot-missing
            ((class t) instance slot-name operation &optional new-value)
   (error "~@<When attempting to ~A, the slot ~S is missing from the ~
@@ -464,7 +464,7 @@
               :key #'slot-definition-location)))
       (cons
        (car position))))))
-
+
 ;;; FIXME: AMOP says that allocate-instance implies finalize-inheritance
 ;;; if the class is not yet finalized, but we don't seem to be taking
 ;;; care of this for non-standard-classes.

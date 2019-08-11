@@ -369,7 +369,7 @@
     (#x9D "Operating-System-Command")
     (#x9E "Privacy-Message")
     (#x9F "Application-Program-Command"))) ; *** See Note above
-
+
 ;;;; UCD accessor functions
 
 ;;; The character database is made of several arrays.
@@ -544,7 +544,7 @@ name is that string, if one exists. Otherwise, NIL is returned."
                                                      **unicode-1-name-char-database**))))
                  (and char-code
                       (code-char char-code)))))))))
-
+
 ;;;; predicates
 
 (defun standard-char-p (char)
@@ -786,7 +786,7 @@ Case is ignored." t)
     "Return T if the arguments are in strictly non-increasing alphabetic order.
 Case is ignored." t))
 
-
+
 (defun digit-char-p (char &optional (radix 10.))
   "If char is a digit in the specified radix, returns the fixnum for which
 that digit stands, else returns NIL."

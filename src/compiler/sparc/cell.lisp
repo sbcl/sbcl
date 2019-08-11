@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; data object ref/set stuff.
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
@@ -33,7 +33,7 @@
 (define-vop (init-slot set-slot)
   (:info name dx-p offset lowtag)
   (:ignore name dx-p))
-
+
 ;;;; Symbol hacking VOPs:
 
 ;;; The compiler likes to be able to directly SET symbols.
@@ -103,7 +103,7 @@
   (:translate sym-global-val))
 (define-vop (fast-symbol-global-value fast-symbol-value)
   (:translate sym-global-val))
-
+
 ;;;; FDEFINITION (fdefn) objects.
 (define-vop (fdefn-fun cell-ref)
   (:variant fdefn-fun-slot other-pointer-lowtag))
@@ -157,7 +157,7 @@
     (move result fdefn)))
 
 
-
+
 ;;;; Binding and Unbinding.
 
 ;;; Establish VAL as a binding for SYMBOL.  Save the old value and the
@@ -216,7 +216,7 @@
       (inst nop)
 
       (emit-label done))))
-
+
 ;;;; closure indexing.
 
 (define-vop (closure-index-ref word-index-ref)
@@ -250,7 +250,7 @@
   (:info offset)
   (:generator 4
     (storew cfp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
-
+
 ;;;; value cell hackery.
 
 (define-vop (value-cell-ref cell-ref)
@@ -258,7 +258,7 @@
 
 (define-vop (value-cell-set cell-set)
   (:variant value-cell-value-slot other-pointer-lowtag))
-
+
 ;;;; instance hackery:
 
 (define-vop (instance-length)
@@ -283,7 +283,7 @@
   (:translate %instance-set)
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types * positive-fixnum *))
-
+
 ;;;; Code object frobbing.
 
 (define-vop (code-header-ref word-index-ref)
@@ -297,7 +297,7 @@
   (:variant 0 other-pointer-lowtag))
 
 
-
+
 ;;;; raw instance slot accessors
 
 (define-vop (raw-instance-ref/word)

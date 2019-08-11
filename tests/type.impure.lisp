@@ -260,7 +260,7 @@
          (m (find-if #'sb-kernel:member-type-p (sb-kernel:union-type-types x))))
     (assert (equal (sb-kernel:member-type-members m) '(foo)))))
 
-
+
 ;;;; Douglas Thomas Crosher rewrote the CMU CL type test system to
 ;;;; allow inline type tests for CONDITIONs and STANDARD-OBJECTs, and
 ;;;; generally be nicer, and Martin Atzmueller ported the patches.
@@ -411,7 +411,7 @@
 (with-test (:name (:inline-type-tests :compiled))
   (tests-of-inline-type-tests)
   (format t "~&/done with compiled (TESTS-OF-INLINE-TYPE-TESTS)~%"))
-
+
 ;;; Redefinition of classes should alter the type hierarchy (BUG 140):
 (defclass superclass () ())
 (defclass maybe-subclass () ())
@@ -420,7 +420,7 @@
 (assert-tri-eq t t (subtypep 'maybe-subclass 'superclass))
 (defclass maybe-subclass () ())
 (assert-tri-eq nil t (subtypep 'maybe-subclass 'superclass))
-
+
 ;;; Prior to sbcl-0.7.6.27, there was some confusion in ARRAY types
 ;;; specialized on some as-yet-undefined type which would cause this
 ;;; program to fail (bugs #123 and #165). Verify that it doesn't.
@@ -446,7 +446,7 @@
     (assert-tri-eq nil t (subtypep t2 t1))
     (assert-tri-eq t   t (subtypep `(not ,t2) `(not ,t1)))
     (assert-tri-eq nil t (subtypep `(not ,t1) `(not ,t2)))))
-
+
 ;;; not easily visible to user code, but this used to be very
 ;;; confusing.
 (with-test (:name (:ctor typep function))
@@ -462,7 +462,7 @@
                         'function))))
 (with-test (:name (:ctor allocate-instance functionp))
   (assert (functionp (allocate-instance (find-class 'sb-pcl::ctor)))))
-
+
 ;;; from PFD ansi-tests
 (with-test (:name (subtypep :complex-cons-type))
   (let ((t1 '(cons (cons (cons (real -744833699 -744833699) cons)
@@ -472,7 +472,7 @@
                     (integer -234496 215373))
               t)))
     (assert-tri-eq nil t (subtypep `(not ,t2) `(not ,t1)))))
-
+
 (defstruct misc-629a)
 (defclass misc-629b () ())
 (defclass misc-629c () () (:metaclass sb-mop:funcallable-standard-class))
@@ -515,7 +515,7 @@
     (assert-tri-eq t t (subtypep `(and (member ,misc-629c)
                                        sb-kernel:instance)
                                  nil))))
-
+
 ;;; this was broken during the FINALIZE-INHERITANCE rearrangement; the
 ;;; MAKE-INSTANCE finalizes the superclass, thus invalidating the
 ;;; subclass, so SUBTYPEP must be prepared to deal with
@@ -524,13 +524,13 @@
 (with-test (:name (subtypep defclass make-instance))
   (make-instance 'ansi-tests-defclass1)
   (assert-tri-eq t t (subtypep 'ansi-tests-defclass3 'standard-object)))
-
+
 ;;; so was this
 (with-test (:name (type-of defclass :undefine))
   (let ((class (eval '(defclass to-be-type-ofed () ()))))
     (setf (find-class 'to-be-type-ofed) nil)
     (assert (eq (type-of (make-instance class)) class))))
-
+
 ;;; accuracy of CONS :SIMPLE-TYPE-=
 (deftype goldbach-1 () '(satisfies even-and-greater-then-two-p))
 (deftype goldbach-2 () '(satisfies sum-of-two-primes-p))
@@ -557,7 +557,7 @@
   (elt (aref x 0) 0))
 (with-test (:name (array :element-type aref optimize speed :bug-306-a))
   (assert (= 0 (bug-306-a #((0))))))
-
+
 ;;; FUNCALLABLE-INSTANCE is a subtype of function.
 (with-test (:name (subtypep function sb-kernel:funcallable-instance))
   (assert-tri-eq t t (subtypep '(and pathname function) nil))
@@ -572,7 +572,7 @@
 (with-test (:name (subtypep standard-object sb-kernel:instance))
   (assert (not (typep #'print-object '(and standard-object sb-kernel:instance))))
   (assert (not (subtypep 'standard-object '(and standard-object sb-kernel:instance)))))
-
+
 (with-test (:name (subtypep simple-array simple-string condition or))
   (assert-tri-eq t t
                  (subtypep '(or simple-array simple-string) '(or simple-string simple-array)))
@@ -769,7 +769,7 @@
 
     (test 'subtypep-fwd-testb1 'subtypep-fwd-testb2 nil nil)
     (test 'subtypep-fwd-testb2 'subtypep-fwd-testb1 t t)))
-
+
 ;;; Array type unions have some tricky semantics.
 
 (macrolet

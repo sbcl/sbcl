@@ -30,7 +30,7 @@
 ;;;; specification.
 
 (in-package "SB-C")
-
+
 ;;;; very low-level representation of instances with meta-class
 ;;;; STANDARD-CLASS
 

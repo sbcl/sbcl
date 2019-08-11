@@ -54,7 +54,7 @@
 ;;; are talking about stuff the rest of the lisp system might be
 ;;; interested in, we use ``word'' to mean the size of a descriptor
 ;;; object, which is 64 bits.
-
+
 ;;;; machine architecture parameters
 
 ;;; the number of bits per word, where a word holds one lisp descriptor
@@ -111,7 +111,7 @@
 (defconstant-eqx float-traps-byte        (byte 6  7) #'equalp)
 (defconstant-eqx float-exceptions-byte   (byte 6  0) #'equalp)
 (defconstant float-fast-bit 0) ; no fast mode on x86-64
-
+
 ;;;; description of the target address space
 
 ;;; where to put the different spaces.
@@ -140,7 +140,7 @@
 
 (defconstant linkage-table-entry-size 16)
 
-
+
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
@@ -154,7 +154,7 @@
   #+sb-safepoint global-safepoint-trap
   #+sb-safepoint csp-safepoint-trap
   error-trap)
-
+
 ;;;; static symbols
 
 ;;; These symbols are loaded into static space directly after NIL so

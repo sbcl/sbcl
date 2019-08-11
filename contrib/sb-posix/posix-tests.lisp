@@ -29,7 +29,7 @@
         (return-from ,name (values ,@values)))
       ,form)
     ,@values))
-
+
 (deftest chdir.1
   (sb-posix:chdir *test-directory*)
   0)
@@ -79,7 +79,7 @@
   #.sb-posix:enotdir
   #+win32
   #.sb-posix:einval)
-
+
 (deftest mkdir.1
   (let ((dne (make-pathname :directory '(:relative "mkdir.does-not-exist.1"))))
     (unwind-protect
@@ -136,7 +136,7 @@
         (sb-posix:rmdir dir)
         result)))
   #.sb-posix::eacces)
-
+
 (deftest rmdir.1
   (let ((dne (make-pathname :directory '(:relative "rmdir.does-not-exist.1"))))
     (ensure-directories-exist (merge-pathnames dne *test-directory*))
@@ -225,7 +225,7 @@
         (sb-posix:rmdir dir)
         result)))
   #.sb-posix::eacces)
-
+
 #-(or (and darwin x86) win32)
 (deftest stat.1
   (let* ((stat (sb-posix:stat *test-directory*))
@@ -326,7 +326,7 @@
         (sb-posix:rmdir dir)
         result)))
   #.sb-posix::eacces)
-
+
 ;;; stat-mode tests
 (defmacro with-stat-mode ((mode pathname) &body body)
   (let ((stat (gensym)))
@@ -396,7 +396,7 @@
              (sb-posix:s-isreg mode)))
       (ignore-errors (delete-file pathname))))
   t)
-
+
 ;;; see comment in filename's designator definition, in macros.lisp
 (deftest filename-designator.1
   (let ((file (format nil "~A/[foo].txt" (namestring *test-directory*))))
@@ -409,7 +409,7 @@
     (let ((*default-pathname-defaults* *test-directory*))
       (sb-posix:unlink (car (directory "*.txt")))))
   0)
-
+
 (deftest open.1
     (let ((name (merge-pathnames "open-test.txt" *test-directory*)))
       (unwind-protect
@@ -685,7 +685,7 @@
         (list (= (sb-posix:stat-atime stat) atime)
               (= (sb-posix:stat-mtime stat) mtime))))
   (t t))
-
+
 ;; readlink tests.
 #-win32
 (progn

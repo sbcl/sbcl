@@ -17,7 +17,7 @@
 
 (in-package "SB-IMPL")
 
-
+
 ;;;; conditions
 
 ;;; encoding condition
@@ -123,7 +123,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defun make-od-name (sym1 sym2)
     (package-symbolicate (cl:symbol-package sym1) sym1 "-" sym2)))
-
+
 ;;;; to-octets conversions
 
 ;;; to latin (including ascii)
@@ -285,7 +285,7 @@
                              (unless (zerop null-padding)
                                (vector-push-extend 0 new-octets))
                              (copy-seq new-octets)))))))))
-
+
 ;;;; to-string conversions
 
 ;;; from latin (including ascii)
@@ -321,7 +321,7 @@
                                                             array astart aend
                                                             mapper)))))))
 (instantiate-octets-definition define-latin->string)
-
+
 ;;;; external formats
 
 (defvar *default-external-format* nil)
@@ -365,7 +365,7 @@
              (setf external-format :latin-1))))
         (/show0 "/default external format ok")
         (setf *default-external-format* external-format))))
-
+
 ;;;; public interface
 
 (defun maybe-defaulted-external-format (external-format)

@@ -339,7 +339,7 @@
 (with-test (:name (the :bug-194d))
   (assert (eq (bug194d) t)))
 
-
+
 ;;; BUG 48a. and b. (symbol-macrolet handling), fixed by Eric Marsden
 ;;; and Raymond Toy for CMUCL, fix ported for sbcl-0.7.6.18.
 (flet ((test (form)
@@ -365,7 +365,7 @@
     (test `(lambda ()
              (symbol-macrolet ((s nil)) (declare (special s)) s)))))
 
-
+
 ;;; bug 120a: Turned out to be constraining code looking like (if foo
 ;;; <X> <X>) where <X> was optimized by the compiler to be the exact
 ;;; same block in both cases, but not turned into (PROGN FOO <X>).
@@ -615,7 +615,7 @@
 (declaim (ftype (function (t) (values package boolean)) bug221f2))
 (defun bug221 (b x)
   (funcall (if b #'bug221f1 #'bug221f2) x))
-
+
 ;;; bug 172: macro lambda lists were too permissive until 0.7.9.28
 ;;; (fix provided by Matthew Danish) on sbcl-devel
 (with-test (:name (defmacro :lambda-list :bug-172))
@@ -655,7 +655,7 @@
     (assert (typep (check-embedded-thes 3 3  0 2.5f0) 'type-error))
     (assert (typep (check-embedded-thes 3 3  2 3.5f0) 'type-error))))
 
-
+
 ;;; INLINE inside MACROLET
 (declaim (inline to-be-inlined))
 (macrolet ((def (x) `(defun ,x (y) (+ y 1))))
@@ -677,7 +677,7 @@
 (defun to-be-inlined (y)
   (+ y 5))
 #-interpreter (assert (= (call-inlined 3) 6))
-
+
 ;;; DEFINE-COMPILER-MACRO to work as expected, not via weird magical
 ;;; IR1 pseudo-:COMPILE-TOPLEVEL handling
 (defvar *bug219-a-expanded-p* nil)
@@ -769,7 +769,7 @@
   (assert (equal (bug223-int 4) '(ext int 3)))
   (bug223-wrap)
   (assert (equal (bug223-int 4) '(ext ext int 2))))
-
+
 ;;; COERCE got its own DEFOPTIMIZER which has to reimplement most of
 ;;; SPECIFIER-TYPE-NTH-ARG.  For a while, an illegal type would throw
 ;;; you into the debugger on compilation.
@@ -782,7 +782,7 @@
 (with-test (:name (coerce :optimizer))
   (assert-error (coerce-defopt1 3))
   (assert-error (coerce-defopt2 3)))
-
+
 ;;; Oops.  In part of the (CATCH ..) implementation of DEBUG-RETURN,
 ;;; it was possible to confuse the type deriver of the compiler
 ;;; sufficiently that compiler invariants were broken (explained by
@@ -805,7 +805,7 @@
 (defun debug-return-catch-break2 (x)
   (declare (type (vector (unsigned-byte 8)) x))
   (setq *y* (the (unsigned-byte 8) (aref x 4))))
-
+
 ;;; FUNCTION-LAMBDA-EXPRESSION should return something that COMPILE
 ;;; can understand.  Here's a simple test for that on a function
 ;;; that's likely to return a hairier list than just a lambda:
@@ -923,7 +923,7 @@
       (load source)
       (full-check)
       (delete-file fasl))))
-
+
 (defun expt-derive-type-bug (a b)
   (unless (< a b)
     (truncate (expt a b))))
@@ -952,7 +952,7 @@
                      c
                      (return-from return :good))))
                :good)))
-
+
 ;;;; MUFFLE-CONDITIONS test (corresponds to the test in the manual)
 ; FIXME: make a better test!
 (with-test (:name muffle-conditions :skipped-on (or :alpha :x86-64))
@@ -969,7 +969,7 @@
     (declare (ignore failure-p warnings style-warnings))
     (assert (= (length notes) 1))
     (assert (equal (multiple-value-list (funcall fun 1)) '(5 -5)))))
-
+
 (with-test (:name (flet labels &key))
   (assert-error (eval '(flet ((%f (&key) nil)) (%f nil nil))))
   (assert-error (eval '(labels ((%f (&key x) x)) (%f nil nil)))))
@@ -1519,7 +1519,7 @@
     ;; remove the DEBUG restriction
     (let ((res (sb-ext:restrict-compiler-policy 'debug 0)))
       (assert (null res)))))
-
+
 ;;;; tests not in the problem domain, but of the consistency of the
 ;;;; compiler machinery itself
 
@@ -1587,7 +1587,7 @@
                   (nil (fun-info-templates info) :exit-if-null))
          ;; ... it has translators
          (grovel-results name))))))
-
+
 ;;;; bug 305: INLINE/NOTINLINE causing local ftype to be lost
 
 (test-util:with-test (:name (compile inline notinline))

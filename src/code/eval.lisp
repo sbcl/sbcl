@@ -321,7 +321,7 @@
         (*eval-tlf-index* tlf-index)
         (*eval-source-info* sb-c::*source-info*))
     (eval-in-lexenv original-exp lexenv)))
-
+
 ;;; miscellaneous full function definitions of things which are
 ;;; ordinarily handled magically by the compiler
 

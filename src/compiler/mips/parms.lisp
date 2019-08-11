@@ -18,7 +18,7 @@
   ;; The o32 ABI specifies 4k-64k as page size. We have to pick the
   ;; maximum since mprotect() works only with page granularity.
 (defconstant +backend-page-bytes+ 65536)
-
+
 ;;;; Machine Architecture parameters:
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -110,7 +110,7 @@
 
 ); eval-when
 
-
+
 ;;;; Other non-type constants.
 
 (defenum ()
@@ -127,7 +127,7 @@
   single-step-around-trap
   single-step-before-trap
   error-trap)
-
+
 ;;;; Static symbols.
 
 ;;; Static symbols are loaded into static space directly after NIL so

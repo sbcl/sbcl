@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; ASSERT and CHECK-TYPE
 
 ;;; ASSERT is written this way, to call ASSERT-ERROR, because of how
@@ -144,7 +144,7 @@ invoked. In that case it will store into PLACE and start over."
                    (check-type-error ',place ,value ',type
                                      ,@(and type-string
                                             `(,type-string)))))))))
-
+
 ;;;; DEFINE-SYMBOL-MACRO
 
 (sb-xc:defmacro define-symbol-macro (name expansion)
@@ -174,7 +174,7 @@ invoked. In that case it will store into PLACE and start over."
                              (:global "a global variable")
                              (t kind))))))
   name)
-
+
 ;;;; DEFINE-COMPILER-MACRO
 
 (sb-xc:defmacro define-compiler-macro (name lambda-list &body body)
@@ -201,7 +201,7 @@ invoked. In that case it will store into PLACE and start over."
     ;; respect to parent function?
     (setf (sb-xc:compiler-macro-function name) definition)
     name))
-
+
 ;;;; CASE, TYPECASE, and friends
 
 ;;; Make this a full warning during SBCL build.
@@ -415,7 +415,7 @@ invoked. In that case it will store into PLACE and start over."
                  ;; TRULY-THE allows transforms to take advantage of the type
                  ;; information without need for constraint propagation.
                  collect `(,type (,fun (truly-the ,type ,var))))))))
-
+
 ;;;; WITH-FOO i/o-related macros
 
 (sb-xc:defmacro with-open-stream ((var stream) &body body)
@@ -493,7 +493,7 @@ invoked. In that case it will store into PLACE and start over."
                 (progn ,@forms)
              (close ,var))
            (get-output-stream-string ,var)))))
-
+
 ;;;; miscellaneous macros
 
 (sb-xc:defmacro nth-value (n form &environment env)

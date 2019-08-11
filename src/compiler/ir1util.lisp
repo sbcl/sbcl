@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; cleanup hackery
 
 (defun lexenv-enclosing-cleanup (lexenv)
@@ -63,7 +63,7 @@
         (setf (block-last block) (ctran-use next))
         (setf (node-next (block-last block)) nil)
         block))))
-
+
 ;;;; lvar use hacking
 
 ;;; Return a list of all the nodes which use LVAR.
@@ -266,7 +266,7 @@
                  (or (not (cast-p use))
                      (lvar-almost-immediately-used-p (cast-value use))))
       (return))))
-
+
 ;;;; BLOCK UTILS
 
 (declaim (inline block-to-be-deleted-p))
@@ -300,7 +300,7 @@
 ;;; Return the lexenv of the last node in BLOCK.
 (defun block-end-lexenv (block)
   (node-lexenv (block-last block)))
-
+
 ;;;; lvar substitution
 
 (defun update-lvar-dependencies (new old)
@@ -396,7 +396,7 @@
         (when new-lvar
           (propagate-lvar-dx new-lvar old-lvar t)
           t)))))
-
+
 ;;;; block starting/creation
 
 ;;; Return the block that CTRAN is the start of, making a block if
@@ -460,7 +460,7 @@
        (setf (ctran-block ctran) nil)
        (link-blocks block (ctran-starts-block ctran))))
     (:block-start)))
-
+
 ;;;;
 
 ;;; Filter values of LVAR through FORM, which must be an ordinary/mv
@@ -579,7 +579,7 @@
     (use-lvar ref lvar)
     (link-node-to-previous-ctran node ctran)
     lvar))
-
+
 ;;;; miscellaneous shorthand functions
 
 ;;; Return the home (i.e. enclosing non-LET) CLAMBDA for NODE. Since
@@ -1125,7 +1125,7 @@
                  (make-short-values-type (list (single-value-type
                                                 (node-derived-type dest)))))
         (reoptimize-lvar prev)))
-
+
 ;;; Return a new LEXENV just like DEFAULT except for the specified
 ;;; slot values. Values for the alist slots are APPENDed to the
 ;;; beginning of the current value, rather than replacing it entirely.
@@ -1194,7 +1194,7 @@
      (lexenv-policy lexenv)
      (lexenv-user-data lexenv)
      lexenv)))
-
+
 ;;;; flow/DFO/component hackery
 
 ;;; Join BLOCK1 and BLOCK2.
@@ -1535,7 +1535,7 @@
             ((not ctran))
           (setf (ctran-block ctran) new-block))
         new-block))))
-
+
 ;;;; deleting stuff
 
 ;;; Deal with deleting the last (read) reference to a LAMBDA-VAR.
@@ -2323,7 +2323,7 @@ is :ANY, the function name is not checked."
   (unlink-node combination)
   (values))
 
-
+
 ;;;; leaf hackery
 
 ;;; Change the LEAF that a REF refers to.
@@ -2493,7 +2493,7 @@ is :ANY, the function name is not checked."
                     (go :next))
                    (cast
                     (go :next))))))))))
-
+
 ;;; Return true if VAR would have to be closed over if environment
 ;;; analysis ran now (i.e. if there are any uses that have a different
 ;;; home lambda than VAR's home.)
@@ -2525,7 +2525,7 @@ is :ANY, the function name is not checked."
 (defun nlx-info-lvar (nlx)
   (declare (type nlx-info nlx))
   (node-lvar (block-last (nlx-info-target nlx))))
-
+
 ;;;; functional hackery
 
 (declaim (ftype (sfunction (functional) clambda) main-entry))
@@ -2724,7 +2724,7 @@ is :ANY, the function name is not checked."
                     (multiple-value-bind (val win)
                        (valid-fun-use call (template-type template))
                       (when (or val (not win)) (return nil)))))))))))
-
+
 ;;;; careful call
 
 ;;; Apply a function to some arguments, returning a list of the values
@@ -2777,7 +2777,7 @@ is :ANY, the function name is not checked."
   (deffrob specifier-type careful-specifier-type compiler-specifier-type ir1-transform-specifier-type)
   (deffrob values-specifier-type careful-values-specifier-type compiler-values-specifier-type ir1-transform-values-specifier-type))
 
-
+
 ;;;; utilities used at run-time for parsing &KEY args in IR1
 
 ;;; This function is used by the result of PARSE-DEFTRANSFORM to find
@@ -2814,7 +2814,7 @@ is :ANY, the function name is not checked."
            ((null arg) t)
          (unless (member (lvar-value (first arg)) keys)
            (return nil)))))
-
+
 ;;;; miscellaneous
 
 ;;; Called by the expansion of the EVENT macro.
@@ -3010,7 +3010,7 @@ is :ANY, the function name is not checked."
          (or (eq fun lvar)
              (lvar-fun-is fun '(%coerce-callable-for-call))))))
 
-
+
 (defun proper-or-circular-list-p (x)
   (if (consp x)
       (let ((rabbit (cdr x))

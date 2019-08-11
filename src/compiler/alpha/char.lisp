@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
@@ -65,7 +65,7 @@
 ;;;
 (define-move-vop move-arg :move-arg
   (character-reg) (any-reg descriptor-reg))
-
+
 ;;;; other operations
 (define-vop (char-code)
   (:translate char-code)
@@ -86,7 +86,7 @@
   (:result-types character)
   (:generator 1
     (inst srl code n-fixnum-tag-bits res)))
-
+
 ;;;; comparison of CHARACTERs
 
 (define-vop (character-compare)

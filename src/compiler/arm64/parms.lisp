@@ -90,7 +90,7 @@
   (defconstant-eqx float-exceptions-byte (byte 8 0) #'equalp)
 
   (defconstant float-fast-bit (ash 1 24))) ;; Flush-to-zero mode
-
+
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
@@ -112,7 +112,7 @@
 (!gencgc-space-setup #xF0000000 :dynamic-space-start #x1000000000)
 
 (defconstant linkage-table-entry-size 16)
-
+
 ;;;; other miscellaneous constants
 
 (defenum (:start 8)
@@ -125,7 +125,7 @@
   single-step-before-trap
   invalid-arg-count-trap
   error-trap)
-
+
 ;;;; Static symbols.
 
 ;;; These symbols are loaded into static space directly after NIL so
@@ -156,7 +156,7 @@
     sb-kernel:%negate)
   #'equalp)
 
-
+
 ;;;; Assembler parameters:
 
 ;;; The number of bits per element in the assemblers code vector.

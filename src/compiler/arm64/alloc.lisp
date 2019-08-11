@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (define-vop (list-or-list*)
   (:args (things :more t :scs (control-stack)))
   (:temporary (:scs (descriptor-reg)) ptr)
@@ -67,7 +67,7 @@
 
 (define-vop (list* list-or-list*)
   (:variant t))
-
+
 ;;;; Special purpose inline allocators.
 
 (define-vop (make-fdefn)
@@ -120,7 +120,7 @@
                             value-cell-size :stack-allocate-p stack-allocate-p
                             :lip lip)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
-
+
 ;;;; Automatic allocators for primitive objects.
 
 (define-vop (make-unbound-marker)

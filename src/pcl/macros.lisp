@@ -25,7 +25,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defglobal *optimize-speed*
   '(optimize (speed 3) (safety 0) (sb-ext:inhibit-warnings 3) (debug 0)))
 
@@ -54,7 +54,7 @@
                  (setq ,var (pop .dolist-carefully.))
                  ,@body)
                (,improper-list-handler)))))
-
+
 ;;;; FIND-CLASS
 ;;;;
 ;;;; This is documented in the CLOS specification.
@@ -109,7 +109,7 @@
                         (find-classoid-cell symbol)
                         errorp))
 
-
+
 (define-compiler-macro find-class (&whole form
                                    symbol &optional (errorp t) environment)
   (declare (ignore environment))
@@ -187,6 +187,6 @@
 
 (defmacro function-apply (form &rest args)
   `(apply (the function ,form) ,@args))
-
+
 (defun get-setf-fun-name (name)
   `(setf ,name))

@@ -204,7 +204,7 @@
 
   DONE)
 
-
+
 ;;;; division
 
 (define-assembly-routine (signed-truncate
@@ -265,7 +265,7 @@
     (inst subq zero-tn rem rem)
     (emit-label label)))
 
-
+
 ;;;; comparison routines
 
 (macrolet

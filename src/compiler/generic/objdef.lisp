@@ -29,7 +29,7 @@
 ;;;;     the beginning of an arbitrary-length sequence of bytes following
 ;;;;     the fixed-layout slots).
 ;;;; -- WHN 2001-12-29
-
+
 ;;;; the primitive objects themselves
 
 (define-primitive-object (cons :type cons
@@ -337,7 +337,7 @@ during backtrace.
   #+x86-64 bsp
   (previous-catch :c-type #-alpha "struct catch_block *" #+alpha "u32")
   tag)
-
+
 ;;;; symbols
 
 (define-primitive-object (symbol :lowtag other-pointer-lowtag

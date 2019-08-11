@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-
+
 ;;;; Allocator for the array header.
 
 (define-vop (make-array-header)
@@ -40,7 +40,7 @@
       (storew ndescr header 0 other-pointer-lowtag))
     (move result header)))
 
-
+
 ;;;; Additional accessors and setters for the array header.
 (define-vop (%array-dimension word-index-ref)
   (:translate %array-dimension)
@@ -63,7 +63,7 @@
     (inst srawi temp temp n-widetag-bits)
     (inst subi temp temp (1- array-dimensions-offset))
     (inst slwi res temp n-fixnum-tag-bits)))
-
+
 ;;;; Bounds checking routine.
 
 
@@ -83,7 +83,7 @@
       (inst cmplw index bound)
       (inst bge error))))
 
-
+
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
@@ -377,7 +377,7 @@
     (unless (location= result value)
       (inst fmr result value))))
 
-
+
 ;;; Complex float arrays.
 
 (define-vop (data-vector-ref/simple-array-complex-single-float)
@@ -477,7 +477,7 @@
       (unless (location= result-imag value-imag)
         (inst fmr result-imag value-imag)))))
 
-
+
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
 ;;;
@@ -499,7 +499,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:variant vector-data-offset other-pointer-lowtag))
-
+
 ;;;
 
 (define-vop (data-vector-ref/simple-array-signed-byte-8 signed-byte-index-ref)
@@ -540,7 +540,7 @@
          (value :scs (signed-reg)))
   (:results (result :scs (signed-reg)))
   (:result-types tagged-num))
-
+
 ;;;; ATOMIC-INCF for arrays
 
 (define-vop (array-atomic-incf/word)

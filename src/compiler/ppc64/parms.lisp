@@ -104,7 +104,7 @@
 
 (defconstant float-fast-bit 2)         ; Non-IEEE mode
 
-
+
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
@@ -157,7 +157,7 @@
   (progn
     (defparameter dynamic-0-space-start #x10000000)
     (defparameter dynamic-0-space-end   #x3ffff000)))
-
+
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
@@ -168,7 +168,7 @@
   single-step-around-trap
   single-step-before-trap
   error-trap)
-
+
 ;;;; Static symbols.
 
 

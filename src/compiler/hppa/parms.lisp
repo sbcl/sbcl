@@ -8,7 +8,7 @@
 
 (defconstant +backend-fasl-file-implementation+ :hppa)
 (defconstant +backend-page-bytes+ 4096)
-
+
 ;;;; Machine Architecture parameters:
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -60,7 +60,7 @@
 (defconstant float-fast-bit 0)                   ; No fast mode on HPPA.
 
 
-
+
 ;;;; Description of the target address space.
 
 ;;; Where to put the different spaces.
@@ -85,7 +85,7 @@
 ;; The space-register holding the C text heap.
 (defconstant c-text-space 4)
 
-
+
 ;;;; Other random constants.
 
 (defenum ()
@@ -103,7 +103,7 @@
   single-step-before-trap
   single-step-after-trap
   error-trap)
-
+
 ;;;; Static symbols.
 
 ;;; These symbols are loaded into static space directly after NIL so

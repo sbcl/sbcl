@@ -86,7 +86,7 @@
 (defconstant-eqx float-exceptions-byte (byte 5 0) #'equalp)
 (defconstant float-fast-bit (ash 1 24)) ;; Flush-to-zero mode
 
-
+
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
@@ -114,7 +114,7 @@
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
-
+
 ;;;; other miscellaneous constants
 
 (defenum (:start 8)
@@ -127,7 +127,7 @@
   single-step-before-trap
   invalid-arg-count-trap
   error-trap)
-
+
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *runtime-asm-routines* '(call-into-lisp do-pending-interrupt)))
@@ -172,7 +172,7 @@
     two-arg-eqv)
   #'equalp)
 
-
+
 ;;;; Assembler parameters:
 
 ;;; The number of bits per element in the assemblers code vector.

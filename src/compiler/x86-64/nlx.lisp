@@ -22,7 +22,7 @@
 (defun unwind-block-ea (tn)
   (aver (sc-is tn unwind-block))
   (ea (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size)) rbp-tn))
-
+
 ;;;; Save and restore dynamic environment.
 ;;;;
 ;;;; These VOPs are used in the reentered function to restore the
@@ -55,7 +55,7 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
     (load-binding-stack-pointer res)))
-
+
 ;;;; unwind block hackery
 
 ;;; Compute the address of the catch block from its TN, then store into the
@@ -146,7 +146,7 @@
     (load-tl-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-uwp-slot)
     (store-tl-symbol-value block *current-unwind-protect-block*)))
-
+
 ;;;; NLX entry VOPs
 (define-vop (nlx-entry)
   ;; Note: we can't list an sc-restriction, 'cause any load vops would

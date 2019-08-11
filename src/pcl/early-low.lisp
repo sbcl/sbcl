@@ -29,7 +29,7 @@
 (declaim (type (member nil early braid complete) **boot-state**))
 (define-load-time-global **boot-state** nil)
 
-
+
 ;;; The PCL package is internal and is used by code in potential
 ;;; bottlenecks. And since it's internal, no one should be
 ;;; doing things like deleting and recreating it in a running target Lisp.
@@ -69,7 +69,7 @@
 (defun condition-type-p (type)
   (and (symbolp type)
        (condition-classoid-p (find-classoid type nil))))
-
+
 ;;;; PCL instances
 
 (sb-kernel::!defstruct-with-alternate-metaclass standard-instance

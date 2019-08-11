@@ -27,7 +27,7 @@
             sb-vm::complex-single-reg sb-vm::complex-double-reg
             sb-vm::tmp-tn sb-vm::zr-tn sb-vm::nsp-offset)))
 
-
+
 
 (defconstant-eqx +conditions+
   '((:eq . 0)
@@ -60,7 +60,7 @@
 (defun invert-condition (condition)
   (aref sb-vm::+condition-name-vec+
         (logxor 1 (conditional-opcode condition))))
-
+
 ;;;; disassembler field definitions
 
 (progn
@@ -116,7 +116,7 @@
   (define-arg-type ldr-str-reg-annotation :printer #'annotate-ldr-str-reg)
 
   (define-arg-type label :sign-extend t :use-label #'use-label))
-
+
 ;;;; primitive emitters
 
 (define-bitfield-emitter emit-word 32
@@ -186,7 +186,7 @@
 (define-instruction lra-header-word (segment)
   (:emitter
    (emit-header-data segment return-pc-widetag)))
-
+
 ;;;; Addressing mode 1 support
 
 ;;; Addressing mode 1 has some 11 formats.  These are immediate,
@@ -259,7 +259,7 @@
              (shifter-operand-operand operand)
              (shifter-operand-register operand)))))
 
-
+
 ;;;; Addressing mode 2 support
 
 ;;; Addressing mode 2 ostensibly has 9 formats.  These are formed from
@@ -293,7 +293,7 @@
   (make-memory-operand :base base :offset offset
                        :mode mode))
 
-
+
 ;;;; Data-processing instructions
 
 
@@ -2231,7 +2231,7 @@
                                     #b01111
                                     #b111)
                                 (tn-offset rn) (tn-offset rd)))))))
-
+
 ;;;; Boxed-object computation instructions (for LRA and CODE)
 
 ;;; Compute the address of a CODE object by parsing the header of a

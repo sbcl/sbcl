@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Return-multiple with other than one value
 #+sb-assembling ;; we don't want a vop for this one.
 (macrolet ((frob ()
@@ -146,7 +146,7 @@
                   (lisp-jump temp)))))
   (frob))
 
-
+
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (throw (:return-style :none))

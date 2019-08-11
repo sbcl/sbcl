@@ -67,7 +67,7 @@
     (apply *unwinnage-fun* format-string format-args))
   (values))
 
-
+
 ;;;; stuff for checking a call against a function type
 ;;;;
 ;;;; FIXME: This is stuff to look at when I get around to fixing
@@ -382,7 +382,7 @@ and no value was provided for it." name))))))))))
            :returns (tail-set-type
                      (lambda-tail-set
                       (optional-dispatch-main-entry functional))))))))
-
+
 ;;;; approximate function types
 ;;;;
 ;;;; FIXME: This is stuff to look at when I get around to fixing function
@@ -616,7 +616,7 @@ and no value was provided for it." name))))))))))
           (unless (find name keys :key #'key-info-name)
             (note-lossage "Function previously called with unknown argument keyword ~S."
                   name)))))))
-
+
 ;;;; ASSERT-DEFINITION-TYPE
 
 ;;; Intersect LAMBDA's var types with TYPES, giving a warning if there
@@ -921,7 +921,7 @@ and no value was provided for it." name))))))))))
                      :allowp (fun-type-allowp type)
                      :returns (fun-type-returns type))
       type))
-
+
 ;;; Call FUN with (arg-lvar arg-type lvars &optional annotation)
 (defun map-combination-args-and-types (fun call &optional info
                                                           unknown-keys-fun
@@ -1062,7 +1062,7 @@ and no value was provided for it." name))))))))))
            nil
            t))))
   (values))
-
+
 ;;;; FIXME: Move to some other file.
 (defun check-catch-tag-type (tag)
   (declare (type lvar tag))

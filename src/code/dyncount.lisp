@@ -23,7 +23,7 @@ comments from CMU CL:
   (when *collect-dynamic-statistics*
     (error "Compiling this file with dynamic stat collection turned on would ~
     be a very bad idea.")))
-
+
 ;;;; hash utilities
 
 (defun make-hash-table-like (table)
@@ -87,7 +87,7 @@ comments from CMU CL:
           (funcall writer v s)
           (terpri s)))))
   table)
-
+
 ;;;; info accumulation
 
 ;;; Used to accumulate info about the usage of a single VOP. Cost and count
@@ -219,7 +219,7 @@ comments from CMU CL:
                 (get-vop-counts (list space) :clear t))
               spaces)
       (get-vop-counts spaces)))
-
+
 ;;;; adjustments
 
 (defun get-vop-costs ()
@@ -236,7 +236,7 @@ comments from CMU CL:
 
 (defvar *native-costs* (get-vop-costs)
   "Costs of assember routines on this machine.")
-
+
 ;;;; classification
 
 (defparameter *basic-classes*
@@ -316,7 +316,7 @@ comments from CMU CL:
               (incf (vop-stats-cost found) (vop-stats-cost value)))
             (setf (gethash key res) value))))
     res))
-
+
 ;;;; analysis
 
 ;;; Sum the count and costs.
@@ -375,7 +375,7 @@ comments from CMU CL:
           (incf (vop-stats-count found) (vop-stats-count v))
           (incf (vop-stats-cost found) (vop-stats-cost v)))))
     res))
-
+
 ;;;; report generation
 
 (defun sort-result (table by)

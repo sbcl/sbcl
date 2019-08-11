@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; utilities
 
 ;;;; TODOs:
@@ -220,7 +220,7 @@
 (defun pointer-hash->bucket (hash mask)
   (declare (type hash hash mask))
   (truly-the index (logand mask (prefuzz-hash hash))))
-
+
 ;;;; user-defined hash table tests
 
 (defun register-hash-table-test (name hash-fun)
@@ -306,7 +306,7 @@ Examples:
              `(register-hash-table-test ',name #',hash-function))
             (t
              (error "Malformed HASH-FUNCTION: ~S" hash-function)))))
-
+
 ;;;; construction and simple accessors
 
 ;;; The smallest table holds 14 items distributed among 16 buckets.
@@ -561,7 +561,7 @@ Examples:
 multiple threads accessing the same hash-table without locking."
          hash-table))
 
-
+
 ;;;; accessing functions
 
 ;;; Make new vectors for the table, extending the table based on the
@@ -1721,7 +1721,7 @@ table itself."
               (kv-vector-high-water-mark kv-vector) 0))))
   hash-table)
 
-
+
 ;;;; methods on HASH-TABLE
 
 ;;; Return a list of keyword args and values to use for MAKE-HASH-TABLE

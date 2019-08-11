@@ -53,7 +53,7 @@
    (signed-reg) (signed-stack)
    (unsigned-reg) (unsigned-stack))
   (inst mov y x))
-
+
 ;;;; the MOVE VOP
 (define-vop (move)
   (:args (x :scs (any-reg descriptor-reg immediate) :target y
@@ -140,7 +140,7 @@
 (define-move-vop move-arg :move-arg
   (any-reg descriptor-reg)
   (any-reg descriptor-reg))
-
+
 ;;;; moves and coercions
 
 ;;; These MOVE-TO-WORD VOPs move a tagged integer to a raw full-word

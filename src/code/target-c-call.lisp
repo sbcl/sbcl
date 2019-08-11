@@ -16,7 +16,7 @@
 ;;;; files for more information.
 
 (in-package "SB-ALIEN")
-
+
 ;;;; extra types
 
 (define-alien-type char (integer 8))
@@ -46,7 +46,7 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (define-alien-type-translator void ()
     (parse-alien-type '(values) (sb-kernel:make-null-lexenv))))
-
+
 
 (defun default-c-string-external-format ()
   (or *default-c-string-external-format*

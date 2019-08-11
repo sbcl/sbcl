@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defvar *!temporary-ensure-accessor-functions* nil)
 (defun ensure-accessor (fun-name)
   (when (member fun-name *!temporary-ensure-accessor-functions* :test 'equal)
@@ -408,7 +408,7 @@
        (boundp (lambda (instance)
                  (emf-funcall sdfun class instance slotd))))
      `(,name ,(class-name class) ,(slot-definition-name slotd)))))
-
+
 (defun maybe-class (class-or-name)
   (when (eq **boot-state** 'complete)
     (if (typep class-or-name 'class)
@@ -489,7 +489,7 @@
              (pv-binding1 ((bug "Please report this")
                            (instance) nil)
                (instance-boundp-custom .pv. 0 instance))))))))))
-
+
 ;;;; FINDING SLOT DEFINITIONS
 ;;;
 ;;; Historical PCL found slot definitions by iterating over

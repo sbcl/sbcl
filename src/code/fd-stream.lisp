@@ -80,7 +80,7 @@
   (reset-buffer buffer)
   (atomic-push buffer *available-buffers*))
 
-
+
 ;;;; the FD-STREAM structure
 
 ;;; Coarsely characterizes the element type of an FD-STREAM w.r.t.
@@ -219,7 +219,7 @@
               (- charpos (aref newlines index) 1))
         ;; zero newlines were seen
         (cons 1 charpos))))
-
+
 ;;;; CORE OUTPUT FUNCTIONS
 
 ;;; Buffer the section of THING delimited by START and END by copying
@@ -435,7 +435,7 @@
 (define-deprecated-function :late "1.0.8.16" output-raw-bytes write-sequence
     (stream thing &optional start end)
   (write-or-buffer-output stream thing (or start 0) (or end (length thing))))
-
+
 ;;;; output routines and related noise
 
 (define-load-time-global *output-routines* ()
@@ -948,7 +948,7 @@
                                     (ldb (byte 8 (- i 8 (* j 8))) byte)))))))
               `(signed-byte ,i)
               (/ i 8)))))
-
+
 ;;;; input routines and related noise
 
 ;;; a list of all available input routines. Each element is a list of
@@ -1716,7 +1716,7 @@
                                             (apply ',string-to-octets-sym rest)))))
         (dolist (ef ',external-format)
           (setf (gethash ef *external-formats*) entry))))))
-
+
 ;;;; utility functions (misc routines, etc)
 
 ;;; Fill in the various routine slots for the given type. INPUT-P and
@@ -2217,7 +2217,7 @@
              (return-from fd-stream-set-file-position
                (typep posn '(alien sb-unix:unix-offset))))))))
 
-
+
 ;;;; creation routines (MAKE-FD-STREAM and OPEN)
 
 ;;; Create a stream for the given Unix file descriptor.
@@ -2559,7 +2559,7 @@
                        :interactive read-evaluated-form
                        (setf filename (the pathname-designator value))))
                    (go retry))))))))))
-
+
 ;;;; initialization
 
 ;;; the stream connected to the controlling terminal, or NIL if there is none
@@ -2673,7 +2673,7 @@
                 (make-two-way-stream *stdin* *stdout*))))
     (princ (get-output-stream-string *error-output*) *stderr*))
   (values))
-
+
 ;;;; miscellany
 
 ;;; the Unix way to beep

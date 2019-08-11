@@ -297,7 +297,7 @@
       (symbol-function '|List|)   #'list
       (symbol-function '|List*|)  #'list*
       (symbol-function '|Vector|) #'vector)
-
+
 ;;;; initialization
 
 ;;; Install BACKQ stuff in the current *READTABLE*.

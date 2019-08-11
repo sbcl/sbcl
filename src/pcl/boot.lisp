@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 #|
 
 The CommonLoops evaluator is meta-circular.
@@ -247,7 +247,7 @@ bootstrapping.
       (generic-function short-method-combination t)
       ()
       short-compute-effective-method))))
-
+
 (defmacro defgeneric (fun-name lambda-list &body options)
   (declare (type list lambda-list))
   (check-designator fun-name defgeneric)
@@ -420,7 +420,7 @@ bootstrapping.
             form.~@:>"
            context method-lambda))
   method-lambda)
-
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (fmakunbound 'defmethod))
 ;;; As per CLHS -
@@ -511,7 +511,7 @@ bootstrapping.
           (t
             (class-prototype (or (generic-function-method-class gf?)
                                  (find-class 'standard-method)))))))
-
+
 ;;; These are used to communicate the method name and lambda-list to
 ;;; MAKE-METHOD-LAMBDA-INTERNAL.
 (defvar *method-name* nil)
@@ -1407,7 +1407,7 @@ bootstrapping.
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *allow-emf-call-tracing-p* nil)
   (defvar *enable-emf-call-tracing-p* #-sb-show nil #+sb-show t))
-
+
 ;;;; effective method functions
 
 (defvar *emf-call-trace-size* 200)
@@ -1587,7 +1587,7 @@ bootstrapping.
                  (clos-slots-ref slots (fast-instance-boundp-index emf)))))))
     (function
      (apply emf args))))
-
+
 
 (defmacro fast-call-next-method-body ((args next-method-call rest-arg)
                                       method-cell
@@ -1848,7 +1848,7 @@ bootstrapping.
        (if (eq **boot-state** 'complete)
            (standard-generic-function-p (gdefinition name))
            (funcallable-instance-p (gdefinition name)))))
-
+
 (defun method-plist-value (method key &optional default)
   (let ((plist (if (consp method)
                    (getf (early-method-initargs method) 'plist)
@@ -1860,7 +1860,7 @@ bootstrapping.
       (setf (getf (getf (early-method-initargs method) 'plist) key default)
             new-value)
       (setf (getf (object-plist method) key default) new-value)))
-
+
 (defun load-defmethod (class name quals specls ll initargs source-location)
   (let ((method-cell (getf initargs 'method-cell)))
     (setq initargs (copy-tree initargs))
@@ -1930,7 +1930,7 @@ bootstrapping.
           (when snl
             (setf (method-plist-value method :pv-table)
                   (intern-pv-table :slot-name-lists snl))))))))
-
+
 (defun analyze-lambda-list (lambda-list)
   (multiple-value-bind (llks required optional rest keywords)
       ;; We say "&MUMBLE is not allowed in a generic function lambda list"
@@ -1977,7 +1977,7 @@ bootstrapping.
                                     (when (or (ll-kwds-allowp llks) old-allowp)
                                       '(&allow-other-keys)))))
                  *))))
-
+
 ;;;; early generic function support
 
 (defvar *!early-generic-functions* ())
@@ -2555,7 +2555,7 @@ bootstrapping.
                 (apply #'make-instance generic-function-class
                        :name fun-name initargs))
         (note-gf-signature fun-name lambda-list-p lambda-list)))))
-
+
 (defun safe-gf-arg-info (generic-function)
   (if (eq (class-of generic-function) *the-class-standard-generic-function*)
       (clos-slots-ref (fsc-instance-slots generic-function)
@@ -2895,7 +2895,7 @@ bootstrapping.
             (set-methods gf (mapcar #'make-method methods)))))
 
   (/show "leaving !FIX-EARLY-GENERIC-FUNCTIONS"))
-
+
 ;;; PARSE-DEFMETHOD is used by DEFMETHOD to parse the &REST argument
 ;;; into the 'real' arguments. This is where the syntax of DEFMETHOD
 ;;; is really implemented.
@@ -2920,7 +2920,7 @@ bootstrapping.
   (flet ((unparse (spec)
            (unparse-specializer-using-class generic-function spec)))
     (mapcar #'unparse specializers)))
-
+
 (macrolet ((def (n name)
              `(defun ,name (lambda-list)
                 (nth-value ,n (parse-specialized-lambda-list lambda-list)))))
@@ -2968,9 +2968,9 @@ bootstrapping.
                             key))
             (make-lambda-list llks nil required optional rest key aux)
             specializers)))
-
+
 (setq **boot-state** 'early)
-
+
 ;;; FIXME: In here there was a #-CMU definition of SYMBOL-MACROLET
 ;;; which used %WALKER stuff. That suggests to me that maybe the code
 ;;; walker stuff was only used for implementing stuff like that; maybe

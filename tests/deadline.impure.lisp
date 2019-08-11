@@ -147,7 +147,7 @@
       (sb-thread:interrupt-thread thread (lambda () 42))
       (let ((seconds-passed (sb-thread:join-thread thread)))
         (assert (< seconds-passed 1.2))))))
-
+
 ;;;; Sleep
 
 (with-test (:name (sb-sys:with-deadline sleep :smoke))

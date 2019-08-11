@@ -107,7 +107,7 @@
      ,@(unless (member :method-combination options :key #'car)
          '((:method-combination beta)))
      ,@options))
-
+
 (defclass top () ())
 (defclass middle (top) ())
 (defclass bottom (middle) ())

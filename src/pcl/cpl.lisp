@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;;; COMPUTE-CLASS-PRECEDENCE-LIST and friends
 
 ;;; Knuth section 2.2.3 has some interesting notes on this.
@@ -190,7 +190,7 @@
       (dolist (after (cpd-after next-cpd))
         (when (zerop (decf (cpd-count after)))
           (push after candidates))))))
-
+
 ;;;; support code for signalling nice error messages
 
 (defun cpl-error (class format-string &rest format-args)

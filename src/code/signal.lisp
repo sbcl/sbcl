@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-UNIX")
-
+
 ;;;; macros for dynamically enabling and disabling signal handling
 
 ;;; Notes on how the without-interrupts/with-interrupts stuff works:

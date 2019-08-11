@@ -414,7 +414,7 @@
 
     ;; Pull out top-level-ish code.
     (separate-toplevelish-components (components))))
-
+
 ;;; Insert the code in LAMBDA at the end of RESULT-LAMBDA.
 (defun merge-1-toplevel-lambda (result-lambda lambda)
   (declare (type clambda result-lambda lambda))

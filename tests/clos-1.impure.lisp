@@ -96,7 +96,7 @@
   (assert (string= (doc (find-method #'set-b-of nil '(t foo))) "docstring for B"))
   (assert (string= (doc (find-method #'c nil '(foo))) "docstring for C"))
   (assert (string= (doc (find-method #'(setf c) nil '(t foo))) "docstring for C")))
-
+
 ;;; some nasty tests of NO-NEXT-METHOD.
 (defvar *method-with-no-next-method*)
 (defvar *nnm-count* 0)
@@ -116,7 +116,7 @@
 (with-test (:name (no-next-method :gf-name-changed))
   (new-nnm-tester 1)
   (assert (= *nnm-count* 2)))
-
+
 ;;; Tests the compiler's incremental rejiggering of GF types.
 (fmakunbound 'foo)
 (with-test (:name :keywords-supplied-in-methods-ok-1)

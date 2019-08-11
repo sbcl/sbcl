@@ -8,14 +8,14 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 (declaim (special *read-suppress*))
 
 ;;; FIXME: Is it standard to ignore numeric args instead of raising errors?
 (defun ignore-numarg (sub-char numarg)
   (when numarg
     (warn "A numeric argument was ignored in #~W~A." numarg sub-char)))
-
+
 ;;;; reading arrays and vectors: the #(, #*, and #A readmacros
 
 (defun sharp-left-paren (stream ignore length)
@@ -130,7 +130,7 @@
                              standard form #<rank>A<contents> nor the ~
                              SBCL-specific form #A(dimensions ~
                              element-type . contents).~@:>")))))
-
+
 ;;;; reading structure instances: the #S readmacro
 
 (defun sharp-S (stream sub-char numarg)
@@ -200,7 +200,7 @@
                                   (list (car body) slot-name))))
                      collect (intern (string (car tail)) *keyword-package*)
                      collect (cadr tail)))))))
-
+
 ;;;; reading numbers: the #B, #C, #O, #R, and #X readmacros
 
 (defun sharp-B (stream sub-char numarg)
@@ -249,7 +249,7 @@
 (defun sharp-X (stream sub-char numarg)
   (ignore-numarg sub-char numarg)
   (sharp-R stream sub-char 16))
-
+
 ;;;; reading circular data: the #= and ## readmacros
 
 (defconstant +sharp-equal-marker+ '+sharp-equal-marker+)
@@ -350,7 +350,7 @@
            entry)
           (t
            (sharp-equal-wrapper-value entry)))))
-
+
 ;;;; conditional compilation: the #+ and #- readmacros
 
 ;;; If X is a symbol, see whether it is present in *FEATURES*. Also
@@ -385,7 +385,7 @@
         (let ((*read-suppress* t))
           (read stream t nil t)
           (values))))
-
+
 ;;;; reading miscellaneous objects: the #P, #\, and #| readmacros
 
 (defun sharp-P (stream sub-char numarg)
@@ -437,7 +437,7 @@
               (munch (fast-read-char) (done-with-fast-read-char)))
             ;; fundamental-stream
             (munch (read-char stream t)))))))
-
+
 ;;;; a grab bag of other sharp readmacros: #', #:, and #.
 
 (defun sharp-quote (stream sub-char numarg)
@@ -495,7 +495,7 @@
         (unless *read-eval*
           (simple-reader-error stream "can't read #. while *READ-EVAL* is NIL"))
         (eval expr)))))
-
+
 (defun sharp-illegal (stream sub-char ignore)
   (declare (ignore ignore))
   (simple-reader-error stream "illegal sharp macro character: ~S" sub-char))

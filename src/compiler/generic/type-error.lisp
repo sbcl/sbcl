@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 (in-package "SB-VM")
-
+
 ;;; (ARRAY NIL) stuff looks the same on all platforms
 ;;;
 ;;; This is separate from DATA-VECTOR-REF, because it's declared as
@@ -84,7 +84,7 @@
     ;; a jump, it's in the regular segment which pollutes the
     ;; instruction pipe with undecodable junk (the sc-numbers).
     (error-call vop errcode object)))
-
+
 #+immobile-space
 (defun type-err-type-tn-loadp (thing)
   (cond ((sc-is thing immediate)
@@ -137,7 +137,7 @@
   (def failed-aver sb-kernel::failed-aver-error
     sb-impl::%failed-aver
     nil form))
-
+
 
 (defun emit-internal-error (kind code values &key trap-emitter
                                                   (compact-error-trap t))

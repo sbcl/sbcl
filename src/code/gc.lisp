@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; DYNAMIC-USAGE and friends
 
 #+(and relocatable-heap gencgc)
@@ -57,7 +57,7 @@
 
 (defun binding-stack-usage ()
   (sap- (binding-stack-pointer-sap) (descriptor-sap sb-vm:*binding-stack-start*)))
-
+
 ;;;; GET-BYTES-CONSED
 
 ;;; the total number of bytes freed so far (including any freeing
@@ -84,7 +84,7 @@ SB-PROFILE package does), or to design a more microefficient interface
 and submit it as a patch."
   (+ (dynamic-usage)
      *n-bytes-freed-or-purified*))
-
+
 ;;;; GC hooks
 
 (!define-load-time-global *after-gc-hooks* nil
@@ -92,7 +92,7 @@ and submit it as a patch."
 triggered during thread exits. In a multithreaded environment these hooks may
 run in any thread.")
 
-
+
 ;;;; internal GC
 
 (define-alien-routine collect-garbage int
@@ -136,7 +136,7 @@ statistics are appended to it."
 #+gencgc
 (define-symbol-macro sb-vm:dynamic-space-end
   (+ (dynamic-space-size) sb-vm:dynamic-space-start))
-
+
 ;;;; SUB-GC
 
 ;;; SUB-GC does a garbage collection.  This is called from three places:
@@ -338,7 +338,7 @@ guaranteed to be collected."
          (drop-all-hash-caches)))
   #-gencgc
   (drop-all-hash-caches))
-
+
 ;;;; auxiliary functions
 
 (defun bytes-consed-between-gcs ()

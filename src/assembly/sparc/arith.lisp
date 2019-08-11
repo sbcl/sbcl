@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Addition and subtraction.
 
 (define-assembly-routine (generic-+
@@ -101,7 +101,7 @@
   (move res temp))
 
 
-
+
 ;;;; Multiplication
 
 
@@ -241,7 +241,7 @@
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
 
 
-
+
 ;;;; Division.
 
 #+sb-assembling
@@ -390,7 +390,7 @@
     (inst neg rem)
     (emit-label label)))
 
-
+
 ;;;; Comparison
 
 (macrolet

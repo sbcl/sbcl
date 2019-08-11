@@ -7,7 +7,7 @@
 ;;;; warranty. See the COPYING and CREDITS files for more information.
 
 (in-package "SB-PCL")
-
+
 ;;;; readers
 
 (defgeneric accessor-method-slot-definition (standard-accessor-method))
@@ -101,7 +101,7 @@
 (defgeneric specializer-object (class-eq-specializer))
 
 (defgeneric specializer-type (specializer))
-
+
 ;;;; writers
 
 (defgeneric (setf class-defstruct-constructor) (new-value structure-class))
@@ -174,7 +174,7 @@
   (new-value effective-slot-definition))
 
 (defgeneric (setf slot-definition-writers) (new-value slot-definition))
-
+
 ;;;; 1 argument
 
 (defgeneric accessor-method-slot-name (m))
@@ -246,7 +246,7 @@
 (defgeneric update-constructors (class))
 
 (defgeneric wrapper-fetcher (class))
-
+
 ;;;; 2 arguments
 
 (defgeneric add-dependent (metaobject dependent))
@@ -335,7 +335,7 @@ protocol. Interface subject to change."))
 
 (defgeneric invalid-superclass (class superclass))
 
-
+
 ;;;; 3 arguments
 
 (defgeneric (setf class-slot-value) (nv class slot-name))
@@ -395,7 +395,7 @@ not be declared, for example for efficiency reasons.
 
 NOTE: This generic function is part of an SBCL-specific experimental
 protocol. Interface subject to change."))
-
+
 ;;;; 4 arguments
 
 (defgeneric make-method-lambda
@@ -449,7 +449,7 @@ NOTE: This generic function is part of an SBCL-specific experimental
 protocol. Interface subject to change."))
 
 (defgeneric (setf slot-value-using-class) (new-value class object slotd))
-
+
 ;;;; 5 arguments
 
 ;;; FIXME: This is currently unused -- where should we call it? Or should we just
@@ -463,7 +463,7 @@ protocol. Interface subject to change."))
 (defgeneric make-method-initargs-form
     (proto-generic-function proto-method lambda-expression lambda-list
      environment))
-
+
 ;;;; 6 arguments
 
 (defgeneric make-method-lambda-using-specializers
@@ -488,7 +488,7 @@ Return three values:
 
 NOTE: This generic function is part of an SBCL-specific experimental
 protocol. Interface subject to change."))
-
+
 ;;;; optional arguments
 
 (defgeneric get-method (generic-function
@@ -506,7 +506,7 @@ protocol. Interface subject to change."))
                           slot-name
                           operation
                           &optional new-value))
-
+
 ;;;; &KEY arguments
 
 ;;; FIXME: make the declared &KEY arguments here agree with those that

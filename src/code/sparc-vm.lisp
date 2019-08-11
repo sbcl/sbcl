@@ -9,13 +9,13 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 (in-package "SB-VM")
-
+
 ;;; See x86-vm.lisp for a description of this.
 #-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "SPARC")
-
+
 (defconstant-eqx +fixup-kinds+ #(:call :sethi :add :absolute) #'equalp)
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind flavor)
@@ -38,7 +38,7 @@
               fixup))))
   nil))
 
-
+
 ;;;; "Sigcontext" access functions, cut & pasted from alpha-vm.lisp.
 ;;;;
 ;;;; See also x86-vm for commentary on signed vs unsigned.
@@ -79,7 +79,7 @@
   (declare (ignore context))
   (warn "stub CONTEXT-FLOATING-POINT-MODES")
   0)
-
+
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (/show0 "entering INTERNAL-ERROR-ARGS")

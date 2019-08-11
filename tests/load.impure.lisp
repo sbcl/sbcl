@@ -116,7 +116,7 @@
          (load *tmp-filename*)
          (assert (equal (merge-pathnames *tmp-filename*) *saved-load-pathname*)))
     (delete-file *tmp-filename*)))
-
+
 ;;; Test many, many variations on LOAD.
 (defparameter *counter* 0)
 (defparameter *loaded-pathname* nil)

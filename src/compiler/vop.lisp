@@ -92,7 +92,7 @@
 ;;; the different policies we can use to determine the coding strategy
 (def!type ltn-policy ()
   '(member :safe :small :small-safe :fast :fast-safe))
-
+
 ;;;; PRIMITIVE-TYPEs
 
 ;;; A PRIMITIVE-TYPE is used to represent the aspects of type
@@ -113,7 +113,7 @@
 
 (defprinter (primitive-type)
   name)
-
+
 ;;;; IR1 annotations used for IR2 conversion
 
 ;;; BLOCK-INFO
@@ -498,7 +498,7 @@
   home
   save-sp
   dynamic-state)
-
+
 ;;;; VOPs and templates
 
 ;;; A VOP is a Virtual Operation. It represents an operation and the
@@ -729,7 +729,7 @@
   write-p
   (vop :test vop :prin1 (vop-info-name (vop-info vop))))
 
-
+
 ;;;; SBs and SCs
 
 ;;; copied from docs/internals/retargeting.tex by WHN 19990707:
@@ -928,7 +928,7 @@
   (reserve-locations (missing-arg) :type sc-locations :read-only t))
 (defprinter (storage-class :conc-name "SC-")
   name)
-
+
 ;;;; TNs
 
 (def!struct (tn (:include sset-element)

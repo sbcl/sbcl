@@ -62,7 +62,7 @@
 ;;; are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number ecx-offset))
-
+
 ;;;; frame hackery
 
 ;;; This is used for setting up the Old-FP in local call.
@@ -276,7 +276,7 @@
     (inst lea res (make-ea :dword :base esp-tn
                            :disp (- (* sp->fp-offset n-word-bytes))))
     (inst sub esp-tn (* (max nargs 3) n-word-bytes))))
-
+
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-REF
 ;;; list for the locations that the values are to be received into.
@@ -483,7 +483,7 @@
          (inst mov esp-tn ebx-tn)
          (inst cld)))))
   (values))
-
+
 ;;;; unknown values receiving
 
 ;;; Emit code needed at the return point for an unknown-values call
@@ -552,7 +552,7 @@
               nvals)
   (:results (start :scs (any-reg control-stack))
             (count :scs (any-reg control-stack))))
-
+
 ;;;; local call with unknown values convention return
 
 (defun check-ocfp-and-return-pc (old-fp return-pc)
@@ -639,7 +639,7 @@
     (inst call target)
     (note-this-location vop :unknown-return)
     (receive-unknown-values values-start nvals start count node)))
-
+
 ;;;; local call with known values return
 
 ;;; Non-TR local call with known return locations. Known-value return
@@ -663,7 +663,7 @@
     (note-this-location vop :call-site)
     (inst call target)
     (note-this-location vop :known-return)))
-
+
 ;;; From Douglas Crosher
 ;;; Return from known values call. We receive the return locations as
 ;;; arguments to terminate their lifetimes in the returning function. We
@@ -682,7 +682,7 @@
     (inst mov esp-tn ebp-tn)
     (inst pop ebp-tn)
     (inst ret)))
-
+
 ;;;; full call
 ;;;
 ;;; There is something of a cross-product effect with full calls.
@@ -950,7 +950,7 @@
     (move eax function)
     ;; And jump to the assembly routine.
     (inst jmp (make-fixup 'tail-call-variable :assembly-routine))))
-
+
 ;;;; unknown values return
 
 ;;; Return a single-value using the Unknown-Values convention.
@@ -1089,7 +1089,7 @@
     (move esi vals)
     (move ecx nvals)
     (inst jmp (make-fixup 'return-multiple :assembly-routine))))
-
+
 ;;;; XEP hackery
 
 ;;; Get the lexical environment from its passing location.

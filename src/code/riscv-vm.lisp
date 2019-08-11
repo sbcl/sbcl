@@ -1,12 +1,12 @@
 ;;; This file contains the RISC-V-specific runtime stuff.
 
 (in-package "SB-VM")
-
+
 #-sb-xc-host
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   #-64-bit "RV32G" #+64-bit "RV64G")
-
+
 ;;; FIXUP-CODE-OBJECT
 
 (defconstant-eqx +fixup-kinds+ #(:absolute :i-type :s-type :u-type) #'equalp)
@@ -48,7 +48,7 @@
           (:u-type
            (setf (ldb (byte 20 12) (sap-ref-32 sap offset)) u)))))
    nil))
-
+
 ;;; CONTEXT-FLOAT-REGISTER
 #-sb-xc-host (progn
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
@@ -85,7 +85,7 @@
            (declare (type (complex double-float) value))
          (setf (sap-ref-double sap 0) (realpart value)
                (sap-ref-double sap 8) (imagpart value))))))))
-
+
 ;;; INTERNAL-ERROR-ARGS
 
 ;;; Given a (POSIX) signal context, extract the internal error
@@ -100,7 +100,7 @@
         (values #.(error-number-or-lose 'invalid-arg-count-error)
                 '(#.arg-count-sc))
         (sb-kernel::decode-internal-error-args (sap+ pc 5) trap-number))))
-
+
 ;;; CONTEXT-CALL-FUNCTION
 
 ;;; Undo the effects of XEP-ALLOCATE-FRAME

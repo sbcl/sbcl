@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; miscellaneous constants, utility functions, and macros
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -43,7 +43,7 @@
                                            collect 'double-float)))
            ,@args))))))
 
-
+
 #+x86 ;; for constant folding
 (macrolet ((def (name ll)
              `(defun ,name ,ll (,name ,@ll))))
@@ -94,7 +94,7 @@
 #-(or x86 x86-64 arm-vfp arm64 riscv) (def-math-rtn "sqrt" 1)
 #-x86 (def-math-rtn "log1p" 1)
 
-
+
 ;;;; power functions
 
 (defun exp (number)
@@ -418,7 +418,7 @@
                  '(dispatch-type number))))
     ((complex)
      (complex-sqrt number))))
-
+
 ;;;; trigonometic and related functions
 
 (defun abs (number)
@@ -646,7 +646,7 @@
     ((complex)
      (complex-atanh number))))
 
-
+
 ;;;; not-OLD-SPECFUN stuff
 ;;;;
 ;;;; (This was conditional on #-OLD-SPECFUN in the CMU CL sources,

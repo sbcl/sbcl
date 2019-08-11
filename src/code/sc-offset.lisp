@@ -8,7 +8,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; SC+OFFSET
 ;;;;
 ;;;; We represent the place where some value is stored with an

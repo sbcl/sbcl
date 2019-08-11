@@ -13,7 +13,7 @@
 (in-package "SB-ALIEN")
 
 (/show0 "target-alieneval.lisp 15")
-
+
 ;;;; alien variables
 
 ;;; Make a string out of the symbol, converting all uppercase letters to
@@ -187,7 +187,7 @@ This is SETFable."
                   ,@body)))
              (t
               body))))))
-
+
 ;;;; runtime C values that don't correspond directly to Lisp types
 
 (defmethod print-object ((value alien-value) stream)
@@ -215,7 +215,7 @@ This is SETFable."
   "Return a System-Area-Pointer pointing to Alien's data."
   (declare (type alien-value alien))
   (alien-value-sap alien))
-
+
 ;;;; allocation/deallocation of heap aliens
 
 (defmacro make-alien (type &optional size &environment env)
@@ -367,7 +367,7 @@ null byte."
   `(multiple-value-bind (sap bytes) (%make-alien-string ,@args)
      (values (%sap-alien sap ',(parse-alien-type '(* char) nil))
              bytes)))
-
+
 ;;;; the SLOT operator
 
 ;;; Find the field named SLOT, or die trying.
@@ -425,7 +425,7 @@ null byte."
               (field-type (alien-record-field-type field)))
          (%sap-alien (sap+ (alien-sap alien) (/ offset sb-vm:n-byte-bits))
                      (make-alien-pointer-type :to field-type)))))))
-
+
 ;;;; the DEREF operator
 
 ;;; This function does most of the work of the different DEREF
@@ -495,7 +495,7 @@ null byte."
   (multiple-value-bind (target-type offset) (deref-guts alien indices)
     (%sap-alien (sap+ (alien-value-sap alien) (/ offset sb-vm:n-byte-bits))
                 (make-alien-pointer-type :to target-type))))
-
+
 ;;;; accessing heap alien variables
 
 (defun %heap-alien (info)
@@ -515,7 +515,7 @@ null byte."
   (declare (type heap-alien-info info))
   (%sap-alien (heap-alien-info-sap info)
               (make-alien-pointer-type :to (heap-alien-info-type info))))
-
+
 ;;;; accessing local aliens
 
 (defun make-local-alien (info)
@@ -570,7 +570,7 @@ null byte."
   (unless (local-alien-info-force-to-memory-p info)
     (error "~S isn't forced to memory. Something went wrong." alien))
   alien)
-
+
 ;;;; the CAST macro
 
 (defmacro cast (alien type &environment env)
@@ -592,7 +592,7 @@ null byte."
             (naturalize (alien-value-sap alien) target-type)
             (error "~S cannot be casted." alien)))
       (error "cannot cast to alien type ~S" (unparse-alien-type target-type))))
-
+
 ;;;; the ALIEN-SIZE macro
 
 (defmacro alien-size (type &optional (units :bits) &environment env)
@@ -608,7 +608,7 @@ null byte."
                            (:words sb-vm:n-word-bits))))
         (error "unknown size for alien type ~S"
                (unparse-alien-type alien-type)))))
-
+
 ;;;; NATURALIZE, DEPORT, EXTRACT-ALIEN-VALUE, DEPOSIT-ALIEN-VALUE
 
 ;;; There is little cost to making an interpreted function,
@@ -658,7 +658,7 @@ null byte."
            (type alien-type type))
   (funcall (coerce-to-interpreted-function (compute-deposit-lambda type))
            value sap offset type))
-
+
 ;;;; ALIEN-FUNCALL, DEFINE-ALIEN-ROUTINE
 
 (defun alien-funcall (alien &rest args)
@@ -798,7 +798,7 @@ way that the argument is passed.
                      (values nil ,@(results)))
                    `((values (alien-funcall ,lisp-name ,@(alien-args))
                              ,@(results))))))))))
-
+
 (defun alien-typep (object type)
   "Return T iff OBJECT is an alien of type TYPE."
   (let ((lisp-rep-type (compute-lisp-rep-type type)))

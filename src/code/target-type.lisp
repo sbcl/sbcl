@@ -12,7 +12,7 @@
 (in-package "SB-KERNEL")
 
 (!begin-collecting-cold-init-forms)
-
+
 ;;; If TYPE is a type that we can do a compile-time test on, then
 ;;; return whether the object is of that type as the first value and
 ;;; second value true. Otherwise return NIL, NIL.
@@ -114,7 +114,7 @@
             (multiple-value-bind (ok result)
                 (sb-c::constant-function-call-p form nil nil)
               (values (not (null result)) ok)))))))))
-
+
 ;;;; miscellaneous interfaces
 
 ;;; Clear memoization of all type system operations that can be
@@ -232,7 +232,7 @@
                      :complexp (not (simple-array-p array))
                      :element-type etype
                      :specialized-element-type etype)))
-
+
 (!defun-from-collected-cold-init-forms !target-type-cold-init)
 
 ;;;; Some functions for examining the type system

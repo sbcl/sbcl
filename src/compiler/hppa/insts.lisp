@@ -22,7 +22,7 @@
             sb-vm::zero-tn
             sb-vm::null-offset sb-vm::code-offset sb-vm::zero-offset)))
 
-
+
 ;;;; Utility functions.
 
 (defun reg-tn-encoding (tn)
@@ -129,7 +129,7 @@
        (byte 2 1)
        (ldb (byte 1 2) space)))
 
-
+
 ;;;; Initial disassembler setup.
 
 (defvar *disassem-use-lisp-reg-names* t)
@@ -304,7 +304,7 @@
                    ((= reg null-offset)
                     (maybe-note-nil-indexed-object offset dstate)))))))
 
-
+
 ;;;; Define-instruction-formats for disassembler.
 
 (define-instruction-format (load/store 32)
@@ -468,7 +468,7 @@
   (t   :field (byte 5 0) :type 'fp-reg))
 
 
-
+
 ;;;; Load and Store stuff.
 
 (define-bitfield-emitter emit-load/store 32
@@ -669,7 +669,7 @@
                              4 #xC (if modify 1 0)
                              (short-disp-encoding segment disp))))
 
-
+
 ;;;; Immediate 21-bit Instructions.
 ;;; Note the heavy scrambling of the immediate value to instruction memory
 
@@ -699,7 +699,7 @@
    (emit-imm21 segment #x0A (reg-tn-encoding reg)
                (encode-imm21 segment value))))
 
-
+
 ;;;; Branch instructions.
 
 (define-bitfield-emitter emit-branch 32
@@ -918,7 +918,7 @@
                               (reg-tn-encoding reg)
                               (if cond 2 6) target nullify))))
 
-
+
 ;;;; Computation Instructions
 
 (define-bitfield-emitter emit-r3-inst 32
@@ -1108,7 +1108,7 @@
   (define-deposit-inst zdep 0))
 
 
-
+
 ;;;; System Control Instructions.
 
 (define-bitfield-emitter emit-break 32
@@ -1187,7 +1187,7 @@
                      (reg-tn-encoding reg))))
 
 
-
+
 ;;;; Floating point instructions.
 
 (define-bitfield-emitter emit-fp-load/store 32
@@ -1411,7 +1411,7 @@
                                result-encoding))))))
 
 
-
+
 ;;;; Instructions built out of other insts.
 
 (define-instruction-macro move (src dst &optional cond)
@@ -1522,7 +1522,7 @@
                         (maybe-negate-cond cond (not not-p)))
                   (inst b target :nullify t)))))))))
 
-
+
 ;;;; Instructions to convert between code ptrs, functions, and lras.
 
 (defun emit-header-data (segment type)
@@ -1605,7 +1605,7 @@
      (lambda (label posn delta-if-after)
        (+ (label-position label posn delta-if-after)
           (component-header-length)))))
-
+
 ;;;; Data instructions.
 (define-bitfield-emitter emit-word 32
   (byte 32 0))

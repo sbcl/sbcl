@@ -113,7 +113,7 @@
           into default-initargs
         finally
           (return (append supplied-initargs default-initargs))))
-
+
 ;;; *****************
 ;;; CTORS   *********
 ;;; *****************
@@ -204,7 +204,7 @@
     (install-initial-constructor ctor :force-p t)
     (setf (gethash function-name *all-ctors*) ctor)
     ctor))
-
+
 ;;; *****************
 ;;; Inline CTOR cache
 ;;; *****************
@@ -408,7 +408,7 @@
                        (declare (notinline allocate-instance))
                        (allocate-instance class))
                      store)))))))
-
+
 ;;; ***********************************************
 ;;; Compile-Time Expansion of MAKE-INSTANCE *******
 ;;; ***********************************************
@@ -530,7 +530,7 @@
           ((and class-arg (not (constantp class-arg)))
            (make-ctor-inline-cache-form
             'ensure-cached-ctor class-arg `(',initargs ',safe-code-p) value-forms)))))))
-
+
 ;;; **************************************************
 ;;; Load-Time Constructor Function Generation  *******
 ;;; **************************************************
@@ -1107,7 +1107,7 @@
                   (setq slots remaining-slots)
                   (return (cons key locations)))))
 
-
+
 ;;; *******************************
 ;;; External Entry Points  ********
 ;;; *******************************

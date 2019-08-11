@@ -19,7 +19,7 @@
 (when (eq sb-ext:*evaluator-mode* :interpret)
   (sb-ext:exit :code 104))
 
-
+
 ;;;; Check that we get debug arglists right.
 
 (defun zoop (zeep &key beep)
@@ -236,7 +236,7 @@
 
 ;; unconditional, in case either previous left it enabled
 (disable-debugger)
-
+
 ;;;; test some limitations of MAKE-LISP-OBJ
 
 ;;; Older GENCGC systems had a bug in the pointer validation used by

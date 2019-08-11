@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; internal errors
 
 (macrolet ((def-it ()
@@ -359,7 +359,7 @@
 
 (deferr failed-aver-error (form)
   (bug "~@<failed AVER: ~2I~_~S~:>" form))
-
+
 ;;;; INTERNAL-ERROR signal handler
 
 ;;; This is needed for restarting XEPs, which do not bind anything but

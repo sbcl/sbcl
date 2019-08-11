@@ -90,7 +90,7 @@
 (defmacro popw (ptr &optional (slot 0) (lowtag 0))
   `(inst pop (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
 
-
+
 ;;;; macros to generate useful values
 
 (defmacro load-symbol (reg symbol)
@@ -150,7 +150,7 @@
 
 (defmacro store-binding-stack-pointer (reg)
   `(store-tl-symbol-value ,reg *binding-stack-pointer*))
-
+
 ;;;; error code
 (defun emit-error-break (vop kind code values)
   (assemble ()
@@ -181,7 +181,7 @@
                         values)
       start-lab)))
 
-
+
 ;;;; PSEUDO-ATOMIC
 
 ;;; This is used to wrap operations which leave untagged memory lying
@@ -226,7 +226,7 @@
          ;; trap instead.  Let's take the opportunity to trigger that
          ;; safepoint right now.
          (emit-safepoint)))))
-
+
 ;;;; indexed references
 
 (sb-xc:deftype load/store-index (scale lowtag min-offset

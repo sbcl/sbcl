@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Unary operations.
 
 (define-vop (fast-safe-arith-op)
@@ -52,7 +52,7 @@
   (:translate lognot)
   (:generator 2
     (inst uaddcm zero-tn x res)))
-
+
 ;;;; Binary fixnum operations.
 
 ;;; Assume that any constant operand is the second arg...
@@ -529,7 +529,7 @@
     (move q-pass q)
     (move r-pass r)))
 
-
+
 ;;;; Binary conditional VOPs:
 
 (define-vop (fast-conditional)
@@ -640,7 +640,7 @@
   (:arg-types * (:constant (signed-byte 9)))
   (:variant-cost 6))
 
-
+
 ;;;; modular functions
 (define-modular-fun +-mod32 (x y) + :untagged nil 32)
 (define-vop (fast-+-mod32/unsigned=>unsigned fast-+/unsigned=>unsigned)
@@ -720,7 +720,7 @@
     (inst shd zero-tn num :variable r)))
 
 
-
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; type frobbing VOPs
 
 ;;; For non-list pointer descriptors, return the header's widetag byte.
@@ -231,7 +231,7 @@
      (move rax old)
      (inst cmpxchg :dword (ea (- 4 other-pointer-lowtag) object) new :lock)
      (inst lea result (ea nil rax (ash 1 n-fixnum-tag-bits)))))
-
+
 (define-vop (pointer-hash)
   (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg) :target res))
@@ -241,7 +241,7 @@
     (move res ptr)
     (inst and res (constantize (dpb -1 (byte (- n-word-bits n-fixnum-tag-bits 1)
                                              n-fixnum-tag-bits) 0)))))
-
+
 ;;;; allocation
 
 (define-vop (binding-stack-pointer-sap)
@@ -259,7 +259,7 @@
   (:policy :fast-safe)
   (:generator 1
     (move int rsp-tn)))
-
+
 ;;;; code object frobbing
 
 (define-vop (code-instructions)
@@ -355,7 +355,7 @@
     (inst mov temp nil-value)
     (inst test :byte res fixnum-tag-mask)
     (inst cmov :e res temp)))
-
+
 ;;;; other miscellaneous VOPs
 
 (defknown sb-unix::receive-pending-interrupt () (values))
@@ -391,7 +391,7 @@
 (define-vop (halt)
   (:generator 1
     (inst break halt-trap)))
-
+
 ;;;; Miscellany
 
 ;;; the RDTSC instruction (present on Pentium processors and
@@ -463,7 +463,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     (inst inc (ea (- (* (+ vector-data-offset index) n-word-bytes)
                      other-pointer-lowtag)
                   count-vector))))
-
+
 ;;;; Memory barrier support
 
 (define-vop (%compiler-barrier)

@@ -24,7 +24,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;; FIXME: This stuff isn't part of the ANSI spec, and isn't even
 ;;; exported from PCL, but it looks as though it might be useful,
 ;;; so I don't want to just delete it. Perhaps it should go in
@@ -136,7 +136,7 @@
   (eval `(trace ,name ,@options))
   (fdefinition name))
 |#
-
+
 #|
 ;;;; Helper for slightly newer trace implementation, based on
 ;;;; breakpoint stuff.  The above is potentially still useful, so it's
@@ -150,7 +150,7 @@
         (push spec result)
         (push (list* 'fast-method (cdr spec)) result)))))
 |#
-
+
 ;;;; MAKE-LOAD-FORM
 
 ;; Overwrite the old bootstrap non-generic MAKE-LOAD-FORM function with a

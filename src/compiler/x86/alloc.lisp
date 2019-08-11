@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; allocation helpers
 
 ;;; Allocation within alloc_region (which is thread local) can be done
@@ -223,7 +223,7 @@
 
 (define-vop (list* list-or-list*)
   (:variant t))
-
+
 ;;;; special-purpose inline allocators
 
 ;;; ALLOCATE-VECTOR
@@ -310,7 +310,7 @@
     (inst rep)
     (inst stos zero)))
 
-
+
 (define-vop (make-fdefn)
   (:policy :fast-safe)
   (:translate make-fdefn)
@@ -353,7 +353,7 @@
   (:generator 10
     (alloc-other result value-cell-widetag value-cell-size node stack-allocate-p)
     (storew value result value-cell-value-slot other-pointer-lowtag)))
-
+
 ;;;; automatic allocators for primitive objects
 
 (define-vop (make-unbound-marker)

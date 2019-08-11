@@ -4,7 +4,7 @@
 
 (with-compilation-unit ()
   (load "docstrings.lisp"))
-
+
 ;;;; Generating documentation strings
 
 (defvar *contrib-directory* #P"../../contrib/")
@@ -53,7 +53,7 @@
             runtime (map 'list #'car contribs) packages)
     (map nil (lambda (contrib) (require (car contrib))) contribs)
     (apply #'sb-texinfo:generate-includes docstring-directory packages)))
-
+
 ;;;; Special cases: external formats list, package locks, variables.template
 
 (defun replace-all (new old string)
@@ -97,7 +97,7 @@
           (declare (ignore key))
           (pushnew (sb-impl::ef-names val) result :test #'equal))
         (table (sort result #'string< :key #'car))))))
-
+
 ;;;; Entry point
 
 (destructuring-bind (program runtime docstring-directory) *posix-argv*

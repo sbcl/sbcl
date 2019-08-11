@@ -1,6 +1,6 @@
 (in-package "SB-ROTATE-BYTE")
 
-
+
 ;;; 32-bit rotates
 
 (define-vop (%32bit-rotate-byte/c)
@@ -42,7 +42,7 @@
       (emit-label label)
       (inst rol :dword result :cl)
       (emit-label end))))
-
+
 ;;; 64-bit rotates
 
 (define-vop (%64bit-rotate-byte/c)

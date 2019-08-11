@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; LIST and LIST*
 (define-vop (list-or-list*)
   (:args (things :more t))
@@ -75,7 +75,7 @@
 (define-vop (list* list-or-list*)
   (:variant t))
 
-
+
 ;;;; Special purpose inline allocators.
 ;;; ALLOCATE-VECTOR
 (define-vop (allocate-vector-on-heap)
@@ -163,7 +163,7 @@
     (with-fixed-allocation
         (result nil temp value-cell-widetag value-cell-size stack-allocate-p)
       (storew value result value-cell-value-slot other-pointer-lowtag))))
-
+
 ;;;; Automatic allocators for primitive objects.
 
 (define-vop (make-unbound-marker)

@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; RANDOM in various integer cases
 
 (deftransform random ((limit &optional state)

@@ -38,7 +38,7 @@
           (sort-vector vector start end predicate-fun key-fun-or-nil))
         sequence)
       (apply #'sb-sequence:sort sequence predicate args))))
-
+
 ;;;; stable sorting
 (defun stable-sort (sequence predicate &rest args &key key)
   "Destructively sort SEQUENCE. PREDICATE should return non-NIL if
@@ -58,7 +58,7 @@
                               predicate-fun
                               (and key (%coerce-callable-to-fun key))))
       (apply #'sb-sequence:stable-sort sequence predicate args))))
-
+
 ;;; FUNCALL-USING-KEY saves us a function call sometimes.
 (eval-when (:compile-toplevel :execute)
   (sb-xc:defmacro funcall2-using-key (pred key one two)
@@ -67,7 +67,7 @@
                   (funcall ,key  ,two))
          (funcall ,pred ,one ,two)))
 ) ; EVAL-WHEN
-
+
 ;;;; stable sort of lists
 (declaim (maybe-inline merge-lists* stable-sort-list))
 
@@ -204,7 +204,7 @@
                     (values list list (shiftf (cdr list) nil))))))
     (when list
       (values (recur list (length list))))))
-
+
 ;;;; stable sort of vectors
 
 ;;; Stable sorting vectors is done with the same algorithm used for
@@ -333,7 +333,7 @@
   (declare (explicit-check))
   (declare (dynamic-extent pred key))
   (vector-merge-sort vector pred key aref))
-
+
 ;;;; merging
 
 (eval-when (:compile-toplevel :execute)

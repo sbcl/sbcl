@@ -73,7 +73,7 @@
 (defparameter *numbers*
   '(-1s0 -1f0 -1d0 -1l0
     #c(-1s0 -1s0) #c(-1f0 -1f0) #c(-1d0 -1d0) #c(-1l0 -1l0)))
-
+
 ;;; tests for MAKE-LOAD-FORM-SAVING-SLOTS
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defstruct savable-structure
@@ -102,7 +102,7 @@
   #.(make-instance 'savable-class :a 3))
 (assert (not (slot-boundp *savable-class* 'a)))
 
-
+
 ;;; ensure that we can dump and reload specialized arrays whose element
 ;;; size is smaller than a byte (caused a few problems circa SBCL
 ;;; 0.8.14.4)
@@ -110,7 +110,7 @@
 (defvar *1-bit* #.(make-array 5 :element-type 'bit :initial-element 0))
 (defvar *2-bit* #.(make-array 5 :element-type '(unsigned-byte 2) :initial-element 0))
 (defvar *4-bit* #.(make-array 5 :element-type '(unsigned-byte 4) :initial-element 1))
-
+
 ;;; tests for constant coalescing (and absence of such) in the
 ;;; presence of strings.
 (progn

@@ -32,7 +32,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defmethod wrapper-fetcher ((class funcallable-standard-class))
   '%funcallable-instance-layout)
 

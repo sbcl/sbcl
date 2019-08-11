@@ -15,7 +15,7 @@
   (:use "COMMON-LISP" "TEST-UTIL"))
 
 (in-package "CLOS-METHOD-COMBINATION-REDEFINITION")
-
+
 ;;;; long-form method combination redefinition
 
 ;;; first, define a method combination
@@ -55,7 +55,7 @@
   (assert (eql (long-or-test 3) 'fixnum))
   (assert (eql (long-or-test (1+ most-positive-fixnum)) 'integer))
   (assert (eql (long-or-test 3.2) 'number)))
-
+
 ;;;; short-form method-combination redefiniton
 
 ;;; define a method-combination
@@ -104,7 +104,7 @@
   (assert (= (short-div 3) 4))
   (assert (= (short-div 3.0) -4)))
 
-
+
 ;;;; modifying the need for args-lambda-list
 
 ;;; define a fancy method combination.  (Happens to implement a finite state machine)
@@ -167,7 +167,7 @@
   (assert (not (even-as (make-instance 'parse-state :string "abcbab") :start 'no)))
   (assert (not (even-as (make-instance 'parse-state :string "abcbabab"))))
   (assert (even-as (make-instance 'parse-state :string "abcbabab") :start 'no)))
-
+
 ;;;; changing between short- and long-form method combination
 (define-method-combination maximum :operator max)
 

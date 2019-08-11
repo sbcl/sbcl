@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-FASL")
-
+
 ;;;; various constants and essentially-constants
 
 ;;; a string which appears at the start of a fasl file header
@@ -128,7 +128,7 @@
 ;;; So we keep the asterisks and make it defglobal.
 (declaim (type simple-string *fasl-file-type*))
 (defglobal *fasl-file-type* "fasl")
-
+
 ;;;; the FOP database
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -151,7 +151,7 @@
 (defglobal **fop-signatures**
     (cons (make-array n-ordinary-fops :element-type '(mod 4) :initial-element 0)
           (make-array n-ordinary-fops :element-type 'bit :initial-element 0)))
-
+
 ;;;; variables
 
 (defvar *load-depth* 0

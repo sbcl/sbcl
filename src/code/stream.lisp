@@ -84,7 +84,7 @@
   (error 'closed-stream-error :stream stream))
 (defun no-op-placeholder (&rest ignore)
   (declare (ignore ignore)))
-
+
 ;;; stream manipulation functions
 
 (defstruct (broadcast-stream (:include ansi-stream
@@ -188,7 +188,7 @@
   (setf (ansi-stream-bout stream) #'closed-flame)
   (setf (ansi-stream-sout stream) #'closed-flame)
   (setf (ansi-stream-misc stream) #'closed-flame))
-
+
 ;;;; for file position and file length
 (defun external-format-char-size (external-format)
   (ef-char-size (get-external-format external-format)))
@@ -278,7 +278,7 @@
 
 (defun file-string-length (stream object)
   (funcall (ansi-stream-misc stream) stream :file-string-length object))
-
+
 ;;;; input functions
 
 (defun ansi-stream-read-line-from-frc-buffer (stream eof-error-p eof-value)
@@ -476,7 +476,7 @@
         ;; must be Gray streams FUNDAMENTAL-STREAM
         (stream-clear-input stream)))
   nil)
-
+
 #-sb-fluid (declaim (inline ansi-stream-read-byte))
 (defun ansi-stream-read-byte (stream eof-error-p eof-value recursive-p)
   ;; Why the "recursive-p" parameter?  a-s-r-b is funcall'ed from
@@ -655,7 +655,7 @@
                             count))
            (setf (ansi-stream-in-index stream) (1+ start))
            (aref ibuf start)))))
-
+
 ;;; output functions
 
 (defun write-char (character &optional (stream *standard-output*))
@@ -750,7 +750,7 @@
   ;; The STREAM argument is not allowed to be a designator.
   (%with-out-stream stream (ansi-stream-bout integer) (stream-write-byte integer))
   integer)
-
+
 
 ;;; Meta: the following comment is mostly true, but gray stream support
 ;;;   is already incorporated into the definitions within this file.
@@ -819,7 +819,7 @@
     (t
      (stream-element-type-stream-element-mode
       (stream-element-type stream)))))
-
+
 ;;;; broadcast streams
 
 (defun make-broadcast-stream (&rest streams)
@@ -920,7 +920,7 @@
                      (funcall (ansi-stream-misc stream) stream operation
                               arg1 arg2)
                      (stream-misc-dispatch stream operation arg1 arg2)))))))))
-
+
 ;;;; synonym streams
 
 (defmethod print-object ((x synonym-stream) stream)
@@ -966,7 +966,7 @@
           (t
            (funcall (ansi-stream-misc syn) syn operation arg1 arg2)))
         (stream-misc-dispatch syn operation arg1 arg2))))
-
+
 ;;;; two-way streams
 
 (defstruct (two-way-stream
@@ -1052,7 +1052,7 @@
            (if out-ansi-stream-p
                (funcall (ansi-stream-misc out) out operation arg1 arg2)
                (stream-misc-dispatch out operation arg1 arg2)))))))
-
+
 ;;;; concatenated streams
 
 (defstruct (concatenated-stream
@@ -1149,7 +1149,7 @@
          (if (ansi-stream-p current)
              (funcall (ansi-stream-misc current) current operation arg1 arg2)
              (stream-misc-dispatch current operation arg1 arg2)))))))
-
+
 ;;;; echo streams
 
 (defstruct (echo-stream
@@ -1237,7 +1237,7 @@
                        :start start :end (+ start bytes-read))
        (aver (= numbytes (+ start bytes-read)))
        numbytes))))
-
+
 ;;;; STRING-INPUT-STREAM stuff
 
 (defstruct (string-input-stream
@@ -1346,7 +1346,7 @@
       (%make-string-input-stream
        string ;; now simple
        start end))))
-
+
 ;;;; STRING-OUTPUT-STREAM stuff
 ;;;;
 ;;;; FIXME: This, like almost none of the stream code is particularly
@@ -1811,7 +1811,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
 (defun finite-base-string-out-misc (stream operation &optional arg1 arg2)
   (declare (ignore stream operation arg1 arg2))
   (error "finite-base-string-out-misc needs an implementation"))
-
+
 ;;;; fill-pointer streams
 
 ;;; Fill pointer STRING-OUTPUT-STREAMs are not explicitly mentioned in
@@ -1949,7 +1949,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
       (array-element-type
        (fill-pointer-output-stream-string stream)))
     (:element-mode 'character)))
-
+
 ;;;; case frobbing streams, used by FORMAT ~(...~)
 
 (defstruct (case-frob-stream
@@ -2187,7 +2187,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
     (if (ansi-stream-p target)
         (funcall (ansi-stream-sout target) target str 0 len)
         (stream-write-string target str 0 len))))
-
+
 ;;;; Shared {READ,WRITE}-SEQUENCE support functions
 
 (declaim (inline stream-compute-io-function
@@ -2229,7 +2229,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
            t)
       (and (typep vector '(simple-array (signed-byte 8) (*)))
            (eq (stream-element-mode stream) 'signed-byte))))
-
+
 ;;;; READ-SEQUENCE
 
 (defun read-sequence (seq stream &key (start 0) end)
@@ -2372,7 +2372,7 @@ benefit of the function GET-OUTPUT-STREAM-STRING."
           (return-from ansi-stream-read-string-from-frc-buffer start))
         (loop (add-chunk))))))
 
-
+
 ;;;; WRITE-SEQUENCE
 
 (defun write-sequence (seq stream &key (start 0) (end nil))

@@ -21,7 +21,7 @@
   (* #-darwin 2
      #+darwin 8
      n-word-bytes))
-
+
 ;;;; Define the registers
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -94,7 +94,7 @@
  (defparameter register-arg-names '(a0 a1 a2 a3)))
 
 
-
+
 ;;;; SB and SC definition:
 
 (!define-storage-bases
@@ -230,7 +230,7 @@
 
   (catch-block control-stack :element-size catch-block-size)
   (unwind-block control-stack :element-size unwind-block-size))
-
+
 ;;;; Make some random tns for important registers.
 
 (macrolet ((defregtn (name sc)
@@ -255,7 +255,7 @@
   (defregtn cfp any-reg)
   (defregtn ocfp any-reg)
   (defregtn nsp any-reg))
-
+
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -276,7 +276,7 @@
   (or (eql sc zero-sc-number)
       (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
-
+
 ;;;; function call parameters
 
 ;;; the SC numbers for register and stack arguments/return values
@@ -317,7 +317,7 @@
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 8)
-
+
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.
 (defun location-print-name (tn)

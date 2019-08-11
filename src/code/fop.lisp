@@ -135,7 +135,7 @@
         (setf (aref string i)
               (sb-xc:code-char (read-varint))))))
   string)
-
+
 ;;;; miscellaneous fops
 
 (define-fop 0 (fop-nop () nil))
@@ -214,7 +214,7 @@
 (define-fop 63 (fop-verify-empty-stack () nil)
   (unless (fop-stack-empty-p (operand-stack))
     (bug "fasl stack not empty when it should be")))
-
+
 ;;;; fops for loading symbols
 
 (defstruct (undefined-package (:copier nil))
@@ -289,7 +289,7 @@
        (simple-package-error (c)
          (make-undefined-package :error (princ-to-string c))))
      (fasl-input))))
-
+
 ;;;; fops for loading numbers
 
 ;;; Load a signed integer LENGTH bytes long from FASL-INPUT-STREAM.
@@ -375,7 +375,7 @@
              (%make-simd-pack tag
                               (fast-read-u-integer 8)
                               (fast-read-u-integer 8)))))))
-
+
 ;;;; loading lists
 
 (defun fop-list (fasl-input n &aux (stack (%fasl-input-stack fasl-input)))
@@ -395,7 +395,7 @@
                (cold-cons (fop-stack-ref i) res)))
          ((= i ptr) res)
       (declare (type index i)))))
-
+
 ;;;; fops for loading arrays
 
 (define-fop 100 :not-host (fop-base-string ((:operands length)))
@@ -483,7 +483,7 @@
 ;;; For LOAD-TIME-VALUE which is used for MAKE-LOAD-FORM
 (define-fop 57 (fop-funcall-no-skip ((:operands n)))
   (fop-funcall* n (operand-stack) nil))
-
+
 ;;;; fops for fixing up circularities
 
 (define-fop 11 (fop-rplaca ((:operands tbl-slot idx) val) nil)
@@ -502,7 +502,7 @@
 
 (define-fop 15 (fop-nthcdr ((:operands n) obj))
   (nthcdr n obj))
-
+
 ;;;; fops for loading functions
 
 ;;; (In CMU CL there was a FOP-CODE-FORMAT (47) which was
@@ -559,7 +559,7 @@
 
 (define-fop 20 :not-host (fop-fun-entry ((:operands fun-index) code-object))
   (%code-entry-point code-object fun-index))
-
+
 ;;;; assemblerish fops
 
 (define-fop 21 (fop-assembler-code)

@@ -22,7 +22,7 @@
             sb-vm::short-immediate-fixnum
             sb-vm::u+i-immediate)))
 
-
+
 ;;;; disassembler field definitions
 
 (define-arg-type reg :printer #'print-reg)
@@ -38,7 +38,7 @@
 (define-arg-type store-annotation :printer #'print-store-annotation)
 (define-arg-type jalr-annotation :printer #'print-jalr-annotation)
 
-
+
 (define-instruction byte (segment byte)
   (:emitter (emit-byte segment byte)))
 

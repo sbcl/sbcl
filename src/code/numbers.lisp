@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; the NUMBER-DISPATCH macro
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -191,7 +191,7 @@
               ,@(generate-number-dispatch vars (error-tags)
                                           (cdr res)))
             ,@(errors))))))
-
+
 ;;;; binary operation dispatching utilities
 
 (eval-when (:compile-toplevel :execute)
@@ -227,7 +227,7 @@
      (,big-op x y))))
 
 ) ; EVAL-WHEN
-
+
 ;;;; canonicalization utilities
 
 ;;; If IMAGPART is 0, return REALPART, otherwise make a complex. This is
@@ -273,7 +273,7 @@
   (if (eql y 1)
       x
       (truncate x y)))
-
+
 ;;;; COMPLEXes
 
 (defun complex (realpart &optional (imagpart 0))
@@ -352,7 +352,7 @@
              (coerce -1 '(dispatch-type number))))
         ((complex)
          (/ number (abs number))))))
-
+
 ;;;; ratios
 
 (defun numerator (number)
@@ -362,7 +362,7 @@
 (defun denominator (number)
   "Return the denominator of NUMBER, which must be rational."
   (denominator number))
-
+
 ;;;; arithmetic operations
 ;;;;
 ;;;; IMPORTANT NOTE: Accessing &REST arguments with NTH is actually extremely
@@ -604,7 +604,7 @@
      (%make-ratio (- (numerator n)) (denominator n)))
     ((complex)
      (complex (- (realpart n)) (- (imagpart n))))))
-
+
 ;;;; TRUNCATE and friends
 
 (defun truncate (number &optional (divisor 1))
@@ -781,7 +781,7 @@
   (multiple-value-bind (res rem)
       (round number divisor)
     (values (float res (if (floatp rem) rem $1.0)) rem)))
-
+
 ;;;; comparisons
 
 (defun = (number &rest more-numbers)
@@ -988,7 +988,7 @@ the first."
     ((complex (or float rational))
      (and (= (realpart x) y)
           (zerop (imagpart x))))))
-
+
 ;;;; logicals
 
 (macrolet ((def (op init doc)
@@ -1116,7 +1116,7 @@ and the number of 0 bits if INTEGER is negative."
      (integer-length (truly-the fixnum integer)))
     (bignum
      (bignum-integer-length integer))))
-
+
 ;;;; BYTE, bytespecs, and related operations
 
 (defun byte (size position)
@@ -1203,7 +1203,7 @@ and the number of 0 bits if INTEGER is negative."
                          word
                          (msf size word))))))
       ((unsigned-byte) (msf size integer)))))
-
+
 ;;;; BOOLE
 
 (defun boole (op integer1 integer2)
@@ -1242,7 +1242,7 @@ and the number of 0 bits if INTEGER is negative."
     (14 (boole 14 integer1 integer2))
     (15 (boole 15 integer1 integer2))
     (t (error 'type-error :datum op :expected-type '(mod 16)))))
-
+
 ;;;; GCD and LCM
 
 (defun gcd (&rest integers)
@@ -1341,7 +1341,7 @@ and the number of 0 bits if INTEGER is negative."
             (bignum-gcd u (make-small-bignum v)))
            ((fixnum bignum)
             (bignum-gcd (make-small-bignum u) v))))))
-
+
 ;;; from Robert Smith; changed not to cons unnecessarily, and tuned for
 ;;; faster operation on fixnum inputs by compiling the central recursive
 ;;; algorithm twice, once using generic and once fixnum arithmetic, and
@@ -1401,7 +1401,7 @@ and the number of 0 bits if INTEGER is negative."
                                ((= n  0) 0))))
                 (fixnum-isqrt n)))
       (bignum (isqrt-recursion n isqrt nil)))))
-
+
 ;;;; miscellaneous number predicates
 
 (macrolet ((def (name doc)
@@ -1413,7 +1413,7 @@ and the number of 0 bits if INTEGER is negative."
   (def minusp "Is this real number strictly negative?")
   (def oddp "Is this integer odd?")
   (def evenp "Is this integer even?"))
-
+
 ;;;; modular functions
 #.
 (collect ((forms))

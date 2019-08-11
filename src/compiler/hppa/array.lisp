@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Allocator for the array header.
 (define-vop (make-array-header)
   (:translate make-array-header)
@@ -37,7 +37,7 @@
       (storew header result 0 other-pointer-lowtag)
       (inst add bytes alloc-tn alloc-tn))))
 
-
+
 ;;;; Additional accessors and setters for the array header.
 (define-full-reffer %array-dimension *
   array-dimensions-offset other-pointer-lowtag
@@ -57,7 +57,7 @@
     (inst sra res n-widetag-bits res)
     (inst addi (- (1- array-dimensions-offset)) res res)
     (inst sll res n-fixnum-tag-bits res)))
-
+
 ;;;; Bounds checking routine.
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -73,7 +73,7 @@
       (%test-fixnum index nil error t)
       (inst bc :>>= nil index bound error))))
 
-
+
 ;;;; Accessors/Setters
 
 ;;; Variants built on top of word-index-ref, etc.  I.e. those vectors whos
@@ -373,7 +373,7 @@
       (unless (location= result-imag value-imag)
         (inst funop :copy value-imag result-imag)))))
 
-
+
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
 (define-full-reffer vector-raw-bits * vector-data-offset other-pointer-lowtag

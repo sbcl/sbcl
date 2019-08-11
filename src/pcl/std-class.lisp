@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defmethod slot-accessor-function ((slotd effective-slot-definition) type)
   (let ((info (the slot-info (slot-definition-info slotd))))
     (ecase type
@@ -133,7 +133,7 @@
 
 (defmethod slot-definition-allocation ((slotd structure-slot-definition))
   :instance)
-
+
 ;;;; various class accessors that are a little more complicated than can be
 ;;;; done with automatically generated reader methods
 
@@ -164,7 +164,7 @@
   (plist-value class 'class-slot-cells))
 (defmethod (setf class-slot-cells) (new-value (class std-class))
   (setf (plist-value class 'class-slot-cells) new-value))
-
+
 ;;;; class accessors that are even a little bit more complicated than those
 ;;;; above. These have a protocol for updating them, we must implement that
 ;;;; protocol.
@@ -257,7 +257,7 @@
                 ;; #'EQ to check for newness
                       (pushnew (method-generic-function m) collect
                                :test #'eq)))))))))
-
+
 (defmethod specializer-method-holder ((self specializer) &optional create)
   ;; CREATE can be ignored, because instances of SPECIALIZER
   ;; other than CLASS-EQ-SPECIALIZER have their DIRECT-METHODS slot
@@ -435,7 +435,7 @@
                     (typep value type))
           (error 'type-error :expected-type type :datum value))))
     value))
-
+
 (defmethod shared-initialize :after
     ((class std-class) slot-names &key
      (direct-superclasses nil direct-superclasses-p)
@@ -843,7 +843,7 @@
 
 (defmethod finalize-inheritance ((class structure-class))
   nil) ; always finalized
-
+
 (defun add-slot-accessors (class dslotds)
   (fix-slot-accessors class dslotds 'add))
 
@@ -876,7 +876,7 @@
           (fix r slot-name 'r slot-doc location))
         (dolist (w (slot-definition-writers dslotd))
           (fix w slot-name 'w slot-doc location))))))
-
+
 (defun add-direct-subclasses (class supers)
   (dolist (super supers)
     (unless (memq class (class-direct-subclasses class))
@@ -895,7 +895,7 @@
        ~2I~_~S~:>"
    class))
 
-
+
 (defun class-has-a-forward-referenced-superclass-p (class)
   (or (when (forward-referenced-class-p class)
         class)
@@ -1112,12 +1112,12 @@
                    (declare (ignore ignore))
                    (update-gf-dfun class gf))
                  gf-table)))))
-
+
 (defmethod compute-default-initargs ((class slot-class))
   (let ((initargs (loop for c in (class-precedence-list class)
                         append (class-direct-default-initargs c))))
     (delete-duplicates initargs :test #'eq :key #'car :from-end t)))
-
+
 ;;;; protocols for constructing direct and effective slot definitions
 
 (defmethod direct-slot-definition-class ((class std-class) &rest initargs)
@@ -1293,7 +1293,7 @@
            :internal-writer-function
            (slot-definition-internal-writer-function slotd)
            (call-next-method))))
-
+
 ;;; NOTE: For bootstrapping considerations, these can't use MAKE-INSTANCE
 ;;;       to make the method object. They have to use make-a-method which
 ;;;       is a specially bootstrapped mechanism for making standard methods.
@@ -1355,7 +1355,7 @@
 (defmethod remove-boundp-method ((class slot-class) generic-function)
   (let ((method (get-method generic-function () (list class) nil)))
     (when method (remove-method generic-function method))))
-
+
 ;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITER-METHOD-FUNCTION
 ;;; function are NOT part of the standard protocol. They are however
 ;;; useful; PCL makes use of them internally and documents them for
@@ -1378,7 +1378,7 @@
 
 (defmethod make-boundp-method-function ((class slot-class) slot-name)
   (make-std-boundp-method-function class slot-name))
-
+
 (defmethod compatible-meta-class-change-p (class proto-new-class)
   (eq (class-of class) (class-of proto-new-class)))
 
@@ -1388,7 +1388,7 @@
            (eq (class-of class) *the-class-funcallable-standard-class*))
       (and (eq (class-of superclass) *the-class-funcallable-standard-class*)
            (eq (class-of class) *the-class-standard-class*))))
-
+
 ;;; What this does depends on which of the four possible values of
 ;;; LAYOUT-INVALID the PCL wrapper has; the simplest case is when it
 ;;; is (:FLUSH <wrapper>) or (:OBSOLETE <wrapper>), when there is
@@ -1437,7 +1437,7 @@
               (%invalidate-wrapper owrapper :obsolete nwrapper)
               (%invalidate-wrapper owrapper :flush nwrapper))))))
   nil)
-
+
 ;;; MAKE-INSTANCES-OBSOLETE can be called by user code. It will cause
 ;;; the next access to the instance (as defined in 88-002R) to trap
 ;;; through the UPDATE-INSTANCE-FOR-REDEFINED-CLASS mechanism.
@@ -1621,7 +1621,7 @@
      (let ((*in-obsolete-instance-trap* t))
        (error 'obsolete-structure :datum instance)))))
 
-
+
 (defun %change-class (instance new-class initargs)
   (declare (notinline allocate-instance))
   (binding* ((old-wrapper (layout-of instance))
@@ -1735,7 +1735,7 @@
 
 (defmethod change-class ((instance t) (new-class-name symbol) &rest initargs)
   (apply #'change-class instance (find-class new-class-name) initargs))
-
+
 ;;;; The metaclasses SYSTEM-CLASS and BUILT-IN-CLASS
 ;;;;
 ;;;; These metaclasses are something of a weird creature. By this
@@ -1771,7 +1771,7 @@
   t)
 (defmethod validate-superclass ((c class) (s built-in-class))
   nil)
-
+
 ;;; Some necessary methods for FORWARD-REFERENCED-CLASS
 (defmethod class-direct-slots ((class forward-referenced-class)) ())
 (defmethod class-direct-default-initargs ((class forward-referenced-class)) ())
@@ -1785,7 +1785,7 @@
 
 (defmethod validate-superclass ((c slot-class) (f forward-referenced-class))
   t)
-
+
 (defmethod add-dependent ((metaobject dependent-update-mixin) dependent)
   (pushnew dependent (plist-value metaobject 'dependents) :test #'eq))
 

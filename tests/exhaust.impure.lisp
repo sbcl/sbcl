@@ -13,7 +13,7 @@
 
 #+interpreter (sb-ext:exit :code 104)
 
-
+
 ;;; Prior to sbcl-0.7.1.38, doing something like (RECURSE), even in
 ;;; safe code, would crash the entire Lisp process. Then the soft
 ;;; stack checking was introduced, which checked (in safe code) for

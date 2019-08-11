@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-
+
 ;;;; Type frobbing VOPs
 
 (define-vop (widetag-of)
@@ -133,7 +133,7 @@
     (inst sll res ptr 3)
     (inst srl res res 1)))
 
-
+
 ;;;; Allocation
 
 (define-vop (dynamic-space-free-pointer)
@@ -160,7 +160,7 @@
   (:generator 1
     (move int csp-tn)))
 
-
+
 ;;;; Code object frobbing.
 
 (define-vop (code-instructions)
@@ -215,7 +215,7 @@
     (inst addu ndescr (- fun-pointer-lowtag other-pointer-lowtag))
     (inst addu func code ndescr)))
 
-
+
 ;;;; Other random VOPs.
 
 
@@ -231,7 +231,7 @@
   (:generator 1
     (inst break 0 halt-trap)))
 
-
+
 ;;;; Dynamic vop count collection support
 
 (define-vop (count-me)

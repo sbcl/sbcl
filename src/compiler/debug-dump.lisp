@@ -18,7 +18,7 @@
 (defvar *contexts*)
 (declaim (type (vector t) *contexts*))
 
-
+
 ;;;; debug blocks
 
 (deftype location-kind ()
@@ -298,7 +298,7 @@
         (dump-location-from-info loc var-locs)))
     ;; lz-compress accept any array of octets and returns a simple-array
     (logically-readonlyize (lz-compress byte-buffer))))
-
+
 ;;; Return DEBUG-SOURCE structure containing information derived from
 ;;; INFO.
 (defun debug-source-for-info (info &key function)
@@ -379,7 +379,7 @@
          (elt sequence 0))
         (t
          (coerce-to-smallest-eltype sequence))))
-
+
 ;;;; variables
 
 ;;; Return a SC+OFFSET describing TN's location.
@@ -566,7 +566,7 @@
            (aver (or (null (leaf-refs var))
                      (not (tn-offset (leaf-info var)))))
            debug-info-var-deleted))))
-
+
 ;;;; arguments/returns
 
 ;;; Return a vector to be used as the COMPILED-DEBUG-FUN-ARGS for FUN.
@@ -624,7 +624,7 @@
   (coerce-to-smallest-eltype
    (mapcar #'tn-sc+offset
            (return-info-locations (tail-set-info (lambda-tail-set fun))))))
-
+
 ;;;; debug functions
 
 ;;; Return a C-D-F structure with all the mandatory slots filled in.
@@ -712,7 +712,7 @@
                    (setf (compiled-debug-fun-returns dfun)
                          (compute-debug-returns fun)))))))
     dfun))
-
+
 ;;;; full component dumping
 
 ;;; Compute the full form function map.
@@ -764,7 +764,7 @@
                                     (source-info-file-info *source-info*))
                                    component-tlf-num)))
        :contexts (compact-vector *contexts*)))))
-
+
 ;;; Write BITS out to BYTE-BUFFER in backend byte order. The length of
 ;;; BITS must be evenly divisible by eight.
 (defun write-packed-bit-vector (bits byte-buffer)

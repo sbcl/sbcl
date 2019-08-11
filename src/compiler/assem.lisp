@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-ASSEM")
-
+
 ;;;; assembly control parameters
 
 ;;; Only the scheduling assembler cares about this constant,
@@ -21,7 +21,7 @@
   (if (boundp '+assem-max-locations+)
       (symbol-value '+assem-max-locations+)
       0))
-
+
 ;;;; the SEGMENT structure
 
 ;;; This structure holds the state of the assembler.
@@ -190,7 +190,7 @@
              ,@body)
          (setf (segment-current-index ,n-segment) ,old-index
                (segment-current-posn ,n-segment) ,old-posn)))))
-
+
 ;;;; structures/types used by the scheduler
 
 (!def-boolean-attribute instruction
@@ -373,7 +373,7 @@
 
 (defun assembling-to-elsewhere-p ()
   (eq *current-destination* (asmstream-elsewhere-section *asmstream*)))
-
+
 ;;;; the scheduler itself
 
 (defmacro without-scheduling (() &body body)
@@ -802,7 +802,7 @@
                    (cons inst remaining))))))
   (values))
 )) ; end PROGN
-
+
 ;;;; structure used during output emission
 
 ;;; a constraint on how the output stream must be aligned
@@ -859,7 +859,7 @@
                     (:copier nil))
   ;; the number of bytes of filler here
   (bytes 0 :type index))
-
+
 ;;;; output functions
 
 ;;; interface: Emit the supplied BYTE to SEGMENT, growing SEGMENT if
@@ -1065,7 +1065,7 @@
 (defun %emit-postit (segment function)
   (push function (segment-postits segment))
   (values))
-
+
 ;;;; output compression/position assignment stuff
 
 ;;; Grovel though all the annotations looking for choosers. When we
@@ -1265,7 +1265,7 @@
     (setf (segment-final-index segment) (segment-final-posn segment))
     new-buffer))
 
-
+
 ;;;; interface to the rest of the compiler
 (defun op-encoder-name (string-designator &optional create)
   (cond ((string= string-designator '.skip)
@@ -1610,7 +1610,7 @@
     (declare (type (simple-array assembly-unit 1) v))
     (length (write-sequence v stream))))
 
-
+
 ;;;; interface to the instruction set definition
 
 ;;; Define a function named NAME that merges its arguments into a

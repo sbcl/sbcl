@@ -6,7 +6,7 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "ARM64")
-
+
 ;;;; FIXUP-CODE-OBJECT
 
 (defconstant-eqx +fixup-kinds+ #(:absolute :cond-branch :uncond-branch)
@@ -28,7 +28,7 @@
          (setf (ldb (byte 26 0) (sap-ref-32 sap offset))
                (ash (- fixup (+ (sap-int sap) offset)) -2)))))
   nil))
-
+
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.
 ;;;;
@@ -69,7 +69,7 @@
            (declare (type (complex double-float) value))
          (setf (sap-ref-double sap 0) (realpart value)
                (sap-ref-double sap 8) (imagpart value)))))))
-
+
 ;;;; INTERNAL-ERROR-ARGS.
 
 ;;; Given a (POSIX) signal context, extract the internal error

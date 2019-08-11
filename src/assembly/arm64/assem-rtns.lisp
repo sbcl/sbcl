@@ -1,5 +1,5 @@
 (in-package "SB-VM")
-
+
 ;;;; Return-multiple with other than one value
 
 #+sb-assembling ;; we don't want a vop for this one.
@@ -70,7 +70,7 @@
 
   ;; Return.
   (lisp-return lra lip :multiple-values))
-
+
 ;;;; tail-call-variable.
 
 #+sb-assembling ;; no vop for this one either.
@@ -140,7 +140,7 @@
   (inst asr nargs nargs (- word-shift n-fixnum-tag-bits))
   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
   (lisp-jump temp lip))
-
+
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (throw

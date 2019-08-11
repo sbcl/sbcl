@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; defining the registers
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -224,7 +224,7 @@
 
   (catch-block control-stack :element-size catch-block-size)
   (unwind-block control-stack :element-size unwind-block-size))
-
+
 ;;; Make some random tns for important registers.
 (macrolet ((defregtn (name sc)
              (let ((offset-sym (symbolicate name "-OFFSET"))
@@ -260,7 +260,7 @@
   (make-random-tn :kind :normal
                   :sc (sc-or-lose 'double-reg)
                   :offset 31))
-
+
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -290,7 +290,7 @@
       (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
 
-
+
 ;;;; function call parameters
 
 ;;; the SC numbers for register and stack arguments/return values
@@ -322,7 +322,7 @@
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 4)
-
+
 ;;; This function is called by debug output routines that want a
 ;;; pretty name for a TN's location. It returns a thing that can be
 ;;; printed with PRINC.

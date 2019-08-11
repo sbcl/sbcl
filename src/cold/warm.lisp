@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "COMMON-LISP-USER")
-
+
 ;;;; general warm init compilation policy
 
 ;;;; Use the same settings as PROCLAIM-TARGET-OPTIMIZATION
@@ -74,7 +74,7 @@
                  "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
                  expr actual)))))))))
 
-
+
 ;;;; compiling and loading more of the system
 
 ;;; FIXME: CMU CL's pclcom.lisp had extra optional stuff wrapped around

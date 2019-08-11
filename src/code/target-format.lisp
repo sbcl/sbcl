@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-FORMAT")
-
+
 ;;;; FORMAT
 
 ;;; This funcallable instance is used only as plain-old-data (conveying
@@ -157,7 +157,7 @@
                          (cdr directives) orig-args args)
                 (format-error "Unknown format directive ~@[(character: ~A)~]"
                               (directive-char-name directive)))))))))))
-
+
 ;;;; FORMAT directive definition macros and runtime support
 
 ;;; This macro is used to extract the next argument from the current arg list.
@@ -218,7 +218,7 @@
             nil (caar ,params)
             "Too many parameters, expected no more than ~W" ,(length specs)))
          ,@body))))
-
+
 ;;;; format interpreters and support functions for simple output
 
 (defun format-write-field (stream string mincol colinc minpad padchar padleft)
@@ -311,7 +311,7 @@
           (*print-level* (unless atsignp *print-level*))
           (*print-length* (unless atsignp *print-length*)))
       (output-object (next-arg) stream))))
-
+
 ;;;; format interpreters and support functions for integer output
 
 ;;; FORMAT-PRINT-NUMBER does most of the work for the numeric printing
@@ -519,7 +519,7 @@
                             (- i (- cur-val cur-sub-val)))
                            (t i))))))
           ((zerop start))))
-
+
 ;;;; plural
 
 (def-format-interpreter #\P (colonp atsignp params)
@@ -534,7 +534,7 @@
       (if atsignp
           (write-string (if (eql arg 1) "y" "ies") stream)
           (unless (eql arg 1) (write-char #\s stream))))))
-
+
 ;;;; format interpreters and support functions for floating point output
 
 (defun decimal-string (n)
@@ -801,7 +801,7 @@
         (format-write-field stream
                             (princ-to-string number)
                             w 1 0 #\space t))))
-
+
 ;;;; FORMAT interpreters and support functions for line/page breaks etc.
 
 (def-format-interpreter #\% (colonp atsignp params)
@@ -840,7 +840,7 @@
   (check-modifier '("colon" "at-sign") (and colonp atsignp))
   (interpret-bind-defaults () params)
   (bug "Unreachable ~S" directives))
-
+
 ;;;; format interpreters and support functions for tabs and simple pretty
 ;;;; printing
 
@@ -900,7 +900,7 @@
   (check-modifier "at-sign" atsignp)
   (interpret-bind-defaults ((n 0)) params
     (pprint-indent (if colonp :current :block) n stream)))
-
+
 ;;;; format interpreter for ~*
 
 (def-format-interpreter #\* (colonp atsignp params)
@@ -926,7 +926,7 @@
             (interpret-bind-defaults ((n 1)) params
               (dotimes (i n)
                 (next-arg)))))))
-
+
 ;;;; format interpreter for indirection
 
 (def-format-interpreter #\? (colonp atsignp params string end)
@@ -942,7 +942,7 @@
       (if atsignp
           (setf args (%format stream (next-arg) orig-args args))
           (%format stream (next-arg) (next-arg))))))
-
+
 ;;;; format interpreters for capitalization
 
 (def-complex-format-interpreter #\( (colonp atsignp params directives)
@@ -965,7 +965,7 @@
 
 (def-complex-format-interpreter #\) ()
   (format-error "no corresponding open paren"))
-
+
 ;;;; format interpreters and support functions for conditionalization
 
 (def-complex-format-interpreter #\[ (colonp atsignp params directives)
@@ -1014,7 +1014,7 @@
 
 (def-complex-format-interpreter #\] ()
   (format-error "No corresponding open bracket"))
-
+
 ;;;; format interpreter for up-and-out
 
 (defvar *outside-args*)
@@ -1032,7 +1032,7 @@
                        (null args)))))
     (throw (if colonp 'up-up-and-out 'up-and-out)
            args)))
-
+
 ;;;; format interpreters for iteration
 
 (def-complex-format-interpreter #\{
@@ -1089,7 +1089,7 @@
 
 (def-complex-format-interpreter #\} ()
   (format-error "No corresponding open brace"))
-
+
 ;;;; format interpreters and support functions for justification
 
 (def-complex-format-interpreter #\<
@@ -1216,7 +1216,7 @@
                                         (if atsignp orig-args arg)
                                         arg))))))
   (if atsignp nil args))
-
+
 ;;;; format interpreter and support functions for user-defined method
 
 (def-format-interpreter #\/ (string start end colonp atsignp params)

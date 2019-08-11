@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; moves and type checks
 
 ;;; Move X to Y unless they are EQ.
@@ -36,7 +36,7 @@
 (defun emit-make-value-cell (node block value res)
   (event make-value-cell-event node)
   (vop make-value-cell node block value nil res))
-
+
 ;;;; leaf reference
 
 ;;; Return the TN that holds the value of THING in the environment ENV.
@@ -367,7 +367,7 @@
       (emit-move node block val (first locs))
       (move-lvar-result node block locs lvar)))
   (values))
-
+
 ;;;; utilities for receiving fixed values
 
 ;;; Return a TN that can be referenced to get the value of LVAR. LVAR
@@ -425,7 +425,7 @@
                     temp)))
             locs
             ptypes)))
-
+
 ;;;; utilities for delivering values to lvars
 
 ;;; Return a list of TNs with the specifier TYPES that can be used as
@@ -592,7 +592,7 @@
         (compiler-warn "Derived type ~s is not a suitable index for ~s."
                        (type-specifier index-type)
                        (type-specifier (lvar-type array)))))))
-
+
 ;;;; template conversion
 
 ;;; Build a TN-REFS list that represents access to the values of the
@@ -768,7 +768,7 @@
     (if (fun-type-p type)
         (fun-type-returns type)
         *wild-type*)))
-
+
 ;;;; local call
 
 ;;; Convert a LET by moving the argument values into the variables.
@@ -989,7 +989,7 @@
                 (ir2-convert-local-known-call node block fun returns
                                               lvar start)))))))
   (values))
-
+
 ;;;; full call
 
 ;;; Given a function lvar FUN, return (VALUES TN-TO-CALL NAMED-P),
@@ -1307,7 +1307,7 @@
         (t
          (ir2-convert-fixed-full-call node block)))
   (values))
-
+
 ;;;; entering functions
 (defun xep-verify-arg-count (node block fun arg-count-location)
   (when (policy fun (plusp verify-arg-count))
@@ -1483,7 +1483,7 @@
         (vop sb-vm::insert-safepoint node block))))
 
   (values))
-
+
 ;;;; function return
 
 ;;; Do stuff to return from a function with the specified values and
@@ -1535,7 +1535,7 @@
             (nil)))))
 
   (values))
-
+
 ;;;; debugger hooks
 ;;;;
 ;;;; These are used by the debugger to find the top function on the
@@ -1553,7 +1553,7 @@
     (move-lvar-result node block
                       (list (ir2-physenv-return-pc ir2-physenv))
                       (node-lvar node))))
-
+
 ;;;; multiple values
 
 ;;; This is almost identical to IR2-CONVERT-LET. Since LTN annotates
@@ -1777,7 +1777,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                    (eq (lvar-uses dest-fun) node))))
         (setf (basic-combination-fun dest) fun)
         (ir2-convert-full-call node block))))
-
+
 ;;;; special binding
 
 ;;; This is trivial, given our assumption of a shallow-binding
@@ -1854,7 +1854,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
           ;; cleanup function). -- JES, 2007-06-16
           (declare (optimize (insert-debug-catch 0)))
           (%primitive unbind-to-here ,n-save-bs))))))
-
+
 ;;;; non-local exit
 
 ;;; Convert a non-local lexical exit. First find the NLX-INFO in our
@@ -2043,7 +2043,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (vop* restore-dynamic-state node block
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
           (nil))))
-
+
 ;;;; n-argument functions
 
 (macrolet ((def (name)
@@ -2094,7 +2094,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (def list)
   (def list*))
 
-
+
 (defoptimizer (mask-signed-field ir2-convert) ((width x) node block)
   (block nil
     (when (constant-lvar-p width)
@@ -2158,7 +2158,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
 (defoptimizer (restart-point ir2-convert) ((location) node block)
   (setf (restart-location-label (lvar-value location))
         (block-label (ir2-block-block block))))
-
+
 ;;; Convert the code in a component into VOPs.
 (defun ir2-convert (component)
   (declare (type component component))

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; allocator for the array header
 
 (define-vop (make-array-header)
@@ -57,7 +57,7 @@
      (pseudo-atomic ()
       (allocation result bytes node nil other-pointer-lowtag)
       (storew header result 0 other-pointer-lowtag)))))
-
+
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *
   array-dimensions-offset other-pointer-lowtag
@@ -77,7 +77,7 @@
     (loadw res x 0 other-pointer-lowtag)
     (inst shr res n-widetag-bits)
     (inst sub res (1- array-dimensions-offset))))
-
+
 ;;;; bounds checking routine
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -155,7 +155,7 @@
                 (:or unsigned-num signed-num))
   (:variant nil)
   (:variant-cost 5))
-
+
 ;;;; accessors/setters
 
 ;;; variants built on top of WORD-INDEX-REF, etc. I.e., those vectors
@@ -185,7 +185,7 @@
   vector-data-offset other-pointer-lowtag
   (descriptor-reg any-reg) *
   %compare-and-swap-svref)
-
+
 ;;;; integer vectors whose elements are smaller than a byte, i.e.,
 ;;;; bit, 2-bit, and 4-bit vectors
 
@@ -624,7 +624,7 @@
         (inst fstd result-imag))
       (inst fxch value-imag))))
 
-
+
 ;;; {un,}signed-byte-8, simple-base-string
 
 (macrolet ((define-data-vector-frobs (ptype element-type ref-inst
@@ -757,7 +757,7 @@
   (define-data-vector-frobs simple-array-signed-byte-16 tagged-num
     movsx signed-reg))
 
-
+
 ;;; These vops are useful for accessing the bits of a vector
 ;;; irrespective of what type of vector it is.
 (define-full-reffer vector-raw-bits * vector-data-offset other-pointer-lowtag
@@ -765,7 +765,7 @@
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
  (unsigned-reg) unsigned-num %set-vector-raw-bits)
 
-
+
 ;;;; ATOMIC-INCF for arrays
 
 (define-vop (array-atomic-incf/word)

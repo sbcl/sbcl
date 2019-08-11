@@ -43,7 +43,7 @@
 ;;;; Compilers for Parallel Computing. Springer Berlin Heidelberg,
 ;;;; 2006. 1-16.
 ;;;; (http://citeseerx.ist.psu.edu/viewdoc/summary?doi=10.1.1.107.9598)
-
+
 ;;; Interference graph data structure
 
 ;; vertex in an interference graph
@@ -109,7 +109,7 @@
   (vertices nil :type list)
   ;; unsorted set of precolored vertices.
   (precolored-vertices nil :type list :read-only t))
-
+
 ;;; Interference graph construction
 ;;;
 ;;; First, compute conflict edges between vertices that aren't
@@ -231,7 +231,7 @@
   ;; Find the other edges by enumerating IR2 blocks
   (do-ir2-blocks (block component)
     (insert-block-local-conflicts block)))
-
+
 ;;; Interference graph construction, the rest: annotating vertex
 ;;; structures, and bundling up the conflict graph.
 ;;;
@@ -327,7 +327,7 @@
     (setf (ig-vertices graph) vertices)
     (do-sset-elements (neighbor (vertex-full-incidence vertex) graph)
       (sset-delete vertex (vertex-full-incidence neighbor)))))
-
+
 ;;; Support code
 
 ;; Return nil if COLOR conflicts with any of NEIGHBOR-COLORS.
@@ -448,7 +448,7 @@
      (vertices-best-color/single-color vertices (sc-locations-first colors)))
     (t
      (vertices-best-color/general vertices colors))))
-
+
 ;;; Coloring inner loop
 
 ;; Greedily choose the color for this vertex, also moving around any
@@ -540,7 +540,7 @@
       ;; These might benefit from further ordering... LexBFS?
       (color-vertices probably-spilled)))
   interference-graph)
-
+
 ;;; Iterative spilling logic.
 
 ;; maximum number of spill iterations
@@ -597,7 +597,7 @@
                (+ spilled (length colored)
                   (length (ig-precolored-vertices graph)))))
       colored)))
-
+
 ;;; Nice interface
 
 ;; Just pack vertices that have been assigned a color.

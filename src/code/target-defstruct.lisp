@@ -10,7 +10,7 @@
 (in-package "SB-KERNEL")
 
 (/show0 "target-defstruct.lisp 12")
-
+
 ;;;; structure frobbing primitives
 
 ;;; Return the value from the INDEXth slot of INSTANCE. This is SETFable.
@@ -48,7 +48,7 @@
                   (incf value-index)
                   (make-case))))))))
 
-
+
 ;;;; target-only parts of the DEFSTRUCT top level code
 
 ;;; A list of hooks designating functions of one argument, the
@@ -100,7 +100,7 @@
       (funcall fun classoid)))
 
   (dd-name dd))
-
+
 ;;; Copy any old kind of structure.
 (defun copy-structure (structure)
   "Return a copy of STRUCTURE with the same (EQL) slot values."
@@ -140,7 +140,7 @@
                 (t ; bignum - use LOGBITP to avoid consing more bignums
                  (copy-loop (logbitp i bitmap))))))
       res)))
-
+
 ;;; default PRINT-OBJECT method
 
 ;;; Printing formerly called the auto-generated accessor functions,
@@ -244,5 +244,5 @@
              ,(+ (- sb-vm:instance-pointer-lowtag)
                  (* (+ sb-vm:instance-slots-offset index)
                     sb-vm:n-word-bytes))))))))
-
+
 (/show0 "target-defstruct.lisp end of file")

@@ -12,7 +12,7 @@
 ;;;; more information.
 
 (cl:in-package :cl-user)
-
+
 ;;;; class precedence tests
 
 (with-test (:name (:class-precedence))
@@ -57,7 +57,7 @@
   (assert (eql (stream-element-type
                 *fundamental-character-stream-instance*)
                'character)))
-
+
 ;;;; example character input and output streams
 
 (defclass character-output-stream (fundamental-character-output-stream)
@@ -68,7 +68,7 @@
 (defclass character-input-stream (fundamental-character-input-stream)
   ((lisp-stream :initarg :lisp-stream
                 :accessor character-input-stream-lisp-stream)))
-
+
 ;;;; example character output stream encapsulating a lisp-stream
 
 (defun make-character-output-stream (lisp-stream)
@@ -108,7 +108,7 @@
   (if new-value
       (setf (character-output-stream-position stream) new-value)
       (character-output-stream-position stream)))
-
+
 ;;;; example character input stream encapsulating a lisp-stream
 
 (defun make-character-input-stream (lisp-stream)
@@ -137,7 +137,7 @@
 
 (defmethod stream-clear-input ((stream character-input-stream))
   (clear-input (character-input-stream-lisp-stream stream)))
-
+
 ;;;; tests for character i/o, using the above:
 
 (with-test (:name (:character-input-stream :character-output-stream))
@@ -227,7 +227,7 @@
                      (write-sequence output-test-list our-char-output)
                      (assert (null (peek-char nil our-char-input nil nil nil)))))
                  test-string))))))
-
+
 ;;;; example classes for binary output
 
 (defclass binary-to-char-output-stream (fundamental-binary-output-stream)
@@ -262,7 +262,7 @@
   (let ((char (code-char integer)))
     (write-char char
                 (binary-to-char-output-stream-lisp-stream stream))))
-
+
 ;;;; tests using binary i/o, using the above
 
 (with-test (:name (fundamental-binary-input-stream
@@ -286,7 +286,7 @@
                      (write-byte byte our-bin-to-char-output))))
                test-string)))))
 
-
+
 
 ;;; Minimal test of file-position
 (with-test (:name file-position)

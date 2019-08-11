@@ -18,7 +18,7 @@
 
 (defvar *default-format-error-control-string* nil)
 (defvar *default-format-error-offset* nil)
-
+
 ;;;; specials used to communicate information
 
 ;;; Used both by the expansion stuff and the interpreter stuff. When it is

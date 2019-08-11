@@ -100,7 +100,7 @@
   (defregset    *c-call-register-arg-offsets* rdi rsi rdx rcx r8 r9)
   #+win32
   (defregset    *c-call-register-arg-offsets* rcx rdx r8 r9))
-
+
 ;;;; SB definitions
 
 (!define-storage-bases
@@ -114,7 +114,7 @@
 (define-storage-base immediate-constant :non-packed)
 (define-storage-base noise :unbounded :size 2)
 )
-
+
 ;;;; SC definitions
 
 (eval-when (:compile-toplevel :execute)
@@ -332,7 +332,7 @@
                           (#.*complex-sc-names* :complex))))
                   (append class-spec (if size (list :operand-size size)))))
               *storage-class-defs*))
-
+
 ;;;; miscellaneous TNs for the various registers
 
 (macrolet ((def-gpr-tns (sc-name name-array &aux (i -1))
@@ -467,7 +467,7 @@
                                  character-widetag)
                          (char-code val)))))
       tn))
-
+
 ;;;; miscellaneous function call parameters
 
 ;;; Offsets of special stack frame locations relative to RBP.
@@ -493,7 +493,7 @@
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 3)
-
+
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
 (defun location-print-name (tn)

@@ -70,7 +70,7 @@ maintained."
                          *gc-pending*
                          #+sb-thread *stop-for-gc-pending*)
                  (sb-unix::receive-pending-interrupt))))))))
-
+
 ;;; EOF-OR-LOSE is a useful macro that handles EOF.
 (defmacro eof-or-lose (stream eof-error-p eof-value)
   `(if ,eof-error-p
@@ -152,7 +152,7 @@ maintained."
                      (,slot ,@args)
                      ,stream-dispatch))
 
-
+
 ;;;; These are hacks to make the reader win.
 
 ;;; This macro sets up some local vars for use by the

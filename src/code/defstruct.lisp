@@ -13,7 +13,7 @@
 (in-package "SB-KERNEL")
 
 (/show0 "code/defstruct.lisp 15")
-
+
 ;;;; getting LAYOUTs
 
 ;;; Return the compiler layout for NAME. (The class referred to by
@@ -106,7 +106,7 @@
 ;;; FIXME: Perhaps both should be defined with SB-XC:DEFMACRO?
 ;;; FIXME: Do we really need both? If so, their names and implementations
 ;;; should probably be tweaked to be more parallel.
-
+
 ;;;; DEFSTRUCT-DESCRIPTION
 
 ;;; The DEFSTRUCT-DESCRIPTION structure holds compile-time information
@@ -122,7 +122,7 @@
 
 (defun dd-layout-or-lose (dd)
   (compiler-layout-or-lose (dd-name dd)))
-
+
 ;;;; DEFSTRUCT-SLOT-DESCRIPTION
 
 ;;; A DEFSTRUCT-SLOT-DESCRIPTION holds compile-time information about
@@ -214,7 +214,7 @@
          (t)))
 (defun dsd-primitive-accessor (dsd &aux (rsd (dsd-raw-slot-data dsd)))
   (if rsd (raw-slot-data-accessor-name rsd) '%instance-ref))
-
+
 ;;;; typed (non-class) structures
 
 ;;; Return a type specifier we can use for testing :TYPE'd structures.
@@ -222,7 +222,7 @@
   (ecase (dd-type defstruct)
     (list 'list)
     (vector `(simple-array ,(dd-element-type defstruct) (*)))))
-
+
 ;;;; shared machinery for inline and out-of-line slot accessor functions
 
 ;;; Classic comment preserved for entertainment value:
@@ -428,7 +428,7 @@
        ,@(!expander-for-defstruct
           null-env-p delayp name-and-options slot-descriptions
           :target))))
-
+
 ;;;; functions to generate code for various parts of DEFSTRUCT definitions
 
 ;;; First, a helper to determine whether a name names an inherited
@@ -499,7 +499,7 @@
                             slot with name ~S (accessing an inherited slot ~
                             instead).~:@>" name (dsd-name slot))))))))
     (stuff)))
-
+
 ;;;; parsing
 
 ;;; CLHS says that
@@ -744,7 +744,7 @@ unless :NAMED is also specified.")))
                 (parse-slots)))
             (parse-slots)))
       (values proto-classoid inherits))))
-
+
 ;;;; stuff to parse slot descriptions
 
 ;;; Parse a slot description for DEFSTRUCT, add it to the description
@@ -996,7 +996,7 @@ unless :NAMED is also specified.")))
             (when (and (dsd-safe-p included-slot) (not (dsd-safe-p new-slot)))
               ;; XXX: notify?
               )))))))
-
+
 ;;;; various helper functions for setting up DEFSTRUCTs
 
 ;;; This function is called at macroexpand time to compute the INHERITS
@@ -1061,7 +1061,7 @@ unless :NAMED is also specified.")))
     (when source-location
       (setf (classoid-source-location classoid) source-location))))
 
-
+
 ;;; Return a form accessing the writable place used for the slot
 ;;; described by DD and DSD in the INSTANCE (a form).
 (defun %accessor-place-form (dd dsd instance)
@@ -1323,7 +1323,7 @@ could not be inlined because the structure definition for ~
 DEFSTRUCT should precede references to the affected functions, ~
 or they must be declared locally notinline at each call site.~@:>"
        :format-arguments (list (length it) (nreverse it) (dd-name dd))))))
-
+
 ;;;; redefinition stuff
 
 ;;; Compare the slots of OLD and NEW, returning 3 lists of slot names:
@@ -1542,7 +1542,7 @@ or they must be declared locally notinline at each call site.~@:>"
              (progn
                (setf (layout-info old-layout) info)
                (values classoid old-layout nil)))))))))
-
+
 ;;; Return a list of pairs (name . index). Used for :TYPE'd
 ;;; constructors to find all the names that we have to splice in &
 ;;; where. Note that these types don't have a layout, so we can't look
@@ -1564,7 +1564,7 @@ or they must be declared locally notinline at each call site.~@:>"
           (setq i (dd-length info)))))
 
     (res)))
-
+
 ;;; These functions are called to actually make a constructor after we
 ;;; have processed the arglist. The correct variant (according to the
 ;;; DD-TYPE) should be called. The function is defined with the
@@ -1859,7 +1859,7 @@ or they must be declared locally notinline at each call site.~@:>"
                          ,(slot-access-transform :setf '(instance value) key))))
                   (sb-c:xdefun ,accessor-name :accessor (instance)
                     ,(slot-access-transform :read '(instance) key))))))
-
+
 ;;;; instances with ALTERNATE-METACLASS
 ;;;;
 ;;;; The CMU CL support for structures with ALTERNATE-METACLASS was a
@@ -2025,7 +2025,7 @@ or they must be declared locally notinline at each call site.~@:>"
          ;; A naive reading of 'build-order' suggests it is,
          ;; but due to def!struct delay voodoo, it isn't.
          (assert (null (symbol-value '*defstruct-hooks*))))))
-
+
 ;;;; finalizing bootstrapping
 
 ;;; Set up DD and LAYOUT for STRUCTURE-OBJECT class itself.

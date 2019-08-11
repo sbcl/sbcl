@@ -36,7 +36,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defmacro dotimes-fixnum ((var count &optional (result nil)) &body body)
   `(dotimes (,var (the fixnum ,count) ,result)
      (declare (fixnum ,var))
@@ -63,7 +63,7 @@
          (when (zerop ,drop-pos)
            (setf ,drops (random-fixnum)
                  ,drop-pos sb-vm:n-positive-fixnum-bits))))))
-
+
 (import 'sb-kernel:funcallable-instance-p) ; why?
 
 (defun set-funcallable-instance-function (fin new-value)
@@ -88,7 +88,7 @@
   `(truly-the simple-vector
               (%funcallable-instance-info
                ,fin ,(get-dsd-index standard-funcallable-instance clos-slots))))
-
+
 (declaim (inline clos-slots-ref (setf clos-slots-ref)))
 (declaim (ftype (function (simple-vector t) t) clos-slots-ref))
 (defun clos-slots-ref (slots index)
@@ -105,7 +105,7 @@
 (declaim (inline std-instance-p))
 (defun std-instance-p (x)
   (%instancep x))
-
+
 ;;; When given a funcallable instance, SET-FUN-NAME *must* side-effect
 ;;; that FIN to give it the name. When given any other kind of
 ;;; function SET-FUN-NAME is allowed to return a new function which is
@@ -144,7 +144,7 @@
                       (every #'symbolp (car (last new-name))))))
     (setf (fdefinition new-name) fun))
   fun)
-
+
 ;;; FIXME: probably no longer needed after init
 (defmacro precompile-random-code-segments (&optional system)
   `(progn
@@ -153,7 +153,7 @@
      (precompile-function-generators ,system)
      (precompile-dfun-constructors ,system)
      (precompile-ctors)))
-
+
 ;;; Return true of any object which is either a funcallable-instance,
 ;;; or an ordinary instance that is not a structure-object.
 ;;; This used to be implemented as (LAYOUT-FOR-STD-CLASS-P (LAYOUT-OF x))
@@ -203,7 +203,7 @@
     `(progn
        (aver (layout-for-std-class-p ,wrapper))
        ,wrapper)))
-
+
 ;;;; structure-instance stuff
 ;;;;
 ;;;; FIXME: Now that the code is SBCL-only, this extra layer of

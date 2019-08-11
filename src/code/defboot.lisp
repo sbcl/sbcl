@@ -20,7 +20,7 @@
 
 (in-package "SB-IMPL")
 
-
+
 ;;;; IN-PACKAGE
 
 (sb-xc:proclaim '(special *package*))
@@ -28,7 +28,7 @@
   (let ((string (string string-designator)))
     `(eval-when (:compile-toplevel :load-toplevel :execute)
        (setq *package* (find-undeleted-package-or-lose ,string)))))
-
+
 ;;;; MULTIPLE-VALUE-FOO
 
 (flet ((validate-vars (vars)
@@ -63,7 +63,7 @@
 
 (sb-xc:defmacro multiple-value-list (value-form)
   `(multiple-value-call #'list ,value-form))
-
+
 ;;;; various conditional constructs
 
 (flet ((prognify (forms env)
@@ -144,7 +144,7 @@ evaluated as a PROGN."
                 (if ,n-result
                     ,n-result
                     ,(expand-forms t (rest forms)))))))))
-
+
 ;;;; various sequencing constructs
 
 (flet ((prog-expansion-from-let (varlist body-decls let)
@@ -166,7 +166,7 @@ evaluated as a PROGN."
 
 (sb-xc:defmacro prog2 (form1 result &body body)
   `(prog1 (progn ,form1 ,result) ,@body))
-
+
 ;;;; DEFUN
 
 ;;; Should we save the inline expansion of the function named NAME?
@@ -288,7 +288,7 @@ evaluated as a PROGN."
   ;; extended defun as used by defstruct
   (sb-xc:defmacro sb-c:xdefun (&environment env name snippet lambda-list &body body)
     (defun-expander env name lambda-list body snippet)))
-
+
 ;;;; DEFVAR and DEFPARAMETER
 
 (sb-xc:defmacro defvar (var &optional (val nil valp) (doc nil docp))
@@ -343,7 +343,7 @@ evaluated as a PROGN."
 
 (defun %compiler-defvar (var)
   (sb-xc:proclaim `(special ,var)))
-
+
 ;;;; iteration constructs
 
 (flet
@@ -479,7 +479,7 @@ evaluated as a PROGN."
                ,var
                ,result)
             nil))))
-
+
 ;;;; conditions, handlers, restarts
 
 (sb-xc:defmacro with-condition-restarts
@@ -904,7 +904,7 @@ specification."
                                            `(,fun-name (cdr ,cell))
                                            `(,fun-name))))))
                          annotated-cases))))))))))
-
+
 ;;;; miscellaneous
 
 (sb-xc:defmacro return (&optional (value nil))

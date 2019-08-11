@@ -1,7 +1,7 @@
 (in-package "SB-VM")
 
 
-
+
 ;;;; Addition and subtraction.
 
 ;;; static-fun-offset returns the address of the raw_addr slot of
@@ -108,7 +108,7 @@
   (move res temp))
 
 
-
+
 ;;;; Multiplication
 
 
@@ -204,7 +204,7 @@
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg))
 
 
-
+
 ;;;; Division.
 
 (define-assembly-routine (positive-fixnum-truncate
@@ -274,7 +274,7 @@
     (inst mulld divisor quo divisor)
     (inst subf rem divisor dividend))
 
-
+
 ;;;; Comparison
 
 (macrolet

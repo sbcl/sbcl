@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; the branch VOP
 
 ;;; The unconditional branch, emitted when we can't drop through to the desired
@@ -20,7 +20,7 @@
   (:generator 5
     (inst jmp dest)))
 
-
+
 ;;;; Generic conditional VOPs
 
 ;;; The generic conditional branch, emitted immediately after test
@@ -190,7 +190,7 @@
   #+sb-unicode
   (def-move-if move-if/char character character-reg character-stack)
   (def-move-if move-if/sap system-area-pointer sap-reg sap-stack))
-
+
 ;;;; conditional VOPs
 
 ;;; Note: a constant-tn is allowed in CMP; it uses an EA displacement,

@@ -405,7 +405,7 @@
       ;; FIXME: tests for MAP to come when some brave soul implements
       ;; the analogous type checking for MAP/%MAP.
       )))
-
+
 ;;; ELT should signal an error of type TYPE-ERROR if its index
 ;;; argument isn't a valid sequence index for sequence:
 (defun test-elt-signal (x)
@@ -415,13 +415,13 @@
 (locally
     (declare (optimize (safety 3)))
   (assert-error (elt (list 1 2 3) 3) type-error))
-
+
 ;;; confusion in the refactoring led to this signalling an unbound
 ;;; variable, not a type error.
 (defun svrefalike (x)
   (svref x 0))
 (assert-error (svrefalike #*0) type-error)
-
+
 ;;; checks for uniform bounding index handling.
 ;;;
 ;;; This used to be SAFETY 3 only, but bypassing these checks with
@@ -964,7 +964,7 @@
  (assert-error
   (with-input-from-string (s string :start 6 :end 9)
     (read-char s))))
-
+
 ;;; testing bit-bashing according to _The Practice of Programming_
 (defun fill-bytes-for-testing (bitsize)
   "Return a list of 'bytes' of type (MOD BITSIZE)."
@@ -1121,7 +1121,7 @@
 (loop for i = 1 then (* i 2) do
       (assert (test-inlined-bashing i))
       until (= i sb-vm:n-word-bits))
-
+
 ;;; tests from the Sacla test suite via Eric Marsden, 2007-05-07
 (remove-duplicates (vector 1 2 2 1) :test-not (lambda (a b) (not (= a b))))
 
@@ -1155,7 +1155,7 @@
     (declare (ignore failure-p))
     (assert (= 1 (length warnings)))
     (assert-error (funcall fun 1 #'eql (complement #'eql)))))
-
+
 ;;; tests of deftype types equivalent to STRING or SIMPLE-STRING
 (deftype %string () 'string)
 (deftype %simple-string () 'simple-string)

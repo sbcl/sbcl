@@ -6,7 +6,7 @@
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "PowerPC")
-
+
 ;;;; FIXUP-CODE-OBJECT
 
 (defconstant-eqx +fixup-kinds+ #(:absolute :b :ba :ha :l) #'equalp)
@@ -83,7 +83,7 @@
     (unsigned 32)
   (context (* os-context-t)))
 
-
+
 ;;;; INTERNAL-ERROR-ARGS.
 
 ;;; GIVEN a (POSIX) signal context, extract the internal error

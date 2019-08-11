@@ -19,7 +19,7 @@
 ;;; This file is based on target-signal.lisp, but most of that went
 ;;; away. Some of it might want to be put back or emulated.
 ;;;
-
+
 ;;; SIGINT is handled like BREAK, except that ANSI BREAK ignores
 ;;; *DEBUGGER-HOOK*, but we want SIGINT's BREAK to respect it, so that
 ;;; SIGINT in --disable-debugger mode will cleanly terminate the system
@@ -40,7 +40,7 @@
            (apply #'%break 'sigint format-string format-arguments)))
     (sb-thread:interrupt-thread (sb-thread::foreground-thread) #'break-it)))
 ||#
-
+
 ;;; Map Windows Exception code to condition names: symbols or strings
 (defvar *exception-code-map*
   (macrolet ((cons-name (symbol)
@@ -131,7 +131,7 @@
            (cerror "Return from the exception handler"
                    'exception :context context-sap :record exception-record-sap
                               :code code)))))
-
+
 
 (in-package "SB-UNIX")
 

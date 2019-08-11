@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; RETURN-MULTIPLE
 
 ;;; For RETURN-MULTIPLE, we have to move the results from the end of
@@ -116,7 +116,7 @@
   (inst stc)
   (inst pop rbp-tn)
   (inst ret))
-
+
 ;;;; TAIL-CALL-VARIABLE
 
 ;;; For tail-call-variable, we have to copy the arguments from the end
@@ -268,7 +268,7 @@
   (emit-error-break nil error-trap (error-number-or-lose 'sb-kernel::object-not-callable-error)
                     (list fun)))
 
-
+
 (define-assembly-routine (throw
                           (:return-style :raw))
                          ((:arg target (descriptor-reg any-reg) rdx-offset)

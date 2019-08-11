@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;; Test generation utilities.
 (defun %test-fixnum (value temp target not-p)
   (declare (ignore temp))
@@ -73,7 +73,7 @@
                     (inst bci greater-or-equal nil end temp target)
                     (inst bci :>= nil end temp when-true)))))))
         (emit-label drop-through)))))
-
+
 ;;;; Other integer ranges.
 
 ;;; A (signed-byte 32) can be represented with either fixnum or a bignum with
@@ -141,7 +141,7 @@
   (:generator 45
     (unsigned-byte-32-test value temp not-p target not-target)
     NOT-TARGET))
-
+
 ;;;; List/symbol types:
 ;;;
 ;;; symbolp (or symbol (eq nil))

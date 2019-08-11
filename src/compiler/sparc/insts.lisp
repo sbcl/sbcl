@@ -23,7 +23,7 @@
             ;; TNs and offsets
             sb-vm::zero-tn
             sb-vm::zero-offset sb-vm::null-offset sb-vm::alloc-offset)))
-
+
 ;;; Constants, types, conversion functions, some disassembler stuff.
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
@@ -201,7 +201,7 @@ about function addresses and register values.")
       (error "Unknown fp-branch condition: ~S~%Must be one of: ~S"
              condition branch-fp-conditions)))
 
-
+
 ;;;; dissassem:define-instruction-formats
 
 (define-instruction-format
@@ -458,7 +458,7 @@ about function addresses and register values.")
   (x     :field (byte 1 12))
   (immed :field (byte 12 0) :sign-extend nil))
 
-
+
 ;;; Conditional moves (only available for Sparc V9 architectures)
 
 ;; The names of all of the condition registers on the V9: 4 FP
@@ -611,7 +611,7 @@ about function addresses and register values.")
   `(:name opf1 :tab rs1 ", " rs2 ", " rd)
   #'equalp)
 
-
+
 ;;;; Primitive emitters.
 
 (define-bitfield-emitter emit-word 32
@@ -679,7 +679,7 @@ about function addresses and register values.")
   (byte 2 30) (byte 5 25) (byte 6 19) (byte 5 14) (byte 1 13) (byte 2 11)
   (byte 11 0))
 
-
+
 ;;;; Most of the format-3-instructions.
 
 (defun emit-format-3-inst (segment op op3 dst src1 src2
@@ -927,7 +927,7 @@ about function addresses and register values.")
 
 ) ; MACROLET
 
-
+
 ;;;; Random instructions.
 
 ;; ldfsr is deprecated on the Sparc V9.  Use ldxfsr instead
@@ -1028,7 +1028,7 @@ about function addresses and register values.")
   (:emitter (emit-format-2-unimp segment 0 0 0 data)))
 
 
-
+
 ;;;; Branch instructions.
 
 ;; The branch instruction is deprecated on the Sparc V9.  Use the
@@ -1306,7 +1306,7 @@ about function addresses and register values.")
                            0)))))
 
 
-
+
 ;;;; Unary and binary fp insts.
 
 (macrolet ((define-unary-fp-inst (name opf &key reads extended)
@@ -1463,7 +1463,7 @@ about function addresses and register values.")
   (define-cmp-fp-inst fcmpeq #b0111 :extended t)        ; v8
 
 ) ; MACROLET
-
+
 ;;;; li, jali, ji, nop, cmp, not, neg, move, and more
 
 (defun %li (reg value)
@@ -1585,7 +1585,7 @@ about function addresses and register values.")
                                0 0 0 (reg-tn-encoding src1))))
 
 
-
+
 ;;;; Instructions for dumping data and header objects.
 
 (define-instruction word (segment word)
@@ -1628,7 +1628,7 @@ about function addresses and register values.")
   (:emitter
    (emit-header-data segment return-pc-widetag)))
 
-
+
 ;;;; Instructions for converting between code objects, functions, and lras.
 
 (defun emit-compute-inst (segment vop dst src label temp calc)
@@ -1694,7 +1694,7 @@ about function addresses and register values.")
                       (lambda (label posn delta-if-after)
                           (+ (label-position label posn delta-if-after)
                              (component-header-length))))))
-
+
 ;;; Sparc V9 additions
 
 

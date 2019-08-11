@@ -87,7 +87,7 @@
 ;;;;
 ;;;; KLUDGE: In SBCL, we only really use variant (1), and any generality
 ;;;; for the other variants is wasted. -- WHN 20000121
-
+
 ;;;; list collection macrology
 
 (sb-xc:defmacro with-loop-list-collection-head
@@ -146,7 +146,7 @@
                                                    &optional user-head-var)
   (or user-head-var
       `(cdr ,head-var)))
-
+
 ;;;; maximization technology
 
 #|
@@ -233,7 +233,7 @@ constructed.
        (when ,(if flag-var `(or (not ,flag-var) ,test) test)
          (setq ,@(and flag-var `(,flag-var t))
                ,answer-var ,temp-var)))))
-
+
 ;;;; LOOP keyword tables
 
 #|
@@ -307,7 +307,7 @@ code to be loaded.
       :for-keywords (maketable for-keywords)
       :iteration-keywords (maketable iteration-keywords)
       :path-keywords (maketable path-keywords))))
-
+
 ;;;; SETQ hackery, including destructuring ("DESETQ")
 
 (defun loop-make-psetq (frobs)
@@ -402,7 +402,7 @@ code to be loaded.
                       (loop-desetq-internal (pop var-val-pairs)
                                             (pop var-val-pairs))
                       actions)))))
-
+
 ;;;; LOOP-local variables
 
 (defstruct (macro-state
@@ -513,7 +513,7 @@ code to be loaded.
 ;;; If this is true, we are in some branch of a conditional. Some
 ;;; clauses may be disallowed.
 (defvar *loop-inside-conditional*)
-
+
 ;;;; code analysis stuff
 
 (defun loop-constant-fold-if-possible (form &optional expected-type)
@@ -526,7 +526,7 @@ code to be loaded.
                    form value expected-type)
         (setq constantp nil value nil)))
     (values form constantp value)))
-
+
 (defun gen-loop-body (prologue before-loop main-body after-loop epilogue)
   (unless (= (length before-loop) (length after-loop))
     ;; FIXME: should be (bug) ?
@@ -550,7 +550,7 @@ code to be loaded.
         (go next-loop)
       end-loop
         ,@(remove nil epilogue))))
-
+
 ;;;; loop errors
 
 (defun loop-context (&aux (loop *loop*))
@@ -580,7 +580,7 @@ code to be loaded.
                (loop-error "The specified data type ~S is not a subtype of ~S."
                            specified-type required-type)))
         specified-type)))
-
+
 ;;; Transform the LOOP kind of destructuring into the DESTRUCTURING-BIND kind
 ;;; basically by adding &optional and ignored &rest dotted list
 (defun transform-destructuring (tree)
@@ -675,7 +675,7 @@ code to be loaded.
                                   (car (source-code loop))
                                   (cadr (source-code loop))))
                      (t (loop-error "unknown LOOP keyword: ~S" keyword))))))))
-
+
 (defun loop-pop-source (&aux (loop *loop*))
   (if (source-code loop)
       (pop (source-code loop))
@@ -728,7 +728,7 @@ code to be loaded.
 (defun loop-disallow-aggregate-booleans ()
   (when (loop-tmember (final-value-culprit *loop*) '(always never thereis))
     (loop-error "This anonymous collection LOOP clause is not permitted with aggregate booleans.")))
-
+
 ;;;; loop types
 
 (defun loop-typed-init (data-type &optional step-var-p)
@@ -826,7 +826,7 @@ code to be loaded.
                                (cons (replicate typ (car v))
                                      (replicate typ (cdr v))))))
                   (translate z variable)))))))
-
+
 ;;;; loop variables
 
 (defun loop-bind-block (&aux (loop *loop*))
@@ -978,7 +978,7 @@ code to be loaded.
   (if (constantp form)
       form
       (loop-make-var (gensym "LOOP-BIND-") form data-type)))
-
+
 (defun loop-do-if (for negatep &aux (loop *loop*) (universe (universe loop)))
   (let ((form (loop-get-form))
         (*loop-inside-conditional* t)
@@ -1051,7 +1051,7 @@ code to be loaded.
 
 (defun loop-do-return ()
   (loop-emit-body (loop-construct-return (loop-get-form))))
-
+
 ;;;; value accumulation: LIST
 
 (defstruct (loop-collector
@@ -1141,7 +1141,7 @@ code to be loaded.
         (append (unless (and (consp form) (eq (car form) 'list))
                   (setq form `(copy-list ,form)))))
       (loop-emit-body `(loop-collect-rplacd ,tempvars ,form)))))
-
+
 ;;;; value accumulation: MAX, MIN, SUM, COUNT
 
 (defun loop-sum-collection (specifically required-type default-type);SUM, COUNT
@@ -1183,7 +1183,7 @@ code to be loaded.
       (loop-emit-body `(loop-accumulate-minimax-value ,data
                                                       ,specifically
                                                       ,form)))))
-
+
 ;;;; value accumulation: aggregate booleans
 
 ;;; handling the ALWAYS and NEVER loop keywords
@@ -1206,7 +1206,7 @@ code to be loaded.
   (loop-emit-final-value)
   (loop-emit-body `(when (setq ,(loop-when-it-var) ,(loop-get-form))
                     ,(loop-construct-return (when-it-var *loop*)))))
-
+
 (defun loop-do-while (negate kwd &aux (form (loop-get-form)))
   (loop-disallow-conditional kwd)
   (loop-pseudo-body `(,(if negate 'when 'unless) ,form (go end-loop))))
@@ -1248,7 +1248,7 @@ code to be loaded.
     (if (loop-tequal (car (source-code loop)) :and)
         (loop-pop-source)
         (return (loop-bind-block)))))
-
+
 ;;;; the iteration driver
 
 (defun loop-hack-iteration (entry &aux (loop *loop*))
@@ -1308,7 +1308,7 @@ code to be loaded.
         (loop-bind-block)
         (return nil))
       (loop-pop-source)))) ; Flush the "AND".
-
+
 ;;;; main iteration drivers
 
 ;;; FOR variable keyword ..args..
@@ -1331,7 +1331,7 @@ code to be loaded.
   (or (when-it-var loop)
       (setf (when-it-var loop)
             (loop-make-var (gensym "LOOP-IT-") nil nil))))
-
+
 ;;;; various FOR/AS subdispatches
 
 ;;; ANSI "FOR x = y [THEN z]" is sort of like the old Genera one when
@@ -1371,7 +1371,7 @@ code to be loaded.
              (step `(,var (aref ,vector-var ,index-var)))
              (pstep `(,index-var (1+ ,index-var))))
         `(,test ,step () ,pstep)))))
-
+
 ;;;; list iteration
 
 (defun loop-list-step (listvar)
@@ -1440,7 +1440,7 @@ code to be loaded.
           `(,other-endtest ,step () ,pseudo-step
             ,@(and (neq first-endtest other-endtest)
                    `(,first-endtest ,step () ,pseudo-step))))))))
-
+
 ;;;; iteration paths
 
 (defstruct (loop-path
@@ -1466,7 +1466,7 @@ code to be loaded.
     (dolist (name names)
       (setf (gethash (symbol-name name) ht) lp))
     lp))
-
+
 ;;; Note: Path functions are allowed to use LOOP-MAKE-VAR, hack
 ;;; the prologue, etc.
 (defun loop-for-being (var val data-type &aux (loop *loop*) (universe (universe loop)))
@@ -1520,7 +1520,7 @@ code to be loaded.
           (loop-make-var (car x) (cadr x) (caddr x))))
     (setf (prologue loop) (nconc (reverse (cadr stuff)) (prologue loop)))
     (cddr stuff)))
-
+
 (defun loop-named-var (name &aux (loop *loop*))
   (let ((tem (loop-tassoc name (named-vars loop))))
     (declare (list tem))
@@ -1575,7 +1575,7 @@ code to be loaded.
                          (symbolp (car (source-code loop))))
                  (return nil))))
             (t (return (nreverse prepositional-phrases)))))))
-
+
 ;;;; master sequencer function
 
 (defun loop-sequencer (indexv indexv-type
@@ -1740,7 +1740,7 @@ code to be loaded.
              (setq remaining-tests t)))
          `(() (,indexv ,step)
            ,remaining-tests ,step-hack () () ,first-test ,step-hack)))))
-
+
 ;;;; interfaces to the master sequencer
 
 (defun loop-for-arithmetic (var val data-type kwd)
@@ -1751,7 +1751,7 @@ code to be loaded.
     '((:from :upfrom :downfrom) (:to :upto :downto :above :below) (:by))
     nil (list (list kwd val)))))
 
-
+
 ;;;; builtin LOOP iteration paths
 
 #||
@@ -1835,7 +1835,7 @@ code to be loaded.
                                  ,variable)
              (,next-fn)))
       ())))
-
+
 ;;;; ANSI LOOP
 
 (sb-ext:define-load-time-global *loop-ansi-universe*

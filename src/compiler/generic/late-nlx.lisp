@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;; Return a list of TNs that can be used to snapshot the dynamic
 ;;; state for use with the SAVE- and RESTORE-DYNAMIC-ENVIRONMENT VOPs.
 (defun make-dynamic-state-tns ()

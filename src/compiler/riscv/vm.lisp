@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defvar *register-names* (make-array 32 :initial-element nil)))
 
@@ -68,7 +68,7 @@
   (defregset boxed-regs a0 a1 a2 a3 l0 l1 l2 l3 ocfp lra lexenv code)
 
   (define-argument-register-set a0 a1 a2 a3))
-
+
 (!define-storage-bases
  (define-storage-base registers :finite :size 32)
  (define-storage-base control-stack :unbounded :size 8)

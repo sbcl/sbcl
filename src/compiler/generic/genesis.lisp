@@ -40,7 +40,7 @@
 (defun round-up (number size)
   "Round NUMBER up to be an integral multiple of SIZE."
   (* size (ceiling number size)))
-
+
 ;;;; implementing the concept of "vector" in (almost) portable
 ;;;; Common Lisp
 ;;;;
@@ -142,7 +142,7 @@
             do (setf (svref new-outer-vector i) (make-smallvec)))
       (setf (bigvec-outer-vector bigvec)
             new-outer-vector))))
-
+
 ;;;; looking up bytes and multi-byte values in a BIGVEC (considering
 ;;;; it as an image of machine memory on the cross-compilation target)
 
@@ -179,7 +179,7 @@
 (macrolet ((acc (bv index) `(#+64-bit bvref-64 #-64-bit bvref-32 ,bv ,index)))
   (defun (setf bvref-word) (new-val bytes index) (setf (acc bytes index) new-val))
   (defun bvref-word (bytes index) (acc bytes index)))
-
+
 ;;;; representation of spaces in the core
 
 ;;; If there is more than one dynamic space in memory (i.e., if a
@@ -256,7 +256,7 @@
                                         (/ sb-vm:immobile-card-bytes sb-vm:n-word-bytes))
                                        (t
                                         0))))
-
+
 ;;;; representation of descriptors
 
 (declaim (inline is-fixnum-lowtag))
@@ -542,7 +542,7 @@
 (defun make-character-descriptor (data)
   (make-other-immediate-descriptor data sb-vm:character-widetag))
 
-
+
 ;;;; miscellaneous variables and other noise
 
 ;;; a handle on the trap object
@@ -561,7 +561,7 @@
 (declaim (special *!cold-toplevels* *!cold-defsymbols*
                   *!cold-defuns* *cold-methods*))
 
-
+
 ;;;; miscellaneous stuff to read and write the core memory
 
 ;; Like above, but the list is held in the target's image of the host symbol,
@@ -611,7 +611,7 @@
     (declare (type descriptor address) (type sb-vm:word index)
              (type (or sb-vm:word sb-vm:signed-word) bits))
     (write-bits (logand bits sb-ext:most-positive-word))))
-
+
 ;;;; allocating images of primitive objects in the cold core
 
 (defun write-header-word (des header-word)
@@ -731,7 +731,7 @@
     #-compact-instance-header
     (write-wordindexed des sb-vm:instance-slots-offset layout)
     des))
-
+
 ;;;; copying simple objects into the cold core
 
 (defun base-string-to-core (string &optional (gspace *dynamic*))
@@ -939,7 +939,7 @@ core and return a descriptor to it."
          (vector (make-array len)))
     (dotimes (i len vector)
       (setf (aref vector i) (funcall transform (cold-svref descriptor i))))))
-
+
 ;;;; symbol magic
 
 #+sb-thread
@@ -1024,7 +1024,7 @@ core and return a descriptor to it."
           ;; way we build other primordial stuff such as layout-of-layout.
           (cold-set symbol target-val)
           target-val)))))
-
+
 ;;;; layouts and type system pre-initialization
 
 ;;; Since we want to be able to dump structure constants and
@@ -1333,7 +1333,7 @@ core and return a descriptor to it."
              (list     (chill-layout 'list t-layout sequence))
              (symbol   (chill-layout 'symbol t-layout)))
         (chill-layout 'null t-layout sequence list symbol)))))
-
+
 ;;;; interning symbols in the cold image
 
 ;;; a map from package name as a host string to
@@ -1800,7 +1800,7 @@ core and return a descriptor to it."
     (cold-set 'sb-vm::*fp-constant-1d0* (number-to-core $1d0))
     (cold-set 'sb-vm::*fp-constant-0f0* (number-to-core $0f0))
     (cold-set 'sb-vm::*fp-constant-1f0* (number-to-core $1f0))))
-
+
 ;;;; functions and fdefinition objects
 
 ;;; a hash table mapping from fdefinition names to descriptors of cold
@@ -2004,7 +2004,7 @@ core and return a descriptor to it."
                                     (descriptor elt)))
                           info)))))
 
-
+
 ;;;; fixups and related stuff
 
 ;;; an EQUAL hash table
@@ -2260,7 +2260,7 @@ core and return a descriptor to it."
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
              '*!initial-assembler-routines*)))
 
-
+
 ;;;; general machinery for cold-loading FASL files
 
 (defun pop-fop-stack (stack)
@@ -2311,7 +2311,7 @@ core and return a descriptor to it."
     (write-line (namestring filename)))
   (with-open-file (s filename :element-type '(unsigned-byte 8))
     (load-as-fasl s nil nil)))
-
+
 ;;;; miscellaneous cold fops
 
 (define-cold-fop (fop-misc-trap) *unbound-marker*)
@@ -2379,7 +2379,7 @@ core and return a descriptor to it."
                  (bug "can't alter layout of ~s" name))))
         ;; Make a new definition from scratch.
         (make-cold-layout name depthoid flags length bitmap inherits))))
-
+
 ;;;; cold fops for loading symbols
 
 ;;; Given STRING naming a symbol exported from COMMON-LISP, return either "SB-XC"
@@ -2428,14 +2428,14 @@ core and return a descriptor to it."
                (read-wordindexed symbol sb-vm:symbol-name-slot)))))
     ;; Genesis performs additional coalescing of uninterned symbols
     (push-fop-table (get-uninterned-symbol name) (fasl-input))))
-
+
 ;;;; cold fops for loading packages
 
 (define-cold-fop (fop-named-package-save (namelen))
   (let ((name (make-string namelen)))
     (read-string-as-bytes (fasl-input-stream) name)
     (push-fop-table (find-package name) (fasl-input))))
-
+
 ;;;; cold fops for loading vectors
 
 (define-cold-fop (fop-base-string (len))
@@ -2490,7 +2490,7 @@ core and return a descriptor to it."
                          (make-fixnum-descriptor total-elements)))
     result))
 
-
+
 ;;;; cold fops for calling (or not calling)
 
 (not-cold-fop fop-eval)
@@ -2564,7 +2564,7 @@ core and return a descriptor to it."
                              *load-time-value-counter*
                              *load-time-value-counter*)))
 
-
+
 ;;;; cold fops for fixing up circularities
 
 (define-cold-fop (fop-rplaca (tbl-slot idx))
@@ -2590,7 +2590,7 @@ core and return a descriptor to it."
   (dotimes (i index)
     (setq obj (read-wordindexed obj sb-vm:cons-cdr-slot)))
   obj)
-
+
 ;;;; cold fops for loading code objects and functions
 
 (define-cold-fop (fop-fdefn)
@@ -2762,7 +2762,7 @@ core and return a descriptor to it."
                  (member flavor '(:assembly-routine :assembly-routine*)))
         (push (cold-cons code-obj (make-fixnum-descriptor offset))
               *allocation-point-fixup-notes*)))))
-
+
 ;;;; sanity checking space layouts
 
 (defun check-spaces ()
@@ -2791,7 +2791,7 @@ core and return a descriptor to it."
       (check sb-vm:dynamic-0-space-start sb-vm:dynamic-0-space-end :dynamic-0)
       #+linkage-table
       (check sb-vm:linkage-table-space-start sb-vm:linkage-table-space-end :linkage-table))))
-
+
 ;;;; emitting C header file
 
 (defun tailwise-equal (string tail)
@@ -3230,7 +3230,7 @@ core and return a descriptor to it."
 };~2%")
     (write-array "sc_and_offset_sc_number_bytes" sb-c::+sc+offset-scn-bytes+)
     (write-array "sc_and_offset_offset_bytes"    sb-c::+sc+offset-offset-bytes+)))
-
+
 ;;;; writing map file
 
 ;;; Write a map file describing the cold load. Some of this
@@ -3316,7 +3316,7 @@ III. initially undefined function references (alphabetically):
           (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
   (values))
-
+
 ;;;; writing core file
 
 (defun output-gspace (gspace data-page core-file write-word verbose)
@@ -3464,7 +3464,7 @@ III. initially undefined function references (alphabetically):
     (format t "done]~%")
     (force-output))
   (values))
-
+
 ;;;; the actual GENESIS function
 
 ;;; Read the FASL files in OBJECT-FILE-NAMES and produce a Lisp core,

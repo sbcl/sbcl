@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; utilities for optimizing array operations
 
 ;;; Return UPGRADED-ARRAY-ELEMENT-TYPE for LVAR, or do
@@ -140,7 +140,7 @@
        (constant-lvar-p arg)
        (lvar-value arg)
        t))
-
+
 ;;;; DERIVE-TYPE optimizers
 
 (defun derive-aref-type (array)
@@ -372,7 +372,7 @@
                             adjustable fill-pointer displaced-to
                             node)))
 
-
+
 ;;;; constructors
 
 ;;; Convert VECTOR into a MAKE-ARRAY.
@@ -1116,7 +1116,7 @@
                                call
                                :adjustable adjustable
                                :fill-pointer fill-pointer))
-
+
 ;;;; ADJUST-ARRAY
 (deftransform adjust-array ((array dims &key displaced-to displaced-index-offset)
                             (array integer &key
@@ -1146,7 +1146,7 @@
                             :displaced-to displaced-to
                             ,@(and displaced-index-offset
                                    '(:displaced-index-offset displacement)))))))
-
+
 ;;;; miscellaneous properties of arrays
 
 ;;; Transforms for various array properties. If the property is know
@@ -1443,7 +1443,7 @@
                           (lvar-value dimension)
                           'dimension)
                index))
-
+
 ;;;; WITH-ARRAY-DATA
 
 ;;; This checks to see whether the array is simple and the start and
@@ -1592,7 +1592,7 @@
                                 :policy (> speed space))
   "inline non-SIMPLE-vector-handling logic"
   (transform-%with-array-data/mumble array node t))
-
+
 ;;;; array accessors
 
 ;;; We convert all typed array accessors into AREF and (SETF AREF) with type
@@ -1803,7 +1803,7 @@
   `(hairy-data-vector-set array
                           (check-bound array (array-total-size array) index)
                           new-value))
-
+
 ;;;; bit-vector array operation canonicalization
 ;;;;
 ;;;; We convert all bit-vector operations to have the result array
@@ -1843,7 +1843,7 @@
 (deftransform bit-not ((bit-array-1 result-bit-array)
                        (bit-vector (eql t)))
   '(bit-not bit-array-1 bit-array-1))
-
+
 ;;; Pick off some constant cases.
 (defoptimizer (array-header-p derive-type) ((array))
   (let ((type (lvar-type array))

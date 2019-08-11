@@ -10,7 +10,7 @@
 ;;;; files for more information.
 (in-package "SB-VM")
 
-
+
 
 (defmacro expand (expr)
   (let ((gensym (gensym)))
@@ -108,7 +108,7 @@ byte-ordering issues."
      (emit-label ,label)
      (inst lra-header-word)))
 
-
+
 ;;;; Stack TN's
 
 ;;; Move a stack TN to a register and vice-versa.
@@ -140,7 +140,7 @@ byte-ordering issues."
           ((control-stack)
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
-
+
 ;;;; Storage allocation:
 
 (defmacro with-fixed-allocation ((result-tn flag-tn temp-tn type-code
@@ -186,7 +186,7 @@ initializes the object."
     (storew zero-tn csp-tn -1)
     (emit-label aligned)))
 
-
+
 ;;;; Error Code
 (defun emit-error-break (vop kind code values)
   (assemble ()
@@ -206,7 +206,7 @@ initializes the object."
       (emit-label start-lab)
       (apply #'error-call vop error-code values)
       start-lab)))
-
+
 ;;;; PSEUDO-ATOMIC
 
 ;;; handy macro for making sequences look atomic
@@ -224,7 +224,7 @@ initializes the object."
          (t
           ;; FIXME: Make this case work, somehow
           (error "EXTRA out-of-range in PSEUDO-ATOMIC"))))))
-
+
 ;;;; indexed references
 
 (sb-xc:deftype load/store-index (scale lowtag min-offset

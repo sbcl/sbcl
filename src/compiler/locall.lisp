@@ -123,7 +123,7 @@
   (merge-tail-sets call fun)
   (change-ref-leaf ref fun)
   (values))
-
+
 ;;;; external entry point creation
 
 ;;; Return a LAMBDA form that can be used as the definition of the XEP
@@ -303,7 +303,7 @@
                                                 :zombie :deleted)))
       (change-ref-leaf ref (or (functional-entry-fun fun)
                                (make-xep fun))))))
-
+
 ;;; Attempt to convert all references to FUN to local calls. The
 ;;; reference must be the function for a call, and the function lvar
 ;;; must be used only once, since otherwise we cannot be sure what
@@ -608,7 +608,7 @@
             :format-control
             "function called with ~R argument~:P, but wants exactly ~R"
             :format-arguments (list n-call-args nargs))))))
-
+
 ;;;; &OPTIONAL, &MORE and &KEYWORD calls
 
 ;;; This is similar to CONVERT-LAMBDA-CALL, but deals with
@@ -832,7 +832,7 @@
                                    more-temps)))))
 
   (values))
-
+
 ;;;; LET conversion
 ;;;;
 ;;;; Converting to a LET has differing significance to various parts
@@ -1295,7 +1295,7 @@
                                         ;  for me to handle - PK 2012-05-30
               (substitute-let-funargs dest clambda component))))
         t))))
-
+
 ;;;; tail local calls and assignments
 
 ;;; Return T if there are no cleanups between BLOCK1 and BLOCK2, or if

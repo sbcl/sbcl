@@ -90,7 +90,7 @@
 ;; style warnings
 (%load-gmp)
 
-
+
 ;;; types and initialization
 
 (define-alien-type gmp-limb
@@ -193,7 +193,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (define-alien-routine __gmpz_clear void
   (x (* (struct gmpint))))
 
-
+
 ;;; integer interface functions
 (defmacro define-twoarg-mpz-funs (funs)
   (loop for i in funs collect `(define-alien-routine ,i void
@@ -225,7 +225,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                            (declaim (inline ,@funs))
                            ,@defines))))
 
-
+
 (define-twoarg-mpz-funs (__gmpz_sqrt
                          __gmpz_nextprime))
 
@@ -304,7 +304,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (a (* (struct gmpint)))
   (b unsigned-long))
 
-
+
 ;; ratio functions
 (defmacro define-threearg-mpq-funs (funs)
   (loop for i in funs collect `(define-alien-routine ,i void
@@ -321,7 +321,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                            __gmpq_mul
                            __gmpq_div))
 
-
+
 ;;;; SBCL interface
 
 ;;; utility macros for GMP mpz variable and result declaration and
@@ -423,7 +423,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
                 (type integer ,@args))
        ,@body)))
 
-
+
 ;; SBCL/GMP functions
 (defgmpfun mpz-add (a b)
   (with-mpz-results ((result (1+ (max (blength a)
@@ -518,7 +518,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
     (with-mpz-vars ((a ga))
       (__gmpz_sqrt (addr result) (addr ga)))))
 
-
+
 ;;; Functions that use GMP-side allocated integers and copy the result
 ;;; into a SBCL bignum at the end of the computation when the required
 ;;; bignum length is known.
@@ -603,7 +603,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (with-gmp-mpz-results (fibn fibn-1)
     (__gmpz_fib2_ui (addr fibn) (addr fibn-1) n)))
 
-
+
 ;;;; Random bignum (mpz) generation
 
 ;; we do not actually use the gestalt of the struct but need its size
@@ -712,7 +712,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (with-mpz-vars ((b gb))
         (__gmpz_urandomm (addr result) ref (addr gb))))))
 
-
+
 ;;; Rational functions
 (declaim (inline %lsize))
 (defun %lsize (minusp n)
@@ -809,7 +809,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (defmpqfun mpq-mul __gmpq_mul)
 (defmpqfun mpq-div __gmpq_div)
 
-
+
 ;;;; SBCL interface and integration installation
 (macrolet ((def (name original)
              (let ((special (intern (format nil "*~A-FUNCTION*" name))))

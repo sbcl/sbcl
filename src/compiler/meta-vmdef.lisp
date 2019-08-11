@@ -17,7 +17,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; storage class and storage base definition
 
 ;;; Define a storage base having the specified NAME. KIND may be :FINITE,
@@ -163,7 +163,7 @@
        (setf (gethash ',name *backend-sc-names*) (sc-or-lose ',name))
        (setf (sc-sb (sc-or-lose ',name)) (sb-or-lose ',sb-name))
        ',name)))
-
+
 ;;;; move/coerce definition
 
 ;;; Given a list of pairs of lists of SCs (as given to DEFINE-MOVE-VOP,
@@ -205,7 +205,7 @@
 (defglobal *sc-vop-slots*
     '((:move . sc-move-vops)
       (:move-arg . sc-move-arg-vops)))
-
+
 ;;;; primitive type definition
 
 ;;; Define a primitive type NAME. Each SCS entry specifies a storage
@@ -232,7 +232,7 @@
      (push (cons ',name ,result) *backend-primitive-type-aliases*)
      ',name))
 
-
+
 ;;;; VOP definition structures
 ;;;;
 ;;;; DEFINE-VOP uses some fairly complex data structures at
@@ -385,7 +385,7 @@
   (scs :test scs)
   (load :test load)
   (offset :test offset))
-
+
 ;;; Make NAME be the VOP used to move values in the specified FROM-SCs
 ;;; to the representation of the TO-SCs of each SC pair in SCS.
 ;;;
@@ -419,7 +419,7 @@
                  (let ((scn (sc-number sc)))
                    (setf (svref vec scn)
                          (adjoin-template vop (svref vec scn))))))))))))
-
+
 ;;;; miscellaneous utilities
 
 ;;; Find the operand or temporary with the specifed Name in the VOP
@@ -482,7 +482,7 @@
       (unless (typep thing type)
         (error "~:R argument is not a ~S: ~S" n type spec))
       thing)))
-
+
 ;;;; time specs
 
 ;;; Return a time spec describing a time during the evaluation of a
@@ -505,7 +505,7 @@
           (sub-phase (second dspec)))
       (+ (ash phase 16)
          sub-phase))))
-
+
 ;;;; generation of emit functions
 
 (defun compute-temporaries-description (parse)
@@ -608,7 +608,7 @@
 (defun make-emit-function-and-friends (parse)
   `(:temps ,(compute-temporaries-description parse)
     ,@(compute-ref-ordering parse)))
-
+
 ;;;; generator functions
 
 ;;; Return an alist that translates from lists of SCs we can load OP
@@ -773,7 +773,7 @@
            (assemble ()
              ,@(vop-parse-body parse))
            ,@(saves))))))
-
+
 (defvar *parse-vop-operand-count*)
 (defun make-operand-parse-temp ()
   (without-package-locks
@@ -868,7 +868,7 @@
                 ((operand-parse-load more)
                  (error "cannot specify :LOAD-IF in a :MORE operand")))))
       (values (the list (operands)) more))))
-
+
 ;;; Parse a temporary specification, putting the OPERAND-PARSE
 ;;; structures in the PARSE structure.
 (defun parse-temporary (spec parse)
@@ -929,7 +929,7 @@
                     (remove name (vop-parse-temps parse)
                             :key #'operand-parse-name))))))
   (values))
-
+
 (defun compute-parse-vop-operand-count (parse)
   (declare (type vop-parse parse))
   (labels ((compute-count-aux (parse)
@@ -1028,7 +1028,7 @@
         (t
          (error "unknown option specifier: ~S" (first spec)))))
     (values)))
-
+
 ;;;; making costs and restrictions
 
 ;;; Given an operand, returns two values:
@@ -1128,7 +1128,7 @@
         ',(if (vop-parse-more-results parse)
               (compute-loading-costs-if-any (vop-parse-more-results parse) nil)
               nil)))))
-
+
 ;;;; operand checking and stuff
 
 ;;; Given a list of arg/result restrictions, check for valid syntax
@@ -1262,7 +1262,7 @@
                 (if (vop-parse-more-results parse)
                     (list (vop-parse-more-results parse)))
                 (vop-parse-temps parse))))
-
+
 ;;;; function translation stuff
 
 ;;; Return forms to establish this VOP as a IR2 translation template
@@ -1333,7 +1333,7 @@
                             `(list ,@(mapcar #'make-operand-type results))))
       :more-results-type ,(when more-results
                             (make-operand-type more-result)))))
-
+
 ;;;; setting up VOP-INFO
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -1388,7 +1388,7 @@
           (unless (eq (vop-parse-body parse) :unspecified)
             (make-generator-function parse)))
       :variant (list ,@variant))))
-
+
 ;;; Define the symbol NAME to be a Virtual OPeration in the compiler.
 ;;; If specified, INHERITS is the name of a VOP that we default
 ;;; unspecified information from. Each SPEC is a list beginning with a
@@ -1703,7 +1703,7 @@
       (try-coalescing vop-info-targets)))
   (setf (gethash (vop-info-name vop-info) *backend-template-names*)
         vop-info))
-
+
 ;;;; emission macros
 
 ;;; Return code to make a list of VOP arguments or results, linked by
@@ -1853,7 +1853,7 @@
                           ,@(when info
                               `((list ,@info))))
            (values))))))
-
+
 ;;;; miscellaneous macros
 
 ;;; SC-Case TN {({(SC-Name*) | SC-Name | T} Form*)}*

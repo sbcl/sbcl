@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 
 ;; For use in constant indexing; we can't use INDEX since the displacement
 ;; field of an EA can't contain 64 bit values.
@@ -63,7 +63,7 @@
       (storew* header result 0 0 t)
       (inst or :byte result other-pointer-lowtag)))))
 
-
+
 ;;;; additional accessors and setters for the array header
 (define-full-reffer %array-dimension *
   array-dimensions-offset other-pointer-lowtag
@@ -111,7 +111,7 @@
           (ea (1+ (- other-pointer-lowtag)) array)
           (+ rank
              (1- array-dimensions-offset)))))
-
+
 ;;;; bounds checking routine
 (define-vop (check-bound)
   (:translate %check-bound)
@@ -190,7 +190,7 @@
                 (:or unsigned-num signed-num))
   (:variant nil)
   (:variant-cost 5))
-
+
 ;;;; accessors/setters
 
 ;;; variants built on top of WORD-INDEX-REF, etc. I.e., those vectors
@@ -221,7 +221,7 @@
   vector-data-offset other-pointer-lowtag
   (descriptor-reg any-reg) *
   %compare-and-swap-svref)
-
+
 ;;;; integer vectors whose elements are smaller than a byte, i.e.,
 ;;;; bit, 2-bit, and 4-bit vectors
 
@@ -722,7 +722,7 @@
     (inst movapd (make-ea-for-float-ref object index offset 16) value)
     (move result value)))
 
-
+
 
 ;;; {un,}signed-byte-{8,16,32} and characters
 (macrolet ((define-data-vector-frobs (ptype mov-inst operand-size
@@ -822,14 +822,14 @@
   (define-data-vector-frobs simple-character-string movzx :dword
     character character-reg))
 
-
+
 ;;; These vops are useful for accessing the bits of a vector
 ;;; irrespective of what type of vector it is.
 (define-full-reffer vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %vector-raw-bits)
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
-
+
 ;;;; ATOMIC-INCF for arrays
 
 (define-vop (array-atomic-incf/word)

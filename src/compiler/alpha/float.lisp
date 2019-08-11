@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; float move functions
 
 (define-move-fun (load-fp-zero 1) (vop x y)
@@ -37,7 +37,7 @@
   (let ((nfp (current-nfp-tn vop))
         (offset (tn-byte-offset y)))
     (inst stt x offset nfp)))
-
+
 ;;;; float move VOPs
 
 (macrolet ((frob (vop sc)
@@ -122,7 +122,7 @@
                   (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack nil)
   (frob move-double-float-arg double-reg double-stack t))
-
+
 ;;;; complex float move functions
 
 (defun complex-single-reg-real-tn (x)
@@ -361,7 +361,7 @@
   (single-reg double-reg complex-single-reg complex-double-reg)
   (descriptor-reg))
 
-
+
 ;;;; float arithmetic VOPs
 
 (define-vop (float-op)
@@ -429,7 +429,7 @@
   (frob %negate/single-float fneg %negate single-reg single-float)
   (frob %negate/double-float fneg %negate double-reg double-float))
 
-
+
 ;;;; float comparison
 
 (define-vop (float-compare)
@@ -477,7 +477,7 @@
   (frob > t >/single-float >/double-float nil)
   (frob = nil =/single-float =/double-float t))
 
-
+
 ;;;; float conversion
 
 (macrolet
@@ -741,10 +741,10 @@
               other-pointer-lowtag)))
     (inst mskll lo-bits 4 lo-bits)))
 
-
+
 ;;;; float mode hackery has moved to alpha-vm.lisp
 
-
+
 ;;;; complex float VOPs
 
 (define-vop (make-complex-single-float)

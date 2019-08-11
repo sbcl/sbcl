@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-
+
 ;;;; Moves and coercions:
 
 ;;; Move a tagged SAP to an untagged representation.
@@ -76,7 +76,7 @@
 ;;; descriptor passing location.
 (define-move-vop move-arg :move-arg
   (sap-reg) (descriptor-reg))
-
+
 ;;;; SAP-INT and INT-SAP
 (define-vop (sap-int)
   (:args (sap :scs (sap-reg) :target int))
@@ -97,7 +97,7 @@
   (:policy :fast-safe)
   (:generator 1
     (move sap int)))
-
+
 ;;;; POINTER+ and POINTER-
 (define-vop (pointer+)
   (:translate sap+)
@@ -142,7 +142,7 @@
   (:result-types signed-num)
   (:generator 1
     (inst sub res ptr1 ptr2)))
-
+
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 (macrolet ((def-system-ref-and-set
                ;; NOTE: The -C VOPs have been disabled, as the allowed
@@ -271,7 +271,7 @@
     single-reg single-float :single :use-lip t)
   (def-system-ref-and-set sap-ref-double %set-sap-ref-double
     double-reg double-float :double :use-lip t))
-
+
 ;;; Noise to convert normal lisp data objects into SAPs.
 (define-vop (vector-sap)
   (:translate vector-sap)

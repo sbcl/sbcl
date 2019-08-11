@@ -54,7 +54,7 @@
 ;;; passed when we are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
-
+
 ;;;; frame hackery
 
 ;;; Return the number of bytes needed for the current non-descriptor
@@ -298,7 +298,7 @@ default-value-8
         (when lra-label
           (inst compute-code-from-lra code-tn code-tn lra-label temp))))
   (values))
-
+
 ;;;; unknown values receiving
 
 ;;; Emit code needed at the return point for an unknown-values call
@@ -361,7 +361,7 @@ default-value-8
                :from :eval :to (:result 1))
               nvals)
   (:temporary (:scs (non-descriptor-reg)) temp))
-
+
 ;;; This hook by the codegen lets us insert code before fall-thru entry points,
 ;;; local-call entry points, and tail-call entry points.  The default does
 ;;; nothing.
@@ -371,7 +371,7 @@ default-value-8
     (emit-label trampoline-label))
   (emit-label start-label))
 
-
+
 ;;;; local call with unknown values convention return
 
 ;;; Non-TR local call for a fixed number of values passed according to the
@@ -457,7 +457,7 @@ default-value-8
       (receive-unknown-values values-start nvals start count label temp)
       (maybe-load-stack-nfp-tn cur-nfp nfp-save temp))))
 
-
+
 ;;;; local call with known values return
 
 ;;; Non-TR local call with known return locations. Known-value return
@@ -524,7 +524,7 @@ default-value-8
     (inst subq return-pc-temp (- other-pointer-lowtag n-word-bytes) lip)
     (move ocfp-temp cfp-tn)
     (inst ret zero-tn lip 1)))
-
+
 ;;;; full call:
 ;;;;
 ;;;; There is something of a cross-product effect with full calls.
@@ -851,7 +851,7 @@ default-value-8
     ;; And jump to the assembly-routine that does the bliting.
     (inst li (make-fixup 'tail-call-variable :assembly-routine) temp)
     (inst jmp zero-tn temp)))
-
+
 ;;;; unknown values return
 
 ;;; Return a single value using the unknown-values convention.
@@ -992,7 +992,7 @@ default-value-8
       (move nvals-arg nvals)
       (inst li (make-fixup 'return-multiple :assembly-routine) temp)
       (inst jmp zero-tn temp))))
-
+
 ;;;; XEP hackery
 
 ;;; Get the lexical environment from its passing location.

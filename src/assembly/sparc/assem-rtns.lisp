@@ -8,7 +8,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Return-multiple with other than one value
 
 #+sb-assembling ;; we don't want a vop for this one.
@@ -95,7 +95,7 @@
   (lisp-return lra))
 
 
-
+
 ;;;; tail-call-variable.
 
 #+sb-assembling ;; no vop for this one either.
@@ -158,7 +158,7 @@
   (lisp-jump temp))
 
 
-
+
 ;;;; Non-local exit noise.
 
 (define-assembly-routine (unwind

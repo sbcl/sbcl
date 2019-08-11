@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; test generation utilities
 
 (defun generate-fixnum-test (value)
@@ -159,14 +159,14 @@
                         (inst cmp al-tn (- end start))
                         (inst jmp less-or-equal target))))))))))))
       (emit-label drop-through))))
-
+
 ;;; simpler VOP that don't need a temporary register
 (define-vop (simple-type-predicate)
   (:args (value :scs (any-reg descriptor-reg control-stack)))
   (:conditional)
   (:info target not-p)
   (:policy :fast-safe))
-
+
 ;;;; other integer ranges
 
 (define-vop (fixnump/unsigned-byte-32 simple-type-predicate)
@@ -318,7 +318,7 @@
        (inst jmp (if not-p :a :be) target)
        (emit-label skip))))
 
-
+
 ;;;; list/symbol types
 ;;;
 ;;; symbolp (or symbol (eq nil))

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Move functions.
 (define-move-fun (load-fp-zero 1) (vop x y)
   ((fp-single-zero) (single-reg)
@@ -51,7 +51,7 @@
    (double-reg) (double-stack))
   (let ((offset (tn-byte-offset y)))
     (str-float x offset (current-nfp-tn vop))))
-
+
 ;;;; Move VOPs
 (define-vop (move-float)
   (:args (x :scs (single-reg double-reg)
@@ -123,7 +123,7 @@
   (single-reg descriptor-reg) (single-reg))
 (define-move-vop move-float-arg :move-arg
   (double-reg descriptor-reg) (double-reg))
-
+
 ;;;; Complex float move functions
 (defun complex-single-reg-real-tn (x)
   (make-random-tn :kind :normal :sc (sc-or-lose 'single-reg)
@@ -321,7 +321,7 @@
 (define-move-vop move-arg :move-arg
   (single-reg double-reg complex-single-reg complex-double-reg)
   (descriptor-reg))
-
+
 ;;;; stuff for c-call float-in-int-register arguments
 (define-vop (move-to-single-int-reg)
   (:note "pointer to float-in-int coercion")
@@ -517,7 +517,7 @@
                   DONE))))
   (frob %negate/single-float %negate single-reg single-float fp-single-zero-tn)
   (frob %negate/double-float %negate double-reg double-float fp-double-zero-tn))
-
+
 ;;;; Comparison:
 
 (define-vop (float-compare)
@@ -557,7 +557,7 @@
   (frob > #b10001 #b01101 >/single-float >/double-float)
   (frob = #b00101 #b11001 =/single-float =/double-float))
 
-
+
 ;;;; Conversion:
 
 (macrolet ((frob (name translate from-sc from-type to-sc to-type)
@@ -876,7 +876,7 @@
                       (t
                        (error "set-floating-point-modes error, ldo offset too large")))
                 (move new res))))
-
+
 ;;;; Complex float VOPs
 
 (define-vop (make-complex-single-float)

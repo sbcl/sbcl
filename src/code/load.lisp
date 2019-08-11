@@ -15,7 +15,7 @@
 ;;;; files for more information.
 
 (in-package "SB-FASL")
-
+
 ;;;; miscellaneous load utilities
 
 ;;; Output the current number of semicolons after a fresh-line.
@@ -40,7 +40,7 @@
       (if name
           (format t "loading ~S~%" name)
           (format t "loading stuff from ~S~%" stream-we-are-loading-from)))))
-
+
 ;;;; utilities for reading from fasl files
 
 #-sb-fluid (declaim (inline read-byte))
@@ -118,7 +118,7 @@
   (declare (optimize (speed 0)))
   (read-arg 4 stream))
 
-
+
 ;;;; the fop table
 
 ;;; The table is implemented as a simple-vector indexed by the table
@@ -162,7 +162,7 @@
   #+gencgc
   (fill vector 0))
 
-
+
 ;;;; the fop stack
 
 (declaim (inline fop-stack-empty-p))
@@ -191,7 +191,7 @@
     (setf (svref stack 0) next
           (svref stack next) value)))
 
-
+
 ;;;; Conditions signalled on invalid fasls (wrong fasl version, etc),
 ;;;; so that user code (esp. ASDF) can reasonably handle attempts to
 ;;;; load such fasls by recompiling them, etc. For simplicity's sake
@@ -472,7 +472,7 @@
   t)
 
 (declaim (notinline read-byte)) ; Why is it even *declaimed* inline above?
-
+
 ;;;; stuff for debugging/tuning by collecting statistics on FOPs (?)
 
 #|

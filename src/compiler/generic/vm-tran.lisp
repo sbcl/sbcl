@@ -97,7 +97,7 @@
     `(truly-the layout (%funcallable-instance-info ,x 0)))
   (define-source-transform %set-funcallable-instance-layout (x val)
     `(setf (%funcallable-instance-info ,x 0) (the layout ,val))))
-
+
 ;;;; simplifying HAIRY-DATA-VECTOR-REF and HAIRY-DATA-VECTOR-SET
 
 (deftransform hairy-data-vector-ref ((string index) (simple-string t))
@@ -348,7 +348,7 @@
   '(if (array-header-p %array)
        (values (%array-data %array) %index)
        (values %array %index)))
-
+
 ;;;; BIT-VECTOR hackery
 
 ;;; SIMPLE-BIT-VECTOR bit-array operations are transformed to a word
@@ -576,7 +576,7 @@
           (declare (optimize (speed 3) (safety 0))
                    (type index index))
           (setf (%vector-raw-bits sequence index) value))))))
-
+
 ;;;; %BYTE-BLT
 
 ;;; FIXME: The old CMU CL code used various COPY-TO/FROM-SYSTEM-AREA
@@ -622,7 +622,7 @@
                (sap+ (sapify src) src-start)
                (- dst-end dst-start)))
      (values)))
-
+
 ;;;; transforms for EQL of floating point values
 #-(vop-named sb-vm::eql/single-float)
 (deftransform eql ((x y) (single-float single-float))
@@ -634,7 +634,7 @@
                   (= (double-float-high-bits x) (double-float-high-bits y)))
   #+64-bit '(= (double-float-bits x) (double-float-bits y)))
 
-
+
 ;;;; modular functions
 ;;;
 ;;; FIXME: I think that the :GOODness of a modular function boils down
@@ -658,7 +658,7 @@
   (define-good-signed-modular-funs
       logand logandc1 logandc2 logeqv logior lognand lognor lognot
       logorc1 logorc2 logxor))
-
+
 ;;;; word-wise logical operations
 
 ;;; These transforms assume the presence of modular arithmetic to
@@ -697,7 +697,7 @@
 (deftransform word-logical-andc2 ((x y))
   `(logand (logandc2 x y) ,most-positive-word))
 
-
+
 ;;; There are two different ways the multiplier can be recoded. The
 ;;; more obvious is to shift X by the correct amount for each bit set
 ;;; in Y and to sum the results. But if there is a string of bits that
@@ -747,7 +747,7 @@
             adds
             shifts)))
 
-
+
 ;;; Transform GET-LISP-OBJ-ADDRESS for constant immediates, since the normal
 ;;; VOP can't handle them.
 

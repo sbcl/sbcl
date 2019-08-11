@@ -28,7 +28,7 @@
 ;;; The minimum size at which we release address ranges to the OS.
 ;;; This must be a multiple of the OS page size.
 (defconstant gencgc-release-granularity +backend-page-bytes+)
-
+
 ;;;; Machine Architecture parameters:
 (eval-when (:compile-toplevel :load-toplevel :execute)
 
@@ -106,7 +106,7 @@
 
 ); eval-when
 
-
+
 ;;;; Description of the target address space.
 
 #+gencgc ; sensibly small read-only and static spaces
@@ -159,7 +159,7 @@
 ;; src/runtime/sparc-arch.c
 (defconstant linkage-table-entry-size 16)
 
-
+
 (defenum (:start 8)
   halt-trap
   pending-interrupt-trap
@@ -171,7 +171,7 @@
   single-step-before-trap
   #+gencgc allocation-trap
   error-trap)
-
+
 ;;;; static symbols.
 
 ;;; These symbols are loaded into static space directly after NIL so
@@ -193,7 +193,7 @@
     two-arg-and two-arg-ior two-arg-xor two-arg-eqv
     two-arg-gcd two-arg-lcm)
   #'equalp)
-
+
 ;;;; Pseudo-atomic trap number
 
 ;;; KLUDGE: Linux on the SPARC doesn't seem to conform to any kind of

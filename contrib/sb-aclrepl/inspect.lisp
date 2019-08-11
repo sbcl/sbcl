@@ -592,7 +592,7 @@ position with the label if the label is a string."
               (push r list)))
           (format nil "[~W~{,~W~}]" (car list) (cdr list))))))
 
-
+
 ;;; INSPECTED-DESCRIPTION
 ;;;
 ;;; Accepts an object and returns
@@ -734,7 +734,7 @@ cons cells and LIST-TYPE is :normal, :dotted, or :cyclic"
 (defmethod inspected-description ((object (eql *inspect-unbound-object-marker*)))
   "..unbound..")
 
-
+
 ;;; FIXME: Most of this should be refactored to share the code
 ;;; with the vanilla inspector. Also, we should check what the
 ;;; Slime inspector does, and provide a an interface for it to

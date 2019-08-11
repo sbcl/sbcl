@@ -11,7 +11,7 @@
 
 (in-package "SB-IMPL")
 
-
+
 ;;; ASCII
 
 (declaim (inline code->ascii-mapper))
@@ -69,7 +69,7 @@
       (code-char byte))
   ascii->string-aref
   string->ascii)
-
+
 ;;; Latin-1
 
 (declaim (inline get-latin1-bytes))
@@ -110,7 +110,7 @@
   latin1->string-aref
   string->latin1)
 
-
+
 ;;; UTF-8
 
 ;;; to UTF-8

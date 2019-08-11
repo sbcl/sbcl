@@ -14,7 +14,7 @@
 ;;; here is awfully chummy with the SB-C package. CMU CL didn't have
 ;;; any separation between the two packages, and a lot of tight
 ;;; coupling remains. -- WHN 2001-06-04
-
+
 ;;;; fasl dumper state
 
 ;;; The FASL-OUTPUT structure represents everything we need to
@@ -240,7 +240,7 @@
     (aver (not (gethash x circ)))
     (setf (gethash x circ) x))
   (values))
-
+
 ;;;; opening and closing fasl files
 
 ;;; Open a fasl file, write its header, and return a FASL-OUTPUT
@@ -317,7 +317,7 @@
   ;; That's all, folks.
   (close (fasl-output-stream fasl-output) :abort abort-p)
   (values))
-
+
 ;;;; main entries to object dumping
 
 ;;; This function deals with dumping objects that are complex enough
@@ -463,7 +463,7 @@
           (dump-circularities *circularities-detected* file)
           (clrhash circ)))
       (sub-dump-object x file)))
-
+
 ;;;; LOAD-TIME-VALUE and MAKE-LOAD-FORM support
 
 ;;; Emit a funcall of the function and return the handle for the
@@ -504,7 +504,7 @@
 (defun fasl-note-dumpable-instance (structure file)
   (setf (gethash structure (fasl-output-valid-structures file)) t)
   (values))
-
+
 ;;;; number dumping
 
 (defun dump-ratio (x file)
@@ -570,7 +570,7 @@
       (sub-dump-object re file)
       (sub-dump-object im file)
       (dump-fop 'fop-complex file)))))
-
+
 ;;;; symbol dumping
 
 ;;; Return the table index of PKG, adding the package to the table if
@@ -595,7 +595,7 @@
            (incf (fasl-output-table-free file))
            (push (cons pkg entry) (fasl-output-packages file))
            entry))))
-
+
 ;;; dumper for lists
 
 ;;; Dump a list, setting up patching information when there are
@@ -689,7 +689,7 @@
         (t
          (dump-byte (logior fop-list-base-opcode) file)
          (dump-varint (- n 16) file))))
-
+
 ;;;; array dumping
 
 ;;; Dump the array thing.
@@ -780,7 +780,7 @@
                             0
                             (ceiling (* length bits-per-length) sb-vm:n-byte-bits)
                             #+sb-xc-host bits-per-length))))
-
+
 ;;; Dump characters and string-ish things.
 
 (defun dump-character (char file)
@@ -840,7 +840,7 @@
     (incf (fasl-output-table-free file)))
 
   (values))
-
+
 ;;;; component (function) dumping
 
 (defun dump-segment (segment code-length fasl-output)
@@ -1093,7 +1093,7 @@
   (dump-push-previously-dumped-fun fun fasl-output)
   (dump-fop 'fop-funcall-for-effect fasl-output 0)
   (values))
-
+
 ;;;; dumping structures
 
 ;;; Even as late as calling DUMP-STRUCTURE we might have to deduce that a

@@ -8,7 +8,7 @@
 ;;;; files for more information.
 
 (in-package "SB-FORMAT")
-
+
 (define-condition format-error (error reference-condition)
   ((complaint :reader format-error-complaint :initarg :complaint)
    (args :reader format-error-args :initarg :args :initform nil)
@@ -52,7 +52,7 @@
 (defun format-error-at (control-string offset complaint &rest args)
   (format-error-at* control-string offset complaint args))
 
-
+
 (defstruct (format-directive (:copier nil)
                              (:constructor %make-directive
                                            (string start end params bits function))

@@ -363,7 +363,7 @@ disappears when accents are placed on top of it. and NIL otherwise"
           #(#x0600 #x0604 #x06DD #x06DD #x070F #x070F #xFFF9 #xFFFB
             #x110BD #x110BD)))))))
 
-
+
 ;;; Implements UAX#15: Normalization Forms
 (declaim (inline char-decomposition-info))
 (defun char-decomposition-info (char)
@@ -614,7 +614,7 @@ only characters for which it returns T are collected."
   ;; FIXME: can be optimized
   (string= string (normalize-string string form)))
 
-
+
 ;;; Unicode case algorithms
 ;; FIXME: Make these parts less redundant (macro?)
 (sb-ext:define-load-time-global **special-titlecases**
@@ -826,7 +826,7 @@ for case-insensitive comparisons.
 The result is not guaranteed to have the same length as the input."
   (string-somethingcase #'char-foldcase string (constantly nil)))
 
-
+
 ;;; Unicode break algorithms
 ;;; In all the breaking methods:
 ;;; (brk) establishes a break between `first` and `second`
@@ -1353,7 +1353,7 @@ it defaults to 80 characters"
       (setf last-break-distance nil))
    next))
 
-
+
 ;;; Collation
 (defconstant +maximum-variable-primary-element+
   #.(sb-cold:read-from-file "output/other-collation-info.lisp-expr"))
@@ -1527,7 +1527,7 @@ with variable-weight characters, as described in UTS #10"
    (unicode> string1 string2 :start1 start1 :end1 end1
              :start2 start2 :end2 end2)))
 
-
+
 ;;; Confusable detection
 
 (defun canonically-deconfuse (string)

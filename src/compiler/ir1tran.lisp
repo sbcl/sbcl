@@ -89,7 +89,7 @@
   to optimize code which uses those definitions? Setting this true
   gives non-ANSI, early-CMU-CL behavior. It can be useful for improving
   the efficiency of stable code.")
-
+
 ;;;; namespace management utilities
 
 ;; As with LEXENV-FIND, we assume use of *LEXENV*, but macroexpanders
@@ -308,7 +308,7 @@
                                   :%source-name name
                                   :type type
                                   :where-from where-from)))))))
-
+
 ;;; Grovel over CONSTANT checking for any sub-parts that need to be
 ;;; processed with MAKE-LOAD-FORM. We have to be careful, because
 ;;; CONSTANT might be circular. We also check that the constant (and
@@ -370,7 +370,7 @@
           (emit-make-load-form constant name)
           (grovel constant))))
   (values))
-
+
 ;;;; some flow-graph hacking utilities
 
 ;;; This function sets up the back link between the node and the
@@ -442,7 +442,7 @@
 (defun use-continuation (node ctran lvar)
   (use-ctran node ctran)
   (use-lvar node lvar))
-
+
 ;;;; exported functions
 
 ;;; This function takes a form and the top level form number for that
@@ -532,7 +532,7 @@
          (frob)
          (frob)
          (setq trail (cdr trail)))))))
-
+
 ;;;; IR1-CONVERT, macroexpansion and special form dispatching
 
 (declaim (ftype (sfunction (ctran ctran (or lvar null) t)
@@ -893,7 +893,7 @@
                           (compiler-error "~@<~A~@:_ ~A~:>"
                                           (wherestring) c))))))
       (funcall (valid-macroexpand-hook) fun form *lexenv*))))
-
+
 ;;;; conversion utilities
 
 ;;; Convert a bunch of forms, discarding all the values except the
@@ -918,7 +918,7 @@
                     forms (cdr forms)))))))
   (values))
 
-
+
 ;;;; code coverage
 
 ;;; Check the policy for whether we should generate code coverage
@@ -982,7 +982,7 @@
           (when *current-path*
             (instrument-coverage start nil form))))
       start))
-
+
 ;;;; converting combinations
 
 ;;; Does this form look like something that we should add single-stepping
@@ -1159,7 +1159,7 @@
   (ir1-convert-combination start next result
                            form
                            (maybe-reanalyze-functional functional)))
-
+
 ;;;; PROCESS-DECLS
 
 ;;; Given a list of LAMBDA-VARs and a variable name, return the

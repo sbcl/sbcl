@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; miscellaneous non-primitive predicates
 
 #-sb-fluid (declaim (inline streamp))
@@ -76,7 +76,7 @@
 (defun sequencep (x)
   (declare (inline extended-sequence-p))
   (or (listp x) (vectorp x) (extended-sequence-p x)))
-
+
 ;;;; primitive predicates. These must be supported directly by the
 ;;;; compiler.
 
@@ -181,7 +181,7 @@
 (defun fixnum-mod-p (x limit)
   (and (fixnump x)
        (<= 0 x limit)))
-
+
 ;;; a vector that maps widetags to layouts, used for quickly finding
 ;;; the layouts of built-in classes
 (define-load-time-global **primitive-object-layouts** nil)
@@ -289,7 +289,7 @@
                     (classoid-pcl-class pname)
                     pname))))
            name)))))
-
+
 ;;;; equality predicates
 
 ;;; This is real simple, 'cause the compiler takes care of it.

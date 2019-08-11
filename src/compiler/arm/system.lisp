@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Type frobbing VOPs
 
 (define-vop (widetag-of)
@@ -128,7 +128,7 @@
   (:generator 1
     (inst bic res ptr lowtag-mask)
     (inst mov res (lsr res 1))))
-
+
 ;;;; Allocation
 
 (define-vop (dynamic-space-free-pointer)
@@ -154,7 +154,7 @@
   (:policy :fast-safe)
   (:generator 1
     (load-csp int)))
-
+
 ;;;; Code object frobbing.
 
 (define-vop (code-instructions)
@@ -230,7 +230,7 @@
     (loadw res res cons-car-slot list-pointer-lowtag)
     (inst tst res fixnum-tag-mask)
     (inst mov :eq res null-tn)))
-
+
 ;;;; other miscellaneous VOPs
 
 (defknown sb-unix::receive-pending-interrupt () (values))

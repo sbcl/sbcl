@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-COLD")
-
+
 ;;;; definition of #+ and #- as a mechanism analogous to #+/#-, but
 ;;;; for SB-XC:*FEATURES* instead of CL:*FEATURES*. (This is handy
 ;;;; when cross-compiling, so that we can make a distinction between
@@ -138,7 +138,7 @@
                            (funcall 'read-target-float stream char))
                      t ; non-terminating so that symbols may contain a dollar sign
                      *xc-readtable*)
-
+
 ;;;; variables like SB-XC:*FEATURES* but different
 
 ;;; This variable is declared here (like SB-XC:*FEATURES*) so that
@@ -151,7 +151,7 @@
 (export '*shebang-backend-subfeatures*)
 (declaim (type list *shebang-backend-subfeatures*))
 (defvar *shebang-backend-subfeatures*)
-
+
 ;;;; string checker, for catching non-portability early
 
 ;;; A note about CLISP compatibility:

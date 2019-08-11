@@ -717,7 +717,7 @@
   block
   target
   info)
-
+
 ;;;; LEAF structures
 
 ;;; Variables, constants and functions are all represented by LEAF
@@ -858,7 +858,7 @@
   #+sb-show id
   inlinep
   (functionals :test functionals))
-
+
 ;;;; function stuff
 
 ;;; We default the WHERE-FROM and TYPE slots to :DEFINED and FUNCTION.
@@ -1356,7 +1356,7 @@
   `(lambda-var-attributep (lambda-var-flags ,var) deleted))
 (defmacro lambda-var-explicit-value-cell (var)
   `(lambda-var-attributep (lambda-var-flags ,var) explicit-value-cell))
-
+
 ;;;; basic node types
 
 ;;; A REF represents a reference to a LEAF. REF-REOPTIMIZE is
@@ -1565,7 +1565,7 @@
 
 ;;; Inserted by ARRAY-CALL-TYPE-DERIVER so that it can be later deleted
 (def!struct (array-index-cast (:include cast) (:copier nil)))
-
+
 ;;;; non-local exit support
 ;;;;
 ;;;; In IR1, we insert special nodes to mark potentially non-local
@@ -1605,7 +1605,7 @@
   #+sb-show id
   (entry :test entry)
   (value :test value))
-
+
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined
 ;;; You might think that NIL as a policy becomes *POLICY*,
@@ -1630,7 +1630,7 @@
                         (lexenv thing)
                         (node (node-lexenv thing))
                         (functional (functional-lexenv thing)))))))
-
+
 ;;;; Freeze some structure types to speed type testing.
 
 ;; FIXME: the frozen-ness can't actually help optimize anything

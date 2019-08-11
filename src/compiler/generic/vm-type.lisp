@@ -68,7 +68,7 @@
   `(integer 0 ,(* (1- (ash 1 (- sb-vm:n-word-bits sb-vm:n-widetag-bits)))
                   sb-vm:n-word-bits)))
 
-
+
 ;;;; hooks into the type system
 
 (sb-xc:deftype unboxed-array (&optional dims)

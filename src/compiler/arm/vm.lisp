@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-
+
 ;;;; register specs
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -67,7 +67,7 @@
   (defregset *register-arg-offsets*  r0 r1 r2)
   (defparameter *register-arg-names* '(r0 r1 r2)))
 
-
+
 ;;;; SB and SC definition:
 
 (!define-storage-bases
@@ -203,7 +203,7 @@
 
   (catch-block control-stack :element-size catch-block-size)
   (unwind-block control-stack :element-size unwind-block-size))
-
+
 ;;;; Make some random tns for important registers.
 
 (macrolet ((defregtn (name sc)
@@ -223,7 +223,7 @@
   (defregtn cfp any-reg)
   (defregtn lr interior-reg)
   (defregtn pc any-reg))
-
+
 ;;; If VALUE can be represented as an immediate constant, then return the
 ;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -241,7 +241,7 @@
 (defun boxed-immediate-sc-p (sc)
   (or (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
-
+
 ;;;; function call parameters
 
 ;;; the SC numbers for register and stack arguments/return values
@@ -266,7 +266,7 @@
                               :sc (sc-or-lose 'descriptor-reg)
                               :offset n))
           *register-arg-offsets*))
-
+
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location.  It returns a thing that can be printed with PRINC.
 (defun location-print-name (tn)

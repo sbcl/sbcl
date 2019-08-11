@@ -13,7 +13,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; cost estimation
 
 ;;; Return some sort of guess about the cost of a call to a function.
@@ -183,7 +183,7 @@
                                              (values-type-optional type))
                            :rest (acond ((values-type-rest type)
                                          (weaken-type it)))))))
-
+
 ;;;; checking strategy determination
 
 ;;; Return the type we should test for when we really want to check

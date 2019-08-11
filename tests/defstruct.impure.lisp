@@ -10,7 +10,7 @@
 ;;;; more information.
 
 (load "compiler-test-util.lisp")
-
+
 ;;;; examples from, or close to, the Common Lisp DEFSTRUCT spec
 
 ;;; Type mismatch of slot default init value isn't an error until the
@@ -182,7 +182,7 @@
   frizzy-hair-p
   polkadots)
 (assert (is-a-bozo-p (make-up-klown)))
-
+
 ;;;; systematically testing variants of DEFSTRUCT:
 ;;;;   * native, :TYPE LIST, and :TYPE VECTOR
 
@@ -371,7 +371,7 @@
 (test-variant vector-struct :colontype vector :boa-constructor-p t)
 (test-variant list-struct :colontype list :boa-constructor-p t)
 
-
+
 ;;;; testing raw slots harder
 ;;;;
 ;;;; The offsets of raw slots need to be rescaled during the punning
@@ -427,7 +427,7 @@
   (assert (eql (manyraw-dd copy) #c(0.33 0.33)))
   (assert (eql (manyraw-ee copy) #c(0.44d0 0.44d0))))
 
-
+
 ;;;; Since GC treats raw slots specially now, let's try this with more objects
 ;;;; and random values as a stress test.
 
@@ -581,7 +581,7 @@
   ;; make-load-form omits slot A. it reads as 0
   (assert (equalp (make-hugest-manyraw :a 0) (dumped-hugest-manyraw))))
 
-
+
 ;;;; miscellaneous old bugs
 
 (defstruct ya-struct)
@@ -617,7 +617,7 @@
 (let ((foo-0-7-8-53 (make-foo-0-7-8-53 :x :s)))
   (assert (eq (foo-0-7-8-53-x foo-0-7-8-53) :s))
   (assert (eq (foo-0-7-8-53-y foo-0-7-8-53) :not)))
-
+
 ;;; tests of behaviour of colliding accessors.
 (defstruct (bug127-foo (:conc-name bug127-baz-)) a)
 (assert (= (bug127-baz-a (make-bug127-foo :a 1)) 1))
@@ -644,7 +644,7 @@
 (assert-error (bug127--foo (make-bug127-e :foo 3)) type-error)
 
 ;;; FIXME: should probably do the same tests on DEFSTRUCT :TYPE
-
+
 ;;; As noted by Paul Dietz for CMUCL, :CONC-NAME handling was a little
 ;;; too fragile:
 (defstruct (conc-name-syntax :conc-name) a-conc-name-slot)
@@ -658,7 +658,7 @@
             (make-conc-name-nil :conc-name-nil-slot 1)) 1))
 (assert-error (conc-name-nil-slot (make-conc-name-nil))
               undefined-function)
-
+
 ;;; The named/typed predicates were a little fragile, in that they
 ;;; could throw errors on innocuous input:
 (defstruct (list-struct (:type list) :named) a-slot)
@@ -675,7 +675,7 @@
 (assert (vector-struct-p (make-vector-struct)))
 (assert (not (vector-struct-p nil)))
 (assert (not (vector-struct-p #())))
-
+
 
 ;;; bug 3d: type safety with redefined type constraints on slots
 #+#.(cl:if (assertoid:legacy-eval-p) '(or) '(and))
@@ -848,7 +848,7 @@
 ;;; bug reported by John Morrison, 2008-07-22 on sbcl-devel
 (defstruct (raw-slot-struct-with-unknown-init (:constructor make-raw-slot-struct-with-unknown-init ()))
  (x (#:unknown-function) :type double-float))
-
+
 ;;; Some checks for the behavior of incompatibly redefining structure
 ;;; classes.  We don't actually check that our detection of
 ;;; "incompatible" is comprehensive, only that if an incompatible
@@ -956,7 +956,7 @@ redefinition."
 ;; When eyeballing these, it's helpful to see when various things are
 ;; happening.
 (setq *compile-verbose* t *load-verbose* t)
-
+
 ;;; Tests begin.
 ;; Base case: recklessly-continue.
 (with-defstruct-redefinition-test :defstruct/recklessly
@@ -1018,7 +1018,7 @@ redefinition."
   (let ((instance (funcall ctor)))
     (load (compile-file-assert path2))
     (assert-invalid instance)))
-
+
 ;;; Subclasses.
 ;; Ensure that recklessly continuing DT(expected)T to instances of
 ;; subclasses.  (This is a case where recklessly continuing is

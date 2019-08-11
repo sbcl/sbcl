@@ -62,7 +62,7 @@
 ;;; are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rcx-offset))
-
+
 ;;;; frame hackery
 
 ;;; This is used for setting up the Old-FP in local call.
@@ -239,7 +239,7 @@
             (t
              (inst lea res (ea (- fp-offset) rsp-tn))
              (inst sub rsp-tn stack-size))))))
-
+
 ;;; Emit code needed at the return-point from an unknown-values call
 ;;; for a fixed number of values. Values is the head of the TN-REF
 ;;; list for the locations that the values are to be received into.
@@ -351,7 +351,7 @@
                     (emit-label (car default))
                     (inst mov (cdr default) nil-value))
                   (inst jmp defaulting-done)))))))))))
-
+
 ;;;; unknown values receiving
 
 ;;; Emit code needed at the return point for an unknown-values call
@@ -432,7 +432,7 @@
               nvals)
   (:results (start :scs (any-reg control-stack))
             (count :scs (any-reg control-stack))))
-
+
 ;;;; local call with unknown values convention return
 
 (defun check-ocfp-and-return-pc (old-fp return-pc)
@@ -520,7 +520,7 @@
     (inst call target)
     (note-this-location vop :unknown-return)
     (receive-unknown-values values-start nvals start count node)))
-
+
 ;;;; local call with known values return
 
 ;;; Non-TR local call with known return locations. Known-value return
@@ -544,7 +544,7 @@
     (note-this-location vop :call-site)
     (inst call target)
     (note-this-location vop :known-return)))
-
+
 ;;; From Douglas Crosher
 ;;; Return from known values call. We receive the return locations as
 ;;; arguments to terminate their lifetimes in the returning function. We
@@ -563,7 +563,7 @@
     (inst mov rsp-tn rbp-tn)
     (inst pop rbp-tn)
     (inst ret)))
-
+
 ;;;; full call
 ;;;
 ;;; There is something of a cross-product effect with full calls.
@@ -924,7 +924,7 @@
                                  'tail-call-variable
                                  'tail-call-callable-variable)
                         vop)))
-
+
 ;;;; unknown values return
 
 ;;; Return a single-value using the Unknown-Values convention.
@@ -1061,7 +1061,7 @@
     (move rsi vals)
     (move rcx nvals)
     (invoke-asm-routine 'jmp 'return-multiple vop)))
-
+
 ;;;; XEP hackery
 
 ;;; Get the lexical environment from its passing location.

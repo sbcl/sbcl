@@ -18,7 +18,7 @@
 ;; but it's compiled after this file is.
 (!define-load-time-global *user-hash-table-tests* nil)
 
-
+
 ;;;; fdefinition (fdefn) objects
 
 (defun make-fdefn (name)
@@ -214,7 +214,7 @@
 (%defun '%coerce-callable-for-call
         #'%coerce-callable-to-fun)
 
-
+
 ;;;; definition encapsulation
 
 (defstruct (encapsulation-info (:constructor make-encapsulation-info
@@ -315,7 +315,7 @@
       (declare (type (or encapsulation-info null) encap-info))
       (when (eq (encapsulation-info-type encap-info) type)
         (return t)))))
-
+
 ;;;; FDEFINITION
 
 ;;; KLUDGE: Er, it looks as though this means that
@@ -414,7 +414,7 @@
                               new-value))))))
               (t
                (setf (fdefn-fun fdefn) new-value)))))))
-
+
 ;;;; FBOUNDP and FMAKUNBOUND
 
 (defun fboundp (name)

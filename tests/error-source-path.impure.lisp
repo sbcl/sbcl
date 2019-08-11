@@ -9,7 +9,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-
+
 ;;; Utilities
 
 (defmacro assert-condition-source-paths (form &rest source-paths)
@@ -27,7 +27,7 @@
   (declare (ignore body))
   (error "error from macro"))
 
-
+
 ;;; Tests
 
 (with-test (:name (:source-path multiple-value-bind))

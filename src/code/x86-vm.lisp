@@ -14,7 +14,7 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "X86")
-
+
 ;;;; :CODE-OBJECT fixups
 
 ;;; This gets called by LOAD to resolve newly positioned objects
@@ -48,7 +48,7 @@
        ;; Relative fixups point outside of this object. Keep them all.
        (aver (or (< fixup obj-start-addr) (> fixup code-end-addr)))
        t))))
-
+
 ;;;; low-level signal context access functions
 ;;;;
 ;;;; Note: In CMU CL, similar functions were hardwired to access
@@ -111,7 +111,7 @@
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (sb-alien:unsigned 32)
   (context (* os-context-t)))
-
+
 ;;;; INTERNAL-ERROR-ARGS
 
 ;;; Given a (POSIX) signal context, extract the internal error
@@ -122,7 +122,7 @@
          (trap-number (sap-ref-8 pc 0)))
     (declare (type system-area-pointer pc))
     (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number)))
-
+
 ;;; This is used in error.lisp to insure that floating-point exceptions
 ;;; are properly trapped. The compiler translates this to a VOP.
 (defun float-wait ()

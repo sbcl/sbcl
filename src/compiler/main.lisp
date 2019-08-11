@@ -86,7 +86,7 @@
 ;; Used during compilation to keep track of with source paths have been
 ;; instrumented in which blocks.
 (defun code-coverage-blocks (x) (cdr x))
-
+
 ;;;; WITH-COMPILATION-UNIT and WITH-COMPILATION-VALUES
 
 (defmacro sb-xc:with-compilation-unit (options &body body)
@@ -382,7 +382,7 @@ Examples:
           (push (list* thing fmt-or-condition args)
                 (file-info-style-warning-tracker file-info)))
         (apply 'style-warn fmt-or-condition args)))))
-
+
 ;;;; component compilation
 
 (defparameter *max-optimize-iterations* 3 ; ARB
@@ -742,7 +742,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
   (clear-constant-info)
   (values))
-
+
 ;;;; clearing global data structures
 ;;;;
 ;;;; FIXME: Is it possible to get rid of this stuff, getting rid of
@@ -787,7 +787,7 @@ necessary, since type inference may take arbitrarily long to converge.")
     (blast *free-funs*)
     (blast *constants*))
   (values))
-
+
 ;;;; trace output
 
 ;;; Print out some useful info about COMPONENT to STREAM.
@@ -811,7 +811,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (print-ir2-blocks component)
   (terpri)
   (values))
-
+
 ;;; Given a pathname, return a SOURCE-INFO structure.
 (defun make-file-source-info (file external-format &optional form-tracking-p)
   (make-source-info
@@ -1074,7 +1074,7 @@ necessary, since type inference may take arbitrarily long to converge.")
   (let ((file-info (source-info-file-info info)))
     (values (aref (file-info-forms file-info) index)
             (aref (file-info-positions file-info) index))))
-
+
 ;;;; processing of top level forms
 
 ;;; This is called by top level form processing when we are ready to
@@ -1451,7 +1451,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                            (convert-and-maybe-compile form path)))))))))))
 
   (values))
-
+
 ;;;; load time value support
 ;;;;
 ;;;; (See EMIT-MAKE-LOAD-FORM.)
@@ -1522,7 +1522,7 @@ necessary, since type inference may take arbitrarily long to converge.")
       (setf (component-name component) (leaf-debug-name lambda))
       (compile-component component)
       (clear-ir1-info component))))
-
+
 ;;;; COMPILE-FILE
 
 (defun object-call-toplevel-lambda (tll)
@@ -1944,7 +1944,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
               (or (probe-file output-file-name) output-file-name))
             warnings-p
             failure-p)))
-
+
 ;;; a helper function for COMPILE-FILE-PATHNAME: the default for
 ;;; the OUTPUT-FILE argument
 ;;;
@@ -1976,7 +1976,7 @@ SPEED and COMPILATION-SPEED optimization values, and the
   (if output-file-p
       (merge-pathnames output-file (cfp-output-file-default input-file))
       (cfp-output-file-default input-file)))
-
+
 ;;;; MAKE-LOAD-FORM stuff
 
 ;;; The entry point for MAKE-LOAD-FORM support. When IR1 conversion

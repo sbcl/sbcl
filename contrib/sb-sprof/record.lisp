@@ -5,7 +5,7 @@
 
 (in-package #:sb-sprof)
 
-
+
 ;;; Append-only sample vector
 
 (deftype sampling-mode ()
@@ -119,7 +119,7 @@
     (setf (aref vector index) info
           (aref vector (1+ index)) pc-or-offset)
     (setf (samples-index samples) (+ index +elements-per-sample+))))
-
+
 ;;; Trace and sample and access functions
 
 (defun map-traces (function samples)
@@ -208,7 +208,7 @@ EXPERIMENTAL: Interface subject to change."
      (let* ((component (sb-di::compiled-debug-fun-component info))
             (start-pc (code-start component)))
        (+ start-pc pc-or-offset)))))
-
+
 ;;; Sampling
 
 (defvar *samples* nil)

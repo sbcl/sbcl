@@ -1,6 +1,6 @@
 (in-package "SB-VM")
 
-
+
 ;;;; Type frobbing VOPs
 
 ;FIX this vop got instruction-exploded after mips convert, look at old hppa
@@ -119,7 +119,7 @@
   (:policy :fast-safe)
   (:generator 1
     (inst zdep ptr n-positive-fixnum-bits n-positive-fixnum-bits res)))
-
+
 ;;;; Allocation
 
 (define-vop (dynamic-space-free-pointer)
@@ -146,7 +146,7 @@
   (:generator 1
     (move csp-tn int)))
 
-
+
 ;;;; Code object frobbing.
 
 (define-vop (code-instructions)
@@ -178,7 +178,7 @@
     (inst addi (- fun-pointer-lowtag other-pointer-lowtag) ndescr ndescr)
     (inst add ndescr code func)))
 
-
+
 ;;;; Other random VOPs.
 
 
@@ -217,7 +217,7 @@
       (inst addi -64 nsp-tn nsp-tn)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
-
+
 ;;;; Dynamic vop count collection support
 
 (define-vop (count-me)

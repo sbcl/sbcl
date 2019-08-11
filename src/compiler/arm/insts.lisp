@@ -21,7 +21,7 @@
   (import '(sb-vm:nil-value sb-vm::registers sb-vm::null-tn sb-vm::null-offset
             sb-vm::pc-tn sb-vm::pc-offset sb-vm::code-offset)))
 
-
+
 
 (defconstant-eqx +conditions+
   '((:eq . 0)
@@ -49,7 +49,7 @@
 
 (defun conditional-opcode (condition)
   (cdr (assoc condition +conditions+ :test #'eq)))
-
+
 ;;;; disassembler field definitions
 
 (define-arg-type condition-code :printer #'print-condition)
@@ -75,7 +75,7 @@
 (define-arg-type load/store-register :printer #'print-load/store-register)
 
 (define-arg-type msr-field-mask :printer #'print-msr-field-mask)
-
+
 ;;;; disassembler instruction format definitions
 
 (define-instruction-format (dp-shift-immediate 32
@@ -308,7 +308,7 @@
 (define-instruction-format (conditional 32 :default-printer '(:name cond))
   (cond :field (byte 4 28) :type 'condition-code)
   (op :field (byte 28 0)))
-
+
 ;;;; primitive emitters
 
 ;(define-bitfield-emitter emit-word 16
@@ -316,7 +316,7 @@
 
 (define-bitfield-emitter emit-word 32
   (byte 32 0))
-
+
 ;;;; miscellaneous hackery
 
 (defun register-p (thing)
@@ -366,7 +366,7 @@
 (define-instruction lra-header-word (segment)
   (:emitter
    (emit-header-data segment return-pc-widetag)))
-
+
 ;;;; Addressing mode 1 support
 
 ;;; Addressing mode 1 has some 11 formats.  These are immediate,
@@ -541,7 +541,7 @@
                     (progn ,@(composite))))
               (composite))))))
 
-
+
 ;;;; Addressing mode 2 support
 
 ;;; Addressing mode 2 ostensibly has 9 formats.  These are formed from
@@ -591,7 +591,7 @@
                         :up))
          (offset (if (eq direction :down) (cadr offset) offset)))
     `(%@ ,base ,offset ,direction ,mode)))
-
+
 ;;;; Data-processing instructions
 
 ;;; Data processing instructions have a 4-bit opcode field and a 1-bit
@@ -689,7 +689,7 @@
 (define-data-processing-instruction movs #x1b t nil)
 (define-data-processing-instruction mvn  #x1e t nil)
 (define-data-processing-instruction mvns #x1f t nil)
-
+
 ;;;; Exception-generating instructions
 
 ;;; There are two exception-generating instructions.  One, BKPT, is
@@ -729,7 +729,7 @@
             :default :control #'debug-trap-control)
   (:emitter
    (emit-word segment #+linux #xe7f001f0 #+netbsd #xe7ffdefe)))
-
+
 ;;;; Miscellaneous arithmetic instructions
 
 (define-bitfield-emitter emit-clz-instruction 32
@@ -750,7 +750,7 @@
                            (tn-offset dest)
                            #b11110001
                            (tn-offset src)))))
-
+
 ;;;; Branch instructions
 
 (define-bitfield-emitter emit-branch-instruction 32
@@ -805,7 +805,7 @@
                                        (conditional-opcode condition)
                                        #b00010010 #b1111 #b1111
                                        #b1111 #b0011 (tn-offset dest)))))
-
+
 ;;;; Semaphore instructions
 
 (defun emit-semaphore-instruction (segment opcode condition dest value address)
@@ -830,7 +830,7 @@
    (with-condition-defaulted (args (condition dest value address))
      (emit-semaphore-instruction segment #b10100
                                  condition dest value address))))
-
+
 ;;;; Status-register instructions
 
 (define-instruction mrs (segment &rest args)
@@ -886,7 +886,7 @@
                             (if (logbitp 4 field-mask) #b10110 #b10010)
                             field-mask #b1111
                             (ldb (byte 12 0) encoded-src))))))
-
+
 ;;;; Multiply instructions
 
 (define-bitfield-emitter emit-multiply-instruction 32
@@ -954,7 +954,7 @@
 
   (define-multiply-instruction smulwb :dzsm #b00010010 #b1010)
   (define-multiply-instruction smulwt :dzsm #b00010010 #b1110))
-
+
 ;;;; Load/store instructions
 
 ;;; Emit a load/store instruction.  CONDITION is a condition code
@@ -1136,7 +1136,7 @@
   (define-misc-load/store-instruction ldrh 1 #b1011 nil)
   (define-misc-load/store-instruction ldrsb 1 #b1101 nil)
   (define-misc-load/store-instruction ldrsh 1 #b1111 nil))
-
+
 ;;;; Boxed-object computation instructions (for LRA and CODE)
 
 ;;; Compute the address of a CODE object by parsing the header of a

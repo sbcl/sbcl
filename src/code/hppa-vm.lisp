@@ -1,10 +1,10 @@
 (in-package "SB-VM")
-
+
 #-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
   "HPPA")
-
+
 ;;;; FIXUP-CODE-OBJECT
 (defconstant-eqx +fixup-kinds+
     #(:absolute :load :load11u :load-short :hi :branch)
@@ -52,7 +52,7 @@
                         (mask-field (byte 3 13) inst)
                         (mask-field (byte 11 21) inst)))))))
   nil))
-
+
 #-sb-xc-host (progn
 
 ;;; For now.

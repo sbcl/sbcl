@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Data object ref/set stuff.
 
 (define-vop (slot)
@@ -55,7 +55,7 @@
     EXIT
     (inst isync)))
 
-
+
 ;;;; Symbol hacking VOPs:
 
 (define-vop (%compare-and-swap-symbol-value)
@@ -229,7 +229,7 @@
     ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst clrrdi res res n-fixnum-tag-bits)))
-
+
 ;;;; Fdefinition (fdefn) objects.
 
 (define-vop (fdefn-fun cell-ref)
@@ -285,7 +285,7 @@
     (move result fdefn)))
 
 
-
+
 ;;;; Binding and Unbinding.
 
 ;;; BIND -- Establish VAL as a binding for SYMBOL.  Save the old value and
@@ -416,7 +416,7 @@
       (emit-label done))))
 
 
-
+
 ;;;; Closure indexing.
 
 (define-vop (closure-index-ref word-index-ref)
@@ -450,7 +450,7 @@
   (:info offset)
   (:generator 4
     (storew cfp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
-
+
 ;;;; Value Cell hackery.
 
 (define-vop (value-cell-ref cell-ref)
@@ -460,7 +460,7 @@
   (:variant value-cell-value-slot other-pointer-lowtag))
 
 
-
+
 ;;;; Instance hackery:
 
 (define-vop (instance-length)
@@ -492,7 +492,7 @@
   (:variant instance-slots-offset instance-pointer-lowtag)
   (:arg-types instance tagged-num * *))
 
-
+
 ;;;; Code object frobbing.
 
 (define-vop (code-header-ref word-index-ref)
@@ -506,7 +506,7 @@
   (:variant 0 other-pointer-lowtag))
 
 
-
+
 ;;;; raw instance slot accessors
 
 (defun offset-for-raw-slot (index &optional (displacement 0))

@@ -14,7 +14,7 @@
 (in-package "SB-KERNEL")
 
 (!begin-collecting-cold-init-forms)
-
+
 ;;;; the CLASSOID structure
 
 ;;; The CLASSOID structure is a supertype of all classoid types.
@@ -32,7 +32,7 @@
   (declare (ignore env))
   `(find-classoid ',(classoid-name self)))
 
-
+
 ;;;; basic LAYOUT stuff
 
 ;;; a vector of conses, initialized by genesis
@@ -81,7 +81,7 @@
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun layout-proper-name (layout)
     (classoid-proper-name (layout-classoid layout))))
-
+
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
 (defun random-layout-clos-hash ()
@@ -97,7 +97,7 @@
   ;; Method Dispatch in PCL", 1990.  -- CSR, 2005-11-30
   (1+ (random (1- layout-clos-hash-limit)
               *layout-clos-hash-random-state*)))
-
+
 ;;; If we can't find any existing layout, then we create a new one
 ;;; storing it in *FORWARD-REFERENCED-LAYOUTS*. In classic CMU CL, we
 ;;; used to immediately check for compatibility, but for
@@ -434,7 +434,7 @@ between the ~A definition and the ~A definition"
         (when (eql (svref inherits i) 0)
           (setf (svref inherits i) (svref inherits (1+ i)))))
       inherits)))
-
+
 ;;;; class precedence lists
 
 ;;; Topologically sort the list of objects to meet a set of ordering
@@ -503,7 +503,7 @@ between the ~A definition and the ~A definition"
                      (return (first intersection)))))))
       (note-class class)
       (topological-sort classes constraints #'std-cpl-tie-breaker))))
-
+
 ;;;; object types to represent classes
 
 ;;; BUILT-IN-CLASS is used to represent the standard classes that
@@ -520,7 +520,7 @@ between the ~A definition and the ~A definition"
                                     (hash-value name))))
 (defun make-structure-classoid (&key name)
   (%make-structure-classoid (interned-type-hash name) name))
-
+
 ;;;; classoid namespace
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -656,7 +656,7 @@ between the ~A definition and the ~A definition"
     (if (and name (eq (find-classoid name nil) classoid))
         name
         classoid)))
-
+
 ;;;; CLASS type operations
 
 ;; CLASSOID-ENUMERABLE-P is referenced during compile by !DEFINE-TYPE-CLASS.
@@ -851,7 +851,7 @@ between the ~A definition and the ~A definition"
 
 (define-type-method (classoid :unparse) (type)
   (classoid-proper-name type))
-
+
 ;;;; built-in classes
 
 ;;; The BUILT-IN-CLASSES list is a data structure which configures the
@@ -1201,7 +1201,7 @@ between the ~A definition and the ~A definition"
   (dolist (x +!built-in-classes+)
     (destructuring-bind (name &key (state :sealed) &allow-other-keys) x
       (setf (classoid-state (find-classoid name)) state))))
-
+
 ;;;; class definition/redefinition
 
 ;;; This is to be called whenever we are altering a class.
@@ -1234,7 +1234,7 @@ between the ~A definition and the ~A definition"
         (when subs
           (remhash classoid subs)))))
   (values))
-
+
 ;;;; cold loading initializations
 
 ;;; FIXME: It would be good to arrange for this to be called when the

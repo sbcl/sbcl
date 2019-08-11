@@ -260,7 +260,7 @@
 
 (defmethod (setf documentation) (new-value (x symbol) (doc-type (eql 'setf)))
   (setf (%doc-info x 'setf) new-value))
-
+
 ;;; method combinations
 (defmethod documentation ((x method-combination) (doc-type (eql 't)))
   (slot-value x '%documentation))
@@ -283,7 +283,7 @@
 (defmethod (setf documentation)
     (new-value (x symbol) (doc-type (eql 'method-combination)))
   (setf (random-documentation x 'method-combination) new-value))
-
+
 ;;; methods
 (defmethod documentation ((x standard-method) (doc-type (eql 't)))
   (slot-value x '%documentation))
@@ -291,7 +291,7 @@
 (defmethod (setf documentation)
     (new-value (x standard-method) (doc-type (eql 't)))
   (setf (slot-value x '%documentation) new-value))
-
+
 ;;; types, classes, and structure names
 
 (macrolet
@@ -349,7 +349,7 @@
   (define-type-documentation-lookup-methods type)
   (define-type-documentation-lookup-methods structure))
 
-
+
 ;;; variables
 (defmethod documentation ((x symbol) (doc-type (eql 'variable)))
   (values (info :variable :documentation x)))
@@ -368,7 +368,7 @@
     (new-value (slotd standard-slot-definition) (doc-type (eql 't)))
   (declare (ignore doc-type))
   (setf (slot-value slotd '%documentation) new-value))
-
+
 ;;; Now that we have created the machinery for setting documentation, we can
 ;;; set the documentation for the machinery for setting documentation.
 (setf (documentation 'documentation 'function)

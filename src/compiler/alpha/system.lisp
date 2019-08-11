@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; type frobbing VOPs
 
 (define-vop (widetag-of)
@@ -123,7 +123,7 @@
     (inst sll ptr 35 res)
     (inst srl res 33 res)))
 
-
+
 ;;;; allocation
 
 (define-vop (dynamic-space-free-pointer)
@@ -150,7 +150,7 @@
   (:generator 1
     (move csp-tn int)))
 
-
+
 ;;;; code object frobbing
 
 (define-vop (code-instructions)
@@ -178,7 +178,7 @@
     (inst addq ndescr offset ndescr)
     (inst subq ndescr (- other-pointer-lowtag fun-pointer-lowtag) ndescr)
     (inst addq code ndescr func)))
-
+
 ;;;; other random VOPs.
 
 (defknown sb-unix::receive-pending-interrupt () (values))
@@ -196,7 +196,7 @@
 (define-vop (istream-memory-barrier)
   (:generator 1
     (inst imb)))
-
+
 ;;;; dynamic vop count collection support
 
 (define-vop (count-me)

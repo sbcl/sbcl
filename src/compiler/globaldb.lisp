@@ -40,7 +40,7 @@
     (format stream "~S ~S, ~D" (meta-info-category x) (meta-info-kind x)
             (meta-info-number x))))
 
-
+
 ;;; Why do we suppress the :COMPILE-TOPLEVEL situation here when we're
 ;;; running the cross-compiler? The cross-compiler (which was built
 ;;; from these sources) has its version of these data and functions
@@ -90,7 +90,7 @@
             :category category :kind kind :type-spec type-spec
             :type-checker checker :validate-function validator
             :default default :number id)))))
-
+
 ;;;; info types, and type numbers, part II: what's
 ;;;; needed only at compile time, not at run time
 
@@ -130,7 +130,7 @@
                 #+sb-xc (meta-info-number (meta-info category kind)))))
 ;; It's an external symbol of SB-INT so wouldn't be removed automatically
 (push '("SB-INT" define-info-type) *!removable-symbols*)
-
+
 
 (macrolet ((meta-info-or-lose (category kind)
              ;; don't need to type-check META-INFO's result, since it
@@ -249,7 +249,7 @@
       (when hookp
         (funcall (truly-the function (cdr hook)) name info-number answer nil))
       (values answer nil))))
-
+
 ;;;; ":FUNCTION" subsection - Data pertaining to globally known functions.
 (define-info-type (:function :definition) :type-spec #-sb-xc-host (or fdefn null) #+sb-xc-host t)
 
@@ -369,7 +369,7 @@
 ;;;   (AND (SATISFIES UNINTERESTING-METHOD-REDEFINITION-P) RATIONAL)
 ;;; is *empty-type*, which in turn avoids type cache pollution.
 (define-info-type (:function :predicate-truth-constraint) :type-spec t)
-
+
 ;;;; ":VARIABLE" subsection - Data pertaining to globally known variables.
 
 ;;; the kind of variable-like thing described

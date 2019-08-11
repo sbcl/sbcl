@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-DEBUG")
-
+
 ;;;; variables and constants
 
 ;;; things to consider when tweaking these values:
@@ -145,7 +145,7 @@ Other commands:
     Discard all pending input on *STANDARD-INPUT*. (This can be
     useful when the debugger was invoked to handle an error in
     deeply nested input syntax, and now the reader is confused.)")
-
+
 (defmacro with-debug-io-syntax (() &body body)
   (let ((thunk (sb-xc:gensym "THUNK")))
     `(dx-flet ((,thunk ()
@@ -166,7 +166,7 @@ Other commands:
               (t
                loc)))
       loc))
-
+
 ;;;; BACKTRACE
 
 (declaim (unsigned-byte *backtrace-frame-count*))
@@ -469,7 +469,7 @@ information."
                   (let ((thread (sb-thread::avlnode-data it)))
                     (when (< a (sb-thread::thread-stack-end thread))
                       thread))))))))
-
+
 ;;;; frame printing
 
 (eval-when (:compile-toplevel :execute)
@@ -767,7 +767,7 @@ the current thread are replaced with dummy objects which can safely escape."
               (format stream "~&   no source available for frame")))
           (error (c)
             (format stream "~&   error printing frame source: ~A" c)))))))
-
+
 ;;;; INVOKE-DEBUGGER
 
 (defvar *debugger-hook* nil
@@ -1169,7 +1169,7 @@ and LDB (the low-level debugger).  See also ENABLE-DEBUGGER."
       (clear-input *debug-io*))
     (let ((*suppress-frame-print* (typep *debug-condition* 'step-condition)))
       (funcall *debug-loop-fun*))))
-
+
 ;;;; DEBUG-LOOP
 
 ;;; Note: This defaulted to T in CMU CL. The changed default in SBCL
@@ -1266,7 +1266,7 @@ forms that explicitly control this kind of evaluation.")
       (fresh-line *debug-io*)
       (prin1 value *debug-io*)))
   (force-output *debug-io*))
-
+
 ;;;; debug loop functions
 
 ;;; These commands are functions, not really commands, so that users
@@ -1441,7 +1441,7 @@ forms that explicitly control this kind of evaluation.")
           (debug-var-value var *current-frame*)
           (error "invalid argument value"))
         var)))
-
+
 ;;;; machinery for definition of debug loop commands
 
 (define-load-time-global *debug-commands* nil)
@@ -1530,7 +1530,7 @@ forms that explicitly control this kind of evaluation.")
             (push (cons name restart-fun) commands))))
     (incf num))
   commands))
-
+
 ;;;; frame-changing commands
 
 (!def-debug-command "UP" ()
@@ -1581,7 +1581,7 @@ forms that explicitly control this kind of evaluation.")
   (print-frame-call *current-frame* *debug-io*))
 
 (!def-debug-command-alias "F" "FRAME")
-
+
 ;;;; commands for entering and leaving the debugger
 
 (!def-debug-command "TOPLEVEL" ()
@@ -1614,7 +1614,7 @@ forms that explicitly control this kind of evaluation.")
       (if restart
           (invoke-restart-interactively restart)
           (princ "There is no such restart." *debug-io*)))))
-
+
 ;;;; information commands
 
 (!def-debug-command "HELP" ()
@@ -1700,7 +1700,7 @@ forms that explicitly control this kind of evaluation.")
   (print (code-location-source-form (frame-code-location *current-frame*)
                                     (read-if-available 0))
          *debug-io*))
-
+
 ;;;; source location printing
 
 (defun code-location-source-form (location context &optional (errorp t))
@@ -1717,7 +1717,7 @@ forms that explicitly control this kind of evaluation.")
              (funcall (if errorp #'error #'warn)
                       "~@<Bogus form-number: the source file has ~
                           probably changed too much to cope with.~:@>"))))))
-
+
 
 ;;; start single-stepping
 (!def-debug-command "START" ()
@@ -1919,7 +1919,7 @@ forms that explicitly control this kind of evaluation.")
   (debug-var-info-available
    (code-location-debug-fun
     (frame-code-location frame))))
-
+
 ;;;; debug loop command utilities
 
 (defun read-prompting-maybe (prompt)

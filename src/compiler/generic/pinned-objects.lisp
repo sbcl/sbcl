@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (defmacro with-pinned-objects ((&rest objects) &body body)
   #.(concatenate 'string
   "Arrange with the garbage collector that the pages occupied by

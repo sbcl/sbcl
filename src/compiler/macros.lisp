@@ -138,7 +138,7 @@
   (when (info :function :source-transform fun-name)
     (warn "Redefining source-transform for ~S" fun-name))
   (setf (info :function :source-transform fun-name) lambda))
-
+
 ;;;; lambda-list parsing utilities
 ;;;;
 ;;;; IR1 transforms, optimizers and type inferencers need to be able
@@ -215,7 +215,7 @@
                 (sort (intersection (mapcar #'car (binds)) (cdr all-dummies))
                       #'string<))))))
 ) ; EVAL-WHEN
-
+
 ;;;; DEFTRANSFORM
 
 ;;; Define an IR1 transformation for NAME. An IR1 transformation
@@ -352,7 +352,7 @@
                                  ,doc
                                  ,important
                                  policy))))))
-
+
 ;;; Create a function which parses combination args according to WHAT
 ;;; and LAMBDA-LIST, where WHAT is either a function name or a list
 ;;; (FUN-NAME KIND) and does some KIND of optimization.
@@ -413,7 +413,7 @@
                           (symbolicate "FUN-INFO-" (second what)))
                        (fun-info-or-lose ',(first what)))
                       #',name))))))
-
+
 ;;;; IR groveling macros
 
 ;;; Iterate over the blocks in a component, binding BLOCK-VAR to each
@@ -627,7 +627,7 @@
            (setf (component-last-block ,component)
                  ,old-last-block))))))
 
-
+
 ;;;; the EVENT statistics/trace utility
 
 ;;; FIXME: This seems to be useful for troubleshooting and
@@ -744,7 +744,7 @@
              (setf (event-info-count v) 0))
            *event-info*)
   (values))
-
+
 ;;;; functions on directly-linked lists (linked through specialized
 ;;;; NEXT operations)
 

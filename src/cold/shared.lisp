@@ -103,7 +103,7 @@
 ;;; SB-C:ASSEMBLE-FILE, to be used to translate assembly files into target
 ;;; object files
 (defvar *target-assemble-file*)
-
+
 ;;;; some tools
 
 ;;; Take the file named X and make it into a file named Y. Sorta like
@@ -173,7 +173,7 @@
             (satisfies unable-to-optimize-note-p)
             (satisfies optional+key-style-warning-p)
             sb-ext:code-deletion-note)))
-
+
 ;;;; special read-macros for building the cold system (and even for
 ;;;; building some of our tools for building the cold system)
 
@@ -307,7 +307,7 @@
   (when failed-test-descriptions
     (error "Feature compatibility check failed, ~S"
            failed-test-descriptions)))
-
+
 ;;;; cold-init-related PACKAGE and SYMBOL tools
 
 ;;; Once we're done with possibly ANSIfying the COMMON-LISP package,
@@ -320,7 +320,7 @@
 (when (member :sb-show sb-xc:*features*)
   (load "src/cold/snapshot.lisp")
   (setq *cl-snapshot* (take-snapshot "COMMON-LISP")))
-
+
 ;;;; master list of source files and their properties
 
 ;;; flags which can be used to describe properties of source files
@@ -470,7 +470,7 @@
           (error "found unexpected flag(s) in *STEMS-AND-FLAGS*: ~S"
                  set-difference)))))
   (cdr *stems-and-flags*))
-
+
 ;;;; tools to compile SBCL sources to create the cross-compiler
 
 ;;; a wrapper for compilation/assembly, used mostly to centralize
@@ -633,7 +633,7 @@
    (with-simple-restart (recompile "Reload")
      (return (load (stem-object-path stem flags :host-compile))))))
 (compile 'host-load-stem)
-
+
 ;;;; tools to compile SBCL sources to create object files which will
 ;;;; be used to create the target SBCL .core file
 

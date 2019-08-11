@@ -27,7 +27,7 @@
   (mio-demo))
 
 (mio-test)
-
+
 ;;; Some tests of bits of optimized MAKE-INSTANCE that were hopelessly
 ;;; wrong until Gerd's ctor MAKE-INSTANCE optimization was ported.
 (defvar *d-i-s-e-count* 0)
@@ -53,7 +53,7 @@
 (assert (= (class-allocation-reader) 3))
 (class-allocation-writer 4)
 (assert (= (class-allocation-reader) 4))
-
+
 ;;; from James Anderson via Gerd Moellmann: defining methods with
 ;;; specializers with forward-referenced superclasses used not to
 ;;; work.
@@ -76,7 +76,7 @@
 (defmethod method-on-unknown ((x unknown-type)) x)
 ;;; (we can't call it without defining methods on allocate-instance
 ;;; etc., but we should be able to define it).
-
+
 ;;; the ctor MAKE-INSTANCE optimizer used not to handle duplicate
 ;;; initargs...
 (defclass dinitargs-class1 ()
@@ -104,7 +104,7 @@
 (assert (slot-boundp (make-instance 'shared-to-local-initform-sub) 'redefined))
 (assert (eq 'orig-initform
             (slot-value (make-instance 'shared-to-local-initform-sub) 'redefined)))
-
+
 (defgeneric no-ignored-warnings (x y))
 (handler-case
     (eval '(defmethod no-ignored-warnings ((x t) (y t))
@@ -118,7 +118,7 @@
     (eval '(defmethod no-ignored-warnings ((x fixnum) (y t))
             (declare (ignore x)) (setq y 'foo)))
   (style-warning (c) (error c)))
-
+
 ;;; ctor optimization bugs:
 ;;;
 ;;; :DEFAULT-INITARGS not checked for validity
@@ -148,7 +148,7 @@
   (assert (= valid-initarg 1)))
 (make-instance 'default-initargs-with-method2)
 (assert (= *d-i-w-m-2* 1))
-
+
 ;;; from Axel Schairer on cmucl-imp 2004-08-05
 (defclass class-with-symbol-initarg ()
   ((slot :initarg slot)))
@@ -164,7 +164,7 @@
   (make-instance 'class-with-symbol-initarg slot arg))
 (assert (eql (slot-value (make-thing 1) 'slot) 1))
 (assert (eql (slot-value (make-other-thing 'slot 2) 'slot) 2))
-
+
 ;;; test that ctors can be used with the literal class
 (eval-when (:compile-toplevel)
   (defclass ctor-literal-class () ())
@@ -177,7 +177,7 @@
   (assert (typep (ctor-literal-class) 'ctor-literal-class)))
 (with-test (:name (:ctor :literal-class-quoted))
   (assert (typep (ctor-literal-class2) 'ctor-literal-class2)))
-
+
 ;;; test that call-next-method and eval-when doesn't cause an
 ;;; undumpable method object to arise in the effective source code.
 ;;; (from Sascha Wilde sbcl-devel 2007-07-15)

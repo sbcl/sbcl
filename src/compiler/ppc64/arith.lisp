@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Unary operations.
 
 (define-vop (fast-safe-arith-op)
@@ -49,7 +49,7 @@
   (:translate lognot)
   (:generator 2
     (inst not res x)))
-
+
 ;;;; Binary fixnum operations.
 
 ;;; Assume that any constant operand is the second arg...
@@ -459,7 +459,7 @@
   (:translate *)
   (:generator 3
     (inst mulli r x y)))
-
+
 ;;; Shifting
 
 (macrolet ((def (name sc-type type result-type cost)
@@ -608,7 +608,7 @@
   (:generator 2
     (inst popcntd temp arg)
     (inst slwi res arg n-fixnum-tag-bits)))
-
+
 ;;;; %LDB
 
 (defknown %%ldb (integer unsigned-byte unsigned-byte) unsigned-byte
@@ -675,7 +675,7 @@
           (mod (- (+ 32 n-fixnum-tag-bits) posn) 32)
           (- 32 size n-fixnum-tag-bits)
           (- 31 n-fixnum-tag-bits))))
-
+
 ;;;; Modular functions:
 
 ;;; FIXME: This should all be correctly ported to 64 bit
@@ -727,7 +727,7 @@
   (define-modular-backend logandc2)
   (define-modular-backend logorc1)
   (define-modular-backend logorc2))
-
+
 ;;;; Binary conditional VOPs:
 
 (define-vop (fast-conditional)
@@ -967,7 +967,7 @@
   (:arg-types * (:constant (signed-byte 11))) ; wtf is 11?
   (:variant-cost 6))
 
-
+
 ;;;; 64-bit logical operations
 
 (define-vop (shift-towards-someplace)
@@ -996,7 +996,7 @@
     (ecase *backend-byte-order*
       (:big-endian    (inst srd r num temp))
       (:little-endian (inst sld r num temp)))))
-
+
 ;;;; Bignum stuff.
 
 (define-vop (bignum-length get-header-data)
@@ -1254,7 +1254,7 @@
   (:translate sb-bignum:%ashl)
   (:generator 1
     (inst sld result digit count)))
-
+
 (in-package "SB-C")
 
 #+nil

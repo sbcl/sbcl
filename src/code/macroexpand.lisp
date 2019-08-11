@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; syntactic environment access
 
 (defun sb-xc:special-operator-p (symbol)

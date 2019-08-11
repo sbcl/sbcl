@@ -1,6 +1,6 @@
 (in-package "SB-VM")
 
-
+
 ;;;; Multiplication and Division helping routines.
 
 ;;; ?? FIXME: Where are generic-* and generic-/?
@@ -84,7 +84,7 @@
   (inst move dividend zero-tn :>=)
   (inst sub zero-tn rem rem))
 
-
+
 ;;;; Generic arithmetic.
 
 (define-assembly-routine (generic-+
@@ -181,7 +181,7 @@
   (inst bv lip)
   (move csp-tn cfp-tn t))
 
-
+
 ;;;; Comparison routines.
 
 (macrolet

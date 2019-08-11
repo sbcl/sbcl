@@ -15,7 +15,7 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "Alpha")
-
+
 (defconstant-eqx +fixup-kinds+
     #(:jmp-hint :bits-63-48 :bits-47-32 :ldah :lda :absolute32)
   #'equalp)
@@ -53,7 +53,7 @@
        (:absolute32
         (setf (sap-ref-32 sap offset) value))))
   nil))
-
+
 ;;;; "sigcontext" access functions, cut & pasted from x86-vm.lisp then
 ;;;; hacked for types.
 ;;;;
@@ -110,7 +110,7 @@
 (define-alien-routine ("os_context_fp_control" context-floating-point-modes)
     (unsigned 64) (context (* os-context-t)))
 
-
+
 (defun internal-error-args (context)
   (declare (type (alien (* os-context-t)) context))
   (let* ((pc (context-pc context))

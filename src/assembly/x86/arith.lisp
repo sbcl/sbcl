@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; addition, subtraction, and multiplication
 
 (macrolet ((define-generic-arith-routine ((fun cost) &body body)
@@ -110,7 +110,7 @@
     OKAY
     (move res eax)
     DONE))
-
+
 ;;;; negation
 
 (define-assembly-routine (generic-negate
@@ -145,7 +145,7 @@
   (storew ecx res bignum-digits-offset other-pointer-lowtag)
 
   OKAY)
-
+
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)
@@ -285,7 +285,7 @@
   (inst cmp x y)
   (inst pop ebp-tn))
 
-
+
 ;;; Support for the Mersenne Twister, MT19937, random number generator
 ;;; due to Matsumoto and Nishimura.
 ;;;

@@ -13,7 +13,7 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "X86-64")
-
+
 ;;;; :CODE-OBJECT fixups
 
 ;;; This gets called by LOAD to resolve newly positioned objects
@@ -74,7 +74,7 @@
        ;; but core relocation can't - it can't find all the call sites.
        (if (eq kind :relative) :relative))))
   nil) ; non-immobile-space builds never record code fixups
-
+
 #+(or darwin linux openbsd win32 sunos)
 (define-alien-routine ("os_context_float_register_addr" context-float-register-addr)
   (* unsigned) (context (* os-context-t)) (index int))
@@ -146,7 +146,7 @@
 
 (defun (setf floating-point-modes) (val) (%floating-point-modes-setter val))
 
-
+
 ;;;; INTERNAL-ERROR-ARGS
 
 ;;; Given a (POSIX) signal context, extract the internal error
@@ -160,7 +160,7 @@
         (values #.(error-number-or-lose 'invalid-arg-count-error)
                 '(#.arg-count-sc))
         (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number))))
-
+
 
 #+immobile-code
 (progn

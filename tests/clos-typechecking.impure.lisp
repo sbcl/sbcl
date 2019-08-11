@@ -21,7 +21,7 @@
 
 (defvar *t* t)
 (defvar *one* 1)
-
+
 ;;;; Slot type checking for standard instances
 
 (defclass foo ()
@@ -115,7 +115,7 @@
   (checked-compile-and-assert (:optimize :maximally-safe)
       '(lambda () (make-instance 'foo :slot *t*))
     (() (condition 'type-error))))
-
+
 ;;;; Slot type checking for funcallable instances
 
 (defclass foo/gf (sb-mop:standard-generic-function)
@@ -205,7 +205,7 @@
   (checked-compile-and-assert (:optimize :maximally-safe)
       '(lambda () (make-instance 'foo/gf :slot/gf *t*))
     (() (condition 'type-error))))
-
+
 ;;;; Type checking for inherited slots
 
 (defclass inheritance-a/slot-value/float ()

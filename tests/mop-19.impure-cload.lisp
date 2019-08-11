@@ -48,7 +48,7 @@
     (assert (eq (class-of method) (find-class 'my-reader))))
   (let ((method (find-method #'b nil (list (find-class t) (find-class 'foo)))))
     (assert (eq (class-of method) (find-class 'my-writer)))))
-
+
 (defclass my-other-class (my-class) ())
 (defmethod sb-mop:validate-superclass ((a my-other-class) (b standard-class)) t)
 

@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; hacking the Unix environment
 ;;;;
 ;;;; In the original CMU CL code that LOAD-FOREIGN is derived from, the
@@ -102,7 +102,7 @@
        (declare (type keyword key) (string val))
        (concatenate 'simple-string (symbol-name key) "=" val)))
    cmucl))
-
+
 #-win32
 (define-alien-routine ("waitpid" c-waitpid) int
   (pid int)
@@ -150,7 +150,7 @@
 #-win32
 (define-alien-routine wifstopped boolean
   (status int))
-
+
 ;;;; process control stuff
 (define-load-time-global *active-processes* nil
   "List of process structures for all active processes.")
@@ -401,7 +401,7 @@ status slot."
     (dolist (proc changed)
       (let ((hook (process-status-hook proc)))
         (funcall hook proc)))))
-
+
 ;;;; RUN-PROGRAM and close friends
 
 ;;; list of file descriptors to close when RUN-PROGRAM exits due to an error
@@ -1071,7 +1071,7 @@ Users Manual for details about the PROCESS structure.
   #+win32 (or (sb-ext:posix-getenv "TEMP")
               "C:/Temp"))
 
-
+
 ;;; Find a file descriptor to use for object given the direction.
 ;;; Returns the descriptor. If object is :STREAM, returns the created
 ;;; stream as the second value.

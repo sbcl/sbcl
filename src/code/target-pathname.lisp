@@ -228,7 +228,7 @@
                                            escape-char :escape-dot t))))
       (apply #'concatenate 'simple-string (strings)))))
 
-
+
 ;;; To be initialized in unix/win32-pathname.lisp
 (define-load-time-global *physical-host* nil)
 
@@ -237,7 +237,7 @@
 ;;; initialized (at which time we can't safely call e.g. #'PATHNAME).
 (defun make-trivial-default-pathname ()
   (%%make-pathname *physical-host* nil nil nil nil :newest))
-
+
 ;;; pathname methods
 
 ;;; SXHASH does a really poor job on pathname directory, especially if in your
@@ -273,7 +273,7 @@
 
 (defmethod make-load-form ((pathname pathname) &optional environment)
   (make-load-form-saving-slots pathname :environment environment))
-
+
 ;;; A pathname is logical if the host component is a logical host.
 ;;; This constructor is used to make an instance of the correct type
 ;;; from parsed arguments.
@@ -299,7 +299,7 @@
 ;;; physical pathname translation.
 (define-load-time-global *logical-hosts*
     (make-hash-table :test 'equal :synchronized t))
-
+
 ;;;; patterns
 
 (defmethod make-load-form ((pattern pattern) &optional environment)
@@ -448,7 +448,7 @@
          (and (consp that)
               (compare-component (car this) (car that))
               (compare-component (cdr this) (cdr that)))))))
-
+
 ;;;; pathname functions
 
 (defun pathname= (pathname1 pathname2)
@@ -917,7 +917,7 @@ a host-structure or string."
   "Return PATHNAME's version."
   (with-pathname (pathname pathname)
     (%pathname-version pathname)))
-
+
 ;;;; namestrings
 
 ;;; Handle the case for PARSE-NAMESTRING parsing a potentially
@@ -1230,7 +1230,7 @@ relative to DEFAULTS."
       (let ((host (pathname-host-or-no-namestring pathname)))
         (with-pathname (defaults defaults)
           (funcall (host-unparse-enough host) pathname defaults))))))
-
+
 ;;;; wild pathnames
 
 (defun wild-pathname-p (pathname &optional field-key)
@@ -1493,7 +1493,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                        (%pathname-version source)
                        (%pathname-version to))
                    (frob %pathname-version)))))))))
-
+
 ;;;;  logical pathname support. ANSI 92-102 specification.
 ;;;;
 ;;;;  As logical-pathname translations are loaded they are
@@ -1580,7 +1580,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                (new (make-logical-host :name name)))
           (setf (gethash name *logical-hosts*) new)
           new))))
-
+
 ;;;; logical pathname parsing
 
 ;;; Deal with multi-char wildcards in a logical pathname token.
@@ -1760,7 +1760,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                     (%pathname-host *logical-pathname-defaults*))
             (oops "no host specified"))
           res))))
-
+
 ;;;; logical pathname unparsing
 
 (defun unparse-logical-directory (pathname)
@@ -1868,7 +1868,7 @@ unspecified elements into a completed to-pathname based on the to-wildname."
                (logical-host-name (%pathname-host pathname)) ":"
                (unparse-logical-directory pathname)
                (unparse-logical-file pathname)))
-
+
 ;;;; logical pathname translations
 
 ;;; Verify that the list of translations consists of lists and prepare

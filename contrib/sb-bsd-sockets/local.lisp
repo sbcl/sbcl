@@ -1,6 +1,6 @@
 (in-package :sb-bsd-sockets)
 
-
+
 ;;;; Local domain sockets
 
 (defclass local-socket (socket)
@@ -36,7 +36,7 @@ also known as unix-domain sockets."))
   (let ((name (sockint::sockaddr-un-path sockaddr)))
     (unless (zerop (length name)) name)))
 
-
+
 ;;;; Local domain sockets in the abstract namespace
 
 (defclass local-abstract-socket (local-socket) ()

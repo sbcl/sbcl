@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;; #+SB-ASSEMBLING as we don't need VOPS, just the asm routines:
 ;;; these are out-of-line versions called by VOPs.
 (fmakunbound 'define-per-register-allocation-routines)

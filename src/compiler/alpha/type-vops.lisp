@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 (defun %test-fixnum (value temp target not-p)
   (assemble ()
     (inst and value fixnum-tag-mask temp)
@@ -164,7 +164,7 @@
             (inst blt temp target)
             (inst bge temp target))))
     NOT-TARGET))
-
+
 ;;;; List/symbol types:
 ;;;
 ;;; symbolp (or symbol (eq nil))

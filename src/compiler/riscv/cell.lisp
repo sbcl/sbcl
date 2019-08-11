@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Data object ref/set stuff.
 
 (define-vop (slot)
@@ -281,7 +281,7 @@
 
 (define-full-setter code-header-set * 0 other-pointer-lowtag
   (descriptor-reg any-reg) * code-header-set)
-
+
 ;;;; raw instance slot accessors
 
 (macrolet ((define-raw-slot-word-vops (name value-sc value-primtype)

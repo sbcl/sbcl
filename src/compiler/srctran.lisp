@@ -63,7 +63,7 @@
      (t
       (give-up-ir1-transform
        "The function doesn't have a fixed argument count.")))))
-
+
 ;;;; list hackery
 
 ;;; Translate CxR into CAR/CDR combos.
@@ -298,7 +298,7 @@
                    'l
                    `(cdr ,(frob (1- n))))))
       `(car ,(frob n)))))
-
+
 ;;;; arithmetic and numerology
 
 (define-source-transform plusp (x) `(sb-xc:> ,x 0))
@@ -390,7 +390,7 @@
     `(if (ratiop ,n-num)
          (%denominator ,n-num)
          1)))
-
+
 ;;;; interval arithmetic for computing bounds
 ;;;;
 ;;;; This is a set of routines for operating on intervals. It
@@ -1114,7 +1114,7 @@
 (defun interval-sqr (x)
   (declare (type interval x))
   (interval-func (lambda (x) (* x x)) (interval-abs x)))
-
+
 ;;;; numeric DERIVE-TYPE methods
 
 ;;; a utility for defining derive-type methods of integer operations. If
@@ -1345,7 +1345,7 @@
                       (first results)))))))
     (derive (lvar-type arg1) (lvar-type arg2)
             (same-leaf-ref-p arg1 arg2))))
-
+
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
 (defoptimizer (+ derive-type) ((x y))
@@ -2111,7 +2111,7 @@
 (floor-rem-bound (make-interval :low '(-20.3) :high 10.3))
 => #S(INTERVAL :LOW (-20.3) :HIGH (20.3))
 |#
-
+
 ;;; same functions for CEILING
 (defun ceiling-quotient-bound (quot)
   ;; Take the ceiling of the quotient and then massage it into what we
@@ -2208,7 +2208,7 @@
 (ceiling-rem-bound (make-interval :low '(-20.3) :high 10.3))
 => #S(INTERVAL :LOW (-20.3) :HIGH (20.3))
 |#
-
+
 (defun truncate-quotient-bound (quot)
   ;; For positive quotients, truncate is exactly like floor. For
   ;; negative quotients, truncate is exactly like ceiling. Otherwise,
@@ -2400,7 +2400,7 @@
 (defoptimizer (random derive-type) ((bound &optional state))
   (declare (ignore state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
-
+
 ;;;; miscellaneous derive-type methods
 
 (defoptimizer (integer-length derive-type) ((x))
@@ -2545,7 +2545,7 @@
 
 (defoptimizer (signum derive-type) ((num))
   (one-arg-derive-type num #'signum-derive-type-aux nil))
-
+
 ;;;; byte operations
 ;;;;
 ;;;; We try to turn byte operations into simple logical operations.
@@ -2713,7 +2713,7 @@
               (specifier-type `(signed-byte ,size-high))
               *universal-type*))
         *universal-type*)))
-
+
 ;;; Rightward ASH
 
 ;;; Assert correctness of build order. (Need not be exhaustive)
@@ -2833,7 +2833,7 @@
     `(ash 1 ,(if (= base 2)
                  `power
                  `(* power ,(1- (integer-length base)))))))
-
+
 ;;; Modular functions
 
 ;;; (ldb (byte s 0) (foo                 x  y ...)) =
@@ -3130,7 +3130,7 @@
                 (declare (ignore xact yact))
                 nil) ; After fixing above, replace with T
               )))))))
-
+
 ;;; Handle the case of a constant BOOLE-CODE.
 (deftransform boole ((op x y) * *)
   "convert to inline logical operations"
@@ -3157,7 +3157,7 @@
       (t
        (abort-ir1-transform "~S is an illegal control arg to BOOLE."
                             control)))))
-
+
 ;;;; converting special case multiply/divide to shifts
 
 ;;; If arg is a constant power of two, turn * into a shift.
@@ -3393,7 +3393,7 @@
             (rem (ldb (byte #.sb-vm:n-word-bits 0)
                       (- x (* quot ,y)))))
        (values quot rem))))
-
+
 ;;;; arithmetic and logical identity operation elimination
 
 ;;; Flush calls to various arith functions that convert to the
@@ -3650,7 +3650,7 @@
   (def ffloor t)
   (def fceiling t))
 
-
+
 ;;;; character operations
 
 (deftransform two-arg-char-equal ((a b) (base-char base-char) *
@@ -3703,7 +3703,7 @@
                   (< n-code 223)))
          (code-char (logxor #x20 n-code))
          x)))
-
+
 ;;;; equality predicate transforms
 
 ;;; If X and Y are the same leaf, then the result is true. Otherwise,
@@ -4078,7 +4078,7 @@
 
 (deftransform char> ((x y) (character character) *)
   (ir1-transform-char< y x x y 'char<))
-
+
 ;;;; converting N-arg comparisons
 ;;;;
 ;;;; We convert calls to N-arg comparison functions such as < into
@@ -4240,7 +4240,7 @@
 (deftransform = ((x y) (integer (constant-arg ratio)))
   "constant-fold INTEGER to RATIO comparison"
   nil)
-
+
 ;;;; converting N-arg arithmetic functions
 ;;;;
 ;;;; N-arg arithmetic and logic functions are associated into two-arg
@@ -4360,7 +4360,7 @@
   (source-transform-intransitive '- '+ args '(%negate)))
 (define-source-transform / (&rest args)
   (source-transform-intransitive '/ '* args '(/ 1)))
-
+
 ;;;; transforming APPLY
 
 ;;; We convert APPLY into MULTIPLE-VALUE-CALL so that the compiler
@@ -4538,7 +4538,7 @@
   (if (rest-var-more-context-ok list)
       `(not (eql 0 count))
       `list))
-
+
 ;;;; transforming FORMAT
 ;;;;
 ;;;; If the control string is a compile-time constant, then replace it
@@ -5025,7 +5025,7 @@
            `(sb-impl::stable-sort-vector sequence
                                          (%coerce-callable-to-fun predicate)
                                          (and key (%coerce-callable-to-fun key)))))))
-
+
 ;;;; debuggers' little helpers
 
 ;;; for debugging when transforms are behaving mysteriously,
@@ -5055,7 +5055,7 @@
     (give-up-ir1-transform "not a real transform"))
   (defun /report-lvar (x message)
     (declare (ignore x message))))
-
+
 ;;; Can fold only when time-zone is supplied.
 (defoptimizer (encode-universal-time optimizer)
     (#1=(second minute hour date month year time-zone) node)
@@ -5090,7 +5090,7 @@
   #-64-bit `(truly-the (and fixnum unsigned-byte)
              (ash (sb-vm::%symbol-tls-index ,sym) sb-vm:n-fixnum-tag-bits)))
 
-
+
 (deftransform make-string-output-stream ((&key element-type))
   (case (cond ((not element-type) #+sb-unicode 'character #-sb-unicode 'base-char)
               ((not (constant-lvar-p element-type)) nil)

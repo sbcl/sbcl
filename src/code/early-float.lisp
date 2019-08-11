@@ -14,7 +14,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; utilities
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -47,7 +47,7 @@
                    (ldb (byte 32 0) sig)))
 
 ) ; EVAL-WHEN
-
+
 ;;;; float parameters
 (defconstant sb-xc:most-positive-single-float #.sb-xc:most-positive-single-float)
 (defconstant sb-xc:most-negative-single-float #.sb-xc:most-negative-single-float)

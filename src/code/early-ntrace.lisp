@@ -20,7 +20,7 @@
 
 (defvar *trace-encapsulate-default* t
   "the default value for the :ENCAPSULATE option to TRACE")
-
+
 ;;;; internal state
 
 ;;; a hash table that maps each traced function to the TRACE-INFO. The

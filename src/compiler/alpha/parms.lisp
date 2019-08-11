@@ -103,7 +103,7 @@
 ); eval-when
 
 
-
+
 ;;;; Description of the target address space.
 
 ;;; Where to put the different spaces.
@@ -132,7 +132,7 @@
 ;;; the X86 port defines *nil-value* as (+ *target-static-space-start* #xB)
 ;;; here, but it seems to be the only port that needs to know the
 ;;; location of NIL from lisp.
-
+
 ;;;; other miscellaneous constants
 
 (defenum (:start 8)
@@ -148,7 +148,7 @@
   single-step-around-trap
   single-step-before-trap
   error-trap)
-
+
 ;;;; static symbols
 
 ;;; These symbols are loaded into static space directly after NIL so

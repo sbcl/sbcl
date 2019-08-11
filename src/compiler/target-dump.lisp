@@ -32,7 +32,7 @@
           (sub-dump-object (subseq vector start end) file)))
     (dump-fop 'fop-array file rank)
     (eq-save-object array file)))
-
+
 #+(and long-float x86)
 (defun dump-long-float (float file)
   (declare (long-float float))

@@ -75,7 +75,7 @@
   (assert (equal (bug225 (make-string-output-stream))
                  '(sb-impl::string-output-stream string-stream stream))))
 
-
+
 ;;; improper buffering on (SIGNED-BYTE 8) streams (fixed by David Lichteblau):
 (with-test (:name (write-byte (unsigned-byte 8) read-byte (signed-byte 8)))
   (let ((p (scratch-file-name)))
@@ -87,7 +87,7 @@
     (with-open-file (s p :element-type '(signed-byte 8))
       (assert (= (read-byte s) -1)))
     (delete-file p)))
-
+
 ;;; :IF-EXISTS got :ERROR and NIL the wrong way round (reported by
 ;;; Milan Zamazal)
 (with-test (:name (open :if-exists :error))
@@ -98,7 +98,7 @@
      (with-open-file (s p :direction :output :if-exists :error)))
     (close stream)
     (delete-file p)))
-
+
 (with-test (:name (read-byte make-string-input-stream type-error))
   (assert-error (read-byte (make-string-input-stream "abc"))
                 type-error))
@@ -124,7 +124,7 @@
             (want "THESE INSERTMBOLS"))
         (assert (equal line want))))
     (delete-file p)))
-
+
 ;;; :DIRECTION :IO didn't work on non-existent pathnames
 (with-test (:name (with-open-file :direction :io :non-existent-pathname))
   (let ((p (scratch-file-name)))
@@ -135,7 +135,7 @@
       (file-position s :start)
       (assert (char= (read-char s) #\1)))
     (delete-file p)))
-
+
 ;;; FILE-POSITION on broadcast-streams is mostly uncontroversial
 (with-test (:name (file-position broadcast-stream 1))
   (assert (= 0 (file-position (make-broadcast-stream))))
@@ -217,7 +217,7 @@
 (with-test (:name (:element-type signed-byte write-byte write-byte))
   (loop for size from 2 to 40 do
            (bin-stream-test :size size :type 'signed-byte)))
-
+
 ;;; Check READ-SEQUENCE signals a TYPE-ERROR when the sequence can't
 ;;; contain a stream element.
 ;;;
@@ -341,7 +341,7 @@
             (assert (subtypep (type-error-expected-type condition)
                               '(signed-byte 8)))))))
     (delete-file pathname)))
-
+
 ;;; Check WRITE-SEQUENCE signals a TYPE-ERROR when the stream can't
 ;;; write a sequence element.
 ;;;
@@ -630,7 +630,7 @@
       (file-position f :start)
       (assert (equal "still open" (read-line f)))))
   (assert (not (probe-file "delete-file-on-stream-test.tmp"))))
-
+
 ;;; READ-CHAR-NO-HANG on bivalent streams (as returned by RUN-PROGRAM)
 ;;; was wrong.  CSR managed to promote the wrongness to all streams in
 ;;; the 1.0.32.x series, breaking slime instantly.

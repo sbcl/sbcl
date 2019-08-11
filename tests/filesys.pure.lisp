@@ -105,7 +105,7 @@
              (assert (equal (directory* "" :name :wild :type :wild)
                             expected-wild))))
       (delete-directory test-directory :recursive t))))
-
+
 ;;;; OPEN
 
 ;;; In sbcl-0.6.9 FOO-NAMESTRING functions  returned "" instead of NIL.
@@ -336,7 +336,7 @@
   (let ((pathname (parse-native-namestring "foo/bar//baz")))
     (assert (string= (car (last (pathname-directory pathname))) "bar"))))
 
-
+
 ;;;; DELETE-DIRECTORY
 
 (with-test (:name (delete-directory :as-file :complicated-name-or-type :bug-1740624))

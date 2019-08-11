@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; allocation helpers
 
 ;;; Most allocation is done by inline code with sometimes help
@@ -263,7 +263,7 @@
 
 (define-vop (list* list-or-list*)
   (:variant t))
-
+
 ;;;; special-purpose inline allocators
 
 ;;; Special variant of 'storew' which might have a shorter encoding
@@ -494,7 +494,7 @@
          (inst jmp :ne loop))
         (storew nil-value tail cons-cdr-slot list-pointer-lowtag))
       done)))
-
+
 #-immobile-space
 (define-vop (make-fdefn)
   (:policy :fast-safe)
@@ -544,7 +544,7 @@
   (:generator 10
     (alloc-other result value-cell-widetag value-cell-size node stack-allocate-p)
     (storew value result value-cell-value-slot other-pointer-lowtag)))
-
+
 ;;;; automatic allocators for primitive objects
 
 (define-vop (make-unbound-marker)

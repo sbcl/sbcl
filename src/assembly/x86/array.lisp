@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Note: On other platforms ALLOCATE-VECTOR is an assembly routine,
 ;;;; but on X86 it is a VOP.
 

@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; special forms for control
 
 (def-ir1-translator progn ((&rest forms) start next result)
@@ -84,7 +84,7 @@ otherwise evaluate ELSE and return its values. ELSE defaults to NIL."
                    (or (sub (car forms))
                        (somesub (cdr forms))))))
         (sub form))))
-
+
 ;;;; BLOCK and TAGBODY
 
 ;;;; We make an ENTRY node to mark the start and a :ENTRY cleanup to
@@ -251,7 +251,7 @@ constrained to be used only within the dynamic extent of the TAGBODY."
       (when home-lambda
         (sset-adjoin entry (lambda-calls-or-closes home-lambda))))
     (use-ctran exit (second found))))
-
+
 ;;;; translators for compiler-magic special forms
 
 ;;; This handles EVAL-WHEN in non-top-level forms. (EVAL-WHENs in top
@@ -406,7 +406,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
    (lambda (&optional vars)
      (ir1-translate-locally body start next result :vars vars))
    :compile))
-
+
 ;;;; %PRIMITIVE
 ;;;;
 ;;;; Uses of %PRIMITIVE are either expanded into Lisp code or turned
@@ -469,7 +469,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
                                   (subseq args required min))
                                ,@(subseq args 0 required)
                                ,@(subseq args min)))))
-
+
 ;;;; QUOTE
 
 (def-ir1-translator quote ((thing) start next result)
@@ -477,7 +477,7 @@ body, references to a NAME will effectively be replaced with the EXPANSION."
 
 Return VALUE without evaluating it."
   (reference-constant start next result thing))
-
+
 ;;; We now have a switch to decide whether relative pathnames
 ;;; can be stored in fasl files as their source name.
 ;;; Regardless of what ANSI says must be bound to *fooNAME* specials,
@@ -663,7 +663,7 @@ be a lambda expression."
                 (source-variable-or-else lvar "callable expression")))
               (t
                `(,coercer ,lvar-name))))))
-
+
 ;;;; FUNCALL
 (def-ir1-translator %funcall ((function &rest args) start next result)
   ;; MACROEXPAND so that (LAMBDA ...) forms arriving here don't get an
@@ -702,7 +702,7 @@ be a lambda expression."
 (define-source-transform %coerce-callable-to-fun (thing)
   (ensure-source-fun-form thing :give-up t))
 
-
+
 ;;;; LET and LET*
 ;;;;
 ;;;; (LET and LET* can't be implemented as macros due to the fact that
@@ -813,7 +813,7 @@ Sequentially evaluate the FORMS in a lexical environment where the
 DECLARATIONS have effect. If LOCALLY is a top level form, then the FORMS are
 also processed as top level forms."
   (ir1-translate-locally body start next result))
-
+
 ;;;; FLET and LABELS
 
 ;;; Given a list of local function specifications in the style of
@@ -948,7 +948,7 @@ other."
                        :funs (pairlis names real-funs))))
         (ir1-convert-fbindings start next result real-funs forms)))))
 
-
+
 ;;;; the THE special operator, and friends
 
 ;;; A logic shared among THE and TRULY-THE.
@@ -1105,7 +1105,7 @@ care."
       (lambda (whole env)
         (declare (ignore env))
         `(the ,(caadr whole) ,@(cddr whole))))
-
+
 ;;;; SETQ
 
 (defun explode-setq (form err-fun)
@@ -1172,7 +1172,7 @@ care."
       (push res (basic-var-sets var))
       (link-node-to-previous-ctran res dest-ctran)
       (use-continuation res next result))))
-
+
 ;;;; CATCH, THROW and UNWIND-PROTECT
 
 ;;; We turn THROW into a MULTIPLE-VALUE-CALL of a magical function,
@@ -1351,7 +1351,7 @@ due to normal completion or a non-local exit such as THROW)."
           (declare (optimize (insert-debug-catch 0)))
           ,@cleanup
           (%continue-unwind ,next ,start ,count))))))
-
+
 ;;;; multiple-value stuff
 
 (def-ir1-translator multiple-value-call ((fun &rest args) start next result)
@@ -1407,7 +1407,7 @@ VALUES-FORM."
     (setf (lvar-dest value-lvar) cast)
     (use-continuation cast next result)))
 
-
+
 ;;;; interface to defining macros
 
 ;;; Old CMUCL comment:

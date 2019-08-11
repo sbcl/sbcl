@@ -12,7 +12,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; coercions
 
 (deftransform float ((n f) (* single-float) *)
@@ -114,7 +114,7 @@
                              (when (< bits ,(* num d))
                                (return (values (truncate bits ,d)))))))))))))))
 
-
+
 ;;;; float accessors
 
 ;;; NaNs can not be constructed from constant bits mainly due to compiler problems
@@ -169,7 +169,7 @@
           `(let ((,temp (abs float2)))
             (if (minusp ,bits) (- ,temp) ,temp)))
         `(if (minusp ,bits) $-1d0 $1d0))))
-
+
 ;;;; DECODE-FLOAT, INTEGER-DECODE-FLOAT, and SCALE-FLOAT
 
 (defknown decode-single-float (single-float)
@@ -346,7 +346,7 @@
   (frob %double-float double-float
         sb-xc:most-negative-double-float sb-xc:most-positive-double-float))
 ) ; PROGN
-
+
 ;;;; float contagion
 
 (defun safe-ctype-for-single-coercion-p (x)
@@ -486,7 +486,7 @@
   (frob >=)
   (frob =)
   (frob = t))
-
+
 ;;;; irrational derive-type methods
 
 ;;; Derive the result to be float for argument types in the
@@ -515,7 +515,7 @@
                  (csubtypep (lvar-type y)
                             (specifier-type '(real $0.0)))))
     (specifier-type 'float)))
-
+
 ;;;; irrational transforms
 
 (macrolet ((def (name prim rtype)
@@ -594,7 +594,7 @@
 ;;; ANSI says log with base zero returns zero.
 (deftransform log ((x y) (float float) float)
   '(if (zerop y) y (/ (log x) (log y))))
-
+
 ;;; Handle some simple transformations.
 
 (deftransform abs ((x) ((complex double-float)) double-float)
@@ -1530,7 +1530,7 @@
     #'cis))
 
 ) ; PROGN
-
+
 ;;;; TRUNCATE, FLOOR, CEILING, and ROUND
 
 (macrolet ((define-frobs (fun ufun)

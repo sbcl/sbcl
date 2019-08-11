@@ -1,6 +1,6 @@
 ;;;; Windows API bindings not needed for cold initialization.
 (in-package "SB-WIN32")
-
+
 ;;;; CreateProcess and surrounding data structures provide a way to implement
 ;;;; RUN-PROGRAM while using handles rather than file descriptors.
 

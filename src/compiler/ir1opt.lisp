@@ -15,7 +15,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; interface for obtaining results of constant folding
 
 ;;; Return true for an LVAR whose sole use is a reference to a
@@ -78,7 +78,7 @@
     (loop for use in uses
           for leaf = (ref-leaf use)
           collect (constant-value leaf))))
-
+
 ;;;; interface for obtaining results of type inference
 
 ;;; Our best guess for the type of this lvar's value. Note that this
@@ -251,7 +251,7 @@
                  (coerce-to-values type))))
            dest))))
     *wild-type*))
-
+
 ;;;; interface routines used by optimizers
 
 ;;; This function is called by optimizers to indicate that something
@@ -366,7 +366,7 @@
         (use-lvar cast internal-lvar)
         t))))
 
-
+
 ;;;; IR1-OPTIMIZE
 
 ;;; Do one forward pass over COMPONENT, deleting unreachable blocks
@@ -538,7 +538,7 @@
                             (bound-cast-check node)))
              (flush-dest (cast-value node))
              (unlink-node node)))))))
-
+
 ;;;; local call return type propagation
 
 ;;; This function is called on RETURN nodes that have their REOPTIMIZE
@@ -620,7 +620,7 @@
                  (reoptimize-lvar (node-lvar ref)))))))))
 
   (values))
-
+
 ;;;; IF optimization
 
 ;;; Check whether the predicate is known to be true or false,
@@ -763,7 +763,7 @@
       (reoptimize-lvar new-lvar)
       (setf (component-reanalyze *current-component*) t)))
   (values))
-
+
 ;;;; exit IR1 optimization
 
 ;;; This function attempts to delete an exit node, returning true if
@@ -793,7 +793,7 @@
           (delete-filter node (node-lvar node) value)
           (unlink-node node)))))
 
-
+
 ;;;; combination IR1 optimization
 
 (defun check-important-result (node info)
@@ -1269,7 +1269,7 @@
                                   (leaf-source-name leaf)
                                   nil))))))))
   (values))
-
+
 ;;;; known function optimization
 
 ;;; Add a failed optimization note to FAILED-OPTIMZATIONS for NODE,
@@ -1624,7 +1624,7 @@
                                         values)))
                    fun-name)))))))
   (values))
-
+
 ;;;; local call optimization
 
 ;;; Propagate TYPE to LEAF and its REFS, marking things changed.
@@ -2082,7 +2082,7 @@
                 when type do (propagate-to-refs var type)))))
 
   (values))
-
+
 ;;;; multiple values optimization
 
 ;;; Do stuff to notice a change to a MV combination node. There are

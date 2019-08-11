@@ -30,7 +30,7 @@
      should go to the mailing lists referenced from ~
      <http://www.sbcl.org/>).~@:>"
    stream fun))
-
+
 (fmakunbound 'stream-element-type)
 
 (defgeneric stream-element-type (stream)
@@ -50,7 +50,7 @@
 
 (defmethod stream-element-type ((non-stream t))
   (error 'type-error :datum non-stream :expected-type 'stream))
-
+
 (fmakunbound 'open-stream-p)
 
 (defgeneric open-stream-p (stream)
@@ -70,7 +70,7 @@
 
 (defmethod open-stream-p ((non-stream t))
   (error 'type-error :datum non-stream :expected-type 'stream))
-
+
 (fmakunbound 'close)
 
 (defgeneric close (stream &key abort)
@@ -86,7 +86,7 @@
   (declare (ignore abort))
   (setf (stream-open-p stream) nil)
   t)
-
+
 (let ()
   (fmakunbound 'input-stream-p)
 
@@ -107,7 +107,7 @@
 
   (defmethod input-stream-p ((non-stream t))
     (error 'type-error :datum non-stream :expected-type 'stream)))
-
+
 (let ()
   (fmakunbound 'interactive-stream-p)
 
@@ -125,7 +125,7 @@
 
   (defmethod interactive-stream-p ((non-stream t))
     (error 'type-error :datum non-stream :expected-type 'stream)))
-
+
 (let ()
   (fmakunbound 'output-stream-p)
 
@@ -146,7 +146,7 @@
 
   (defmethod output-stream-p ((non-stream t))
     (error 'type-error :datum non-stream :expected-type 'stream)))
-
+
 ;;; character input streams
 ;;;
 ;;; A character input stream can be created by defining a class that
@@ -271,7 +271,7 @@
        (aver (not recursive-p))
        (stream-read-byte stream)))))
 
-
+
 ;;; character output streams
 ;;;
 ;;; A character output stream can be created by defining a class that
@@ -438,7 +438,7 @@
      seq stream start end stream-element-mode
      #'ill-out #'stream-write-byte)))
 
-
+
 ;;; binary streams
 ;;;
 ;;; Binary streams can be created by defining a class that includes
@@ -478,7 +478,7 @@
   (declare (ignore stream position-spec))
   nil)
 
-
+
 ;;; This is not in the Gray stream proposal, so it is left here
 ;;; as example code.
 #|
@@ -516,7 +516,7 @@
 
 (defmethod stream-clear-output ((stream character-output-stream))
   (clear-output (character-output-stream-lisp-stream stream)))
-
+
 ;;; example character input stream encapsulating a lisp-stream
 
 (defun make-character-input-stream (lisp-stream)

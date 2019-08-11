@@ -449,7 +449,7 @@ distinct from the global value. Can also be SETF."
   "Return true if Object is a symbol in the \"KEYWORD\" package."
   (and (symbolp object)
        (eq (sb-xc:symbol-package object) *keyword-package*)))
-
+
 ;;;; GENSYM and friends
 
 (defvar *gentemp-counter* 0)

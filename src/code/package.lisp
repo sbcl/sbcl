@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; the PACKAGE-HASHTABLE structure
 
 ;;; Packages are implemented using a special kind of hashtable -
@@ -52,7 +52,7 @@
   (free (missing-arg) :type index)
   ;; The number of deleted entries.
   (deleted 0 :type index))
-
+
 ;;;; the PACKAGE structure
 
 (sb-xc:defstruct (package

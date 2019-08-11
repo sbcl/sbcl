@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; exported printer control variables
 
 ;; NB: all of the following are initialized during genesis
@@ -90,7 +90,7 @@ variable: an unreadable object representing the error is printed instead.")
         (*suppress-print-errors* nil)
         (*print-vector-length* nil))
     (funcall function)))
-
+
 ;;;; routines to print objects
 
 (macrolet ((def (fn doc &rest forms)
@@ -232,7 +232,7 @@ variable: an unreadable object representing the error is printed instead.")
                     sb-vm:n-positive-fixnum-bits
                     (* (%bignum-length object) sb-bignum::digit-size))
                 bits-per-char))))
-
+
 ;;;; support for the PRINT-UNREADABLE-OBJECT macro
 
 (defun print-not-readable-error (object stream)
@@ -286,7 +286,7 @@ variable: an unreadable object representing the error is printed instead.")
                (print-description)
                (write-char #\> stream)))))
   nil)
-
+
 ;;;; OUTPUT-OBJECT -- the main entry point
 
 ;;; Objects whose print representation identifies them EQLly don't
@@ -449,7 +449,7 @@ variable: an unreadable object representing the error is printed instead.")
               (write-string (if (eql (find-external-symbol name package) 0) "::" ":")
                             stream)))))
         (output-token name)))))
-
+
 ;;;; escaping symbols
 
 ;;; When we print symbols we have to figure out if they need to be
@@ -686,7 +686,7 @@ variable: an unreadable object representing the error is printed instead.")
       ;; See ANSI 2.3.1.1 "Potential Numbers as Tokens".)
       (when (test letter) (advance OTHER nil))
       (go DIGIT))))
-
+
 ;;;; case hackery: One of these functions is chosen to output symbol
 ;;;; names according to the values of *PRINT-CASE* and READTABLE-CASE.
 
@@ -786,7 +786,7 @@ variable: an unreadable object representing the error is printed instead.")
     (aref (compute-fun-vector)
           (logior (case print-case (:upcase 0) (:downcase 4) (t 8))
                   (truly-the (mod 4) readtable-case)))))
-
+
 ;;;; recursive objects
 
 (defmethod print-object ((list cons) stream)
@@ -963,7 +963,7 @@ variable: an unreadable object representing the error is printed instead.")
                (incf index count)))
            (write-char #\) stream)))))
 
-
+
 ;;;; integer, ratio, and complex printing (i.e. everything but floats)
 
 (defun %output-radix (base stream)
@@ -1109,7 +1109,7 @@ variable: an unreadable object representing the error is printed instead.")
   (write-char #\space stream)
   (output-object (imagpart complex) stream)
   (write-char #\) stream))
-
+
 ;;;; float printing
 
 ;;; FLONUM-TO-STRING (and its subsidiary function FLOAT-STRING) does
@@ -1406,7 +1406,7 @@ variable: an unreadable object representing the error is printed instead.")
            (print-float-exponent float 0 stream)
            (print-float-exponent float (1- k) stream)))
      float)))
-
+
 ;;; Given a non-negative floating point number, SCALE-EXPONENT returns
 ;;; a new floating point number Z in the range (0.1, 1.0] and an
 ;;; exponent E such that Z * 10^E is (approximately) equal to the
@@ -1465,7 +1465,7 @@ variable: an unreadable object representing the error is printed instead.")
               (declare (long-float d))))))))
 (eval-when (:compile-toplevel :execute)
   (setf *read-default-float-format* 'cl:single-float))
-
+
 ;;;; entry point for the float printer
 
 ;;; the float printer as called by PRINT, PRIN1, PRINC, etc. The
@@ -1550,7 +1550,7 @@ variable: an unreadable object representing the error is printed instead.")
 
 
 
-
+
 ;;;; other leaf objects
 
 ;;; If *PRINT-ESCAPE* is false, just do a WRITE-CHAR, otherwise output
@@ -1705,7 +1705,7 @@ variable: an unreadable object representing the error is printed instead.")
                 (format stream "~S~@{ ~16,'0X~}"
                         'simd-pack-256
                         p0 p1 p2 p3))))))))
-
+
 ;;;; functions
 
 (defmethod print-object ((object function) stream)
@@ -1719,7 +1719,7 @@ variable: an unreadable object representing the error is printed instead.")
               ;; and not #<FUNCTION> before SRC;PCL;PRINT-OBJECT is loaded.
               (if (closurep object) 'closure (type-of object))
               name))))
-
+
 ;;;; catch-all for unknown things
 
 (declaim (inline lowtag-of))

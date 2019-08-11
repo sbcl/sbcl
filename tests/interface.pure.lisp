@@ -11,7 +11,7 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-
+
 ;;;; properties of symbols, e.g. presence of doc strings for public symbols
 
 (enable-test-parallelism)

@@ -13,7 +13,7 @@
 
 (defmacro silently (&rest things)
   `(let ((*standard-output* (make-broadcast-stream))) ,@things))
-
+
 ;; Interpreted closure is a problem for COMPILE
 (with-test (:name (disassemble function) :skipped-on :interpreter)
   ;; DISASSEMBLE shouldn't fail on closures or unpurified functions
@@ -93,7 +93,7 @@
     (assert (equal (function-lambda-expression
                     (nth-value 1 (funcall f)))
                    '(lambda (w) (block f2 (* w 0.3)))))))
-
+
 ;;; Tests of documentation on types and classes
 
 (defun assert-documentation (thing doc-type expected)
@@ -377,7 +377,7 @@
   (assert
    (or (member :big-endian *features*)
        (member :little-endian *features*))))
-
+
 (with-test (:name (apropos :inherited :bug-1364413))
   (let* ((package (make-package "BUGGALO" :use nil))
          (symbol (intern "BUGGALO" package)))
@@ -433,7 +433,7 @@
 (with-test (:name (:generic-function-pretty-arglist 5))
   (assert (equal (sb-pcl::generic-function-pretty-arglist #'gf-arglist-5)
                  '(x &key y z &allow-other-keys))))
-
+
 (defgeneric traced-gf (x))
 (defmethod traced-gf (x) (1+ x))
 

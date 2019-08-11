@@ -16,7 +16,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;; Scan through BLOCK looking for uses of :UNKNOWN lvars that have
 ;;; their DEST outside of the block. We do some checking to verify the
 ;;; invariant that all pushes come after the last pop.
@@ -44,7 +44,7 @@
 
       (setf (ir2-block-pushed 2block) (pushed))))
   (values))
-
+
 ;;;; Computation of live UVL sets
 (defun nle-block-p (block)
   (and (eq (component-head (block-component block))
@@ -272,7 +272,7 @@
              (setf (ir2-block-start-stack 2block) start)
              t)))))
 
-
+
 ;;;; Ordering of live UVL stacks
 
 (defun ordered-list-intersection (ordered-list other-list)
@@ -376,7 +376,7 @@
              ;; of STACK analysis, so abort now if we're in trouble.
              (aver (not (plusp todo))))
         while (plusp todo)))
-
+
 ;;; This is called when we discover that the stack-top unknown-values
 ;;; lvar at the end of BLOCK1 is different from that at the start of
 ;;; BLOCK2 (its successor).
@@ -460,7 +460,7 @@
             (setf (ir2-block-end-stack 2block) start-stack))))))
 
   (values))
-
+
 ;;;; stack analysis
 
 ;;; Return a list of all the blocks containing genuine uses of one of

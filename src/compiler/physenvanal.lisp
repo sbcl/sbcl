@@ -211,7 +211,7 @@
             (when (and (lambda-var-p var)
                        (lambda-var-indirect var))
               (setf (lambda-var-explicit-value-cell var) t))))))))
-
+
 ;;;; non-local exit
 
 (defvar *functional-escape-info*)
@@ -384,7 +384,7 @@
             (aver (neq (node-physenv exit) target-physenv))
             (note-non-local-exit target-physenv exit))))))
   (values))
-
+
 ;;;; final decision on stack allocation of dynamic-extent structures
 (defun recheck-dynamic-extent-lvars (component)
   (declare (type component component))
@@ -435,7 +435,7 @@
                      (setf (component-dx-lvars component)
                            (append real-dx-lvars (component-dx-lvars component)))))))))
   (values))
-
+
 ;;;; cleanup emission
 
 ;;; Zoom up the cleanup nesting until we hit CLEANUP1, accumulating

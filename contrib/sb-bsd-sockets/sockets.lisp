@@ -63,7 +63,7 @@ directly instantiated.")))
           (sb-ext:finalize socket (lambda () (sockint::close fd))
                            :dont-save t)))))
 
-
+
 
 (defun call-with-socket-addr (socket sockaddr-args thunk)
   (multiple-value-bind (sockaddr size)
@@ -97,7 +97,7 @@ directly instantiated.")))
   (with-socket-fd-and-addr (fd sockaddr size address) socket
     (socket-error-case ("bind" (sockint::bind fd sockaddr size)))))
 
-
+
 
 (defmethod socket-accept ((socket socket))
   (with-socket-fd-and-addr (fd sockaddr size) socket
@@ -337,7 +337,7 @@ request an input stream and get an output stream in response\)."
     (sb-ext:cancel-finalization socket)
     stream))
 
-
+
 
 ;;; Error handling
 

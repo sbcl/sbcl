@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; moves and coercions
 
 ;;; Move a tagged SAP to an untagged representation.
@@ -71,7 +71,7 @@
 ;;; descriptor passing location.
 (define-move-vop move-arg :move-arg
   (sap-reg) (descriptor-reg))
-
+
 ;;;; SAP-INT and INT-SAP
 
 ;;; The function SAP-INT is used to generate an integer corresponding
@@ -98,7 +98,7 @@
   (:policy :fast-safe)
   (:generator 1
     (move sap int)))
-
+
 ;;;; POINTER+ and POINTER-
 
 (define-vop (pointer+)
@@ -139,7 +139,7 @@
   (:generator 1
     (move res ptr1)
     (inst sub res ptr2)))
-
+
 ;;;; mumble-SYSTEM-REF and mumble-SYSTEM-SET
 
 (macrolet ((def-system-ref-and-set (ref-name
@@ -226,7 +226,7 @@
     sap-reg system-area-pointer :dword)
   (def-system-ref-and-set sb-c::sap-ref-lispobj-with-offset sb-c::%set-sap-ref-lispobj-with-offset
     descriptor-reg * :dword))
-
+
 ;;;; SAP-REF-DOUBLE
 
 (define-vop (sap-ref-double-with-offset)
@@ -313,7 +313,7 @@
                   (unless (location= value result)
                     (inst fstd result))
                   (inst fxch value)))))))
-
+
 ;;;; SAP-REF-SINGLE
 
 (define-vop (sap-ref-single-with-offset)
@@ -399,7 +399,7 @@
                   (unless (location= value result)
                     (inst fst result))
                   (inst fxch value)))))))
-
+
 ;;;; SAP-REF-LONG
 
 (define-vop (sap-ref-long)
@@ -455,7 +455,7 @@
                   (unless (location= value result)
                     (inst fstd result))
                   (inst fxch value)))))))
-
+
 ;;; noise to convert normal lisp data objects into SAPs
 
 (define-vop (vector-sap)

@@ -12,7 +12,7 @@
 ;;;; files for more information.
 
 (in-package "SB-KERNEL")
-
+
 ;;;; the CONDITION class
 
 (/show0 "condition.lisp 20")
@@ -106,7 +106,7 @@
               :stream stream :lines 1)))
     (t
      (print-unreadable-object (object stream :type t :identity t)))))
-
+
 ;;;; slots of CONDITION objects
 
 (defun find-slot-default (class slot)
@@ -174,7 +174,7 @@
                     (error "Unbound condition slot: ~S" (condition-slot-name cslot))
                     (return value))))))
         val)))
-
+
 ;;;; MAKE-CONDITION
 
 (defun allocate-condition (designator &rest initargs)
@@ -251,7 +251,7 @@
 
     condition))
 
-
+
 ;;;; DEFINE-CONDITION
 
 ;;; Compute the effective slots of CLASS, copying inherited slots and
@@ -503,7 +503,7 @@
          ;; we're under EVAL or loaded as source.
          (%set-condition-report ',name ,report)
          ',name))))
-
+
 ;;;; various CONDITIONs specified by ANSI
 
 (define-condition serious-condition (condition) ())
@@ -727,7 +727,7 @@
       (format stream "~2I~@[~:@_ ~:@_~:{~:(~A~): ~S~:^, ~:_~}~]~:@_ ~:@_Stream: ~S"
               (stream-error-position-info error-stream position)
               error-stream))))
-
+
 ;;;; special SBCL extension conditions
 
 ;;; an error apparently caused by a bug in SBCL itself
@@ -784,7 +784,7 @@
 ;;; unFBOUNDPness meant they were running on an system which didn't
 ;;; support the extension.)
 (define-condition unsupported-operator (simple-error) ())
-
+
 ;;; (:ansi-cl :function remove)
 ;;; (:ansi-cl :section (a b c))
 ;;; (:ansi-cl :glossary "similar")
@@ -1017,7 +1017,7 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
      (format stream "Unknown &KEY argument: ~S"
              (unknown-keyword-argument-name condition)))))
 
-
+
 ;;;; various other (not specified by ANSI) CONDITIONs
 ;;;;
 ;;;; These might logically belong in other files; they're here, after
@@ -1331,13 +1331,13 @@ the values returned by the form as a list. No associated restarts."))
      (declare (ignore condition))
      (format stream "Returning from STEP")))
   (:documentation "Condition signaled when STEP returns."))
-
+
 ;;; A knob for muffling warnings, mostly for use while loading files.
 (defvar *muffled-warnings* 'uninteresting-redefinition
   "A type that ought to specify a subtype of WARNING.  Whenever a
 warning is signaled, if the warning is of this type and is not
 handled by any other handler, it will be muffled.")
-
+
 ;;; Various STYLE-WARNING signaled in the system.
 ;; For the moment, we're only getting into the details for function
 ;; redefinitions, but other redefinitions could be done later
@@ -1497,7 +1497,7 @@ handled by any other handler, it will be muffled.")
   (:report (lambda (warning stream)
              (format stream "Overwriting ~S"
                      (redefinition-with-deftransform-transform warning)))))
-
+
 ;;; Various other STYLE-WARNINGS
 (define-condition dubious-asterisks-around-variable-name
     (style-warning simple-condition)
@@ -1637,7 +1637,7 @@ the usual naming convention (names like *FOO*) for special variables"
   ()
   (:default-initargs :kind 'ftype :description "known function"))
 
-
+
 ;;;; deprecation conditions
 
 (define-condition deprecation-condition (reference-condition)
@@ -1728,7 +1728,7 @@ compile-time. An error will be signaled at run-time."))
    "This error is signaled at run-time when an attempt is made to use
 a thing that is in :FINAL deprecation, i.e. call a function or access
 a variable."))
-
+
 ;;;; restart definitions
 
 (define-condition abort-failure (control-error) ()

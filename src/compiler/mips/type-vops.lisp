@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;; Test generation utilities.
 (defun %test-fixnum (value temp target not-p)
   (assemble ()
@@ -92,7 +92,7 @@
                       (inst blez temp when-true))))))))
         (inst nop)
         (emit-label drop-through)))))
-
+
 ;;;; TYPE-VOPs for types that are more complex to test for than simple
 ;;;; LOWTAG and WIDETAG tests, but that are nevertheless important:
 

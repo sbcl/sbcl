@@ -18,7 +18,7 @@
 ;;; when we descend into a compound object or when we step through elements of
 ;;; a compound object.
 (defconstant +max-hash-depthoid+ 4)
-
+
 ;;;; mixing hash values
 
 ;;; a function for mixing hash values
@@ -109,7 +109,7 @@
   (logand (setf (aref state 0) (mix (address-based-counter-val) (aref state 0)))
           mask))
 
-
+
 ;;;; hashing strings
 ;;;;
 ;;;; Note that this operation is used in compiler symbol table
@@ -183,7 +183,7 @@
     ;; The generated code seems tight enough, and the comment is, after all,
     ;; >14 years old.
     (%sxhash-simple-substring string start end)))
-
+
 ;;;; the SXHASH function
 
 ;; simple cases
@@ -408,7 +408,7 @@
                     9550684))
                (t 42))))
     (sxhash-recurse x +max-hash-depthoid+)))
-
+
 ;;;; the PSXHASH function
 
 ;;;; FIXME: This code does a lot of unnecessary full calls. It could be made

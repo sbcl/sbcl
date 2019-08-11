@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-DISASSEM")
-
+
 ;;; types and defaults
 
 (defconstant label-column-width 7)
@@ -27,7 +27,7 @@
   `(integer 0 (,max-filtered-value-index)))
 (deftype filtered-value-vector ()
   `(simple-array t (,max-filtered-value-index)))
-
+
 ;;;; disassembly parameters
 
 ;; With a few tweaks, you can use a running SBCL as a cross-assembler
@@ -57,7 +57,7 @@
 
 (defvar *disassem-note-column* (+ 45 *disassem-inst-column-width*)
   "The column in which end-of-line comments for notes are started.")
-
+
 ;;;; A DCHUNK contains the bits we look at to decode an
 ;;;; instruction.
 ;;;; I tried to keep this abstract so that if using integers > the machine
@@ -152,7 +152,7 @@
 (defun dchunk-count-bits (x)
   (declare (type dchunk x))
   (logcount x))
-
+
 (defstruct (arg (:constructor %make-arg (name))
                 (:copier nil)
                 (:predicate nil))
@@ -177,7 +177,7 @@
   (length 0 :type disassem-length)               ; in bytes
 
   (default-printer nil :type list))
-
+
 ;;; A FUNSTATE holds the state of any arguments used in a disassembly
 ;;; function. It is a 2-level alist. The outer list maps each ARG to
 ;;; a list of styles in which that arg can be rendered.
@@ -192,7 +192,7 @@
 (defun arg-or-lose (name funstate)
   (or (car (assoc name funstate :key #'arg-name :test #'eq))
       (pd-error "unknown argument ~S" name)))
-
+
 ;;; machinery to provide more meaningful error messages during compilation
 (defvar *current-instruction-flavor*)
 (defun pd-error (fmt &rest args)
@@ -474,7 +474,7 @@
          `(list ,@forms))
         (t
          (car forms))))
-
+
 ;;; DEFINE-ARG-TYPE Name {Key Value}*
 ;;;
 ;;; Define a disassembler argument type NAME (which can then be referenced in
@@ -520,7 +520,7 @@
   (setf (get name 'arg-type)
         (apply 'modify-arg (%make-arg name) nil
                (nconc (when inherit (list :type inherit)) properties))))
-
+
 (defun %gen-arg-forms (arg rendering funstate)
   (declare (type arg arg) (type list funstate))
   (ecase rendering
@@ -557,7 +557,7 @@
        (if (arg-use-label arg)
            `((lookup-label ,(maybe-listify numeric-forms)))
            numeric-forms)))))
-
+
 (defun find-printer-fun (printer-source args cache *current-instruction-flavor*)
   (let* ((source (preprocess-printer printer-source args))
          (funstate (make-funstate args))
@@ -698,7 +698,7 @@
 ;;; reference refers to a valid arg.
 (defun preprocess-printer (printer args)
   (preprocess-conditionals (preprocess-chooses printer args) args))
-
+
 ;;; Return the first non-keyword symbol in a depth-first search of TREE.
 (defun find-first-field-name (tree)
   (cond ((null tree)
@@ -721,7 +721,7 @@
         (t
          (sharing-mapcar (lambda (sub) (preprocess-chooses sub args))
                          printer))))
-
+
 ;;;; some simple functions that help avoid consing when we're just
 ;;;; recursively filtering things that usually don't change
 
@@ -734,7 +734,7 @@
        (recons list
                      (funcall fun (car list))
                      (sharing-mapcar fun (cdr list)))))
-
+
 (defun all-arg-refs-relevant-p (printer args)
   (cond ((or (null printer) (keywordp printer) (eq printer t))
          t)
@@ -880,7 +880,7 @@
            (compile-test subj key funstate))
           (t
            (pd-error "bogus test-form: ~S" test)))))
-
+
 #-sb-fluid (declaim (inline bytes-to-bits))
 (declaim (maybe-inline sign-extend tab tab0))
 

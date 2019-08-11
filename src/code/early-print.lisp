@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; level and length abbreviations
 
 ;;; The current level we are printing at, to be compared against
@@ -43,7 +43,7 @@
      (write-string "..." ,stream)
      (return)))
 
-
+
 ;;;; circularity detection stuff
 
 ;;; When *PRINT-CIRCLE* is T, this gets bound to a hash table that

@@ -21,7 +21,7 @@
 ;;; should be made conditional on SB-TWEAK.
 
 (declaim (ftype (function (component) index) ir2-block-count))
-
+
 ;;;; conflict determination
 
 ;;; Return true if TN has a conflict in SC at the specified offset.
@@ -262,7 +262,7 @@
     (setf (finite-sb-current-size sb) new-size))
   (values))
 
-
+
 ;;;; internal errors
 
 ;;; Give someone a hard time because there isn't any load function
@@ -417,7 +417,7 @@
              (primitive-type-name ptype)
              (mapcar #'sc-name (listify-restrictions load-scs))
              incon))))
-
+
 ;;;; register saving
 
 ;;; Do stuff to note that TN is spilled at VOP for the debugger's benefit.
@@ -575,7 +575,7 @@
           (basic-save-tn tn vop)))))
 
   (values))
-
+
 ;;;; optimized saving
 
 ;;; Save TN if it isn't a single-writer TN that has already been
@@ -741,7 +741,7 @@
                 (return t)))
         (setq block (optimized-emit-saves-block block saves restores)))
       (setq block (ir2-block-prev block)))))
-
+
 ;;; Iterate over the normal TNs, finding the cost of packing on the
 ;;; stack in units of the number of references. We count all read
 ;;; references as +1, write references as + *tn-write-cost*, and
@@ -825,7 +825,7 @@
               ;; race conditions in the debugger involving
               ;; backtraces from asynchronous interrupts.
               (setf (tn-sc tn) (tn-sc save-tn)))))))))
-
+
 ;;;; load TN packing
 
 ;;; These variables indicate the last location at which we computed
@@ -1240,7 +1240,7 @@
           (check-operand-restrictions (vop-info-arg-load-scs info)
                                       (vop-args vop))))))
   (values))
-
+
 ;;;; targeting
 
 ;;; Link the TN-REFS READ and WRITE together using the TN-REF-TARGET
@@ -1334,7 +1334,7 @@
                 (neq (tn-kind target) :arg-pass)
                 (check-ok-target target tn sc))
       (return-from find-ok-target-offset it))))
-
+
 ;;;; location selection
 
 ;;; Select some location for TN in SC, returning the offset if we
@@ -1382,7 +1382,7 @@
   (if (member (tn-kind tn) '(:save :save-once :specified-save))
       (tn-save-tn tn)
       tn))
-
+
 ;;;; pack interface
 
 ;; Misc. utilities

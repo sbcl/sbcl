@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; DEFKNOWNs
 
 #+linkage-table
@@ -94,7 +94,7 @@
   (defsapref sap-ref-long long-float)
 ) ; MACROLET
 
-
+
 ;;;; transforms for converting sap relation operators
 
 (macrolet ((def (sap-fun int-fun)
@@ -105,7 +105,7 @@
   (def sap= =)
   (def sap>= >=)
   (def sap> >))
-
+
 ;;;; transforms for optimizing SAP+
 
 (deftransform sap+ ((sap offset))
@@ -187,7 +187,7 @@
     %set-sap-ref-32 %set-sap-ref-64)
   (def %set-signed-sap-ref-word (sap offset value)
     %set-signed-sap-ref-32 %set-signed-sap-ref-64))
-
+
 ;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
 
 #-64-bit-registers

@@ -6,7 +6,7 @@
 (defun machine-type ()
   "Return a string describing the type of the local machine."
   "ARM")
-
+
 ;;;; FIXUP-CODE-OBJECT
 
 (defconstant-eqx +fixup-kinds+ #(:absolute) #'equalp)
@@ -21,7 +21,7 @@
       (:absolute
        (setf (sap-ref-32 sap offset) fixup))))
   nil))
-
+
 ;;;; "Sigcontext" access functions, cut & pasted from sparc-vm.lisp,
 ;;;; then modified for ARM.
 ;;;;
@@ -37,7 +37,7 @@
   (declare (ignore context index))
   (warn "stub %SET-CONTEXT-FLOAT-REGISTER")
   (coerce new-value format))
-
+
 ;;;; INTERNAL-ERROR-ARGS.
 
 ;;; Given a (POSIX) signal context, extract the internal error

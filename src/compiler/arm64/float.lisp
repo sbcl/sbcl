@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Move functions:
 
 (define-move-fun (load-single 1) (vop x y)
@@ -28,7 +28,7 @@
 (define-move-fun (store-double 2) (vop x y)
                  ((double-reg) (double-stack))
   (storew x (current-nfp-tn vop) (tn-offset y)))
-
+
 ;;;; Move VOPs:
 
 (macrolet ((frob (vop sc)
@@ -112,7 +112,7 @@
                   (,sc descriptor-reg) (,sc)))))
   (frob move-single-float-arg single-reg single-stack nil)
   (frob move-double-float-arg double-reg double-stack t))
-
+
 ;;;; Complex float move functions
 
 
@@ -133,7 +133,7 @@
   ((complex-double-reg) (complex-double-stack))
   (storew x (current-nfp-tn vop) (tn-offset y)))
 
-
+
 ;;;
 ;;; Complex float register to register moves.
 ;;;
@@ -248,7 +248,7 @@
        (storew x nfp (tn-offset y))))))
 (define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
-
+
 ;;;; Unboxed-to-boxed MOVE-ARG handling:
 
 ;; This little gem here says to use the VOP MOVE-ARG to move any float
@@ -258,7 +258,7 @@
 (define-move-vop move-arg :move-arg
   (single-reg double-reg complex-single-reg complex-double-reg)
   (descriptor-reg))
-
+
 ;;;; Arithmetic VOPs:
 
 (define-vop (float-op)
@@ -336,7 +336,7 @@
   (:save-p :compute-only)
   (:generator 1
     (inst fsqrt y x)))
-
+
 ;;;; Comparison:
 
 (define-vop (float-compare)
@@ -421,7 +421,7 @@
   (frob <= :le <=/single-float-zero <=/double-float-zero nil)
   (frob >= :ge >=/single-float-zero >=/double-float-zero nil)
   (frob = :eq eql/single-float-zero eql/double-float-zero t))
-
+
 ;;;; Conversion:
 
 (macrolet ((frob (name translate from-sc from-type to-sc to-type)
@@ -648,7 +648,7 @@
                           4
                           0))
                    other-pointer-lowtag)))))))
-
+
 ;;;; Float mode hackery:
 
 (sb-xc:deftype float-modes () '(unsigned-byte 32))
@@ -674,7 +674,7 @@
   (:generator 3
     (inst msr :fpsr new)
     (move res new)))
-
+
 ;;;; Complex float VOPs
 
 (define-vop (make-complex-single-float)

@@ -240,7 +240,7 @@
   (assert (equal-mod-gensyms
            (macroexpand-1 '(setf (bar-a x) 3))
            '(let* ((#2=#:x x) (new 3)) (funcall #'(setf bar-a) new #2#)))))
-
+
 ;;; WITH-CURRENT-SOURCE-FORM tests
 
 (defmacro warnings-in-subforms (a b)

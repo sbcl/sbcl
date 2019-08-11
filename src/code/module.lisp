@@ -14,7 +14,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; exported specials
 
 (defvar *modules* ()
@@ -23,7 +23,7 @@
 
 (defvar *module-provider-functions* (list 'module-provide-contrib)
   "See function documentation for REQUIRE.")
-
+
 ;;;; PROVIDE and REQUIRE
 
 (defun provide (module-name)
@@ -71,7 +71,7 @@
                                 'require module-name)))))
       (set-difference *modules* saved-modules))))
 
-
+
 ;;;; miscellany
 
 (defun module-provide-contrib (name)

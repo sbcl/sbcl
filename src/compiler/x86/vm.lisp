@@ -92,7 +92,7 @@
   (eval-when (:compile-toplevel :load-toplevel :execute)
     (defparameter *register-arg-names* '(edx edi esi)))
   (defregset    *register-arg-offsets* edx edi esi))
-
+
 ;;;; SB definitions
 
 (!define-storage-bases
@@ -117,7 +117,7 @@
 (define-storage-base immediate-constant :non-packed)
 (define-storage-base noise :unbounded :size 2)
 )
-
+
 ;;;; SC definitions
 
 (eval-when (:compile-toplevel :execute)
@@ -310,7 +310,7 @@
                          (#.*double-sc-names*  :double))))
                   (append class-spec (if size (list :operand-size size)))))
               *storage-class-defs*))
-
+
 ;;;; miscellaneous TNs for the various registers
 
 (macrolet ((def-misc-reg-tns (sc-name &rest reg-names)
@@ -342,7 +342,7 @@
                   :sc (sc-or-lose 'fp-constant)
                   :offset 31))          ; Offset doesn't get used.
 |#
-
+
 ;;; If value can be represented as an immediate constant, then return
 ;;; the appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
@@ -387,7 +387,7 @@
           (character (logior (ash (char-code val) n-widetag-bits)
                              character-widetag))))
       tn))
-
+
 ;;;; miscellaneous function call parameters
 
 ;;; Offsets of special stack frame locations relative to EBP.
@@ -423,7 +423,7 @@
 
 ;;; This is used by the debugger.
 (defconstant single-value-return-byte-offset 2)
-
+
 ;;; This function is called by debug output routines that want a pretty name
 ;;; for a TN's location. It returns a thing that can be printed with PRINC.
 (defun location-print-name (tn)

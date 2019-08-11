@@ -5,7 +5,7 @@
 ;;;; blocks.
 
 (in-package "SB-C")
-
+
 ;;; A CLAMBDA is deemed to be "externally referenced" if:
 ;;;   - It is of KIND :TOPLEVEL (a toplevel CLAMBDA).
 ;;;   - It is LAMBDA-HAS-EXTERNAL-REFERENCES-P true (from COMPILE
@@ -26,7 +26,7 @@
                 (not (eq (node-component ref)
                          home-component)))
               (lambda-refs clambda)))))
-
+
 (defun dce-analyze-ref (ref)
   (let ((leaf (ref-leaf ref)))
     (typecase leaf
@@ -70,7 +70,7 @@
   (dce-analyze-block
    (node-block
     (lambda-bind clambda))))
-
+
 (defun eliminate-dead-code (component)
   (clear-flags component)
 

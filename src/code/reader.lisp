@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; miscellaneous global variables
 
 ;;; ANSI: "the floating-point format that is to be used when reading a
@@ -33,7 +33,7 @@
 ;;; In case we get an error trying to parse a symbol, we want to rebind the
 ;;; above stuff so it's cool.
 
-
+
 ;;;; reader errors
 
 (defun reader-eof-error (stream context)
@@ -50,7 +50,7 @@
          :stream stream
          :format-control control
          :format-arguments args))
-
+
 ;;;; macros and functions for character tables
 
 (declaim (ftype (sfunction (character readtable) (unsigned-byte 8))
@@ -163,7 +163,7 @@
 (defun token-delimiterp (char &optional (rt *readtable*))
   ;; depends on actual attribute numbering in readtable.lisp.
   (<= (get-cat-entry char rt) +char-attr-terminating-macro+))
-
+
 ;;;; constituent traits (see ANSI 2.1.4.2)
 
 ;;; There are a number of "secondary" attributes which are constant
@@ -209,7 +209,7 @@
   (if (typep char 'base-char)
       (elt +constituent-trait-table+ (char-code char))
       +char-attr-constituent+))
-
+
 ;;;; Readtable Operations
 
 (defun assert-not-standard-readtable (readtable operation)
@@ -432,7 +432,7 @@ standard Lisp readtable when NIL."
     (!cmt-entry-to-fun-designator
      (get-raw-cmt-dispatch-entry (char-upcase sub-char) dtable))))
 
-
+
 ;;;; definitions to support internal programming conventions
 
 (defconstant +EOF+ 0)
@@ -464,7 +464,7 @@ standard Lisp readtable when NIL."
                   ;; promise to return a character or else signal EOF.
                   (cond ((eq char +EOF+) (error 'end-of-file :stream stream))
                         ((done-p) (return (the character char))))))))))
-
+
 ;;;; temporary initialization hack
 
 ;; Install the (easy) standard macro-chars into *READTABLE*.
@@ -508,7 +508,7 @@ standard Lisp readtable when NIL."
       (set-cmt-entry char nil)))
 
   (/show0 "leaving !cold-init-standard-readtable"))
-
+
 ;;;; implementation of the read buffer
 
 (defstruct (token-buf (:predicate nil) (:copier nil)
@@ -670,7 +670,7 @@ standard Lisp readtable when NIL."
      "~A was invoked with RECURSIVE-P being true outside ~
       of a recursive read operation."
      `(,operator-name))))
-
+
 ;;;; READ-PRESERVING-WHITESPACE, READ-DELIMITED-LIST, and READ
 
 ;;; A list for #=, used to keep track of objects with labels assigned that
@@ -778,7 +778,7 @@ standard Lisp readtable when NIL."
           (unread-char next-char stream))))
     (if (eq result local-eof-val) eof-value result)))
 
-
+
 ;;;; basic readmacro definitions
 ;;;;
 ;;;; Some large, hairy subsets of readmacro definitions (backquotes
@@ -1022,7 +1022,7 @@ standard Lisp readtable when NIL."
                              +char-attr-package-delimiter+))
                (setq colon t))
              (ouch-read-buffer char read-buffer))))))
-
+
 ;;;; character classes
 
 ;;; Return the character class for CHAR.
@@ -1090,7 +1090,7 @@ standard Lisp readtable when NIL."
             ((= att +char-attr-invalid+)
              (simple-reader-error stream "invalid constituent: ~s" char))
             (t att))))))
-
+
 ;;;; token fetching
 
 (defvar *read-suppress* nil
@@ -1602,7 +1602,7 @@ extended <package-name>::<form-in-package> syntax."
     (if (neq first-char +EOF+)
         (values (internal-read-extended-token stream first-char t))
         (reader-eof-error stream "after escape"))))
-
+
 ;;;; number-reading functions
 
 ;; Mapping of read-base to the max input characters in a positive fixnum.
@@ -1789,7 +1789,7 @@ extended <package-name>::<form-in-package> syntax."
                           :error c :stream stream
                           :format-control "failed to build ratio")))))
       (if negativep (- num) num))))
-
+
 ;;;; General reader for dispatch macros
 
 (defun dispatch-char-error (stream sub-char ignore)
@@ -1827,7 +1827,7 @@ extended <package-name>::<form-in-package> syntax."
     (let ((fn (get-raw-cmt-dispatch-entry sub-char dispatch-table)))
       (funcall (!cmt-entry-to-function fn #'dispatch-char-error)
                stream sub-char (if numargp numarg nil)))))
-
+
 ;;;; READ-FROM-STRING
 
 (declaim (ftype (sfunction (string t t index (or null index) t) (values t index))
@@ -1853,7 +1853,7 @@ extended <package-name>::<form-in-package> syntax."
   (declare (string string))
   (maybe-note-read-from-string-signature-issue eof-error-p)
   (%read-from-string string eof-error-p eof-value start end preserve-whitespace)))
-
+
 ;;;; PARSE-INTEGER
 
 (defun parse-integer (string &key (start 0) end (radix 10) junk-allowed)
@@ -1912,12 +1912,12 @@ extended <package-name>::<form-in-package> syntax."
                  nil
                  (parse-error "no digits in string ~S")))
          (- index offset))))))
-
+
 ;;;; reader initialization code
 
 (defun !reader-cold-init ()
   (!cold-init-standard-readtable))
-
+
 (defmethod print-object ((readtable readtable) stream)
   (print-unreadable-object (readtable stream :identity t :type t)))
 

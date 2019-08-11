@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Moves and coercions:
 
 ;;; Move a tagged char to an untagged representation.

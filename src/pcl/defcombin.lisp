@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;; FIXME: according to ANSI 3.4.10 this is supposed to allow &WHOLE
 ;;; in the long syntax. But it clearly does not, because if you write
 ;;; (&WHOLE v) then you get (LAMBDA (&WHOLE V ...) ...) which is illegal
@@ -51,7 +51,7 @@
       (or (cdr (assoc options (method-combination-info-cache info) :test #'equal))
           (cdar (push (cons options (funcall (method-combination-info-constructor info) options))
                       (method-combination-info-cache info)))))))
-
+
 ;;;; standard method combination
 (setf (gethash 'standard **method-combinations**)
       (make-method-combination-info
@@ -76,7 +76,7 @@
                  (flush-effective-method-cache gf)
                  (reinitialize-instance gf)))
           (maphash #'flush gfs))))))
-
+
 ;;;; short method combinations
 ;;;;
 ;;;; Short method combinations all follow the same rule for computing the
@@ -156,7 +156,7 @@
       of DEFINE-METHOD-COMBINATION and so requires all methods have ~
       either ~{the single qualifier ~S~^ or ~}.~@:>"
      method gf why type-name (short-method-combination-qualifiers type-name))))
-
+
 ;;;; long method combinations
 
 (defun expand-long-defcombin (form)

@@ -279,7 +279,7 @@
                             (emit-string (make-string n :initial-element char))))
                         (return)))))
                  (emit-directive item))))))))))
-
+
 ;;;; FORMATTER stuff
 
 (sb-xc:defmacro formatter (control-string)
@@ -456,7 +456,7 @@
              (format-error-at nil (caar ,params)
                               "Too many parameters, expected none"))
            ,@body))))
-
+
 ;;;; format directive machinery
 
 (defmacro def-complex-format-directive (char lambda-list &body body)
@@ -519,7 +519,7 @@
                             (t directives))))
                    kind stop-at-semi)))
             (find-directive (cdr directives) kind stop-at-semi)))))
-
+
 ;;;; format directives for simple output
 
 (def-format-directive #\A (colonp atsignp params)
@@ -573,7 +573,7 @@
                      (*print-length* nil))))
            (output-object ,(expand-next-arg) stream))
         `(output-object ,(expand-next-arg) stream))))
-
+
 ;;;; format directives for integer output
 
 (defun expand-format-integer (base colonp atsignp params)
@@ -621,7 +621,7 @@
                   (if colonp
                       `(format-print-ordinal stream ,n-arg)
                       `(format-print-cardinal stream ,n-arg))))))))
-
+
 ;;;; format directive for pluralization
 
 (def-format-directive #\P (colonp atsignp params end)
@@ -647,7 +647,7 @@
       (if atsignp
           `(write-string (if (eql ,arg 1) "y" "ies") stream)
           `(unless (eql ,arg 1) (write-char #\s stream))))))
-
+
 ;;;; format directives for floating point output
 
 (def-format-directive #\F (colonp atsignp params)
@@ -674,7 +674,7 @@
   (expand-bind-defaults ((d 2) (n 1) (w 0) (pad #\space)) params
     `(format-dollars stream ,(expand-next-arg) ,d ,n ,w ,pad ,colonp
                      ,atsignp)))
-
+
 ;;;; format directives for line/page breaks etc.
 
 (def-format-directive #\% (colonp atsignp params)
@@ -725,7 +725,7 @@
   (check-modifier '("colon" "at-sign") (and colonp atsignp))
   (values (expand-bind-defaults () params)
           (bug "Unreachable ~S" directives)))
-
+
 ;;;; format directives for tabs and simple pretty printing
 
 (def-format-directive #\T (colonp atsignp params)
@@ -754,7 +754,7 @@
   (check-modifier "at-sign" atsignp)
   (expand-bind-defaults ((n 0)) params
     `(pprint-indent ,(if colonp :current :block) ,n stream)))
-
+
 ;;;; format directive for ~*
 
 (def-format-directive #\* (colonp atsignp params end)
@@ -791,7 +791,7 @@
                   `(dotimes (i ,n)
                      ,(expand-next-arg)))
                 (expand-next-arg))))))
-
+
 ;;;; format directive for indirection
 
 (def-format-directive #\? (colonp atsignp params string end)
@@ -812,7 +812,7 @@
                 `(setf args (%format stream ,(expand-next-arg) orig-args args))
                 (throw 'need-orig-args nil))
             `(%format stream ,(expand-next-arg) ,(expand-next-arg))))))
-
+
 ;;;; format directives for capitalization
 
 (def-complex-format-directive #\( (colonp atsignp params directives)
@@ -836,7 +836,7 @@
 
 (def-complex-format-directive #\) ()
   (format-error "No corresponding open parenthesis"))
-
+
 ;;;; format directives and support functions for conditionalization
 
 (def-complex-format-directive #\[ (colonp atsignp params directives)
@@ -964,7 +964,7 @@
 
 (def-complex-format-directive #\] ()
   (format-error "No corresponding open bracket"))
-
+
 ;;;; format directive for up-and-out
 
 (def-format-directive #\^ (colonp atsignp params)
@@ -983,7 +983,7 @@
      ,(if colonp
           '(return-from outside-loop nil)
           '(return))))
-
+
 ;;;; format directives for iteration
 
 (def-complex-format-directive #\{ (colonp atsignp params string end directives)
@@ -1061,7 +1061,7 @@
 
 (def-complex-format-directive #\} ()
   (format-error "No corresponding open brace"))
-
+
 ;;;; format directives and support functions for justification
 
 (defconstant-eqx !illegal-inside-justification
@@ -1287,7 +1287,7 @@
                                      '(nil 0 0))
                                segments ,colonp ,atsignp
                                ,mincol ,colinc ,minpad ,padchar)))))
-
+
 ;;;; format directive and support function for user-defined method
 
 (def-format-directive #\/ (string start end colonp atsignp params)

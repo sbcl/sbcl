@@ -13,7 +13,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; utilities used during code generation
 
 ;;; the number of bytes used by the code object header
@@ -51,7 +51,7 @@
 ;;; designated by 2ENV
 (defun callee-return-pc-tn (2env)
   (ir2-physenv-return-pc-pass 2env))
-
+
 ;;;; noise to emit an instruction trace
 
 (defun trace-instruction (section vop inst args state
@@ -77,7 +77,7 @@
       (t
        (format t "~0,8T~A~@[~0,8T~{~A~^, ~}~]~%" inst args))))
   (values))
-
+
 ;;;; GENERATE-CODE and support routines
 
 ;;; standard defaults for slots of SEGMENT objects

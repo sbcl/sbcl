@@ -749,7 +749,7 @@
                        'simd-pack-256 *simd-pack-element-types*))
          (when (csubtypep element-type (specifier-type pack-type))
            (return (list pack-type)))))))
-
+
 ;;;; type utilities
 
 ;;; Return the type structure corresponding to a type specifier.
@@ -971,7 +971,7 @@ expansion happened."
   (values-specifier-type-cache-clear)
   (values))
 
-
+
 (!defun-from-collected-cold-init-forms !early-type-cold-init)
 
 ;;; When cross-compiling SPECIFIER-TYPE with a quoted argument,

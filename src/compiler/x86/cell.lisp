@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; data object ref/set stuff
 
 (define-vop (slot)
@@ -69,7 +69,7 @@
                             :disp (- (* offset n-word-bytes) lowtag))
            new :lock)
      (move result eax)))
-
+
 ;;;; symbol hacking VOPs
 
 (define-vop (%compare-and-swap-symbol-value)
@@ -241,7 +241,7 @@
     ;; ensure this is explained in the comment in objdef.lisp
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
     (inst and res (lognot #b11))))
-
+
 ;;;; fdefinition (FDEFN) objects
 
 (define-vop (fdefn-fun cell-ref)        ; /pfw - alpha
@@ -288,7 +288,7 @@
     (storew (make-fixup 'undefined-tramp :assembly-routine)
             fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
-
+
 ;;;; binding and unbinding
 
 ;;; BIND -- Establish VAL as a binding for SYMBOL. Save the old value and
@@ -405,7 +405,7 @@
     (store-binding-stack-pointer bsp)
 
     DONE))
-
+
 ;;;; closure indexing
 
 (define-full-reffer closure-index-ref *
@@ -439,7 +439,7 @@
   (:info offset)
   (:generator 4
     (storew ebp-tn object (+ closure-info-offset offset) fun-pointer-lowtag)))
-
+
 ;;;; value cell hackery
 
 (define-vop (value-cell-ref cell-ref)
@@ -447,7 +447,7 @@
 
 (define-vop (value-cell-set cell-set)
   (:variant value-cell-value-slot other-pointer-lowtag))
-
+
 ;;;; structure hackery
 
 (define-vop (instance-length)
@@ -478,7 +478,7 @@
 (define-full-compare-and-swap %raw-instance-cas/word instance
   instance-slots-offset instance-pointer-lowtag
   (unsigned-reg) unsigned-num %raw-instance-cas/word)
-
+
 ;;;; code object frobbing
 
 (define-full-reffer code-header-ref * 0 other-pointer-lowtag
@@ -499,7 +499,7 @@
     (inst push object)
     (inst call (make-fixup 'code-header-set :assembly-routine))
     (move result value)))
-
+
 ;;;; raw instance slot accessors
 
 (defun instance-slot-ea (object index &optional (displacement 0))

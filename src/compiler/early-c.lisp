@@ -36,7 +36,7 @@
 (defconstant sb-xc:multiple-values-limit sb-xc:most-positive-fixnum
   "The exclusive upper bound on the number of multiple VALUES that you can
   return.")
-
+
 ;;;; cross-compiler-only versions of CL special variables, so that we
 ;;;; don't have weird interactions with the host compiler
 
@@ -44,7 +44,7 @@
 (defvar sb-xc:*compile-file-truename*)
 (defvar sb-xc:*compile-print*)
 (defvar sb-xc:*compile-verbose*)
-
+
 ;;;; miscellaneous types used both in the cross-compiler and on the target
 
 ;;;; FIXME: The INDEX and LAYOUT-DEPTHOID definitions probably belong
@@ -60,7 +60,7 @@
   ;; FIXME: Probably should exclude negative bignum
   #+compact-instance-header 'integer
   #-compact-instance-header '(and integer (not (eql 0))))
-
+
 ;;; An INLINEP value describes how a function is called. The values
 ;;; have these meanings:
 ;;;     NIL     No declaration seen: do whatever you feel like, but don't
@@ -166,7 +166,7 @@ the stack without triggering overflow protection.")
     (prog1
         *object-id-counter*
       (incf *object-id-counter*))))
-
+
 ;;;; miscellaneous utilities
 
 ;;; This is for "observers" who want to know if type names have been added.

@@ -13,7 +13,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; type predicate translation
 ;;;;
 ;;;; We maintain a bidirectional association between type predicates
@@ -48,7 +48,7 @@
                         :key #'cdr)))
     (%deftransform name '(function (t) *) #'fold-type-predicate)
     name))
-
+
 ;;;; IR1 transforms
 
 ;;; If we discover the type argument is constant during IR1
@@ -157,7 +157,7 @@
          (cell (find-classoid-cell name :create t)))
     `(or (classoid-cell-classoid ',cell)
          (error "Class not yet defined: ~S" name))))
-
+
 (defoptimizer (%typep-wrapper constraint-propagate-if)
     ((test-value variable type) node gen)
   (declare (ignore test-value gen))
@@ -187,7 +187,7 @@
               (t
                (delay-ir1-transform node :constraint)
                'test-value)))))
-
+
 ;;;; standard type predicates, i.e. those defined in package COMMON-LISP,
 ;;;; plus at least one oddball (%INSTANCEP)
 ;;;;
@@ -230,7 +230,7 @@
   (define-type-predicate symbolp symbol)
   (define-type-predicate vectorp vector))
 (!define-standard-type-predicates)
-
+
 ;;;; transforms for type predicates not implemented primitively
 ;;;;
 ;;;; See also VM dependent transforms.
@@ -248,7 +248,7 @@
 
 (deftransform symbolp ((x) ((not null)) * :important nil)
   '(non-null-symbol-p x))
-
+
 ;;;; TYPEP source transform
 
 ;;; Return a form that tests the variable N-OBJECT for being in the
@@ -1065,7 +1065,7 @@
       (with-current-source-form (spec)
         (source-transform-typep object (cadr spec)))
       (values nil t)))
-
+
 ;;;; coercion
 
 ;;; Constant-folding.

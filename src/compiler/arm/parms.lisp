@@ -95,7 +95,7 @@
 ;; conditional.
 #-arm-vfp
 (error "Don't know how to set the FPU control word layout on non-VFP systems")
-
+
 ;;;; Where to put the different spaces.
 
 ;;; On non-gencgc we need large dynamic and static spaces for PURIFY
@@ -120,7 +120,7 @@
   (progn
     (defparameter dynamic-0-space-start #x4f000000)
     (defparameter dynamic-0-space-end   #x66fff000)))
-
+
 ;;;; other miscellaneous constants
 
 (defenum (:start 8)
@@ -132,7 +132,7 @@
   single-step-around-trap
   single-step-before-trap
   error-trap)
-
+
 ;;;; Static symbols.
 
 ;;; These symbols are loaded into static space directly after NIL so
@@ -166,7 +166,7 @@
     sb-kernel:%negate)
   #'equalp)
 
-
+
 ;;;; Assembler parameters:
 
 ;;; The number of bits per element in the assemblers code vector.

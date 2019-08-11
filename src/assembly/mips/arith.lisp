@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 
-
+
 ;;;; Addition and subtraction.
 
 ;;; static-fun-offset returns the address of the raw_addr slot of
@@ -119,7 +119,7 @@
   (move cfp-tn csp-tn t))
 
 
-
+
 ;;;; Multiplication
 
 
@@ -219,7 +219,7 @@
   (frob fixnum-* "fixnum *" 30 tagged-num any-reg t))
 
 
-
+
 ;;;; Division.
 
 
@@ -292,7 +292,7 @@
     (inst mfhi rem))
 
 
-
+
 ;;;; Comparison routines.
 
 (macrolet

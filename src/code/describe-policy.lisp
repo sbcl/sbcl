@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C") ;(SB-C, not SB-C, since we're built in warm load.)
-
+
 (defun describe-compiler-policy (&optional spec)
   "Print all global optimization settings, augmented by SPEC."
   (let ((policy (process-optimize-decl (cons 'optimize spec) *policy*)))

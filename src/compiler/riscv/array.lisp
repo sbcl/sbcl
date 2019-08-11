@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Allocator for the array header.
 (define-vop (make-array-header)
   (:policy :fast-safe)
@@ -63,7 +63,7 @@
         (storew pa-flag header 0 other-pointer-lowtag)))
     (move result header)))
 
-
+
 ;;;; Additional accessors and setters for the array header.
 (define-full-reffer %array-dimension *
   array-dimensions-offset other-pointer-lowtag
@@ -357,7 +357,7 @@
   (def-small-data-vector-frobs simple-array-unsigned-byte-2 2)
   (def-small-data-vector-frobs simple-array-unsigned-byte-4 4))
 
-
+
 ;;; These vops are useful for accessing the bits of a vector irrespective of
 ;;; what type of vector it is.
 (define-full-reffer vector-raw-bits * vector-data-offset other-pointer-lowtag

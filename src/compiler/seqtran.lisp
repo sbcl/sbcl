@@ -31,7 +31,7 @@
 ;;; Moreover, it would be nice if some of the declarations were commented
 ;;; with their reason for existence.
 
-
+
 ;;;; mapping onto lists: the MAPFOO functions
 
 ;; This expander allows a compiler-macro for FN to take effect by eliding
@@ -127,7 +127,7 @@
 
 (define-source-transform mapcon (function list &rest more-lists)
   (mapfoo-transform function (cons list more-lists) :nconc nil))
-
+
 ;;;; mapping onto sequences: the MAP function
 
 ;;; MAP is %MAP plus a check to make sure that any length specified in
@@ -377,7 +377,7 @@
             (t
              (%give-up))))))
 
-
+
 ;;; FIXME: once the confusion over doing transforms with known-complex
 ;;; arrays is over, we should also transform the calls to (AND (ARRAY
 ;;; * (*)) (NOT (SIMPLE-ARRAY * (*)))) objects.
@@ -782,7 +782,7 @@
   `(sb-sequence:fill seq item
                      :start start
                      :end (%check-generic-sequence-bounds seq start end)))
-
+
 ;;;; hairy sequence transforms
 
 ;;; FIXME: no hairy sequence transforms in SBCL?
@@ -793,7 +793,7 @@
 ;;; transforms might want to look at it for inspiration, even though
 ;;; the actual code is ancient CMUCL -- and hence bitrotted. The code
 ;;; was deleted in 1.0.7.23.
-
+
 ;;;; string operations
 
 ;;; We transform the case-sensitive string predicates into a non-keyword
@@ -896,7 +896,7 @@
 
 (deftransform string ((x) (symbol)) '(symbol-name x))
 (deftransform string ((x) (string)) '(progn x))
-
+
 ;;;; transforms for sequence functions
 
 ;;; FIXME: In the copy loops below, we code the loops in a strange
@@ -1267,7 +1267,7 @@
 
 (deftransform copy-seq ((seq) ((and sequence (not vector) (not list))))
   '(sb-sequence:copy-seq seq))
-
+
 (deftransform search ((pattern text &key start1 start2 end1 end2 test test-not
                                key from-end)
                       ((constant-arg sequence) * &rest *))
@@ -1769,7 +1769,7 @@
                          ,@(coerce-constants vars 'vector))
                        `(%concatenate-to-vector
                          ,vector-widetag ,@(coerce-constants vars 'list))))))))))
-
+
 ;;;; CONS accessor DERIVE-TYPE optimizers
 
 (defoptimizer (car derive-type) ((cons))
@@ -1789,7 +1789,7 @@
            null-type)
           ((cons-type-p type)
            (cons-type-cdr-type type)))))
-
+
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
 (defoptimizer (find derive-type) ((item sequence &key key test
@@ -2277,7 +2277,7 @@
   (define-trimmer-transform string-right-trim nil t)
   (define-trimmer-transform string-trim t t))
 
-
+
 ;;; (partially) constant-fold backq-* functions, or convert to their
 ;;; plain CL equivalent (now that they're not needed for pprinting).
 
@@ -2339,7 +2339,7 @@
       `(lambda ,gensyms
          (declare (ignore ,@ignored))
          (append ,@arguments)))))
-
+
 (deftransform reverse ((sequence) (vector) * :important nil)
   `(sb-impl::vector-reverse sequence))
 
@@ -2351,7 +2351,7 @@
 
 (deftransform nreverse ((sequence) (list) * :important nil)
   `(sb-impl::list-nreverse sequence))
-
+
 (deftransforms (intersection nintersection)
     ((list1 list2 &key key test test-not))
   (let ((null-type (specifier-type 'null)))
@@ -2441,7 +2441,7 @@
            'list1)
           (t
            (give-up-ir1-transform)))))
-
+
 (deftransform tree-equal ((list1 list2 &key test test-not))
   (cond ((and (same-leaf-ref-p list1 list2)
               (not test-not)

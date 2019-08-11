@@ -130,7 +130,7 @@
     ;; again ANSI's specification of DESCRIBE doesn't mention it and
     ;; ANSI's example of DESCRIBE-OBJECT does its own final TERPRI.
     (values)))
-
+
 ;;;; DESCRIBE-OBJECT Protocol
 ;;;;
 ;;;; Style guide:
@@ -157,7 +157,7 @@
 (defgeneric object-self-string (object))
 
 (defgeneric object-type-string (object))
-
+
 ;;; Methods for builtin objects
 
 (defmethod object-self-string ((object t))
@@ -360,7 +360,7 @@
         (out "Exports" (humanize exports))
         (format stream "~@:_~S internal symbols."
                 (package-internal-symbol-count object))))))
-
+
 ;;;; Helpers to deal with shared functionality
 
 (defun describe-deprecation (namespace name stream)

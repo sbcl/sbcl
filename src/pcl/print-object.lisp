@@ -26,7 +26,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;;; the PRINT-OBJECT generic function
 
 ;;; Blow away the old non-generic function placeholder which was used
@@ -43,7 +43,7 @@
 (unless (sb-impl::!c-runtime-noinform-p)
   (write-string " done
 "))
-
+
 ;;;; PRINT-OBJECT methods for objects from PCL classes
 ;;;;
 

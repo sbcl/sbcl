@@ -24,7 +24,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defmethod make-instance ((class symbol) &rest initargs)
   (apply #'make-instance (find-class class) initargs))
 
@@ -268,7 +268,7 @@
                       (memq (slot-definition-name slotd) slot-names))
               (initialize-slot-from-initfunction class instance slotd))))
     instance))
-
+
 ;;; If initargs are valid return nil, otherwise signal an error.
 (defun check-initargs-1 (class initargs call-list
                          &optional (plist-p t) (error-p t))

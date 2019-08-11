@@ -13,7 +13,7 @@
 (in-package "SB-ALIEN")
 
 (/show0 "host-alieneval.lisp 15")
-
+
 ;;;; utility functions
 
 (defun align-offset (offset alignment)
@@ -27,7 +27,7 @@
         ((> bits 8) 16)
         ((> bits 1) 8)
         (t 1)))
-
+
 ;;;; ALIEN-TYPE-INFO stuff
 
 ;;; We define a keyword "BOA" constructor so that we can reference the
@@ -79,7 +79,7 @@
          ,@body)
        (setf (,(method-slot method) (alien-type-class-or-lose ',class))
              #',defun-name))))
-
+
 ;;;; type parsing and unparsing
 
 ;;; CMU CL used COMPILER-LET to bind *AUXILIARY-TYPE-DEFINITIONS*, and
@@ -164,7 +164,7 @@
 ;;; *RECORD-TYPES-ALREADY-UNPARSED*.
 (defun %unparse-alien-type (type)
   (invoke-alien-type-method :unparse type))
-
+
 ;;;; alien type defining stuff
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
@@ -213,7 +213,7 @@
     (setf (info :alien-type :kind name) :defined)
     (setf (info :source-location :alien-type name) source-location)
     name))
-
+
 ;;;; the root alien type
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
@@ -222,7 +222,7 @@
 (defmethod print-object ((type alien-type) stream)
   (print-unreadable-object (type stream :type t)
     (sb-impl:print-type-specifier stream (unparse-alien-type type))))
-
+
 ;;;; the SAP type
 
 (define-alien-type-class (system-area-pointer))
@@ -255,7 +255,7 @@
 (define-alien-type-method (system-area-pointer :extract-gen) (type sap offset)
   (declare (ignore type))
   `(sap-ref-sap ,sap (/ ,offset sb-vm:n-byte-bits)))
-
+
 ;;;; the ALIEN-VALUE type
 
 (define-alien-type-class (alien-value :include system-area-pointer))
@@ -271,7 +271,7 @@
   (declare (ignore type))
   (/noshow "doing alien type method ALIEN-VALUE :DEPORT-GEN" value)
   `(alien-sap ,value))
-
+
 ;;; HEAP-ALIEN-INFO -- defstruct.
 ;;;
 (defmethod print-object ((info heap-alien-info) stream)
@@ -291,7 +291,7 @@
 (defun heap-alien-info-sap (info)
   (foreign-symbol-sap (heap-alien-info-alien-name info)
                       (heap-alien-info-datap info)))
-
+
 ;;;; Interfaces to the different methods
 
 (defun alien-type-= (type1 type2)
@@ -368,7 +368,7 @@
 ;;; details.
 (defun compute-alien-rep-type (type &optional (context :normal))
   (invoke-alien-type-method :alien-rep type context))
-
+
 ;;;; default methods
 
 (defun missing-alien-operation-error (type operation)
@@ -427,7 +427,7 @@
   (declare (ignore state))
   (missing-alien-operation-error "return from CALL-OUT"
                                  (unparse-alien-type type)))
-
+
 ;;;; the INTEGER type
 
 (define-alien-type-class (integer)
@@ -502,7 +502,7 @@
         `(,ref-fun ,sap (/ ,offset sb-vm:n-byte-bits))
         (error "cannot extract ~W-bit integers"
                (alien-integer-type-bits type)))))
-
+
 ;;;; the BOOLEAN type
 
 (define-alien-type-class (boolean :include integer :include-args (signed)))
@@ -528,7 +528,7 @@
 (define-alien-type-method (boolean :deport-gen) (type value)
   (declare (ignore type))
   `(if ,value 1 0))
-
+
 ;;;; the ENUM type
 
 (define-alien-type-class (enum :include (integer (bits 32))
@@ -661,7 +661,7 @@
      ,@(mapcar (lambda (mapping)
                  `(,(car mapping) ,(cdr mapping)))
                (alien-enum-type-from type))))
-
+
 ;;;; the FLOAT types
 
 (define-alien-type-class (float)
@@ -705,7 +705,7 @@
   (declare (ignore type))
   `(sap-ref-double ,sap (/ ,offset sb-vm:n-byte-bits)))
 
-
+
 ;;;; the POINTER type
 
 (define-alien-type-class (pointer :include (alien-value (bits
@@ -761,7 +761,7 @@
       (null
        (int-sap 0)))
    `(or null system-area-pointer (alien ,type))))
-
+
 ;;;; the MEM-BLOCK type
 
 (define-alien-type-class (mem-block :include alien-value))
@@ -777,7 +777,7 @@
     `(sb-kernel:system-area-ub8-copy ,value 0 ,sap
       (truncate ,offset sb-vm:n-byte-bits)
       ',(truncate bits sb-vm:n-byte-bits))))
-
+
 ;;;; the ARRAY type
 
 (define-alien-type-class (array :include mem-block)
@@ -827,7 +827,7 @@
                   (equal dim1 dim2))
               (alien-subtype-p (alien-array-type-element-type type1)
                                (alien-array-type-element-type type2))))))
-
+
 ;;;; the RECORD type
 
 (def!struct (alien-record-field (:copier nil))
@@ -989,7 +989,7 @@
                (or (memq type2 types) (match-fields types)))
              (let ((*alien-type-matches* (make-hash-table :test #'eq)))
                (match-fields))))))
-
+
 ;;;; the FUNCTION and VALUES alien types
 
 ;;; Calling-convention spec, typically one of predefined keywords.
@@ -1094,7 +1094,7 @@
        (every #'alien-type-=
               (alien-values-type-values type1)
               (alien-values-type-values type2))))
-
+
 ;;;; a structure definition needed both in the target and in the
 ;;;; cross-compilation host
 
@@ -1120,7 +1120,7 @@
             "~:[~;(forced to stack) ~]~S"
             (local-alien-info-force-to-memory-p info)
             (unparse-alien-type (local-alien-info-type info)))))
-
+
 ;;;; the ADDR macro
 
 (sb-xc:defmacro addr (expr &environment env)

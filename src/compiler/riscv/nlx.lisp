@@ -15,7 +15,7 @@
 ;;; non-local entry.
 (defun make-nlx-entry-arg-start-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn ocfp-offset))
-
+
 ;;; Save and restore dynamic environment.
 ;;;
 ;;; These VOPs are used in the reentered function to restore the appropriate
@@ -68,7 +68,7 @@
   (:args (nsp :scs (any-reg descriptor-reg)))
   (:generator 1
     (move nsp-tn nsp)))
-
+
 ;;;; Unwind block hackery:
 
 ;;; Compute the address of the catch block from its TN, then store into the
@@ -139,7 +139,7 @@
     (load-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-uwp-slot)
     (store-symbol-value block *current-unwind-protect-block*)))
-
+
 ;;;; NLX entry VOPs:
 
 (define-vop (nlx-entry)
@@ -226,7 +226,7 @@
       (inst bne dst csp-tn loop)
 
       (emit-label done))))
-
+
 ;;; This VOP is just to force the TNs used in the cleanup onto the stack.
 ;;;
 (define-vop (uwp-entry)

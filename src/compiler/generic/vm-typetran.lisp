@@ -12,7 +12,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; internal predicates
 
 ;;; These type predicates are used to implement simple cases of TYPEP.
@@ -123,7 +123,7 @@
 ;;; accepting any type object.
 (define-type-predicate %standard-char-p standard-char)
 (define-type-predicate non-null-symbol-p (and symbol (not null)))
-
+
 (defglobal *backend-type-predicates-grouped*
     (let (plist)
       (loop for (type . pred) in *backend-type-predicates*

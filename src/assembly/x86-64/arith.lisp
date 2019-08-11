@@ -45,7 +45,7 @@
   (inst mov rcx-tn (fixnumize arg-count))
   (inst jmp (static-fun-addr fun))))
 
-
+
 ;;;; addition, subtraction, and multiplication
 
 #+sb-assembling
@@ -135,7 +135,7 @@
 
     SINGLE-WORD-BIGNUM
     (return-single-word-bignum res res rax)))
-
+
 ;;;; negation
 
 (define-assembly-routine (generic-negate
@@ -159,7 +159,7 @@
   (inst clc) (inst ret)
   GENERIC
   (tail-call-static-fun '%negate 1))
-
+
 ;;;; comparison
 
 (macrolet ((define-cond-assem-rtn (name translate static-fn test)

@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;; Rather than compiling the constructors here, just tickle the range
 ;;; of shapes defined above, leaving the generation of the
 ;;; constructors to precompile-dfun-constructors.

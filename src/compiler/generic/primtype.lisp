@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; primitive type definitions
 
 (/show0 "primtype.lisp 17")
@@ -135,7 +135,7 @@
 ;;; miscellaneous primitive types that don't exist at the LISP level
 (!def-primitive-type catch-block (catch-block) :type nil)
 (!def-primitive-type unwind-block (unwind-block) :type nil)
-
+
 ;;;; PRIMITIVE-TYPE-OF and friends
 
 ;;; Return the most restrictive primitive type that contains OBJECT.

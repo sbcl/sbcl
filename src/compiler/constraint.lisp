@@ -86,7 +86,7 @@
   ;; If true, negates the sense of the constraint, so the relation
   ;; does *not* hold.
   (not-p nil :type boolean))
-
+
 ;;; Historically, CMUCL and SBCL have used a sparse set implementation
 ;;; for which most operations are O(n) (see sset.lisp), but at the
 ;;; cost of at least a full word of pointer for each constraint set
@@ -290,7 +290,7 @@
     (defconsetop conset-union bit-ior)
     (defconsetop conset-intersection bit-and)
     (defconsetop conset-difference bit-andc2)))
-
+
 ;;; Constraints are hash-consed. Unfortunately, types aren't, so we have
 ;;; to over-approximate and then linear search through the potential hits.
 ;;; LVARs can only be found in EQL (not-p = NIL) constraints, while constant
@@ -383,7 +383,7 @@
         (when (lambda-var-p y)
           (register-constraint y new x))
         new)))
-
+
 ;;; Actual conset interface
 ;;;
 ;;; Constraint propagation needs to iterate over the set of lambda-vars known to
@@ -542,7 +542,7 @@
         (inherit-constraints (eql1) var2 constraints target)
         (inherit-constraints (eql2) var1 constraints target))
       t)))
-
+
 ;;; If REF is to a LAMBDA-VAR with CONSTRAINTs (i.e. we can do flow
 ;;; analysis on it), then return the LAMBDA-VAR, otherwise NIL.
 #-sb-fluid (declaim (inline ok-ref-lambda-var))

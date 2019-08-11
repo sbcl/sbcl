@@ -9,7 +9,7 @@
 ;;;; public domain. The software is in the public domain and is
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
-
+
 ;;;; CLISP issues
 
 ;;; as explained on #lisp ca. October 2003:
@@ -37,7 +37,7 @@
 #+clisp
 (ext:without-package-lock ("SYSTEM")
   (setf system::*inhibit-floating-point-underflow* t))
-
+
 ;;;; CMU CL issues
 
 ;;; CMU CL, at least as of 18b, doesn't support PRINT-OBJECT. In
@@ -65,7 +65,7 @@
 
 #+(and cmu sparc)
 (ext:set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
-
+
 ;;;; OpenMCL issues
 
 ;;; This issue in OpenMCL led to some SBCL bug reports ca. late 2003.

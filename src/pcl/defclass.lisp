@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;;; DEFCLASS macro and close personal friends
 
 (declaim (global  *the-class-t*
@@ -313,7 +313,7 @@
              (push entry *initfunctions-for-this-defclass*))
            (cadr entry)))))
 
-
+
 ;;; This is the early definition of LOAD-DEFCLASS. It just collects up
 ;;; all the class definitions in a list. Later, in braid1.lisp, these
 ;;; are actually defined.

@@ -454,7 +454,7 @@
     (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
       (inst beq y zero-tn zero))))
 
-
+
 ;;;; Binary conditional VOPs.
 
 ;;; Unlike other backends, it is not worth defining vops which
@@ -532,7 +532,7 @@
   (:arg-types * tagged-num)
   (:variant-cost 7))
 
-
+
 ;;;; Logical operations
 
 (define-vop (shift-towards-someplace)
@@ -555,7 +555,7 @@
   (:generator 1
     (inst sll r num amount)))
 
-
+
 ;;;; Modular arithmetic
 (defmacro define-mod-binop ((name prototype) function)
   `(define-vop (,name ,prototype)

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; Moves and coercions:
 
 ;;; Move a tagged char to an untagged representation.
@@ -68,7 +68,7 @@
 ;;; to a descriptor passing location.
 (define-move-vop move-arg :move-arg
   (character-reg) (any-reg descriptor-reg))
-
+
 ;;;; Other operations:
 
 (define-vop (char-code)
@@ -90,7 +90,7 @@
   (:result-types character)
   (:generator 1
     (inst srwi res code n-fixnum-tag-bits)))
-
+
 ;;; Comparison of characters.
 (define-vop (character-compare)
   (:args (x :scs (character-reg))

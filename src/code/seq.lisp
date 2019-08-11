@@ -17,7 +17,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; utilities
 
 (defun %check-generic-sequence-bounds (seq start end)
@@ -339,7 +339,7 @@
          :datum list
          :type '(and list (satisfies list-length))))
 
-
+
 
 (defun emptyp (sequence)
   "Returns T if SEQUENCE is an empty sequence and NIL
@@ -466,7 +466,7 @@
                       (sb-sequence:make-sequence-like
                        prototype length)))))
           (t (bad-sequence-type-error (type-specifier type))))))
-
+
 ;;;; SUBSEQ
 ;;;;
 
@@ -548,7 +548,7 @@
     (list-subseq* sequence start end)
     (vector-subseq* sequence start end)
     (sb-sequence:subseq sequence start end)))
-
+
 ;;;; COPY-SEQ
 
 (defun copy-seq (sequence)
@@ -563,7 +563,7 @@
 
 (defun list-copy-seq* (sequence)
   (copy-list-macro sequence :check-proper-list t))
-
+
 ;;;; FILL
 
 (defun list-fill* (sequence item start end)
@@ -693,7 +693,7 @@
    (sb-sequence:fill sequence item
                      :start start
                      :end (%check-generic-sequence-bounds sequence start end))))
-
+
 
 (defmacro word-specialized-vector-tag-p (tag)
   `(or
@@ -879,7 +879,7 @@ many elements are copied."
     (the sequence
       (values (apply #'sb-sequence:replace target-sequence1
                      (the sequence source-sequence2) args)))))
-
+
 ;;;; REVERSE
 (defun reverse (sequence)
   "Return a new sequence containing the same elements but in reverse order."
@@ -942,7 +942,7 @@ many elements are copied."
                    (funcall setter new-vector forward-index
                             (funcall getter vector backward-index))))))
         new-vector))))
-
+
 ;;;; NREVERSE
 
 (defun list-nreverse (list)
@@ -1004,7 +1004,7 @@ many elements are copied."
     ;; meaning it should return definitely an EXTENDED-SEQUENCE
     ;; and not a list or vector.
     (the extended-sequence (values (sb-sequence:nreverse sequence)))))
-
+
 
 (defmacro sb-sequence:dosequence ((element sequence &optional return) &body body)
   "Executes BODY with ELEMENT subsequently bound to each element of
@@ -1030,7 +1030,7 @@ many elements are copied."
                    (tagbody
                       ,@forms))))))))))
 
-
+
 ;;;; CONCATENATE
 
 (defun concatenate (result-type &rest sequences)
@@ -1156,7 +1156,7 @@ many elements are copied."
           (funcall setter result index e)
           (incf index)))
       result)))
-
+
 ;;;; MAP
 
 ;;; helper functions to handle arity-1 subcases of MAP
@@ -1421,7 +1421,7 @@ many elements are copied."
            (setf iter (sb-sequence:iterator-step result-sequence
                                                            iter from-end)))))))
   result-sequence)
-
+
 ;;;; REDUCE
 
 (defmacro mumble-reduce (function
@@ -1518,7 +1518,7 @@ many elements are copied."
                 (mumble-reduce function sequence key start end
                                initial-value aref)))))
     (apply #'sb-sequence:reduce function sequence args)))
-
+
 ;;;; DELETE
 
 (defmacro mumble-delete (pred)
@@ -1715,7 +1715,7 @@ many elements are copied."
           (if-not-mumble-delete-from-end)
           (if-not-mumble-delete)))
     (apply #'sb-sequence:delete-if-not predicate sequence args)))
-
+
 ;;;; REMOVE
 
 ;;; MUMBLE-REMOVE-MACRO does not include (removes) each element that
@@ -1915,7 +1915,7 @@ many elements are copied."
           (if-not-mumble-remove-from-end)
           (if-not-mumble-remove)))
     (apply #'sb-sequence:remove-if-not predicate sequence args)))
-
+
 ;;;; REMOVE-DUPLICATES
 
 ;;; Remove duplicates from a list. If from-end, remove the later duplicates,
@@ -2067,7 +2067,7 @@ many elements are copied."
                                  start end key from-end))
     (vector-remove-duplicates* sequence test test-not start end key from-end)
     (apply #'sb-sequence:remove-duplicates sequence args)))
-
+
 ;;;; DELETE-DUPLICATES
 (defun list-delete-duplicates* (list test test-not key from-end start end)
   (declare (index start)
@@ -2143,7 +2143,7 @@ many elements are copied."
                                key from-end start end))
     (vector-delete-duplicates* sequence test test-not key from-end start end)
     (apply #'sb-sequence:delete-duplicates sequence args)))
-
+
 ;;;; SUBSTITUTE
 
 (defun list-substitute* (pred new list start end count key test test-not old)
@@ -2276,7 +2276,7 @@ many elements are copied."
            (explicit-check sequence :result)
            (truly-dynamic-extent args))
   (subst-dispatch 'normal))
-
+
 ;;;; SUBSTITUTE-IF, SUBSTITUTE-IF-NOT
 
 (define-sequence-traverser substitute-if
@@ -2302,7 +2302,7 @@ many elements are copied."
         (test-not nil)
         old)
     (subst-dispatch 'if-not)))
-
+
 ;;;; NSUBSTITUTE
 
 (define-sequence-traverser nsubstitute
@@ -2369,7 +2369,7 @@ many elements are copied."
                   test)
           (funcall setter sequence index new)
           (decf count))))))
-
+
 ;;;; NSUBSTITUTE-IF, NSUBSTITUTE-IF-NOT
 
 (define-sequence-traverser nsubstitute-if
@@ -2483,7 +2483,7 @@ many elements are copied."
       (when (not (funcall test (apply-key key (funcall getter sequence index))))
         (funcall setter sequence index new)
         (decf count)))))
-
+
 ;;;; FIND, POSITION, and their -IF and -IF-NOT variants
 
 (defun effective-find-position-test (test test-not)
@@ -2651,7 +2651,7 @@ many elements are copied."
                   sequence from-end start end
                   (effective-find-position-key key)))
     (apply #'sb-sequence:position-if-not predicate sequence args)))
-
+
 ;;;; COUNT-IF, COUNT-IF-NOT, and COUNT
 
 (defmacro vector-count-if (notp from-end-p predicate sequence
@@ -2760,7 +2760,7 @@ many elements are copied."
               (vector-count-if test-not-p t test sequence :two-arg-predicate item)
               (vector-count-if test-not-p nil test sequence :two-arg-predicate item)))
         (apply #'sb-sequence:count item sequence args))))
-
+
 ;;;; MISMATCH
 
 (defmacro match-vars (&rest body)
@@ -2810,7 +2810,7 @@ many elements are copied."
        (())
      (declare (fixnum index1 index2))
      (if-mismatch (aref sequence1 index1) (pop sequence2))))
-
+
 (defmacro list-mumble-mismatch ()
   `(do ((index1 start1 (+ index1 (the fixnum inc)))
         (index2 start2 (+ index2 (the fixnum inc))))
@@ -2881,7 +2881,7 @@ many elements are copied."
   (the (or index null)
     (values (apply #'sb-sequence:mismatch sequence1
                    (the sequence sequence2) args))))
-
+
 ;;; search comparison functions
 
 ;;; Compare two elements and return if they don't match.
@@ -2934,7 +2934,7 @@ many elements are copied."
          (search-compare-vector-list ,main ,sub ,index)
          (search-compare-vector-vector ,main ,sub ,index)
          (return-from search (apply #'sb-sequence:search ,sub ,main args)))))
-
+
 ;;;; SEARCH
 
 (defmacro list-search (main sub)

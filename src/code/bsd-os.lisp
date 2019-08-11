@@ -82,7 +82,7 @@
   (or sb-sys::*software-version*
       (setf sb-sys::*software-version*
             (sysctl :str ctl-kern kern-osrelease))))
-
+
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
   (multiple-value-bind (err? utime stime maxrss ixrss idrss

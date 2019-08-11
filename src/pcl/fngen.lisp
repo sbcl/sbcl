@@ -22,7 +22,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 ;;; GET-FUN is the main user interface to this code. It is like
 ;;; COMPILE, only more efficient. It achieves this efficiency by
 ;;; reducing the number of times that the compiler needs to be called.
@@ -76,7 +76,7 @@
   (if (default-constantp form)
       (list (constant-form-value form))
       nil))
-
+
 (defstruct (fgen (:constructor make-fgen (gensyms generator generator-lambda system))
                  (:copier nil))
   gensyms
@@ -102,7 +102,7 @@
 
 (defun lookup-fgen (test)
   (gethash test *fgens*))
-
+
 (defun get-fun-generator (lambda test-converter code-converter)
   (let* ((test (compute-test lambda test-converter))
          (fgen (lookup-fgen test)))
@@ -163,7 +163,7 @@
                              (values f t))
                            f)))))
     collect))
-
+
 (defmacro precompile-function-generators (&optional system)
   (let (collect)
     (with-locked-system-table (*fgens*)

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; data types used by pathnames
 
 ;;; The HOST structure holds the functions that both parse the
@@ -38,7 +38,7 @@
 ;;; matches of translations.
 (sb-xc:defstruct (pattern (:constructor make-pattern (pieces)) (:copier nil))
   (pieces nil :type list))
-
+
 ;;;; PATHNAME structures
 
 ;;; the various magic tokens that are allowed to appear in pretty much

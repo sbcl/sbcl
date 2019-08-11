@@ -9,7 +9,7 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 (in-package "SB-VM")
-
+
 (defconstant-eqx +immediate-types+
   `(,unbound-marker-widetag ,character-widetag #+64-bit ,single-float-widetag)
   #'equal)

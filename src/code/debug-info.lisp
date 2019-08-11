@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; flags for compiled debug variables
 
 ;;; FIXME: old CMU CL representation follows:
@@ -40,7 +40,7 @@
 (defconstant compiled-debug-var-minimal-p              #b00100000)
 (defconstant compiled-debug-var-deleted-p              #b01000000)
 (defconstant compiled-debug-var-indirect-p             #b10000000)
-
+
 ;;;; compiled debug blocks
 ;;;;
 ;;;;    Compiled debug blocks are in a packed binary representation in the
@@ -79,7 +79,7 @@
 (defconstant debug-info-var-optional -4)
 (defconstant debug-info-var-supplied-p -5)
 
-
+
 ;;;; DEBUG-FUN objects
 
 (def!struct (debug-fun (:constructor nil)
@@ -319,7 +319,7 @@
     (compiled-debug-fun-cleanup :cleanup)
     (compiled-debug-fun nil)))
 
-
+
 ;;;; minimal debug function
 
 ;;; The minimal debug info format compactly represents debug-info for some
@@ -371,7 +371,7 @@
 ;;; the component until you find the right one. Well, I guess you need
 ;;; to at least know which function is an XEP for the real function
 ;;; (which would be useful info anyway).
-
+
 ;;;; DEBUG SOURCE
 
 ;;; There is one per compiled file and one per function compiled at
@@ -396,7 +396,7 @@
   ;; be in one or more code components. They all point at the same form.
   form
   (function nil :read-only t))
-
+
 ;;;; DEBUG-INFO structures
 
 (def!struct (debug-info

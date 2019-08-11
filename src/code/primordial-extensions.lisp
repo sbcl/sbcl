@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;; Helper for making the DX closure allocation in macros expanding
 ;;; to CALL-WITH-FOO less ugly.
 (defmacro dx-flet (functions &body forms)
@@ -42,7 +42,7 @@
 ;; the old value of I. Formerly in 'setf' but too late to avoid full calls.
 (declaim (inline xsubtract))
 (defun xsubtract (a b) (- b a))
-
+
 ;;;; GENSYM tricks
 
 ;;; Automate an idiom often found in macros:
@@ -70,7 +70,7 @@
 (defun make-gensym-list (n &optional name)
   (let ((arg (if name (string name) "G")))
     (loop repeat n collect (sb-xc:gensym arg))))
-
+
 ;;;; miscellany
 
 ;;; Lots of code wants to get to the KEYWORD package or the
@@ -207,7 +207,7 @@
                              (values id nil))
                        `(defconstant ,sym ,value ,@docstring))))
                  identifiers))))
-
+
 ;;; a helper function for various macros which expect clauses of a
 ;;; given length, etc.
 ;;;

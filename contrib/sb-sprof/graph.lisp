@@ -5,7 +5,7 @@
 
 (in-package #:sb-sprof)
 
-
+
 ;;;; Graph Utilities
 
 (defstruct (vertex (:constructor make-vertex)
@@ -133,7 +133,7 @@
     (setf (graph-vertices graph)
           (topological-sort (nconc (sccs) (trivial))))))
 
-
+
 ;;;; Call graph
 
 (deftype address ()
@@ -242,7 +242,7 @@
     (format stream "~s [~d]" (node-name (call-vertex call))
             (node-index (call-vertex call)))))
 
-
+
 ;;; Graph construction
 
 ;;; One function can have more than one COMPILED-DEBUG-FUNCTION with

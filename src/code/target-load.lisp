@@ -20,7 +20,7 @@
   "the TRUENAME of the file that LOAD is currently loading")
 (defvar *load-pathname* nil
   "the defaulted pathname that LOAD is currently loading")
-
+
 ;;;; LOAD-AS-SOURCE
 
 ;;; something not EQ to anything we might legitimately READ
@@ -87,7 +87,7 @@
                     do (sb-c::with-source-paths
                          (eval-form form nil))))))))
   t)
-
+
 ;;;; LOAD itself
 
 (define-condition fasl-header-missing (invalid-fasl)
@@ -274,7 +274,7 @@
                      defaulted-fasl-pathname)))
           (defaulted-fasl-truename defaulted-fasl-pathname)
           (defaulted-source-truename defaulted-source-pathname))))
-
+
 ;;;; linkage fixups
 
 ;;; Lisp assembler routines are named by Lisp symbols, not strings,

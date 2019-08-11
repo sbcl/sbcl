@@ -11,7 +11,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; Unix pathname host support
 
 ;;; FIXME: the below shouldn't really be here, but in documentation
@@ -265,7 +265,7 @@
                   nil
                   :newest)))))
 
-
+
 ;;;; Grabbing the kind of file when we have a namestring.
 (defun native-file-kind (namestring)
   (multiple-value-bind (existsp errno ino mode)
@@ -282,7 +282,7 @@
          #-win32
          (#.sb-unix:s-iflnk :symlink)
          (t :special))))))
-
+
 ;;;; TRUENAME, PROBE-FILE, FILE-AUTHOR, FILE-WRITE-DATE.
 
 ;;; Rewritten in 12/2007 by RMK, replacing 13+ year old CMU code that
@@ -501,7 +501,7 @@ is a wild pathname."
 An error of type FILE-ERROR is signaled if no such file exists,
 or if PATHSPEC is a wild pathname."
   (query-file-system pathspec :write-date))
-
+
 ;;;; miscellaneous other operations
 
 (/show0 "filesys.lisp 700")
@@ -638,7 +638,7 @@ exist or if is a file or a symbolic link."
           (recurse physical)
           (delete-dir physical)))))
 
-
+
 (sb-alien:define-alien-variable ("sbcl_home" *sbcl-home*) c-string)
 
 (defun sbcl-homedir-pathname ()
@@ -693,7 +693,7 @@ system. HOST argument is ignored by SBCL."
     *default-pathname-defaults*
     :as-directory t)))
 
-
+
 ;;;; DIRECTORY
 
 (defun directory (pathspec &key (resolve-symlinks t))
@@ -1222,7 +1222,7 @@ Experimental: interface subject to change."
                 (mapcar (lambda (x) (cons (simple-intersection
                                            (car one) (car two)) x))
                         (intersect-directory-helper (cdr one) (cdr two)))))))))
-
+
 
 (defun directory-pathname-p (pathname)
   (and (pathnamep pathname)

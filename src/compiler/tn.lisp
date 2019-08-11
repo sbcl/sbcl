@@ -31,7 +31,7 @@
               (unless ,tn (go ,outer))
        ,inner (progn ,@body)
               (if (setq ,tn (tn-next ,tn)) (go ,inner) (go ,outer)))))
-
+
 (defun set-ir2-physenv-live-tns (value instance)
   (setf (ir2-physenv-live-tns instance) value))
 
@@ -103,7 +103,7 @@
       (delete-some #'ir2-component-wired-tns
                    #'set-ir2-component-wired-tns)))
   (values))
-
+
 ;;;; TN creation
 
 ;;; Create a packed TN of the specified primitive-type in the
@@ -306,7 +306,7 @@
 
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
-
+
 ;;;; TN referencing
 
 ;;; Make a TN-REF that references TN and return it. WRITE-P should be
@@ -359,7 +359,7 @@
       (push-in tn-ref-next ref (tn-writes tn))
       (push-in tn-ref-next ref (tn-reads tn)))
   (values))
-
+
 ;;;; miscellaneous utilities
 
 ;;; Emit a move-like template determined at run-time, with X as the

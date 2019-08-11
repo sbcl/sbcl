@@ -111,7 +111,7 @@
                  :drop-through drop-through
                  :value-tn-ref value-tn-ref))
 
-
+
 ;;;; Other integer ranges.
 
 ;;; A (SIGNED-BYTE N-WORD-BITS) can be represented with either fixnum or a

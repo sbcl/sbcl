@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; DEFKNOWNs
 
 (defknown %sap-alien (system-area-pointer alien-type) alien-value
@@ -76,7 +76,7 @@
     (movable flushable))
 (defknown sb-alien::c-string-external-format * *
         (movable flushable))
-
+
 ;;;; cosmetic transforms
 
 (deftransform slot ((object slot)
@@ -90,7 +90,7 @@
 (deftransform %slot-addr ((object slot)
                           ((alien (* t)) symbol))
   '(%slot-addr (deref object) slot))
-
+
 ;;;; SLOT support
 
 (defun find-slot-offset-and-type (alien slot)
@@ -165,7 +165,7 @@
     (/noshow "in DEFTRANSFORM %SLOT-ADDR, creating %SAP-ALIEN")
     `(%sap-alien (sap+ (alien-sap alien) (/ ,slot-offset sb-vm:n-byte-bits))
                  ',(make-alien-pointer-type :to slot-type))))
-
+
 ;;;; DEREF support
 
 (defun find-deref-alien-type (alien)
@@ -290,7 +290,7 @@
     `(lambda (alien ,@indices-args)
        (%sap-alien (sap+ (alien-sap alien) (/ ,offset-expr sb-vm:n-byte-bits))
                    ',(make-alien-pointer-type :to element-type)))))
-
+
 ;;;; support for aliens on the heap
 
 (defun heap-alien-sap-and-type (info)
@@ -341,7 +341,7 @@
     (/noshow "in DEFTRANSFORM %HEAP-ALIEN-ADDR, creating %SAP-ALIEN")
     `(%sap-alien ,sap ',(make-alien-pointer-type :to type))))
 
-
+
 ;;;; support for local (stack or register) aliens
 
 (defun alien-info-constant-or-abort (info)
@@ -432,7 +432,7 @@
     (if (local-alien-info-force-to-memory-p info)
         `(%sap-alien var ',(make-alien-pointer-type :to alien-type))
         (error "This shouldn't happen."))))
-
+
 ;;;; %CAST
 
 (defoptimizer (%cast derive-type) ((alien type))
@@ -454,7 +454,7 @@
            `(naturalize (alien-sap alien) ',target-type))
           (t
            (abort-ir1-transform "cannot cast to alien type ~S" target-type)))))
-
+
 ;;;; ALIEN-SAP, %SAP-ALIEN, %ADDR, etc.
 
 (deftransform alien-sap ((alien))
@@ -478,7 +478,7 @@
   "optimize away %SAP-ALIEN"
   (give-up-ir1-transform
    "forced to do runtime allocation of alien-value structure"))
-
+
 ;;;; NATURALIZE/DEPORT/EXTRACT/DEPOSIT magic
 
 (flet ((%computed-lambda (compute-lambda type)
@@ -502,7 +502,7 @@
     (%computed-lambda #'compute-extract-lambda type))
   (deftransform (setf %alien-value) ((value sap offset type))
     (%computed-lambda #'compute-deposit-lambda type)))
-
+
 ;;;; a hack to clean up divisions
 
 (defun count-low-order-zeros (thing)
@@ -589,7 +589,7 @@
                          ,(1- (ash 1 (+ width (lvar-value amount))))))
               `(lambda (value amount1 amount2)
                  (ash value (+ amount1 amount2)))))))))
-
+
 ;;;; ALIEN-FUNCALL support
 
 (deftransform alien-funcall ((function &rest args)

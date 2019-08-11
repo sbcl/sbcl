@@ -13,7 +13,7 @@
 ;;;; more information.
 
 (in-package "SB-VM")
-
+
 ;;; Do whatever is necessary to make the given code component
 ;;; executable.  This isn't always strictly necessary (some ARM
 ;;; systems have coherent caches, for example), but it covers the

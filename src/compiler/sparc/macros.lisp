@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;; Instruction-like macros.
 
 (defmacro move (dst src)
@@ -96,7 +96,7 @@
      (inst lra-header-word)))
 
 
-
+
 ;;;; stack TN's
 
 ;;; Move a stack TN to a register and vice-versa.
@@ -128,8 +128,8 @@
           ((control-stack)
            (loadw ,n-reg cfp-tn (tn-offset ,n-stack))))))))
 
-
-
+
+
 ;;;; Storage allocation:
 
 ;;;; Allocation macro
@@ -280,7 +280,7 @@
     (storew zero-tn csp-tn 0) ; sneaky use of delay slot
     (inst add csp-tn csp-tn n-word-bytes)
     (emit-label aligned)))
-
+
 ;;;; Error Code
 (defun emit-error-break (vop kind code values)
   (assemble ()
@@ -299,7 +299,7 @@
       (emit-label start-lab)
       (apply #'error-call vop error-code values)
       start-lab)))
-
+
 ;;; a handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((&optional) &rest forms)
   (let ()

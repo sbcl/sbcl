@@ -29,7 +29,7 @@
 (defun print-pretty-on-stream-p (stream)
   (and (pretty-stream-p stream)
        *print-pretty*))
-
+
 ;;;; stream interface routines
 
 (defun pretty-out (stream char)
@@ -103,7 +103,7 @@
 
 (defun pretty-misc (stream op &optional arg1 arg2)
   (declare (ignore stream op arg1 arg2)))
-
+
 ;;;; logical blocks
 
 (defstruct (logical-block (:copier nil))
@@ -191,7 +191,7 @@
       (fill (pretty-stream-prefix stream) #\space
             :start old-indent :end new-indent)))
   nil)
-
+
 ;;;; the pending operation queue
 
 (defmacro enqueue (stream type &rest args)
@@ -283,7 +283,7 @@
         (:section-relative (values t t)))
     (enqueue stream tab :sectionp sectionp :relativep relativep
              :colnum colnum :colinc colinc)))
-
+
 ;;;; tab support
 
 (defun compute-tab-size (tab section-start column)
@@ -374,7 +374,7 @@
             (setf end srcpos)))
         (unless (eq new-buffer buffer)
           (replace new-buffer buffer :end1 end :end2 end))))))
-
+
 ;;;; stuff to do the actual outputting
 
 (defun ensure-space-in-buffer (stream want)
@@ -576,7 +576,7 @@
   (write-string (pretty-stream-buffer stream)
                 (pretty-stream-target stream)
                 :end (pretty-stream-buffer-fill-pointer stream)))
-
+
 ;;;; user interface to the pretty printer
 
 (defun pprint-newline (kind &optional stream)
@@ -700,7 +700,7 @@ line break."
       (write-char #\space stream)
       (pprint-tab :section-relative 0 (or tabsize 16) stream)
       (pprint-newline :fill stream))))
-
+
 ;;;; pprint-dispatch tables
 
 (define-load-time-global *standard-pprint-dispatch-table* nil)
@@ -881,7 +881,7 @@ line break."
                     (merge 'list list (list entry) (lambda (a b) (entry< b a)))
                     list)))))
   nil)
-
+
 ;;;; standard pretty-printing routines
 
 (defun pprint-array (stream array)
@@ -1343,7 +1343,7 @@ line break."
        (output-object (pprint-pop) stream)
        (pprint-exit-if-list-exhausted)
        (pprint-newline :mandatory stream)))))
-
+
 ;;;; the interface seen by regular (ugly) printer and initialization routines
 
 (defmacro with-pretty-stream ((stream-var

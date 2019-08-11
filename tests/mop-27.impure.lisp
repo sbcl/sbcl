@@ -79,7 +79,7 @@
 (defmethod sb-mop:remove-direct-method ((specializer pattern-specializer) method)
   (setf (slot-value specializer 'direct-methods)
         (remove method (slot-value specializer 'direct-methods))))
-
+
 (defgeneric simplify (x)
   (:generic-function-class pattern-gf/1))
 ;;; KLUDGE: order of definition matters, as we simply traverse

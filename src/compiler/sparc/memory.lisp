@@ -30,7 +30,7 @@
   (:generator 4
     (storew value object offset lowtag)))
 
-
+
 ;;;; Indexed references:
 
 ;;; Define some VOPs for indexed memory reference.

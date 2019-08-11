@@ -55,7 +55,7 @@
 ;;; are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
-
+
 ;;; bytes-needed-for-non-descriptor-stack-frame is the amount
 ;;; we grow or shrink the NSP/NFP stack. This stack is used
 ;;; by C-code so the convention (grow direction, grow size)
@@ -164,7 +164,7 @@
       (move csp-tn res)
       (inst ldo (* nargs n-word-bytes) csp-tn csp-tn))))
 
-
+
 ;;; Fix: boil down below notes into something nicer
 ;;; Emit code needed at the return-point from an unknown-values call for a
 ;;; fixed number of values.  VALUES is the head of the TN-REF list for the
@@ -309,7 +309,7 @@ default-value-8
           (inst compute-code-from-lra code-tn lra-label temp code-tn)))))
   (values))
 
-
+
 ;;;; Unknown values receiving:
 
 ;;;    Emit code needed at the return point for an unknown-values call for an
@@ -372,7 +372,7 @@ default-value-8
               nvals)
   (:temporary (:scs (non-descriptor-reg)) temp))
 
-
+
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
 ;;; does nothing.
@@ -382,7 +382,7 @@ default-value-8
     (emit-label trampoline-label))
   (emit-label start-label))
 
-
+
 ;;;; Local call with unknown values convention return:
 
 ;;; Non-TR local call for a fixed number of values passed according to the
@@ -473,7 +473,7 @@ default-value-8
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
-
+
 ;;;; Local call with known values return:
 
 ;;; Non-TR local call with known return locations.  Known-value return works
@@ -543,7 +543,7 @@ default-value-8
     (inst bv lip)
     (move ocfp-temp cfp-tn t)))
 
-
+
 ;;;; Full call:
 ;;;
 ;;;    There is something of a cross-product effect with full calls.  Different
@@ -883,7 +883,7 @@ default-value-8
         (move cur-nfp nsp-tn)
         (inst nop)))))
 
-
+
 ;;;; Unknown values return:
 
 ;;; Return a single value using the unknown-values convention.
@@ -1007,7 +1007,7 @@ default-value-8
         (inst ldil fixup tmp)
         (inst be fixup lisp-heap-space tmp :nullify t)))))
 
-
+
 ;;;; XEP hackery:
 
 ;;; Get the lexical environment from its passing location.

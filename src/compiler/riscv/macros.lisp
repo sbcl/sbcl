@@ -76,7 +76,7 @@ byte-ordering issues."
   (emit-label label)
   (inst lra-header-word))
 
-
+
 ;;;; Three Way Comparison
 (defun three-way-comparison (x y condition flavor not-p target)
   (ecase condition
@@ -94,7 +94,7 @@ byte-ordering issues."
                     (inst bge x y target)
                     (inst blt x y target)))))))
 
-
+
 (defun emit-error-break (vop kind code values)
   (assemble ()
     (when vop (note-this-location vop :internal-error))
@@ -116,7 +116,7 @@ byte-ordering issues."
                             error-trap)
                         (error-number-or-lose error-code) values)
       start-lab)))
-
+
 ;;;; PSEUDO-ATOMIC
 
 ;;; handy macro for making sequences look atomic
@@ -458,7 +458,7 @@ and
                   (inst fstore ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))
          (move-complex ,format result value)))))
 
-
+
 ;;;; Stack TN's
 
 ;;; Move a stack TN to a register and vice-versa.
@@ -498,7 +498,7 @@ and
     (storew zero-tn csp-tn -1)
     (emit-label aligned)))
 
-
+
 ;;;; Storage allocation:
 
 ;;; This is the main mechanism for allocating memory in the lisp heap.

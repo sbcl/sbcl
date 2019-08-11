@@ -11,7 +11,7 @@
 ;;;; absoluely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-
+
 ;;;; WHITE-BOX TESTS
 
 (shadowing-import 'assertoid:assert-error)
@@ -883,7 +883,7 @@
                                        (sb-debug:print-backtrace :count 10))))))))
     (wait-for-threads threads)))
 
-
+
 
 (defun subtypep-hash-cache-test ()
   (dotimes (i 10000)
@@ -902,7 +902,7 @@
         (loop repeat 30
               collect (make-thread #'subtypep-hash-cache-test)))
   (terpri))
-
+
 ;;;; BLACK BOX TESTS
 
 (with-test (:name (:parallel defclass))

@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; type frobbing VOPs
 
 (define-vop (widetag-of)
@@ -67,7 +67,7 @@
     (inst movzx result (make-ea :byte :base object
                                       :disp (- other-pointer-lowtag)))))
 
-
+
 (define-vop (fun-subtype)
   (:translate fun-subtype)
   (:policy :fast-safe)
@@ -113,7 +113,7 @@
     (load-type al-tn x (- other-pointer-lowtag))
     (storew eax x 0 other-pointer-lowtag)
     (move res x)))
-
+
 (define-vop (pointer-hash)
   (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg) :target res))
@@ -125,7 +125,7 @@
     ;; fixnum.
     (inst and res (lognot lowtag-mask))
     (inst shr res 1)))
-
+
 ;;;; allocation
 
 (define-vop (binding-stack-pointer-sap)
@@ -143,7 +143,7 @@
   (:policy :fast-safe)
   (:generator 1
     (move int esp-tn)))
-
+
 ;;;; code object frobbing
 
 (define-vop (code-instructions)
@@ -250,7 +250,7 @@
     (inst mov temp nil-value)
     (emit-optimized-test-inst res fixnum-tag-mask)
     (inst cmov :e res temp)))
-
+
 ;;;; other miscellaneous VOPs
 
 (defknown sb-unix::receive-pending-interrupt () (values))
@@ -305,7 +305,7 @@
   (:generator 1
     (note-next-instruction vop :internal-error)
     (inst wait)))
-
+
 ;;;; Miscellany
 
 ;;; the RDTSC instruction (present on Pentium processors and
@@ -375,7 +375,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:info index)
   (:generator 0
     (inst inc (make-ea-for-vector-data count-vector :offset index))))
-
+
 ;;;; Memory barrier support
 
 (define-vop (%compiler-barrier)

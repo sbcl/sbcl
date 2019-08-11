@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 ;;;; test generation utilities
 
 (defun generate-fixnum-test (value)
@@ -190,7 +190,7 @@
                   (inst cmp :byte temp (- end start))
                   (inst jmp less-or-equal target))))))))
       (emit-label drop-through))))
-
+
 ;;;; other integer ranges
 
 (define-vop (fixnump/unsigned-byte-64 simple-type-predicate)
@@ -359,7 +359,7 @@
        (inst cmp value (constantize fixnum-hi))
        (inst jmp (if not-p :a :be) target)
        (emit-label skip))))
-
+
 ;;;; list/symbol types
 ;;;
 ;;; symbolp (or symbol (eq nil))
@@ -382,7 +382,7 @@
       (inst jmp :e is-not-cons-label)
       (test-type value temp target not-p (list-pointer-lowtag)))
     DROP-THRU))
-
+
 (define-vop (widetag=)
   (:translate widetag=)
   (:policy :fast-safe)

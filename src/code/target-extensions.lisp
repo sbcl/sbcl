@@ -16,7 +16,7 @@
 ;;;; files for more information.
 
 (in-package "SB-IMPL")
-
+
 ;;; like (DELETE .. :TEST #'EQ):
 ;;;   Delete all LIST entries EQ to ITEM (destructively modifying
 ;;;   LIST), and return the modified LIST.
@@ -80,7 +80,7 @@ these hooks.")
             (warn "Problem running ~A hook ~S:~%  ~A" kind hook c)
             (with-simple-restart (continue "Skip this ~A hook." kind)
               (error "Problem running ~A hook ~S:~%  ~A" kind hook c)))))))
-
+
 ;;; Binary search for simple vectors
 (defun binary-search* (value seq key)
   (declare (simple-vector seq))
@@ -122,7 +122,7 @@ these hooks.")
                         (svref vector (truly-the index (1+ (* 2 i))))))))))
     (recurse 0 (truncate (length vector) 2))))
 
-
+
 ;;;; helpers for C library calls
 
 ;;; Signal a SIMPLE-CONDITION/ERROR condition associated with an ANSI C

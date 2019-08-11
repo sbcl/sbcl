@@ -65,7 +65,7 @@
 ;;; passed when we are using non-standard conventions.
 (defun make-arg-count-location ()
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn nargs-offset))
-
+
 ;;;; Frame hackery:
 
 ;;; Return the number of bytes needed for the current non-descriptor
@@ -257,7 +257,7 @@
         ;; Deallocate the callee stack frame.
         (move csp-tn ocfp-tn))))
   (values))
-
+
 ;;;; Unknown values receiving:
 
 ;;;    Emit code needed at the return point for an unknown-values call for an
@@ -307,7 +307,7 @@
   (:temporary (:sc any-reg :offset nargs-offset :from :result) nvals)
   ;; Avoid being clobbered by RECEIVE-UNKNOWN-VALUES
   (:temporary (:sc descriptor-reg :offset r0-offset :from :result) r0-temp))
-
+
 ;;; This hook in the codegen pass lets us insert code before fall-thru entry
 ;;; points, local-call entry points, and tail-call entry points.  The default
 ;;; does nothing.
@@ -317,7 +317,7 @@
     (emit-label trampoline-label))
   (emit-label start-label))
 
-
+
 ;;;; XEP hackery:
 
 ;;; Get the lexical environment from its passing location.
@@ -604,7 +604,7 @@
                (inst b :hi err-lab))
               (t
                (check-min)))))))
-
+
 ;;;; Local call with unknown values convention return:
 
 ;;; Non-TR local call for a fixed number of values passed according to the
@@ -694,7 +694,7 @@
       (receive-unknown-values values-start nvals start count label lip)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
-
+
 ;;;; Local call with known values return:
 
 ;;; Non-TR local call with known return locations.  Known-value return works
@@ -762,7 +762,7 @@
         (inst mov-sp nsp-tn cur-nfp)))
     (move cfp-tn old-fp-temp)
     (lisp-return return-pc-temp lip :known)))
-
+
 ;;;; Full call:
 ;;;
 ;;; There is something of a cross-product effect with full calls.
@@ -1059,7 +1059,7 @@
         (inst mov-sp nsp-tn cur-nfp)))
     (load-inline-constant tmp-tn '(:fixup tail-call-variable :assembly-routine) lip)
     (inst br tmp-tn)))
-
+
 ;;;; Unknown values return:
 
 ;;; Return a single value using the unknown-values convention.
@@ -1183,7 +1183,7 @@
     (move nvals nvals-arg)
     (load-inline-constant tmp-tn '(:fixup return-multiple :assembly-routine) lip)
     (inst br tmp-tn)))
-
+
 ;;; Single-stepping
 
 (define-vop (step-instrument-before-vop)

@@ -219,7 +219,7 @@
   `(let ((,table-var *package-names*))
      (sb-thread::with-recursive-system-lock ((info-env-mutex ,table-var))
        ,@body)))
-
+
 (defmethod make-load-form ((p package) &optional environment)
   (declare (ignore environment))
   `(find-undeleted-package-or-lose ,(package-name p)))
@@ -351,7 +351,7 @@ of :INHERITED :EXTERNAL :INTERNAL."
           (package-hashtable-size table) (package-hashtable-size temp-table)
           (package-hashtable-free table) (package-hashtable-free temp-table)
           (package-hashtable-deleted table) 0)))
-
+
 ;;;; package locking operations, built unconditionally now
 
 (defun package-locked-p (package)
@@ -527,7 +527,7 @@ error if any of PACKAGES is not a valid package designator."
                               :format-arguments (cons name format-arguments))))
   name)
 
-
+
 ;;;; miscellaneous PACKAGE operations
 
 (defmethod print-object ((package package) stream)
@@ -731,7 +731,7 @@ Experimental: interface subject to change."
 
 (defun package-external-symbol-count (package)
   (%package-hashtable-symbol-count (package-external-symbols package)))
-
+
 (defvar *package* (error "*PACKAGE* should be initialized in cold load!")
   "the current package")
 
@@ -806,7 +806,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
 ;;; FIND-UNDELETED-PACKAGE-OR-LOSE.
 (defun package-name (package-designator)
   (package-%name (%find-package-or-lose package-designator)))
-
+
 ;;;; operations on package hashtables
 
 ;;; Add a symbol to a package hashtable. The symbol MUST NOT be present.
@@ -950,7 +950,7 @@ REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
     (declare (type fixnum size deleted used))
     (when (< used (truncate size 4))
       (resize-package-hashtable table (* used 2)))))
-
+
 ;;; Enter any new NICKNAMES for PACKAGE into *PACKAGE-NAMES*. If there is a
 ;;; conflict then give the user a chance to do something about it.
 ;;; Package names do not affect the uses/used-by relation,
@@ -1192,7 +1192,7 @@ implementation it is ~S." *!default-package-use-list*)
   (let ((result ()))
     (do-packages (package) (push package result))
     result))
-
+
 ;;; Check internal and external symbols, then scan down the list
 ;;; of hashtables for inherited symbols.
 (defun %find-symbol (string length package)
@@ -1336,7 +1336,7 @@ implementation it is ~S." *!default-package-use-list*)
     (with-symbol ((symbol) (package-external-symbols package) string length hash)
       (return-from find-external-symbol symbol)))
   0)
-
+
 (define-condition name-conflict (reference-condition package-error)
   ((function :initarg :function :reader name-conflict-function)
    (datum :initarg :datum :reader name-conflict-datum)
@@ -1493,7 +1493,7 @@ uninterned."
                      (%set-symbol-package symbol nil))
                  t)
                 (t nil)))))))
-
+
 ;;; Take a symbol-or-list-of-symbols and return a list, checking types.
 (defun symbol-listify (thing)
   (cond ((listp thing)
@@ -1510,7 +1510,7 @@ uninterned."
 
 (defun string-listify (thing)
   (mapcar #'string (ensure-list thing)))
-
+
 (defun export (symbols &optional (package (sane-package)))
   "Exports SYMBOLS from PACKAGE, checking that no name conflicts result."
   (with-package-graph ()
@@ -1564,7 +1564,7 @@ uninterned."
             (add-symbol external sym)
             (nuke-symbol internal sym))))
       t)))
-
+
 ;;; Check that all symbols are accessible, then move from external to internal.
 (defun unexport (symbols &optional (package (sane-package)))
   "Makes SYMBOLS no longer exported from PACKAGE."
@@ -1590,7 +1590,7 @@ uninterned."
             (add-symbol internal sym)
             (nuke-symbol external sym))))
       t)))
-
+
 ;;; Check for name conflict caused by the import and let the user
 ;;; shadowing-import if there is.
 ;;;
@@ -1643,7 +1643,7 @@ the importation, then a correctable error is signalled."
         (dolist (sym homeless)
           (%set-symbol-package sym package))
         t))))
-
+
 ;;; If a conflicting symbol is present, unintern it, otherwise just
 ;;; stick the symbol in.
 (defun shadowing-import (symbols &optional (package (sane-package)))
@@ -1700,7 +1700,7 @@ it is not already present."
                 (add-symbol internal s))
               (pushnew s (package-%shadowing-symbols package))))))))
   t)
-
+
 ;;; Do stuff to use a package, with all kinds of fun name-conflict checking.
 (defun use-package (packages-to-use &optional (package (sane-package)))
   "Add all the PACKAGES-TO-USE to the use list for PACKAGE so that the
@@ -1791,7 +1791,7 @@ PACKAGE."
       (multiple-value-bind (symbol found) (find-symbol string package)
         (when found (pushnew symbol result))))
     result))
-
+
 ;;;; APROPOS and APROPOS-LIST
 
 (defun briefly-describe-symbol (symbol)
@@ -1838,7 +1838,7 @@ PACKAGE."
   (dolist (symbol (apropos-list string-designator package external-only))
     (briefly-describe-symbol symbol))
   (values))
-
+
 ;;;; final initialization
 
 ;;;; Due to the relative difficulty - but not impossibility - of manipulating

@@ -67,7 +67,7 @@
       ()
       '(lambda (n) (coerce n 'single-float))
     (((expt 10 1000)) (condition 'floating-point-overflow))))
-
+
 (defun are-we-getting-ash-right (x y)
   (declare (optimize speed)
            (type (unsigned-byte 32) x)
@@ -143,7 +143,7 @@
     (loop for x in neg-values do
          (test x 'nc-ash 'c-ash))))
 
-
+
 (declaim (inline ppc-ldb-2))
 
 (defun ppc-ldb-2 (fun value)
@@ -169,4 +169,4 @@
    (ppc-ldb-1 (lambda (x)
                 (push x acc)))
    (assert (equal acc '(#xff #xff #xff #xff)))))
-
+

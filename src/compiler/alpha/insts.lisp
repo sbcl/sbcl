@@ -20,7 +20,7 @@
             sb-vm::zero-tn sb-vm::fp-single-zero-tn sb-vm::fp-double-zero-tn
             sb-vm::zero-offset sb-vm::null-offset sb-vm::code-offset)))
 
-
+
 ;;;; utility functions
 
 (defun reg-tn-encoding (tn)
@@ -42,7 +42,7 @@
      (unless (eq (sb-name (sc-sb (tn-sc tn))) 'float-registers)
        (error "~S isn't a floating-point register." tn))
      (tn-offset tn))))
-
+
 ;;;; initial disassembler setup
 
 (defvar *disassem-use-lisp-reg-names* t)
@@ -97,7 +97,7 @@
                (declare (type (signed-byte 21) value)
                         (type disassem-state dstate))
                (+ 4 (ash value 2) (dstate-cur-addr dstate))))
-
+
 ;;;; DEFINE-INSTRUCTION-FORMATs for the disassembler
 
 (define-instruction-format (memory 32
@@ -165,7 +165,7 @@
   ;; semi-traditional prefilter approach.
   (code :prefilter (lambda (dstate) (read-suffix 32 dstate))
         :reader bugchk-trap-code))
-
+
 ;;;; emitters
 
 (define-bitfield-emitter emit-word 16
@@ -195,7 +195,7 @@
 
 (define-bitfield-emitter emit-pal 32
   (byte 6 26) (byte 26 0))
-
+
 ;;;; macros for instructions
 
 (macrolet ((define-memory (name op &optional fixup float)
@@ -577,7 +577,7 @@
 (define-instruction-macro li (value reg)
   `(%li ,value ,reg))
 
-
+
 ;;;;
 
 (define-instruction lword (segment lword)

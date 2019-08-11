@@ -223,7 +223,7 @@ with that condition (or with no condition) will be returned."
           (cerror cerror-arg condition)
           (funcall function condition)))))
 
-
+
 (defun assert-error (assertion &rest rest)
   (let* ((rest rest)
          (n-args-and-values (if (fixnump (car rest))

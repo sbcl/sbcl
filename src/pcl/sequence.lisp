@@ -8,7 +8,7 @@
 ;;;; more information.
 
 (in-package "SB-IMPL")
-
+
 ;;;; basic protocol
 (define-condition sequence:protocol-unimplemented (type-error
                                                    reference-condition)
@@ -152,7 +152,7 @@
    PROTOCOL-UNIMPLEMENTED error if the sequence protocol is not
    implemented for the class of SEQUENCE."))
 
-
+
 ;;;; iterator protocol
 
 ;;; The general protocol
@@ -448,7 +448,7 @@
 
 (defun sequence:canonize-key (key)
   (or (and key (if (functionp key) key (fdefinition key))) #'identity))
-
+
 ;;;; LOOP support.  (DOSEQUENCE support is present in the core SBCL
 ;;;; code).
 (defun sb-loop::loop-elements-iteration-path (variable data-type prep-phrases)
@@ -470,7 +470,7 @@
             (sb-loop::wrappers sb-loop::*loop*))
       `(((,variable nil ,data-type)) () () nil (funcall ,endp ,seq ,it ,lim ,f-e)
         (,variable (funcall ,elt ,seq ,it) ,it (funcall ,step ,seq ,it ,f-e))))))
-
+
 ;;;; generic implementations for sequence functions.
 
 (defgeneric sequence:map (result-prototype function sequence &rest sequences)

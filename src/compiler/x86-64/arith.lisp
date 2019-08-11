@@ -10,7 +10,7 @@
 ;;;; files for more information.
 
 (in-package "SB-VM")
-
+
 
 ;; If 'plausible-signed-imm32-operand-p' is true, use it; otherwise use a RIP-relative constant.
 ;; I couldn't think of a more accurate name for this other than maybe
@@ -77,7 +77,7 @@
   (:generator 2
     (move res x)
     (inst not res)))
-
+
 ;;;; binary fixnum operations
 
 ;;; Assume that any constant operand is the second arg...
@@ -372,7 +372,7 @@
                                (location= x r))))
          (y :scs (signed-reg signed-stack)))
   (:arg-types unsigned-num signed-num))
-
+
 
 (define-vop (fast-+-c/signed=>signed fast-safe-arith-op)
   (:translate +)
@@ -445,7 +445,7 @@
                   (inst inc r))
                  (t
                   (inst add r (constantize y))))))))
-
+
 ;;;; multiplication and division
 
 (define-vop (fast-*/fixnum=>fixnum fast-safe-arith-op)
@@ -714,7 +714,7 @@
     (move rem edx)))
 
 
-
+
 ;;;; Shifting
 (define-vop (fast-ash-c/fixnum=>fixnum)
   (:translate ash)
@@ -1076,7 +1076,7 @@ constant shift greater than word length")))
     (inst shl result :cl)
 
     DONE))
-
+
 (define-vop (signed-byte-64-len)
   (:translate integer-length)
   (:note "inline (signed-byte 64) integer-length")
@@ -1175,7 +1175,7 @@ constant shift greater than word length")))
     POS
     (inst or res 1)
     (inst bsr res res)))
-
+
 ;;;; binary conditional VOPs
 
 (define-vop (fast-conditional)
@@ -1497,7 +1497,7 @@ constant shift greater than word length")))
   (:args (x :scs (any-reg descriptor-reg) :load-if t))
   (:arg-types * (:constant fixnum))
   (:variant-cost 6))
-
+
 ;;;; 64-bit logical operations
 
 ;;; Only the lower 6 bits of the shift amount are significant.
@@ -1525,7 +1525,7 @@ constant shift greater than word length")))
     (move r num)
     (move ecx amount)
     (inst shl r :cl)))
-
+
 ;;;; Modular functions
 
 (defmacro define-mod-binop ((name prototype) function)
@@ -1720,7 +1720,7 @@ constant shift greater than word length")))
   `(lognot (logior ,x ,y)))
 (define-source-transform lognand (x y)
   `(lognot (logand ,x ,y)))
-
+
 ;;;; bignum stuff
 
 (define-vop (bignum-length get-header-data)
@@ -2098,7 +2098,7 @@ constant shift greater than word length")))
                     (= mask most-positive-word))
           (inst and r (or (plausible-signed-imm32-operand-p mask)
                           (constantize mask))))))))
-
+
 (in-package "SB-C")
 
 (defun *-transformer (y node fun)

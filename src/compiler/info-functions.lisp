@@ -16,7 +16,7 @@
 ;;;; files for more information.
 
 (in-package "SB-C")
-
+
 ;;;; internal utilities defined in terms of INFO
 
 (defun check-variable-name (name &key
@@ -167,7 +167,7 @@
   (let ((answer (info :function :inlining-data fun-name)))
     (when (typep answer 'dxable-args)
       (dxable-args-list answer))))
-
+
 ;;;; ANSI Common Lisp functions which are defined in terms of the info
 ;;;; database
 
@@ -240,7 +240,7 @@ return NIL. Can be set with SETF when ENV is NIL."
       (:symbol name "setting the compiler-macro-function of ~A")
     (setf (info :function :compiler-macro-function name) function)
     function))
-
+
 ;;;; a subset of DOCUMENTATION functionality for bootstrapping
 
 ;; Return the number of calls to NAME that IR2 emitted as full calls,

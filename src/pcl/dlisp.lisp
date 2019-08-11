@@ -102,7 +102,7 @@
 
 (defun make-fast-method-call-lambda-list (nargs applyp)
   (list* '.pv. '.next-method-call. (make-dfun-lambda-list nargs applyp)))
-
+
 ;;; Emitting various accessors.
 
 (defun emit-one-class-reader (class-slot-p)

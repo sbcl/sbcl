@@ -67,7 +67,7 @@
 (setenv "SBCL_MACHINE_TYPE" (machine-type))
 (setenv "SBCL_SOFTWARE_TYPE" (software-type))
 
-
+
 ;;; Type tools
 
 (defun random-type (n)
@@ -92,7 +92,7 @@
        (assert (eq ,expected-result ,result))
        (assert (eq ,expected-certainp ,certainp)))))
 
-
+
 ;;; Thread tools
 
 (defun make-kill-thread (&rest args)
@@ -297,7 +297,7 @@
 
 (defun skipped-p (skipped-on)
   (sb-impl::featurep skipped-on))
-
+
 ;;;; MAP-{OPTIMIZATION-QUALITY-COMBINATIONS,OPTIMIZE-DECLARATIONS}
 
 (sb-int:defconstant-eqx +optimization-quality-names+
@@ -431,7 +431,7 @@
 (defun map-optimize-declarations* (function specifier)
   (apply #'map-optimize-declarations
          function (expand-optimize-specifier specifier)))
-
+
 ;;;; CHECKED-COMPILE
 
 (defun prepare-form (thing &key optimize)

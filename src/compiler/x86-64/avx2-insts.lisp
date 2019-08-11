@@ -59,7 +59,7 @@
 (define-arg-type vex-b
   :prefilter  (lambda (dstate value)
                 (dstate-setprop dstate (if (plusp value) 0 +rex-b+))))
-
+
 (define-instruction-format (vex2 16)
                            (vex :field (byte 8 0) :value #xC5)
                            (r :field (byte 1 (+ 8 7)) :type 'vex-r)
@@ -162,7 +162,7 @@
                                 '(:name :tab reg ", " reg/mem))
   (reg :field (byte 3 (+ start 11))
        :type 'reg))
-
+
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun vex-encode-pp (pp)
     (ecase pp
@@ -276,7 +276,7 @@
                              (reg-encoding reg segment)))
   (emit-byte segment imm))
 
-
+
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
   (defun avx2-inst-printer-list (inst-format-stem prefix opcode
                                  &key more-fields printer
@@ -832,7 +832,7 @@
   (def vmovmskpd  #x66 #x50 :reg-only t)
   (def vmovmskps  nil  #x50 :reg-only t)
   (def vpmovmskb  #x66 #xd7 :reg-only t))
-
+
 ;;; AVX/AVX2 instructions
 
 (define-instruction vzeroupper (segment)
@@ -1009,7 +1009,7 @@
 
   (def vpsllvd #x66 #x47 0)
   (def vpsllvq #x66 #x47 1))
-
+
 (define-arg-type vmx/y
   :prefilter #'prefilter-reg/mem
   :printer #'print-vmx/y)

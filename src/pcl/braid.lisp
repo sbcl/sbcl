@@ -30,7 +30,7 @@
 ;;;; specification.
 
 (in-package "SB-PCL")
-
+
 (defun allocate-standard-instance (wrapper)
   (let ((instance (%make-standard-instance
                    (make-array (layout-length wrapper)
@@ -110,7 +110,7 @@
                   (sort instance-slots #'< :key #'slot-definition-location)))
             class-slots
             custom-slots)))
-
+
 ;;;; BOOTSTRAP-META-BRAID
 ;;;;
 ;;;; This function builds the base metabraid from the early class definitions.
@@ -575,7 +575,7 @@
                                        supers subs
                                        (cons name cpl)
                                        wrapper prototype))))))
-
+
 (defun class-of (x)
   (declare (explicit-check))
   (wrapper-class* (layout-of x)))
@@ -631,7 +631,7 @@
 
 (pushnew 'ensure-deffoo-class sb-kernel::*defstruct-hooks*)
 (pushnew 'ensure-deffoo-class sb-kernel::*define-condition-hooks*)
-
+
 (defun !make-class-predicate (class name source-location)
   (let* ((gf (ensure-generic-function name :lambda-list '(object)
                                       'source source-location))
