@@ -11,7 +11,7 @@
 
 ;;; Not loaded until warm build. package-data-list only affects symbols
 ;;; that are visible to genesis.
-(export '(search-roots gc-and-search-roots))
+(export '(search-roots))
 
 (define-alien-variable  "gc_object_watcher" unsigned)
 (define-alien-variable  "gc_traceroot_criterion" int)
@@ -67,116 +67,180 @@
                               (ash (cadr root) sb-vm:n-fixnum-tag-bits)))
                      (extra (cddr root))
                      (symbol
-                      (unless (eq root-kind 1)
+                      (unless (eql root-kind 1)
                         #+sb-thread
                         (find-symbol-from-tls-index (ash extra sb-vm:n-fixnum-tag-bits))
                         #-sb-thread
                         extra)))
                 (awhen (and thread (sb-thread:thread-name thread))
                   (setq thread it)) ; if nameless, just show as #<thread ...>
-                (ecase root-kind
-                  (1 ; control stack
-                   (if thread
-                       (rplaca path `(,thread ,extra))
-                       (rplaca path :pinned)))
-                  (2 (rplaca path `(,thread ,symbol nil))) ; binding stack
-                  (3 (rplaca path `(,thread ,symbol t))))))) ; TLS
+                (rplaca path (ecase root-kind
+                               (1                   ; control stack
+                                (if thread
+                                    `(,thread ,extra)
+                                    :pinned))
+                               (2 `(,thread ,symbol nil)) ; binding stack
+                               (3 `(,thread ,symbol t))))))) ; TLS
         (push (cons target path) results)))))
 
-(defun print-traceroot-paths (paths &optional (multiline t))
-  (dolist (path paths)
-    (destructuring-bind (target root . rest) path
-      (cond (multiline
-             (format t "Path to ~S:~%" target)
-             (cond ((eq root :static))
-                   ((eq root :pinned)
-                    ;; found in pins table, but thread unknown,
-                    ;; as happens when run without GC
-                    (format t "from pinned object~%"))
-                   ((symbolp (cadr root))
-                    (destructuring-bind (thread symbol currentp) root
-                      (if currentp
-                          (format t "from ~S ~S (TLS)~%" thread symbol)
-                          (format t "from ~S ~S (binding)~%" thread symbol))))
-                   (t
-                    (destructuring-bind (thread pc) root
-                      (format t "from ~S PC=~X in ~A~%"
-                              thread (sap-int pc) (sb-di::code-header-from-pc pc)))))
-             (let ((*print-pretty* nil))
-               (dolist (node rest)
-                 (let ((obj (car node))
-                       (slot (cdr node)))
-                   (format t " ~D ~16X [~4D] "
-                           (or (sb-kernel:generation-of obj) "S")
-                           (sb-kernel:get-lisp-obj-address obj)
-                           slot)
-                   ;; Some objects print fairly concisely, so we'll show them.
-                   ;; But do NOT show CONS, VECTOR, INSTANCE. Especially not those.
-                   (typecase obj
-                     ((or package symbol sb-kernel:fdefn sb-kernel:code-component
-                          pathname sb-impl::host hash-table)
-                      (format t "~S~%" obj))
-                     (t
-                      (format t "a ~(~a~)~%" (type-of obj))))))))
-            (t
-             (if (consp root)
-                 (if (symbolp (cadr root))
-                     (destructuring-bind (thread symbol currentp) root
-                       (format t "~S:~S {~A}" thread symbol (if currentp "TLS" "binding")))
-                     (destructuring-bind (thread pc) root
-                       (format t "~S:#x~X" thread (sap-int pc)))))
-             (dolist (node rest)
-               (format t " -> #x~X[~D]"
-                       (sb-kernel:get-lisp-obj-address (car node))
-                       (cdr node)))
-             (format t " -> #x~x~%" (sb-kernel:get-lisp-obj-address target)))))))
-
-(flet ((criterion-value (criterion)
-         (ecase criterion
-           ;; CRITERION determines just how rooty (how deep) a root must be.
-           ;; :OLDEST says we can stop upon seeing an object in the oldest
-           ;; gen to GC, or older. This is the easiest test to satisfy.
-           ;; To find a root of an image-backed object, you want to stop only
-           ;; at a truly :STATIC object, because everything dumped was
-           ;; effectively :PSEUDO-STATIC, which is usually the same
-           ;; as :OLDEST, unless the oldest gen to GC has been decreased.
-           (:oldest 0)
-           (:pseudo-static 1)
-           (:static 2)))
-       (return-results (input output print)
-         (let ((results (preprocess-traceroot-results input output)))
-           (cond (print
-                  (print-traceroot-paths results (eq print :verbose))
-                  (values))
+(defun print-traceroot-path (path &key (stream *standard-output*) (multiline t))
+  (destructuring-bind (target root . rest) path
+    (cond (multiline
+           (format stream "Path to ~S:~%" target)
+           (cond ((eq root :static))
+                 ((eq root :pinned)
+                  ;; found in pins table, but thread unknown,
+                  ;; as happens when run without GC
+                  (format stream "from pinned object~%"))
+                 ((symbolp (second root))
+                  (destructuring-bind (thread symbol currentp) root
+                    (format stream "from ~S ~S (~:[binding~;TLS~])~%"
+                            thread symbol currentp)))
                  (t
-                  results)))))
+                  (destructuring-bind (thread pc) root
+                    (format stream "from ~S PC=~X in ~A~%"
+                            thread (sap-int pc) (sb-di::code-header-from-pc pc)))))
+           (let ((*print-pretty* nil)
+                 (*print-circle* t))
+             (dolist (node rest)
+               (destructuring-bind (obj . slot) node
+                 (format stream " ~D ~16X [~4D] "
+                         (or (sb-kernel:generation-of obj) "S")
+                         (sb-kernel:get-lisp-obj-address obj)
+                         slot)
+                 ;; Some objects print fairly concisely, so we'll show them.
+                 ;; But do NOT show CONS, VECTOR, INSTANCE. Especially not those.
+                 (typecase obj
+                   (symbol
+                    (format stream "~/sb-ext:print-symbol-with-prefix/~%" obj))
+                   ((or package sb-kernel:fdefn sb-kernel:code-component
+                        pathname sb-impl::host hash-table)
+                    (format stream "~S~%" obj))
+                   (t
+                    (format stream "a ~(~a~)~%" (type-of obj))))))))
+          (t
+           (let ((*print-pretty* nil))
+             (when (consp root)
+               (if (symbolp (second root))
+                   (destructuring-bind (thread symbol currentp) root
+                     (format stream "~S:~S {~:[binding~;TLS~]}"
+                             thread symbol currentp))
+                   (destructuring-bind (thread pc) root
+                     (format stream "~S:#x~X" thread (sap-int pc)))))
+             (dolist (node rest)
+               (destructuring-bind (obj . slot) node
+                 (format stream " -> (~S) #x~X[~D]"
+                         (type-of obj) (sb-kernel:get-lisp-obj-address obj) slot)))
+             (format stream " -> #x~x~%" (sb-kernel:get-lisp-obj-address target)))))))
 
-;;; This is the more accurate of the object liveness proof generators,
-;;; as there is no chance for other code to execute in between the
-;;; garbage collection and production of the chain of referencing objects.
-(defun gc-and-search-roots (wps &optional (criterion :oldest) (print t))
-  (declare (type (member nil t :verbose) print))
-  (let* ((input (ensure-list wps))
-         (output (make-array (length input)))
-         (param (cons input output)))
-    (declare (truly-dynamic-extent output param))
-    (setf gc-traceroot-criterion (criterion-value criterion))
-    (sb-sys:with-pinned-objects (param)
-      (setf gc-object-watcher (sb-kernel:get-lisp-obj-address param)))
-    (gc :full t)
-    (setf gc-object-watcher 0)
-    (return-results input output print)))
+(defun print-traceroot-paths (paths &key (stream *standard-output*) (multiline t))
+  (dolist (path paths)
+    (print-traceroot-path path :stream stream :multiline multiline)))
 
-;;; This object liveness proof generator works well enough,
-;;; but might be adversely affected by actions of concurrent threads.
-(defun search-roots (wps &optional (criterion :oldest) (print t))
-  (declare (type (member nil t :verbose) print))
-  (let* ((input (ensure-list wps))
+(declaim (ftype (function ((or list sb-ext:weak-pointer)
+                           &key
+                           (:criterion (member :oldest :pseudo-static :static))
+                           (:gc t)
+                           (:print (or boolean (eql :verbose)))))
+                search-roots))
+(defun search-roots (weak-pointers &key (criterion :oldest) (gc nil) (print t))
+  "Find roots keeping the targets of WEAK-POINTERS alive.
+
+WEAK-POINTERS must be a single SB-EXT:WEAK-POINTER or a list of those,
+pointing to objects for which roots should be searched.
+
+GC controls whether the search is performed in the context of a
+garbage collection, that is with all Lisp threads stopped. Possible
+values are:
+
+  T
+    This is the more accurate of the object liveness proof generators,
+    as there is no chance for other code to execute in between the
+    garbage collection and production of the chain of referencing
+    objects.
+
+  NIL
+    This works well enough, but might be adversely affected by actions
+    of concurrent threads.
+
+CRITERION determines just how rooty (how deep) a root must be in order
+to be considered. Possible values are:
+
+  :OLDEST
+     This says we can stop upon seeing an object in the oldest gen to
+     GC, or older. This is the easiest test to satisfy.
+
+  :PSEUDO-STATIC
+     This is usually the same as :OLDEST, unless the oldest gen to GC
+     has been decreased.
+
+  :STATIC
+     To find a root of an image-backed object, you want to stop only at
+     a truly :STATIC object.
+
+PRINT controls whether discovered paths should be returned or
+printed. Possible values are
+
+  :VERBOSE
+    Return no values. Print discovered paths using a verbose format
+    with each node of each path on a separate line.
+
+  true (other than :VERBOSE)
+    Return no values. Print discovered paths using a compact format
+    with all nodes of each path on a single line.
+
+  NIL
+    Do not print any output. Instead return the discovered paths as a
+    list of lists. Each list has the form
+
+      (TARGET . (ROOT NODE*))
+
+    where TARGET is one of the target of one of the WEAK-POINTERS.
+
+    ROOT is a description of the root at which the path starts and has
+    one of the following forms:
+
+      :STATIC
+        If the root of the path is a non-collectible heap object.
+
+      :PINNED
+        If an unknown thread stack pins the root of the path.
+
+      ((THREAD-NAME | THREAD-OBJECT) SYMBOL CURRENTP)
+        If the path begins at a special binding of SYMBOL in a
+        thread. CURRENTP is a BOOLEAN indicating whether the value is
+        current or shadowed by another binding.
+
+      ((THREAD-NAME | THREAD-OBJECT) GUESSED-PC)
+        If the path begins at a lexical variable in the function whose
+        code contains GUESSED-PC.
+
+    Each NODE in the remainder of the path is a cons (OBJECT . SLOT)
+    indicating that the slot at index SLOT in OBJECT references the
+    next path node.
+
+Experimental: subject to change without prior notice."
+  (let* ((input (ensure-list weak-pointers))
          (output (make-array (length input)))
-         (param (cons input output)))
-    (declare (truly-dynamic-extent output param))
-    (sb-sys:without-gcing
-      (alien-funcall (extern-alien "prove_liveness" (function int unsigned int))
-                     (sb-kernel:get-lisp-obj-address param)
-                     (criterion-value criterion)))
-    (return-results input output print))))
+         (param (cons input output))
+         (criterion-value (ecase criterion
+                            (:oldest 0)
+                            (:pseudo-static 1)
+                            (:static 2)) ))
+    (cond (gc
+           (setf gc-traceroot-criterion criterion-value)
+           (sb-sys:with-pinned-objects (param)
+             (setf gc-object-watcher (sb-kernel:get-lisp-obj-address param)))
+           (gc :full t)
+           (setf gc-object-watcher 0))
+          (t
+           (sb-sys:without-gcing
+             (alien-funcall (extern-alien "prove_liveness" (function int unsigned int))
+                            (sb-kernel:get-lisp-obj-address param)
+                            criterion-value))))
+    (let ((results (preprocess-traceroot-results input output)))
+      (cond (print
+             (print-traceroot-paths results :multiline (eq print :verbose))
+             (values))
+            (t
+             results)))))

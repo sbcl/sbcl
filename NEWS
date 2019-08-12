@@ -1,6 +1,8 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.5.6:
+  * new feature: SB-EXT:SEARCH-ROOTS discovers paths from live objects to the
+    roots keeping them alive.
   * enhancement: string output streams created with :ELEMENT-TYPE 'BASE-CHAR
     use internal buffers of BASE-STRING instead of UCS-4 strings restricted
     to the ASCII range, yielding a theoretical 4:1 space reduction.
@@ -34,7 +36,7 @@ changes in sbcl-1.5.4 relative to sbcl-1.5.3:
   * bug fix: the system reasons more correctly regarding the array rank of
     complicated array types.  (reported by Bart Botta)
   * bug fix: DOUBLE-FLOAT-P never gets weaked to NUMBERP.  (reported by Bart
-    Botta)  
+    Botta)
   * enhancement: the regression test suite can now benefit from paralellism,
     completing much faster when enough compute power is available.
   * optimization: readtables with non-base-char dispatch characters are less
