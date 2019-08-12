@@ -1,4 +1,3 @@
-
 #include "sbcl.h"
 #include "arch.h"
 #include "runtime.h"
@@ -522,8 +521,10 @@ static lispobj trace1(lispobj object,
                     continue;
                 int wordindex = find_ref((lispobj*)ptr, target);
                 if (wordindex == -1) {
-                    fprintf(stderr, "Strange: no ref from %p to %p\n",
-                            (void*)ptr, (void*)target);
+                    if (heap_trace_verbose) {
+                        fprintf(stderr, "Strange: no ref from %p to %p\n",
+                                (void*)ptr, (void*)target);
+                    }
                     continue;
                 }
                 hopscotch_insert(visited, ptr, 1);
@@ -531,21 +532,25 @@ static lispobj trace1(lispobj object,
                              top_layer, &layer_capacity);
                 // Stop if the object at 'ptr' is tenured.
                 if (root_p(ptr, criterion)) {
-                    fprintf(stderr, "Stopping at %p: tenured\n", (void*)ptr);
+                    if (heap_trace_verbose) {
+                        fprintf(stderr, "Stopping at %p: tenured\n", (void*)ptr);
+                    }
                     anchor = &top_layer->nodes[top_layer->count-1];
                 }
             }
         }
         if (!top_layer->count) {
-            fprintf(stderr, "Failure tracing from %p. Current targets:\n", (void*)object);
-            for_each_hopscotch_key(i, target, (*targets)) {
-                fprintf(stderr, "%p", (void*)target);
-                fprintf(stderr, "(g%d,", traceroot_gen_of(target));
-                fputs(classify_obj(target), stderr);
-                maybe_show_object_name(target, stderr);
-                fprintf(stderr,") ");
+            if (heap_trace_verbose) {
+                fprintf(stderr, "Failure tracing from %p. Current targets:\n", (void*)object);
+                for_each_hopscotch_key(i, target, (*targets)) {
+                    fprintf(stderr, "%p", (void*)target);
+                    fprintf(stderr, "(g%d,", traceroot_gen_of(target));
+                    fputs(classify_obj(target), stderr);
+                    maybe_show_object_name(target, stderr);
+                    fprintf(stderr,") ");
+                }
+                putc('\n', stderr);
             }
-            putc('\n', stderr);
             free_graph(top_layer);
             return 0;
         }
@@ -591,8 +596,10 @@ static lispobj trace1(lispobj object,
                                   make_sap(thread_pc));
         }
     } else { // Stopped at (pseudo)static object
-        fprintf(stderr, "Anchor object is @ %p. word[%d]\n",
-                native_pointer(anchor->object), anchor->wordindex);
+        if (heap_trace_verbose) {
+            fprintf(stderr, "Anchor object is @ %p. word[%d]\n",
+                    native_pointer(anchor->object), anchor->wordindex);
+        }
         path_node = liststar3(0, 0, 0);
     }
 
@@ -782,15 +789,21 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
 {
     struct scan_state ss;
     memset(&ss, 0, sizeof ss);
-    fprintf(stderr, "Pass 1: Counting heap objects... ");
+    if (heap_trace_verbose) {
+        fprintf(stderr, "Pass 1: Counting heap objects... ");
+    }
     scan_spaces(&ss);
-    fprintf(stderr, "%ld objs, %ld ptrs, %ld immediates\n",
-            ss.n_objects, ss.n_pointers,
-            ss.n_scanned_words - ss.n_pointers);
+    if (heap_trace_verbose) {
+        fprintf(stderr, "%ld objs, %ld ptrs, %ld immediates\n",
+                ss.n_objects, ss.n_pointers,
+                ss.n_scanned_words - ss.n_pointers);
+    }
     // Guess at the initial size of ~ .5 million objects.
     int size = 1<<19; // flsl(tot_n_objects); this would work if you have it
     while (ss.n_objects > size) size <<= 1;
-    fprintf(stderr, "Pass 2: Inverting heap. Initial size=%d objects\n", size);
+    if (heap_trace_verbose) {
+        fprintf(stderr, "Pass 2: Inverting heap. Initial size=%d objects\n", size);
+    }
     hopscotch_create(&ss.inverted_heap, HASH_FUNCTION,
                      4, // XXX: half the word size if 64-bit
                      size /* initial size */, 0 /* default hop range */);
@@ -803,7 +816,9 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
     gc_assert(ss.scratchpad.base);
     ss.scratchpad.free = ss.scratchpad.base + 2 * sizeof(uint32_t);
     ss.scratchpad.end  = ss.scratchpad.base + scratchpad_size;
-    fprintf(stderr, "Scratchpad: %lu bytes\n", (long unsigned)scratchpad_size);
+    if (heap_trace_verbose) {
+        fprintf(stderr, "Scratchpad: %lu bytes\n", (long unsigned)scratchpad_size);
+    }
 #if HAVE_GETRUSAGE
     struct rusage before, after;
     getrusage(RUSAGE_SELF, &before);
@@ -815,16 +830,18 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
 #if HAVE_GETRUSAGE
     getrusage(RUSAGE_SELF, &after);
     // We're done building the necessary structure. Show some memory stats.
+    if (heap_trace_verbose) {
 #define timediff(b,a,field) \
-    ((a.field.tv_sec-b.field.tv_sec)*1000000+(a.field.tv_usec-b.field.tv_usec))
-    fprintf(stderr,
-            "Inverted heap: ct=%d, cap=%d, LF=%f ET=%ld+%ld sys+usr\n",
-            inverted_heap->count,
-            1+hopscotch_max_key_index(*inverted_heap),
-            100*(float)inverted_heap->count / (1+hopscotch_max_key_index(*inverted_heap)),
-            timediff(before, after, ru_stime),
-            timediff(before, after, ru_utime));
+        ((a.field.tv_sec-b.field.tv_sec)*1000000+(a.field.tv_usec-b.field.tv_usec))
+        fprintf(stderr,
+                "Inverted heap: ct=%d, cap=%d, LF=%f ET=%ld+%ld sys+usr\n",
+                inverted_heap->count,
+                1+hopscotch_max_key_index(*inverted_heap),
+                100*(float)inverted_heap->count / (1+hopscotch_max_key_index(*inverted_heap)),
+                timediff(before, after, ru_stime),
+                timediff(before, after, ru_utime));
 #endif
+    }
 };
 
 /* Find any shortest path from a thread or tenured object
@@ -888,9 +905,10 @@ int gc_prove_liveness(void(*context_scanner)(),
                       int n_pins, uword_t* pins,
                       int criterion)
 {
-    int n_watched = 0, n_live = 0, n_bad = 0, n_imm = 0;
+    int n_watched = 0, n_live = 0, n_bad = 0, n_imm = 0, n_paths = 0;
     lispobj input = CONS(objects)->car,
-            output = CONS(objects)->cdr;
+            output = CONS(objects)->cdr,
+            paths = CONS(output)->cdr;
     lispobj list;
     for (list = input ; list != NIL && listp(list) ; list = CONS(list)->cdr) {
         ++n_watched;
@@ -906,18 +924,26 @@ int gc_prove_liveness(void(*context_scanner)(),
         else if (wpval != UNBOUND_MARKER_WIDETAG)
             ++n_imm;
     }
-    if (!listp(list) || n_bad || lowtag_of(output) != OTHER_POINTER_LOWTAG
-        || widetag_of(native_pointer(output)) != SIMPLE_VECTOR_WIDETAG) {
-        fprintf(stderr, "; Bad value in liveness tracker\n");
+    if (!listp(list) || n_bad || lowtag_of(paths) != OTHER_POINTER_LOWTAG
+        || widetag_of(native_pointer(paths)) != SIMPLE_VECTOR_WIDETAG) {
+        if (heap_trace_verbose) {
+            fprintf(stderr, "; Bad value in liveness tracker\n");
+        }
+        CONS(output)->car = make_fixnum(-1);
         return -1;
     }
-    fprintf(stderr, "; Liveness tracking: %d/%d live watched objects",
-            n_live, n_watched);
-    if (n_imm)
-        fprintf(stderr, " (ignored %d non-pointers)", n_imm);
-    putc('\n', stderr);
-    if (!n_live)
+    if (heap_trace_verbose) {
+        fprintf(stderr, "; Liveness tracking: %d/%d live watched objects",
+                n_live, n_watched);
+
+        if (n_imm)
+            fprintf(stderr, " (ignored %d non-pointers)", n_imm);
+        putc('\n', stderr);
+    }
+    if (!n_live) {
+        CONS(output)->car = make_fixnum(0);
         return 0;
+    }
     // Put back lowtags on pinned objects, since wipe_nonpinned_words() removed
     // them. But first test whether lowtags were already repaired
     // in case prove_liveness() is called after gc_prove_liveness().
@@ -927,8 +953,10 @@ int gc_prove_liveness(void(*context_scanner)(),
             pins[i] = compute_lispobj((lispobj*)pins[i]);
         }
     }
-    return trace_paths(context_scanner, input, output,
-                       n_pins, (lispobj*)pins, criterion);
+    n_paths = trace_paths(context_scanner, input, paths,
+                          n_pins, (lispobj*)pins, criterion);
+    CONS(output)->car = make_fixnum(n_paths);
+    return n_paths;
 }
 
 /* This should be called inside WITHOUT-GCING so that the set

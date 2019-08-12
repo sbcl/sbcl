@@ -222,11 +222,11 @@ printed. Possible values are
 Experimental: subject to change without prior notice."
   (let* ((input (ensure-list weak-pointers))
          (output (make-array (length input)))
-         (param (cons input output))
+         (param (cons input (cons :result output)))
          (criterion-value (ecase criterion
                             (:oldest 0)
                             (:pseudo-static 1)
-                            (:static 2)) ))
+                            (:static 2))))
     (cond (gc
            (setf gc-traceroot-criterion criterion-value)
            (sb-sys:with-pinned-objects (param)
@@ -235,12 +235,15 @@ Experimental: subject to change without prior notice."
            (setf gc-object-watcher 0))
           (t
            (sb-sys:without-gcing
-             (alien-funcall (extern-alien "prove_liveness" (function int unsigned int))
-                            (sb-kernel:get-lisp-obj-address param)
-                            criterion-value))))
-    (let ((results (preprocess-traceroot-results input output)))
+             (alien-funcall
+              (extern-alien "prove_liveness" (function int unsigned int))
+              (sb-kernel:get-lisp-obj-address param)
+              criterion-value))))
+    (case (cadr param)
+      (-1 (error "Input is not a proper list of weak pointers.")))
+    (let ((paths (preprocess-traceroot-results input output)))
       (cond (print
-             (print-traceroot-paths results :multiline (eq print :verbose))
+             (print-traceroot-paths paths :multiline (eq print :verbose))
              (values))
             (t
-             results)))))
+             paths)))))

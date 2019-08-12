@@ -247,36 +247,19 @@ An example of using this could look like this:
 *MY-STRING*
 
 * (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)))
-    ; Liveness tracking: 1/1 live watched objects
-    Pass 1: Counting heap objects... 602789 objs, 1637358 ptrs, 894478 immediates
-    Pass 2: Inverting heap. Initial size=1048576 objects
-    Scratchpad: 13099008 bytes
-    Inverted heap: ct=599785, cap=1048607, LF=57.198265 ET=3831+125697 sys+usr
-    Stopping at 0x10004e9ea0: tenured
-    Anchor object is @ 0x10004e9ea0. word[2]
  -> ((SIMPLE-VECTOR 3)) #x10004E9EAF[2] -> (SYMBOL) #x5044100F[1] -> (CONS) #x100181FAE7[1] -> (CONS) #x100181FAF7[1] -> (CONS) #x100181FB07[0] -> #x100181F9AF
 @end lisp
 
-The indented output appears on @code{sb-sys:*stdout*} (i.e. would not be
-visible in SLIME) while the non-indented output appears on
-@code{cl:*standard-output*}. The single line of output on
-@code{cl:*standard-output*} shows the path from a root to @t{"my
-string"}: the path starts with SBCL's internal package system data
-structures followed by the symbol (@t{cl-user:*my-string*}) followed the
-three cons cells of the list.
+The single line of output on @code{cl:*standard-output*} shows the path
+from a root to @t{"my string"}: the path starts with SBCL's internal
+package system data structures followed by the symbol
+(@t{cl-user:*my-string*}) followed the three cons cells of the list.
 
 The @code{:print :verbose} argument produces similar behavior but
 describe the path elements in more detail:
 
 @lisp
 * (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)) :print :verbose)
-    ; Liveness tracking: 1/1 live watched objects
-    Pass 1: Counting heap objects... 601937 objs, 1635802 ptrs, 893142 immediates
-    Pass 2: Inverting heap. Initial size=1048576 objects
-    Scratchpad: 13086720 bytes
-    Inverted heap: ct=599133, cap=1048607, LF=57.136086 ET=0+124554 sys+usr
-    Stopping at 0x10004e9ea0: tenured
-    Anchor object is @ 0x10004e9ea0. word[2]
 Path to "my string":
  6       10004E9EAF [   2] a (simple-vector 3)
  0         5044100F [   1] COMMON-LISP-USER::*MY-STRING*
@@ -289,13 +272,6 @@ The @code{:print nil} argument is a bit different:
 
 @lisp
 * (sb-ext:search-roots (sb-ext:make-weak-pointer (third *my-string*)) :print nil)
-    ; Liveness tracking: 1/1 live watched objects
-    Pass 1: Counting heap objects... 602802 objs, 1637375 ptrs, 894487 immediates
-    Pass 2: Inverting heap. Initial size=1048576 objects
-    Scratchpad: 13099008 bytes
-    Inverted heap: ct=599796, cap=1048607, LF=57.199314 ET=3937+150556 sys+usr
-    Stopping at 0x10004e9ea0: tenured
-    Anchor object is @ 0x10004e9ea0. word[2]
 (("my string" :STATIC (#(*MY-STRING* 0 0) . 2) (*MY-STRING* . 1)
   ((1 2 "my string") . 1) ((2 "my string") . 1) (("my string") . 0)))
 @end lisp
