@@ -87,7 +87,7 @@ info: $(INFOFILES)
 	$(MAKEINFO) $(I_FLAGS) $<
 
 # Texinfo docstring snippets
-docstrings: tempfiles-stamp
+docstrings variables.texinfo: tempfiles-stamp
 	sh make-tempfiles.sh "$(SBCL_SYSTEM)" "$(DOCSTRINGDIR)" && touch $(DOCSTRINGDIR)
 
 tempfiles-stamp:
