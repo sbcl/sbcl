@@ -840,8 +840,8 @@ static void compute_heap_inverse(struct hopscotch_table* inverted_heap,
                 100*(float)inverted_heap->count / (1+hopscotch_max_key_index(*inverted_heap)),
                 timediff(before, after, ru_stime),
                 timediff(before, after, ru_utime));
-#endif
     }
+#endif
 };
 
 /* Find any shortest path from a thread or tenured object
