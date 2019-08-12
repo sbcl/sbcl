@@ -32,17 +32,17 @@
            (ecase root
              (:tls
               (scrubstack)
-              (sb-ext:gc-and-search-roots wp :oldest nil))
+              (sb-ext:search-roots wp :criterion :oldest :gc t :print nil))
              (:bindings ; bind *FRED* again so the old value is on the binding stack
               (let ((*fred* 1))
                 (scrubstack)
-                (sb-ext:gc-and-search-roots wp :oldest nil)))
+                (sb-ext:search-roots wp :criterion :oldest :gc t :print nil)))
              (:stack
               ; put the OBJ back on the control stack
               ; and also ensure that *FRED* is not a root.
               (setq obj *fred* *fred* nil)
               (scrubstack)
-              (sb-ext:gc-and-search-roots wp :oldest nil)))))
+              (sb-ext:search-roots wp :criterion :oldest :gc t :print nil)))))
       (assert paths)
       (let* ((path (cdar paths))
              (root (car path)))
@@ -55,7 +55,7 @@
           (:bindings
            (assert (typep (cdr path) '(cons (eql *fred*) (cons nil))))))))))
 
-(with-test (:name :stack-indirect)
+(with-test (:name (sb-ext:search-roots :stack-indirect))
   (let ((wp (make-weak-pointer (list 1 2 3 4))))
     (test1 wp (weak-pointer-value wp) :stack)
     (test1 wp (weak-pointer-value wp) :tls)
@@ -65,12 +65,12 @@
 (defun f0 ()
   (let* ((c (cons 1 2))
          (wp (make-weak-pointer c)))
-    (let ((paths (sb-ext:gc-and-search-roots wp :static nil)))
+    (let ((paths (sb-ext:search-roots wp :criterion :static :gc t :print nil)))
       (assert paths)
       (let* ((path (car paths))
              (nodes (cdr path)))
         (assert (and (sb-int:singleton-p nodes)
                      (string= "main thread" (caar nodes))))))
     c))
-(with-test (:name :stack-direct)
+(with-test (:name (sb-ext:search-roots :stack-direct))
   (f0))
