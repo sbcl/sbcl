@@ -884,11 +884,11 @@
             (pop answers))))))
 
     ;; The algorithm is indifferent to non-array types.
-    (assert
-     (equal (sb-kernel:type-specifier
-             (sb-kernel:specifier-type
-              `(or list ,@(huge-union (lambda (x) `(array ,x (1 1 1)))))))
-            '(or cons null (array * (1 1 1)))))
+    (let ((result (sb-kernel:type-specifier
+                   (sb-kernel:specifier-type
+                    `(or list ,@(huge-union (lambda (x) `(array ,x (1 1 1)))))))))
+      (assert (or (equal result '(or cons null (array * (1 1 1))))
+                  (equal result '(or null cons (array * (1 1 1)))))))
 
     ;; And unions of unions of distinct array types should reduce.
     (assert
