@@ -264,6 +264,49 @@
    #-compact-instance-header
    (sb-pcl::standard-funcallable-instance-hash-code fin)))
 
+(declaim (inline integer-sxhash))
+(defun integer-sxhash (x)
+  (if (fixnump x) (sxhash (truly-the fixnum x)) (sb-bignum:sxhash-bignum x)))
+
+(defun number-sxhash (x)
+  (declare (optimize (sb-c::verify-arg-count 0) speed))
+  (labels ((hash-ratio (x)
+             (let ((result 127810327))
+               (declare (type fixnum result))
+               (mixf result (integer-sxhash (numerator x)))
+               (mixf result (integer-sxhash (denominator x)))
+               result))
+           (hash-rational (x)
+             (if (ratiop x)
+                 (hash-ratio x)
+                 (integer-sxhash x))))
+    (macrolet ((hash-complex-float (type)
+                 `(let ((result 535698211))
+                    (declare (type fixnum result))
+                    (mixf result (sxhash (truly-the ,type (realpart x))))
+                    (mixf result (sxhash (truly-the ,type (imagpart x))))
+                    result)))
+      (typecase x
+        (fixnum (sxhash x)) ; (Should be picked off by main SXHASH)
+        (integer (sb-bignum:sxhash-bignum x))
+        (single-float (sxhash x)) ; through DEFTRANSFORM
+        (double-float (sxhash x)) ; through DEFTRANSFORM
+        #+long-float (long-float (error "stub: no LONG-FLOAT"))
+        (ratio (hash-ratio x))
+        #+long-float
+        ((complex long-float) (hash-complex-float long-float))
+        ((complex double-float) (hash-complex-float double-float))
+        ((complex single-float) (hash-complex-float single-float))
+        ((complex rational)
+         (let ((result 535698211))
+           (declare (type fixnum result))
+           (mixf result (hash-rational (imagpart x)))
+           (mixf result (hash-rational (realpart x)))
+           result))
+        (t 0)))))
+
+(clear-info :function :inlinep 'integer-sxhash)
+
 (defun sxhash (x)
   ;; profiling SXHASH is hard, but we might as well try to make it go
   ;; fast, in case it is the bottleneck somewhere.  -- CSR, 2003-03-14
@@ -289,46 +332,7 @@
   ;; we could do away with the question of order if only we had jump tables.
   ;; (Also, could somebody perhaps explain how these magic numbers were chosen?)
   (declare (optimize speed))
-  (labels ((sxhash-number (x)
-             (macrolet ((hash-complex-float ()
-                          `(let ((result 535698211))
-                             (declare (type fixnum result))
-                             (mixf result (sxhash (realpart x)))
-                             (mixf result (sxhash (imagpart x)))
-                             result)))
-               (etypecase x
-                 ;; FIXNUM is handled in the outer typecase, but we also see it
-                 ;; in SXHASH-NUMBER because of RATIONAL and (COMPLEX RATIONAL).
-                 (fixnum (sxhash x))    ; through DEFTRANSFORM
-                 (integer (sb-bignum:sxhash-bignum x))
-                 (single-float (sxhash x)) ; through DEFTRANSFORM
-                 (double-float (sxhash x)) ; through DEFTRANSFORM
-                 #+long-float (long-float (error "stub: no LONG-FLOAT"))
-                 (ratio (let ((result 127810327))
-                          (declare (type fixnum result))
-                          (mixf result (sxhash-number (numerator x)))
-                          (mixf result (sxhash-number (denominator x)))
-                          result))
-                 #+long-float
-                 ((complex long-float)
-                  (hash-complex-float))
-                 ((complex double-float)
-                  (hash-complex-float))
-                 ((complex single-float)
-                  (hash-complex-float))
-                 ((complex rational)
-                  (let ((result 535698211)
-                        (realpart (realpart x))
-                        (imagpart (imagpart x)))
-                    (declare (type fixnum result))
-                    (mixf result (if (fixnump imagpart)
-                                     (sxhash imagpart)
-                                     (sxhash-number imagpart)))
-                    (mixf result (if (fixnump realpart)
-                                     (sxhash realpart)
-                                     (sxhash-number realpart)))
-                    result)))))
-           (sxhash-recurse (x depthoid)
+  (labels ((sxhash-recurse (x depthoid)
              (declare (type index depthoid))
              (typecase x
                ;; we test for LIST here, rather than CONS, because the
@@ -396,7 +400,7 @@
                ;; Maybe the NUMBERP emitter could be informed that X can't be a fixnum,
                ;; because writing this case as (OR BIGNUM RATIO FLOAT COMPLEX)
                ;; produces far worse code.
-               (number (sxhash-number x))
+               (number (number-sxhash x))
                (character
                 (logxor 72185131
                         (sxhash (char-code x)))) ; through DEFTRANSFORM

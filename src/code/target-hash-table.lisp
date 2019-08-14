@@ -144,15 +144,18 @@
   (declare (values hash (member t nil)))
   (if (%other-pointer-subtype-p
        key
+       ;; SYMBOL is listed here so that we can hash symbols address-insensitively.
+       ;; Given that we're already picking off a bunch of OTHER-POINTER objects
+       ;; and already calling SXHASH, the overhead is minimal. In fact, with suitably
+       ;; and rearranged widetags, this would be included in the numeric range.
        '#.(list sb-vm:bignum-widetag sb-vm:ratio-widetag sb-vm:double-float-widetag
                 sb-vm:single-float-widetag
                 sb-vm:complex-widetag sb-vm:complex-single-float-widetag sb-vm:complex-double-float-widetag
                 sb-vm:symbol-widetag))
-      ;; SYMBOL is listed here so that we can hash symbols address-insensitively.
-      ;; Given that we're already picking off a bunch of OTHER-POINTER objects
-      ;; and already calling SXHASH, the overhead is minimal. In fact, with suitably
-      ;; and rearranged widetags, this would be included in the numeric range.
-      (values (sxhash key) nil)
+      (values (if (= (%other-pointer-widetag key) sb-vm:symbol-widetag)
+                  (sxhash (truly-the symbol key))
+                  (number-sxhash key))
+              nil)
       ;; I don't want to add a case for INSTANCE-WITH-HASH-P here,
       ;; but in the EQUAL and EQUAL hash functions, we do that.
       (eq-hash key)))

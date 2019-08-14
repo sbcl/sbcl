@@ -12,6 +12,16 @@
 
 (in-package "SB-C")
 
+;;; Because we unobviously run transforms in the reverse order of definition,
+;;; these must be the first transforms defined so that they become the last
+;;; transforms attempted, with INTEGER taking precedence over NUMBER.
+;;; I once tried to fix that glitch by using APPEND instead of PUSH into
+;;; FUN-INFO-TRANSFORMS, and of course it broke things because we depend on such
+;;; stupidity. It would be easily remedied by reversing all definitions whenever
+;;; it matters but I didn't feel like figuring out all places where it does.
+(deftransform sxhash ((x) (number)) `(sb-impl::number-sxhash x))
+(deftransform sxhash ((x) (integer)) `(sb-impl::integer-sxhash x))
+
 ;;; Note about signed zeros with respect to SXHASH (but not PSXHASH!) -
 
 ;;; Change b0a51fec91 added some logic to discard the sign of floating-point zeros
