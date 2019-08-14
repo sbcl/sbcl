@@ -81,6 +81,21 @@
     (assert (search "foo" output))
     (assert (search "returned OK" output))))
 
+;;; The following should not work:
+;;;  (DEFUN G () (M))
+;;;  (DEFMACRO M (&REST r) (format t "M invoked: ~S~%" r))
+;;;  (ENCAPSULATE 'M 'foo (lambda (f &rest r) (format t "encapsulation: ~S ~S~%" f r)))
+;;;  (G)
+;;; If (ENCAPSULATE) were permitted, M's guard trampoline would be replaced by the
+;;; encapsulation which is not meaningful. Most uses of the macro M will NOT invoke
+;;; the encapsulation since we don't store macro functions in the symbol-function location.
+;;; Only a consumer of M being accidentally compiled first and resolving M to an
+;;; fdefinition would see the encapulation. That should just be an error.
+(with-test (:name :no-macro-encapsulation)
+  (assert-error (sb-int:encapsulate 'cond 'tryme
+                                    (lambda (f &rest stuff)
+                                      (declare (ignore f stuff))))))
+
 ;;; bug 379
 (with-test (:name (trace :encapsulate nil)
             :fails-on (or (and :ppc (not :linux)) :sparc :arm64)

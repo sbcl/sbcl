@@ -237,6 +237,8 @@
 (defun encapsulate (name type function)
   (let* ((fdefn (find-fdefn name))
          (underlying-fun (sb-c:safe-fdefn-fun fdefn)))
+    (when (macro/special-guard-fun-p underlying-fun)
+      (error "~S can not be encapsulated" name))
     (when (typep underlying-fun 'generic-function)
       (return-from encapsulate
         (encapsulate-generic-function underlying-fun type function)))
