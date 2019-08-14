@@ -54,4 +54,5 @@ extern os_vm_offset_t search_for_embedded_core(char *filename,
  * against a runtime with patches which add new C code) */
 extern unsigned char build_id[];
 
+char* get_asm_routine_by_name(const char* name);
 #endif

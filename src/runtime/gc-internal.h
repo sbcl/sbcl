@@ -155,38 +155,7 @@ static inline void set_function_layout(lispobj __attribute__((unused)) *fun_ptr,
 #include "genesis/bignum.h"
 extern boolean positive_bignum_logbitp(int,struct bignum*);
 
-#ifdef LISP_FEATURE_IMMOBILE_CODE
-
-/* The callee_lispobj of an fdefn is the value in the 'raw_addr' slot to which
- * control transfer occurs, but cast as a simple-fun or code component.
- * It can momentarily disagree with the 'fun' slot when assigning a new value.
- * Pointer tracing should almost always examine both slots, as scav_fdefn() does.
- * If the raw_addr value points to read-only space, the callee is just raw_addr
- * itself, which either looks like a simple-fun or a fixnum depending on platform.
- * It is not critical that this exceptional situation be consistent by having
- * a pointer lowtag because it only affects print_otherptr() and verify_space()
- * neither of which materially impact garbage collection. */
-
 extern lispobj fdefn_callee_lispobj(struct fdefn *fdefn);
-extern lispobj virtual_fdefn_callee_lispobj(struct fdefn *fdefn,uword_t);
-
-#else
-
-static inline lispobj points_to_asm_routine_p(uword_t ptr) {
-# if defined(LISP_FEATURE_IMMOBILE_SPACE)
-    extern uword_t asm_routines_start, asm_routines_end;
-    // Lisp assembly routines are in varyobj space, not readonly space
-    return asm_routines_start <= ptr && ptr < asm_routines_end;
-# else
-    return READ_ONLY_SPACE_START <= ptr && ptr < READ_ONLY_SPACE_END;
-# endif
-}
-static inline lispobj fdefn_callee_lispobj(struct fdefn *fdefn) {
-    return (lispobj)fdefn->raw_addr -
-      (points_to_asm_routine_p((uword_t)fdefn->raw_addr) ? 0 : FUN_RAW_ADDR_OFFSET);
-}
-
-#endif
 
 boolean valid_widetag_p(unsigned char widetag);
 

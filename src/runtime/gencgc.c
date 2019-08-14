@@ -1596,6 +1596,12 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
     if (instruction_ptr_p((void*)addr, object_start))
         return object_start;
 
+    // FIXME: I think there is a window of GC vulnerability regarding FINs
+    // and FDEFNs containing executable bytes. In either case if the only pointer
+    // to such an object is the program counter, the object could be considered
+    // garbage because there is no _tagged_ pointer to it.
+    // This is an almost impossible situation to arise, but seems worth some study.
+
     /* Large object pages only contain ONE object, and it will never
      * be a CONS.  However, arrays and bignums can be allocated larger
      * than necessary and then shrunk to fit, leaving what look like

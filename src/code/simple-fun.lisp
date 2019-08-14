@@ -534,23 +534,21 @@
                       'undefined-function)
                   :name symbol))
           t
-          fun-name)))
-    ;; In most cases, install the guard closure in the usual way.
-    #-immobile-code (setf (fdefn-fun (find-or-create-fdefn symbol)) closure)
+          fun-name))
+        (fdefn (find-or-create-fdefn symbol)))
 
-    ;; Do something slightly different for immobile code: fmakunbound, causing the FUN
-    ;; slot to become NIL, and RAW-ADDR to contain a call instruction; then overwrite
-    ;; NIL with the above closure. This is better than assigning a closure, because
-    ;; assigning a closure into an fdefn generally conses a new closure trampoline.
-    ;; (The CALL goes to undefined tramp which pops the stack to deduce the fdefn)
+    ;; In most cases, install the guard closure in the usual way.
+    #-immobile-code (setf (fdefn-fun fdefn) closure)
+
+    ;; Do something slightly different for immobile code: fmakunbound, assigning
+    ;; FUN = NIL and RAW-ADDR = UNDEFINED-TRAMP; then overwrite the NIL with the
+    ;; above closure. This is better than assigning a closure, because closures
+    ;; require a new closure-calling trampoline to be consed.
     #+immobile-code
-    (let ((fdefn (find-or-create-fdefn symbol)))
-      (fdefn-makunbound fdefn)
-      (%primitive sb-vm::set-fdefn-fun ; This invokes TOUCH-GC-CARD
-                  fdefn closure
-                  (sap-ref-word (int-sap (get-lisp-obj-address fdefn))
-                                (- (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)
-                                   sb-vm:other-pointer-lowtag))))))
+    (progn (fdefn-makunbound fdefn)
+           (%primitive sb-vm::set-undefined-fdefn-fun fdefn closure))
+
+    fdefn))
 
 ;;;; Iterating over closure values
 

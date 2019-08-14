@@ -3594,16 +3594,17 @@ register."
   (let* ((callee
            ;; FIXME: this could handle static calls, but needs some
            ;; help from the backends
+          (make-lisp-obj
            (cond #+immobile-space
                  ((eql (sap-ref-8 (context-pc context) 0) #xB8) ; MOV EAX,imm
+                  ;; Construct a properly tagged FDEFN given the value
+                  ;; that machine code references it by for purposes
+                  ;; of the ensuing CALL instruction.
                   ;; FIXME: this ought to go in {target}-vm.lisp as
                   ;; something like GET-FDEFN-FOR-SINGLE-STEP
-                  (let ((jmp-target (sap-ref-32 (context-pc context) 1)))
-                    (make-lisp-obj
-                     (+ jmp-target (- (ash word-shift fdefn-raw-addr-slot))
-                        other-pointer-lowtag))))
-                 (t (make-lisp-obj
-                     (context-register context callee-register-offset)))))
+                  (+ (sap-ref-32 (context-pc context) 1) -2 other-pointer-lowtag))
+                 (t
+                  (context-register context callee-register-offset)))))
          (step-info (single-step-info-from-context context)))
     ;; If there was not enough debug information available, there's no
     ;; sense in signaling the condition.
@@ -3658,11 +3659,10 @@ register."
         (cond
          #+immobile-code
          ((fdefn-p callee) ; as above, should be in {target}-vm.lisp
-          ;; Don't store the FDEFN in RAX, but the address of the raw_addr slot.
+          ;; Store into RAX the necessary value for issuing a CALL to the JMP
+          ;; opcode in the FDEFN header.
           (setf (context-register context callee-register-offset)
-                (+ (get-lisp-obj-address new-callee)
-                   (- other-pointer-lowtag)
-                   (ash word-shift fdefn-raw-addr-slot)))
+                (sb-vm::fdefn-entry-address new-callee))
           ;; And skip over the MOV EAX, imm instruction.
           (sb-vm::incf-context-pc context 5))
          (t

@@ -151,7 +151,7 @@
                                     (and (sb-vm::call-direct-p callee code-header-funs)
                                          (match-p (%fun-name callee)
                                                   callees exclude-callees))))
-                         (let ((entry (sb-vm::fdefn-call-target fdefn)))
+                         (let ((entry (sb-vm::fdefn-raw-addr fdefn)))
                            (when verbose
                              (let ((*print-pretty* nil))
                                (unless printed-fun-name
@@ -179,10 +179,8 @@
 (defun sb-vm::remove-static-links (fdefn)
   (sb-thread::with-system-mutex (sb-c::*static-linker-lock*)
     ;; If the jump is to FUN-ENTRY, change it back to FDEFN-ENTRY
-    (let ((fun-entry (sb-vm::fdefn-call-target fdefn))
-          (fdefn-entry (+ (get-lisp-obj-address fdefn)
-                          (ash fdefn-raw-addr-slot word-shift)
-                          (- other-pointer-lowtag))))
+    (let ((fun-entry (sb-vm::fdefn-raw-addr fdefn))
+          (fdefn-entry (sb-vm::fdefn-entry-address fdefn)))
       ;; Examine only those code components which potentially use FDEFN.
       (do-immobile-functions
          (code fun addr :if (loop for i downfrom (1- (sb-kernel:code-header-words code))

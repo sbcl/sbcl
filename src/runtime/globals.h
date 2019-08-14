@@ -48,6 +48,11 @@ extern uword_t immobile_space_lower_bound, immobile_space_max_offset;
 extern uword_t immobile_range_1_max_offset, immobile_range_2_min_offset;
 extern unsigned int varyobj_space_size;
 #endif
+extern uword_t asm_routines_start, asm_routines_end;
+
+static inline lispobj points_to_asm_code_p(uword_t ptr) {
+    return asm_routines_start <= ptr && ptr < asm_routines_end;
+}
 
 extern boolean alloc_profiling;
 extern os_vm_address_t alloc_profile_buffer;

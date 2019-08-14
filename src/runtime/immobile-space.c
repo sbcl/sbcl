@@ -85,8 +85,6 @@ uword_t immobile_space_lower_bound, immobile_space_max_offset;
 uword_t immobile_range_1_max_offset, immobile_range_2_min_offset;
 unsigned int varyobj_space_size = VARYOBJ_SPACE_SIZE;
 
-uword_t asm_routines_start, asm_routines_end;
-
 // This table is for objects fixed in size, as opposed to variable-sized.
 // (Immobile objects are naturally fixed in placement)
 struct fixedobj_page *fixedobj_pages;
@@ -1541,35 +1539,26 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     return simple_fun + FUN_RAW_ADDR_OFFSET;
 }
 
-/// Fixup the fdefn at 'where' based on it moving by 'displacement'.
-/// 'fdefn_old' is needed for computing the pre-fixup callee if the
-/// architecture uses a call-relative instruction.
-#ifndef LISP_FEATURE_IMMOBILE_CODE
-#define adjust_fdefn_entrypoint(dumm1,dummy2,dummy3)
-#else
-static void adjust_fdefn_entrypoint(lispobj* where, int displacement,
-                                    struct fdefn* fdefn_old)
+static void adjust_fdefn_raw_addr(struct fdefn* fdefn)
 {
-    struct fdefn* fdefn = (struct fdefn*)where;
-    int callee_adjust = 0;
-    // Get the tagged object referred to by the fdefn_raw_addr.
-    lispobj callee_old = fdefn_callee_lispobj(fdefn_old);
-    // If it's the undefined function trampoline, or the referent
-    // did not move, then the callee_adjust stays 0.
-    // Otherwise we adjust the rel32 field by the change in callee address.
-    if (callee_old && forwarding_pointer_p(native_pointer(callee_old))) {
-        lispobj callee_new = forwarding_pointer_value(native_pointer(callee_old));
-        callee_adjust = callee_new - callee_old;
-    }
-#ifdef LISP_FEATURE_X86_64
-    UNALIGNED_STORE32((char*)&fdefn->raw_addr + 1,
-                      UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1)
-                      + callee_adjust - displacement);
-#else
-#error "Can't adjust fdefn_raw_addr for this architecture"
-#endif
+  if (!fdefn->raw_addr || points_to_asm_code_p((lispobj)fdefn->raw_addr))
+      return;
+  lispobj* raw_addr = (lispobj*)fdefn->raw_addr;
+  lispobj* obj_base = 0;
+  lispobj header;
+  int i;
+  for (i=1; i<=4; ++i)
+      if ((header = raw_addr[-i]) == 1 || other_immediate_lowtag_p(header)) {
+          obj_base = raw_addr-i;
+          break;
+      }
+  gc_assert(obj_base);
+  int offset = (char*)raw_addr - (char*)obj_base;
+  if (header == 1) {
+      char* new = (char*)native_pointer(forwarding_pointer_value(obj_base));
+      fdefn->raw_addr = new + offset;
+  }
 }
-#endif
 
 /* Fix the layout of OBJ, and return the layout's address in tempspace.
  * If compact headers, store the layout back into the object.
@@ -1673,16 +1662,7 @@ static void fixup_space(lispobj* where, size_t n_words)
           break;
         case FDEFN_WIDETAG:
           adjust_words(where+1, 2, 0);
-          // If fixed-size objects (hence FDEFNs) are movable, then fixing the
-          // raw address can not be done here, because it is impossible to compute
-          // the absolute jump target - we don't know what the fdefn's original
-          // address was to compute a pc-relative address. So we do those while
-          // permuting the FDEFNs. But because static fdefns do not move,
-          // we do process their raw address slot here.
-#if DEFRAGMENT_FIXEDOBJ_SUBSPACE
-          if (static_space_p)
-#endif
-              adjust_fdefn_entrypoint(where, 0, (struct fdefn*)where);
+          adjust_fdefn_raw_addr((struct fdefn*)where);
           break;
 
         // Special case because we might need to mark hashtables
@@ -2073,49 +2053,6 @@ static void defrag_immobile_space(boolean verbose)
     // Might require filler between inter-object-type gaps
     add_filler_if_needed(alloc_ptrs[FDEFN_WIDETAG/4], tramp_alloc_ptr);
     add_filler_if_needed(alloc_ptrs[CODE_HEADER_WIDETAG/4], gf_alloc_ptr);
-
-#ifdef LISP_FEATURE_X86_64
-    // Fixup JMP displacements in fdefns. This can not be done in the same pass
-    // as space permutation,
-    // because we don't know the order in which a generic function and its
-    // related fdefn will be reached. Were this attempted in a single pass,
-    // it could miss a GF that will be moved after the fdefn is moved.
-    // And it can't be done in fixup_space() because that does not know the
-    // original address of each fdefn, so can't compute the absolute callee.
-    obj = (lispobj*)VARYOBJ_SPACE_START;
-    while (obj < varyobj_free_pointer) {
-        if (!forwarding_pointer_p(obj)) {
-            gc_assert(filler_obj_p(obj));
-            obj += sizetab[widetag_of(obj)](obj);
-            continue;
-        }
-        lispobj* new = native_pointer(forwarding_pointer_value(obj));
-        int widetag = widetag_of(tempspace_addr(new));
-        if (widetag == FDEFN_WIDETAG)
-            // Fix displacement in JMP or CALL instruction.
-            adjust_fdefn_entrypoint(tempspace_addr(new),
-                                    (char*)new - (char*)obj,
-                                    (struct fdefn*)obj);
-        obj += sizetab[widetag](tempspace_addr(new));
-    }
-    for ( page_index = find_fixedobj_page_index(defrag_base) ;
-          page_index <= max_used_fixedobj_page ; ++page_index) {
-        int obj_spacing = fixedobj_page_obj_align(page_index);
-        if (!obj_spacing) continue;
-        lispobj* obj = fixedobj_page_address(page_index);
-        lispobj* limit = compute_fixedobj_limit(obj, obj_spacing);
-        do {
-            if (fixnump(*obj)) continue;
-            gc_assert(forwarding_pointer_p(obj));
-            lispobj* new = native_pointer(forwarding_pointer_value(obj));
-            if (widetag_of(tempspace_addr(new)) == FDEFN_WIDETAG)
-                // Fix displacement in JMP or CALL instruction.
-                adjust_fdefn_entrypoint(tempspace_addr(new),
-                                        (char*)new - (char*)obj,
-                                        (struct fdefn*)obj);
-        } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
-    }
-#endif  /* LISP_FEATURE_X86_64 */
 #endif  /* DEFRAGMENT_FIXEDOBJ_SUBSPACE */
 
     if (immobile_space_reloc_index) {
@@ -2284,13 +2221,13 @@ static void apply_absolute_fixups(lispobj fixups, struct code* code)
             /* Dynamic space functions can call immobile space functions
              * and fdefns using the two-instruction sequence:
              *   MOV RAX, #x{addr} ; CALL RAX
-             * where the addr is either word index 3 of an fdefn
-             * (the jump instruction), or word index 6 of a simple-fun.
+             * where the addr is either word index 0 of an fdefn
+             * (the jump instruction), or word index 2 of a simple-fun.
              * We have to heuristically figure out which it is.
              * If we started by assuming that it's a simple-fun then
              * we might go astray if it's an fdefn because we can't
-             * correctly look backwards 6 words. */
-            header_addr = (lispobj*)(ptr - offsetof(struct fdefn, raw_addr));
+             * look at negative word indices. */
+            header_addr = (lispobj*)(ptr - 2);
             if (forwarding_pointer_p(header_addr)) {
                 fpval = forwarding_pointer_value(header_addr);
                 if (widetag_of(tempspace_addr(native_pointer(fpval))) == FDEFN_WIDETAG)

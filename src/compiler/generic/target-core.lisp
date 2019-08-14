@@ -45,12 +45,12 @@
                            (- (ash sb-vm:simple-fun-self-slot sb-vm:word-shift)
                               sb-vm:fun-pointer-lowtag))))))
 
-  ;; Return the address to which to jump when calling NAME through its fdefn.
-  (defun sb-vm::fdefn-entry-address (name)
-    (let ((fdefn (find-or-create-fdefn name)))
+  ;; Return the address to which to jump when calling FDEFN,
+  ;; which is either an fdefn or the name of an fdefn.
+  (defun sb-vm::fdefn-entry-address (fdefn)
+    (let ((fdefn (if (fdefn-p fdefn) fdefn (find-or-create-fdefn fdefn))))
       (+ (get-lisp-obj-address fdefn)
-         (ash sb-vm:fdefn-raw-addr-slot sb-vm:word-shift)
-         (- sb-vm:other-pointer-lowtag)))))
+         (- 2 sb-vm:other-pointer-lowtag)))))
 
 (flet ((fixup (code-obj offset sym kind flavor preserved-lists statically-link-p)
          (declare (ignorable statically-link-p))

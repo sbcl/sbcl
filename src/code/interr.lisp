@@ -134,7 +134,11 @@
                  (symbol fdefn-or-symbol)
                  (fdefn (fdefn-name fdefn-or-symbol))))
          (condition
-           (make-condition 'undefined-function
+           ;; Depending whether NAME is a special operator we signal a different
+           ;; condition class. Similar logic appears in SB-C::INSTALL-GUARD-FUNCTION.
+           (make-condition (if (and (symbolp name) (special-operator-p name))
+                               'special-form-function
+                               'undefined-function)
                            :name name
                            :not-yet-loaded
                            (cond ((and (boundp 'sb-c:*compilation*)

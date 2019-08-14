@@ -249,15 +249,7 @@
   (loadw length vector 1 other-pointer-lowtag)
   (inst mov fun (ea (- 8 other-pointer-lowtag) vector length 4))
 
-  (let ((fdefn-raw-addr
-          (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag)
-              fun)))
-    #+immobile-code
-    (progn
-      (inst lea vector fdefn-raw-addr)
-      (inst jmp vector))
-    #-immobile-code
-    (inst jmp fdefn-raw-addr))
+  (inst jmp (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag) fun))
   UNDEFINED
   (inst jmp (make-fixup 'undefined-tramp :assembly-routine))
   NOT-CALLABLE

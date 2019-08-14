@@ -1029,16 +1029,19 @@
            (format output "~a: # ~x~% .size ~0@*~a, 32~%"
                      (c-symbol-quote c-name)
                      (logior code-addr other-pointer-lowtag))
-           (format output " .quad 0x~x, 0x~x, ~:[~;CS+~]0x~x, 0x~x~%"
+           (format output " .quad 0x~x, 0x~x, ~:[~;CS+~]0x~x, ~:[~;CS+~]0x~x~%"
                    (sap-ref-word (int-sap ptr) 0)
                    (sap-ref-word (int-sap ptr) 8)
-                   code-space-p (if code-space-p (- fun (bounds-low code-bounds)) fun)
-                   raw-fun)
+                   code-space-p
+                   (if code-space-p (- fun (bounds-low code-bounds)) fun)
+                   code-space-p
+                   (if code-space-p (- raw-fun (bounds-low code-bounds)) raw-fun))
            (incf code-addr (* 4 n-word-bytes))))
         (#.funcallable-instance-widetag
          (unless seen-gfs
            (setq seen-gfs t)
-           (format output " .size lisp_trampolines, .-lisp_trampolines~%"))
+           (when seen-trampolines
+             (format output " .size lisp_trampolines, .-lisp_trampolines~%")))
          (let* ((sap (int-sap (translate-ptr code-addr spaces)))
                 (fin-fun (sap-ref-word sap (ash 2 word-shift)))
                 (code-space-p (in-bounds-p fin-fun code-bounds))
@@ -1373,18 +1376,6 @@
            (vector-push-extend `(,(+ core-header-size core-offs)
                                  ,(- referent code-start) . ,R_X86_64_32)
                                fixups))
-         (rel-fixup (core-offs referent addend)
-           (aver (not pie))
-           (incf n-rel)
-           (when print
-             (format t "~x = 0x~(~x~): (r)~%" core-offs (core-to-logical core-offs) #+nil referent))
-           (touch-core-page core-offs)
-           (setf (sap-ref-32 (car spaces) core-offs) 0)
-           (vector-push-extend `(,(+ core-header-size core-offs)
-                                 ;; Emitted as signed absolute plus addend,
-                                 ;; since the originating PC is known.
-                                 ,(+ (- referent code-start) addend) . ,R_X86_64_32S)
-                               fixups))
          (touch-core-page (core-offs)
            ;; use the OS page size, not +backend-page-bytes+
            (setf (gethash (floor core-offs 4096) affected-pages) t))
@@ -1405,7 +1396,7 @@
                  (return (+ (space-addr space)
                             (* (- page page0) +backend-page-bytes+)
                             (logand core-offs (1- +backend-page-bytes+))))))))
-         (scanptrs (vaddr obj wordindex-min wordindex-max &aux (n-fixups 0))
+         (scanptrs (vaddr obj wordindex-min wordindex-max &optional force &aux (n-fixups 0))
            (do* ((base-addr (logandc2 (get-lisp-obj-address obj) lowtag-mask))
                  (sap (int-sap base-addr))
                  ;; core-offs is the offset in the lisp.core ELF section.
@@ -1414,7 +1405,7 @@
                 ((> i wordindex-max) n-fixups)
              (let* ((byte-offs (ash i word-shift))
                     (ptr (sap-ref-word sap byte-offs)))
-               (when (and (is-lisp-pointer ptr) (in-bounds-p ptr code-bounds))
+               (when (and (or (is-lisp-pointer ptr) force) (in-bounds-p ptr code-bounds))
                  (abs-fixup (+ vaddr byte-offs) (+ core-offs byte-offs) ptr)
                  (incf n-fixups)))))
          (scanptr (vaddr obj wordindex)
@@ -1454,19 +1445,7 @@
                 (setq nwords (+ len 2))))
              (#.fdefn-widetag
               (scanptrs vaddr obj 1 2)
-              (let* ((fdefn-pc-sap ; where to read to access the rel32 operand
-                      (int-sap (+ (- (get-lisp-obj-address obj) other-pointer-lowtag)
-                                  (ash fdefn-raw-addr-slot word-shift))))
-                     ;; what the fdefn's logical PC will be
-                     (fdefn-logical-pc (+ vaddr (ash fdefn-raw-addr-slot word-shift)))
-                     (rel32off (signed-sap-ref-32 fdefn-pc-sap 1))
-                     (next-pc (+ fdefn-logical-pc 5))
-                     (target (+ next-pc rel32off)))
-                (when (in-bounds-p target code-bounds)
-                  ;; This addend needs to account for the fact that the location
-                  ;; where fixup occurs is not where the fdefn will actually exist.
-                  (rel-fixup (+ core-offs (ash 3 word-shift) 1)
-                             target (- next-pc))))
+              (scanptrs vaddr obj 3 3 t)
               (return-from scan-obj))
              ((#.closure-widetag #.funcallable-instance-widetag)
               ;; read the trampoline slot

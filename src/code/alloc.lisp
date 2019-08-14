@@ -405,15 +405,6 @@
     (%set-symbol-package symbol nil)
     symbol))
 
-(defun alloc-immobile-fdefn ()
-  (or (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
-           (allocate-immobile-obj (* fdefn-size n-word-bytes)
-                                  fdefn-widetag ; word 0
-                                  0 other-pointer-lowtag nil)) ; word 1, lowtag, errorp
-      (values (%primitive alloc-immobile-fixedobj other-pointer-lowtag
-                          fdefn-size
-                          fdefn-widetag)))) ; word 0
-
 #+immobile-code
 (progn
 (defun alloc-immobile-gf ()
@@ -433,19 +424,6 @@
     (%set-funcallable-instance-info gf 0 slot-vector)
     (!set-fin-trampoline gf)
     gf))
-
-(defun alloc-immobile-trampoline ()
-  (let ((obj (%primitive alloc-immobile-fixedobj other-pointer-lowtag 6
-                         ;; total word count
-                         (logior (ash 6 code-header-size-shift) code-header-widetag))))
-    (with-pinned-objects (obj)
-      (setf (sap-ref-word (int-sap (get-lisp-obj-address obj))
-                          (- (ash code-boxed-size-slot word-shift)
-                             other-pointer-lowtag))
-            ;; The 'fixups' slot permanently contains 0. Therefore we can say that
-            ;; there are only 3 boxed header words instead of the usual 4 words.
-            (* 3 n-word-bytes))) ; boxed size in bytes, untagged
-    obj))
 
 ) ; end PROGN
 ) ; end PROGN

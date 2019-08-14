@@ -149,6 +149,7 @@
   fun-end-breakpoint-trap
   single-step-around-trap
   single-step-before-trap
+  undefined-function-trap
   invalid-arg-count-trap
   memory-fault-emulation-trap
   #+sb-safepoint global-safepoint-trap
@@ -203,3 +204,13 @@
 
 #+sb-simd-pack
 (defglobal *simd-pack-element-types* '(integer single-float double-float))
+
+(defconstant undefined-fdefn-header
+  ;; This constant is constructed as follows: Take the INT 0xCC opcode
+  ;; plus the undefined-fun trap byte, then the bytes of the 'disp' field
+  ;; of the JMP instruction that would overwrite the INT instruction.
+  ;;   INT3 <trap-code> = CC **
+  ;;   JMP [RIP+16]     = FF 25 10 00 00 00 00
+  ;; When assigning a function we'll change the first two bytes to 0xFF 0x25.
+  ;; The 'disp' field will aready be correct.
+  (logior (ash undefined-function-trap 8) #x1000CC))

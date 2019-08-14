@@ -27,10 +27,13 @@
 #include "thread.h"
 #include "pseudo-atomic.h"
 #include "unaligned.h"
+#include "search.h"
+#include "globals.h" // for asm_routines_start,end
 
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
-
+#include "forwarding-ptr.h"
+#include "core.h"
 
 #ifdef LISP_FEATURE_UD2_BREAKPOINTS
 #define UD2_INST 0x0b0f         /* UD2 */
@@ -369,12 +372,27 @@ sigtrap_handler(int __attribute__((unused)) signal,
     access_control_stack_pointer(arch_os_get_current_thread()) =
         (lispobj *)*os_context_sp_addr(context);
 
-    /* On entry %eip points just after the INT3 byte and aims at the
+    /* On entry %rip points just after the INT3 byte and aims at the
      * 'kind' value (eg trap_Cerror). For error-trap and Cerror-trap a
      * number of bytes will follow, the first is the length of the byte
      * arguments to follow. */
     trap = *(unsigned char *)(*os_context_pc_addr(context));
-
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    if (trap == trap_UndefinedFunction) {
+        lispobj* fdefn = search_immobile_space((void*)*os_context_pc_addr(context));
+        if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
+            static char* undefined_tramp;
+            if (!undefined_tramp)
+                undefined_tramp = get_asm_routine_by_name("UNDEFINED-TRAMP");
+            // Return to undefined-tramp
+            *os_context_pc_addr(context) = (uword_t)undefined_tramp;
+            // with RAX containing the FDEFN
+            *os_context_register_addr(context,reg_RAX) =
+                make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
+            return;
+        }
+    }
+#endif
     handle_trap(context, trap);
 }
 
@@ -551,7 +569,6 @@ arch_set_fp_modes(unsigned int mxcsr)
     asm ("ldmxcsr %0" : : "m" (temp));
 }
 
-#ifdef LISP_FEATURE_IMMOBILE_CODE
 /// Return the Lisp object that fdefn's raw_addr slot jumps to.
 /// This will either be:
 /// (1) a simple-fun,
@@ -560,22 +577,36 @@ arch_set_fp_modes(unsigned int mxcsr)
 /// (3) a code-component with no simple-fun within it, that makes
 ///     closures and other funcallable-instances look like simple-funs.
 /// If the fdefn jumps to the UNDEFINED-FDEFN routine, then return 0.
-lispobj virtual_fdefn_callee_lispobj(struct fdefn* fdefn, uword_t vaddr) {
-    unsigned char tagged_ptr_bias = ((unsigned char*)&fdefn->raw_addr)[7];
-    // If the pointer bias is 0, then this fdefn's raw_addr must
-    // point to an assembler routine entry point.
-    if (tagged_ptr_bias == 0)
-        return 0;
-    int32_t offs = UNALIGNED_LOAD32((char*)&fdefn->raw_addr + 1);
-    // Base the callee address off where the fdefn virtually is.
-    // Compensate for the offset of the raw_addr slot,
-    // and add 5 for the length of "JMP rel32" instruction.
-    return vaddr + offsetof(struct fdefn,raw_addr) + 5 + offs - tagged_ptr_bias;
-}
 lispobj fdefn_callee_lispobj(struct fdefn* fdefn) {
-  return virtual_fdefn_callee_lispobj(fdefn, (uword_t)fdefn);
+    lispobj* raw_addr = (lispobj*)fdefn->raw_addr;
+    if (!raw_addr || points_to_asm_code_p((lispobj)raw_addr))
+        // technically this should return the address of the code object
+        // containing asm routines, but it's fine to return 0.
+        return 0;
+    // If the object to which raw_addr points was already forwarded,
+    // this returns the "old" pointer, prior to forwarding, so that
+    // scavenging that pointer alters it. Otherwise scav_fdefn would not
+    // decide to rewrite the raw_addr slot of the fdefn.
+    // This logic is rather nasty, but I don't know what else to do.
+    lispobj word;
+    if (header_widetag(word = raw_addr[-2]) == SIMPLE_FUN_WIDETAG
+        || (word == 1 &&
+            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-2)))
+            == SIMPLE_FUN_WIDETAG))
+        return make_lispobj(raw_addr - 2, FUN_POINTER_LOWTAG);
+    int widetag;
+    if ((widetag = header_widetag(word = raw_addr[-4])) == CODE_HEADER_WIDETAG
+        || (word == 1 &&
+            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
+            == CODE_HEADER_WIDETAG))
+        return make_lispobj(raw_addr - 4, OTHER_POINTER_LOWTAG);
+    if (widetag == FUNCALLABLE_INSTANCE_WIDETAG
+        || (word == 1 &&
+            widetag_of(native_pointer(forwarding_pointer_value(raw_addr-4)))
+            == FUNCALLABLE_INSTANCE_WIDETAG))
+        return make_lispobj(raw_addr - 4, FUN_POINTER_LOWTAG);
+    lose("Unknown object in fdefn raw addr: %p", raw_addr);
 }
-#endif
 
 #include "genesis/vector.h"
 #define LOCK_PREFIX 0xF0

@@ -437,37 +437,6 @@ static inline void fix_fun_header_layout(lispobj __attribute__((unused)) *fun,
 #endif
 }
 
-/* About relocation of fdefns - suppose we had originally intended to load:
- *   [ range of adjustable addresses  ]
- *   | fixedobj space | varyobj space |
- *          fdefn --------> callee
- *   0x1000000        0x2000000
- * and the subspaces were actually placed at much higher addresses
- * that do not overlap at all with the intended addresses:
- *                                       | fixedoboj space | varyobj space |
- *                                       0x8000000 ...
- * Then given an fdefn, its callee as computed from the new address appears
- * such there would be no relocation adjustment for the addressed object.
- * We correctly do not adjust the fdefn's callee displacement.
- * But suppose the moved spaces overlap the expected load addresses:
- *        [ range of adjustable addresses  ]
- *        | fixedobj space | varyobj space |
- *               fdefn --------> callee
- *   0x1000000 = desired
- *        0x1008000 = actual
- * In that case there can be an fdefn whose callee appears to be in the
- * adjustment range, and we'd compute an (incorrect) adjustment. In reality,
- * both the fdefn and its intended target moved by the same amount,
- * so the net change to the fdefn JMP instruction displacement ought to be zero.
- * To deal with this, we have to compute the fdefn callee as if the fdefn were
- * at its intended load address, then check whether that callee needs adjustment,
- * and compute a net adjustment by incorporating the amount by which the fdefn
- * itself moved.  Since both spaces move together for now, these two deltas
- * cancel out, and the net adjustment becomes zero. The full complexity is
- * required to handle the situation where only one of the immobile subspaces
- * moved, which we can't actually handle yet at all.
- * But already there was a bug when they move together by a small amount.
- */
 static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 {
     lispobj *where = (lispobj*)start;
@@ -525,28 +494,10 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             continue;
         case FDEFN_WIDETAG:
             adjust_pointers(where+1, 2, adj);
-            // 'raw_addr' doesn't satisfy is_lisp_pointer() for x86,
+            // For most architectures, 'raw_addr' doesn't satisfy is_lisp_pointer()
             // so adjust_pointers() would ignore it. Therefore we need to
-            // forcibly adjust it.
-#ifndef LISP_FEATURE_IMMOBILE_CODE
+            // forcibly adjust it. This is correct whether or not there are tag bits.
             adjust_word_at(where+3, adj);
-#elif defined(LISP_FEATURE_X86_64)
-            // the offset from fdefns to code can change if:
-            // - static space fdefn -> immobile space code and immobile space moved
-            // - immobile spaces changed relative position
-            {
-                // See comment above this function concerning fdefn adjustment.
-                lispobj orig = inverse_adjust(adj, (lispobj)where);
-                lispobj callee = virtual_fdefn_callee_lispobj((struct fdefn*)where, orig);
-                sword_t callee_delta = calc_adjustment(adj, callee);
-                delta = callee_delta - ((lispobj)where - orig);
-                if (delta != 0) {
-                    void* prel32 = 1 + (char*)(where+3);
-                    FIXUP_rel(UNALIGNED_STORE32(prel32, UNALIGNED_LOAD32(prel32) + delta),
-                              prel32);
-                }
-            }
-#endif
             continue;
         case CODE_HEADER_WIDETAG:
             if (filler_obj_p(where)) {
@@ -1023,6 +974,12 @@ Please report this as a bug");
     immobile_space_max_offset   = range2.end - range1.start;
     immobile_range_1_max_offset = range1.end - range1.start;
     immobile_range_2_min_offset = range2.start - range1.start;
+#else
+    asm_routines_start = READ_ONLY_SPACE_START;
+    if (widetag_of((lispobj*)asm_routines_start) != CODE_HEADER_WIDETAG)
+        lose("Can't find asm routines");
+    int nwords = sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
+    asm_routines_end = asm_routines_start + nwords*N_WORD_BYTES;
 #endif
 #ifdef LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch(); // before WPing immobile space
@@ -1123,7 +1080,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 #include "genesis/hash-table.h"
 #include "genesis/vector.h"
 #include "genesis/cons.h"
-os_vm_address_t get_asm_routine_by_name(const char* name)
+char* get_asm_routine_by_name(const char* name)
 {
     struct code* code = get_asm_routine_code_component();
     lispobj ht = CONS(code->debug_info)->car;
@@ -1146,7 +1103,7 @@ os_vm_address_t get_asm_routine_by_name(const char* name)
 
 void asm_routine_poke(const char* routine, int offset, char byte)
 {
-    char *address = (char *)get_asm_routine_by_name(routine);
+    char *address = get_asm_routine_by_name(routine);
     if (address)
         address[offset] = byte;
 }

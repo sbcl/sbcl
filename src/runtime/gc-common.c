@@ -49,6 +49,7 @@
 #include "gc-private.h"
 #include "forwarding-ptr.h"
 #include "var-io.h"
+#include "search.h"
 
 #ifdef LISP_FEATURE_SPARC
 #define LONG_FLOAT_SIZE 4
@@ -754,12 +755,13 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
     scavenge(where + 1, FDEFN_SIZE - 1);
 #else
     struct fdefn *fdefn = (struct fdefn *)where;
-
-    /* FSHOW((stderr, "scav_fdefn, function = %p, raw_addr = %p\n",
-       fdefn->fun, fdefn->raw_addr)); */
-
     scavenge(where + 1, 2); // 'name' and 'fun'
-#ifndef LISP_FEATURE_IMMOBILE_CODE
+# ifdef LISP_FEATURE_IMMOBILE_SPACE
+    lispobj obj = fdefn_callee_lispobj(fdefn);
+    lispobj new = obj;
+    scavenge(&new, 1);
+    if (new != obj) fdefn->raw_addr += (new - obj);
+# else
     lispobj raw_fun = (lispobj)fdefn->raw_addr;
     if (raw_fun > READ_ONLY_SPACE_END) {
         lispobj simple_fun = raw_fun - FUN_RAW_ADDR_OFFSET;
@@ -768,16 +770,7 @@ scav_fdefn(lispobj *where, lispobj __attribute__((unused)) object)
         if (simple_fun != raw_fun - FUN_RAW_ADDR_OFFSET)
             fdefn->raw_addr = (char *)simple_fun + FUN_RAW_ADDR_OFFSET;
     }
-#elif defined(LISP_FEATURE_X86_64)
-    lispobj obj = fdefn_callee_lispobj(fdefn);
-    if (obj) {
-        lispobj new = obj;
-        scavenge(&new, 1); // enliven
-        gc_dcheck(new == obj); // must not move
-    }
-#else
-#  error "Need to implement scav_fdefn"
-#endif
+# endif
 #endif
     return FDEFN_SIZE;
 }

@@ -103,7 +103,6 @@ lispobj  copy_large_object(lispobj object, sword_t nwords, int page_type_flag);
 
 lispobj *search_read_only_space(void *pointer);
 lispobj *search_static_space(void *pointer);
-lispobj *search_immobile_space(void *pointer);
 lispobj *search_dynamic_space(void *pointer);
 
 extern int properly_tagged_p_internal(lispobj pointer, lispobj *start_addr);

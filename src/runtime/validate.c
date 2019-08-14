@@ -32,6 +32,8 @@ uword_t DYNAMIC_SPACE_START;
 #endif
 #endif
 
+uword_t asm_routines_start, asm_routines_end;
+
 static void
 ensure_space(uword_t start, uword_t size)
 {

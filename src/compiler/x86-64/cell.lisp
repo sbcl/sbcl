@@ -406,6 +406,7 @@
     (storew raw fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result function)))
 #+immobile-code
+(progn
 (define-vop (set-fdefn-fun)
   (:args (fdefn :scs (descriptor-reg))
          (function :scs (descriptor-reg))
@@ -418,7 +419,21 @@
       (inst mov (ea (- (ash fdefn-fun-slot word-shift) other-pointer-lowtag) fdefn)
             function)
       (inst mov (ea (- (ash fdefn-raw-addr-slot word-shift) other-pointer-lowtag) fdefn)
-            raw-word))))
+            raw-word)
+      ;; Ensure that the header contains a JMP instruction, not INT3.
+      ;; This store is aligned
+      (inst mov :word (ea (- 2 other-pointer-lowtag) fdefn) #x25FF))))
+(define-vop (set-undefined-fdefn-fun)
+  ;; Do not set the raw-addr slot and do not change the header
+  (:args (fdefn :scs (descriptor-reg))
+         (function :scs (descriptor-reg)))
+  (:vop-var vop)
+  (:generator 38
+    (pseudo-atomic ()
+      (inst push fdefn)
+      (invoke-asm-routine 'call 'touch-gc-card vop)
+      (inst mov (ea (- (ash fdefn-fun-slot word-shift) other-pointer-lowtag) fdefn)
+            function)))))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)
@@ -426,28 +441,18 @@
   (:args (fdefn :scs (descriptor-reg) :target result))
   (:results (result :scs (descriptor-reg)))
   (:vop-var vop)
-  #+immobile-code (:temporary (:sc unsigned-reg) temp)
   (:generator 38
-    #+immobile-code
-    (let ((tramp (make-fixup 'undefined-fdefn :assembly-routine)))
-     (if (sb-c::code-immobile-p vop)
-         (inst lea temp (ea tramp rip-tn))
-         (inst mov temp tramp))
-     ;; Compute displacement from the call site
-     (inst sub :dword temp fdefn)
-     (inst sub :dword temp
-           (+ (- other-pointer-lowtag) (ash fdefn-raw-addr-slot word-shift) 5))
-     ;; Compute the encoding of a "CALL rel32" instruction
-     (inst shl temp 8)
-     (inst or :byte temp #xE8)
-     ;; Store
-     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
-     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag))
-    #-immobile-code
-    (progn
-     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
-     (storew (make-fixup 'undefined-tramp :assembly-routine)
-             fdefn fdefn-raw-addr-slot other-pointer-lowtag))
+    ;; Change the JMP instruction to INT3 so that a trap occurs in the fdefn
+    ;; itself, otherwise we've no way of knowing what function name was invoked.
+    (inst mov :word (ea (- 2 other-pointer-lowtag) fdefn)
+          (logand undefined-fdefn-header #xFFFF))
+    ;; Once the opcode is written, the values in 'fun' and 'raw-addr' become irrelevant.
+    ;; These stores act primarily to clear the reference from a GC perspective.
+    (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
+    ;; We never call through the raw-addr for undefined functions
+    ;; with immobile-code; the INT3 instruction prevents it.
+    (storew (or #-immobile-code (make-fixup 'undefined-tramp :assembly-routine) 0)
+            fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 
 ;;;; binding and unbinding

@@ -120,9 +120,7 @@
 #+immobile-code
 (with-test (:name :reference-assembly-tramp)
   (dolist (testcase '(("FUNCALLABLE-INSTANCE-TRAMP"
-                       sb-kernel:%make-funcallable-instance)
-                      ("UNDEFINED-FDEFN"
-                       sb-kernel:make-fdefn)))
+                       sb-kernel:%make-funcallable-instance)))
     (let ((lines
            (split-string
             (with-output-to-string (stream)
