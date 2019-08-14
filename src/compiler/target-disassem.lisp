@@ -1588,7 +1588,7 @@
      stream)))
 
 ;;; Disassemble the machine code instructions in each memory segment
-;;; in SEGMENTS in turn to STREAM.
+;;; in SEGMENTS in turn to STREAM. Return NIL.
 (defun disassemble-segments (segments stream dstate)
   (declare (type list segments)
            (type stream stream)
@@ -1641,7 +1641,7 @@
                             (use-labels t))
   (declare (type compiled-function fun)
            (type stream stream)
-           (type (member t nil) use-labels))
+           (type boolean use-labels))
   (let* ((dstate (make-dstate))
          (segments (get-fun-segments fun)))
     (when use-labels
@@ -1676,13 +1676,18 @@
 
 (defun disassemble (object &key
                            (stream *standard-output*)
-                           (use-labels t))
+                           (use-labels t)
+                           (length sb-vm:n-word-bytes lengthp))
   "Disassemble the compiled code associated with OBJECT, which can be a
   function, a lambda expression, or a symbol with a function definition. If
   it is not already compiled, the compiler is called to produce something to
   disassemble."
-  (declare (type (or (member t) stream) stream)
-           (type (member t nil) use-labels))
+  (when (typep object '(or address system-area-pointer))
+    (return-from disassemble
+                 (disassemble-memory object length
+                                     :stream stream :use-labels use-labels)))
+  (when lengthp
+    (warn ":LENGTH argument ignored"))
   (if (typep object 'code-component)
       (disassemble-code-component object :stream stream :use-labels use-labels)
       (flet ((disassemble1 (fun)
@@ -1710,7 +1715,7 @@
            (type disassem-length length)
            (type stream stream)
            (type (or null code-component) code-component)
-           (type (member t nil) use-labels))
+           (type boolean use-labels))
   (let* ((address
           (if (system-area-pointer-p address)
               (sap-int address)
@@ -1739,14 +1744,14 @@
 (defun disassemble-code-component (code-component &key
                                                   (stream *standard-output*)
                                                   (use-labels t))
-  (declare (type (or code-component compiled-function)
-                 code-component)
+  (declare (type (or code-component function) code-component)
            (type stream stream)
-           (type (member t nil) use-labels))
+           (type boolean use-labels))
   (let* ((code-component
-          (if (functionp code-component)
-              (fun-code-header (%fun-fun code-component))
-              code-component))
+          (typecase code-component
+           (interpreted-function (fun-code-header (compile nil code-component)))
+           (function (fun-code-header (%fun-fun code-component)))
+           (t code-component)))
          (dstate (make-dstate))
          (segments
           (if (eq code-component sb-fasl::*assembler-routines*)

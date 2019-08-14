@@ -1673,8 +1673,9 @@
 
 ;; FIXME: consider making (OR FUNCTION-DESIGNATOR CONS) something like
 ;; EXTENDED-FUNCTION-DESIGNATOR
-(defknown disassemble ((or function-designator cons code-component) &key
-                       (:stream stream) (:use-labels t))
+(defknown disassemble ((or function-designator cons code-component
+                           system-area-pointer word)
+                       &key (:stream stream) (:use-labels boolean) (:length integer))
   null)
 
 (defknown describe (t &optional (or stream (member t nil))) (values))
