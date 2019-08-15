@@ -2,7 +2,7 @@
 
 ;;;; the specifications of target packages, except for a few things
 ;;;; which are handled elsewhere by other mechanisms:
-;;;;   * any SHADOWing and nickname hackery;
+;;;;   * some SHADOWing and nickname hackery;
 ;;;;   * the standard, non-SBCL-specific packages COMMON-LISP,
 ;;;;     COMMON-LISP-USER, and KEYWORD.
 ;;;;
@@ -3394,6 +3394,13 @@ structure representations"
                "WORD-REG-SC-NUMBER" "WORD-SHIFT"
                #+win32 "CONTEXT-RESTORE-TRAP"
                "ZERO-SC-NUMBER"))
+
+   #s(sb-cold:package-data
+      :name "SB-RBTREE"
+      :doc "internal: red/black tree"
+      :use ("CL" "SB-INT" "SB-EXT")
+      :shadow ("DELETE")
+      :export ("INSERT" "DELETE" "FIND=" "FIND<="))
 
    #s(sb-cold:package-data
       :name "SB-WALKER"

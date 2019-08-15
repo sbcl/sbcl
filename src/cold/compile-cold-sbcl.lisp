@@ -104,7 +104,14 @@
                  (return))
                (let ((pid (host-sb-posix:fork)))
                  (when (zerop pid)
-                   (target-compile-stem stem flags)
+                   (let ((basename (substitute #\- #\/ (namestring stem))))
+                     (with-open-file (*error-output*
+                                      (format nil "/tmp/~a.err" basename)
+                                      :direction :output :if-exists :supersede)
+                     (with-open-file (*standard-output*
+                                      (format nil "/tmp/~a.out" basename)
+                                      :direction :output :if-exists :supersede)
+                       (target-compile-stem stem flags))))
                    ;; FIXME: convey exit code based on COMPILE result.
                    (sb-cold::exit-process 0))
                  (push pid subprocess-list))

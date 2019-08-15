@@ -148,6 +148,8 @@
   (name (error "missing PACKAGE-DATA-NAME datum"))
   ;; a doc string
   (doc (error "missing PACKAGE-DOC datum"))
+  ;; a list of string designators for shadowing symbols
+  shadow
   ;; a tree containing names for exported symbols which'll be set up at package
   ;; creation time, and NILs, which are ignored. (This is a tree in order to
   ;; allow constructs like '("ENOSPC" #+LINUX ("EDQUOT" "EISNAM" "ENAVAIL"
@@ -401,6 +403,9 @@
     (dolist (package-data package-data-list)
       (let* ((name (package-data-name package-data))
              (package (make-package name :use nil)))
+        ;; Walk the tree of shadowing names
+        (dolist (string (flatten (package-data-shadow package-data)))
+          (shadow string package))
         ;; Walk the tree of exported names, exporting each name.
         (dolist (string (flatten (package-data-export package-data)))
           (export (intern string package) package))))
