@@ -101,7 +101,7 @@
       ;; Nodes are immutable, so the original tree is unchanged
       (dotimes (i n)
         (assert (= (node-value (find= i original-tree)) (- i)))))))
-        
+
 (defun tree-count (tree)
   (labels ((recurse (tree)
              (+ 1
