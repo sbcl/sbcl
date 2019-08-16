@@ -26,14 +26,14 @@
 #define reg_FDEFN     REG(10)   /* was NL7 until recently -dan */
 #define reg_NARGS     REG(11)
 #define reg_CFUNC     REG(12)   /* Silly to blow a reg on FF-name */
-#define reg_NFP       REG(13)   /* Lisp may save around FF-call */
+// r13 is as if it does not exist
 #define reg_BSP       REG(14)   /* Binding stack pointer */
 #define reg_CFP       REG(15)   /* Control/value stack frame pointer */
 #define reg_CSP       REG(16)   /* Control/value stack top */
 #define reg_ALLOC     REG(17)   /* (Global) dynamic free pointer */
 #define reg_NULL      REG(18)   /* NIL and globals nearby */
 #define reg_CODE      REG(19)   /* Current function object */
-#define reg_CNAME     REG(20)   /* Current function name */
+#define reg_NFP       REG(20)   /* Lisp may save around FF-call */
 #define reg_LEXENV    REG(21)   /* And why burn a register for this ? */
 #define reg_OCFP      REG(22)   /* The caller's reg_CFP */
 #define reg_LRA       REG(23)   /* Tagged lisp return address */
@@ -43,32 +43,26 @@
 #define reg_A3        REG(27)   /* Last of (only) 4 arg regs */
 #define reg_L0        REG(28)   /* Tagged temp regs */
 #define reg_L1        REG(29)
-#ifdef LISP_FEATURE_SB_THREAD
 #define reg_THREAD    REG(30)   /* TLS block pointer */
-#else
-#define reg_L2        REG(30)   /* Last lisp temp reg */
-#endif
 #define reg_LIP       REG(31)   /* Lisp Interior Pointer, e.g., locative */
 
-#ifdef LISP_FEATURE_SB_THREAD
-#define REG30_NAME "THREAD"
-#else
-#define REG30_NAME "L2"
-#endif
-
+// We should probably eliminate uses of the wired 0 register and use r0
+// as the NIL value. It's not wired to 0 in hardware, and we seldom use it in
+// ways that would be sensitive to its unusual nature (effectively a wired 0)
+// regarding load/store and some other instructions.
 #define REGNAMES \
         "ZERO",         "NSP",          "TOC",          "NL0", \
-        "NL1",          "NL2",          "NL3P",         "NL4", \
+        "NL1",          "NL2",          "NL3",          "NL4", \
         "NL5",          "NL6",          "FDEFN",        "NARGS", \
-        "NFP",          "CFUNC",        "BSP",          "CFP", \
+        "CFUNC",        "r13",          "BSP",          "CFP", \
         "CSP",          "ALLOC",        "NULL",         "CODE", \
-        "CNAME",        "LEXENV",       "OCFP",         "LRA", \
+        "NFP",          "LEXENV",       "OCFP",         "LRA", \
         "A0",           "A1",           "A2",           "A3", \
-        "L0",           "L1",           REG30_NAME,     "LIP"
+        "L0",           "L1",           "THREAD",       "LIP"
 
 /* OAOOM: Same as compiler/ppc/vm.lisp */
 #define BOXED_REGISTERS { \
-    reg_FDEFN, reg_CODE, reg_CNAME, reg_LEXENV, reg_OCFP, reg_LRA, \
+    reg_FDEFN, reg_CODE, reg_LEXENV, reg_OCFP, reg_LRA, \
     reg_A0, reg_A1, reg_A2, reg_A3, \
-    reg_L0, reg_L1, REG(30) \
+    reg_L0, reg_L1, reg_THREAD \
 }

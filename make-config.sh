@@ -709,7 +709,7 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     printf ' :64-bit :64-bit-registers' >> $ltf
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table' >> $ltf
+    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     # there is no glibc bug that requires the 'where-is-mcontext' hack.
     # (Sufficiently new glibc uses the correct definition, which is the same as

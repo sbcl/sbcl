@@ -15,12 +15,9 @@
 ;;;
 ;;; The number of bytes reserved above the number stack pointer.  These
 ;;; slots are required by architecture, mostly (?) to make C backtrace
-;;; work. This must be a power of 2 - see BYTES-REQUIRED-FOR-NUMBER-STACK.
+;;; work. This must be a power of 2 - see BYTES-NEEDED-FOR-NON-DESCRIPTOR-STACK-FRAME.
 ;;;
-(defconstant number-stack-displacement
-  (* #-darwin 2
-     #+darwin 8
-     n-word-bytes))
+(defconstant number-stack-displacement (* 4 n-word-bytes))
 
 ;;;; Define the registers
 
@@ -52,14 +49,14 @@
   (defreg fdefn 10)
   (defreg nargs 11)
   (defreg cfunc 12)
-  (defreg nfp 13)
+  ;; no use of r13 allowed
   (defreg bsp 14)
   (defreg cfp 15)
   (defreg csp 16)
   (defreg alloc 17)
   (defreg null 18)
   (defreg code 19)
-  (defreg cname 20)
+  (defreg nfp 20)
   (defreg lexenv 21)
   (defreg ocfp 22)
   (defreg lra 23)
@@ -72,15 +69,17 @@
   (defreg thread 30)
   (defreg lip 31)
 
+  ;; NL6 is used as a workaround for the inability to use
+  ;; an arbitrary displacement in load/store of 8-byte quantities.
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 #| nl6 |# cfunc nargs nfp)
 
   (defregset descriptor-regs
-      fdefn a0 a1 a2 a3  ocfp lra cname lexenv l0 l1)
+      fdefn a0 a1 a2 a3  ocfp lra lexenv l0 l1)
 
   ;; OAOOM: Same as runtime/ppc-lispregs.h
   (defregset boxed-regs
-      fdefn code cname lexenv ocfp lra
+      fdefn code lexenv ocfp lra
       a0 a1 a2 a3
       l0 l1 thread)
 

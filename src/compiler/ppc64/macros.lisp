@@ -204,7 +204,9 @@
   ;; Normal allocation to the heap.
   (declare (ignore stack-p node))
 
-  #-alloc-use-sigtrap ; sigtrap is not working
+  ;; if sigtrap is making you suffer, enable out-of-line allocator for everything
+  ;;  #-alloc-use-sigtrap
+  #+nil
   (let ((lip (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
                              :offset lip-offset)))
     (inst lr lip (make-fixup 'alloc-tramp :assembly-routine))

@@ -181,18 +181,7 @@
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 ;;;
 (defconstant-eqx +static-symbols+
- `#(,@+common-static-symbols+
-    ;; The C TLS pointer is technically a "reserved" register and may not be used
-    ;; by application code for anything, except that we do use it.
-    ;; You can't even run single-threaded C code if it has the wrong value.
-    ;; (At minimum, lazy binding of C symbols via the PLT needs it.)
-    ;; To avoid wasting a register, we should use the same register as the
-    ;; lisp thread, from which we can recover the C thread,
-    ;; and vice versa. Actually that may not be legal either - it might be
-    ;; that signal handlers need the correct value in r13, I don't know.
-    ;; ("Reserved" could rightly mean: touch it at all, and you die)
-    ;; We store the r13 value in a static lisp symbol.
-    r13-value)
+ `#(,@+common-static-symbols+)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+

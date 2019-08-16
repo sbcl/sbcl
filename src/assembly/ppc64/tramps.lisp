@@ -64,10 +64,9 @@
   (inst mtctr lip-tn)
   (inst bctr))
 
-;;; This is like call_into_c, but it does not affect the pseudo-atomic state,
-;;; and it preserves every FPR and GPR, because the trampoline must resemble
-;;; an allocation trap as much as possible - affecting no machine state except for
-;;; the register into which allocation occurs, and the allocation region.
+;;; This is the super-slow out-of-line allocator in which all allocations
+;;; go through C. It acts like call_into_c without affecting the pseudo-atomic
+;;; state or any CPU register except the one into which allocation occurs.
 ;;; We use a static area in which to perform the spill/restore just prior to
 ;;; this code, making it accessible relative to the instruction pointer on entry.
 (define-assembly-routine
@@ -79,7 +78,6 @@
      (:temp r2 unsigned-reg 2)
      (:temp r3 unsigned-reg 3)
      (:temp r12 unsigned-reg 12)
-     (:temp r13 unsigned-reg 13)
      (:temp lip unsigned-reg 31)) ; lisp LIP reg needn't be saved
   ;; Reserve space for spilling 32 GPRs, 32 FPRs, the argument/result,
   ;; the link register, and the caller's link register (already spilled).
@@ -110,14 +108,6 @@
     ;; back-chain is correct if we are in a function that allocated any number
     ;; stack space. (It would be better if we could play nice with the C stack.)
     (inst stdu machine-sp machine-sp -32)
-    ;; restore r13 from the value cell of the R13-VALUE static lisp symbol.
-    ;; I very much suspect that you're not allowed to save and restore R13,
-    ;; but in fact must NEVER touch it at all.
-    ;; Anyway this seems to work for now.
-    (inst addi r13 null-tn (+ (static-symbol-offset 'r13-value)
-                              (- other-pointer-lowtag)
-                              (ash symbol-value-slot word-shift)))
-    (inst ld r13 r13 0)
     (inst lr r12 (make-fixup "alloc_tramp" :foreign))
     (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF THIS IS REMOVED
     (inst ld r12 r12 0)

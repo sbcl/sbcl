@@ -22,7 +22,9 @@
 ;;;; * The stack shall be quadword aligned.
 ;;;; * The minimum stack frame size shall be 32 bytes.
 
-(defconstant +stack-alignment-mask+ 31)
+;;;; "The stack pointer (stored in r1) shall maintain quadword alignment."
+;;;; (quadword = 16 bytes)
+(defconstant +stack-alignment-mask+ 15)
 
 (defstruct arg-state
   (gpr-args 0)
@@ -270,7 +272,7 @@
                (inst stdu nsp-tn nsp-tn delta))
               (t
                (inst lr temp delta)
-               (inst stdux  nsp-tn nsp-tn temp)))))
+               (inst stdux nsp-tn nsp-tn temp)))))
     (unless (location= result nsp-tn)
       ;; They are only location= when the result tn was allocated by
       ;; make-call-out-tns above, which takes the number-stack-displacement

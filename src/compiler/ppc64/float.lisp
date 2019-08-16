@@ -696,7 +696,7 @@
     (let ((nfp (current-nfp-tn vop)))
       (inst mffs fp-temp)
       (inst stfd fp-temp nfp (* n-word-bytes (tn-offset temp)))
-      (loadw res nfp (1+ (tn-offset temp))))))
+      (loadw res nfp (tn-offset temp)))))
 
 (define-vop (set-floating-point-modes)
   (:args (new :scs (unsigned-reg) :target res))

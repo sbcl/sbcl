@@ -60,9 +60,7 @@ High Address
           |   Vector register save area (quadword aligned)
           |   Local variable space
           |   Parameter save area    (SP + 48)
-          |   TOC save area          (SP + 40)
-          |   link editor doubleword (SP + 32)
-          |   compiler doubleword    (SP + 24)
+          |   TOC save area          (SP + 24)
           |   LR save area           (SP + 16)
           |   CR save area           (SP + 8)
 SP  --->  +-- Back chain             (SP + 0)
@@ -222,7 +220,6 @@ indirect_ptr(specials)
 	/* Initialize tagged registers */
 	li reg_ZERO,0
 	li reg_CODE,0
-	li reg_CNAME,0
 	li reg_LEXENV,0
 	li reg_FDEFN,0
 	li reg_OCFP,0
@@ -233,9 +230,6 @@ indirect_ptr(specials)
 	li reg_A3,0
 	li reg_L0,0
 	li reg_L1,0
-#if !defined(LISP_FEATURE_SB_THREAD)
-	li reg_L2,0
-#endif
 	li reg_LIP,0
 	lis reg_NULL,NIL@h
 	ori reg_NULL,reg_NULL,NIL@l
@@ -335,12 +329,10 @@ lra:
 
 
 	GFUNCDEF(call_into_c)
-	/* In the 64-bit ABI, a function pointer is a pointer to a
-	 * 3-word "function descriptor" the first word of which contains the
-	 * entry address, and the second the value that the callee needs
-	 * in the TOC register. The third word can be ignored for C. */
-	ld reg_TOC, 8(reg_CFUNC)
-	ld reg_CFUNC, 0(reg_CFUNC)
+	/* There is very much a chicken-and-egg problem here.
+	 * This code knows how to reference C globals via r2,
+	 * but how can we load r2 ? */
+
 	/* We're kind of low on unboxed, non-dedicated registers here:
 	most of the unboxed registers may have outgoing C args in them.
 	CFUNC is going to have to go in the CTR in a moment, anyway
@@ -379,7 +371,9 @@ lra:
 	std reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 #else
 	/* Store Lisp state */
-	clrrwi reg_NFP,reg_ALLOC,3
+	// I have no idea what bit of state we're trying to set.
+	// At most this would clear the pseudo-atomic-interrupt flag.
+	clrrdi reg_NFP,reg_ALLOC,3
 	store(reg_NFP,reg_CFUNC,dynamic_space_free_pointer)
 	/* load(reg_CFUNC,current_thread) */
 
@@ -407,6 +401,24 @@ lra:
 
 	mr reg_NL3,reg_NARGS
 
+	/* "If a function changes the value of the TOC pointer register,
+	* it shall first save it in the TOC pointer doubleword." */
+	std reg_TOC, 24(1)
+
+	/* In the 64-bit ABI, a function pointer is a pointer to a
+	 * 3-word "function descriptor" the first word of which contains the
+	 * entry address, and the second the value that the callee needs
+	 * in the TOC register. */
+	mfctr 11
+	/* "When a function is entered through its global entry point,
+	 * register r12 contains the entry-point address." */
+	ld reg_CFUNC, 0(11)
+	ld reg_TOC, 8(11)
+	/* The third function descriptor word can allegedly be ignored for C.
+	 * Actually not all descriptors have 3 words afaict.
+	 * I don't see how they are ABI-compliant */
+	// ld 11, 16(11)
+	mtctr reg_CFUNC
         /* Into C we go. */
 	bctrl
 
@@ -415,6 +427,8 @@ lra:
 	ori reg_NULL,reg_NULL,NIL@l
 	/* And reg_ZERO */
 	li reg_ZERO,0
+	/* And the TOC register (which is not used in lisp) */
+	ld reg_TOC, 24(1)
 
 	/* If we GC'ed during the FF code (as the result of a callback ?)
 	the tagged lisp registers may now contain garbage (since the
@@ -422,7 +436,6 @@ lra:
 	harmless in all such registers before allowing an interrupt */
         li reg_FDEFN,0
 	li reg_CODE,0
-	li reg_CNAME,0
 	li reg_LEXENV,0
 	/* reg_OCFP was pointing to a control stack frame & was preserved by C */
 	li reg_LRA,0
@@ -433,8 +446,8 @@ lra:
 	li reg_L0,0
 	li reg_L1,0
 #if !defined(LISP_FEATURE_SB_THREAD)
-	/* reg_L2 is our TLS block pointer. */
-	li reg_L2,0
+	/* reg_THREAD is our TLS block pointer. */
+	li reg_THREAD,0
 #endif
 	li reg_LIP,0
 

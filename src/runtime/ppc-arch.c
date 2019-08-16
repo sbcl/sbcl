@@ -323,24 +323,13 @@ void
 handle_allocation_trap(os_context_t * context)
 {
     unsigned int *pc;
-    unsigned int inst;
-    unsigned int target;
-    uword_t __attribute__((unused)) target_ptr, end_addr;
     unsigned int opcode;
-    int size;
-    boolean were_in_lisp;
+    sword_t size = 0;
     char *memory;
-
-    target = 0;
-    size = 0;
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "In handle_allocation_trap\n");
-#endif
 
     /* I don't think it's possible for us NOT to be in lisp when we get
      * here.  Remove this later? */
-    were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
+    boolean were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
 
     if (were_in_lisp) {
         fake_foreign_function_call(context);
@@ -357,11 +346,13 @@ handle_allocation_trap(os_context_t * context)
      */
 
     pc = (unsigned int *) (*os_context_pc_addr(context));
+#if 0
     inst = pc[0];
     end_addr = (inst >> 11) & 0x1f;
     target = (inst >> 16) & 0x1f;
 
     target_ptr = *os_context_register_addr(context, target);
+#endif
 
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
@@ -381,7 +372,9 @@ handle_allocation_trap(os_context_t * context)
      * is the size of the allocation.  Get it and call alloc to allocate
      * new space.
      */
-    inst = pc[-1];
+
+    unsigned int inst = pc[-1];
+    int target = (inst >> 21) & 0x1f;
     opcode = inst >> 26;
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
@@ -473,10 +466,9 @@ handle_allocation_trap(os_context_t * context)
     }
 
     /* Skip the allocation trap and the write of the updated free
-     * pointer back to the allocation region.  This is two
-     * instructions when threading is enabled and four instructions
-     * otherwise. */
-#ifdef LISP_FEATURE_SB_THREAD
+     * pointer back to the allocation region.  This is either two
+     * instructions or four instructions. */
+#if defined LISP_FEATURE_SB_THREAD || defined LISP_FEATURE_64_BIT
     (*os_context_pc_addr(context)) = (uword_t)(pc + 2);
 #else
     (*os_context_pc_addr(context)) = (uword_t)(pc + 4);
@@ -523,6 +515,13 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
+#ifdef LISP_FEATURE_GENCGC
+    /* Is this an allocation trap? */
+    if (allocation_trap_p(context)) {
+        handle_allocation_trap(context);
+        return;
+    }
+#endif
     unsigned int code;
 
     code=*((u32 *)(*os_context_pc_addr(context)));
@@ -536,14 +535,6 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         interrupt_handle_pending(context);
         return;
     }
-
-#ifdef LISP_FEATURE_GENCGC
-    /* Is this an allocation trap? */
-    if (allocation_trap_p(context)) {
-        handle_allocation_trap(context);
-        return;
-    }
-#endif
 
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
@@ -567,6 +558,9 @@ void arch_install_interrupt_handlers()
 {
     undoably_install_low_level_interrupt_handler(SIGILL, sigtrap_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
+#ifdef LISP_FEATURE_64_BIT
+    undoably_install_low_level_interrupt_handler(SIGFPE, sigtrap_handler);
+#endif
 }
 
 void
@@ -609,6 +603,32 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
     return;
   }
+
+#ifdef LISP_FEATURE_64_BIT
+  /* In the 64-bit ABI, function pointers are alway passed around
+   * as "function descriptors", not directly the jump target address.
+   * A descriptor is 3 words:
+   *   word 0 = address to jump to
+   *   word 1 = value to place in r2
+   *   word 2 = value to place in r11
+   * For foreign calls, the value that we hand off to call_into_c
+   * is therefore a function descriptor. To make things consistent,
+   * (so that we need not distinguish between #+/-dynamic-core or other reasons)
+   * this linkage table entry itself has to look like a function descriptor.
+   * We can just copy the real descriptor to here, except in one case:
+   * call_into_c is not itself an ABI-compatible call. It really should be
+   * a lisp assembly routine, but then we have a turtles-all-the-way-down problem:
+   * it's tricky to access C global data from lisp assembly routines.
+   */
+  extern long call_into_c; // actually a function entry address,
+  // but trick the compiler into thinking it isn't, so that it does not
+  // indirect through a descriptor, but instead we get its logical address.
+  if (target_addr != &call_into_c) {
+    memcpy(reloc_addr, target_addr, 24);
+    return;
+  }
+#endif
+
   /*
    * Make JMP to function entry.
    *
