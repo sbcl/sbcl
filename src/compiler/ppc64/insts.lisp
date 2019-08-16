@@ -99,6 +99,11 @@
                   regname
                   dstate))))
 
+(define-arg-type ds-field
+  :prefilter (lambda (dstate value)
+               (declare (ignore dstate))
+               (* value 4)))
+
 (defconstant-eqx bo-kind-names
     #(:bo-dnzf :bo-dnzfp :bo-dzf :bo-dzfp :bo-f :bo-fp nil nil
       :bo-dnzt :bo-dnztp :bo-dzt :bo-dztp :bo-t :bo-tp nil nil
@@ -303,6 +308,12 @@
       (bo :field ,(ppc-byte 6 10) :type 'bo-field)
       (bt :field ,(ppc-byte 6 10) :type 'bi-field)
       (d :field ,(ppc-byte 16 31) :sign-extend t)
+      (ds :field ,(ppc-byte 16 29) :sign-extend t :type 'ds-field)
+      ;; I don't think the 2 leftover bits of the scaled D field
+      ;; (bits that would otherwise be part of the immediate value
+      ;; were it not for their use an an opcode extension) have
+      ;; a name in the processor manual. I'm naming them SUBOP.
+      (subop :field ,(ppc-byte 30 31))
       (flm :field ,(ppc-byte 7 14) :sign-extend nil)
       (fra :field ,(ppc-byte 11 15) :type 'fp-reg)
       (frb :field ,(ppc-byte 16 20) :type 'fp-reg)
@@ -371,6 +382,9 @@
 
 (def-ppc-iformat (d '(:name :tab rt "," d "(" ra ")"))
   rt ra d)
+
+(def-ppc-iformat (ds '(:name :tab rt "," ds "(" ra ")"))
+  rt ra ds subop)
 
 (def-ppc-iformat (d-si '(:name :tab rt "," ra "," si ))
   rt ra si)
@@ -884,12 +898,11 @@
            (define-ds-instruction (name op subop)
              `(define-instruction ,name (segment rt ra si)
                 (:declare (type (signed-byte 16) si))
-                ;; Todo: add an instruction field to match 'subop' to the
-                ;;       the low two bits of the DS field.
-                ;; (:printer d ((op ,op)))
+                (:printer ds ((op ,op) (subop ,subop)))
                 (:emitter
                  (if (= (mod si 4) 0)
-                     (emit-ds-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) (ash si -2) ,subop)
+                     (emit-ds-form-inst segment ,op (reg-tn-encoding rt)
+                                        (reg-tn-encoding ra) (ash si -2) ,subop)
                      (error "Displacement should be a multiple of 4")))))
 
            (define-2-a-instructions (name op xo &key (cost 1) other-dependencies)
