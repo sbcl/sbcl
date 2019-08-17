@@ -1083,9 +1083,8 @@
             (lo :scs (unsigned-reg)))
   (:result-types unsigned-num unsigned-num)
   (:generator 40
-   (inst tw :t x x)
-    (inst mulhwu hi-temp x y)
-    (inst mullw lo-temp x y)
+    (inst mulhdu hi-temp x y)
+    (inst mulld lo-temp x y)
     (inst addc lo lo-temp carry-in)
     (inst addze hi hi-temp)))
 
