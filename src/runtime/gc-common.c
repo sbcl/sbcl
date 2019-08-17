@@ -2094,7 +2094,7 @@ scavenge_interrupt_context(os_context_t * context)
 #ifdef ARCH_HAS_NPC_REGISTER
     INTERIOR_POINTER_VARS(npc);
 #endif
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     INTERIOR_POINTER_VARS(ctr);
 #endif
 
@@ -2108,7 +2108,7 @@ scavenge_interrupt_context(os_context_t * context)
 #ifdef ARCH_HAS_NPC_REGISTER
     PAIR_INTERIOR_POINTER(npc);
 #endif
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     PAIR_INTERIOR_POINTER(ctr);
 #endif
 
@@ -2151,7 +2151,7 @@ scavenge_interrupt_context(os_context_t * context)
 #ifdef ARCH_HAS_NPC_REGISTER
     FIXUP_INTERIOR_POINTER(npc);
 #endif
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     FIXUP_INTERIOR_POINTER(ctr);
 #endif
 }

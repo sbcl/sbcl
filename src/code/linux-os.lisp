@@ -48,7 +48,7 @@
           ;;   seemed to do the same thing as far as the
           ;;   "cpu" field is concerned, i.e. it always
           ;;   starts with the (C-syntax) string "cpu\t\t: ".
-          #+ppc "cpu"
+          #+(or ppc ppc64) "cpu"
           ;; The field "model name" exists on kernel 2.4.21-rc6-ac1
           ;; anyway, with values e.g.
           ;;   "AMD Athlon(TM) XP 2000+"

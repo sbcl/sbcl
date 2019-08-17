@@ -158,7 +158,7 @@ void *handle_fun_end_breakpoint(os_context_t *context)
 
     lra = codeptr->constants[REAL_LRA_SLOT];
 
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     /* PPC now passes LRA objects in reg_LRA during return.  Other
      * platforms should as well, but haven't been fixed yet. */
     *os_context_register_addr(context, reg_LRA) = lra;

@@ -1921,13 +1921,13 @@ signal_thread_trampoline(void *pthread_arg)
     intptr_t signo = (intptr_t) pthread_arg;
     os_context_t fake_context;
     siginfo_t fake_info;
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     mcontext_t uc_regs;
 #endif
 
     memset(&fake_info, 0, sizeof(fake_info));
     memset(&fake_context, 0, sizeof(fake_context));
-#ifdef LISP_FEATURE_PPC
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
     memset(&uc_regs, 0, sizeof(uc_regs));
     fake_context.uc_mcontext.uc_regs = &uc_regs;
 #endif

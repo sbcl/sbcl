@@ -55,6 +55,11 @@
   (defreg csp 16)
   (defreg alloc 17)
   (defreg null 18)
+  ;; Use of a tagged pointer in reg_CODE on PPC64 is expensive, adding an extra
+  ;; instruction to each load of a boxed constant. We should allow this register
+  ;; to contain an untagged pointer, and allow "fixnums" (ambiguous pointers)
+  ;; to pin code just as is done on the x86 backends.  And if we implicitly pin
+  ;; executing code, then we can get rid all LRA-related noise as well.
   (defreg code 19)
   (defreg nfp 20)
   (defreg lexenv 21)
