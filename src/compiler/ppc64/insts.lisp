@@ -1496,12 +1496,17 @@
   (define-instruction-macro mr. (ra rs)
     `(inst or. ,ra ,rs ,rs))
 
-  (define-4-xo-instructions divdu 31 457 :cost 36)
-  (define-4-xo-instructions divwu 31 459 :cost 36)
+  (define-4-xo-instructions div    31 331 :cost 36)
+  (define-4-xo-instructions divw   31 491 :cost 36)
+  (define-4-xo-instructions divwu  31 459 :cost 36)
+  (define-4-xo-instructions divwe  31 427 :cost 36)
+  (define-4-xo-instructions divweu 31 395 :cost 36)
 
-  (define-4-xo-instructions divd 31 489 :cost 36)
-  (define-4-xo-instructions div 31 331 :cost 36)
-                                        ; This is a 601-specific instruction.
+  (define-4-xo-instructions divd   31 489 :cost 36)
+  (define-4-xo-instructions divdu  31 457 :cost 36)
+  (define-4-xo-instructions divde  31 425 :cost 36)
+  (define-4-xo-instructions divdeu 31 393 :cost 36)
+
   (define-instruction mtmq (segment rt)
     (:printer xfx ((op 31) (xo 467) (spr (ash 0 5))) '(:name :tab rt))
     (:delay 1)
@@ -1528,7 +1533,7 @@
 
 
   (define-2-x-5-instructions nand 31 476)
-  (define-4-xo-instructions divw 31 491 :cost 36)
+
   (define-instruction mcrxr (segment crf)
     (:printer x-18 ((op 31) (xo 512)))
     (:delay 1)
