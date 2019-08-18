@@ -121,7 +121,7 @@ Low Address
 	RESTORE_FPR(28) ; RESTORE_FPR(29) ; RESTORE_FPR(30) ; RESTORE_FPR(31) ; \
 	addi sp, sp, FRAME_SIZE     /* Restore SP */ ; \
 	ld 0, 16(sp) ; mtlr 0       /* Restore LR  */ ; \
-	ld 0,  8(sp) ; mtcrf 255, 0 /* Restore CR */
+	lwz 0, 8(sp) ; mtcr 0       /* Restore CR */
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 /* the CSP page sits right before the thread */
