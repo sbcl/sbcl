@@ -120,8 +120,8 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst andi. res ptr lowtag-mask)
-    (inst sldi res res 1)))
+    (inst srdi res ptr 1) ; clear the fixnum sign bit
+    (inst rldicr res res 0 (- 63 n-fixnum-tag-bits))))
 
 
 ;;;; Allocation

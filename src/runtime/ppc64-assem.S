@@ -31,136 +31,97 @@ x:
 #define wordstore(reg,temp,csym) \
 	addis temp, 2, ptr_##csym@toc@ha ; ld temp, ptr_##csym@toc@l(temp) ; stw reg, 0(temp)
 
-#define	FIRST_SAVE_FPR	14	/* lowest-numbered non-volatile FPR */
-#define	FIRST_SAVE_GPR	13	/* lowest-numbered non-volatile GPR */
-#define NGPR_SAVE_BYTES(n) ((32-(n))*8)
-#define FRAME_ARG_BYTES(n)  (((((n)+2)*8)+15)&~15)
-#define	NFPR_SAVE_BYTES(n) ((32-(n))*8)
-
-#define FRAME_SIZE(first_g,first_f,out_arg_words,savecr) \
-(NFPR_SAVE_BYTES(first_f)+ NGPR_SAVE_BYTES(first_g)+ FRAME_ARG_BYTES(out_arg_words))
-#define SAVE_FPR(n) stfd n,-8*(32-(n))(11)
-#define SAVE_GPR(n) std n,-8*(32-(n))(11)
-#define FULL_FRAME_SIZE 512
-#define RESTORE_FPR(n) lfd n,-8*(32-(n))(11)
-#define RESTORE_GPR(n) ld n,-8*(32-(n))(11)
-
 /*
 
 From PPC-elf64abi:
-The following figure shows the stack frame organization. SP in the figure denotes the stack pointer (general purpose register r1) of the called function after it has executed code establishing its stack frame
-
+The following figure shows the stack frame organization.
+SP in the figure denotes the stack pointer (general purpose register r1) of the called
+function after it has executed code establishing its stack frame.
+	
 High Address
 
           +-> Back chain
           |   Floating point register save area
           |   General register save area
-          |   VRSAVE save word (32-bits)
-          |   Alignment padding (4 or 12 bytes)
+          |   Alignment padding
           |   Vector register save area (quadword aligned)
           |   Local variable space
-          |   Parameter save area    (SP + 48)
-          |   TOC save area          (SP + 24)
-          |   LR save area           (SP + 16)
-          |   CR save area           (SP + 8)
+          |   Parameter save area    (SP + 32)
+          |   TOC save doubleword    (SP + 24)
+          |   LR save doubleword     (SP + 16)
+          |   reserved word
+          |   CR save word           (SP + 8)
 SP  --->  +-- Back chain             (SP + 0)
 
 Low Address
 
 */
-#define C_FULL_PROLOG \
-	mflr 0 ; \
-	std 0,16(1) /* Save into LR save area */; \
-	mr 11,1 ; \
-	stdu 1,-FULL_FRAME_SIZE(1) /* Update SP and back chain atomically */; \
-	SAVE_FPR(14) ; \
-	SAVE_FPR(15) ; \
-	SAVE_FPR(16) ; \
-	SAVE_FPR(17) ; \
-	SAVE_FPR(18) ; \
-	SAVE_FPR(19) ; \
-	SAVE_FPR(20) ; \
-	SAVE_FPR(21) ; \
-	SAVE_FPR(22) ; \
-	SAVE_FPR(23) ; \
-	SAVE_FPR(24) ; \
-	SAVE_FPR(25) ; \
-	SAVE_FPR(26) ; \
-	SAVE_FPR(27) ; \
-	SAVE_FPR(28) ; \
-	SAVE_FPR(29) ; \
-	SAVE_FPR(30) ; \
-	SAVE_FPR(31) ; \
-	la 11,-NFPR_SAVE_BYTES(FIRST_SAVE_FPR)(11) ; \
-	SAVE_GPR(13) ; \
-	SAVE_GPR(14) ; \
-	SAVE_GPR(15) ; \
-	SAVE_GPR(16) ; \
-	SAVE_GPR(17) ; \
-	SAVE_GPR(18) ; \
-	SAVE_GPR(19) ; \
-	SAVE_GPR(20) ; \
-	SAVE_GPR(21) ; \
-	SAVE_GPR(22) ; \
-	SAVE_GPR(23) ; \
-	SAVE_GPR(24) ; \
-	SAVE_GPR(25) ; \
-	SAVE_GPR(26) ; \
-	SAVE_GPR(27) ; \
-	SAVE_GPR(28) ; \
-	SAVE_GPR(29) ; \
-	SAVE_GPR(30) ; \
-	SAVE_GPR(31) ; \
-	mfcr 0	; \
-	std 0,8(1) /* Save into CR save area */ ; \
-	std 2,40(1) /* Save into TOC save area */
+	
+/* "Floating-point register fN is saved in the doubleword located 8x(32-N)
+    bytes before the back-chain word of the previous frame.
+    General-purpose register rN is saved in the doubleword located 8x(32-N)
+    bytes below the floating-point save area."
+	
+    While not entirely obvious from that description, it seems conventional
+    to spill the nonvolatile registers such that the higher the register number
+    the higher the address in which it is stored.
+    Additionally, it seems that gcc spills the floating-pointer registers
+    before it lowers the stack pointer. This is permissible because there is
+    a red zone of 512 bytes, of which leaf functions are allowed to access
+    288 bytes below the stack pointer, the rest being reserved for system use.
+    It also spills r31 before it lowers the stack pointer, which allows
+    moving r1 into r31 as recommented in the ABI for functions which require
+    a frame pointer.
+    It looks like the size of the user-accessible part of the red zone was
+    exactly calculated to allow spilling every nonvolatile GPR and FPR (18 of each)
+    without lowering the stack pointer (36 doublewords = 288 bytes).
+*/
+	
+// We don't need a frame pointer since the frame is fixed in size.
+// Access the spill/restore areas off the stack pointer.
+#define sp 1
 
+// 18 nonvolatile GPRs (14 through 31)
+// 18 nonvolatile FPRs (14 through 31)
+//  4 mandatory doublewords
+#define FRAME_SIZE ((18+18+4)*8)
+#define SAVE_FPR(n)     stfd n, (FRAME_SIZE+8*(n-32))(sp)
+#define RESTORE_FPR(n)  lfd n,  (FRAME_SIZE+8*(n-32))(sp)
+#define SAVE_GPR(n)     std n,  (FRAME_SIZE+8*(n-32-18))(sp)
+#define RESTORE_GPR(n)  ld n,   (FRAME_SIZE+8*(n-32-18))(sp)
+
+// Note that CR, LR, and TOC are saved/restored in the frame of the *CALLER*
+
+#define C_FULL_PROLOG \
+	mfcr 0 ; stw 0,  8(sp)   /* save CR */ ; \
+	mflr 0 ; std 0, 16(sp)   /* save LR */ ; \
+	std 2, 24(sp)            /* save TOC ptr  */ ; \
+	stdu sp, -FRAME_SIZE(sp) /* Update SP and back chain atomically */; \
+	SAVE_FPR(31) ; SAVE_FPR(30) ; SAVE_FPR(29) ; SAVE_FPR(28) ; \
+	SAVE_FPR(27) ; SAVE_FPR(26) ; SAVE_FPR(25) ; SAVE_FPR(24) ; \
+	SAVE_FPR(23) ; SAVE_FPR(22) ; SAVE_FPR(21) ; SAVE_FPR(20) ; \
+	SAVE_FPR(19) ; SAVE_FPR(18) ; SAVE_FPR(17) ; SAVE_FPR(16) ; \
+	SAVE_FPR(15) ; SAVE_FPR(14) ; \
+	SAVE_GPR(31) ; SAVE_GPR(30) ; SAVE_GPR(29) ; SAVE_GPR(28) ; \
+	SAVE_GPR(27) ; SAVE_GPR(26) ; SAVE_GPR(25) ; SAVE_GPR(24) ; \
+	SAVE_GPR(23) ; SAVE_GPR(22) ; SAVE_GPR(21) ; SAVE_GPR(20) ; \
+	SAVE_GPR(19) ; SAVE_GPR(18) ; SAVE_GPR(17) ; SAVE_GPR(16) ; \
+	SAVE_GPR(15) ; SAVE_GPR(14)
+	
 #define C_FULL_EPILOG \
-	ld 5,8(1) /* Restore CR */ ; \
-	mtcrf 255,5 ; \
-	la 11,FULL_FRAME_SIZE-NFPR_SAVE_BYTES(FIRST_SAVE_FPR)(1) ; \
-	RESTORE_GPR(13) ; \
-	RESTORE_GPR(14) ; \
-	RESTORE_GPR(15) ; \
-	RESTORE_GPR(16) ; \
-	RESTORE_GPR(17) ; \
-	RESTORE_GPR(18) ; \
-	RESTORE_GPR(19) ; \
-	RESTORE_GPR(20) ; \
-	RESTORE_GPR(21) ; \
-	RESTORE_GPR(22) ; \
-	RESTORE_GPR(23) ; \
-	RESTORE_GPR(24) ; \
-	RESTORE_GPR(25) ; \
-	RESTORE_GPR(26) ; \
-	RESTORE_GPR(27) ; \
-	RESTORE_GPR(28) ; \
-	RESTORE_GPR(29) ; \
-	RESTORE_GPR(30) ; \
-	RESTORE_GPR(31) ; \
-	la 11,NFPR_SAVE_BYTES(FIRST_SAVE_FPR)(11) ; \
-	RESTORE_FPR(14) ; \
-	RESTORE_FPR(15) ; \
-	RESTORE_FPR(16) ; \
-	RESTORE_FPR(17) ; \
-	RESTORE_FPR(18) ; \
-	RESTORE_FPR(19) ; \
-	RESTORE_FPR(20) ; \
-	RESTORE_FPR(21) ; \
-	RESTORE_FPR(22) ; \
-	RESTORE_FPR(23) ; \
-	RESTORE_FPR(24) ; \
-	RESTORE_FPR(25) ; \
-	RESTORE_FPR(26) ; \
-	RESTORE_FPR(27) ; \
-	RESTORE_FPR(28) ; \
-	RESTORE_FPR(29) ; \
-	RESTORE_FPR(30) ; \
-	RESTORE_FPR(31) ; \
-	ld reg_NSP,0(1) /* Restore Stack Pointer from Back Chain */ ; \
-	ld 0,16(1) /* Restore LR from LR save area */ ; \
-	ld reg_TOC,40(1) /* Restor TOC from TOC save area */
-	mtlr 0 ; \
+	RESTORE_GPR(14) ; RESTORE_GPR(15) ; \
+	RESTORE_GPR(16) ; RESTORE_GPR(17) ; RESTORE_GPR(18) ; RESTORE_GPR(19) ; \
+	RESTORE_GPR(20) ; RESTORE_GPR(21) ; RESTORE_GPR(22) ; RESTORE_GPR(23) ; \
+	RESTORE_GPR(24) ; RESTORE_GPR(25) ; RESTORE_GPR(26) ; RESTORE_GPR(27) ; \
+	RESTORE_GPR(28) ; RESTORE_GPR(29) ; RESTORE_GPR(30) ; RESTORE_GPR(31) ; \
+	RESTORE_FPR(14) ; RESTORE_FPR(15) ; \
+	RESTORE_FPR(16) ; RESTORE_FPR(17) ; RESTORE_FPR(18) ; RESTORE_FPR(19) ; \
+	RESTORE_FPR(20) ; RESTORE_FPR(21) ; RESTORE_FPR(22) ; RESTORE_FPR(23) ; \
+	RESTORE_FPR(24) ; RESTORE_FPR(25) ; RESTORE_FPR(26) ; RESTORE_FPR(27) ; \
+	RESTORE_FPR(28) ; RESTORE_FPR(29) ; RESTORE_FPR(30) ; RESTORE_FPR(31) ; \
+	addi sp, sp, FRAME_SIZE     /* Restore SP */ ; \
+	ld 0, 16(sp) ; mtlr 0       /* Restore LR  */ ; \
+	ld 0,  8(sp) ; mtcrf 255, 0 /* Restore CR */
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 /* the CSP page sits right before the thread */
@@ -290,11 +251,16 @@ lra:
 	nop
 
 	/* Return the one value. */
-
 	mr REG(3),reg_A0
 
 	/* Turn on  pseudo-atomic */
 	la reg_ALLOC,flag_PseudoAtomic(reg_ALLOC)
+	
+	/* Lisp does not understand the TOC register, so we have to restore it
+	   now - prior to the epilogue - because there are memory accesses
+	   by way of the TOC register in this code, in particular
+	   the load() and store() macros uses register 2 as the base */
+	ld 2, (24+FRAME_SIZE)(sp)
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* Store lisp state */
