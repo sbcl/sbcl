@@ -389,13 +389,16 @@
 ;;; Given a STEM, remap the path component "/target/" to a suitable
 ;;; target directory.
 (defun stem-remap-target (stem)
-  (let ((position (search "/target/" stem)))
-    (if position
-      (concatenate 'string
-                   (subseq stem 0 (1+ position))
-                   (string-downcase (target-platform-keyword))
-                   (subseq stem (+ position 7)))
-      stem)))
+  (flet ((try-replacing (this that)
+           (let ((position (search this stem)))
+             (when position
+               (concatenate 'string
+                            (subseq stem 0 (1+ position))
+                            (string-downcase that)
+                            (subseq stem (+ position (length this) -1)))))))
+    (or (try-replacing "/target/" (target-platform-keyword))
+        (try-replacing "/asm-target/" (backend-assembler-target-name))
+        stem)))
 (compile 'stem-remap-target)
 
 ;;; Determine the source path for a stem by remapping from the abstract name

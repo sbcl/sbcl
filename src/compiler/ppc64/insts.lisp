@@ -551,8 +551,8 @@
 ;;;; Primitive emitters.
 
 
-(define-bitfield-emitter emit-dword 64
-  (byte 64 0))
+(define-bitfield-emitter emit-word 32 (byte 32 0))
+(define-bitfield-emitter emit-dword 64 (byte 64 0))
 
 (define-bitfield-emitter emit-i-form-inst 32
   (byte 6 26) (byte 24 2) (byte 1 1) (byte 1 0))
@@ -565,6 +565,9 @@
 
 (define-bitfield-emitter emit-d-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 16 0))
+
+(define-bitfield-emitter emit-ds-form-inst 32 ; D scaled form
+  (byte 6 26) (byte 5 21) (byte 5 16) (byte 14 2) (byte 2 0))
 
 ; Also used for XL-form.  What's the difference ?
 (define-bitfield-emitter emit-x-form-inst 32
@@ -587,9 +590,6 @@
 
 (define-bitfield-emitter emit-md-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 6 5) (byte 3 2) (byte 1 1) (byte 1 0))
-
-(define-bitfield-emitter emit-ds-form-inst 32
-  (byte 6 26) (byte 5 21) (byte 5 16) (byte 14 2) (byte 2 0))
 
 
 (eval-when (:compile-toplevel :execute)
@@ -704,7 +704,7 @@
                                  (writes frt) ,@other-writes)
                   (:emitter
                    (emit-x-form-inst segment ,op (fp-reg-tn-encoding frt)
-                                     (reg-or-0 ra) (reg-tn-encoding rb) ,xo 0)))))           
+                                     (reg-or-0 ra) (reg-tn-encoding rb) ,xo 0)))))
            (define-x-23-st-instruction (name op xo &key (cost 1) other-dependencies)
              (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
                `(define-instruction ,name (segment frs ra rb)
@@ -802,7 +802,7 @@
   (define-x-instruction      lwarx 31 20)
   (define-x-instruction      ldarx 31 84)
   (define-x-5-st-instruction stbcx. 31 694 1 :other-dependencies ((writes :ccr)))
-  (define-x-5-st-instruction sthcx. 31 726 1 :other-dependencies ((writes :ccr)))  
+  (define-x-5-st-instruction sthcx. 31 726 1 :other-dependencies ((writes :ccr)))
   (define-x-5-st-instruction stwcx. 31 150 1 :other-dependencies ((writes :ccr)))
   (define-x-5-st-instruction stdcx. 31 214 1 :other-dependencies ((writes :ccr)))
 
@@ -1834,7 +1834,7 @@
     `(inst nor. ,ra ,rs ,rs))
 
 ;; These can be temporarily commented out to find inadvertent
-;; use of 32-bit rlwinm and related macro instructions.
+;; use of 32-bit rlwinm and related macro instructions in 64-bit code.
 (progn
   (define-instruction-macro extlwi (ra rs n b)
     `(inst rlwinm ,ra ,rs ,b 0 (1- ,n)))
@@ -2071,8 +2071,19 @@
 
 ;;;; Instructions for dumping data and header objects.
 
+(define-instruction word (segment word)
+  (:declare (type (or (unsigned-byte 32) (signed-byte 32) fixup) word))
+  :pinned
+  (:delay 0)
+  (:emitter
+   (etypecase word
+     (fixup
+      (note-fixup segment :absolute word)
+      (emit-word segment 0))
+     (integer
+      (emit-word segment word)))))
 (define-instruction dword (segment dword)
-  (:declare (type (or (unsigned-byte 32) (signed-byte 32) fixup) dword))
+  (:declare (type (or (unsigned-byte 32) (signed-byte 32) fixup) dword)) ; what is this I can't even
   :pinned
   (:delay 0)
   (:emitter
@@ -2094,10 +2105,9 @@
   (emit-back-patch
    segment n-word-bytes
    #'(lambda (segment posn)
-       (emit-dword segment
-                   (logior type
-                           (ash (+ posn (component-header-length))
-                                (- n-widetag-bits word-shift)))))))
+       (#-64-bit emit-word #+64-bit emit-dword
+        segment (logior type (ash (+ posn (component-header-length))
+                                  (- n-widetag-bits word-shift)))))))
 
 (define-instruction simple-fun-header-word (segment)
   :pinned

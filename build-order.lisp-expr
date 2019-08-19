@@ -511,7 +511,7 @@
  ("src/assembly/assemfile" :not-target)
 
  ("src/compiler/target-dstate" :not-host)
- ("src/compiler/target/insts")
+ ("src/compiler/asm-target/insts")
  #+avx2
  ("src/compiler/target/avx2-insts")
  ("src/compiler/target/macros")
@@ -667,7 +667,7 @@
 
  ;; target-only assemblerish stuff
  ("src/compiler/target-disassem"     :not-host)
- ("src/compiler/target/target-insts" :not-host)
+ ("src/compiler/asm-target/target-insts" :not-host)
  #+avx2
  ("src/compiler/target/target-avx2-insts" :not-host)
 
