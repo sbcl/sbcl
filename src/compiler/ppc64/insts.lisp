@@ -34,6 +34,11 @@
          (tn-offset tn)
          (error "~S isn't a register." tn)))))
 
+(defun reg-or-0 (tn)
+  (cond ((eql tn 0) 0)
+        ((location= tn zero-tn) (error "Can't encode RA=r0"))
+        (t (reg-tn-encoding tn))))
+
 (defun fp-reg-tn-encoding (tn)
   (declare (type tn tn))
   (unless (eq (sb-name (sc-sb (tn-sc tn))) 'float-registers)
@@ -356,20 +361,20 @@
 
 
 
-(macrolet ((def-ppc-iformat ((name &optional default-printer) &rest specs)
-               (flet ((specname-field (specname)
-                        (or (assoc specname +ppc-field-specs-alist+)
-                            (error "Unknown ppc instruction field spec ~s" specname))))
-                 (labels ((spec-field (spec)
-                            (if (atom spec)
-                                (specname-field spec)
-                                (cons (car spec)
-                                      (cdr (specname-field (cadr spec)))))))
-                   (collect ((field (list '(op :field (byte 6 26)))))
-                            (dolist (spec specs)
-                              (field (spec-field spec)))
-                            `(define-instruction-format (,name 32 ,@(if default-printer `(:default-printer ,default-printer)))
-                              ,@(field)))))))
+(defmacro def-ppc-iformat ((name &optional default-printer) &rest specs)
+  (flet ((specname-field (specname)
+           (or (assoc specname +ppc-field-specs-alist+)
+               (error "Unknown ppc instruction field spec ~s" specname))))
+    (labels ((spec-field (spec)
+               (if (atom spec)
+                   (specname-field spec)
+                   (cons (car spec)
+                         (cdr (specname-field (cadr spec)))))))
+      (collect ((field (list '(op :field (byte 6 26)))))
+               (dolist (spec specs)
+                 (field (spec-field spec)))
+               `(define-instruction-format (,name 32 ,@(if default-printer `(:default-printer ,default-printer)))
+                 ,@(field))))))
 
 (def-ppc-iformat (i '(:name :tab li))
   li aa lk)
@@ -383,10 +388,10 @@
 (def-ppc-iformat (d '(:name :tab rt "," d "(" ra ")"))
   rt ra d)
 
-(def-ppc-iformat (ds '(:name :tab rt "," ds "(" ra ")"))
+(def-ppc-iformat (ds '(:name :tab rt "," ds "(" ra ")")) ; D scaled
   rt ra ds subop)
 
-(def-ppc-iformat (d-si '(:name :tab rt "," ra "," si ))
+(def-ppc-iformat (d-si '(:name :tab rt "," ra "," si )) ; D with signed immediate
   rt ra si)
 
 (def-ppc-iformat (d-rs '(:name :tab rs "," d "(" ra ")"))
@@ -536,7 +541,6 @@
 
 (def-ppc-iformat (m-sh '(:name :tab ra "," rs "," sh "," mb "," me))
   rs ra sh mb me rc)
-) ; end MACROLET DEF-PPC-IFORMAT
 
 (define-instruction-format (xinstr 32 :default-printer '(:name :tab data))
   (op-to-a :field (byte 16 16))
@@ -596,6 +600,233 @@
         (reads (reads dep))
         (writes (writes dep))))
     (values (reads) (writes)))))
+
+;; Load-store instructions can not access register 0 as RA.
+;; In the non-updating opcodes, 0 encodes a literal 0.
+;; In the updating opcodes, "If RA=0 or RA=RT, the instruction form is invalid."
+(macrolet ((define-d-instruction (name op &key (cost 2) other-dependencies pinned)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment rt ra si)
+                 (:declare (type (signed-byte 16) si))
+                 (:printer d ((op ,op)))
+                 (:delay ,cost)
+                 (:cost ,cost)
+                 ,@(when pinned '(:pinned))
+                 (:dependencies (reads ra) (reads :memory) ,@other-reads
+                                (writes rt) ,@other-writes)
+                 (:emitter
+                  (emit-d-form-inst segment ,op (reg-tn-encoding rt) (reg-or-0 ra) si)))))
+           (define-ds-instruction (name op subop)
+             `(define-instruction ,name (segment rt ra si)
+                (:declare (type (signed-byte 16) si))
+                (:printer ds ((op ,op) (subop ,subop)))
+                (:emitter
+                 (if (= (mod si 4) 0)
+                     (emit-ds-form-inst segment ,op (reg-tn-encoding rt)
+                                        (reg-or-0 ra) (ash si -2) ,subop)
+                     (error "Displacement should be a multiple of 4")))))
+           ;; This is really stupid. We use a diffent macro because use a different printer
+           ;; because we use a different instruction format.
+           ;; Why not just print loads and stores using the SAME format???
+           ;; We're basically causing a turtles-all-the-way-down problem.
+           (define-d-rs-instruction (name op &key (cost 1) other-dependencies pinned)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment rs ra si)
+                  (:declare (type (signed-byte 16) si))
+                  (:printer d-rs ((op ,op)))
+                  (:delay ,cost)
+                  (:cost ,cost)
+                  ,@(when pinned '(:pinned))
+                  (:dependencies (reads rs) (reads ra) ,@other-reads
+                                 (writes :memory :partially t) ,@other-writes)
+                  (:emitter
+                   (emit-d-form-inst segment ,op (reg-tn-encoding rs) (reg-or-0 ra) si)))))
+           (define-x-instruction (name op xo &key (cost 2) other-dependencies)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment rt ra rb)
+                 (:printer x ((op ,op) (xo ,xo)))
+                 (:delay ,cost)
+                 (:cost ,cost)
+                 (:dependencies (reads ra) (reads rb) (reads :memory) ,@other-reads
+                                (writes rt) ,@other-writes)
+                 (:emitter
+                  (emit-x-form-inst segment ,op (reg-tn-encoding rt)
+                                    (reg-or-0 ra) (reg-tn-encoding rb) ,xo 0)))))
+           ;; Bit 31 is the EH field for the store conditional forms, or the RC field
+           ;; for ALU operations. It's arbitrary which name we give it.
+           (define-x-5-st-instruction (name op xo bit31 &key (cost 1) other-dependencies)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment rs ra rb)
+                  (:printer x-5 ((op ,op) (xo ,xo) (rc ,bit31)))
+                  (:delay ,cost)
+                  (:cost ,cost)
+                  (:dependencies (reads ra) (reads rb) (reads rs) ,@other-reads
+                                 (writes :memory :partially t) ,@other-writes)
+                  (:emitter
+                   (emit-x-form-inst segment ,op (reg-tn-encoding rs)
+                                     (reg-or-0 ra) (reg-tn-encoding rb) ,xo ,bit31)))))
+           ;; As above - this is stupid.  Different macro, different printer, different format.
+           ;; But they should be the same.
+           (define-d-frt-instruction (name op &key (cost 3) other-dependencies)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment frt ra si)
+                 (:declare (type (signed-byte 16) si))
+                 (:printer d-frt ((op ,op)))
+                 (:delay ,cost)
+                 (:cost ,cost)
+                 (:dependencies (reads ra) (reads :memory) ,@other-reads
+                                (writes frt) ,@other-writes)
+                 (:emitter
+                  (emit-d-form-inst segment ,op (fp-reg-tn-encoding frt) (reg-or-0 ra) si)))))
+           (define-d-frs-instruction (name op &key (cost 1) other-dependencies)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment frs ra si)
+                 (:declare (type (signed-byte 16) si))
+                 (:printer d-frs ((op ,op)))
+                 (:delay ,cost)
+                 (:cost ,cost)
+                 (:dependencies (reads frs) (reads ra) ,@other-reads
+                                (writes :memory :partially t) ,@other-writes)
+                 (:emitter
+                  (emit-d-form-inst segment ,op
+                                    (fp-reg-tn-encoding frs) (reg-or-0 ra) si)))))
+           ;; Again, more horribleness: essentially identical formats.
+           ;; And these names are gobbledygook - if "X-5" means that it takes 5 operands
+           ;; after the opcode, then what are "-20-" and "-23-" supposed to mean?
+           ;; Clearly they don't take 20 and 23 operands respectively.
+           (define-x-20-instruction (name op xo &key (cost 2) other-dependencies)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment frt ra rb)
+                  (:printer x-20 ((op ,op) (xo ,xo)))
+                  (:delay ,cost)
+                  (:cost ,cost)
+                  (:dependencies (reads ra) (reads rb) ,@other-reads
+                                 (writes frt) ,@other-writes)
+                  (:emitter
+                   (emit-x-form-inst segment ,op (fp-reg-tn-encoding frt)
+                                     (reg-or-0 ra) (reg-tn-encoding rb) ,xo 0)))))           
+           (define-x-23-st-instruction (name op xo &key (cost 1) other-dependencies)
+             (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+               `(define-instruction ,name (segment frs ra rb)
+                  (:printer x-23 ((op ,op) (xo ,xo)))
+                  (:delay ,cost)
+                  (:cost ,cost)
+                  (:dependencies (reads ra) (reads rb) (reads frs) ,@other-reads
+                                 (writes :memory :partially t) ,@other-writes)
+                  (:emitter
+                   (emit-x-form-inst segment ,op (fp-reg-tn-encoding frs)
+                                     (reg-or-0 ra) (reg-tn-encoding rb) ,xo 0))))))
+
+  ;;; Loads
+  ;; Byte
+  (define-d-instruction      lbz   34)
+  (define-d-instruction      lbzu  35 :other-dependencies ((writes ra)))
+  (define-x-instruction      lbzx  31 87)
+  (define-x-instruction      lbzux 31 119 :other-dependencies ((writes ra)))
+  ;; Halfword zero-extend    ing
+  (define-d-instruction      lhz   40)
+  (define-d-instruction      lhzu  41 :other-dependencies ((writes ra)))
+  (define-x-instruction      lhzx  31 279)
+  (define-x-instruction      lhzux 31 311 :other-dependencies ((writes ra)))
+  ;; Halfword sign-extend    ing
+  (define-d-instruction      lha   42)
+  (define-d-instruction      lhau  43 :other-dependencies ((writes ra)))
+  (define-x-instruction      lhax  31 343)
+  (define-x-instruction      lhaux 31 375 :other-dependencies ((writes ra)))
+  ;; Word zero-extending)
+  (define-instruction lwz (segment rt ra si)
+    (:declare (type (or fixup (signed-byte 16)) si))
+    (:printer d ((op 32)))
+    (:delay 2)
+    (:cost 2)
+    (:dependencies (reads ra) (writes rt) (reads :memory))
+    (:emitter
+     (when (typep si 'fixup)
+       (note-fixup segment :l si)
+       (setq si 0))
+     (emit-d-form-inst segment 32 (reg-tn-encoding rt) (reg-or-0 ra) si)))
+  (define-d-instruction      lwzu  33 :other-dependencies ((writes ra)))
+  (define-x-instruction      lwzx  31 23)
+  (define-x-instruction      lwzux 31 55 :other-dependencies ((writes ra)))
+  ;; Sign-extending
+  (define-ds-instruction     lwa   58 #b10)
+  (define-x-instruction      lwax  31 341)
+  (define-x-instruction      lwaux 31 373 :other-dependencies ((writes ra)))
+  ;; Doubleword
+  (define-ds-instruction     ld    58 #b00)
+  (define-ds-instruction     ldu   58 #b01)
+  (define-x-instruction      ldx   31 21)
+  (define-x-instruction      ldux  31 53)
+  ;; Quadword
+  ;; (not done yet)
+
+  ;;; Stores
+  ;; Byte
+  (define-d-rs-instruction   stb   38)
+  (define-d-rs-instruction   stbu  39 :other-dependencies ((writes ra)))
+  (define-x-5-st-instruction stbx  31 215 0)
+  (define-x-5-st-instruction stbux 31 247 0 :other-dependencies ((writes ra)))
+  ;; Halfword
+  (define-d-rs-instruction   sth   44)
+  (define-d-rs-instruction   sthu  45 :other-dependencies ((writes ra)))
+  (define-x-5-st-instruction sthx  31 407 0)
+  (define-x-5-st-instruction sthux 31 439 0 :other-dependencies ((writes ra)))
+  ;; Word
+  (define-d-rs-instruction   stw   36)
+  (define-d-rs-instruction   stwu  37 :other-dependencies ((writes ra)))
+  (define-x-5-st-instruction stwx  31 151 0)
+  (define-x-5-st-instruction stwux 31 183 0 :other-dependencies ((writes ra)))
+  ;; Doubleword
+  (define-ds-instruction     std   62 #b00)
+  (define-ds-instruction     stdu  62 #b01) ; :other-dependencies ((writes ra))
+  (define-x-5-st-instruction stdx  31 149 0)
+  (define-x-5-st-instruction stdux 31 181 0 :other-dependencies ((writes ra)))
+  ;; Quadword
+  ;; (not done yet)
+
+  ;; Byte-reversed
+  (define-x-instruction      lhbrx  31 790)
+  (define-x-instruction      lwbrx  31 534)
+  (define-x-instruction      ldbrx  31 532)
+  (define-x-5-st-instruction sthbrx 31 918 0)
+  (define-x-5-st-instruction stwbrx 31 662 0)
+  (define-x-5-st-instruction stdbrx 31 660 0)
+
+  ;; Multiword
+  (define-d-instruction      lmw 46 :pinned t)
+  (define-d-rs-instruction   stmw 47 :pinned t)
+
+  ;; Load and reserve, store conditional
+  (define-x-instruction      lbarx 31 52)
+  (define-x-instruction      lharx 31 116)
+  (define-x-instruction      lwarx 31 20)
+  (define-x-instruction      ldarx 31 84)
+  (define-x-5-st-instruction stbcx. 31 694 1 :other-dependencies ((writes :ccr)))
+  (define-x-5-st-instruction sthcx. 31 726 1 :other-dependencies ((writes :ccr)))  
+  (define-x-5-st-instruction stwcx. 31 150 1 :other-dependencies ((writes :ccr)))
+  (define-x-5-st-instruction stdcx. 31 214 1 :other-dependencies ((writes :ccr)))
+
+  ;; Floating-point load/store
+  (define-d-frt-instruction   lfs    48)
+  (define-d-frt-instruction   lfsu   49 :other-dependencies ((writes ra)))
+  (define-d-frt-instruction   lfd    50)
+  (define-d-frt-instruction   lfdu   51 :other-dependencies ((writes ra)))
+  (define-x-20-instruction    lfsx   31 535)
+  (define-x-20-instruction    lfsux  31 567 :other-dependencies ((writes ra)))
+  (define-x-20-instruction    lfdx   31 599)
+  (define-x-20-instruction    lfdux  31 631 :other-dependencies ((writes ra)))
+
+  (define-d-frs-instruction   stfs   52)
+  (define-d-frs-instruction   stfsu  53 :other-dependencies ((writes ra)))
+  (define-d-frs-instruction   stfd   54)
+  (define-d-frs-instruction   stfdu  55 :other-dependencies ((writes ra)))
+  (define-x-23-st-instruction stfsx  31 663)
+  (define-x-23-st-instruction stfsux 31 695 :other-dependencies ((writes ra)))
+  (define-x-23-st-instruction stfdx  31 727)
+  (define-x-23-st-instruction stfdux 31 759 :other-dependencies ((writes ra)))
+  ;; Todo: lfiwax lfiwzx stfiwx
+  ;;       lfdp stfdp lfdpx stfdpx
+  )
 
 (macrolet ((define-xo-instruction
                (name op xo oe-p rc-p always-reads-xer always-writes-xer cost)
@@ -665,38 +896,6 @@
                  (define-xo-a-instruction ,(symbolicate base "O")  ,op ,xo t nil ,always-reads-xer ,always-writes-xer ,cost)
                  (define-xo-a-instruction ,(symbolicate base "O.") ,op ,xo t t ,always-reads-xer ,always-writes-xer ,cost)))
 
-           (define-x-instruction (name op xo &key (cost 2) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment rt ra rb)
-                   (:printer x ((op ,op) (xo ,xo)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   (:dependencies (reads ra) (reads rb) (reads :memory) ,@other-reads
-                    (writes rt) ,@other-writes)
-                   (:emitter
-                    (emit-x-form-inst segment ,op
-                     (reg-tn-encoding rt)
-                     (reg-tn-encoding ra)
-                     (reg-tn-encoding rb)
-                     ,xo
-                     0)))))
-
-           (define-x-20-instruction (name op xo &key (cost 2) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment frt ra rb)
-                   (:printer x-20 ((op ,op) (xo ,xo)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   (:dependencies (reads ra) (reads rb) ,@other-reads
-                    (writes frt) ,@other-writes)
-                   (:emitter
-                    (emit-x-form-inst segment ,op
-                     (fp-reg-tn-encoding frt)
-                     (reg-tn-encoding ra)
-                     (reg-tn-encoding rb)
-                     ,xo
-                     0)))))
-
            (define-x-5-instruction (name op xo rc-p &key (cost 1) other-dependencies)
                (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
                  `(define-instruction ,name (segment ra rs rb)
@@ -712,39 +911,6 @@
                      (reg-tn-encoding rb)
                      ,xo
                      ,(if rc-p 1 0))))))
-
-
-           (define-x-5-st-instruction (name op xo rc-p &key (cost 1) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment rs ra rb)
-                   (:printer x-5 ((op ,op) (xo ,xo) (rc ,(if rc-p 1 0))))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   (:dependencies (reads ra) (reads rb) (reads rs) ,@other-reads
-                    (writes :memory :partially t) ,@other-writes)
-                   (:emitter
-                    (emit-x-form-inst segment ,op
-                     (reg-tn-encoding rs)
-                     (reg-tn-encoding ra)
-                     (reg-tn-encoding rb)
-                     ,xo
-                     ,(if rc-p 1 0))))))
-
-           (define-x-23-st-instruction (name op xo &key (cost 1) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment frs ra rb)
-                   (:printer x-23 ((op ,op) (xo ,xo)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   (:dependencies (reads ra) (reads rb) (reads frs) ,@other-reads
-                    (writes :memory :partially t) ,@other-writes)
-                   (:emitter
-                    (emit-x-form-inst segment ,op
-                     (fp-reg-tn-encoding frs)
-                     (reg-tn-encoding ra)
-                     (reg-tn-encoding rb)
-                     ,xo
-                     0)))))
 
            (define-x-10-instruction (name op xo rc-p &key (cost 1) other-dependencies)
                (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
@@ -799,7 +965,8 @@
 
 
            (define-d-si-instruction (name op &key (fixup nil) (cost 1) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
+             (binding* (((other-reads other-writes) (classify-dependencies other-dependencies))
+                        (allow-r0 (not (member name '(addi addis)))))
                  `(define-instruction ,name (segment rt ra si)
                    (:declare (type (or ,@(when fixup '(fixup))
                                        (unsigned-byte 16) (signed-byte 16))
@@ -814,7 +981,9 @@
                       (ecase ,fixup
                         ((:ha :l) (note-fixup segment ,fixup si)))
                       (setq si (fixup-offset si)))
-                    (emit-d-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) si)))))
+                    (emit-d-form-inst segment ,op (reg-tn-encoding rt)
+                                      ,(if allow-r0 '(reg-tn-encoding ra) '(reg-or-0 ra))
+                                      si)))))
 
            (define-d-rs-ui-instruction (name op &key (cost 1) other-dependencies)
                (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
@@ -827,56 +996,6 @@
                     (writes ra) ,@other-writes)
                    (:emitter
                     (emit-d-form-inst segment ,op (reg-tn-encoding rs) (reg-tn-encoding ra) ui)))))
-
-           (define-d-instruction (name op &key (cost 2) other-dependencies pinned)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment rt ra si)
-                   (:declare (type (signed-byte 16) si))
-                   (:printer d ((op ,op)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   ,@(when pinned '(:pinned))
-                   (:dependencies (reads ra) (reads :memory) ,@other-reads
-                    (writes rt) ,@other-writes)
-                   (:emitter
-                    (emit-d-form-inst segment ,op (reg-tn-encoding rt) (reg-tn-encoding ra) si)))))
-
-           (define-d-frt-instruction (name op &key (cost 3) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment frt ra si)
-                   (:declare (type (signed-byte 16) si))
-                   (:printer d-frt ((op ,op)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   (:dependencies (reads ra) (reads :memory) ,@other-reads
-                    (writes frt) ,@other-writes)
-                   (:emitter
-                    (emit-d-form-inst segment ,op (fp-reg-tn-encoding frt) (reg-tn-encoding ra) si)))))
-
-           (define-d-rs-instruction (name op &key (cost 1) other-dependencies pinned)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment rs ra si)
-                   (:declare (type (signed-byte 16) si))
-                   (:printer d-rs ((op ,op)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   ,@(when pinned '(:pinned))
-                   (:dependencies (reads rs) (reads ra) ,@other-reads
-                    (writes :memory :partially t) ,@other-writes)
-                   (:emitter
-                    (emit-d-form-inst segment ,op (reg-tn-encoding rs) (reg-tn-encoding ra) si)))))
-
-           (define-d-frs-instruction (name op &key (cost 1) other-dependencies)
-               (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
-                 `(define-instruction ,name (segment frs ra si)
-                   (:declare (type (signed-byte 16) si))
-                   (:printer d-frs ((op ,op)))
-                   (:delay ,cost)
-                   (:cost ,cost)
-                   (:dependencies (reads frs) (reads ra) ,@other-reads
-                    (writes :memory :partially t) ,@other-writes)
-                   (:emitter
-                    (emit-d-form-inst segment ,op (fp-reg-tn-encoding frs) (reg-tn-encoding ra) si)))))
 
            (define-a-instruction (name op xo rc &key (cost 1) other-dependencies)
                `(define-instruction ,name (segment frt fra frb frc)
@@ -894,16 +1013,6 @@
                    (fp-reg-tn-encoding frb)
                    ,xo
                    ,rc))))
-
-           (define-ds-instruction (name op subop)
-             `(define-instruction ,name (segment rt ra si)
-                (:declare (type (signed-byte 16) si))
-                (:printer ds ((op ,op) (subop ,subop)))
-                (:emitter
-                 (if (= (mod si 4) 0)
-                     (emit-ds-form-inst segment ,op (reg-tn-encoding rt)
-                                        (reg-tn-encoding ra) (ash si -2) ,subop)
-                     (error "Displacement should be a multiple of 4")))))
 
            (define-2-a-instructions (name op xo &key (cost 1) other-dependencies)
                `(progn
@@ -1230,48 +1339,28 @@
     (:emitter
      (emit-x-form-inst segment 19 (valid-bo-encoding :bo-u) 0 0  528 1)))
 
-  (define-instruction rlwimi (segment ra rs sh mb me)
-    (:printer m-sh ((op 20) (rc 0)))
-    (:dependencies (reads rs) (writes ra))
-    (:delay 1)
-    (:emitter
-     (emit-a-form-inst segment 20 (reg-tn-encoding rs) (reg-tn-encoding ra) sh mb me 0)))
-
-  (define-instruction rlwimi. (segment ra rs sh mb me)
-    (:printer m-sh ((op 20) (rc 1)))
-    (:dependencies (reads rs) (writes ra) (writes :ccr))
-    (:delay 1)
-    (:emitter
-     (emit-a-form-inst segment 20 (reg-tn-encoding rs) (reg-tn-encoding ra) sh mb me 1)))
-
-  (define-instruction rlwinm (segment ra rs sh mb me)
-    (:printer m-sh ((op 21) (rc 0)))
-    (:delay 1)
-    (:dependencies (reads rs) (writes ra))
-    (:emitter
-     (emit-a-form-inst segment 21 (reg-tn-encoding rs) (reg-tn-encoding ra) sh mb me 0)))
-
-  (define-instruction rlwinm. (segment ra rs sh mb me)
-    (:printer m-sh ((op 21) (rc 1)))
-    (:delay 1)
-    (:dependencies (reads rs) (writes ra) (writes :ccr))
-    (:emitter
-     (emit-a-form-inst segment 21 (reg-tn-encoding rs) (reg-tn-encoding ra) sh mb me 1)))
-
-  (define-instruction rlwnm (segment ra rs rb mb me)
-    (:printer m ((op 23) (rc 0) (rb nil :type 'reg)))
-    (:delay 1)
-    (:dependencies (reads rs) (writes ra) (reads rb))
-    (:emitter
-     (emit-a-form-inst segment 23 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) mb me 0)))
-
-  (define-instruction rlwnm. (segment ra rs rb mb me)
-    (:printer m ((op 23) (rc 1) (rb nil :type 'reg)))
-    (:delay 1)
-    (:dependencies (reads rs) (reads rb) (writes ra) (writes :ccr))
-    (:emitter
-     (emit-a-form-inst segment 23 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) mb me 1)))
-
+  (macrolet ((def (name op rc)
+               `(define-instruction ,name (segment ra rs sh mb me)
+                  (:printer m-sh ((op ,op) (rc ,rc)))
+                  (:dependencies (reads rs) (writes ra))
+                  (:delay 1)
+                  (:emitter
+                   (emit-a-form-inst segment ,op (reg-tn-encoding rs) (reg-tn-encoding ra)
+                                     sh mb me ,rc)))))
+    (def rlwinm  21 0) ; Rotate Left Word Immediate then AND with Mask
+    (def rlwinm. 21 1)
+    (def rlwimi  20 0) ; Rotate Left Word Immediate then Mask Insert
+    (def rlwimi. 20 1))
+  (macrolet ((def (name op rc)
+               `(define-instruction ,name (segment ra rs rb mb me)
+                  (:printer m ((op ,op) (rc ,rc) (rb nil :type 'reg)))
+                  (:delay 1)
+                  (:dependencies (reads rs) (writes ra) (reads rb))
+                  (:emitter
+                   (emit-a-form-inst segment ,op (reg-tn-encoding rs) (reg-tn-encoding ra)
+                                     (reg-tn-encoding rb) mb me ,rc)))))
+    (def rlwnm  23 0) ; Rotate Left Word then AND with Mask
+    (def rlwnm. 23 1))
   (macrolet ((def (mnemonic op Rc)
                `(define-instruction ,mnemonic (segment ra rs sh m)
                   ;; This is problematic because 1 bit of the 'sh' value
@@ -1283,11 +1372,11 @@
                     (ldb (byte 5 0) sh)
                     (logior (ash (ldb (byte 5 0) m) 1) (ldb (byte 1 5) m))
                     ,op (ldb (byte 1 5) sh) ,rc)))))
-    (def rldicl  0 0)
+    (def rldicl  0 0) ; Rotate Left Doubleword Immediate then Clear Left
     (def rldicl. 0 1)
-    (def rldicr  1 0)
+    (def rldicr  1 0) ; Rotate Left Doubleword Immediate then Clear Right
     (def rldicr. 1 1)
-    (def rldic   2 0)
+    (def rldic   2 0) ; Rotate Left Doubleword Immediate then Clear
     (def rldic.  2 1))
 
   (define-d-rs-ui-instruction ori 24)
@@ -1350,9 +1439,6 @@
   ;; This instruction set file is actually less understandable than x86-64
   ;; given the propensity to name fields (such as 'xo') so cryptically.
 
-  (define-x-instruction lwarx 31 20)
-  (define-x-instruction ldarx 31 84)
-  (define-x-instruction lwzx 31 23)
   (define-2-x-5-instructions slw 31 24)
   (define-2-x-5-instructions sld 31 27) ; (logical) shift left doubleword
   (define-2-x-5-instructions srd 31 539) ; (logical) shift right doubleword
@@ -1364,14 +1450,11 @@
 
   (define-4-xo-instructions subf 31 40)
                                         ; dcbst
-  (define-x-instruction lwzux 31 55 :other-dependencies ((writes rt)))
   (define-2-x-5-instructions andc 31 60)
   (define-2-xo-oe-instructions mulhd 31 73 :cost 5)
   (define-2-xo-oe-instructions mulhw 31 75 :cost 5)
 
-  (define-x-instruction lbzx 31 87)
   (define-4-xo-a-instructions neg 31 104)
-  (define-x-instruction lbzux 31 119 :other-dependencies ((writes rt)))
   (define-2-x-5-instructions nor 31 124)
   (define-4-xo-instructions subfe 31 136 :always-reads-xer t :always-writes-xer t)
 
@@ -1395,28 +1478,14 @@
     (:dependencies (reads rt) (writes :ccr))
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash mask 1) 144 0)))
 
-  (define-x-5-st-instruction stwcx. 31 150 t :other-dependencies ((writes :ccr)))
-  (define-x-5-st-instruction stdcx. 31 214 t :other-dependencies ((writes :ccr)))
-  (define-x-5-st-instruction stwx 31 151 nil)
-  (define-x-5-st-instruction stwux 31 183 nil :other-dependencies ((writes ra)))
-
-  (define-x-instruction ldx 31 21) ; load doubleword indexed
-  (define-x-instruction ldux 31 53) ; load doubleword with update indexed
-  (define-x-5-st-instruction stdx 31 149 nil) ; store doubleword indexed
-  (define-x-5-st-instruction stdux 31 181 nil) ; store doubleword with update indexed
-
   (define-4-xo-a-instructions subfze 31 200 :always-reads-xer t :always-writes-xer t)
   (define-4-xo-a-instructions addze 31 202 :always-reads-xer t :always-writes-xer t)
-  (define-x-5-st-instruction stbx 31 215 nil)
   (define-4-xo-a-instructions subfme 31 232 :always-reads-xer t :always-writes-xer t)
   (define-4-xo-a-instructions addme 31 234 :always-reads-xer t :always-writes-xer t)
   (define-4-xo-instructions mulld 31 233 :cost 5)
   (define-4-xo-instructions mullw 31 235 :cost 5)
-  (define-x-5-st-instruction stbux 31 247 nil :other-dependencies ((writes ra)))
   (define-4-xo-instructions add 31 266)
-  (define-x-instruction lhzx 31 279)
   (define-2-x-5-instructions eqv 31 284)
-  (define-x-instruction lhzux 31 311 :other-dependencies ((writes ra)))
   (define-2-x-5-instructions xor 31 316)
 
   (define-instruction mfmq (segment rt)
@@ -1443,14 +1512,7 @@
     (:dependencies (reads rt) (reads :ctr))
     (:emitter (emit-xfx-form-inst segment 31 (reg-tn-encoding rt) (ash 9 5) 339 0)))
 
-
-  (define-x-instruction lwax 31 341)
-  (define-x-instruction lhax 31 343)
-  (define-x-instruction lwaux 31 373 :other-dependencies ((writes ra)))
-  (define-x-instruction lhaux 31 375 :other-dependencies ((writes ra)))
-  (define-x-5-st-instruction sthx 31 407 nil)
   (define-2-x-5-instructions orc 31 412)
-  (define-x-5-st-instruction sthux 31 439 nil :other-dependencies ((writes ra)))
 
   (define-instruction or (segment ra rs rb)
     (:printer x-5 ((op 31) (xo 444) (rc 0)) '((:cond
@@ -1545,55 +1607,39 @@
     (:delay 1)
     :pinned
     (:cost 8)
-    (:emitter (emit-x-form-inst segment 31 (reg-tn-encoding rs) (reg-tn-encoding ra) (reg-tn-encoding rb) 533 0)))
-  (define-x-instruction lwbrx 31 534)
-  (define-x-20-instruction lfsx 31 535)
+    (:emitter
+     (emit-x-form-inst segment 31 (reg-tn-encoding rs) (reg-or-0 ra) (reg-tn-encoding rb) 533 0)))
+
   (define-2-x-5-instructions srw 31 536)
-  (define-x-20-instruction lfsux 31 567 :other-dependencies ((writes ra)))
 
   (define-instruction lswi (segment rt ra rb)
     (:printer x-1 ((op 31) (xo 597) (rc 0)))
     :pinned
     (:delay 8)
     (:cost 8)
-    (:emitter (emit-x-form-inst segment 31 (reg-tn-encoding rt) (reg-tn-encoding ra) rb 597 0)))
+    (:emitter (emit-x-form-inst segment 31 (reg-tn-encoding rt) (reg-or-0 ra) rb 597 0)))
 
   (define-instruction sync (segment)
     (:printer x-27 ((op 31) (xo 598)))
     (:delay 1)
     :pinned
     (:emitter (emit-x-form-inst segment 31 0 0 0 598 0)))
-  (define-x-20-instruction lfdx 31 599)
-  (define-x-20-instruction lfdux 31 631 :other-dependencies ((writes ra)))
+
   (define-instruction stswx (segment rs ra rb)
     (:printer x-5 ((op 31) (xo 661)))
     :pinned
     (:cost 8)
     (:delay 1)
-    (:emitter (emit-x-form-inst segment 31
-                                (reg-tn-encoding rs)
-                                (reg-tn-encoding ra)
-                                (reg-tn-encoding rb)
-                                661
-                                0)))
-  (define-x-5-st-instruction stwbrx 31 662 nil)
-  (define-x-23-st-instruction stfsx 31 663)
-  (define-x-23-st-instruction stfsux 31 695 :other-dependencies ((writes ra)))
+    (:emitter
+     (emit-x-form-inst segment 31 (reg-tn-encoding rs) (reg-or-0 ra) (reg-tn-encoding rb) 661 0)))
+
   (define-instruction stswi (segment rs ra nb)
     (:printer x-8 ((op 31) (xo 725)))
     :pinned
     (:delay 1)
     (:emitter
-     (emit-x-form-inst segment 31
-                       (reg-tn-encoding rs)
-                       (reg-tn-encoding ra)
-                       nb
-                       725
-                       0)))
+     (emit-x-form-inst segment 31 (reg-tn-encoding rs) (reg-or-0 ra) nb 725 0)))
 
-  (define-x-23-st-instruction stfdx 31 727)
-  (define-x-23-st-instruction stfdux 31 759 :other-dependencies ((writes ra)))
-  (define-x-instruction lhbrx 31 790)
   (define-2-x-5-instructions sraw 31 792)
 
   (macrolet ((def-sraw (mnemonic xo rc)
@@ -1630,51 +1676,9 @@
     (:delay 1)
     (:emitter (emit-x-form-inst segment 31 0 0 0 854 0)))
 
-  (define-x-5-st-instruction sthbrx 31 918 nil)
-
   (define-2-x-10-instructions extsb 31 954)
   (define-2-x-10-instructions extsh 31 922)
                                         ; Whew.
-
-  (define-instruction lwz (segment rt ra si)
-    (:declare (type (or fixup (signed-byte 16)) si))
-    (:printer d ((op 32)))
-    (:delay 2)
-    (:cost 2)
-    (:dependencies (reads ra) (writes rt) (reads :memory))
-    (:emitter
-     (when (typep si 'fixup)
-       (note-fixup segment :l si)
-       (setq si 0))
-     (emit-d-form-inst segment 32 (reg-tn-encoding rt) (reg-tn-encoding ra) si)))
-
-  (define-d-instruction lwzu 33 :other-dependencies ((writes ra)))
-  (define-d-instruction lbz 34)
-  (define-d-instruction lbzu 35 :other-dependencies ((writes ra)))
-  (define-d-rs-instruction stw 36)
-  (define-d-rs-instruction stwu 37 :other-dependencies ((writes ra)))
-  (define-d-rs-instruction stb 38)
-  (define-d-rs-instruction stbu 39 :other-dependencies ((writes ra)))
-  (define-d-instruction lhz 40)
-  (define-d-instruction lhzu 41 :other-dependencies ((writes ra)))
-  (define-d-instruction lha 42)
-  (define-d-instruction lhau 43 :other-dependencies ((writes ra)))
-  (define-d-rs-instruction sth 44)
-  (define-d-rs-instruction sthu 45 :other-dependencies ((writes ra)))
-  (define-d-instruction lmw 46 :pinned t)
-  (define-d-rs-instruction stmw 47 :pinned t)
-  (define-d-frt-instruction lfs 48)
-  (define-d-frt-instruction lfsu 49 :other-dependencies ((writes ra)))
-  (define-d-frt-instruction lfd 50)
-  (define-d-frt-instruction lfdu 51 :other-dependencies ((writes ra)))
-  (define-d-frs-instruction stfs 52)
-  (define-d-frs-instruction stfsu 53 :other-dependencies ((writes ra)))
-  (define-d-frs-instruction stfd 54)
-  (define-d-frs-instruction stfdu 55 :other-dependencies ((writes ra)))
-
-  (define-ds-instruction ld 58  #b00)
-  (define-ds-instruction ldu 58 #b01)
-  (define-ds-instruction lwa 58 #b10)
 
   (define-2-a-tab-instructions fdivs 59 18 :cost 17)
   (define-2-a-tab-instructions fsubs 59 20)
@@ -1684,9 +1688,6 @@
   (define-2-a-instructions fmadds 59 29 :cost 4)
   (define-2-a-instructions fnmsubs 59 30 :cost 4)
   (define-2-a-instructions fnmadds 59 31 :cost 4)
-
-  (define-ds-instruction std 62 #b00)
-  (define-ds-instruction stdu 62 #b01)
 
   (define-instruction fcmpu (segment crfd fra frb)
     (:printer x-15 ((op 63) (xo 0)))
@@ -1823,12 +1824,8 @@
   (define-instruction-macro subi (rt ra simm)
     `(inst addi ,rt ,ra (- ,simm)))
 
-  (define-instruction-macro li (rt val)
-    `(inst addi ,rt zero-tn ,val))
-
-  (define-instruction-macro lis (rt val)
-    `(inst addis ,rt zero-tn ,val))
-
+  (define-instruction-macro li (rt val) `(inst addi ,rt 0 ,val))
+  (define-instruction-macro lis (rt val) `(inst addis ,rt 0 ,val))
 
   (define-instruction-macro not (ra rs)
     `(inst nor ,ra ,rs ,rs))
