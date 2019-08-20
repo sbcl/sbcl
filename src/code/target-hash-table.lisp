@@ -15,14 +15,6 @@
 ;;;; utilities
 
 ;;;; TODOs:
-;;;;  - optimistically assume that rehash=1 does not affect the key in question,
-;;;;    even if it was hashed by address. (Surely a win for non-address-based hash)
-;;;;    Only rehash if the lookup failed
-;;;;  - do not inhibit GC during rehash of table.
-;;;;    This works for non-weak tables during GETHASH so far,
-;;;;    but not yet PUTHASH nor REMHASH.
-;;;;    When rehashing weak vectors, can we can toggle the weakness bit off
-;;;;    to prevent any monkey business for the duration?
 ;;;;  - change recursive locks to nonrecursive.
 ;;;;    This will, I fear, be impossible because we've exposed and documented
 ;;;;    an API that pretty much tells users that it's ok to create a synchronized
