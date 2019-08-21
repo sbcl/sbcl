@@ -168,6 +168,8 @@
   ;; to be certain that it's not supposed to happen when building the xc.
   #+sb-xc-xhost (error "Strange CLEAR-INFO building the xc: ~S ~S"
                        name info-numbers)
+  (when (pcl-methodfn-name-p name)
+    (error "Can't SET-INFO-VALUE on PCL-internal function"))
   (let (new)
     (with-globaldb-name (key1 key2) name
       :simple
@@ -265,7 +267,10 @@
   ;; 19990330
   :default
   #+sb-xc-host nil
-  #-sb-xc-host (lambda (name) (if (fboundp name) :function nil)))
+  #-sb-xc-host (lambda (name)
+                 (if (or (fboundp name) (pcl-methodfn-name-p name))
+                     :function
+                     nil)))
 
 ;;; The deferred mode processor for fasteval special operators.
 ;;; Immediate processors are hung directly off symbols in a dedicated slot.

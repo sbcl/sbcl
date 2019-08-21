@@ -78,9 +78,7 @@
   ;; the compiler isn't figuring out not to test SYMBOLP twice in a row.
   (with-globaldb-name (key1 key2 nil) name
       :hairy
-      ;; INFO-GETHASH returns NIL or a vector. INFO-VECTOR-FDEFN accepts
-      ;; either. If fdefn isn't found, fall through to the legality test.
-      (awhen (info-vector-fdefn (info-gethash name *info-environment*))
+      (awhen (get-fancily-named-fdefn name nil)
         (return-from find-fdefn it))
       :simple
       (progn
@@ -106,11 +104,23 @@
 (defun find-or-create-fdefn (name)
   (or (find-fdefn name)
       ;; We won't reach here if the name was not legal
-      (let ((fdefn (get-info-value-initializing :function :definition name
-                                                (make-fdefn name))))
-        (when (typep name '(cons (eql sb-pcl::slot-accessor)))
-          (sb-pcl::ensure-accessor name))
-        fdefn)))
+      (let (made-new)
+        (dx-flet ((new (name)
+                    (setq made-new t)
+                    (make-fdefn name)))
+          (let ((fdefn (with-globaldb-name (key1 key2) name
+                        :simple (get-info-value-initializing
+                                 :function :definition name (new name))
+                        :hairy (get-fancily-named-fdefn name #'new))))
+            ;; Slot accessors spring into existence as soon as a reference
+            ;; is made to the respective fdefn, but we can't do this in
+            ;; (flet NEW) because ENSURE-ACCESSOR calls (SETF FDEFINITION)
+            ;; which would recurse, as the fdefn would not have been
+            ;; installed yet.
+            (when (and made-new
+                       (typep name '(cons (eql sb-pcl::slot-accessor))))
+              (sb-pcl::ensure-accessor name))
+            fdefn)))))
 
 ;;; Return T if FUNCTION is the error-signaling trampoline for a macro or a
 ;;; special operator. Test for this by seeing whether FUNCTION is the same
@@ -136,8 +146,10 @@
 ;;; (We could issue a warning and/or remove the type if incompatible.)
 (defun maybe-clobber-ftype (name new-function)
   (declare (ignore new-function))
-  (unless (eq :declared (info :function :where-from name))
-    (clear-info :function :type name)))
+  ;; Ignore PCL-internal function names.
+  (unless (pcl-methodfn-name-p name)
+    (unless (eq :declared (info :function :where-from name))
+      (clear-info :function :type name))))
 
 ;;; Return the fdefn-fun of NAME's fdefinition including any encapsulations.
 ;;; LOOKUP-FN, defaulting to FIND-FDEFN, specifies how to lookup the fdefn.
@@ -438,3 +450,84 @@
         (fdefn-makunbound fdefn)))
     (undefine-fun-name name)
     name))
+
+;;; A simple open-addressing hashset.
+(define-load-time-global *fdefns*
+  (cons (make-array 128 :initial-element 0) 0))
+(define-load-time-global *fdefns-lock* (sb-thread:make-mutex :name "fdefns"))
+
+;;; Fancily named fdefns are not attached to symbols, but instead in a custom
+;;; data structure which we probe in the manner of a quadratic probing hash-table.
+;;; A max load factor ensures that probing terminates.
+;;; https://fgiesen.wordpress.com/2015/02/22/triangular-numbers-mod-2n/
+;;; contains a proof that triangular numbers mod 2^N visit every cell.
+
+;;; The intent here - which may be impossible to realize - was to allow GC
+;;; methods whose name is not reachable.  I couldn't get it to do the right thing.
+;;; e.g. (defmethod foo (x (y cons)) ...) creates mappings:
+;;; (SB-PCL::FAST-METHOD FOO (T CONS)) -> #<SB-KERNEL:FDEFN (SB-PCL::FAST-METHOD FOO (T CONS))>
+;;; (SB-PCL::SLOW-METHOD FOO (T CONS)) -> #<SB-KERNEL:FDEFN (SB-PCL::SLOW-METHOD FOO (T CONS))>
+;;; where it seems like (unintern 'FOO) should allow both of those to get GCd.
+;;; I suspect that it will require hanging those fancily named fdefns off the symbol
+;;; FOO rather than having a global table.  Alternatively, that can be simulated by
+;;; having GC preserve liveness of any element whenever the second item in the list
+;;; comprising fdefn-name is an a-priori live symbol.  That will be more efficient than
+;;; having a hash-table hanging off every symbol that names a method.
+;;; e.g. both of the preceding names would be hanging off of FOO, as would others
+;;; such as (FAST-METHOD FOO :AROUND (LIST INTEGER)) and a myriad of others.
+;;; I suspect that any approach of hanging off the symbols will be space-inefficient
+;;; and difficult to implement.
+
+;;; At any rate, we can make use of the key-in-value nature of fdefns to halve
+;;; the number of words required to store the name -> object mapping.
+(defun get-fancily-named-fdefn (name constructor &aux (hash (globaldb-sxhashoid name)))
+  (declare (type (or function null) constructor))
+  (labels ((lookup (vector &aux (mask (1- (length vector)))
+                                (index (logand hash mask))
+                                (step 0)
+                                (empty-cell nil))
+             ;; Because rehash is forced well before the table becomes 100% full,
+             ;; it should not be possible to loop infinitely here.
+             (loop (let ((fdefn (svref vector index)))
+                     (cond ((eql fdefn 0) ; not found
+                            (return-from lookup (or empty-cell index)))
+                           #+nil ((eql fdefn nil) ; smashed by GC
+                                  (unless empty-cell (setq empty-cell index)))
+                           ((equal (fdefn-name fdefn) name)
+                            (return-from lookup fdefn))))
+                   (setq index (logand (+ index (incf step)) mask))))
+           (insert (hash item vector mask &aux (index (logand hash mask))
+                                               (step 0)
+                                               (empty-cell nil))
+             (loop (case (svref vector index)
+                    ((0) ; not found
+                     (return (setf (svref vector (or empty-cell index)) item)))
+                    #+nil ((nil) ; smashed by GC
+                           (unless empty-cell (setq empty-cell index))))
+                   (setq index (logand (+ index (incf step)) mask)))))
+    (or (let ((result (lookup (car *fdefns*))))
+          (when (fdefn-p result) result))
+        (when constructor ; double-check w/lock before inserting
+          (sb-thread::with-system-mutex (*fdefns-lock*)
+            (let* ((fdefns *fdefns*)
+                   (vector (car fdefns))
+                   (result (lookup vector)))
+              (if (fdefn-p result)
+                  result
+                  (let ((new-fdefn (funcall constructor name)))
+                    (if (<= (incf (cdr fdefns)) (ash (length vector) -1)) ; under 50% full
+                        ;; It might even be less full than that due to GC.
+                        (setf (svref vector result) new-fdefn)
+                        ;; The actual count is unknown without re-counting.
+                        (let* ((count (count-if #'fdefn-p vector))
+                               (new-size (power-of-two-ceiling
+                                          (ceiling (* count 2))))
+                               (new-vect (make-array new-size :initial-element 0))
+                               (new-mask (1- new-size)))
+                          (dovector (item vector)
+                            (when (fdefn-p item)
+                              (insert (globaldb-sxhashoid (fdefn-name item)) item
+                                      new-vect new-mask)))
+                          (insert hash new-fdefn new-vect new-mask)
+                          (setf *fdefns* (cons new-vect (1+ count)))))
+                    new-fdefn))))))))

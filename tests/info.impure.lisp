@@ -501,7 +501,7 @@
   ;; Precompute random generalized function names for testing, some of which
   ;; are "simple" (per the taxonomy of globaldb) and some hairy.
   (let ((work (coerce (loop repeat 10000
-                            nconc (list `(sb-pcl::slow-method ,(gensym)) ; simple name
+                            nconc (list `(setf ,(gensym)) ; simple name
                                          (gensym))) ; very simple name
                       'vector))
         (n-threads 10) readers writers fdefn-results random-results)

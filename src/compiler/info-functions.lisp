@@ -76,7 +76,10 @@
 
         (unless (eq :function kind)
           (assert-it)
-          (setf (info :function :kind name) :function)))))
+          ;; There's no reason to store (:FUNCTION :KIND) for names which
+          ;; could only be of kind :FUNCTION if anything.
+          (unless (pcl-methodfn-name-p name)
+            (setf (info :function :kind name) :function))))))
 
   ;; scrubbing old data II: dangling forward references
   ;;
