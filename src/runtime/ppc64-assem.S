@@ -90,13 +90,19 @@ Low Address
 #define SAVE_GPR(n)     std n,  (FRAME_SIZE+8*(n-32-18))(sp)
 #define RESTORE_GPR(n)  ld n,   (FRAME_SIZE+8*(n-32-18))(sp)
 
-// Note that CR, LR, and TOC are saved/restored in the frame of the *CALLER*
-
+// Note that CR and LR are saved/restored in the frame of the *CALLER*
+// But based on absence of language similar to
+//   "The caller frame {CR Save Word | LR Save Doubleword} may be used as the save location"
+// in the description of the TOC save doubleword, I infer that you may NOT
+// use the caller's frame for this purpose.
+// Examining some C compiler output for V2 of the ABI shows that it
+// saves the TOC register in the new frame, not the old.
+	
 #define C_FULL_PROLOG \
 	mfcr 0 ; stw 0,  8(sp)   /* save CR */ ; \
 	mflr 0 ; std 0, 16(sp)   /* save LR */ ; \
-	std 2, 24(sp)            /* save TOC ptr  */ ; \
 	stdu sp, -FRAME_SIZE(sp) /* Update SP and back chain atomically */; \
+	std 2, 24(sp)            /* save TOC ptr  */ ; \
 	SAVE_FPR(31) ; SAVE_FPR(30) ; SAVE_FPR(29) ; SAVE_FPR(28) ; \
 	SAVE_FPR(27) ; SAVE_FPR(26) ; SAVE_FPR(25) ; SAVE_FPR(24) ; \
 	SAVE_FPR(23) ; SAVE_FPR(22) ; SAVE_FPR(21) ; SAVE_FPR(20) ; \
@@ -260,7 +266,7 @@ lra:
 	   now - prior to the epilogue - because there are memory accesses
 	   by way of the TOC register in this code, in particular
 	   the load() and store() macros uses register 2 as the base */
-	ld 2, (24+FRAME_SIZE)(sp)
+	ld 2, (24)(sp)
 
 #if defined(LISP_FEATURE_SB_THREAD)
 	/* Store lisp state */
@@ -371,19 +377,21 @@ lra:
 	* it shall first save it in the TOC pointer doubleword." */
 	std reg_TOC, 24(1)
 
-	/* In the 64-bit ABI, a function pointer is a pointer to a
-	 * 3-word "function descriptor" the first word of which contains the
-	 * entry address, and the second the value that the callee needs
-	 * in the TOC register. */
 	mfctr 11
 	/* "When a function is entered through its global entry point,
 	 * register r12 contains the entry-point address." */
 	ld reg_CFUNC, 0(11)
+#ifdef LISP_FEATURE_BIG_ENDIAN
+	/* In the v1 64-bit ABI, a function pointer is a pointer to a
+	 * 3-word "function descriptor" the first word of which contains the
+	 * entry address, and the second the value that the callee needs
+	 * in the TOC register. */
 	ld reg_TOC, 8(11)
 	/* The third function descriptor word can allegedly be ignored for C.
 	 * Actually not all descriptors have 3 words afaict.
 	 * I don't see how they are ABI-compliant */
 	// ld 11, 16(11)
+#endif
 	mtctr reg_CFUNC
         /* Into C we go. */
 	bctrl

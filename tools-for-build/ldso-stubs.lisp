@@ -50,42 +50,13 @@ ldso_stub__~A: ;                                \\
     .procend
     .import ~a,code~%" stub stub fct fct)))
 
-  #+ppc64
-  ;; The ABI requires that we leave a 'nop' where the linker can insert a load
-  ;; of r2 after the callee returns. Naively making the obvious change to the
-  ;; 32-bit stub - adding a nop after the 'b' - does not work; it gets the same
-  ;; error as if the nop were absent.  I think the linker expects to see a
-  ;; function descriptor for this stub, to decide whether r2 differs for the
-  ;; callee. The error message is suboptimal in claiming that there was no nop
-  ;; despite that there is.
-  ;; Ironically we don't care if r2 is restored when coming back into Lisp
-  ;; because we don't use. Nonetheless, this makes the C code build.
-  ;; It would be nice to figure out if we can have the effect of tail call
-  ;; by just using 'b' instead of 'bl' though.
-  (format stream " .globl ~A
- .p2align 2
- .type ~:*~A,@function
- .section .opd,\"aw\",@progbits
-~:*~A:
- .p2align 3
- .quad .Lfunc_begin~D, .TOC.@tocbase, 0
- .text
-.Lfunc_begin~:*~D:
- mflr 0
- std 0, 16(1)
- stdu 1, -112(1)
- bl ~A
- nop
- addi 1, 1, 112
- ld 0, 16(1)
- mtlr 0
- blr
- .long 0
- .quad 0
-.Lfunc_end~2:*~D:
- .size ~2:*~A, .Lfunc_end~D-.Lfunc_begin~:*~D~2%"
-          (format nil "ldso_stub__~a" fct)
-          index fct)
+  ;; All we need to do is anchor the C symbol, nothing more.
+  ;; This can only be expected to work because of #+sb-dynamic-core.
+  ;; In some environments, even though we anchor the symbol,
+  ;; it may still have type "U" in the binary file, to be resolved by
+  ;; the system 'ld'; genesis can't deal with such lazily bound symbols.
+  ;; ".quad" = 8 bytes, not a Quadword as defined by the architecture (16 bytes)
+  #+ppc64 (format stream ".quad ~A~%" fct)
 
   #-(or sparc hppa ppc64)
   (format stream "LDSO_STUBIFY(~A)~%" fct))
@@ -174,7 +145,9 @@ _ldso_stub__ ## fct ## $lazy_ptr:                @\\
         .indirect_symbol _ ## fct               @\\
         .long dyld_stub_binding_helper"
 
-#+ppc64 ""
+#+ppc64 "
+.data # can't place in read-only data because reasons
+.align 3"
 
 #+riscv "
 #define LDSO_STUBIFY(fct)                \\
@@ -404,6 +377,7 @@ ldso_stub__ ## fct: ;                  \\
     (dolist (stub *stubs*)
       (check-type stub string)
       (ldso-stubify (incf i) stub f)))
+  #-(or ppc64) ; this file contains no code
   (format f "
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.

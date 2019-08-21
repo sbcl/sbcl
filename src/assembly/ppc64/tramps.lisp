@@ -98,18 +98,20 @@
       (dotimes (i 31)
         (inst std (reg i 'unsigned-reg) lip (decf disp 8))))
     ;; Everything else has been spilled now, except CTR which is volatile across calls.
-    ;; Normally you store _our_ LR into the _caller's_ frame, but I'm not sure we can
-    ;; do that here. The lisp number stack is the C stack and I think we don't create
-    ;; a correct minimal C frame each time we consume number stack space.
-    ;; Instead save LR into the spill area preceding this chunk of code.
+    ;; Store the LR that we received in the normal save location of 16(sp).
+    ;; This works because whenever Lisp adjusts the C stack pointer, it reserves
+    ;; the mandatory 4 words.
     (inst mflr r0)
-    (inst std r0 lip -24)
-    ;; Allocate minimal C frame and update back-chain. As noted, I doubt that the
-    ;; back-chain is correct if we are in a function that allocated any number
-    ;; stack space. (It would be better if we could play nice with the C stack.)
+    (inst std r0 machine-sp 16)
+    ;; Allocate a new minimal C frame.
     (inst stdu machine-sp machine-sp -32)
     (inst lr r12 (make-fixup "alloc_tramp" :foreign))
-    (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF THIS IS REMOVED
+    ;; We assume that little-endian machines use V2 of the ABI.
+    ;; In V2 you can call a function via its global entry point
+    ;; without loading r2. Just r12 is enough, because the callee
+    ;; can compute r2 from r12 if it needs to.
+    ;; big-endian would more accurately be: if this is the v1 ABI
+    #+big-endian (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF WE DON'T DO THIS AT ALL
     (inst ld r12 r12 0)
     ;; load the size argument into the first C argument register
     (inst ld r3 lip -8)
@@ -119,9 +121,14 @@
     (inst mtctr r3) ; stash the result in a reg that won't be clobbered
     ;; Reload a pointer to this asm routine
     (inst lr lip (make-fixup 'alloc-tramp :assembly-routine))
-    (inst ld r0 lip -24) ; restore the return address
+    ;; Restore the return address from the caller's frame.
+    ;; 'sp' hasn't been restored yet, so add our frame size.
+    (inst ld r0 machine-sp (+ 32 16))
     (inst mtlr r0)
-    ;; Restore all registers except LIP
+    ;; Restore all registers except LIP (register 31).
+    ;; LIP is a lisp-volatile register for lisp.
+    ;; Also note that we implicitly restore r1 (the C stack pointer)
+    ;; so there is no "add 1, 1, 32" to undo the 'stdu'.
     (let ((disp -24))
       (dotimes (i 32)
         (inst lfd (reg i 'double-reg) lip (decf disp 8)))
