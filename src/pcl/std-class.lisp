@@ -1344,16 +1344,21 @@
                              'source source-location)))
 
 (defmethod remove-reader-method ((class slot-class) generic-function)
-  (let ((method (get-method generic-function () (list class) nil)))
+  (let ((method
+         (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
+              (get-method generic-function () (list class) nil))))
     (when method (remove-method generic-function method))))
 
 (defmethod remove-writer-method ((class slot-class) generic-function)
   (let ((method
-          (get-method generic-function () (list *the-class-t* class) nil)))
+         (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 2)
+              (get-method generic-function () (list *the-class-t* class) nil))))
     (when method (remove-method generic-function method))))
 
 (defmethod remove-boundp-method ((class slot-class) generic-function)
-  (let ((method (get-method generic-function () (list class) nil)))
+  (let ((method
+         (and (= (length (arg-info-metatypes (gf-arg-info generic-function))) 1)
+              (get-method generic-function () (list class) nil))))
     (when method (remove-method generic-function method))))
 
 ;;; MAKE-READER-METHOD-FUNCTION and MAKE-WRITER-METHOD-FUNCTION

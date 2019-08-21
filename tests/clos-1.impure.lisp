@@ -255,3 +255,16 @@
   (assert (equal (bug-309084-b/gf2 1 2 3 4) '(1 3 t b nil (3 b))))
   (assert (equal (bug-309084-b/gf2 1 2 :z t) '(1 :z t b nil (:z b))))
   (assert (equal (bug-309084-b/gf2 1 2 3 4 :z 5) '(1 3 t 5 t (3 5)))))
+
+(defmethod bug-1840595-a (x y))
+(defmethod bug-1840595-z (x))
+
+(with-test (:name :bug-1840595/reader)
+  (eval '(defclass bug-1840595r () ()))
+  (assert-error (eval '(defclass bug-1840595r () ((a :reader bug-1840595-a)))))
+  (eval '(defclass bug-1840595r () ())))
+
+(with-test (:name :bug-1840595/writer)
+  (eval '(defclass bug-1840595w () ()))
+  (assert-error (eval '(defclass bug-1840595w () ((z :writer bug-1840595-z)))))
+  (eval '(defclass bug-1840595w () ())))

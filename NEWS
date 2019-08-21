@@ -6,6 +6,9 @@ changes relative to sbcl-1.5.6:
   * enhancement: string output streams created with :ELEMENT-TYPE 'BASE-CHAR
     use internal buffers of BASE-STRING instead of UCS-4 strings restricted
     to the ASCII range, yielding a theoretical 4:1 space reduction.
+  * bug fix: compliant redefinition of classes whose previous definition
+    caused argument mismatch errors does not generate errors any more.
+    (lp#1840595, reported by 3b on #sbcl)
   * optimization: improved make-array type derivation for multi-dimensional
     arrays. (lp#1838442)
 
