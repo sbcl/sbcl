@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.6:
+changes relative to sbcl-1.5.5:
   * new feature: SB-EXT:SEARCH-ROOTS discovers paths from live objects to the
     roots keeping them alive.
   * enhancement: string output streams created with :ELEMENT-TYPE 'BASE-CHAR
