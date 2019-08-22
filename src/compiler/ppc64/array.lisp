@@ -328,7 +328,8 @@
 (defmacro compute-lispword-offset () ; for {tagged word, double float, complex single}
   '(progn
      (unless (= word-shift n-fixnum-tag-bits)
-       (inst sldi offset index (- word-shift n-fixnum-tag-bits)))
+       (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+       (setf index offset))
      (inst addi offset index (- (* vector-data-offset n-word-bytes)
                                 other-pointer-lowtag))))
 
