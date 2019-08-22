@@ -69,7 +69,7 @@
           (destructuring-bind (fun args result) expr
             (let ((actual (apply fun (sb-int:ensure-list args))))
               (unless (eql actual result)
-                (#+sb-devel error
+                (#+sb-devel cerror ""
                  #-sb-devel format #-sb-devel t
                  "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
                  expr actual)))))))))
