@@ -18,7 +18,8 @@
 (with-test (:name (:funcall-macro-signals-error))
   (assert-error (eval '(funcall 'cond nil)) undefined-function))
 (with-test (:name (:funcall-special-op-signals-error))
-  (assert-error (eval '(funcall 'quote nil)) sb-int:special-form-function))
+  (assert-error (eval '(funcall 'quote nil)) #+x86-64 sb-int:special-form-function
+                                             #-x86-64 undefined-function))
 
 ;;; ROOM should run without signalling an error. (bug 247)
 (let ((*standard-output* (make-broadcast-stream)))
