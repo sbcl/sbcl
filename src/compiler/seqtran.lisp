@@ -668,6 +668,11 @@
                                   (double-float-bits tmp))
                                  #+64-bit
                                  (:complex-single-float
+                                  #+big-endian
+                                  (logior (ash (single-float-bits (realpart tmp)) 32)
+                                          (ldb (byte 32 0)
+                                               (single-float-bits (imagpart tmp))))
+                                  #+little-endian
                                   (logior (ash (single-float-bits (imagpart tmp)) 32)
                                           (ldb (byte 32 0)
                                                (single-float-bits (realpart tmp))))))))
@@ -698,6 +703,11 @@
                                           `(double-float-bits item))
                                          #+64-bit
                                          (:complex-single-float
+                                          #+big-endian
+                                          `(logior (ash (single-float-bits (realpart item)) 32)
+                                                   (ldb (byte 32 0)
+                                                        (single-float-bits (imagpart item))))
+                                          #+little-endian
                                           `(logior (ash (single-float-bits (imagpart item)) 32)
                                                    (ldb (byte 32 0)
                                                         (single-float-bits (realpart item)))))))))
