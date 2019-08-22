@@ -201,7 +201,7 @@
          ;; FIXME: remind me what convention we used for 64bitizing
          ;; stuff?  -- CSR, 2003-08-27
          ,@(when restore-fixnum-mask
-             `((inst clrrwi r temp (1- n-lowtag-bits))))))
+             `((inst clrrwi r temp n-fixnum-tag-bits)))))
      (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
                   fast-signed-binop)
        (:translate ,translate)
