@@ -475,7 +475,7 @@
 
 ;;;; Conversion:
 
-(macrolet ((frob (name translate inst to-sc to-type)
+(macrolet ((frob (name translate to-sc to-type)
              `(define-vop (,name)
                 (:args (x :scs (signed-reg)))
                 (:temporary (:scs (double-stack)) temp)
@@ -492,9 +492,11 @@
                     (inst std x (current-nfp-tn vop) disp)
                     (inst lfd y (current-nfp-tn vop) disp)
                     (note-this-location vop :internal-error)
-                    (inst ,inst y y))))))
-  (frob %single-float/signed %single-float fcfids single-reg single-float)
-  (frob %double-float/signed %double-float fcfid double-reg double-float))
+                    (inst fcfid y y)
+                    ,@(and (eq to-type 'single-float)
+                           `((inst frsp y y))))))))
+  (frob %single-float/signed %single-float single-reg single-float)
+  (frob %double-float/signed %double-float double-reg double-float))
 
 (macrolet ((frob (name translate inst to-sc to-type)
             `(define-vop (,name)
