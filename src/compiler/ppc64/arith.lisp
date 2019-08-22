@@ -602,12 +602,10 @@
   (:policy :fast-safe)
   (:args (arg :scs (unsigned-reg)))
   (:arg-types unsigned-num)
-  (:results (res :scs (any-reg)))
-  (:result-types positive-fixnum)
-  (:temporary (:scs (non-descriptor-reg)) temp)
+  (:results (res :scs (unsigned-reg)))
+  (:result-types unsigned-num)
   (:generator 2
-    (inst popcntd temp arg)
-    (inst slwi res arg n-fixnum-tag-bits)))
+    (inst popcntd res arg)))
 
 ;;;; %LDB
 
