@@ -449,9 +449,13 @@
     ;; Once the opcode is written, the values in 'fun' and 'raw-addr' become irrelevant.
     ;; These stores act primarily to clear the reference from a GC perspective.
     (storew nil-value fdefn fdefn-fun-slot other-pointer-lowtag)
-    ;; We never call through the raw-addr for undefined functions
-    ;; with immobile-code; the INT3 instruction prevents it.
-    (storew (or #-immobile-code (make-fixup 'undefined-tramp :assembly-routine) 0)
+    ;; With #+immobile-code we never call via the raw-addr slot for undefined
+    ;; functions if the single instruction "call <fdefn>" form is used. The INT3
+    ;; raises sigtrap which we catch, then load RAX with the address of the fdefn
+    ;; and resume at undefined-tramp. However, CALL-SYMBOL jumps via raw-addr if
+    ;; its callable object was not a function. In that case RAX holds a symbol,
+    ;; so we're OK because we can identify the undefined function.
+    (storew (make-fixup 'undefined-tramp :assembly-routine)
             fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 

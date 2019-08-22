@@ -14,6 +14,12 @@
 
 (cl:in-package :cl-user)
 
+;;; Regression due to 1f892df9600eb986038526c3ec738809b15a3f75
+(with-test (:name (:funcall-macro-signals-error))
+  (assert-error (eval '(funcall 'cond nil)) undefined-function))
+(with-test (:name (:funcall-special-op-signals-error))
+  (assert-error (eval '(funcall 'quote nil)) sb-int:special-form-function))
+
 ;;; ROOM should run without signalling an error. (bug 247)
 (let ((*standard-output* (make-broadcast-stream)))
   (room)

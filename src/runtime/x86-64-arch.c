@@ -379,13 +379,12 @@ sigtrap_handler(int __attribute__((unused)) signal,
     trap = *(unsigned char *)(*os_context_pc_addr(context));
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (trap == trap_UndefinedFunction) {
+        // The interrupted PC pins this fdefn. Sigtrap is delivered on the ordinary stack,
+        // not the alternate stack.
         lispobj* fdefn = search_immobile_space((void*)*os_context_pc_addr(context));
         if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
-            static char* undefined_tramp;
-            if (!undefined_tramp)
-                undefined_tramp = get_asm_routine_by_name("UNDEFINED-TRAMP");
             // Return to undefined-tramp
-            *os_context_pc_addr(context) = (uword_t)undefined_tramp;
+            *os_context_pc_addr(context) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
             // with RAX containing the FDEFN
             *os_context_register_addr(context,reg_RAX) =
                 make_lispobj(fdefn, OTHER_POINTER_LOWTAG);
