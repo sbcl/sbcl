@@ -618,7 +618,7 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
      * The 32-bit could should do this as well since it's simpler. */
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
 #else
-    // Could use either ABI, but we're assuming v1 
+    // Could use either ABI, but we're assuming v1
     /* In the 64-bit v1 ABI, function pointers are alway passed around
      * as "function descriptors", not directly the jump target address.
      * A descriptor is 3 words:
@@ -635,7 +635,7 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
      * it's tricky to access C global data from lisp assembly routines.
      */
     memcpy(reloc_addr, target_addr, 24);
-#endif    
+#endif
     return;
   }
   // Can't encode more than 32 bits of jump address
