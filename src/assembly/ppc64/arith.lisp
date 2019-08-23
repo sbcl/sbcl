@@ -30,8 +30,7 @@
    (:temp lip interior-reg lip-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  ; Clear the damned "sticky overflow" bit in :cr0 and :xer
-  (inst mtxer zero-tn)
+  (inst mcrxr 0) ; clear XER
   (inst or temp x y)
   (inst andi. temp temp fixnum-tag-mask)
   (inst bne DO-STATIC-FUN)
@@ -78,8 +77,7 @@
    (:temp nargs any-reg nargs-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  ; Clear the damned "sticky overflow" bit in :cr0
-  (inst mtxer zero-tn)
+  (inst mcrxr 0) ; clear XER
 
   (inst or temp x y)
   (inst andi. temp temp fixnum-tag-mask)
@@ -134,7 +132,7 @@
    (:temp ocfp any-reg ocfp-offset))
 
   ;; If either arg is not a fixnum, call the static function.  But first ...
-  (inst mtxer zero-tn)
+  (inst mcrxr 0) ; clear XER
 
   (inst or temp x y)
   (inst andi. temp temp fixnum-tag-mask)

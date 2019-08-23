@@ -151,8 +151,8 @@
 
 (defun valid-cr-field-encoding (enc)
   (let* ((field (if (integerp enc)
-                  (and (= enc (logand #x7 enc)))
-                  (position enc cr-field-names))))
+                    (and (= enc (logand #x7 enc)) enc)
+                    (position enc cr-field-names))))
     (if field
       (ash field 2)
       (error "Invalid condition register field specifier : ~s" enc))))

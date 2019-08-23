@@ -97,7 +97,7 @@ Low Address
 // use the caller's frame for this purpose.
 // Examining some C compiler output for V2 of the ABI shows that it
 // saves the TOC register in the new frame, not the old.
-	
+
 #define C_FULL_PROLOG \
 	mfcr 0 ; stw 0,  8(sp)   /* save CR */ ; \
 	mflr 0 ; std 0, 16(sp)   /* save LR */ ; \
