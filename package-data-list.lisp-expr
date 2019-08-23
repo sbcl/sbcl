@@ -298,6 +298,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "!DEFINE-STORAGE-CLASS" "DEFINE-VOP"
                "DEFKNOWN" "DEFOPTIMIZER"
                "DEFTRANSFORM" "DERIVE-TYPE"
+               "DIS"
                "DO-FORMS-FROM-INFO"
                "EMIT-BLOCK-HEADER"
                "PHYSENV-DEBUG-LIVE-TN" "PHYSENV-LIVE-TN"
@@ -1317,6 +1318,8 @@ possibly temporarily, because it might be used internally."
                "UNSIGNED-BYTE-WITH-A-BITE-OUT"
                "SFUNCTION" "UNSIGNED-BYTE*"
                "CONSTANT-DISPLACEMENT"
+               "EXTENDED-FUNCTION-DESIGNATOR"
+               "EXTENDED-FUNCTION-DESIGNATOR-P"
                ;; ..and type predicates
                "DOUBLE-FLOAT-P"
                "LOGICAL-PATHNAME-P"
@@ -3525,6 +3528,8 @@ SBCL itself"
   (setf sb-mop:generic-function-name)
   sb-mop:slot-definition-allocation
   sb-mop:slot-definition-name
+  sb-pcl::method-p
+  sb-mop:method-function
   sb-pcl::%force-cache-flushes
   sb-pcl::check-wrapper-validity
   sb-pcl::class-has-a-forward-referenced-superclass-p

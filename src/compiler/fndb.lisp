@@ -1671,11 +1671,10 @@
                        &allow-other-keys)
   pathname)
 
-;; FIXME: consider making (OR FUNCTION-DESIGNATOR CONS) something like
-;; EXTENDED-FUNCTION-DESIGNATOR
-(defknown disassemble ((or function-designator cons code-component
-                           system-area-pointer word)
-                       &key (:stream stream) (:use-labels boolean) (:length integer))
+(defknown disassemble ((or extended-function-designator
+                           (cons (member lambda))
+                           code-component)
+                       &key (:stream stream) (:use-labels t))
   null)
 
 (defknown describe (t &optional (or stream (member t nil))) (values))

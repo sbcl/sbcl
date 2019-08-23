@@ -1648,46 +1648,28 @@
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
 
-(defun valid-extended-function-designators-for-disassemble-p (thing)
-  (typecase thing
-    ((or (cons (eql lambda)) interpreted-function)
-     (compile nil thing))
-    ((satisfies legal-fun-name-p)
-     (compiled-funs-or-lose (or (and (symbolp thing) (macro-function thing))
-                                (fdefinition thing))
-                            thing))
-    (sb-pcl::%method-function
-         ;; in a %METHOD-FUNCTION, the user code is in the fast function, so
-         ;; we to disassemble both.
-         ;; FIXME: interpreted methods need to get compiled.
-         (list thing (sb-pcl::%method-function-fast-function thing)))
-    (function thing)
-    (t nil)))
+(defun get-compiled-funs (thing)
+  (named-let recurse ((fun (cond ((legal-fun-name-p thing)
+                                  (or (and (symbolp thing) (macro-function thing))
+                                      (fdefinition thing)))
+                                 ((sb-pcl::method-p thing)
+                                  (sb-mop:method-function thing))
+                                 (t thing))))
+    (typecase fun
+      ((or (cons (member lambda named-lambda)) interpreted-function)
+       (awhen (compile nil fun)
+         (list it)))
+      (sb-pcl::%method-function
+       ;; user's code is in the fast-function
+       (cons fun (recurse (sb-pcl::%method-function-fast-function fun))))
+      (function
+       (list fun)))))
 
-(defun compiled-funs-or-lose (thing &optional (name thing))
-  (let ((funs (valid-extended-function-designators-for-disassemble-p thing)))
-    (if funs
-        funs
-        (error 'simple-type-error
-               :datum thing
-               :expected-type '(satisfies valid-extended-function-designators-for-disassemble-p)
-               :format-control "Can't make a compiled function from ~S"
-               :format-arguments (list name)))))
-
-(defun disassemble (object &key
-                           (stream *standard-output*)
-                           (use-labels t)
-                           (length sb-vm:n-word-bytes lengthp))
+(defun disassemble (object &key (stream *standard-output*) (use-labels t))
   "Disassemble the compiled code associated with OBJECT, which can be a
   function, a lambda expression, or a symbol with a function definition. If
   it is not already compiled, the compiler is called to produce something to
   disassemble."
-  (when (typep object '(or address system-area-pointer))
-    (return-from disassemble
-                 (disassemble-memory object length
-                                     :stream stream :use-labels use-labels)))
-  (when lengthp
-    (warn ":LENGTH argument ignored"))
   (if (typep object 'code-component)
       (disassemble-code-component object :stream stream :use-labels use-labels)
       (flet ((disassemble1 (fun)
@@ -1695,7 +1677,7 @@
                (disassemble-fun fun
                                 :stream stream
                                 :use-labels use-labels)))
-        (mapc #'disassemble1 (ensure-list (compiled-funs-or-lose object)))))
+        (mapc #'disassemble1 (get-compiled-funs object))))
   nil)
 
 ;;; Disassembles the given area of memory starting at ADDRESS and
@@ -1741,17 +1723,14 @@
 
 ;;; Disassemble the machine code instructions associated with
 ;;; CODE-COMPONENT (this may include multiple entry points).
-(defun disassemble-code-component (code-component &key
-                                                  (stream *standard-output*)
-                                                  (use-labels t))
-  (declare (type (or code-component function) code-component)
-           (type stream stream)
+(defun disassemble-code-component (thing &key (stream *standard-output*)
+                                              (use-labels t))
+  (declare (type stream stream)
            (type boolean use-labels))
   (let* ((code-component
-          (typecase code-component
-           (interpreted-function (fun-code-header (compile nil code-component)))
-           (function (fun-code-header (%fun-fun code-component)))
-           (t code-component)))
+          (etypecase thing
+           (function (fun-code-header (%fun-fun thing)))
+           (code-component thing)))
          (dstate (make-dstate))
          (segments
           (if (eq code-component sb-fasl::*assembler-routines*)
@@ -1771,18 +1750,20 @@
               (get-code-segments code-component))))
     (when use-labels
       (label-segments segments dstate))
-#|
-    ;; Formerly something like the following existed,
-    ;; but I don't think we need it.
-    (loop (when (>= (dstate-cur-offs dstate) raw-data-end) (return))
-          (print-current-address stream dstate)
-          (format stream "~A  #x~v,'0x~%"
-                  '.word (* 2 sb-vm:n-word-bytes)
-                  (sap-ref-word (dstate-segment-sap dstate)
-                                (dstate-cur-offs dstate)))
-          (incf (dstate-cur-offs dstate) sb-vm:n-word-bytes))
-|#
     (disassemble-segments segments stream dstate)))
+
+(defun sb-c:dis (object &optional length (stream *standard-output* streamp))
+  (typecase object
+   ((or address system-area-pointer)
+    (aver length)
+    (disassemble-memory object length :stream stream))
+   (t
+    (aver (not streamp))
+    (when (and (symbolp object) (special-operator-p object))
+      ;; What could it do- disassemble the interpreter?
+      (error "Can't disassemble a special operator"))
+    (dolist (fun (get-compiled-funs object))
+      (disassemble-code-component fun :stream (or length stream))))))
 
 ;;;; code to disassemble assembler segments
 

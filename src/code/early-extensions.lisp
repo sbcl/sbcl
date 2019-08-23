@@ -738,6 +738,23 @@ NOTE: This interface is experimental and subject to change."
 (defun legal-fun-name-p (name)
   (values (valid-function-name-p name)))
 
+;;; * extended-function-designator: an object that denotes a function and that is one of:
+;;;   a function name (denoting the function it names in the global environment),
+;;;   or a function (denoting itself). The consequences are undefined if a function name
+;;;   is used as an extended function designator but it does not have a global definition
+;;;   as a function, or if it is a symbol that has a global definition as a macro
+;;;   or a special form.
+;;; Release 1.4.6 advertised that (disassemble 'a-macro) works, which entails a choice:
+;;; - if (EXTENDED-FUNCTION-DESIGNATOR-P) is to return NIL, then we have to
+;;;   add (OR (SATISFIES MACRO-FUNCTION) ...) to the signature of DISASSEMBLE.
+;;; - if (EXTENDED-FUNCTION-DESIGNATOR-P) is to return T, then we must avoid
+;;;   using this predicate in contexts that demand a function.
+(defun extended-function-designator-p (x)
+  (or (and (legal-fun-name-p x)
+           (fboundp x)
+           (not (and (symbolp x) (special-operator-p x))))
+      (functionp x)))
+
 (deftype function-name () '(satisfies legal-fun-name-p))
 
 ;;; Signal an error unless NAME is a legal function name.

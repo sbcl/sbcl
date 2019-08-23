@@ -245,6 +245,9 @@
 (sb-xc:deftype double-float-significand ()
   `(integer 0 (,(ash 1 sb-vm:double-float-digits))))
 
+(sb-xc:deftype extended-function-designator ()
+               '(satisfies extended-function-designator-p))
+
 ;;; Common logic for %%TYPEP and CROSS-TYPEP
 (defmacro number-typep (object type)
   `(let ((object ,object) (type ,type))
