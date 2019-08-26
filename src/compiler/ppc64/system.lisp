@@ -56,9 +56,11 @@
   (:result-types fixnum)
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 1
-    (inst lr temp (- (ash (+ instance-slots-offset
-                             (get-dsd-index layout sb-kernel::%bits))
-                          word-shift) instance-pointer-lowtag))
+    (inst lr temp (- (+ #+little-endian 4
+                        (ash (+ instance-slots-offset
+                                (get-dsd-index layout sb-kernel::%bits))
+                             word-shift))
+                     instance-pointer-lowtag))
     (inst lwax res object temp)))
 
 (define-vop (%other-pointer-widetag)
