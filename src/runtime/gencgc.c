@@ -1946,6 +1946,7 @@ pin_object(lispobj object)
     }
 }
 
+#if !GENCGC_IS_PRECISE
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -1971,9 +1972,19 @@ preserve_pointer(void *addr)
             return immobile_space_preserve_pointer(addr);
         return;
     }
-    lispobj *object_start;
+    lispobj *object_start = conservative_root_p((lispobj)addr, page);
+    if (object_start) pin_object(compute_lispobj(object_start));
+}
+#else
 
-#if GENCGC_IS_PRECISE
+/* Pin an unambiguous descriptor object which may or may not be a pointer.
+ * Ignore objects with immediate lowtags */
+static void pin_exact_root(lispobj obj)
+{
+    if (!is_lisp_pointer(obj)) return;
+    page_index_t page = find_page_index((void*)obj);
+    if (page < 0) return;
+
     /* If we're in precise gencgc (non-x86oid as of this writing) then
      * we are only called on valid object pointers in the first place,
      * so we just have to do a bounds-check against the heap, a
@@ -1982,7 +1993,7 @@ preserve_pointer(void *addr)
                             (page_single_obj_p(page) &&
                              page_table[page].pinned)))
         return;
-    object_start = native_pointer((lispobj)addr);
+    lispobj *object_start = native_pointer(obj);
     switch (widetag_of(object_start)) {
     case SIMPLE_FUN_WIDETAG:
 #ifdef RETURN_PC_WIDETAG
@@ -1990,12 +2001,9 @@ preserve_pointer(void *addr)
 #endif
         object_start = fun_code_header(object_start);
     }
-#else
-    if ((object_start = conservative_root_p((lispobj)addr, page)) == NULL)
-        return;
-#endif
     pin_object(compute_lispobj(object_start));
 }
+#endif
 
 
 #define IN_REGION_P(a,kind) (kind##_region.start_addr<=a && a<=kind##_region.free_pointer)
@@ -3254,7 +3262,7 @@ garbage_collect_generation(generation_index_t generation, int raise)
     for_each_thread(th) {
         lispobj pin_list = read_TLS(PINNED_OBJECTS,th);
         while (pin_list != NIL) {
-            preserve_pointer((void*)(CONS(pin_list)->car));
+            pin_exact_root(CONS(pin_list)->car);
             pin_list = CONS(pin_list)->cdr;
         }
     }
