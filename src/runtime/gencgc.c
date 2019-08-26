@@ -1896,6 +1896,10 @@ pin_object(lispobj object)
 
     lispobj* object_start = native_pointer(object);
     page_index_t first_page = find_page_index(object_start);
+    if (!page_single_obj_p(first_page)
+        && hopscotch_containsp(&pinned_objects, object))
+        return;
+
     size_t nwords = OBJECT_SIZE(*object_start, object_start);
     page_index_t last_page = find_page_index(object_start + nwords - 1);
     page_index_t page;
@@ -1907,26 +1911,23 @@ pin_object(lispobj object)
          * Assert this here, because the previous logic used to,
          * and page protection bugs are scary */
         gc_assert(!page_table[page].write_protected);
-        /* Mark the page immovable. */
+        /* Mark the page as containing pinned objects. */
         page_table[page].pinned = 1;
     }
 
     if (page_single_obj_p(first_page)) {
-        maybe_adjust_large_object(first_page, nwords);
-        return;
+        return maybe_adjust_large_object(first_page, nwords);
     }
 
-    if (!hopscotch_containsp(&pinned_objects, object)) {
-        hopscotch_insert(&pinned_objects, object, 1);
-        struct code* maybe_code = (struct code*)native_pointer(object);
-        if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG) {
-          for_each_simple_fun(i, fun, maybe_code, 0, {
-              hopscotch_insert(&pinned_objects,
-                               make_lispobj(fun, FUN_POINTER_LOWTAG),
-                               1);
-          })
-        }
-    }
+    hopscotch_insert(&pinned_objects, object, 1);
+    struct code* maybe_code = (struct code*)native_pointer(object);
+    if (widetag_of(&maybe_code->header) == CODE_HEADER_WIDETAG)
+        for_each_simple_fun(i, fun, maybe_code, 0, {
+            hopscotch_insert(&pinned_objects,
+                             make_lispobj(fun, FUN_POINTER_LOWTAG),
+                             1);
+        })
+
     if (lowtag_of(object) == INSTANCE_POINTER_LOWTAG
         && (*(lispobj*)(object - INSTANCE_POINTER_LOWTAG)
             & CUSTOM_GC_SCAVENGE_FLAG)) {
