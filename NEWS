@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.5:
+changes in sbcl-1.5.6 relative to sbcl-1.5.5:
   * platform support:
     - experimental support for 64-bit PowerPC running Linux (extending Brian
       Bokser's work from 2018), on both the v1 and v2 ABIs
