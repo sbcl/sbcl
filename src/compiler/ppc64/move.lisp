@@ -227,7 +227,7 @@
     (with-fixed-allocation
         (y pa-flag temp bignum-widetag (+ 2 bignum-digits-offset))
       ;; rotate the sign bit into the LSB of the size in the header
-      (inst rldicl temp x n-widetag-bits 0)
+      (inst rldicl temp x (1+ n-widetag-bits) 0)
       (inst andi. temp temp (ash 1 n-widetag-bits)) ; mask only that bit
       ;; cause the size to be either 1 or 2 bigdigits, and add the widetag
       (inst addi temp temp (logior (ash 1 n-widetag-bits) bignum-widetag))
