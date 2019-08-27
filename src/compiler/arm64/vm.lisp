@@ -79,7 +79,6 @@
   (defregset non-descriptor-regs
       nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nl8 nl9 nargs nfp ocfp)
 
-  ;; OAOOM: Same as runtime/arm64-lispregs.h
   (defregset boxed-regs
       r0 r1 r2 r3 r4 r5 r6
       r7 r8 r9 #-sb-thread r10 #+sb-thread thread lexenv code)

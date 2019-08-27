@@ -60,13 +60,3 @@
 #define reg_CFUNC       IREG(4)
 #define reg_CODE        IREG(5)
 #define reg_LIP         IREG(7)
-
-#define REGNAMES \
-        "ZERO",         "ALLOC",        "NULL",         "CSP", \
-        "CFP",          "BSP",          "%g6",          "%g7", \
-        "NL0",          "NL1",          "NL2",          "NL3", \
-        "NL4",          "NL5",          "NSP",          "NARGS", \
-        "A0",           "A1",           "A2",           "A3", \
-        "A4",           "A5",           "OCFP",         "LRA", \
-        "CNAME",        "LEXENV",       "L0",           "NFP", \
-        "CFUNC",        "CODE",         "???",          "LIP"

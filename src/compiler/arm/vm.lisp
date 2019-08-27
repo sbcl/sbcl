@@ -55,7 +55,6 @@
   (defregset non-descriptor-regs
       ocfp nfp nargs nl2 nl3)
 
-  ;; OAOOM: Same as runtime/arm-lispregs.h
   (defregset boxed-regs
       r0 r1 r2 lexenv r8 code)
 

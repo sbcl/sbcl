@@ -3020,9 +3020,7 @@ core and return a descriptor to it."
 	     (when trailing-slash (write-char #\\ stream))
 	     (terpri stream))))
     (let ((names sb-vm::*register-names*))
-      #-sparc ; %g6 and %g7 don't exist in the vm definition
-      (prettify "REGNAMES"
-		(map 'list (lambda (x) (format nil "~s" x)) names))
+      (prettify "REGNAMES" (map 'list (lambda (x) (format nil "~s" x)) names))
       (when (boundp 'sb-vm::boxed-regs)
         (prettify "BOXED_REGISTERS {"
                   (mapcar (lambda (i) (format nil "reg_~A" (aref names i)))
