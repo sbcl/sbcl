@@ -1714,11 +1714,11 @@
   ;; floating convert with round signed-doubleword to double-precision
   (define-2-x-21-instructions fcfid 63 846)
   ;; floating convert with round unsigned-doubleword to double-precision
-  (define-2-x-21-instructions fcfidu 63 846)
+  (define-2-x-21-instructions fcfidu 63 974)
   ;; floating convert with round signed-doubleword to single-precision
-  (define-2-x-21-instructions fcfids 63 846)
+  (define-2-x-21-instructions fcfids 59 846)
   ;; floating convert with round unsigned-doubleword to single-precision
-  (define-2-x-21-instructions fcfidus 63 846)
+  (define-2-x-21-instructions fcfidus 59 974)
 
   (define-2-a-tab-instructions fdiv 63 18 :cost 31)
   (define-2-a-tab-instructions fsub 63 20)
