@@ -3002,12 +3002,12 @@ core and return a descriptor to it."
   (declare (ignorable stream))
   #-x86 ;; too weird - "UESP" (user-mode register ESP) is only
   ;; visible in a ucontext, so not a lisp register.
-  (flet ((prettify (macro list)
+  (flet ((prettify (macro list &optional trailing-slash)
 	   (aver (not (member nil list)))
            (format stream "#define ~a " macro)
            (let ((linelen 100) ; force a line break
                  (delim nil))
-             (dolist (item list (terpri stream))
+             (dolist (item list)
                (cond ((> linelen 70)
                       (format stream "~:[~;,~]\\~%    " delim)
                       (setq delim nil linelen 4)) ; four leading spaces
@@ -3016,14 +3016,18 @@ core and return a descriptor to it."
                       (incf linelen 2)))
                (write-string item stream)
                (incf linelen (length item))
-               (setq delim t)))))
+               (setq delim t))
+	     (when trailing-slash (write-char #\\ stream))
+	     (terpri stream))))
     (let ((names sb-vm::*register-names*))
       #-sparc ; %g6 and %g7 don't exist in the vm definition
-      (prettify "REGNAMES" (coerce names 'list))
+      (prettify "REGNAMES"
+		(map 'list (lambda (x) (format nil "~s" x)) names))
       (when (boundp 'sb-vm::boxed-regs)
         (prettify "BOXED_REGISTERS {"
                   (mapcar (lambda (i) (format nil "reg_~A" (aref names i)))
-                          (symbol-value 'sb-vm::boxed-regs)))
+                          (symbol-value 'sb-vm::boxed-regs))
+		  t)
         (format stream "}~%")))))
 
 (defun write-errnames-h (stream)
