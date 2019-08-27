@@ -6082,7 +6082,7 @@
                           '(2 4 3))
                  3)))
 
-(with-test (:name :usigned-word-float-conversion)
+(with-test (:name :unsigned-word-float-conversion)
   (assert (= (rational (funcall (checked-compile `(lambda (x)
                                                     (float (the sb-ext:word x) 1d0)))
                                 sb-ext:most-positive-word))

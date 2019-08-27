@@ -27,10 +27,11 @@
   #-gencgc (:ignore gc-temp)
   (:results (result :scs (descriptor-reg)))
   (:generator 0
-    (pseudo-atomic (pa-flag)
-      (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
+    (inst sldi ndescr rank (- word-shift n-fixnum-tag-bits))
+    (inst addi ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
                                 lowtag-mask))
-      (inst clrrwi ndescr ndescr n-lowtag-bits)
+    (inst clrrwi ndescr ndescr n-lowtag-bits)
+    (pseudo-atomic (pa-flag)
       (allocation header ndescr other-pointer-lowtag
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
