@@ -498,6 +498,7 @@
   (frob %single-float/signed %single-float single-reg single-float)
   (frob %double-float/signed %double-float double-reg double-float))
 
+#+nil ;; no fcfidu instructions
 (macrolet ((frob (name translate inst to-sc to-type)
             `(define-vop (,name)
                (:args (x :scs (unsigned-reg)))
