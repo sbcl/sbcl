@@ -69,6 +69,7 @@
 ;;; state or any CPU register except the one into which allocation occurs.
 ;;; We use a static area in which to perform the spill/restore just prior to
 ;;; this code, making it accessible relative to the instruction pointer on entry.
+#+nil
 (define-assembly-routine
     (xalloc-tramp (:return-style :raw)
                   (:align n-lowtag-bits)
@@ -78,7 +79,7 @@
      (:temp r2 unsigned-reg 2)
      (:temp r3 unsigned-reg 3)
      (:temp r12 unsigned-reg 12)
-     (:temp lip unsigned-reg 31)) ; lisp LIP reg needn't be saved
+     (:temp lip unsigned-reg 31))      ; lisp LIP reg needn't be saved
   ;; Reserve space for spilling 32 GPRs, 32 FPRs, the argument/result,
   ;; the link register, and the caller's link register (already spilled).
   ;; And double-lispword align the start of the routine.
