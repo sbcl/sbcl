@@ -49,18 +49,3 @@
 #define reg_CODE     REG(29)
 #define reg_LIP      REG(30)
 #define reg_NARGS    REG(31)
-
-#define REGNAMES \
-        "ZERO",         "LR",           "NSP",          "GLOBAL", \
-        "THREAD",       "LRA",          "CFP",          "OCFP", \
-        "NFP",          "CSP",          "A0",           "NL0", \
-        "A1",           "NL1",          "A2",           "NL2", \
-        "A3",           "NL3",          "L0",           "NL4", \
-        "L1",           "NL5",          "L2",           "NL6", \
-        "L3",           "NL7",          "CFUNC",        "LEXENV", \
-        "NULL",         "CODE",         "LIP",          "NARGS"
-
-#define BOXED_REGISTERS { \
-  reg_A0, reg_A1, reg_A2, reg_A3, reg_L0, \
-  reg_L1, reg_L2, reg_L3, reg_OCFP, reg_LRA, reg_LEXENV, reg_CODE \
-}

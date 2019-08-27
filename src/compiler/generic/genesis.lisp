@@ -2998,6 +2998,34 @@ core and return a descriptor to it."
             (c-symbol-name symbol)
             (sb-xc:mask-field (symbol-value symbol) -1))))
 
+(defun write-regnames-h (stream)
+  (declare (ignorable stream))
+  #-x86 ;; too weird - "UESP" (user-mode register ESP) is only
+  ;; visible in a ucontext, so not a lisp register.
+  (flet ((prettify (macro list)
+	   (aver (not (member nil list)))
+           (format stream "#define ~a " macro)
+           (let ((linelen 100) ; force a line break
+                 (delim nil))
+             (dolist (item list (terpri stream))
+               (cond ((> linelen 70)
+                      (format stream "~:[~;,~]\\~%    " delim)
+                      (setq delim nil linelen 4)) ; four leading spaces
+                     (delim
+                      (write-string ", " stream)
+                      (incf linelen 2)))
+               (write-string item stream)
+               (incf linelen (length item))
+               (setq delim t)))))
+    (let ((names sb-vm::*register-names*))
+      #-sparc ; %g6 and %g7 don't exist in the vm definition
+      (prettify "REGNAMES" (coerce names 'list))
+      (when (boundp 'sb-vm::boxed-regs)
+        (prettify "BOXED_REGISTERS {"
+                  (mapcar (lambda (i) (format nil "reg_~A" (aref names i)))
+                          (symbol-value 'sb-vm::boxed-regs)))
+        (format stream "}~%")))))
+
 (defun write-errnames-h (stream)
   ;; C code needs strings for describe_internal_error()
   (format stream "#define INTERNAL_ERROR_NAMES ~{\\~%~S~^, ~}~2%"
@@ -3676,6 +3704,7 @@ III. initially undefined function references (alphabetically):
                        (format stream "#endif~%"))))
         (out-to "config" (write-config-h stream))
         (out-to "constants" (write-constants-h stream))
+        (out-to "regnames" (write-regnames-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb-vm::write-gc-tables stream))
         (out-to "tagnames" (write-tagnames-h stream))

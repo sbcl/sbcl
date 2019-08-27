@@ -43,9 +43,6 @@
 #define reg_R14 REG(14)
 #define reg_R15 REG(15)
 
-#define REGNAMES "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI", \
-        "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15"
-
 /* reg_SP = stack pointer, reg_FP = frame pointer */
 #define reg_SP reg_RSP
 #define reg_FP reg_RBP

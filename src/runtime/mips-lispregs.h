@@ -35,20 +35,3 @@
 #define reg_NSP     REG(29)
 #define reg_CODE    REG(30)
 #define reg_LIP     REG(31)
-
-#define REGNAMES \
-        "ZERO",         "NL3",          "CFUNC",        "NL4", \
-        "NL0",          "NL1",          "NL2",          "NARGS", \
-        "A0",           "A1",           "A2",           "A3", \
-        "A4",           "A5",           "FDEFN",        "LEXENV", \
-        "NFP",          "OCFP",         "LRA",          "L0", \
-        "NIL",          "BSP",          "CFP",          "CSP", \
-        "L1",           "ALLOC",        "K0",           "K1", \
-        "GP",           "NSP",          "CODE",         "LIP"
-
-
-/* OAOOM: Same as compiler/mips/vm.lisp */
-#define BOXED_REGISTERS { \
-    reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, reg_FDEFN, reg_LEXENV, \
-    reg_NFP, reg_OCFP, reg_LRA, reg_L0, reg_L1, reg_CODE \
-}

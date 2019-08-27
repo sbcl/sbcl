@@ -543,3 +543,5 @@
           (values :default nil))))
       (t
        (values :default nil)))))
+
+(defparameter *register-names* +qword-register-names+)

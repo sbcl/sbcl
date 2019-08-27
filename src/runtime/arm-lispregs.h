@@ -34,14 +34,3 @@
 #define reg_NSP         REG(13)
 #define reg_LR          REG(14)
 #define reg_PC          REG(15)
-
-#define REGNAMES \
-        "R0",           "R1",           "R2",           "LEXENV", \
-        "NL2",          "CODE",         "NL3",          "OCFP", \
-        "R8",           "NFP",          "NULL",         "CFP", \
-        "NARGS",        "NSP",          "LR",           "PC"
-
-/* OAOOM: Same as compiler/arm/vm.lisp */
-#define BOXED_REGISTERS { \
-    reg_R0, reg_R1, reg_R2, reg_LEXENV, reg_R8, reg_CODE \
-}

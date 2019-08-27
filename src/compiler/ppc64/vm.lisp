@@ -49,7 +49,7 @@
   (defreg fdefn 10)
   (defreg nargs 11)
   (defreg cfunc 12)
-  ;; no use of r13 allowed
+  (defreg r13 13) ; reserved
   (defreg bsp 14)
   (defreg cfp 15)
   (defreg csp 16)

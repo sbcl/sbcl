@@ -55,18 +55,4 @@
 #define reg_NSP REG(30)         /* sp - stack pointer */
 #define reg_ZERO REG(31)        /* reads as zero, writes are noops */
 
-
-#define REGNAMES \
-    "LIP", "A0", "A1", "A2", "A3", "A4", "A5", "L0", "NARGS",  \
-    "CSP", "CFP", "OCFP", "BSP", "LEXENV", "CODE", "NULL", \
-    "NL0", "NL1", "NL2", "NL3", "NL4", "NL5", "ALLOC", "FDEFN", \
-    "CFUNC", "NFP", "LRA", "L1", "L2", "GP", "NSP", "ZERO"
-
-/* OAOOM: Same as compiler/alpha/vm.lisp */
-#define BOXED_REGISTERS { \
-    reg_CODE, reg_FDEFN, reg_LEXENV, reg_NARGS, reg_OCFP, reg_LRA, \
-    reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, \
-    reg_L0, reg_L1, reg_L2 \
-}
-
 #define call_into_lisp_LRA_page 0x10000

@@ -13,6 +13,10 @@
 
 #define NREGS 32
 
+// We should probably eliminate uses of the wired 0 register and use r0
+// as the NIL value. It's not wired to 0 in hardware, and we seldom use it in
+// ways that would be sensitive to its unusual nature (effectively a wired 0)
+// regarding load/store and some other instructions.
 #define reg_ZERO      REG(0)    /* Should always contain 0 in lisp */
 #define reg_NSP       REG(1)    /* The number/C stack pointer */
 #define reg_TOC       REG(2)    /* ABI-reserved GOT + small data pointer */
@@ -45,24 +49,3 @@
 #define reg_L1        REG(29)
 #define reg_THREAD    REG(30)   /* TLS block pointer */
 #define reg_LIP       REG(31)   /* Lisp Interior Pointer, e.g., locative */
-
-// We should probably eliminate uses of the wired 0 register and use r0
-// as the NIL value. It's not wired to 0 in hardware, and we seldom use it in
-// ways that would be sensitive to its unusual nature (effectively a wired 0)
-// regarding load/store and some other instructions.
-#define REGNAMES \
-        "ZERO",         "NSP",          "TOC",          "NL0", \
-        "NL1",          "NL2",          "NL3",          "NL4", \
-        "NL5",          "NL6",          "FDEFN",        "NARGS", \
-        "CFUNC",        "r13",          "BSP",          "CFP", \
-        "CSP",          "ALLOC",        "NULL",         "CODE", \
-        "NFP",          "LEXENV",       "OCFP",         "LRA", \
-        "A0",           "A1",           "A2",           "A3", \
-        "L0",           "L1",           "THREAD",       "LIP"
-
-/* OAOOM: Same as compiler/ppc/vm.lisp */
-#define BOXED_REGISTERS { \
-    reg_FDEFN, reg_CODE, reg_LEXENV, reg_OCFP, reg_LRA, \
-    reg_A0, reg_A1, reg_A2, reg_A3, \
-    reg_L0, reg_L1, reg_THREAD \
-}

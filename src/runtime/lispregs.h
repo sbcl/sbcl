@@ -10,6 +10,7 @@
  */
 
 #include "target-lispregs.h"
+#include "genesis/regnames.h"
 
 #ifndef __ASSEMBLER__
 extern char *lisp_register_names[];

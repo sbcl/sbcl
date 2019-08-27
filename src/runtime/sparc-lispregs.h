@@ -70,9 +70,3 @@
         "A4",           "A5",           "OCFP",         "LRA", \
         "CNAME",        "LEXENV",       "L0",           "NFP", \
         "CFUNC",        "CODE",         "???",          "LIP"
-
-/* OAOOM: Same as compiler/sparc/vm.lisp */
-#define BOXED_REGISTERS { \
-    reg_A0, reg_A1, reg_A2, reg_A3, reg_A4, reg_A5, reg_CNAME, reg_LEXENV, \
-    reg_OCFP, reg_LRA, reg_L0, reg_CODE \
-}
