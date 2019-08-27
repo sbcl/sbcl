@@ -3003,7 +3003,7 @@ core and return a descriptor to it."
   #-x86 ;; too weird - "UESP" (user-mode register ESP) is only
   ;; visible in a ucontext, so not a lisp register.
   (flet ((prettify (macro list &optional trailing-slash)
-	   (aver (not (member nil list)))
+           (aver (not (member nil list)))
            (format stream "#define ~a " macro)
            (let ((linelen 100) ; force a line break
                  (delim nil))
@@ -3017,15 +3017,15 @@ core and return a descriptor to it."
                (write-string item stream)
                (incf linelen (length item))
                (setq delim t))
-	     (when trailing-slash (write-char #\\ stream))
-	     (terpri stream))))
+             (when trailing-slash (write-char #\\ stream))
+             (terpri stream))))
     (let ((names sb-vm::*register-names*))
       (prettify "REGNAMES" (map 'list (lambda (x) (format nil "~s" x)) names))
       (when (boundp 'sb-vm::boxed-regs)
         (prettify "BOXED_REGISTERS {"
                   (mapcar (lambda (i) (format nil "reg_~A" (aref names i)))
                           (symbol-value 'sb-vm::boxed-regs))
-		  t)
+                  t)
         (format stream "}~%")))))
 
 (defun write-errnames-h (stream)

@@ -258,7 +258,9 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 }
 
 #define INLINE_ALLOC_DEBUG 0
-#ifdef LISP_FEATURE_GENCGC
+#ifdef LISP_FEATURE_CHENEYGC
+#define handle_allocation_trap(x) (0)
+#else
 /*
  * Return non-zero if the current instruction is an allocation trap
  */
@@ -319,7 +321,7 @@ allocation_trap_p(os_context_t * context)
 #define boxed_region gc_alloc_region[0]
 #endif
 
-void
+static int
 handle_allocation_trap(os_context_t * context)
 {
     unsigned int *pc;
@@ -327,15 +329,9 @@ handle_allocation_trap(os_context_t * context)
     sword_t size = 0;
     char *memory;
 
-    /* I don't think it's possible for us NOT to be in lisp when we get
-     * here.  Remove this later? */
-    boolean were_in_lisp = !foreign_function_call_active_p(arch_os_get_current_thread());
-
-    if (were_in_lisp) {
-        fake_foreign_function_call(context);
-    } else {
-        fprintf(stderr, "**** Whoa! allocation trap and we weren't in lisp!\n");
-    }
+    if (!allocation_trap_p(context)) return 0;
+    gc_assert(!foreign_function_call_active_p(arch_os_get_current_thread()));
+    fake_foreign_function_call(context);
 
     /*
      * Look at current instruction: TWNE temp, NL3. We're here because
@@ -461,9 +457,7 @@ handle_allocation_trap(os_context_t * context)
          & LOWTAG_MASK);
 #endif
 
-    if (were_in_lisp) {
-        undo_fake_foreign_function_call(context);
-    }
+    undo_fake_foreign_function_call(context);
 
     /* Skip the allocation trap and the write of the updated free
      * pointer back to the allocation region.  This is either two
@@ -473,7 +467,7 @@ handle_allocation_trap(os_context_t * context)
 #else
     (*os_context_pc_addr(context)) = (uword_t)(pc + 4);
 #endif
-
+    return 1; // handled
 }
 #endif
 
@@ -515,13 +509,8 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-#ifdef LISP_FEATURE_GENCGC
-    /* Is this an allocation trap? */
-    if (allocation_trap_p(context)) {
-        handle_allocation_trap(context);
-        return;
-    }
-#endif
+    if (handle_allocation_trap(context)) return;
+
     unsigned int code;
 
     code=*((u32 *)(*os_context_pc_addr(context)));
