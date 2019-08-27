@@ -34,9 +34,11 @@
          (offset :scs (any-reg)))
   (:arg-types system-area-pointer positive-fixnum)
   (:results (result :scs (descriptor-reg)))
+  (:temporary (:scs (unsigned-reg)) temp)
   (:result-types *)
   (:generator 5
-    (inst lwzx result sap offset)))
+    (inst sldi temp offset (- word-shift n-fixnum-tag-bits))
+    (inst ldx result sap temp)))
 
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
@@ -46,9 +48,11 @@
          (value :scs (descriptor-reg) :target result))
   (:arg-types system-area-pointer positive-fixnum *)
   (:results (result :scs (descriptor-reg)))
+  (:temporary (:scs (unsigned-reg)) temp)
   (:result-types *)
   (:generator 5
-    (inst stwx value sap offset)
+    (inst sldi temp offset (- word-shift n-fixnum-tag-bits))
+    (inst stdx value sap temp)
     (move result value)))
 
 (define-vop (code-from-mumble)
