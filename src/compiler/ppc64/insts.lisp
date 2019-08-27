@@ -2030,7 +2030,8 @@
      (inst li reg value))
     ((unsigned-byte 16)
      (inst ori reg zero-tn value))
-    ((or (signed-byte 32) (unsigned-byte 32))
+    ;; FIXME: 64-bit sign-extends the upper half
+    ((or (signed-byte #+64-bit 31 #-64-bit 32) (unsigned-byte #+64-bit 30 #-64-bit 32))
      (let* ((high-half (ldb (byte 16 16) value))
             (low-half (ldb (byte 16 0) value)))
        (declare (type (unsigned-byte 16) high-half low-half))

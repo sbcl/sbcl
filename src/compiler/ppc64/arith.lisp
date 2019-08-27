@@ -127,7 +127,7 @@
   (:args (x :target r :scs (unsigned-reg zero)))
   (:info y)
   (:arg-types unsigned-num
-              (:constant (and (unsigned-byte 32) (not (integer 0 0)))))
+              (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
@@ -136,7 +136,7 @@
   (:args (x :target r :scs (signed-reg zero)))
   (:info y)
   (:arg-types signed-num
-              (:constant (and (signed-byte 32) (not (integer 0 0)))))
+              (:constant (and (signed-byte 31) (not (integer 0 0)))))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 32) arithmetic"))
@@ -154,7 +154,7 @@
   (:args (x :target r :scs (unsigned-reg zero)))
   (:info y)
   (:arg-types unsigned-num
-              (:constant (and (unsigned-byte 32) (not (integer 0 0)))))
+              (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) logical op"))
@@ -163,7 +163,7 @@
   (:args (x :target r :scs (signed-reg zero)))
   (:info y)
   (:arg-types signed-num
-              (:constant (and (unsigned-byte 32) (not (integer 0 0)))))
+              (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 32) logical op"))
