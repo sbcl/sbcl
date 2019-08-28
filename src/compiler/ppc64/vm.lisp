@@ -146,10 +146,9 @@
   (character-stack non-descriptor-stack) ; non-descriptor characters.
   (sap-stack non-descriptor-stack) ; System area pointers.
   (single-stack non-descriptor-stack) ; single-floats
-  (double-stack non-descriptor-stack
-                :element-size 2 :alignment 2) ; double floats.
-  (complex-single-stack non-descriptor-stack :element-size 2)
-  (complex-double-stack non-descriptor-stack :element-size 4 :alignment 2)
+  (double-stack non-descriptor-stack) ; double floats.
+  (complex-single-stack non-descriptor-stack :element-size 2 :alignment 2)
+  (complex-double-stack non-descriptor-stack :element-size 2 :alignment 2)
 
 
   ;; **** Things that can go in the integer registers.

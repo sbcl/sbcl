@@ -192,7 +192,7 @@
     (let ((real-tn (complex-double-reg-real-tn y)))
       (inst lfd real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn y)))
-      (inst lfd imag-tn nfp (+ offset (* 2 n-word-bytes))))))
+      (inst lfd imag-tn nfp (+ offset n-word-bytes)))))
 
 (define-move-fun (store-complex-double 4) (vop x y)
   ((complex-double-reg) (complex-double-stack))
@@ -201,7 +201,7 @@
     (let ((real-tn (complex-double-reg-real-tn x)))
       (inst stfd real-tn nfp offset))
     (let ((imag-tn (complex-double-reg-imag-tn x)))
-      (inst stfd imag-tn nfp (+ offset (* 2 n-word-bytes))))))
+      (inst stfd imag-tn nfp (+ offset n-word-bytes)))))
 
 
 ;;;
@@ -369,7 +369,7 @@
          (let ((real-tn (complex-double-reg-real-tn x)))
            (inst stfd real-tn nfp offset))
          (let ((imag-tn (complex-double-reg-imag-tn x)))
-           (inst stfd imag-tn nfp (+ offset (* 2 n-word-bytes)))))))))
+           (inst stfd imag-tn nfp (+ offset n-word-bytes))))))))
 (define-move-vop move-complex-double-float-arg :move-arg
   (complex-double-reg descriptor-reg) (complex-double-reg))
 
@@ -747,7 +747,7 @@
              (offset (tn-byte-offset r)))
          (unless (location= real r)
            (inst stfs real nfp offset))
-         (inst stfs imag nfp (+ offset 4)))))))
+         (inst stfs imag nfp (+ offset n-word-bytes)))))))
 
 (define-vop (make-complex-double-float)
   (:translate complex)
@@ -801,6 +801,6 @@
                      (inst ,inst r (current-nfp-tn vop)
                            (+ (tn-byte-offset x) ,byte-offset))))))))
   (def real single 0 lfs)
-  (def imag single 4 lfs)
+  (def imag single 8 lfs)
   (def real double 0 lfd)
   (def imag double 8 lfd))
