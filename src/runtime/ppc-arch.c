@@ -524,13 +524,22 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
         interrupt_handle_pending(context);
         return;
     }
-
+#ifdef LISP_FEATURE_64_BIT
+    /* TDI LGT,$NULL,code */
+    if ((code >> 16) == ((2 << 10) | (1 << 5) | reg_NULL)) {
+        int trap = code & 0xff;
+        handle_trap(context,trap);
+        return;
+    }
+#else
     if ((code >> 16) == ((3 << 10) | (6 << 5))) {
         /* twllei reg_ZERO,N will always trap if reg_ZERO = 0 */
         int trap = code & 0xff;
         handle_trap(context,trap);
         return;
     }
+#endif
+
     /* twi :ne ... or twi ... nargs */
     if (((code >> 26) == 3) && (((code >> 21) & 31) == 24
                                 || ((code >> 16) & 31) == reg_NARGS

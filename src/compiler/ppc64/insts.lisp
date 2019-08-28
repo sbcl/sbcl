@@ -1083,7 +1083,18 @@
                             0)))))
 
    ;;; The instructions, in numerical order
-
+  #+64-bit
+  (define-instruction unimp (segment data)
+    (:declare (type (signed-byte 16) data))
+    (:printer xinstr ((op-to-a #.(logior (ash 2 10) (ash 1 5) null-offset)))
+              :default :control #'unimp-control)
+    :pinned
+    (:delay 0)
+    (:emitter
+     #.(assert (> nil-value (1- (expt 2 16))))
+     ;; TDI LGT,$NULL,data
+     (emit-d-form-inst segment 2 1 null-offset data)))
+  #-64-bit
   (define-instruction unimp (segment data)
     (:declare (type (signed-byte 16) data))
     (:printer xinstr ((op-to-a #.(logior (ash 3 10) (ash 6 5) 0)))
