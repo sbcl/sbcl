@@ -510,7 +510,8 @@
 ;;;; raw instance slot accessors
 
 (defun offset-for-raw-slot (index &optional (displacement 0))
-  (- (ash (+ index displacement instance-slots-offset) word-shift)
+  (- (+ (ash (+ index instance-slots-offset) word-shift)
+        displacement)
      instance-pointer-lowtag))
 
 (macrolet ((def (suffix sc primtype)
@@ -603,7 +604,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types single-float)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (inst lfsx value object offset)))
 
@@ -618,7 +620,8 @@
   (:result-types single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (inst stfsx value object offset)
     (unless (location= result value)
@@ -642,7 +645,8 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types double-float)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (inst lfdx value object offset)))
 
@@ -657,7 +661,8 @@
   (:result-types double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (inst stfdx value object offset)
     (unless (location= result value)
@@ -672,7 +677,7 @@
     (inst stfs (complex-single-reg-real-tn value)
           object (offset-for-raw-slot index))
     (inst stfs (complex-single-reg-imag-tn value)
-          object (offset-for-raw-slot index 1))))
+          object (offset-for-raw-slot index (/ n-word-bytes 2)))))
 
 (define-vop (raw-instance-ref/complex-single)
   (:translate %raw-instance-ref/complex-single)
@@ -684,10 +689,11 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types complex-single-float)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (inst lfsx (complex-single-reg-real-tn value) object offset)
-    (inst addi offset offset n-word-bytes)
+    (inst addi offset offset (/ n-word-bytes 2))
     (inst lfsx (complex-single-reg-imag-tn value) object offset)))
 
 (define-vop (raw-instance-set/complex-single)
@@ -701,14 +707,15 @@
   (:result-types complex-single-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (let ((value-real (complex-single-reg-real-tn value))
           (result-real (complex-single-reg-real-tn result)))
       (inst stfsx value-real object offset)
       (unless (location= result-real value-real)
         (inst frsp result-real value-real)))
-    (inst addi offset offset n-word-bytes)
+    (inst addi offset offset (/ n-word-bytes 2))
     (let ((value-imag (complex-single-reg-imag-tn value))
           (result-imag (complex-single-reg-imag-tn result)))
       (inst stfsx value-imag object offset)
@@ -724,7 +731,7 @@
     (inst stfd (complex-single-reg-real-tn value)
           object (offset-for-raw-slot index))
     (inst stfd (complex-double-reg-imag-tn value)
-          object (offset-for-raw-slot index 2))))
+          object (offset-for-raw-slot index n-word-bytes))))
 
 (define-vop (raw-instance-ref/complex-double)
   (:translate %raw-instance-ref/complex-double)
@@ -736,10 +743,11 @@
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:result-types complex-double-float)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (inst lfdx (complex-double-reg-real-tn value) object offset)
-    (inst addi offset offset (* 2 n-word-bytes))
+    (inst addi offset offset n-word-bytes)
     (inst lfdx (complex-double-reg-imag-tn value) object offset)))
 
 (define-vop (raw-instance-set/complex-double)
@@ -753,14 +761,15 @@
   (:result-types complex-double-float)
   (:temporary (:scs (non-descriptor-reg)) offset)
   (:generator 5
-    (inst addi offset index (- (ash instance-slots-offset word-shift)
+    (inst sldi offset index (- word-shift n-fixnum-tag-bits))
+    (inst addi offset offset (- (ash instance-slots-offset word-shift)
                                instance-pointer-lowtag))
     (let ((value-real (complex-double-reg-real-tn value))
           (result-real (complex-double-reg-real-tn result)))
       (inst stfdx value-real object offset)
       (unless (location= result-real value-real)
         (inst fmr result-real value-real)))
-    (inst addi offset offset (* 2 n-word-bytes))
+    (inst addi offset offset n-word-bytes)
     (let ((value-imag (complex-double-reg-imag-tn value))
           (result-imag (complex-double-reg-imag-tn result)))
       (inst stfdx value-imag object offset)
