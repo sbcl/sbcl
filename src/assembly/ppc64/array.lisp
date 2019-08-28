@@ -55,7 +55,6 @@
      (:temp pa-flag non-descriptor-reg nl3-offset)
      (:temp vector descriptor-reg a3-offset)
      (:temp temp non-descriptor-reg nl2-offset))
-  (inst li zero 0)
   (pseudo-atomic (pa-flag)
     (inst addi ndescr words (fixnumize (1+ vector-data-offset)))
     (inst rldicr ndescr ndescr (- word-shift n-fixnum-tag-bits) (- 63 n-lowtag-bits))
@@ -66,6 +65,7 @@
     (storew temp vector 0 other-pointer-lowtag)
     ;; Our storage is allocated, but not initialized, and our contract
     ;; calls for it to be zero-fill.  Do so now.
+    (inst li zero 0)
     (let ((loop (gen-label)))
       (inst addi temp vector (- n-word-bytes other-pointer-lowtag))
       ;; The header word has already been set, skip it.
