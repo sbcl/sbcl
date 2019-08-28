@@ -2032,7 +2032,7 @@
     ((unsigned-byte 16)
      #+64-bit ; register 0 is not wired to hold 0
      (progn (inst addi reg 0 value)      ; gets "accidental" sign extension
-	    (inst andi. reg reg #xFFFF)) ; undo the sign extension
+            (inst andi. reg reg #xFFFF)) ; undo the sign extension
      #-64-bit
      (inst ori reg sb-vm::zero-tn value)) ; ORing with the wired 0 works
     ;; FIXME: 64-bit sign-extends the upper half

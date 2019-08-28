@@ -378,4 +378,4 @@
 #+sb-safepoint
 (defun emit-safepoint ()
   (inst lwz temp-reg-tn null-tn
-	(- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))
+        (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))
