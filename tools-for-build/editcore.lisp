@@ -34,7 +34,8 @@
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
                 #:map-segment-instructions #:inst-name
                 #:dstate-next-addr #:dstate-cur-offs)
-  (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:|call|)
+  (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:|call|
+                #:get-gpr #:reg-name)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
                 #:hash-table-pairs #:hash-table-%count))
@@ -554,7 +555,7 @@
 ;;; - jmp/call instructions that transfer control to the fixedoj space
 ;;;    delimited by bounds in STATE.
 ;;; At execution time the function will have virtual address LOAD-ADDR.
-(defun list-non-opaque-instructions (sap length core load-addr emit-cfi)
+(defun list-textual-instructions (sap length core load-addr emit-cfi)
   (let ((dstate (core-dstate core))
         (seg (core-seg core))
         (call-inst (core-call-inst core))
@@ -573,14 +574,28 @@
      (lambda (dchunk inst)
        (cond
          ((< next-fixup-addr (dstate-next-addr dstate))
-          (let ((operand (sap-ref-32 sap (- next-fixup-addr load-addr))))
+          (let ((operand (sap-ref-32 sap (- next-fixup-addr load-addr)))
+                (offs (dstate-cur-offs dstate)))
             (when (in-bounds-p operand (core-code-bounds core))
               (cond
                 ((and (eq (inst-name inst) 'mov) ; match "mov eax, imm32"
-                      (eql (sap-ref-8 sap (dstate-cur-offs dstate)) #xB8))
-                 (push (list* (dstate-cur-offs dstate) 5 "mov" operand) list))
+                      (eql (sap-ref-8 sap offs) #xB8))
+                 (let ((text (format nil "mov $(CS+0x~x),%eax"
+                                      (- operand (bounds-low (core-code-bounds core))))))
+                   (push (list* (dstate-cur-offs dstate) 5 "mov" text) list)))
+                ((and (eq (inst-name inst) 'mov) ; match "mov qword ptr [R+disp8], imm32"
+                      (eql (sap-ref-8 sap (1- offs))    #x48)
+                      (eql (sap-ref-8 sap offs)         #xC7)
+                      ;; modRegRm = #b01 #b000 #b___
+                      (eql (logand (sap-ref-8 sap (1+ offs)) #o370) #o100))
+                 (let* ((reg (ldb (byte 3 0) (sap-ref-8 sap (1+ offs))))
+                        (text (format nil "movq $(CS+0x~x),~d(%~a)"
+                                      (- operand (bounds-low (core-code-bounds core)))
+                                      (signed-sap-ref-8 sap (+ offs 2))
+                                      (reg-name (get-gpr :qword reg)))))
+                   (push (list* (1- (dstate-cur-offs dstate)) 8 "mov" text) list)))
                 ((and (eq (inst-name inst) '|call|) ; match "call qword ptr [addr]"
-                      (eql (ldb (byte 24 0) (sap-ref-32 sap (dstate-cur-offs dstate)))
+                      (eql (ldb (byte 24 0) (sap-ref-32 sap offs))
                            #x2514FF)) ; ModRM+SIB encodes disp32, no base, no index
                  ;; This form of call instruction is employed for asm routines when
                  ;; compile-to-memory-space is :AUTO.  If the code were to be loaded
@@ -589,8 +604,7 @@
                  (push (list* (dstate-cur-offs dstate) 7 "call*" operand) list))
                 (t
                  (bug "Can't reverse-engineer fixup: ~s ~x"
-                      (inst-name inst)
-                      (sap-ref-32 sap (dstate-cur-offs dstate)))))))
+                      (inst-name inst) (sap-ref-32 sap offs))))))
           (pop (core-fixup-addrs core))
           (setq next-fixup-addr (or (car (core-fixup-addrs core)) most-positive-word)))
          ((or (eq inst jmp-inst) (eq inst call-inst))
@@ -649,7 +663,7 @@
   ;; thereby affecting the ELF data (cfi or relocs) produced.
   (let ((instructions
          (merge 'list labels
-                (list-non-opaque-instructions (int-sap paddr) count core vaddr emit-cfi)
+                (list-textual-instructions (int-sap paddr) count core vaddr emit-cfi)
                 #'< :key #'car))
         (ptr paddr))
     (symbol-macrolet ((cur-offset (- ptr paddr)))
@@ -715,8 +729,9 @@
                                   nil)
                                  (t)))
                           ((string= opcode "mov")
-                           (format stream " mov $(CS+0x~x),%eax~%"
-                                   (- operand (bounds-low (core-code-bounds core)))))
+                           ;; the so-called "operand" is the entire instruction
+                           (write-string operand stream)
+                           (terpri stream))
                           ((string= opcode "call*")
                            ;; Indirect call - since the code is in immobile space,
                            ;; we could render this as a 2-byte NOP followed by a direct
@@ -1021,21 +1036,19 @@
          (let* ((ptr (translate-ptr code-addr spaces))
                 (fdefn (%make-lisp-obj (logior ptr other-pointer-lowtag)))
                 (name (fun-name-from-core (fdefn-name fdefn) core))
-                (fun (get-lisp-obj-address (fdefn-fun fdefn)))
-                (code-space-p (in-bounds-p fun code-bounds))
-                (raw-fun (sap-ref-word (int-sap ptr)
-                                       (ash fdefn-raw-addr-slot word-shift)))
                 (c-name (c-name name core pp-state "F")))
            (format output "~a: # ~x~% .size ~0@*~a, 32~%"
                      (c-symbol-quote c-name)
                      (logior code-addr other-pointer-lowtag))
-           (format output " .quad 0x~x, 0x~x, ~:[~;CS+~]0x~x, ~:[~;CS+~]0x~x~%"
-                   (sap-ref-word (int-sap ptr) 0)
-                   (sap-ref-word (int-sap ptr) 8)
-                   code-space-p
-                   (if code-space-p (- fun (bounds-low code-bounds)) fun)
-                   code-space-p
-                   (if code-space-p (- raw-fun (bounds-low code-bounds)) raw-fun))
+           (flet ((relativize (slot &aux (x (sap-ref-word (int-sap ptr) (ash slot word-shift))))
+                    (if (in-bounds-p x code-bounds)
+                        (format nil "CS+0x~x" (- x (bounds-low code-bounds)))
+                        (format nil "0x~x" x))))
+             (format output " .quad 0x~x, 0x~x, ~a, ~a~%"
+                     (sap-ref-word (int-sap ptr) 0)
+                     (sap-ref-word (int-sap ptr) 8)
+                     (relativize fdefn-fun-slot)
+                     (relativize fdefn-raw-addr-slot)))
            (incf code-addr (* 4 n-word-bytes))))
         (#.funcallable-instance-widetag
          (unless seen-gfs
