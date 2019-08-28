@@ -163,9 +163,6 @@
     (or (= (conset-min conset) (conset-max conset))
         (not (find 1 (conset-vector conset)
                    :start (conset-min conset)
-                   ;; the :end argument can be commented out when
-                   ;; bootstrapping on a < 1.0.9 SBCL errors out with
-                   ;; a full call to DATA-VECTOR-REF-WITH-OFFSET.
                    :end (conset-max conset)))))
 
   (defun copy-conset (conset)
