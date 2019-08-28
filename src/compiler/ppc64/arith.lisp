@@ -55,31 +55,31 @@
 ;;; Assume that any constant operand is the second arg...
 
 (define-vop (fast-fixnum-binop fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg zero))
-         (y :target r :scs (any-reg zero)))
+  (:args (x :target r :scs (any-reg))
+         (y :target r :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
 
 (define-vop (fast-unsigned-binop fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero))
-         (y :target r :scs (unsigned-reg zero)))
+  (:args (x :target r :scs (unsigned-reg))
+         (y :target r :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline (unsigned-byte 32) arithmetic"))
 
 (define-vop (fast-signed-binop fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg zero))
-         (y :target r :scs (signed-reg zero)))
+  (:args (x :target r :scs (signed-reg))
+         (y :target r :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline (signed-byte 32) arithmetic"))
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg zero)))
+  (:args (x :target r :scs (any-reg)))
   (:info y)
   (:arg-types tagged-num
               (:constant (and (signed-byte 14) (not (integer 0 0)))))
@@ -88,7 +88,7 @@
   (:note "inline fixnum arithmetic"))
 
 (define-vop (fast-fixnum-binop30-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg zero)))
+  (:args (x :target r :scs (any-reg)))
   (:info y)
   (:arg-types tagged-num
               (:constant (and (signed-byte 30) (not (integer 0 0)))))
@@ -97,7 +97,7 @@
   (:note "inline fixnum arithmetic"))
 
 (define-vop (fast-fixnum-logop-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg zero)))
+  (:args (x :target r :scs (any-reg)))
   (:info y)
   (:arg-types tagged-num
               (:constant (and (unsigned-byte 14) (not (integer 0 0)))))
@@ -106,7 +106,7 @@
   (:note "inline fixnum logical op"))
 
 (define-vop (fast-fixnum-logop30-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg zero)))
+  (:args (x :target r :scs (any-reg)))
   (:info y)
   (:arg-types tagged-num
               (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
@@ -115,7 +115,7 @@
   (:note "inline fixnum logical op"))
 
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero)))
+  (:args (x :target r :scs (unsigned-reg)))
   (:info y)
   (:arg-types unsigned-num
               (:constant (and (signed-byte 16) (not (integer 0 0)))))
@@ -124,7 +124,7 @@
   (:note "inline (unsigned-byte 32) arithmetic"))
 
 (define-vop (fast-unsigned-binop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero)))
+  (:args (x :target r :scs (unsigned-reg)))
   (:info y)
   (:arg-types unsigned-num
               (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
@@ -133,7 +133,7 @@
   (:note "inline (unsigned-byte 32) arithmetic"))
 
 (define-vop (fast-signed-binop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg zero)))
+  (:args (x :target r :scs (signed-reg)))
   (:info y)
   (:arg-types signed-num
               (:constant (and (signed-byte 31) (not (integer 0 0)))))
@@ -142,7 +142,7 @@
   (:note "inline (signed-byte 32) arithmetic"))
 
 (define-vop (fast-unsigned-logop-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero)))
+  (:args (x :target r :scs (unsigned-reg)))
   (:info y)
   (:arg-types unsigned-num
               (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
@@ -151,7 +151,7 @@
   (:note "inline (unsigned-byte 32) logical op"))
 
 (define-vop (fast-unsigned-logop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg zero)))
+  (:args (x :target r :scs (unsigned-reg)))
   (:info y)
   (:arg-types unsigned-num
               (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
@@ -160,7 +160,7 @@
   (:note "inline (unsigned-byte 32) logical op"))
 
 (define-vop (fast-signed-logop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg zero)))
+  (:args (x :target r :scs (signed-reg)))
   (:info y)
   (:arg-types signed-num
               (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
@@ -169,7 +169,7 @@
   (:note "inline (signed-byte 32) logical op"))
 
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg zero)))
+  (:args (x :target r :scs (signed-reg)))
   (:info y)
   (:arg-types signed-num
               (:constant (and (signed-byte 16) (not (integer 0 0)))))
@@ -178,7 +178,7 @@
   (:note "inline (signed-byte 32) arithmetic"))
 
 (define-vop (fast-signed-logop-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg zero)))
+  (:args (x :target r :scs (signed-reg)))
   (:info y)
   (:arg-types signed-num
               (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
@@ -503,7 +503,7 @@
       (inst cmpdi ndesc 63)
       (inst srd result number ndesc)
       (inst ble done)
-      (move result zero-tn)
+      (inst li result 0)
       (inst b done)
 
       POSITIVE
@@ -523,10 +523,10 @@
   (:policy :fast-safe)
   (:generator 4
     (cond
-      ((and (minusp amount) (< amount -63)) (move result zero-tn))
+      ((and (minusp amount) (< amount -63)) (inst li result 0))
       ((minusp amount) (inst srdi result number (- amount)))
       ;; possible because this is used in the modular version too
-      ((> amount 63) (move result zero-tn))
+      ((> amount 63) (inst li result 0))
       (t (inst sldi result number amount)))))
 
 (define-vop (fast-ash/signed=>signed)
@@ -734,35 +734,35 @@
   (:policy :fast-safe))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
-  (:args (x :scs (any-reg zero))
-         (y :scs (any-reg zero)))
+  (:args (x :scs (any-reg))
+         (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison"))
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg zero)))
+  (:args (x :scs (any-reg)))
   (:arg-types tagged-num (:constant (signed-byte 14)))
   (:info target not-p y))
 
 (define-vop (fast-conditional/signed fast-conditional)
-  (:args (x :scs (signed-reg zero))
-         (y :scs (signed-reg zero)))
+  (:args (x :scs (signed-reg))
+         (y :scs (signed-reg)))
   (:arg-types signed-num signed-num)
   (:note "inline (signed-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
-  (:args (x :scs (signed-reg zero)))
+  (:args (x :scs (signed-reg)))
   (:arg-types signed-num (:constant (signed-byte 16)))
   (:info target not-p y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
-  (:args (x :scs (unsigned-reg zero))
-         (y :scs (unsigned-reg zero)))
+  (:args (x :scs (unsigned-reg))
+         (y :scs (unsigned-reg)))
   (:arg-types unsigned-num unsigned-num)
   (:note "inline (unsigned-byte 64) comparison"))
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
-  (:args (x :scs (unsigned-reg zero)))
+  (:args (x :scs (unsigned-reg)))
   (:arg-types unsigned-num (:constant (unsigned-byte 16)))
   (:info target not-p y))
 
@@ -939,8 +939,8 @@
 ;;;
 
 (define-vop (fast-eql/fixnum fast-conditional)
-  (:args (x :scs (any-reg descriptor-reg zero))
-         (y :scs (any-reg zero)))
+  (:args (x :scs (any-reg descriptor-reg))
+         (y :scs (any-reg)))
   (:arg-types tagged-num tagged-num)
   (:note "inline fixnum comparison")
   (:translate eql)
@@ -953,7 +953,7 @@
   (:variant-cost 7))
 
 (define-vop (fast-eql-c/fixnum fast-conditional/fixnum)
-  (:args (x :scs (any-reg descriptor-reg zero)))
+  (:args (x :scs (any-reg descriptor-reg)))
   (:arg-types tagged-num (:constant (signed-byte #.(- 16 n-fixnum-tag-bits))))
   (:info target not-p y)
   (:translate eql)
@@ -1015,7 +1015,7 @@
   (:variant bignum-digits-offset other-pointer-lowtag)
   (:translate sb-bignum:%bignum-set)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg immediate zero))
+         (index :scs (any-reg immediate))
          (value :scs (unsigned-reg)))
   (:arg-types t positive-fixnum unsigned-num)
   (:results (result :scs (unsigned-reg)))
@@ -1047,9 +1047,10 @@
             (carry :scs (unsigned-reg)))
   (:result-types unsigned-num positive-fixnum)
   (:generator 3
-    (inst addic temp c -1)
-    (inst adde result a b)
-    (inst addze carry zero-tn)))
+    (inst addic temp c -1) ; set CA flag if 'c' is nonzero
+    (inst adde result a b) ; add a + b + CA and carry out
+    (inst li temp 0)
+    (inst addze carry temp)))
 
 (define-vop (sub-w/borrow)
   (:translate sb-bignum:%subtract-with-borrow)
@@ -1065,7 +1066,8 @@
   (:generator 4
     (inst addic temp c -1)
     (inst sube result a b)
-    (inst addze borrow zero-tn)))
+    (inst li temp 0)
+    (inst addze borrow temp)))
 
 (define-vop (bignum-mult-and-add-3-arg)
   (:translate sb-bignum:%multiply-and-add)

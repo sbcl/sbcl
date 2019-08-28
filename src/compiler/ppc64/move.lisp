@@ -12,7 +12,7 @@
 (in-package "SB-VM")
 
 (define-move-fun (load-immediate 1) (vop x y)
-  ((null immediate zero)
+  ((null immediate)
    (any-reg descriptor-reg))
   (let ((val (tn-value x)))
     (etypecase val
@@ -27,7 +27,7 @@
                           character-widetag))))))
 
 (define-move-fun (load-number 1) (vop x y)
-  ((immediate zero)
+  ((immediate)
    (signed-reg unsigned-reg))
   (inst lr y (tn-value x)))
 
@@ -71,7 +71,7 @@
 ;;;; The Move VOP:
 (define-vop (move)
   (:args (x :target y
-            :scs (any-reg descriptor-reg zero null)
+            :scs (any-reg descriptor-reg null)
             :load-if (not (location= x y))))
   (:results (y :scs (any-reg descriptor-reg control-stack)
                :load-if (not (location= x y))))
@@ -90,7 +90,7 @@
 ;;; frame for argument or known value passing.
 (define-vop (move-arg)
   (:args (x :target y
-            :scs (any-reg descriptor-reg zero null))
+            :scs (any-reg descriptor-reg null))
          (fp :scs (any-reg)
              :load-if (not (sc-is y any-reg descriptor-reg))))
   (:results (y))

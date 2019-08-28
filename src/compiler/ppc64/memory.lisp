@@ -74,7 +74,7 @@
                                &aux (net-shift (- shift n-fixnum-tag-bits)))
   `(define-vop (,name)
      (:args (object :scs (descriptor-reg))
-            (index :scs (any-reg zero immediate))
+            (index :scs (any-reg immediate))
             ,@(when write-p
                 '((value :scs (any-reg descriptor-reg) :target result))))
      (:arg-types * tagged-num ,@(when write-p '(*)))
@@ -86,10 +86,8 @@
      (:policy :fast-safe)
      (:generator 5
        (sc-case index
-         ((immediate zero)
-          (let ((offset (- (+ (if (sc-is index zero)
-                                  0
-                                  (ash (tn-value index) ,shift))
+         ((immediate)
+          (let ((offset (- (+ (ash (tn-value index) ,shift)
                               (ash offset word-shift))
                            lowtag)))
             (if (and (typep offset '(signed-byte 16))
@@ -125,7 +123,7 @@
 
 (define-vop (word-index-cas)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg zero immediate))
+         (index :scs (any-reg immediate))
          (old-value :scs (any-reg descriptor-reg))
          (new-value :scs (any-reg descriptor-reg)))
   (:arg-types * tagged-num * *)
@@ -136,10 +134,8 @@
   (:policy :fast-safe)
   (:generator 5
     (sc-case index
-      ((immediate zero)
-       (let ((offset (- (+ (if (sc-is index zero)
-                               0
-                               (ash (tn-value index) word-shift))
+      ((immediate)
+       (let ((offset (- (+ (ash (tn-value index) word-shift)
                            (ash offset word-shift))
                         lowtag)))
          (inst lr temp offset)))

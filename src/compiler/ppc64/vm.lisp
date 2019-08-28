@@ -74,10 +74,8 @@
   (defreg thread 30)
   (defreg lip 31)
 
-  ;; NL6 is used as a workaround for the inability to use
-  ;; an arbitrary displacement in load/store of 8-byte quantities.
   (defregset non-descriptor-regs
-      nl0 nl1 nl2 nl3 nl4 nl5 #| nl6 |# cfunc nargs nfp)
+      nl0 nl1 nl2 nl3 nl4 nl5 nl6 cfunc nargs nfp)
 
   (defregset descriptor-regs
       fdefn a0 a1 a2 a3  ocfp lra lexenv l0 l1)
@@ -109,8 +107,7 @@
   ;; Non-immediate contstants in the constant pool
   (constant constant)
 
-  ;; ZERO and NULL are in registers.
-  (zero immediate-constant)
+  ;; NULL is in a register.
   (null immediate-constant)
 
   ;; Anything else that can be an immediate.
@@ -132,7 +129,7 @@
   (any-reg
    registers
    :locations #.(append non-descriptor-regs descriptor-regs)
-   :constant-scs (zero immediate)
+   :constant-scs (immediate)
    :save-p t
    :alternate-scs (control-stack))
 
@@ -174,12 +171,12 @@
   ;; Non-Descriptor (signed or unsigned) numbers.
   (signed-reg registers
    :locations #.non-descriptor-regs
-   :constant-scs (zero immediate)
+   :constant-scs (immediate)
    :save-p t
    :alternate-scs (signed-stack))
   (unsigned-reg registers
    :locations #.non-descriptor-regs
-   :constant-scs (zero immediate)
+   :constant-scs (immediate)
    :save-p t
    :alternate-scs (unsigned-stack))
 
@@ -235,7 +232,6 @@
                     :sc (sc-or-lose ',sc)
                     :offset ,offset-sym)))))
 
-  (defregtn zero any-reg)
   (defregtn lip interior-reg)
   (defregtn null descriptor-reg)
   (defregtn code descriptor-reg)
@@ -254,8 +250,6 @@
 ;;; appropriate SC number, otherwise return NIL.
 (defun immediate-constant-sc (value)
   (typecase value
-    ((integer 0 0)
-     zero-sc-number)
     (null
      null-sc-number)
     ((or (integer #.sb-xc:most-negative-fixnum #.sb-xc:most-positive-fixnum)
@@ -267,8 +261,7 @@
          nil))))
 
 (defun boxed-immediate-sc-p (sc)
-  (or (eql sc zero-sc-number)
-      (eql sc null-sc-number)
+  (or (eql sc null-sc-number)
       (eql sc immediate-sc-number)))
 
 ;;;; function call parameters
@@ -388,4 +381,4 @@
 ;;; regain the ability to subtract lowtags "for free".
 (defglobal temp-reg-tn (make-random-tn :kind :normal
                                        :sc (sc-or-lose 'unsigned-reg)
-                                       :offset nl6-offset))
+                                       :offset zero-offset))

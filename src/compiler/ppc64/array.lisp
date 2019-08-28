@@ -109,7 +109,7 @@
        (:translate data-vector-set)
        (:arg-types ,type positive-fixnum ,element-type)
        (:args (object :scs (descriptor-reg))
-              (index :scs (any-reg zero immediate))
+              (index :scs (any-reg immediate))
               (value :scs ,scs))
        (:results (result :scs ,scs))
        (:result-types ,element-type)))))
@@ -226,7 +226,7 @@
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
                 (index :scs (unsigned-reg) :target shift)
-                (value :scs (unsigned-reg zero immediate) :target result))
+                (value :scs (unsigned-reg immediate) :target result))
          (:arg-types ,type positive-fixnum positive-fixnum)
          (:results (result :scs (unsigned-reg)))
          (:result-types positive-fixnum)
@@ -247,7 +247,7 @@
              (inst lr temp ,(1- (ash 1 bits)))
              (inst slw temp temp shift)
              (inst andc old old temp))
-           (unless (sc-is value zero)
+           (progn
              (sc-case value
                (immediate
                 (inst lr temp (logand (tn-value value) ,(1- (ash 1 bits)))))
@@ -265,7 +265,7 @@
          (:translate data-vector-set)
          (:policy :fast-safe)
          (:args (object :scs (descriptor-reg))
-                (value :scs (unsigned-reg zero immediate) :target result))
+                (value :scs (unsigned-reg immediate) :target result))
          (:arg-types ,type
                      (:constant index)
                      positive-fixnum)
@@ -295,7 +295,6 @@
                                               ,bits))))
                         (inst and old old temp))))
                (sc-case value
-                 (zero)
                  (immediate
                   (let ((value (ash (logand (tn-value value)
                                             ,(1- (ash 1 bits)))
@@ -515,7 +514,7 @@
   (:note "setf vector-raw-bits VOP")
   (:translate %set-vector-raw-bits)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg zero immediate))
+         (index :scs (any-reg immediate))
          (value :scs (unsigned-reg)))
   (:arg-types * positive-fixnum unsigned-num)
   (:results (result :scs (unsigned-reg)))
@@ -538,7 +537,7 @@
   (:translate data-vector-set)
   (:arg-types simple-array-signed-byte-8 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg zero immediate))
+         (index :scs (any-reg immediate))
          (value :scs (signed-reg)))
   (:results (result :scs (signed-reg)))
   (:result-types tagged-num))
@@ -558,7 +557,7 @@
   (:translate data-vector-set)
   (:arg-types simple-array-signed-byte-16 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))
-         (index :scs (any-reg zero immediate))
+         (index :scs (any-reg immediate))
          (value :scs (signed-reg)))
   (:results (result :scs (signed-reg)))
   (:result-types tagged-num))

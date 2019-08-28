@@ -315,7 +315,8 @@
     (inst andi. temp csp-tn lowtag-mask)
     (inst beq aligned)
     (inst addi csp-tn csp-tn n-word-bytes)
-    (storew zero-tn csp-tn -1)
+    (inst li temp 0)
+    (storew temp csp-tn -1)
     (emit-label aligned)))
 
 
@@ -376,4 +377,5 @@
 
 #+sb-safepoint
 (defun emit-safepoint ()
-  (inst lwz zero-tn null-tn (- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))
+  (inst lwz temp-reg-tn null-tn
+	(- (+ gc-safepoint-trap-offset n-word-bytes other-pointer-lowtag))))

@@ -19,15 +19,16 @@
             sb-vm::zero sb-vm::immediate-constant
             sb-vm::registers sb-vm::float-registers
             ;; TNs and offsets
-            sb-vm::zero-tn sb-vm::lip-tn
-            sb-vm::zero-offset sb-vm::null-offset)))
+            sb-vm::lip-tn
+            sb-vm::null-offset)))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
 
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
   (sc-case tn
-    (zero zero-offset)
+    ;; zero is not a storage class for the 64-bit vm
+    #-64-bit (zero sb-vm::zero-offset)
     (null null-offset)
     (t
      (if (eq (sb-name (sc-sb (tn-sc tn))) 'registers)
@@ -36,7 +37,7 @@
 
 (defun reg-or-0 (tn)
   (cond ((eql tn 0) 0)
-        ((location= tn zero-tn) (error "Can't encode RA=r0"))
+        ((eql (tn-offset tn) 0) (error "Can't encode RA=r0"))
         (t (reg-tn-encoding tn))))
 
 (defun fp-reg-tn-encoding (tn)
@@ -2029,7 +2030,11 @@
     ((signed-byte 16)
      (inst li reg value))
     ((unsigned-byte 16)
-     (inst ori reg zero-tn value))
+     #+64-bit ; register 0 is not wired to hold 0
+     (progn (inst addi reg 0 value)      ; gets "accidental" sign extension
+	    (inst andi. reg reg #xFFFF)) ; undo the sign extension
+     #-64-bit
+     (inst ori reg sb-vm::zero-tn value)) ; ORing with the wired 0 works
     ;; FIXME: 64-bit sign-extends the upper half
     ((or (signed-byte #+64-bit 31 #-64-bit 32) (unsigned-byte #+64-bit 30 #-64-bit 32))
      (let* ((high-half (ldb (byte 16 16) value))

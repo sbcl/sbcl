@@ -36,7 +36,7 @@
                ((maybe-load (tn)
                   (once-only ((tn tn))
                     `(sc-case ,tn
-                       ((any-reg descriptor-reg zero null)
+                       ((any-reg descriptor-reg null)
                         ,tn)
                        (control-stack
                         (load-stack-tn temp ,tn)

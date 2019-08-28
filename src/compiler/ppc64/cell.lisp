@@ -375,28 +375,28 @@
 #-sb-thread
 (define-vop (unbind)
   (:temporary (:scs (descriptor-reg)) symbol value)
+  (:temporary (:scs (any-reg)) zero)
   (:generator 0
     (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
     (loadw value bsp-tn (- binding-value-slot binding-size))
     (storew value symbol symbol-value-slot other-pointer-lowtag)
-    (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
-    (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+    (inst li zero 0)
+    (storew zero bsp-tn (- binding-symbol-slot binding-size))
+    (storew zero bsp-tn (- binding-value-slot binding-size))
     (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))))
 
 
 (define-vop (unbind-to-here)
   (:args (arg :scs (descriptor-reg any-reg) :target where))
-  (:temporary (:scs (any-reg) :from (:argument 0)) where)
+  (:temporary (:scs (any-reg) :from (:argument 0)) where zero)
   (:temporary (:scs (descriptor-reg)) symbol value)
   (:generator 0
-    (let ((loop (gen-label))
-          (skip (gen-label))
-          (done (gen-label)))
       (move where arg)
       (inst cmpd where bsp-tn)
       (inst beq done)
+      (inst li zero 0)
 
-      (emit-label loop)
+      LOOP
       (loadw symbol bsp-tn (- binding-symbol-slot binding-size))
       (inst cmpdi symbol 0)
       (inst beq skip)
@@ -405,15 +405,15 @@
       (inst stwx value thread-base-tn symbol)
       #-sb-thread
       (storew value symbol symbol-value-slot other-pointer-lowtag)
-      (storew zero-tn bsp-tn (- binding-symbol-slot binding-size))
+      (storew zero bsp-tn (- binding-symbol-slot binding-size))
 
-      (emit-label skip)
-      (storew zero-tn bsp-tn (- binding-value-slot binding-size))
+      SKIP
+      (storew zero bsp-tn (- binding-value-slot binding-size))
       (inst subi bsp-tn bsp-tn (* binding-size n-word-bytes))
       (inst cmpd where bsp-tn)
       (inst bne loop)
 
-      (emit-label done))))
+      DONE))
 
 
 

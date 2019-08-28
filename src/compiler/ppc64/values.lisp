@@ -113,7 +113,7 @@
 ;;;
 (define-vop (%more-arg-values)
   (:args (context :scs (descriptor-reg any-reg) :target src)
-         (skip :scs (any-reg zero immediate))
+         (skip :scs (any-reg immediate))
          (num :scs (any-reg) :target count))
   (:arg-types * positive-fixnum positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 0)) src)
@@ -124,8 +124,6 @@
             (count :scs (any-reg)))
   (:generator 20
     (sc-case skip
-      (zero
-       (inst mr src context))
       (immediate
        (inst addi src context (* (tn-value skip) n-word-bytes)))
       (any-reg
