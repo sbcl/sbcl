@@ -257,7 +257,7 @@
                        (go :next))))))
              (t
               ;; Loops shouldn't cause a problem, either it will
-              ;; encounter a not "uninteresting" node the destination
+              ;; encounter a not "uninteresting" node, or the destination
               ;; will be unreachable anyway.
               (let ((start (block-start (first (block-succ (node-block node))))))
                 (when start
