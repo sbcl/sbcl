@@ -231,32 +231,38 @@
            (type node node))
   (unless (bind-p node)
     (aver (eq (node-lvar node) lvar)))
-  (let ((dest (lvar-dest lvar)))
+  (let ((dest (lvar-dest lvar))
+        ctran)
     (tagbody
      :next
-       (let ((ctran (node-next node)))
-         (cond (ctran
-                (setf node (ctran-next ctran))
-                (if (eq node dest)
-                    (return-from almost-immediately-used-p t)
-                    (typecase node
-                      (ref
-                       (go :next))
-                      (cast
-                       (when (and (memq (cast-type-check node) '(:external nil))
-                                  (eq dest (node-dest node)))
-                         (go :next)))
-                      (combination
-                       ;; KLUDGE: Unfortunately we don't have an attribute for
-                       ;; "never unwinds", so we just special case
-                       ;; %ALLOCATE-CLOSURES: it is easy to run into with eg.
-                       ;; FORMAT and a non-constant first argument.
-                       (when (eq '%allocate-closures (combination-fun-source-name node nil))
-                         (go :next))))))
-               (t
-                (when (eq (block-start (first (block-succ (node-block node))))
-                          (node-prev dest))
-                  (return-from almost-immediately-used-p t))))))))
+       (setf ctran (node-next node))
+     :next-ctran
+       (cond (ctran
+              (setf node (ctran-next ctran))
+              (if (eq node dest)
+                  (return-from almost-immediately-used-p t)
+                  (typecase node
+                    (ref
+                     (go :next))
+                    (cast
+                     (when (and (memq (cast-type-check node) '(:external nil))
+                                (eq dest (node-dest node)))
+                       (go :next)))
+                    (combination
+                     ;; KLUDGE: Unfortunately we don't have an attribute for
+                     ;; "never unwinds", so we just special case
+                     ;; %ALLOCATE-CLOSURES: it is easy to run into with eg.
+                     ;; FORMAT and a non-constant first argument.
+                     (when (eq '%allocate-closures (combination-fun-source-name node nil))
+                       (go :next))))))
+             (t
+              ;; Loops shouldn't cause a problem, either it will
+              ;; encounter a not "uninteresting" node the destination
+              ;; will be unreachable anyway.
+              (let ((start (block-start (first (block-succ (node-block node))))))
+                (when start
+                  (setf ctran start)
+                  (go :next-ctran))))))))
 
 ;;; Check that all the uses are almost immediately used and look through CASTs,
 ;;; as they can be freely deleted removing the immediateness
