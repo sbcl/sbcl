@@ -189,6 +189,7 @@
                                    other-pointer-lowtag))
            (inst lwzx result object temp)
            (inst andi. temp index ,(1- elements-per-word))
+           #+big-endian
            (inst xori temp temp ,(1- elements-per-word))
            ,@(unless (= bits 1)
                `((inst slwi temp temp ,(1- (integer-length bits)))))
@@ -207,6 +208,7 @@
          (:generator 15
            (multiple-value-bind (word extra)
                (floor index ,elements-per-word)
+             #+big-endian
              (setf extra (logxor extra (1- ,elements-per-word)))
              (let ((offset (- (+ (* word (/ n-word-bytes 2))
                                  (* vector-data-offset n-word-bytes))
@@ -239,6 +241,7 @@
                                        other-pointer-lowtag))
            (inst lwzx old object offset)
            (inst andi. shift index ,(1- elements-per-word))
+           #+big-endian
            (inst xori shift shift ,(1- elements-per-word))
            ,@(unless (= bits 1)
                `((inst slwi shift shift ,(1- (integer-length bits)))))
@@ -275,6 +278,8 @@
          (:temporary (:scs (non-descriptor-reg)) offset-reg temp old)
          (:generator 20
            (multiple-value-bind (word extra) (floor index ,elements-per-word)
+             #+big-endian
+             (setf extra (logxor extra ,(1- elements-per-word)))
              (let ((offset (- (+ (* word (/ n-word-bytes 2))
                                  (* vector-data-offset n-word-bytes))
                               other-pointer-lowtag)))
@@ -285,30 +290,26 @@
                       (inst lwzx old object offset-reg)))
                (unless (and (sc-is value immediate)
                             (= (tn-value value) ,(1- (ash 1 bits))))
-                 (cond ((zerop extra)
+                 (cond ((= extra #+big-endian ,(1- elements-per-word)
+                                 #+little-endian 0)
                         (inst clrlwi old old ,bits))
                        (t
                         (inst lr temp
                               (lognot (ash ,(1- (ash 1 bits))
-                                           (* (logxor extra
-                                                      ,(1- elements-per-word))
-                                              ,bits))))
+                                           (* extra ,bits))))
                         (inst and old old temp))))
                (sc-case value
                  (immediate
                   (let ((value (ash (logand (tn-value value)
                                             ,(1- (ash 1 bits)))
-                                    (* (logxor extra
-                                               ,(1- elements-per-word))
-                                       ,bits))))
+                                    (* extra ,bits))))
                     (cond ((typep value '(unsigned-byte 16))
                            (inst ori old old value))
                           (t
                            (inst lr temp value)
                            (inst or old old temp)))))
                  (unsigned-reg
-                  (inst slwi temp value
-                        (* (logxor extra ,(1- elements-per-word)) ,bits))
+                  (inst slwi temp value (* extra ,bits))
                   (inst or old old temp)))
                (if (typep offset '(signed-byte 16))
                    (inst stw old object offset)
