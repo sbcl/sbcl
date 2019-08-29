@@ -24,26 +24,26 @@
 (!def-primitive-type positive-fixnum (any-reg signed-reg unsigned-reg)
   :type (unsigned-byte #.sb-vm:n-positive-fixnum-bits))
 (/show0 "primtype.lisp 27")
-#-64-bit-registers
+#-(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-31 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 31))
 (/show0 "primtype.lisp 31")
-#-64-bit-registers
+#-(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-32 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 32))
 (/show0 "primtype.lisp 35")
-#+64-bit-registers
+#+(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-63 (signed-reg unsigned-reg descriptor-reg)
   :type (unsigned-byte 63))
-#+64-bit-registers
+#+(or 64-bit 64-bit-registers)
 (!def-primitive-type unsigned-byte-64 (unsigned-reg descriptor-reg)
   :type (unsigned-byte 64))
 (!def-primitive-type fixnum (any-reg signed-reg)
   :type (signed-byte #.(1+ n-positive-fixnum-bits)))
-#-64-bit-registers
+#-(or 64-bit 64-bit-registers)
 (!def-primitive-type signed-byte-32 (signed-reg descriptor-reg)
   :type (signed-byte 32))
-#+64-bit-registers
+#+(or 64-bit 64-bit-registers)
 (!def-primitive-type signed-byte-64 (signed-reg descriptor-reg)
   :type (signed-byte 64))
 

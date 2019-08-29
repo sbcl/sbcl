@@ -376,6 +376,8 @@
  ;;      any Sun UltraSPARC (possibly also non-Ultras -- currently untested)
  ;;   :ppc
  ;;      any PowerPC CPU
+ ;;   :ppc64
+ ;;      64-bit PowerPC CPU, ISA 2.06 (POWER7) or later
  ;;   :hppa
  ;;      any PA-RISC CPU
  ;;   :mips
@@ -394,11 +396,10 @@
  ;; properties derived from the machine architecture
  ;;
  ;;   :64-bit
- ;;     means (= sb-vm:n-word-bits 64) currently true for x86-64 and arm64
+ ;;     means (= sb-vm:n-word-bits 64) currently true for x86-64, arm64, riscv64, ppc64
  ;;
  ;;   :64-bit-registers
- ;;     means (= sb-vm:n-machine-word-bits 64) currently true for alpha,
- ;;     arm64, and x86-64.
+ ;;     means (= sb-vm:n-machine-word-bits 64), yet (= sb-vm:n-word-bits 32) currently true for alpha
  ;;
  ;;   :control-stack-grows-downward-not-upward
  ;;     On the X86, the Lisp control stack grows downward. On the
