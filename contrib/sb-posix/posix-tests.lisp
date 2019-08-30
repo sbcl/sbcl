@@ -432,14 +432,14 @@
   #+win32
   #.sb-posix:eacces)
 
-#-(or (and (or x86-64 arm64 alpha) (or linux sunos)) win32)
+#-(or (and (or x86-64 arm64 ppc64 alpha) (or linux sunos)) win32)
 (deftest fcntl.1
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (= (sb-posix:fcntl fd sb-posix::f-getfl) sb-posix::o-nonblock))
   t)
 ;; On AMD64/Linux O_LARGEFILE is always set, even though the whole
 ;; flag makes no sense.
-#+(and (or x86-64 arm64 alpha) (or linux sunos))
+#+(and (or x86-64 arm64 ppc64 alpha) (or linux sunos))
 (deftest fcntl.1
   (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
     (/= 0 (logand (sb-posix:fcntl fd sb-posix::f-getfl)
