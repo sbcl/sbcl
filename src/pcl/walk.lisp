@@ -413,16 +413,13 @@
 ;;;       interface to its walker which looks like the interface to this
 ;;;       walker.
 
-(defmacro get-walker-template-internal (x)
-  `(get ,x 'walker-template))
-
 (defmacro define-walker-template (name
                                   &optional (template '(nil repeat (eval))))
-  `(setf (get-walker-template-internal ',name) ',template))
+  `(setf (info :function :walker-template ',name) ',template))
 
 (defun get-walker-template (x context)
   (cond ((symbolp x)
-         (get-walker-template-internal x))
+         (info :function :walker-template x))
         ((and (listp x) (eq (car x) 'lambda))
          '(lambda repeat (eval)))
         (t

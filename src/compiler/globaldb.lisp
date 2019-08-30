@@ -366,6 +366,9 @@
 ;;; structure containing the info used to special-case compilation.
 (define-info-type (:function :info) :type-spec (or sb-c::fun-info null))
 
+;;; For PCL code walker
+(define-info-type (:function :walker-template) :type-spec (or list symbol))
+
 ;;; This is a type specifier <t> such that if an argument X to the function
 ;;; does not satisfy (TYPEP x <t>) then the function definitely returns NIL.
 ;;; When the named function is a predicate that appears in (SATISFIES p)
