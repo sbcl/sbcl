@@ -177,6 +177,8 @@
   (:note "signed word to integer coercion")
   (:generator 20
     (move x arg)
+    ;; Don't even think about using mcrxr, you couldn't make up a
+    ;; slower instruction
     (inst mtxer zero-tn)              ; clear sticky overflow bit in XER, CR0
     (inst addo temp x x)              ; set XER OV if top two bits differ
     (inst addo. temp temp temp)       ; set CR0 SO if any top three bits differ

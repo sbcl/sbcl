@@ -175,6 +175,8 @@
   (:generator 20
     #.(aver (= n-fixnum-tag-bits 1))
     (move x arg)
+    ;; Don't even think about using mcrxr, you couldn't make up a
+    ;; slower instruction
     (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
     (inst addo. y arg arg)
     (inst bns done) ; branch if no summary overflow
