@@ -218,10 +218,10 @@
                      (t
                       (inst lr temp offset)
                       (inst lwzx result object temp))))
-             (unless (zerop extra)
-               (inst srwi result result (* ,bits extra)))
-             (unless (= extra ,(1- elements-per-word))
-               (inst andi. result result ,(1- (ash 1 bits)))))))
+             (cond ((zerop extra)
+                    (inst rlwinm result result 0 (- 32 ,bits) 31))
+                   (t
+                    (inst rlwinm result result (- 32 extra) (- 32 ,bits) 31))))))
        (define-vop (,(symbolicate 'data-vector-set/ type))
          (:note "inline array store")
          (:translate data-vector-set)
@@ -290,9 +290,12 @@
                       (inst lwzx old object offset-reg)))
                (unless (and (sc-is value immediate)
                             (= (tn-value value) ,(1- (ash 1 bits))))
-                 (cond ((= extra #+big-endian ,(1- elements-per-word)
-                                 #+little-endian 0)
+                 (cond #+big-endian
+                       ((= extra ,(1- elements-per-word))
                         (inst clrlwi old old ,bits))
+                       #+little-endian
+                       ((= extra 0)
+                        (inst rlwinm old old 0 0 (- 31 ,bits)))
                        (t
                         (inst lr temp
                               (lognot (ash ,(1- (ash 1 bits))
