@@ -175,7 +175,7 @@
   (:generator 20
     #.(aver (= n-fixnum-tag-bits 1))
     (move x arg)
-    (inst mcrxr 0) ; clear XER
+    (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
     (inst addo. y arg arg)
     (inst bns done) ; branch if no summary overflow
     (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
@@ -192,7 +192,7 @@
   (:generator 4
     #.(aver (= n-fixnum-tag-bits 1))
     (move x arg)
-    (inst mcrxr 0) ; clear XER
+    (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
     (inst addo. y x x)
     (inst bns done) ; branch if no summary overflow
     (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
@@ -203,7 +203,7 @@
   (:generator 4
     #.(aver (= n-fixnum-tag-bits 1))
     (move x arg)
-    (inst mcrxr 0) ; clear XER
+    (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
     (inst addo. y x x)
     (inst bns done) ; branch if no summary overflow
     (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))

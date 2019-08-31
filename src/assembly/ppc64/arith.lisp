@@ -30,7 +30,7 @@
    (:temp lip interior-reg lip-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  (inst mcrxr 0) ; clear XER
+  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
   (inst or temp x y)
   (inst andi. temp temp fixnum-tag-mask)
   (inst bne DO-STATIC-FUN)
@@ -77,7 +77,7 @@
    (:temp nargs any-reg nargs-offset)
    (:temp ocfp any-reg ocfp-offset))
 
-  (inst mcrxr 0) ; clear XER
+  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
 
   (inst or temp x y)
   (inst andi. temp temp fixnum-tag-mask)
@@ -132,7 +132,7 @@
    (:temp ocfp any-reg ocfp-offset))
 
   ;; If either arg is not a fixnum, call the static function.  But first ...
-  (inst mcrxr 0) ; clear XER
+  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
 
   (inst or temp x y)
   (inst andi. temp temp fixnum-tag-mask)
