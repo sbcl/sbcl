@@ -221,7 +221,7 @@
              (cond ((zerop extra)
                     (inst rlwinm result result 0 (- 32 ,bits) 31))
                    (t
-                    (inst rlwinm result result (- 32 extra) (- 32 ,bits) 31))))))
+                     (inst rlwinm result result (- 32 (* ,bits extra)) 31 31))))))
        (define-vop (,(symbolicate 'data-vector-set/ type))
          (:note "inline array store")
          (:translate data-vector-set)
