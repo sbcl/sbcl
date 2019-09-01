@@ -319,7 +319,7 @@
       ;; (bits that would otherwise be part of the immediate value
       ;; were it not for their use an an opcode extension) have
       ;; a name in the processor manual. I'm naming them SUBOP.
-      (subop :field ,(ppc-byte 30 31))
+      (ds-form-subop :field ,(ppc-byte 30 31))
       (flm :field ,(ppc-byte 7 14) :sign-extend nil)
       (fra :field ,(ppc-byte 11 15) :type 'fp-reg)
       (frb :field ,(ppc-byte 16 20) :type 'fp-reg)
@@ -348,7 +348,20 @@
       (ui :field ,(ppc-byte 16 31) :sign-extend nil)
       (xo21-30 :field ,(ppc-byte 21 30) :sign-extend nil)
       (xo22-30 :field ,(ppc-byte 22 30) :sign-extend nil)
-      (xo26-30 :field ,(ppc-byte 26 30) :sign-extend nil))
+      (xo26-30 :field ,(ppc-byte 26 30) :sign-extend nil)
+
+      ;; Apart from abbreviations documented in the ISA manual,
+      ;; I can not figure out the naming convention at all.
+      ;; So I'm making up my own WITH COMMENTS starting now.
+
+      ;; 6-bit mask begin/end
+      (mask6 :field ,(ppc-byte 21 26) :prefilter #'unrotate-mask)
+      ;; 6-bit shift amount
+      (sh6 :fields (list ,(ppc-byte 16 20) ,(ppc-byte 30)) :prefilter #'unsplit-sh)
+      (md-form-subop :field ,(ppc-byte 27 29))
+      (xs-form-subop :field ,(ppc-byte 21 29))
+      )
+
     #'equal)
 
 
@@ -390,7 +403,7 @@
   rt ra d)
 
 (def-ppc-iformat (ds '(:name :tab rt "," ds "(" ra ")")) ; D scaled
-  rt ra ds subop)
+  rt ra ds (subop ds-form-subop))
 
 (def-ppc-iformat (d-si '(:name :tab rt "," ra "," si )) ; D with signed immediate
   rt ra si)
@@ -574,9 +587,6 @@
 (define-bitfield-emitter emit-x-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 10 1) (byte 1 0))
 
-(define-bitfield-emitter emit-xs-form-inst 32
-  (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 9 2) (byte 1 1) (byte 1 0))
-
 (define-bitfield-emitter emit-xfx-form-inst 32
   (byte 6 26) (byte 5 21) (byte 10 11) (byte 10 1) (byte 1 0))
 
@@ -589,8 +599,6 @@
 (define-bitfield-emitter emit-a-form-inst 32
   (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 5 6) (byte 5 1) (byte 1 0))
 
-(define-bitfield-emitter emit-md-form-inst 32
-  (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 6 5) (byte 3 2) (byte 1 1) (byte 1 0))
 
 
 (eval-when (:compile-toplevel :execute)
@@ -1373,11 +1381,21 @@
                                      (reg-tn-encoding rb) mb me ,rc)))))
     (def rlwnm  23 0) ; Rotate Left Word then AND with Mask
     (def rlwnm. 23 1))
+
+  (define-bitfield-emitter emit-md-form-inst 32
+    (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 6 5) (byte 3 2) (byte 1 1) (byte 1 0))
+  (def-ppc-iformat (md-form '(:name :tab ra "," rs "," sh "," mask))
+    rs ra (sh sh6) (mask mask6) (subop md-form-subop) rc)
+  (defun unsplit-sh (dstate sh0-4 sh5)
+    (declare (ignore dstate))
+    (logior (ash sh5 5) sh0-4))
+  (defun unrotate-mask (dstate value)
+    (declare (ignore dstate))
+    (logior (ash (logand value 1) 5) (ash value -1)))
+
   (macrolet ((def (mnemonic op Rc)
                `(define-instruction ,mnemonic (segment ra rs sh m)
-                  ;; This is problematic because 1 bit of the 'sh' value
-                  ;; is stored in the 5-bit RC field.
-                  ;; (:printer m ((op 30) (rc ,rc) (rb nil :type 'reg)))
+                  (:printer md-form ((op 30) (subop ,op) (rc ,rc)))
                   (:emitter
                    (emit-md-form-inst
                     segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra)
@@ -1667,9 +1685,14 @@
                                      sh ,xo ,rc)))))
     (def-sraw srawi  824 0)
     (def-sraw srawi. 824 1))
+
+  (define-bitfield-emitter emit-xs-form-inst 32
+    (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 9 2) (byte 1 1) (byte 1 0))
+  (def-ppc-iformat (xs-form '(:name :tab ra "," rs "," sh))
+    rs ra (sh sh6) (subop xs-form-subop) rc)
   (macrolet ((def-srad (mnemonic xo rc)
                `(define-instruction ,mnemonic (segment ra rs sh)
-                  (:printer x-9 ((op 31) (xo ,xo) (rc ,rc)))
+                  (:printer xs-form ((op 31) (subop ,xo) (rc ,rc)))
                   (:cost 1)
                   (:delay 1)
                   (:dependencies (reads rs) (writes ra))
