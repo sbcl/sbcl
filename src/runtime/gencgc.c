@@ -4386,8 +4386,8 @@ sword_t scav_code_header(lispobj *object, lispobj header)
 {
     ++n_scav_calls[CODE_HEADER_WIDETAG/4];
 
-    int my_gen = gen_of((lispobj)object) & 7;
-    if (my_gen == from_space) {
+    int my_gen = gc_gen_of((lispobj)object, 127);
+    if (my_gen < 127 && ((my_gen & 7) == from_space)) {
         // Since 'from_space' objects are not directly scavenged - they can
         // only be scavenged after moving to newspace, then this object
         // must be pinned. (It's logically in newspace). Assert that.

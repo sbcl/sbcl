@@ -289,14 +289,6 @@ struct heap_adjust {
     int n_relocs_rel; // relative
 };
 
-static inline struct code* get_asm_routine_code_component() {
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-    return (struct code*)VARYOBJ_SPACE_START;
-#else
-    return (struct code*)READ_ONLY_SPACE_START;
-#endif
-}
-
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
 #define adjust_word(ignore,thing) thing
 #define relocate_heap(ignore)
@@ -647,9 +639,9 @@ static void relocate_heap(struct heap_adjust* adj)
 #endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    // Assembler routines move with varyobj space.
-    // (They're in readonly space if no immobile space)
-    struct code* code = get_asm_routine_code_component();
+    // Assembler routines move with varyobj space, if it exists.
+    // Otherwise they're either in readonly or static space.
+    struct code* code = (struct code*)asm_routines_start;
     lispobj* jump_table = (lispobj*)code_text_start(code);
     for ( ; *jump_table ; ++jump_table )
         adjust_word_at(jump_table, adj);
@@ -975,9 +967,19 @@ Please report this as a bug");
     immobile_range_1_max_offset = range1.end - range1.start;
     immobile_range_2_min_offset = range2.start - range1.start;
 #else
-    asm_routines_start = READ_ONLY_SPACE_START;
-    if (widetag_of((lispobj*)asm_routines_start) != CODE_HEADER_WIDETAG)
-        lose("Can't find asm routines");
+    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
+        asm_routines_start = READ_ONLY_SPACE_START;
+    } else {
+        lispobj *where = (lispobj*)STATIC_SPACE_START;
+        while (where < static_space_free_pointer) {
+            if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
+                asm_routines_start = (uword_t)where;
+                break;
+            }
+            where += OBJECT_SIZE(*where, where);
+        }
+    }
+    if (!asm_routines_start)lose("Can't find asm routines");
     int nwords = sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
     asm_routines_end = asm_routines_start + nwords*N_WORD_BYTES;
 #endif
@@ -1082,7 +1084,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 #include "genesis/cons.h"
 char* get_asm_routine_by_name(const char* name)
 {
-    struct code* code = get_asm_routine_code_component();
+    struct code* code = (struct code*)asm_routines_start;
     lispobj ht = CONS(code->debug_info)->car;
     if (ht) {
         struct vector* table =
