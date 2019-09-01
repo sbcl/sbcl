@@ -190,7 +190,7 @@ dump_cmd(char **ptr)
             }
 #endif
             if (decode && addr == (char*)next_object) {
-                lispobj word = *addr;
+                lispobj word = *(lispobj*)addr;
                 // ensure validity of widetag because crashing with
                 // "no size function" would be worse than doing nothing
                 if (word != 0 && !is_lisp_pointer(word)
