@@ -209,7 +209,7 @@
   #+nil
   (let ((lip (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
                              :offset lip-offset)))
-    (inst lr lip (make-fixup 'alloc-tramp :assembly-routine))
+    (inst addi lip null-tn (make-fixup 'alloc-tramp :asm-routine-nil-offset))
     (if (numberp size)
         (inst lr temp-tn size)
         (move temp-tn size))

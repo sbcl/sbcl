@@ -2677,7 +2677,7 @@ core and return a descriptor to it."
           ;; the code vector will be properly aligned.
           (round-up sb-vm:code-constants-offset 2))
          (space (or #+immobile-space *immobile-varyobj*
-                    #+(or x86 x86-64) *static*
+                    #+(or ppc ppc64 x86 x86-64) *static*
                     *read-only*))
          (asm-code
           (allocate-cold-descriptor
@@ -2712,6 +2712,8 @@ core and return a descriptor to it."
            (ecase flavor
              (:assembly-routine (lookup-assembler-reference sym))
              (:assembly-routine* (lookup-assembler-reference sym :indirect))
+             (:asm-routine-nil-offset
+              (- (lookup-assembler-reference sym) sb-vm:nil-value))
              (:foreign
               (let ((sym (base-string-from-core sym)))
                 #+sb-dynamic-core (dyncore-note-symbol sym nil)

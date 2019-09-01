@@ -207,6 +207,6 @@
 
   (move target catch)
   ;; reuse catch
-  (inst lr catch (make-fixup 'unwind :assembly-routine))
+  (inst addi catch null-tn (make-fixup 'unwind :asm-routine-nil-offset))
   (inst mtlr catch)
   (inst blr))

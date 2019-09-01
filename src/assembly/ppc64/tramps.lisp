@@ -14,8 +14,7 @@
                                    fun-pointer-lowtag))))
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
   (inst dword simple-fun-widetag) ;; header
-  (inst dword (make-fixup 'undefined-tramp-tagged
-                          :assembly-routine)) ;; self
+  (inst dword (make-fixup 'undefined-tramp-tagged :assembly-routine)) ;; self
   (dotimes (i (- simple-fun-insts-offset 2))
     (inst dword nil-value))
 
@@ -121,7 +120,7 @@
     ;; We're back.
     (inst mtctr r3) ; stash the result in a reg that won't be clobbered
     ;; Reload a pointer to this asm routine
-    (inst lr lip (make-fixup 'alloc-tramp :assembly-routine))
+    (inst addi lip null-tn (make-fixup 'alloc-tramp :asm-routine-nil-offset))
     ;; Restore the return address from the caller's frame.
     ;; 'sp' hasn't been restored yet, so add our frame size.
     (inst ld r0 machine-sp (+ 32 16))

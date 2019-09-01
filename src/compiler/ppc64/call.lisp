@@ -874,7 +874,7 @@ default-value-8
         (inst addi nsp-tn cur-nfp
               (- (bytes-needed-for-non-descriptor-stack-frame)
                  number-stack-displacement))))
-    (inst lr temp (make-fixup 'tail-call-variable :assembly-routine))
+    (inst addi temp null-tn (make-fixup 'tail-call-variable :asm-routine-nil-offset))
     (inst mtlr temp)
     (inst blr)))
 
@@ -1002,7 +1002,7 @@ default-value-8
       (move old-fp old-fp-arg)
       (move vals vals-arg)
       (move nvals nvals-arg)
-      (inst lr temp (make-fixup 'return-multiple :assembly-routine))
+      (inst addi temp null-tn (make-fixup 'return-multiple :asm-routine-nil-offset))
       (inst mtlr temp)
       (inst blr))))
 
