@@ -46,23 +46,20 @@
    :references '((:amop :generic-function allocate-instance)
                  (:amop :function set-funcallable-instance-function))))
 
-(defun allocate-standard-funcallable-instance-immobile (wrapper name)
-  (allocate-standard-funcallable-instance wrapper name
-                                          #+(and compact-instance-header immobile-code) t))
-
-(defun allocate-standard-funcallable-instance (wrapper name &optional
-                                                              #+(and compact-instance-header immobile-code)
-                                                              immobile)
+(defun allocate-standard-funcallable-instance (wrapper name)
   (declare (layout wrapper))
   (let* ((hash (if name
                    (mix (sxhash name) (sxhash :generic-function)) ; arb. constant
                    (sb-impl::new-instance-hash-code)))
          (slots (make-array (layout-length wrapper) :initial-element +slot-unbound+))
-         (fin (cond #+(and compact-instance-header immobile-code)
-                    ((and immobile
-                          (not (eql (layout-bitmap wrapper) -1)))
+         (fin (cond #+(and immobile-code)
+                    ((or (find (find-layout 'generic-function) (layout-inherits wrapper))
+                         ;; KLUDGE: early GFs are created with nothing in the layout-inherits.
+                         ;; Could we add some assertions that the standard CLOS type lattice
+                         ;; is correctly interconnected before allocating instances???
+                         (eq wrapper *sgf-wrapper*))
                      (truly-the funcallable-instance
-                                (sb-vm::make-immobile-gf wrapper slots)))
+                                (sb-vm::make-immobile-funinstance wrapper slots)))
                     (t
                      (let ((f (truly-the funcallable-instance
                                          (%make-standard-funcallable-instance

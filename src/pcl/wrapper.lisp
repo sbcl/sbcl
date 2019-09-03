@@ -34,17 +34,6 @@
   (make-layout classoid :length length :invalid nil
                :flags +pcl-object-layout-flag+ :bitmap bitmap))
 
-;;; With compact-instance-header and immobile-code, the primitive object has
-;;; 2 descriptor slots (fin-fun and CLOS slot vector) and 2 non-desriptor slots
-;;; containing machine instructions, after the self-pointer (trampoline) slot.
-;;; Scavenging the self-pointer is unnecessary though harmless.
-;;; This intricate calculation of #b110 makes it insensitive to the
-;;; index of the trampoline slot.
-#+(and immobile-code compact-instance-header)
-(defconstant +fsc-layout-bitmap+
-  (logxor (1- (ash 1 sb-vm:funcallable-instance-info-offset))
-          (ash 1 (1- sb-vm:funcallable-instance-trampoline-slot))))
-
 ;;; This is called in BRAID when we are making wrappers for classes
 ;;; whose slots are not initialized yet, and which may be built-in
 ;;; classes. We pass in the class name in addition to the class.
@@ -60,11 +49,6 @@
         layout))
      (t
       (make-wrapper-internal
-       :bitmap (cond #+(and immobile-code compact-instance-header)
-                     ((member name '(generic-function
-                                     standard-generic-function))
-                      +fsc-layout-bitmap+)
-                     (t -1))
        :length length
        :classoid (make-standard-classoid
                   :name name :pcl-class class))))))
@@ -81,10 +65,6 @@
     ((or (typep class 'std-class)
          (typep class 'forward-referenced-class))
      (make-wrapper-internal
-      :bitmap (cond #+(and immobile-code compact-instance-header)
-                    ((eq (class-of class) *the-class-funcallable-standard-class*)
-                     +fsc-layout-bitmap+)
-                    (t -1))
       :length length
       :classoid
       (let ((owrap (class-wrapper class)))

@@ -9,6 +9,28 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(defclass foo ()
+  ((%function :initarg :function :reader foo-%function))
+  (:metaclass sb-mop:funcallable-standard-class))
+
+(defmethod initialize-instance :after ((f foo) &key)
+  (sb-mop:set-funcallable-instance-function f (foo-%function f)))
+
+(setf (fdefinition 'zonk) (make-instance 'foo :function (lambda (y) y)))
+(with-test (:name :call-nonstandard-funcallable-instance)
+  #+immobile-code
+  (let* ((fdefn (sb-int:find-fdefn 'zonk))
+         (raw-entry-point
+          (sb-sys:sap-ref-sap (sb-sys:int-sap (sb-kernel:get-lisp-obj-address fdefn))
+                              sb-vm::(+ (ash fdefn-raw-addr-slot word-shift)
+                                        (- other-pointer-lowtag))))
+         (code-obj (sb-di::code-header-from-pc raw-entry-point)))
+    ;; gets a custom trampoline because it has no embedded trampoline
+    (assert (search "#<trampoline #<" (write-to-string code-obj))))
+
+  ;; And it doesn't crash when called
+  (funcall 'zonk 3))
+
 #|
 This file contains a test of immobile_space_preserve_pointer(),
 but demonstrates just about nothing, as it stands.

@@ -405,27 +405,6 @@
     (%set-symbol-package symbol nil)
     symbol))
 
-#+immobile-code
-(progn
-(defun alloc-immobile-gf ()
-  (values (%primitive alloc-immobile-fixedobj fun-pointer-lowtag 6 ; kludge
-                      (logior (ash 5 n-widetag-bits) funcallable-instance-widetag))))
-(defun make-immobile-gf (layout slot-vector)
-  (let ((gf (truly-the funcallable-instance (alloc-immobile-gf))))
-    ;; Set layout prior to writing raw slots
-    (setf (%funcallable-instance-layout gf) layout)
-    ;; just being pedantic - liveness is preserved by the stack reference,
-    ;; and address is fixed, by definition.
-    (with-pinned-objects (gf)
-      (let ((addr (logandc2 (get-lisp-obj-address gf) lowtag-mask)))
-        (setf (sap-ref-word (int-sap addr)
-                            (ash funcallable-instance-trampoline-slot word-shift))
-              (truly-the word (+ addr (ash 4 word-shift))))))
-    (%set-funcallable-instance-info gf 0 slot-vector)
-    (!set-fin-trampoline gf)
-    gf))
-
-) ; end PROGN
 ) ; end PROGN
 
 (declaim (inline immobile-space-addr-p))

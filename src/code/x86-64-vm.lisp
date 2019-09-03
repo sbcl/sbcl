@@ -208,12 +208,65 @@
                   sb-kernel::+layout-all-tagged+))
         (eql kind sb-vm:closure-widetag))))
 
-(defmacro !set-fin-trampoline (fin)
-  `(let ((sap (int-sap (get-lisp-obj-address ,fin)))
-         (insts-offs (- (ash (1+ funcallable-instance-info-offset) word-shift)
-                        fun-pointer-lowtag)))
-     (setf (sap-ref-word sap insts-offs) #xFFFFFFE9058B48 ; MOV RAX,[RIP-23]
-           (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
+(defconstant +fsc-layout-bitmap+
+  (logxor (1- (ash 1 funcallable-instance-info-offset))
+          (ash 1 (1- funcallable-instance-trampoline-slot))))
+
+;;; This allocator is in its own function because the immobile allocator
+;;; VOPs are impolite (i.e. bad) and trash all registers.
+;;; Since there are no callee-saved registers, this makes it legit'
+;;; to put in a separate function.
+#+immobile-code
+(defun alloc-immobile-funinstance ()
+  (values (%primitive alloc-immobile-fixedobj fun-pointer-lowtag 6 ; kludge
+                      (logior (ash 5 n-widetag-bits) funcallable-instance-widetag))))
+
+;; TODO: put a trampoline in all fins and allocate them anywhere.
+;; Revision e7cd2bd40f5b9988 caused some FINs to go in dynamic space
+;; which is fine, but those fins need to have a default bitmap of -1 instead
+;; of a special bitmap because we examine the bitmap when deciding whether
+;; the FIN can be installed into an FDEFN without needing an external trampoline.
+;; The easiest way to achieve this intent is to default all bitmaps to -1,
+;; then change it in the layout when writing raw words. A better fix would
+;; try to allocate all FINs in immobile space until it is exhausted, then fallback
+;; to dynamic space. The address of the fin is no longer an issue, since fdefns
+;; can point to the entire address space, but the fixed-size immobile object
+;; allocator doesn't returns 0 - it calls the monitor if it fails.
+
+;; So ideally, all funcallable instances would resemble simple-funs for a
+;; small added cost of 2 words per object. It will be necessary to have the GC
+;; treat ambiguous interior pointers to the unboxed words in the same way as
+;; any code pointer. Placing FINs on pages marked as containing code will allow
+;; the conservative root check to be skipped for obviously non-code objects.
+
+;; Also we will need to write the embedded trampoline either in a word index
+;; that differs based on length of the FIN, or place the boxed slots after
+;; the trampoline. As of now, this can only deal with standard GFs.
+;; The primitive object has 2 descriptor slots (fin-fun and CLOS slot vector)
+;; and 2 non-descriptor slots containing machine instructions, after the
+;; self-pointer (trampoline) slot. Scavenging the self-pointer is unnecessary
+;; though harmless. This intricate and/or obfuscated calculation of #b110
+;; is insensitive to the index of the trampoline slot, probably.
+#+immobile-code
+(defun make-immobile-funinstance (layout slot-vector)
+  (let ((gf (truly-the funcallable-instance (alloc-immobile-funinstance))))
+    ;; Ensure that the layout has a bitmap indicating the indices of
+    ;; non-descriptor slots. Doing this just-in-time is easiest, it turns out.
+    (unless (= (layout-bitmap layout) +fsc-layout-bitmap+)
+      (setf (layout-bitmap layout) +fsc-layout-bitmap+))
+    ;; Set layout prior to writing raw slots
+    (setf (%funcallable-instance-layout gf) layout)
+    ;; just being pedantic - liveness is preserved by the stack reference.
+    (with-pinned-objects (gf)
+      (let* ((addr (logandc2 (get-lisp-obj-address gf) lowtag-mask))
+             (sap (int-sap addr))
+             (insts-offs (ash (1+ funcallable-instance-info-offset) word-shift)))
+        (setf (sap-ref-word sap (ash funcallable-instance-trampoline-slot word-shift))
+              (truly-the word (+ addr insts-offs))
+              (sap-ref-word sap insts-offs) #xFFFFFFE9058B48  ; MOV RAX,[RIP-23]
+              (sap-ref-32 sap (+ insts-offs 7)) #x00FD60FF))) ; JMP [RAX-3]
+    (%set-funcallable-instance-info gf 0 slot-vector)
+    gf))
 
 #+immobile-space
 (defun alloc-immobile-fdefn ()
