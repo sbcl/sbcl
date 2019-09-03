@@ -140,8 +140,6 @@
     positive-fixnum any-reg)
   (def-data-vector-frobs simple-array-fixnum word-index
     tagged-num any-reg)
-  (def-data-vector-frobs simple-array-signed-byte-32 32-bits-index
-    signed-num signed-reg)
   (def-data-vector-frobs simple-array-signed-byte-64 word-index
     signed-num signed-reg))
 
@@ -560,6 +558,26 @@
   (:variant vector-data-offset other-pointer-lowtag)
   (:translate data-vector-set)
   (:arg-types simple-array-signed-byte-16 positive-fixnum tagged-num)
+  (:args (object :scs (descriptor-reg))
+         (index :scs (any-reg immediate))
+         (value :scs (signed-reg)))
+  (:results (result :scs (signed-reg)))
+  (:result-types tagged-num))
+
+(define-vop (data-vector-ref/simple-array-signed-byte-32
+             signed-32-bits-index-ref)
+  (:note "inline array access")
+  (:variant vector-data-offset other-pointer-lowtag)
+  (:translate data-vector-ref)
+  (:arg-types simple-array-signed-byte-32 positive-fixnum)
+  (:results (value :scs (signed-reg)))
+  (:result-types tagged-num))
+
+(define-vop (data-vector-set/simple-array-signed-byte-32 32-bits-index-set)
+  (:note "inline array store")
+  (:variant vector-data-offset other-pointer-lowtag)
+  (:translate data-vector-set)
+  (:arg-types simple-array-signed-byte-32 positive-fixnum tagged-num)
   (:args (object :scs (descriptor-reg))
          (index :scs (any-reg immediate))
          (value :scs (signed-reg)))
