@@ -83,17 +83,17 @@
 (define-vop (move-from-single)
   (:args (x :scs (single-reg) :to :save))
   ;; There are no moves between float regs and gprs, so use the stack
-  (:temporary (:scs (double-stack)) stack-temp)
+  (:temporary (:scs (single-stack)) stack-temp)
   (:results (y :scs (descriptor-reg)))
   (:vop-var vop)
   (:note "float to pointer coercion")
   (:generator 4
-    (inst li y single-float-widetag)
     (let ((base (current-nfp-tn vop))
           (disp (tn-byte-offset stack-temp)))
-      #+little-endian (progn (inst stw y base disp) (inst stfs x base (+ disp 4)))
-      #+big-endian    (progn (inst stfs x base disp) (inst stw y base (+ disp 4)))
-      (inst ld y base disp))))
+      (inst stfs x base disp)
+      (inst lwz temp-reg-tn base disp)
+      (inst sldi temp-reg-tn temp-reg-tn 32)
+      (inst ori y temp-reg-tn single-float-widetag))))
 
 (define-move-vop move-from-single :move
   (single-reg) (descriptor-reg))
