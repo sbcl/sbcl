@@ -235,8 +235,10 @@
 #-sb-xc-host
 (progn
   (defun alien-callback-accessor-form (type sap offset)
-    (let ((parsed-type (parse-alien-type type nil)))
-      (cond ((sb-alien::alien-integer-type-p parsed-type)
+    (let (#+big-endian
+          (parsed-type (parse-alien-type type nil)))
+      (cond #+big-endian
+            ((sb-alien::alien-integer-type-p parsed-type)
              ;; Unaligned access is slower, but possible, so this is nice and
              ;; simple. Also, we're a big-endian machine, so we need to get
              ;; byte offsets correct.
@@ -252,19 +254,8 @@
             (t
              `(deref (sap-alien (sap+ ,sap ,offset) (* ,type)))))))
 
-  ;;; The "Mach-O Runtime Conventions" document for OS X almost
-  ;;; specifies the calling convention (it neglects to mention that
-  ;;; the linkage area is 24 bytes).
-  #+darwin
-  (defconstant n-foreign-linkage-area-bytes 24)
-
-  ;;; On linux only use 8 bytes for LR and Back chain.  JRXR
-  ;;; 2006/11/10.
-  #-darwin
-  (defconstant n-foreign-linkage-area-bytes 8)
-
   ;;; Returns a vector in static space containing machine code for the
-  ;;; callback wrapper.  Linux version.  JRXR.  2006/11/13
+  ;;; callback wrapper.
   (defun alien-callback-assembler-wrapper (index result-type argument-types)
     (flet ((make-gpr (n)
              (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset n))
@@ -279,15 +270,15 @@
           (let* (
                  ;; Argument store.
                  (arg-store-size
-                  (* n-word-bytes
-                     (apply '+
-                         (mapcar (lambda (type)
-                                   (ceiling (alien-type-bits type)
-                                            n-word-bits))
-                                 argument-types ))))
+                   (* n-word-bytes
+                      (apply '+
+                             (mapcar (lambda (type)
+                                       (ceiling (alien-type-bits type)
+                                                n-word-bits))
+                                     argument-types ))))
                  ;; Return area allocation.
                  (n-return-area-words
-                  (ceiling (or (alien-type-bits result-type) 0) n-word-bits))
+                   (ceiling (or (alien-type-bits result-type) 0) n-word-bits))
                  (n-return-area-bytes (* n-return-area-words
                                          n-word-bytes))
                  ;; FIXME: magic constant, and probably n-args-bytes
@@ -311,18 +302,18 @@
                  (in-words-processed 0)
                  (out-words-processed 0)
                  (gprs (mapcar #'make-gpr '(3 4 5 6 7 8 9 10)))
-                 (fprs (mapcar #'make-fpr
-                               '(1 2 3 4 5 6 7 8))) )
+                 (fprs (mapcar #'make-fpr '(1 2 3 4 5 6 7 8 9 10 11 12 13))))
             ;; Setup useful functions and then copy all args.
             (flet ((load-address-into (reg addr)
-                       (let ((high (ldb (byte 16 16) addr))
-                             (low (ldb (byte 16 0) addr)))
-                         (inst lis reg high)
-                         (inst ori reg reg low)))
+                     (let ((high (ldb (byte 16 16) addr))
+                           (low (ldb (byte 16 0) addr)))
+                       (inst lis reg high)
+                       (inst ori reg reg low)))
                    (save-arg (type words)
                      (let ((integerp (not (alien-float-type-p type)))
                            (in-offset (+ (* in-words-processed n-word-bytes)
-                                         n-foreign-linkage-area-bytes))
+                                         (* 12 n-word-bytes
+                                            #+big-endian 2)))
                            (out-offset (- (* out-words-processed n-word-bytes)
                                           arg-store-pos)))
                        (cond (integerp
@@ -341,7 +332,7 @@
                                         (pop gprs))
                                     (dotimes (k words)
                                       (let ((gpr (pop gprs)))
-                                        (inst stw gpr stack-pointer
+                                        (inst std gpr stack-pointer
                                               out-offset))
                                       (incf out-words-processed)
                                       (incf out-offset n-word-bytes)))
@@ -359,10 +350,8 @@
                                                 n-word-bytes)))
                                     (dotimes (k words)
                                       ;; Copy from memory to memory.
-                                      (inst ld r0 stack-pointer
-                                            in-offset)
-                                      (inst std r0 stack-pointer
-                                            out-offset)
+                                      (inst ld r0 stack-pointer in-offset)
+                                      (inst std r0 stack-pointer out-offset)
                                       (incf out-words-processed)
                                       (incf out-offset n-word-bytes)
                                       (incf in-words-processed)
@@ -372,37 +361,30 @@
                              ;; for single- and double-floats.
                              ((alien-single-float-type-p type)
                               (let ((fpr (pop fprs)))
-                                (if fpr
-                                    (inst stfs fpr stack-pointer out-offset)
-                                    (progn
-                                      ;; The ABI says that floats
-                                      ;; stored on the stack are
-                                      ;; promoted to doubles.  gcc
-                                      ;; stores them as floats.
-                                      ;; Follow gcc here.
-                                      ;;  => no alignment needed either.
-                                      (inst lfs f0
-                                            stack-pointer in-offset)
-                                      (inst stfs f0
-                                            stack-pointer out-offset)
-                                      (incf in-words-processed))))
+                                (cond (fpr
+                                       (pop gprs)
+                                       (inst stfs fpr stack-pointer out-offset))
+                                      (t
+                                       ;; The ABI says that floats
+                                       ;; stored on the stack are
+                                       ;; promoted to doubles.  gcc
+                                       ;; stores them as floats.
+                                       ;; Follow gcc here.
+                                       ;;  => no alignment needed either.
+                                       (inst lfs f0 stack-pointer in-offset)
+                                       (inst stfs f0 stack-pointer out-offset)
+                                       (incf in-words-processed))))
                               (incf out-words-processed))
                              ((alien-double-float-type-p type)
                               (let ((fpr (pop fprs)))
+                                (pop gprs)
                                 (if fpr
                                     (inst stfd fpr stack-pointer out-offset)
                                     (progn
-                                      ;; Ensure alignment.
-                                      (if (oddp in-words-processed)
-                                          (progn
-                                            (incf in-words-processed)
-                                            (incf in-offset n-word-bytes)))
-                                      (inst lfd f0
-                                            stack-pointer in-offset)
-                                      (inst stfd f0
-                                            stack-pointer out-offset)
-                                      (incf in-words-processed 2))))
-                              (incf out-words-processed 2))
+                                      (inst lfd f0 stack-pointer in-offset)
+                                      (inst stfd f0 stack-pointer out-offset)
+                                      (incf in-words-processed))))
+                              (incf out-words-processed))
                              (t
                               (bug "Unknown alien floating point type: ~S" type))))))
               (mapc #'save-arg
@@ -475,8 +457,8 @@
                (sap (vector-sap vector)))
           (alien-funcall
            (extern-alien "ppc_flush_icache"
-                                  (function void
-                                            system-area-pointer
-                                            unsigned-long))
+                         (function void
+                                   system-area-pointer
+                                   unsigned-long))
            sap (length buffer))
           vector)))))
