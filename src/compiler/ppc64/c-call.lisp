@@ -29,12 +29,8 @@
 (defstruct arg-state
   (gpr-args 0)
   (fpr-args 0)
-  ;; SVR4 [a]abi wants two words on stack (callee saved lr,
-  ;; backpointer).
-  #-darwin (stack-frame-size 2)
-  ;; PowerOpen ABI wants 8 words on the stack corresponding to GPR3-10
-  ;; in addition to the 6 words of link area (see number-stack-displacement)
-  #+darwin (stack-frame-size (+ 8 6)))
+  (stack-frame-size #+little-endian 12
+                    #+big-endian 14))
 
 (defun int-arg (state prim-type reg-sc stack-sc)
   (let ((reg-args (arg-state-gpr-args state)))
@@ -200,7 +196,14 @@
       (dolist (arg-type (alien-fun-type-arg-types type))
         (arg-tns (invoke-alien-type-method :arg-tn arg-type arg-state)))
       (values (make-wired-tn* 'positive-fixnum any-reg-sc-number nsp-offset)
-              (* (arg-state-stack-frame-size arg-state) n-word-bytes)
+              (let ((size (arg-state-stack-frame-size arg-state)))
+                (cond #+little-endian
+                      ((= size 12)
+                       ;; no stack args
+                       0)
+                      (t
+                       ;; it's later added by alloc-number-stack-space
+                       (- size (/ number-stack-displacement n-word-bytes)))))
               (arg-tns)
               (invoke-alien-type-method
                :result-tn
@@ -261,18 +264,14 @@
   (:result-types system-area-pointer)
   (:temporary (:scs (unsigned-reg) :to (:result 0)) temp)
   (:generator 0
-    (unless (zerop amount)
-      ;; FIXME: I don't understand why we seem to be adding
-      ;; NUMBER-STACK-DISPLACEMENT twice here.  Weird.  -- CSR,
-      ;; 2003-08-20
-      (let ((delta (- (logandc2 (+ amount number-stack-displacement
-                                   +stack-alignment-mask+)
-                                +stack-alignment-mask+))))
-        (cond ((typep delta '(signed-byte 16))
-               (inst stdu nsp-tn nsp-tn delta))
-              (t
-               (inst lr temp delta)
-               (inst stdux nsp-tn nsp-tn temp)))))
+    (let ((delta (- (logandc2 (+ (* amount n-word-bytes)
+                                 number-stack-displacement +stack-alignment-mask+)
+                              +stack-alignment-mask+))))
+      (cond ((typep delta '(signed-byte 16))
+             (inst stdu nsp-tn nsp-tn delta))
+            (t
+             (inst lr temp delta)
+             (inst stdux nsp-tn nsp-tn temp))))
     (unless (location= result nsp-tn)
       ;; They are only location= when the result tn was allocated by
       ;; make-call-out-tns above, which takes the number-stack-displacement
@@ -283,14 +282,13 @@
   (:info amount)
   (:policy :fast-safe)
   (:generator 0
-    (unless (zerop amount)
-      (let ((delta (logandc2 (+ amount number-stack-displacement
-                                +stack-alignment-mask+)
-                             +stack-alignment-mask+)))
-        (cond ((typep delta '(signed-byte 16))
-               (inst addi nsp-tn nsp-tn delta))
-              (t
-               (inst ld nsp-tn nsp-tn 0)))))))
+    (let ((delta (logandc2 (+ (* amount n-word-bytes)
+                              number-stack-displacement +stack-alignment-mask+)
+                           +stack-alignment-mask+)))
+      (cond ((typep delta '(signed-byte 16))
+             (inst addi nsp-tn nsp-tn delta))
+            (t
+             (inst ld nsp-tn nsp-tn 0))))))
 
 #-sb-xc-host
 (progn
