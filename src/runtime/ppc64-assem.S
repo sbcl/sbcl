@@ -250,7 +250,13 @@ indirect_ptr(specials)
 
 	.align 3
 lra:
+#ifdef LISP_FEATURE_BIG_ENDIAN
+        .long 0
 	.long RETURN_PC_WIDETAG
+#else
+	.long RETURN_PC_WIDETAG
+        .long 0
+#endif
 
 	/* Blow off any extra values. */
 	mr reg_CSP,reg_OCFP
