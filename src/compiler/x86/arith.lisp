@@ -1624,6 +1624,7 @@ constant shift greater than word length")))
          (c :scs (any-reg unsigned-reg control-stack) :target temp))
   (:arg-types unsigned-num unsigned-num positive-fixnum)
   (:temporary (:sc any-reg :from (:argument 2) :to :eval) temp)
+  (:temporary (:sc any-reg :from :eval :to :result :offset eax-offset :target carry) carry-temp)
   (:results (result :scs (unsigned-reg) :from (:argument 0))
             (carry :scs (unsigned-reg)))
   (:result-types unsigned-num positive-fixnum)
@@ -1632,8 +1633,9 @@ constant shift greater than word length")))
     (move temp c)
     (inst neg temp) ; Set the carry flag to 0 if c=0 else to 1
     (inst adc result b)
-    (inst set carry :c)
-    (inst and carry 1)))
+    (inst set carry-temp :c)
+    (inst and carry-temp 1)
+    (move carry carry-temp)))
 
 ;;; Note: the borrow is 1 for no borrow and 0 for a borrow, the opposite
 ;;; of the x86 convention.
