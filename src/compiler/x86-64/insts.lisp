@@ -2376,7 +2376,7 @@
 (define-instruction set (segment dst cond)
   (:printer cond-set ())
   (:emitter
-   (emit-prefixes segment dst nil :byte)
+   (emit-prefixes segment (sized-thing dst :byte) nil :byte)
    (emit-byte segment #x0F)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b10010000))
    (emit-ea segment dst #b000)))
