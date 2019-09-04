@@ -377,11 +377,12 @@ lra:
 	* it shall first save it in the TOC pointer doubleword." */
 	std reg_TOC, 24(1)
 
-	mfctr 11
+
 	/* "When a function is entered through its global entry point,
 	 * register r12 contains the entry-point address." */
-	ld reg_CFUNC, 0(11)
 #ifdef LISP_FEATURE_BIG_ENDIAN
+	mfctr 11
+	ld reg_CFUNC, 0(11)
 	/* In the v1 64-bit ABI, a function pointer is a pointer to a
 	 * 3-word "function descriptor" the first word of which contains the
 	 * entry address, and the second the value that the callee needs
@@ -391,8 +392,10 @@ lra:
 	 * Actually not all descriptors have 3 words afaict.
 	 * I don't see how they are ABI-compliant */
 	// ld 11, 16(11)
-#endif
 	mtctr reg_CFUNC
+#else
+	mfctr reg_CFUNC
+#endif 
         /* Into C we go. */
 	bctrl
 

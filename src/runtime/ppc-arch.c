@@ -608,33 +608,78 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
   // indirect through a descriptor, but instead we get its logical address.
   if (target_addr != &call_into_c) {
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
-    /* Can only use ABI version 2.
-     * Since everything is vectored through call_into_c,
-     * and function pointers are what they should be,
-     * we can just store the actual target in the linkage table entry
-     * and let call_into_c load it.
-     * The 32-bit could should do this as well since it's simpler. */
-    *(unsigned long *)reloc_addr = (unsigned long)target_addr;
+      int* inst_ptr;
+      unsigned long a0,a16,a32,a48;
+      unsigned int inst;
+
+      inst_ptr = (int*) reloc_addr;
+
+      a48 = (unsigned long) target_addr >> 48 & 0xFFFF;
+      a32 = (unsigned long) target_addr >> 32 & 0xFFFF;
+      a16 = (unsigned long) target_addr >> 16 & 0xFFFF;
+      a0 =  (unsigned long) target_addr       & 0xFFFF;
+
+
+      /* addis 12, 0, a48 */
+
+      inst = (15 << 26) | (12 << 21) | (0 << 16) | a48;
+      *inst_ptr++ = inst;
+
+      /* ori 12, 12, a32 */
+
+      inst = (24 << 26) | (12 << 21) | (12 << 16) | a32;
+      *inst_ptr++ = inst;
+
+      /* sldi 12, 12, 32 */
+      inst = (30 << 26) | (12 << 21) | (12 << 16) | 0x07C6;
+      *inst_ptr++ = inst;
+
+      /* oris 12, 12, a16 */
+
+      inst = (25 << 26) | (12 << 21) | (12 << 16) | a16;
+      *inst_ptr++ = inst;
+
+      /* ori 12, 12, a0 */
+
+      inst = (24 << 26) | (12 << 21) | (12 << 16) | a0;
+      *inst_ptr++ = inst;
+
+      /*
+       * mtctr 12
+       */
+
+      inst = (31 << 26) | (12 << 21) | (9 << 16) | (467 << 1);
+      *inst_ptr++ = inst;
+
+      /*
+       * bctr
+       */
+
+      inst = (19 << 26) | (20 << 21) | (528 << 1);
+      *inst_ptr++ = inst;
+
+      os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
+
 #else
-    // Could use either ABI, but we're assuming v1
-    /* In the 64-bit v1 ABI, function pointers are alway passed around
-     * as "function descriptors", not directly the jump target address.
-     * A descriptor is 3 words:
-     *   word 0 = address to jump to
-     *   word 1 = value to place in r2
-     *   word 2 = value to place in r11
-     * For foreign calls, the value that we hand off to call_into_c
-     * is therefore a function descriptor. To make things consistent,
-     * (so that we need not distinguish between #+/-dynamic-core or other reasons)
-     * this linkage table entry itself has to look like a function descriptor.
-     * We can just copy the real descriptor to here, except in one case:
-     * call_into_c is not itself an ABI-compatible call. It really should be
-     * a lisp assembly routine, but then we have a turtles-all-the-way-down problem:
-     * it's tricky to access C global data from lisp assembly routines.
-     */
-    memcpy(reloc_addr, target_addr, 24);
+      // Could use either ABI, but we're assuming v1
+      /* In the 64-bit v1 ABI, function pointers are alway passed around
+       * as "function descriptors", not directly the jump target address.
+       * A descriptor is 3 words:
+       *   word 0 = address to jump to
+       *   word 1 = value to place in r2
+       *   word 2 = value to place in r11
+       * For foreign calls, the value that we hand off to call_into_c
+       * is therefore a function descriptor. To make things consistent,
+       * (so that we need not distinguish between #+/-dynamic-core or other reasons)
+       * this linkage table entry itself has to look like a function descriptor.
+       * We can just copy the real descriptor to here, except in one case:
+       * call_into_c is not itself an ABI-compatible call. It really should be
+       * a lisp assembly routine, but then we have a turtles-all-the-way-down problem:
+       * it's tricky to access C global data from lisp assembly routines.
+       */
+      memcpy(reloc_addr, target_addr, 24);
 #endif
-    return;
+      return;
   }
   // Can't encode more than 32 bits of jump address
   gc_assert(((unsigned long) target_addr >> 32) == 0);
