@@ -5,7 +5,8 @@
 #-sb-xc-host
 (defun machine-type ()
   "Returns a string describing the type of the local machine."
-  "PowerPC")
+  #-64-bit "PowerPC"
+  #+64-bit "PowerPC64")
 
 ;;;; FIXUP-CODE-OBJECT
 
