@@ -99,10 +99,14 @@
                    ;; Ignore the :ACCESSOR-NAME initarg
                    ,@args :allow-other-keys t))))
     (let ((double-float-alignment
-            ;; white list of architectures that can load unaligned doubles:
-            #+(or x86 x86-64 ppc arm64 riscv) 1
-            ;; at least sparc, mips and alpha can't:
-            #-(or x86 x86-64 ppc arm64 riscv) 2))
+           ;; alignment in machine words of double-float slots.
+           ;; For 8 byte words, this should be 1 since double-floats are 8 bytes.
+           ;; It can be 1 if the word size is 4 bytes and the machine permits
+           ;; double-floats to be unnaturally aligned (x86 and ppc).
+           (or #+(or x86 x86-64 ppc ppc64 arm64 riscv) 1
+               ;; other architectures align double-floats to twice the
+               ;; machine word size
+               2)))
      (setq *raw-slot-data*
       (vector
        (make-raw-slot-data :raw-type 'sb-vm:word
