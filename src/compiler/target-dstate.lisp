@@ -68,6 +68,8 @@
   (alignment sb-vm:n-word-bytes :type alignment)
   (byte-order sb-c:*backend-byte-order*
               :type (member :big-endian :little-endian))
+  ;; current instruction as found in instruction space
+  (inst)
   ;; for user code to track decoded bits, cleared each time after a
   ;; non-prefix instruction is processed
   (inst-properties 0 :type fixnum)

@@ -624,6 +624,7 @@
                           (terpri stream))
                         (return))
                        (t
+                        (setf (dstate-inst dstate) inst)
                         (setf (dstate-next-offs dstate)
                               (+ (dstate-cur-offs dstate)
                                  (inst-length inst)))

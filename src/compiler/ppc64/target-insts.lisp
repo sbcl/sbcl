@@ -18,18 +18,16 @@
                (dstate-byte-order dstate)))
 
 (defun maybe-add-notes (regno dstate)
-  (let* ((inst (current-instruction dstate))
-         (op (ldb (byte 6 26) inst)))
-    (case op
-      ;; lwz
-      (32
+  (let ((inst (current-instruction dstate))
+        (symbolic-inst (sb-disassem::dstate-inst dstate)))
+    (case (sb-disassem::inst-name symbolic-inst)
+      (lwz
        (when (= regno (ldb (byte 5 16) inst)) ; only for the second
          (case (ldb (byte 5 16) inst)
            ;; reg_CODE
            (#.sb-vm::code-offset
             (note-code-constant (ldb (byte 16 0) inst) dstate)))))
-      ;; ldx
-      (31
+      (ldx
        (when (= regno (ldb (byte 5 16) inst) sb-vm::code-offset)
          (let ((ra (ldb (byte 5 11) inst))
                (prev (current-instruction dstate -4)))
@@ -37,8 +35,7 @@
                       (= (ldb (byte 5 16) prev) 0)
                       (= (ldb (byte 5 21) prev) ra))
              (note-code-constant (ldb (byte 16 0) prev) dstate)))))
-      ;; addi
-      (14
+      (addi
        (when (= regno null-offset)
          (maybe-note-nil-indexed-object (ldb (byte 16 0) inst) dstate))))))
 
