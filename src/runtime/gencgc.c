@@ -3322,26 +3322,26 @@ garbage_collect_generation(generation_index_t generation, int raise)
         // will need to enliven what they point to.
         // So we will end up doubly traversing the control stack(s), but it should
         // be a performance gain to avoid all the PC adjustments for call/return.
-	lispobj *object_ptr;
-	for (object_ptr = th->control_stack_start;
-	     object_ptr < access_control_stack_pointer(th);
-	     object_ptr++)
+        lispobj *object_ptr;
+        for (object_ptr = th->control_stack_start;
+             object_ptr < access_control_stack_pointer(th);
+             object_ptr++)
             preserve_pointer((void*)*object_ptr);
-	int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
-	for (i = i - 1; i >= 0; --i) {
+        int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+        for (i = i - 1; i >= 0; --i) {
             os_context_t* context = nth_interrupt_context(i, th);
             int j;
-	    // FIXME: if we pick a register to consistently use with m[ft]lr
-	    // then we would only need to examine that, and LR and CTR here.
-	    // We may already be consistent, I just don't what the consistency is.
-	    static int boxed_registers[] = BOXED_REGISTERS;
-	    int __attribute__((unused)) ct = 0;
+            // FIXME: if we pick a register to consistently use with m[ft]lr
+            // then we would only need to examine that, and LR and CTR here.
+            // We may already be consistent, I just don't what the consistency is.
+            static int boxed_registers[] = BOXED_REGISTERS;
+            int __attribute__((unused)) ct = 0;
             for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j)
-	        preserve_pointer((void*)*os_context_register_addr(context,
-								  boxed_registers[j]));
-	    preserve_pointer((void*)*os_context_lr_addr(context));
-	    preserve_pointer((void*)*os_context_ctr_addr(context));
-	}
+                preserve_pointer((void*)*os_context_register_addr(context,
+                                                                  boxed_registers[j]));
+            preserve_pointer((void*)*os_context_lr_addr(context));
+            preserve_pointer((void*)*os_context_ctr_addr(context));
+        }
 #endif // PPC64
     }
 #endif

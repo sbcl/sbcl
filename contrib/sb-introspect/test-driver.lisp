@@ -374,7 +374,7 @@
 (deftest* (allocation-information.4
            ;; Ignored as per the comment above, even though it seems
            ;; unlikely that this is the right condition.
-           :fails-on (or :win32 (and :sparc :gencgc)))
+           :fails-on (or :win32 :ppc64 (and :sparc :gencgc)))
     #+gencgc
     (tai (make-list 1) :heap
          `(:space :dynamic :boxed t :large nil)
