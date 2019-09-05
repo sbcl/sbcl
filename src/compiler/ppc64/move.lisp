@@ -41,7 +41,7 @@
 
 (define-move-fun (load-constant 5) (vop x y)
   ((constant) (descriptor-reg))
-  (loadw y code-tn (tn-offset x) other-pointer-lowtag))
+  (loadw y code-tn (tn-offset x) code-tn-lowtag))
 
 (define-move-fun (load-stack 5) (vop x y)
   ((control-stack) (any-reg descriptor-reg))
@@ -132,7 +132,7 @@
     (cond ((sb-c::tn-leaf x)
            (inst lr y (tn-value x)))
           (t
-           (loadw y code-tn (tn-offset x) other-pointer-lowtag)
+           (loadw y code-tn (tn-offset x) code-tn-lowtag)
            (inst sradi y y n-fixnum-tag-bits)))))
 (define-move-vop move-to-word-c :move
   (constant) (signed-reg unsigned-reg))

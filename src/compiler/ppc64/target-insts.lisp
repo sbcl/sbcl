@@ -27,6 +27,13 @@
            ;; reg_CODE
            (#.sb-vm::code-offset
             (note-code-constant (ldb (byte 16 0) inst) dstate)))))
+      (ld
+       (when (= regno (ldb (byte 5 16) inst) sb-vm::code-offset)
+         ;; FIXME: should be sign-extended, but we only access words
+         ;; at positive displacement from reg_CODE.
+         (let ((ofs (ash (ldb (byte 14 2) inst) 2))) ; D scaled form
+           (note-code-constant (- ofs sb-vm:other-pointer-lowtag)
+                               dstate))))
       (ldx
        (when (= regno (ldb (byte 5 16) inst) sb-vm::code-offset)
          (let ((ra (ldb (byte 5 11) inst))

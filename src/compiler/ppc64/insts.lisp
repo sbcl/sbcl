@@ -19,10 +19,15 @@
             sb-vm::zero sb-vm::immediate-constant
             sb-vm::registers sb-vm::float-registers
             ;; TNs and offsets
+            sb-vm::code-tn-lowtag
             sb-vm::lip-tn
             sb-vm::null-offset)))
 
 ;;;; Constants, types, conversion functions, some disassembler stuff.
+
+;;; This constant is referenced only in files in the ppc64 subdirectory,
+;;; but ppc32 uses this file as well.
+(defconstant code-tn-lowtag #+ppc64 0 #-ppc64 other-pointer-lowtag)
 
 (defun reg-tn-encoding (tn)
   (declare (type tn tn))
@@ -2202,7 +2207,7 @@
                    (inst ori temp temp (ldb (byte 16 0) delta))
                    (inst add dst src temp))))))
 
-;; code = lip - header - label-offset + other-pointer-tag
+;; code = lip - header - label-offset + code-tn-lowtag
 (define-instruction compute-code-from-lip (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -2212,13 +2217,11 @@
   (:emitter
    (emit-compute-inst segment vop dst src label temp
                       #'(lambda (label posn delta-if-after)
-                          (- other-pointer-lowtag
-                             ;;function-pointer-type
+                          (- code-tn-lowtag
                              (label-position label posn delta-if-after)
                              (component-header-length))))))
 
-;; code = lra - other-pointer-tag - header - label-offset + other-pointer-tag
-;;      = lra - (header + label-offset)
+;; code = lra - other-pointer-tag - header - label-offset + code-tn-lowtag
 (define-instruction compute-code-from-lra (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -2228,11 +2231,12 @@
   (:emitter
    (emit-compute-inst segment vop dst src label temp
                       #'(lambda (label posn delta-if-after)
-                          (- (+ (label-position label posn delta-if-after)
-                                (component-header-length)))))))
+                          (- code-tn-lowtag
+                             (label-position label posn delta-if-after)
+                             (component-header-length)
+                             other-pointer-lowtag)))))
 
-;; lra = code + other-pointer-tag + header + label-offset - other-pointer-tag
-;;     = code + header + label-offset
+;; lra = code - code-tn-lowtag + header + label-offset + other-pointer-tag
 (define-instruction compute-lra-from-code (segment dst src label temp)
   (:declare (type tn dst src temp) (type label label))
   (:attributes variable-length)
@@ -2243,4 +2247,6 @@
    (emit-compute-inst segment vop dst src label temp
                       #'(lambda (label posn delta-if-after)
                           (+ (label-position label posn delta-if-after)
-                             (component-header-length))))))
+                             (component-header-length)
+                             other-pointer-lowtag
+                             (- code-tn-lowtag))))))

@@ -762,8 +762,7 @@ default-value-8
                      (loadw name-pass cfp-tn (tn-offset name))
                      (do-next-filler))
                     (constant
-                     (loadw name-pass code-tn (tn-offset name)
-                         other-pointer-lowtag)
+                     (loadw name-pass code-tn (tn-offset name) code-tn-lowtag)
                      (do-next-filler)))
                   ;; The step instrumenting must be done after
                   ;; FUNCTION is loaded, but before ENTRY-POINT is
@@ -788,8 +787,7 @@ default-value-8
                      (loadw lexenv cfp-tn (tn-offset arg-fun))
                      (do-next-filler))
                     (constant
-                     (loadw lexenv code-tn (tn-offset arg-fun)
-                         other-pointer-lowtag)
+                     (loadw lexenv code-tn (tn-offset arg-fun) code-tn-lowtag)
                      (do-next-filler)))
                   (loadw function lexenv closure-fun-slot
                       fun-pointer-lowtag)

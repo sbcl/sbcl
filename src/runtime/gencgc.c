@@ -61,6 +61,7 @@
 #include "hopscotch.h"
 #include "genesis/cons.h"
 #include "forwarding-ptr.h"
+#include "lispregs.h"
 
 /* forward declarations */
 page_index_t  gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
@@ -1629,6 +1630,35 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
 
     return object_start;
 }
+#elif defined LISP_FEATURE_PPC64
+/* "Less conservative" than above - only consider code pointers as ambiguous
+ * roots, not all pointers.  Eventually every architecture could use this
+ * because life is so much easier when on-stack code does not move */
+static lispobj*
+conservative_root_p(lispobj addr, page_index_t addr_page_index)
+{
+    struct page* page = &page_table[addr_page_index];
+    // We allow ambiguous pointers to code, and only code.
+    if ((page->type & PAGE_TYPE_MASK) != CODE_PAGE_TYPE)
+        return 0;
+
+    // quick check 1: within from_space and within page usage
+    if ((addr & (GENCGC_CARD_BYTES - 1)) >= page_bytes_used(addr_page_index) ||
+        (compacting_p() && (page->gen != from_space ||
+                            (page->pinned && (page->type & SINGLE_OBJECT_FLAG)))))
+        return 0;
+    gc_assert(!(page->type & OPEN_REGION_PAGE_FLAG));
+
+    // Find the containing object, if any
+    lispobj* object_start = search_dynamic_space((void*)addr);
+    if (!object_start) return 0;
+
+    /* If 'addr' points to object_start exactly or anywhere in
+     * the boxed words, then it points to the object */
+    if ((lispobj*)addr == object_start || instruction_ptr_p((void*)addr, object_start))
+        return object_start;
+    return 0;
+}
 #endif
 
 /* Adjust large bignum and vector objects. This will adjust the
@@ -1963,7 +1993,7 @@ pin_object(lispobj object)
     }
 }
 
-#if !GENCGC_IS_PRECISE
+#if !GENCGC_IS_PRECISE || defined LISP_FEATURE_PPC64
 /* Take a possible pointer to a Lisp object and mark its page in the
  * page_table so that it will not be relocated during a GC.
  *
@@ -1992,11 +2022,11 @@ preserve_pointer(void *addr)
     lispobj *object_start = conservative_root_p((lispobj)addr, page);
     if (object_start) pin_object(compute_lispobj(object_start));
 }
-#else
+#endif
 
 /* Pin an unambiguous descriptor object which may or may not be a pointer.
  * Ignore objects with immediate lowtags */
-static void pin_exact_root(lispobj obj)
+static void __attribute__((unused)) pin_exact_root(lispobj obj)
 {
     if (!is_lisp_pointer(obj)) return;
     page_index_t page = find_page_index((void*)obj);
@@ -2020,7 +2050,6 @@ static void pin_exact_root(lispobj obj)
     }
     pin_object(compute_lispobj(object_start));
 }
-#endif
 
 
 #define IN_REGION_P(a,kind) (kind##_region.start_addr<=a && a<=kind##_region.free_pointer)
@@ -3282,6 +3311,38 @@ garbage_collect_generation(generation_index_t generation, int raise)
             pin_exact_root(CONS(pin_list)->car);
             pin_list = CONS(pin_list)->cdr;
         }
+#ifdef LISP_FEATURE_PPC64
+        // Scan the control stack and interrupt contexts for ambiguous code roots.
+        // Doing it in gc-common would be too late, since all pinned objects have
+        // to be discovered before transporting anything.
+        // I think we never store reg_CODE on the control stack (yet) - it will only
+        // appear in an interrupt context - so this is probably unnecessary for now.
+        // However, I'd like to eliminate LRAs (at least on the PPC64 backend),
+        // in which case all the looks-like-fixnum return PCs on the control stack,
+        // will need to enliven what they point to.
+        // So we will end up doubly traversing the control stack(s), but it should
+        // be a performance gain to avoid all the PC adjustments for call/return.
+	lispobj *object_ptr;
+	for (object_ptr = th->control_stack_start;
+	     object_ptr < access_control_stack_pointer(th);
+	     object_ptr++)
+            preserve_pointer((void*)*object_ptr);
+	int i = fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,th));
+	for (i = i - 1; i >= 0; --i) {
+            os_context_t* context = nth_interrupt_context(i, th);
+            int j;
+	    // FIXME: if we pick a register to consistently use with m[ft]lr
+	    // then we would only need to examine that, and LR and CTR here.
+	    // We may already be consistent, I just don't what the consistency is.
+	    static int boxed_registers[] = BOXED_REGISTERS;
+	    int __attribute__((unused)) ct = 0;
+            for (j = (int)(sizeof boxed_registers / sizeof boxed_registers[0])-1; j >= 0; --j)
+	        preserve_pointer((void*)*os_context_register_addr(context,
+								  boxed_registers[j]));
+	    preserve_pointer((void*)*os_context_lr_addr(context));
+	    preserve_pointer((void*)*os_context_ctr_addr(context));
+	}
+#endif // PPC64
     }
 #endif
 

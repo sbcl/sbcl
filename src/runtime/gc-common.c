@@ -2006,7 +2006,8 @@ static int boxed_registers[] = BOXED_REGISTERS;
     pair_interior_pointer(context,                              \
                           ACCESS_INTERIOR_POINTER_##name,       \
                           &name##_offset,                       \
-                          &name##_register_pair)
+                          &name##_register_pair,                \
+                          #name)
 
 /* One complexity here is that if a paired register is not found for
  * an interior pointer, then that pointer does not get updated.
@@ -2017,6 +2018,7 @@ static int boxed_registers[] = BOXED_REGISTERS;
  * static space without problems. */
 #define FIXUP_INTERIOR_POINTER(name)                                    \
     do {                                                                \
+        /* fprintf(stderr, "Fixing interior ptr "#name"\n"); */         \
         if (name##_register_pair >= 0) {                                \
             ACCESS_INTERIOR_POINTER_##name =                            \
                 (*os_context_register_addr(context,                     \
@@ -2026,10 +2028,17 @@ static int boxed_registers[] = BOXED_REGISTERS;
         }                                                               \
     } while (0)
 
+#ifdef LISP_FEATURE_PPC64
+// reg_CODE holds a native pointer on PPC64
+#define plausible_base_register(val,reg) (is_lisp_pointer(val)||reg==reg_CODE)
+#else
+#define plausible_base_register(val,reg) (is_lisp_pointer(val))
+#endif
 
 static void
 pair_interior_pointer(os_context_t *context, uword_t pointer,
-                      uword_t *saved_offset, int *register_pair)
+                      uword_t *saved_offset, int *register_pair,
+                      char *regname)
 {
     unsigned int i;
 
@@ -2043,12 +2052,10 @@ pair_interior_pointer(os_context_t *context, uword_t pointer,
     *saved_offset = (((uword_t)1) << (N_WORD_BITS - 1)) - 1;
     *register_pair = -1;
     for (i = 0; i < (sizeof(boxed_registers) / sizeof(int)); i++) {
-        uword_t reg;
         uword_t offset;
-        int index;
 
-        index = boxed_registers[i];
-        reg = *os_context_register_addr(context, index);
+        int regindex = boxed_registers[i];
+        uword_t regval = *os_context_register_addr(context, regindex);
 
         /* An interior pointer is never relative to a non-pointer
          * register (an oversight in the original implementation).
@@ -2062,15 +2069,34 @@ pair_interior_pointer(os_context_t *context, uword_t pointer,
          * move, thus destroying the interior pointer.  --AB,
          * 2010-Jul-14 */
 
-        if (is_lisp_pointer(reg) &&
-            ((reg & ~LOWTAG_MASK) <= pointer)) {
-            offset = pointer - (reg & ~LOWTAG_MASK);
+        // Note this can produce weird pairings that seem not to adversely
+        // affect anything. For instance if reg_LIP points lower than anything
+        // in a boxed register except for let's say register A0 which is
+        // currently NIL, then we'll say that LIP was based on A0 + huge offset.
+        // NIL doesn't move, so we won't alter LIP. But what if A0 had something
+        // random in it and lower than LIP? It will pair with LIP and then
+        // adjust LIP to point to garbage.  This is "harmless" because
+        // we never actually treat LIP as an exact root.
+
+        if (plausible_base_register(regval, regindex) &&
+            ((regval & ~LOWTAG_MASK) <= pointer)) {
+            offset = pointer - (regval & ~LOWTAG_MASK);
             if (offset < *saved_offset) {
                 *saved_offset = offset;
-                *register_pair = index;
+                *register_pair = regindex;
             }
         }
     }
+#if 0
+    if (*register_pair >= 0)
+        fprintf(stderr, "p_i_p: %-3s=%#lx based on %s=%lx + %lx\n",
+                regname, pointer,
+                lisp_register_names[*register_pair],
+                *os_context_register_addr(context, *register_pair),
+                *saved_offset);
+    else
+        fprintf(stderr, "p_i_p: %-3s=%#lx not based\n", regname, pointer);
+#endif
 }
 
 static void
