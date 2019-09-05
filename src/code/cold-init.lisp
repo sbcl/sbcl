@@ -274,9 +274,6 @@
   ;; The system is finally ready for GC.
   (/show0 "enabling GC")
   (setq *gc-inhibit* nil)
-  (/show0 "doing first GC")
-  (gc :full t)
-  (/show0 "back from first GC")
 
   ;; The show is on.
   (/show0 "going into toplevel loop")

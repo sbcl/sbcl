@@ -55,4 +55,11 @@ extern os_vm_offset_t search_for_embedded_core(char *filename,
 extern unsigned char build_id[];
 
 char* get_asm_routine_by_name(const char* name);
+
+// By setting this to 0, all objects begin life in the nursery, and nothing
+// is pseudo-static. As such, any bugs due to code movement are likely to
+// occur sooner. Or set it to 1 to make things sort of not move immediately.
+// Either way, use this only for debugging, and at your own risk.
+//#define CORE_PAGE_GENERATION 0
+#define CORE_PAGE_GENERATION PSEUDO_STATIC_GENERATION
 #endif

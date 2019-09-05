@@ -4298,7 +4298,7 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
     // Process an integral number of ptes on each read.
     page_index_t max_pages_per_read = sizeof data / sizeof (struct corefile_pte);
     page_index_t page = 0;
-    generation_index_t gen = PSEUDO_STATIC_GENERATION;
+    generation_index_t gen = CORE_PAGE_GENERATION;
     while (page < n_ptes) {
         page_index_t pages_remaining = n_ptes - page;
         page_index_t npages =
@@ -4331,7 +4331,7 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
               ((char*)get_alloc_pointer() - page_address(0)));
     // write-protecting needs the current value of next_free_page
     next_free_page = n_ptes;
-    if (ENABLE_PAGE_PROTECTION)
+    if (gen != 0 && ENABLE_PAGE_PROTECTION)
         write_protect_generation_pages(gen);
 }
 

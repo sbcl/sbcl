@@ -1070,6 +1070,12 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
                 // fprintf(stderr, "NOTE: TLS size increased to %x\n", dynamic_values_bytes);
             }
 #endif
+            if (widetag_of(native_pointer(initial_function)) == SIMPLE_FUN_WIDETAG
+                && !lisp_startup_options.noinform) {
+                fprintf(stderr, "Initial page table:\n");
+                extern void print_generation_stats(void);
+                print_generation_stats();
+            }
             sanity_check_loaded_core(initial_function);
             return initial_function;
         case RUNTIME_OPTIONS_MAGIC: break; // already processed

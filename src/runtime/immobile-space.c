@@ -1180,17 +1180,36 @@ static int page_attributes_valid;
 void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
 {
     int n_pages, word_idx, page;
+    generation_index_t gen = CORE_PAGE_GENERATION;
 
     gc_init_immobile();
+
+    if (gen != PSEUDO_STATIC_GENERATION) {
+        // Change every object's generation. This is only for debugging.
+        lispobj *where, *end;
+        where = fixedobj_page_address(0);
+        end = (lispobj*)((char*)where + fixedobj_len);
+        while (where < end) {
+            if (!fixnump(*where)) assign_generation(where, gen);
+            where += OBJECT_SIZE(*where, where);
+        }
+        where = (lispobj*)VARYOBJ_SPACE_START;
+        end = (lispobj*)((char*)where + varyobj_len);
+        while (where < end) {
+            if (!filler_obj_p(where)) assign_generation(where, gen);
+            where += OBJECT_SIZE(*where, where);
+        }
+        fprintf(stderr, "WARNING: demoted immobile objects to gen%d\n", gen);
+    }
 
     n_pages = fixedobj_len / IMMOBILE_CARD_BYTES;
     for (page = 0; page <= FIXEDOBJ_RESERVED_PAGES; ++page) {
         // set page attributes that can't match anything in get_freeish_page()
         fixedobj_pages[page].attr.parts.obj_align = 1;
         fixedobj_pages[page].attr.parts.obj_size = 1;
-        if (ENABLE_PAGE_PROTECTION)
+        if (gen != 0 && ENABLE_PAGE_PROTECTION)
             fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
-        fixedobj_pages[page].gens |= 1 << PSEUDO_STATIC_GENERATION;
+        fixedobj_pages[page].gens |= 1 << gen;
     }
     for (page = FIXEDOBJ_RESERVED_PAGES ; page < n_pages ; ++page) {
         lispobj* page_data = fixedobj_page_address(page);
@@ -1204,7 +1223,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
                 fixedobj_pages[page].attr.parts.obj_align
                   = immobile_obj_spacing(header, obj, size);
                 fixedobj_pages[page].gens |= 1 << __immobile_obj_gen_bits(obj);
-                if (ENABLE_PAGE_PROTECTION)
+                if (gen != 0 && ENABLE_PAGE_PROTECTION)
                     fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
                 break;
             }
@@ -1259,7 +1278,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
     }
     // Set the WP bits for pages occupied by the core file.
     // (There can be no inter-generation pointers.)
-    if (ENABLE_PAGE_PROTECTION) {
+    if (gen != 0 && ENABLE_PAGE_PROTECTION) {
         low_page_index_t page;
         for (page = 0 ; page <= last_page ; ++page)
             varyobj_page_touched_bits[page/32] &= ~(1U<<(page & 31));

@@ -35,6 +35,7 @@
 
 (assert (zerop (deref (extern-alien "lowtag_for_widetag" (array char 64))
                       (ash sb-vm:character-widetag -2))))
+(gc :full t)
 
 ;;; Verify that all defstructs except for one were compiled in a null lexical
 ;;; environment. Compiling any call to a structure constructor would like to

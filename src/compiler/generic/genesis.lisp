@@ -3375,7 +3375,6 @@ III. initially undefined function references (alphabetically):
 
 #+gencgc
 (defun output-page-table (gspace data-page core-file write-word verbose)
-  (declare (ignore verbose))
   ;; Write as many PTEs as there are pages used.
   ;; A corefile PTE is { uword_t scan_start_offset; page_bytes_t bytes_used; }
   (let* ((data-bytes (* (gspace-free-word-index gspace) sb-vm:n-word-bytes))
@@ -3384,6 +3383,8 @@ III. initially undefined function references (alphabetically):
           (if (typep sb-vm:gencgc-card-bytes '(unsigned-byte 16)) 2 4))
          (sizeof-corefile-pte (+ sb-vm:n-word-bytes sizeof-usage))
          (pte-bytes (round-up (* sizeof-corefile-pte n-ptes) sb-vm:n-word-bytes))
+         (n-code 0)
+         (n-mixed 0)
          (ptes (make-bigvec)))
     (expand-bigvec ptes pte-bytes)
     (dotimes (page-index n-ptes)
@@ -3396,12 +3397,14 @@ III. initially undefined function references (alphabetically):
                       0))
              (type-bits (if (plusp usage)
                             (ecase (page-type pte)
-                              (:code  #b11)
-                              (:mixed #b01))
+                              (:code  (incf n-code)  #b11)
+                              (:mixed (incf n-mixed) #b01))
                             0)))
         (setf (bvref-word ptes pte-offset) (logior sso type-bits))
         (funcall (if (eql sizeof-usage 2) #'(setf bvref-16) #'(setf bvref-32))
                  usage ptes (+ pte-offset sb-vm:n-word-bytes))))
+    (when verbose
+      (format t "~d boxed pages, ~d code pages~%" n-mixed n-code))
     (force-output core-file)
     (let ((posn (file-position core-file)))
       (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))
