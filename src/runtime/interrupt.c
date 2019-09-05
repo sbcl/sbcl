@@ -2229,6 +2229,14 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
 #endif
 
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
+    /* Holy hell is this more obfuscated than necessary when using
+     * signal emulation on macOS. It almost makes one want to cry.
+     * We're not actually on an alternate stack at this point.
+     * Instead of telling the emulated sigsegv (which needn't have been
+     * emulated at all) to return to an intruction which executes a
+     * sigtrap (also emulated), we should just go straight where
+     * we need to go and hand it the original context rather than
+     * having to track the context through two bogus signals */
 #  if !(defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64))
 #    error memory fault emulation needs validating for this architecture
 #  endif
