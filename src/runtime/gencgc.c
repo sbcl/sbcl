@@ -453,14 +453,17 @@ write_generation_stats(FILE *file)
     fprintf(file,
             "Gen  Boxed   Code    Raw  LgBox LgCode  LgRaw  Pin       Alloc     Waste        Trig      WP GCs Mem-age\n");
 
+    generation_index_t i, begin, end;
+    // Print from the lowest gen that has any allocated pages.
+    for (begin = 0; begin <= PSEUDO_STATIC_GENERATION; ++begin)
+        if (generations[begin].bytes_allocated) break;
     // Print up to and including the highest gen that has any allocated pages.
-    generation_index_t i, stop_at;
-    for (stop_at = SCRATCH_GENERATION; stop_at >= 0; --stop_at)
-        if (generations[stop_at].bytes_allocated) break;
+    for (end = SCRATCH_GENERATION; end >= 0; --end)
+        if (generations[end].bytes_allocated) break;
 
-    for (i = 0; i <= stop_at; i++) {
+    for (i = begin; i <= end; i++) {
         page_index_t page;
-        // page kinds: small boxed, small unboxed, large boxed, large unboxed
+        // page kinds: small {boxed,code,unboxed}, large {boxed,code,unboxed}
         page_index_t pagect[6], pinned_cnt = 0, tot_pages = 0;
 
         memset(pagect, 0, sizeof pagect);
