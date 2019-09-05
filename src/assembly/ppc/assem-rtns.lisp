@@ -205,6 +205,6 @@
 
   (move target catch)
   ;; reuse catch
-  (inst addi catch null-tn (make-fixup 'unwind :asm-routine-nil-offset))
+  (load-asm-rtn-addr catch 'unwind)
   (inst mtlr catch)
   (inst blr))

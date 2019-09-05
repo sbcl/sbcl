@@ -2677,7 +2677,7 @@ core and return a descriptor to it."
           ;; the code vector will be properly aligned.
           (round-up sb-vm:code-constants-offset 2))
          (space (or #+immobile-space *immobile-varyobj*
-                    #+(or ppc ppc64 x86 x86-64) *static*
+                    #+(and gencgc (or ppc ppc64 x86 x86-64)) *static*
                     *read-only*))
          (asm-code
           (allocate-cold-descriptor

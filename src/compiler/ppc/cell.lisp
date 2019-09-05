@@ -266,7 +266,7 @@
       (inst addi lip function
             (- (ash simple-fun-insts-offset word-shift) fun-pointer-lowtag))
       (inst beq normal-fn)
-      (inst addi lip null-tn (make-fixup 'closure-tramp :asm-routine-nil-offset))
+      (load-asm-rtn-addr lip 'closure-tramp)
       (emit-label normal-fn)
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
@@ -280,7 +280,7 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 38
     (storew null-tn fdefn fdefn-fun-slot other-pointer-lowtag)
-    (inst addi temp null-tn (make-fixup 'undefined-tramp :asm-routine-nil-offset))
+    (load-asm-rtn-addr temp 'undefined-tramp)
     (storew temp fdefn fdefn-raw-addr-slot other-pointer-lowtag)
     (move result fdefn)))
 
