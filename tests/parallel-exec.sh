@@ -1,6 +1,8 @@
 #!/bin/sh
 
-mkdir -p /var/tmp/junk /var/tmp/sbcl-test-logs
+logdir=/var/tmp/sbcl-test-logs-$$
+echo ==== Writing logs to $logdir ====
+mkdir -p /var/tmp/junk $logdir
 TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --noinform --core ../output/sbcl.core --no-userinit --no-sysinit --noprint --disable-debugger << EOF
 (require :sb-posix)
@@ -41,7 +43,7 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
           (wait))
         (let ((pid (sb-posix:fork)))
           (when (zerop pid)
-            (with-open-file (stream (format nil "/var/tmp/sbcl-test-logs/~a" file)
+            (with-open-file (stream (format nil "$logdir/~a" file)
                                     :direction :output :if-exists :supersede)
               (alien-funcall (extern-alien "dup2" (function int int int))
                              (sb-sys:fd-stream-fd stream) 1)
