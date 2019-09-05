@@ -441,8 +441,6 @@ extern void fpu_restore(void *);
 extern void
 write_generation_stats(FILE *file)
 {
-    generation_index_t i;
-
 #ifdef LISP_FEATURE_X86
     int fpu_state[27];
 
@@ -453,31 +451,46 @@ write_generation_stats(FILE *file)
 
     /* Print the heap stats. */
     fprintf(file,
-            "Gen  Boxed Unboxed   LgBox LgUnbox  Pin       Alloc     Waste        Trig      WP GCs Mem-age\n");
+            "Gen  Boxed   Code    Raw  LgBox LgCode  LgRaw  Pin       Alloc     Waste        Trig      WP GCs Mem-age\n");
 
-    for (i = 0; i <= SCRATCH_GENERATION; i++) {
+    // Print up to and including the highest gen that has any allocated pages.
+    generation_index_t i, stop_at;
+    for (stop_at = SCRATCH_GENERATION; stop_at >= 0; --stop_at)
+        if (generations[stop_at].bytes_allocated) break;
+
+    for (i = 0; i <= stop_at; i++) {
         page_index_t page;
         // page kinds: small boxed, small unboxed, large boxed, large unboxed
-        page_index_t pagect[4], pinned_cnt = 0, tot_pages = 0;
+        page_index_t pagect[6], pinned_cnt = 0, tot_pages = 0;
 
         memset(pagect, 0, sizeof pagect);
         for (page = 0; page < next_free_page; page++)
             if (!page_free_p(page) && page_table[page].gen == i) {
-                int k = (page_single_obj_p(page)<<1) | !page_boxed_p(page);
+                int k;
+                switch (page_table[page].type & PAGE_TYPE_MASK) {
+                case CODE_PAGE_TYPE: k = 1; break;
+                case UNBOXED_PAGE_FLAG: k = 2; break;
+                default: k = 0; break;
+                }
+                if (page_single_obj_p(page)) k += 3;
                 pagect[k]++;
                 if (page_table[page].pinned) pinned_cnt++;
             }
-        tot_pages = pagect[0] + pagect[1] + pagect[2] + pagect[3];
+        tot_pages = pagect[0] + pagect[1] + pagect[2]
+                  + pagect[3] + pagect[4] + pagect[5];
         struct generation* gen = &generations[i];
         gc_assert(gen->bytes_allocated == count_generation_bytes_allocated(i));
         fprintf(file,
-                " %d %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT" %7"PAGE_INDEX_FMT
-                " %7"PAGE_INDEX_FMT" %4"PAGE_INDEX_FMT
+                " %d %7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+                "%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT"%7"PAGE_INDEX_FMT
+                " %4"PAGE_INDEX_FMT
                 " %11"OS_VM_SIZE_FMT
                 " %9"OS_VM_SIZE_FMT
                 " %11"OS_VM_SIZE_FMT
                 " %7"PAGE_INDEX_FMT" %3d %7.4f\n",
-                i, pagect[0], pagect[1], pagect[2], pagect[3], pinned_cnt,
+                i,
+                pagect[0], pagect[1], pagect[2], pagect[3], pagect[4], pagect[5],
+                pinned_cnt,
                 (uintptr_t)gen->bytes_allocated,
                 (uintptr_t)npage_bytes(tot_pages) - generations[i].bytes_allocated,
                 (uintptr_t)gen->gc_trigger,
