@@ -556,9 +556,6 @@ void arch_install_interrupt_handlers()
 {
     undoably_install_low_level_interrupt_handler(SIGILL, sigtrap_handler);
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
-#ifdef LISP_FEATURE_64_BIT
-    undoably_install_low_level_interrupt_handler(SIGFPE, sigtrap_handler);
-#endif
 }
 
 void

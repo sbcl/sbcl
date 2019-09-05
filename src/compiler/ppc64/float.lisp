@@ -713,9 +713,9 @@
   (:vop-var vop)
   (:generator 3
     (let ((nfp (current-nfp-tn vop)))
-      (storew new nfp (1+ (tn-offset temp)))
+      (storew new nfp (tn-offset temp))
       (inst lfd fp-temp nfp (* n-word-bytes (tn-offset temp)))
-      ;; (inst mtfsf 255 fp-temp) ; FIXME: gets sigfpe
+      (inst mtfsf 255 fp-temp)
       (move res new))))
 
 
