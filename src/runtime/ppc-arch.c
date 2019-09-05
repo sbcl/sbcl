@@ -509,7 +509,7 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
-    if (handle_allocation_trap(context)) return;
+    if (signal == SIGTRAP && handle_allocation_trap(context)) return;
 
     unsigned int code;
 
