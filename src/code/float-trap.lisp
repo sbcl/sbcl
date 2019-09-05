@@ -226,17 +226,22 @@ sets the floating point modes to their current values (and thus is a no-op)."
         ;; which can be set from user code.  Compute the mask here,
         ;; and clear them below.
         #+mips (cause-mask (dpb (lognot (float-trap-mask traps))
-                                 float-exceptions-byte #xffffffff))
+                                float-exceptions-byte #xffffffff))
         (orig-modes (gensym)))
+    #+ppc64
+    (unless (logbitp float-invalid-trap-bit (ldb float-sticky-bits exception-mask))
+      ;; float-invalid-trap-bit is just a summary of this bits which
+      ;; all have to be cleared invidually.
+      (setf (ldb float-invalid-byte exception-mask) 0))
     `(let ((,orig-modes (floating-point-modes)))
-      (unwind-protect
-           (progn
-             (setf (floating-point-modes)
-                   (logand ,orig-modes ,(logand trap-mask exception-mask)))
-             ,@body)
-        ;; Restore the original traps and exceptions.
-        (setf (floating-point-modes)
-              (logior (logand ,orig-modes ,(logior traps exceptions))
-                      (logand (floating-point-modes)
-                              ,(logand trap-mask exception-mask
-                                       #+mips cause-mask))))))))
+       (unwind-protect
+            (progn
+              (setf (floating-point-modes)
+                    (logand ,orig-modes ,(logand trap-mask exception-mask)))
+              ,@body)
+         ;; Restore the original traps and exceptions.
+         (setf (floating-point-modes)
+               (logior (logand ,orig-modes ,(logior traps exceptions))
+                       (logand (floating-point-modes)
+                               ,(logand trap-mask exception-mask
+                                        #+mips cause-mask))))))))

@@ -101,6 +101,7 @@
 (defconstant-eqx float-sticky-bits (byte 5 25) #'equalp)
 (defconstant-eqx float-traps-byte (byte 5 3) #'equalp)
 (defconstant-eqx float-exceptions-byte (byte 5 25) #'equalp)      ; cexc
+(defconstant-eqx float-invalid-byte (byte 6 19) #'equalp)
 
 (defconstant float-fast-bit 2)         ; Non-IEEE mode
 
