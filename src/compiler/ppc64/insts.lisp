@@ -303,7 +303,7 @@
     (error "Bad bits."))
   ``(byte ,(1+ ,(- endbit startbit)) ,(- 31 ,endbit)))
 
-(defconstant-eqx +ppc-field-specs-alist+
+(defglobal *ppc-field-specs-alist*
     `((aa :field ,(ppc-byte 30))
       (ba :field ,(ppc-byte 11 15) :type 'bi-field)
       (bb :field ,(ppc-byte 16 20) :type 'bi-field)
@@ -355,15 +355,13 @@
       ;; So I'm making up my own WITH COMMENTS starting now.
 
       ;; 6-bit mask begin/end
-      (mask6 :field ,(ppc-byte 21 26) :prefilter #'unrotate-mask)
+      (mask6 :field ,(ppc-byte 21 26) :prefilter #'decode-mask6)
       ;; 6-bit shift amount
       (sh6 :fields (list ,(ppc-byte 16 20) ,(ppc-byte 30)) :prefilter #'unsplit-sh)
       (md-form-subop :field ,(ppc-byte 27 29))
+      (mds-form-subop :field ,(ppc-byte 27 30))
       (xs-form-subop :field ,(ppc-byte 21 29))
-      )
-
-    #'equal)
-
+      ))
 
 (define-instruction-format (instr 32)
   (op :field (byte 6 26))
@@ -377,7 +375,7 @@
 
 (defmacro def-ppc-iformat ((name &optional default-printer) &rest specs)
   (flet ((specname-field (specname)
-           (or (assoc specname +ppc-field-specs-alist+)
+           (or (assoc specname *ppc-field-specs-alist*)
                (error "Unknown ppc instruction field spec ~s" specname))))
     (labels ((spec-field (spec)
                (if (atom spec)
@@ -1389,7 +1387,9 @@
   (defun unsplit-sh (dstate sh0-4 sh5)
     (declare (ignore dstate))
     (logior (ash sh5 5) sh0-4))
-  (defun unrotate-mask (dstate value)
+  (defun encode-mask6 (m)
+    (logior (ash (ldb (byte 5 0) m) 1) (ldb (byte 1 5) m)))
+  (defun decode-mask6 (dstate value)
     (declare (ignore dstate))
     (logior (ash (logand value 1) 5) (ash value -1)))
 
@@ -1397,17 +1397,31 @@
                `(define-instruction ,mnemonic (segment ra rs sh m)
                   (:printer md-form ((op 30) (subop ,op) (rc ,rc)))
                   (:emitter
-                   (emit-md-form-inst
-                    segment 30 (reg-tn-encoding rs) (reg-tn-encoding ra)
-                    (ldb (byte 5 0) sh)
-                    (logior (ash (ldb (byte 5 0) m) 1) (ldb (byte 1 5) m))
-                    ,op (ldb (byte 1 5) sh) ,rc)))))
+                   (emit-md-form-inst segment 30
+                                      (reg-tn-encoding rs) (reg-tn-encoding ra)
+                                      (ldb (byte 5 0) sh)
+                                      (encode-mask6 m)
+                                      ,op (ldb (byte 1 5) sh) ,rc)))))
     (def rldicl  0 0) ; Rotate Left Doubleword Immediate then Clear Left
     (def rldicl. 0 1)
     (def rldicr  1 0) ; Rotate Left Doubleword Immediate then Clear Right
     (def rldicr. 1 1)
     (def rldic   2 0) ; Rotate Left Doubleword Immediate then Clear
     (def rldic.  2 1))
+
+  (define-bitfield-emitter emit-mds-form-inst 32
+    (byte 6 26) (byte 5 21) (byte 5 16) (byte 5 11) (byte 6 5) (byte 4 1) (byte 1 0))
+  (def-ppc-iformat (mds-form '(:name :tab ra "," rs "," rb "," mask))
+    rs ra rb (mask mask6) (subop mds-form-subop) rc)
+  (macrolet ((def (mnemonic op Rc)
+               `(define-instruction ,mnemonic (segment ra rs rb m)
+                  (:printer mds-form ((op 30) (subop ,op) (rc ,rc)))
+                  (:emitter
+                   (emit-mds-form-inst segment 30 (reg-tn-encoding rs)
+                                       (reg-tn-encoding ra) (reg-tn-encoding rb)
+                                       (encode-mask6 m) ,op ,rc)))))
+    (def rldcl  8 0) ; Rotate Left Doubleword then Clear Left
+    (def rldcl. 8 1))
 
   (define-d-rs-ui-instruction ori 24)
 
@@ -1924,6 +1938,10 @@
 
   (define-instruction-macro slwi. (ra rs n)
     `(inst rlwinm. ,ra ,rs ,n 0 (- 31 ,n)))
+
+  (define-instruction-macro rotldi (ra rs n) `(inst rldicl ,ra ,rs ,n 0))
+  (define-instruction-macro rotrdi (ra rs n) `(inst rldicl ,ra ,rs (- 64 ,n) 0))
+  (define-instruction-macro rotld (ra rs rb) `(inst rldcl ,ra ,rs ,rb 0))
 
 ) ; end PROGN
 
