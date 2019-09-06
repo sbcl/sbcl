@@ -55,8 +55,12 @@
 #endif
 #endif
 
-/* Magic encoding for the instruction used for traps. */
+#ifdef LISP_FEATURE_64_BIT
+#define TRAP_INSTRUCTION(trap) ((2<<26) | (1 << 21) | reg_NULL << 16 | (trap))
+#else
 #define TRAP_INSTRUCTION(trap) ((3<<26) | (6 << 21) | (trap))
+#endif
+
 
 os_vm_address_t
 arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
