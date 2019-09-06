@@ -19,7 +19,9 @@
             sb-vm::zero sb-vm::immediate-constant
             sb-vm::registers sb-vm::float-registers
             ;; TNs and offsets
+            sb-vm::code-tn
             sb-vm::code-tn-lowtag
+            sb-vm::code-offset
             sb-vm::lip-tn
             sb-vm::null-offset)))
 
@@ -604,6 +606,44 @@
 
 
 
+(defun patchable-emit-d-form (segment opcode rt ra si)
+  (cond ((and (label-p si) (= ra code-offset))
+         ;; Assume that the displacement is short enough to
+         ;; be 1 instruction and we never need to use a chooser.
+         (emit-back-patch
+          segment 4
+          (lambda (segment posn)
+            (declare (ignore posn))
+            (emit-d-form-inst segment opcode rt ra
+                              (+ (component-header-length)
+                                 (segment-header-skew segment)
+                                 (label-position si))))))
+        (t
+         (when (typep si 'fixup)
+           (note-fixup segment :l si)
+           (setq si 0))
+         (emit-d-form-inst segment opcode rt ra si))))
+
+(defun patchable-emit-ds-form (segment opcode rt ra si subop)
+  (cond ((and (label-p si) (= ra code-offset))
+         ;; Assume that the displacement is short enough to
+         ;; be 1 instruction and we never need to use a chooser.
+         (emit-back-patch
+          segment 4
+          (lambda (segment posn)
+            (declare (ignore posn))
+            ;; call recursively to get the error check and scaling
+            (patchable-emit-ds-form
+             segment opcode rt ra
+             (+ (component-header-length)
+                (segment-header-skew segment)
+                (label-position si))
+             subop))))
+        (t
+         (if (= (mod si 4) 0)
+             (emit-ds-form-inst segment opcode rt ra (ash si -2) subop)
+             (error "Displacement should be a multiple of 4")))))
+
 (eval-when (:compile-toplevel :execute)
 (defun classify-dependencies (deplist)
   (collect ((reads) (writes))
@@ -619,7 +659,7 @@
 (macrolet ((define-d-instruction (name op &key (cost 2) other-dependencies pinned)
              (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
                `(define-instruction ,name (segment rt ra si)
-                 (:declare (type (signed-byte 16) si))
+                 (:declare (type (or (signed-byte 16) label) si))
                  (:printer d ((op ,op)))
                  (:delay ,cost)
                  (:cost ,cost)
@@ -627,16 +667,14 @@
                  (:dependencies (reads ra) (reads :memory) ,@other-reads
                                 (writes rt) ,@other-writes)
                  (:emitter
-                  (emit-d-form-inst segment ,op (reg-tn-encoding rt) (reg-or-0 ra) si)))))
+                  (patchable-emit-d-form segment ,op (reg-tn-encoding rt) (reg-or-0 ra) si)))))
            (define-ds-instruction (name op subop)
              `(define-instruction ,name (segment rt ra si)
-                (:declare (type (signed-byte 16) si))
+                (:declare (type (or (signed-byte 16) label) si))
                 (:printer ds ((op ,op) (subop ,subop)))
                 (:emitter
-                 (if (= (mod si 4) 0)
-                     (emit-ds-form-inst segment ,op (reg-tn-encoding rt)
-                                        (reg-or-0 ra) (ash si -2) ,subop)
-                     (error "Displacement should be a multiple of 4")))))
+                 (patchable-emit-ds-form segment ,op (reg-tn-encoding rt)
+                                         (reg-or-0 ra) si ,subop))))
            ;; This is really stupid. We use a diffent macro because use a different printer
            ;; because we use a different instruction format.
            ;; Why not just print loads and stores using the SAME format???
@@ -682,7 +720,7 @@
            (define-d-frt-instruction (name op &key (cost 3) other-dependencies)
              (multiple-value-bind (other-reads other-writes) (classify-dependencies other-dependencies)
                `(define-instruction ,name (segment frt ra si)
-                 (:declare (type (signed-byte 16) si))
+                 (:declare (type (or (signed-byte 16) label) si))
                  (:printer d-frt ((op ,op)))
                  (:delay ,cost)
                  (:cost ,cost)
@@ -747,16 +785,14 @@
   (define-x-instruction      lhaux 31 375 :other-dependencies ((writes ra)))
   ;; Word zero-extending)
   (define-instruction lwz (segment rt ra si)
-    (:declare (type (or fixup (signed-byte 16)) si))
+    (:declare (type (or (signed-byte 16) label fixup) si))
     (:printer d ((op 32)))
     (:delay 2)
     (:cost 2)
     (:dependencies (reads ra) (writes rt) (reads :memory))
     (:emitter
-     (when (typep si 'fixup)
-       (note-fixup segment :l si)
-       (setq si 0))
-     (emit-d-form-inst segment 32 (reg-tn-encoding rt) (reg-or-0 ra) si)))
+     (patchable-emit-d-form segment 32 (reg-tn-encoding rt)
+                            (reg-or-0 ra) si)))
   (define-d-instruction      lwzu  33 :other-dependencies ((writes ra)))
   (define-x-instruction      lwzx  31 23)
   (define-x-instruction      lwzux 31 55 :other-dependencies ((writes ra)))
@@ -2082,47 +2118,49 @@
 
 ;;; Some more macros
 
+#-64-bit
 (defun %lr (reg value)
   (etypecase value
     ((signed-byte 16)
      (inst li reg value))
     ((unsigned-byte 16)
-     #+64-bit ; register 0 is not wired to hold 0
-     (progn (inst addi reg 0 value)      ; gets "accidental" sign extension
-            (inst andi. reg reg #xFFFF)) ; undo the sign extension
-     #-64-bit
-     (inst ori reg sb-vm::zero-tn value)) ; ORing with the wired 0 works
-    ;; FIXME: 64-bit sign-extends the upper half
-    ((or (signed-byte #+64-bit 31 #-64-bit 32) (unsigned-byte #+64-bit 30 #-64-bit 32))
+     (inst ori reg zero-tn value))
+    ((or (signed-byte 32) (unsigned-byte 32))
      (let* ((high-half (ldb (byte 16 16) value))
             (low-half (ldb (byte 16 0) value)))
        (declare (type (unsigned-byte 16) high-half low-half))
        (cond ((and (logbitp 15 low-half) (= high-half #xffff))
               (inst li reg (dpb low-half (byte 16 0) -1)))
+             ((and (not (logbitp 15 low-half)) (zerop high-half))
+              (inst li reg low-half))
              (t
               (inst lis reg (if (logbitp 15 high-half)
                                 (dpb high-half (byte 16 0) -1)
-                                high-half))
+                              high-half))
               (unless (zerop low-half)
-                (inst ori reg reg low-half))))
-       ;; Clear left if sign extension "accidentally" happened.
-       ;; This suggests futher possibilities- any string of consecutive 1 bits
-       ;; (and some discontiguous strings) can be computed in at most 3
-       ;; instructions: load -1, clear left, clear right, possibly omitting
-       ;; either clear if not needed; or: load -1, clear left, rotate.
-       (when (and (plusp value) (logbitp 15 high-half))
-         (inst rldicl reg reg 0 32))))
-    ((or (signed-byte 64) (unsigned-byte 64))
-     (let* ((quarter-1 (ldb (byte 16 0) value))
-            (quarter-2 (ldb (byte 16 16) value))
-            (quarter-3 (ldb (byte 16 32) value))
-            (quarter-4 (ldb (byte 16 48) value)))
-       (inst lis reg quarter-4)
-       (inst ori reg reg quarter-3)
-       (inst sldi reg reg 32)
-       (inst oris reg reg quarter-2)
-       (inst ori reg reg quarter-1)))
+                (inst ori reg reg low-half))))))
+    (fixup
+     (inst lis reg value)
+     (inst addi reg reg value))))
 
+;;; The 64-bit code for %LR is simple - if one 'li' instruction
+;;; isn't adequate, then load the value from memory.
+;;; There are plenty of tricks that we're missing though, such as some large
+;;; positive constants being modularly equivalent to small negative ones,
+;;; and any constant for which a single 'addis' would suffice.
+#+64-bit
+(defun %lr (reg value)
+  (etypecase value
+    ((signed-byte 16)
+     (inst li reg value))
+    ((unsigned-byte 16)
+     (inst lhz reg code-tn (register-inline-constant value :halfword)))
+    ((signed-byte 32)
+     (inst lwa reg code-tn (register-inline-constant value :word)))
+    ((unsigned-byte 32)
+     (inst lwz reg code-tn (register-inline-constant value :word)))
+    ((or (signed-byte 64) (unsigned-byte 64))
+     (inst ld reg code-tn (register-inline-constant value :dword)))
     (fixup
      (inst lis reg value)
      (inst addi reg reg value))))
@@ -2250,3 +2288,39 @@
                              (component-header-length)
                              other-pointer-lowtag
                              (- code-tn-lowtag))))))
+
+;;; Unboxed constant support
+
+(defun sb-vm::canonicalize-inline-constant (constant)
+  (destructuring-bind (value size) constant
+    (cons size value)))
+
+(defun sb-vm::inline-constant-value (constant)
+  (declare (ignore constant))
+  (let ((label (gen-label)))
+    (values label label)))
+
+(defun sort-inline-constants (constants)
+  (stable-sort constants #'> :key (lambda (constant)
+                                    (size-nbyte (caar constant)))))
+
+(defun size-nbyte (size)
+  (ecase size
+    (:byte     1)
+    (:halfword 2)
+    (:word     4)
+    (:dword    8)
+    (:qword   16)))
+
+(defun emit-inline-constant (section constant label)
+  (let* ((type (car constant))
+         (size (size-nbyte type)))
+    (emit section
+          `(.align ,(integer-length (1- size)))
+          label
+          (let* ((val (cdr constant))
+                 (bytes (loop repeat size
+                              collect (prog1 (ldb (byte 8 0) val)
+                                        (setf val (ash val -8))))))
+            #+big-endian (setq bytes (nreverse bytes))
+            `(.byte ,@bytes)))))

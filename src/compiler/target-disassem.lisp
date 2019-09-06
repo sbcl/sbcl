@@ -1833,12 +1833,13 @@
 (defun get-code-constant (byte-offset dstate)
   (declare (type offset byte-offset)
            (type disassem-state dstate))
-  (let ((code (seg-code (dstate-segment dstate))))
-    (if code
-        (values (code-header-ref code
-                                 (ash (+ byte-offset sb-vm:other-pointer-lowtag)
-                                      (- sb-vm:word-shift)))
-                t)
+  ;; Cautiously avoid reading any word index that is not within
+  ;; the boxed portion of the header.
+  (let ((code (seg-code (dstate-segment dstate)))
+        (wordindex (ash (+ byte-offset sb-vm:other-pointer-lowtag)
+                        (- sb-vm:word-shift))))
+    (if (and code (< 1 wordindex (code-header-words code)))
+        (values (code-header-ref code wordindex) t)
         (values nil nil))))
 
 ;;; Return the lisp object at ADDR in the code component being disassembled.
@@ -1969,6 +1970,14 @@
 ;;; Store a note about the lisp constant located BYTE-OFFSET bytes
 ;;; from the current code-component, to be printed as an end-of-line
 ;;; comment after the current instruction is disassembled.
+;;; NB: This API is bad. We say BYTE-OFFSET bytes from the object,
+;;; but it actually means offset from whatever value would be in CODE-TN.
+;;; Most backends pass in an odd number ("odd" in both senses) because it's
+;;; whatever offset is in the instruction which when added to the tagged
+;;; pointer in CODE-TN gets to an aligned offset. But for backends which
+;;; do not have a lowtag in CODE-TN you have to subtract OTHER-POINTER-LOWTAG
+;;; because we add it back in GET-CODE-CONSTANT under the assumption
+;;; that you meant to add that much. How stupid!
 (defun note-code-constant (byte-offset dstate)
   (declare (type offset byte-offset)
            (type disassem-state dstate))
