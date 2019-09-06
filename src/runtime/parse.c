@@ -151,55 +151,58 @@ char *parse_token(char **ptr)
     return token;
 }
 
-uword_t parse_number(char **ptr)
+/// Return 1 for successful parse
+int parse_number(char **ptr, int *output)
 {
     char *token = parse_token(ptr);
     uword_t result;
 
     if (token == NULL) {
         printf("expected a number\n");
-        throw_to_monitor();
+        return 0;
     }
-    else if (string_to_long(token, &result))
-        return result;
-    else {
-        printf("invalid number: ``%s''\n", token);
-        throw_to_monitor();
+    if (string_to_long(token, &result)) {
+        // FIXME: consumers of this interface expect to receive an 'int',
+        // but string_to_long yields a uword_t.
+        // Should enforce the smaller range.
+        *output = result;
+        return 1;
     }
+    printf("invalid number: ``%s''\n", token);
     return 0;
 }
 
-char *parse_addr(char **ptr, boolean safely)
+int parse_addr(char **ptr, boolean safely, char **output)
 {
     char *token = parse_token(ptr);
     lispobj result;
 
     if (token == NULL) {
         printf("expected an address\n");
-        throw_to_monitor();
+        return 0;
     }
-    else if (token[0] == '$') {
+    if (token[0] == '$') {
         if (!lookup_variable(token+1, &result)) {
             printf("unknown variable: ``%s''\n", token);
-            throw_to_monitor();
+            return 0;
         }
-        result &= ~7;
-    }
-    else {
+        result &= ~7; // LOWTAG_MASK maybe?
+    } else {
         uword_t value;
         if (!string_to_long(token, &value)) {
             printf("invalid number: ``%s''\n", token);
-            throw_to_monitor();
+            return 0;
         }
-        result = (value & ~3);
+        result = (value & ~3); // what is ~3 for - word alignment?
     }
 
     if (safely && !gc_managed_addr_p(result)) {
         printf("invalid Lisp-level address: %p\n", (void *)result);
-        throw_to_monitor();
+        return 0;
     }
 
-    return (char *)result;
+    *output = (char *)result;
+    return 1;
 }
 
 static lispobj lookup_symbol(char *name)
@@ -230,6 +233,8 @@ static lispobj lookup_symbol(char *name)
 
 static int parse_regnum(char *s)
 {
+    // Well this is confusing as heck! Registers r0..r9 in the AARCH64 vm definition
+    // are machine regs 10 through 19. So caveat emptor if you use this syntax.
     if ((s[1] == 'R') || (s[1] == 'r')) {
         int regnum;
 
@@ -257,7 +262,7 @@ static int parse_regnum(char *s)
     }
 }
 
-lispobj parse_lispobj(char **ptr)
+int parse_lispobj(char **ptr, lispobj *output)
 {
     struct thread *thread=arch_os_get_current_thread();
     char *token = parse_token(ptr);
@@ -267,8 +272,9 @@ lispobj parse_lispobj(char **ptr)
 
     if (token == NULL) {
         printf("expected an object\n");
-        throw_to_monitor();
-    } else if (token[0] == '$') {
+        return 0;
+    }
+    if (token[0] == '$') {
         if (isalpha(token[1])) {
             int free_ici;
             int regnum;
@@ -278,7 +284,7 @@ lispobj parse_lispobj(char **ptr)
 
             if (free_ici == 0) {
                 printf("Variable ``%s'' is not valid -- there is no current interrupt context.\n", token);
-                throw_to_monitor();
+                return 0;
             }
 
             context = nth_interrupt_context(free_ici - 1, thread);
@@ -286,27 +292,30 @@ lispobj parse_lispobj(char **ptr)
             regnum = parse_regnum(token);
             if (regnum < 0) {
                 printf("bogus register: ``%s''\n", token);
-                throw_to_monitor();
+                return 0;
             }
 
             result = *os_context_register_addr(context, regnum);
         } else if (!lookup_variable(token+1, &result)) {
             printf("unknown variable: ``%s''\n", token);
-            throw_to_monitor();
+            return 0;
         }
     } else if (token[0] == '@') {
         if (string_to_long(token+1, &pointer)) {
+            // More wtf - are we trying to round down to a double-lispword
+            // or to a lispword? I don't know.
+            // This '@' input syntax is just plain useless anyway.
             pointer &= ~3;
             if (gc_managed_addr_p(pointer))
                 result = *(lispobj *)pointer;
             else {
                 printf("invalid Lisp-level address: ``%s''\n", token+1);
-                throw_to_monitor();
+                return 0;
             }
         }
         else {
             printf("invalid address: ``%s''\n", token+1);
-            throw_to_monitor();
+            return 0;
         }
     }
     else if (string_to_long(token, &value))
@@ -315,8 +324,9 @@ lispobj parse_lispobj(char **ptr)
         ;
     else {
         printf("invalid Lisp object: ``%s''\n", token);
-        throw_to_monitor();
+        return 0;
     }
 
-    return result;
+    *output = result;
+    return 1;
 }

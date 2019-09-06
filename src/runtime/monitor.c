@@ -121,10 +121,9 @@ dump_cmd(char **ptr)
           decode = 1;
           *ptr += 3;
         }
-        addr = parse_addr(ptr, !force);
+        if (!parse_addr(ptr, !force, &addr)) return 0;
 
-        if (more_p(ptr))
-            count = parse_number(ptr);
+        if (more_p(ptr) && !parse_number(ptr, &count)) return 0;
     }
 
     if (count == 0) {
@@ -218,9 +217,8 @@ dump_cmd(char **ptr)
 static int
 print_cmd(char **ptr)
 {
-    lispobj obj = parse_lispobj(ptr);
-
-    print(obj);
+    lispobj obj;
+    if (parse_lispobj(ptr, &obj)) print(obj);
     return 0;
 }
 
@@ -228,7 +226,8 @@ static int
 pte_cmd(char **ptr)
 {
     extern void gc_show_pte(lispobj);
-    gc_show_pte(parse_lispobj(ptr));
+    lispobj obj;
+    if (parse_lispobj(ptr, &obj)) gc_show_pte(obj);
     return 0;
 }
 
@@ -236,7 +235,8 @@ static int
 kill_cmd(char **ptr)
 {
 #ifndef LISP_FEATURE_WIN32
-    kill(getpid(), parse_number(ptr));
+    int sig;
+    if (parse_number(ptr, &sig)) kill(getpid(), sig);
 #endif
     return 0;
 }
@@ -321,7 +321,7 @@ help_cmd(char __attribute__((unused)) **ptr)
 static int
 exit_cmd(char __attribute__((unused)) **ptr)
 {
-    return 1; // quit flag
+    return 1; // 'done' flag
 }
 
 static int
@@ -362,7 +362,7 @@ print_context_cmd(char **ptr)
     if (more_p(ptr)) {
         int index;
 
-        index = parse_number(ptr);
+        if (!parse_number(ptr, &index)) return 0;
 
         if ((index >= 0) && (index < free_ici)) {
             printf("There are %d interrupt contexts.\n", free_ici);
@@ -390,9 +390,9 @@ backtrace_cmd(char **ptr)
     void lisp_backtrace(int frames);
     int n;
 
-    if (more_p(ptr))
-        n = parse_number(ptr);
-    else
+    if (more_p(ptr)) {
+        if (!parse_number(ptr, &n)) return 0;
+    } else
         n = 100;
 
     printf("Backtrace:\n");
