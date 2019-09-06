@@ -250,13 +250,7 @@ indirect_ptr(specials)
 
 	.align 3
 lra:
-#ifdef LISP_FEATURE_BIG_ENDIAN
-        .long 0
-	.long RETURN_PC_WIDETAG
-#else
-	.long RETURN_PC_WIDETAG
-        .long 0
-#endif
+	.quad RETURN_PC_WIDETAG
 
 	/* Blow off any extra values. */
 	mr reg_CSP,reg_OCFP
@@ -509,7 +503,7 @@ lra:
 	/* Due to pointer verification in MAKE-LISP-OBJ, this must
 	include its header data (the offset from the start of the
 	code-object to the LRA). */
-	.long  (((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
+	.quad  (((CODE_SIZE+1)&~1)<<N_WIDETAG_BITS)|RETURN_PC_WIDETAG
 
 	/* We are receiving unknown multiple values, thus must deal
 	with the single-value and multiple-value cases separately. */
@@ -552,7 +546,7 @@ fun_end_breakpoint_multiple_values:
 
 	/* The actual magic trap. */
 fun_end_breakpoint_trap:
-	twllei	reg_ZERO, trap_FunEndBreakpoint
+        tdlgti  reg_NULL, trap_FunEndBreakpoint
 
 	/* Finally, the debugger needs to know where the end of the
 	fun_end_breakpoint_guts are, so that it may calculate its size

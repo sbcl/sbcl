@@ -66,6 +66,11 @@ lispobj find_code(os_context_t *context)
     lispobj code = *os_context_register_addr(context, reg_CODE);
     lispobj header;
 
+#ifdef LISP_FEATURE_PPC64
+    if (lowtag_of(code) == 0)
+        code |= OTHER_POINTER_LOWTAG;
+#endif
+
     if (lowtag_of(code) != OTHER_POINTER_LOWTAG)
         return NIL;
 
