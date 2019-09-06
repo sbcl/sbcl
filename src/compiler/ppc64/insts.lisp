@@ -2315,6 +2315,7 @@
     (:dword    8)
     (:qword   16)))
 
+#+ppc64
 (defun emit-inline-constant (section constant label)
   (let* ((type (car constant))
          (size (size-nbyte type)))
