@@ -701,30 +701,50 @@
     (sb-c::give-up-ir1-transform))
   '(%primitive fast-ash-left-mod64/unsigned=>unsigned integer count))
 
-(macrolet
-    ((define-modular-backend (fun &optional constantp)
-       (let ((mfun-name (symbolicate fun '-mod64))
-             (modvop (symbolicate 'fast- fun '-mod64/unsigned=>unsigned))
-             (modcvop (symbolicate 'fast- fun 'mod64-c/unsigned=>unsigned))
-             (vop (symbolicate 'fast- fun '/unsigned=>unsigned))
-             (cvop (symbolicate 'fast- fun '-c/unsigned=>unsigned)))
-         `(progn
-            (define-modular-fun ,mfun-name (x y) ,fun :untagged nil 64)
-            (define-vop (,modvop ,vop)
-              (:translate ,mfun-name))
-            ,@(when constantp
-                `((define-vop (,modcvop ,cvop)
-                    (:translate ,mfun-name))))))))
-  (define-modular-backend + t)
-  (define-modular-backend - t)
-  (define-modular-backend * t)
-  (define-modular-backend logeqv)
-  (define-modular-backend lognand)
-  (define-modular-backend lognor)
-  (define-modular-backend logandc1)
-  (define-modular-backend logandc2)
-  (define-modular-backend logorc1)
-  (define-modular-backend logorc2))
+(defmacro define-mod-binop ((name prototype) function)
+  `(define-vop (,name ,prototype)
+     (:args (x :target r :scs (unsigned-reg signed-reg))
+            (y :scs (unsigned-reg signed-reg)))
+     (:arg-types untagged-num untagged-num)
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+
+(defmacro define-mod-binop-c ((name prototype) function)
+  `(define-vop (,name ,prototype)
+     (:args (x :target r :scs (unsigned-reg signed-reg)))
+     (:info y)
+     (:arg-types untagged-num (:constant (and (signed-byte 30) (not (integer 0 0)))))
+     (:results (r :scs (unsigned-reg signed-reg) :from (:argument 0)))
+     (:result-types unsigned-num)
+     (:translate ,function)))
+
+(macrolet ((def (name -c-p)
+             (let ((fun64   (symbolicate name "-MOD64"))
+                   (funfx   (symbolicate name "-MODFX"))
+                   (vopu    (symbolicate "FAST-" name "/UNSIGNED=>UNSIGNED"))
+                   (vopcu   (symbolicate "FAST-" name "-C/UNSIGNED=>UNSIGNED"))
+                   (vopf    (symbolicate "FAST-" name "/FIXNUM=>FIXNUM"))
+                   (vopcf   (symbolicate "FAST-" name "-C/FIXNUM=>FIXNUM"))
+                   (vop64u  (symbolicate "FAST-" name "-MOD64/WORD=>UNSIGNED"))
+                   (vop64f  (symbolicate "FAST-" name "-MOD64/FIXNUM=>FIXNUM"))
+                   (vop64cu (symbolicate "FAST-" name "-MOD64-C/WORD=>UNSIGNED"))
+                   (vopfxf  (symbolicate "FAST-" name "-MODFX/FIXNUM=>FIXNUM"))
+                   (vopfxcf (symbolicate "FAST-" name "-MODFX-C/FIXNUM=>FIXNUM")))
+               `(progn
+                  (define-modular-fun ,fun64 (x y) ,name :untagged nil 64)
+                  (define-modular-fun ,funfx (x y) ,name :tagged t
+                    #.(- n-word-bits n-fixnum-tag-bits))
+                  (define-mod-binop (,vop64u ,vopu) ,fun64)
+                  (define-vop (,vop64f ,vopf) (:translate ,fun64))
+                  (define-vop (,vopfxf ,vopf) (:translate ,funfx))
+                  ,@(when -c-p
+                      `((define-mod-binop-c (,vop64cu ,vopcu) ,fun64)
+                        (define-vop (,vopfxcf ,vopcf) (:translate ,funfx))))))))
+  (def + t)
+  (def - t)
+  (def * nil))
+
 
 ;;;; Binary conditional VOPs:
 

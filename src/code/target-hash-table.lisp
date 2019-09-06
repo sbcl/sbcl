@@ -633,7 +633,7 @@ multiple threads accessing the same hash-table without locking."
 ;;; We don't define +-MODFX for all backends, and I can't figure out
 ;;; the rationale, nor how to detect this other than by trial and error.
 ;;; Like why does 64-bit ARM have it but 32-bit not have?
-#-(or x86 x86-64 arm64 riscv)
+#-(or x86 x86-64 arm64 riscv ppc64)
 (progn
 (declaim (inline sb-vm::+-modfx))
 (defun sb-vm::+-modfx (x y)
