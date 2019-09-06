@@ -1139,17 +1139,24 @@ register."
                    (t
                     nil)))))
     (dolist (boxed-reg-offset sb-vm::boxed-regs
-             ;; If we can't actually pair the PC then we presume that
-             ;; we're in an assembly-routine and that reg_CODE is, in
-             ;; fact, the right thing to use...  And that it will do
-             ;; no harm to return it here anyway even if it isn't.
-             (normalize-candidate
-              (boxed-context-register context sb-vm::code-offset)))
+                              ;; If we can't actually pair the PC then we presume that
+                              ;; we're in an assembly-routine and that reg_CODE is, in
+                              ;; fact, the right thing to use...  And that it will do
+                              ;; no harm to return it here anyway even if it isn't.
+                              (normalize-candidate
+                               #+ppc64
+                               (make-lisp-obj (logior
+                                               (context-register context sb-vm::code-offset)
+                                               sb-vm:other-pointer-lowtag)
+                                              nil)
+                               #-ppc64
+                               (boxed-context-register context sb-vm::code-offset)))
       (let ((candidate
-             (normalize-candidate
-              (boxed-context-register context boxed-reg-offset))))
+              (normalize-candidate
+               (boxed-context-register context boxed-reg-offset))))
         (when (and (not (symbolp candidate)) ;; NIL or :UNDEFINED-FUNCTION
                    (nth-value 1 (context-code-pc-offset context candidate)))
+          (print boxed-reg-offset)
           (return candidate))))))
 
 ;;;; frame utilities
