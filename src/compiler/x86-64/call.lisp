@@ -305,24 +305,29 @@
          (inst mov rsp-tn rbx-tn)))
       (t
        (collect ((defaults))
-         (let ((default-stack-slots (gen-label)))
+         (let ((default-stack-slots (gen-label))
+               (used-registers
+                 (loop for i from 1 below register-arg-count
+                       for tn = (tn-ref-tn (setf values (tn-ref-across values)))
+                       unless (eq (tn-kind tn) :unused)
+                       collect tn
+                       finally (setf values (tn-ref-across values))))
+               (used-stack-slots-p
+                 (loop for ref = values then (tn-ref-across ref)
+                       while ref
+                       thereis (neq (tn-kind (tn-ref-tn ref)) :unused))))
           (assemble ()
             (note-this-location vop :unknown-return)
-            ;; Branch off to the MV case.
-            (inst jmp :c regs-defaulted)
-            ;; Do the single value case.
-            ;; Default the register args
-            (do ((i 1 (1+ i))
-                 (val (tn-ref-across values) (tn-ref-across val)))
-                ((= i register-arg-count) (setf values val))
-              (unless (eq (tn-kind (tn-ref-tn val)) :unused)
-                (inst mov (tn-ref-tn val) nil-value)))
-            (move rbx-tn rsp-tn)
-            (if (loop for ref = values then (tn-ref-across ref)
-                      while ref
-                      thereis (neq (tn-kind (tn-ref-tn ref)) :unused))
-                (inst jmp default-stack-slots)
-                (inst jmp defaulting-done))
+            ;; If it returned exactly one value the registers and the
+            ;; stack slots need to be filled with NIL.
+            (cond (used-stack-slots-p
+                   (inst jmp :nc default-stack-slots))
+                  (t
+                   (inst jmp :c regs-defaulted)
+                   (loop for reg in used-registers
+                         do (inst mov reg nil-value))
+                   (move rbx-tn rsp-tn)
+                   (inst jmp defaulting-done)))
             REGS-DEFAULTED
             (do ((i register-arg-count (1+ i))
                  (val values (tn-ref-across val)))
@@ -347,6 +352,9 @@
               (when defaults
                 (assemble (:elsewhere)
                   (emit-label default-stack-slots)
+                  (loop for reg in used-registers
+                        do (inst mov reg nil-value))
+                  (move rbx-tn rsp-tn)
                   (dolist (default defaults)
                     (emit-label (car default))
                     (inst mov (cdr default) nil-value))
