@@ -1156,7 +1156,6 @@ register."
                (boxed-context-register context boxed-reg-offset))))
         (when (and (not (symbolp candidate)) ;; NIL or :UNDEFINED-FUNCTION
                    (nth-value 1 (context-code-pc-offset context candidate)))
-          (print boxed-reg-offset)
           (return candidate))))))
 
 ;;;; frame utilities
