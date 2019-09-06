@@ -1145,10 +1145,10 @@ register."
                               ;; no harm to return it here anyway even if it isn't.
                               (normalize-candidate
                                #+ppc64
-                               (make-lisp-obj (logior
-                                               (context-register context sb-vm::code-offset)
-                                               sb-vm:other-pointer-lowtag)
-                                              nil)
+                               (let ((code (context-register context sb-vm::code-offset)))
+                                 (%make-lisp-obj (if (logtest sb-vm:lowtag-mask code)
+                                                     code
+                                                     (logior code sb-vm:other-pointer-lowtag))))
                                #-ppc64
                                (boxed-context-register context sb-vm::code-offset)))
       (let ((candidate
