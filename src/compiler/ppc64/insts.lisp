@@ -20,6 +20,8 @@
             sb-vm::registers sb-vm::float-registers
             ;; TNs and offsets
             sb-vm::code-tn
+            #-64-bit
+            sb-vm::zero-tn
             sb-vm::code-tn-lowtag
             sb-vm::code-offset
             sb-vm::lip-tn
