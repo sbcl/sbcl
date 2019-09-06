@@ -1265,7 +1265,7 @@ register."
          do (when (sap= fp
                         (descriptor-sap
                          (catch-ref catch-block-cfp-slot)))
-              (push (cons (print (catch-ref catch-block-tag-slot))
+              (push (cons (catch-ref catch-block-tag-slot)
                           (make-compiled-code-location
                            (catch-entry-offset) (frame-debug-fun frame)))
                     reversed-result))
