@@ -1239,8 +1239,11 @@ register."
                (sap-ref-lispobj catch (* slot n-word-bytes)))
              #-(or x86 x86-64)
              (catch-entry-offset ()
-               (let ((lra (catch-ref catch-block-entry-pc-slot))
-                     (component (catch-ref catch-block-code-slot)))
+               (let* ((lra (catch-ref catch-block-entry-pc-slot))
+                      (component (catch-ref catch-block-code-slot))
+                      #+ppc64
+                      (component (%make-lisp-obj (logior (ash component n-fixnum-tag-bits)
+                                                         other-pointer-lowtag))))
                  (* (- (1+ (get-header-data lra))
                        (code-header-words component))
                     n-word-bytes)))
@@ -1262,7 +1265,7 @@ register."
          do (when (sap= fp
                         (descriptor-sap
                          (catch-ref catch-block-cfp-slot)))
-              (push (cons (catch-ref catch-block-tag-slot)
+              (push (cons (print (catch-ref catch-block-tag-slot))
                           (make-compiled-code-location
                            (catch-entry-offset) (frame-debug-fun frame)))
                     reversed-result))
