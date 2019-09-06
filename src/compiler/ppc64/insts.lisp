@@ -2302,6 +2302,7 @@
   (let ((label (gen-label)))
     (values label label)))
 
+#+ppc64
 (defun sort-inline-constants (constants)
   (stable-sort constants #'> :key (lambda (constant)
                                     (size-nbyte (caar constant)))))
