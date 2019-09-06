@@ -53,7 +53,7 @@
 static FILE *ldb_in = 0;
 static int ldb_in_fd = -1;
 
-typedef void cmd(char **ptr);
+typedef int cmd(char **ptr);
 
 static cmd dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
@@ -64,7 +64,7 @@ static cmd kill_cmd;
 
 static struct cmd {
     char *cmd, *help;
-    void (*fn)(char **ptr);
+    int (*fn)(char **ptr);
 } supported_cmds[] = {
     {"help", "Display this help information.", help_cmd},
     {"?", "(an alias for help)", help_cmd},
@@ -101,7 +101,7 @@ visible(unsigned char c)
         return c;
 }
 
-static void
+static int
 dump_cmd(char **ptr)
 {
     static char *lastaddr = 0;
@@ -129,7 +129,7 @@ dump_cmd(char **ptr)
 
     if (count == 0) {
         printf("COUNT must be non-zero.\n");
-        return;
+        return 0;
     }
 
     lastcount = count;
@@ -212,32 +212,36 @@ dump_cmd(char **ptr)
     }
 
     lastaddr = addr;
+    return 0;
 }
 
-static void
+static int
 print_cmd(char **ptr)
 {
     lispobj obj = parse_lispobj(ptr);
 
     print(obj);
+    return 0;
 }
 
-static void
+static int
 pte_cmd(char **ptr)
 {
     extern void gc_show_pte(lispobj);
     gc_show_pte(parse_lispobj(ptr));
+    return 0;
 }
 
-static void
+static int
 kill_cmd(char **ptr)
 {
 #ifndef LISP_FEATURE_WIN32
     kill(getpid(), parse_number(ptr));
 #endif
+    return 0;
 }
 
-static void
+static int
 regs_cmd(char __attribute__((unused)) **ptr)
 {
     struct thread __attribute__((unused)) *thread=arch_os_get_current_thread();
@@ -271,6 +275,7 @@ regs_cmd(char __attribute__((unused)) **ptr)
 #ifndef LISP_FEATURE_GENCGC
     printf("TRIGGER\t=\t%p\n", (void*)current_auto_gc_trigger);
 #endif
+    return 0;
 }
 
 /* (There used to be call_cmd() here, to call known-at-cold-init-time
@@ -278,13 +283,14 @@ regs_cmd(char __attribute__((unused)) **ptr)
  * sbcl-0.7.5.1. See older CVS versions if you want to resuscitate
  * it.) */
 
-static void
+static int
 flush_cmd(char __attribute__((unused)) **ptr)
 {
     flush_vars();
+    return 0;
 }
 
-static void
+static int
 quit_cmd(char __attribute__((unused)) **ptr)
 {
     char buf[10];
@@ -298,9 +304,10 @@ quit_cmd(char __attribute__((unused)) **ptr)
         printf("\nUnable to read response, assuming y.\n");
         exit(1);
     }
+    return 0;
 }
 
-static void
+static int
 help_cmd(char __attribute__((unused)) **ptr)
 {
     struct cmd *cmd;
@@ -308,20 +315,20 @@ help_cmd(char __attribute__((unused)) **ptr)
     for (cmd = supported_cmds; cmd->cmd != NULL; cmd++)
         if (cmd->help != NULL)
             printf("%s\t%s\n", cmd->cmd, cmd->help);
+    return 0;
 }
 
-static int done;
-
-static void
+static int
 exit_cmd(char __attribute__((unused)) **ptr)
 {
-    done = 1;
+    return 1; // quit flag
 }
 
-static void
+static int
 purify_cmd(char __attribute__((unused)) **ptr)
 {
     purify(NIL, NIL);
+    return 0;
 }
 
 static void
@@ -344,7 +351,7 @@ print_context(os_context_t *context)
 #endif
 }
 
-static void
+static int
 print_context_cmd(char **ptr)
 {
     int free_ici;
@@ -374,9 +381,10 @@ print_context_cmd(char **ptr)
             print_context(nth_interrupt_context(free_ici - 1, thread));
         }
     }
+    return 0;
 }
 
-static void
+static int
 backtrace_cmd(char **ptr)
 {
     void lisp_backtrace(int frames);
@@ -389,9 +397,10 @@ backtrace_cmd(char **ptr)
 
     printf("Backtrace:\n");
     lisp_backtrace(n);
+    return 0;
 }
 
-static void
+static int
 catchers_cmd(char __attribute__((unused)) **ptr)
 {
     struct catch_block *catch = (struct catch_block *)
@@ -417,15 +426,17 @@ catchers_cmd(char __attribute__((unused)) **ptr)
             catch = catch->previous_catch;
         }
     }
+    return 0;
 }
 
-static void
+static int
 grab_sigs_cmd(char __attribute__((unused)) **ptr)
 {
     extern void sigint_init(void);
 
     printf("Grabbing signals.\n");
     sigint_init();
+    return 0;
 }
 
 static void
@@ -449,7 +460,7 @@ sub_monitor(void)
         ldb_in_fd = fileno(ldb_in);
     }
 
-    while (!done) {
+    while (1) {
         printf("ldb> ");
         fflush(stdout);
         line = fgets(buf, sizeof(buf), ldb_in);
@@ -480,7 +491,8 @@ sub_monitor(void)
             printf("unknown command: ``%s''\n", token);
         else {
             reset_printer();
-            (*found->fn)(&ptr);
+            int done = (*found->fn)(&ptr);
+            if (done) return;
         }
     }
 }
@@ -497,8 +509,6 @@ ldb_monitor()
     setjmp(curbuf);
 
     sub_monitor();
-
-    done = 0;
 
     memcpy(curbuf, oldbuf, sizeof(curbuf));
 }
