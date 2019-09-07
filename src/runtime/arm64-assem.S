@@ -102,6 +102,8 @@ call_into_lisp:
 #endif
 	// Clear the boxed registers that don't already have something
 	// in them.
+        mov     reg_R0, #0
+        mov     reg_R1, #0
         mov     reg_R2, #0
         mov     reg_R3, #0
         mov     reg_R4, #0
