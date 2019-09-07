@@ -3198,13 +3198,7 @@
   `(nth-value 1 (truncate number divisor)))
 
 (deftransform mod ((number divisor))
-  `(let ((rem (rem number divisor)))
-     (if (and (not (zerop rem))
-              (if (minusp divisor)
-                  (plusp number)
-                  (minusp number)))
-         (+ rem divisor)
-         rem)))
+  `(nth-value 1 (floor number divisor)))
 
 ;;; If arg is a constant power of two, turn FLOOR into a shift and
 ;;; mask. If CEILING, add in (1- (ABS Y)), do FLOOR and correct a
