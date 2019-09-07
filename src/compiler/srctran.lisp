@@ -3194,6 +3194,23 @@
          (values (+ tru 1) (- rem divisor))
          (values tru rem))))
 
+;;; Float precision prevents from doing the same
+(deftransform floor ((number divisor) (rational rational))
+  `(multiple-value-bind (tru rem) (truncate number divisor)
+     (if (if (minusp divisor)
+             (> rem 0)
+             (< rem 0))
+         (values (1- tru) (+ rem divisor))
+         (values tru rem))))
+
+(deftransform ceiling ((number divisor) (rational rational))
+  `(multiple-value-bind (tru rem) (truncate number divisor)
+     (if (if (minusp divisor)
+             (< rem 0)
+             (> rem 0))
+         (values (+ tru 1) (- rem divisor))
+         (values tru rem))))
+
 (deftransform rem ((number divisor))
   `(nth-value 1 (truncate number divisor)))
 
