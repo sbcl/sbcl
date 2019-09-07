@@ -329,9 +329,9 @@
                              (pathname pathspec)
                              (sane-default-pathname-defaults)))))
              (when (wild-pathname-p pathname)
-               (simple-file-perror
-                "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
-                pathname nil query-for pathspec))
+               (sb-kernel::%file-error
+                pathname "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
+                query-for pathspec))
              (return (%query-file-system pathname query-for errorp)))
          (use-value (value)
            :report "Specify a different path."
@@ -406,7 +406,7 @@
                  (realpath
                   (parse realpath :as-directory t))
                  (errorp
-                  (simple-file-perror "couldn't resolve ~A" filename errno)))))
+                  (file-perror filename errno "couldn't resolve ~A")))))
            (resolve-problematic-symlink (filename errno realpath-failed)
              ;; SBCL has for many years had a policy that a pathname
              ;; that names an existing, dangling or self-referential
@@ -443,8 +443,8 @@
                     (:write-date (+ unix-to-universal-time mtime))))
                  ;; The file doesn't exist; maybe error.
                  (errorp
-                  (simple-file-perror "Failed to find the ~*~A~2:* of ~A"
-                                      pathname errno query-for))))))
+                  (file-perror
+                   pathname errno "Failed to find the ~*~A~2:* of ~A" query-for))))))
     (binding* ((filename (native-namestring pathname :as-file t))
                ((existsp errno nil mode nil uid nil nil nil nil mtime)
                 (sb-unix:unix-stat filename)))
@@ -504,8 +504,6 @@ or if PATHSPEC is a wild pathname."
 
 ;;;; miscellaneous other operations
 
-(/show0 "filesys.lisp 700")
-
 (defun rename-file (file new-name)
   "Rename FILE to have the specified NEW-NAME. If FILE is a stream open to a
 file, then the associated file is renamed."
@@ -517,18 +515,13 @@ file, then the associated file is renamed."
          (new-namestring (native-namestring (physicalize-pathname new-name)
                                             :as-file t)))
     (unless new-namestring
-      (error 'simple-file-error
-             :pathname new-name
-             :format-control "~S can't be created."
-             :format-arguments (list new-name)))
+      (sb-kernel::%file-error new-name "~S can't be created." new-name))
     (multiple-value-bind (res error)
         (sb-unix:unix-rename original-namestring new-namestring)
       (unless res
-        (error 'simple-file-error
-               :pathname new-name
-               :format-control "~@<couldn't rename ~2I~_~A ~I~_to ~2I~_~A: ~
-                                ~I~_~A~:>"
-               :format-arguments (list original new-name (strerror error))))
+        (file-perror
+         new-name error
+         "~@<couldn't rename ~2I~_~A ~I~_to ~2I~_~A~:>" original new-name))
       (when (streamp file)
         (file-name file new-name))
       (values new-name old-truename (truename new-name)))))
@@ -552,15 +545,16 @@ per standard Unix unlink() behaviour."
                      (values nil (sb-win32:get-last-error)))
         (unless res
           (with-simple-restart (continue "Return T")
-            (file-perror 'delete-file-error "Couldn't delete ~A" namestring err)))))
+            (file-perror namestring err 'delete-file-error
+                         :format-control "Couldn't delete ~A"
+                         :format-arguments (list namestring))))))
   t)
 
 (defun directorize-pathname (pathname)
   (cond
     ((wild-pathname-p pathname)
-     (simple-file-perror
-      "Cannot compute directory pathname for wild pathname ~S"
-      pathname))
+     (sb-kernel::%file-error
+      pathname "Cannot compute directory pathname for wild pathname ~S" pathname))
     ((let* ((name (pathname-name pathname))
             (namep (pathname-component-present-p name))
             (type (pathname-type pathname))
@@ -627,9 +621,9 @@ exist or if is a file or a symbolic link."
                   (get-errno))
                  (if res
                      dir
-                     (simple-file-perror
-                      "Could not delete directory ~A"
-                      namestring errno))))))
+                     (file-perror
+                      namestring errno
+                      "Could not delete directory ~A" namestring))))))
     (let ((physical (directorize-pathname
                      (physicalize-pathname
                       (merge-pathnames
@@ -780,10 +774,9 @@ filenames."
                      ;; pathnames. This is just wrong.
                      (case (car pieces)
                        ((:absolute :wild-inferiors)
-                        (error 'simple-file-error
-                               :format-control "Invalid use of ~S after ~S."
-                               :format-arguments (list piece (car pieces))
-                               :pathname pathname))
+                        (sb-kernel::%file-error
+                         pathname
+                         "Invalid use of ~S after ~S." piece (car pieces)))
                        ((:relative :up :back)
                         (push piece pieces))
                        (t
@@ -1237,9 +1230,7 @@ Experimental: interface subject to change."
   (let ((pathname (physicalize-pathname (merge-pathnames (pathname pathspec))))
         (created-p nil))
     (when (wild-pathname-p pathname)
-      (error 'simple-file-error
-             :format-control "bad place for a wild pathname"
-             :pathname pathspec))
+      (sb-kernel::%file-error pathspec "bad place for a wild pathname"))
     (let* ((dir (pathname-directory pathname))
            (*default-pathname-defaults*
              (make-pathname :directory dir :device (pathname-device pathname)))
@@ -1262,22 +1253,15 @@ Experimental: interface subject to change."
                   (sb-unix:unix-mkdir namestring mode)
                   (unless (directory-pathname-p (probe-file newpath))
                     (restart-case
-                        (error
-                         'simple-file-error
-                         :pathname pathspec
-                         :format-control
-                         (if (and probed
-                                  (not (directory-pathname-p probed)))
-                             "Can't create directory ~A,~
-                                 ~%a file with the same name already exists."
-                             "Can't create directory ~A")
-                         :format-arguments (list namestring))
+                        (sb-kernel::%file-error
+                         pathspec
+                         "Can't create directory ~A~:[~;,~%a file with ~
+                          the same name already exists.~]"
+                         namestring
+                         (and probed (not (directory-pathname-p probed))))
                       (retry ()
                         :report "Retry directory creation."
                         (ensure-directories-exist
-                         pathspec
-                         :verbose verbose :mode mode))))
+                         pathspec :verbose verbose :mode mode))))
                   (setf created-p t)))))
       (values pathspec created-p))))
-
-(/show0 "filesys.lisp 1000")

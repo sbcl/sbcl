@@ -1841,6 +1841,13 @@ the restart does not exist."))
 (define-condition simple-control-error (simple-condition control-error) ())
 (define-condition simple-file-error    (simple-condition file-error)    ())
 
+(defun %file-error (pathname &optional datum &rest arguments)
+  (typecase datum
+    (format-control (error 'simple-file-error :pathname pathname
+                                              :format-control datum
+                                              :format-arguments arguments))
+    (t (apply #'error datum :pathname pathname arguments))))
+
 (define-condition file-exists (simple-file-error) ())
 (define-condition file-does-not-exist (simple-file-error) ())
 (define-condition delete-file-error (simple-file-error) ())

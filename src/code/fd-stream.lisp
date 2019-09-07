@@ -459,17 +459,19 @@
          :format-arguments (list format-control
                                  (list* stream format-arguments)
                                  (when errno (strerror errno)))))
-(defun file-perror (condition format-control pathname &optional errno &rest format-arguments)
-  (declare (optimize allow-non-returning-tail-call))
-  (error condition
-         :pathname pathname
-         :format-control "~@<~?~@[: ~2I~_~A~]~:>"
-         :format-arguments (list format-control
-                                 (list* pathname format-arguments)
-                                 (when errno (strerror errno)))))
 
-(defun simple-file-perror (format-control pathname &optional errno &rest format-arguments)
-  (apply #'file-perror 'simple-file-error format-control pathname errno format-arguments))
+(defun file-perror (pathname errno &optional datum &rest arguments)
+  (declare (optimize allow-non-returning-tail-call))
+  (multiple-value-bind (condition-type arguments)
+      (typecase datum
+        (format-control
+         (values 'simple-file-error
+                 (list :format-control "~@<~?~@[: ~2I~_~A~]~:>"
+                       :format-arguments (list datum arguments
+                                               (when errno (strerror errno))))))
+        (t
+         (values datum arguments)))
+    (apply #'error condition-type :pathname pathname arguments)))
 
 (defun c-string-encoding-error (external-format code)
   (declare (optimize allow-non-returning-tail-call))
@@ -2011,13 +2013,10 @@
                         ;; others are SIMPLE-FILE-ERRORS? Surely they should
                         ;; all be the same?
                         (unless okay
-                          (error 'simple-stream-error
-                                 :format-control
-                                 "~@<Couldn't restore ~S to its original contents ~
-                                  from ~S while closing ~S: ~2I~_~A~:>"
-                                 :format-arguments
-                                 (list file orig fd-stream (strerror err))
-                                 :stream fd-stream))))
+                          (simple-stream-perror
+                           fd-stream "~@<Couldn't restore ~S to its original ~
+                                      contents from ~S while closing ~S~:>"
+                           err file orig fd-stream))))
                     ;; We can't restore the original, and aren't
                     ;; appending, so nuke that puppy.
                     ;;
@@ -2032,24 +2031,18 @@
                     (multiple-value-bind (okay err)
                         (sb-unix:unix-unlink file)
                       (unless okay
-                        (error 'simple-file-error
-                               :pathname file
-                               :format-control
-                               "~@<Couldn't remove ~S while closing ~S: ~2I~_~A~:>"
-                               :format-arguments
-                               (list file fd-stream (strerror err)))))))))
+                        (file-perror
+                         file err
+                         "~@<Couldn't remove ~S while closing ~S~:>" file fd-stream)))))))
            (t
             (finish-fd-stream-output fd-stream)
             (let ((orig (fd-stream-original fd-stream)))
               (when (and orig (fd-stream-delete-original fd-stream))
                 (multiple-value-bind (okay err) (sb-unix:unix-unlink orig)
                   (unless okay
-                    (error 'simple-file-error
-                           :pathname orig
-                           :format-control
-                           "~@<couldn't delete ~S while closing ~S: ~2I~_~A~:>"
-                           :format-arguments
-                           (list orig fd-stream (strerror err)))))))
+                    (file-perror
+                     orig err
+                     "~@<Couldn't delete ~S while closing ~S~:>" orig fd-stream)))))
             ;; In case of no-abort close, don't *really* close the
             ;; stream until the last moment -- the cleaning up of the
             ;; original can be done first.
@@ -2318,11 +2311,10 @@
   (multiple-value-bind (okay err) (sb-unix:unix-rename namestring original)
     (if okay
         t
-        (error 'simple-file-error
-               :pathname namestring
-               :format-control
-               "~@<couldn't rename ~2I~_~S ~I~_to ~2I~_~S: ~4I~_~A~:>"
-               :format-arguments (list namestring original (strerror err))))))
+        (file-perror
+         namestring err
+         "~@<couldn't rename ~2I~_~S ~I~_to ~2I~_~S~:>" namestring original))))
+
 
 (defun open (filename
              &key
