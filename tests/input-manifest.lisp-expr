@@ -67,4 +67,6 @@
   "tests/data/HangulSyllableType.txt"
   "tests/data/GraphemeBreakProperty.txt"
   "tests/data/WordBreakProperty.txt"
-  "tests/data/SentenceBreakProperty.txt"))
+  "tests/data/SentenceBreakProperty.txt")
+ ("filesys.pure.lisp"
+  "exists"))
