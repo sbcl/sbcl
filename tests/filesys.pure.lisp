@@ -359,7 +359,8 @@
                   (delete-file (concatenate 'string filename ".bak")))))))
     (do-open 'sb-impl::supersede "bar")
     (do-open 'sb-impl::overwrite "bar")
-    (do-open 'sb-impl::rename "bar")))
+    (do-open 'sb-impl::rename "bar")
+    (do-open 'append "foobar")))
 
 (with-test (:name (parse-native-namestring :canon) :skipped-on (not :unix))
   (let ((pathname (parse-native-namestring "foo/bar//baz")))
