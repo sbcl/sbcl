@@ -359,16 +359,14 @@
                      (sane-default-pathname-defaults)
                      :as-directory (eq :directory kind))))
            (errorp
-            (simple-file-perror
-             "Failed to find the ~*~A~2:* of ~A"
-             filename (sb-win32:get-last-error) query-for)))))
+            (file-perror filename (sb-win32:get-last-error)
+                         "Failed to find the ~a of ~A" query-for filename)))))
       (:write-date
        (cond
          ((sb-win32::native-file-write-date filename))
          (errorp
-          (simple-file-perror
-           "Failed to find the ~*~A~2:* of ~A"
-           filename (sb-win32:get-last-error) query-for)))))))
+          (file-perror filename (sb-win32:get-last-error)
+                       "Failed to find the ~a of ~A" query-for filename)))))))
 
 #-win32
 (defun %query-file-system (pathname query-for errorp)
