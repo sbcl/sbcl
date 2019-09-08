@@ -330,8 +330,8 @@
                              (sane-default-pathname-defaults)))))
              (when (wild-pathname-p pathname)
                (sb-kernel::%file-error
-                pathname "Can't find the ~*~A~2:* of wild pathname ~A~* (physicalized from ~A)."
-                query-for pathspec))
+                pathname "Can't find the ~A of wild pathname ~A (physicalized from ~A)."
+                query-for pathname pathspec))
              (return (%query-file-system pathname query-for errorp)))
          (use-value (value)
            :report "Specify a different path."
@@ -444,7 +444,7 @@
                  ;; The file doesn't exist; maybe error.
                  (errorp
                   (file-perror
-                   pathname errno "Failed to find the ~*~A~2:* of ~A" query-for))))))
+                   pathname errno "Failed to find the ~A of ~A" query-for pathname))))))
     (binding* ((filename (native-namestring pathname :as-file t))
                ((existsp errno nil mode nil uid nil nil nil nil mtime)
                 (sb-unix:unix-stat filename)))

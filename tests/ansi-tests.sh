@@ -1,7 +1,8 @@
 #!/bin/sh -e
 
-git config --global core.autocrlf false
-git clone https://github.com/sbcl/ansi-test.git
+if [ ! -e ansi-test ]; then
+   git clone https://github.com/sbcl/ansi-test.git
+fi
 
 cd ansi-test
 ../../run-sbcl.sh --lose-on-corruption --disable-ldb \
