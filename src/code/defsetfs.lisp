@@ -255,7 +255,7 @@
         (setq all-dummies (append all-dummies dummies (cdr newval))
               all-vals (append all-vals vals
                                (mapcar (constantly nil) (cdr newval)))
-              newvals (append newvals (list (car newval))))
+              newvals (append newvals (and newval (list (car newval)))))
         (push setter setters)
         (push getter getters)))
     (values all-dummies all-vals newvals
