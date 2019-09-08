@@ -2014,9 +2014,10 @@
                         ;; all be the same?
                         (unless okay
                           (simple-stream-perror
-                           fd-stream "~@<Couldn't restore ~S to its original ~
-                                      contents from ~S while closing ~S~:>"
-                           err file orig fd-stream))))
+                           "~@<Couldn't restore ~S to its original ~
+                               contents from ~S while closing ~S~:>"
+                           fd-stream err
+                           file orig fd-stream))))
                     ;; We can't restore the original, and aren't
                     ;; appending, so nuke that puppy.
                     ;;
