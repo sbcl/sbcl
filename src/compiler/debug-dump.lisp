@@ -418,6 +418,7 @@
                         (not (lambda-var-explicit-value-cell var))
                         (neq (lambda-physenv fun)
                              (lambda-physenv (lambda-var-home var)))))
+         (large-fixnums (>= (integer-length sb-xc:most-positive-fixnum) 62))
          more)
     (declare (type index flags))
     (when minimal
@@ -446,18 +447,17 @@
     (when (and same-name-p
                (not (or more minimal)))
       (setf flags (logior flags compiled-debug-var-same-name-p)))
-    #+64-bit ; FIXME: fails if SB-VM:N-FIXNUM-TAG-BITS is 3
-              ; which early-vm.lisp claims to work
-    (cond (indirect
-           (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
-           (when save-tn
-             (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))
-          (t
-           (if (and tn (tn-offset tn))
-               (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
-               (aver minimal))
-           (when save-tn
-             (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn)))))
+    (when large-fixnums
+      (cond (indirect
+             (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
+             (when save-tn
+               (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))
+            (t
+             (if (and tn (tn-offset tn))
+                 (setf (ldb (byte 27 8) flags) (tn-sc+offset tn))
+                 (aver minimal))
+             (when save-tn
+               (setf (ldb (byte 27 35) flags) (tn-sc+offset save-tn))))))
     (vector-push-extend flags buffer)
     (unless (or minimal
                 same-name-p
@@ -475,14 +475,12 @@
            ;; accessed through a saved frame pointer.
            ;; The first one/two sc-offsets are for the frame pointer,
            ;; the third is for the stack offset.
-           #-64-bit
-           (vector-push-extend (tn-sc+offset tn) buffer)
-           #-64-bit
-           (when save-tn
-             (vector-push-extend (tn-sc+offset save-tn) buffer))
-           (vector-push-extend (tn-sc+offset (leaf-info var)) buffer))
-          #-64-bit
-          (t
+           (unless large-fixnums
+             (vector-push-extend (tn-sc+offset tn) buffer)
+             (when save-tn
+               (vector-push-extend (tn-sc+offset save-tn) buffer))
+             (vector-push-extend (tn-sc+offset (leaf-info var)) buffer)))
+          ((not large-fixnums)
            (if (and tn (tn-offset tn))
                (vector-push-extend (tn-sc+offset tn) buffer)
                (aver minimal))

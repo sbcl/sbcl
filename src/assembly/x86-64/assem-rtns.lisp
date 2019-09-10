@@ -247,7 +247,8 @@
   (inst jmp :b undefined)
 
   (loadw length vector 1 other-pointer-lowtag)
-  (inst mov fun (ea (- 8 other-pointer-lowtag) vector length 4))
+  (inst mov fun (ea (- 8 other-pointer-lowtag) vector length
+                    (ash 1 (- word-shift n-fixnum-tag-bits))))
 
   (inst jmp (ea (- (* fdefn-raw-addr-slot n-word-bytes) other-pointer-lowtag) fun))
   UNDEFINED
