@@ -68,7 +68,7 @@
   (:arg-types unsigned-num unsigned-num)
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic"))
+  (:note "inline word arithmetic"))
 
 (define-vop (fast-signed-binop fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg))
@@ -76,22 +76,12 @@
   (:arg-types signed-num signed-num)
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
-  (:note "inline (signed-byte 32) arithmetic"))
+  (:note "inline signed-word arithmetic"))
 
 (define-vop (fast-fixnum-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg)))
   (:info y)
-  (:arg-types tagged-num
-              (:constant (and (signed-byte 14) (not (integer 0 0)))))
-  (:results (r :scs (any-reg)))
-  (:result-types tagged-num)
-  (:note "inline fixnum arithmetic"))
-
-(define-vop (fast-fixnum-binop30-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg)))
-  (:info y)
-  (:arg-types tagged-num
-              (:constant (and (signed-byte 30) (not (integer 0 0)))))
+  (:arg-types tagged-num (:constant fixnum))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum arithmetic"))
@@ -99,17 +89,7 @@
 (define-vop (fast-fixnum-logop-c fast-safe-arith-op)
   (:args (x :target r :scs (any-reg)))
   (:info y)
-  (:arg-types tagged-num
-              (:constant (and (unsigned-byte 14) (not (integer 0 0)))))
-  (:results (r :scs (any-reg)))
-  (:result-types tagged-num)
-  (:note "inline fixnum logical op"))
-
-(define-vop (fast-fixnum-logop30-c fast-safe-arith-op)
-  (:args (x :target r :scs (any-reg)))
-  (:info y)
-  (:arg-types tagged-num
-              (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
+  (:arg-types tagged-num (:constant fixnum))
   (:results (r :scs (any-reg)))
   (:result-types tagged-num)
   (:note "inline fixnum logical op"))
@@ -117,74 +97,34 @@
 (define-vop (fast-unsigned-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg)))
   (:info y)
-  (:arg-types unsigned-num
-              (:constant (and (signed-byte 16) (not (integer 0 0)))))
+  (:arg-types unsigned-num (:constant word))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic"))
-
-(define-vop (fast-unsigned-binop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg)))
-  (:info y)
-  (:arg-types unsigned-num
-              (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) arithmetic"))
-
-(define-vop (fast-signed-binop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg)))
-  (:info y)
-  (:arg-types signed-num
-              (:constant (and (signed-byte 31) (not (integer 0 0)))))
-  (:results (r :scs (signed-reg)))
-  (:result-types signed-num)
-  (:note "inline (signed-byte 32) arithmetic"))
+  (:note "inline word arithmetic"))
 
 (define-vop (fast-unsigned-logop-c fast-safe-arith-op)
   (:args (x :target r :scs (unsigned-reg)))
   (:info y)
-  (:arg-types unsigned-num
-              (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
+  (:arg-types unsigned-num (:constant word))
   (:results (r :scs (unsigned-reg)))
   (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) logical op"))
-
-(define-vop (fast-unsigned-logop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (unsigned-reg)))
-  (:info y)
-  (:arg-types unsigned-num
-              (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
-  (:results (r :scs (unsigned-reg)))
-  (:result-types unsigned-num)
-  (:note "inline (unsigned-byte 32) logical op"))
-
-(define-vop (fast-signed-logop32-c fast-safe-arith-op)
-  (:args (x :target r :scs (signed-reg)))
-  (:info y)
-  (:arg-types signed-num
-              (:constant (and (unsigned-byte 30) (not (integer 0 0)))))
-  (:results (r :scs (signed-reg)))
-  (:result-types signed-num)
-  (:note "inline (signed-byte 32) logical op"))
+  (:note "inline word logical op"))
 
 (define-vop (fast-signed-binop-c fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg)))
   (:info y)
-  (:arg-types signed-num
-              (:constant (and (signed-byte 16) (not (integer 0 0)))))
+  (:arg-types signed-num (:constant signed-word))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
-  (:note "inline (signed-byte 32) arithmetic"))
+  (:note "inline signed-word arithmetic"))
 
 (define-vop (fast-signed-logop-c fast-safe-arith-op)
   (:args (x :target r :scs (signed-reg)))
   (:info y)
-  (:arg-types signed-num
-              (:constant (and (unsigned-byte 16) (not (integer 0 0)))))
+  (:arg-types signed-num (:constant signed-word))
   (:results (r :scs (signed-reg)))
   (:result-types signed-num)
-  (:note "inline (signed-byte 32) logical op"))
+  (:note "inline signed-word logical op"))
 
 (defmacro !define-var-binop (translate untagged-penalty op
                              &optional arg-swap restore-fixnum-mask)
@@ -217,181 +157,6 @@
              `(inst ,op r y x)
              `(inst ,op r x y))))))
 
-;;; FIXME: the code has really only been checked for adds; we could do
-;;; subtracts, too, but my brain is not up to the task of figuring out
-;;; signs and borrows.
-(defmacro !define-const-binop (translate untagged-penalty op &optional (shifted-op nil))
-  `(progn
-     (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                  ,(if shifted-op
-                       'fast-fixnum-binop30-c
-                       'fast-fixnum-binop-c))
-       (:translate ,translate)
-       ,@(when shifted-op
-          `((:temporary (:sc any-reg :target r) temp)))
-       (:generator 1
-        ,(if shifted-op
-             `(let* ((y (fixnumize y))
-                     (high-half (ldb (byte 16 16) y))
-                     (low-half (ldb (byte 16 0) y)))
-               ;; Compare %LR in insts.lisp.
-               (cond
-                 ((and (logbitp 15 low-half) (= high-half #xffff))
-                  ;; Let sign-extension do the work for us, but make sure
-                  ;; to turn LOW-HALF into a signed integer.
-                  (inst ,op r x (dpb low-half (byte 16 0) -1)))
-                 ((and (not (logbitp 15 low-half)) (zerop high-half))
-                  (inst ,op r x low-half))
-                 ((zerop low-half)
-                  (inst ,shifted-op r x (if (logbitp 15 high-half)
-                                            (dpb high-half (byte 16 0) -1)
-                                            high-half)))
-                 (t
-                  ;; Check to see whether compensating for the sign bit
-                  ;; of LOW-HALF is necessary.
-                  (let ((high-half (let ((top (if (logbitp 15 low-half)
-                                                  (ldb (byte 16 0)
-                                                       (1+ high-half))
-                                                  high-half)))
-                                     (if (logbitp 15 top)
-                                         (dpb top (byte 16 0) -1)
-                                         top))))
-                    (inst ,shifted-op temp x high-half)
-                    (inst ,op r temp low-half)))))
-             `(inst ,op r x (fixnumize y)))))
-     (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-                  ,(if shifted-op
-                       'fast-signed-binop32-c
-                       'fast-signed-binop-c))
-       (:translate ,translate)
-       ,@(when shifted-op
-          `((:temporary (:sc non-descriptor-reg :target r) temp)))
-       (:generator ,untagged-penalty
-        ,(if shifted-op
-             `(let ((high-half (ldb (byte 16 16) y))
-                    (low-half (ldb (byte 16 0) y)))
-               ;; Compare %LR in insts.lisp.
-               (cond
-                 ((and (logbitp 15 low-half) (= high-half #xffff))
-                  ;; Let sign-extension do the work for us, but make sure
-                  ;; to turn LOW-HALF into a signed integer.
-                  (inst ,op r x (dpb low-half (byte 16 0) -1)))
-                 ((and (not (logbitp 15 low-half)) (zerop high-half))
-                  (inst ,op r x low-half))
-                 ((zerop low-half)
-                  (inst ,shifted-op r x (if (logbitp 15 high-half)
-                                            (dpb high-half (byte 16 0) -1)
-                                            high-half)))
-                 (t
-                  ;; Check to see whether compensating for the sign bit
-                  ;; of LOW-HALF is necessary.
-                  (let ((high-half (let ((top (if (logbitp 15 low-half)
-                                                  (ldb (byte 16 0)
-                                                       (1+ high-half))
-                                                  high-half)))
-                                     (if (logbitp 15 top)
-                                         (dpb top (byte 16 0) -1)
-                                         top))))
-                    (inst ,shifted-op temp x high-half)
-                    (inst ,op r temp low-half)))))
-             `(inst ,op r x y))))
-     (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-                  ,(if shifted-op
-                       'fast-unsigned-binop32-c
-                       'fast-unsigned-binop-c))
-       (:translate ,translate)
-       ,@(when shifted-op
-          `((:temporary (:sc non-descriptor-reg :target r) temp)))
-       (:generator ,untagged-penalty
-        ,(if shifted-op
-             `(let ((high-half (ldb (byte 16 16) y))
-                    (low-half (ldb (byte 16 0) y)))
-               ;; Compare %LR in insts.lisp.
-               (cond
-                 ((and (logbitp 15 low-half) (= high-half #xffff))
-                  ;; Let sign-extension do the work for us, but make sure
-                  ;; to turn LOW-HALF into a signed integer.
-                  (inst ,op r x (dpb low-half (byte 16 0) -1)))
-                 ((and (not (logbitp 15 low-half)) (zerop high-half))
-                  (inst ,op r x low-half))
-                 ((zerop low-half)
-                  (inst ,shifted-op r x (if (logbitp 15 high-half)
-                                            (dpb high-half (byte 16 0) -1)
-                                            high-half)))
-                 (t
-                  ;; Check to see whether compensating for the sign bit
-                  ;; of LOW-HALF is necessary.
-                  (let ((high-half (let ((top (if (logbitp 15 low-half)
-                                                  (ldb (byte 16 0)
-                                                       (1+ high-half))
-                                                  high-half)))
-                                     (if (logbitp 15 top)
-                                         (dpb top (byte 16 0) -1)
-                                         top))))
-                    (inst ,shifted-op temp x high-half)
-                    (inst ,op r temp low-half)))))
-             `(inst ,op r x y))))))
-
-;;; For logical operations, we don't have to worry about signed bit
-;;; propagation from the lower half of a 32-bit operand.
-(defmacro !define-const-logop (translate untagged-penalty op &optional (shifted-op nil))
-  `(progn
-     (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum)
-                  ,(if shifted-op
-                       'fast-fixnum-logop30-c
-                       'fast-fixnum-logop-c))
-       (:translate ,translate)
-       ,@(when shifted-op
-          `((:temporary (:sc any-reg :target r) temp)))
-       (:generator 1
-        ,(if shifted-op
-             `(let* ((y (fixnumize y))
-                     (high-half (ldb (byte 16 16) y))
-                     (low-half (ldb (byte 16 0) y)))
-               (cond
-                 ((zerop high-half) (inst ,op r x low-half))
-                 ((zerop low-half) (inst ,shifted-op r x high-half))
-                 (t
-                  (inst ,shifted-op temp x high-half)
-                  (inst ,op r temp low-half))))
-             `(inst ,op r x (fixnumize y)))))
-     (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed)
-                  ,(if shifted-op
-                       'fast-signed-logop32-c
-                       'fast-signed-logop-c))
-       (:translate ,translate)
-       ,@(when shifted-op
-          `((:temporary (:sc non-descriptor-reg :target r) temp)))
-       (:generator ,untagged-penalty
-        ,(if shifted-op
-             `(let ((high-half (ldb (byte 16 16) y))
-                    (low-half (ldb (byte 16 0) y)))
-               (cond
-                 ((zerop high-half) (inst ,op r x low-half))
-                 ((zerop low-half) (inst ,shifted-op r x high-half))
-                 (t
-                  (inst ,shifted-op temp x high-half)
-                  (inst ,op r temp low-half))))
-             `(inst ,op r x y))))
-     (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned)
-                  ,(if shifted-op
-                       'fast-unsigned-logop32-c
-                       'fast-unsigned-logop-c))
-       (:translate ,translate)
-       ,@(when shifted-op
-          `((:temporary (:sc non-descriptor-reg :target r) temp)))
-       (:generator ,untagged-penalty
-        ,(if shifted-op
-             `(let ((high-half (ldb (byte 16 16) y))
-                    (low-half (ldb (byte 16 0) y)))
-               (cond
-                 ((zerop high-half) (inst ,op r x low-half))
-                 ((zerop low-half) (inst ,shifted-op r x high-half))
-                 (t
-                  (inst ,shifted-op temp x high-half)
-                  (inst ,op r temp low-half))))
-             `(inst ,op r x y))))))
-
 (!define-var-binop + 4 add)
 (!define-var-binop - 4 sub)
 (!define-var-binop logand 2 and)
@@ -405,17 +170,62 @@
 (!define-var-binop lognand 2 nand nil t)
 (!define-var-binop lognor 2 nor nil t)
 
-(!define-const-binop + 4 addi addis)
-(!define-const-binop - 4 subi)
-;;; Implementing a 32-bit immediate version of LOGAND wouldn't be any
-;;; better than loading the 32-bit constant via LR and then performing
-;;; an /AND/.  So don't bother.  (It would be better in some cases, such
-;;; as when one half of the word is zeros--we save a register--but we
-;;; would have specified one temporary register in the VOP, so we lose
-;;; any possible advantage.)
-(!define-const-logop logand 2 andi.)
-(!define-const-logop logior 2 ori oris)
-(!define-const-logop logxor 2 xori xoris)
+(defun generate-fast-+-c (r x y)
+  (cond ((typep y '(signed-byte 16))
+         (inst addi r x y))
+        ;; See if this can be done as an addis + addi.
+        ;; If bit 15 is on, 1 is added to the high part to undo the
+        ;; effect of sign-extension from the low. The post-adjustment
+        ;; high part needs to fit in (signed-byte 16)
+        ((typep (+ (ash y -16) (ldb (byte 1 15) y)) '(signed-byte 16))
+         (inst addis r x (+ (ash y -16) (ldb (byte 1 15) y)))
+         (let ((low (ldb (byte 16 0) y)))
+           (unless (zerop low)
+             (inst addi r r low))))
+        (t
+         (inst lr temp-reg-tn y)
+         (inst add r x temp-reg-tn))))
+
+(macrolet ((define-const-binop (translate untagged-penalty)
+             `(progn
+                (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum) fast-fixnum-binop-c)
+                  (:translate ,translate)
+                  (:generator 1 (generate-fast-+-c r x (fixnumize (,translate y)))))
+                (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed) fast-signed-binop-c)
+                  (:translate ,translate)
+                  (:generator ,untagged-penalty (generate-fast-+-c r x (,translate y))))
+                (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned) fast-unsigned-binop-c)
+                  (:translate ,translate)
+                  (:generator ,untagged-penalty (generate-fast-+-c r x (,translate y)))))))
+  (define-const-binop + 4)
+  (define-const-binop - 4))
+
+(macrolet ((define-const-logop (translate untagged-penalty op shifted-op general-op)
+  `(flet ((emit (r x y)
+            (cond ((typep y '(unsigned-byte 16))
+                   (inst ,op r x y))
+                  ((and (typep (ash y -16) '(unsigned-byte 16))
+                        ;; logical AND can't be split into two instructions
+                        ,@(if (eq translate 'logand) '((zerop (ldb (byte 16 0) y)))))
+                   (inst ,shifted-op r x (ash y -16))
+                   (when (ldb-test (byte 16 0) y)
+                     (inst ,op r x (ldb (byte 16 0) y)))) ; not sign-extended
+                  (t
+                   (inst lr temp-reg-tn y)
+                   (inst ,general-op r x temp-reg-tn)))))
+     (define-vop (,(symbolicate 'fast- translate '-c/fixnum=>fixnum) fast-fixnum-logop-c)
+       (:translate ,translate)
+       (:generator 1 (emit r x (fixnumize y))))
+     (define-vop (,(symbolicate 'fast- translate '-c/signed=>signed) fast-signed-logop-c)
+       (:translate ,translate)
+       (:generator ,untagged-penalty (emit r x y)))
+     (define-vop (,(symbolicate 'fast- translate '-c/unsigned=>unsigned) fast-unsigned-logop-c)
+       (:translate ,translate)
+       (:generator ,untagged-penalty (emit r x y))))))
+
+  (define-const-logop logand 2 andi. andis. and)
+  (define-const-logop logior 2 ori oris or)
+  (define-const-logop logxor 2 xori xoris xor))
 
 (define-vop (fast-*/fixnum=>fixnum fast-fixnum-binop)
   (:temporary (:scs (non-descriptor-reg)) temp)
@@ -424,41 +234,31 @@
     (inst sradi temp y n-fixnum-tag-bits)
     (inst mulld r x temp)))
 
-(define-vop (fast-*-c/fixnum=>fixnum fast-fixnum-binop-c)
-  (:translate *)
-  (:arg-types tagged-num
-              (:constant (and (signed-byte 16) (not (integer 0 0)))))
-  (:generator 1
-    (inst mulli r x y)))
-
-(define-vop (fast-*-bigc/fixnum=>fixnum fast-fixnum-binop-c)
-  (:translate *)
-  (:arg-types tagged-num
-              (:constant (and fixnum (not (signed-byte 16)))))
-  (:temporary (:scs (non-descriptor-reg)) temp)
-  (:generator 1
-    (inst lr temp y)
-    (inst mulld r x temp)))
-
 (define-vop (fast-*/signed=>signed fast-signed-binop)
   (:translate *)
   (:generator 4
     (inst mulld r x y)))
-
-(define-vop (fast-*-c/signed=>signed fast-signed-binop-c)
-  (:translate *)
-  (:generator 3
-    (inst mulli r x y)))
 
 (define-vop (fast-*/unsigned=>unsigned fast-unsigned-binop)
   (:translate *)
   (:generator 4
     (inst mulld r x y)))
 
-(define-vop (fast-*-c/unsigned=>unsigned fast-unsigned-binop-c)
-  (:translate *)
-  (:generator 3
-    (inst mulli r x y)))
+(macrolet ((generate ()
+             '(cond ((typep y '(signed-byte 16))
+                     (inst mulli r x y))
+                    (t
+                     (inst lr temp-reg-tn y)
+                     (inst mulld r x temp-reg-tn)))))
+  (define-vop (fast-*-c/fixnum=>fixnum fast-fixnum-binop-c)
+    (:translate *)
+    (:generator 1 (generate)))
+  (define-vop (fast-*-c/signed=>signed fast-signed-binop-c)
+    (:translate *)
+    (:generator 3 (generate)))
+  (define-vop (fast-*-c/unsigned=>unsigned fast-unsigned-binop-c)
+    (:translate *)
+    (:generator 3 (generate))))
 
 ;;; Shifting
 
