@@ -1868,12 +1868,12 @@ register."
                                ((logtest sb-c::compiled-debug-var-same-name-p flags)
                                 prev-name)
                                (t (geti))))
+                 ;; Keep the condition in sync with DUMP-1-VAR
+                 (large-fixnums (>= (integer-length sb-xc:most-positive-fixnum) 62))
                  (sc+offset (if deleted 0
-                                #-64-bit (geti)
-                                #+64-bit (ldb (byte 27 8) flags)))
+                                (if large-fixnums (ldb (byte 27 8) flags) (geti))))
                  (save-sc+offset (and save
-                                      #-64-bit (geti)
-                                      #+64-bit (ldb (byte 27 35) flags)))
+                                      (if large-fixnums (ldb (byte 27 35) flags) (geti))))
                  (indirect-sc+offset (and indirect-p
                                           (geti))))
             (aver (not (and args-minimal (not minimal))))

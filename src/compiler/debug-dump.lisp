@@ -418,6 +418,7 @@
                         (not (lambda-var-explicit-value-cell var))
                         (neq (lambda-physenv fun)
                              (lambda-physenv (lambda-var-home var)))))
+         ;; Keep this condition in sync with PARSE-COMPILED-DEBUG-VARS
          (large-fixnums (>= (integer-length sb-xc:most-positive-fixnum) 62))
          more)
     (declare (type index flags))
@@ -478,8 +479,8 @@
            (unless large-fixnums
              (vector-push-extend (tn-sc+offset tn) buffer)
              (when save-tn
-               (vector-push-extend (tn-sc+offset save-tn) buffer))
-             (vector-push-extend (tn-sc+offset (leaf-info var)) buffer)))
+               (vector-push-extend (tn-sc+offset save-tn) buffer)))
+           (vector-push-extend (tn-sc+offset (leaf-info var)) buffer))
           ((not large-fixnums)
            (if (and tn (tn-offset tn))
                (vector-push-extend (tn-sc+offset tn) buffer)

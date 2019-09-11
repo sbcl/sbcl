@@ -141,11 +141,11 @@
   ;; other than what the fixnum 0 hashes to (as tested in hash.impure.lisp)
   (let ((c (logandc1 1193941380939624010 sb-xc:most-positive-fixnum)))
     `(let ((x (double-float-bits x)))
-       ;; shift by -2 to get sign bit into hash.
-       ;; shifting by -1 isn't enough, for lack of significant bits in a fixnum.
-       ;; This would need to shift more if N-FIXNUM-TAG-BITS > 1,
-       ;; but seriously, who changes that parameter?
-       (logand (logxor (ash x 4) (ash x -2) ,c) sb-xc:most-positive-fixnum))))
+       ;; ensure we mix the sign bit into the hash
+       (logand (logxor (ash x 4)
+                       (ash x (- (1+ sb-vm:n-fixnum-tag-bits)))
+                       ,c)
+               sb-xc:most-positive-fixnum))))
 
 (deftransform sxhash ((x) (double-float)) '#.+sxhash-double-float-expr+)
 
