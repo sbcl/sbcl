@@ -101,8 +101,9 @@ extern void os_zero(os_vm_address_t addr, os_vm_size_t length);
  * or (x == bit) depending on the use-case */
 #define NOT_MOVABLE      0
 #define MOVABLE          1
-#define MOVABLE_LOW      2
+#define ALLOCATE_LOW     2
 #define IS_THREAD_STRUCT 4
+#define MOVABLE_LOW      (MOVABLE|ALLOCATE_LOW)
 extern os_vm_address_t os_validate(int movable,
                                    os_vm_address_t addr,
                                    os_vm_size_t len);

@@ -7,7 +7,7 @@
 #include "interr.h"
 
 os_vm_address_t
-os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
     os_vm_address_t actual;
@@ -18,7 +18,7 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
     }
 #endif
 #ifdef MAP_32BIT
-    if (movable & MOVABLE_LOW)
+    if (attributes & ALLOCATE_LOW)
         flags |= MAP_32BIT;
 #endif
     actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
@@ -27,7 +27,8 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
         return 0;               /* caller should check this */
     }
 
-    if (!movable && (addr!=actual)) {
+    // If requested addr was 0, the MOVABLE attribute means nothing.
+    if (addr && !(attributes & MOVABLE) && (addr != actual)) {
         fprintf(stderr, "mmap: wanted %lu bytes at %p, actually mapped at %p\n",
                 (unsigned long) len, addr, actual);
         return 0;

@@ -649,7 +649,10 @@ sbcl_main(int argc, char *argv[], char *envp[])
      * it must follow os_init(). -- WHN 2000-01-26 */
     arch_init();
 #endif
-    allocate_spaces(have_hardwired_spaces);
+    // FIXME: if the 'have' flag is 0 and you've disabled disabling of ASLR
+    // then we haven't done an exec(), nor unmapped the mappings that were obtained
+    // already obtained (if any) so it is unhelpful to try again here.
+    allocate_lisp_dynamic_space(have_hardwired_spaces);
     gc_init();
 
     setup_locale();

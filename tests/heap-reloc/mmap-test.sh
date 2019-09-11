@@ -27,5 +27,5 @@ export SBCL_FAKE_MMAP_INSTRUCTION_FILE=`pwd`/fakemap
 # The base gets aligned up to 0x2000010000 and one page is subtracted
 # from dynamic space size so not to overrun the memory.
 # And this script does not actually exit with the correct status anyway.
-(cd .. ; TEST_SBCL_RUNTIME=`pwd`/heap-reloc/test-sbcl ./run-tests.sh core.test.sh)
+(cd .. ; TEST_SBCL_RUNTIME=`pwd`/heap-reloc/test-sbcl ./run-tests.sh save*.test.sh)
 rm test-sbcl

@@ -34,10 +34,27 @@ uword_t DYNAMIC_SPACE_START;
 
 uword_t asm_routines_start, asm_routines_end;
 
+// Return the ALLOCATE_LOW flag or 0 for the hardwired spaces
+// depending on the backend.  Why specify the ALLOCATE_LOW on a non-relocatable
+// mapping? To make the OS tell us an address that it would have been ok with,
+// as well as our code being ok with. Otherwise, we see unhelpful output:
+//  "mmap: wanted 1048576 bytes at 0x50000000, actually mapped at 0x7f75b1f6b000"
+// which could never work as the base of static space on x86-64.
+// Care is needed because not all backends put the small spaces below 2GB.
+// In particular, arm64 has #xF0000000 which is above 2GB but below 4GB.
+// The ALLOCATE_LOW flag means that the limit is 2GB.
+// (See MAP_32BIT in http://man7.org/linux/man-pages/man2/mmap.2.html)
+static const int should_allocate_low =
+#ifdef LISP_FEATURE_X86_64
+    ALLOCATE_LOW;
+#else
+    0;
+#endif
+
 static void
-ensure_space(uword_t start, uword_t size)
+ensure_space(int attributes, uword_t start, uword_t size)
 {
-    if (os_validate(NOT_MOVABLE, (os_vm_address_t)start, (os_vm_size_t)size)==NULL) {
+    if (os_validate(attributes, (os_vm_address_t)start, (os_vm_size_t)size)==NULL) {
         fprintf(stderr,
                 "ensure_space: failed to allocate %lu bytes at %p\n",
                 (long unsigned)size, (void*)start);
@@ -81,8 +98,9 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
     boolean success = 1;
     for (i = 0; i< n_spaces; ++i) {
         if (hard_failp)
-            ensure_space(preinit_spaces[i].start, preinit_spaces[i].size);
-        else if (!os_validate(NOT_MOVABLE,
+            ensure_space(NOT_MOVABLE | should_allocate_low,
+                         preinit_spaces[i].start, preinit_spaces[i].size);
+        else if (!os_validate(NOT_MOVABLE | should_allocate_low,
                               (os_vm_address_t)preinit_spaces[i].start,
                               preinit_spaces[i].size)) {
             success = 0;
@@ -96,19 +114,22 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
 }
 
 void
-allocate_spaces(boolean did_preinit)
+allocate_lisp_dynamic_space(boolean did_preinit)
 {
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
     // Allocate the largest space(s) first,
     // since if that fails, it's game over.
 #ifdef LISP_FEATURE_GENCGC
-    ensure_space(DYNAMIC_SPACE_START  , dynamic_space_size);
+    ensure_space(NOT_MOVABLE, DYNAMIC_SPACE_START  , dynamic_space_size);
 #else
-    ensure_space(DYNAMIC_0_SPACE_START, dynamic_space_size);
-    ensure_space(DYNAMIC_1_SPACE_START, dynamic_space_size);
+    ensure_space(NOT_MOVABLE, DYNAMIC_0_SPACE_START, dynamic_space_size);
+    ensure_space(NOT_MOVABLE, DYNAMIC_1_SPACE_START, dynamic_space_size);
 #endif
 #endif
 
+    // Small spaces can be allocated after large spaces are.
+    // The above code is only utilized when heap relocation is disabled.
+    // And when so, failure to allocate dynamic space is fatal.
     if (!did_preinit)
       allocate_hardwired_spaces(1);
 
