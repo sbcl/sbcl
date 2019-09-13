@@ -1,5 +1,7 @@
 (in-package "SB-COLD")
 
+(declaim (optimize debug))
+
 ;;; Common functions
 
 (defvar *output-directory*
@@ -185,7 +187,7 @@ Length should be adjusted when the standard changes.")
 "Table of scripts. Used in the creation of misc entries.")
 
 (defparameter *line-break-class-table*
-  (with-input-txt-file (s "LineBreakProperty")
+  (with-input-txt-file (s "LineBreak")
     (loop with hash = (make-hash-table)
        for line = (read-line s nil nil) while line
        unless (or (not (position #\# line)) (= 0 (position #\# line)))
@@ -707,7 +709,7 @@ Length should be adjusted when the standard changes.")
     (values code-points ret))))
 
 (defparameter *collation-table*
-  (with-input-txt-file (stream "Allkeys70")
+  (with-input-txt-file (stream "Allkeys80")
     (loop with hash = (make-hash-table :test #'equal)
        for line = (read-line stream nil nil) while line
        unless (eql 0 (position #\# line))

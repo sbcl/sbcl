@@ -187,7 +187,7 @@
                           (setf **character-cases** table))
 
                         (setf **character-collations**
-                              (let* ((table (make-hash-table :size 27978
+                              (let* ((table (make-hash-table :size 30057
                                                              #+64-bit :test #+64-bit #'eq))
                                      (index 0)
                                      (info (make-ubn-vector ,collations 4))
@@ -209,7 +209,7 @@
                                           (incf index))
                                         (setf (gethash (apply #'pack-3-codepoints codepoints) table)
                                               key)))
-                                (assert (= (hash-table-count table) 27978))
+                                (assert (= (hash-table-count table) 30057))
                                 table))))
 
                     ,(with-open-file

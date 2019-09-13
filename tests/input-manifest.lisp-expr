@@ -62,7 +62,7 @@
   "tools-for-build/PropList.txt"
   "tools-for-build/BidiMirroring.txt"
   "tools-for-build/DerivedAge.txt"
-  "tools-for-build/LineBreakProperty.txt"
+  "tools-for-build/LineBreak.txt"
   "tests/data/DerivedBidiClass.txt"
   "tests/data/HangulSyllableType.txt"
   "tests/data/GraphemeBreakProperty.txt"
