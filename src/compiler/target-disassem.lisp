@@ -1822,11 +1822,6 @@
   (declare (type offset byte-offset))
   (grok-symbol-slot-ref (+ sb-vm:nil-value byte-offset)))
 
-;;; Return the Lisp object located BYTE-OFFSET from NIL.
-(defun get-nil-indexed-object (byte-offset)
-  (declare (type offset byte-offset))
-  (make-lisp-obj (+ sb-vm:nil-value byte-offset)))
-
 ;;; Return two values; the Lisp object located at BYTE-OFFSET in the
 ;;; constant area of the code-object in the current segment and T, or
 ;;; NIL and NIL if there is no code-object in the current segment.
@@ -2027,14 +2022,21 @@
 ;;; symbol and slot, to be printed as an end-of-line comment after the
 ;;; current instruction is disassembled. Returns non-NIL iff a note
 ;;; was recorded.
+;;; If the address is the start of an assembly routine, print it as
+;;; a symbol without a quote.
 (defun maybe-note-nil-indexed-object (nil-byte-offset dstate)
   (declare (type offset nil-byte-offset)
            (type disassem-state dstate))
-  (let ((obj (get-nil-indexed-object nil-byte-offset)))
-    (note (lambda (stream)
-            (prin1-quoted-short obj stream))
-          dstate)
-    t))
+  (binding* ((addr (+ sb-vm:nil-value nil-byte-offset))
+             ((obj validp) (make-lisp-obj addr nil)))
+    (when validp
+      ;; ambiguous case - the backend could potentially use NIL
+      ;; to compute certain arbitrary fixnums.
+      (awhen (and (fixnump obj) (find-assembler-routine addr))
+        (note (lambda (stream) (prin1-short it stream)) dstate)
+        (return-from maybe-note-nil-indexed-object t))
+      (note (lambda (stream) (prin1-quoted-short obj stream)) dstate)
+      t)))
 
 ;;; If ADDRESS is the address of a primitive assembler routine or
 ;;; foreign symbol, store a note describing which one, to be printed
