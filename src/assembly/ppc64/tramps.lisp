@@ -111,8 +111,8 @@
     ;; without loading r2. Just r12 is enough, because the callee
     ;; can compute r2 from r12 if it needs to.
     ;; big-endian would more accurately be: if this is the v1 ABI
-    #+big-endian (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF WE DON'T DO THIS AT ALL
-    (inst ld r12 r12 0)
+    #+big-endian (progn (inst ld r2 r12 8) ; TODO: SEE WHAT HAPPENS IF WE DON'T DO THIS AT ALL
+                        (inst ld r12 r12 0))
     ;; load the size argument into the first C argument register
     (inst ld r3 lip -8)
     (inst mtctr r12)

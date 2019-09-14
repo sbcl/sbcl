@@ -173,12 +173,16 @@
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:note "signed word to integer coercion")
   (:generator 20
-    #.(aver (= n-fixnum-tag-bits 1))
     (move x arg)
     ;; Don't even think about using mcrxr, you couldn't make up a
     ;; slower instruction
     (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
-    (inst addo. y arg arg)
+    (ecase n-fixnum-tag-bits
+      (1 (inst addo. y arg arg))
+      ;; result is not properly tagged until all shifts are performed,
+      ;; so don't move result into Y until the last step.
+      (2 (inst addo temp arg arg) (inst addo. y temp temp))
+      (3 (inst addo temp arg arg) (inst addo temp temp temp) (inst addo. y temp temp)))
     (inst bns done) ; branch if no summary overflow
     (with-fixed-allocation (y pa-flag temp bignum-widetag (1+ bignum-digits-offset))
       (storew x y bignum-digits-offset other-pointer-lowtag))
@@ -186,31 +190,40 @@
 (define-move-vop move-from-signed :move
   (signed-reg) (descriptor-reg))
 
-(define-vop (move-from-fixnum+1)
-  (:args (arg :scs (signed-reg unsigned-reg) :target x))
-  (:results (y :scs (any-reg descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)
-  (:vop-var vop)
-  (:generator 4
-    #.(aver (= n-fixnum-tag-bits 1))
-    (move x arg)
-    (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
-    (inst addo. y x x)
-    (inst bns done) ; branch if no summary overflow
-    (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum))
-                   y)
-    DONE))
+(macrolet ((define-move-from-fixnum+1 ()
+             `(define-vop (move-from-fixnum+1)
+                (:args (arg :scs (signed-reg unsigned-reg)
+                            ,@(when (> n-fixnum-tag-bits 1)
+                                '(:target x))))
+                ,@(when (> n-fixnum-tag-bits 1)
+                    '((:temporary (:scs (non-descriptor-reg) :from (:argument 0)) x)))
+                (:results (y :scs (any-reg descriptor-reg)))
+                (:vop-var vop)
+                (:generator 4
+                  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
+                  ;; this condition has to be done as part of the macroexpander
+                  ;; because the variable X does not exist for case 1.
+                  ,@(ecase n-fixnum-tag-bits
+                      (1 '((inst addo. y arg arg)))
+                      (2 '((inst addo x arg arg) (inst addo. y x x)))
+                      (3 '((inst addo x arg arg) (inst addo x x x) (inst addo. y x x))))
+                  (inst bns done) ; branch if no summary overflow
+                  (load-constant vop (emit-constant (1+ sb-xc:most-positive-fixnum)) y)
+                  DONE))))
+  (define-move-from-fixnum+1))
 
-(define-vop (move-from-fixnum-1 move-from-fixnum+1)
-  (:generator 4
-    #.(aver (= n-fixnum-tag-bits 1))
-    (move x arg)
-    (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
-    (inst addo. y x x)
-    (inst bns done) ; branch if no summary overflow
-    (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum))
-                   y)
-    DONE))
+(macrolet ((define-move-from-fixnum-1 ()
+             `(define-vop (move-from-fixnum-1 move-from-fixnum+1)
+                (:generator 4
+                  (inst li temp-reg-tn 0) (inst mtxer temp-reg-tn) ; clear XER
+                  ,@(ecase n-fixnum-tag-bits
+                      (1 '((inst addo. y arg arg)))
+                      (2 '((inst addo x arg arg) (inst addo. y x x)))
+                      (3 '((inst addo x arg arg) (inst addo x x x) (inst addo. y x x))))
+                  (inst bns done) ; branch if no summary overflow
+                  (load-constant vop (emit-constant (1- sb-xc:most-negative-fixnum)) y)
+                  DONE))))
+  (define-move-from-fixnum-1))
 
 ;;; Check for fixnum, and possibly allocate one or two word bignum
 ;;; result.  Use a worst-case cost to make sure people know they may

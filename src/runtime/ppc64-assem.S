@@ -513,13 +513,13 @@ lra:
 	/* Compute the correct value for reg_CODE based on the LRA.
 	This is a "simple" matter of subtracting a constant from
 	reg_LRA (where the LRA is stored by the return sequence) to
-	obtain a tagged pointer to the enclosing code component.  Both
-	values are tagged OTHER_POINTER_LOWTAG, so we just have to
-	account for N words (see calculation for RETURN_PC_WIDETAG, above)
-	between the two addresses.
+	obtain a tagged pointer to the enclosing code component.
+	Code pointers have no tag, so we have have to subtract
+	OTHER_POINTER_LOWTAG as well as account for the number of
+	boxed words (see calculation for RETURN_PC_WIDETAG, above).
 	Restoring reg_CODE doesn't appear to be strictly necessary
 	here, but let's observe the niceties.*/
-	addi reg_CODE, reg_LRA, ((CODE_SIZE+1)&~1)*-N_WORD_BYTES
+	addi reg_CODE, reg_LRA, ((CODE_SIZE+1)&~1)*-N_WORD_BYTES-OTHER_POINTER_LOWTAG
 
 	/* Multiple values are stored relative to reg_OCFP, which we
 	set to be the current top-of-stack. */
@@ -529,7 +529,7 @@ lra:
 	addi reg_CSP, reg_CSP, 4
 
 	/* Record the number of values we have as a FIXNUM. */
-	li reg_NARGS, 4
+	li reg_NARGS, 1<<N_FIXNUM_TAG_BITS
 
 	/* Blank the remaining arg-passing registers. */
 	mr reg_A1, reg_NULL
@@ -542,6 +542,8 @@ lra:
 fun_end_breakpoint_multiple_values:
 	/* Compute the correct value for reg_CODE.  See the
 	explanation for the single-value case, above. */
+	// And of course this is even more magic since we seem to assume
+	// a certain code size. Wtf is this actually supposed to be????
 	addi reg_CODE, reg_LRA, -24
 
 	/* The actual magic trap. */

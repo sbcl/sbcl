@@ -1438,6 +1438,7 @@
 
   (macrolet ((def (mnemonic op Rc)
                `(define-instruction ,mnemonic (segment ra rs sh m)
+                  (:declare (type (integer 0 63) sh m))
                   (:printer md-form ((op 30) (subop ,op) (rc ,rc)))
                   (:emitter
                    (emit-md-form-inst segment 30
@@ -1941,10 +1942,12 @@
     `(inst rlwinm. ,ra ,rs (mod (+ ,b ,n) 32) (- 32 ,n) 31))
 
   (define-instruction-macro srwi (ra rs n) ; N < 32
-    `(inst rlwinm ,ra ,rs (- 32 ,n) ,n 31))
+    `(let ((.n. (the (integer 0 31) ,n)))
+       (inst rlwinm ,ra ,rs (logand #b11111 (- 32 .n.)) .n. 31))) ; n=0 -> rotate 0
 
   (define-instruction-macro srwi. (ra rs n)
-    `(inst rlwinm. ,ra ,rs (- 32 ,n) ,n 31))
+    `(let ((.n. (the (integer 0 31) ,n)))
+       (inst rlwinm. ,ra ,rs (logand #b11111 (- 32 .n.)) .n. 31))) ; n=0 -> rotate 0
 
   (define-instruction-macro clrlwi (ra rs n)
     `(inst rlwinm ,ra ,rs 0 ,n 31))
@@ -1997,10 +2000,12 @@
     `(inst rldicr. ,ra ,rs ,n (- 63 ,n)))
 
   (define-instruction-macro srdi (ra rs n) ; N < 64
-    `(inst rldicl ,ra ,rs (- 64 ,n) ,n))
+    `(let ((.n. (the (integer 0 63) ,n)))
+       (inst rldicl ,ra ,rs (logand #b111111 (- 64 .n.)) .n.))) ; n=0 -> rotate 0
 
   (define-instruction-macro srdi. (ra rs n)
-    `(inst rldicl. ,ra ,rs (- 64 ,n) ,n))
+    `(let ((.n. (the (integer 0 63) ,n)))
+       (inst rldicl. ,ra ,rs (logand #b111111 (- 64 .n.)) .n.))) ; n=0 -> rotate 0
 
   (define-instruction-macro clrrdi (ra rs n) ; N < 64
     `(inst rldicr ,ra ,rs 0 (- 63 ,n)))
