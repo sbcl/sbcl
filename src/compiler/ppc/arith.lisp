@@ -1164,45 +1164,41 @@
   (:generator 1
     (inst srawi digit fixnum n-fixnum-tag-bits)))
 
-;;; Algorithm from page 74 of of Power ISA version 2.07
-;;; under "Programming Note" for the divweu instruction.
 (define-vop (bignum-floor)
   (:translate sb-bignum:%bigfloor)
   (:policy :fast-safe)
-  ;; I tried to tighten up the TN lifetimes for better packing
-  ;; (in fewer physical registers), but I got it wrong and everything broke.
-  ;; We have enough non-descriptor registers that this isn't a problem.
-  (:args (Dh :scs (unsigned-reg)) ; dividend high
-         (Dl :scs (unsigned-reg)) ; dividend low
-         (Dv :scs (unsigned-reg) :to :save)) ; divisor
+  (:args (num-high :scs (unsigned-reg) :target rem)
+         (num-low :scs (unsigned-reg) :target rem-low)
+         (denom :scs (unsigned-reg) :to (:eval 1)))
   (:arg-types unsigned-num unsigned-num unsigned-num)
-  (:results (Q :scs (unsigned-reg))  ; quotient
-            (R :scs (unsigned-reg))) ; remainder
+  (:temporary (:scs (unsigned-reg) :from (:argument 1)) rem-low)
+  (:temporary (:scs (unsigned-reg) :from (:eval 0)) temp)
+  (:results (quo :scs (unsigned-reg) :from (:eval 0))
+            (rem :scs (unsigned-reg) :from (:argument 0)))
   (:result-types unsigned-num unsigned-num)
-  (:temporary (:scs (non-descriptor-reg)) q1)
-  (:temporary (:scs (non-descriptor-reg)) q2)
-  (:temporary (:scs (non-descriptor-reg)) -r1)
-  (:temporary (:scs (non-descriptor-reg)) r2)
-  (:generator 15
-    ;; I don't know how we know when utilizing this vop
-    ;; that overflow won't occur. But the code for x86[-64]
-    ;; does not check for overflow either.
-    (inst divweu q1 Dh Dv)   ; q1
-    (inst divwu  q2 Dl Dv)   ; q2
-    (inst mullw -r1 q1 Dv)   ; -r1 = q1 * Dv
-    (inst mullw r2 q2 Dv)    ; temp = q2 * Dv
-    (inst subf r2 r2 Dl)     ; r2 = Dl - (q2 * Dv)
-    ;; move to result TNs
-    (inst add Q q1 q2)       ; Q = q1 + q2
-    (inst subf R -r1 r2)     ; R = r1 + r2
-    (inst cmplw R r2)        ; R < r2 ?
-    (inst blt ADJ)           ; must adjust Q and R if yes
-    (inst cmplw R Dv)        ; R >= Dv ?
-    (inst blt DONE)          ; must adjust Q and R if yes
-    ADJ
-    (inst addi Q Q 1)        ; Q = Q + 1
-    (inst subf R Dv R)       ; R = R - Dv
-    DONE))
+  (:generator 325 ; number of inst assuming targeting works.
+    (move rem num-high)
+    (move rem-low num-low)
+    (flet ((maybe-subtract (&optional (guess temp))
+             (inst subi temp guess 1)
+             (inst and temp temp denom)
+             (inst sub rem rem temp))
+           (sltu (res x y)
+             (inst subfc res y x)
+             (inst subfe res res res)
+             (inst neg res res)))
+      (sltu quo rem denom)
+      (maybe-subtract quo)
+      (dotimes (i 32)
+        (inst slwi rem rem 1)
+        (inst srwi temp rem-low 31)
+        (inst or rem rem temp)
+        (inst slwi rem-low rem-low 1)
+        (sltu temp rem denom)
+        (inst slwi quo quo 1)
+        (inst or quo quo temp)
+        (maybe-subtract)))
+    (inst not quo quo)))
 
 (define-vop (signify-digit)
   (:translate sb-bignum:%fixnum-digit-with-correct-sign)
