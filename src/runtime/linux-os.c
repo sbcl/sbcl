@@ -174,7 +174,6 @@ futex_wake(int *lock_word, int n)
 #endif
 
 
-int linux_sparc_siginfo_bug = 0;
 
 #ifdef LISP_FEATURE_SB_THREAD
 int
@@ -221,12 +220,7 @@ void os_init(char __attribute__((unused)) *argv[],
         lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
              major_version);
     }
-    if (!(major_version>2 || minor_version >= 4)) {
-#ifdef LISP_FEATURE_SPARC
-        FSHOW((stderr,"linux kernel %d.%d predates 2.4;\n enabling workarounds for SPARC kernel bugs in signal handling.\n", major_version,minor_version));
-        linux_sparc_siginfo_bug = 1;
-#endif
-    }
+
 #ifdef LISP_FEATURE_SB_THREAD
 #if defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
     futex_init();

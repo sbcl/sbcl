@@ -70,12 +70,6 @@ os_vm_size_t os_vm_page_size;
 #include "gc.h"
 #include "gencgc-internal.h"
 #include <wincrypt.h>
-
-#if 0
-int linux_sparc_siginfo_bug = 0;
-int linux_supports_futex=0;
-#endif
-
 #include <stdarg.h>
 #include <string.h>
 

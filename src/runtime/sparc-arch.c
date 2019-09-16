@@ -24,10 +24,6 @@
 #include "breakpoint.h"
 #include "monitor.h"
 
-#ifdef LISP_FEATURE_LINUX
-extern int linux_sparc_siginfo_bug;
-#endif
-
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {
 #if 1 /* New way. */
@@ -311,11 +307,7 @@ arch_handle_allocation_trap(os_context_t *context)
 static void sigill_handler(int signal, siginfo_t *siginfo,
                            os_context_t *context)
 {
-    if ((siginfo->si_code) == ILL_ILLOPC
-#ifdef LISP_FEATURE_LINUX
-        || (linux_sparc_siginfo_bug && (siginfo->si_code == 2))
-#endif
-        ) {
+    if ((siginfo->si_code) == ILL_ILLOPC) {
         int trap;
         unsigned int inst;
         unsigned int* pc = (unsigned int*) siginfo->si_addr;
@@ -324,11 +316,7 @@ static void sigill_handler(int signal, siginfo_t *siginfo,
         trap = inst & 0xff;
         handle_trap(context,trap);
     }
-    else if ((siginfo->si_code) == ILL_ILLTRP
-#ifdef LISP_FEATURE_LINUX
-             || (linux_sparc_siginfo_bug && (siginfo->si_code) == 192)
-#endif
-             ) {
+    else if ((siginfo->si_code) == ILL_ILLTRP) {
         if (pseudo_atomic_trap_p(context)) {
             /* A trap instruction from a pseudo-atomic.  We just need
                to fixup up alloc-tn to remove the interrupted flag,
