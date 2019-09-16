@@ -47,9 +47,21 @@ include genesis/Makefile.features
 # symlink to Config-foo.
 # Commonly used variables in Config are: ARCH_SRC, ASSEM_SRC, GC_SRC,
 # OS_SRC, OS_LIBS, OS_CLEAN_FILES
+DISABLE_PIE=yes
 include Config
 
 # Disable PIE when possible
+# If dynamic core is enabled, we should not care whether we get a PIE or not,
+# and would prefer the default for the installed C toolchain,
+# however, when building the 32-bit x86 code without the disabling of PIE,
+# I got a linker error that was totally unhelpful in that it did not indicate
+# an offending source file:
+#  /usr/bin/ld: BFD (GNU Binutils for Debian) 2.31.1 assertion fail ../../bfd/elflink.c:14480
+# Process of elimination concluded that it's from ldso-stubs.
+# I'm disinclined to find the problem with the asm code in that file.
+# More pertinently, if sb-dynamic-core is enabled, the stubs shouldn't be needed.
+# But we link them them because of, I guess, "historical reasons".
+ifeq ($(DISABLE_PIE),yes)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 CFLAGS += -fno-pie
 LINKFLAGS += -no-pie
@@ -61,6 +73,7 @@ CFLAGS += -fno-pie
 LINKFLAGS += -nopie
 LDFLAGS += -nopie
 __LDFLAGS__ += -nopie
+endif
 endif
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coalesce.c coreparse.c    \

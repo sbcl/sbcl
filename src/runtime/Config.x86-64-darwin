@@ -45,6 +45,9 @@ ARCH_SRC = x86-64-arch.c
 LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_size 0x100000
 
 CFLAGS += -arch x86_64 -fno-omit-frame-pointer
+ifeq ($(LISP_FEATURE_SB_DYNAMIC_CORE),1)
+  DISABLE_PIE=no
+endif
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c

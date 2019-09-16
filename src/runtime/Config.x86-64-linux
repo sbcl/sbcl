@@ -44,6 +44,9 @@ endif
 
 CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer
 CPPFLAGS += -include memcpy.h
+ifeq ($(LISP_FEATURE_SB_DYNAMIC_CORE),1)
+  DISABLE_PIE=no
+endif
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c
