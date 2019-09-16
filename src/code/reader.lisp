@@ -104,12 +104,12 @@
         (gethash sub-char it))))
 
 ;; Coerce THING to a character-macro-table entry
-(defmacro !coerce-to-cmt-entry (thing)
+(defmacro coerce-to-cmt-entry (thing)
   `(let ((x ,thing))
      (if (typep x '(or null function)) x (find-or-create-fdefn x))))
 
 ;; Return a callable function given a character-macro-table entry.
-(defmacro !cmt-entry-to-function (val fallback)
+(defmacro cmt-entry-to-function (val fallback)
   `(let ((x ,val))
      (truly-the
       function
@@ -118,7 +118,7 @@
             (t (sb-c:safe-fdefn-fun x))))))
 
 ;; Return a function-designator given a character-macro-table entry.
-(defmacro !cmt-entry-to-fun-designator (val)
+(defmacro cmt-entry-to-fun-designator (val)
   `(let ((x ,val))
      (if (fdefn-p x) (fdefn-name x) x)))
 
@@ -346,7 +346,7 @@ standard Lisp readtable when NIL."
                             +char-attr-constituent+
                             +char-attr-terminating-macro+)
                    designated-readtable)
-    (set-cmt-entry char (!coerce-to-cmt-entry function) designated-readtable)
+    (set-cmt-entry char (coerce-to-cmt-entry function) designated-readtable)
     t)) ; (ANSI-specified return value)
 
 (defun get-macro-character (char &optional (rt-designator *readtable*))
@@ -357,7 +357,7 @@ standard Lisp readtable when NIL."
   (let* ((designated-readtable (or rt-designator *standard-readtable*))
          ;; the first return value: (OR FUNCTION SYMBOL) if CHAR is a macro
          ;; character, or NIL otherwise
-         (fun-value (!cmt-entry-to-fun-designator
+         (fun-value (cmt-entry-to-fun-designator
                      (get-raw-cmt-entry char designated-readtable))))
     (values fun-value
             ;; NON-TERMINATING-P return value:
@@ -408,7 +408,7 @@ standard Lisp readtable when NIL."
     (when (digit-char-p sub-char)
       (error "SUB-CHAR must not be a decimal digit: ~S" sub-char))
     (let ((dtable (get-dispatch-macro-char-table disp-char readtable))
-          (function (!coerce-to-cmt-entry function)))
+          (function (coerce-to-cmt-entry function)))
       ;; (SET-MACRO-CHARACTER #\$ (GET-MACRO-CHARACTER #\#)) will share
       ;; the dispatch table. Perhaps it should be copy-on-write?
       (if (typep sub-char 'base-char)
@@ -429,7 +429,7 @@ standard Lisp readtable when NIL."
    or NIL if there is no associated function."
   (let ((dtable (get-dispatch-macro-char-table
                  disp-char (or rt-designator *standard-readtable*))))
-    (!cmt-entry-to-fun-designator
+    (cmt-entry-to-fun-designator
      (get-raw-cmt-dispatch-entry (char-upcase sub-char) dtable))))
 
 
@@ -754,7 +754,7 @@ standard Lisp readtable when NIL."
     (and (form-tracking-stream-p stream)
          ;; Subtract 1 because the position points _after_ CHAR.
          (1- (form-tracking-stream-input-char-pos stream)))
-    (funcall (!cmt-entry-to-function
+    (funcall (cmt-entry-to-function
               (get-raw-cmt-entry char *readtable*) #'read-token)
              stream char)))
 
@@ -1825,7 +1825,7 @@ extended <package-name>::<form-in-package> syntax."
                  (return (setq sub-char (char-upcase ch))))))))
     ;; Look up the function and call it.
     (let ((fn (get-raw-cmt-dispatch-entry sub-char dispatch-table)))
-      (funcall (!cmt-entry-to-function fn #'dispatch-char-error)
+      (funcall (cmt-entry-to-function fn #'dispatch-char-error)
                stream sub-char (if numargp numarg nil)))))
 
 ;;;; READ-FROM-STRING
@@ -1936,7 +1936,7 @@ extended <package-name>::<form-in-package> syntax."
                        and ch from 0
                        when fn do (push (cons (code-char ch) fn) output))
                  (dolist (cell output) ; coerce values to function-designator
-                   (rplacd cell (!cmt-entry-to-fun-designator (cdr cell))))
+                   (rplacd cell (cmt-entry-to-fun-designator (cdr cell))))
                  (when hash-table-p ; caller wants hash-tables
                    (setq output (%stuff-hash-table (make-hash-table) output)))
                  (push (cons char output) alist)))))
