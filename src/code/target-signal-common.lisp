@@ -29,9 +29,9 @@
 
 (defun unblock-deferrable-signals ()
   (with-alien ((%unblock-deferrable-signals
-                (function void unsigned-long unsigned-long) :extern
+                (function void unsigned-long) :extern
                 "unblock_deferrable_signals"))
-    (alien-funcall %unblock-deferrable-signals 0 0)
+    (alien-funcall %unblock-deferrable-signals 0)
     nil))
 
 (defun with-deferrable-signals-unblocked (enable-interrupts function)

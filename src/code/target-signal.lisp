@@ -39,10 +39,8 @@
 
 #-sb-safepoint
 (defun unblock-gc-signals ()
-  (with-alien ((%unblock-gc-signals
-                (function void unsigned-long unsigned-long) :extern
-                "unblock_gc_signals"))
-    (alien-funcall %unblock-gc-signals 0 0)
+  (with-alien ((%unblock-gc-signals (function void) :extern "unblock_gc_signals"))
+    (alien-funcall %unblock-gc-signals)
     nil))
 
 

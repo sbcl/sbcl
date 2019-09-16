@@ -117,6 +117,26 @@ union interrupt_handler interrupt_handlers[NSIG];
     os_context_t *context = arch_os_get_context(&void_context);
 #endif
 
+// For each bit present in 'source', add it to 'dest'.
+// This is the same as "sigorset(dest, dest, source)" if _GNU_SOURCE is defined.
+static void sigmask_logior(sigset_t *dest, const sigset_t *source)
+{
+    int i;
+    for(i = 1; i < NSIG; i++) {
+        if (sigismember(source, i)) sigaddset(dest, i);
+    }
+}
+
+// For each bit present in 'source', remove it from 'dest'
+// (logically AND with logical complement).
+static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
+{
+    int i;
+    for(i = 1; i < NSIG; i++) {
+        if (sigismember(source, i)) sigdelset(dest, i);
+    }
+}
+
 /* Foreign code may want to start some threads on its own.
  * Non-targetted, truly asynchronous signals can be delivered to
  * basically any thread, but invoking Lisp handlers in such foregign
@@ -138,8 +158,6 @@ add_handled_signals(sigset_t *sigset)
         }
     }
 }
-
-void block_signals(sigset_t *what, sigset_t *where, sigset_t *old);
 #endif
 
 static boolean
@@ -157,14 +175,15 @@ maybe_resignal_to_lisp_thread(int signal, os_context_t *context)
              signal);
 #endif
         }
-        {
-            sigset_t sigset;
-            sigemptyset(&sigset);
-            add_handled_signals(&sigset);
-            block_signals(&sigset, 0, 0);
-            block_signals(&sigset, os_context_sigmask_addr(context), 0);
-            kill(getpid(), signal);
-        }
+        sigset_t sigset;
+        sigemptyset(&sigset);
+        add_handled_signals(&sigset);
+        thread_sigmask(SIG_BLOCK, &sigset, 0);
+        // This arranges for every handled signal to be blocked on return from this
+        // handler invocation, presumably because that avoids further detours through
+        // this thread's handler for signals that we don't want it to handle.
+        sigmask_logior(os_context_sigmask_addr(context), &sigset);
+        kill(getpid(), signal);
         return 1;
     } else
 #endif
@@ -248,41 +267,9 @@ get_current_sigmask(sigset_t *sigset)
     thread_sigmask(SIG_BLOCK, 0, sigset);
 }
 
-void
-block_signals(sigset_t *what, sigset_t *where, sigset_t *old)
-{
-    if (where) {
-        int i;
-        if (old)
-            sigcopyset(old, where);
-        for(i = 1; i < NSIG; i++) {
-            if (sigismember(what, i))
-                sigaddset(where, i);
-        }
-    } else {
-        thread_sigmask(SIG_BLOCK, what, old);
-    }
-}
-
-void
-unblock_signals(sigset_t *what, sigset_t *where, sigset_t *old)
-{
-    if (where) {
-        int i;
-        if (old)
-            sigcopyset(old, where);
-        for(i = 1; i < NSIG; i++) {
-            if (sigismember(what, i))
-                sigdelset(where, i);
-        }
-    } else {
-        thread_sigmask(SIG_UNBLOCK, what, old);
-    }
-}
-
 // Stringify sigset into the supplied result buffer.
 static void
-sigset_tostring(sigset_t *sigset, char* result, int result_length)
+sigset_tostring(const sigset_t *sigset, char* result, int result_length)
 {
     int i;
     int len = 0;
@@ -298,12 +285,12 @@ sigset_tostring(sigset_t *sigset, char* result, int result_length)
     result[len] = 0;
 }
 
-/* Return 1 is all signals is sigset2 are masked in sigset, return 0
- * if all re unmasked else die. Passing NULL for sigset is a shorthand
+/* Return 1 if all signals in sigset2 are masked in sigset, return 0
+ * if all are unmasked, else die. Passing NULL for sigset is a shorthand
  * for the current sigmask. */
 boolean
-all_signals_blocked_p(sigset_t *sigset, sigset_t *sigset2,
-                                const char *name)
+all_signals_blocked_p(const sigset_t *sigset, sigset_t *sigset2,
+                      const char *name)
 {
     int i;
     boolean has_blocked = 0, has_unblocked = 0;
@@ -477,7 +464,7 @@ void
 block_deferrable_signals(sigset_t *old)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    block_signals(&deferrable_sigset, 0, old);
+    thread_sigmask(SIG_BLOCK, &deferrable_sigset, old);
 #endif
 }
 
@@ -485,30 +472,38 @@ void
 block_blockable_signals(sigset_t *old)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
-    block_signals(&blockable_sigset, 0, old);
+    thread_sigmask(SIG_BLOCK, &blockable_sigset, old);
 #endif
 }
 
+// Do one of two things depending on whether the specified 'where'
+// is non-null or null.
+// 1. If non-null, then alter the mask in *where, removing deferrable signals
+//    from it without affecting the thread's mask from perspective of the OS.
+// 2. If null, the actually change the current thread's signal mask.
 void
-unblock_deferrable_signals(sigset_t *where, sigset_t *old)
+unblock_deferrable_signals(sigset_t *where)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (interrupt_handler_pending_p())
         lose("unblock_deferrable_signals: losing proposition\n");
 #ifndef LISP_FEATURE_SB_SAFEPOINT
+    // If 'where' is null, check_gc_signals_unblocked_or_lose() will
+    // fetch the current signal mask (from the OS) and check that.
     check_gc_signals_unblocked_or_lose(where);
 #endif
-    unblock_signals(&deferrable_sigset, where, old);
+    if (where)
+        sigmask_logandc(where, &deferrable_sigset);
+    else
+        thread_sigmask(SIG_UNBLOCK, &deferrable_sigset, 0);
 #endif
 }
 
 #ifndef LISP_FEATURE_SB_SAFEPOINT
-void
-unblock_gc_signals(sigset_t *where, sigset_t *old)
-{
-#ifndef LISP_FEATURE_WIN32
-    unblock_signals(&gc_sigset, where, old);
-#endif
+// This function previously had an #ifdef guard precluding doing anything for
+// win32, which was redundant because SB_SAFEPOINT is always defined for win32.
+void unblock_gc_signals(void) {
+    thread_sigmask(SIG_UNBLOCK, &gc_sigset, 0);
 }
 #endif
 
@@ -523,11 +518,11 @@ unblock_signals_in_context_and_maybe_warn(os_context_t *context)
 "Enabling blocked gc signals to allow returning to Lisp without risking\n\
 gc deadlocks. Since GC signals are only blocked in signal handlers when \n\
 they are not safe to interrupt at all, this is a pretty severe occurrence.\n");
-        unblock_gc_signals(sigset, 0);
+        sigmask_logandc(sigset, &gc_sigset);
     }
 #endif
     if (!interrupt_handler_pending_p()) {
-        unblock_deferrable_signals(sigset, 0);
+        unblock_deferrable_signals(sigset);
     }
 #endif
 }
@@ -1168,7 +1163,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
 #ifdef LISP_FEATURE_C_STACK_IS_CONTROL_STACK
         /* handler.lisp will hide from the GC, will be enabled in the handler itself.
          * Not a problem for the conservative GC. */
-        unblock_gc_signals(0, 0);
+        unblock_gc_signals();
 #endif
 #else
         WITH_GC_AT_SAFEPOINTS_ONLY()
