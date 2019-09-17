@@ -1387,7 +1387,7 @@
   (multiple-value-bind (symbols new-string) (extract-user-fun-directives string)
     (if symbols
         `(load-time-value (make-fmt-control ,new-string ',symbols) t)
-        (possibly-base-stringize string))))
+        (possibly-base-stringize new-string))))
 
 ;;; compile-time checking for argument mismatch.  This code is
 ;;; inspired by that of Gerd Moellmann, and comes decorated with

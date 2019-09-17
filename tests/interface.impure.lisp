@@ -520,4 +520,7 @@
                   (assert (= (traced-gf 5) 10)))))
     (assert (= (length output) 0))))
 
+(with-test (:name :undefined-fun-macro-error)
+  (assert (search "is a macro" (princ-to-string (make-condition 'undefined-function :name 'cond)))))
+
 ;;;; success
