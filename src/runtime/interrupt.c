@@ -137,10 +137,10 @@ union interrupt_handler interrupt_handlers[NSIG];
  *    }
  *  ./sigismembertest => 40 65 -1
  */
-#ifdef LISP_FEATURE_DARWIN // Does not have SIGRTMAX
-#  define MAX_SIGNUM (NSIG-1)
-#else
+#ifdef SIGRTMAX
 #  define MAX_SIGNUM SIGRTMAX
+#else
+#  define MAX_SIGNUM (NSIG-1)
 #endif
 
 // For each bit present in 'source', add it to 'dest'.
