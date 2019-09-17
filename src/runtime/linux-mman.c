@@ -3,8 +3,26 @@
 #include <errno.h>
 
 #include "genesis/config.h"
+#include "genesis/constants.h"
+#include "globals.h"
 #include "os.h"
 #include "interr.h"
+
+#ifdef LISP_FEATURE_ALPHA
+/* The Alpha is a 64 bit CPU.  SBCL is a 32 bit application.  Due to all
+ * the places that assume we can get a pointer into a fixnum with no
+ * information loss, we have to make sure it allocates all its ram in the
+ * 0-2Gb region.  */
+
+static void * under_2gb_free_pointer;
+os_set_cheneygc_spaces(uword_t space0_start, uword_t space1_start)
+{
+    uword_t max;
+    max = (space1_start > space0_start) ? space1_start : space0_start;
+    under_2gb_free_pointer = max + dynamic_space_size;
+}
+
+#endif
 
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
