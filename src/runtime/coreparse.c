@@ -1228,13 +1228,15 @@ static void tally(lispobj ptr, struct visitor* v)
         ++v->headers[header_index].count;
         v->headers[header_index].words += words;
         if (widetag == SIMPLE_VECTOR_WIDETAG) {
-            int st = 0;
-            switch ((*obj >> N_WIDETAG_BITS) & 7) {
-            case subtype_VectorWeak: st = 1; break;
-            case subtype_VectorValidHashing: st = 2; break;
-            }
-            ++v->sv_subtypes[st].count;
-            v->sv_subtypes[st].words += words;
+            int subtype = (*obj >> N_WIDETAG_BITS) & 7;
+            if (subtype == subtype_VectorWeak)
+                subtype = 1;
+            else if (subtype & subtype_VectorHashing)
+                subtype = 2;
+            else // The above test should account for everything
+                gc_assert(subtype == 0);
+            ++v->sv_subtypes[subtype].count;
+            v->sv_subtypes[subtype].words += words;
         }
     }
 }
