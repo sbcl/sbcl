@@ -120,7 +120,7 @@ union interrupt_handler interrupt_handlers[NSIG];
     os_context_t *context = arch_os_get_context(&void_context);
 #endif
 
-/* In the code below we iterate from 1 through SIGRTMAX inclusive, not NSIG,
+/* The code below wants to iterate from 1 through SIGRTMAX inclusive, not NSIG,
  * because NSIG is the maximum capacity of a sigset, whereas SIGRTMAX is a
  * possibly smaller value indicating the number of signal numbers that could
  * really be in use. For systems which have distinctly different values
@@ -137,13 +137,18 @@ union interrupt_handler interrupt_handlers[NSIG];
  *    }
  *  ./sigismembertest => 40 65 -1
  */
+#ifdef LISP_FEATURE_DARWIN // Does not have SIGRTMAX
+#  define MAX_SIGNUM (NSIG-1)
+#else
+#  define MAX_SIGNUM SIGRTMAX
+#endif
 
 // For each bit present in 'source', add it to 'dest'.
 // This is the same as "sigorset(dest, dest, source)" if _GNU_SOURCE is defined.
 static void sigmask_logior(sigset_t *dest, const sigset_t *source)
 {
     int i;
-    for(i = 1; i <= SIGRTMAX; i++) {
+    for(i = 1; i <= MAX_SIGNUM; i++) {
         if (sigismember(source, i)) sigaddset(dest, i);
     }
 }
@@ -153,7 +158,7 @@ static void sigmask_logior(sigset_t *dest, const sigset_t *source)
 static void sigmask_logandc(sigset_t *dest, const sigset_t *source)
 {
     int i;
-    for(i = 1; i <= SIGRTMAX; i++) {
+    for(i = 1; i <= MAX_SIGNUM; i++) {
         if (sigismember(source, i)) sigdelset(dest, i);
     }
 }
@@ -294,7 +299,7 @@ sigset_tostring(const sigset_t *sigset, char* result, int result_length)
 {
     int i;
     int len = 0;
-    for(i = 1; i <= SIGRTMAX; i++)
+    for(i = 1; i <= MAX_SIGNUM; i++)
         if (sigismember(sigset, i)) {
             // ensure room for (generously) 3 digits + comma + null, or give up
             if (len > result_length - 5) {
@@ -320,7 +325,7 @@ all_signals_blocked_p(const sigset_t *sigset, sigset_t *sigset2,
         get_current_sigmask(&current);
         sigset = &current;
     }
-    for(i = 1; i <= SIGRTMAX; i++) {
+    for(i = 1; i <= MAX_SIGNUM; i++) {
         if (sigismember(sigset2, i)) {
             if (sigismember(sigset, i))
                 has_blocked = 1;
@@ -1884,7 +1889,7 @@ sigaction_nodefer_test_handler(int signal,
      * the signal we're handling when SA_NODEFER is set; Linux before
      * 2.6.13 or so also doesn't block the other signal when
      * SA_NODEFER is set. */
-    for(i = 1; i <= SIGRTMAX; i++)
+    for(i = 1; i <= MAX_SIGNUM; i++)
         if (sigismember(&current, i) !=
             (((i == SA_NODEFER_TEST_BLOCK_SIGNAL) || (i == signal)) ? 1 : 0)) {
             FSHOW_SIGNAL((stderr, "SA_NODEFER doesn't work, signal %d\n", i));
