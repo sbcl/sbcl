@@ -153,6 +153,8 @@ context_eflags_addr(os_context_t *context)
     return &context->uc_mcontext.gregs[REG_RFL];
 #elif defined LISP_FEATURE_FREEBSD || defined(__DragonFly__)
     return &context->uc_mcontext.mc_rflags;
+#elif defined __HAIKU__
+    return &context->uc_mcontext.rflags;
 #elif defined LISP_FEATURE_DARWIN
     return CONTEXT_ADDR_FROM_STEM(rflags);
 #elif defined __OpenBSD__

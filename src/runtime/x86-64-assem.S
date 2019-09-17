@@ -32,7 +32,8 @@
 #include "genesis/complex.h"
 	
 /* Minimize conditionalization for different OS naming schemes. */
-#if defined __linux__  || defined LISP_FEATURE_FREEBSD || defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
+#if defined __linux__  || defined LISP_FEATURE_HAIKU || defined LISP_FEATURE_FREEBSD || \
+   defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
 #define GNAME(var) var
 #else
 #define GNAME(var) _##var

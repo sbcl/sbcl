@@ -1,0 +1,102 @@
+#include "os.h"
+#include "interr.h"
+#include "interrupt.h"
+#include "arch.h" // for arch_get_bad_addr
+#include "interrupt.h" // for sig_stop_for_gc_handler
+#include <stdio.h>
+
+size_t os_vm_page_size;
+
+os_vm_address_t
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
+{
+    // There's no MAP_NORESERVE flag? How do we inform the OS not to commit
+    // the whole range to swap?
+    int flags =  MAP_PRIVATE | MAP_ANONYMOUS;
+    os_vm_address_t actual;
+
+    printf("mmap(%d,%p,%ld)\n", attributes, addr, len);
+#ifdef MAP_32BIT
+    if (attributes & ALLOCATE_LOW)
+        flags |= MAP_32BIT;
+#endif
+    actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+    if (actual == MAP_FAILED) {
+        perror("mmap");
+        return 0;               /* caller should check this */
+    }
+
+    // If requested addr was 0, the MOVABLE attribute means nothing.
+    if (addr && !(attributes & MOVABLE) && (addr != actual)) {
+        fprintf(stderr, "mmap: wanted %lu bytes at %p, actually mapped at %p\n",
+                (unsigned long) len, addr, actual);
+        return 0;
+    }
+
+    return actual;
+}
+
+void
+os_invalidate(os_vm_address_t addr, os_vm_size_t len)
+{
+    if (munmap(addr,len) == -1) {
+        perror("munmap");
+    }
+}
+
+void
+os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
+{
+    if (mprotect(address, length, prot)) {
+        perror("mprotect");
+    }
+}
+
+char *os_get_runtime_executable_path(int __attribute__((unused)) external)
+{
+    return NULL; // this function is allowed to fail
+}
+
+void
+os_init(char __attribute__((unused)) *argv[], char __attribute__((unused)) *envp[])
+{
+    os_vm_page_size = BACKEND_PAGE_BYTES;
+}
+
+static void
+sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
+{
+    /*fprintf(stderr, "SIGSEGV: pc=%p addr=%p\n",
+	   context->uc_mcontext.rip, info->si_addr);*/
+    os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
+    if (!gencgc_handle_wp_violation(addr))
+        if (!handle_guard_page_triggered(context, addr))
+            interrupt_handle_now(signal, info, context);
+}
+
+void
+os_install_interrupt_handlers(void)
+{
+    undoably_install_low_level_interrupt_handler(SIGSEGV, sigsegv_handler);
+#ifdef LISP_FEATURE_SB_THREAD
+    undoably_install_low_level_interrupt_handler(SIG_STOP_FOR_GC,
+                                                 sig_stop_for_gc_handler);
+#endif
+}
+
+int pthread_getattr_np(pthread_t thread, pthread_attr_t *attr)
+{
+    lose("pthread_getattr_np unimplemented");
+}
+
+int pthread_attr_setstack(pthread_attr_t *attr,
+                          void *stackaddr, size_t stacksize)
+{
+  lose("pthread_attr_setstack unimplemented");
+}
+
+int pthread_attr_getstack(const pthread_attr_t *attr,
+                          void **stackaddr, size_t *stacksize)
+{
+  lose("pthread_attr_getstack unimplemented");
+}

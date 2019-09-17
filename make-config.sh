@@ -303,6 +303,9 @@ case `uname` in
     HP-UX)
         sbcl_os="hpux"
         ;;
+    Haiku)
+        sbcl_os="haiku"
+        ;;
     *)
         echo unsupported OS type: `uname`
         exit 1
@@ -503,6 +506,12 @@ case "$sbcl_os" in
         link_or_copy Config.$sbcl_arch-hpux Config
         link_or_copy $sbcl_arch-hpux-os.h target-arch-os.h
         link_or_copy hpux-os.h target-os.h
+        ;;
+    haiku)
+        printf ' :unix :elf :haiku :sb-dynamic-core' >> $ltf
+        link_or_copy Config.$sbcl_arch-haiku Config
+        link_or_copy $sbcl_arch-haiku-os.h target-arch-os.h
+        link_or_copy haiku-os.h target-os.h
         ;;
     *bsd)
         printf ' :unix' >> $ltf

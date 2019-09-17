@@ -723,7 +723,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
         lose("couldn't find initial function\n");
     }
 
-#if defined(SVR4) || defined(__linux__) || defined(__NetBSD__)
+#if defined(SVR4) || defined(__linux__) || defined(__NetBSD__) || defined(__HAIKU__)
     tzset();
 #endif
 

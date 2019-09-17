@@ -359,7 +359,11 @@ sigaddset_deferrable(sigset_t *s)
     sigaddset(s, SIGURG);
     sigaddset(s, SIGTSTP);
     sigaddset(s, SIGCHLD);
+#ifdef SIGIO
     sigaddset(s, SIGIO);
+#else
+    sigaddset(s, SIGPOLL);
+#endif
 #ifndef LISP_FEATURE_HPUX
     sigaddset(s, SIGXCPU);
     sigaddset(s, SIGXFSZ);
@@ -1463,7 +1467,7 @@ interrupt_handle_now_handler(int signal, siginfo_t *info, void *void_context)
     SAVE_ERRNO(signal,context,void_context);
 #ifndef LISP_FEATURE_WIN32
     if ((signal == SIGILL) || (signal == SIGBUS)
-#if !(defined(LISP_FEATURE_LINUX) || defined(LISP_FEATURE_ANDROID))
+#if !(defined LISP_FEATURE_LINUX || defined LISP_FEATURE_ANDROID || defined LISP_FEATURE_HAIKU)
         || (signal == SIGEMT)
 #endif
         )

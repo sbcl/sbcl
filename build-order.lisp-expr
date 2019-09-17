@@ -232,6 +232,7 @@
  #+hpux  ("src/code/hpux-os"  :not-host)
  #+bsd   ("src/code/bsd-os"   :not-host)
  #+linux ("src/code/linux-os" :not-host)
+ #+haiku ("src/code/haiku-os" :not-host)
  #+win32 ("src/code/win32-os" :not-host)
 
  ("src/code/share-vm" :not-host)
