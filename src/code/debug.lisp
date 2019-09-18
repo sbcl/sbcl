@@ -876,6 +876,22 @@ the current thread are replaced with dummy objects which can safely escape."
       (t
        hint))))
 
+;;; Adding all the declarations in the world can't seem to stop the compiler from
+;;; inserting code into INVOKE-DEBUGGER to assert that FUNCALL-WITH-DEBUG-IO-SYNTAX
+;;; does not return (adhering to its contract as a never-returing function).
+;;; And the error report - which never happens - contains the entire s-expression for
+;;; the body of INVOKE-DEBUGGER. Notice all the extra junk coming from:
+#| (sb-introspect::map-code-constants
+     (sb-kernel:fun-code-header #'invoke-debugger)
+     (lambda (x) (if (consp x) (print x)))) |#
+;;; Adding a type deriver prevents such stupidity.
+(eval-when (:compile-toplevel)
+  (sb-c::defoptimizer (funcall-with-debug-io-syntax sb-c:derive-type) ((fun &rest rest))
+    (declare (ignore rest))
+    (if (sb-c::lvar-fun-is fun '(%invoke-debugger))
+        *empty-type*
+        *universal-type*)))
+
 (defun invoke-debugger (condition)
   "Enter the debugger."
   (let ((*stack-top-hint* (resolve-stack-top-hint))
