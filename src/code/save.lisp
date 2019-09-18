@@ -288,17 +288,38 @@ sufficiently motivated to do lengthy fixes."
   (call-hooks "save" *save-hooks*)
   #+sb-wtimer
   (itimer-emulation-deinit)
-  ;; Terminate finalizer thread now, especially given that the thread runs
-  ;; user-supplied code that might not even work in later steps of deinit.
-  ;; See also the comment at definition of THREAD-EPHEMERAL-P.
-  #+sb-thread (finalizer-thread-stop)
-  (let ((threads (sb-thread:list-all-threads)))
-    (unless (= 1 (length threads))
-      (let* ((interactive (sb-thread::interactive-threads))
-             (other (set-difference threads interactive)))
-        (error 'save-with-multiple-threads-error
-               :interactive-threads interactive
-               :other-threads other))))
+  #+sb-thread
+  (progn
+    ;; Terminate finalizer thread now, especially given that the thread runs
+    ;; user-supplied code that might not even work in later steps of deinit.
+    ;; See also the comment at definition of THREAD-EPHEMERAL-P.
+    (finalizer-thread-stop)
+    (let ((threads (sb-thread:list-all-threads)))
+      (when (cdr threads)
+        ;; Despite calling FINALIZER-THREAD-STOP, an unlucky thread schedule
+        ;; courtesy of the OS might notionally start the finalizer thread but not
+        ;; run it until now. Suppose it barely got to its lisp trampoline,
+        ;; at which point we see it in *ALL-THREADS* not having observed it
+        ;; in *FINALIZER-THREAD*. FINALIZER-THREAD-STOP didn't know to stop it.
+        ;; Without adding significantly more synchronization, the best recourse
+        ;; is to consider it as nonexistent whenever it was "stopped".
+        ;; A newly started finalizer thread can do nothing but exit immediately
+        ;; whenever *FINALIZER-THREAD* is NIL so we don't actually care
+        ;; what that thread is doing at this point.
+        (let ((finalizer (find-if (lambda (x)
+                                    (and (sb-thread::thread-%ephemeral-p x)
+                                         (string= (sb-thread:thread-name x) "finalizer")))
+                                  threads)))
+          (when finalizer
+            (sb-thread:join-thread finalizer)))
+        ;; Regardless of what happened above, grab the all-threads list again.
+        (setq threads (sb-thread:list-all-threads)))
+      (when (cdr threads)
+        (let* ((interactive (sb-thread::interactive-threads))
+               (other (set-difference threads interactive)))
+          (error 'save-with-multiple-threads-error
+                 :interactive-threads interactive
+                 :other-threads other)))))
   (tune-image-for-dump)
   (float-deinit)
   (profile-deinit)

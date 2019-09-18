@@ -1607,13 +1607,38 @@ terminates the thread.
 See also: RETURN-FROM-THREAD, ABORT-THREAD."
   #-sb-thread (declare (ignore function name arguments ephemeral))
   #-sb-thread (error "Not supported in unithread builds.")
-  #+sb-thread (assert (or (atom arguments)
-                           (null (cdr (last arguments))))
-                       (arguments)
-                       "Argument passed to ~S, ~S, is an improper list."
-                       'make-thread arguments)
   #+sb-thread
-  (let ((thread (%make-thread :name name :%ephemeral-p ephemeral)))
+  (progn (assert (or (atom arguments)
+                     (null (cdr (last arguments))))
+                 (arguments)
+                 "Argument passed to ~S, ~S, is an improper list."
+                 'make-thread arguments)
+         (run-thread (%make-thread :name name :%ephemeral-p ephemeral)
+                     function arguments)))
+
+;;; The purpose of splitting out RUN-THREAD from MAKE-THREAD is that when
+;;; starting the finalizer thread, we might be able to do:
+;;; (let ((thread (%make-thread :name "finalizer" :%ephemeral-p t)))
+;;;   (when (cas *finalizer-thread* nil thread)
+;;;     (run-thread thread ...)
+;;; which is possibly an improvement in two ways:
+
+;;; (1) it ensures that there is no hidden state in the transition diagram
+;;;     when we are invisibly starting the finalizer thread but have not made it
+;;;     known to FINALIZER-THREAD-STOP that we are doing so. There would be a
+;;;     thread object published or not - and no "maybe starting" state.
+;;; (2) imagine two threads, each of which actually GC'd - so the 'gc_happened'
+;;;     flag in gc-common.c is T for both - and each wants to start the finalizer.
+;;;     They both get all the way into NEW-LISP-THREAD-TRAMPOLINE, only for one
+;;;     to lose the CAS on *FINALIZER-THREAD*. It's a lot of overhead to start
+;;;     a thread that does nothing and then exits.
+;;;
+;;; But it's not all fun and games, because we'd have to figure out how to
+;;; get FINALIZER-THREAD-STOP _not_ to attempt to join a thread that has not
+;;; yet sprung into being as an OS-level thread.
+
+#+sb-thread
+(defun run-thread (thread function arguments)
     (declare (inline make-semaphore
                      make-waitqueue
                      make-mutex))
@@ -1643,7 +1668,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
           (if (zerop (%create-thread (get-lisp-obj-address #'start-routine)))
               (setf thread nil)
               (wait-on-semaphore setup-sem)))))
-    (or thread (error "Could not create a new thread."))))
+    (or thread (error "Could not create a new thread.")))
 
 (defun join-thread (thread &key (default nil defaultp) timeout)
   "Suspend current thread until THREAD exits. Return the result values
