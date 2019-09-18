@@ -587,7 +587,8 @@ void fast_bzero(void*, size_t); /* in <arch>-assem.S */
  * of zeroing it ourselves, i.e. in practice give the memory back to the
  * OS. Generally done after a large GC.
  */
-static void zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
+static void __attribute__((unused))
+zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
 #ifdef LISP_FEATURE_LINUX
     // We use MADV_DONTNEED only on Linux due to differing semantics from BSD.
     // Linux treats it as a demand that the memory be 0-filled, or refreshed
@@ -3536,7 +3537,11 @@ remap_page_range (page_index_t from, page_index_t to)
      * tricks for memory zeroing. See sbcl-devel thread
      * "Re: patch: standalone executable redux".
      */
-#if defined(LISP_FEATURE_SUNOS)
+    /* I have no idea what the issue with Haiku is, but using the simpler
+     * zero_pages() works where the unmap,map technique does not. Yet the
+     * trick plus a post-check that the pages were correctly zeroed finds
+     * no problem at that time. So what's failing later and why??? */
+#if defined LISP_FEATURE_SUNOS || defined LISP_FEATURE_HAIKU
     zero_pages(from, to);
 #else
     size_t granularity = gencgc_release_granularity;

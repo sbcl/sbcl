@@ -42,7 +42,9 @@
 #ifdef LISP_FEATURE_ANDROID
   #include <termios.h>
 #else
-  #include <sys/termios.h>
+# ifndef LISP_FEATURE_HAIKU
+#  include <sys/termios.h>
+# endif
   #include <langinfo.h>
 #endif
   #include <sys/time.h>
@@ -282,8 +284,12 @@ main(int argc, char __attribute__((unused)) *argv[])
     defsignal("sighup", SIGHUP);
     defsignal("sigill", SIGILL);
     defsignal("sigint", SIGINT);
+#ifdef SIGIO
     defsignal("sigio", SIGIO);
+#endif
+#ifdef SIGIOT
     defsignal("sigiot", SIGIOT);
+#endif
     defsignal("sigkill", SIGKILL);
     defsignal("sigpipe", SIGPIPE);
     defsignal("sigprof", SIGPROF);

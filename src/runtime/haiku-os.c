@@ -15,7 +15,6 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS;
     os_vm_address_t actual;
 
-    printf("mmap(%d,%p,%ld)\n", attributes, addr, len);
 #ifdef MAP_32BIT
     if (attributes & ALLOCATE_LOW)
         flags |= MAP_32BIT;
