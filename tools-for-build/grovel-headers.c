@@ -287,9 +287,6 @@ main(int argc, char __attribute__((unused)) *argv[])
 #ifdef SIGIO
     defsignal("sigio", SIGIO);
 #endif
-#ifdef SIGIOT
-    defsignal("sigiot", SIGIOT);
-#endif
     defsignal("sigkill", SIGKILL);
     defsignal("sigpipe", SIGPIPE);
     defsignal("sigprof", SIGPROF);

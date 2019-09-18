@@ -115,7 +115,6 @@
 (defconstant sigill 4) ; #x4
 (defconstant sigint 2) ; #x2
 (defconstant sigio 29) ; #x1d
-(defconstant sigiot 6) ; #x6
 (defconstant sigkill 9) ; #x9
 (defconstant sigpipe 13) ; #xd
 (defconstant sigprof 27) ; #x1b
