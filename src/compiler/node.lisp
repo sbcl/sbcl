@@ -550,8 +550,7 @@
 (declaim (inline reoptimize-component))
 (defun reoptimize-component (component kind)
   (declare (type component component)
-           (type (member nil :maybe t) kind))
-  (aver kind)
+           (type (member :maybe t) kind))
   (unless (eq (component-reoptimize component) t)
     (setf (component-reoptimize component) kind)))
 

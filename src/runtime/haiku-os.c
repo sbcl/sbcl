@@ -67,7 +67,7 @@ static void
 sigsegv_handler(int signal, siginfo_t *info, os_context_t *context)
 {
     /*fprintf(stderr, "SIGSEGV: pc=%p addr=%p\n",
-	   context->uc_mcontext.rip, info->si_addr);*/
+           context->uc_mcontext.rip, info->si_addr);*/
     os_vm_address_t addr = arch_get_bad_addr(signal, info, context);
     if (!gencgc_handle_wp_violation(addr))
         if (!handle_guard_page_triggered(context, addr))
