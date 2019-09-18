@@ -1620,7 +1620,6 @@
 (defknown assert-error (t &rest t) null)
 (defknown check-type-error (t t type-specifier &optional (or null string)) t)
 (defknown invoke-debugger (condition) nil)
-(defknown sb-debug::funcall-with-debug-io-syntax (function &rest t) *)
 (defknown break (&optional format-control &rest t) null)
 (defknown make-condition (type-specifier &rest t) condition ())
 (defknown compute-restarts (&optional (or condition null)) list)

@@ -2519,6 +2519,12 @@
             ;; optimization.
             ((and (bound-cast-p cast)
                   (bound-cast-check cast)))
+            ((and (eq atype *empty-type*)
+                  (do-uses (node value t)
+                    (unless (basic-combination-p node)
+                      (return))))
+             ;; Combinations have nil-fun-returned-error
+             (setf (cast-%type-check cast) nil))
             (t
              (let ((context (node-source-form cast))
                    (detail (lvar-all-sources (cast-value cast))))
