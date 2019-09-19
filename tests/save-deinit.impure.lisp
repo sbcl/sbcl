@@ -17,6 +17,9 @@
 ;;;      #<THREAD "finalizer" RUNNING {10022A0073}>
 
 ;;; The test below is sufficient to show that it has been fixed.
+
+#-sb-thread (exit :code 104)
+
 (sb-int:encapsulate
  'sb-thread::new-lisp-thread-trampoline
  'finalizer-bug
