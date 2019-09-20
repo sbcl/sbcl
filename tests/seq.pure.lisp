@@ -449,6 +449,14 @@
     `(lambda (e) (search '(a) '(b) :end1 e))
     ((0) 0)))
 
+(with-test (:name (search :type-derivation))
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (eql (search a (the (simple-vector 2) b) :from-end t) 2))
+   ((#() #(1 2)) t)
+   ((#(1) #(1 2)) nil)))
+
 (with-test (:name (count :no-consing)
             :skipped-on :interpreter)
   (let ((f (checked-compile

@@ -1402,6 +1402,7 @@
 
 (defoptimizer (search derive-type) ((sequence1 sequence2
                                                &key start1 end1 start2 end2
+                                               from-end
                                                &allow-other-keys))
   (let* ((constant-start1 (and (constant-lvar-p start1)
                                (lvar-value start1)))
@@ -1411,6 +1412,9 @@
                                (lvar-value start2)))
          (constant-end2 (and (constant-lvar-p end2)
                              (lvar-value end2)))
+         (not-from-end (or (not from-end)
+                           (and (constant-lvar-p from-end)
+                                (not (lvar-value from-end)))))
          (min-result (or constant-start2 0))
          (max-result (or constant-end2 (1- sb-xc:array-dimension-limit)))
          (max2 (sequence-lvar-dimensions sequence2))
@@ -1429,7 +1433,9 @@
                                      ((or start1 end1 (not (integerp min1)))
                                       ;; The result can be equal to MAX-RESULT only when
                                       ;; searching for "" and :start2 being equal to :end2
-                                      (if (or (and start2
+                                      ;; or :from-end t
+                                      (if (or (not not-from-end)
+                                              (and start2
                                                    (not constant-start2))
                                               (= max-result min-result))
                                           0
