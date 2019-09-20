@@ -339,12 +339,12 @@ Examples:
       ;; from T to #<thread> now. That is unlikely, but we must try once
       ;; again to CAS the value to NIL.
       (unless (eq oldval thread)
-	(setq thread oldval)
-	;; Also, we could be racing with someone else trying to stop the
-	;; thread, so we could see T | #<thread> -> NIL.
-	(when (null thread)
-	  (return-from finalizer-thread-stop))
-	(aver (eq (cas *finalizer-thread* thread nil) thread))))
+        (setq thread oldval)
+        ;; Also, we could be racing with someone else trying to stop the
+        ;; thread, so we could see T | #<thread> -> NIL.
+        (when (null thread)
+          (return-from finalizer-thread-stop))
+        (aver (eq (cas *finalizer-thread* thread nil) thread))))
     (when (%instancep thread)
       ;; The finalizer thread will exit when we wake it up
       ;; and it sees that *FINALIZER-THREAD* is NIL.
