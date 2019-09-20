@@ -81,7 +81,7 @@
        ;; foreign routine, if possible.  If not, just note the
        ;; final value.
        (let ((addr (+ immed-val (ash (cdr sethi) 10))))
-         (or (note-code-constant-absolute addr dstate)
+         (or (note-code-constant addr dstate :absolute)
              (maybe-note-assembler-routine addr t dstate)
              (note (format nil "~A = #x~8,'0X" (get-reg-name rd) addr) dstate)))
        (setf *note-sethi-inst* (delete sethi *note-sethi-inst*)))

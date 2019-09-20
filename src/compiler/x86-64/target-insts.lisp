@@ -306,7 +306,7 @@
             (firstp
                (princ16 disp stream)
                (or (minusp disp)
-                   (nth-value 1 (note-code-constant-absolute disp dstate))
+                   (nth-value 1 (note-code-constant disp dstate :absolute))
                    (maybe-note-assembler-routine disp nil dstate)
                    ;; Static symbols coming from CELL-REF
                    (maybe-note-static-symbol (+ disp (- other-pointer-lowtag
@@ -321,8 +321,7 @@
         ;; The origin is zero when disassembling into a trace-file.
         ;; Don't crash on account of it.
         (when (plusp addr)
-          (or (nth-value
-               1 (note-code-constant-absolute addr dstate width))
+          (or (nth-value 1 (note-code-constant addr dstate :absolute))
               ;; Don't try to look up C symbols in immobile space.
               ;; In an elfinated core, the range that is reserved for
               ;; compilation to memory says it is all associated with

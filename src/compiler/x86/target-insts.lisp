@@ -209,7 +209,7 @@
             (t ; memory absolute
              (setq offset (ldb (byte 32 0) offset)) ; never show as negative
              (princ16 offset stream)
-             (or (nth-value 1 (note-code-constant-absolute offset dstate))
+             (or (nth-value 1 (note-code-constant offset dstate :absolute))
                  (maybe-note-assembler-routine offset nil dstate))))))
   (write-char #\] stream))
 

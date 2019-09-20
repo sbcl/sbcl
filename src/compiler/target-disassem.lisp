@@ -1822,41 +1822,6 @@
   (declare (type offset byte-offset))
   (grok-symbol-slot-ref (+ sb-vm:nil-value byte-offset)))
 
-;;; Return two values; the Lisp object located at BYTE-OFFSET in the
-;;; constant area of the code-object in the current segment and T, or
-;;; NIL and NIL if there is no code-object in the current segment.
-(defun get-code-constant (byte-offset dstate)
-  (declare (type offset byte-offset)
-           (type disassem-state dstate))
-  ;; Cautiously avoid reading any word index that is not within
-  ;; the boxed portion of the header.
-  (let ((code (seg-code (dstate-segment dstate)))
-        (wordindex (ash (+ byte-offset sb-vm:other-pointer-lowtag)
-                        (- sb-vm:word-shift))))
-    (if (and code (< 1 wordindex (code-header-words code)))
-        (values (code-header-ref code wordindex) t)
-        (values nil nil))))
-
-;;; Return the lisp object at ADDR in the code component being disassembled.
-;;; Since we've already decided what the ADDR is, there is nothing that
-;;; has to be done to pin objects or disable GC here - if the object can
-;;; move, then ADDR is already potentially wrong.
-(defun get-code-constant-absolute (addr dstate &optional width
-                                   &aux (code (seg-code (dstate-segment dstate))))
-  (declare (type address addr))
-  (declare (type disassem-state dstate))
-  (declare (ignore width))
-  (if (null code)
-     (values nil nil)
-     (let* ((n-header-bytes (* (code-header-words code) sb-vm:n-word-bytes))
-            (header-addr (- (get-lisp-obj-address code)
-                            sb-vm:other-pointer-lowtag))
-            (code-start (+ header-addr n-header-bytes)))
-         (cond ((< header-addr addr code-start)
-                (values (sap-ref-lispobj (int-sap addr) 0) t))
-               (t
-                (values nil nil))))))
-
 (define-load-time-global *assembler-routines-by-addr* nil)
 
 ;;; Return the name of the primitive Lisp assembler routine that contains
@@ -1962,41 +1927,49 @@
       (prin1-short thing stream)
       (prin1-short `',thing stream)))
 
-;;; Store a note about the lisp constant located BYTE-OFFSET bytes
-;;; from the current code-component, to be printed as an end-of-line
-;;; comment after the current instruction is disassembled.
-;;; NB: This API is bad. We say BYTE-OFFSET bytes from the object,
-;;; but it actually means offset from whatever value would be in CODE-TN.
-;;; Most backends pass in an odd number ("odd" in both senses) because it's
-;;; whatever offset is in the instruction which when added to the tagged
-;;; pointer in CODE-TN gets to an aligned offset. But for backends which
-;;; do not have a lowtag in CODE-TN you have to subtract OTHER-POINTER-LOWTAG
-;;; because we add it back in GET-CODE-CONSTANT under the assumption
-;;; that you meant to add that much. How stupid!
-(defun note-code-constant (byte-offset dstate)
-  (declare (type offset byte-offset)
-           (type disassem-state dstate))
-  (multiple-value-bind (const valid)
-      (get-code-constant byte-offset dstate)
-    (when valid
-      (note (lambda (stream)
-              (prin1-quoted-short const stream))
-            dstate))
-    const))
+;;; Store a note about the lisp constant at LOCATION in the code object
+;;; being disassembled, to be printed as an end-of-line comment.
+;;; The interpretation of LOCATION depends on HOW as follows:
+;;; - if :INDEX, then LOCATION is directly the argument to CODE-HEADER-REF.
+;;; - if :RELATIVE, then it is is a byte displacement beyond CODE.
+;;; - if :ABSOLUTE, then it is an address (I'm not sure if this an address
+;;    beyond DSTATE-SEGMENT-SAP or SEGMENT-VIRTUAL-LOCATION when those differ)
+;;; In any case, if the offset indicates a location outside of the
+;;; boxed constants, nothing is printed.
 
-;;; Store a note about the lisp constant located at ADDR in the
-;;; current code-component, to be printed as an end-of-line comment
-;;; after the current instruction is disassembled.
-(defun note-code-constant-absolute (addr dstate &optional width)
-  (declare (type address addr)
-           (type disassem-state dstate))
-  (multiple-value-bind (const valid)
-      (get-code-constant-absolute addr dstate width)
-    (when valid
-      (note (lambda (stream)
-              (prin1-quoted-short const stream))
-            dstate))
-    (values const valid)))
+(defun note-code-constant (location dstate &optional (how :relative))
+  (declare (type disassem-state dstate))
+  (binding* ((code (seg-code (dstate-segment dstate)))
+             ((addr index)
+              (ecase how
+               (:relative
+                ;; When CODE-TN has a lowtag (as it usually does), we add it in here.
+                (let ((addr (+ location #-ppc64 sb-vm:other-pointer-lowtag)))
+                  (values addr (ash addr (- sb-vm:word-shift)))))
+               (:absolute
+                ;; Concerning object movement:
+                ;; Since we've already decided what the ADDR is, there is nothing that
+                ;; has to be done to pin objects or disable GC here - if the object
+                ;; is movable, then ADDR is already potentially wrong unless the caller
+                ;; took care of immobilizing the DSTATE's code blob.
+                ;; It's OK to compute a bogus address (when CODE is NIL). It's just math.
+                (values location
+                        (ash (- location (- (get-lisp-obj-address code)
+                                            sb-vm:other-pointer-lowtag))
+                             (- sb-vm:word-shift))))
+               (:index
+                (values nil location)))))
+    ;; Cautiously avoid reading any word index that is not within the
+    ;; boxed portion of the header.
+    ;; The metadata at index 1 is not considered a valid index.
+    (cond ((and code (< 1 index (code-header-words code)))
+           (when addr ; ADDR must be word-aligned to be sensible
+             (aver (not (logtest addr (ash sb-vm:lowtag-mask -1)))))
+           (let ((const (code-header-ref code index)))
+             (note (lambda (stream) (prin1-quoted-short const stream)) dstate)
+             (values const t)))
+          (t
+           (values nil nil)))))
 
 ;;; If the memory address located NIL-BYTE-OFFSET bytes from the
 ;;; constant NIL is a valid slot in a symbol, store a note describing
@@ -2193,11 +2166,8 @@
          (emit-note (symbol-name (get-internal-error-name errnum)))
          (dolist (sc+offset sc+offsets)
            (emit-err-arg)
-           (if (= (sb-c:sc+offset-scn sc+offset)
-                  sb-vm:constant-sc-number)
-               (note-code-constant (* (1- (sb-c:sc+offset-offset sc+offset))
-                                      sb-vm:n-word-bytes)
-                                   dstate)
+           (if (= (sb-c:sc+offset-scn sc+offset) sb-vm:constant-sc-number)
+               (note-code-constant (sb-c:sc+offset-offset sc+offset) dstate :index)
                (emit-note (get-random-tn-name sc+offset))))))
      (incf (dstate-next-offs dstate) adjust))))
 
