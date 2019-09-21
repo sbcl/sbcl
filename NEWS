@@ -2,6 +2,9 @@
 
 changes relative to sbcl-1.5.6:
   * enhancement: sb-thread support on x86-64 Sun OS (lp#1841280)
+  * enhancement: the 64-bit PPC little-endian port passes all the tests, and
+    includes sb-thread support (the big-endian variant still has some tests
+    failing).
 
 changes in sbcl-1.5.6 relative to sbcl-1.5.5:
   * platform support:
