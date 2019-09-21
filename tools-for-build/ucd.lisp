@@ -556,7 +556,37 @@ Length should be adjusted when the standard changes.")
              (setf (ucd-misc (gethash code-point *ucd-entries*)) new-misc))))))
 
 (defun fixup-casefolding ()
-  (with-input-txt-file (s "CaseFolding")
+  ;; KLUDGE: CaseFolding.txt as distributed by Unicode contains a
+  ;; non-ASCII character, an eszet, within a comment to act as an
+  ;; example.  We can't in general assume that our host lisp will let
+  ;; us read that, and we can't portably write that we don't care
+  ;; about the text content of anything on a line after a hash because
+  ;; text decoding happens at a lower level.  So here we rewrite the
+  ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
+  ;; to the eszet character.
+  (with-open-file (in (make-pathname :name "CaseFolding" :type "txt"
+                                     :defaults *unicode-character-database*)
+                      :element-type '(unsigned-byte 8))
+    (with-open-file (out (make-pathname :name "CaseFolding" :type "txt"
+                                        :defaults *output-directory*)
+                         :direction :output
+                         :if-exists :supersede
+                         :if-does-not-exist :create
+                         :element-type '(unsigned-byte 8))
+      ;; KLUDGE: it's inefficient, though simple, to do the I/O
+      ;; byte-by-bite.
+      (do ((inbyte (read-byte in nil nil) (read-byte in nil nil))
+           (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>")))
+          ((null inbyte))
+        (if (= inbyte #xc3)
+            (let ((second (read-byte in nil nil)))
+              (cond
+                ((null second) (write-byte inbyte out) (return nil))
+                ((= second #x9f) (write-sequence eszet out))
+                (t (write-byte inbyte out) (write-byte second out))))
+            (write-byte inbyte out)))))
+  (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
+                                    :defaults *output-directory*))
     (loop for line = (read-line s nil nil)
        while line
        unless (or (not (position #\; line)) (equal (position #\# line) 0))
