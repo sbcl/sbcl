@@ -1010,7 +1010,7 @@
            (inst bge zero-tn count done))
           (t
            (inst li index-temp (fixnumize index))
-           (inst bge index-temp count)))
+           (inst bge index-temp count done)))
     (loadw value object index)
     done))
 
