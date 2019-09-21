@@ -35,6 +35,13 @@
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
 
+#+sb-thread
+(progn
+  (defun load-tls-index (reg symbol)
+    (inst lwz reg symbol (- #+little-endian 4 other-pointer-lowtag)))
+  (defun store-tls-index (reg symbol)
+    (inst stw reg symbol (- #+little-endian 4 other-pointer-lowtag))))
+
 (macrolet
     ((frob (slot)
        (let ((loader (intern (concatenate 'simple-string
@@ -77,9 +84,8 @@
     `(progn
        (inst lwz ,reg null-tn
              (+ (static-symbol-offset ',symbol)
-                (ash symbol-tls-index-slot word-shift)
-                (- other-pointer-lowtag)))
-       (inst lwzx ,reg thread-base-tn ,reg)))
+                (- #+little-endian 4 other-pointer-lowtag)))
+       (inst ldx ,reg thread-base-tn ,reg)))
   #-sb-thread
   (defmacro load-tl-symbol-value (reg symbol)
     `(load-symbol-value ,reg ,symbol))
@@ -89,9 +95,8 @@
     `(progn
        (inst lwz ,temp null-tn
              (+ (static-symbol-offset ',symbol)
-                (ash symbol-tls-index-slot word-shift)
-                (- other-pointer-lowtag)))
-       (inst stwx ,reg thread-base-tn ,temp)))
+                (- #+little-endian 4 other-pointer-lowtag)))
+       (inst stdx ,reg thread-base-tn ,temp)))
   #-sb-thread
   (defmacro store-tl-symbol-value (reg symbol temp)
     (declare (ignore temp))

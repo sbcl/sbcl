@@ -251,7 +251,7 @@
 (let ((feature-compatibility-tests
        '(("(and sb-thread (not gencgc))"
           ":SB-THREAD requires :GENCGC")
-         ("(and sb-thread (not (or ppc x86 x86-64 arm64)))"
+         ("(and sb-thread (not (or ppc ppc64 x86 x86-64 arm64)))"
           ":SB-THREAD not supported on selected architecture")
          ("(and gencgc cheneygc)"
           ":GENCGC and :CHENEYGC are incompatible")

@@ -138,11 +138,15 @@ Low Address
    This way the symbol ptr_ symbol lives within a 32 bits offset
    of the TOC. See Store and Load macros in this file */
 #define indirect_ptr(csym) ptr_##csym: .quad csym
+#if !defined(LISP_FEATURE_SB_THREAD)
 indirect_ptr(current_binding_stack_pointer)
 indirect_ptr(current_control_stack_pointer)
 indirect_ptr(current_control_frame_pointer)
+#endif
 indirect_ptr(dynamic_space_free_pointer)
+#if !defined(LISP_FEATURE_SB_THREAD)
 indirect_ptr(foreign_function_call_active)
+#endif
 indirect_ptr(all_threads)
 #if defined(LISP_FEATURE_SB_THREAD)
 indirect_ptr(specials)
@@ -170,13 +174,9 @@ indirect_ptr(specials)
 
 	/* Call out to obtain our TLS block. */
 	load(reg_NL0,specials)
-	/* This won't work on darwin: wrong fixup style.  And is it
-	 * supposed to be lis/ori or lis/addi?  Or does it differ
-	 * between darwin and everything else again? */
-	lis reg_CFUNC,pthread_getspecific@h
-	ori reg_CFUNC,reg_CFUNC,pthread_getspecific@l
-	mtctr reg_CFUNC
-	bctrl
+        bl pthread_getspecific
+        nop
+
 	mr reg_THREAD, reg_NL0
 
 	/* Restore our original parameters. */
@@ -208,7 +208,8 @@ indirect_ptr(specials)
 	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
-#else
+#endif
+#if !defined(LISP_FEATURE_SB_THREAD)
 	wordstore(reg_ZERO,reg_NL4,foreign_function_call_active)
 	load(reg_BSP,current_binding_stack_pointer)
 	load(reg_CSP,current_control_stack_pointer)
@@ -276,7 +277,8 @@ lra:
 
 	/* No longer in Lisp. */
 	std reg_ALLOC,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-#else
+#endif
+#if !defined(LISP_FEATURE_SB_THREAD)
 	/* Store lisp state */
 	clrrwi reg_NL1,reg_ALLOC,3
 	store(reg_NL1,reg_NL2,dynamic_space_free_pointer)
@@ -341,7 +343,8 @@ lra:
 
 	/* No longer in Lisp. */
 	std reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-#else
+#endif
+#ifndef LISP_FEATURE_SB_THREAD
 	/* Store Lisp state */
 	// I have no idea what bit of state we're trying to set.
 	// At most this would clear the pseudo-atomic-interrupt flag.
@@ -447,7 +450,8 @@ lra:
 
 	/* The binding stack pointer isn't preserved by C. */
 	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
-#else
+#endif
+#ifndef LISP_FEATURE_SB_THREAD
 	/* No long in foreign function call. */
 	store(reg_ZERO,reg_NL2,foreign_function_call_active)
 

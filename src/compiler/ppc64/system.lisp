@@ -204,8 +204,8 @@
   (:arg-types signed-num)
   (:policy :fast-safe)
   (:generator 2
-    (inst slwi n n word-shift)
-    (inst lwzx sap thread-base-tn n)))
+    (inst sldi n n word-shift)
+    (inst ldx sap thread-base-tn n)))
 
 (define-vop (halt)
   (:generator 1
