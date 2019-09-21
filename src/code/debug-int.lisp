@@ -835,7 +835,11 @@
                 (if (fixnump lra)
                     (let ((fp (frame-pointer up-frame)))
                       (values lra
-                              (stack-ref fp (1+ lra-save-offset))))
+                              (let ((code (stack-ref fp (1+ lra-save-offset))))
+                                code
+                                #+ppc64
+                                (%make-lisp-obj (logior (ash code n-fixnum-tag-bits)
+                                                        other-pointer-lowtag)))))
                     (values (get-header-data lra)
                             (lra-code-header lra)))
               (if code

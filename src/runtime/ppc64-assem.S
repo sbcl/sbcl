@@ -330,7 +330,9 @@ lra:
 
 	/* Convert the return address to an offset and save it on the stack. */
 	sub reg_NFP,reg_LIP,reg_CODE
-	la reg_NFP,OTHER_POINTER_LOWTAG(reg_NFP)
+#if 	N_FIXNUM_TAG_BITS == 3
+	sldi reg_NFP,reg_NFP,1
+#endif
 	std reg_NFP,8(reg_CFP)
 
 #ifdef LISP_FEATURE_SB_THREAD
@@ -469,9 +471,11 @@ lra:
 
 	/* Get the return address back. */
 	ld reg_LIP,8(reg_CFP)
+#if 	N_FIXNUM_TAG_BITS == 3
+	srdi reg_LIP,reg_LIP,1
+#endif	
 	ld reg_CODE,16(reg_CFP)
 	add reg_LIP,reg_CODE,reg_LIP
-	la reg_LIP,-OTHER_POINTER_LOWTAG(reg_LIP)
 
         /* Debugger expects LR to be valid when we come out of PA */
 	mtlr reg_LIP
