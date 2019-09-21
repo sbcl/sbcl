@@ -162,7 +162,7 @@ indirect_ptr(specials)
 	GFUNCDEF(call_into_lisp)
 	C_FULL_PROLOG
 	/* NL0 - function, NL1 - frame pointer, NL2 - nargs. */
-#if defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SB_THREAD
 	/* We need to obtain a pointer to our TLS block before we do
 	 * anything else.  For this, we call pthread_getspecific().
 	 * We've preserved all of the callee-saves registers, so we
@@ -203,13 +203,12 @@ indirect_ptr(specials)
 
 	/* Turn on pseudo-atomic */
 	li reg_ALLOC,flag_PseudoAtomic
-#if defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SB_THREAD
 	std reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
 	ld reg_OCFP,THREAD_CONTROL_FRAME_POINTER_OFFSET(reg_THREAD)
-#endif
-#if !defined(LISP_FEATURE_SB_THREAD)
+#else
 	wordstore(reg_ZERO,reg_NL4,foreign_function_call_active)
 	load(reg_BSP,current_binding_stack_pointer)
 	load(reg_CSP,current_control_stack_pointer)
@@ -269,7 +268,7 @@ lra:
 	   the load() and store() macros uses register 2 as the base */
 	ld 2, (24)(sp)
 
-#if defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SB_THREAD
 	/* Store lisp state */
 	std reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
 	std reg_CSP,THREAD_CONTROL_STACK_POINTER_OFFSET(reg_THREAD)
@@ -277,8 +276,7 @@ lra:
 
 	/* No longer in Lisp. */
 	std reg_ALLOC,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-#endif
-#if !defined(LISP_FEATURE_SB_THREAD)
+#else
 	/* Store lisp state */
 	clrrwi reg_NL1,reg_ALLOC,3
 	store(reg_NL1,reg_NL2,dynamic_space_free_pointer)
@@ -343,8 +341,7 @@ lra:
 
 	/* No longer in Lisp. */
 	std reg_CSP,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
-#endif
-#ifndef LISP_FEATURE_SB_THREAD
+#else
 	/* Store Lisp state */
 	// I have no idea what bit of state we're trying to set.
 	// At most this would clear the pseudo-atomic-interrupt flag.
@@ -425,7 +422,7 @@ lra:
 	li reg_A3,0
 	li reg_L0,0
 	li reg_L1,0
-#if !defined(LISP_FEATURE_SB_THREAD)
+#ifndef LISP_FEATURE_SB_THREAD
 	/* reg_THREAD is our TLS block pointer. */
 	li reg_THREAD,0
 #endif
@@ -444,14 +441,13 @@ lra:
 	/* Atomic ... */
 	li reg_ALLOC,flag_PseudoAtomic
 
-#if defined(LISP_FEATURE_SB_THREAD)
+#ifdef LISP_FEATURE_SB_THREAD
 	/* No longer in foreign function call. */
 	std reg_ZERO,THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET(reg_THREAD)
 
 	/* The binding stack pointer isn't preserved by C. */
 	ld reg_BSP,THREAD_BINDING_STACK_POINTER_OFFSET(reg_THREAD)
-#endif
-#ifndef LISP_FEATURE_SB_THREAD
+#else
 	/* No long in foreign function call. */
 	store(reg_ZERO,reg_NL2,foreign_function_call_active)
 
