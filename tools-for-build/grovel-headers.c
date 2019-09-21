@@ -95,10 +95,36 @@ defconstant(char* lisp_name, unsigned long unix_number)
            lisp_name, unix_number, unix_number);
 }
 
+#ifdef __HAIKU__
+// Haiku defines negative error numbers. I don't think that's allowed for any
+// of the Posix-specified numbers such as ENOENT, as per
+// https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/errno.h.html#tag_13_10
+// "The <errno.h> header shall define the following macros which shall expand to integer
+//  constant expressions with type int, distinct positive values (except as noted below) ...
+//  [ENOENT]" etc
+// But all the constants seem to be based off of INT_MIN.
+//    #define B_GENERAL_ERROR_BASE INT_MIN
+//    #define B_STORAGE_ERROR_BASE (B_GENERAL_ERROR_BASE + 0x6000)
+//    #define B_ENTRY_NOT_FOUND (B_STORAGE_ERROR_BASE + 3)
+//    #define B_TO_POSIX_ERROR(error) (error)
+//    #define ENOENT B_TO_POSIX_ERROR(B_ENTRY_NOT_FOUND)
+// The header correctly has errno as a signed int:
+//    extern int *_errnop(void);
+//    #define errno (*(_errnop()))
+// but printing those as though they were unsigned long causes them to get sign-extended
+// and show up as huge positive numbers.  So we have a platform-specific variant of
+// deferrno() which treats them as 'int' to preserve the negative sign, which has the right
+// behavior because the system calls do actually return 'int'.
+void deferrno(char* lisp_name, int unix_number)
+{
+    printf("(defconstant %s %d)\n", lisp_name, unix_number);
+}
+#else
 void deferrno(char* lisp_name, unsigned long unix_number)
 {
     defconstant(lisp_name, unix_number);
 }
+#endif
 
 void defsignal(char* lisp_name, unsigned long unix_number)
 {
@@ -225,7 +251,7 @@ main(int argc, char __attribute__((unused)) *argv[])
     deferrno("ewouldblock", EWOULDBLOCK);
     printf("\n");
 
-    deferrno("sc-nprocessors-onln", _SC_NPROCESSORS_ONLN);
+    defconstant("sc-nprocessors-onln", _SC_NPROCESSORS_ONLN);
 
     printf(";;; for wait3(2) in run-program.lisp\n");
 #ifdef WCONTINUED
