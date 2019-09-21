@@ -33,7 +33,8 @@
   "tests/data/GraphemeBreakTest.txt"
   "tests/data/WordBreakTest.txt"
   "tests/data/SentenceBreakTest.txt"
-  "tests/data/LineBreakTest.txt")
+  "tests/data/LineBreakTest.txt"
+  "tests/data/line-break-exceptions.lisp-expr")
  ("load.impure.lisp"
   "tests/parallel-fasl-load-test.lisp"
   "tests/data/wonky1.lisp"
