@@ -739,7 +739,7 @@ Length should be adjusted when the standard changes.")
     (values code-points ret))))
 
 (defparameter *collation-table*
-  (with-input-txt-file (stream "Allkeys80")
+  (with-input-txt-file (stream "allkeys")
     (loop with hash = (make-hash-table :test #'equal)
        for line = (read-line stream nil nil) while line
        unless (eql 0 (position #\# line))
