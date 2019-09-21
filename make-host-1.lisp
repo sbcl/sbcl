@@ -100,6 +100,7 @@
                  "output/decomp.dat"
                  "output/foldcases.lisp-expr"
                  "output/misc-properties.lisp-expr"
+                 "output/n-collation-entries.lisp-expr"
                  "output/numerics.lisp-expr"
                  "output/other-collation-info.lisp-expr"
                  "output/titlecases.lisp-expr"
