@@ -248,7 +248,7 @@
 
  ("src/code/misc" :c-headers)
 
- ("src/code/symbol"        :not-host :trace-file)
+ ("src/code/symbol"        :not-host)
  ("src/code/late-cas"      :not-host)
  ("src/code/fd-stream"     :not-host)
  ("src/code/stream"        :not-host)
