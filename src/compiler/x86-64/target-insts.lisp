@@ -304,37 +304,41 @@
       (cond ((eq (machine-ea-base value) :rip)
              (princ disp stream))
             (firstp
-               (princ16 disp stream)
-               (or (minusp disp)
-                   (nth-value 1 (note-code-constant disp dstate :absolute))
-                   (maybe-note-assembler-routine disp nil dstate)
-                   ;; Static symbols coming from CELL-REF
-                   (maybe-note-static-symbol (+ disp (- other-pointer-lowtag
-                                                        n-word-bytes))
-                                             dstate)))
+             (princ16 disp stream)
+             ;; Avoid the MAYBE-NOTE- calls if we can.  A negative offset is never an
+             ;; absolute address as would be used for asm routines and static symbols.
+             (or (minusp disp)
+                 (maybe-note-assembler-routine disp nil dstate)
+                 ;; Static symbols coming from CELL-REF
+                 (maybe-note-static-symbol (+ disp (- other-pointer-lowtag n-word-bytes))
+                                           dstate)))
             (t
              (princ disp stream))))
     (write-char #\] stream)
     (when (and (eq (machine-ea-base value) :rip) (neq mode :compute))
       ;; Always try to print the EA as a note
-      (let ((addr (+ disp (dstate-next-addr dstate))))
-        ;; The origin is zero when disassembling into a trace-file.
-        ;; Don't crash on account of it.
-        (when (plusp addr)
-          (or (nth-value 1 (note-code-constant addr dstate :absolute))
-              ;; Don't try to look up C symbols in immobile space.
-              ;; In an elfinated core, the range that is reserved for
-              ;; compilation to memory says it is all associated with
-              ;; the symbol "lisp_jit_code" which is not useful.
-              (unless (sb-kernel:immobile-space-addr-p addr)
-                (maybe-note-assembler-routine addr nil dstate))
-              ;; Show the absolute address and maybe the contents.
-              (note (format nil "[#x~x]~@[ = #x~x~]"
-                            addr
-                            (case width
-                              (:qword
-                               (unboxed-constant-ref dstate addr disp))))
-                    dstate)))))
+      (block nil
+       (binding* ((seg (dstate-segment dstate))
+                  (code (seg-code seg) :exit-if-null)
+                  (offs (sb-disassem::segment-offs-to-code-offs
+                         (+ (dstate-next-offs dstate) disp) seg)))
+           (when (note-code-constant offs dstate) (return)))
+       (let ((addr (+ disp (dstate-next-addr dstate))))
+         ;; The origin is zero when disassembling into a trace-file.
+         ;; Don't crash on account of it.
+         ;; Also, don't try to look up C symbols in immobile space.
+         ;; In an elfinated core, the range that is reserved for
+         ;; compilation to memory says it is all associated with
+         ;; the symbol "lisp_jit_code" which is not useful.
+         (when (plusp addr)
+           (or (unless (sb-kernel:immobile-space-addr-p addr)
+                 (maybe-note-assembler-routine addr nil dstate))
+               ;; Show the absolute address and maybe the contents.
+               (note (format nil "[#x~x]~@[ = #x~x~]"
+                             addr
+                             (case width
+                              (:qword (unboxed-constant-ref dstate addr disp))))
+                     dstate))))))
     #+sb-thread
     (flet ((guess-symbol (predicate)
              (binding* ((code-header (seg-code (dstate-segment dstate)) :exit-if-null)

@@ -1944,7 +1944,10 @@
               (ecase how
                (:relative
                 ;; When CODE-TN has a lowtag (as it usually does), we add it in here.
-                (let ((addr (+ location #-ppc64 sb-vm:other-pointer-lowtag)))
+                ;; x86-64 does not have a code-tn, but it behaves like ppc64
+                ;; in that the displacement is relative to the base of the code.
+                (let ((addr (+ location
+                               #-(or x86-64 ppc64) sb-vm:other-pointer-lowtag)))
                   (values addr (ash addr (- sb-vm:word-shift)))))
                (:absolute
                 ;; Concerning object movement:
