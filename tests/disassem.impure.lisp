@@ -8,8 +8,9 @@
 
 (with-test (:name :disassemble-sap)
   (with-output-to-string (s)
-    (sb-c:dis (sb-sys:int-sap (- (sb-kernel:get-lisp-obj-address #'car)
-                                 sb-vm:fun-pointer-lowtag))
+    (sb-c:dis (sb-sys:int-sap (+ (- (sb-kernel:get-lisp-obj-address #'car)
+                                    sb-vm:fun-pointer-lowtag)
+                                 (* 2 sb-vm:n-word-bytes)))
               12
               s)))
 
