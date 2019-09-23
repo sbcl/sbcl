@@ -211,9 +211,12 @@
                                         (dotimes (i key-length)
                                           (setf (ldb (byte 32 (* i 32)) key) (aref info index))
                                           (incf index))
+                                        ;; verify the validity of
+                                        ;; :test 'eq on 64-bit
+                                        #+64-bit (aver (typep (apply #'pack-3-codepoints codepoints) 'fixnum))
                                         (setf (gethash (apply #'pack-3-codepoints codepoints) table)
                                               key)))
-                                (assert (= (hash-table-count table) n-entries))
+                                (aver (= (hash-table-count table) n-entries))
                                 table))))
 
                     ,(with-open-file
