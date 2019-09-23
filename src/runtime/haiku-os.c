@@ -3,6 +3,7 @@
 #include "interrupt.h"
 #include "arch.h" // for arch_get_bad_addr
 #include "interrupt.h" // for sig_stop_for_gc_handler
+#include <image.h>
 #include <stdio.h>
 
 size_t os_vm_page_size;
@@ -53,7 +54,13 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
 
 char *os_get_runtime_executable_path(int __attribute__((unused)) external)
 {
-    return NULL; // this function is allowed to fail
+    int cookie = 0;
+    image_info info;
+    int status = _get_next_image_info(0, &cookie, &info, sizeof(info));
+    if (status == 0)
+        return info.name;
+    else
+        return NULL;
 }
 
 void
