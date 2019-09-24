@@ -429,6 +429,14 @@ else
 fi
 
 case "$sbcl_os" in
+    netbsd)
+        # default to using paxctl to disable mprotect restrictions
+        if [ "x$(sysctl -n security.pax.mprotect.enabled 2>/dev/null)" = x1 -a \
+             "x$SBCL_PAXCTL" = x ]; then
+            echo "SBCL_PAXCTL=\"/usr/sbin/paxctl +m\"; export SBCL_PAXCTL" \
+                 >> output/build-config
+        fi
+        ;;
     openbsd)
         # openbsd 6.0 and newer restrict mmap of RWX pages
         if [ $(uname -r | tr -d .) -gt 60 ]; then
