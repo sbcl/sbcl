@@ -1,10 +1,28 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.5.6:
-  * enhancement: sb-thread support on x86-64 Sun OS (lp#1841280)
-  * enhancement: the 64-bit PPC little-endian port passes all the tests, and
-    includes sb-thread support (the big-endian variant still has some tests
-    failing).
+  * platform support:
+    ** many bug fixes to the experimental 64-bit PowerPC/Linux port, to the
+       extent that the little-endian variant passes all applicable tests in
+       the regression test suite; the big-endian variant currently has some
+       failures
+    ** experimental support for sb-threads on 64-bit PowerPC/Linux
+    ** support threads on x86-64 Sun OS (lp#1841280)
+    ** handle PAX restrictions on mprotect() on NetBSD
+    ** experimental support for HaikuOS
+    ** the runtime is built as a position-independent executable by default on
+       x86-64 Linux and x86-64 Darwin
+  * fixes and enhancements related to Unicode:
+    ** update of the data files to Unicode 8.0
+    ** fix a bug in the implementation of the Unicode line breaking algorithm
+       regarding hebrew letters and hyphens
+  * enhancement: add a restart to OPEN with :IF-EXISTS :ERROR to allow
+    re-opening with :APPEND.  (lp#806398, reported by Tobias Rittweiler)
+  * bug fix: compiler optimizations on SEARCH with :FROM-END T didn't account
+    for the empty sequence.  (lp#1844821)
+  * bug fix: handle SETF of nested empty VALUES correctly.  (lp#1806478)
+  * optimization: FLOOR and CEILING on rationals are simpler, and the
+    compiler's understanding of them is better.
 
 changes in sbcl-1.5.6 relative to sbcl-1.5.5:
   * platform support:
