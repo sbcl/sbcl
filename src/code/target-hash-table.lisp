@@ -785,11 +785,10 @@ multiple threads accessing the same hash-table without locking."
     ;;  (1) every usable pair was at some point filled (so HWM = SIZE)
     ;;  (2) no cells below HWM are available (so COUNT = SIZE)
     (aver (= hwm (hash-table-size table)))
-    (unless (hash-table-weak-p table)
-      ;; Consider a GC that occurs after we've decided that the table
-      ;; is too small, but before getting here. There could be some smashed
-      ;; cells, and if so, the count will be less than the SIZE.
-      (aver (= (hash-table-count table) hwm)))
+    (when (and (not (hash-table-weak-p table)) (/= (hash-table-count table) hwm))
+      ;; If the table is not weak, then every cell pair has to be in use
+      ;; as a precondition to resizing. If weak, this might not be true.
+      (signal-corrupt-hash-table table))
 
     ;; Copy over the hash-vector,
     ;; This is done early because when GC scans the new vector, it needs to see
