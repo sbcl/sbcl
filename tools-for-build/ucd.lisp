@@ -15,6 +15,7 @@
 (defmacro with-input-txt-file ((s name) &body body)
   `(with-open-file (,s (make-pathname :name ,name :type "txt"
                                       :defaults *unicode-character-database*))
+     (setf (gethash (format nil "tools-for-build/~A.txt" ,name) *ucd-inputs*) 'used)
      ,@body))
 
 (defmacro with-output-dat-file ((s name) &body body)
@@ -22,6 +23,7 @@
                                       :defaults *output-directory*)
                        :direction :output :element-type '(unsigned-byte 8)
                        :if-exists :supersede :if-does-not-exist :create)
+     (setf (gethash (format nil "output/~A.dat" ,name) *ucd-outputs*) 'made)
      ,@body))
 
 (defmacro with-ucd-output-syntax (&body body)
@@ -36,8 +38,9 @@
                                       :defaults *output-directory*)
                        :direction :output :element-type 'character
                        :if-exists :supersede :if-does-not-exist :create)
+     (setf (gethash (format nil "output/~A.lisp-expr" ,name) *ucd-outputs*) 'made)
      (with-ucd-output-syntax
-       ,@body)))
+         ,@body)))
 
 (defun split-string (line character)
   (loop for prev-position = 0 then (1+ position)
@@ -67,6 +70,7 @@
 (defvar *slurped-random-constants*
   (with-open-file (f (make-pathname :name "more-ucd-consts" :type "lisp-expr"
                                     :defaults *unicode-character-database*))
+    (setf (gethash "tools-for-build/more-ucd-consts.lisp-expr" *ucd-inputs*) 'used)
     (read f)))
 
 (defun init-indices (symbol &aux (strings
@@ -567,12 +571,14 @@ Length should be adjusted when the standard changes.")
   (with-open-file (in (make-pathname :name "CaseFolding" :type "txt"
                                      :defaults *unicode-character-database*)
                       :element-type '(unsigned-byte 8))
+    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
     (with-open-file (out (make-pathname :name "CaseFolding" :type "txt"
                                         :defaults *output-directory*)
                          :direction :output
                          :if-exists :supersede
                          :if-does-not-exist :create
                          :element-type '(unsigned-byte 8))
+      (setf (gethash "output/CaseFolding.txt" *ucd-outputs*) 'made)
       ;; KLUDGE: it's inefficient, though simple, to do the I/O
       ;; byte-by-bite.
       (do ((inbyte (read-byte in nil nil) (read-byte in nil nil))

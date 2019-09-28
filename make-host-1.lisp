@@ -69,6 +69,9 @@
     (> min-output-stamp
        (reduce #'max inputs :key #'file-write-date))))
 
+(defvar *ucd-inputs*)
+(defvar *ucd-outputs*)
+
 ;;; Build the unicode database now. It depends on nothing in the cross-compiler
 ;;; (and let's keep it that way). This code is slow to run, so compile it.
 (let ((inputs '("tools-for-build/ucd.lisp"
@@ -87,11 +90,13 @@
                 "tools-for-build/Jamo.txt"
                 "tools-for-build/CaseFolding.txt"
                 "tools-for-build/PropList.txt"
-                "tools-for-build/DerivedNormalizationProps.txt"))
+                "tools-for-build/DerivedNormalizationProps.txt"
+                "tools-for-build/more-ucd-consts.lisp-expr"))
       (outputs '("output/bidi-mirrors.lisp-expr"
                  "output/block-ranges.lisp-expr"
                  "output/block-names.lisp-expr"
                  "output/case.dat"
+                 "output/CaseFolding.txt"
                  "output/casepages.dat"
                  "output/casepages.lisp-expr"
                  "output/collation.dat"
@@ -111,11 +116,35 @@
                  "output/ucd-names.lisp-expr")))
   (unless (outputs-up-to-date inputs outputs)
     (format t "~&; Building Unicode data~%")
-    (let ((object (compile-file "tools-for-build/ucd.lisp")))
-      (load object :verbose t)
-      (delete-file object))
-    (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
-      (funcall s))))
+    (let ((*ucd-inputs* (make-hash-table :test 'equal))
+          (*ucd-outputs* (make-hash-table :test 'equal)))
+      (dolist (input inputs)
+        (setf (gethash input *ucd-inputs*) 'unused))
+      (dolist (output outputs)
+        (setf (gethash output *ucd-outputs*) 'unmade))
+      (let ((object (compile-file "tools-for-build/ucd.lisp")))
+        (setf (gethash "tools-for-build/ucd.lisp" *ucd-inputs*) 'used)
+        (load object :verbose t)
+        (delete-file object))
+      (dolist (s '(sb-cold::slurp-ucd sb-cold::slurp-proplist sb-cold::output))
+        (funcall s))
+      (let (unused-inputs extra-inputs unused-outputs extra-outputs)
+        (maphash (lambda (k v) (when (eql v 'unused) (push k unused-inputs))) *ucd-inputs*)
+        (maphash (lambda (k v) (when (and (eql v 'used) (not (member k inputs :test 'equal)))
+                                 (push k extra-inputs)))
+                 *ucd-inputs*)
+        (maphash (lambda (k v) (when (eql v 'unmade) (push k unused-outputs))) *ucd-outputs*)
+        (maphash (lambda (k v) (when (and (eql v 'made) (not (member k outputs :test 'equal)))
+                                 (push k extra-outputs)))
+                 *ucd-outputs*)
+        (unless (and (null unused-inputs) (null extra-inputs)
+                     (null unused-outputs) (null extra-outputs))
+          (error "~&~@[Unused ucd inputs: ~A~%~]~
+                  ~@[Extra ucd inputs: ~A~%~]~
+                  ~@[Uncreated ucd outputs: ~A~%~]~
+                  ~@[Extra ucd outputs: ~A~%~]"
+                 unused-inputs extra-inputs
+                 unused-outputs extra-outputs))))))
 
 ;;; I don't know the best combination of OPTIMIZE qualities to produce a correct
 ;;; and reasonably fast cross-compiler in ECL. At over half an hour to complete
