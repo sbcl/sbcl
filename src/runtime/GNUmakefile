@@ -115,7 +115,7 @@ libsbcl.a: $(OBJS)
 
 PIC_OBJS = $(subst .o,.pic.o,$(filter-out ldso-stubs.o,$(OBJS)))
 libsbcl.so: $(PIC_OBJS)
-	cc -shared -o $@ $^ -ldl -lpthread -lm
+	cc -shared -o $@ $^ $(LIBS)
 # for this to work, you must have with-gcc-tls in your build features already.
 # can't define it here because then it conflicts if you have it in both places.
 %.pic.o: %.c
