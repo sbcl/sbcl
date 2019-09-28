@@ -214,13 +214,6 @@ static void getuname(int *major_version, int* minor_version, int *patch_version)
 void os_init(char __attribute__((unused)) *argv[],
              char __attribute__((unused)) *envp[])
 {
-    int major_version, minor_version, patch_version;
-    getuname(&major_version, &minor_version, &patch_version);
-    if (major_version<2) {
-        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
-             major_version);
-    }
-
 #ifdef LISP_FEATURE_SB_THREAD
 #if defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
     futex_init();
@@ -255,6 +248,20 @@ void os_init(char __attribute__((unused)) *argv[],
 
 int os_preinit(char *argv[], char *envp[])
 {
+    int major_version, minor_version, patch_version;
+    getuname(&major_version, &minor_version, &patch_version);
+    if (major_version<2) {
+        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
+             major_version);
+    }
+    // Rev b44ca02cb963 conditionally enabled a workaround for a kernel 2.6 bug.
+    // Rev d4d6c4b16a36 moved the workaround check from compile-time to runtime.
+    // 14 years later we're still performing that check, which annoyingly adds
+    // signal-related junk to startup which must be ignored when debugging.
+    // Let's assume that major version 3 and later are fine.
+    extern void set_sigaction_nodefer_works();
+    if (major_version>=3) set_sigaction_nodefer_works();
+
 #if ALLOW_PERSONALITY_CHANGE
     if (getenv("SBCL_IS_RESTARTING")) {
         /* We restarted due to previously enabled ASLR.  Now,
@@ -271,15 +278,12 @@ int os_preinit(char *argv[], char *envp[])
     if (allocate_hardwired_spaces(0)) // soft failure mode
         return 1; // indicate that we already allocated hardwired spaces
 
+#if ALLOW_PERSONALITY_CHANGE
     /* KLUDGE: Disable memory randomization on new Linux kernels
      * by setting a personality flag and re-executing. (We need
      * to re-execute, since the memory maps that can conflict with
      * the SBCL spaces have already been done at this point).
      */
-    int major_version, minor_version, patch_version;
-    getuname(&major_version, &minor_version, &patch_version);
-
-#if ALLOW_PERSONALITY_CHANGE
     if ((major_version == 2
          /* Some old kernels will apparently lose unsupported personality flags
           * on exec() */

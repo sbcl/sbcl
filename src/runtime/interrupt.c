@@ -1903,9 +1903,12 @@ sigaction_nodefer_test_handler(int signal,
         sigaction_nodefer_works = 1;
 }
 
+void set_sigaction_nodefer_works() { sigaction_nodefer_works = 1; }
+
 static void
 see_if_sigaction_nodefer_works(void)
 {
+    if (sigaction_nodefer_works > 0) return; // good
     struct sigaction sa, old_sa;
 
     sa.sa_flags = SA_SIGINFO | SA_NODEFER;
