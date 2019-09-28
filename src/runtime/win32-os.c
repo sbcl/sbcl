@@ -919,7 +919,7 @@ os_invalidate_free_by_any_address(os_vm_address_t addr,
 
 /* os_validate doesn't commit, i.e. doesn't actually "validate" in the
  * sense that we could start using the space afterwards.  Usually it's
- * os_map or Lisp code that will run into that, in which case we recommit
+ * load_core_bytes or Lisp code that will run into that, in which case we recommit
  * elsewhere in this file.  For cases where C wants to write into newly
  * os_validate()d memory, it needs to commit it explicitly first:
  */
@@ -931,7 +931,7 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
 }
 
 /*
- * os_map() is called to map a chunk of the core file into memory.
+ * load_core_bytes() is called to load a chunk of the core file into memory.
  *
  * Unfortunately, Windows semantics completely screws this up, so
  * we just add backing store from the swapfile to where the chunk
@@ -941,7 +941,7 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
  * thing to maintain).
  */
 
-void os_map(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
+void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_size_t count;
 

@@ -168,43 +168,6 @@ lose:
     return core_start;
 }
 
-#ifndef LISP_FEATURE_HPUX
-#define load_core_bytes(fd, where, addr, len) os_map(fd, where, addr, len)
-#else
-#define load_core_bytes(fd, where, addr, len) copy_core_bytes(fd, where, addr, len)
-/* If more platforms don't support overlapping mmap rename this
- * def to something like ifdef nommapoverlap */
-/* currently hpux only */
-static void copy_core_bytes(int fd, os_vm_offset_t offset,
-                            os_vm_address_t addr, int len)
-{
-  unsigned char buf[4096];
-  int c,x;
-  int old_fd = lseek(fd, 0, SEEK_CUR);
-
-  if(len & (4096-1)){
-    fprintf(stderr, "cant copy a slice of core because slice-length is not of page size(4096)\n");
-    exit(-1);
-  }
-  if(old_fd < 0){
-    fprintf(stderr, "cant perform lseek() on corefile\n");
-  }
-  lseek(fd, offset, SEEK_SET);
-  if(fd < 0){
-    fprintf(stderr, "cant perform lseek(%u,%lu,SEEK_SET) on corefile\n", fd, offset);
-  }
-  for(x = 0; x < len; x += 4096){
-    c = read(fd, buf, 4096);
-    if(c != 4096){
-      fprintf(stderr, "cant read memory area from corefile at position %lu, got %d\n", offset + x, c);
-      exit(-1);
-    }
-    memcpy(addr+x, buf, 4096);
-  }
-  os_flush_icache(addr, len);
-}
-#endif
-
 #ifndef LISP_FEATURE_SB_CORE_COMPRESSION
 # define inflate_core_bytes(fd,offset,addr,len) \
     lose("This runtime was not built with zlib-compressed core support... aborting\n")
