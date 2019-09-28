@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.6:
+changes in sbcl-1.5.7 relative to sbcl-1.5.6:
   * platform support:
     ** many bug fixes to the experimental 64-bit PowerPC/Linux port, to the
        extent that the little-endian variant passes all applicable tests in
