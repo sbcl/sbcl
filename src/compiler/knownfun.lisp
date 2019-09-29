@@ -255,8 +255,7 @@
       (let* ((sym (lvar-value lvar))
              (var (maybe-find-free-var sym))
              (local-type (when var
-                           (let ((*lexenv* (node-lexenv node)))
-                             (lexenv-find var type-restrictions))))
+                           (lexenv-find var type-restrictions :lexenv (node-lexenv node))))
              (global-type (info :variable :type sym)))
         (if local-type
             (type-intersection local-type global-type)

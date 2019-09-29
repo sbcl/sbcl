@@ -139,7 +139,7 @@
     (apply #'symbol-concat (sane-package) things))
   ;; SYMBOLICATE in given package.
   (defun package-symbolicate (package &rest things)
-    (apply #'symbol-concat package things))
+    (apply #'symbol-concat (find-package package) things))
   ;; like SYMBOLICATE, but producing keywords
   (defun keywordicate (&rest things)
     (apply #'symbol-concat *keyword-package* things))

@@ -606,11 +606,11 @@
 ;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The
 ;;; :TEST keyword may be used to determine the name equality
 ;;; predicate.
-(defmacro lexenv-find (name slot &key test)
-  (once-only ((n-res `(assoc ,name (,(let ((*package* (sb-xc:symbol-package 'lexenv-funs)))
-                                          (symbolicate "LEXENV-" slot))
-                                     *lexenv*)
-                             :test ,(or test '#'eq))))
+(defmacro lexenv-find (name slot &key (lexenv '*lexenv*) test
+                                 &aux (accessor (package-symbolicate
+                                                 (cl:symbol-package 'lexenv-funs)
+                                                 "LEXENV-" slot)))
+  (once-only ((n-res `(assoc ,name (,accessor ,lexenv) :test ,(or test '#'eq))))
     `(if ,n-res
          (values (cdr ,n-res) t)
          (values nil nil))))
