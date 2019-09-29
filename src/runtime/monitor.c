@@ -101,7 +101,7 @@ visible(unsigned char c)
         return c;
 }
 
-static int
+static int NO_SANITIZE_MEMORY
 dump_cmd(char **ptr)
 {
     static char *lastaddr = 0;

@@ -466,7 +466,7 @@ ra_pointer_p (void *ra)
   return ((uword_t) ra) > 4096 && !stack_pointer_p (ra);
 }
 
-static int
+static int NO_SANITIZE_MEMORY
 x86_call_context (void *fp, void **ra, void **ocfp)
 {
   void *c_ocfp;
@@ -548,7 +548,7 @@ static void print_backtrace_frame(char *pc, void *fp, int i, FILE *f) {
  * backtraces from gdb with call backtrace_from_fp(...). Useful for
  * example when debugging threading deadlocks.
  */
-void
+void NO_SANITIZE_MEMORY
 log_backtrace_from_fp(void *fp, int nframes, int start, FILE *f)
 {
   int i = start;
