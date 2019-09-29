@@ -68,7 +68,7 @@
 ;;; Print to STREAM the name of the general-purpose register encoded by
 ;;; VALUE and of size WIDTH.
 (defun print-reg-with-width (value width stream dstate)
-  (declare (type stream stream)
+  (declare (type (or null stream) stream)
            (type disassem-state dstate))
   (let* ((num (etypecase value
                ((unsigned-byte 4) value)
@@ -81,7 +81,9 @@
                                 (<= 4 num 7))
                            (+ 16 -4 num) ; legacy high-byte register
                            num))))
-    (princ (reg-name reg) stream))
+    (if stream
+        (princ (reg-name reg) stream)
+        (push reg (dstate-operands dstate))))
   ;; XXX plus should do some source-var notes
   )
 
@@ -156,14 +158,16 @@
   (princ16 value stream))
 
 (defun print-xmmreg (value stream dstate)
-  (declare (type stream stream) (ignore dstate))
-  (write-string (reg-name (get-fpr
+  (let* ((reg (get-fpr
                            ;; FIXME: why are we seeing a value from the GPR
                            ;; prefilter instead of XMM prefilter here sometimes?
                            (etypecase value
                              ((unsigned-byte 4) value)
                              (reg (reg-num value)))))
-                stream))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (push name (dstate-operands dstate)))))
 
 (defun print-xmmreg/mem (value stream dstate)
   (if (machine-ea-p value)
@@ -181,11 +185,12 @@
     (note (lambda (stream) (princ it stream)) dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)
-  (if (or #+immobile-space (maybe-note-lisp-callee value dstate)
-          (maybe-note-assembler-routine value nil dstate)
-          (maybe-note-static-symbol value dstate))
-      (princ16 value stream)
-      (princ value stream)))
+  (cond ((not stream) (push value (dstate-operands dstate)))
+        ((or #+immobile-space (maybe-note-lisp-callee value dstate)
+             (maybe-note-assembler-routine value nil dstate)
+             (maybe-note-static-symbol value dstate))
+         (princ16 value stream))
+        (t (princ value stream))))
 
 ;;; Return an instance of REG or MACHINE-EA.
 ;;; MOD and R/M are the extracted bits from the instruction's ModRM byte.
@@ -273,8 +278,11 @@
   (declare (type (member :ref :sized-ref :compute) mode)
            (type machine-ea value)
            (type (member nil :byte :word :dword :qword) width)
-           (type stream stream)
+           (type (or null stream) stream)
            (type disassem-state dstate))
+  (when (null stream)
+    (return-from print-mem-ref
+      (push (cons value width) (dstate-operands dstate))))
   (let ((base-reg (machine-ea-base value))
         (disp (machine-ea-disp value))
         (index-reg (machine-ea-index value))

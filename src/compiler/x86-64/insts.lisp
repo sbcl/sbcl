@@ -135,8 +135,9 @@
   :prefilter #'prefilter-width
   :printer (lambda (value stream dstate)
              (declare (ignore value))
-             (princ (schar (symbol-name (inst-operand-size dstate)) 0)
-                    stream)))
+             (when stream
+               (princ (schar (symbol-name (inst-operand-size dstate)) 0)
+                      stream))))
 
 ;;; Used to capture the effect of the #x66 operand size override prefix.
 (define-arg-type x66
@@ -156,7 +157,6 @@
 (define-arg-type accum
   :printer (lambda (value stream dstate)
              (declare (ignore value)
-                      (type stream stream)
                       (type disassem-state dstate))
              (print-reg 0 stream dstate)))
 
@@ -189,9 +189,10 @@
                  (setf width :dword))
                (read-signed-suffix (* (size-nbyte width) n-byte-bits) dstate))
   :printer (lambda (value stream dstate)
-             (if (maybe-note-static-symbol value dstate)
-                 (princ16 value stream)
-                 (princ value stream))))
+             (cond ((not stream) (push value (dstate-operands dstate)))
+                   ((maybe-note-static-symbol value dstate)
+                    (princ16 value stream))
+                   (t (princ value stream)))))
 
 (define-arg-type signed-imm-data/asm-routine
   :type 'signed-imm-data
@@ -293,9 +294,10 @@
                   :type 'imm-byte
                   :printer (lambda (value stream dstate)
                              (declare (type (unsigned-byte 8) value)
-                                      (type stream stream)
-                                      (ignore dstate))
-                             (format stream ,format-string value)))))
+                                      (type (or null stream) stream))
+                             (if stream
+                                 (format stream ,format-string value)
+                                 (push value (dstate-operands dstate)))))))
   (define-sse-shuffle-arg-type sse-shuffle-pattern-2-2 "#b~2,'0B")
   (define-sse-shuffle-arg-type sse-shuffle-pattern-8-4 "#4r~4,4,'0R"))
 
@@ -2912,7 +2914,8 @@
 #-sb-xc-host
 (defun print-mov[dq]-opcode  (dchunk inst stream dstate)
   (declare (ignore dchunk inst))
-  (princ (if (dstate-getprop dstate +rex-w+) 'movq 'movd) stream))
+  (when stream
+    (princ (if (dstate-getprop dstate +rex-w+) 'movq 'movd) stream)))
 
 (flet ((move-xmm<->gpr (segment dst src size)
          ;; We no longer AVER that the size of the src/dst is exactly :DWORD.

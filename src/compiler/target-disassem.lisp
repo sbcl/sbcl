@@ -1927,6 +1927,18 @@
       (prin1-short thing stream)
       (prin1-short `',thing stream)))
 
+(defun tab (column stream)
+  (when stream
+    (funcall (formatter "~V,1t") stream column))
+  nil)
+(defun tab0 (column stream)
+  (funcall (formatter "~V,0t") stream column)
+  nil)
+
+(defun princ16 (value stream)
+  (when stream
+    (write value :stream stream :radix t :base 16 :escape nil)))
+
 ;;; Store a note about the lisp constant at LOCATION in the code object
 ;;; being disassembled, to be printed as an end-of-line comment.
 ;;; The interpretation of LOCATION depends on HOW as follows:

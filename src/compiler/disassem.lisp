@@ -572,18 +572,19 @@
         (chunk inst stream dstate
                &aux (chunk (truly-the dchunk chunk))
                     (inst (truly-the instruction inst))
-                    (stream (truly-the stream stream))
+                    (stream (truly-the (or null stream) stream))
                     (dstate (truly-the disassem-state dstate)))
        (macrolet ((local-format-arg (arg fmt)
                     `(funcall (formatter ,fmt) stream ,arg)))
+         ;; All the LOCAL-foo functions print nothing if stream is nil
          (flet ((local-tab-to-arg-column ()
                   (tab (dstate-argument-column dstate) stream))
                 (local-print-name ()
-                  (princ (inst-print-name inst) stream))
+                  (when stream (princ (inst-print-name inst) stream)))
                 (local-write-char (ch)
-                  (write-char ch stream))
+                  (when stream (write-char ch stream)))
                 (local-princ (thing)
-                  (princ thing stream))
+                  (when stream (princ thing stream)))
                 (local-princ16 (thing)
                   (princ16 thing stream))
                 (local-call-arg-printer (arg printer)
@@ -882,7 +883,6 @@
            (pd-error "bogus test-form: ~S" test)))))
 
 #-sb-fluid (declaim (inline bytes-to-bits))
-(declaim (maybe-inline sign-extend tab tab0))
 
 (defun bytes-to-bits (bytes)
   (declare (type disassem-length bytes))
@@ -902,13 +902,3 @@
   (if (logbitp (1- size) int)
       (dpb int (byte size 0) -1)
       int))
-
-(defun tab (column stream)
-  (funcall (formatter "~V,1t") stream column)
-  nil)
-(defun tab0 (column stream)
-  (funcall (formatter "~V,0t") stream column)
-  nil)
-
-(defun princ16 (value stream)
-  (write value :stream stream :radix t :base 16 :escape nil))

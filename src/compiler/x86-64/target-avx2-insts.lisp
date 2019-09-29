@@ -12,13 +12,16 @@
 (in-package "SB-X86-64-ASM")
 
 (defun print-ymmreg (value stream dstate)
-  (let ((offset (etypecase value
+  (let* ((offset (etypecase value
                   ((unsigned-byte 4) value)
-                  (reg (reg-num value)))))
-    (write-string (reg-name (if (dstate-getprop dstate +vex-l+)
+                  (reg (reg-num value))))
+         (reg (if (dstate-getprop dstate +vex-l+)
                                 (get-avx2 offset)
                                 (get-fpr offset)))
-                  stream)))
+         (name (reg-name reg)))
+    (if stream
+        (write-string name stream)
+        (push name (dstate-operands dstate)))))
 
 (defun print-ymmreg/mem (value stream dstate)
   (if (machine-ea-p value)
