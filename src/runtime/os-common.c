@@ -10,6 +10,7 @@
  */
 # define _GNU_SOURCE /* needed for RTLD_DEFAULT from dlfcn.h */
 #include <stdio.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
