@@ -100,29 +100,23 @@
      (split-string (remove +mul+ (remove +div+ string)) #\Space)
      :test #'string=)) 'string))
 
-(defvar *line-break-exceptions*
-  (let ((strings
-         (with-open-file (s "data/line-break-exceptions.lisp-expr" :external-format :utf-8)
-           (read s)))
-        (result (make-hash-table :test 'equal)))
-    (dolist (s strings result)
-      (setf (gethash s result) t))))
-
-(defun test-line-breaking ()
-  (declare (optimize (debug 2)))
-  (with-test (:name (:line-breaking)
-                    :skipped-on (not :sb-unicode))
+(with-test (:name (:line-breaking)
+            :skipped-on (not :sb-unicode))
+  (let* ((line-break-exceptions (make-hash-table :test 'equal))
+         (strings
+           (with-open-file (s "data/line-break-exceptions.lisp-expr" :external-format :utf-8)
+             (read s))))
+    (dolist (s strings)
+      (setf (gethash s line-break-exceptions) t))
     (with-open-file (s "data/LineBreakTest.txt" :external-format :utf8)
       (loop for line = (read-line s nil nil)
-         while line
-         do (let ((string (subseq line 0 (max 0 (1- (or (position #\# line) 1))))))
-              (unless (string= string "")
-                (let* ((expected (process-line-break-line string))
-                       (annotated (sb-unicode::line-break-annotate
-                                   (string-from-line-break-line string)))
-                       (actual (substitute :can :must annotated)))
-                  (if (gethash string *line-break-exceptions*)
-                      (assert (not (equal expected actual)))
-                      (assert (equal expected actual))))))))))
-
-(test-line-breaking)
+            while line
+            do (let ((string (subseq line 0 (max 0 (1- (or (position #\# line) 1))))))
+                 (unless (string= string "")
+                   (let* ((expected (process-line-break-line string))
+                          (annotated (sb-unicode::line-break-annotate
+                                      (string-from-line-break-line string)))
+                          (actual (substitute :can :must annotated)))
+                     (if (gethash string line-break-exceptions)
+                         (assert (not (equal expected actual)))
+                         (assert (equal expected actual))))))))))
