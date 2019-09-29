@@ -47,13 +47,15 @@ os_init(char *argv[], char *envp[])
     os_vm_page_size = BACKEND_PAGE_BYTES;
 }
 
-os_vm_address_t os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
+os_vm_address_t os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
+    int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
+    attributes &= ~IS_GUARD_PAGE;
     int flags = MAP_PRIVATE | MAP_NORESERVE | MAP_ANON;
     if (addr)
         flags |= MAP_FIXED;
 
-    addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+    addr = mmap(addr, len, protection, flags, -1, 0);
 
     if (addr == MAP_FAILED) {
         perror("mmap");

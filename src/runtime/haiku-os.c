@@ -11,6 +11,8 @@ size_t os_vm_page_size;
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
+    int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
+    attributes &= ~IS_GUARD_PAGE;
     // There's no MAP_NORESERVE flag? How do we inform the OS not to commit
     // the whole range to swap?
     int flags =  MAP_PRIVATE | MAP_ANONYMOUS;
@@ -20,7 +22,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     if (attributes & ALLOCATE_LOW)
         flags |= MAP_32BIT;
 #endif
-    actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+    actual = mmap(addr, len, protection, flags, -1, 0);
     if (actual == MAP_FAILED) {
         perror("mmap");
         return 0;               /* caller should check this */

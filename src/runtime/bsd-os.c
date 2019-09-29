@@ -125,8 +125,10 @@ os_context_sigmask_addr(os_context_t *context)
 }
 
 os_vm_address_t
-os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
+    int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
+    attributes &= ~IS_GUARD_PAGE;
     int flags = 0;
 
     /* FIXME: use of MAP_FIXED here looks decidedly wrong! (and not what we do
@@ -144,7 +146,7 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
      * OpenBSD says:
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
-    switch (movable) {
+    switch (attributes) {
     case MOVABLE_LOW:
 #ifdef MAP_32BIT
         flags = MAP_32BIT;
@@ -180,7 +182,7 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
             os_vm_address_t resaddr;
             os_vm_size_t curlen = MIN(max_allocation_size, len);
 
-            resaddr = mmap(curaddr, curlen, OS_VM_PROT_ALL, flags, -1, 0);
+            resaddr = mmap(curaddr, curlen, protection, flags, -1, 0);
 
             if (resaddr == (os_vm_address_t) - 1) {
                 perror("mmap");
@@ -199,7 +201,7 @@ os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
     } else
 #endif
     {
-        addr = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+        addr = mmap(addr, len, protection, flags, -1, 0);
     }
 
     /* FIXME: if MAP_FIXED and MOVABLE_LOW, probe for other possible addresses,

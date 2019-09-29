@@ -68,9 +68,21 @@ os_vm_address_t undefined_alien_address = 0;
 
 static void
 ensure_undefined_alien(void) {
-    os_vm_address_t start = os_allocate(os_vm_page_size);
+    os_vm_address_t start = os_validate(MOVABLE|IS_GUARD_PAGE, NULL,
+#ifndef LISP_FEATURE_WIN32
+    /* We can/should disregard our 'os_vm_page_size' constant which tends to be
+     * larger than the granularity that the OS will allow you to manipulate via
+     * mprotect(). e.g. on x86-64-linux we use a page size of 32K but in reality
+     * the protection granularity is 4K.
+     * Moreover, since the memory protection is not changed after allocation,
+     * the granuarity that mprotect() operates on is immaterial. As such, it
+     * probably would work to put N_WORD_BYTES here since that's all we need. */
+                                        getpagesize()
+#else // Use the same value as does contrib/sb-posix/interface.lisp
+                                        4096
+#endif
+                                        );
     if (start) {
-        os_protect(start, os_vm_page_size, OS_VM_PROT_NONE);
         undefined_alien_address = start;
     } else {
         lose("could not allocate guard page for undefined alien\n");

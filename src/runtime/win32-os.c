@@ -814,14 +814,15 @@ static inline boolean local_thread_stack_address_p(os_vm_address_t address)
  */
 
 os_vm_address_t
-os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
     MEMORY_BASIC_INFORMATION mem_info;
 
     if (!addr) {
         /* the simple case first */
+        int protection = attributes & IS_GUARD_PAGE ? PAGE_NOACCESS : PAGE_EXECUTE_READWRITE;
         return
-            AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_EXECUTE_READWRITE));
+            AVERLAX(VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, protection));
     }
 
     if (!AVERLAX(VirtualQuery(addr, &mem_info, sizeof mem_info)))

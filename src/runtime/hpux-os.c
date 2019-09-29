@@ -34,13 +34,15 @@ os_init(char *argv[], char *envp[])
 }
 
 os_vm_address_t
-os_validate(int movable, os_vm_address_t addr, os_vm_size_t len)
+os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
+    int protection = attributes & IS_GUARD_PAGE ? OS_VM_PROT_NONE : OS_VM_PROT_ALL;
+    attributes &= ~IS_GUARD_PAGE;
     os_vm_address_t actual;
     int flags = MAP_PRIVATE | MAP_ANONYMOUS;
     if (addr) flags |= MAP_FIXED;
 
-    actual = mmap(addr, len, OS_VM_PROT_ALL, flags, -1, 0);
+    actual = mmap(addr, len, protection, flags, -1, 0);
 
     if (actual == MAP_FAILED) {
         perror("mmap");
