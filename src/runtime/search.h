@@ -18,6 +18,8 @@ extern struct symbol* lisp_symbol_from_tls_index(lispobj tls_index);
 extern lispobj sb_kernel_package();
 // Find via heap scan
 extern lispobj* search_for_symbol(char *name, lispobj start, lispobj end, boolean);
+lispobj *search_all_gc_spaces(void *pointer); // 'search.c' provides
+lispobj *search_dynamic_space(void *pointer); // Provided by 'gencgc' or 'cheneygc'
 lispobj *search_immobile_space(void *pointer);
 
 #endif

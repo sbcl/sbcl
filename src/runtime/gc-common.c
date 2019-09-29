@@ -1545,20 +1545,6 @@ boolean valid_widetag_p(unsigned char widetag) {
 
 #include "genesis/gc-tables.h"
 
-
-lispobj *search_all_gc_spaces(void *pointer)
-{
-    lispobj *start;
-    if (((start = search_dynamic_space(pointer)) != NULL) ||
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-        ((start = search_immobile_space(pointer)) != NULL) ||
-#endif
-        ((start = search_static_space(pointer)) != NULL) ||
-        ((start = search_read_only_space(pointer)) != NULL))
-        return start;
-    return NULL;
-}
-
 /* Find the code object for the given pc, or return NULL on
    failure. */
 lispobj *

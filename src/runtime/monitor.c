@@ -37,6 +37,7 @@
 #include "thread.h"
 #include "genesis/static-symbols.h"
 #include "genesis/primitive-objects.h"
+#include "genesis/gc-tables.h"
 #include "gc-internal.h"
 
 
@@ -57,7 +58,7 @@ typedef int cmd(char **ptr);
 
 static cmd dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
-static cmd print_context_cmd, pte_cmd;
+static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
 static cmd grab_sigs_cmd;
 static cmd kill_cmd;
@@ -87,6 +88,7 @@ static struct cmd {
     {"pte", "Page table entry for address", pte_cmd},
     {"quit", "Quit.", quit_cmd},
     {"regs", "Display current Lisp registers.", regs_cmd},
+    {"search", "Search heap for object.", search_cmd},
     {NULL, NULL, NULL}
 };
 
@@ -397,6 +399,18 @@ backtrace_cmd(char **ptr)
 
     printf("Backtrace:\n");
     lisp_backtrace(n);
+    return 0;
+}
+
+static int search_cmd(char **ptr)
+{
+    char *addr;
+    if (!parse_addr(ptr, 1, &addr)) return 0;
+    lispobj *obj = search_all_gc_spaces((void*)addr);
+    if(obj)
+        printf("#x%"OBJ_FMTX"\n", compute_lispobj(obj));
+    else
+        printf("Not found\n");
     return 0;
 }
 

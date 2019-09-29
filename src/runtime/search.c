@@ -43,6 +43,19 @@ search_static_space(void *pointer)
     return gc_search_space(start, pointer);
 }
 
+lispobj *search_all_gc_spaces(void *pointer)
+{
+    lispobj *start;
+    if (((start = search_dynamic_space(pointer)) != NULL) ||
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+        ((start = search_immobile_space(pointer)) != NULL) ||
+#endif
+        ((start = search_static_space(pointer)) != NULL) ||
+        ((start = search_read_only_space(pointer)) != NULL))
+        return start;
+    return NULL;
+}
+
 static int __attribute__((unused)) strcmp_ucs4_ascii(uint32_t* a, unsigned char* b,
                                                      boolean ignore_case)
 {
