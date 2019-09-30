@@ -60,6 +60,8 @@
 (defknown int-sap ((unsigned-byte #.sb-vm:n-machine-word-bits))
   system-area-pointer (movable))
 
+;;; FIXME: presumably the x86-64 backend could benefit from the -WITH-OFFSET
+;;; transforms.  Perhaps measure to find out whether the transform ever fires.
 (macrolet ((defsapref (fun value-type)
              (let (#+x86
                    (with-offset-fun (intern (format nil "~A-WITH-OFFSET" fun)))
@@ -81,12 +83,10 @@
   (defsapref sap-ref-16 (unsigned-byte 16))
   (defsapref sap-ref-32 (unsigned-byte 32))
   (defsapref sap-ref-64 (unsigned-byte 64))
-  (defsapref sap-ref-word word)
   (defsapref signed-sap-ref-8 (signed-byte 8))
   (defsapref signed-sap-ref-16 (signed-byte 16))
   (defsapref signed-sap-ref-32 (signed-byte 32))
   (defsapref signed-sap-ref-64 (signed-byte 64))
-  (defsapref signed-sap-ref-word sb-vm:signed-word)
   (defsapref sap-ref-sap system-area-pointer)
   (defsapref sap-ref-lispobj t)
   (defsapref sap-ref-single single-float)
@@ -176,17 +176,21 @@
   #+long-float (def sap-ref-long)
   #+long-float (def %set-sap-ref-long t long-float))
 
-(macrolet ((def (fun args 32-bit 64-bit)
-               `(deftransform ,fun (,args)
-                  (ecase sb-vm::n-word-bits
-                    (32 '(,32-bit ,@args))
-                    (64 '(,64-bit ,@args))))))
-  (def sap-ref-word (sap offset) sap-ref-32 sap-ref-64)
-  (def signed-sap-ref-word (sap offset) signed-sap-ref-32 signed-sap-ref-64)
-  (def %set-sap-ref-word (sap offset value)
-    %set-sap-ref-32 %set-sap-ref-64)
-  (def %set-signed-sap-ref-word (sap offset value)
-    %set-signed-sap-ref-32 %set-signed-sap-ref-64))
+;;; [%SET-][SIGNED-]SAP-REF-WORD gets a defknown but no IR transforms,
+;;; just source transforms.
+(macrolet ((def (alias args value-type)
+             (let* ((str (string alias))
+                    (prefix (subseq str 0 (- (length str) 4))) ; remove -WORD
+                    (fun (symbolicate prefix (write-to-string sb-vm:n-word-bits)))
+                    (setp (string= prefix "%SET-" :end1 4)))
+             `(progn
+                (defknown ,alias (system-area-pointer fixnum ,@(if setp (list value-type)))
+                  ,value-type (flushable))
+                (define-source-transform ,alias ,args `(,',fun ,,@args))))))
+  (def sap-ref-word (sap offset) word)
+  (def signed-sap-ref-word (sap offset) sb-vm:signed-word)
+  (def %set-sap-ref-word (sap offset value) word)
+  (def %set-signed-sap-ref-word (sap offset value) sb-vm:signed-word))
 
 ;;; Transforms for 64-bit SAP accessors on 32-bit platforms.
 
