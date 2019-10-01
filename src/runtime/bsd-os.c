@@ -131,14 +131,27 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     attributes &= ~IS_GUARD_PAGE;
     int flags = 0;
 
-    /* FIXME: use of MAP_FIXED here looks decidedly wrong! (and not what we do
-     * in linux-os.c). Granted there are differences between *BSD and Linux,
-     * but on MAP_FIXED they agree: it destroys an existing mapping.
+#ifndef LISP_FEATURE_DARWIN // Do not use MAP_FIXED, because the OS is sane.
 
-     * macOS says:
-       If the memory region specified by addr and len overlaps pages of any existing
-       mapping(s), then the overlapped part of the existing mapping(s) will be discarded.
+    /* The *BSD family of OSes seem to ignore 'addr' when it is outside
+     * of some range which I could not figure out.  Sometimes it seems like the
+     * condition is that any address below 4GB can't be requested without MAP_FIXED,
+     * but on the other hand, asking for 0x1000 without MAP_FIXED works fine.
+     * So we are forced to use MAP_FIXED even for movable mappings. Thus, the logic
+     * below does not work as intended because:
+     * (1) We can't detect when MAP_FIXED destroyed an existing mapping.
+     *     But we can avoid the destruction by using MAP_EXCL when that flag exists,
+     *     which it does not always.
+     * (2) Passing MAP_FIXED when we do not require a fixed address gets MAP_FAILURE
+     *     for mappings that we would have been willing to relocate.
+     *     So relocation is effectively disabled.
+     * (3) To mitigate the problem of point (2) we remove MAP_FIXED for the
+     *     dynamic space which seems to mostly work, but might cause an opposite
+     *     problem: we relocate the heap when perhaps we need not have.
+     *     That is, even if the OS _could_ _have_ given the address requested,
+     *     it randomly decided not to, thus forcing extra work upon us.
 
+     * For reference,
      * FreeBSD says:
        If MAP_EXCL is not specified, a successful MAP_FIXED request replaces any
        previous mappings for the process' pages ...
@@ -146,29 +159,19 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
      * OpenBSD says:
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
-    switch (attributes) {
-    case MOVABLE_LOW:
-#ifdef MAP_32BIT
-        flags = MAP_32BIT;
-        break;
-#endif
-        /* Unless we have MAP_32BIT, use MAP_FIXED because if you don't,
-         * there is little chance of getting the hinted address. That in itself
-         * is ok, unless mapped above 2GB, which, sadly, is always the case.
-         * (It may not be on OpenBSD which defines MAP_TRYFIXED as using
-         * the hint address, and moreover that it "is the default behavior") */
-        // FALLTHROUGH_INTENDED
-    case NOT_MOVABLE:
+    // ALLOCATE_LOW seems never to get what we want
+    if (!(attributes & MOVABLE) | (attributes & ALLOCATE_LOW)) {
         flags = MAP_FIXED;
-        break;
-    case IS_THREAD_STRUCT:
+    }
+    if (attributes & IS_THREAD_STRUCT) {
 #if defined(LISP_FEATURE_OPENBSD) && defined(MAP_STACK)
         /* OpenBSD requires MAP_STACK for pages used as stack.
          * Note that FreeBSD has a MAP_STACK with different behavior. */
         flags = MAP_STACK;
 #endif
-        break;
     }
+#endif
+
 #ifdef MAP_EXCL // not defined in OpenBSD, NetBSD, DragonFlyBSD
     if (flags & MAP_FIXED) flags |= MAP_EXCL;
 #endif
@@ -204,8 +207,6 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
         addr = mmap(addr, len, protection, flags, -1, 0);
     }
 
-    /* FIXME: if MAP_FIXED and MOVABLE_LOW, probe for other possible addresses,
-     * since the combination of (MAP_FIXED | MAP_EXCL) won't */
     if (addr == MAP_FAILED) {
         perror("mmap");
         return NULL;
