@@ -64,3 +64,8 @@
     (assert (search "0. [0,0] : T" result))
     (assert (search "9. [0,9] : T" result))
     (assert (not (search "10." result)))))
+
+(with-test (:name (inspect vector fill-pointer))
+  (let* ((array (make-array 3 :fill-pointer 2))
+         (result (test-inspect array)))
+    (assert (search "VECTOR of length 2" result))))

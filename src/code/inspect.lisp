@@ -236,7 +236,7 @@ evaluated expressions.
              (cons "Documentation" (documentation object t))))))
 
 (defmethod inspected-parts ((object vector))
-  (let ((length (min (array-total-size object) *inspect-length*)))
+  (let ((length (min (length object) *inspect-length*)))
     (values (format nil
                     "The object is a ~:[~;displaced ~]VECTOR of length ~W.~%"
                     (and (array-header-p object)
