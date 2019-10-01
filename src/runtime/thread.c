@@ -923,13 +923,19 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
             (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline_switch_stack, th))
 #else
 
-# if defined(LISP_FEATURE_WIN32)
+# ifdef LISP_FEATURE_WIN32
             pthread_attr_setstacksize(&attr, thread_control_stack_size) ||
 # elif defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK)
             pthread_attr_setstack(&attr, th->control_stack_start, thread_control_stack_size) ||
 # else
             pthread_attr_setstack(&attr, th->alien_stack_start, ALIEN_STACK_SIZE) ||
 # endif
+# ifdef LISP_FEATURE_NETBSD
+            /* Even though the manpage says pthread_attr_setstack
+               would override the guard page, it's no longer true. */
+            pthread_attr_setguardsize(&attr, 0) ||
+# endif
+
             (retcode = pthread_create(kid_tid, &attr, new_thread_trampoline, th))
 #endif
             ) {
