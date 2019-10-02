@@ -80,7 +80,7 @@ static page_index_t free_page;
 static void* get_free_page() {
     --free_page;
     if (free_page < next_free_page)
-        lose("Needed more space to GC\n");
+        lose("Needed more space to GC");
     page_table[free_page].type = UNBOXED_PAGE_FLAG;
     char* mem = page_address(free_page);
     zero_dirty_pages(free_page, free_page);

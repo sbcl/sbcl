@@ -750,7 +750,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             break;
         default:
             if (!(other_immediate_lowtag_p(widetag) && lowtag_for_widetag[widetag>>2]))
-              lose("Unknown widetag %x\n", widetag);
+              lose("Unknown widetag %x", widetag);
             // Skip irrelevant objects.
             if (leaf_obj_widetag_p(widetag) ||
                 (widetag == WEAK_POINTER_WIDETAG) || /* do not follow! */

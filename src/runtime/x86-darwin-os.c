@@ -74,7 +74,7 @@ int arch_os_thread_init(struct thread *thread) {
 
     if (n < 0) {
         perror("i386_set_ldt");
-        lose("unexpected i386_set_ldt(..) failure\n");
+        lose("unexpected i386_set_ldt(..) failure");
     }
     thread_mutex_unlock(&modify_ldt_lock);
 
@@ -289,7 +289,7 @@ void call_handler_on_thread(mach_port_t thread,
                                 x86_FLOAT_STATE32,
                                 (thread_state_t)save_float_state,
                                 &state_count)) != KERN_SUCCESS)
-        lose("thread_get_state (x86_THREAD_STATE32) failed %d\n", ret);
+        lose("thread_get_state (x86_THREAD_STATE32) failed %d", ret);
     /* Set up siginfo */
     save_siginfo = stack_allocate(&new_state, sizeof(*siginfo));
     if (siginfo == NULL)
@@ -311,7 +311,7 @@ void call_handler_on_thread(mach_port_t thread,
                                 x86_THREAD_STATE32,
                                 (thread_state_t)&new_state,
                                 state_count)) != KERN_SUCCESS)
-        lose("thread_set_state (x86_FLOAT_STATE32) failed %d\n", ret);
+        lose("thread_set_state (x86_FLOAT_STATE32) failed %d", ret);
 
 }
 
@@ -394,7 +394,7 @@ catch_exception_raise(mach_port_t exception_port,
                                 x86_THREAD_STATE32,
                                 (thread_state_t)&thread_state,
                                 &state_count)) != KERN_SUCCESS)
-        lose("thread_get_state (x86_THREAD_STATE32) failed %d\n", ret);
+        lose("thread_get_state (x86_THREAD_STATE32) failed %d", ret);
     switch (exception) {
     case EXC_BAD_ACCESS:
         signal = SIGBUS;
@@ -471,12 +471,12 @@ catch_exception_raise(mach_port_t exception_port,
                                         x86_THREAD_STATE32,
                                         (thread_state_t)thread_state.EAX,
                                         x86_THREAD_STATE32_COUNT)) != KERN_SUCCESS)
-                lose("thread_set_state (x86_THREAD_STATE32) failed %d\n", ret);
+                lose("thread_set_state (x86_THREAD_STATE32) failed %d", ret);
             if ((ret = thread_set_state(thread,
                                         x86_FLOAT_STATE32,
                                         (thread_state_t)thread_state.ECX,
                                         x86_FLOAT_STATE32_COUNT)) != KERN_SUCCESS)
-                lose("thread_set_state (x86_FLOAT_STATE32) failed %d\n", ret);
+                lose("thread_set_state (x86_FLOAT_STATE32) failed %d", ret);
             break;
         }
         /* Trap call */
@@ -508,12 +508,12 @@ catch_exception_raise(mach_port_t exception_port,
   do_not_handle:
     dealloc_ret = mach_port_deallocate (mach_task_self(), thread);
     if (dealloc_ret) {
-      lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);
+      lose("mach_port_deallocate (thread) failed with return_code %d", dealloc_ret);
     }
 
     dealloc_ret = mach_port_deallocate (mach_task_self(), task);
     if (dealloc_ret) {
-      lose("mach_port_deallocate (task) failed with return_code %d\n", dealloc_ret);
+      lose("mach_port_deallocate (task) failed with return_code %d", dealloc_ret);
     }
 
     return ret;

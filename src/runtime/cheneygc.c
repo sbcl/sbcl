@@ -129,7 +129,7 @@ collect_garbage(generation_index_t ignore)
     else if (current_dynamic_space == (lispobj *) DYNAMIC_1_SPACE_START)
         new_space = (lispobj *) DYNAMIC_0_SPACE_START;
     else {
-        lose("GC lossage.  Current dynamic space is bogus!\n");
+        lose("GC lossage.  Current dynamic space is bogus!");
     }
     new_space_free_pointer = new_space;
 
@@ -369,13 +369,13 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
     addr = os_round_up_to_page((os_vm_address_t)current_dynamic_space
                                + dynamic_usage);
     if (addr < (os_vm_address_t)dynamic_space_free_pointer)
-        lose("set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)\n",
+        lose("set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)",
              (unsigned long)dynamic_usage,
              (unsigned long)((os_vm_address_t)dynamic_space_free_pointer
                              - (os_vm_address_t)current_dynamic_space));
 
     if (dynamic_usage > dynamic_space_size)
-        lose("set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)\n",
+        lose("set_auto_gc_trigger: tried to set gc trigger too high! (0x%08lx)",
              (unsigned long)dynamic_usage);
     length = os_trunc_size_to_page(dynamic_space_size - dynamic_usage);
 

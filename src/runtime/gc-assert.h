@@ -15,7 +15,7 @@
 #include "interr.h" /* for lose() */
 
 #define gc_abort()                                                     \
-  lose("GC invariant lost, file \"%s\", line %d\n", __FILE__, __LINE__)
+  lose("GC invariant lost, file \"%s\", line %d", __FILE__, __LINE__)
 
 /// Enable extra debug-only checks if DEBUG
 #ifdef DEBUG

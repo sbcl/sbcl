@@ -131,7 +131,7 @@ int arch_os_thread_cleanup(struct thread *thread) {
 
     thread_mutex_lock(&modify_ldt_lock);
     if (sysi86(SI86DSCR, &delete) < 0) {
-      lose("Couldn't remove segment\n");
+      lose("Couldn't remove segment");
     }
     thread_mutex_unlock(&modify_ldt_lock);
 #endif

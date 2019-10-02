@@ -191,7 +191,7 @@ int arch_os_thread_init(struct thread *thread) {
     n = i386_set_ldt(LDT_AUTO_ALLOC, (union descriptor*) &ldt_entry, 1);
     if (n < 0) {
         perror("i386_set_ldt");
-        lose("unexpected i386_set_ldt(..) failure\n");
+        lose("unexpected i386_set_ldt(..) failure");
     }
     FSHOW_SIGNAL((stderr, "/ TLS: Allocated LDT %x\n", n));
     thread->tls_cookie=n;

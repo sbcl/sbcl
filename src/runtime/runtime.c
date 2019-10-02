@@ -90,7 +90,7 @@ sigint_handler(int __attribute__((unused)) signal,
                siginfo_t __attribute__((unused)) *info,
                os_context_t *context)
 {
-    lose("\nSIGINT hit at 0x%08lX\n",
+    lose("\nSIGINT hit at 0x%08lX",
          (unsigned long) *os_context_pc_addr(context));
 }
 
@@ -113,7 +113,7 @@ successful_malloc(size_t size)
 {
     void* result = malloc(size);
     if (0 == result) {
-        lose("malloc failure\n");
+        lose("malloc failure");
     } else {
         return result;
     }
@@ -255,7 +255,7 @@ search_for_core ()
     core = copied_existing_filename_or_null(lookhere);
 
     if (!core) {
-        lose("can't find core file at %s\n", lookhere);
+        lose("can't find core file at %s", lookhere);
     }
 
     free(lookhere);
@@ -523,11 +523,11 @@ sbcl_main(int argc, char *argv[], char *envp[])
                 ++argi;
             } else if (0 == strcmp(arg, "--core")) {
                 if (core) {
-                    lose("more than one core file specified\n");
+                    lose("more than one core file specified");
                 } else {
                     ++argi;
                     if (argi >= argc) {
-                        lose("missing filename for --core argument\n");
+                        lose("missing filename for --core argument");
                     }
                     core = copied_string(argv[argi]);
                     ++argi;
@@ -622,7 +622,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
                  * error. */
                 if (!end_runtime_options &&
                     0 == strcmp(arg, "--end-runtime-options")) {
-                    lose("bad runtime option \"%s\"\n", argi0);
+                    lose("bad runtime option \"%s\"", argi0);
                 }
                 sbcl_argv[argj++] = arg;
             }
@@ -720,7 +720,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
     initial_function = load_core_file(core, embedded_core_offset,
                                       merge_core_pages);
     if (initial_function == NIL) {
-        lose("couldn't find initial function\n");
+        lose("couldn't find initial function");
     }
 
 #if defined(SVR4) || defined(__linux__) || defined(__NetBSD__) || defined(__HAIKU__)
@@ -765,6 +765,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
     FSHOW((stderr, "/funcalling initial_function=0x%lx\n",
           (unsigned long)initial_function));
     create_initial_thread(initial_function);
-    lose("unexpected return from initial thread in main()\n");
+    lose("unexpected return from initial thread in main()");
     return 0;
 }

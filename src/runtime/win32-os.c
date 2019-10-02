@@ -1525,7 +1525,7 @@ char *dirname(char *path)
     int i;
 
     if (pathlen >= sizeof(buf)) {
-        lose("Pathname too long in dirname.\n");
+        lose("Pathname too long in dirname.");
         return NULL;
     }
 

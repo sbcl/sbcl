@@ -98,13 +98,13 @@ newspace_alloc(long nwords, int constantp)
     gc_assert((nwords & 1) == 0);
     if(constantp) {
         if(read_only_free + nwords >= (lispobj *)READ_ONLY_SPACE_END) {
-            lose("Ran out of read-only space while purifying!\n");
+            lose("Ran out of read-only space while purifying!");
         }
         ret=read_only_free;
         read_only_free+=nwords;
     } else {
         if(static_free + nwords >= (lispobj *)STATIC_SPACE_END) {
-            lose("Ran out of static space while purifying!\n");
+            lose("Ran out of static space while purifying!");
         }
         ret=static_free;
         static_free+=nwords;

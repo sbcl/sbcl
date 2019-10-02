@@ -341,7 +341,7 @@ static void netbsd_init()
     /* If we're older than 2.0... */
     if (osrev < 200000000) {
         fprintf(stderr, "osrev = %d (needed at least 200000000).\n", osrev);
-        lose("NetBSD kernel too old to run sbcl.\n");
+        lose("NetBSD kernel too old to run sbcl.");
     }
 
     /* NetBSD counts mmap()ed space against the process's data size limit,

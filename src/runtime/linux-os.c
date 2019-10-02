@@ -112,7 +112,7 @@ futex_init()
     if (errno == ENOSYS)
         lose("This version of SBCL is compiled with threading support, but your kernel\n"
              "is too old to support this. Please use a more recent kernel or\n"
-             "a version of SBCL without threading support.\n");
+             "a version of SBCL without threading support.");
     sys_futex(&x, FUTEX_WAIT_PRIVATE, 1, 0);
     if (errno == EWOULDBLOCK) {
         futex_private_supported_p = 1;
@@ -221,7 +221,7 @@ void os_init(char __attribute__((unused)) *argv[],
     if(! isnptl()) {
        lose("This version of SBCL only works correctly with the NPTL threading\n"
             "library. Please use a newer glibc, use an older SBCL, or stop using\n"
-            "LD_ASSUME_KERNEL\n");
+            "LD_ASSUME_KERNEL");
     }
 #endif
 
@@ -251,7 +251,7 @@ int os_preinit(char *argv[], char *envp[])
     int major_version, minor_version, patch_version;
     getuname(&major_version, &minor_version, &patch_version);
     if (major_version<2) {
-        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)\n",
+        lose("linux kernel version too old: major version=%d (can't run in version < 2.0.0)",
              major_version);
     }
     // Rev b44ca02cb963 conditionally enabled a workaround for a kernel 2.6 bug.

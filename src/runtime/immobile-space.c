@@ -264,7 +264,7 @@ static int get_hint(int attributes, int *page)
             free_slot = hint_index;
     }
     if (free_slot<0)
-        lose("Should not happen\n"); // TODO: evict a hint
+        lose("Should not happen"); // TODO: evict a hint
     // Linearly search for a free page from the beginning
     int free_page = get_freeish_page(0, attributes);
     *page = free_page;
@@ -1649,7 +1649,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         switch (widetag) {
         default:
           if (!leaf_obj_widetag_p(widetag))
-            lose("Unhandled widetag in fixup_space: %p\n", (void*)header_word);
+            lose("Unhandled widetag in fixup_space: %p", (void*)header_word);
           break;
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         case FUNCALLABLE_INSTANCE_WIDETAG:
@@ -2301,7 +2301,7 @@ void check_fixedobj_page(int page,
           genmask |= 1<<gen;
           if (fixedobj_points_to_younger_p(obj, obj_size, gen, keep_gen, new_gen)) {
             if (fixedobj_page_wp(page))
-              lose("sees_younger @ %p + %d\n", obj, obj_size);
+              lose("sees_younger @ %p + %d", obj, obj_size);
             sees_younger = 1;
           }
       }
@@ -2424,7 +2424,7 @@ void check_varyobj_pages()
       }
     }
     if (scan_start_obj != (lispobj*)(long)stored_scan_start)
-      lose("page %d: stored_scan_start=%p does not match found %p\n",
+      lose("page %d: stored_scan_start=%p does not match found %p",
            page, stored_scan_start, *found_below);
     if (found_below != found_above) {
       // the object below must touch this page.
@@ -2472,7 +2472,7 @@ void check_varyobj_pages()
        *    actual=0, expected=1 -> // NOT ok
        */
       if (~actual & mask)
-          lose("genmask wrong: actual=%x expect=%x\n", actual, mask);
+          lose("genmask wrong: actual=%x expect=%x", actual, mask);
   }
 }
 #endif

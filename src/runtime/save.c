@@ -88,7 +88,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
             }
             else {
                 perror(GENERAL_WRITE_FAILURE_MSG);
-                lose("core file is incomplete or corrupt\n");
+                lose("core file is incomplete or corrupt");
             }
         }
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
@@ -106,12 +106,12 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
         stream.next_in  = (void*)addr;
         ret = deflateInit(&stream, compression);
         if (ret != Z_OK)
-            lose("deflateInit: %i\n", ret);
+            lose("deflateInit: %i", ret);
         do {
             stream.avail_out = ZLIB_BUFFER_SIZE;
             stream.next_out = buf;
             ret = deflate(&stream, Z_FINISH);
-            if (ret < 0) lose("zlib deflate error: %i... exiting\n", ret);
+            if (ret < 0) lose("zlib deflate error: %i... exiting", ret);
             written = buf;
             end     = buf+ZLIB_BUFFER_SIZE-stream.avail_out;
             total_written += end - written;
@@ -121,7 +121,7 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
                     written += count;
                 } else {
                     perror(GENERAL_WRITE_FAILURE_MSG);
-                    lose("core file is incomplete or corrupt\n");
+                    lose("core file is incomplete or corrupt");
                 }
             }
         } while (stream.avail_out == 0);
@@ -133,15 +133,15 @@ write_bytes_to_file(FILE * file, char *addr, long bytes, int compression)
 #endif
     } else {
 #ifdef LISP_FEATURE_SB_CORE_COMPRESSION
-        lose("Unknown core compression level %i, exiting\n", compression);
+        lose("Unknown core compression level %i, exiting", compression);
 #else
-        lose("zlib-compressed core support not built in this runtime\n");
+        lose("zlib-compressed core support not built in this runtime");
 #endif
     }
 
     if (fflush(file) != 0) {
       perror(GENERAL_WRITE_FAILURE_MSG);
-      lose("core file is incomplete or corrupt\n");
+      lose("core file is incomplete or corrupt");
     }
 };
 

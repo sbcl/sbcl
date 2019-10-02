@@ -736,7 +736,7 @@ allocation_tracker_sized(uword_t* sp)
             (modrm & 0xC0) == 0xC0 && /* register-direct mode */
             ((modrm >> 3) & 0x7) == (modrm & 0x7)) { /* same register */
         } else {
-            lose("Can't decode instruction @ pc %p\n", pc);
+            lose("Can't decode instruction @ pc %p", pc);
         }
         // rewrite call into:
         //  LOCK INC QWORD PTR, [R11+n] ; opcode = 0xFF / 0

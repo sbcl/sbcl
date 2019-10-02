@@ -336,7 +336,7 @@ all_signals_blocked_p(const sigset_t *sigset, sigset_t *sigset2,
     if (has_blocked && has_unblocked) {
         char buf[3*64]; // assuming worst case 64 signals present in sigset
         sigset_tostring(sigset, buf, sizeof buf);
-        lose("%s signals partially blocked: {%s}\n", name, buf);
+        lose("%s signals partially blocked: {%s}", name, buf);
     }
     if (has_blocked)
         return 1;
@@ -405,7 +405,7 @@ check_deferrables_unblocked_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (deferrables_blocked_p(sigset))
-        lose("deferrables blocked\n");
+        lose("deferrables blocked");
 #endif
 }
 
@@ -414,7 +414,7 @@ check_deferrables_blocked_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (!deferrables_blocked_p(sigset))
-        lose("deferrables unblocked\n");
+        lose("deferrables unblocked");
 #endif
 }
 
@@ -431,7 +431,7 @@ check_blockables_unblocked_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (blockables_blocked_p(sigset))
-        lose("blockables blocked\n");
+        lose("blockables blocked");
 #endif
 }
 
@@ -458,7 +458,7 @@ check_blockables_blocked_or_lose(sigset_t *sigset)
      *   -- DFL, trying to expand on a comment by AK.
      */
     if (!blockables_blocked_p(sigset))
-        lose("blockables unblocked\n");
+        lose("blockables unblocked");
 #endif
 }
 
@@ -476,7 +476,7 @@ check_gc_signals_unblocked_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32)
     if (gc_signals_blocked_p(sigset))
-        lose("gc signals blocked\n");
+        lose("gc signals blocked");
 #endif
 }
 
@@ -485,7 +485,7 @@ check_gc_signals_blocked_or_lose(sigset_t *sigset)
 {
 #if !defined(LISP_FEATURE_WIN32)
     if (!gc_signals_blocked_p(sigset))
-        lose("gc signals unblocked\n");
+        lose("gc signals unblocked");
 #endif
 }
 #endif
@@ -516,7 +516,7 @@ unblock_deferrable_signals(sigset_t *where)
 {
 #if !defined(LISP_FEATURE_WIN32) || defined(LISP_FEATURE_SB_THREAD)
     if (interrupt_handler_pending_p())
-        lose("unblock_deferrable_signals: losing proposition\n");
+        lose("unblock_deferrable_signals: losing proposition");
 #ifndef LISP_FEATURE_SB_SAFEPOINT
     // If 'where' is null, check_gc_signals_unblocked_or_lose() will
     // fetch the current signal mask (from the OS) and check that.
@@ -563,9 +563,9 @@ check_interrupts_enabled_or_lose(os_context_t *context)
 {
     __attribute__((unused)) struct thread *thread = arch_os_get_current_thread();
     if (read_TLS(INTERRUPTS_ENABLED,thread) == NIL)
-        lose("interrupts not enabled\n");
+        lose("interrupts not enabled");
     if (arch_pseudo_atomic_atomic(context))
-        lose ("in pseudo atomic section\n");
+        lose ("in pseudo atomic section");
 }
 
 /* Save sigset (or the current sigmask if 0) if there is no pending
@@ -588,7 +588,7 @@ maybe_save_gc_mask_and_block_deferrables(sigset_t *sigset)
     /* With threads a SIG_STOP_FOR_GC and a normal GC may also want to
      * block. */
     if (data->gc_blocked_deferrables)
-        lose("gc_blocked_deferrables already true\n");
+        lose("gc_blocked_deferrables already true");
 #endif
     if ((!data->pending_handler) &&
         (!data->gc_blocked_deferrables)) {
@@ -667,32 +667,32 @@ check_interrupt_context_or_lose(os_context_t *context)
      * call this function. */
     if (interrupt_deferred_p) {
         if (!(!interrupts_enabled || pseudo_atomic_interrupted || in_race_p))
-            lose("Stray deferred interrupt.\n");
+            lose("Stray deferred interrupt.");
     }
     if (gc_pending)
         if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p || safepoint_active))
-            lose("GC_PENDING, but why?\n");
+            lose("GC_PENDING, but why?");
 #if defined(LISP_FEATURE_SB_THREAD)
     {
         int stop_for_gc_pending =
             (read_TLS(STOP_FOR_GC_PENDING,thread) != NIL);
         if (stop_for_gc_pending)
             if (!(pseudo_atomic_interrupted || gc_inhibit || in_race_p || safepoint_active))
-                lose("STOP_FOR_GC_PENDING, but why?\n");
+                lose("STOP_FOR_GC_PENDING, but why?");
         if (pseudo_atomic_interrupted)
             if (!(gc_pending || stop_for_gc_pending || interrupt_deferred_p))
-                lose("pseudo_atomic_interrupted, but why?\n");
+                lose("pseudo_atomic_interrupted, but why?");
     }
 #else
     if (pseudo_atomic_interrupted)
         if (!(gc_pending || interrupt_deferred_p))
-            lose("pseudo_atomic_interrupted, but why?\n");
+            lose("pseudo_atomic_interrupted, but why?");
 #endif
 #endif
     if (interrupt_pending && !interrupt_deferred_p)
-        lose("INTERRUPT_PENDING but not pending handler.\n");
+        lose("INTERRUPT_PENDING but not pending handler.");
     if ((data->gc_blocked_deferrables) && interrupt_pending)
-        lose("gc_blocked_deferrables and interrupt pending\n.");
+        lose("gc_blocked_deferrables and interrupt pending.");
     if (data->gc_blocked_deferrables)
         check_deferrables_blocked_or_lose(sigset);
     if (interrupt_pending || interrupt_deferred_p ||
@@ -801,13 +801,13 @@ fake_foreign_function_call(os_context_t *context)
 /*             dynamic_space_free_pointer); */
 #if defined(LISP_FEATURE_ALPHA) || defined(LISP_FEATURE_MIPS)
     if ((sword_t)dynamic_space_free_pointer & 1) {
-        lose("dead in fake_foreign_function_call, context = %x\n", context);
+        lose("dead in fake_foreign_function_call, context = %x", context);
     }
 #endif
 /* why doesnt PPC and SPARC do something like this: */
 #if defined(LISP_FEATURE_HPPA)
     if ((sword_t)dynamic_space_free_pointer & 4) {
-        lose("dead in fake_foreign_function_call, context = %x, d_s_f_p = %x\n", context, dynamic_space_free_pointer);
+        lose("dead in fake_foreign_function_call, context = %x, d_s_f_p = %x", context, dynamic_space_free_pointer);
     }
 #endif
 #endif
@@ -831,7 +831,7 @@ fake_foreign_function_call(os_context_t *context)
         fixnum_value(read_TLS(FREE_INTERRUPT_CONTEXT_INDEX,thread));
 
     if (context_index >= (MAX_INTERRUPTS-THREAD_HEADER_SLOTS)) {
-        lose("maximum interrupt nesting depth (%d) exceeded\n",
+        lose("maximum interrupt nesting depth (%d) exceeded",
              MAX_INTERRUPTS-THREAD_HEADER_SLOTS);
     }
 
@@ -919,7 +919,7 @@ interrupt_internal_error(os_context_t *context, boolean continuable)
         describe_internal_error(context);
         /* There's no good way to recover from an internal error
          * before the Lisp error handling mechanism is set up. */
-        lose("internal error too early in init, can't recover\n");
+        lose("internal error too early in init, can't recover");
     }
 
     thread_sigmask(SIG_SETMASK, os_context_sigmask_addr(context), 0);
@@ -1134,7 +1134,7 @@ interrupt_handle_pending(os_context_t *context)
 #endif
 #ifdef LISP_FEATURE_GENCGC
     if (get_pseudo_atomic_interrupted(thread))
-        lose("pseudo_atomic_interrupted after interrupt_handle_pending\n");
+        lose("pseudo_atomic_interrupted after interrupt_handle_pending");
 #endif
     /* It is possible that the end of this function was reached
      * without never actually doing anything, the tests in Lisp for
@@ -1177,7 +1177,7 @@ interrupt_handle_now(int signal, siginfo_t *info, os_context_t *context)
         /* This can happen if someone tries to ignore or default one
          * of the signals we need for runtime support, and the runtime
          * support decides to pass on it. */
-        lose("no handler for signal %d in interrupt_handle_now(..)\n", signal);
+        lose("no handler for signal %d in interrupt_handle_now(..)", signal);
 
         // BUG: if a C function pointer can be misaligned such that it
         // looks to satisfy functionp() then we do the wrong thing.
@@ -1261,11 +1261,11 @@ maybe_defer_handler(void *handler, struct interrupt_data *data,
     check_blockables_blocked_or_lose(0);
 
     if (read_TLS(INTERRUPT_PENDING,thread) != NIL)
-        lose("interrupt already pending\n");
+        lose("interrupt already pending");
     if (thread->interrupt_data->pending_handler)
-        lose("there is a pending handler already (PA)\n");
+        lose("there is a pending handler already (PA)");
     if (data->gc_blocked_deferrables)
-        lose("maybe_defer_handler: gc_blocked_deferrables true\n");
+        lose("maybe_defer_handler: gc_blocked_deferrables true");
 
     /* If interrupts are disabled then INTERRUPT_PENDING is set and
      * not PSEDUO_ATOMIC_INTERRUPTED. This is important for a pseudo
@@ -1316,7 +1316,7 @@ store_signal_data_for_later (struct interrupt_data *data, void *handler,
         lose("tried to overwrite pending interrupt handler %p with %p",
              data->pending_handler, handler);
     if (!handler)
-        lose("tried to defer null interrupt handler\n");
+        lose("tried to defer null interrupt handler");
     data->pending_handler = handler;
     data->pending_signal = signal;
     if(info)
@@ -2065,7 +2065,7 @@ undoably_install_low_level_interrupt_handler (int signal,
     struct sigaction sa;
 
     if (0 > signal || signal >= NSIG) {
-        lose("bad signal number %d\n", signal);
+        lose("bad signal number %d", signal);
     }
 
     if (ARE_SAME_HANDLER(handler, SIG_DFL))
@@ -2194,7 +2194,7 @@ sigabrt_handler(int __attribute__((unused)) signal,
     /* Save the interrupt context. No need to undo it, since lose()
      * shouldn't return. */
     fake_foreign_function_call(context);
-    lose("SIGABRT received.\n");
+    lose("SIGABRT received.");
 }
 
 void
@@ -2408,7 +2408,7 @@ handle_trap(os_context_t *context, int trap)
 #endif
     case trap_Halt:
         fake_foreign_function_call(context);
-        lose("%%PRIMITIVE HALT called; the party is over.\n");
+        lose("%%PRIMITIVE HALT called; the party is over.");
     default:
         unhandled_trap_error(context);
     }

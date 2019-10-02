@@ -403,12 +403,12 @@ catch_exception_raise(mach_port_t exception_port,
 
     dealloc_ret = mach_port_deallocate (mach_task_self(), thread);
     if (dealloc_ret) {
-        lose("mach_port_deallocate (thread) failed with return_code %d\n", dealloc_ret);
+        lose("mach_port_deallocate (thread) failed with return_code %d", dealloc_ret);
     }
 
     dealloc_ret = mach_port_deallocate (mach_task_self(), task);
     if (dealloc_ret) {
-        lose("mach_port_deallocate (task) failed with return_code %d\n", dealloc_ret);
+        lose("mach_port_deallocate (task) failed with return_code %d", dealloc_ret);
     }
 
     return ret;

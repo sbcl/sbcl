@@ -993,7 +993,7 @@ wake_thread_posix(os_thread_t os_thread)
                                  * transition. */
                                 int status = pthread_kill(os_thread, SIGPIPE);
                                 if (status)
-                                    lose("wake_thread_posix: pthread_kill failed with %d\n",
+                                    lose("wake_thread_posix: pthread_kill failed with %d",
                                          status);
                             }
                             break;

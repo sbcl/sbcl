@@ -170,7 +170,7 @@ lose:
 
 #ifndef LISP_FEATURE_SB_CORE_COMPRESSION
 # define inflate_core_bytes(fd,offset,addr,len) \
-    lose("This runtime was not built with zlib-compressed core support... aborting\n")
+    lose("This runtime was not built with zlib-compressed core support... aborting")
 #else
 # define ZLIB_BUFFER_SIZE (1u<<16)
 static void inflate_core_bytes(int fd, os_vm_offset_t offset,
@@ -187,7 +187,7 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 # endif
 
     if (-1 == lseek(fd, offset, SEEK_SET)) {
-        lose("Unable to lseek() on corefile\n");
+        lose("Unable to lseek() on corefile");
     }
 
     stream.zalloc = NULL;
@@ -198,14 +198,14 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
 
     ret = inflateInit(&stream);
     if (ret != Z_OK)
-        lose("zlib error %i\n", ret);
+        lose("zlib error %i", ret);
 
     stream.next_out  = (void*)addr;
     stream.avail_out = len;
     do {
         ssize_t count = read(fd, buf, ZLIB_BUFFER_SIZE);
         if (count < 0)
-            lose("unable to read core file (errno = %i)\n", errno);
+            lose("unable to read core file (errno = %i)", errno);
         stream.next_in = buf;
         stream.avail_in = count;
         if (count == 0) break;
@@ -215,13 +215,13 @@ static void inflate_core_bytes(int fd, os_vm_offset_t offset,
             break;
         case Z_OK:
             if (stream.avail_out == 0)
-                lose("Runaway gzipped core directory... aborting\n");
+                lose("Runaway gzipped core directory... aborting");
             if (stream.avail_in > 0)
                 lose("zlib inflate returned without fully"
-                     "using up input buffer... aborting\n");
+                     "using up input buffer... aborting");
             break;
         default:
-            lose("zlib inflate error: %i\n", ret);
+            lose("zlib inflate error: %i", ret);
             break;
         }
     } while (ret != Z_STREAM_END);
@@ -730,7 +730,7 @@ process_directory(int count, struct ndir_entry *entry,
         int compressed = id & DEFLATED_CORE_SPACE_ID_FLAG;
         id -= compressed;
         if (id < 1 || id > MAX_CORE_SPACE_ID)
-            lose("unknown space ID %ld addr %p\n", id, (void*)addr);
+            lose("unknown space ID %ld addr %p", id, (void*)addr);
 
 #ifndef LISP_FEATURE_RELOCATABLE_HEAP
         int enforce_address = 1;
@@ -761,7 +761,7 @@ process_directory(int count, struct ndir_entry *entry,
         spaces[id].base = addr;
         uword_t len = os_vm_page_size * entry->page_count;
         if (id == DYNAMIC_CORE_SPACE_ID && len > dynamic_space_size) {
-            lose("dynamic space too small for core: %luKiB required, %luKiB available.\n",
+            lose("dynamic space too small for core: %luKiB required, %luKiB available.",
                  (unsigned long)len >> 10,
                  (unsigned long)dynamic_space_size >> 10);
         }
@@ -942,7 +942,7 @@ Please report this as a bug");
             where += OBJECT_SIZE(*where, where);
         }
     }
-    if (!asm_routines_start)lose("Can't find asm routines");
+    if (!asm_routines_start) lose("Can't find asm routines");
     int nwords = sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
     asm_routines_end = asm_routines_start + nwords*N_WORD_BYTES;
 #endif
@@ -989,7 +989,7 @@ load_core_file(char *file, os_vm_offset_t file_offset, int merge_core_pages)
 
     count = read(fd, header, os_vm_page_size);
     if (count < (ssize_t) os_vm_page_size) {
-        lose("premature end of core file\n");
+        lose("premature end of core file");
     }
 
     ptr = header;

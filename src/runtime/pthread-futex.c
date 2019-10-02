@@ -44,7 +44,7 @@ do {                                                                   \
 #endif
 
 #define futex_abort()                                                  \
-  lose("Futex assertion failure, file \"%s\", line %d\n", __FILE__, __LINE__)
+  lose("Futex assertion failure, file \"%s\", line %d", __FILE__, __LINE__)
 
 struct futex {
     struct futex *prev;

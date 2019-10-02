@@ -85,7 +85,7 @@ ensure_undefined_alien(void) {
     if (start) {
         undefined_alien_address = start;
     } else {
-        lose("could not allocate guard page for undefined alien\n");
+        lose("could not allocate guard page for undefined alien");
     }
 }
 

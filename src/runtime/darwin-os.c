@@ -151,7 +151,7 @@ mach_lisp_thread_init(struct thread * thread)
                                  thread_exception_port,
                                  MACH_MSG_TYPE_MAKE_SEND);
     if (ret) {
-        lose("mach_port_insert_right failed with return_code %d\n", ret);
+        lose("mach_port_insert_right failed with return_code %d", ret);
     }
 
     current_mach_thread = mach_thread_self();
@@ -161,19 +161,19 @@ mach_lisp_thread_init(struct thread * thread)
                                      EXCEPTION_DEFAULT,
                                      THREAD_STATE_NONE);
     if (ret) {
-        lose("thread_set_exception_ports failed with return_code %d\n", ret);
+        lose("thread_set_exception_ports failed with return_code %d", ret);
     }
 
     ret = mach_port_deallocate (mach_task_self(), current_mach_thread);
     if (ret) {
-        lose("mach_port_deallocate failed with return_code %d\n", ret);
+        lose("mach_port_deallocate failed with return_code %d", ret);
     }
 
     ret = mach_port_move_member(mach_task_self(),
                                 thread_exception_port,
                                 mach_exception_handler_port_set);
     if (ret) {
-        lose("mach_port_move_member failed with return_code %d\n", ret);
+        lose("mach_port_move_member failed with return_code %d", ret);
     }
 
     return ret;

@@ -46,7 +46,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 
     if (actual == MAP_FAILED) {
         perror("mmap");
-        lose("os_validate(): mmap() failure\n");
+        lose("os_validate(): mmap() failure");
     }
 
     if (addr && (addr!=actual)) {
@@ -63,7 +63,7 @@ os_invalidate(os_vm_address_t addr, os_vm_size_t len)
 {
     if (munmap(addr,len) == -1) {
         perror("munmap");
-        lose("os_invalidate(): mmap() failure\n");
+        lose("os_invalidate(): mmap() failure");
     }
 }
 

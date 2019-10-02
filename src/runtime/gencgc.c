@@ -602,7 +602,7 @@ zero_range_with_mmap(os_vm_address_t addr, os_vm_size_t length) {
     // cautious not to resurrect bytes that originally came from the file.
     if ((os_vm_address_t)addr >= anon_dynamic_space_start) {
         if (madvise(addr, length, MADV_DONTNEED) != 0)
-            lose("madvise failed\n");
+            lose("madvise failed");
     } else
 #endif
     {
@@ -831,7 +831,7 @@ gc_alloc_new_region(sword_t nbytes, int page_type_flag, struct alloc_region *all
         for (p = alloc_region->start_addr;
              (void*)p < alloc_region->end_addr; p++) {
             if (*p != 0) {
-                lose("The new region is not zero at %p (start=%p, end=%p).\n",
+                lose("The new region is not zero at %p (start=%p, end=%p).",
                      p, alloc_region->start_addr, alloc_region->end_addr);
             }
         }
@@ -1413,7 +1413,7 @@ static uword_t adjust_obj_ptes(page_index_t first_page,
           int i;
           for(i=0; i<(int)(GENCGC_CARD_BYTES/N_WORD_BYTES); ++i)
               if (words[i])
-                lose("non-zeroed trailer of shrunken object @ %p\n",
+                lose("non-zeroed trailer of shrunken object @ %p",
                      page_address(first_page));
         }
 #endif
@@ -2479,7 +2479,7 @@ scavenge_newspace(generation_index_t generation)
                 && (page_table[i].gen == generation)
                 && (page_table[i].write_protected_cleared != 0)
                 && (page_table[i].pinned == 0)) {
-                lose("write protected page %d written to in scavenge_newspace\ngeneration=%d pin=%d\n",
+                lose("write protected page %d written to in scavenge_newspace\ngeneration=%d pin=%d",
                      i, generation, page_table[i].pinned);
             }
         }
@@ -2866,7 +2866,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 if (compacting_p() && (state->flags & VERIFY_POST_GC) ?
                     (state->min_pointee_gen < my_gen) != rememberedp :
                     (state->min_pointee_gen < my_gen) && !rememberedp)
-                    lose("object @ %p is gen%d min_pointee=gen%d %s\n",
+                    lose("object @ %p is gen%d min_pointee=gen%d %s",
                          where, my_gen, state->min_pointee_gen,
                          rememberedp ? "written" : "not written");
 #endif
@@ -3746,7 +3746,7 @@ collect_garbage(generation_index_t last_gen)
         /* Check that they are all empty. */
         for (i = 0; i < gen_to_wp; i++) {
             if (generations[i].bytes_allocated)
-                lose("trying to write-protect gen. %d when gen. %d nonempty\n",
+                lose("trying to write-protect gen. %d when gen. %d nonempty",
                      gen_to_wp, i);
         }
         write_protect_generation_pages(gen_to_wp);
@@ -4130,7 +4130,7 @@ gencgc_handle_wp_violation(void* fault_addr)
                         page_table[page_index].write_protected_cleared,
                         page_table[page_index].gen);
                 if (!continue_after_memoryfault_on_unprotected_pages)
-                    lose("Feh.\n");
+                    lose("Feh.");
             }
         }
         /* Don't worry, we can handle it. */
@@ -4347,7 +4347,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
      * beyond hope, there's not much we can do.
      * (beyond FUNCALLing lisp_init_function, but I suspect that's
      * going to be rather unsatisfactory too... */
-    lose("Attempt to save core after non-conservative GC failed.\n");
+    lose("Attempt to save core after non-conservative GC failed.");
 }
 
 /* Read corefile ptes from 'fd' which has already been positioned

@@ -52,7 +52,7 @@ int arch_os_thread_init(struct thread *thread) {
     sigstack.ss_flags = 0;
     sigstack.ss_size  = calc_altstack_size(thread);
     if(sigaltstack(&sigstack,0)<0)
-        lose("Cannot sigaltstack: %s\n",strerror(errno));
+        lose("Cannot sigaltstack: %s",strerror(errno));
 
     return 1;                   /* success */
 }
