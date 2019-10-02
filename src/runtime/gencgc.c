@@ -4365,7 +4365,10 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
     if (lseek(fd, offset, SEEK_SET) != offset) lose("failed seek");
     char data[8192];
     // Process an integral number of ptes on each read.
-    page_index_t max_pages_per_read = sizeof data / sizeof (struct corefile_pte);
+    // Parentheses around sizeof (type) are necessary to suppress a
+    // clang warning (-Wsizeof-array-div) that we're dividing the array size
+    // by a divisor that is not the size of one element in that array.
+    page_index_t max_pages_per_read = sizeof data / (sizeof (struct corefile_pte));
     page_index_t page = 0;
     generation_index_t gen = CORE_PAGE_GENERATION;
     while (page < n_ptes) {
