@@ -44,7 +44,10 @@ default_lossage_handler(void)
     static int backtrace_invoked = 0;
     if (!backtrace_invoked) {
         backtrace_invoked = 1;
-        lisp_backtrace(100);
+        // This may not be exactly the right condition for determining
+        // whether it might be possible to backtrace, but at least it prevents
+        // lose() from itself losing early in startup.
+        if (arch_os_get_current_thread()) lisp_backtrace(100);
     }
     exit(1);
 }

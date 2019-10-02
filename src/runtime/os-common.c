@@ -10,7 +10,6 @@
  */
 # define _GNU_SOURCE /* needed for RTLD_DEFAULT from dlfcn.h */
 #include <stdio.h>
-#include <stdlib.h>
 #include <errno.h>
 #include <string.h>
 
@@ -237,12 +236,8 @@ void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
         fail = 1;
     }
 #endif
-    if (fail) {
-        // Don't lose() - it would attempt to perform a lisp backtrace and crash.
-        fprintf(stderr, "load_core_bytes(%d,%x,%lx,%x) failed\n",
-                fd, offset, (long)addr, (int)len);
-        exit(1);
-    }
+    if (fail)
+        lose("load_core_bytes(%d,%x,%lx,%x) failed", fd, offset, (long)addr, (int)len);
 }
 
 boolean
