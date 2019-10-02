@@ -270,7 +270,8 @@
 
 #+immobile-space
 (defun alloc-immobile-fdefn ()
-  (or (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
+  (or #+nil ; Avoid creating new objects in the text segment for now
+      (and (= (alien-funcall (extern-alien "lisp_code_in_elf" (function int))) 1)
            (allocate-immobile-obj (* fdefn-size n-word-bytes)
                                   (logior (ash undefined-fdefn-header 16)
                                           fdefn-widetag) ; word 0

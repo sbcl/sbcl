@@ -1733,7 +1733,7 @@
             ;; in case the resulting executable needs to compile anything.
             ;; (Call frame info will be missing, but at least it's something.)
             (dolist (item '(("*COMPILE-FILE-TO-MEMORY-SPACE*" . "DYNAMIC")
-                            ("*COMPILE-TO-MEMORY-SPACE*" . "AUTO")))
+                            ("*COMPILE-TO-MEMORY-SPACE*" . "DYNAMIC")))
               (destructuring-bind (symbol . value) item
                 (%set-symbol-global-value
                  (find-target-symbol "SB-C" symbol map)
