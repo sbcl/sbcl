@@ -383,7 +383,8 @@ sigtrap_handler(int __attribute__((unused)) signal,
     if (trap == trap_UndefinedFunction) {
         // The interrupted PC pins this fdefn. Sigtrap is delivered on the ordinary stack,
         // not the alternate stack.
-        lispobj* fdefn = search_immobile_space((void*)*os_context_pc_addr(context));
+        // (FIXME: an interior pointer to an fdefn _should_ pin it, but doesn't)
+        lispobj* fdefn = (lispobj*)(*os_context_pc_addr(context) & ~LOWTAG_MASK);
         if (fdefn && widetag_of(fdefn) == FDEFN_WIDETAG) {
             // Return to undefined-tramp
             *os_context_pc_addr(context) = (uword_t)((struct fdefn*)fdefn)->raw_addr;
