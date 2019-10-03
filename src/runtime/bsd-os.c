@@ -160,7 +160,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
        Except for MAP_FIXED mappings, the system will never replace existing mappings. */
 
     // ALLOCATE_LOW seems never to get what we want
-    if (!(attributes & MOVABLE) | (attributes & ALLOCATE_LOW)) {
+    if (!(attributes & MOVABLE) || (attributes & ALLOCATE_LOW)) {
         flags = MAP_FIXED;
     }
     if (attributes & IS_THREAD_STRUCT) {
