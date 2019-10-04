@@ -25,7 +25,9 @@ while [ $i -le 6 ]
 do
   echo Trial $i
   i=`expr $i + 1`
-  ./test-sbcl --noinform --core ../../output/sbcl.core --eval '(gc :full t)' --quit
+  ./test-sbcl --lose-on-corruption --disable-ldb --noinform --core ../../output/sbcl.core \
+              --no-sysinit --no-userinit --noprint --disable-debugger \
+              --eval '(gc :full t)' --quit
 done
 rm ./test-sbcl
 
