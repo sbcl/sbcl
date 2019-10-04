@@ -869,6 +869,27 @@ process_directory(int count, struct ndir_entry *entry,
         }
     }
 
+    // Compute the bounds of the lisp assembly routines
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
+    asm_routines_start = VARYOBJ_SPACE_START;
+#else
+    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
+        asm_routines_start = READ_ONLY_SPACE_START;
+    } else {
+        lispobj *where = (lispobj*)STATIC_SPACE_START;
+        while (where < static_space_free_pointer) {
+            if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
+                asm_routines_start = (uword_t)where;
+                break;
+            }
+            where += OBJECT_SIZE(*where, where);
+        }
+        if (!asm_routines_start) lose("Can't find asm routines");
+    }
+#endif
+    asm_routines_end = asm_routines_start +
+      N_WORD_BYTES * sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
+
 #ifdef LISP_FEATURE_RELOCATABLE_HEAP
 #  ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
@@ -929,22 +950,6 @@ Please report this as a bug");
     immobile_space_max_offset   = range2.end - range1.start;
     immobile_range_1_max_offset = range1.end - range1.start;
     immobile_range_2_min_offset = range2.start - range1.start;
-#else
-    if (widetag_of((lispobj*)READ_ONLY_SPACE_START) == CODE_HEADER_WIDETAG) {
-        asm_routines_start = READ_ONLY_SPACE_START;
-    } else {
-        lispobj *where = (lispobj*)STATIC_SPACE_START;
-        while (where < static_space_free_pointer) {
-            if (widetag_of((lispobj*)where) == CODE_HEADER_WIDETAG) {
-                asm_routines_start = (uword_t)where;
-                break;
-            }
-            where += OBJECT_SIZE(*where, where);
-        }
-    }
-    if (!asm_routines_start) lose("Can't find asm routines");
-    int nwords = sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
-    asm_routines_end = asm_routines_start + nwords*N_WORD_BYTES;
 #endif
 #ifdef LISP_FEATURE_X86_64
     tune_asm_routines_for_microarch(); // before WPing immobile space

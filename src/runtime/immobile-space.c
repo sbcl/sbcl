@@ -1284,10 +1284,6 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         for (page = 0 ; page <= last_page ; ++page)
             varyobj_page_touched_bits[page/32] &= ~(1U<<(page & 31));
     }
-    lispobj* code = (lispobj*)VARYOBJ_SPACE_START;
-    asm_routines_start = VARYOBJ_SPACE_START;
-    asm_routines_end   = asm_routines_start +
-                         (sizetab[CODE_HEADER_WIDETAG](code) << WORD_SHIFT);
     page_attributes_valid = 1;
 }
 

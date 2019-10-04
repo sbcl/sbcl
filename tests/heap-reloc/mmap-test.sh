@@ -1,14 +1,6 @@
 #!/bin/sh
 
-(cd ../../src/runtime ; make libsbcl.a)
-
-# Specify that some symbols are undefined so that the complete
-# contents of 'wrap.o' and 'largefile.o' get pulled in.
-# FIXME: maybe need '-m32' flag and whatnot
-cc -o test-sbcl -g \
-  -Wl,-ufstat_wrapper -Wl,-uget_timezone -Wl,-ulseek_largefile -Wl,-uspawn \
-  -Wl,--export-dynamic -no-pie fake-mman.c ../../src/runtime/libsbcl.a \
-  -ldl -lpthread -lm
+source ./build-test-sbcl
 
 export SBCL_FAKE_MMAP_INSTRUCTION_FILE=`pwd`/fakemap
 
@@ -17,6 +9,10 @@ export SBCL_FAKE_MMAP_INSTRUCTION_FILE=`pwd`/fakemap
   --eval '(setf (extern-alien "gencgc_verbose" int) 1)' \
   --eval '(gc :full t)' \
   --eval '(exit)'
+
+# TODO:
+# 1. this needs to be run as part of the regression suite
+# 2. and split into one test per shell file for parallelization
 
 # There is a slight problem in that one of the tests in core.test.sh
 # asserts something about dynamic space size, which due to relocation
