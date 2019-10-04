@@ -1,7 +1,7 @@
 (cd ../../src/runtime ; make -s libsbcl.a)
 
 # TODO: insert CFLAGS in some principled way
-m_arg=`../../run-sbcl.sh --noinform --eval '(progn #+x86 (princ "-m32"))' --quit`
+m_arg=`../../run-sbcl.sh --noinform --eval '(progn #+sb-core-compression (princ "-lz") #+x86 (princ "-m32"))' --quit`
 
 # Specify that some symbols are undefined so that the complete
 # contents of 'wrap.o' and 'largefile.o' get pulled in.

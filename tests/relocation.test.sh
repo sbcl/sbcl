@@ -14,7 +14,7 @@ fi
 
 set -e
 cd heap-reloc
-source ./build-test-sbcl
+. ./build-test-sbcl
 
 # Exercise all the lines of 'fakemap' by starting up N times in a row.
 # KLUDGE: assume N = 6
