@@ -648,6 +648,9 @@ openbsd_init()
     mib[1] = CPU_OSFXSR;
     size = sizeof (openbsd_use_fxsave);
     sysctl(mib, 2, &openbsd_use_fxsave, &size, NULL, 0);
+    if (openbsd_use_fxsave)
+        /* Use the SSE detector */
+        fast_bzero_pointer = fast_bzero_detect;
 #endif
 
     /* OpenBSD, like NetBSD, counts mmap()ed space against the
