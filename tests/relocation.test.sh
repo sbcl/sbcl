@@ -5,7 +5,9 @@
 # TODO: get this to run for all platforms that have a relocatable heap
 # (I think that's everything that we care about these days?)
 
-run_sbcl --eval '(exit :code (or #+(and (or x86 x86-64) linux) 0 1))'
+# Without sb-dynamic-core we can't build a new C runtime as it messes up
+# all of the addresses of C symbols that were wired in.
+run_sbcl --eval '(exit :code (or #+(and (or x86 x86-64) linux sb-dynamic-core) 0 1))'
 if [ $? -eq 1 ]
 then
     # shell tests don't have a way of exiting as "not applicable"
