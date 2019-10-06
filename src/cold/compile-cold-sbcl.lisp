@@ -125,6 +125,7 @@
                                   :direction :output :if-exists :supersede)))
                        (handler-case (target-compile-stem stem flags)
                          (error (e)
+                           (format *error-output* "~a~%" e)
                            (close *standard-output*)
                            (close *error-output*)
                            (sb-cold::exit-process 1))
