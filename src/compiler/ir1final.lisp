@@ -143,10 +143,10 @@
                (delete-filter node lvar (cast-value node))))))))
 
 (defglobal *two-arg-functions*
-    '((* two-arg-*)
+    `((* two-arg-*)
       (+ two-arg-+)
       (- two-arg--)
-      (/ two-arg-/)
+      (/ two-arg-/ (,(specifier-type 'integer) ,(specifier-type 'integer)) sb-kernel::integer-/-integer)
       (< two-arg-<)
       (= two-arg-=)
       (> two-arg->)
@@ -242,16 +242,23 @@
 (defun rewrite-full-call (combination)
   (let ((combination-name (lvar-fun-name (combination-fun combination) t))
         (args (combination-args combination)))
-    (let ((two-arg (cadr (assoc combination-name *two-arg-functions*)))
+    (let ((two-arg (assoc combination-name *two-arg-functions*))
           (ref (lvar-uses (combination-fun combination))))
       (when (and two-arg
                  (ref-p ref)
                  (= (length args) 2)
                  (not (fun-lexically-notinline-p combination-name
                                                  (node-lexenv combination))))
-        (change-ref-leaf
-         ref
-         (find-free-fun two-arg "rewrite-full-call"))))))
+        (destructuring-bind (name two-arg &optional types typed-two-arg) two-arg
+          (declare (ignore name))
+          (when (and types
+                     (loop for arg in args
+                           for type in types
+                           always (csubtypep (lvar-type arg) type)))
+            (setf two-arg typed-two-arg))
+          (change-ref-leaf
+           ref
+           (find-free-fun two-arg "rewrite-full-call")))))))
 
 ;;; Do miscellaneous things that we want to do once all optimization
 ;;; has been done:
