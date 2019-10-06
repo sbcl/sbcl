@@ -1821,6 +1821,7 @@
   (def popf  #x9D) ; Pop flags.
   (def sahf  #x9E) ; Store AH into flags.
   (def lahf  #x9F) ; Load AH from flags.
+  (def icebp #xF1) ; ICE breakpoint
   (def hlt   #xF4) ; Halt
   (def cmc   #xF5) ; Complement Carry Flag.
   (def clc   #xF8) ; Clear Carry Flag.
@@ -2401,16 +2402,13 @@
 ;;;; interrupt instructions
 
 (define-instruction break (segment &optional (code nil codep))
-  #-ud2-breakpoints (:printer byte-imm ((op (or #+int4-breakpoints #xCE #xCC)))
-                               '(:name :tab code) :control #'break-control)
-  #+ud2-breakpoints (:printer word-imm ((op #x0B0F))
-                               '(:name :tab code) :control #'break-control)
+  (:printer byte-imm ((op #xCC)) :default :print-name 'int3 :control #'break-control)
+  (:printer word-imm ((op #x0B0F)) :default :print-name 'ud2 :control #'break-control)
+  ;; INTO always signals SIGILL in 64-bit code. Using it avoids conflicting with gdb's
+  ;; use of sigtrap and shortens the error break by 1 byte relative to UD2.
+  (:printer byte-imm ((op #xCE)) :default :print-name 'into :control #'break-control)
   (:emitter
    #-ud2-breakpoints (emit-byte segment (or #+int4-breakpoints #xCE #xCC))
-   ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
-   ;; throw a sigill with 0x0b0f instead and check for this in the
-   ;; SIGILL handler and pass it on to the sigtrap handler if
-   ;; appropriate
    #+ud2-breakpoints (emit-word segment #x0B0F)
    (when codep (emit-byte segment (the (unsigned-byte 8) code)))))
 
@@ -2423,6 +2421,20 @@
       (emit-byte segment (if (eql number 4) #xCE #xCC)))
      ((unsigned-byte 8)
       (emit-bytes segment #xCD number)))))
+
+(define-instruction ud0 (segment reg rm)
+  (:printer ext-reg-reg/mem-no-width ((op #xFF)))
+  (:emitter
+   (emit-prefixes segment rm reg :dword)
+   (emit-bytes segment #x0F #xFF)
+   (emit-ea segment rm reg)))
+
+(define-instruction ud1 (segment reg rm)
+  (:printer ext-reg-reg/mem-no-width ((op #xB9)))
+  (:emitter
+   (emit-prefixes segment rm reg :dword)
+   (emit-bytes segment #x0F #xB9)
+   (emit-ea segment rm reg)))
 
 (define-instruction iret (segment)
   (:printer byte ((op #xCF)))

@@ -1727,16 +1727,10 @@
 ;;;; interrupt instructions
 
 (define-instruction break (segment &optional (code nil codep))
-  #-ud2-breakpoints (:printer byte-imm ((op #xCC))
-                               '(:name :tab code) :control #'break-control)
-  #+ud2-breakpoints (:printer word-imm ((op #x0B0F))
-                               '(:name :tab code) :control #'break-control)
+  (:printer byte-imm ((op #xCC)) :default :print-name 'int3 :control #'break-control)
+  (:printer word-imm ((op #x0B0F)) :default :print-name 'ud2 :control #'break-control)
   (:emitter
    #-ud2-breakpoints (emit-byte segment #xCC)
-   ;; On darwin, trap handling via SIGTRAP is unreliable, therefore we
-   ;; throw a sigill with 0x0b0f instead and check for this in the
-   ;; SIGILL handler and pass it on to the sigtrap handler if
-   ;; appropriate
    #+ud2-breakpoints (emit-word segment #x0B0F)
    (when codep (emit-byte segment (the (unsigned-byte 8) code)))))
 

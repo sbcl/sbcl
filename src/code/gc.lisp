@@ -464,6 +464,17 @@ Experimental: interface subject to change."
                                  (function double generation-index-t))
                    generation))
 
+(macrolet ((cases ()
+             `(cond ((< (current-dynamic-space-start) addr
+                        (sap-int (dynamic-space-free-pointer)))
+                     :dynamic)
+                    ((immobile-space-addr-p addr) :immobile)
+                    ((< sb-vm:read-only-space-start addr
+                        (sap-int sb-vm:*read-only-space-free-pointer*))
+                     :read-only)
+                    ((< sb-vm:static-space-start addr
+                        (sap-int sb-vm:*static-space-free-pointer*))
+                     :static))))
 ;;; Return true if X is in any non-stack GC-managed space.
 ;;; (Non-stack implies not TLS nor binding stack)
 ;;; This assumes a single contiguous dynamic space, which is of course a
@@ -477,13 +488,9 @@ Experimental: interface subject to change."
 (defun heap-allocated-p (x)
   (let ((addr (get-lisp-obj-address x)))
     (and (sb-vm:is-lisp-pointer addr)
-         (cond ((< (current-dynamic-space-start) addr
-                   (sap-int (dynamic-space-free-pointer)))
-                :dynamic)
-               ((immobile-space-addr-p addr) :immobile)
-               ((< sb-vm:read-only-space-start addr
-                   (sap-int sb-vm:*read-only-space-free-pointer*))
-                :read-only)
-               ((< sb-vm:static-space-start addr
-                   (sap-int sb-vm:*static-space-free-pointer*))
-                :static)))))
+         (cases))))
+
+;;; Internal use only. FIXME: I think this duplicates code that exists
+;;; somewhere else which I could not find.
+(defun lisp-space-p (sap &aux (addr (sap-int sap))) (cases))
+) ; end MACROLET
