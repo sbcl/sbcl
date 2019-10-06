@@ -556,6 +556,7 @@
   (:translate truncate)
   (:args (x :scs (any-reg) :target eax)
          (y :scs (any-reg control-stack)))
+  (:args-var args)
   (:arg-types tagged-num tagged-num)
   (:temporary (:sc signed-reg :offset eax-offset :target quo
                    :from (:argument 0) :to (:result 0)) eax)
@@ -568,11 +569,12 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 31
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
-      (if (sc-is y any-reg)
-          (inst test y y)  ; smaller instruction
+    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+                                    (specifier-type '(eql 0)))
+      (if (sc-is y signed-reg)
+          (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq zero))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
     (inst cqo)
     (inst idiv eax y)
@@ -616,8 +618,9 @@
   (:args (x :scs (unsigned-reg) :target eax)
          (y :scs (unsigned-reg signed-stack)))
   (:arg-types unsigned-num unsigned-num)
+  (:args-var args)
   (:temporary (:sc unsigned-reg :offset eax-offset :target quo
-                   :from (:argument 0) :to (:result 0)) eax)
+               :from (:argument 0) :to (:result 0)) eax)
   (:temporary (:sc unsigned-reg :offset edx-offset :target rem
                    :from (:argument 0) :to (:result 1)) edx)
   (:results (quo :scs (unsigned-reg))
@@ -627,11 +630,12 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
-      (if (sc-is y unsigned-reg)
-          (inst test y y)  ; smaller instruction
+    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+                                    (specifier-type '(eql 0)))
+      (if (sc-is y signed-reg)
+          (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq zero))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
     (inst xor edx edx)
     (inst div eax y)
@@ -666,6 +670,7 @@
   (:translate truncate)
   (:args (x :scs (signed-reg) :target eax)
          (y :scs (signed-reg signed-stack)))
+  (:args-var args)
   (:arg-types signed-num signed-num)
   (:temporary (:sc signed-reg :offset eax-offset :target quo
                    :from (:argument 0) :to (:result 0)) eax)
@@ -678,11 +683,12 @@
   (:vop-var vop)
   (:save-p :compute-only)
   (:generator 33
-    (let ((zero (generate-error-code vop 'division-by-zero-error x y)))
+    (when (types-equal-or-intersect (tn-ref-type (tn-ref-across args))
+                                    (specifier-type '(eql 0)))
       (if (sc-is y signed-reg)
-          (inst test y y)  ; smaller instruction
+          (inst test y y)               ; smaller instruction
           (inst cmp y 0))
-      (inst jmp :eq zero))
+      (inst jmp :eq (generate-error-code vop 'division-by-zero-error x y)))
     (move eax x)
     (inst cqo)
     (inst idiv eax y)
