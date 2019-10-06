@@ -4350,6 +4350,38 @@
 (define-source-transform lcm (&rest args)
   (source-transform-transitive 'lcm args 1 'integer '(abs)))
 
+(deftransform gcd ((x y) ((and fixnum (not (eql 0)))
+                          (and fixnum (not (eql 0)))))
+  `(sb-kernel::fixnum-gcd x y))
+
+(defun derive-gcd (args)
+  (let ((min)
+        (max)
+        includes-zero
+        (zero (specifier-type '(integer 0 0))))
+    (loop for arg in args
+          for type = (lvar-type arg)
+          do (multiple-value-bind (low high) (integer-type-numeric-bounds type)
+               (unless (and low high)
+                 (return-from derive-gcd))
+               (when (types-equal-or-intersect type zero)
+                 (setf includes-zero t))
+               (if min
+                   (setf min (min min low)
+                         max (max max high))
+                   (setf min low
+                         max high))))
+    (specifier-type `(integer ,(if includes-zero
+                                   0
+                                   1)
+                              ,(max (abs min)
+                                    (abs max))))))
+
+(defoptimizer (gcd derive-type) ((&rest args))
+  (derive-gcd args))
+(defoptimizer (sb-kernel::fixnum-gcd derive-type) ((&rest args))
+  (derive-gcd args))
+
 ;;; Do source transformations for intransitive n-arg functions such as
 ;;; /. With one arg, we form the inverse. With two args we pass.
 ;;; Otherwise we associate into two-arg calls.

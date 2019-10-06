@@ -278,10 +278,12 @@
   (movable foldable flushable))
 
 (defknown gcd (&rest integer) unsigned-byte
-  (movable foldable flushable)
-  #|:derive-type 'boolean-result-type|#)
-(defknown lcm (&rest integer) unsigned-byte
   (movable foldable flushable))
+(defknown sb-kernel::fixnum-gcd (fixnum fixnum) (integer 0 #.(1+ most-positive-fixnum))
+    (movable foldable flushable))
+
+(defknown lcm (&rest integer) unsigned-byte
+    (movable foldable flushable))
 
 #+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defknown exp (number) irrational
