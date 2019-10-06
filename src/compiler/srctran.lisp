@@ -4410,6 +4410,27 @@
 (defoptimizer (sb-kernel::fixnum-gcd derive-type) ((&rest args))
   (derive-gcd args))
 
+(defoptimizer (lcm derive-type) ((&rest args))
+  (let (min
+        maxes)
+    (loop for arg in args
+          for type = (lvar-type arg)
+          do (multiple-value-bind (low high) (integer-type-numeric-bounds type)
+               (unless (and low high)
+                 (return-from lcm-derive-type-optimizer))
+               (let* ((crosses-zero (<= low 0 high))
+                      (abs-low (abs low))
+                      (abs-high (abs high))
+                      (low (if crosses-zero
+                               0
+                               (min abs-high abs-low)))
+                      (high (max abs-low abs-high)))
+                 (if min
+                     (setf min (min min low))
+                     (setf min low))
+                 (push high maxes))))
+    (specifier-type `(integer ,min ,(reduce #'* maxes)))))
+
 ;;; Do source transformations for intransitive n-arg functions such as
 ;;; /. With one arg, we form the inverse. With two args we pass.
 ;;; Otherwise we associate into two-arg calls.
