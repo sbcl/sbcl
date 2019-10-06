@@ -790,6 +790,18 @@ constant shift greater than word length")))
     ;; The result-type ensures us that this shift will not overflow.
     (inst shl result :cl)))
 
+(define-vop (fast-ash-left/fixnum-unbounded=>fixnum
+             fast-ash-left/fixnum=>fixnum)
+  (:translate)
+  (:generator 3
+    (move result number)
+    (move ecx amount)
+    (inst cmp amount 63)
+    (inst jmp :be OKAY)
+    (zeroize result)
+    OKAY
+    (inst shl result :cl)))
+
 (define-vop (fast-ash-c/signed=>signed)
   (:translate ash)
   (:policy :fast-safe)
@@ -891,6 +903,18 @@ constant shift greater than word length")))
   (:generator 4
     (move result number)
     (move ecx amount)
+    (inst shl result :cl)))
+
+(define-vop (fast-ash-left/unsigned-unbounded=>unsigned
+             fast-ash-left/unsigned=>unsigned)
+  (:translate)
+  (:generator 3
+    (move result number)
+    (move ecx amount)
+    (inst cmp amount 63)
+    (inst jmp :be OKAY)
+    (zeroize result)
+    OKAY
     (inst shl result :cl)))
 
 (define-vop (fast-ash/signed=>signed)
@@ -1679,6 +1703,9 @@ constant shift greater than word length")))
   (:translate ash-left-mod64))
 (define-vop (fast-ash-left-mod64/unsigned=>unsigned
              fast-ash-left/unsigned=>unsigned))
+(define-vop (fast-ash-left-mod64/unsigned-unbounded=>unsigned
+             fast-ash-left/unsigned-unbounded=>unsigned)
+  (:translate ash-left-mod64))
 (deftransform ash-left-mod64 ((integer count)
                               ((unsigned-byte 64) (unsigned-byte 6)))
   (when (sb-c::constant-lvar-p count)
@@ -1688,6 +1715,9 @@ constant shift greater than word length")))
 (define-vop (fast-ash-left-modfx-c/fixnum=>fixnum
              fast-ash-c/fixnum=>fixnum)
   (:variant :modular)
+  (:translate ash-left-modfx))
+(define-vop (fast-ash-left-modfx/fixnum-unbounded=>fixnum
+             fast-ash-left/fixnum-unbounded=>fixnum)
   (:translate ash-left-modfx))
 (define-vop (fast-ash-left-modfx/fixnum=>fixnum
              fast-ash-left/fixnum=>fixnum))
