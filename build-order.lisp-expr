@@ -494,6 +494,7 @@
  ("src/compiler/array-tran")
  ("src/compiler/seqtran")
  ("src/compiler/saptran")
+ ("src/compiler/modarith")
  ("src/compiler/sxhash")
  ("src/code/quantifiers")
  ("src/compiler/bitops-derive-type")
