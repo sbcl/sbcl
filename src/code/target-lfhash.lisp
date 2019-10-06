@@ -68,7 +68,8 @@
   ;; fixnums for efficiency. (And if we didn't limit it to fixnums, we
   ;; should use a cleverer algorithm, since this one scales pretty
   ;; badly for huge X.)
-  (declare (fixnum x))
+  (declare (fixnum x)
+           (optimize speed (safety 0)))
   (if (<= x 5)
       (and (>= x 2) (/= x 4))
       (and (not (evenp x))
@@ -77,8 +78,8 @@
                 (r 1)
                 (inc 2 (logxor inc 6)) ;; 2,4,2,4...
                 (d 5 (+ d inc)))
-               ((or (= r 0) (> d q)) (/= r 0))
-             (declare (fixnum inc))
+               ((or (= r 0) (> d q)) d (/= r 0))
+             (declare ((and fixnum (integer 1)) inc d))
              (multiple-value-setq (q r) (truncate x d))))))
 
 ;;; Given any non-negative integer, return a prime number >= to it.

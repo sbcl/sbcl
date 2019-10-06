@@ -4385,7 +4385,11 @@
                      ((/= low high))
                      ((= low 1)
                       (return-from derive-gcd (specifier-type '(eql 1))))
-                     ((and (fixnump (abs low))
+                     #-sb-xc-host
+                     ((and (typep (abs low)
+                                  `(integer 0
+                                            ,(min (expt 2 32)
+                                                  sb-xc:most-positive-fixnum)))
                            ;; Get some extra points
                            (positive-primep (abs low)))
                       (push (abs low) primes)))
