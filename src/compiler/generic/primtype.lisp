@@ -77,6 +77,7 @@
 
 ;;; primitive other-pointer number types
 (/show0 "primtype.lisp 81")
+(!def-primitive-type integer (descriptor-reg))
 (!def-primitive-type bignum (descriptor-reg))
 (!def-primitive-type ratio (descriptor-reg))
 (!def-primitive-type complex (descriptor-reg))
@@ -257,7 +258,7 @@
                                  (if (or (< hi sb-xc:most-negative-fixnum)
                                          (> lo sb-xc:most-positive-fixnum))
                                      (part-of bignum)
-                                     (any)))
+                                     (part-of integer)))
                           (let ((type (car spec))
                                 (min (cadr spec))
                                 (max (caddr spec)))
@@ -269,7 +270,7 @@
                             (and lo (> lo sb-xc:most-positive-fixnum)))
                         (part-of bignum))
                        (t
-                        (any))))
+                        (part-of integer))))
                 (float
                  (let ((exact (and (null lo) (null hi))))
                    (case (numeric-type-format type)

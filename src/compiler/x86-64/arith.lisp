@@ -1432,6 +1432,68 @@ constant shift greater than word length")))
   (define-conditional-vop < :l :b :ge :ae)
   (define-conditional-vop > :g :a :le :be))
 
+(define-vop (fast-if->-zero)
+  (:args (x :scs (descriptor-reg)))
+  (:arg-types integer (:constant (integer 0 0)))
+  (:info target not-p y)
+  (:ignore y)
+  (:temporary (:sc unsigned-reg) temp)
+  (:translate >)
+  (:conditional)
+  (:variant nil)
+  (:variant-vars bignum-only)
+  (:policy :fast-safe)
+  (:generator 8
+    (move temp x)
+    (unless bignum-only
+      (generate-fixnum-test temp)
+      (inst jmp :nz BIGNUM)
+      (inst test temp temp)
+      (inst jmp (if not-p :le :g) target)
+      (inst jmp DONE))
+    BIGNUM
+    (loadw temp x 0 other-pointer-lowtag)
+    (inst shr temp n-widetag-bits)
+    (inst cmp :qword
+          (ea (- (+ (* bignum-digits-offset n-word-bytes))
+                 other-pointer-lowtag
+                 n-word-bytes)
+              x
+              temp
+              (ash 1 word-shift))
+          0)
+    (inst jmp (if not-p :l :ge) target)
+    DONE))
+
+(define-vop (fast-if->-zero-bignum fast-if->-zero)
+  (:arg-types bignum (:constant (integer 0 0)))
+  (:variant t))
+
+(define-vop (fast-if-<-zero fast-if->-zero)
+  (:info y)
+  (:translate <)
+  (:conditional :l)
+  (:variant nil)
+  (:generator 9
+    (unless bignum-only
+      (move temp x)
+      (generate-fixnum-test temp)
+      (inst jmp :z TEST))
+    (loadw temp x 0 other-pointer-lowtag)
+    (inst shr temp n-widetag-bits)
+    (inst mov temp (ea (- (* bignum-digits-offset n-word-bytes)
+                          other-pointer-lowtag
+                          n-word-bytes)
+                       x
+                       temp
+                       (ash 1 word-shift)))
+    TEST
+    (inst test temp temp)))
+
+(define-vop (fast-if-<-zero-bignum fast-if-<-zero)
+  (:arg-types bignum (:constant (integer 0 0)))
+  (:variant t))
+
 (define-vop (fast-if-eql/signed fast-conditional/signed)
   (:translate eql %eql/integer)
   (:generator 6
