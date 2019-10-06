@@ -4374,24 +4374,36 @@
   (let ((min)
         (max)
         includes-zero
-        (zero (specifier-type '(integer 0 0))))
+        primes)
     (loop for arg in args
           for type = (lvar-type arg)
           do (multiple-value-bind (low high) (integer-type-numeric-bounds type)
                (unless (and low high)
                  (return-from derive-gcd))
-               (when (types-equal-or-intersect type zero)
-                 (setf includes-zero t))
+               (cond ((<= low 0 high)
+                      (setf includes-zero t))
+                     ((/= low high))
+                     ((= low 1)
+                      (return-from derive-gcd (specifier-type '(eql 1))))
+                     ((and (fixnump (abs low))
+                           ;; Get some extra points
+                           (positive-primep (abs low)))
+                      (push (abs low) primes)))
                (if min
                    (setf min (min min low)
                          max (max max high))
                    (setf min low
                          max high))))
-    (specifier-type `(integer ,(if includes-zero
-                                   0
-                                   1)
-                              ,(max (abs min)
-                                    (abs max))))))
+    (specifier-type (cond ((not primes)
+                           `(integer ,(if includes-zero
+                                          0
+                                          1)
+                                     ,(max (abs min)
+                                           (abs max))))
+                          ((cdr primes)
+                           '(eql 1))
+                          (t
+                           `(or (eql 1) (eql ,(car primes))))))))
 
 (defoptimizer (gcd derive-type) ((&rest args))
   (derive-gcd args))
