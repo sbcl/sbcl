@@ -165,19 +165,7 @@
 /* the CSP page sits right before the thread */
 #define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 
-/*
- * x86/darwin (as of MacOS X 10.4.5) doesn't reliably file signal
- * handlers (SIGTRAP or Mach exception handlers) for 0xCC, wo we have
- * to use ud2 instead. ud2 is an undefined opcode, #x0b0f, or
- * 0F 0B in low-endian notation, that causes SIGILL to fire. We check
- * for this instruction in the SIGILL handler and if we see it, we
- * advance the EIP by two bytes to skip over ud2 instruction and
- * call sigtrap_handler. */
-#if defined(LISP_FEATURE_UD2_BREAKPOINTS)
-#define TRAP ud2
-#else
 #define TRAP int3
-#endif
 
 	.text
 	.globl	GNAME(all_threads)

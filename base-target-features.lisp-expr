@@ -227,11 +227,6 @@
  ;; local storage.
  ; :restore-fs-segment-register-from-tls
 
- ;; On some x86oid operating systems (darwin) SIGTRAP is not reliably
- ;; delivered for the INT3 instruction, so we use the UD2 instruction
- ;; which generates SIGILL instead.
- ; :ud2-breakpoints
-
  ;; Support for detection of unportable code (when applied to the
  ;; COMMON-LISP package, or SBCL-internal pacakges) or bad-neighbourly
  ;; code (when applied to user-level packages), relating to material

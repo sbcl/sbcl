@@ -92,21 +92,7 @@
 #define SIZE(name)
 #endif
 
-/*
- * x86/darwin (as of MacOS X 10.4.5) doesn't reliably fire signal
- * handlers (SIGTRAP or Mach exception handlers) for 0xCC, wo we have
- * to use ud2 instead. ud2 is an undefined opcode, #x0b0f, or
- * 0F 0B in low-endian notation, that causes SIGILL to fire. We check
- * for this instruction in the SIGILL handler and if we see it, we
- * advance the EIP by two bytes to skip over ud2 instruction and
- * call sigtrap_handler. */
-#if defined(LISP_FEATURE_UD2_BREAKPOINTS)
-#define TRAP ud2
-#elif defined(LISP_FEATURE_INT4_BREAKPOINTS)
-#define TRAP .byte 0xCE /* due to illegality, assembler won't emit "into" */
-#else
 #define TRAP int3
-#endif
 
 #define THREAD_BASE_REG %r13
 
