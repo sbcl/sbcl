@@ -989,7 +989,7 @@
                  (make-list (length vars) :initial-element nil))))
         (:variant-cost
          (setf (vop-parse-cost parse) (vop-spec-arg spec 'unsigned-byte)))
-        ((:vop-var :args-ref-var :results-ref-var)
+        (:vop-var
          (setf (vop-parse-vop-var parse) (vop-spec-arg spec 'symbol)))
         (:args-var
          (setf (vop-parse-args-var parse) (vop-spec-arg spec 'symbol)))
