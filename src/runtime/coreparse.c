@@ -637,6 +637,13 @@ set_adjustment(struct heap_adjust* adj,
 #   define apply_pie_relocs(dummy1,dummy2,dummy3) (0)
 #endif
 
+/* TODO: If static + readonly were mapped as desired without disabling ASLR
+ * but one of the large spaces couldn't be mapped as desired, start over from
+ * the top, disabling ASLR. This should help to avoid relocating the heap
+ * if at all possible. It might make sense to parse the core header sooner in
+ * startup to avoid wasting time on all actions performed prior to re-exec.
+ */
+
 static void
 process_directory(int count, struct ndir_entry *entry,
                   int fd, os_vm_offset_t file_offset,
@@ -781,7 +788,11 @@ process_directory(int count, struct ndir_entry *entry,
             else
 #endif
             if (request) {
-                addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
+                // Avoid "Relocation of fixedobj space not supported" error by
+                // not passing relocatable flag for immobile space if text in ELF.
+                addr = (uword_t)os_validate(sub_2gb_flag ?
+                                            (lisp_code_in_elf() ? NOT_MOVABLE : MOVABLE_LOW) :
+                                            MOVABLE,
                                             (os_vm_address_t)addr, request);
                 if (!addr) {
                     lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
