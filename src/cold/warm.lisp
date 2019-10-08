@@ -134,7 +134,6 @@
                               (ensure-directories-exist output)
                               (compile-file stem :output-file output)))
                      ((nil) output))
-                  (declare (ignore warnings-p))
                   (cond ((not output-truename)
                          (error "COMPILE-FILE of ~S failed." stem))
                         (failure-p
@@ -152,8 +151,12 @@
                            (when (and failure-p (probe-file output-truename))
                                  (delete-file output-truename)
                                  (format t "~&deleted ~S~%" output-truename))))
-                        ;; Otherwise: success, just fall through.
-                        (t nil))
+                        (warnings-p
+                         ;; Maybe we should escalate more warnings to errors
+                         ;; (see HANDLER-BIND for SIMPLE-WARNING below)
+                         ;; rather than asking what to do here?
+                         #+x86-64 ;; this should complete without warnings
+                         (cerror "Ignore warnings" "Compile completed with warnings")))
                   (unless (handler-bind
                               ((sb-kernel:redefinition-with-defgeneric
                                 #'muffle-warning))
