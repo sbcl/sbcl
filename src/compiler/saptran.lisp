@@ -182,7 +182,7 @@
              (let* ((str (string alias))
                     (prefix (subseq str 0 (- (length str) 4))) ; remove -WORD
                     (fun (symbolicate prefix (write-to-string sb-vm:n-word-bits)))
-                    (setp (string= prefix "%SET-" :end1 4)))
+                    (setp (string= prefix "%SET-" :end1 5)))
              `(progn
                 (defknown ,alias (system-area-pointer fixnum ,@(if setp (list value-type)))
                   ,value-type (flushable))
