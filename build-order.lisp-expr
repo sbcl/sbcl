@@ -824,8 +824,8 @@
   "src/code/step"
   "src/code/warm-lib"
   "src/code/alien-callback"
-  #+win32 "src/code/warm-mswin"
   "src/code/run-program"
+  #+win32 "src/code/warm-mswin"
   #+gencgc "src/code/traceroot"
 
   "src/code/repack-xref"
