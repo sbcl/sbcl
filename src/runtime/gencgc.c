@@ -3010,8 +3010,10 @@ write_protect_generation_pages(generation_index_t generation)
     page_index_t start = 0, end;
     int n_hw_prot = 0, n_sw_prot = 0;
 
-    // Neither 0 nor scratch can be set in the mask
-    gc_assert(generation != 0 && generation != SCRATCH_GENERATION);
+    // Neither 0 nor scratch can be protected. Additionally, protection of
+    // pseudo-static space is applied only in gc_load_corefile_ptes().
+    gc_assert(generation != 0 && generation != SCRATCH_GENERATION
+              && generation != PSEUDO_STATIC_GENERATION);
 
     while (start  < next_free_page) {
         if (!protect_page_p(start, generation)) {
@@ -4403,8 +4405,33 @@ void gc_load_corefile_ptes(core_entry_elt_t n_ptes, core_entry_elt_t total_bytes
               ((char*)get_alloc_pointer() - page_address(0)));
     // write-protecting needs the current value of next_free_page
     next_free_page = n_ptes;
-    if (gen != 0 && ENABLE_PAGE_PROTECTION)
-        write_protect_generation_pages(gen);
+    if (gen != 0 && ENABLE_PAGE_PROTECTION) {
+        // coreparse can avoid hundreds to thousands of mprotect() calls by
+        // treating the whole range from the corefile as protectable, except
+        // that soft-marked code pages must NOT be subject to mprotect.
+        // So just watch out for empty pages and code.  Unboxed object pages
+        // will get unprotected on demand.
+#define non_protectable_page_p(x) !page_bytes_used(x) || \
+              (CODE_PAGES_USE_SOFT_PROTECTION && \
+               (page_table[x].type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE)
+        page_index_t start = 0, end;
+        // cf. write_protect_generation_pages()
+        while (start  < next_free_page) {
+            if (non_protectable_page_p(start)) {
+                ++start;
+                continue;
+            }
+            page_table[start].write_protected = 1;
+            for (end = start + 1; end < next_free_page; end++) {
+                if (non_protectable_page_p(end)) break;
+                page_table[end].write_protected = 1;
+            }
+            os_protect(page_address(start),
+                       npage_bytes(end - start),
+                       OS_VM_PROT_READ | OS_VM_PROT_EXECUTE);
+            start = end;
+        }
+    }
 }
 
 /* Prepare the array of corefile_ptes for save */
