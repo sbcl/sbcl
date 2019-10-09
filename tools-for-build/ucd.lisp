@@ -594,7 +594,9 @@ Length should be adjusted when the standard changes.")
   (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
                                     :defaults
                                     #+(and sbcl sb-unicode) *unicode-character-database*
-                                    #-(and sbcl sb-unicode) *output-directory*))
+                                    #-(and sbcl sb-unicode) *output-directory*)
+                     #+(and sbcl sb-unicode) :external-format
+                     #+(and sbcl sb-unicode) :utf-8)
     (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
     (loop for line = (read-line s nil nil)
        while line
