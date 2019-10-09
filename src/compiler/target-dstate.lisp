@@ -61,6 +61,9 @@
   (segment-sap (int-sap 0) :type system-area-pointer)
   ;; the current segment
   (segment nil :type (or null segment))
+  ;; true if disassembling non-lisp code, which disables interpretation
+  ;; of  bytes after a trap instruction as SC+OFFSETs.
+  (foreign-code-p nil)
   ;; to avoid buffer overrun at segment end, we might need to copy bytes
   ;; here first because sap-ref-dchunk reads a fixed length.
   (scratch-buf (make-array 8 :element-type '(unsigned-byte 8)))

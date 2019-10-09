@@ -320,12 +320,12 @@
 (defun cdf-offset (compiled-debug-fun spaces)
   ;; (Note that on precisely GC'd platforms, this operation is dangerous,
   ;; but no more so than everything else in this file)
-  (let ((locs (sb-c::compiled-debug-fun-encoded-locs compiled-debug-fun)))
+  (let ((locs (sb-c::compiled-debug-fun-encoded-locs
+               (truly-the sb-c::compiled-debug-fun compiled-debug-fun))))
     (sb-c::compiled-debug-fun-offset
-     (if (fixnump locs)
-         compiled-debug-fun
-         (sb-c::make-compiled-debug-fun
-          :name nil :encoded-locs (translate locs spaces))))))
+     (sb-c::make-compiled-debug-fun
+      :name nil
+      :encoded-locs (if (fixnump locs) locs (translate locs spaces))))))
 
 ;;; Return a list of ((NAME START . END) ...)
 ;;; for each C symbol that should be emitted for this code object.
@@ -762,8 +762,11 @@
         (aver (zerop (rem start-pc n-word-bytes)))
         (push `(:data . ,(ash start-pc (- word-shift))) blobs))
       (loop
-        (let* ((next (when (%instancep (sb-c::compiled-debug-fun-next cdf))
-                       (translate (sb-c::compiled-debug-fun-next cdf) spaces)))
+        (let* ((next (when (%instancep (sb-c::compiled-debug-fun-next
+                                        (truly-the sb-c::compiled-debug-fun cdf)))
+                       (translate (sb-c::compiled-debug-fun-next
+                                   (truly-the sb-c::compiled-debug-fun cdf))
+                                  spaces)))
                (end-pc (if next
                            (cdf-offset next spaces)
                            (%code-text-size code))))

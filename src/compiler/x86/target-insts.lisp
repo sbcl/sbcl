@@ -218,7 +218,7 @@
 (defun break-control (chunk inst stream dstate)
   ;; Do not parse bytes following a trap instruction unless it belongs to lisp code.
   ;; C++ compilers will emit ud2 for various reasons.
-  (unless (sb-kernel::lisp-space-p (dstate-segment-sap dstate))
+  (when (sb-disassem::dstate-foreign-code-p dstate)
     (return-from break-control))
   (flet ((nt (x) (if stream (note x dstate))))
     (let ((trap (if (eq (sb-disassem::inst-print-name inst) 'ud2)
