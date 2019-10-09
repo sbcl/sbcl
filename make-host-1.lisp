@@ -96,7 +96,7 @@
                  "output/block-ranges.lisp-expr"
                  "output/block-names.lisp-expr"
                  "output/case.dat"
-                 "output/CaseFolding.txt"
+                 #-(and sbcl sb-unicode) "output/CaseFolding.txt"
                  "output/casepages.dat"
                  "output/casepages.lisp-expr"
                  "output/collation.dat"

@@ -568,10 +568,10 @@ Length should be adjusted when the standard changes.")
   ;; text decoding happens at a lower level.  So here we rewrite the
   ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
   ;; to the eszet character.
+  #-(and sbcl sb-unicode) ; Unicode-enabled SBCL can read this file as-is
   (with-open-file (in (make-pathname :name "CaseFolding" :type "txt"
                                      :defaults *unicode-character-database*)
                       :element-type '(unsigned-byte 8))
-    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
     (with-open-file (out (make-pathname :name "CaseFolding" :type "txt"
                                         :defaults *output-directory*)
                          :direction :output
@@ -592,7 +592,10 @@ Length should be adjusted when the standard changes.")
                 (t (write-byte inbyte out) (write-byte second out))))
             (write-byte inbyte out)))))
   (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
-                                    :defaults *output-directory*))
+                                    :defaults
+                                    #+(and sbcl sb-unicode) *unicode-character-database*
+                                    #-(and sbcl sb-unicode) *output-directory*))
+    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
     (loop for line = (read-line s nil nil)
        while line
        unless (or (not (position #\; line)) (equal (position #\# line) 0))
