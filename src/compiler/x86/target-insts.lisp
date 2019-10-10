@@ -225,9 +225,6 @@
                     (word-imm-code chunk dstate)
                     (byte-imm-code chunk dstate))))
      (case trap
-       (#.cerror-trap
-        (nt "cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (#.breakpoint-trap
         (nt "breakpoint trap"))
        (#.pending-interrupt-trap
@@ -237,4 +234,6 @@
        (#.fun-end-breakpoint-trap
         (nt "function end breakpoint trap"))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))

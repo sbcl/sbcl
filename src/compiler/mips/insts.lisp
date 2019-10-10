@@ -1062,11 +1062,10 @@
          (nt "Single step around trap"))
         (#.single-step-before-trap
          (nt "Single step before trap"))
-        (#.cerror-trap
-         (nt "Cerror trap")
-         (handle-break-args #'snarf-error-junk trap stream dstate))
         (t
-         (handle-break-args #'snarf-error-junk trap stream dstate))))))
+         (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
+                   (>= trap error-trap))
+           (handle-break-args #'snarf-error-junk trap stream dstate)))))))
 
 (define-instruction break (segment code &optional (subcode 0))
   (:declare (type (unsigned-byte 10) code subcode))

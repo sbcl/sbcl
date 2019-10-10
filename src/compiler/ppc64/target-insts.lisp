@@ -50,9 +50,6 @@
   (flet ((nt (x) (if stream (note x dstate))))
     (let ((trap (xinstr-data chunk dstate)))
      (case trap
-       (#.cerror-trap
-        (nt "Cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (#.breakpoint-trap
         (nt "Breakpoint trap"))
        (#.pending-interrupt-trap
@@ -62,4 +59,6 @@
        (#.fun-end-breakpoint-trap
         (nt "Function end breakpoint trap"))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap cerror-trap) (nt "cerror trap"))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))

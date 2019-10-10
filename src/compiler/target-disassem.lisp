@@ -2145,25 +2145,26 @@
 ;;;   1) a SYSTEM-AREA-POINTER
 ;;;   2) a BYTE-OFFSET from the SAP to begin at
 ;;; It should read information from the SAP starting at BYTE-OFFSET, and
-;;; return four values:
+;;; return five values:
 ;;;   1) the error number
 ;;;   2) the total length, in bytes, of the information
 ;;;   3) a list of SC-OFFSETs of the locations of the error parameters
 ;;;   4) a list of the length (as read from the SAP), in bytes, of each
 ;;;      of the return values.
+;;;   5) a boolean indicating whether to disassemble 1 byte prior to
+;;;      decoding the SC+OFFSETs.  (This byte is literally the byte in
+;;;      memory, which is distinct from the 'error number')
 (defun handle-break-args (error-parse-fun trap-number stream dstate)
   (declare (type function error-parse-fun)
            (type (or null stream) stream)
            (type disassem-state dstate))
-  (when (or (= trap-number sb-vm:cerror-trap)
-            (>= trap-number sb-vm:error-trap))
-   (multiple-value-bind (errnum adjust sc+offsets lengths error-byte)
+  (multiple-value-bind (errnum adjust sc+offsets lengths error-byte)
        (funcall error-parse-fun
                 (dstate-segment-sap dstate)
                 (dstate-next-offs dstate)
                 trap-number
                 (null stream))
-     (when stream
+    (when stream
        (setf (dstate-cur-offs dstate)
              (dstate-next-offs dstate))
        (flet ((emit-err-arg ()
@@ -2184,7 +2185,7 @@
            (if (= (sb-c:sc+offset-scn sc+offset) sb-vm:constant-sc-number)
                (note-code-constant (sb-c:sc+offset-offset sc+offset) dstate :index)
                (emit-note (get-random-tn-name sc+offset))))))
-     (incf (dstate-next-offs dstate) adjust))))
+    (incf (dstate-next-offs dstate) adjust)))
 
 ;;; arm64 stores an error-number in the instruction bytes,
 ;;; so can't easily share this code.

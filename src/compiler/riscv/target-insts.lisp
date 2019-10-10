@@ -211,8 +211,7 @@ about function addresses and register values.")
         (nt "single-step trap (before)"))
        (#.invalid-arg-count-trap
         (nt "Invalid argument count trap"))
-       (#.cerror-trap
-        (nt "cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap error-trap) (progn (nt "cerror trap") t))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))

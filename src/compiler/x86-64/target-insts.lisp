@@ -453,11 +453,10 @@
         (nt "single-step trap (before)"))
        (#.invalid-arg-count-trap
         (nt "Invalid argument count trap"))
-       (#.cerror-trap
-        (nt "cerror trap")
-        (handle-break-args #'snarf-error-junk trap stream dstate))
        (t
-        (handle-break-args #'snarf-error-junk trap stream dstate))))))
+        (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
+                  (>= trap error-trap))
+          (handle-break-args #'snarf-error-junk trap stream dstate)))))))
 
 (defun sb-c::convert-alloc-point-fixups (code locs)
   ;; Find the instruction which jumps over the profiling code,
