@@ -568,10 +568,10 @@ Length should be adjusted when the standard changes.")
   ;; text decoding happens at a lower level.  So here we rewrite the
   ;; CaseFolding.txt file to exclude the UTF-8 sequence corresponding
   ;; to the eszet character.
-  #-(and sbcl sb-unicode) ; Unicode-enabled SBCL can read this file as-is
   (with-open-file (in (make-pathname :name "CaseFolding" :type "txt"
                                      :defaults *unicode-character-database*)
                       :element-type '(unsigned-byte 8))
+    (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
     (with-open-file (out (make-pathname :name "CaseFolding" :type "txt"
                                         :defaults *output-directory*)
                          :direction :output
@@ -582,21 +582,27 @@ Length should be adjusted when the standard changes.")
       ;; KLUDGE: it's inefficient, though simple, to do the I/O
       ;; byte-by-bite.
       (do ((inbyte (read-byte in nil nil) (read-byte in nil nil))
-           (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>")))
-          ((null inbyte))
-        (if (= inbyte #xc3)
-            (let ((second (read-byte in nil nil)))
+           (eszet (map '(vector (unsigned-byte 8)) 'char-code "<eszet>"))
+           (eszet-count 0)
+           (filename "CaseFolding.txt"))
+          ((null inbyte)
+           (unless (= eszet-count 1)
+             (error "Unexpected number of eszets in ~A: ~D"
+                    filename eszet-count)))
+        (cond
+          ((= inbyte #xc3)
+           (let ((second (read-byte in nil nil)))
               (cond
-                ((null second) (write-byte inbyte out) (return nil))
-                ((= second #x9f) (write-sequence eszet out))
-                (t (write-byte inbyte out) (write-byte second out))))
-            (write-byte inbyte out)))))
+                ((null second)
+                 (error "No continuation after #xc3 in ~A" filename))
+                ((= second #x9f) (incf eszet-count) (write-sequence eszet out))
+                (t (error "Unexpected continuation after #xc3 in ~A: #x~X"
+                          filename second)))))
+          ((>= inbyte #x7f)
+           (error "Unexpected octet in ~A: #x~X" filename inbyte))
+          (t (write-byte inbyte out))))))
   (with-open-file (s (make-pathname :name "CaseFolding" :type "txt"
-                                    :defaults
-                                    #+(and sbcl sb-unicode) *unicode-character-database*
-                                    #-(and sbcl sb-unicode) *output-directory*)
-                     #+(and sbcl sb-unicode) :external-format
-                     #+(and sbcl sb-unicode) :utf-8)
+                                    :defaults *output-directory*))
     (setf (gethash "tools-for-build/CaseFolding.txt" *ucd-inputs*) 'used)
     (loop for line = (read-line s nil nil)
        while line
