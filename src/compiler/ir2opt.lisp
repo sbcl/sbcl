@@ -381,11 +381,11 @@
   (let ((primitive-types (list (primitive-type-or-lose 'fixnum)
                                (primitive-type-or-lose 'sb-vm::positive-fixnum)
                                .
-                               #+64-bit
+                               #+(or 64-bit 64-bit-registers)
                                ((primitive-type-or-lose 'sb-vm::unsigned-byte-63)
                                 (primitive-type-or-lose 'sb-vm::unsigned-byte-64)
                                 (primitive-type-or-lose 'sb-vm::signed-byte-64))
-                               #-64-bit
+                               #-(or 64-bit 64-bit-registers)
                                ((primitive-type-or-lose 'sb-vm::unsigned-byte-31)
                                 (primitive-type-or-lose 'sb-vm::unsigned-byte-32)
                                 (primitive-type-or-lose 'sb-vm::signed-byte-32)))))
