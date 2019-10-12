@@ -1753,6 +1753,9 @@
       (label-segments segments dstate))
     (disassemble-segments segments stream dstate)))
 
+;;; This convenience function has two syntaxes depending on what OBJECT is:
+;;;   (DIS OBJ &optional STREAM)
+;;;   (DIS ADDR|SAP LENGTH &optional STREAM)
 (defun sb-c:dis (object &optional length (stream *standard-output* streamp))
   (typecase object
    ((or address system-area-pointer)
@@ -1760,11 +1763,16 @@
     (disassemble-memory object length :stream stream))
    (t
     (aver (not streamp))
-    (when (and (symbolp object) (special-operator-p object))
-      ;; What could it do- disassemble the interpreter?
-      (error "Can't disassemble a special operator"))
-    (dolist (fun (get-compiled-funs object))
-      (disassemble-code-component fun :stream (or length stream))))))
+    (when length
+      (setq stream length))
+    (cond ((code-component-p object)
+           (disassemble-code-component object :stream stream))
+          (t
+           (when (and (symbolp object) (special-operator-p object))
+             ;; What could it do- disassemble the interpreter?
+             (error "Can't disassemble a special operator"))
+           (dolist (fun (get-compiled-funs object))
+             (disassemble-code-component fun :stream stream)))))))
 
 ;;;; code to disassemble assembler segments
 
