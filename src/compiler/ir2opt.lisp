@@ -400,11 +400,7 @@
                                         (:or
                                          (loop for type in (cdr type)
                                                always (memq type primitive-types)))
-                                        (:constant
-                                         (and constants
-                                              (subtypep (cdr type) `(or (signed-byte ,sb-vm:n-word-bits)
-                                                                        (unsigned-byte ,sb-vm:n-word-bits)
-                                                                        character))))))))
+                                        (:constant constants)))))
           collect (template-name template))))
 
 (define-load-time-global *comparison-vops*
