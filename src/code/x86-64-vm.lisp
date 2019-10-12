@@ -159,6 +159,7 @@
     (cond ((= trap-number invalid-arg-count-trap)
            (values #.(error-number-or-lose 'invalid-arg-count-error)
                    '(#.arg-count-sc)))
+          #+linux
           ((= trap-number uninitialized-load-trap)
            (values #.(error-number-or-lose 'uninitialized-memory-error)
                    (locally
@@ -171,7 +172,7 @@
                             (ea (logxor (sb-vm:context-register
                                          context (tn-offset sb-vm::temp-reg-tn))
                                         msan-mem-to-shadow-xor-const)))
-                     `(:raw ,ea ,nbytes ,value)))))
+                       `(:raw ,ea ,nbytes ,value)))))
           (t
            (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number)))))
 
