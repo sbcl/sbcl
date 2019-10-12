@@ -365,11 +365,100 @@
                                     (start-vop (ir2-block-next block))))))))
         (delete-fall-through-jumps component)))))
 
+(defmacro do-vops (vop ir2-block &body body)
+  `(do ((,vop (ir2-block-start-vop ,ir2-block) (vop-next ,vop)))
+       ((null ,vop))
+     ,@body))
+
+(defun next-vop (vop)
+  (or (vop-next vop)
+      (let ((next-block (ir2-block-next (vop-block vop))))
+        (and (not (or (ir2-block-%trampoline-label next-block)
+                      (ir2-block-%label next-block)))
+             (ir2-block-start-vop next-block)))))
+
+(defun immediate-templates (fun &optional (constants t))
+  (let ((primitive-types (list (primitive-type-or-lose 'fixnum)
+                               (primitive-type-or-lose 'sb-vm::positive-fixnum)
+                               .
+                               #+64-bit
+                               ((primitive-type-or-lose 'sb-vm::unsigned-byte-63)
+                                (primitive-type-or-lose 'sb-vm::unsigned-byte-64)
+                                (primitive-type-or-lose 'sb-vm::signed-byte-64))
+                               #-64-bit
+                               ((primitive-type-or-lose 'sb-vm::unsigned-byte-31)
+                                (primitive-type-or-lose 'sb-vm::unsigned-byte-32)
+                                (primitive-type-or-lose 'sb-vm::signed-byte-32)))))
+    (loop for template in (fun-info-templates (fun-info-or-lose fun))
+          when (loop for type in (template-arg-types template)
+                     always (and (consp type)
+                                 (case (car type)
+                                   (:or
+                                    (loop for type in (cdr type)
+                                          always (memq type primitive-types)))
+                                   (:constant
+                                    (and constants
+                                         (subtypep (cdr type) `(or (signed-byte ,sb-vm:n-word-bits)
+                                                                   (unsigned-byte ,sb-vm:n-word-bits))))))))
+          collect (template-name template))))
+
+(define-load-time-global *comparison-vops*
+    (append (immediate-templates 'eq)
+            (immediate-templates '>)
+            (immediate-templates '<)))
+
+(define-load-time-global *commutative-comparison-vops*
+    (immediate-templates 'eq nil))
+
+(defun vop-arg-list (vop)
+  (let ((args (loop for arg = (vop-args vop) then (tn-ref-across arg)
+                    while arg
+                    collect (tn-ref-tn arg))))
+    (if (vop-codegen-info vop)
+        (nconc args (vop-codegen-info vop))
+        args)))
+
+(defun vop-args-equal (vop1 vop2 &optional reverse)
+  (let* ((args1 (vop-arg-list vop1))
+         (args2 (vop-arg-list vop2)))
+    (equal (if reverse
+               (nreverse args1)
+               args1)
+           args2)))
+
+;;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
+;;; into CMP X,Y BRANCH-IF M BRANCH-IF N
+(defun ir2-optimize-comparisons (component)
+  (do-ir2-blocks (block component)
+    (do-vops branch-if block
+      (when (eq (vop-name branch-if) 'branch-if)
+        (let ((prev (vop-prev branch-if)))
+          (when (and prev
+                     (memq (vop-name prev) *comparison-vops*))
+            (let ((next (next-vop branch-if))
+                  transpose)
+              (when (and next
+                         (memq (vop-name next) *comparison-vops*)
+                         (or (vop-args-equal prev next)
+                             (and (or (setf transpose
+                                            (memq (vop-name prev) *commutative-comparison-vops*))
+                                      (memq (vop-name next) *commutative-comparison-vops*))
+                                  (vop-args-equal prev next t))))
+                (when transpose
+                  ;; Could flip the flags for non-commutative operations
+                  (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
+                        for arg in (nreverse (vop-arg-list prev))
+                        do (change-tn-ref-tn tn-ref arg)))
+                (delete-vop next)))))))))
+
 (defun ir2-optimize (component)
   (let ((*2block-info*  (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
 
     (convert-cmovs component)
+    #+x86-64 ;; while it's portable the VOPs are not validated for
+             ;; compatibility on other backends yet.
+    (ir2-optimize-comparisons component)
     (delete-unused-ir2-blocks component))
 
   (values))
