@@ -378,8 +378,11 @@
              (ir2-block-start-vop next-block)))))
 
 (defun immediate-templates (fun &optional (constants t))
-  (let ((primitive-types (list (primitive-type-or-lose 'fixnum)
+  (let ((primitive-types (list (primitive-type-or-lose 'character)
+                               (primitive-type-or-lose 'fixnum)
                                (primitive-type-or-lose 'sb-vm::positive-fixnum)
+                               (primitive-type-or-lose 'double-float)
+                               (primitive-type-or-lose 'single-float)
                                .
                                #+(or 64-bit 64-bit-registers)
                                ((primitive-type-or-lose 'sb-vm::unsigned-byte-63)
@@ -390,25 +393,33 @@
                                 (primitive-type-or-lose 'sb-vm::unsigned-byte-32)
                                 (primitive-type-or-lose 'sb-vm::signed-byte-32)))))
     (loop for template in (fun-info-templates (fun-info-or-lose fun))
-          when (loop for type in (template-arg-types template)
-                     always (and (consp type)
-                                 (case (car type)
-                                   (:or
-                                    (loop for type in (cdr type)
-                                          always (memq type primitive-types)))
-                                   (:constant
-                                    (and constants
-                                         (subtypep (cdr type) `(or (signed-byte ,sb-vm:n-word-bits)
-                                                                   (unsigned-byte ,sb-vm:n-word-bits))))))))
+          when (and (typep (template-result-types template) '(cons (eql :conditional)))
+                    (loop for type in (template-arg-types template)
+                          always (and (consp type)
+                                      (case (car type)
+                                        (:or
+                                         (loop for type in (cdr type)
+                                               always (memq type primitive-types)))
+                                        (:constant
+                                         (and constants
+                                              (subtypep (cdr type) `(or (signed-byte ,sb-vm:n-word-bits)
+                                                                        (unsigned-byte ,sb-vm:n-word-bits)
+                                                                        character))))))))
           collect (template-name template))))
 
 (define-load-time-global *comparison-vops*
     (append (immediate-templates 'eq)
+            (immediate-templates '=)
             (immediate-templates '>)
-            (immediate-templates '<)))
+            (immediate-templates '<)
+            (immediate-templates 'char<)
+            (immediate-templates 'char>)
+            (immediate-templates 'char=)))
 
 (define-load-time-global *commutative-comparison-vops*
-    (immediate-templates 'eq nil))
+    (append (immediate-templates 'eq nil)
+            (immediate-templates 'char= nil)
+            (immediate-templates '= nil)))
 
 (defun vop-arg-list (vop)
   (let ((args (loop for arg = (vop-args vop) then (tn-ref-across arg)
