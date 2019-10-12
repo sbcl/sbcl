@@ -36,6 +36,27 @@ a list of protocol aliases"
 ;; Since getprotobyname is not thread-safe, we need a lock.
 (sb-ext:defglobal **getprotoby-lock** (sb-thread:make-mutex :name "getprotoby lock"))
 
+;;; msan sanitizer does not intercept getprotobyname_r() and reports that the output
+;;; parameter does not get written by the library function. Minimal test program:
+;;;   #include <netdb.h>
+;;;   #include <stdio.h>
+;;;   #include <sanitizer/msan_interface.h>
+;;;
+;;;   long __attribute__((no_sanitize_memory)) get(void* p){ return *(long*)p; }
+;;;   void main() {
+;;;     struct protoent ent, *answer;
+;;;     char strings[1024];
+;;;     answer = (void*)0xaabbccddee;
+;;;     __msan_allocated_memory(&answer, 8); // mark it as poisoned
+;;;     int rc = getprotobyname_r("nosuchproto", &ent, strings, 1024, &answer);
+;;;     printf("rc=%d answer=%lx\n", rc, get(&answer));
+;;;     __msan_check_mem_is_initialized(&answer, 8);
+;;;   }
+;;; Result:
+;;;   rc=0 res=0
+;;;   Uninitialized bytes in __msan_check_mem_is_initialized at offset 0 inside [0x7ffca9a14580, 8)
+;;;   ==110705==WARNING: MemorySanitizer: use-of-uninitialized-value
+
 ;;; getprotobyname only works in the internet domain, which is why this
 ;;; is here
 #-android
@@ -80,7 +101,10 @@ a list of protocol aliases"
                            name result-buf buffer buffer-length #-solaris result)))
                  (cond ((eql res 0)
                         #-solaris
-                        (when (sb-alien:null-alien (sb-alien:deref result 0))
+                        (when (sb-alien:null-alien
+                               ;; See comment above about spurious failure under MSAN.
+                               (locally (declare (optimize (safety 0)))
+                                 (sb-alien:deref result 0)))
                           (error 'unknown-protocol :name name))
                         (return-from getprotobyname
                           (protoent-to-values result-buf)))

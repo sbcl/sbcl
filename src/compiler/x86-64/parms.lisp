@@ -154,6 +154,9 @@
   memory-fault-emulation-trap
   #+sb-safepoint global-safepoint-trap
   #+sb-safepoint csp-safepoint-trap
+  uninitialized-load-trap
+  ;; ERROR-TRAP has to be numerically highest.
+  ;; The various internal errors are numbered from here upward.
   error-trap)
 
 ;;;; static symbols

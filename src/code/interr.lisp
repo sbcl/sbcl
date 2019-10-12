@@ -361,6 +361,31 @@
   (%primitive print "Thread local storage exhausted.")
   (sb-impl::%halt))
 
+(deferr uninitialized-memory-error (address nbytes value)
+  (declare (type sb-vm:word address))
+  ;; Ignore sanitizer errors from reading the C stack.
+  ;; These occur because foreign code typically marks shadow words as valid/invalid
+  ;; as it consumes parts of the stack for each new frame; but Lisp does not mark words
+  ;; as valid when storing to the stack, so reading via sap-ref-n needs to disregard
+  ;; the sanitizer error.  This was especially noticeable in our 'callback.impure' test.
+  ;; Obviously it would be more efficient to annotate all the pertinent code with
+  ;; a safety 0 declaration to avoid a detour through the trap handler, but that was
+  ;; more intrusive than I'd have liked. At minimum, these functions need some help:
+  ;;   SB-DI::SUB-ACCESS-DEBUG-VAR-SLOT
+  ;;   SB-DI::X86-CALL-CONTEXT
+  ;;   SB-VM::BOXED-CONTEXT-REGISTER
+  (let ((stackp (and (>= address (get-lisp-obj-address sb-vm:*control-stack-start*))
+                     (< address (get-lisp-obj-address sb-vm:*control-stack-end*)))))
+    (unless stackp
+      (let ((pc (sap-int (sb-vm:context-pc *current-internal-error-context*))))
+        (cerror "Treat the value #x~*~x as valid."
+                'sanitizer-error
+                :value value
+                :address address
+                :size nbytes
+                :format-control "Read of uninitialized memory: ~D byte~:P at #x~x = #x~x (PC=#x~x)."
+                :format-arguments (list nbytes address value pc))))))
+
 (deferr failed-aver-error (form)
   (bug "~@<failed AVER: ~2I~_~S~:>" form))
 
@@ -424,15 +449,18 @@
                               (svref **internal-error-handlers** error-number))))
                    (cond
                      ((functionp handler)
-                      ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
-                      (macrolet ((arg (n)
-                                   `(sb-di::sub-access-debug-var-slot
-                                     fp (nth ,n arguments) alien-context)))
-                        (ecase (length arguments)
-                          (0 (funcall handler))
-                          (1 (funcall handler (arg 0)))
-                          (2 (funcall handler (arg 0) (arg 1)))
-                          (3 (funcall handler (arg 0) (arg 1) (arg 2))))))
+                      (if (eq (car arguments) :raw) ; pass args as they are
+                          (apply handler (cdr arguments))
+                          ;; Otherwise decode the SC+OFFSETs
+                          ;; INTERNAL-ERROR-ARGS supplies the right amount of arguments
+                          (macrolet ((arg (n)
+                                       `(sb-di::sub-access-debug-var-slot
+                                         fp (nth ,n arguments) alien-context)))
+                            (ecase (length arguments)
+                              (0 (funcall handler))
+                              (1 (funcall handler (arg 0)))
+                              (2 (funcall handler (arg 0) (arg 1)))
+                              (3 (funcall handler (arg 0) (arg 1) (arg 2)))))))
                      ((eql handler 0) ; if (DEFERR x) was inadvertently omitted
                       (error 'simple-error
                              :format-control

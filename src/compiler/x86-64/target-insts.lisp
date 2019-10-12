@@ -455,8 +455,19 @@
         (nt "Invalid argument count trap"))
        (t
         (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
-                  (>= trap error-trap))
-          (handle-break-args #'snarf-error-junk trap stream dstate)))))))
+                  (>= trap uninitialized-load-trap))
+          (handle-break-args
+           (lambda (sap offset trap-number length-only)
+             (if (= trap-number uninitialized-load-trap)
+                 (let ((reg (ash (sap-ref-8 sap offset) -2)))
+                   ;; decode a single byte arg, not an SC+OFFSET
+                   (values (error-number-or-lose 'uninitialized-memory-error)
+                           1     ; total number of bytes consumed after the trap
+                           (list (make-sc+offset unsigned-reg-sc-number reg))
+                           '(1)  ; display 1 byte for the register encoding
+                           nil)) ; no error number after the trap instruction
+                 (snarf-error-junk sap offset trap-number length-only)))
+           trap stream dstate)))))))
 
 (defun sb-c::convert-alloc-point-fixups (code locs)
   ;; Find the instruction which jumps over the profiling code,

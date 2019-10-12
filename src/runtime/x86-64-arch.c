@@ -177,9 +177,12 @@ void arch_skip_instruction(os_context_t *context)
         case trap_Error:
         case trap_Cerror:
             skip_internal_error(context);
-
             break;
-
+        case trap_UninitializedLoad:
+            // Skip 1 byte. We can't encode that the internal_error_nargs is 1
+            // because it is not an SC+OFFSET that follows the trap code.
+            *os_context_pc_addr(context) += 1;
+            break;
         case trap_Breakpoint:           /* not tested */
         case trap_FunEndBreakpoint: /* not tested */
             break;

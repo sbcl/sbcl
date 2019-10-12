@@ -767,6 +767,11 @@
 (define-condition simple-storage-condition (storage-condition simple-condition)
   ())
 
+(define-condition sanitizer-error (simple-error)
+  ((value :reader sanitizer-error-value :initarg :value)
+   (address :reader sanitizer-error-address :initarg :address)
+   (size :reader sanitizer-error-size :initarg :size)))
+
 ;;; a condition for use in stubs for operations which aren't supported
 ;;; on some platforms
 ;;;

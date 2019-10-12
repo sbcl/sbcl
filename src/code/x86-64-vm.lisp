@@ -156,10 +156,24 @@
   (let* ((pc (context-pc context))
          (trap-number (sap-ref-8 pc 0)))
     (declare (type system-area-pointer pc))
-    (if (= trap-number invalid-arg-count-trap)
-        (values #.(error-number-or-lose 'invalid-arg-count-error)
-                '(#.arg-count-sc))
-        (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number))))
+    (cond ((= trap-number invalid-arg-count-trap)
+           (values #.(error-number-or-lose 'invalid-arg-count-error)
+                   '(#.arg-count-sc)))
+          ((= trap-number uninitialized-load-trap)
+           (values #.(error-number-or-lose 'uninitialized-memory-error)
+                   (locally
+                       (declare (optimize (safety 0)))
+                     (let* ((data (sap-ref-8 pc 1)) ; encodes dst register and size
+                            (value (sb-vm:context-register context (ash data -2)))
+                            (nbytes (ash 1 (logand data #b11)))
+                            ;; EMIT-SAP-REF always loads the EA into TEMP-REG-TN
+                            ;; which points to the shadow, not the user memory now.
+                            (ea (logxor (sb-vm:context-register
+                                         context (tn-offset sb-vm::temp-reg-tn))
+                                        msan-mem-to-shadow-xor-const)))
+                     `(:raw ,ea ,nbytes ,value)))))
+          (t
+           (sb-kernel::decode-internal-error-args (sap+ pc 1) trap-number)))))
 
 
 #+immobile-code

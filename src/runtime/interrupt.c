@@ -2361,8 +2361,14 @@ handle_trap(os_context_t *context, int trap)
 #ifdef trap_InvalidArgCount
     case trap_InvalidArgCount:
 #endif
+#ifdef trap_UninitializedLoad
+# define CONTINUABLE_P (trap==trap_Cerror || trap==trap_UninitializedLoad)
+    case trap_UninitializedLoad:
+#else
+# define CONTINUABLE_P (trap==trap_Cerror)
+#endif
         FSHOW((stderr, "/<trap error/cerror %d>\n", trap));
-        interrupt_internal_error(context, trap==trap_Cerror);
+        interrupt_internal_error(context, CONTINUABLE_P);
         break;
     case trap_Breakpoint:
         arch_handle_breakpoint(context);

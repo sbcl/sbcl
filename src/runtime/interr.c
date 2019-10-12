@@ -199,6 +199,10 @@ void skip_internal_error (os_context_t *context) {
         printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
     }
 
+    // FIXME: this looks wrong. nargs[] is used as byte count here, but it's actually
+    // a count of varint-encoded SC+OFFSETs. It's certainly _possible_ for an
+    // SC+OFFSET to encode to 1 byte. Do we know that in every case that
+    // skip_internal_error() is called, each SC+OFFSET does encode to 1 byte?
     ptr += internal_error_nargs[code];
     *((unsigned char **)os_context_pc_addr(context)) = ptr;
 }

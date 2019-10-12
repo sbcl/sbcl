@@ -425,7 +425,8 @@ during backtrace.
 ;;; If we can't do that for some reason - like, say, the safepoint page
 ;;; is located prior to 'struct thread', then these just become ordinary slots.
 (defglobal *thread-header-slot-names*
-  (append #+immobile-space '(function-layout
+  (append '(msan-xor-constant)
+          #+immobile-space '(function-layout
                              varyobj-space-addr
                              varyobj-card-count
                              varyobj-card-marks)))

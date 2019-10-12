@@ -93,6 +93,9 @@
    ("An attempt was made to use an undefined FDEFINITION." undefined-fun 1)
    #+(or arm arm64 x86-64)
    ("An attempt was made to use an undefined alien function" undefined-alien-fun 1)
+   ;; Only x86-64 can detect uninitialized C memory
+   ;; but there's no harm in defining this error.
+   ("Read of uninitialized memory" uninitialized-memory 0)
    ("invalid argument count" invalid-arg-count 1)
    ("invalid argument count" local-invalid-arg-count 2)
    ("bogus argument to VALUES-LIST" bogus-arg-to-values-list 1)
