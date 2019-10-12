@@ -164,7 +164,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 |#
 
 (defun emit-sap-ref (size insn modifier result ea node)
-  (declare (ignorable node))
+  (declare (ignorable node size))
   (cond
    #+linux
    ((and (sb-c:msan-unpoison sb-c:*compilation*) (policy node (> safety 0)))
