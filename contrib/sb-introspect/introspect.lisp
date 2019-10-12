@@ -521,29 +521,25 @@ value."
 
 (defun function-type (function-designator)
   "Returns the ftype of FUNCTION-DESIGNATOR, or NIL."
-  (flet ((ftype-of (function-designator)
-           (type-specifier
-            (global-ftype function-designator))))
-    (etypecase function-designator
-      (symbol
-       (when (and (fboundp function-designator)
-                  (not (macro-function function-designator))
-                  (not (special-operator-p function-designator)))
-         (ftype-of function-designator)))
-      (cons
-       (when (and (legal-fun-name-p function-designator)
-                  (fboundp function-designator))
-         (ftype-of function-designator)))
-      (generic-function
-       (function-type (sb-pcl:generic-function-name function-designator)))
-      (function
-       ;; Give declared type in globaldb priority over derived type
-       ;; because it contains more accurate information e.g. for
-       ;; struct-accessors.
-       (let ((type (function-type (%fun-name (%fun-fun function-designator)))))
-         (if type
-             type
-             (sb-impl::%fun-type function-designator)))))))
+  (etypecase function-designator
+    ((or symbol cons)
+     ;; XXX: why require FBOUNDP? Would it be wrong to always report the proclaimed type?
+     (when (and (legal-fun-name-p function-designator) ; guarding FBOUNDP against error
+                (fboundp function-designator)
+                (eq (info :function :kind function-designator) :function))
+       (type-specifier (global-ftype function-designator))))
+    (function
+     (let ((name (%fun-name function-designator)))
+       (if (and (legal-fun-name-p name)
+                (fboundp name)
+                ;; It seems inappropriate to report the global ftype if this
+                ;; function is not the current binding of the global name,
+                (eq (fdefinition name) function-designator))
+           ;; Give declared type in globaldb priority over derived type
+           ;; because it contains more accurate information e.g. for
+           ;; struct-accessors.
+           (function-type name)
+           (sb-impl::%fun-type function-designator))))))
 
 ;;;; find callers/callees, liberated from Helmut Eller's code in SLIME
 
