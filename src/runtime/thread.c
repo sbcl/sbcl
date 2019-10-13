@@ -722,7 +722,7 @@ create_thread_struct(lispobj start_routine) {
     th->tls_size = dynamic_values_bytes;
 #endif
     uword_t* __attribute__((__unused__)) constants = (uword_t*)th;
-#ifdef THREAD_MSAN_XOR_CONSTANT_SLOT
+#if defined LISP_FEATURE_X86_64 && defined LISP_FEATURE_LINUX
     constants[THREAD_MSAN_XOR_CONSTANT_SLOT] = 0x500000000000;
 #endif
 #ifdef LISP_FEATURE_GENCGC
