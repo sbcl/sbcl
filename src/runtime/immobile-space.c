@@ -1562,7 +1562,7 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     // resembling a FP. (It doesn't, but better safe than sorry)
     if (asm_routines_start <= raw_addr && raw_addr < asm_routines_end)
         return raw_addr;
-    lispobj simple_fun = fun_taggedtr_from_self(raw_addr);
+    lispobj simple_fun = fun_taggedptr_from_self(raw_addr);
     adjust_words(&simple_fun, 1, 0);
     return fun_self_from_taggedptr(simple_fun);
 }
