@@ -4092,6 +4092,11 @@
                           (and fixnum (not (eql 0)))))
   `(sb-kernel::fixnum-gcd x y))
 
+(deftransforms (gcd sb-kernel::fixnum-gcd lcm) ((x y))
+  (if (same-leaf-ref-p x y)
+      'x
+      (give-up-ir1-transform)))
+
 (defun derive-gcd (args)
   (let ((min)
         (max)
