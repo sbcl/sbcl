@@ -55,7 +55,8 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
         FILE *maps = fopen("/proc/self/maps","r");
         if (maps) {
             char line[512];
-            while (fgets(line, sizeof line, maps)) write(2, line, strlen(line));
+            while (fgets(line, sizeof line, maps))
+                ignore_value(write(2, line, strlen(line)));
             fclose(maps);
         }
         return 0;
