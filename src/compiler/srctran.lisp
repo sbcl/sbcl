@@ -4114,7 +4114,7 @@
                                                   sb-xc:most-positive-fixnum)))
                            ;; Get some extra points
                            (positive-primep (abs low)))
-                      (push (abs low) primes)))
+                      (pushnew (abs low) primes)))
                (if min
                    (setf min (min min low)
                          max (max max high))
