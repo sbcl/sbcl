@@ -4094,7 +4094,7 @@
 
 (deftransforms (gcd sb-kernel::fixnum-gcd lcm) ((x y))
   (if (same-leaf-ref-p x y)
-      'x
+      '(abs x)
       (give-up-ir1-transform)))
 
 (defun derive-gcd (args)
