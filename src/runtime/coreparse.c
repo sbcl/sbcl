@@ -1165,11 +1165,11 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             break;
         case CLOSURE_WIDETAG:
             // We must scan the closure's trampoline word.
+            graph_visit(ptr, fun_taggedptr_from_self(obj[1]), seen);
             // Closures can utilize one payload word beyond what the header
             // indicates. This is quite sucky and I don't know why I did that.
             // However, it is correctly accounted for by SHORT_BOXED_NWORDS
             // which gives you the right number of words to scan.
-            graph_visit(ptr, obj[1] - FUN_RAW_ADDR_OFFSET, seen);
             nwords = SHORT_BOXED_NWORDS(*obj);
             for(i=2; i<=nwords; ++i) RECURSE(obj[i]);
             break;

@@ -303,28 +303,17 @@ trans_code(struct code *code)
 
     set_forwarding_pointer((lispobj *)code, l_new_code);
 
-    /* set forwarding pointers for all the function headers in the */
-    /* code object.  also fix all self pointers */
-    /* Do this by scanning the new code, since the old header is unusable */
-
-    uword_t displacement = l_new_code - l_code;
     struct code *new_code = (struct code *) native_pointer(l_new_code);
+    uword_t displacement = l_new_code - l_code;
 
-    for_each_simple_fun(i, nfheaderp, new_code, 1, {
-        /* Calculate the old raw function pointer */
-        struct simple_fun* fheaderp =
-          (struct simple_fun*)LOW_WORD((char*)nfheaderp - displacement);
-        /* Calculate the new lispobj */
-        lispobj nfheaderl = make_lispobj(nfheaderp, FUN_POINTER_LOWTAG);
-
-        set_forwarding_pointer((lispobj *)fheaderp, nfheaderl);
-
-        /* fix self pointer. */
-        nfheaderp->self =
-#if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
-            FUN_RAW_ADDR_OFFSET +
-#endif
-            nfheaderl;
+    for_each_simple_fun(i, new_fun, new_code, 1, {
+        // Calculate the old raw function pointer
+        struct simple_fun* old_fun = (struct simple_fun*)((char*)new_fun - displacement);
+        if (fun_self_from_baseptr(old_fun) == old_fun->self) {
+            new_fun->self = fun_self_from_baseptr(new_fun);
+            set_forwarding_pointer((lispobj*)old_fun,
+                                   make_lispobj(new_fun, FUN_POINTER_LOWTAG));
+        }
     })
 #ifdef LISP_FEATURE_GENCGC
     /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
@@ -382,13 +371,12 @@ static sword_t
 scav_closure(lispobj *where, lispobj header)
 {
     struct closure *closure = (struct closure *)where;
-    lispobj fun = closure->fun;
-    if (fun) {
-        fun -= FUN_RAW_ADDR_OFFSET;
+    if (closure->fun) {
+        lispobj fun = fun_taggedptr_from_self(closure->fun);
         lispobj newfun = fun;
         scavenge(&newfun, 1);
         if (newfun != fun) // Don't write unnecessarily
-            closure->fun = ((struct simple_fun*)(newfun - FUN_POINTER_LOWTAG))->self;
+            closure->fun = fun_self_from_taggedptr(newfun);
     }
     int payload_words = SHORT_BOXED_NWORDS(header);
     // Payload includes 'fun' which was just looked at, so subtract it.

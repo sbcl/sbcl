@@ -129,4 +129,17 @@ static inline lispobj fun_code_tagged(lispobj* fun) {
     return make_lispobj(fun_code_header(fun), OTHER_POINTER_LOWTAG);
 }
 
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+# define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
+# define fun_self_from_taggedptr(funptr) \
+    funptr - FUN_POINTER_LOWTAG + 2*N_WORD_BYTES
+# define fun_taggedptr_from_self(self) \
+    self - 2*N_WORD_BYTES + FUN_POINTER_LOWTAG
+#else
+# define fun_self_from_baseptr(simple_fun) \
+    make_lispobj(simple_fun,FUN_POINTER_LOWTAG)
+# define fun_self_from_taggedptr(funptr) funptr
+# define fun_taggedptr_from_self(self) self
+#endif
+
 #endif

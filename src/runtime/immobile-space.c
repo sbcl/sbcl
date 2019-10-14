@@ -1562,9 +1562,9 @@ static lispobj adjust_fun_entrypoint(lispobj raw_addr)
     // resembling a FP. (It doesn't, but better safe than sorry)
     if (asm_routines_start <= raw_addr && raw_addr < asm_routines_end)
         return raw_addr;
-    lispobj simple_fun = raw_addr - FUN_RAW_ADDR_OFFSET;
+    lispobj simple_fun = fun_taggedtr_from_self(raw_addr);
     adjust_words(&simple_fun, 1, 0);
-    return simple_fun + FUN_RAW_ADDR_OFFSET;
+    return fun_self_from_taggedptr(simple_fun);
 }
 
 static void adjust_fdefn_raw_addr(struct fdefn* fdefn)

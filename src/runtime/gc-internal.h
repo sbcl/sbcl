@@ -45,8 +45,6 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 // For those of us who are too memory-impaired to know how to use the value:
 //  - it is the amount to ADD to a tagged simple-fun pointer to get its entry address
 //  - or the amount to SUBTRACT from an entry address to get a tagged fun pointer
-// I almost might prefer two accessors named tagged_fun_to_fun_entry() and
-// and fun_entry_to_tagged_fun() instead of the manifest constant.
 #if defined(LISP_FEATURE_SPARC) || defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)
 #define FUN_RAW_ADDR_OFFSET 0
 #else

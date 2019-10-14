@@ -157,7 +157,7 @@ static int find_ref(lispobj* source, lispobj target)
         return -1;
 #if FUN_SELF_FIXNUM_TAGGED
     case CLOSURE_WIDETAG:
-        check_ptr(1, ((struct closure*)source)->fun - FUN_RAW_ADDR_OFFSET);
+        check_ptr(1, fun_taggedptr_from_self(((struct closure*)source)->fun));
         break;
 #endif
     case CODE_HEADER_WIDETAG:
@@ -619,7 +619,7 @@ static lispobj trace1(lispobj object,
 #if FUN_SELF_FIXNUM_TAGGED
         case 1:
             if (functionp(ptr) && widetag_of(native_pointer(ptr)) == CLOSURE_WIDETAG)
-                target -= FUN_RAW_ADDR_OFFSET;
+                target = fun_taggedptr_from_self(target);
             break;
 #endif
         case 3:
@@ -709,7 +709,7 @@ static uword_t build_refs(lispobj* where, lispobj* end,
             continue;
 #if FUN_SELF_FIXNUM_TAGGED
         case CLOSURE_WIDETAG:
-            check_ptr(((struct closure*)where)->fun - FUN_RAW_ADDR_OFFSET);
+            check_ptr(fun_taggedptr_from_self(((struct closure*)where)->fun));
             break;
 #endif
         case CODE_HEADER_WIDETAG:
