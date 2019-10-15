@@ -511,3 +511,34 @@
             (list (make-package-data :name asm-package
                                      :use (list* "CL" *asm-package-use-list*)
                                      :doc nil)))))
+
+;;; Not all things shown by this are actually unused. Some get removed
+;;; by the tree-shaker as intended.
+#+nil
+(defun show-unused-exports (&aux nonexistent uninteresting)
+  (dolist (entry (with-open-file (f "package-data-list.lisp-expr") (read f)))
+    (let ((pkg (find-package (package-data-name entry))))
+      (dolist (string (mapcan (lambda (x) (if (stringp x) (list x) x))
+                              (package-data-export entry)))
+        (unless (or (string= string "!" :end1 1) (string= string "*!" :end1 2))
+          (let ((s (find-symbol string pkg)))
+            (cond ((not s)
+                   (push (cons pkg string) nonexistent))
+                  ((and (not (boundp s))
+                        (not (sb-kernel:symbol-info s))
+                        (not (gethash s sb-c::*backend-parsed-vops*)))
+                   (push s uninteresting))))))))
+  (format t "~&Nonexistent:~%")
+  (dolist (x nonexistent)
+    (format t "  ~a ~a~%" (package-name (car x)) (cdr x)))
+  (format t "~&Possibly uninteresting:~%")
+  ;; FIXME: prints some things that it shouldn't as "uninteresting"
+  ;; including but not limited to:
+  ;;   - alien struct slot names
+  ;;   - catch tag names (e.g. 'TOPLEVEL-CATCHER)
+  ;;   - declarations
+  ;;   - restart names
+  ;;   - object-not-<type>-error
+  ;;   - markers such as SB-SYS:MACRO (in lexenvs)
+  (dolist (x uninteresting)
+    (format t "  ~s~%" x)))

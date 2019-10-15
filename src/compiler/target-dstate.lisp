@@ -65,7 +65,7 @@
   ;; of  bytes after a trap instruction as SC+OFFSETs.
   (foreign-code-p nil)
   ;; to avoid buffer overrun at segment end, we might need to copy bytes
-  ;; here first because sap-ref-dchunk reads a fixed length.
+  ;; here first because we access memory in chunks larger than 1 byte.
   (scratch-buf (make-array 8 :element-type '(unsigned-byte 8)))
   ;; what to align to in most cases
   (alignment sb-vm:n-word-bytes :type alignment)

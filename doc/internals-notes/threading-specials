@@ -893,7 +893,6 @@ SB-KERNEL:*WILD-TYPE*                                   ; readonly
 SB-KERNEL:*UNPARSE-FUN-TYPE-SIMPLIFY*
 SB-KERNEL:*CURRENT-LEVEL-IN-PRINT*
 SB-KERNEL:*UNIVERSAL-FUN-TYPE*
-SB-KERNEL:*COLD-INIT-COMPLETE-P*
 SB-KERNEL:*UNIVERSAL-TYPE*                              ; readonly
 SB-KERNEL:*HANDLER-CLUSTERS*                            ; bound per-thread
 SB-KERNEL:*EMPTY-TYPE*                                  ; readonly
