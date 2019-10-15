@@ -8,7 +8,7 @@ freebsd_build_task:
     memory: 1G
 
   prepare_script:
-    - pkg install -y sbcl gmake
+    - pkg install -y sbcl gmake git
 
   build_script:
     - echo '"1.9.99.999"' > version.lisp-expr
