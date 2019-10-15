@@ -15,7 +15,7 @@ jobs:
       no-threads:
         options: "--without-sb-thread"
   pool:
-    vmImage: 'Ubuntu-16.04'
+    vmImage: 'ubuntu-latest'
 
   steps:
   - script: |
@@ -35,7 +35,7 @@ jobs:
 - job: macOS
 
   pool:
-    vmImage: 'macOS-10.13'
+    vmImage: 'macOS-latest'
   steps:
   - script: |
       brew install sbcl
@@ -56,7 +56,7 @@ jobs:
     mingw_path: C:\tools\msys64\usr\bin:/c/Program Files/Steel Bank Common Lisp/1.4.14
     CC: x86_64-w64-mingw32-gcc
   pool:
-    vmImage: 'vs2017-win2016'
+    vmImage: 'windows-latest'
 
   steps:
   - script: |
