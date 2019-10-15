@@ -250,7 +250,7 @@
                      (if (floatp (first values))
                          (native-flonum-value (first values))
                          (first values)))
-          (#+sb-devel error
+          (#+sb-devel cerror #+sb-devel "Ignore"
            #-sb-devel format #-sb-devel t
            "~&//CROSS-FLOAT DISCREPANCY!
 // CACHE: ~S -> ~S~%// HOST : ~@[#x~X = ~]~S~%"
