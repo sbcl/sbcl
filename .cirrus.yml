@@ -1,0 +1,21 @@
+freebsd_build_task:
+
+  freebsd_instance:
+    matrix:
+      image: freebsd-12-0-release-amd64
+      image: freebsd-11-2-release-amd64
+    cpu: 1
+    memory: 1G
+
+  prepare_script:
+    - pkg install -y sbcl gmake
+
+  build_script:
+    - echo '"1.9.99.999"' > version.lisp-expr
+    - ./make.sh
+
+  test_script:
+    - cd tests; ./run-tests.sh
+
+  ansi_test_script:
+    - cd tests; ./ansi-tests.sh
