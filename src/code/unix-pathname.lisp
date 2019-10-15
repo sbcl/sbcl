@@ -166,21 +166,22 @@
       (when directory
         (ecase (pop directory)
           (:absolute
-           (let ((next (pop directory)))
-             (cond
-               ((typep next '(or (eql :home) (cons (eql :home))))
-                (let* ((username (when (consp next) (second next)))
-                       (namestring (handler-case
-                                       (user-homedir-namestring username)
-                                     (error (condition)
-                                       (no-native-namestring-error
-                                        pathname
-                                        "user homedir not known~@[ for ~S~]: ~A"
-                                        username condition)))))
-                  (write-string namestring s)))
-               (next
-                (push next directory)))
-             (write-char #\/ s)))
+           (if (typep (car directory) '(or (eql :home) (cons (eql :home))))
+               (let* ((home (pop directory))
+                      (username (and (consp home) (second home)))
+                      (namestring (handler-case
+                                      (user-homedir-namestring username)
+                                    (error (condition)
+                                      (no-native-namestring-error
+                                       pathname
+                                       "user homedir not known~@[ for ~S~]: ~A"
+                                       username condition))))
+                      (length (length namestring)))
+                 (write-string namestring s)
+                 (unless (and (plusp length)
+                              (char= (char namestring (1- length)) #\/))
+                   (write-char #\/ s)))
+               (write-char #\/ s)))
           (:relative)))
       (loop for (piece . subdirs) on directory
             do (typecase piece
