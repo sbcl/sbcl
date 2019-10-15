@@ -393,8 +393,16 @@
 
 (defun create-target-packages (package-data-list)
   (labels ((flatten (tree)
-             (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
-                     tree)))
+             (let ((result (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
+                                   tree)))
+               (when (< (length (remove-duplicates result :test 'equal))
+                        (length result))
+                 (error "Duplicates in package-data-list: ~a~%"
+                        (mapcon (lambda (x)
+                                  (when (member (car x) (cdr x) :test 'equal)
+                                    (list (car x))))
+                                result)))
+               result)))
 
     (hide-host-packages)
 
