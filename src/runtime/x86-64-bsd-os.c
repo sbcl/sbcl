@@ -201,9 +201,9 @@ os_restore_fp_control(os_context_t *context)
     asm ("fldcw %0" : : "m" (ex->en_cw));
 }
 
-os_context_register_t *                                                                                                                                                       
-os_context_float_register_addr(os_context_t *context, int offset)                                                                                                             
-{                                                                                                                                                                             
+os_context_register_t *
+os_context_float_register_addr(os_context_t *context, int offset)
+{
     return (os_context_register_t *)&((struct savefpu*)&context->uc_mcontext.mc_fpstate)->sv_xmm[offset];
 }
 
