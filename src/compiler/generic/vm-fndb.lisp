@@ -535,7 +535,7 @@
   (flushable))
 
 ;; T argument is for the 'fun' slot.
-(defknown sb-vm::%copy-closure (index t) function (flushable))
+(defknown sb-vm::%alloc-closure (index t) function (flushable))
 
 (defknown %fun-fun (function) simple-fun (flushable recursive))
 

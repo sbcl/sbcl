@@ -532,8 +532,9 @@
                        temp)
                 result 0 fun-pointer-lowtag (not stack-allocate-p)))
      ;; Done with pseudo-atomic
-     (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
-     (storew temp result closure-fun-slot fun-pointer-lowtag))))
+     (when label
+       (inst lea temp (rip-relative-ea label (ash simple-fun-insts-offset word-shift)))
+       (storew temp result closure-fun-slot fun-pointer-lowtag)))))
 
 ;;; The compiler likes to be able to directly make value cells.
 (define-vop (make-value-cell)
@@ -604,7 +605,7 @@
 ;;; Exactly 4 allocators are rendered via this vop:
 ;;;  BIGNUM               (%ALLOCATE-BIGNUM)
 ;;;  FUNCALLABLE-INSTANCE (%MAKE-FUNCALLABLE-INSTANCE)
-;;;  CLOSURE              (%COPY-CLOSURE)
+;;;  CLOSURE              (%ALLOC-CLOSURE)
 ;;;  INSTANCE             (%MAKE-INSTANCE)
 ;;; WORDS accounts for the mandatory slots *including* the header.
 ;;; EXTRA is the variable payload, also measured in words.

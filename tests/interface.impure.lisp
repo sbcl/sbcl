@@ -491,6 +491,7 @@
     (assert (= (length output) 0))))
 
 (let* ((mf (lambda (args nms)
+             (declare (ignore nms))
              (* 2 (car args))))
        (m (make-instance 'standard-method
                          :specializers (list (find-class 'integer))
@@ -522,5 +523,21 @@
 
 (with-test (:name :undefined-fun-macro-error)
   (assert (search "is a macro" (princ-to-string (make-condition 'undefined-function :name 'cond)))))
+
+(defun testme (a b) (values "nice" (+ a b)))
+(compile 'testme)
+(defparameter trace-this-f1 #'testme)
+(sb-int:encapsulate-funobj trace-this-f1)
+
+(defun funky (a b c) (lambda (z) (values "nice" a b (+ (incf a) (decf c) z))))
+(compile 'funky)
+(defparameter trace-this-f2 (funky 10 'wat 19))
+(sb-int:encapsulate-funobj trace-this-f2)
+
+(with-test (:name :trace-funobj-encapsulation)
+  (assert (search "returned \"nice\""
+                  (with-output-to-string (*trace-output*) (funcall trace-this-f1 1 2))))
+  (assert (search "returned \"nice\""
+                  (with-output-to-string (*trace-output*) (funcall trace-this-f2 1)))))
 
 ;;;; success

@@ -36,7 +36,7 @@
 
 (macrolet ((extendedp-bit ()
              ;; The closure header is updated using sap-ref-n.
-             ;; Why not use SET-HEADER-DATA???
+             ;; (SET-HEADER-DATA expects other-pointer-lowtag, not fun-pointer)
              (ash closure-extra-data-indicator sb-vm:n-widetag-bits))
            (%closure-index-set (closure index val)
              ;; Use the identical convention as %CLOSURE-INDEX-REF for the index.
@@ -49,7 +49,39 @@
                     ,val))
            (closure-header-word (closure)
              `(sap-ref-word (int-sap (get-lisp-obj-address ,closure))
-                            (- sb-vm:fun-pointer-lowtag))))
+                            (- sb-vm:fun-pointer-lowtag)))
+           (new-closure (len)
+             #-(or x86 x86-64)
+             `(sb-vm::%alloc-closure ,len (%closure-fun closure))
+             #+(or x86 x86-64)
+             `(with-pinned-objects ((%closure-fun closure))
+                ;; %CLOSURE-CALLEE manifests as a fixnum which remains
+                ;; valid across GC due to %CLOSURE-FUN being pinned
+                ;; until after the new closure is made.
+                (sb-vm::%alloc-closure ,len (sb-vm::%closure-callee closure))))
+           (copy-slots (extra-bit)
+             `(progn
+                (loop with sap = (int-sap (get-lisp-obj-address copy))
+                      for i from 0 below (1- payload-len)
+                      for ofs from (- (ash 2 sb-vm:word-shift) sb-vm:fun-pointer-lowtag)
+                      by sb-vm:n-word-bytes
+                      do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
+                (setf (closure-header-word copy) ; Update the header
+                      ;; Closure copy lost its high header bits, so OR them in again.
+                      (logior #+(and immobile-space 64-bit sb-thread)
+                              (sap-int (sb-vm::current-thread-offset-sap
+                                        sb-vm::thread-function-layout-slot))
+                              #+(and immobile-space 64-bit (not sb-thread))
+                              (get-lisp-obj-address sb-vm:function-layout)
+                              (closure-header-word copy)
+                              ,extra-bit)))))
+
+  (defun copy-closure (closure)
+    (declare (closure closure))
+    (let* ((payload-len (get-closure-length (truly-the function closure)))
+           (copy (new-closure (1- payload-len))))
+      (with-pinned-objects (copy) (copy-slots 0))
+      copy))
 
   ;;; Assign CLOSURE a new name and/or docstring in VALUES, and return the
   ;;; closure. If PERMIT-COPY is true, this function may return a copy of CLOSURE
@@ -65,33 +97,12 @@
           (extendedp (logtest (fun-header-data closure) closure-extra-data-indicator)))
       (when (and (not extendedp) permit-copy (oddp payload-len))
         ;; PAYLOAD-LEN includes the trampoline, so the number of slots we would
-        ;; pass to %COPY-CLOSURE is 1 less than that, were it not for
+        ;; pass to %ALLOC-CLOSURE is 1 less than that, were it not for
         ;; the fact that we actually want to create 1 additional slot.
         ;; So in effect, asking for PAYLOAD-LEN does exactly the right thing.
-        (let ((copy #-(or x86 x86-64)
-                    (sb-vm::%copy-closure payload-len (%closure-fun closure))
-                    #+(or x86 x86-64)
-                    (with-pinned-objects ((%closure-fun closure))
-                      ;; %CLOSURE-CALLEE manifests as a fixnum which remains
-                      ;; valid across GC due to %CLOSURE-FUN being pinned
-                      ;; until after the new closure is made.
-                      (sb-vm::%copy-closure payload-len
-                                            (sb-vm::%closure-callee closure)))))
+        (let ((copy (new-closure payload-len)))
           (with-pinned-objects (copy)
-            (loop with sap = (int-sap (get-lisp-obj-address copy))
-                  for i from 0 below (1- payload-len)
-                  for ofs from (- (ash 2 sb-vm:word-shift) sb-vm:fun-pointer-lowtag)
-                  by sb-vm:n-word-bytes
-                  do (setf (sap-ref-lispobj sap ofs) (%closure-index-ref closure i)))
-            (setf (closure-header-word copy) ; Update the header
-                  ;; Closure copy lost its high header bits, so OR them in again.
-                  (logior #+(and immobile-space 64-bit sb-thread)
-                          (sap-int (sb-vm::current-thread-offset-sap
-                                    sb-vm::thread-function-layout-slot))
-                          #+(and immobile-space 64-bit (not sb-thread))
-                          (get-lisp-obj-address sb-vm:function-layout)
-                          (extendedp-bit)
-                          (closure-header-word copy)))
+            (copy-slots (extendedp-bit))
             ;; We copy only if there was no padding, which means that adding 1 slot
             ;; physically adds 2 slots. You might think that the added data go in the
             ;; first new slot, followed by padding. Nope! Take an example of a
@@ -252,6 +263,7 @@
            (def (accessor index)
              `(progn
                 (defun (setf ,accessor) (newval fun)
+                  (declare (simple-fun fun))
                   ;; Prevent wild pointers due to 'purify' moving all code to
                   ;; readonly space. (Can't have read-only pointing to dynamic)
                   ;; There are a number of things we could do to "fix" this, none

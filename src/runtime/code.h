@@ -142,4 +142,8 @@ static inline lispobj fun_code_tagged(lispobj* fun) {
 # define fun_taggedptr_from_self(self) self
 #endif
 
+#define simplefun_is_wrapped(fun) \
+  fun->self != fun_self_from_baseptr(fun) && fun->self != 0
+#define CODE_IS_TRACED 0x01
+
 #endif

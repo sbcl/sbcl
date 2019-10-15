@@ -462,6 +462,15 @@ sword_t scav_code_header(lispobj *where, lispobj header)
 
     /* Scavenge the boxed section of the code data block. */
     scavenge(where + 2, n_header_words - 2);
+    /* And scavenge any 'self' pointers pointing outside of the object */
+    for_each_simple_fun(i, fun, code, 1, {
+        if (simplefun_is_wrapped(fun)) {
+            lispobj target_fun = fun_taggedptr_from_self(fun->self);
+            lispobj new = target_fun;
+            scavenge(&new, 1);
+            if (new != target_fun) fun->self = fun_self_from_taggedptr(new);
+        }
+    })
 
     return code_total_nwords(code);
 }

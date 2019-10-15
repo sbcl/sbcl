@@ -261,11 +261,11 @@ during backtrace.
 
 (define-primitive-object (closure :lowtag fun-pointer-lowtag
                                    :widetag closure-widetag
-                                   ;; This allocator is %COPY-foo because it's only
-                                   ;; used when renaming a closure. The compiler has
-                                   ;; its own way of making closures, which requires
-                                   ;; that the length be a compile-time constant.
-                                   :alloc-trans %copy-closure)
+                                   ;; This allocator is used when renaming or cloning
+                                   ;; a closure. The compiler has its own way of making
+                                   ;; closures which requires that the length be
+                                   ;; a compile-time constant.
+                                   :alloc-trans %alloc-closure)
   (fun :init :arg :ref-trans #+(or x86 x86-64) %closure-callee
                              #-(or x86 x86-64) %closure-fun)
   (info :rest-p t))

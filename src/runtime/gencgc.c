@@ -4527,6 +4527,26 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         /* Scavenge the boxed section of the code data block. */
         sword_t n_header_words = code_header_words((struct code *)object);
         scavenge(object + 2, n_header_words - 2);
+#ifdef LISP_FEATURE_64_BIT
+        /* If any function in this code object redirects to a function outside
+         * the object, then scavenge all entry points. Otherwise there is no need,
+         * as trans_code() made necessary adjustments to internal entry points.
+         * This test is just an optimization to avoid some work */
+        if (((*object >> 8) & 0xff) == CODE_IS_TRACED) {
+#else
+        { /* Not enough spare bits in the header to hold random flags.
+           * Just do the extra work always */
+#endif
+            struct code* code = (struct code*)object;
+            for_each_simple_fun(i, fun, code, 1, {
+                if (simplefun_is_wrapped(fun)) {
+                    lispobj target_fun = fun_taggedptr_from_self(fun->self);
+                    lispobj new = target_fun;
+                    scavenge(&new, 1);
+                    if (new != target_fun) fun->self = fun_self_from_taggedptr(new);
+                }
+            })
+        }
 
         /* If my_gen is other than newspace, then scan for old->young
          * pointers. If my_gen is newspace, there can be no such pointers
