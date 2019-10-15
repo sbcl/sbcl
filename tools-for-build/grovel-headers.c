@@ -266,36 +266,6 @@ main(int argc, char __attribute__((unused)) *argv[])
 
     printf(";;; various ioctl(2) flags\n");
     defconstant("tiocgpgrp",  TIOCGPGRP);
-    defconstant("tiocspgrp",  TIOCSPGRP);
-    defconstant("tiocgwinsz", TIOCGWINSZ);
-    defconstant("tiocswinsz", TIOCSWINSZ);
-    /* KLUDGE: These are referenced by old CMUCL-derived code, but
-     * Linux doesn't define them.
-     *
-     * I think these are the BSD names, but I don't know what the
-     * corresponding SysV/Linux names are. As a point of reference,
-     * CMUCL doesn't have these defined either (although the defining
-     * forms *do* exist in src/code/unix.lisp), so I don't feel nearly
-     * so bad about not hunting them down. Insight into renamed
-     * obscure ioctl(2) flags appreciated. --njf, 2002-08-26
-     *
-     * I note that the first one I grepped for, TIOCSIGSEND, is
-     * referenced in SBCL conditional on #+HPUX. Maybe the porters of
-     * Oxbridge know more about things like that? And even if they
-     * don't, one benefit of the Rhodes crusade to heal the worthy
-     * ports should be that afterwards, if we grep for something like
-     * this in CVS and it's not there, we can lightheartedly nuke it.
-     * -- WHN 2002-08-30 */
-    /*
-      defconstant("tiocsigsend", TIOCSIGSEND);
-      defconstant("tiocflush", TIOCFLUSH);
-      defconstant("tiocgetp", TIOCGETP);
-      defconstant("tiocsetp", TIOCSETP);
-      defconstant("tiocgetc", TIOCGETC);
-      defconstant("tiocsetc", TIOCSETC);
-      defconstant("tiocgltc", TIOCGLTC);
-      defconstant("tiocsltc", TIOCSLTC);
-    */
     printf("\n");
 
     printf(";;; signals\n");
@@ -334,9 +304,6 @@ main(int argc, char __attribute__((unused)) *argv[])
     defsignal("sigusr1", SIGUSR1);
     defsignal("sigusr2", SIGUSR2);
     defsignal("sigvtalrm", SIGVTALRM);
-#ifdef SIGWAITING
-    defsignal("sigwaiting", SIGWAITING);
-#endif
     defsignal("sigwinch", SIGWINCH);
 #ifdef SIGXCPU
     defsignal("sigxcpu", SIGXCPU);

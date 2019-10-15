@@ -92,9 +92,6 @@
 
 ;;; various ioctl(2) flags
 (defconstant tiocgpgrp 1074033783) ; #x40047477
-(defconstant tiocspgrp 2147775606) ; #x80047476
-(defconstant tiocgwinsz 1074295912) ; #x40087468
-(defconstant tiocswinsz 2148037735) ; #x80087467
 
 ;;; signals
 (defconstant sigalrm 14) ; #xe
