@@ -41,6 +41,8 @@
     (when (eq (car i) item)
       (return j))))
 
+(defun interned-symbol-p (x) (and (symbolp x) (symbol-package x)))
+
 ;;;; variables initialization and shutdown sequences
 
 ;;; (Most of the save-a-core functionality is defined later, in its

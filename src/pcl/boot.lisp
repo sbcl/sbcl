@@ -568,9 +568,6 @@ bootstrapping.
                              'standard-method)
                          initargs-form)))
 
-(defun interned-symbol-p (x)
-  (and (symbolp x) (symbol-package x)))
-
 (defun make-defmethod-form
     (name qualifiers specializers unspecialized-lambda-list
      method-class-name initargs-form)

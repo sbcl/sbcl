@@ -79,8 +79,6 @@
 (define-internal-pcl-function-name-syntax sb-pcl::slow-method (list)
   (valid-function-name-p (cadr list)))
 
-(defun interned-symbol-p (x) (and (symbolp x) (symbol-package x)))
-
 (flet ((struct-accessor-p (object slot-name)
          (let ((c-slot-name (lvar-value slot-name)))
            (unless (interned-symbol-p c-slot-name)
