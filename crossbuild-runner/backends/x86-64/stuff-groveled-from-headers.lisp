@@ -7,6 +7,9 @@
 (define-alien-type uint (unsigned 32))
 (define-alien-type ulong (unsigned 64))
 
+(defconstant error_file_not_found 2)
+(defconstant error_file_exists #x50)
+
 ;; these are total fabrications
 (defconstant max_path 1024)
 (defconstant error-no-data 1)
