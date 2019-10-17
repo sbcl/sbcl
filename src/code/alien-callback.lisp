@@ -198,7 +198,7 @@ ENTER-ALIEN-CALLBACK pulls the corresponding trampoline out and calls it.")
 ;;;; interface (not public, yet) for alien callbacks
 
 (defmacro alien-callback (specifier function &environment env)
-  "Returns an alien-value with of alien ftype SPECIFIER, that can be passed to
+  "Returns an alien-value of alien ftype SPECIFIER, that can be passed to
 an alien function as a pointer to the FUNCTION. If a callback for the given
 SPECIFIER and FUNCTION already exists, it is returned instead of consing a new
 one."
