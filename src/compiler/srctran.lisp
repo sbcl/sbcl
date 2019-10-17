@@ -3626,7 +3626,7 @@
                            (not (equal x-dim y-dim)))
                       nil
                       (give-up-ir1-transform))))
-               ((or (types-equal-or-intersect x-type combination-type)
+               ((and (types-equal-or-intersect x-type combination-type)
                     (types-equal-or-intersect y-type combination-type))
                 (give-up-ir1-transform))
                (t

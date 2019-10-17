@@ -2449,3 +2449,9 @@
       (locally (declare (optimize (space 0)))
         (stable-sort p ,#'string<)))
    (((copy-seq "acb")) "abc" :test #'equal)))
+
+(with-test (:name :equal-to-eql)
+  (let ((f (checked-compile
+            `(lambda (x y)
+               (equal (the hash-table x) y)))))
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
