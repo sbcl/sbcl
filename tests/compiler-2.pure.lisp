@@ -2454,4 +2454,8 @@
   (let ((f (checked-compile
             `(lambda (x y)
                (equal (the hash-table x) y)))))
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn))))
+  (let ((f (checked-compile
+            `(lambda (x y)
+               (equalp (the function x) y)))))
     (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
