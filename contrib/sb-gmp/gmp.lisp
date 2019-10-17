@@ -118,7 +118,7 @@
 ;; at some particular point can use mpz_realloc2, or clear variables
 ;; no longer needed."
 ;;
-;; We can therefore allocate a bignum of sufficiant size and use the
+;; We can therefore allocate a bignum of sufficient size and use the
 ;; space for GMP computations without the need for memory transfer
 ;; from C to Lisp space.
 (declaim (inline z-to-bignum z-to-bignum-neg))
@@ -176,14 +176,14 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
             (mp_num (struct gmpint))
             (mp_den (struct gmpint))))
 
-;;; memory initialization functions to support non-alloced results
+;;; Memory initialization functions to support non-allocated results
 ;;; since an upper bound cannot always correctly predetermined
 ;;; (e.g. the memory required for the fib function exceed the number
 ;;; of limbs that are be determined through the infamous Phi-relation
 ;;; resulting in a memory access error.
 
-;; use these for non-prealloced bignum values, but only when
-;; ultimately necessary since copying back into bignum space a the end
+;; Use these for non-preallocated bignum values, but only when
+;; ultimately necessary since copying back into bignum space at the end
 ;; of the operation is about three times slower than the shared buffer
 ;; approach.
 (declaim (inline __gmpz_init __gmpz_clear))
@@ -324,7 +324,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 ;;;; SBCL interface
 
-;;; utility macros for GMP mpz variable and result declaration and
+;;; Utility macros for GMP mpz variable and result declaration and
 ;;; incarnation of associated SBCL bignums
 
 (defmacro with-mpz-results (pairs &body body)
@@ -596,7 +596,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 
 (defgmpfun mpz-fib2 (n)
   ;; (let ((size (1+ (ceiling (* n (log 1.618034 2)) 64)))))
-  ;; fibonacci number magnitude in bits is assymptotic to n(log_2 phi)
+  ;; fibonacci number magnitude in bits is asymptotic to n(log_2 phi)
   ;; This is correct for the result but appears not to be enough for GMP
   ;; during computation (memory access error), so use GMP-side allocation.
   (check-type n ui)

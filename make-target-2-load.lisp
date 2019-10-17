@@ -39,8 +39,8 @@
                                     (dd-constructors dd))))))
              (classoid-subclasses (find-classoid t)))
     ;; Todo: perform one pass, then a full GC, then a final pass to confirm
-    ;; it worked. It shoud be an error if any uninternable symbols remain,
-    ;; but at present there are about 13 other "!" symbols with referers.
+    ;; it worked. It should be an error if any uninternable symbols remain,
+    ;; but at present there are about 13 other "!" symbols with referrers.
     (with-package-iterator (iter (list-all-packages) :internal :external)
       (loop (multiple-value-bind (winp symbol accessibility package) (iter)
               (declare (ignore accessibility))
@@ -104,7 +104,7 @@
           (format t "Found string ~S~%" (weak-pointer-value wp)))
         (warn "Potential problem with format-control strings.
 Please check that all strings which were not recognizable to the compiler
-(as the first argument to WARN, etc) are wrapped in SB-FORMAT:TOKENS")
+(as the first argument to WARN, etc.) are wrapped in SB-FORMAT:TOKENS")
         ;; This is for display only, I don't check the result.
         ;; NOTE: this symbol doesn't become external until after fasload.
         #+gencgc (when (fboundp 'sb-ext::search-roots)
