@@ -2248,3 +2248,40 @@ constant shift greater than word length")))
      :node node)
   "recode as leas, shifts and adds"
   (*-transformer (lvar-value y) node 'sb-vm::%lea-modfx))
+
+(defun exactly-one-read-p (results)
+  (when results
+    (let ((refs (tn-reads (tn-ref-tn results))))
+      ;; How can REFS be NIL? I don't understand.
+      (and refs (not (tn-ref-next refs))))))
+
+;;; When writing to a bitfield, msan tracks precisely which of
+;;; the bits in a byte have been written, as mentioned in the paper:
+;;; (https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/43308.pdf)
+;;; "For example, bit shifts and bit logic operations are often used
+;;; to extract individual field from bitfields. As adjacent fields
+;;; may be not initialized, it is important that the result shadow
+;;; matches the exact bits occupied by a particular field."
+;;; SAP-REF- has to respect the exactness by not complaining about bits which
+;;; have not been written if the intent is not to read them.
+;;; So given a VOP which is some sap-ref, if the result flows into a LOGAND,
+;;; then it's a masked load and we do not read the shadow of the
+;;; bits that are masked off.
+(defun masked-memory-load-p (vop)
+  (let ((next-vop (vop-next vop))
+        next-next-vop)
+    (case (and next-vop (vop-info-name (vop-info next-vop)))
+      ((sb-vm::fast-logand-c/unsigned=>unsigned
+        sb-vm::fast-logand-c/signed-unsigned=>unsigned)
+       (when (exactly-one-read-p (vop-results vop))
+         (car (vop-codegen-info next-vop))))
+      (sb-vm::move-from-word/fixnum
+       ;; The result of this vop has to have exactly 1 read
+       ;; (the MOVE-FROM-WORD) and the result of that has to
+       ;; have exactly one read (the LOGAND)
+       (when (and (exactly-one-read-p (vop-results vop))
+                  (setq next-next-vop (vop-next next-vop))
+                  (eq (vop-info-name (vop-info next-next-vop))
+                      'sb-vm::fast-logand-c/fixnum=>fixnum)
+                  (exactly-one-read-p (vop-results next-vop)))
+         (car (vop-codegen-info next-next-vop)))))))

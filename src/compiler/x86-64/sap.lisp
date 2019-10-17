@@ -163,7 +163,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
 /// and we store the shadow _before_ the app store."
 |#
 
-(defun emit-sap-ref (size insn modifier result ea node)
+(defun emit-sap-ref (size insn modifier result ea node vop)
   (declare (ignorable node size))
   (cond
    #+linux
@@ -174,9 +174,24 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     (sb-assem::%inst insn modifier result (ea temp-reg-tn))
     (inst xor temp-reg-tn (thread-slot-ea thread-msan-xor-constant-slot))
     ;; Per the documentation, shadow is tested _after_
-    (inst cmp size (ea temp-reg-tn) 0)
-    (let ((good (gen-label)))
+    (let ((mask (sb-c::masked-memory-load-p vop))
+          (good (gen-label))
+          bad)
+      ;; If the load is going to be masked, then we must only check the
+      ;; shadow bits under the mask.
+      (cond ((not mask)
+             (inst cmp size (ea temp-reg-tn) 0))
+            ((or (neq size :qword) (plausible-signed-imm32-operand-p mask))
+             (inst test size (ea temp-reg-tn) mask))
+            (t
+             ;; Test two 32-bit chunks of the shadow memory since we don't
+             ;; have an available register to load a 64-bit constant.
+             (inst test :dword (ea temp-reg-tn) (ldb (byte 32 0) mask))
+             (setq bad (gen-label))
+             (inst jmp :ne bad)
+             (inst test :dword (ea 4 temp-reg-tn) (ldb (byte 32 32) mask))))
       (inst jmp :e good)
+      (when bad (emit-label bad))
       (inst break sb-vm:uninitialized-load-trap)
       ;; Encode the target size and register. If XMM register loads were sanitized,
       ;; then this would need some more bits to indicate the register file.
@@ -218,8 +233,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:node-var node)
+                    (:vop-var vop)
                     (:generator 3 (emit-sap-ref ,size ',(sb-assem::op-encoder-name ref-insn)
-                                                ',modifier result (ea sap offset) node)))
+                                                ',modifier result (ea sap offset) node vop)))
                   (define-vop (,ref-name-c)
                     (:translate ,ref-name)
                     (:policy :fast-safe)
@@ -229,9 +245,9 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:results (result :scs (,sc)))
                     (:result-types ,type)
                     (:node-var node)
+                    (:vop-var vop)
                     (:generator 2 (emit-sap-ref ,size ',(sb-assem::op-encoder-name ref-insn)
-                                                ',modifier result (ea offset sap) node)))
-
+                                                ',modifier result (ea offset sap) node vop)))
                   (define-vop (,set-name)
                     (:translate ,set-name)
                     (:policy :fast-safe)
