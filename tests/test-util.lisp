@@ -284,6 +284,7 @@
   (push (list type *test-file* (or test-name *test-count*))
         *failures*)
   (unless (stringp condition)
+    (sb-debug:print-backtrace :from :interrupted-frame)
     (when (or (and *break-on-failure*
                    (not (eq type :expected-failure)))
               *break-on-expected-failure*)
