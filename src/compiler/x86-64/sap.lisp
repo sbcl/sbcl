@@ -176,13 +176,15 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     ;; Per the documentation, shadow is tested _after_
     (let ((mask (sb-c::masked-memory-load-p vop))
           (good (gen-label))
+          (nbytes (size-nbyte size))
           bad)
       ;; If the load is going to be masked, then we must only check the
       ;; shadow bits under the mask.
       (cond ((not mask)
              (inst cmp size (ea temp-reg-tn) 0))
             ((or (neq size :qword) (plausible-signed-imm32-operand-p mask))
-             (inst test size (ea temp-reg-tn) mask))
+             (inst test size (ea temp-reg-tn)
+                   (ldb (byte (* 8 nbytes) 0) mask)))
             (t
              ;; Test two 32-bit chunks of the shadow memory since we don't
              ;; have an available register to load a 64-bit constant.
@@ -195,11 +197,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
       (inst break sb-vm:uninitialized-load-trap)
       ;; Encode the target size and register. If XMM register loads were sanitized,
       ;; then this would need some more bits to indicate the register file.
-      (let ((scale (ecase size
-                     (:byte  0)
-                     (:word  1)
-                     (:dword 2)
-                     (:qword 3))))
+      (let ((scale (1- (integer-length nbytes))))
         (inst byte (logior (ash (tn-offset result) 2) scale)))
       (emit-label good)))
    (t
