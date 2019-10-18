@@ -657,12 +657,45 @@ functions when called with no arguments."
 (eval-when (:compile-toplevel :load-toplevel)
   (export 'sb-int::encapsulate-funobj 'sb-int))
 
+(defun compile-funobj-encapsulation (wrapper info actual-fun)
+  #+(or x86 x86-64)
+  (let ((code
+         ;; Don't actually "compile" - just emulate the result of compiling.
+         ;; Cloning a precompiled template object consumes only 272 bytes
+         ;; versus about 128KB to invoke the compiler.
+         (sb-c::copy-code-object
+          (load-time-value
+           (let ((c (fun-code-header
+                     ;; Immobile code might use relative fixups which won't work
+                     ;; when the code gets copied.
+                     (let ((sb-c::*compile-to-memory-space* :dynamic))
+                       (compile nil
+                                `(lambda (&rest args)
+                                   ;; The code constants will be overwritten in the copy.
+                                   ;; These are just placeholders essentially.
+                                   (apply ,#'trace-call ,(make-trace-info) #() args))))))
+                 (index (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun)))
+             ;; First three args to APPLY must be at the expected offets
+             (aver (typep (code-header-ref c (+ index 0)) 'function))
+             (aver (typep (code-header-ref c (+ index 1)) 'trace-info))
+             (aver (typep (code-header-ref c (+ index 2)) 'simple-vector))
+             c)
+           t)))
+        (index (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun)))
+    (setf (code-header-ref code (+ index 0)) (symbol-function wrapper)
+          (code-header-ref code (+ index 1)) info
+          (code-header-ref code (+ index 2)) actual-fun)
+    (%code-entry-point code 0))
+  #-(or x86 x86-64)
+  (values (compile nil `(lambda (&rest args)
+                          (apply #',wrapper ,info ,actual-fun args)))))
+
 ;;; The usual ENCAPSULATE encapsulates NAME by changing what NAME points to,
 ;;; that is, by altering the fdefinition.
 ;;; In contrast, ENCAPSULATE-FUNOBJ encapsulates TRACED-FUN by changing the
 ;;; entry point of the function to redirect to a tracing wrapper which then
 ;;; calls back to the correct entry point.
-(defun encapsulate-funobj (traced-fun &optional (name (%fun-name traced-fun)))
+(defun encapsulate-funobj (traced-fun &optional fdefn)
   (declare (type (or simple-fun closure) traced-fun))
   (let* ((proxy-fun
           (typecase traced-fun
@@ -687,19 +720,13 @@ functions when called with no arguments."
             ;; to the tracing wraper, which will invoke a new closure that is
             ;; behaviorally identical to the original closure.
             (sb-impl::copy-closure traced-fun))))
-         (info (sb-debug::make-trace-info :what name
-                                          :encapsulated t
-                                          :named t
-                                          :report 'trace))
-         (tracing-lambda
-          `(lambda (&rest args)
-             (apply #'sb-debug::trace-call ,info ,proxy-fun args)))
-         ;; It would be possible to avoid calling COMPILE by making the tracing
-         ;; wrapper itself a closure, but then we'd have to wrap that wrapper in
-         ;; some kind of trampoline code to make it look like a simple fun before
-         ;; installing it as the entry address, because a closure can only have a
-         ;; simple-fun as its entry point. Same for a code object.
-         (tracing-wrapper (compile nil tracing-lambda)))
+         (info (make-trace-info :what (cond (fdefn (fdefn-name fdefn))
+                                            (t (%fun-name traced-fun)))
+                                :encapsulated t
+                                :named t
+                                :report 'trace))
+         (tracing-wrapper
+          (compile-funobj-encapsulation 'trace-call info proxy-fun)))
     (with-pinned-objects (tracing-wrapper)
       (let (#+(or x86 x86-64)
             (tracing-wrapper-entry
@@ -733,4 +760,7 @@ functions when called with no arguments."
             (setf (sap-ref-lispobj (int-sap (get-lisp-obj-address traced-fun))
                                    (- sb-vm:n-word-bytes sb-vm:fun-pointer-lowtag))
                   tracing-wrapper))))))
+    ;; Update fdefn's raw-addr slot to point to the tracing wrapper
+    (when (and fdefn (eq (fdefn-fun fdefn) traced-fun))
+      (setf (fdefn-fun fdefn) tracing-wrapper))
     tracing-wrapper))
