@@ -53,7 +53,7 @@
   ;; with a block name, or a BLOCK and some bindings.
   (def-subtype lambda-env (block)))
 
-;;; This implementation of lexical environments takes a fairly unconvential
+;;; This implementation of lexical environments takes a fairly unconventional
 ;;; approach to dealing with sequential (LET*) binding. [Anything said here
 ;;; about LET* pertains to LAMBDA as well]. The conceptual model for LET* is
 ;;; that it is a sequence of nested LET forms, each creating one binding.
@@ -120,7 +120,7 @@
 ;;; freezing must do a non-trivial amount of work are quite rare.
 
 ;;; All that said, the representation of "mutable" is that instead of
-;;; a vector of sybols, we have a cons of a fixnum and a vector, so ...
+;;; a vector of symbols, we have a cons of a fixnum and a vector, so ...
 ;;; Return T if the ENV is currently undergoing sequential variable binding.
 (declaim (inline env-mutable-p))
 (defun env-mutable-p (env) (consp (env-symbols env)))
@@ -270,7 +270,7 @@
                            (recurse it (and globalp (not (lambda-env-p env)))))
                           (globalp
                            (member symbol sb-c::*disabled-package-locks*))))
-      ;; Ambigous case: both in the same decl list. Oh well...
+      ;; Ambiguous case: both in the same decl list. Oh well...
       (case (car declaration)
         (disable-package-locks
          (when (member symbol (cdr declaration)) (return t)))
@@ -678,7 +678,7 @@
             (values 0 lambda-list body)))
     ;; Choke now if the list can't be parsed.
     ;; If lexical environment is NIL, :silent will be passed as NIL,
-    ;; and we can warn about "suspcious variables" and such.
+    ;; and we can warn about "suspicious variables" and such.
     (parse-lambda-list lambda-list :silent silent)
     (multiple-value-bind (forms decls docstring) (parse-body body t t)
       (%make-proto-fn name lambda-list decls forms docstring
