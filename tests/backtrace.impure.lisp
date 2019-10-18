@@ -124,15 +124,18 @@
 ;;;
 ;;; See CHECK-BACKTRACE for an explanation of the structure
 ;;; EXPECTED-FRAMES.
-(defun verify-backtrace (test-function expected-frames &key details)
+(defun verify-backtrace (test-function expected-frames &key details
+                                                            error)
   (labels ((find-frame (function-name frames)
              (member function-name frames
                      :key (if details #'caar #'car)
                      :test #'equal))
            (fail (datum &rest arguments)
              (return-from verify-backtrace
-               (values nil (apply #'sb-kernel:coerce-to-condition
-                                  datum 'simple-error 'error arguments)))))
+               (let ((c (apply #'sb-kernel:coerce-to-condition datum 'simple-error 'error arguments)))
+                 (if error
+                     (error c)
+                     (values nil c))))))
     (call-with-backtrace
      (lambda (backtrace condition)
        (declare (ignore condition))
@@ -157,9 +160,8 @@
      test-function :details details)))
 
 (defun assert-backtrace (test-function expected-frames &key details)
-  (multiple-value-bind (successp condition)
-      (verify-backtrace test-function expected-frames :details details)
-    (or successp (error condition))))
+  (verify-backtrace test-function expected-frames :details details
+                                                  :error t))
 
 (defvar *p* (namestring *load-truename*))
 
