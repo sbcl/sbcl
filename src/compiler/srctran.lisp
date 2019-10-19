@@ -414,7 +414,7 @@
 ;;; that negative zeros are strictly less than positive zeros.
 (macrolet ((def (name op)
              `(defun ,name (x y)
-                (declare (real x y))
+                (declare (type real x y))
                 (if (and (floatp x) (floatp y) (zerop x) (zerop y))
                     (,op (float-sign x) (float-sign y))
                     (,op x y)))))

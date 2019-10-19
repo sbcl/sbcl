@@ -349,8 +349,8 @@
                       (primitive-types))
               (let ((n-values (nth-value 1 (values-types
                                             (lvar-derived-type arg)))))
-                (loop repeat n-values
-                      for (prim-type . lvar-type) = (pop types)
+                (loop for (prim-type . lvar-type) = (pop types)
+                      repeat n-values
                       do
                       (primitive-types (or prim-type
                                            *backend-t-primitive-type*))
