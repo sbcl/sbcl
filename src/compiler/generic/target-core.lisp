@@ -105,7 +105,7 @@
 
        (finish-fixups (code-obj preserved-lists)
          (declare (ignorable code-obj preserved-lists))
-         #+(or immobile-space x86)
+         #+(or x86 x86-64)
          (let ((rel-fixups (elt preserved-lists 0))
                (abs-fixups (elt preserved-lists 1)))
            (when (or abs-fixups rel-fixups)

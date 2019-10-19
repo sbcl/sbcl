@@ -82,7 +82,7 @@
   (def %caller-frame ())
   (def %caller-pc ())
   (def %code-debug-info)
-  #+(or x86 immobile-space) (def sb-vm::%code-fixups)
+  #+(or x86 x86-64) (def sb-vm::%code-fixups)
 
   ;; instances
   (def %make-instance) ; Allocate a new instance with X data slots.

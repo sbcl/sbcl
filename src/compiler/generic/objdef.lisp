@@ -203,7 +203,10 @@ during backtrace.
               :ref-trans %code-debug-info
               :set-known ()
               :set-trans (setf %code-debug-info))
-  #+(or x86 immobile-space)
+  ;; Define this slot if the architecture might ever use fixups.
+  ;; x86-64 doesn't necessarily use them, depending on the feature set,
+  ;; but this keeps things consistent.
+  #+(or x86 x86-64)
   (fixups :type t
           :ref-known (flushable)
           :ref-trans %code-fixups
