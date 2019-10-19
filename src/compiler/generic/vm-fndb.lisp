@@ -98,8 +98,8 @@
 (defknown pointer-hash (t) hash (flushable))
 
 (defknown %sp-string-compare
-  (simple-string index index simple-string index index)
-  (or index null)
+  (simple-string index (or null index) simple-string index (or null index))
+  (values index fixnum)
   (foldable flushable))
 
 (defknown %sxhash-string (string) hash (foldable flushable))

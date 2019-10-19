@@ -824,34 +824,19 @@
 ;;; Return a form that tests the free variables STRING1 and STRING2
 ;;; for the ordering relationship specified by LESSP and EQUALP. The
 ;;; start and end are also gotten from the environment. Both strings
-;;; must be SIMPLE-BASE-STRINGs.
-(macrolet ((def (name lessp equalp)
+;;; must be simple.
+(macrolet ((def (name test index)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
-                                   (simple-base-string simple-base-string t t t t) *)
-                `(let* ((end1 (if (not end1) (length string1) end1))
-                        (end2 (if (not end2) (length string2) end2))
-                        (index (sb-impl::%sp-string-compare
-                                string1 start1 end1 string2 start2 end2)))
-                  (if index
-                      (cond ((= index end1)
-                             ,(if ',lessp 'index nil))
-                            ((= (+ index (- start2 start1)) end2)
-                             ,(if ',lessp nil 'index))
-                            ((,(if ',lessp 'char< 'char>)
-                               (schar string1 index)
-                               (schar string2
-                                      (truly-the index
-                                                 (+ index
-                                                    (truly-the fixnum
-                                                               (- start2
-                                                                  start1))))))
-                             index)
-                            (t nil))
-                      ,(if ',equalp 'end1 nil))))))
-  (def string<* t nil)
-  (def string<=* t t)
-  (def string>* nil nil)
-  (def string>=* nil t))
+                                   (simple-string simple-string t t t t) *)
+                `(multiple-value-bind (index diff)
+                     (%sp-string-compare string1 start1 end1 string2 start2 end2)
+                   (if ,',test
+                       ,,(if index ''index 'nil)
+                       ,,(if index 'nil ''index))))))
+  (def string<* (< diff 0) t)
+  (def string<=* (> diff 0) nil)
+  (def string>* (> diff 0) t)
+  (def string>=* (< diff 0) nil))
 
 (deftransform string=* ((string1 string2 start1 end1 start2 end2)
                         (string string
@@ -885,15 +870,17 @@
         (t
          (give-up-ir1-transform))))
 
-(macrolet ((def (name result-fun)
+(macrolet ((def (name test index)
              `(deftransform ,name ((string1 string2 start1 end1 start2 end2)
-                                   (simple-base-string simple-base-string t t t t) *)
-                `(,',result-fun
-                  (sb-impl::%sp-string-compare
-                   string1 start1 (or end1 (length string1))
-                   string2 start2 (or end2 (length string2)))))))
-  (def string=* not) ; FIXME: this xform looks counterproductive.
-  (def string/=* identity))
+                                   (simple-string simple-string t t t t) *)
+                `(multiple-value-bind (index diff)
+                     (%sp-string-compare string1 start1 end1 string2 start2 end2)
+                   (declare (ignorable index))
+                   (if (,',test diff 0)
+                       ,,(if index ''index t)
+                       nil)))))
+  (def string=* = nil) ; FIXME: this xform looks counterproductive.
+  (def string/=* /= t))
 
 (deftransform string/=* ((str1 str2 start1 end1 start2 end2) * * :node node
                          :important nil)

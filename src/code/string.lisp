@@ -175,53 +175,37 @@
                                  (rotatef string1 string2)
                                  t)))
                  (char-loop character base-char))))))
-    (not (%sp-string-compare string1 start1 end1 string2 start2 end2))))
+    (zerop (nth-value 1 (%sp-string-compare string1 start1 end1 string2 start2 end2)))))
 
 (defun string/=* (string1 string2 start1 end1 start2 end2)
   (with-two-strings string1 string2 start1 end1 offset1 start2 end2
-    (let ((comparison (%sp-string-compare string1 start1 end1
-                                          string2 start2 end2)))
-      (if comparison (- (the fixnum comparison) offset1)))))
+    (multiple-value-bind (index diff)
+        (%sp-string-compare string1 start1 end1 string2 start2 end2)
+      (if (zerop diff)
+          nil
+          (- index offset1)))))
 
-;;; LESSP is true if the desired expansion is for STRING<* or STRING<=*.
-;;; EQUALP is true if the desired expansion is for STRING<=* or STRING>=*.
-(defmacro string<>=*-body (lessp equalp)
-  (let ((offset1 (gensym)))
-    `(with-two-strings string1 string2 start1 end1 ,offset1 start2 end2
-       (let ((index (%sp-string-compare string1 start1 end1
-                                        string2 start2 end2)))
-         (if index
-             (cond ((= (the fixnum index) (the fixnum end1))
-                    ,(if lessp
-                         `(- (the fixnum index) ,offset1)
-                       `nil))
-                   ((= (+ (the fixnum index) (- start2 start1))
-                       (the fixnum end2))
-                    ,(if lessp
-                         `nil
-                       `(- (the fixnum index) ,offset1)))
-                   ((,(if lessp 'char< 'char>)
-                     (schar string1 index)
-                     (schar string2 (+ (the fixnum index) (- start2 start1))))
-                    (- (the fixnum index) ,offset1))
-                   (t nil))
-             ,(if equalp `(- (the fixnum end1) ,offset1) nil))))))
+(defmacro string<>=*-body (test index)
+  `(with-two-strings string1 string2 start1 end1 offset1 start2 end2
+     (multiple-value-bind (index diff)
+         (%sp-string-compare string1 start1 end1
+                             string2 start2 end2)
+       (if (,test diff 0)
+           ,(if index '(- index offset1) nil)
+           ,(if index nil '(- index offset1))))))
 
 (defun string<* (string1 string2 start1 end1 start2 end2)
-  (declare (fixnum start1 start2))
-  (string<>=*-body t nil))
+  (string<>=*-body < t))
 
 (defun string>* (string1 string2 start1 end1 start2 end2)
-  (declare (fixnum start1 start2))
-  (string<>=*-body nil nil))
+  (string<>=*-body > t))
 
 (defun string<=* (string1 string2 start1 end1 start2 end2)
-  (declare (fixnum start1 start2))
-  (string<>=*-body t t))
+  (string<>=*-body > nil))
 
 (defun string>=* (string1 string2 start1 end1 start2 end2)
   (declare (fixnum start1 start2))
-  (string<>=*-body nil t))
+  (string<>=*-body < nil))
 
 (defun string< (string1 string2 &key (start1 0) end1 (start2 0) end2)
   "Given two strings, if the first string is lexicographically less than
