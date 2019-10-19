@@ -509,23 +509,18 @@
 
 ;;;; fixup emitters
 
-(defun emit-absolute-fixup (segment fixup)
-  ;; A fixup into the code itself has a position denoted by either a label,
-  ;; or a label plus an additional offset relative to that label.
-  ;; If the latter, strip outo the addend, incoporate it into the backpatch,
-  ;; and note the fixup without the addend, because dump/apply-fixups can
-  ;; handle labels, but not a label + addend.
-  (let ((offset (fixup-offset fixup)))
-    (note-fixup segment :absolute
-                (if (typep offset '(cons label))
-                    (make-fixup nil :code-object (car offset))
-                    fixup))
-    (if (typep offset '(or label (cons label)))
-        (multiple-value-bind (label extra-offset)
-            (if (listp offset)
-                (values (car offset) (cdr offset))
-                (values offset 0))
-          (emit-back-patch
+(defun emit-absolute-fixup (segment fixup &optional (extra-addend 0))
+  (note-fixup segment :absolute fixup)
+  (let ((addend (fixup-offset fixup)))
+    ;; Fixups are dumped without an explicit addend. The value in the fixed-up
+    ;; location is implicitly added to the address resolved by the loader.
+    ;; A fixup into the code object has a position denoted by a label,
+    ;; and so the addend - the offset from the tagged code pointer to the label -
+    ;; is indeterminate until label positions are fully computed.
+    ;; This requires a backpatch. Additionally, if there is a displacement
+    ;; beyond the label, it is incorporated into the implicit addend.
+    (if (typep addend 'label)
+        (emit-back-patch
            segment
            4
            (lambda (segment posn)
@@ -534,9 +529,9 @@
                          (+ (component-header-length)
                             (- (segment-header-skew segment))
                             (- other-pointer-lowtag)
-                            (label-position label)
-                            extra-offset)))))
-        (emit-dword segment offset))))
+                            (label-position addend)
+                            extra-addend))))
+        (emit-dword segment addend))))
 
 (defun emit-relative-fixup (segment fixup)
   (note-fixup segment :relative fixup)
@@ -559,13 +554,17 @@
 (defun emit-byte+reg (seg byte reg)
   (emit-byte seg (+ byte (reg-tn-encoding reg))))
 
+(deftype asm-expression ()
+  '(cons (eql +) (cons label (cons integer null))))
+
 (defstruct (ea (:constructor make-ea (size &key base index scale disp))
                (:copier nil))
   (size nil :type (member :byte :word :dword) :read-only t)
   (base nil :type (or tn null) :read-only t)
   (index nil :type (or tn null) :read-only t)
   (scale 1 :type (member 1 2 4 8) :read-only t)
-  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup)
+  (disp 0 :type (or (unsigned-byte 32) (signed-byte 32)
+                    fixup asm-expression)
           :read-only t))
 
 (defmethod print-object ((ea ea) stream)
@@ -636,11 +635,16 @@
             (r/m (cond (index #b100)
                        ((null base) #b101)
                        (t (reg-tn-encoding base)))))
-       (when (and (fixup-p disp)
-                  (typep (fixup-offset disp) '(or label (cons label))))
+       (when (typep disp '(or fixup asm-expression))
          (aver (null base))
          (aver (null index))
-         (return-from emit-ea (emit-ea segment disp reg allow-constants)))
+         (emit-mod-reg-r/m-byte segment #b00 reg #b101)
+         (multiple-value-bind (fixup extra-offset)
+             (if (typep disp 'fixup)
+                 (values disp 0)
+                 (values (make-fixup nil :code-object (second disp)) (third disp)))
+           (return-from emit-ea
+             (emit-absolute-fixup segment fixup extra-offset))))
        (emit-mod-reg-r/m-byte segment mod reg r/m)
        (when (= r/m #b100)
          (let ((ss (1- (integer-length scale)))
@@ -2585,8 +2589,4 @@
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
 (defun sb-c::replace-coverage-instruction (inst-buffer inst-index label offset)
   (setf (svref inst-buffer inst-index)
-        `(mov ,(make-ea :byte
-                        :disp (make-fixup nil
-                                          :code-component
-                                          (cons label offset)))
-              1)))
+        `(mov ,(make-ea :byte :disp `(+ ,label ,offset)) 1)))
