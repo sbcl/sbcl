@@ -22,9 +22,8 @@
           (aref a 2) 'interned-symbol
           (aref a 3) random-symbol
           (aref a 4) 18
-          (aref a 5) (+ most-positive-fixnum (random 100) (random 100))
+          (aref a 5) (+ most-positive-fixnum 1 (random 100) (random 100))
           (aref a 6) (make-hash-table))
-    (assert (typep (aref a 5) 'bignum))
     (assert (weak-vector-p a))
     (sb-sys:scrub-control-stack)
     (gc)
