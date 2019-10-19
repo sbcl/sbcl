@@ -3567,6 +3567,10 @@
              (let ((ctype (specifier-type type)))
                (and (csubtypep x-type ctype)
                     (csubtypep y-type ctype))))
+           (both-intersect-p (type)
+             (let ((ctype (specifier-type type)))
+               (and (types-equal-or-intersect x-type ctype)
+                    (types-equal-or-intersect y-type ctype))))
            (some-csubtypep (type)
              (let ((ctype (specifier-type type)))
                (or (csubtypep x-type ctype)
@@ -3631,10 +3635,11 @@
                 (give-up-ir1-transform))
                (t
                 '(eql x y))))
-        ((some-csubtypep2 '(and array (not vector))
-                          'vector)
-         nil)
-        (t (give-up-ir1-transform))))))
+        ((or (both-intersect-p 'string)
+             (both-intersect-p 'pathname)
+             (both-intersect-p 'bit-vector)
+             (both-intersect-p 'cons))
+         (give-up-ir1-transform))))))
 
 (deftransform equalp ((x y) * *)
   "convert to simpler equality predicate"
@@ -3648,6 +3653,10 @@
              (let ((ctype (specifier-type type)))
                (and (csubtypep x-type ctype)
                     (csubtypep y-type ctype))))
+           (both-intersect-p (type)
+             (let ((ctype (specifier-type type)))
+               (and (types-equal-or-intersect x-type ctype)
+                    (types-equal-or-intersect y-type ctype))))
            (some-csubtypep (type)
              (let ((ctype (specifier-type type)))
                (or (csubtypep x-type ctype)
@@ -3710,7 +3719,14 @@
                   (types-equal-or-intersect y-type combination-type))
              (give-up-ir1-transform)
              '(eq x y)))
-        (t (give-up-ir1-transform))))))
+        ((or (both-intersect-p 'number)
+             (both-intersect-p 'array)
+             (both-intersect-p 'character)
+             (both-intersect-p 'cons)
+             (both-intersect-p 'pathname)
+             (both-intersect-p 'instance)
+             (both-intersect-p 'hash-table))
+         (give-up-ir1-transform))))))
 
 ;;; Convert to EQL if both args are rational and complexp is specified
 ;;; and the same for both.
