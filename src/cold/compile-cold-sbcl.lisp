@@ -82,13 +82,18 @@
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 
-#+#.(cl:if (cl:find-package "HOST-SB-POSIX") '(and) '(or))
+#+(or #.(cl:if (cl:and (cl:find-package "POSIX")
+                       (cl:find-symbol "WITH-SUBPROCESSES" "POSIX"))
+               :clisp '(or))
+      #.(cl:if (cl:find-package "HOST-SB-POSIX") :sbcl '(or)))
 (defun parallel-make-host-2 (max-jobs)
   (let ((subprocess-count 0)
         (subprocess-list nil)
         stop)
     (labels ((wait ()
-               (multiple-value-bind (pid status) (host-sb-posix:wait)
+               (multiple-value-bind (pid status)
+                   #+sbcl (host-sb-posix:wait)
+                   #-sbcl (sb-cold::posix-wait)
                  (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
                  (unless (zerop status)
                    (let ((stem (cdr (assoc pid subprocess-list))))
@@ -106,43 +111,47 @@
                          (write-string line)
                          (terpri)))
                  (delete-file f))))
-      (host-sb-ext:disable-debugger)
-      (unwind-protect
-           (do-stems-and-flags (stem flags 2)
-             (unless (position :not-target flags)
-               (when (>= subprocess-count max-jobs)
-                 (wait))
-               (when stop
-                 (return))
-               (let ((pid (host-sb-posix:fork)))
-                 (when (zerop pid)
-                   (let ((pid (host-sb-unix:unix-getpid)))
-                     (let ((*standard-output*
-                            (open (format nil "~d.out" pid)
-                                  :direction :output :if-exists :supersede))
-                           (*error-output*
-                            (open (format nil "~d.err" pid)
-                                  :direction :output :if-exists :supersede)))
-                       (handler-case (target-compile-stem stem flags)
-                         (error (e)
-                           (format *error-output* "~a~%" e)
-                           (close *standard-output*)
-                           (close *error-output*)
-                           (sb-cold::exit-process 1))
-                         (:no-error (res)
-                           (declare (ignore res))
-                           (delete-file *standard-output*)
-                           (delete-file *error-output*)
-                           (sb-cold::exit-process 0))))))
-                 (push (cons pid stem) subprocess-list))
-               (incf subprocess-count)
-               ;; Cause the compile-time effects from this file
-               ;; to appear in subsequently forked children.
-               (let ((*compile-for-effect-only* t))
-                 (target-compile-stem stem flags))))
-        (loop (if (plusp subprocess-count) (wait) (return)))
-        (when stop
-          (sb-cold::exit-process 1)))
+      #+sbcl (host-sb-ext:disable-debugger)
+      (#+clisp posix:with-subprocesses
+       #-clisp progn
+        (unwind-protect
+             (do-stems-and-flags (stem flags 2)
+               (unless (position :not-target flags)
+                 (when (>= subprocess-count max-jobs)
+                   (wait))
+                 (when stop
+                   (return))
+                 (let ((pid #+sbcl (host-sb-posix:fork)
+                            #-sbcl (sb-cold::posix-fork)))
+                   (when (zerop pid)
+                     (let ((pid #+clisp (posix:process-id)
+                                #+sbcl (host-sb-unix:unix-getpid)))
+                       (let ((*standard-output*
+                              (open (format nil "~d.out" pid)
+                                    :direction :output :if-exists :supersede))
+                             (*error-output*
+                              (open (format nil "~d.err" pid)
+                                    :direction :output :if-exists :supersede)))
+                         (handler-case (target-compile-stem stem flags)
+                           (error (e)
+                             (format *error-output* "~a~%" e)
+                             (close *standard-output*)
+                             (close *error-output*)
+                             (sb-cold::exit-subprocess 1))
+                           (:no-error (res)
+                             (declare (ignore res))
+                             (delete-file *standard-output*)
+                             (delete-file *error-output*)
+                             (sb-cold::exit-subprocess 0))))))
+                   (push (cons pid stem) subprocess-list))
+                 (incf subprocess-count)
+                 ;; Cause the compile-time effects from this file
+                 ;; to appear in subsequently forked children.
+                 (let ((*compile-for-effect-only* t))
+                   (target-compile-stem stem flags))))
+          (loop (if (plusp subprocess-count) (wait) (return)))
+          (when stop
+            (sb-cold::exit-process 1))))
       (values))))
 
 ;;; Actually compile

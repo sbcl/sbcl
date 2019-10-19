@@ -44,19 +44,39 @@
               value2)))))
 
 (defvar *make-host-parallelism*
-  (or #+sbcl
-      (let ((envvar (sb-ext:posix-getenv "SBCL_MAKE_PARALLEL")))
+  (or #+(or clisp sbcl)
+      (let ((envvar #+clisp (ext:getenv "SBCL_MAKE_PARALLEL")
+                    #+sbcl (sb-ext:posix-getenv "SBCL_MAKE_PARALLEL")))
         (when envvar
-          (require :sb-posix)
+          #+sbcl (require :sb-posix)
           (parse-make-host-parallelism envvar)))))
 
 (defun make-host-1-parallelism () (car *make-host-parallelism*))
 (defun make-host-2-parallelism () (cdr *make-host-parallelism*))
 
+;;; clisp doesn't expose fork() and consequently doesn't behave
+;;; correctly when (EXT:EXIT) is called in a forked child process.
+#+clisp #+clisp
+(defun exit-process (arg) (ext:exit arg))
+(ffi:def-call-out exit-subprocess (:name "exit") (:arguments (arg ffi:int))
+                  (:library :default) (:language :stdc))
+
 #+sbcl
 (let ((f (multiple-value-bind (sym access) (find-symbol "OS-EXIT" "SB-SYS")
            (if (eq access :external) sym 'sb-unix:unix-exit))))
-  (defun exit-process (arg) (funcall f arg)))
+  (defun exit-process (arg) (funcall f arg))
+  (defun exit-subprocess (arg) (funcall f arg)))
+
+#+clisp
+(ffi:def-call-out posix-fork (:name "fork") (:return-type ffi:int)
+                  (:library :default) (:language :stdc))
+
+#+clisp
+(defun posix-wait ()
+  (multiple-value-bind (pid status code) (posix:wait)
+    (if (eql status :exited)
+      (values pid code)
+      (values pid (- code)))))
 
 ;;; If TRUE, then COMPILE-FILE is being invoked only to process
 ;;; :COMPILE-TOPLEVEL forms, not to produce an output file.
