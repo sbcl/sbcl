@@ -5214,7 +5214,7 @@ changes in sbcl-0.9.1 relative to sbcl-0.9.0:
   * optimization: there's now a fast-path for fixnum arguments in the
     generic subtraction routines on x86/x86-64. (Thanks to Lutz Euler)
   * optimization: the code generated on x86-64 is more compact thanks
-    to not outputting unneccessary prefix bytes. (Thanks to Lutz Euler)
+    to not outputting unnecessary prefix bytes. (Thanks to Lutz Euler)
   * bug fix: floating-point exception handling now partly works on
     x86-64.  (Thanks to James Knight)
   * improvement to the MIPS backend from Thiemo Seufer: C-style

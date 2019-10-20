@@ -1259,7 +1259,7 @@
      ;; apply the final 12 bits with LDR.  For now, we'll allow up to 20
      ;; bits of displacement, as that should be easy to implement, and a
      ;; megabyte large code object is already a bit unwieldly.  If
-     ;; neccessary, we can expand to a 28 bit displacement.
+     ;; necessary, we can expand to a 28 bit displacement.
      (labels ((compute-delta (position &optional magic-value)
                 (- (label-position label
                                    (when magic-value position)

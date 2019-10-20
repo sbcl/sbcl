@@ -32,7 +32,7 @@
   ;; unfortunately not enforced by PAD-DATA-BLOCK and
   ;; FIXED-ALLOC), so that ESP is always divisible by 8 (for
   ;; 32-bit lispobjs).  In that case, this AND instruction is
-  ;; unneccessary and could be removed.  If not, explain why.  -- CSR,
+  ;; unnecessary and could be removed.  If not, explain why.  -- CSR,
   ;; 2004-03-30
   (inst and esp-tn (lognot lowtag-mask))
   (inst lea alloc-tn (make-ea :byte :base esp-tn :disp lowtag))

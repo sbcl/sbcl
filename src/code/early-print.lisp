@@ -140,7 +140,7 @@
              ;;
              ;; If mode is :LOGICAL-BLOCK and assign is false, return true
              ;; to indicate that this object is circular, but don't assign
-             ;; it a number yet. This is neccessary for cases like
+             ;; it a number yet. This is necessary for cases like
              ;; #1=(#2=(#2# . #3=(#1# . #3#))))).
              (:logical-block-circular
               (cond ((and (not assign)

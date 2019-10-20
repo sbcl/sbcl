@@ -914,7 +914,7 @@ boolean create_os_thread(struct thread *th,os_thread_t *kid_tid)
     pthread_attr_t attr;
     if (pthread_attr_init(&attr) == 0) {
 
-    /* See perform_thread_post_mortem for at least one reason why this lock is neccessary */
+    /* See perform_thread_post_mortem for at least one reason why this lock is necessary */
         retcode = pthread_mutex_lock(&create_thread_lock);
         gc_assert(retcode == 0);
 
