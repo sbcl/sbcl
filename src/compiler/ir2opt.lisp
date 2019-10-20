@@ -429,7 +429,7 @@
   (let* ((args1 (vop-arg-list vop1))
          (args2 (vop-arg-list vop2)))
     (equal (if reverse
-               (nreverse args1)
+               (reverse args1)
                args1)
            args2)))
 
