@@ -1049,8 +1049,8 @@ word breaking rules specified in UAX #29. Returns a list of strings"
       ((binary-search cp scontinues) :scontinue)
       ((proplist-p char :sterm) :sterm)
       ((and (or (member gc '(:Po :Ps :Pe :Pf :Pi))
-                (eql (line-break-class char) :qu))
-            (not (eql cp #x05F3))) :close)
+                (eql (line-break-class char) :qu)))
+       :close)
       (t nil))))
 
 (defun sentence-prebreak (string)
