@@ -373,7 +373,7 @@
   (inst cmp rcx (ea (- other-pointer-lowtag) y))
   (inst jmp :ne done)
   (inst shr rcx n-widetag-bits)
-  ;; can you have 0 payload words? probably not, but let's be safe here.
+  ;; can you have 0 payload words? Probably not, but let's be safe here.
   (inst jrcxz done)
   loop
   (inst mov rax (ea (- other-pointer-lowtag) x rcx 8))
