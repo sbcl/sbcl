@@ -43,40 +43,50 @@
         (cons (and (find-package "SB-INTERPRETER") value1)
               value2)))))
 
-(defvar *make-host-parallelism*
-  (or #+(or clisp sbcl)
-      (let ((envvar #+clisp (ext:getenv "SBCL_MAKE_PARALLEL")
-                    #+sbcl (sb-ext:posix-getenv "SBCL_MAKE_PARALLEL")))
-        (when envvar
-          #+sbcl (require :sb-posix)
-          (parse-make-host-parallelism envvar)))))
-
+(defvar *make-host-parallelism* nil)
 (defun make-host-1-parallelism () (car *make-host-parallelism*))
 (defun make-host-2-parallelism () (cdr *make-host-parallelism*))
 
-;;; clisp doesn't expose fork() and consequently doesn't behave
-;;; correctly when (EXT:EXIT) is called in a forked child process.
-#+clisp #+clisp
-(defun exit-process (arg) (ext:exit arg))
-(ffi:def-call-out exit-subprocess (:name "exit") (:arguments (arg ffi:int))
-                  (:library :default) (:language :stdc))
-
 #+sbcl
-(let ((f (multiple-value-bind (sym access) (find-symbol "OS-EXIT" "SB-SYS")
-           (if (eq access :external) sym 'sb-unix:unix-exit))))
-  (defun exit-process (arg) (funcall f arg))
-  (defun exit-subprocess (arg) (funcall f arg)))
+(progn
+  (setq *make-host-parallelism*
+        (let ((envvar (sb-ext:posix-getenv "SBCL_MAKE_PARALLEL")))
+          (when envvar
+            (require :sb-posix)
+            (parse-make-host-parallelism envvar))))
+  (defmacro with-subprocesses (&rest body) `(progn ,@body))
+  (let ((f (multiple-value-bind (sym access) (find-symbol "OS-EXIT" "SB-SYS")
+             (if (eq access :external) sym 'sb-unix:unix-exit))))
+    (defun exit-process (arg) (funcall f arg))
+    (defun exit-subprocess (arg) (funcall f arg)))
+  ;; Lazily reference sb-posix because it may not be loaded
+  (defun posix-fork () (funcall (intern "FORK" "HOST-SB-POSIX")))
+  (defun getpid () (funcall (intern "UNIX-GETPID" "HOST-SB-UNIX")))
+  (defun posix-wait () (funcall (intern "WAIT" "HOST-SB-POSIX"))))
 
 #+clisp
-(ffi:def-call-out posix-fork (:name "fork") (:return-type ffi:int)
+(progn
+  (setq *make-host-parallelism*
+        (let ((envvar (ext:getenv "SBCL_MAKE_PARALLEL")))
+          (when envvar
+            (parse-make-host-parallelism envvar))))
+  ;; FFI symbols won't exist if libffcall could not be found at build time.
+  (defmacro with-subprocesses (&rest rest)
+    (cons (or (find-symbol "WITH-SUBPROCESSES" "POSIX") 'progn) rest))
+  ;; clisp doesn't expose fork() and consequently doesn't behave
+  ;; correctly when (EXT:EXIT) is called in a forked child process.
+  (defun exit-process (arg) (ext:exit arg))
+  #+#.(cl:if (cl:find-package "FFI") '(and) '(or))
+  (progn (ffi:def-call-out exit-subprocess (:name "exit") (:arguments (arg ffi:int))
                   (:library :default) (:language :stdc))
-
-#+clisp
-(defun posix-wait ()
-  (multiple-value-bind (pid status code) (posix:wait)
-    (if (eql status :exited)
-      (values pid code)
-      (values pid (- code)))))
+         (ffi:def-call-out posix-fork (:name "fork") (:return-type ffi:int)
+                  (:library :default) (:language :stdc)))
+  (defun getpid () (posix:process-id))
+  (defun posix-wait ()
+    (multiple-value-bind (pid status code) (posix:wait)
+      (if (eql status :exited)
+          (values pid code)
+          (values pid (- code))))))
 
 ;;; If TRUE, then COMPILE-FILE is being invoked only to process
 ;;; :COMPILE-TOPLEVEL forms, not to produce an output file.
@@ -772,3 +782,32 @@
                     table stream))
          (format t "~&; wrote ~a - ~d entries"
                  filename (hash-table-count table))))))
+
+;;;; Please avoid writing "consecutive" (un-nested) reader conditionals
+;;;; in this file, whether for the same or different feature test.
+;;;; The following example prints 3 different results in 3 different lisp
+;;;; implementations all of which have feature :linux (and not :nofeat).
+#|
+(let ((i 0))
+  (dolist (s '("#-nofeat #+linux a b c d e"
+               "#-nofeat #-linux a b c d e"
+               "#+nofeat #-linux a b c d e"
+               "#+nofeat #+linux a b c d e"
+               "#+linux #-nofeat a b c d e"
+               "#-linux #-nofeat a b c d e"
+               "#-linux #+nofeat a b c d e"
+               "#+linux #+nofeat a b c d e"
+               "#+linux #-linux a b c d e"
+               "#-linux #-linux a b c d e"
+               "#-linux #+linux a b c d e"
+               "#+linux #+linux a b c d e"
+               "#+nofeat #-nofeat a b c d e"
+               "#-nofeat #-nofeat a b c d e"
+               "#-nofeat #+nofeat a b c d e"
+               "#+nofeat #+nofeat a b c d e"))
+  (format t "test ~2d: ~a ~s~%"
+          (incf i)
+          (let ((stream (make-string-input-stream s)))
+            (list (read stream) (read stream) (read stream)))
+          s)))
+|#

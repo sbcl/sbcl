@@ -82,18 +82,12 @@
 
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 
-#+(or #.(cl:if (cl:and (cl:find-package "POSIX")
-                       (cl:find-symbol "WITH-SUBPROCESSES" "POSIX"))
-               :clisp '(or))
-      #.(cl:if (cl:find-package "HOST-SB-POSIX") :sbcl '(or)))
 (defun parallel-make-host-2 (max-jobs)
   (let ((subprocess-count 0)
         (subprocess-list nil)
         stop)
     (labels ((wait ()
-               (multiple-value-bind (pid status)
-                   #+sbcl (host-sb-posix:wait)
-                   #-sbcl (sb-cold::posix-wait)
+               (multiple-value-bind (pid status) (sb-cold::posix-wait)
                  (format t "~&; Subprocess ~D exit status ~D~%"  pid status)
                  (unless (zerop status)
                    (let ((stem (cdr (assoc pid subprocess-list))))
@@ -112,8 +106,7 @@
                          (terpri)))
                  (delete-file f))))
       #+sbcl (host-sb-ext:disable-debugger)
-      (#+clisp posix:with-subprocesses
-       #-clisp progn
+      (sb-cold::with-subprocesses
         (unwind-protect
              (do-stems-and-flags (stem flags 2)
                (unless (position :not-target flags)
@@ -121,11 +114,9 @@
                    (wait))
                  (when stop
                    (return))
-                 (let ((pid #+sbcl (host-sb-posix:fork)
-                            #-sbcl (sb-cold::posix-fork)))
+                 (let ((pid (sb-cold::posix-fork)))
                    (when (zerop pid)
-                     (let ((pid #+clisp (posix:process-id)
-                                #+sbcl (host-sb-unix:unix-getpid)))
+                     (let ((pid (sb-cold::getpid)))
                        (let ((*standard-output*
                               (open (format nil "~d.out" pid)
                                     :direction :output :if-exists :supersede))
