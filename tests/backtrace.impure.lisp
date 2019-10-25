@@ -330,7 +330,7 @@
   ;; WTF is this? This is a way to make these tests not depend so much on the
   ;; details of LOAD/EVAL. Around 1.0.57 we changed %SIMPLE-EVAL to be
   ;; slightly smarter, which meant that things which used to have xeps
-  ;; suddently had tl-xeps, etc. This takes care of that.
+  ;; suddenly had tl-xeps, etc. This takes care of that.
   `(funcall
     (checked-compile
      '(lambda ()

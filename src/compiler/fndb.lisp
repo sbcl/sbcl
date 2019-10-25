@@ -49,7 +49,7 @@
 ;;; FIXNUMness) might be different between host and target. Perhaps
 ;;; this property should be protected by #-SB-XC-HOST? Perhaps we need
 ;;; 3-stage bootstrapping after all? (Ugh! It's *so* slow already!)
-(defknown typep (t type-specifier &optional lexenv-designator) t
+(defknown typep (t type-specifier &optional lexenv-designator) boolean
    ;; Unlike SUBTYPEP or UPGRADED-ARRAY-ELEMENT-TYPE and friends, this
    ;; seems to be FOLDABLE. Like SUBTYPEP, it's affected by type
    ;; definitions, but unlike SUBTYPEP, there should be no way to make

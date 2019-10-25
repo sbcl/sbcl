@@ -569,7 +569,7 @@
 ;;; interpolate between regions of the type hierarchy, such as
 ;;; INSTANCE (which corresponds to all those classes with slots which
 ;;; are not funcallable), FUNCALLABLE-INSTANCE (those classes with
-;;; slots which are funcallable) and EXTENDED-SEQUUENCE (non-LIST
+;;; slots which are funcallable) and EXTENDED-SEQUENCE (non-LIST
 ;;; non-VECTOR classes which are also sequences).  These special cases
 ;;; are the ones that aren't really discussed by Baker in his
 ;;; "Decision Procedure for SUBTYPEP" paper.
