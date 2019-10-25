@@ -3523,15 +3523,14 @@ used for a COMPLEX component.~:@>"
         car-not2)
     ;; UGH.  -- CSR, 2003-02-24
     (macrolet ((frob-car (car1 car2 cdr1 cdr2
-                          &optional (not1 nil not1p))
-                 `(type-union
-                   (make-cons-type ,car1 (type-union ,cdr1 ,cdr2))
-                   (make-cons-type
-                    (type-intersection ,car2
-                     ,(if not1p
-                          not1
-                          `(type-negation ,car1)))
-                    ,cdr2))))
+                               &optional not1)
+                   `(let ((intersection (type-intersection ,car2
+                                                           ,(or not1
+                                                                `(type-negation ,car1)))))
+                      (unless (type= intersection ,car2)
+                        (type-union
+                         (make-cons-type ,car1 (type-union ,cdr1 ,cdr2))
+                         (make-cons-type intersection ,cdr2))))))
       (cond ((type= car-type1 car-type2)
              (make-cons-type car-type1
                              (type-union cdr-type1 cdr-type2)))
@@ -3543,17 +3542,13 @@ used for a COMPLEX component.~:@>"
             ((csubtypep car-type2 car-type1)
              (frob-car car-type2 car-type1 cdr-type2 cdr-type1))
             ;; more general case of the above, but harder to compute
-            ((progn
-               (setf car-not1 (type-negation car-type1))
-               (multiple-value-bind (yes win)
-                   (csubtypep car-type2 car-not1)
-                 (and (not yes) win)))
+            ((multiple-value-bind (yes win)
+                 (csubtypep car-type2 (setf car-not1 (type-negation car-type1)))
+               (and (not yes) win))
              (frob-car car-type1 car-type2 cdr-type1 cdr-type2 car-not1))
-            ((progn
-               (setf car-not2 (type-negation car-type2))
-               (multiple-value-bind (yes win)
-                   (csubtypep car-type1 car-not2)
-                 (and (not yes) win)))
+            ((multiple-value-bind (yes win)
+                 (csubtypep car-type1 (setf car-not2 (type-negation car-type2)))
+               (and (not yes) win))
              (frob-car car-type2 car-type1 cdr-type2 cdr-type1 car-not2))
             ;; Don't put these in -- consider the effect of taking the
             ;; union of (CONS (INTEGER 0 2) (INTEGER 5 7)) and
