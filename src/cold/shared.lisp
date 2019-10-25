@@ -721,8 +721,13 @@
              '(or))
   (labels ((contains-irrational (x)
              (typecase x
-               (cons (or (contains-irrational (car x))
-                         (contains-irrational (cdr x))))
+               (cons
+                ;; Tail-recursion not guaranteed
+                (do ((cons x (cdr cons)))
+                    ((atom cons)
+                     (contains-irrational cons))
+                  (when (contains-irrational (car cons))
+                    (return t))))
                (simple-vector (some #'contains-irrational x))
                ;; We use package literals -- see e.g. SANE-PACKAGE - which
                ;; must be treated as opaque, but COMMAs should not be opaque.
