@@ -666,3 +666,12 @@
 
 (with-test (:name :ctypep-function)
   (assert (not (sb-kernel:ctypep #'+ (eval '(sb-kernel:specifier-type '(function (list))))))))
+
+(with-test (:name :cons-union-loop)
+  (checked-compile-and-assert
+   ()
+   `(lambda (x)
+      (typep x '(or (cons (or fixnum vector (member a "b")))
+                 (cons (or (and (not vector) array) (and (not integer) number)) number))))
+   ((10) nil)
+   (((cons 1 2)) t)))
