@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.7:
+changes in sbcl-1.5.8 relative to sbcl-1.5.7:
   * platform support:
     ** support for Mac OS X Catalina
     ** improvements in interoperability with C code compiled with memory
