@@ -1238,7 +1238,7 @@
   (def simplify-unions union-type-p type-union2))
 
 (defun maybe-distribute-one-union (union-type types)
-  (let* ((intersection (apply #'type-intersection types))
+  (let* ((intersection (%type-intersection types))
          (union (mapcar (lambda (x) (type-intersection x intersection))
                         (union-type-types union-type))))
     (if (notany (lambda (x) (or (hairy-type-p x)
@@ -1268,7 +1268,7 @@
                (distributed (maybe-distribute-one-union first-union
                                                         other-types)))
           (if distributed
-              (apply #'type-union distributed)
+              (%type-union distributed)
               (%make-hairy-type `(and ,@(map 'list #'type-specifier
                                              simplified-types)))))
         (cond
@@ -2136,16 +2136,15 @@
                    ((eq ctype *universal-type*) (not-real))
                    ((typep ctype 'numeric-type) (complex1 ctype))
                    ((typep ctype 'union-type)
-                    (apply #'type-union
-                           (mapcar #'do-complex (union-type-types ctype))))
+                    (%type-union (mapcar #'do-complex (union-type-types ctype))))
                    ((typep ctype 'member-type)
-                    (apply #'type-union
-                           (mapcar-member-type-members
-                            (lambda (x)
-                              (if (realp x)
-                                  (do-complex (ctype-of x))
-                                  (not-real)))
-                            ctype)))
+                    (%type-union
+                     (mapcar-member-type-members
+                      (lambda (x)
+                        (if (realp x)
+                            (do-complex (ctype-of x))
+                            (not-real)))
+                      ctype)))
                    ((and (typep ctype 'intersection-type)
                          ;; FIXME: This is very much a
                          ;; not-quite-worst-effort, but we are required to do
@@ -3043,8 +3042,8 @@ used for a COMPLEX component.~:@>"
                     :might-contain-other-types t)
 
 (define-type-method (intersection :negate) (type)
-  (apply #'type-union
-         (mapcar #'type-negation (intersection-type-types type))))
+  (%type-union
+   (mapcar #'type-negation (intersection-type-types type))))
 
 ;;; A few intersection types have special names. The others just get
 ;;; mechanically unparsed.
@@ -3148,7 +3147,7 @@ used for a COMPLEX component.~:@>"
                                      intersected
                                      :test #'type=)))
            (and (not (equal intersected remaining))
-                (type-union type1 (apply #'type-intersection remaining)))))
+                (type-union type1 (%type-intersection remaining)))))
         (t
          (let ((accumulator *universal-type*))
            (do ((t2s (intersection-type-types type2) (cdr t2s)))
@@ -3174,9 +3173,8 @@ used for a COMPLEX component.~:@>"
                      (type-intersection accumulator union))))))))
 
 (def-type-translator and :list ((:context context) &rest type-specifiers)
-  (apply #'type-intersection
-         (mapcar (lambda (x) (specifier-type-r context x))
-                 type-specifiers)))
+  (%type-intersection (mapcar (lambda (x) (specifier-type-r context x))
+                              type-specifiers)))
 
 ;;;; union types
 
@@ -3186,8 +3184,7 @@ used for a COMPLEX component.~:@>"
 
 (define-type-method (union :negate) (type)
   (declare (type ctype type))
-  (apply #'type-intersection
-         (mapcar #'type-negation (union-type-types type))))
+  (%type-intersection (mapcar #'type-negation (union-type-types type))))
 
 ;;; Unlike ARRAY-TYPE-DIMENSIONS this handles union types, which
 ;;; includes the type STRING.
@@ -3371,9 +3368,9 @@ used for a COMPLEX component.~:@>"
         (t
          (multiple-value-bind (sub-value sub-certain?)
              (type= type1
-                    (apply #'type-union
-                           (mapcar (lambda (x) (type-intersection type1 x))
-                                   (union-type-types type2))))
+                    (%type-union
+                     (mapcar (lambda (x) (type-intersection type1 x))
+                             (union-type-types type2))))
            (if sub-certain?
                (values sub-value sub-certain?)
                ;; The ANY/TYPE expression above is a sufficient condition for
@@ -3433,9 +3430,8 @@ used for a COMPLEX component.~:@>"
                                (type-intersection type1 t2))))))))
 
 (def-type-translator or :list ((:context context) &rest type-specifiers)
-  (let ((type (apply #'type-union
-                     (mapcar (lambda (x) (specifier-type-r context x))
-                             type-specifiers))))
+  (let ((type (%type-union (mapcar (lambda (x) (specifier-type-r context x))
+                                   type-specifiers))))
     (if (union-type-p type)
         (sb-kernel::simplify-array-unions type)
         type)))
