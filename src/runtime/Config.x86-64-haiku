@@ -21,7 +21,6 @@ ifdef LISP_FEATURE_SB_THREAD
 endif
 
 CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer
-CPPFLAGS += -include memcpy.h
 # The installed compiler won't work with no-pie.
 # The support ticket https://dev.haiku-os.org/ticket/12430 is closed,
 # but it certainly looks like my default install succumbed to the same problem
