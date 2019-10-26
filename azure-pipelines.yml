@@ -53,7 +53,6 @@ jobs:
 
 - job: Windows
   variables:
-    mingw_path: C:\tools\msys64\usr\bin:/c/Program Files/Steel Bank Common Lisp/1.4.14
     CC: x86_64-w64-mingw32-gcc
   pool:
     vmImage: 'windows-latest'
@@ -61,10 +60,12 @@ jobs:
   steps:
   - script: |
       choco install --no-progress msys2 --params "/NoUpdate"
+      ECHO ##vso[task.prependpath]C:\tools\msys64\usr\bin:/c/Program Files/Steel Bank Common Lisp/1.4.14
+
     displayName: 'install host msys2'
 
   - script: |
-      C:\tools\msys64\usr\bin\bash -c '/usr/bin/pacman -S --noconfirm --needed mingw-w64-x86_64-gcc make diffutils'
+      C:\tools\msys64\usr\bin\bash -c 'pacman -S --noconfirm --needed mingw-w64-x86_64-gcc make diffutils'
     displayName: 'install gcc'
 
   - script: |
@@ -72,13 +73,13 @@ jobs:
     displayName: 'install host sbcl'
 
   - script: |
-      C:\tools\msys64\usr\bin\bash -c "PATH=\"/usr/bin:/c/Program Files/Steel Bank Common Lisp/1.4.14:$PATH\" $(make.sh)"
+      C:\tools\msys64\usr\bin\bash -c "$(make.sh)"
     displayName: 'make'
     env:
       SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
 
   - script: |
-      C:\tools\msys64\usr\bin\bash make-windows-installer.sh
+      C:\tools\msys64\usr\bin\bash -c "sh ./make-windows-installer.sh"
     displayName: 'make-installer'
 
   - task: CopyFiles@2
@@ -91,9 +92,9 @@ jobs:
     artifact: win32.msi
 
   - script: |
-        C:\tools\msys64\usr\bin\bash -c 'cd tests; PATH="/usr/bin:$PATH" ./run-tests.sh'
+        C:\tools\msys64\usr\bin\bash -c "cd tests; ./run-tests.sh"
     displayName: 'tests'
 
   - script: |
-        C:\tools\msys64\usr\bin\bash -c 'cd tests; PATH="/usr/bin:$PATH" ./ansi-tests.sh'
+        C:\tools\msys64\usr\bin\bash -c "cd tests; ./ansi-tests.sh"
     displayName: 'ansi-tests'
