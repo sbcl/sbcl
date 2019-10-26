@@ -1,5 +1,28 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.5.7:
+  * platform support:
+    ** support for Mac OS X Catalina
+    ** improvements in interoperability with C code compiled with memory
+       sanitization options
+    ** libsbcl.so links to zlib when sb-core-compression is enabled.
+       (lp#1845763, thanks to Juan M. Bello-Rivas)
+    ** workarounds for BSD issues around mmap() and pthread_attr_setstack().
+       (lp#1845936)
+    ** support SSE for bzero if available on OpenBSD
+  * optimizations:
+    ** improved type understanding and translations for division operators
+       (including TRUNCATE, GCD, LCM).
+    ** sequential comparisons and branches can elide intermediate comparisons.
+       (lp#1847284)
+    ** convert EQUAL and EQUALP to EQL if either of the arguments is a type
+       for which the structural equality predicate is identical to the simpler
+       equality check.  (lp#1848583)
+    ** internal operators implementing string comparisons produce
+       simpler-to-consume values.  (lp#1848776)
+  * bug fix: inspecting adjustable arrays and vectors with fill pointers works
+    better.  (lp#1846191, reported by Yves Pagani)
+
 changes in sbcl-1.5.7 relative to sbcl-1.5.6:
   * platform support:
     ** many bug fixes to the experimental 64-bit PowerPC/Linux port, to the
