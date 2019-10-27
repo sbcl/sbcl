@@ -2094,12 +2094,13 @@ core and return a descriptor to it."
          (offset (or (cdr (assq symbol list))
                      (error "Assembler routine ~S not defined." symbol))))
     (+ (logandc2 (descriptor-bits code-component) sb-vm:lowtag-mask)
+       (code-header-bytes code-component)
        (ecase mode
          (:direct
-            (+ (code-header-bytes code-component) offset))
+            offset)
          (:indirect
-            (ash (+ (round-up sb-vm:code-constants-offset 2)
-                    (count-if (lambda (x) (< (cdr x) offset)) list))
+            ;; add 1 for the prefix word that counts the absolute fixups
+            (ash (1+ (count-if (lambda (x) (< (cdr x) offset)) list))
                  sb-vm:word-shift))))))
 
 ;;; Unlike in the target, FOP-KNOWN-FUN sometimes has to backpatch.
@@ -2176,8 +2177,8 @@ core and return a descriptor to it."
               #+x86 (and in-dynamic-space
                           (not (< obj-start-addr addr code-end-addr)))
               #+x86-64 (eq flavor :foreign)))
-        (push (cons kind after-header)
-              (gethash (descriptor-bits code-object) *code-fixup-notes*)))))
+          (push (cons kind after-header)
+                (gethash (descriptor-bits code-object) *code-fixup-notes*)))))
   code-object)
 
 (defun resolve-static-call-fixups ()
@@ -2193,6 +2194,7 @@ core and return a descriptor to it."
   (collect ((relative) (absolute))
     (dolist (item list)
       (ecase (car item)
+        ;; There should be no absolute64 fixups to preserve
         (:relative (relative (cdr item)))
         (:absolute (absolute (cdr item)))))
     (number-to-core (sb-c::pack-code-fixup-locs (absolute) (relative)))))
@@ -2229,14 +2231,6 @@ core and return a descriptor to it."
                (if (listp key) (cold-list sym) sym))
              'sb-vm::+required-foreign-symbols+)
     (cold-set (cold-intern '*assembler-routines*) *cold-assembler-obj*)
-    (setq *cold-assembler-routines*
-          (sort *cold-assembler-routines* #'< :key #'cdr))
-    #+(or x86 x86-64) ; fill in the indirect call table
-    (let ((index (round-up sb-vm:code-constants-offset 2)))
-      (dolist (item *cold-assembler-routines*)
-        (write-wordindexed/raw *cold-assembler-obj* index
-                               (lookup-assembler-reference (car item)))
-        (incf index)))
     (to-core *cold-assembler-routines*
              (lambda (rtn)
                (cold-cons (cold-intern (first rtn)) (make-fixnum-descriptor (cdr rtn))))
@@ -2693,10 +2687,22 @@ core and return a descriptor to it."
                                       :start start
                                       :end (+ start length)))
     ;; Update the name -> address table.
-    (dotimes (i n-routines)
-      (let ((offset (descriptor-fixnum (pop-stack)))
-            (name (pop-stack)))
-        (push (cons name offset) *cold-assembler-routines*)))
+    (let (table)
+      (dotimes (i n-routines)
+        (let ((offset (descriptor-fixnum (pop-stack)))
+              (name (pop-stack)))
+          (push (cons name offset) table)))
+      ;; Now that we combine all assembler routines into a single code object
+      ;; at assembly time, they can all be sorted at this point.
+      ;; We used to combine them with some magic in genesis.
+      (setq *cold-assembler-routines* (sort table #'< :key #'cdr)))
+    #+(or x86 x86-64) ; fill in the indirect call table
+    (let ((index (ash (code-header-bytes asm-code) (- sb-vm:word-shift))))
+      (dolist (item *cold-assembler-routines*)
+        ;; Preincrement because we skip 1 word for the word containing
+        ;; the number of absolute fixups that follow.
+        (write-wordindexed/raw asm-code (incf index)
+                               (lookup-assembler-reference (car item)))))
     (apply-fixups (%fasl-input-stack (fasl-input)) asm-code n-fixups)))
 
 ;;; Target variant of this is defined in 'target-load'

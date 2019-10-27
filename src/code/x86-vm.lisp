@@ -22,7 +22,7 @@
 ;;; Return T if and only if the fixup needs to be recorded in %CODE-FIXUPS
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
-  (declare (ignore flavor))
+  (declare (ignorable flavor))
   (let* ((obj-start-addr (logandc2 (get-lisp-obj-address code) sb-vm:lowtag-mask))
          (sap (code-instructions code))
          (code-end-addr (+ (sap-int sap) (%code-code-size code))))
@@ -34,7 +34,13 @@
        ;; Record absolute fixups that point into CODE. An absolute fixup
        ;; can't point to another dynamic-space object, but it could point
        ;; to read-only or static space. Those don't need to be saved.
-       (< obj-start-addr (sap-ref-32 sap offset) code-end-addr))
+       (if (< obj-start-addr (sap-ref-32 sap offset) code-end-addr)
+           t
+           (unless (member flavor '(:symbol-tls-index :foreign-dataref :foreign
+                                    :assembly-routine))
+             #+nil
+             (warn "Unrecorded absolute fixup in ~s at ~x ~s ~s ~s~%"
+                   code offset fixup kind flavor))))
       (:relative
        ;; Fixup is the actual address wanted.
        ;; Replace word with value to add to that loc to get there.

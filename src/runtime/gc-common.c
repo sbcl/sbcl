@@ -306,6 +306,17 @@ trans_code(struct code *code)
     struct code *new_code = (struct code *) native_pointer(l_new_code);
     uword_t displacement = l_new_code - l_code;
 
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+    // Fixup absolute jump tables. These aren't recorded in code->fixups
+    // because we don't need to denote an arbitrary set of places in the code.
+    // The count alone suffices. A GC immediately after creating the code
+    // could cause us to observe some 0 words here. Those should be ignored.
+    lispobj* jump_table = (lispobj*)code_text_start(new_code);
+    int count = *jump_table;
+    int i;
+    for (i = 1; i < count; ++i)
+        if (jump_table[i]) jump_table[i] += displacement;
+#endif
     for_each_simple_fun(i, new_fun, new_code, 1, {
         // Calculate the old raw function pointer
         struct simple_fun* old_fun = (struct simple_fun*)((char*)new_fun - displacement);
@@ -315,14 +326,12 @@ trans_code(struct code *code)
                                    make_lispobj(new_fun, FUN_POINTER_LOWTAG));
         }
     })
+    gencgc_apply_code_fixups(code, new_code);
 #ifdef LISP_FEATURE_GENCGC
     /* Cheneygc doesn't need this os_flush_icache, it flushes the whole
        spaces once when all copying is done. */
     os_flush_icache(code_text_start(new_code), code_text_size(new_code));
 #endif
-
-    gencgc_apply_code_fixups(code, new_code);
-
     return new_code;
 }
 

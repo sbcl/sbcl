@@ -1348,6 +1348,15 @@
                    (.byte ; takes >1 byte, unlike inst BYTE which takes only 1
                     (dolist (byte operands (return-from op))
                       (emit-byte segment byte)))
+                   (.lispword
+                    (destructuring-bind (val) operands
+                      #+little-endian
+                      (loop for i below sb-vm:n-word-bits by 8
+                            do (emit-byte segment (ldb (byte 8 i) val)))
+                      #+big-endian
+                      (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
+                            do (emit-byte segment (ldb (byte 8 i) val))))
+                    (return-from op))
                    (.skip
                     (destructuring-bind (n-bytes &optional (pattern 0)) operands
                       (%emit-skip segment n-bytes pattern))
@@ -1416,6 +1425,12 @@
         ;; Total size of the code object must be multiple of 2 lispwords
         (aver (not (logtest (+ (segment-header-skew segment) index)
                             sb-vm:lowtag-mask)))
+        ;; TODO: as the comment in GENERATE-CODE suggests, we would like to align
+        ;; code objects to 16 bytes for 32-bit x86. That's simple - all we have to do
+        ;; is ensure that each code blob is a multiple of 16 bytes in size.
+        ;; Since code can only go on pages reserved for code, there will be no smaller
+        ;; object on the same page to cause misalignment.
+        ;; Extra padding can be inserted before the trailing simple-fun table.
         (let ((padding (if (eql n-entries 0)
                            0
                            (- index trailer-len (label-position end-text)))))

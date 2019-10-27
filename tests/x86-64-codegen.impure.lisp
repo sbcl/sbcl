@@ -329,3 +329,26 @@
 
 (with-test (:name :huge-code :skipped-on (not :immobile-code))
   (sb-vm::allocate-code-object :immobile 4 (* 2 1024 1024)))
+
+(defun bbb (x y z)
+  (declare (optimize (sb-c::verify-arg-count 0)))
+  (if x
+      (ecase y
+        (-2 'a) (2 'b) (3 'c) (4 (error "no")) (5 'd) (6 'e) (7 'wat) (8 '*) (9 :hi))
+      (case z
+        (#\a :a) (#\b :b) (#\e :c) (#\f :d) (#\g :e) (#\h :f) (t nil))))
+
+(with-test (:name :multiway-branch)
+  (let* ((lines
+          (split-string
+           (with-output-to-string (s) (disassemble 'bbb :stream s))
+           #\newline))
+         (n-comparisons
+          (loop for line in lines count (search "CMP" line))))
+    ;; there's 1 test of NIL, 1 test of character-widetag, and 2 limit checks
+    (assert (= n-comparisons 4))
+    (loop for ((x y z) . expect) in '(((t 3 nil) . c)
+                                      ((t 9 nil) . :hi)
+                                      ((nil nil #\b) . :b)
+                                      ((nil nil #\x) . nil))
+          do (assert (eq (bbb x y z) expect)))))

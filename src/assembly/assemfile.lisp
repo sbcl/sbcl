@@ -40,22 +40,22 @@
         (let ((sb-xc:*features* (cons :sb-assembling sb-xc:*features*))
               (*readtable* sb-cold:*xc-readtable*))
           (load (merge-pathnames name (make-pathname :type "lisp")))
-          ;; Leave room for the indirect call table. relocate_heap() in
-          ;; 'coreparse' finds the end with a 0 word so add 1 extra word.
+          ;; Reserve space for the jump table. The first word of the table
+          ;; indicates the total length.
           #+(or x86 x86-64)
           (emit (asmstream-data-section asmstream)
-                `(.skip ,(* (align-up (1+ (length *entry-points*)) 2)
-                            sb-vm:n-word-bytes)))
-          (when (emit-inline-constants)
-            ;; Ensure alignment to double-Lispword in case a raw constant
-            ;; causes misalignment, as actually happens on ARM64.
-            ;; You might think one Lispword is aligned enough, but it isn't,
-            ;; because to created a tagged pointer to an asm routine,
-            ;; the base address must have all 0s in the tag bits.
-            ;; Note that for code components that contain simple-funs,
-            ;; alignment is ensured by SIMPLE-FUN-HEADER-WORD.
-            (emit (asmstream-data-section asmstream)
-                  `(.align ,sb-vm:n-lowtag-bits)))
+                `(.lispword ,(1+ (length *entry-points*)))
+                `(.skip ,(* (length *entry-points*) sb-vm:n-word-bytes)))
+          (emit-inline-constants)
+          ;; Ensure alignment to double-Lispword in case a raw constant
+          ;; causes misalignment, as actually happens on ARM64.
+          ;; You might think one Lispword is aligned enough, but it isn't,
+          ;; because to created a tagged pointer to an asm routine,
+          ;; the base address must have all 0s in the tag bits.
+          ;; Note that for code components that contain simple-funs,
+          ;; alignment is ensured by SIMPLE-FUN-HEADER-WORD.
+          (emit (asmstream-data-section asmstream)
+                `(.align ,sb-vm:n-lowtag-bits))
           (let ((segment (assemble-sections
                           asmstream nil
                           (make-segment :inst-hook (default-segment-inst-hook)

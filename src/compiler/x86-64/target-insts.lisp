@@ -469,6 +469,8 @@
                  (snarf-error-junk sap offset trap-number length-only)))
            trap stream dstate)))))))
 
+;;; Note: this really has nothing to do with the code fixups, and we're
+;;; merely utilizing PACK-CODE-FIXUP-LOCS to perform data compression.
 (defun sb-c::convert-alloc-point-fixups (code locs)
   ;; Find the instruction which jumps over the profiling code,
   ;; and record the offset, and not the instruction that makes the call

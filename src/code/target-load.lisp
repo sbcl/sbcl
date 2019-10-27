@@ -314,7 +314,7 @@
         (let ((next-offset (if (< (1+ i) count) (cdr (svref vector (1+ i))) size)))
           (aver (> next-offset offset))
           ;; store inclusive bounds on PC offset range and the function index
-          (setf (gethash name ht) (list* offset (1- next-offset) i)))))))
+          (setf (gethash name ht) (list* offset (1- next-offset) (1+ i))))))))
 
 (defun !warm-load (file)
   (restart-case (let ((sb-c::*source-namestring*

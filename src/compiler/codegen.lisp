@@ -130,6 +130,39 @@
 (progn (defun sb-vm:sort-inline-constants (constants) constants)
        (defun sb-vm:emit-inline-constant (&rest args)
          (error "EMIT-INLINE-CONSTANT called with ~S" args)))
+;;; Emit the subset of inline constants which represent jump tables
+;;; and remove those constants so that they don't get emitted again.
+(defun emit-jump-tables ()
+  ;; Other backends will probably need relative jump tables instead
+  ;; of absolute tables because of the problem of needing to load
+  ;; the LIP register prior to loading an arbitrary PC.
+  #+(or x86 x86-64)
+  (let* ((asmstream *asmstream*)
+         (constants (asmstream-constant-vector asmstream))
+         (section (asmstream-data-section asmstream))
+         (nwords 0))
+    (collect ((jump-tables) (other))
+      (dovector (constant constants)
+        ;; Constant is ((category . data) . label)
+        (cond ((eq (caar constant) :jump-table)
+               (incf nwords (length (cdar constant)))
+               (jump-tables constant))
+              (t
+               (other constant))))
+      ;; Preface the unboxed data with a count of jump-table words,
+      ;; including the count itself as 1 word.
+      ;; On average this will add another padding word half of the time
+      ;; depending on the number of boxed constants. We could reduce space
+      ;; by storing one bit in the header indicating whether or not there
+      ;; is a jump table. I don't think that's worth the trouble.
+      (emit section `(.lispword ,(1+ nwords)))
+      (when (plusp nwords)
+        (dolist (constant (jump-tables))
+          (sb-vm:emit-inline-constant section (car constant) (cdr constant)))
+        (let ((nremaining (length (other))))
+          (adjust-array constants nremaining
+                        :fill-pointer nremaining
+                        :initial-contents (other)))))))
 ;;; Return T if and only if there were any constants emitted.
 (defun emit-inline-constants ()
   (let* ((asmstream *asmstream*)
@@ -242,6 +275,8 @@
             ;; on 8 byte boundaries we cannot guarantee proper loop alignment
             ;; there (yet.)  Only x86-64 does something with ALIGNP, but
             ;; it may be useful in the future.
+            ;; FIXME: see comment in ASSEMBLE-SECTIONS - we *can* enforce larger
+            ;; alignment than the size of a cons cell.
             (let ((alignp (let ((cloop (block-loop 1block)))
                             (when (and cloop
                                        (loop-tail cloop)
@@ -284,9 +319,14 @@
     ;; Truncate the final assembly code buffer to length
     (sb-assem::truncate-section-to-length (asmstream-code-section asmstream))
 
+    ;; Jump tables precede the coverage mark bytes to simplify locating
+    ;; them in trans_code().
+    (emit-jump-tables)
+    ;; Todo: can we implement the flow-based aspect of coverage mark compression
+    ;; in IR2 instead of waiting until assembly generation?
     (coverage-mark-lowering-pass component asmstream)
-
     (emit-inline-constants)
+
     (let* ((info (component-info component))
            (simple-fun-labels
             (mapcar #'entry-info-offset (ir2-component-entries info)))

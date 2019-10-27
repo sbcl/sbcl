@@ -1673,10 +1673,6 @@ static void fixup_space(lispobj* where, size_t n_words)
           // Fixup the constant pool.
           code = (struct code*)where;
           adjust_words(where+2, code_header_words(code)-2, 0);
-          // Fixup all embedded simple-funs
-          for_each_simple_fun(i, f, code, 1, {
-              f->self = adjust_fun_entrypoint(f->self);
-          });
           apply_absolute_fixups(code->fixups, code);
           break;
         case CLOSURE_WIDETAG:
@@ -2053,12 +2049,29 @@ static void defrag_immobile_space(boolean verbose)
                        sizetab[widetag_of(addr)](addr) << WORD_SHIFT);
                 int displacement = new_vaddr - (lispobj)addr;
                 switch (widetag_of(addr)) {
+                default:
+                    lose("What is object type %x doing here?", widetag_of(addr));
                 case CODE_HEADER_WIDETAG:
                     for_each_simple_fun(index, fun, (struct code*)addr, 1, {
+                        struct simple_fun *new_fun =
+                            (struct simple_fun*)((char*)fun + displacement);
+                        // Fix the 'self' slot for the new logical address,
+                        // storing via the current (temporary) address.
+                        ((struct simple_fun*)tempspace_addr(new_fun))->self =
+                            fun_self_from_baseptr(new_fun);
                         set_forwarding_pointer((lispobj*)fun,
-                                               make_lispobj((char*)fun + displacement,
-                                                            FUN_POINTER_LOWTAG));
+                                               make_lispobj(new_fun, FUN_POINTER_LOWTAG));
                     });
+                    {
+                    // Fix any absolute jump tables
+                    lispobj* jump_table =
+                        (lispobj*)code_text_start((struct code*)
+                                                  tempspace_addr((void*)new_vaddr));
+                    int count = *jump_table;
+                    int i;
+                    for (i = 1; i < count; ++i)
+                        if (jump_table[i]) jump_table[i] += displacement;
+                    }
                     break;
                 }
                 set_forwarding_pointer(addr,

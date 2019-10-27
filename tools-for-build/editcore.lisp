@@ -924,12 +924,20 @@
 
     ;; Scan the assembly routines.
     (let* ((code-component (make-code-obj code-addr))
-           (header-len (code-header-words code-component)))
+           (obj-sap (int-sap (- (get-lisp-obj-address code-component)
+                                other-pointer-lowtag)))
+           (header-len (code-header-words code-component))
+           (jump-table-count (sap-ref-word (code-instructions code-component) 0)))
       ;; Write the code component header
-      (emit-asm-directives :qword
-                           (int-sap (- (get-lisp-obj-address code-component)
-                                       other-pointer-lowtag))
-                           header-len output #())
+      (emit-asm-directives :qword obj-sap header-len output #())
+      ;; Write the jump table
+      (format output " .quad ~D" jump-table-count)
+      (dotimes (i (1- jump-table-count))
+        (format output ",CS+0x~x"
+                (- (sap-ref-word (code-instructions code-component)
+                                 (ash (1+ i) sb-vm:word-shift))
+                   code-addr)))
+      (terpri output)
       (let ((name->addr
              ;; the CDR of each alist item is a target cons (needing translation)
              (sort
@@ -943,18 +951,12 @@
                        (car (translate (%code-debug-info code-component) spaces))
                        spaces))
               #'< :key #'cadr)))
-        (let* ((n-entrypoints (length name->addr))
-               (min-entry-offs (cadar name->addr))
-               (n-words (/ min-entry-offs n-word-bytes)))
-          ;; Write a table of N-WORDS in length containing the entrypoints
-          ;; Not all words in the jump table will necessarily be used.
-          (dotimes (i n-words)
-            (format output "~A ~:[0~;CS+0x~:*~x~]"
-                    (if (= i 0) " .quad" ",")
-                    (when (< i n-entrypoints)
-                      (+ (ash header-len word-shift)
-                         (cadr (nth i name->addr)))))))
-        (terpri output)
+        ;; Possibly a padding word
+        (let ((here (ash jump-table-count sb-vm:word-shift))
+              (first-entry-point (cadar name->addr)))
+          (when (> first-entry-point here)
+            (assert (= first-entry-point (+ here 8)))
+            (format output " .quad 0~%")))
         ;; Loop over the embedded routines
         (let ((list name->addr)
               (obj-size (code-object-size code-component)))

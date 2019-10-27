@@ -47,6 +47,48 @@
                  (first flags))
              dest))))
 
+(define-vop (multiway-branch-if-eq)
+  ;; TODO: also accept signed-reg, unsigned-reg, character-reg
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:info values labels otherwise)
+  (:temporary (:sc unsigned-reg) index)
+  (:generator 10
+    (etypecase (car values)
+      (fixnum
+       (let* ((min (reduce #'min values))
+              (max (reduce #'max values))
+              (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+         (mapc (lambda (value label) (setf (aref vector (- value min)) label))
+               values labels)
+         (inst test x fixnum-tag-mask)
+         (inst jmp :ne otherwise)
+         (inst lea index (make-ea :dword :base x :disp (- min)))
+         (inst cmp index (fixnumize (- max min)))
+         (inst jmp :a otherwise)
+         (let ((table (register-inline-constant :jump-table (coerce vector 'list))))
+           (inst jmp (make-ea :dword :index index
+                                     :disp (make-fixup nil :code-object table))))))
+      (character
+       (let* ((min (reduce #'min values :key #'char-code))
+              (max (reduce #'max values :key #'char-code))
+              (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+         (mapc (lambda (value label)
+                 (setf (aref vector (- (char-code value) min)) label))
+               values labels)
+         (inst mov index x)
+         (inst and index widetag-mask)
+         (inst cmp index character-widetag)
+         (inst jmp :ne otherwise)
+         (inst mov index x)
+         (inst shr index n-widetag-bits)
+         (inst sub index min)
+         (inst cmp index (- max min))
+         (inst jmp :a otherwise)
+         (let ((table (register-inline-constant :jump-table (coerce vector 'list))))
+           (inst jmp (make-ea :dword :index index
+                              :disp (make-fixup nil :code-object table)
+                              :scale 4))))))))
+
 (define-load-time-global *cmov-ptype-representation-vop*
   (mapcan (lambda (entry)
             (destructuring-bind (ptypes &optional sc vop)

@@ -2523,13 +2523,15 @@
          (aver (typep value 'double-float))
          (cons :double-float
                (ldb (byte 64 0) (logior (ash (double-float-high-bits value) 32)
-                                        (double-float-low-bits value))))))))
+                                        (double-float-low-bits value)))))
+      ((:jump-table)
+       (cons :jump-table value)))))
 
 (defun inline-constant-value (constant)
   (let ((label (gen-label))
         (size  (ecase (car constant)
                  ((:byte :word :dword) (car constant))
-                 (:double-float :dword))))
+                 ((:double-float :jump-table) :dword))))
     (values label (make-ea size
                            :disp (make-fixup nil :code-object label)))))
 
@@ -2540,21 +2542,52 @@
     (:dword 4)
     (:double-float 8)))
 
+(defun align-of (constant)
+  (case (car constant)
+    (:jump-table n-word-bytes)
+    (t (size-nbyte (car constant)))))
+
 (defun sort-inline-constants (constants)
-  (stable-sort constants #'> :key (lambda (constant)
-                                    (size-nbyte (caar constant)))))
+  ;; Each constant is ((size . bits) . label)
+  (stable-sort constants #'> :key (lambda (x) (align-of (car x)))))
+
+(define-instruction .dword (segment &rest vals)
+  (:emitter
+   (dolist (val vals)
+     (cond ((label-p val)
+            ;; note a fixup prior to writing the backpatch so that the fixup's
+            ;; position is the location counter at the patch point
+            ;; (i.e. prior to skipping 8 bytes)
+            ;; This fixup is *not* recorded in code->fixups. Instead, trans_code()
+            ;; will fixup a counted initial subsequence of unboxed words.
+            (note-fixup segment :absolute (make-fixup nil :code-object 0))
+            (emit-back-patch
+             segment
+             4
+             (lambda (segment posn)
+               (declare (ignore posn)) ; don't care where the fixup itself is
+               (emit-dword segment
+                           (+ (component-header-length)
+                              (- (segment-header-skew segment))
+                              (- other-pointer-lowtag)
+                              (label-position val))))))
+           (t
+            (emit-dword segment val))))))
 
 (defun emit-inline-constant (section constant label)
-  (let ((size (size-nbyte (car constant))))
+  ;; See comment at CANONICALIZE-INLINE-CONSTANT about how we are
+  ;; careless with the distinction between alignment and size.
+  ;; Such slop would not work for big-endian machines.
+  (let ((size (align-of constant)))
     (emit section
           `(.align ,(integer-length (1- size)))
           label
-          ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
-          ;; But it works fine to emit as a sequence of bytes
-          `(.byte ,@(let ((val (cdr constant)))
-                      (loop repeat size
-                            collect (prog1 (ldb (byte 8 0) val)
-                                      (setf val (ash val -8)))))))))
+          (if (eq (car constant) :jump-table)
+              `(.dword ,@(cdr constant))
+              `(.byte ,@(let ((val (cdr constant)))
+                          (loop repeat size
+                                collect (prog1 (ldb (byte 8 0) val)
+                                          (setf val (ash val -8))))))))))
 
 ;;; Perform exhaustive analysis here because of the extreme degree
 ;;; of confusion I have about what is allowed to reach the instruction

@@ -60,6 +60,52 @@
               (dolist (flag flags)
                 (inst jmp flag dest)))))))
 
+(define-vop (multiway-branch-if-eq)
+  ;; TODO: also accept signed-reg, unsigned-reg, character-reg
+  ;; also, could probably tighten up the TN lifetime to avoid a move
+  (:args (x :scs (any-reg descriptor-reg)))
+  (:info values labels otherwise)
+  (:temporary (:sc unsigned-reg) table)
+  (:generator 10
+    (etypecase (car values)
+      (fixnum
+       (let* ((min (reduce #'min values))
+              (max (reduce #'max values))
+              (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+         (mapc (lambda (value label) (setf (aref vector (- value min)) label))
+               values labels)
+         ;; First exclude out-of-bounds values because there's no harm
+         ;; in doing that up front regardless of the argument's lisp type.
+         (if (= min 0)
+             (move temp-reg-tn x)
+             (inst lea temp-reg-tn (ea (fixnumize (- min)) x)))
+         (inst cmp temp-reg-tn (fixnumize (- max min)))
+         (inst jmp :a otherwise)
+         ;; We have to check the type here because a chain of EQ tests
+         ;; does not impose a type constraint. If we have a derived a
+         ;; fixnum type though, this test could/should be elided.
+         (inst test x fixnum-tag-mask)
+         (inst jmp :ne otherwise)
+         (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
+         (inst jmp (ea table temp-reg-tn 4))))
+      (character
+       (let* ((min (reduce #'min values :key #'char-code))
+              (max (reduce #'max values :key #'char-code))
+              (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+         (mapc (lambda (value label)
+                 (setf (aref vector (- (char-code value) min)) label))
+               values labels)
+         ;; Same as above, but test the widetag before shifting it out.
+         (inst cmp :byte x character-widetag)
+         (inst jmp :ne otherwise)
+         (inst mov :dword temp-reg-tn x)
+         (inst shr :dword temp-reg-tn n-widetag-bits)
+         (inst sub :dword temp-reg-tn min)
+         (inst cmp temp-reg-tn (- max min))
+         (inst jmp :a otherwise)
+         (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
+         (inst jmp (ea table temp-reg-tn 8)))))))
+
 (define-load-time-global *cmov-ptype-representation-vop*
   (mapcan (lambda (entry)
             (destructuring-bind (ptypes &optional sc vop)

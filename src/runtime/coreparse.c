@@ -462,6 +462,13 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
             adjust_pointers(where+2, code_header_words(code)-2, adj);
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+            // Fixup absolute jump table
+            lispobj* jump_table = (lispobj*)code_text_start(code);
+            int count = *jump_table;
+            int i;
+            for (i = 1; i < count; ++i) adjust_word_at(jump_table+i, adj);
+#endif
             // Fixup all embedded simple-funs
             for_each_simple_fun(i, f, code, 1, {
                 fix_fun_header_layout((lispobj*)f, adj);
@@ -600,14 +607,7 @@ static void relocate_heap(struct heap_adjust* adj)
 #else
     relocate_space(DYNAMIC_SPACE_START, (lispobj*)get_alloc_pointer(), adj);
 #endif
-
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
-    // Assembler routines move with varyobj space, if it exists.
-    // Otherwise they're either in readonly or static space.
-    struct code* code = (struct code*)asm_routines_start;
-    lispobj* jump_table = (lispobj*)code_text_start(code);
-    for ( ; *jump_table ; ++jump_table )
-        adjust_word_at(jump_table, adj);
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
     if (lisp_code_in_elf())

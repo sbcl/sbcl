@@ -18,8 +18,7 @@
 
 ;;; This gets called by LOAD to resolve newly positioned objects
 ;;; with things (like code instructions) that have to refer to them.
-;;; Return :ABSOLUTE if an absolute fixup needs to be recorded in %CODE-FIXUPS,
-;;; and return :RELATIVE if a relative fixup needs to be recorded.
+;;; Return KIND  if the fixup needs to be recorded in %CODE-FIXUPS.
 ;;; The code object we're fixing up is pinned whenever this is called.
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset) (ignorable flavor))
@@ -29,29 +28,26 @@
                        (signed-sap-ref-32 sap offset))
                    fixup)))
     (ecase kind
-        (:absolute64
+      (:absolute64
          ;; Word at sap + offset contains a value to be replaced by
          ;; adding that value to fixup.
          (setf (sap-ref-64 sap offset) fixup))
-        (:absolute
+      (:absolute
          ;; Word at sap + offset contains a value to be replaced by
          ;; adding that value to fixup.
          (setf (sap-ref-32 sap offset) fixup))
-        (:relative
+      (:relative
          ;; Fixup is the actual address wanted.
          ;; Replace word with value to add to that loc to get there.
          ;; In the #-immobile-code case, there's nothing to assert.
-         ;; Relative fixups pretty much can't happen.
+         ;; Relative fixups don't exist with movable code.
          #+immobile-code
          (unless (immobile-space-obj-p code)
            (error "Can't compute fixup relative to movable object ~S" code))
          (setf (signed-sap-ref-32 sap offset)
-               (etypecase fixup
-                 (integer
-                  ;; JMP/CALL are relative to the next instruction,
-                  ;; so add 4 bytes for the size of the displacement itself.
-                  (- fixup
-                     (the (unsigned-byte 64) (+ (sap-int sap) offset 4)))))))))
+               ;; JMP/CALL are relative to the next instruction,
+               ;; so add 4 bytes for the size of the displacement itself.
+               (- fixup (sap-int (sap+ sap (+ offset 4))))))))
   ;; An absolute fixup is stored in the code header's %FIXUPS slot if it
   ;; references an immobile-space (but not static-space) object.
   ;; Note that:
