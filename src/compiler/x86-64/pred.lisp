@@ -64,7 +64,7 @@
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg
   ;; also, could probably tighten up the TN lifetime to avoid a move
   (:args (x :scs (any-reg descriptor-reg)))
-  (:info values labels otherwise)
+  (:info values labels otherwise test-vop-name)
   (:temporary (:sc unsigned-reg) table)
   (:generator 10
     (etypecase (car values)
@@ -82,10 +82,11 @@
          (inst cmp temp-reg-tn (fixnumize (- max min)))
          (inst jmp :a otherwise)
          ;; We have to check the type here because a chain of EQ tests
-         ;; does not impose a type constraint. If we have a derived a
-         ;; fixnum type though, this test could/should be elided.
-         (inst test x fixnum-tag-mask)
-         (inst jmp :ne otherwise)
+         ;; does not impose a type constraint.
+         ;; If type of X was derived as fixnum, then elide this test.
+         (unless (eq test-vop-name 'sb-vm::fast-if-eq-fixnum/c)
+           (inst test x fixnum-tag-mask)
+           (inst jmp :ne otherwise))
          (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
          (inst jmp (ea table temp-reg-tn 4))))
       (character
@@ -96,11 +97,13 @@
                  (setf (aref vector (- (char-code value) min)) label))
                values labels)
          ;; Same as above, but test the widetag before shifting it out.
-         (inst cmp :byte x character-widetag)
-         (inst jmp :ne otherwise)
+         (unless (eq test-vop-name 'sb-vm::fast-char=/character/c)
+           (inst cmp :byte x character-widetag)
+           (inst jmp :ne otherwise))
          (inst mov :dword temp-reg-tn x)
          (inst shr :dword temp-reg-tn n-widetag-bits)
-         (inst sub :dword temp-reg-tn min)
+         (unless (= min 0)
+           (inst sub :dword temp-reg-tn min))
          (inst cmp temp-reg-tn (- max min))
          (inst jmp :a otherwise)
          (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))

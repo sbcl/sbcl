@@ -233,7 +233,7 @@
   ;; (to the debugger) locations in this block
   (locations nil :type list))
 
-(defprinter (ir2-block)
+(defprinter (ir2-block :identity t)
   (pushed :test pushed)
   (popped :test popped)
   (start-vop :test start-vop)

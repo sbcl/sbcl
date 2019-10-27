@@ -469,12 +469,16 @@
         ;; No need to check for (NULL vop) in the exit condition
         ;; because the loop won't entered if there are fewer than 2 vops.
         (cond ((eq (vop-next vop) last-vop) ; at penultimate vop now
-               (return (when (and (eq (vop-name vop) 'if-eq)
-                                  (let ((comparand (tn-ref-tn (tn-ref-across (vop-args vop)))))
-                                    (and (tn-sc comparand)
-                                         (sc-is comparand sb-vm::immediate)
-                                         (typep (tn-value comparand)
-                                                '(or fixnum character)))))
+               (return (when (or (and (eq (vop-name vop) 'if-eq)
+                                      (let ((comparand
+                                             (tn-ref-tn (tn-ref-across (vop-args vop)))))
+                                        (and (tn-sc comparand)
+                                             (sc-is comparand sb-vm::immediate)
+                                             (typep (tn-value comparand)
+                                                    '(or fixnum character)))))
+                                 (member (vop-name vop)
+                                         '(sb-vm::fast-char=/character/c
+                                           sb-vm::fast-if-eq-fixnum/c)))
                          vop)))
               (t
                (setq vop (vop-next vop))))))))
@@ -493,8 +497,13 @@
 ;;; is cluttered up by the coverage noise prior to performing the next comparison.
 ;;; It's probably just as well, because the coverage report would have no idea
 ;;; how to decode the recorded information from the multiway branch vop.
-(defun longest-if-else-chain (vop)
-  (let ((test-var (tn-ref-tn (vop-args vop)))
+;;; FIXME: this will not find an if/else chain in the following example:
+;;;    (DEFUN F (X) (IF (FIXNUMP X) (CASE X (0 1) (1 2) (2 3) (3 4))))
+;;; because there is an extraneous MOVE vop at the head of each block.
+;;; I need to see through that move.
+(defun longest-if-else-chain (start-vop)
+  (let ((test-var (tn-ref-tn (vop-args start-vop)))
+        (vop start-vop)
         chain
         blocks-to-delete)
     (loop
@@ -516,8 +525,10 @@
                (setf (ir2-block-%label then-block) (gen-label)))
            (when chain
              (push block blocks-to-delete))
-           (push (cons (tn-value (tn-ref-tn (tn-ref-across (vop-args vop)))) then-block)
-                 chain)
+           (let ((val (if (eq (vop-name vop) 'if-eq)
+                          (tn-value (tn-ref-tn (tn-ref-across (vop-args vop))))
+                          (car (vop-codegen-info vop)))))
+             (push (cons val then-block) chain))
            (let ((else-block-predecessors
                   (car (gethash else-block *2block-info*)))
                  (else-vop (ir2-block-start-vop else-block)))
@@ -535,11 +546,16 @@
                    (setf (ir2-block-%label else-block) (gen-label)))
                ;; the chain is order-insensitive but more understandable
                ;; if returned in the order that tests appeared in source.
-               (return (values (list (nreverse chain) else-block)
+               (return (values (list (vop-name start-vop) (nreverse chain) else-block)
                                blocks-to-delete)))
              (setq vop (ir2-block-start-vop else-block)))))))))
 
-(defun should-use-jump-table-p (chain &aux (choices (car chain)))
+;;; Decide whether CHAIN can be implemented as a multiway branch.
+;;; As a further enhancement, it would be nice if we could factor out the
+;;; parts that can be, if any can be.
+;;; e.g. (case x (1 :a) (2 :b) (3 :c) (zot 'y)) ; with any order of tests
+;;; could be expressed as (if (eq x 'zot) y [multiway-branch])
+(defun should-use-jump-table-p (chain &aux (choices (cadr chain)))
   ;; Don't convert to a multiway branch if there are 3 or fewer comparisons.
   (unless (>= (length choices) 4)
     (return-from should-use-jump-table-p nil))
@@ -574,15 +590,16 @@
                 ;; there had better be no vops remaining
                 (aver (null (ir2-block-start-vop block))))
               ;; Unzip the alist
-              (let* ((values (mapcar #'car (first chain)))
-                     (blocks (mapcar #'cdr (first chain)))
-                     (labels (mapcar #'ir2-block-%label blocks))
-                     (otherwise (ir2-block-%label (second chain))))
-                (emit-and-insert-vop node 2block
-                                     (template-or-lose 'sb-vm::multiway-branch-if-eq)
-                                     (reference-tn src nil) nil nil
-                                     (list values labels otherwise))
-                (update-block-succ 2block (cons (cadr chain) blocks))))))))))
+              (destructuring-bind (test-vop-name clauses else-block) chain
+                (let* ((values (mapcar #'car clauses))
+                       (blocks (mapcar #'cdr clauses))
+                       (labels (mapcar #'ir2-block-%label blocks))
+                       (otherwise (ir2-block-%label else-block)))
+                  (emit-and-insert-vop node 2block
+                                       (template-or-lose 'sb-vm::multiway-branch-if-eq)
+                                       (reference-tn src nil) nil nil
+                                       (list values labels otherwise test-vop-name))
+                  (update-block-succ 2block (cons else-block blocks)))))))))))
 
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))

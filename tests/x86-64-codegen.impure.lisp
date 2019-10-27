@@ -331,6 +331,8 @@
   (sb-vm::allocate-code-object :immobile 4 (* 2 1024 1024)))
 
 (defun bbb (x y z)
+  ;; I don't want the number of expected comparisons to depend on whether
+  ;; the code gets disassembled with versus without the initial segment.
   (declare (optimize (sb-c::verify-arg-count 0)))
   (if x
       (ecase y
@@ -338,17 +340,35 @@
       (case z
         (#\a :a) (#\b :b) (#\e :c) (#\f :d) (#\g :e) (#\h :f) (t nil))))
 
-(with-test (:name :multiway-branch)
-  (let* ((lines
+(defun try-case-known-fixnum (x)
+  (declare (optimize (sb-c::verify-arg-count 0)))
+  (case (the fixnum x)
+    (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah)))
+
+(defun try-case-known-char (x)
+  (declare (optimize (sb-c::verify-arg-count 0)))
+  (case (the character x)
+    (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :b)))
+
+(defun expect-n-comparisons (fun-name howmany)
+  (let ((lines
           (split-string
-           (with-output-to-string (s) (disassemble 'bbb :stream s))
-           #\newline))
-         (n-comparisons
-          (loop for line in lines count (search "CMP" line))))
-    ;; there's 1 test of NIL, 1 test of character-widetag, and 2 limit checks
-    (assert (= n-comparisons 4))
-    (loop for ((x y z) . expect) in '(((t 3 nil) . c)
-                                      ((t 9 nil) . :hi)
-                                      ((nil nil #\b) . :b)
-                                      ((nil nil #\x) . nil))
-          do (assert (eq (bbb x y z) expect)))))
+           (with-output-to-string (s) (disassemble fun-name :stream s))
+           #\newline)))
+    (assert (= (loop for line in lines count (search "CMP" line))
+               howmany))))
+
+(with-test (:name :multiway-branch-generic-eq)
+  ;; there's 1 test of NIL, 1 test of character-widetag, and 2 limit checks
+  (expect-n-comparisons 'bbb 4)
+  (loop for ((x y z) . expect) in '(((t 3 nil) . c)
+                                    ((t 9 nil) . :hi)
+                                    ((nil nil #\b) . :b)
+                                    ((nil nil #\x) . nil))
+        do (assert (eq (bbb x y z) expect))))
+
+(with-test (:name :multiway-branch-fixnum-eq)
+  (expect-n-comparisons 'try-case-known-fixnum 1)) ; just the upper bound
+
+(with-test (:name :multiway-branch-char-eq)
+  (expect-n-comparisons 'try-case-known-char 2)) ; widetag test and upper bound
