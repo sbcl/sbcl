@@ -372,3 +372,18 @@
 
 (with-test (:name :multiway-branch-char-eq)
   (expect-n-comparisons 'try-case-known-char 2)) ; widetag test and upper bound
+
+(with-test (:name :multiway-branch-min-branch-factor)
+  ;; Test that multiway vop shows up in IR2
+  (let ((s (with-output-to-string (sb-c::*compiler-trace-output*)
+             (checked-compile '(lambda (b)
+                                (case b
+                                  ((0) :a) ((0) :b) ((0) :c) ((1) :d)
+                                  ((2) :e) ((3) :f)))
+                              :allow-style-warnings t))))
+    (assert (search "MULTIWAY-BRANCH" s)))
+  ;; There are too few cases after duplicate removal to be considered multiway
+  (let ((s (with-output-to-string (sb-c::*compiler-trace-output*)
+             (checked-compile '(lambda (b) (case b ((0) :a) ((0) :b) ((0) :c) ((1) :d)))
+                              :allow-style-warnings t))))
+    (assert (not (search "MULTIWAY-BRANCH" s)))))

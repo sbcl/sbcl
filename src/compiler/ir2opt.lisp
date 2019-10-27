@@ -556,54 +556,56 @@
 ;;; e.g. (case x (1 :a) (2 :b) (3 :c) (zot 'y)) ; with any order of tests
 ;;; could be expressed as (if (eq x 'zot) y [multiway-branch])
 (defun should-use-jump-table-p (chain &aux (choices (cadr chain)))
-  ;; Don't convert to a multiway branch if there are 3 or fewer comparisons.
-  (unless (>= (length choices) 4)
-    (return-from should-use-jump-table-p nil))
-  (let ((values (mapcar #'car choices)))
-    (cond ((every #'fixnump values)) ; ok
-          ((every #'characterp values)
-           (setq values (mapcar #'char-code values)))
-          (t
-           (return-from should-use-jump-table-p nil)))
-    (let* ((min (reduce #'min values))
-           (max (reduce #'max values))
-           (table-size (1+ (- max min )))
-           (size-limit (* (length values) 2)))
-      ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
-      ;; for 4 entries, which is excessive.
-      (<= table-size size-limit))))
+  ;; Dup keys could exist. REMOVE-DUPLICATES from-end can handle that:
+  ;;  "the one occurring earlier in sequence is discarded, unless from-end
+  ;;   is true, in which case the one later in sequence is discarded."
+  (let ((choices (remove-duplicates choices :key #'car :from-end t)))
+    ;; Convert to multiway only if at least 4 key comparisons would be needed.
+    (unless (>= (length choices) 4)
+      (return-from should-use-jump-table-p nil))
+    (let ((values (mapcar #'car choices)))
+      (cond ((every #'fixnump values)) ; ok
+            ((every #'characterp values)
+             (setq values (mapcar #'char-code values)))
+            (t
+             (return-from should-use-jump-table-p nil)))
+      (let* ((min (reduce #'min values))
+             (max (reduce #'max values))
+             (table-size (1+ (- max min )))
+             (size-limit (* (length values) 2)))
+        ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
+        ;; for 4 entries, which is excessive.
+        (when (<= table-size size-limit)
+          ;; Recons the data to play things safe: (vop-name choices else)
+          (list (first chain) choices (third chain)))))))
 
 (defun convert-if-else-chains (component)
   (do-ir2-blocks (2block component)
     (let ((comparison (ends-in-branch-if-eq-imm-p 2block)))
       (when (and comparison (exactly-two-successors-p 2block))
-        (multiple-value-bind (chain blocks-to-delete) (longest-if-else-chain comparison)
-          (when (should-use-jump-table-p chain)
-            (let ((node (vop-node comparison))
-                  (src (tn-ref-tn (vop-args comparison))))
-              (delete-vop (vop-next comparison)) ; delete the BRANCH-IF
-              (delete-vop comparison) ; delete the initial IF-EQ
-              ;; Delete vops that are bypassed
-              (dolist (block blocks-to-delete)
-                (delete-vop (ir2-block-last-vop block))
-                (delete-vop (ir2-block-last-vop block))
-                ;; there had better be no vops remaining
-                (aver (null (ir2-block-start-vop block))))
-              ;; Unzip the alist
-              (destructuring-bind (test-vop-name clauses else-block) chain
-                ;; Dup keys could exist. REMOVE-DUPLICATES from-end can handle that:
-                ;;  "the one occurring earlier in sequence is discarded, unless from-end
-                ;;   is true, in which case the one later in sequence is discarded."
-                (let* ((clauses (remove-duplicates clauses :key #'car :from-end t))
-                       (values (mapcar #'car clauses))
-                       (blocks (mapcar #'cdr clauses))
-                       (labels (mapcar #'ir2-block-%label blocks))
-                       (otherwise (ir2-block-%label else-block)))
-                  (emit-and-insert-vop node 2block
-                                       (template-or-lose 'sb-vm::multiway-branch-if-eq)
-                                       (reference-tn src nil) nil nil
-                                       (list values labels otherwise test-vop-name))
-                  (update-block-succ 2block (cons else-block blocks)))))))))))
+        (binding* (((chain delete-blocks) (longest-if-else-chain comparison))
+                   (culled-chain (should-use-jump-table-p chain) :exit-if-null)
+                   (node (vop-node comparison))
+                   (src (tn-ref-tn (vop-args comparison))))
+          (delete-vop (vop-next comparison)) ; delete the BRANCH-IF
+          (delete-vop comparison) ; delete the initial IF-EQ
+          ;; Delete vops that are bypassed
+          (dolist (block delete-blocks)
+            (delete-vop (ir2-block-last-vop block))
+            (delete-vop (ir2-block-last-vop block))
+            ;; there had better be no vops remaining
+            (aver (null (ir2-block-start-vop block))))
+          ;; Unzip the alist
+          (destructuring-bind (test-vop-name clauses else-block) culled-chain
+            (let* ((values (mapcar #'car clauses))
+                   (blocks (mapcar #'cdr clauses))
+                   (labels (mapcar #'ir2-block-%label blocks))
+                   (otherwise (ir2-block-%label else-block)))
+              (emit-and-insert-vop node 2block
+                                   (template-or-lose 'sb-vm::multiway-branch-if-eq)
+                                   (reference-tn src nil) nil nil
+                                   (list values labels otherwise test-vop-name))
+              (update-block-succ 2block (cons else-block blocks)))))))))
 
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))
