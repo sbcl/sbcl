@@ -591,7 +591,11 @@
                 (aver (null (ir2-block-start-vop block))))
               ;; Unzip the alist
               (destructuring-bind (test-vop-name clauses else-block) chain
-                (let* ((values (mapcar #'car clauses))
+                ;; Dup keys could exist. REMOVE-DUPLICATES from-end can handle that:
+                ;;  "the one occurring earlier in sequence is discarded, unless from-end
+                ;;   is true, in which case the one later in sequence is discarded."
+                (let* ((clauses (remove-duplicates clauses :key #'car :from-end t))
+                       (values (mapcar #'car clauses))
                        (blocks (mapcar #'cdr clauses))
                        (labels (mapcar #'ir2-block-%label blocks))
                        (otherwise (ir2-block-%label else-block)))

@@ -2459,3 +2459,11 @@
             `(lambda (x y)
                (equalp (the function x) y)))))
     (assert (not (ctu:find-code-constants f :type 'sb-kernel:fdefn)))))
+
+(with-test (:name :multiway-branch-duplicate-case)
+  (let ((f (checked-compile '(lambda (b)
+                              (case b
+                                ((1 2) :good)
+                                ((3 2) :bad)))
+                            :allow-style-warnings t)))
+    (assert (eq (funcall f 2) :good))))
