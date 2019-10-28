@@ -208,6 +208,12 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     }
 
     if (addr == MAP_FAILED) {
+#ifdef LISP_FEATURE_OPENBSD
+        if (errno == ENOTSUP)
+            fprintf(stderr, "RWX mmap not supported, is the current filesystem"
+                    " mounted with wxallowed?\n");
+        else
+#endif
         perror("mmap");
         return NULL;
     }
