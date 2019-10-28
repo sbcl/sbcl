@@ -121,7 +121,7 @@ libsbcl.so: $(PIC_OBJS)
 %.pic.o: %.c
 	$(CC) -fPIC -c $(filter-out -fno-pie,$(CFLAGS)) $< -o $@
 %.pic.o: %.S # (-fPIC doesn't affect hand-written assembly source)
-	$(CC) -DPOSITION_INDEPENDENT_ASM -c $(CFLAGS) $< -o $@
+	$(CC) -c $(CFLAGS) $< -o $@
 testmain: testmain.c libsbcl.so -ldl
 
 SHRINKWRAP_DEPS = ../../output/sbcl.core ../../tools-for-build/editcore.lisp

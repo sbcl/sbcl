@@ -39,19 +39,11 @@
 #define GNAME(var) _##var
 #endif
 
-// FIXME: There's almost no need to opt out of POSITION_INDEPENDENT_ASM, but for the
-// usual reason: limited ability to test on all platforms, and laziness in figuring
-// out differences in the platforms that I have tested. The macOS link step fails if
-// our code guarded by POSITION_INDEPENDENT_ASM is used in lieu of LISP_FEATURE_DARWIN.
-// And due to paranoia, I'll also not touch the LISP_FEATURE_WIN32 code.
-// I will however assume that all the others OSes that support
-// LISP_FEATURE_SB_DYNAMIC_CORE work with POSITION_INDEPENDENT_ASM case.
-#if !defined POSITION_INDEPENDENT_ASM && defined LISP_FEATURE_SB_DYNAMIC_CORE \
+// Produce position-independent code for LISP_FEATURE_SB_DYNAMIC_CORE.
+// macOS does not like the general way we do this, so do something different.
+// I don't know about win32, so conservatively exclude that too.
+#if defined LISP_FEATURE_SB_DYNAMIC_CORE \
   && !defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_WIN32
-#define POSITION_INDEPENDENT_ASM 1
-#endif
-
-#ifdef POSITION_INDEPENDENT_ASM
 #define PIC_CALL(x) x@PLT
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #else
