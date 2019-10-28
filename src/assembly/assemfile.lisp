@@ -41,11 +41,20 @@
               (*readtable* sb-cold:*xc-readtable*))
           (load (merge-pathnames name (make-pathname :type "lisp")))
           ;; Reserve space for the jump table. The first word of the table
-          ;; indicates the total length.
+          ;; indicates the total length in words, counting the length word itself
+          ;; as a word, and the words comprising jump tables that were registered
+          ;; as unboxed constants. The logic in compiler/codegen splits unboxed
+          ;; constants into two groups: jump-tables and everything else, but that's
+          ;; because a code coverage map, if present, goes in between them.
+          ;; Assembly routines have no coverage map, so there is no need to split.
           #+(or x86 x86-64)
-          (emit (asmstream-data-section asmstream)
-                `(.lispword ,(1+ (length *entry-points*)))
-                `(.skip ,(* (length *entry-points*) sb-vm:n-word-bytes)))
+          (let ((n-extra-words
+                 (loop for ((category . data) . label)
+                       across (asmstream-constant-vector asmstream)
+                       when (eq category :jump-table) sum (length data))))
+            (emit (asmstream-data-section asmstream)
+                  `(.lispword ,(+ (length *entry-points*) n-extra-words 1))
+                  `(.skip ,(* (length *entry-points*) sb-vm:n-word-bytes))))
           (emit-inline-constants)
           ;; Ensure alignment to double-Lispword in case a raw constant
           ;; causes misalignment, as actually happens on ARM64.

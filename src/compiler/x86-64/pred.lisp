@@ -400,12 +400,5 @@
     ;; Anything else it needs will be callee-saved.
     (move rdi x) ; load the C call args
     (move rsi y)
-
-    (let ((fixup (make-fixup "generic_eql" :foreign)))
-      (cond ((sb-c::code-immobile-p vop))
-            (t
-             (inst mov temp-reg-tn fixup)
-             (setf fixup temp-reg-tn)))
-      (inst call fixup)) ; result => ZF
-
+    (invoke-asm-routine 'call 'generic-eql vop)
     DONE))

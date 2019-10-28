@@ -334,6 +334,164 @@
   (def-it positive-fixnum-count 12 any-reg positive-fixnum)
   (def-it positive-fixnum-count 13 any-reg fixnum :signed t))
 
+;;; General case of EQL
+
+(defconstant cplx-dfloat-real-offs (+ (ash complex-double-float-real-slot word-shift)
+                                   (- other-pointer-lowtag)))
+(defconstant cplx-dfloat-imag-offs (+ (ash complex-double-float-imag-slot word-shift)
+                                   (- other-pointer-lowtag)))
+
+#+sb-assembling ; the vop lives in compiler/x86-64/pred (for historical reasons)
+(progn
+;;; KLUDGE: The ASSEMBLE macro can't pick assembler statement labels out of
+;;; a LET body, so having a global variable for the eql-dispatch table seems like
+;;; the lesser evil, allowing use of the convenient syntax afforded by ASSEMBLE
+;;; to label statements. The alternative, a lexical var, would require
+;;; the GEN-LABEL/EMIT-LABEL pattern everywhere below.
+;;; EMIT-ASSEMBLE could accept an initial LET form, but ultimately ASSEMBLE would
+;;; still have to understand that the binding occurs after it calls GEN-LABEL
+;;; for all implicit labels. In source code it would look something like:
+;;;   (define-assembly-routine ... ((:temp ...)) (:let ((c (register-inline-constant ...)))))
+;;; It just doesn't seem worth the effort to do all that.
+(defparameter eql-dispatch nil)
+(define-assembly-routine (generic-eql (:return-style :none))
+    ((:temp rax unsigned-reg rax-offset)
+     (:temp rcx unsigned-reg rcx-offset)
+     (:temp rsi unsigned-reg rsi-offset)
+     (:temp rdi unsigned-reg rdi-offset)
+     (:temp r11 unsigned-reg r11-offset))
+  ;; SINGLE-FLOAT is included in this table because its widetag within the range
+  ;; of accepted widetags in the precondition for calling this routine.
+  ;; Technically it would be an error to see an other-pointer object with that tag.
+  ;; Would it be right for EQL to fail and report heap corruption? Maybe.
+  ;; Or, better, would it be possible on 64-bit platforms to give single-float a
+  ;; widetag that is numerically less than bignum?
+  ;; We're obliged to special-case single-float in NUMBERP etc anyway.
+  (setq eql-dispatch
+        (register-inline-constant :jump-table
+                                  `(,eql-bignum
+                                    ,eql-ratio
+                                    ,eql-single-float
+                                    ,eql-double-float
+                                    ,eql-complex-rational
+                                    ,eql-complex-single
+                                    ,eql-complex-double)))
+
+  ;; widetags are spaced 4 apart, and we've subtracted BIGNUM_WIDETAG,
+  ;; so scaling by 2 gets a multiple of 8 with bignum at offset 0 etc.
+  ;; But the upper 3 bytes of EAX hold junk presently, so clear them.
+  (inst and :dword rax #x7f)
+  (inst lea r11 eql-dispatch)
+  (inst jmp (ea r11 rax 2))
+
+  EQL-SINGLE-FLOAT       ; should not get here
+  (inst xor :dword rax rax)
+  FLIP-ZF-AND-RETURN
+  (inst xor :byte rax 1) ;  ZF <- 0, i.e. not EQL
+  (inst ret)
+
+  ;; for either of these two types, do a bitwise comparison of 8 bytes
+  (inst .align 4 :long-nop)
+  EQL-DOUBLE-FLOAT
+  EQL-COMPLEX-SINGLE
+  (inst mov rax (ea -7 rsi))
+  (inst cmp rax (ea -7 rdi))
+  (inst ret) ; if ZF set then EQL
+
+  (inst .align 4 :long-nop)
+  EQL-COMPLEX-DOUBLE
+  ;;; This could be done as one XMM register comparison.
+  ;;; It's just as well to use GPRs though since the vop
+  ;;; does not specify any xmm register temps.
+  (inst mov rax (ea cplx-dfloat-real-offs rsi))
+  (inst xor rax (ea cplx-dfloat-real-offs rdi))
+  ;; rsi,rdi are clobberable as they are vop :temps, not :args
+  (inst mov rsi (ea cplx-dfloat-imag-offs rsi))
+  (inst xor rsi (ea cplx-dfloat-imag-offs rdi))
+  (inst or rsi rax)
+  (inst ret) ; if ZF set then realpart and imagpart were each EQL
+
+  (inst .align 4 :long-nop)
+  EQL-RATIO
+  (inst push rsi)
+  (inst push rdi)
+  (loadw rdi rdi ratio-numerator-slot other-pointer-lowtag)
+  (loadw rsi rsi ratio-numerator-slot other-pointer-lowtag)
+  (inst call eql-integer)
+  (inst pop rdi) ; restore stack before jne
+  (inst pop rsi)
+  (inst jmp :ne done)
+  (loadw rdi rdi ratio-denominator-slot other-pointer-lowtag)
+  (loadw rsi rsi ratio-denominator-slot other-pointer-lowtag)
+  ;; fall into eql-integer
+  EQL-INTEGER
+  (inst cmp rdi rsi)
+  (inst jmp :e done)
+  ;; both have to be non-fixnum to be EQL now. To test for that,
+  ;; it suffices to check that the AND has a 1 in the low bit.
+  (inst mov :dword rax rdi)
+  (inst and :dword rax rsi)
+  (inst and :byte rax 1)
+  ;; %al is 1 if they are both bignums, or 0 if not. 0 is failure (*not* EQL)
+  ;; so we have to do an operation that inverts the Z flag.
+  (inst jmp :e flip-ZF-and-return)
+  EQL-BIGNUM
+  (inst mov rax (ea (- other-pointer-lowtag) rdi))
+  (inst xor rax (ea (- other-pointer-lowtag) rsi))
+  ;; kill the GC mark bit by shifting out (as if we'd actually get fullcgc
+  ;; to concurrently mark the heap. Well, I can hope can't I?)
+  (inst shl rax 1)
+  (inst jmp :ne done) ; not equal
+  ;; Preserve rcx and compute the header length in words.
+  ;; Maybe we should deem that bignums have at most (2^32-1) payload words
+  ;; so that I can use an unaligned 'movl'. Or, maybe I should put the length
+  ;; in the high 4 bytes of the header so that the same GC mark bit would work
+  ;; as for all other objects (in byte index 3 of the header)
+  (inst push rcx)
+  (inst mov rcx (ea (- other-pointer-lowtag) rdi))
+  (inst shl rcx 1)
+  (inst shr rcx (1+ n-widetag-bits))
+  (inst jrcxz epilogue) ; zero payload length, can this happen?
+  compare-loop
+  (inst mov rax (ea (- other-pointer-lowtag) rsi rcx 8))
+  (inst cmp rax (ea (- other-pointer-lowtag) rdi rcx 8))
+  (inst jmp :ne epilogue)
+  (inst dec rcx)
+  (inst jmp :ne compare-loop) ; exiting with ZF set means we win
+  epilogue
+  (inst pop rcx)
+  done
+  (inst ret)
+
+  (inst .align 4 :long-nop)
+  EQL-COMPLEX-RATIONAL
+  (inst push rsi)
+  (inst push rdi)
+  (loadw rdi rdi complex-real-slot other-pointer-lowtag)
+  (loadw rsi rsi complex-real-slot other-pointer-lowtag)
+  (inst call eql-rational)
+  (inst pop rdi) ; restore stack balance prior to possibly returning
+  (inst pop rsi)
+  (inst jmp :ne done)
+  (loadw rdi rdi complex-imag-slot other-pointer-lowtag)
+  (loadw rsi rsi complex-imag-slot other-pointer-lowtag)
+  ;; fall into eql-rational
+  EQL-RATIONAL
+  ;; First pick off fixnums like in eql_integer
+  (inst cmp rdi rsi)
+  (inst jmp :e done)
+  (inst mov :dword rax rdi)
+  (inst and :dword rax rsi)
+  (inst and :dword rax 1)
+  ;; %eax is 1 if they are both other-pointer objects, 0 if not
+  (inst jmp :e flip-ZF-and-return)
+  (inst mov :byte rax (ea (- other-pointer-lowtag) rsi))
+  (inst cmp :byte rax (ea (- other-pointer-lowtag) rdi))
+  (inst jmp :ne done)
+  ;; widetags matched, so they are both bignums or both ratios
+  (inst lea r11 eql-dispatch)
+  (inst jmp (ea (* -2 bignum-widetag) r11 rax 2))))
+
 ;;; EQL for integers that are either fixnum or bignum
 
 ;; The restriction on use of this assembly routine can't be expressed a
