@@ -85,7 +85,7 @@
          ;; does not impose a type constraint.
          ;; If type of X was derived as fixnum, then elide this test.
          (unless (eq test-vop-name 'sb-vm::fast-if-eq-fixnum/c)
-           (inst test x fixnum-tag-mask)
+           (inst test :byte x fixnum-tag-mask)
            (inst jmp :ne otherwise))
          (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
          (inst jmp (ea table temp-reg-tn 4))))
