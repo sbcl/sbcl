@@ -261,6 +261,8 @@
   (emit-bytes segment opcode)
   (when is4
     (incf remaining-bytes))
+  ;; FIXME: :xmm-index should be removed and we should alter the EA
+  ;; to have the proper FPR as the index reg when appropriate.
   (emit-ea segment thing reg :remaining-bytes remaining-bytes :xmm-index vm)
   (when is4
     (emit-byte segment (ash (reg-id-num (reg-id is4)) 4))))

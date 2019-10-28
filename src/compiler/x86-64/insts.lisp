@@ -1239,8 +1239,7 @@
                    operand)))
           operands))
 
-(defun emit-ea (segment thing reg &key allow-constants (remaining-bytes 0)
-                                       xmm-index)
+(defun emit-ea (segment thing reg &key (remaining-bytes 0) xmm-index)
   (when (register-p reg)
     (setq reg (reg-encoding reg segment)))
   (etypecase thing
@@ -1249,14 +1248,8 @@
     (tn
      (ecase (sb-name (sc-sb (tn-sc thing)))
        (stack
-        ;; Could this be refactored to fall into the EA case below instead
-        ;; of consing a new EA? Probably.  Does it matter? Probably not.
         (emit-ea segment (ea (frame-byte-offset (tn-offset thing)) rbp-tn) reg))
        (constant
-        (unless allow-constants
-          ;; Why?
-          (error
-           "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
         ;; To access the constant at index 5 out of 6 constants, that's simply
         ;; word index -1 from the origin label, and so on.
         (emit-ea segment
@@ -1316,11 +1309,7 @@
              ((or (= mod #b10) (null base))
               (if (fixup-p disp)
                   (emit-absolute-fixup segment disp)
-                  (emit-signed-dword segment disp))))))
-    (fixup
-        (emit-mod-reg-r/m-byte segment #b00 reg #b100)
-        (emit-sib-byte segment 0 #b100 #b101)
-        (emit-absolute-fixup segment thing))))
+                  (emit-signed-dword segment disp))))))))
 
 ;;;; utilities
 
@@ -1542,17 +1531,15 @@
                            ;; 64-bit immediate. Instruction size: 10 bytes.
                            (emit-byte+reg segment #xB8 dst)
                            (emit-qword segment src))))
-                  ((and (fixup-p src)
-                        (member (fixup-flavor src)
-                                '(:named-call :static-call :assembly-routine
-                                  :layout :immobile-symbol :foreign)))
+                  ((fixup-p src) ; treat as a 32-bit unsigned integer
+                   ;; But imm-to-reg could take a 64-bit operand if needed.
                    (emit-prefixes segment dst nil :dword)
                    (emit-byte+reg segment #xB8 dst)
                    (emit-absolute-fixup segment src))
                   (t
                    (emit-prefixes segment src dst size)
                    (emit-byte segment (opcode+size-bit #x8A size))
-                   (emit-ea segment src dst :allow-constants t))))
+                   (emit-ea segment src dst))))
         ((integerp src) ; imm to memory
             ;; C7 only deals with 32 bit immediates even if the
             ;; destination is a 64-bit location. The value is
@@ -1573,14 +1560,9 @@
             (emit-prefixes segment dst src size)
             (emit-byte segment (opcode+size-bit #x88 size))
             (emit-ea segment dst src))
-        ((fixup-p src)
-            ;; MOV to memory take at most a 32-bit immediate arg.
-            ;; The acceptable fixup flavors are enumerated here.
-            ;; The linkage table and immobile spaces reside at
-            ;; low enough addresses that this works.
-            (aver (member (fixup-flavor src)
-                          '(:foreign :foreign-dataref :symbol-tls-index
-                            :assembly-routine :layout :immobile-symbol)))
+        ((fixup-p src) ; equivalent to 32-bit unsigned integer
+            ;; imm-to-mem can not take a 64-bit operand, but could sign-extend
+            ;; to 8 bytes, which is probably not what you want.
             (emit-prefixes segment dst nil size)
             (emit-byte segment #xC7)
             (emit-ea segment dst #b000)
@@ -1659,7 +1641,7 @@
     (:printer move-with-extension ((op #b1011011)))
     (:emitter (emit* segment sizes dst src nil))))
 
-(flet ((emit* (segment thing gpr-opcode mem-opcode subcode allowp)
+(flet ((emit* (segment thing gpr-opcode mem-opcode subcode)
          (let ((size (or (operand-size thing) :qword)))
            (aver (or (eq size :qword) (eq size :word)))
            (emit-prefixes segment thing nil (if (eq size :word) :word :do-not-set))
@@ -1667,7 +1649,7 @@
                   (emit-byte+reg segment gpr-opcode thing))
                  (t
                   (emit-byte segment mem-opcode)
-                  (emit-ea segment thing subcode :allow-constants allowp))))))
+                  (emit-ea segment thing subcode))))))
   (define-instruction push (segment src)
     ;; register
     (:printer reg-no-width-default-qword ((op #b01010)))
@@ -1696,12 +1678,12 @@
             (emit-byte segment #x68)
             (emit-absolute-fixup segment src))
            (t
-            (emit* segment src #x50 #xFF 6 t)))))
+            (emit* segment src #x50 #xFF 6)))))
 
   (define-instruction pop (segment dst)
     (:printer reg-no-width-default-qword ((op #b01011)))
     (:printer reg/mem-default-qword ((op '(#x8F 0))))
-    (:emitter (emit* segment dst #x58 #x8F 0 nil))))
+    (:emitter (emit* segment dst #x58 #x8F 0))))
 
 ;;; Compared to x86 we need to take two particularities into account
 ;;; here:
@@ -1834,7 +1816,7 @@
 
 ;;;; arithmetic
 
-(flet ((emit* (name segment maybe-size dst src lockp opcode allowp)
+(flet ((emit* (name segment maybe-size dst src lockp opcode)
          (let ((size (cond ((is-size-p maybe-size) maybe-size)
                            (t
                             (shiftf lockp src dst maybe-size)
@@ -1845,7 +1827,7 @@
             ((and (neq size :byte) (plausible-signed-imm8-operand-p src size))
              (emit-prefixes segment dst nil size :lock lockp)
              (emit-byte segment #x83)
-             (emit-ea segment dst opcode :allow-constants allowp)
+             (emit-ea segment dst opcode)
              (emit-byte segment it))
             ((or (integerp src)
                  (and (fixup-p src)
@@ -1857,7 +1839,7 @@
                                                 size)))
                    (t
                     (emit-byte segment (opcode+size-bit #x80 size))
-                    (emit-ea segment dst opcode :allow-constants allowp)))
+                    (emit-ea segment dst opcode)))
              (if (fixup-p src)
                  (emit-absolute-fixup segment src)
                  (let ((imm (or (and (eq size :qword)
@@ -1872,8 +1854,8 @@
                (emit-prefixes segment reg/mem reg size :lock lockp)
                (emit-byte segment
                           (opcode+size-bit (dpb opcode (byte 3 3) dir-bit) size))
-               (emit-ea segment reg/mem reg :allow-constants allowp)))))))
-  (macrolet ((define (name subop &optional allow-constants)
+               (emit-ea segment reg/mem reg)))))))
+  (macrolet ((define (name subop)
                `(define-instruction ,name (segment maybe-size dst &optional src prefix)
                   (:printer accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
                   (:printer reg/mem-imm ((op '(#b1000000 ,subop))))
@@ -1882,13 +1864,12 @@
                   (:printer reg/mem-imm ((op '(#b1000001 ,subop)) (width 1)
                                          (imm nil :type 'signed-imm-byte)))
                   (:printer reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))
-                  (:emitter (emit* ,(string name) segment maybe-size dst src prefix
-                                   ,subop ,allow-constants)))))
+                  (:emitter (emit* ,(string name) segment maybe-size dst src prefix ,subop)))))
     (define add #b000)
     (define adc #b010)
     (define sub #b101)
     (define sbb #b011)
-    (define cmp #b111 t)
+    (define cmp #b111)
     (define and #b100)
     (define or  #b001)
     (define xor #b110)))
@@ -2372,7 +2353,7 @@
      (emit-prefixes segment src dst size))
    (emit-byte segment #x0F)
    (emit-byte segment (dpb (conditional-opcode cond) (byte 4 0) #b01000000))
-   (emit-ea segment src dst :allow-constants t)))
+   (emit-ea segment src dst)))
 
 ;;;; conditional byte set
 

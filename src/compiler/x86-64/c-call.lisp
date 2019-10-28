@@ -238,7 +238,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
+   (inst mov res (ea (make-fixup foreign-symbol :foreign-dataref)))))
 
 #+sb-safepoint
 (defconstant thread-saved-csp-offset -1)
