@@ -389,11 +389,13 @@
                               :allow-style-warnings t))))
     (assert (not (search "MULTIWAY-BRANCH" s)))))
 
-(defun ecase-test (x)
-  (ecase x (:a 1) (:b 2) (:c 3)))
-(defun etypecase-test (x)
-  (etypecase x
-    ((integer 1 20) 'hi) ((cons (eql :thing)) 'wat) (bit-vector 'hi-again)))
 (with-test (:name :ecase-failure-trap)
-  (assert (null (ctu:find-named-callees #'ecase-test)))
-  (assert (null (ctu:find-named-callees #'etypecase-test))))
+  (assert (null (ctu:find-named-callees
+                 (checked-compile `(lambda (x)
+                                     (ecase x (:a 1) (:b 2) (:c 3)))))))
+  (assert (null (ctu:find-named-callees
+                 (checked-compile `(lambda (x)
+                                     (etypecase x
+                                       ((integer 1 20) 'hi)
+                                       ((cons (eql :thing)) 'wat)
+                                       (bit-vector 'hi-again))))))))
