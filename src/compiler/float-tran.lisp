@@ -716,6 +716,7 @@
 (defstruct (interval (:constructor %make-interval (low high))
                      (:copier nil))
   low high)
+(declaim (freeze-type interval))
 
 #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (progn
