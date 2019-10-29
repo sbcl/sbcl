@@ -268,7 +268,7 @@
   (:temporary (:sc unsigned-reg) raw)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (inst lea raw (make-fixup 'closure-tramp :assembly-routine))
+    (inst mov raw (make-fixup 'closure-tramp :assembly-routine))
     (inst cmp (make-ea :byte :base function :disp (- fun-pointer-lowtag))
           simple-fun-widetag)
     (inst cmov :e raw

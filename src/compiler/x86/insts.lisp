@@ -596,7 +596,7 @@
             (format stream "+~A" (ea-disp ea))))
          (write-char #\] stream))))
 
-(defun emit-ea (segment thing reg &optional allow-constants)
+(defun emit-ea (segment thing reg)
   (etypecase thing
     (tn
      (ecase (sb-name (sc-sb (tn-sc thing)))
@@ -610,9 +610,6 @@
                           :disp (frame-byte-offset (tn-offset thing)))
                  reg))
        (constant
-        (unless allow-constants
-          (error
-           "Constant TNs can only be directly used in MOV, PUSH, and CMP."))
         (emit-mod-reg-r/m-byte segment #b00 reg #b101)
         (emit-absolute-fixup segment
                              (make-fixup nil
@@ -635,16 +632,6 @@
             (r/m (cond (index #b100)
                        ((null base) #b101)
                        (t (reg-tn-encoding base)))))
-       (when (typep disp '(or fixup asm-expression))
-         (aver (null base))
-         (aver (null index))
-         (emit-mod-reg-r/m-byte segment #b00 reg #b101)
-         (multiple-value-bind (fixup extra-offset)
-             (if (typep disp 'fixup)
-                 (values disp 0)
-                 (values (make-fixup nil :code-object (second disp)) (third disp)))
-           (return-from emit-ea
-             (emit-absolute-fixup segment fixup extra-offset))))
        (emit-mod-reg-r/m-byte segment mod reg r/m)
        (when (= r/m #b100)
          (let ((ss (1- (integer-length scale)))
@@ -661,12 +648,13 @@
        (cond ((= mod #b01)
               (emit-byte segment disp))
              ((or (= mod #b10) (null base))
-              (if (fixup-p disp)
-                  (emit-absolute-fixup segment disp)
-                  (emit-dword segment disp))))))
-    (fixup
-     (emit-mod-reg-r/m-byte segment #b00 reg #b101)
-     (emit-absolute-fixup segment thing))))
+              (if (integerp disp)
+                  (emit-dword segment disp)
+                  (multiple-value-bind (fixup extra-offset)
+                      (if (typep disp 'fixup)
+                          (values disp 0)
+                          (values (make-fixup nil :code-object (second disp)) (third disp)))
+                    (emit-absolute-fixup segment fixup extra-offset)))))))))
 
 (defun fp-reg-tn-p (thing)
   (and (tn-p thing)
@@ -787,45 +775,27 @@
 
   (:emitter
    (emit-prefix segment prefix)
-   (let ((size (matching-operand-size dst src)))
+   (let ((size (matching-operand-size dst src))
+         (imm-src-p (typep src '(or integer fixup))))
      (maybe-emit-operand-size-prefix segment size)
      (cond ((register-p dst)
-            (cond ((or (integerp src)
-                       (and (fixup-p src)
-                            (eq (fixup-flavor src) :symbol-tls-index)))
-                   (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst)
-                   (if (fixup-p src)
-                       (emit-absolute-fixup segment src)
-                       (emit-imm-operand segment src size)))
-                  ((and (fixup-p src) (accumulator-p dst))
-                   (emit-byte segment
-                              (if (eq size :byte)
-                                  #b10100000
-                                  #b10100001))
-                   (emit-absolute-fixup segment src))
-                  (t
-                   (emit-byte segment
-                              (if (eq size :byte)
-                                  #b10001010
-                                  #b10001011))
-                   (emit-ea segment src (reg-tn-encoding dst) t))))
-           ((and (fixup-p dst) (accumulator-p src))
-            (emit-byte segment (if (eq size :byte) #b10100010 #b10100011))
-            (emit-absolute-fixup segment dst))
-           ((integerp src)
-            (emit-byte segment (if (eq size :byte) #b11000110 #b11000111))
-            (emit-ea segment dst #b000)
-            (emit-imm-operand segment src size))
-           ((register-p src)
-            (emit-byte segment (if (eq size :byte) #b10001000 #b10001001))
+            (cond (imm-src-p ; immediate to register
+                   (emit-byte+reg segment (if (eq size :byte) #xB0 #xB8) dst))
+                  (t ; mem to register or register to register
+                   (emit-byte segment (if (eq size :byte) #x8A #x8B))
+                   (emit-ea segment src (reg-tn-encoding dst)))))
+           ((register-p src) ; register to memory
+            (emit-byte segment (if (eq size :byte) #x88 #x89))
             (emit-ea segment dst (reg-tn-encoding src)))
-           ((fixup-p src)
-            (aver (eq size :dword))
-            (emit-byte segment #b11000111)
-            (emit-ea segment dst #b000)
-            (emit-absolute-fixup segment src))
+           (imm-src-p ; immediate to memory
+            (emit-byte segment (if (eq size :byte) #xC6 #xC7))
+            (emit-ea segment dst #b000))
            (t
-            (error "bogus arguments to MOV: ~S ~S" dst src))))))
+            (error "bogus arguments to MOV: ~S ~S" dst src)))
+     (when imm-src-p
+       (if (fixup-p src)
+           (emit-absolute-fixup segment src)
+           (emit-imm-operand segment src size))))))
 
 (defun emit-move-with-extension (segment dst src opcode)
   (aver (register-p dst))
@@ -895,7 +865,7 @@
                    (emit-byte+reg segment #x50 src))
                   (t
                    (emit-byte segment #b11111111)
-                   (emit-ea segment src #b110 t))))))))
+                   (emit-ea segment src #b110))))))))
 
 (define-instruction pusha (segment)
   (:printer byte ((op #b01100000)))
@@ -1060,15 +1030,14 @@
 
 ;;;; arithmetic
 
-(defun emit-random-arith-inst (name segment dst src opcode
-                               &optional allow-constants)
+(defun emit-random-arith-inst (name segment dst src opcode)
   (let ((size (matching-operand-size dst src)))
     (maybe-emit-operand-size-prefix segment size)
     (cond
      ((integerp src)
       (cond ((and (not (eq size :byte)) (<= -128 src 127))
              (emit-byte segment #b10000011)
-             (emit-ea segment dst opcode allow-constants)
+             (emit-ea segment dst opcode)
              (emit-byte segment src))
             ((accumulator-p dst)
              (emit-byte segment
@@ -1080,24 +1049,24 @@
              (emit-imm-operand segment src size))
             (t
              (emit-byte segment (if (eq size :byte) #b10000000 #b10000001))
-             (emit-ea segment dst opcode allow-constants)
+             (emit-ea segment dst opcode)
              (emit-imm-operand segment src size))))
      ((register-p src)
       (emit-byte segment
                  (dpb opcode
                       (byte 3 3)
                       (if (eq size :byte) #b00000000 #b00000001)))
-      (emit-ea segment dst (reg-tn-encoding src) allow-constants))
+      (emit-ea segment dst (reg-tn-encoding src)))
      ((register-p dst)
       (emit-byte segment
                  (dpb opcode
                       (byte 3 3)
                       (if (eq size :byte) #b00000010 #b00000011)))
-      (emit-ea segment src (reg-tn-encoding dst) allow-constants))
+      (emit-ea segment src (reg-tn-encoding dst)))
      (t
       (error "bogus operands to ~A" name)))))
 
-(macrolet ((define (name subop &optional allow-constants)
+(macrolet ((define (name subop)
              `(define-instruction ,name (segment dst src &optional prefix)
                 (:printer accum-imm ((op ,(dpb subop (byte 3 2) #b0000010))))
                 (:printer reg/mem-imm ((op '(#b1000000 ,subop))))
@@ -1106,13 +1075,12 @@
                 (:printer reg-reg/mem-dir ((op ,(dpb subop (byte 3 1) #b000000))))
                 (:emitter
                  (emit-prefix segment prefix)
-                 (emit-random-arith-inst ,(string name) segment dst src ,subop
-                                         ,allow-constants)))))
+                 (emit-random-arith-inst ,(string name) segment dst src ,subop)))))
   (define add #b000)
   (define adc #b010)
   (define sub #b101)
   (define sbb #b011)
-  (define cmp #b111 t)
+  (define cmp #b111)
   (define and #b100)
   (define or  #b001)
   (define xor #b110))

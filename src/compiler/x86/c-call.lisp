@@ -227,7 +227,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst lea res (make-fixup foreign-symbol :foreign))))
+   (inst mov res (make-fixup foreign-symbol :foreign))))
 
 #+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
@@ -239,7 +239,7 @@
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 2
-   (inst mov res (make-fixup foreign-symbol :foreign-dataref))))
+   (inst mov res (make-ea :dword :disp (make-fixup foreign-symbol :foreign-dataref)))))
 
 (defun force-x87-to-mem (tn fp-temp)
   (aver (location= tn fr0-tn))

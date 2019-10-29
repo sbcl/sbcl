@@ -78,6 +78,8 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes thread-alloc-region-slot)
+                    ;; not a foreign-dataref because we don't support
+                    ;; dynamic core + no threads.
                     #-sb-thread (make-fixup "gc_alloc_region" :foreign)))
          (end-addr
             ;; thread->alloc_region.end_addr
@@ -366,7 +368,7 @@
   (:args)
   (:results (result :scs (any-reg)))
   (:generator 1
-    (inst lea result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
+    (inst mov result (make-fixup 'funcallable-instance-tramp :assembly-routine))))
 
 (define-vop (fixed-alloc)
   (:args)

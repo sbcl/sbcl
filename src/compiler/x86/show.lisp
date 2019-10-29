@@ -36,7 +36,7 @@
       (inst sub esp-tn n-word-bytes)
       (align-stack-pointer esp-tn)
       (storew object esp-tn))
-    (inst lea eax (make-fixup "debug_print" :foreign))
+    (inst mov eax (make-fixup "debug_print" :foreign))
     (inst call (make-fixup "call_into_c" :foreign))
     #-darwin
     (inst add esp-tn n-word-bytes)
