@@ -193,11 +193,3 @@
 ;; Address-sensitive keys can't store a precomputed hash. They instead
 ;; store this value that indicates address-sensitivity.
 (defconstant +magic-hash-vector-value+ #xFFFFFFFF)
-
-;;; Return an association list representing the same data as HASH-TABLE.
-(defun %hash-table-alist (hash-table)
-  (let ((result nil))
-    (maphash (lambda (key value)
-               (push (cons key value) result))
-             hash-table)
-    result))

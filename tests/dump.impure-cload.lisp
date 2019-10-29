@@ -403,3 +403,18 @@
 (with-test (:name :dump-std-obj-literal-layout)
   (assert (eq (try-literal-layout)
               (sb-kernel:find-layout 'class-with-shared-slot))))
+
+(defparameter *some-hash-table*
+  #.(let ((ht (make-hash-table)))
+      (setf (gethash 'first ht) :a)
+      (setf (gethash 'second ht) :b)
+      ht))
+;;; In the interest of producing repeatable results from externalized
+;;; hash-tables, the make-load-form method iterates in such a way that
+;;; the k/v vector should be ordered the same as it originally was.
+;;; This also has implications on the order of items in each bucket
+;;; when there are collisions.
+(with-test (:name :reconstructed-hash-table)
+  (let ((pairs (sb-impl::hash-table-pairs *some-hash-table*)))
+    (assert (eq (aref pairs 2) 'first))
+    (assert (eq (aref pairs 4) 'second))))

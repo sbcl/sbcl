@@ -1728,6 +1728,23 @@ table itself."
     :rehash-threshold ',(hash-table-rehash-threshold hash-table)
     :weakness         ',(hash-table-weakness         hash-table)))
 
+;;; Return an association list representing the same data as HASH-TABLE.
+;;; Iterate downward so that PUSH creates the result in insertion order.
+;;; One the one hand, this should not to be construed as a guarantee about
+;;; the order, but on the other, it is convenient to see key/values in the
+;;; same order as insertion, and moreover, preserving that order makes
+;;; %STUFF-HASH-TABLE produce the same k/v vector.
+(defun %hash-table-alist (hash-table)
+  (let ((result nil))
+    (let ((kvv (hash-table-pairs hash-table)))
+      (do ((i (* 2 (kv-vector-high-water-mark kvv)) (- i 2)))
+          ((= i 0))
+        (let ((k (aref kvv i))
+              (v (aref kvv (1+ i))))
+          (unless (or (empty-ht-slot-p k) (empty-ht-slot-p v))
+            (push (cons k v) result)))))
+    result))
+
 ;;; Stuff an association list into HASH-TABLE. Return the hash table,
 ;;; so that we can use this for the *PRINT-READABLY* case in
 ;;; PRINT-OBJECT (HASH-TABLE T) without having to worry about LET

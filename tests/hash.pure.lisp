@@ -252,3 +252,15 @@
   (let ((table (make-hash-table :test 'eq :weakness :key)))
     (setf (gethash 42 table) t)
     (gethash 42 table)))
+
+(with-test (:name :write-hash-table-readably)
+  (let ((h1 (make-hash-table)))
+    (setf (gethash :a h1) 1
+          (gethash :b h1) 2
+          (gethash :c h1) 3)
+    (let* ((s1 (write-to-string h1 :readably t))
+           (h2 (read-from-string s1))
+           (s2 (write-to-string h2 :readably t)))
+      ;; S1 and S2 used to be STRING/= prior to making
+      ;; %HASH-TABLE-ALIST iterate backwards.
+      (assert (string= s1 s2)))))
