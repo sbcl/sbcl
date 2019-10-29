@@ -2087,6 +2087,8 @@ core and return a descriptor to it."
 ;; Boxed header length is stored directly in bytes, not words
 (defun code-header-bytes (code-object)
   (ldb (byte 32 0) (read-bits-wordindexed code-object sb-vm:code-boxed-size-slot)))
+(defun code-header-words (code-object) ; same, but expressed in words
+  (ash (code-header-bytes code-object) (- sb-vm:word-shift)))
 
 (defun lookup-assembler-reference (symbol &optional (mode :direct))
   (let* ((code-component *cold-assembler-obj*)
@@ -2147,9 +2149,15 @@ core and return a descriptor to it."
              (:absolute
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (unsigned-byte 32) addr))
-              ;; Absolute fixups are recorded if within the object for x86.
-              #+x86 (and in-dynamic-space
-                          (< obj-start-addr addr code-end-addr))
+              #+x86
+              (let ((n-jump-table-words
+                     (read-bits-wordindexed code-object
+                                            (code-header-words code-object))))
+                ;; Absolute fixups are recorded if within the object for x86.
+                (and in-dynamic-space
+                     (< obj-start-addr addr code-end-addr)
+                     ;; Except for an initial sequence of unboxed words
+                     (>= after-header (ash n-jump-table-words sb-vm:word-shift))))
               ;; Absolute fixups on x86-64 do not refer to this code component,
               ;; because we have RIP-relative addressing, but references to
               ;; other immobile-space objects must be recorded.
@@ -2697,7 +2705,7 @@ core and return a descriptor to it."
       ;; We used to combine them with some magic in genesis.
       (setq *cold-assembler-routines* (sort table #'< :key #'cdr)))
     #+(or x86 x86-64) ; fill in the indirect call table
-    (let ((index (ash (code-header-bytes asm-code) (- sb-vm:word-shift))))
+    (let ((index (code-header-words asm-code)))
       (dolist (item *cold-assembler-routines*)
         ;; Preincrement because we skip 1 word for the word containing
         ;; the number of absolute fixups that follow.

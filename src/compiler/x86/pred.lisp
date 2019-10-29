@@ -62,12 +62,14 @@
                values labels)
          (inst test x fixnum-tag-mask)
          (inst jmp :ne otherwise)
-         (inst lea index (make-ea :dword :base x :disp (- min)))
+         (if (= min 0)
+             (inst mov index x)
+             (inst lea index (make-ea :dword :base x :disp (fixnumize (- min)))))
          (inst cmp index (fixnumize (- max min)))
          (inst jmp :a otherwise)
          (let ((table (register-inline-constant :jump-table (coerce vector 'list))))
-           (inst jmp (make-ea :dword :index index
-                                     :disp (make-fixup nil :code-object table))))))
+           (inst jmp (make-ea :dword :disp (ea-disp table)
+                              :index index :scale 1)))))
       (character
        (let* ((min (reduce #'min values :key #'char-code))
               (max (reduce #'max values :key #'char-code))
@@ -85,9 +87,8 @@
          (inst cmp index (- max min))
          (inst jmp :a otherwise)
          (let ((table (register-inline-constant :jump-table (coerce vector 'list))))
-           (inst jmp (make-ea :dword :index index
-                              :disp (make-fixup nil :code-object table)
-                              :scale 4))))))))
+           (inst jmp (make-ea :dword :disp (ea-disp table)
+                              :index index :scale 4))))))))
 
 (define-load-time-global *cmov-ptype-representation-vop*
   (mapcan (lambda (entry)

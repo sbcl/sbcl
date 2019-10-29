@@ -612,9 +612,7 @@
     (initialize-ir2-blocks-flow-info component)
     ;; Look for if/else chains before cmovs, because a cmov
     ;; affects whether the last if/else is recognizable.
-    ;; The 32-bit x86 assembler was giving me problems.
-    ;; Otherwise this really should be ok for #+(or x86 x86-64).
-    #+x86-64 (convert-if-else-chains component)
+    #+(or x86 x86-64) (convert-if-else-chains component)
     (convert-cmovs component)
     #+x86-64 ;; while it's portable the VOPs are not validated for
              ;; compatibility on other backends yet.
