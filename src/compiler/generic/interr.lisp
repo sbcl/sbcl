@@ -104,6 +104,8 @@
    ("attempt to THROW to a non-existent tag" unseen-throw-tag 1)
    ("division by zero" division-by-zero 2)
    ("Object is of the wrong type." object-not-type 2)
+   ("ECASE failure" ecase-failure 2)
+   ("ETYPECASE failure" etypecase-failure 2)
    ("odd number of &KEY arguments" odd-key-args 0)
    ("unknown &KEY argument" unknown-key-arg 1)
    ("invalid array index" invalid-array-index 3)

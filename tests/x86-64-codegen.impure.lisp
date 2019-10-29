@@ -11,6 +11,7 @@
 
 #-x86-64 (sb-ext:exit :code 104)
 
+(load "compiler-test-util.lisp")
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
   ;; is something stupid like (lambda () in ...) which pretty-prints
@@ -387,3 +388,12 @@
              (checked-compile '(lambda (b) (case b ((0) :a) ((0) :b) ((0) :c) ((1) :d)))
                               :allow-style-warnings t))))
     (assert (not (search "MULTIWAY-BRANCH" s)))))
+
+(defun ecase-test (x)
+  (ecase x (:a 1) (:b 2) (:c 3)))
+(defun etypecase-test (x)
+  (etypecase x
+    ((integer 1 20) 'hi) ((cons (eql :thing)) 'wat) (bit-vector 'hi-again)))
+(with-test (:name :ecase-failure-trap)
+  (assert (null (ctu:find-named-callees #'ecase-test)))
+  (assert (null (ctu:find-named-callees #'etypecase-test))))

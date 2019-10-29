@@ -310,6 +310,13 @@
          :operation '/
          :operands (list this that)))
 
+(macrolet ((def (errname fun-name)
+             `(setf (svref **internal-error-handlers**
+                           ,(error-number-or-lose errname))
+                    (fdefinition ',fun-name))))
+  (def etypecase-failure-error etypecase-failure)
+  (def ecase-failure-error ecase-failure))
+
 (deferr object-not-type-error (object type)
   (if (invalid-array-p object)
       (invalid-array-error object)
