@@ -5096,10 +5096,10 @@
   (deftransform set ((symbol value) ((constant-arg symbol) *))
     (xform symbol :special)))
 
-(deftransforms (prin1-to-string princ-to-string) ((object) (number))
+(deftransforms (prin1-to-string princ-to-string) ((object) (number) * :important nil)
   `(stringify-object object))
 
-(deftransform princ ((object &optional stream) (string &optional t))
+(deftransform princ ((object &optional stream) (string &optional t) * :important nil)
   `(write-string object stream))
 
 #+sb-thread
