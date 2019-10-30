@@ -545,4 +545,8 @@
   (assert (search "returned \"nice\""
                   (with-output-to-string (*trace-output*) (funky-closure 5)))))
 
+;;; https://bugs.launchpad.net/sbcl/+bug/1850531
+(with-test (:name :describe-function-not-named-by-designator)
+  (describe (formatter "~&~A~A") (make-broadcast-stream))) ; should not crash
+
 ;;;; success

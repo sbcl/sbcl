@@ -151,7 +151,9 @@
 ;;; was explicit. See SAVE-INLINE-EXPANSION-P for why we care.
 ;;; (Essentially, once stored then always stored, lest inconsistency result)
 ;;; If we have just a DXABLE-ARGS, or nothing at all, return NIL and NIL.
-(declaim (ftype (sfunction ((or symbol cons)) (values list boolean))
+;;; If called on a string or anything that is not a function designator,
+;;; return NIL and NIL.
+(declaim (ftype (sfunction (t) (values list boolean))
                 fun-name-inline-expansion))
 (defun fun-name-inline-expansion (fun-name)
   (multiple-value-bind (answer winp) (info :function :inlining-data fun-name)
