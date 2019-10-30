@@ -97,7 +97,8 @@
                  (setf (aref vector (- (char-code value) min)) label))
                values labels)
          ;; Same as above, but test the widetag before shifting it out.
-         (unless (eq test-vop-name 'sb-vm::fast-char=/character/c)
+         (unless (member test-vop-name '(fast-char=/character/c
+                                         fast-if-eq-character/c))
            (inst cmp :byte x character-widetag)
            (inst jmp :ne otherwise))
          (inst mov :dword temp-reg-tn x)

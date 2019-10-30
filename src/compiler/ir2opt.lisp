@@ -458,30 +458,44 @@
                         do (change-tn-ref-tn tn-ref arg)))
                 (delete-vop next)))))))))
 
-;;; If 2BLOCK ends in an IF-EQ vop and BRANCH-IF vop where the second operand
-;;; of IF-EQ is an immediate value, then return that vop.
+;;; If 2BLOCK ends in an IF-EQ (or similar) + BRANCH-IF where the second operand
+;;; of the test is an immediate value, then return the conditional vop.
+;;; There may optionally be a MOVE vop prior to the conditional test,
+;;; and optionally an unconditional BRANCH after the conditional branch.
 (defun ends-in-branch-if-eq-imm-p (2block)
-  (let ((vop (ir2-block-start-vop 2block))
-        (last-vop (ir2-block-last-vop 2block)))
-    ;; See if there are are least 2 vops and the final one is BRANCH-IF
-    (when (and last-vop (vop-next vop) (eq (vop-name last-vop) 'branch-if))
-      (loop
-        ;; No need to check for (NULL vop) in the exit condition
-        ;; because the loop won't entered if there are fewer than 2 vops.
-        (cond ((eq (vop-next vop) last-vop) ; at penultimate vop now
-               (return (when (or (and (eq (vop-name vop) 'if-eq)
-                                      (let ((comparand
-                                             (tn-ref-tn (tn-ref-across (vop-args vop)))))
-                                        (and (tn-sc comparand)
-                                             (sc-is comparand sb-vm::immediate)
-                                             (typep (tn-value comparand)
-                                                    '(or fixnum character)))))
-                                 (member (vop-name vop)
-                                         '(sb-vm::fast-char=/character/c
+  (let ((last-vop (ir2-block-last-vop 2block)))
+    ;; Final BRANCH can be ignored. Finding the if/else chain is based on successors.
+    ;; It's fair to assume that the branch corresponds to the "other" successor.
+    (when (and last-vop (eq (vop-name last-vop) 'branch))
+      (setq last-vop (vop-prev last-vop)))
+    ;; See if we're looking at a BRANCH-IF now
+    (when (and last-vop (eq (vop-name last-vop) 'branch-if))
+      (let ((vop (vop-prev last-vop)))
+        (when (or (and (eq (vop-name vop) 'if-eq)
+                       (let ((comparand (tn-ref-tn (tn-ref-across (vop-args vop)))))
+                         (and (tn-sc comparand)
+                              (sc-is comparand sb-vm::immediate)
+                              (typep (tn-value comparand) '(or fixnum character)))))
+                  ;; Thanks to schizophrenic compiler transforms,
+                  ;; character comparisons can show up as either of
+                  ;; the first two vops.
+                  (member (vop-name vop) '(sb-vm::fast-char=/character/c
+                                           sb-vm::fast-if-eq-character/c
                                            sb-vm::fast-if-eq-fixnum/c)))
-                         vop)))
-              (t
-               (setq vop (vop-next vop))))))))
+          ;; Do some extra work when the IF is preceded by a MOVE
+          (let ((test (tn-ref-tn (vop-args vop)))
+                (prev (vop-prev vop)))
+            ;; If: - The arg to IF is the result of a move
+            ;;     - The result of the move goes nowhere but the IF
+            ;; then the move is into a TN that is dead as soon as the
+            ;; IF happens; a multiway branch is potentially ok.
+            (if (and prev
+                     (eq (vop-name prev) 'move)
+                     (and (eq (tn-ref-tn (vop-results prev)) test)
+                          (null (tn-ref-next (tn-writes test)))  ; exactly 1 write
+                          (null (tn-ref-next (tn-reads test))))) ; exactly 1 read
+                prev
+                vop)))))))
 
 ;;; Return T if and only if 2BLOCK has exactly two successors
 (defun exactly-two-successors-p (2block)
@@ -489,18 +503,15 @@
          (rest (cdr successors)))
     (and rest (not (cdr rest)))))
 
-;;; Return the longest chain of if/else operations starting at VOP.
+;;; Compute the longest chain of if/else operations starting at VOP.
 ;;; This is a simple task, as all we have to do is follow the 'else' of each IF.
-;;; Result is (TN ((value . block) ...) drop-thru)
+;;; Primary return value is (((value . block) ...) drop-thru vop-name).
+;;; Secondary value is a list of blocks to delete.
 ;;; If code coverage is enabled, it should theoretically be possible to find
 ;;; the if-else chain, but in practice it won't happen, because each else block
 ;;; is cluttered up by the coverage noise prior to performing the next comparison.
 ;;; It's probably just as well, because the coverage report would have no idea
 ;;; how to decode the recorded information from the multiway branch vop.
-;;; FIXME: this will not find an if/else chain in the following example:
-;;;    (DEFUN F (X) (IF (FIXNUMP X) (CASE X (0 1) (1 2) (2 3) (3 4))))
-;;; because there is an extraneous MOVE vop at the head of each block.
-;;; I need to see through that move.
 (defun longest-if-else-chain (start-vop)
   (let ((test-var (tn-ref-tn (vop-args start-vop)))
         (vop start-vop)
@@ -510,7 +521,11 @@
      (let* ((block (vop-block vop))
             (successors (cdr (gethash block *2block-info*))))
        (destructuring-bind (label negate flags)
-           (vop-codegen-info (vop-next vop))
+           (let ((next (vop-next vop)))
+             (vop-codegen-info (if (eq (vop-name next) 'branch-if)
+                                   next
+                                   ;; START-VOP is a MOVE, skip over it
+                                   (vop-next next))))
          (declare (ignore flags))
          (binding* ((target-block (gethash label *2block-info*))
                     ;; successors are listed in an indeterminate order (I think)
@@ -525,28 +540,34 @@
                (setf (ir2-block-%label then-block) (gen-label)))
            (when chain
              (push block blocks-to-delete))
-           (let ((val (if (eq (vop-name vop) 'if-eq)
-                          (tn-value (tn-ref-tn (tn-ref-across (vop-args vop))))
-                          (car (vop-codegen-info vop)))))
-             (push (cons val then-block) chain))
-           (let ((else-block-predecessors
-                  (car (gethash else-block *2block-info*)))
-                 (else-vop (ir2-block-start-vop else-block)))
+           (let* ((comparison (if (eq (vop-name vop) 'move) (vop-next vop) vop))
+                  (val (if (eq (vop-name comparison) 'if-eq)
+                           ;; if-eq takes a constant TN
+                           (tn-value (tn-ref-tn (tn-ref-across (vop-args comparison))))
+                           ;; "-eq-/C" vops take a codegen arg
+                           (car (vop-codegen-info comparison))))
+                  (else-block-predecessors (car (gethash else-block *2block-info*)))
+                  (else-vop (ir2-block-start-vop else-block)))
+             (push (cons val then-block) chain)
              ;; If ELSE block has more than one predecessor, that's OK,
              ;; but the chain must stop at this IF.
              (unless (and (and (singleton-p else-block-predecessors)
                                (eq (car else-block-predecessors) block))
                           else-vop
-                          (eq (ends-in-branch-if-eq-imm-p (vop-block else-vop)) else-vop)
+                          (eq (ends-in-branch-if-eq-imm-p (vop-block else-vop))
+                              else-vop)
                           (eq (tn-ref-tn (vop-args else-vop)) test-var)
                           (exactly-two-successors-p else-block))
                (unless (cdr chain) ; does this IF start a chain of length at least 2?
                  (return-from longest-if-else-chain (values nil nil)))
+               ;; The else block could have been the fallthru of the last IF,
+               ;; so it may not have needed a label, but now it does need one.
                (or (ir2-block-%label else-block)
                    (setf (ir2-block-%label else-block) (gen-label)))
                ;; the chain is order-insensitive but more understandable
                ;; if returned in the order that tests appeared in source.
-               (return (values (list (vop-name start-vop) (nreverse chain) else-block)
+               (return (values (list (nreverse chain) else-block
+                                     (vop-name comparison))
                                blocks-to-delete)))
              (setq vop (ir2-block-start-vop else-block)))))))))
 
@@ -555,7 +576,7 @@
 ;;; parts that can be, if any can be.
 ;;; e.g. (case x (1 :a) (2 :b) (3 :c) (zot 'y)) ; with any order of tests
 ;;; could be expressed as (if (eq x 'zot) y [multiway-branch])
-(defun should-use-jump-table-p (chain &aux (choices (cadr chain)))
+(defun should-use-jump-table-p (chain &aux (choices (car chain)))
   ;; Dup keys could exist. REMOVE-DUPLICATES from-end can handle that:
   ;;  "the one occurring earlier in sequence is discarded, unless from-end
   ;;   is true, in which case the one later in sequence is discarded."
@@ -576,27 +597,32 @@
         ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
         ;; for 4 entries, which is excessive.
         (when (<= table-size size-limit)
-          ;; Recons the data to play things safe: (vop-name choices else)
-          (list (first chain) choices (third chain)))))))
+          ;; Return the new choices
+          (cons choices (cdr chain)))))))
 
 (defun convert-if-else-chains (component)
   (do-ir2-blocks (2block component)
-    (let ((comparison (ends-in-branch-if-eq-imm-p 2block)))
-      (when (and comparison (exactly-two-successors-p 2block))
-        (binding* (((chain delete-blocks) (longest-if-else-chain comparison))
+    (let ((head (ends-in-branch-if-eq-imm-p 2block)))
+      (when (and head (exactly-two-successors-p 2block))
+        (binding* (((chain delete-blocks) (longest-if-else-chain head))
                    (culled-chain (should-use-jump-table-p chain) :exit-if-null)
-                   (node (vop-node comparison))
-                   (src (tn-ref-tn (vop-args comparison))))
-          (delete-vop (vop-next comparison)) ; delete the BRANCH-IF
-          (delete-vop comparison) ; delete the initial IF-EQ
-          ;; Delete vops that are bypassed
-          (dolist (block delete-blocks)
-            (delete-vop (ir2-block-last-vop block))
-            (delete-vop (ir2-block-last-vop block))
-            ;; there had better be no vops remaining
-            (aver (null (ir2-block-start-vop block))))
+                   (node (vop-node head))
+                   (src (tn-ref-tn (vop-args head))))
+          (flet ((delete-test (vop)
+                   ;; delete 2 to 4 vops starting at VOP, depending on whether
+                   ;; there is an initial MOVE and final BRANCH.
+                   (delete-vop (vop-next vop))
+                   (awhen (vop-next vop) (delete-vop it))
+                   (awhen (vop-next vop) (delete-vop it))
+                   (delete-vop vop)))
+            (delete-test head)
+            ;; Delete vops that are bypassed
+            (dolist (2block delete-blocks)
+              (delete-test (ir2-block-start-vop 2block))
+              ;; there had better be no vops remaining
+              (aver (null (ir2-block-start-vop 2block)))))
           ;; Unzip the alist
-          (destructuring-bind (test-vop-name clauses else-block) culled-chain
+          (destructuring-bind (clauses else-block test-vop-name) culled-chain
             (let* ((values (mapcar #'car clauses))
                    (blocks (mapcar #'cdr clauses))
                    (labels (mapcar #'ir2-block-%label blocks))
@@ -610,6 +636,7 @@
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
+    (when *compiler-trace-output* (print-ir2-blocks component))
     ;; Look for if/else chains before cmovs, because a cmov
     ;; affects whether the last if/else is recognizable.
     #+(or x86 x86-64) (convert-if-else-chains component)

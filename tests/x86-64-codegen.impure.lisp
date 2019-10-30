@@ -345,11 +345,19 @@
   (declare (optimize (sb-c::verify-arg-count 0)))
   (case (the fixnum x)
     (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah)))
+(defun try-case-maybe-fixnum (x)
+  (when (typep x 'fixnum)
+    (case x
+      (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah))))
 
 (defun try-case-known-char (x)
   (declare (optimize (sb-c::verify-arg-count 0)))
   (case (the character x)
     (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :b)))
+(defun try-case-maybe-char (x)
+  (declare (optimize (sb-c::verify-arg-count 0)))
+  (when (characterp x)
+    (case x (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :a))))
 
 (defun expect-n-comparisons (fun-name howmany)
   (let ((lines
@@ -369,10 +377,12 @@
         do (assert (eq (bbb x y z) expect))))
 
 (with-test (:name :multiway-branch-fixnum-eq)
-  (expect-n-comparisons 'try-case-known-fixnum 1)) ; just the upper bound
+  (expect-n-comparisons 'try-case-known-fixnum 1) ; just the upper bound
+  (expect-n-comparisons 'try-case-maybe-fixnum 1))
 
 (with-test (:name :multiway-branch-char-eq)
-  (expect-n-comparisons 'try-case-known-char 2)) ; widetag test and upper bound
+  (expect-n-comparisons 'try-case-known-char 2) ; widetag test and upper bound
+  (expect-n-comparisons 'try-case-maybe-char 2))
 
 (with-test (:name :multiway-branch-min-branch-factor)
   ;; Test that multiway vop shows up in IR2
