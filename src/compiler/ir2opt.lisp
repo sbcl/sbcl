@@ -571,6 +571,16 @@
                                blocks-to-delete)))
              (setq vop (ir2-block-start-vop else-block)))))))))
 
+;;; There could be a backend-aware aspect to the decision about whether to
+;;; convert to a jump table. This rightfully belongs in the target definition,
+;;; but so far there is only x86[-64] support, and we support any table size.
+;;; Other machines might have some limitations due to register pressure and/or
+;;; size of immediate constants.  I might remove this after all...
+(defun can-encode-jump-table-p (min max)
+  (declare (ignorable min max))
+  #+(or x86 x86-64)
+  t)
+
 ;;; Decide whether CHAIN can be implemented as a multiway branch.
 ;;; As a further enhancement, it would be nice if we could factor out the
 ;;; parts that can be, if any can be.
@@ -596,7 +606,8 @@
              (size-limit (* (length values) 2)))
         ;; Don't waste too much space, e.g. {5,6,10,20} would require 16 words
         ;; for 4 entries, which is excessive.
-        (when (<= table-size size-limit)
+        (when (and (<= table-size size-limit)
+                   (can-encode-jump-table-p min max))
           ;; Return the new choices
           (cons choices (cdr chain)))))))
 

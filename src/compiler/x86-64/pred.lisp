@@ -76,10 +76,14 @@
                values labels)
          ;; First exclude out-of-bounds values because there's no harm
          ;; in doing that up front regardless of the argument's lisp type.
-         (if (= min 0)
-             (move temp-reg-tn x)
-             (inst lea temp-reg-tn (ea (fixnumize (- min)) x)))
-         (inst cmp temp-reg-tn (fixnumize (- max min)))
+         (let ((-min (fixnumize (- min))))
+           (typecase -min
+            ;; TODO: if min is 0, use X directly, don't move into temp-reg-tn
+            ((eql 0) (move temp-reg-tn x))
+            ((signed-byte 32) (inst lea temp-reg-tn (ea -min x)))
+            (t (inst mov temp-reg-tn x)
+               (inst add :qword temp-reg-tn (constantize -min)))))
+         (inst cmp temp-reg-tn (constantize (fixnumize (- max min))))
          (inst jmp :a otherwise)
          ;; We have to check the type here because a chain of EQ tests
          ;; does not impose a type constraint.

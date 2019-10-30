@@ -399,6 +399,21 @@
                               :allow-style-warnings t))))
     (assert (not (search "MULTIWAY-BRANCH" s)))))
 
+;;; Don't crash on large constants
+;;; https://bugs.launchpad.net/sbcl/+bug/1850701
+;;; (modified example to avoid style warning)
+(with-test (:name :multiway-branch-large-constants)
+  (let ((f (checked-compile
+            '(lambda (p)
+               (case p
+                (1881481965704634 0)
+                (1881481965704630 1)
+                (1881481965704635 2)
+                (1881481965704629 3)
+                (1881481965704633 4)
+                (t nil))))))
+    (assert (eql (funcall f 1881481965704629) 3))))
+
 (with-test (:name :ecase-failure-trap)
   (assert (null (ctu:find-named-callees
                  (checked-compile `(lambda (x)
