@@ -636,7 +636,6 @@
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
-    (when *compiler-trace-output* (print-ir2-blocks component))
     ;; Look for if/else chains before cmovs, because a cmov
     ;; affects whether the last if/else is recognizable.
     #+(or x86 x86-64) (convert-if-else-chains component)
