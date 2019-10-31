@@ -437,6 +437,46 @@
     (assert (eql (funcall f nil 2 nil) 2))
     (assert (eql (funcall f 0 -1 :hi) :hi))))
 
+;; https://bugs.launchpad.net/sbcl/+bug/1850785
+(with-test (:name :multiway-branch-to-branch)
+  ;; The behavior changes because of single-use var elimination
+  ;; which eliminates a move which eliminates a vop as a no-op,
+  ;; or something, which left an empty block. (Hand-waving explanation)
+  (let* ((form '(case c
+                 ((6) c)
+                 ((9 13 12) (case a ((-2589) a) ((970) 0) (t b)))
+                 (t a)))
+         (l1 `(lambda (a b c) (declare (optimize (debug 0))) ,form))
+         (l2 `(lambda (a b c) ,form))
+         (f1 (checked-compile l1))
+         (f2 (checked-compile l2))
+         (vals '(:good :bad 0)))
+    (assert (eq (apply f1 vals) :good))
+    (assert (eq (apply f2 vals) :good)))
+  ;;
+  (let* ((form '(case d
+                 ((7 18) (case b
+                           ((114361) :bad)
+                           ((77773) a)
+                           ((118772) c)
+                           (t :bad)))
+                 ((6) 2)
+                 ((3) b)
+                 ((15 21 9 19 2) 3)
+                 ((20) 1)
+                 (t a)))
+         (vals '(:good 5 :xyz 0))
+         (l1 `(lambda (a b c d)
+                (declare (type fixnum b))
+                ,form))
+         (l2 `(lambda (a b c d)
+                (declare (optimize (speed 3)))
+                ,form))
+         (f1 (checked-compile l1))
+         (f2 (checked-compile l2)))
+    (assert (eq (apply f1 vals) :good))
+    (assert (eq (apply f2 vals) :good))))
+
 (with-test (:name :ecase-failure-trap)
   (assert (null (ctu:find-named-callees
                  (checked-compile `(lambda (x)

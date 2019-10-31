@@ -293,6 +293,8 @@
                       (return label))
                      ((ir2-block-start-vop block)
                       (return nil)))))))
+    ;; This is the same information as in *2block-info*. "Too Many Cooks"
+    ;; (Well, the *2block-info* is gone at this point)
     (let ((label-block-map (make-hash-table :test #'eq)))
       (do-ir2-blocks (block component)
         (setf (gethash (ir2-block-%trampoline-label block) label-block-map)
@@ -300,19 +302,22 @@
         (setf (gethash (ir2-block-%label block) label-block-map)
               block))
       (labels ((unchain-jumps (vop)
-                 (let* ((target (first (vop-codegen-info vop)))
-                        (target-block (gethash target label-block-map))
+                 ;; Handle any branching vop except a multiway branch
+                 (setf (first (vop-codegen-info vop))
+                       (follow-jumps (first (vop-codegen-info vop)))))
+               (follow-jumps (target-label)
+                 (declare (type label target-label))
+                 (let* ((target-block (gethash target-label label-block-map))
                         (target-vop (start-vop target-block)))
-                   (when (and target-vop
-                              (eq (vop-name target-vop) 'branch)
-                              (neq target
-                                   (first (vop-codegen-info target-vop))))
-                     (setf (first (vop-codegen-info vop))
-                           (first (vop-codegen-info target-vop)))
-                     ;; What if it jumps to a jump too?
-                     (unchain-jumps vop))))
+                   (if (and target-vop
+                            (eq (vop-name target-vop) 'branch)
+                            (neq (first (vop-codegen-info target-vop))
+                                 target-label))
+                       (follow-jumps (first (vop-codegen-info target-vop)))
+                       target-label)))
                (remove-jump-overs (branch-if branch)
-                 ;; Turn BRANCH-IF L1 BRANCH L2 L1: into BRANCH-IF[NOT] L2
+                 ;; Turn BRANCH-IF #<L1>, BRANCH #<L2>, L1:
+                 ;; into BRANCH-IF[NOT] L2
                  (when (and branch
                             (eq (vop-name branch) 'branch))
                    (let* ((branch-if-info (vop-codegen-info branch-if))
@@ -327,41 +332,48 @@
                (conditional-p (vop)
                  (let ((info (vop-info vop)))
                    (eq (vop-info-result-types info) :conditional))))
+        ;; Pass 1: conditional | unconditional jump to an unconditional jump
+        ;; should take the label of the latter.
         (do-ir2-blocks (block component)
           (let ((last (ir2-block-last-vop block)))
-            (case (and last
-                       (vop-name last))
+            (case (and last (vop-name last))
               (branch
-                  (unchain-jumps last)
-                ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
-                (let ((prev (vop-prev last)))
-                  (when (and prev
-                             (or (eq (vop-name prev) 'branch-if)
-                                 (conditional-p prev)))
-                    (unchain-jumps prev))))
+               (unchain-jumps last)
+               ;; A block may end up having BRANCH-IF + BRANCH after converting an IF.
+               ;; Multiway can't coexist with any other branch preceding or following
+               ;; in the block, so we don't have to check for that, just a BRANCH-IF.
+               (let ((prev (vop-prev last)))
+                 (when (and prev
+                            (or (eq (vop-name prev) 'branch-if)
+                                (conditional-p prev)))
+                   (unchain-jumps prev))))
               (branch-if
                (unchain-jumps last))
+              (multiway-branch-if-eq
+               ;; codegen-info = (values labels else-label . extra)
+               (let ((info (cdr (vop-codegen-info last))))
+                 (setf (car info) (mapcar #'follow-jumps (car info))
+                       (cadr info) (follow-jumps (cadr info)))))
               (t
-               (when (and last
-                          (conditional-p last))
+               (when (and last (conditional-p last))
                  (unchain-jumps last))))))
+        ;; Pass 2
         ;; Need to unchain the jumps before handling jump-overs,
         ;; otherwise the BRANCH over which BRANCH-IF jumps may be a
         ;; target of some other BRANCH
         (do-ir2-blocks (block component)
           (let ((last (ir2-block-last-vop block)))
-            (case (and last
-                       (vop-name last))
+            (case (and last (vop-name last))
               (branch-if
                (remove-jump-overs last
                                   (start-vop (ir2-block-next block))))
               (branch
-                  ;; A block may end up having BRANCH-IF BRANCH after coverting an IF
-                  (let ((prev (vop-prev last)))
-                    (when (and prev
-                               (or (eq (vop-name prev) 'branch-if)
-                                   (conditional-p prev)))
-                      (remove-jump-overs prev last))))
+               ;; A block may end up having BRANCH-IF + BRANCH after coverting an IF
+               (let ((prev (vop-prev last)))
+                 (when (and prev
+                            (or (eq (vop-name prev) 'branch-if)
+                                (conditional-p prev)))
+                   (remove-jump-overs prev last))))
               (t
                (when (and last
                           (conditional-p last))
@@ -650,7 +662,7 @@
                    (labels (mapcar #'ir2-block-%label blocks))
                    (otherwise (ir2-block-%label else-block)))
               (emit-and-insert-vop node 2block
-                                   (template-or-lose 'sb-vm::multiway-branch-if-eq)
+                                   (template-or-lose 'multiway-branch-if-eq)
                                    (reference-tn src nil) nil nil
                                    (list values labels otherwise test-vop-name))
               ;; De-duplicate the  successor blocks and update the flowgraph.
