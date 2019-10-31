@@ -455,8 +455,8 @@
   (declare (type vop vop))
   (do ((ref (vop-refs vop) (tn-ref-next-ref ref)))
       ((null ref))
-    (delete-tn-ref ref))
-
+    (unless (eql (tn-kind (tn-ref-tn ref)) :unused)
+      (delete-tn-ref ref)))
   (let ((prev (vop-prev vop))
         (next (vop-next vop))
         (block (vop-block vop)))

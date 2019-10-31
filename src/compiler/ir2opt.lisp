@@ -204,6 +204,11 @@
 (defun delete-unused-ir2-blocks (component)
   (declare (type component component))
   (let ((live-2blocks (make-hash-table :test #'eq)))
+    ;; The liveness algorithm is a straightforward DFS depending on correctness
+    ;; of successor links from any reachable block. Unreached blocks could have junk
+    ;; in the successor and predecessor links, but it would nice if that didn't
+    ;; happen, as junk makes it hard to understand the IR2 flow graph.
+    ;; Mutators should try to keep things tidy.
     (labels ((mark-2block (2block)
                (declare (type ir2-block 2block))
                (when (gethash 2block live-2blocks)
@@ -214,8 +219,7 @@
 
     (flet ((delete-2block (2block)
              (declare (type ir2-block 2block))
-             (do ((vop (ir2-block-start-vop 2block)
-                    (vop-next vop)))
+             (do ((vop (ir2-block-start-vop 2block) (vop-next vop)))
                  ((null vop))
                (delete-vop vop))))
       (do-ir2-blocks (2block component (values))
@@ -512,6 +516,8 @@
 ;;; is cluttered up by the coverage noise prior to performing the next comparison.
 ;;; It's probably just as well, because the coverage report would have no idea
 ;;; how to decode the recorded information from the multiway branch vop.
+;;; Not to mention, SB-ASSEM::%MARK-USED-LABELS does not understand that labels
+;;; in the branch table are all used. So there's that to contend with too.
 (defun longest-if-else-chain (start-vop)
   (let ((test-var (tn-ref-tn (vop-args start-vop)))
         (vop start-vop)
@@ -536,6 +542,9 @@
                      (if negate
                          (values drop-thru target-block)
                          (values target-block drop-thru))))
+           ;; If the ELSE block was the branch target (a negated branch),
+           ;; then the THEN block might have no label as it is a dropthru.
+           ;; Label it now in case of that.
            (or (ir2-block-%label then-block)
                (setf (ir2-block-%label then-block) (gen-label)))
            (when chain
@@ -631,7 +640,9 @@
             (dolist (2block delete-blocks)
               (delete-test (ir2-block-start-vop 2block))
               ;; there had better be no vops remaining
-              (aver (null (ir2-block-start-vop 2block)))))
+              (aver (null (ir2-block-start-vop 2block)))
+              ;; The block can't be reached, and goes nowhere.
+              (update-block-succ 2block nil)))
           ;; Unzip the alist
           (destructuring-bind (clauses else-block test-vop-name) culled-chain
             (let* ((values (mapcar #'car clauses))
@@ -642,7 +653,10 @@
                                    (template-or-lose 'sb-vm::multiway-branch-if-eq)
                                    (reference-tn src nil) nil nil
                                    (list values labels otherwise test-vop-name))
-              (update-block-succ 2block (cons else-block blocks)))))))))
+              ;; De-duplicate the  successor blocks and update the flowgraph.
+              ;; The ELSE block could be identical to any of the THEN blocks.
+              (update-block-succ
+               2block (remove-duplicates (cons else-block blocks))))))))))
 
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))

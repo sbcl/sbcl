@@ -414,6 +414,29 @@
                 (t nil))))))
     (assert (eql (funcall f 1881481965704629) 3))))
 
+;; https://bugs.launchpad.net/sbcl/+bug/1850705
+(with-test (:name :multiway-branch-dead-code-elim)
+  (let ((f (checked-compile
+            '(lambda (b)
+              (case b
+                ((4 1 2 3) 0)
+                ((2 4) (mod b (min -49 0)))
+                (t 0)))
+            :allow-style-warnings t)))
+    (dotimes (i 5) (assert (eql (funcall f i) 0)))
+    (assert (eql (funcall f 'anything) 0)))
+  (let ((f (checked-compile
+            '(lambda (s1 s2 c)
+              (case s2
+                ((2) s2)
+                ((2) (mod s1 (max 9 0)))
+                ((1 4) 0)
+                ((-1) c)
+                (t 0)))
+            :allow-style-warnings t)))
+    (assert (eql (funcall f nil 2 nil) 2))
+    (assert (eql (funcall f 0 -1 :hi) :hi))))
+
 (with-test (:name :ecase-failure-trap)
   (assert (null (ctu:find-named-callees
                  (checked-compile `(lambda (x)
