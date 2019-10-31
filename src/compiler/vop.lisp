@@ -506,7 +506,7 @@
 (def!struct (vop (:constructor make-vop (block node info args results))
                  (:copier nil))
   ;; VOP-INFO structure containing static info about the operation
-  (info nil :type (or vop-info null))
+  (info nil :type vop-info)
   ;; the IR2-BLOCK this VOP is in
   (block (missing-arg) :type ir2-block)
   ;; VOPs evaluated after and before this one. Null at the
