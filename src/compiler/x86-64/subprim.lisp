@@ -75,24 +75,3 @@
     (inst cmp ptr nil-value)
     (inst jmp :ne LOOP)
     DONE))
-
-;;; These could use a little help from jump-to-jump elimination,
-;;; but nonetheless they encode more compactly than full calls.
-(define-vop (ecase-failure)
-  (:policy :fast-safe)
-  (:translate ecase-failure)
-  (:args (value :scs (any-reg descriptor-reg))
-         (keys :scs (descriptor-reg constant)))
-  (:vop-var vop)
-  (:generator 10
-    (inst jmp (generate-error-code vop 'sb-kernel::ecase-failure-error
-                                   value keys))))
-(define-vop (etypecase-failure)
-  (:policy :fast-safe)
-  (:translate etypecase-failure)
-  (:args (value :scs (any-reg descriptor-reg))
-         (keys :scs (descriptor-reg constant)))
-  (:vop-var vop)
-  (:generator 10
-    (inst jmp (generate-error-code vop 'sb-kernel::etypecase-failure-error
-                                   value keys))))
