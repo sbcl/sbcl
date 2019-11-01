@@ -477,6 +477,24 @@
     (assert (eq (apply f1 vals) :good))
     (assert (eq (apply f2 vals) :good))))
 
+(defun count-assembly-labels (lines)
+  (count-if (lambda (line &aux (colon (search ": " line)))
+              (and colon
+                   (char= (char line (+ colon 2)) #\L)))
+            lines))
+
+(with-test (:name :disassembler-label-jump-table-targets)
+  (let* ((f (checked-compile
+             '(lambda (x)
+               (declare (optimize (sb-c::verify-arg-count 0)))
+               (case (truly-the fixnum x)
+                 (0 (a)) (1 (b)) (2 (c)) (3 (d))))
+             :allow-style-warnings t))
+         (lines (split-string
+                 (with-output-to-string (s) (disassemble f :stream s))
+                 #\newline)))
+    (assert (>= (count-assembly-labels lines) 4))))
+
 (with-test (:name :ecase-failure-trap)
   (assert (null (ctu:find-named-callees
                  (checked-compile `(lambda (x)

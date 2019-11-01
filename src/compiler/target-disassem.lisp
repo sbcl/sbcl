@@ -737,6 +737,15 @@
   ;; add labels at the beginning with a label-number of nil; we'll notice
   ;; later and fill them in (and sort them)
   (declare (type disassem-state dstate))
+  ;; Holy cow, is this flaky. The problem is that labels are computed as absolute
+  ;; addresses, yet GC is (in theory) able to relocate the code while disassembling.
+  ;; The labels wouldn't make sense if that happens.
+  ;; I'm disinclined to revise all of the backends to compute labels relative to
+  ;; code-instructions. Probably we shouldn't try to support code movement while
+  ;; disassembling, it's just not worth the headache.
+  ;; However, a potential fix might be to pin the code while scanning it for
+  ;; labels, then relativize all labels to the segment base.
+  ;; When disassembling arbitrary memory, relativization would be skipped.
   (let ((labels (dstate-labels dstate)))
     (map-segment-instructions
      (lambda (chunk inst)
@@ -776,9 +785,19 @@
                  (push (cons adjusted-value nil) labels)))))
      segment
      dstate)
-    (setf (dstate-labels dstate) labels)
     ;; erase any notes that got there by accident
-    (setf (dstate-notes dstate) nil)))
+    (setf (dstate-notes dstate) nil)
+    ;; add labels from code header jump tables. As noted above,
+    ;; this is buggy if code moves, but no worse than anything else.
+    #+(or x86 x86-64)
+    (binding* ((code (seg-code segment) :exit-if-null))
+      (with-pinned-objects (code)
+        (loop with insts = (code-instructions code)
+              for i from 1 below (sap-ref-word insts 0)
+              do (pushnew (cons (sap-ref-word insts (ash i sb-vm:word-shift)) nil)
+                          labels :key #'car))))
+    ;; Return the new list
+    (setf (dstate-labels dstate) labels)))
 
 ;;; If any labels in DSTATE have been added since the last call to
 ;;; this function, give them label-numbers, enter them in the
@@ -1564,6 +1583,11 @@
   (setf (dstate-labels dstate)
         (remove-if (lambda (lab)
                      (not
+                      ;; Ok, this is bogus when you want to show the code
+                      ;; as if the origin were 0 (perhaps to compare
+                      ;; two disssemblies that should be the same).
+                      ;; Maybe that's a another good reason to store
+                      ;; labels as relativized.
                       (some (lambda (seg)
                               (let ((start (seg-virtual-location seg)))
                                 (<= start
