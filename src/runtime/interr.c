@@ -188,22 +188,35 @@ char internal_error_nargs[] = INTERNAL_ERROR_NARGS;
 void skip_internal_error (os_context_t *context) {
     unsigned char *ptr = (unsigned char *)*os_context_pc_addr(context);
 #ifdef LISP_FEATURE_ARM64
+    // This code is broken. The program counter as received in *context
+    // points one instruction beyond the BRK opcode.
+    // I wrote a test vop that emits a cerror break thusly:
+    //
+    // ; 62C:       40A122D4         BRK #5386                       ; Cerror trap
+    // ; 630:       30               BYTE #X30                       ; R2
+    //
+    // and added a printf to see the instruction pointer here:
+    //   skip_internal_error: pc=0x1002441630
+    //
+    // which got a trap code of 0. This is due to the fact that DESCRIPTOR-REG
+    // is the lowest SC number, so the encoded SC+OFFSET of R2 is a small
+    // value, and therefore shifting right by 13 bits extracts a 0.
+    // Internal error number 0 has 0 arguments, so we skip nothing in the varint
+    // decoder loop, which is the right thing for the wrong reason.
     u32 trap_instruction = *(u32 *)ptr;
     unsigned char code = trap_instruction >> 13 & 0xFF;
     ptr += 4;
 #else
     unsigned char code = *ptr;
-    ptr++;
+    ptr++; // skip the byte indicating the kind of trap
 #endif
     if (code > sizeof(internal_error_nargs)) {
         printf("Unknown error code %d at %p\n", code, (void*)*os_context_pc_addr(context));
     }
-
-    // FIXME: this looks wrong. nargs[] is used as byte count here, but it's actually
-    // a count of varint-encoded SC+OFFSETs. It's certainly _possible_ for an
-    // SC+OFFSET to encode to 1 byte. Do we know that in every case that
-    // skip_internal_error() is called, each SC+OFFSET does encode to 1 byte?
-    ptr += internal_error_nargs[code];
+    int nargs = internal_error_nargs[code];
+    int nbytes = 0;
+    while (nargs--) read_var_integer(ptr, &nbytes);
+    ptr += nbytes;
     *((unsigned char **)os_context_pc_addr(context)) = ptr;
 }
 
