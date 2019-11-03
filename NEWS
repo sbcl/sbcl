@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.5.8:
+  * optimizations:
+    ** CASE and ECASE with symbols as keys can be optimized
+       into a jump table on the x86[-64] architecture.
+
 changes in sbcl-1.5.8 relative to sbcl-1.5.7:
   * platform support:
     ** support for Mac OS X Catalina

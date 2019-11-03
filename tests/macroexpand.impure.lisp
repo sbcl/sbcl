@@ -11,6 +11,8 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
+(load "compiler-test-util.lisp")
+
 ;;; From Matthew Swank on cll 2005-10-06
 
 (defmacro defglobal* (name &optional value)
@@ -263,3 +265,44 @@
                      (warnings-in-subforms (progn 1) (progn 2))
                      (progn 3))))
                  '((1 2 0) (2 2 0) (1 1 2 0) (2 1 2 0)))))
+
+;;; Tests of EXPAND-SYMBOL-CASE.
+;;; The logic of converting the case to use symbol-hash is valid
+;;; even if the architecture would not do that.
+;;; Use a simple hash function so that the binning can be directly
+;;; controlled by the test.
+(defun wonky-hash (x) (char-code (char (string (the symbol x)) 0)))
+
+;;; Test bin merging with two different scenarios because it matters
+;;; whether a bin in which collisions occur is numerically lower than
+;;; or higher than a bin already emitted into the COND.
+(with-test (:name :symbol-case-complicated)
+  (let ((tests '((:foo a b c d) (:bar e f |a|)))
+        (fun
+         (checked-compile
+          `(lambda (x)
+             ,(sb-impl:expand-symbol-case
+               'x
+               '(((or (eql s 'a) (eql s 'b) (eql s 'c) (eql s 'd)) nil :foo)
+                 ((or (eql s 'e) (eql s 'f) (eql s '|a|)) nil :bar))
+               '(a b c d e f |a|)
+               nil
+               'wonky-hash)))))
+    (loop for (expect . inputs) in tests
+          do (dolist (input inputs)
+               (assert (eql (funcall fun input) expect)))))
+
+  (let ((tests '((:foo f e d c) (:bar b a |d|)))
+        (fun
+         (checked-compile
+          `(lambda (x)
+             ,(sb-impl:expand-symbol-case
+               'x
+               '(((or (eql s 'f) (eql s 'e) (eql s 'd) (eql s 'c)) nil :foo)
+                 ((or (eql s 'b) (eql s 'a) (eql s '|d|)) nil :bar))
+               '(a b c d e f |d|)
+               nil
+               'wonky-hash)))))
+    (loop for (expect . inputs) in tests
+          do (dolist (input inputs)
+               (assert (eql (funcall fun input) expect))))))

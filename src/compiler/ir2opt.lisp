@@ -272,6 +272,27 @@
 ;;; Remove BRANCHes that are jumped over by BRANCH-IF
 ;;; Should be run after DELETE-NO-OP-VOPS, otherwise the empty moves
 ;;; will interfere.
+
+;;; FIXME: there is one more minor glitch caused by multiway branch,
+;;; but it is not a correctness bug. Consider:
+;;;  (defun f (&optional (a (missing-arg)) (b (missing-arg))
+;;;                      (c (missing-arg)) (d (missing-arg)))
+;;;     (list a b c d ))
+;;;
+;;; Granted that this is a slightly weird idiom, but it is used frequently
+;;; in system internals as well as by FORMATTER's macroexpansion.
+;;; The main entry point dispatches on the argument count.
+;;; After elimination of redundant moves, we end up with:
+;;;   ; DF2:       42FF2498         JMP QWORD PTR [RAX+R11*4]
+;;;   ; DF6:       E981000000       JMP L3
+;;;   ; DFB:       E999000000       JMP L4
+;;;   ; E00:       E9B1000000       JMP L5
+;;;   ; E05:       E9C9000000       JMP L6
+;;; where every one of the jumps to a label is unreachable.
+;;; This is because each of the original IF's would have branched
+;;; to two MOVEs that are eliminated as the arg/results get packed
+;;; in the same physical location, and then the branch is performed,
+;;; but it is in a dead IR2 block.
 (defun ir2-optimize-jumps (component)
   (flet ((start-vop (block)
            (do ((block block (ir2-block-next block)))

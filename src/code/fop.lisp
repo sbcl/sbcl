@@ -221,8 +221,14 @@
   (error nil :read-only t))
 (declaim (freeze-type undefined-package))
 
-;; Cold load has its own implementation of all symbol fops,
-;; but we have to execute define-fop now to assign their numbers.
+;;; Cold load has its own implementation of all symbol fops,
+;;; but we have to execute define-fop now to assign their numbers.
+;;;
+;;; Any symbols created by the loader must have their SYMBOL-HASH computed.
+;;; This is a requirement for the CASE macro to work. When code is compiled
+;;; to memory, symbols in the expansion are subject to SXHASH, so all is well.
+;;; When loaded, even uninterned symbols need a hash.
+;;; Interned symbols automatically get a precomputed hash.
 (labels #+sb-xc-host ()
         #-sb-xc-host
         ((read-symbol-name (length+flag fasl-input)
@@ -250,12 +256,6 @@
                               (undefined-package-error package)))
                  (push-fop-table (%intern name length package elt-type t)
                                  fasl-input))))
-         ;; Symbol-hash is usually computed lazily and memoized into a symbol.
-         ;; Laziness slightly improves the speed of allocation.
-         ;; But when loading fasls, the time spent in the loader totally swamps
-         ;; any time savings of not precomputing symbol-hash.
-         ;; INTERN hashes everything anyway, so let's be consistent
-         ;; and precompute the hashes of uninterned symbols too.
          (ensure-hashed (symbol)
            (ensure-symbol-hash symbol)
            symbol))

@@ -637,6 +637,8 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :import-from (("SB-KERNEL" "*PACKAGE-NAMES*"))
       :export ("FORMAT-MICROSECONDS" "FORMAT-MILLISECONDS" ; for ~/fmt/
                "PRINT-TYPE" "PRINT-TYPE-SPECIFIER"
+               ;; protect from tree shaker so we can test this function
+               "EXPAND-SYMBOL-CASE"
                ;; symbols used by sb-simple-streams
                "ANSI-STREAM-CLEAR-INPUT"
                "ANSI-STREAM-FRESH-LINE" "ANSI-STREAM-LISTEN"

@@ -138,6 +138,7 @@
   (def etypecase-failure sb-kernel::etypecase-failure-error etypecase-failure
     nil value keys)
   (def nil-fun-returned-error nil-fun-returned-error nil nil fun)
+  (def sb-impl::unreachable sb-kernel::unreachable-error sb-impl::unreachable nil)
   (def failed-aver sb-kernel::failed-aver-error
     sb-impl::%failed-aver
     nil form))
