@@ -170,5 +170,5 @@
          (nt "Single step before trap"))
         (t
          (when (or (and (= trap cerror-trap) (progn (nt "cerror trap") t))
-                   (>= trap-number error-trap))
+                   (>= trap error-trap))
            (handle-break-args #'snarf-error-junk trap stream dstate)))))))
