@@ -1058,10 +1058,14 @@
     (print-operands (vop-args vop))
     (pprint-newline :linear)
     (when (vop-codegen-info vop)
-      (princ (with-simple-output-to-string (stream)
-               (let ((*print-level* 1)
-                     (*print-length* 3))
-                 (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))
+      (case (vop-name vop)
+       (multiway-branch-if-eq
+        (princ (vop-codegen-info vop)))
+       (t
+        (princ (with-simple-output-to-string (stream)
+                 (let ((*print-level* 1)
+                       (*print-length* 3))
+                   (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))))
       (pprint-newline :linear))
     (when (vop-results vop)
       (princ "=> ")
