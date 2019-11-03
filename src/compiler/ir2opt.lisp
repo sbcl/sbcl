@@ -677,8 +677,9 @@
     ;; affects whether the last if/else is recognizable.
     #+(or x86 x86-64) (convert-if-else-chains component)
     (convert-cmovs component)
-    #+x86-64 ;; while it's portable the VOPs are not validated for
-             ;; compatibility on other backends yet.
+    #+(or arm arm64 x86 x86-64)
+    ;; while it's portable the VOPs are not validated for
+    ;; compatibility on other backends yet.
     (ir2-optimize-comparisons component)
     (delete-unused-ir2-blocks component))
 
