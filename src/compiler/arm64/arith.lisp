@@ -764,6 +764,13 @@
   (:conditional :eq)
   (:policy :fast-safe))
 
+(defun fixnum-abs-add-sub-immediate-p (n)
+  (fixnum-add-sub-immediate-p (abs n)))
+
+(defun abs-add-sub-immediate-p (n)
+  (or (add-sub-immediate-p (abs n))
+      (add-sub-immediate-p (ldb (byte n-word-bits 0) (- n)))))
+
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg))
          (y :scs (any-reg)))
@@ -772,7 +779,7 @@
 
 (define-vop (fast-conditional-c/fixnum fast-conditional/fixnum)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (satisfies fixnum-add-sub-immediate-p)))
+  (:arg-types tagged-num (:constant (satisfies fixnum-abs-add-sub-immediate-p)))
   (:info y))
 
 (define-vop (fast-conditional/signed fast-conditional)
@@ -783,7 +790,7 @@
 
 (define-vop (fast-conditional-c/signed fast-conditional/signed)
   (:args (x :scs (signed-reg)))
-  (:arg-types signed-num (:constant (satisfies add-sub-immediate-p)))
+  (:arg-types signed-num (:constant (satisfies abs-add-sub-immediate-p)))
   (:info y))
 
 (define-vop (fast-conditional/unsigned fast-conditional)
@@ -794,27 +801,35 @@
 
 (define-vop (fast-conditional-c/unsigned fast-conditional/unsigned)
   (:args (x :scs (unsigned-reg)))
-  (:arg-types unsigned-num (:constant (satisfies add-sub-immediate-p)))
+  (:arg-types unsigned-num (:constant (satisfies abs-add-sub-immediate-p)))
   (:info y))
 
 (defmacro define-conditional-vop (tran cond unsigned)
   `(progn
-     ,@(mapcar (lambda (suffix cost signed)
-                 (unless (and (member suffix '(/fixnum -c/fixnum))
-                              (eq tran 'eql))
-                   `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)"
-                                                  tran suffix))
-                                 ,(intern
-                                   (format nil "~:@(FAST-CONDITIONAL~A~)"
-                                           suffix)))
-                     (:translate ,tran)
-                     (:conditional ,(if signed cond unsigned))
-                     (:generator ,cost
-                      (inst cmp x
-                       ,(if (eq suffix '-c/fixnum) '(fixnumize y) 'y))))))
-               '(/fixnum -c/fixnum /signed -c/signed /unsigned -c/unsigned)
-               '(4 3 6 5 6 5)
-               '(t t t t nil nil))))
+     ,@(loop for (suffix cost signed constant) in
+             '((/fixnum 4 t)
+               (-c/fixnum 3 t t)
+               (/signed 6 t)
+               (-c/signed 5 t t)
+               (/unsigned 6 nil)
+               (-c/unsigned 5 nil t))
+             for value = (if (eq suffix '-c/fixnum)
+                             '(fixnumize y)
+                             'y)
+             collect
+             `(define-vop (,(intern (format nil "~:@(FAST-IF-~A~A~)" tran suffix))
+                           ,(intern (format nil "~:@(FAST-CONDITIONAL~A~)" suffix)))
+                (:translate ,tran)
+                (:conditional ,(if signed cond unsigned))
+                (:generator ,cost
+                  ,(if constant
+                       `(let ((value ,value))
+                          (if (minusp value)
+                              (inst cmn x (abs value))
+                              (if (add-sub-immediate-p value)
+                                  (inst cmp x value)
+                                  (inst cmn x (ldb (byte n-word-bits 0) (- value))))))
+                       `(inst cmp x ,value)))))))
 
 (define-conditional-vop < :lt :lo)
 (define-conditional-vop > :gt :hi)
@@ -848,7 +863,7 @@
 
 (define-vop (fast-eql-c/fixnum)
   (:args (x :scs (any-reg)))
-  (:arg-types tagged-num (:constant (satisfies fixnum-add-sub-immediate-p)))
+  (:arg-types tagged-num (:constant (satisfies fixnum-abs-add-sub-immediate-p)))
   (:info y)
   (:translate eql)
   (:policy :fast-safe)
