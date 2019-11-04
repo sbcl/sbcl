@@ -567,7 +567,8 @@ symbol-case giving up: case=((V U) (F))
           `(let ((,symbol ,keyform))
              (block ,block
                (when (symbolp ,symbol)
-                 (let ((,h (ldb ',byte
+                 (let ((,h (ldb (byte ,(byte-size byte)
+                                      ,(byte-position byte))
                                 ;; always use pre-memoized hash
                                 (,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun)
                                  ,symbol))))
