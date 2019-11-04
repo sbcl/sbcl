@@ -308,6 +308,10 @@ with that condition (or with no condition) will be returned."
 
 (defun ecase-failure (value keys)
   (declare (optimize allow-non-returning-tail-call))
+  ;; inline definition not seen yet. Can't move this file later
+  ;; in build because **<foo>-clusters** are needed early.
+  (declare (notinline coerce))
+  (when (vectorp keys) (setq keys (coerce keys 'list)))
   (error 'case-failure
          :name 'ecase
          :datum value

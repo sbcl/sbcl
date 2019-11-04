@@ -495,6 +495,21 @@
                  #\newline)))
     (assert (>= (count-assembly-labels lines) 4))))
 
+(with-test (:name :ecase-symbol->integer-branch-free)
+  (let* ((f (checked-compile
+             '(lambda (x)
+               ;; The safety 0 decl skips the arg count check
+               ;; and trusts that X satisfies symbolp.
+               (declare (symbol x) (optimize (safety 0)))
+               (ecase x
+                 ((nil) 0) (a 1) (b 2) (c 3) (d 4)
+                 (e 5) (f 6) (g 7) (h 8) (i 9)))))
+         (lines (split-string
+                 (with-output-to-string (s) (disassemble f :stream s))
+                 #\newline)))
+    ;; Aside from ECASE failure, there are no other JMPs
+    (assert (= (count-assembly-labels lines) 1))))
+
 (with-test (:name :ecase-failure-trap)
   (assert (null (ctu:find-named-callees
                  (checked-compile `(lambda (x)

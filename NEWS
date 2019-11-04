@@ -2,8 +2,11 @@
 
 changes relative to sbcl-1.5.8:
   * optimizations:
-    ** CASE and ECASE with symbols as keys can be optimized
-       into a jump table on the x86[-64] architecture.
+    ** CASE and ECASE with symbols as keys may be optimized into a vector
+       lookup if all result forms are quoted or self-evaluating objects.
+    ** CASE and ECASE can be optimized into a jump table on the x86[-64]
+       backends with arbitrary result forms provided that the clause keys
+       are either all fixnums, all characters, or all symbols.
 
 changes in sbcl-1.5.8 relative to sbcl-1.5.7:
   * platform support:

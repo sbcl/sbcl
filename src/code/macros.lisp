@@ -449,70 +449,112 @@ symbol-case giving up: case=((V U) (F))
                          (return-from expand-symbol-case nil))))))
              (reverse clauses)))
            (clause->bins (make-array (length clauses) :initial-element nil))
-           (bins (make-array (ash 1 (byte-size byte)) :initial-element nil)))
+           (bins (make-array (ash 1 (byte-size byte)) :initial-element 0))
+           (symbol (sb-xc:gensym "S"))
+           (hash (sb-xc:gensym "H"))
+           (is-symbol `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol))
+           (calc-hash
+            `(ldb (byte ,(byte-size byte)
+                        ,(byte-position byte))
+                  ;; always use pre-memoized hash
+                  (,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun) ,symbol))))
+      (declare (ignorable default))
 
-      ;; Place each symbol into its hash bin. Also, for each clause compute the
-      ;; set of hash bins that it has placed a symbol into.
-      (loop for clause in clauses for clause-index from 0
-            do (dolist (symbol (car clause))
-                 (let ((masked-hash (ldb byte (funcall hash-fun symbol))))
-                   (pushnew masked-hash (aref clause->bins clause-index))
-                   (push (cons symbol clause-index) (aref bins masked-hash)))))
-      ;; Canonically order each element of clause->bins
-      (dotimes (i (length clause->bins))
-        (setf (aref clause->bins i) (sort (aref clause->bins i) #'<)))
+      (flet ((trivial-result-p (clause)
+               ;; Return 2 values: T/NIL if the clause's consequent
+               ;; is trivial, and its value when trivial.
+               (let ((consequent (cdr clause)))
+                 (if (singleton-p consequent)
+                     (let ((form (car consequent)))
+                       (cond ((typep form '(cons (eql quote) (cons t null)))
+                              (values t (cadr form)))
+                             ((self-evaluating-p form) (values t form))
+                             (t (values nil nil))))
+                     ;; NIL -> T, otherwise -> NIL
+                     (values (not consequent) nil)))))
 
-      ;;(dotimes (i (length clause->bins))
-      ;;  (format t "clause ~d -> bins ~d~%" i (aref clause->bins i)))
-      ;;(dotimes (i (length bins))
-      ;;  (format t "bin ~d -> ~s~%" i (aref bins i)))
+        ;; Try doing an array lookup if the hashing has no collisions and
+        ;; every consequent is trivial.
+        (when (= maxprobes 1)
+          (block try-table-lookup
+            (let ((values (make-array (length bins)))
+                  (types nil))
+              (dolist (clause clauses)
+                (multiple-value-bind (trivialp value) (trivial-result-p clause)
+                  (unless trivialp
+                    (return-from try-table-lookup))
+                  (push (ctype-of value) types)
+                  (dolist (symbol (car clause))
+                    (let ((index (ldb byte (funcall hash-fun symbol))))
+                      (aver (eql (aref bins index) 0)) ; no collisions
+                      (setf (aref bins index) symbol
+                            (aref values index) value)))))
+              (when (every #'fixnump values)
+                (setq values (sb-xc:coerce values '(simple-array fixnum (*)))))
+              (return-from expand-symbol-case
+                `(let ((,hash 0)
+                       (,symbol ,keyform))
+                   (if (and ,is-symbol (eq ,symbol (svref ,bins (setq ,hash ,calc-hash))))
+                       (truly-the ,(type-specifier (apply #'type-union types))
+                                  (aref ,values ,hash))
+                       ,(if errorp
+                            ;; coalescing of simple-vectors in a saved core
+                            ;; could eliminate repeated data from the same
+                            ;; ECASE that gets inlined many times over.
+                            `(ecase-failure
+                              ,symbol ,(coerce keys 'simple-vector)))))))))
 
-      ;; Perform a very limited bin merging step as follows: if a clause
-      ;; placed its symbols in more than one bin, allow it provided that either:
-      ;; - the clause's consequent is trivial, OR
-      ;; - none of its bins contains a symbol from a different clause.
-      ;; In the former case, we don't need to merge bins.
-      ;; In the latter case, the bins define an equivalence class
-      ;; that does not intersect any other equivalence class.
-      ;;
-      ;; To make this work, if a bin requires an IF to disambiguate which consequent
-      ;; to take, then it is removed from the clase->bins entry for each clause
-      ;; for which it contains a consequent so that the code below which computes
-      ;; the COND does not see the bin as a member of any equivalence class.
-      ;; Pass 1: decide whether to give up or go on.
-      (loop for clause in clauses for clause-index from 0
-            do (let* ((consequent (cdr clause))
-                      (consequent-trivialp
-                       (or (null consequent)
-                           (and (singleton-p consequent)
-                                (let ((form (car consequent)))
-                                  (or (typep form '(cons (eql quote) (cons t null)))
-                                      (self-evaluating-p form))))))
-                      (equivalence-class (aref clause->bins clause-index)))
-                 ;; if a nontrivial consequent is distributed into
-                 ;; more than one hash bin ...
-                 (when (and (cdr equivalence-class) (not consequent-trivialp))
-                   (dolist (bin-index (aref clause->bins clause-index))
-                     (dolist (item (aref bins bin-index))
-                       (unless (eql (cdr item) clause-index)
-                         #+sb-devel (format t "~&symbol-case gives up: case=~s~%" clause)
-                         (return-from expand-symbol-case)))))))
-      ;; Pass 2: remove bins with more than one consequent from their
-      ;; clause equivalence class.
-      ;; Maybe these passes could be combined, but I'd rather conservatively
-      ;; preserve accumulated data thus far before wrecking it.
-      (dotimes (bin-index (length bins))
-        (let ((unique-clause-indices
-               (remove-duplicates (mapcar #'cdr (aref bins bin-index)))))
-          (when (cdr unique-clause-indices)
-            (dolist (clause-index unique-clause-indices)
-              (setf (aref clause->bins clause-index)
-                    (delete bin-index (aref clause->bins clause-index)))))))
+        ;; Reset the bins, try it the long way
+        (fill bins nil)
+        ;; Place each symbol into its hash bin. Also, for each clause compute the
+        ;; set of hash bins that it has placed a symbol into.
+        (loop for clause in clauses for clause-index from 0
+              do (dolist (symbol (car clause))
+                   (let ((masked-hash (ldb byte (funcall hash-fun symbol))))
+                     (pushnew masked-hash (aref clause->bins clause-index))
+                     (push (cons symbol clause-index) (aref bins masked-hash)))))
+        ;; Canonically order each element of clause->bins
+        (dotimes (i (length clause->bins))
+          (setf (aref clause->bins i) (sort (aref clause->bins i) #'<)))
+
+        ;; Perform a very limited bin merging step as follows: if a clause
+        ;; placed its symbols in more than one bin, allow it provided that either:
+        ;; - the clause's consequent is trivial, OR
+        ;; - none of its bins contains a symbol from a different clause.
+        ;; In the former case, we don't need to merge bins.
+        ;; In the latter case, the bins define an equivalence class
+        ;; that does not intersect any other equivalence class.
+        ;;
+        ;; To make this work, if a bin requires an IF to disambiguate which consequent
+        ;; to take, then it is removed from the clase->bins entry for each clause
+        ;; for which it contains a consequent so that the code below which computes
+        ;; the COND does not see the bin as a member of any equivalence class.
+        ;; Pass 1: decide whether to give up or go on.
+        (loop for clause in clauses for clause-index from 0
+              do (let ((equivalence-class (aref clause->bins clause-index)))
+                   ;; if a nontrivial consequent is distributed into
+                   ;; more than one hash bin ...
+                   (when (and (cdr equivalence-class)
+                              (not (trivial-result-p clause)))
+                     (dolist (bin-index (aref clause->bins clause-index))
+                       (dolist (item (aref bins bin-index))
+                         (unless (eql (cdr item) clause-index)
+                           #+sb-devel (format t "~&symbol-case gives up: case=~s~%" clause)
+                           (return-from expand-symbol-case)))))))
+        ;; Pass 2: remove bins with more than one consequent from their
+        ;; clause equivalence class.
+        ;; Maybe these passes could be combined, but I'd rather conservatively
+        ;; preserve accumulated data thus far before wrecking it.
+        (dotimes (bin-index (length bins))
+          (let ((unique-clause-indices
+                 (remove-duplicates (mapcar #'cdr (aref bins bin-index)))))
+            (when (cdr unique-clause-indices)
+              (dolist (clause-index unique-clause-indices)
+                (setf (aref clause->bins clause-index)
+                      (delete bin-index (aref clause->bins clause-index))))))))
 
       ;; Compute the COND clauses over the range of hash values.
-      (let ((symbol (sb-xc:gensym "S"))
-            (h (sb-xc:gensym "H"))
-            (sym-vectors (loop repeat maxprobes
+      (let ((sym-vectors (loop repeat maxprobes
                                collect (make-array (length bins) :initial-element 0)))
             (cond-clauses))
         ;; For each nonempty bin:
@@ -532,7 +574,7 @@ symbol-case giving up: case=((V U) (F))
                     (cond ((cdr unique-clause-indices)
                            ;; Exactly 2 actions in the bin due to hardcoded limitation
                            ;; on the implementation of collision resolution.
-                           `((eql ,h ,bin-index)
+                           `((eql ,hash ,bin-index)
                              (cond ((eq ,symbol ',(caar bin-contents))
                                     ,@(action (cdar bin-contents)))
                                    (t
@@ -543,9 +585,9 @@ symbol-case giving up: case=((V U) (F))
                              (when (eql bin-index (car equivalence-class))
                                ;; This is the representative bin of a class
                                `(,(if (cdr equivalence-class)
-                                      `(or ,@(mapcar (lambda (x) `(eql ,h ,x))
+                                      `(or ,@(mapcar (lambda (x) `(eql ,hash ,x))
                                                      equivalence-class))
-                                      `(eql ,h ,bin-index))
+                                      `(eql ,hash ,bin-index))
                                  ,@(action clause-index))))))))
               (when cond-clause (push cond-clause cond-clauses)))))
 
@@ -559,6 +601,13 @@ symbol-case giving up: case=((V U) (F))
                   (return))))))
 
         ;; Produce the COND
+        ;; But no other backend supports multiway branching,
+        ;; so return now, and not sooner, so that:
+        ;; - we can test the above logic (for AVER failures) on all platforms
+        ;; - no "unreachable code" notes are printed about this function
+        ;;   if we were to return early.
+        ;; So, just joking, maybe don't produce the COND.
+        #+(or x86 x86-64)
         (let ((block (sb-xc:gensym "B"))
               (unused-bins))
           ;; Take note of the unused bins
@@ -566,29 +615,25 @@ symbol-case giving up: case=((V U) (F))
             (unless (aref bins i) (push i unused-bins)))
           `(let ((,symbol ,keyform))
              (block ,block
-               (when (,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol)
-                 (let ((,h (ldb (byte ,(byte-size byte)
-                                      ,(byte-position byte))
-                                ;; always use pre-memoized hash
-                                (,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun)
-                                 ,symbol))))
+               (when ,is-symbol
+                 (let ((,hash ,calc-hash))
                    ;; At most two probes are required, and usually just 1
                    (when ,(ecase maxprobes
-                            (1 `(eq (svref ,(elt sym-vectors 0) ,h) ,symbol))
-                            (2 `(or (eq (svref ,(elt sym-vectors 0) ,h) ,symbol)
-                                    (eq (svref ,(elt sym-vectors 1) ,h) ,symbol))))
+                            (1 `(eq (svref ,(elt sym-vectors 0) ,hash) ,symbol))
+                            (2 `(or (eq (svref ,(elt sym-vectors 0) ,hash) ,symbol)
+                                    (eq (svref ,(elt sym-vectors 1) ,hash) ,symbol))))
                      (return-from ,block
                        (cond ,@(nreverse cond-clauses)
                              ,@(when unused-bins
                                  ;; to make it clear that the number of "ways"
                                  ;; is the exact right number- I'm hoping this will help
                                  ;; elide the bounds check in multiway-branch. TBD
-                                 `(((or ,@(mapcar (lambda (x) `(eql ,h ,x))
+                                 `(((or ,@(mapcar (lambda (x) `(eql ,hash ,x))
                                                   (nreverse unused-bins)))
                                     (unreachable))))
                              (t (unreachable)))))))
                ,@(if errorp
-                     `((ecase-failure ,symbol ',keys))
+                     `((ecase-failure ,symbol ,(coerce keys 'simple-vector)))
                      (cddr default)))))))))
 
 ;;; CASE-BODY returns code for all the standard "case" macros. NAME is
