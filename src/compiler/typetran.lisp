@@ -1297,3 +1297,6 @@
           ((csubtypep (lvar-type object) this-type)
            nil)
           ((give-up-ir1-transform)))))
+
+(deftransform non-null-symbol-p ((object) (symbol))
+  `(not (eq object nil)))
