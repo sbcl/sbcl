@@ -588,9 +588,10 @@ during backtrace.
   ;; Possibly not the best place for this definition, but other accessors
   ;; for primitive objects are here too.
   (defun code-jump-table-words (code)
-    (declare (code-component code))
-    #-(or x6 x86-64) 0
-    #+(or x6 x86-64)
+    (declare (code-component code)
+             (ignorable code))
+    #-(or x86 x86-64) 0
+    #+(or x86 x86-64)
     (with-pinned-objects (code)
       (truly-the (unsigned-byte 16) (sap-ref-word (code-instructions code) 0))))
 
