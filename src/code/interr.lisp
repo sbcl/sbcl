@@ -395,6 +395,8 @@
 
 (deferr failed-aver-error (form)
   (bug "~@<failed AVER: ~2I~_~S~:>" form))
+(deferr unreachable-error ()
+  (bug "Unreachable code reached"))
 
 ;;;; INTERNAL-ERROR signal handler
 
