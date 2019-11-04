@@ -304,3 +304,23 @@
     (loop for (expect . inputs) in tests
           do (dolist (input inputs)
                (assert (eql (funcall fun input) expect))))))
+
+(with-test (:name :symbol-case-clause-ordering)
+  (let ((f (checked-compile
+            '(lambda (x) (case x ((a z) 1) ((y b w) 2) ((b c) 3)))
+            :allow-style-warnings t)))
+    (assert (eql (funcall f 'b) 2))))
+
+(with-test (:name :symbol-case-conservatively-fail)
+  (flet ((uses-symbol-hash-p (tree)
+           (let (seen)
+             (nsubst-if nil
+                        (lambda (x)
+                          (when (eq x 'sb-kernel:symbol-hash) (setq seen t)) nil)
+                        tree)
+             seen)))
+    (assert (not (uses-symbol-hash-p
+                  (handler-bind ((style-warning #'muffle-warning))
+                    (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2) (a 3)))))))
+    (assert (uses-symbol-hash-p
+             (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2)))))))

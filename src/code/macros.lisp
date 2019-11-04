@@ -417,39 +417,43 @@ symbol-case giving up: case=((V U) (F))
       #+sb-devel (format t "~&symbol-case giving up: probes=~d byte=~d~%"
                          maxprobes byte)
       (return-from expand-symbol-case nil))
-    (let ((bins (make-array (ash 1 (byte-size byte)) :initial-element nil))
-          (clause->bins #())
-          (default (when (eql (caar clauses) 't) (pop clauses)))
-          (unique-symbols)
-          (canonical-clauses))
-      ;; This is crummy, but we first have to undo our pre-expansion
-      ;; and remove dups. Otherwise the (BUG "Messup") below could occur.
-      ;; (The case-body-aux helper could de-duplicate, but it doesn't.)
-      (dolist (clause clauses)
-        (destructuring-bind (antecedent . consequent) clause
-          (aver (typep consequent '(cons (eql nil))))
-          (pop consequent) ; strip the NIL that CASE-BODY inserts
-          (when (typep antecedent '(cons (eql eql)))
-            (setq antecedent `(or ,antecedent)))
-          (flet ((extract-key (form) ; (EQL #:gN (QUOTE foo)) -> FOO
-                   (let ((third (third form)))
-                     (aver (typep third '(cons (eql quote))))
-                     (the symbol (second third)))))
-            (let (clause-symbols)
-              ;; De-duplicate across all clauses and within each clause
-              ;; due to possible extreme stupidity in source code.
-              (dolist (term (cdr antecedent))
-                (aver (typep term '(cons (eql eql))))
-                (let ((symbol (extract-key term)))
-                  (unless (member symbol unique-symbols)
-                    (push symbol unique-symbols)
-                    (push symbol clause-symbols))))
-              (push (cons clause-symbols consequent) canonical-clauses)))))
+    (let* ((default (when (eql (caar clauses) 't) (pop clauses)))
+           (unique-symbols)
+           (clauses
+            ;; This is crummy, but we first have to undo our pre-expansion
+            ;; and remove dups. Otherwise the (BUG "Messup") below could occur.
+            (mapcar
+             (lambda (clause)
+               (destructuring-bind (antecedent . consequent) clause
+                 (aver (typep consequent '(cons (eql nil))))
+                 (pop consequent) ; strip the NIL that CASE-BODY inserts
+                 (when (typep antecedent '(cons (eql eql)))
+                   (setq antecedent `(or ,antecedent)))
+                 (flet ((extract-key (form) ; (EQL #:gN (QUOTE foo)) -> FOO
+                          (let ((third (third form)))
+                            (aver (typep third '(cons (eql quote))))
+                            (the symbol (second third)))))
+                   (let (clause-symbols)
+                     ;; De-duplicate across all clauses and within each clause
+                     ;; due to possible extreme stupidity in source code.
+                     (dolist (term (cdr antecedent))
+                       (aver (typep term '(cons (eql eql))))
+                       (let ((symbol (extract-key term)))
+                         (unless (member symbol unique-symbols)
+                           (push symbol unique-symbols)
+                           (push symbol clause-symbols))))
+                     (if clause-symbols ; all symbols could have dropped out
+                         (cons clause-symbols consequent)
+                         ;; give up. There are reasons the compiler should see
+                         ;; all subforms. Maybe not good reasons.
+                         (return-from expand-symbol-case nil))))))
+             (reverse clauses)))
+           (clause->bins (make-array (length clauses) :initial-element nil))
+           (bins (make-array (ash 1 (byte-size byte)) :initial-element nil)))
 
       ;; Place each symbol into its hash bin. Also, for each clause compute the
       ;; set of hash bins that it has placed a symbol into.
-      (setq clause->bins (make-array (length canonical-clauses) :initial-element nil))
-      (loop for clause in canonical-clauses for clause-index from 0
+      (loop for clause in clauses for clause-index from 0
             do (dolist (symbol (car clause))
                  (let ((masked-hash (ldb byte (funcall hash-fun symbol))))
                    (pushnew masked-hash (aref clause->bins clause-index))
@@ -476,7 +480,7 @@ symbol-case giving up: case=((V U) (F))
       ;; for which it contains a consequent so that the code below which computes
       ;; the COND does not see the bin as a member of any equivalence class.
       ;; Pass 1: decide whether to give up or go on.
-      (loop for clause in canonical-clauses for clause-index from 0
+      (loop for clause in clauses for clause-index from 0
             do (let* ((consequent (cdr clause))
                       (consequent-trivialp
                        (or (null consequent)
@@ -518,7 +522,7 @@ symbol-case giving up: case=((V U) (F))
         ;;   class has >1 item. If it does, insert for only a representative element.
         ;;   By the above construction, no other bin in the class can have >1 consequent.
         (flet ((action (clause-index)
-                 (let ((clause (nth clause-index canonical-clauses)))
+                 (let ((clause (nth clause-index clauses)))
                    (or (cdr clause) '(nil)))))
           (dotimes (bin-index (length bins))
             (let* ((bin-contents (aref bins bin-index))
