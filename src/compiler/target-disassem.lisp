@@ -1777,7 +1777,7 @@
         (let ((sap (code-instructions code-component)))
           (dotimes (i (1- n))
             (let ((a (sap-ref-word sap (ash (1+ i) sb-vm:word-shift))))
-              (format t "; ~vt~v,'02x = ~a~%"
+              (format stream "; ~vt~v,'02x = ~a~%"
                       (+ label-column-width
                          (dstate-addr-print-len dstate)
                          3) ; i don't know what 3 means
