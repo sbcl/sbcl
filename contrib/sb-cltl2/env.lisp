@@ -500,7 +500,7 @@ the condition types that have been muffled."
            (sb-kernel:type-specifier it))))
       (declaration
        (copy-list sb-int:*recognized-declarations*))
-      (t (if (info :declaration :handler declaration-name)
+      (t (if (functionp (info :declaration :known declaration-name))
              (extra-decl-info
               declaration-name
               (typecase env
@@ -604,7 +604,7 @@ cons (DECL-NAME . VALUE). VALUE will be returned by:
      (flet ((func ,lambda-list
               ,@body))
        (setf
-        (info :declaration :handler ',decl-name)
+        (info :declaration :known ',decl-name)
         (lambda (lexenv spec pd-vars pd-fvars)
           (multiple-value-bind (kind data) (func spec lexenv)
             (update-lexenv-user-data lexenv kind data pd-vars pd-fvars)))))))

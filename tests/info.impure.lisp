@@ -109,7 +109,7 @@
     (assert (member 'happiness *recognized-declarations*))
     (proclaim '(declaration happiness))
     (assert (equal *recognized-declarations* saved)) ; not pushed again
-    (setf (info :declaration :recognized 'happiness) nil)
+    (setf (info :declaration :known 'happiness) nil)
     (assert (not (member 'happiness *recognized-declarations*)))))
 
 (test-util:with-test (:name :recognized-decl-not-also-type)

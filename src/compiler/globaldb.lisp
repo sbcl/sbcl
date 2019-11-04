@@ -453,7 +453,7 @@
                        ;; The compiler-macro signals an error
                        ;; on forward-referenced info-types.
                        #+sb-xc-host (declare (notinline info))
-                       (when (info :declaration :recognized name)
+                       (when (info :declaration :known name)
                          (error 'declaration-type-conflict-error
                                 :format-arguments (list name)))))
 
@@ -495,8 +495,8 @@
 ;; Therefore maintain a list of recognized declarations. This list makes the
 ;; globaldb storage of same redundant, but oh well.
 (defglobal *recognized-declarations* nil)
-(define-info-type (:declaration :recognized)
-  :type-spec boolean
+(define-info-type (:declaration :known)
+  :type-spec (or function boolean)
   ;; There's no portable way to unproclaim that a symbol is a declaration,
   ;; but at the low-level permit new-value to be NIL.
   :validate-function (lambda (name new-value)
@@ -509,8 +509,6 @@
                              (t
                               (setq *recognized-declarations*
                                     (delete name *recognized-declarations*))))))
-
-(define-info-type (:declaration :handler) :type-spec (or function null))
 
 ;;;; ":ALIEN-TYPE" subsection - Data pertaining to globally known alien-types.
 (define-info-type (:alien-type :kind)

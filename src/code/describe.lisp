@@ -737,7 +737,7 @@
                                 maybe-inline
                                 deprecated))
                  "an SBCL-specific")
-                ((info :declaration :recognized name)
+                ((info :declaration :known name)
                  "a user-defined"))))
     (when kind
       (describe-block (stream "~A names ~A declaration." name kind)))))

@@ -1214,8 +1214,8 @@
             ((ignorable type optimize special dynamic-extent)
              )
             (t
-             (let ((fn (info :declaration :handler (first spec))))
-               (when fn
+             (let ((fn (info :declaration :known (first spec))))
+               (when (functionp fn)
                  (setq lexenv
                        (funcall
                         fn lexenv spec

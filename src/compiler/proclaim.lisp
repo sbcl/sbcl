@@ -231,7 +231,7 @@
            form name))
   (with-single-package-locked-error
       (:symbol name "globally declaring ~A as a declaration proclamation"))
-  (setf (info :declaration :recognized name) t))
+  (setf (info :declaration :known name) t))
 
 ;;; ANSI defines the declaration (FOO X Y) to be equivalent to
 ;;; (TYPE FOO X Y) when FOO is a type specifier. This function
@@ -328,7 +328,7 @@
         (declaration
          (map-args #'process-declaration-declaration form))
         (t
-         (unless (info :declaration :recognized kind)
+         (unless (info :declaration :known kind)
            (compiler-warn "unrecognized declaration ~S" raw-form)))))))
 
 (defun sb-xc:proclaim (raw-form)
