@@ -274,7 +274,7 @@
 ;;; Test bin merging with two different scenarios because it matters
 ;;; whether a bin in which collisions occur is numerically lower than
 ;;; or higher than a bin already emitted into the COND.
-(with-test (:name :symbol-case-complicated)
+(with-test (:name :symbol-case-complicated :skipped-on (not (or :x86 :x86-64)))
   (let ((tests '((:foo a b c d) (:bar e f |a|)))
         (fun
          (checked-compile

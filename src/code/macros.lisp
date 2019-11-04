@@ -776,7 +776,6 @@ symbol-case giving up: case=((V U) (F))
   ;; the customary expansion as a series of IF tests.
   ;; Production code rarely uses CCASE, and the expansion differs such that
   ;; it doesn't seem worth the effort to handle it as a jump table.
-  #+(or x86 x86-64)
   (when (and (member name '(case ecase)) (every #'symbolp keys))
     (awhen (expand-symbol-case keyform clauses keys errorp 'sxhash)
       (return-from case-body-aux it)))
