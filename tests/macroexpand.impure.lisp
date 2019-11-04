@@ -11,8 +11,6 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-(load "compiler-test-util.lisp")
-
 ;;; From Matthew Swank on cll 2005-10-06
 
 (defmacro defglobal* (name &optional value)

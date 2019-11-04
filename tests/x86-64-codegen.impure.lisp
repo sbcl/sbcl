@@ -495,15 +495,6 @@
                  #\newline)))
     (assert (>= (count-assembly-labels lines) 4))))
 
-(with-test (:name :symbol-case-as-jump-table)
-  ;; The DEFPACKAGE macro contains an example of a CASE with symbols as keys.
-  ;; This just asserts that the expander worked.
-  ;; CASE over symbols an extremely common idiom,
-  ;; not that we care whether a macroexpander uses it.
-  (let ((c (sb-kernel:fun-code-header (macro-function 'defpackage))))
-    ;; This probably should get an accessor such as CODE-JUMP-TABLE-WORDS
-    (assert (>= (sb-sys:sap-ref-word (sb-kernel:code-instructions c) 0) 12))))
-
 (with-test (:name :ecase-failure-trap)
   (assert (null (ctu:find-named-callees
                  (checked-compile `(lambda (x)

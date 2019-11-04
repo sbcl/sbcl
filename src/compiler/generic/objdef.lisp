@@ -585,6 +585,15 @@ during backtrace.
     ;; for 32-bit words. The boxed count can't in practice be that large.
     (ldb (byte 22 0) (ash (%code-boxed-size code) (- n-fixnum-tag-bits word-shift))))
 
+  ;; Possibly not the best place for this definition, but other accessors
+  ;; for primitive objects are here too.
+  (defun code-jump-table-words (code)
+    (declare (code-component code))
+    #-(or x6 x86-64) 0
+    #+(or x6 x86-64)
+    (with-pinned-objects (code)
+      (truly-the (unsigned-byte 16) (sap-ref-word (code-instructions code) 0))))
+
   (defun %code-code-size (code)
     (declare (code-component code))
     (- (code-object-size code) (ash (code-header-words code) word-shift)))

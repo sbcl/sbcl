@@ -786,11 +786,11 @@
     (setf (dstate-notes dstate) nil)
     ;; add labels from code header jump tables. As noted above,
     ;; this is buggy if code moves, but no worse than anything else.
-    #+(or x86 x86-64)
+    ;; CODE-JUMP-TABLE-WORDS = 0 if the architecture doesn't have jump tables.
     (binding* ((code (seg-code segment) :exit-if-null))
       (with-pinned-objects (code)
         (loop with insts = (code-instructions code)
-              for i from 1 below (sap-ref-word insts 0)
+              for i from 1 below (code-jump-table-words code)
               do (pushnew (cons (sap-ref-word insts (ash i sb-vm:word-shift)) nil)
                           labels :key #'car))))
     ;; Return the new list
@@ -1770,7 +1770,20 @@
               (get-code-segments code-component))))
     (when use-labels
       (label-segments segments dstate))
-    (disassemble-segments segments stream dstate)))
+    (disassemble-segments segments stream dstate)
+    (let ((n (code-jump-table-words code-component)))
+      (when (> n 1)
+        (format stream "; Jump table~%")
+        (let ((sap (code-instructions code-component)))
+          (dotimes (i (1- n))
+            (let ((a (sap-ref-word sap (ash (1+ i) sb-vm:word-shift))))
+              (format t "; ~vt~v,'02x = ~a~%"
+                      (+ label-column-width
+                         (dstate-addr-print-len dstate)
+                         3) ; i don't know what 3 means
+                      (* 2 sb-vm:n-word-bytes)
+                      a
+                      (gethash a (dstate-label-hash dstate))))))))))
 
 ;;; This convenience function has two syntaxes depending on what OBJECT is:
 ;;;   (DIS OBJ &optional STREAM)
@@ -1784,14 +1797,12 @@
     (aver (not streamp))
     (when length
       (setq stream length))
-    (cond ((code-component-p object)
-           (disassemble-code-component object :stream stream))
-          (t
-           (when (and (symbolp object) (special-operator-p object))
-             ;; What could it do- disassemble the interpreter?
-             (error "Can't disassemble a special operator"))
-           (dolist (fun (get-compiled-funs object))
-             (disassemble-code-component fun :stream stream)))))))
+    (dolist (thing (cond ((code-component-p object) (list object))
+                         ((and (symbolp object) (special-operator-p object))
+                          ;; What could it do- disassemble the interpreter?
+                          (error "Can't disassemble a special operator"))
+                         (t (get-compiled-funs object))))
+      (disassemble-code-component thing :stream stream)))))
 
 ;;;; code to disassemble assembler segments
 

@@ -202,6 +202,8 @@
                      (setf (sap-ref-32 sap 7) (logior (ash disp8 24) #x408B48))
                      11))))
         (setf (sap-ref-32 sap i) #xFD60FF))) ; JMP [RAX-3]
+    ;; Verify that the jump table size reads as  0.
+    (aver (zerop (code-jump-table-words code)))
     ;; It is critical that there be a trailing 'uint16' of 0 in this object
     ;; so that CODE-N-ENTRIES reports 0.  By luck, there is exactly enough
     ;; room in the object to hold two 0 bytes. It would be easy enough to enlarge
