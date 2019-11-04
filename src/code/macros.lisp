@@ -566,7 +566,7 @@ symbol-case giving up: case=((V U) (F))
             (unless (aref bins i) (push i unused-bins)))
           `(let ((,symbol ,keyform))
              (block ,block
-               (when (symbolp ,symbol)
+               (when (,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol)
                  (let ((,h (ldb (byte ,(byte-size byte)
                                       ,(byte-position byte))
                                 ;; always use pre-memoized hash
