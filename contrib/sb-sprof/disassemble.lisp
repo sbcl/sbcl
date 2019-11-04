@@ -49,9 +49,7 @@
   (when *samples*
     (let* ((samples *samples*)
            (counts (ensure-sample-counts samples))
-           (location (+ (sb-disassem::seg-virtual-location
-                         (sb-disassem:dstate-segment dstate))
-                        (sb-disassem::dstate-cur-offs dstate)))
+           (location (sb-disassem:dstate-cur-addr dstate))
            (count (pc-sample-count location counts)))
       (unless (zerop count)
         (let* ((total-count (samples-trace-count samples))

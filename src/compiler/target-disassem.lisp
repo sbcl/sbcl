@@ -366,8 +366,7 @@
            (ignore chunk)
            (type (or null stream) stream)
            (type disassem-state dstate))
-  (when (and (aligned-p (+ (seg-virtual-location (dstate-segment dstate))
-                           (dstate-cur-offs dstate))
+  (when (and (aligned-p (dstate-cur-addr dstate)
                         (* 2 sb-vm:n-word-bytes))
              ;; Check type.
              (= (sap-ref-8 (dstate-segment-sap dstate)
@@ -420,9 +419,7 @@
            (ignore chunk)
            (type (or null stream) stream)
            (type disassem-state dstate))
-  (let ((location
-         (+ (seg-virtual-location (dstate-segment dstate))
-            (dstate-cur-offs dstate)))
+  (let ((location (dstate-cur-addr dstate))
         (alignment (dstate-alignment dstate)))
     (unless (aligned-p location alignment)
       (when stream
@@ -906,9 +903,7 @@
 (defun print-current-address (stream dstate)
   (declare (type stream stream)
            (type disassem-state dstate))
-  (let* ((location
-          (+ (seg-virtual-location (dstate-segment dstate))
-             (dstate-cur-offs dstate)))
+  (let* ((location (dstate-cur-addr dstate))
          (location-column-width *disassem-location-column-width*)
          (plen ; the number of rightmost hex chars of this address to print
           (or (dstate-addr-print-len dstate)
