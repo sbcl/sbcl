@@ -205,6 +205,7 @@ invoked. In that case it will store into PLACE and start over."
 ;;;; CASE, TYPECASE, and friends
 
 ;;; Make this a full warning during SBCL build.
+#+sb-xc ; Don't redefine if recompiling in a warm REPL
 (define-condition duplicate-case-key-warning (#-sb-xc-host style-warning #+sb-xc-host warning)
   ((key :initarg :key
         :reader case-warning-key)
@@ -649,7 +650,11 @@ symbol-case giving up: case=((V U) (F))
 ;;; of the ordinary clauses. When PROCEEDP, it is an error to
 ;;; omit ERRORP, and the ERROR form generated is executed within a
 ;;; RESTART-CASE allowing KEYFORM to be set and retested.
-(eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
+
+;;; Note the absence of EVAL-WHEN here. The cross-compiler calls this function
+;;; and gets the compiled code that the host produced in make-host-1.
+;;; If recompiled, you do not want an interpreted definition that might come
+;;; from EVALing a toplevel form - the stack blows due to infinite recursion.
 (defun case-body (name keyform cases multi-p test errorp proceedp needcasesp)
   (unless (or cases (not needcasesp))
     (warn "no clauses in ~S" name))
@@ -789,7 +794,6 @@ symbol-case giving up: case=((V U) (F))
                         (etypecase 'etypecase-failure)
                         (ecase 'ecase-failure))
                      ,keyform-value ',keys)))))))
-) ; EVAL-WHEN
 
 (sb-xc:defmacro case (keyform &body cases)
   "CASE Keyform {({(Key*) | Key} Form*)}*
