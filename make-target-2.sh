@@ -41,16 +41,16 @@ fi
 # for much longer than that, don't worry, it's likely to be normal.
 warm_compile=yes
 devel=""
-if [ "$1" == --load ]; then
+if [ "$1" = --load ]; then
     warm_compile=no
-elif [ "$1" == --load-with-sb-devel ]; then
+elif [ "$1" = --load-with-sb-devel ]; then
     warm_compile=no
     devel="(pushnew :sb-devel *features*)"
 elif [ "x$1" != x ]; then
     echo Unknown option \'"$1"\' to make-target-2
     exit 1
 fi
-if [ "$warm_compile" == yes ]; then
+if [ "$warm_compile" = yes ]; then
     echo //doing warm init - compilation phase
     ./src/runtime/sbcl --core output/cold-sbcl.core \
      --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
