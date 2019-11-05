@@ -39,11 +39,18 @@ fi
 # system with the :SB-SHOW feature enabled, it does it rather silently,
 # without trying to tell you about what it's doing. So unless it hangs
 # for much longer than that, don't worry, it's likely to be normal.
-if [ "$1" != --load ]; then
-    if [ "x$1" != x ]; then
-        echo Unknown option \'"$1"\' to make-target-2
-        exit 1
-    fi
+warm_compile=yes
+devel=""
+if [ "$1" == --load ]; then
+    warm_compile=no
+elif [ "$1" == --load-with-sb-devel ]; then
+    warm_compile=no
+    devel="(pushnew :sb-devel *features*)"
+elif [ "x$1" != x ]; then
+    echo Unknown option \'"$1"\' to make-target-2
+    exit 1
+fi
+if [ "$warm_compile" == yes ]; then
     echo //doing warm init - compilation phase
     ./src/runtime/sbcl --core output/cold-sbcl.core \
      --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
@@ -52,6 +59,7 @@ fi
 echo //doing warm init - load and dump phase
 ./src/runtime/sbcl --core output/cold-sbcl.core \
  --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
+ --eval "(progn ${devel})" \
  --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
  --eval '(progn #+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2))' \
  --eval '(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
