@@ -1290,23 +1290,94 @@
                          (string string-designator))
                      *backend-instruction-set-package*))))
 
+(defstruct (stmt (:constructor make-stmt (label vop mnemonic operands)))
+  (label    nil :read-only t)
+  (vop      nil :read-only t)
+  (mnemonic nil :read-only t)
+  (operands nil :read-only t))
+(declaim (freeze-type stmt))
+
+(defun dump-symbolic-asm (statements stream &aux last-vop)
+  (format stream "~3&Assembler input:~%")
+  (dovector (statement statements)
+    (unless (functionp statement)
+      (binding* ((vop (stmt-vop statement) :exit-if-null))
+        (unless (eq vop last-vop)
+          (format stream "# ~A~%"
+                  (sb-c::vop-info-name (sb-c::vop-info vop))))
+        (setq last-vop vop))
+      (let ((label (stmt-label statement)))
+        (when label
+          (format stream "~{~A: ~}~%" (ensure-list label))))
+      (let ((*print-pretty* nil))
+        (format stream "    ~:@(~A~) ~{~A~^, ~}~%"
+                (stmt-mnemonic statement)
+                (stmt-operands statement)))))
+  (format stream "# end of input~%"))
+
 ;;; Append all buffer chains of all sections, placing them in forward order.
+;;; This should really be performed BEFORE we do the coverage mark lowering,
+;;; as it would certainly make that pass easier given that the purpose
+;;; of the combining step is to regularize the representation.
 (defun combine-sections (sections)
-  (let ((first (car sections)))
-    ;; There shouldn't be much consing due to this REVAPPEND. We're not
-    ;; reversing the contents of the buffers, just the buffer chain itself.
-    (revappend (let ((last-buffer-len (section-buf-index first))
-                     (more-buffers (cddr first)))
-                 (if (eql last-buffer-len 0)
-                     more-buffers ; Exclude empty buffer
-                     (cons (subseq (section-last-buf first) 0 last-buffer-len)
-                           more-buffers)))
-               (awhen (rest sections) (combine-sections it)))))
+  (let ((index 0))
+    ;; Compute an upper bound on the output vector length.
+    ;; It will be shortened when done.
+    (dolist (section sections)
+      (let ((chain (section-buf-chain section)))
+        (incf index (+ (section-buf-index section)
+                       (reduce #'+ (cdr chain) :key #'length)))))
+    ;; Each stmt in the output will be (<LBL> <VOP> MNEMONIC . STUFF)
+    ;; where <LBL> is either a label or possibly empty list of labels.
+    ;; <VOP> can be a VOP or NIL.
+    ;; Or the whole stmt can be a function.
+    (let ((output (make-array index :initial-element 0))
+          (current-stmt))
+      (setq index 0)
+      (flet ((emit-stmt ()
+               (destructuring-bind (label vop mnemonic . operands) current-stmt
+                 (setf (aref output index) (make-stmt label vop mnemonic operands)
+                       current-stmt nil)
+                 (incf index))))
+        (dolist (section sections)
+          (let ((last-buf (car (section-buf-chain section)))
+                (last-len (section-buf-index section)))
+            (dolist (buffer (reverse (section-buf-chain section)))
+              ;; All buffers except maybe the last completely are full.
+              (dotimes (i (if (eq buffer last-buf) last-len (length buffer)))
+                (let ((thing (svref buffer i)))
+                  (etypecase thing
+                    (label
+                     (let ((ll (list thing)))
+                       (cond ((null current-stmt) (setf current-stmt ll))
+                             ((atom (car current-stmt)) ; upgrade label to a list
+                              (setf (car current-stmt) (cons (car current-stmt) ll)))
+                             (t (nconc (car current-stmt) ll)))))
+                    (cons
+                     (let ((inst
+                            (if (sb-c::vop-p (car thing)) thing (cons nil thing))))
+                       (if current-stmt
+                           (setf (cdr current-stmt) inst)       ; labeled
+                           (setf current-stmt (cons nil inst))) ; unlabeled
+                       (emit-stmt)))
+                    ;; Let's make sure that functions don't appear when unexpected.
+                    #-(or x86 x86-64)
+                    (function
+                     (when current-stmt
+                       ;; It must be a label only, because upon seeing a mnemonic
+                       ;; we would have emitted the complete statement.
+                       (emit-stmt))
+                     (setf (aref output index) thing)
+                     (incf index))))))))
+        ;; There is potentially a trailing label
+        (when current-stmt (emit-stmt)))
+      #+sb-xc-host (adjust-array output index)
+      #-sb-xc-host (sb-kernel:%shrink-vector output index))))
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
-        (sections (combine-sections inputs))
+        (statements (combine-sections inputs))
         (in-without-scheduling)
         (was-scheduling))
     ;; HEADER-SKEW is 1 word (in bytes) if the boxed code header word count is odd.
@@ -1326,21 +1397,22 @@
     (%emit-label segment nil (segment-origin segment))
     #+sb-dyncount
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
-    (dolist (buffer sections)
-      (dovector (operation buffer)
-        (etypecase operation
-          (cons
-           (let ((first (car operation)))
-             (when (sb-c::vop-p first)
-               (setq **current-vop** first)
-               (pop operation)))
-           (block op
-             (let ((mnemonic (the symbol (car operation)))
-                   (operands (cdr operation)))
-               (when (char= (char (symbol-name mnemonic) 0) #\.)
+    (when (and sb-c::*compiler-trace-output*
+               (memq :symbolic-asm sb-c::*compile-trace-targets*))
+      (dump-symbolic-asm statements sb-c::*compiler-trace-output*))
+    (dovector (statement statements)
+      (if (functionp statement)
+          (%emit-postit segment statement)
+          (let ((mnemonic (stmt-mnemonic statement))
+                (operands (stmt-operands statement)))
+            (awhen (stmt-vop statement) (setq **current-vop** it))
+            (dolist (label (ensure-list (stmt-label statement)))
+              (%emit-label segment **current-vop** label))
+            (block op
+              (when (char= (char (symbol-name mnemonic) 0) #\.)
                  ;; potentially a pseudo-op. Any mnemonic can start with a dot,
                  ;; not just the ones handled here by the generic assembler.
-                 (case mnemonic
+                (case mnemonic
                    (.align
                     (destructuring-bind (bits &optional (pattern 0)) operands
                       (%emit-alignment segment **current-vop** bits pattern))
@@ -1377,10 +1449,11 @@
                     (return-from op))
                    (.comment ; ignore it
                     (return-from op))))
-               (instruction-hooks segment)
-               (apply mnemonic segment (perform-operand-lowering operands)))))
-          (label (%emit-label segment **current-vop** operation))
-          (function (%emit-postit segment operation))))))
+              ;; This seems wrong - if we return from the block named OP,
+              ;; the hooks aren't run - is that OK?
+              (instruction-hooks segment)
+              (apply mnemonic segment
+                     (perform-operand-lowering operands)))))))
   (finalize-segment segment))
 
 ;;; The interface to %ASSEMBLE-SECTIONS

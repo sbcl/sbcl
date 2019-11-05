@@ -114,7 +114,9 @@
 (defvar *compiler-warning-count*)
 (defvar *compiler-style-warning-count*)
 (defvar *compiler-note-count*)
-(defvar *compiler-trace-output*)
+;;; Bind this to a stream to capture various internal debugging output.
+(defvar *compiler-trace-output* nil)
+(defvar *compile-trace-targets* '(:ir1 :ir2 :vop :disassemble))
 (defvar *constraint-universe*)
 (defvar *current-path*)
 (defvar *current-component*)

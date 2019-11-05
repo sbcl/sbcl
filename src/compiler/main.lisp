@@ -18,10 +18,6 @@
 ;;; Set to NIL to disable loop analysis for register allocation.
 (defvar *loop-analyze* t)
 
-;;; Bind this to a stream to capture various internal debugging output.
-(defvar *compiler-trace-output* nil)
-(defvar *compile-trace-targets* '(:ir1 :ir2 :vop :disassemble))
-
 ;;; *BLOCK-COMPILE-ARG* holds the original value of the :BLOCK-COMPILE
 ;;; argument, which overrides any internal declarations.
 (defvar *block-compile-arg*)
