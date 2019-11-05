@@ -12,6 +12,12 @@
 
 (in-package "SB-ALIEN")
 
+;;; ALIEN-CALLBACK is supposed to be external in SB-ALIEN-INTERNALS, but the
+;;; export gets lost, and then 'chill' gets a conflict with SB-ALIEN over it.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (export (intern "ALIEN-CALLBACK" "SB-ALIEN-INTERNALS")
+          "SB-ALIEN-INTERNALS"))
+
 ;;;; ALIEN CALLBACKS
 ;;;;
 ;;;; See "Foreign Linkage / Callbacks" in the SBCL Internals manual.
