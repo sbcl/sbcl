@@ -324,3 +324,9 @@
                     (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2) (a 3)))))))
     (assert (uses-symbol-hash-p
              (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2)))))))
+
+(with-test (:name :symbol-case-default-form)
+  (let ((f (checked-compile
+            '(lambda (x)
+              (case x ((a b c) 1) ((d e f) 2) (t #*10101))))))
+    (assert (equal (funcall f 30) #*10101))))

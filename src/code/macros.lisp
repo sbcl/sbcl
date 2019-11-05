@@ -502,7 +502,8 @@ symbol-case giving up: case=((V U) (F))
                             ;; could eliminate repeated data from the same
                             ;; ECASE that gets inlined many times over.
                             `(ecase-failure
-                              ,symbol ,(coerce keys 'simple-vector)))))))))
+                              ,symbol ,(coerce keys 'simple-vector))
+                            `(progn ,@(cddr default)))))))))
 
         ;; Reset the bins, try it the long way
         (fill bins nil)
