@@ -1335,7 +1335,7 @@
           (current-stmt))
       (setq index 0)
       (flet ((emit-stmt ()
-               (destructuring-bind (label vop mnemonic . operands) current-stmt
+               (destructuring-bind (label &optional vop mnemonic . operands) current-stmt
                  (setf (aref output index) (make-stmt label vop mnemonic operands)
                        current-stmt nil)
                  (incf index))))
@@ -1361,7 +1361,6 @@
                            (setf current-stmt (cons nil inst))) ; unlabeled
                        (emit-stmt)))
                     ;; Let's make sure that functions don't appear when unexpected.
-                    #-(or x86 x86-64)
                     (function
                      (when current-stmt
                        ;; It must be a label only, because upon seeing a mnemonic
@@ -1408,11 +1407,12 @@
             (awhen (stmt-vop statement) (setq **current-vop** it))
             (dolist (label (ensure-list (stmt-label statement)))
               (%emit-label segment **current-vop** label))
-            (block op
-              (when (char= (char (symbol-name mnemonic) 0) #\.)
-                 ;; potentially a pseudo-op. Any mnemonic can start with a dot,
-                 ;; not just the ones handled here by the generic assembler.
-                (case mnemonic
+            (when mnemonic
+              (block op
+                (when (char= (char (symbol-name mnemonic) 0) #\.)
+                   ;; potentially a pseudo-op. Any mnemonic can start with a dot,
+                   ;; not just the ones handled here by the generic assembler.
+                  (case mnemonic
                    (.align
                     (destructuring-bind (bits &optional (pattern 0)) operands
                       (%emit-alignment segment **current-vop** bits pattern))
@@ -1449,11 +1449,11 @@
                     (return-from op))
                    (.comment ; ignore it
                     (return-from op))))
-              ;; This seems wrong - if we return from the block named OP,
-              ;; the hooks aren't run - is that OK?
-              (instruction-hooks segment)
-              (apply mnemonic segment
-                     (perform-operand-lowering operands)))))))
+                ;; This seems wrong - if we return from the block named OP,
+                ;; the hooks aren't run - is that OK?
+                (instruction-hooks segment)
+                (apply mnemonic segment
+                       (perform-operand-lowering operands))))))))
   (finalize-segment segment))
 
 ;;; The interface to %ASSEMBLE-SECTIONS
