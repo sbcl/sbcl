@@ -97,10 +97,11 @@
   `(inst mov ,reg (+ nil-value (static-symbol-offset ,symbol))))
 
 ;; Return the effective address of the value slot of static SYMBOL.
-(defun static-symbol-value-ea (symbol)
+(defun static-symbol-value-ea (symbol &optional (byte 0))
    (ea (+ nil-value
           (static-symbol-offset symbol)
           (ash symbol-value-slot word-shift)
+          byte
           (- other-pointer-lowtag))))
 
 (defun thread-tls-ea (index)

@@ -298,19 +298,10 @@
                  POSITIVE))
            (unless (memq :popcnt *backend-subfeatures*)
              ;; POPCNT = ECX bit 23
-             (multiple-value-bind (bytes bits) (floor (+ 23 n-fixnum-tag-bits)
-                                                      n-byte-bits)
-               ;; FIXME: should be
-               ;;    (INST TEST :BYTE (STATIC-SYMBOL-VALUE-EA '*BLAH*) CONST)
-               ;; but can't do that until sizes are removed from EAs
-               ;; because STATIC-SYMBOL-VALUE-EA returns a :QWORD ea for now.
+             (multiple-value-bind (byte bit) (floor (+ 23 n-fixnum-tag-bits)
+                                                    n-byte-bits)
                (inst test :byte
-                     (ea (+ nil-value
-                            (static-symbol-offset '*cpuid-fn1-ecx*)
-                            (ash symbol-value-slot word-shift)
-                            (- other-pointer-lowtag)
-                            bytes))
-                     (ash 1 bits)))
+                     (static-symbol-value-ea '*cpuid-fn1-ecx* byte) (ash 1 bit)))
              (inst jmp :z slow))
            ;; Intel's implementation of POPCNT on some models treats it as
            ;; a 2-operand ALU op in the manner of ADD,SUB,etc which means that
