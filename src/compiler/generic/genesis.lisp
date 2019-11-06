@@ -1562,32 +1562,22 @@ core and return a descriptor to it."
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor ()
   (let* ((des (allocate-header+object *static* sb-vm:symbol-size 0))
-         (result (make-descriptor (+ (descriptor-bits des)
+         (nil-val (make-descriptor (+ (descriptor-bits des)
                                      (* 2 sb-vm:n-word-bytes)
                                      (- sb-vm:list-pointer-lowtag
-                                        sb-vm:other-pointer-lowtag)))))
-    (write-wordindexed des
-                       1
-                       (make-other-immediate-descriptor
-                        0
-                        sb-vm:symbol-widetag))
-    (write-wordindexed des
-                       (+ 1 sb-vm:symbol-value-slot)
-                       result)
-    (write-wordindexed des
-                       (+ 2 sb-vm:symbol-value-slot) ; = 1 + symbol-hash-slot
-                       result)
-    (write-wordindexed des
-                       (+ 1 sb-vm:symbol-info-slot)
-                       (cold-cons result result)) ; NIL's info is (nil . nil)
-    (write-wordindexed des
-                       (+ 1 sb-vm:symbol-name-slot)
-                       ;; NIL's name is in dynamic space because any extra
-                       ;; bytes allocated in static space would need to
-                       ;; be accounted for by STATIC-SYMBOL-OFFSET.
-                       (set-readonly (base-string-to-core "NIL" *dynamic*)))
-    (setf (gethash (descriptor-bits result) *cold-symbols*) nil
-          (get nil 'cold-intern-info) result)))
+                                        sb-vm:other-pointer-lowtag))))
+         (header (make-other-immediate-descriptor 0 sb-vm:symbol-widetag))
+         (initial-info (cold-cons nil-val nil-val))
+         ;; NIL's name is in dynamic space because any extra bytes allocated
+         ;; in static space need to be accounted for by STATIC-SYMBOL-OFFSET.
+         (name (set-readonly (base-string-to-core "NIL" *dynamic*))))
+    (write-wordindexed des 1 header)
+    (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
+    (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
+    (write-wordindexed des (+ 1 sb-vm:symbol-info-slot) initial-info)
+    (write-wordindexed des (+ 1 sb-vm:symbol-name-slot) name)
+    (setf (gethash (descriptor-bits nil-val) *cold-symbols*) nil
+          (get nil 'cold-intern-info) nil-val)))
 
 (defvar core-file-name)
 ;;; Since the initial symbols must be allocated before we can intern

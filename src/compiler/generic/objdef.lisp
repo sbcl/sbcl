@@ -356,14 +356,27 @@ during backtrace.
   ;; OTHER-POINTER-LOWTAG is 7, LIST-POINTER-LOWTAG is 3, so if you
   ;; subtract 3 from (SB-KERNEL:GET-LISP-OBJ-ADDRESS 'NIL) you get the
   ;; first data slot, and if you subtract 7 you get a symbol header.
+  ;; (The numbers mentioned pertain to the 32-bit machines, not 64-bit)
 
-  ;; also the CAR of NIL-as-end-of-list
+  ;; HASH and VALUE are the first two slots.
+  ;; Traditionally VALUE was the first slot, corresponding to the CAR of
+  ;; NIL-as-end-of-list; and HASH was the second, corresponding to CDR.
+  ;; Some architectures reverse the order because by storing HASH in the word
+  ;; after the object header it becomes a memory-safe operation to read
+  ;; SYMBOL-HASH-SLOT from _any_ object whatsoever (the minimum size is 2 words)
+  ;; using lisp code equivalent to "native_pointer(ptr)[1]".
+  ;; Either order should work on any backend; it is merely a question of checking
+  ;; that backend-specific files don't rely on a certain order.
+  ;; Also note that in general, accessing the hash requires masking off bits to
+  ;; yield a fixnum result, all the more so if the object is any random type.
+
+  #+(or arm arm64 ppc ppc64 x86 x86-64) (hash :set-trans %set-symbol-hash)
+
   (value :init :unbound
          :set-trans %set-symbol-global-value
          :set-known ())
-  ;; also the CDR of NIL-as-end-of-list.  Its reffer needs special
-  ;; care for this reason, as hash values must be fixnums.
-  (hash :set-trans %set-symbol-hash)
+
+  #-(or arm arm64 ppc ppc64 x86 x86-64) (hash :set-trans %set-symbol-hash)
 
   (info :ref-trans symbol-info :ref-known (flushable)
         :set-trans (setf symbol-info)
