@@ -593,7 +593,8 @@
              (restart-case
                  (if trace-file
                      (funcall compile-file src :output-file tmp-obj
-                                               :trace-file t :allow-other-keys t)
+                              ;; if tracing, also show high-level progress
+                              :trace-file t :print t :allow-other-keys t)
                      (funcall compile-file src :output-file tmp-obj))
                (recompile ()
                  :report report-recompile-restart
