@@ -226,7 +226,25 @@
   ;; not caught by the front end.
 
   (define-binop logand 2 and
+    :c/fixnum=>fixnum
+    ;; Use :dword size if the constant is (unsigned-byte 32) and destination
+    ;; is a GPR; the high 32 bits get automatically zeroed.
+    ((let ((y (fixnumize y)))
+       (cond ((and (typep y '(unsigned-byte 32)) (gpr-tn-p x))
+              ;; A 32-bit mov suffices unless to memory.
+              (unless (location= x r)
+                (inst mov (if (gpr-tn-p r) :dword :qword) r x))
+              ;; TODO: if a :dword MOV was done, the AND is unnecessary
+              ;; when Y = (ldb (byte 32 0) (fixnumize -1 n-fixnum-tag-bits))
+              ;; Probably not very common, so not too important.
+              (inst and :dword r y))
+           (t
+            (move r x)
+            (inst and r (constantize y))))))
     :c/unsigned=>unsigned
+    ;; Probably should give it the preceding treatment here too.
+    ;; Also, if the constant is #xFFFFFFFF, then just a MOV is enough
+    ;; if the destination is a register.
     ((move r x)
      (let ((y (constantize y)))
        ;; ANDing with #xFFFF_FFFF_FFFF_FFFF is a no-op, other than
