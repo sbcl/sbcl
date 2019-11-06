@@ -2474,3 +2474,12 @@
   ;; was converted to a jump table.
   (let ((c (sb-kernel:fun-code-header #'sb-debug::parse-trace-options)))
     (assert (>= (sb-kernel:code-jump-table-words c) 30))))
+
+(with-test (:name :modular-arith-type-derivers)
+  (let ((f (checked-compile
+            `(lambda (x)
+               (declare ((and fixnum
+                              unsigned-byte) x)
+                        (optimize speed))
+               (rem x 10)))))
+        (assert (not (ctu:find-code-constants f :type 'bignum)))))
