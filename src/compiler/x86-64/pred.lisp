@@ -94,11 +94,11 @@
          (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
          (inst jmp (ea table temp-reg-tn 4))))
       (character
-       (let* ((min (reduce #'min values :key #'char-code))
-              (max (reduce #'max values :key #'char-code))
+       (let* ((min (reduce #'min values :key #'sb-xc:char-code))
+              (max (reduce #'max values :key #'sb-xc:char-code))
               (vector (make-array (1+ (- max min)) :initial-element otherwise)))
          (mapc (lambda (value label)
-                 (setf (aref vector (- (char-code value) min)) label))
+                 (setf (aref vector (- (sb-xc:char-code value) min)) label))
                values labels)
          ;; Same as above, but test the widetag before shifting it out.
          (unless (member test-vop-name '(fast-char=/character/c

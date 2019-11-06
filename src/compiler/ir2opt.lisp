@@ -639,7 +639,7 @@
     (let ((values (mapcar #'car choices)))
       (cond ((every #'fixnump values)) ; ok
             ((every #'characterp values)
-             (setq values (mapcar #'char-code values)))
+             (setq values (mapcar #'sb-xc:char-code values)))
             (t
              (return-from should-use-jump-table-p nil)))
       (let* ((min (reduce #'min values))

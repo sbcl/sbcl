@@ -774,6 +774,14 @@
     (unless data-only
       (dump-fop 'fop-spec-vector file length)
       (dump-byte widetag file))
+
+    #+sb-xc-host
+    (when (or (= widetag sb-vm:simple-array-fixnum-widetag)
+              (= widetag sb-vm:simple-array-unsigned-fixnum-widetag))
+      ;; Fixnum vector contents are tagged numbers. Make a copy.
+      (setq vector (map 'vector (lambda (x) (ash x sb-vm:n-fixnum-tag-bits))
+                        vector)))
+
     ;; cross-io doesn't know about fasl streams, so use actual stream.
     (sb-impl::buffer-output (fasl-output-stream file)
                             vector

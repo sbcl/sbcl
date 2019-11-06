@@ -402,12 +402,6 @@ symbol-case giving up: case=((V U) (F))
 ;;; looked as if the COND might return NIL.
 (defun expand-symbol-case (keyform clauses keys errorp hash-fun)
   (declare (ignorable keyform clauses keys errorp))
-  ;; I'm not sure how I want to handle the cross-compiler's dependence
-  ;; on SXHASH here. The path of least resistance is to avoid this macro.
-  ;; Nonetheless I'd like to see how often this expander would run if it could
-  ;; during cross-compilation.
-  ;; (we could emulate SBCL's SXHASH of strings/symbols in the host, it's not hard)
-  #+sb-xc-host (return-from expand-symbol-case nil)
   ;; for few keys, the clever algorithm  probably gives no better performance
   ;; - and potentially worse - than the CPU's branch predictor.
   (unless (>= (length keys) 6)
