@@ -170,14 +170,7 @@
                   (:translate ,translate)
                   (:generator 1
                    ,@(or c/fixnum=>fixnum
-                         `((cond
-                             ,@(and (eq op 'sub)
-                                    `(((and (not (location= r x))
-                                            (typep (- (fixnumize y)) '(signed-byte 32)))
-                                       (inst lea r (ea (- (fixnumize y)) x)))))
-                             (t
-                              (move r x)
-                              (inst ,op r (constantize (fixnumize y)))))))))
+                         `((move r x) (inst ,op r (constantize (fixnumize y)))))))
                 (define-vop (,(symbolicate "FAST-" translate "/SIGNED=>SIGNED")
                              fast-signed-binop)
                   (:translate ,translate)
@@ -187,15 +180,7 @@
                              fast-signed-binop-c)
                   (:translate ,translate)
                   (:generator ,untagged-penalty
-                   ,@(or c/signed=>signed
-                         `((cond
-                             ,@(and (eq op 'sub)
-                                    `(((and (not (location= r x))
-                                            (typep (- y) '(signed-byte 32)))
-                                       (inst lea r (ea (- y) x)))))
-                             (t
-                              (move r x)
-                              (inst ,op r (constantize y))))))))
+                   ,@(or c/signed=>signed `((move r x) (inst ,op r (constantize y))))))
                 (define-vop (,(symbolicate "FAST-"
                                            translate
                                            "/UNSIGNED=>UNSIGNED")
@@ -210,17 +195,23 @@
                   (:translate ,translate)
                   (:generator ,untagged-penalty
                    ,@(or c/unsigned=>unsigned
-                         `((cond
-                             ,@(and (eq op 'sub)
-                                    `(((and (not (location= r x))
-                                            (typep (- y) '(signed-byte 32)))
-                                       (inst lea r (ea (- y) x)))))
-                             (t
-                              (move r x)
-                              (inst ,op r (constantize y)))))))))))
+                         `((move r x) (inst ,op r (constantize y)))))))))
 
-  ;;(define-binop + 4 add)
-  (define-binop - 4 sub)
+  ;; It doesn't work as desired to pass forms to DEFINE-BINOP if such forms would
+  ;; invoke a helper function or macro, since - thanks to the vop inheritance mechanism -
+  ;; any enclosing lexical context is discarded. You can, however, wrap stuff around the
+  ;; DEFINE-BINOP, hence this somewhat strange "(let ((emit)))" idiom.
+  (macrolet ((define-subtract ()
+               (let ((emit '(cond ((and (not (location= r x)) (typep (- y) '(signed-byte 32)))
+                                   (inst lea r (ea (- y) x)))
+                                  (t
+                                   (move r x)
+                                   (inst sub r (constantize y))))))
+                 `(define-binop - 4 sub
+                    :c/fixnum=>fixnum ((let ((y (fixnumize y))) ,emit))
+                    :c/signed=>signed (,emit)
+                    :c/unsigned=>unsigned (,emit)))))
+    (define-subtract))
 
   ;; The following have microoptimizations for some special cases
   ;; not caught by the front end.
