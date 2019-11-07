@@ -5129,3 +5129,12 @@
             (values-type-union (fun-type-returns type)
                                (values-specifier-type '(values null &optional)))
             (fun-type-returns type))))))
+
+(deftransform pointerp ((object))
+  (let ((type (lvar-type object)))
+    (cond ((csubtypep type (specifier-type '(or fixnum character #+64-bit single-float)))
+           'nil)
+          ((csubtypep type (specifier-type '(or symbol list instance function)))
+           't)
+          (t
+           (give-up-ir1-transform)))))

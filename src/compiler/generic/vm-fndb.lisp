@@ -65,7 +65,8 @@
            #+64-bit
            signed-byte-64-p
            weak-pointer-p code-component-p lra-p
-           sb-vm::unbound-marker-p
+           sb-int:unbound-marker-p
+           pointerp
            simple-fun-p
            closurep
            funcallable-instance-p
@@ -112,6 +113,15 @@
 
 (defknown symbol-hash (symbol) hash
   (flushable movable))
+;;; This unusual accessor will read the word at SYMBOL-HASH-SLOT in any
+;;; object, not only symbols. The result is meaningful only if the object
+;;; is a symbol. The second argument indicates a predicate that the first
+;;; argument is known to satisfy, if any.
+;;; There is one more case, but an uninteresting one: the object is known
+;;; to be anything except NIL. That predicate would be IDENTITY,
+;;; which is not terribly helpful from a code generation stance.
+(defknown symbol-hash* (t (member nil symbolp non-null-symbol-p))
+  hash (flushable movable always-translatable))
 
 (defknown %set-symbol-hash (symbol hash)
   t ())

@@ -208,6 +208,13 @@
                 (ensure-symbol-hash x)
                 result)))))
 
+(deftransform symbol-hash* ((object predicate) (symbol null))
+  `(symbol-hash* object 'symbolp)) ; annotate that object satisfies SYMBOLP
+(deftransform symbol-hash* ((object predicate)
+                            ((and (not null) symbol)
+                             (constant-arg (member nil symbolp))))
+  `(symbol-hash* object 'non-null-symbol-p)) ; etc
+
 ;;; These transforms are somehow needed when compiling ARRAY-PSXHASH and
 ;;; then never again.  Can't we define the guts of it to not need them?
 (deftransform psxhash ((x &optional depthoid) (character &optional t))

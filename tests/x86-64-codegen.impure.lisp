@@ -520,3 +520,20 @@
                                        ((integer 1 20) 'hi)
                                        ((cons (eql :thing)) 'wat)
                                        (bit-vector 'hi-again))))))))
+
+(with-test (:name :symbol-case-optimization-levels)
+  (let ((cases
+         '((a 1) (b 1) (c 3/2)
+           (d 2) (e 2) (f "hello")
+           (g 3) (h 3) (i -3))))
+    (dolist (constraint '(t symbol (not null) (and symbol (not null))))
+      (dotimes (safety 4)
+        (let ((f (checked-compile
+                  `(lambda (x)
+                    (declare (optimize (safety ,safety)))
+                    (case (the ,constraint x) ,@cases (t :feep))))))
+          (dolist (input '(a b c d e f g h i j k nil 5 7))
+            (when (typep input constraint)
+              (assert (eq (funcall f input)
+                          (let ((cell (assoc input cases)))
+                            (if cell (cadr cell) :feep)))))))))))

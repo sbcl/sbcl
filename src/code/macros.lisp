@@ -447,11 +447,27 @@ symbol-case giving up: case=((V U) (F))
            (bins (make-array (ash 1 (byte-size byte)) :initial-element 0))
            (symbol (sb-xc:gensym "S"))
            (hash (sb-xc:gensym "H"))
-           (is-symbol `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol))
+           (is-hashable
+            ;; For x86-64, any non-immediate object is considered hashable,
+            ;; so we only do a lowtag test on the object, though the correct hash
+            ;; is obtained only if the object is a symbol.
+            #+x86-64 `(pointerp ,symbol)
+            ;; For others backends, the set of keys in a particular CASE form
+            ;; makes a difference. NIL as a possible key mandates choosing SYMBOLP
+            ;; but NON-NULL-SYMBOL-P is the quicker test.
+            #-x86-64 `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol))
            (calc-hash
             `(ldb (byte ,(byte-size byte)
                         ,(byte-position byte))
-                  ;; always use pre-memoized hash
+                  ;; Always access the pre-memoized value in the hash slot.
+                  ;; SYMBOL-HASH* reads the word following the header word
+                  ;; in any pointer object regardless of lowtag.
+                  #+x86-64
+                  ,(if (eq hash-fun 'sxhash)
+                       `(symbol-hash* ,symbol nil)
+                       `(,hash-fun ,symbol))
+                  ;; For others, use SYMBOL-HASH.
+                  #-x86-64
                   (,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun) ,symbol))))
       (declare (ignorable default))
 
@@ -489,7 +505,7 @@ symbol-case giving up: case=((V U) (F))
               (return-from expand-symbol-case
                 `(let ((,hash 0)
                        (,symbol ,keyform))
-                   (if (and ,is-symbol (eq ,symbol (svref ,bins (setq ,hash ,calc-hash))))
+                   (if (and ,is-hashable (eq ,symbol (svref ,bins (setq ,hash ,calc-hash))))
                        (truly-the ,(type-specifier (apply #'type-union types))
                                   (aref ,values ,hash))
                        ,(if errorp
@@ -611,7 +627,7 @@ symbol-case giving up: case=((V U) (F))
             (unless (aref bins i) (push i unused-bins)))
           `(let ((,symbol ,keyform))
              (block ,block
-               (when ,is-symbol
+               (when ,is-hashable
                  (let ((,hash ,calc-hash))
                    ;; At most two probes are required, and usually just 1
                    (when ,(ecase maxprobes

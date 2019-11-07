@@ -83,6 +83,7 @@
   (def %caller-pc ())
   (def %code-debug-info)
   #+(or x86 x86-64) (def sb-vm::%code-fixups)
+  #+x86-64 (def pointerp)
 
   ;; instances
   (def %make-instance) ; Allocate a new instance with X data slots.
@@ -152,3 +153,9 @@
   (and (%other-pointer-p x)
        (member (%other-pointer-widetag x) choices)
        t))
+
+#+x86-64
+(defun symbol-hash* (x satisfies)
+  (declare (explicit-check)) ; actually, not
+  (declare (ignore satisfies))
+  (symbol-hash* x nil))

@@ -316,7 +316,11 @@
            (let (seen)
              (nsubst-if nil
                         (lambda (x)
-                          (when (eq x 'sb-kernel:symbol-hash) (setq seen t)) nil)
+                          (when (and (symbolp x)
+                                     (or (string= x "SYMBOL-HASH")
+                                         (string= x "SYMBOL-HASH*")))
+                            (setq seen t))
+                          nil)
                         tree)
              seen)))
     (assert (not (uses-symbol-hash-p

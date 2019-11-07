@@ -359,6 +359,18 @@
        (inst cmp value (constantize fixnum-hi))
        (inst jmp (if not-p :a :be) target)
        (emit-label skip))))
+
+(define-vop (pointerp)
+  (:args (value :scs (any-reg descriptor-reg) :target temp))
+  (:temporary (:sc unsigned-reg :from (:argument 0)) temp)
+  (:conditional)
+  (:info target not-p)
+  (:policy :fast-safe)
+  (:translate pointerp)
+  (:generator 3
+    (inst lea :dword temp (ea -3 value))
+    (inst test :byte temp #b11)
+    (inst jmp (if not-p :nz :z) target)))
 
 ;;;; list/symbol types
 ;;;
