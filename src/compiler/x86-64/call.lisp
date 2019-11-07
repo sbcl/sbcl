@@ -1093,7 +1093,8 @@
   (:generator 20
     ;; Avoid the copy if there are no more args.
     (cond ((zerop fixed)
-           (inst jrcxz JUST-ALLOC-FRAME))
+           (inst test rcx-tn rcx-tn)
+           (inst jmp :z JUST-ALLOC-FRAME))
           ((and (eql min-verified fixed)
                 (> fixed 1))
            ;; verify-arg-count will do a CMP
@@ -1285,7 +1286,8 @@
       (move rcx count)
       ;; Check to see whether there are no args, and just return NIL if so.
       (inst mov result nil-value)
-      (inst jrcxz done)
+      (inst test rcx rcx)
+      (inst jmp :z done)
       (inst lea dst (ea nil rcx (ash 2 (- word-shift n-fixnum-tag-bits))))
       (unless stack-allocate-p
         (instrument-alloc dst node))

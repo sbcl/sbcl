@@ -442,7 +442,7 @@
   (inst mov rcx (ea (- other-pointer-lowtag) rdi))
   (inst shl rcx 1)
   (inst shr rcx (1+ n-widetag-bits))
-  (inst jrcxz epilogue) ; zero payload length, can this happen?
+  (inst jmp :z epilogue) ; zero payload length, can this happen?
   compare-loop
   (inst mov rax (ea (- other-pointer-lowtag) rsi rcx 8))
   (inst cmp rax (ea (- other-pointer-lowtag) rdi rcx 8))
@@ -523,7 +523,7 @@
   (inst jmp :ne done)
   (inst shr rcx n-widetag-bits)
   ;; can you have 0 payload words? Probably not, but let's be safe here.
-  (inst jrcxz done)
+  (inst jmp :z done)
   loop
   (inst mov rax (ea (- other-pointer-lowtag) x rcx 8))
   (inst cmp rax (ea (- other-pointer-lowtag) y rcx 8))

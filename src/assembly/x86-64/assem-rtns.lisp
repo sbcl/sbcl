@@ -33,7 +33,8 @@
      (:temp loop-index unsigned-reg r9-offset))
 
   ;; Pick off the cases where everything fits in register args.
-  (inst jrcxz ZERO-VALUES)
+  (inst test rcx rcx)
+  (inst jmp :z ZERO-VALUES)
   (inst cmp rcx (fixnumize 1))
   (inst jmp :e ONE-VALUE)
   (inst cmp rcx (fixnumize 2))

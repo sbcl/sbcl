@@ -31,7 +31,8 @@
      (:temp edi unsigned-reg edi-offset))
 
   ;; Pick off the cases where everything fits in register args.
-  (inst jecxz ZERO-VALUES)
+  (inst test ecx ecx)
+  (inst jmp :z ZERO-VALUES)
   (inst cmp ecx (fixnumize 1))
   (inst jmp :e ONE-VALUE)
   (inst cmp ecx (fixnumize 2))

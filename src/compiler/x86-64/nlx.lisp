@@ -166,7 +166,8 @@
           ((= nvals 1)
            (let ((no-values (gen-label)))
              (inst mov (tn-ref-tn values) nil-value)
-             (inst jrcxz no-values)
+             (inst test rcx-tn rcx-tn)
+             (inst jmp :z no-values)
              (loadw (tn-ref-tn values) start -1)
              (emit-label no-values)))
           (t
@@ -228,7 +229,8 @@
       (move num count))
     (move rcx count)
     (zeroize loop-index)
-    (inst jrcxz DONE)
+    (inst test rcx rcx)
+    (inst jmp :z DONE)
     LOOP
     (inst sub loop-index n-word-bytes)
     (inst mov temp (ea source loop-index))
