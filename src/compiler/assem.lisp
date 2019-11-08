@@ -1267,29 +1267,6 @@
 
 
 ;;;; interface to the rest of the compiler
-(defun op-encoder-name (string-designator &optional create)
-  (cond ((string= string-designator '.skip)
-         (return-from op-encoder-name '.skip))
-        ;; other pseudo-ops?
-        )
-  (let ((conflictp
-         ;; This kludge avoids interning instruction encoder names in lowercase
-         ;; most of the time, which was a hack to avoid overlap with Lisp macros
-         ;; of the same name.
-         (member string-designator
-                 '("ASR" "LSR" "LSL" "ROR"                     ; ARM
-                   "T"                                         ; Sparc "trap"
-                   "AND" "OR" "NOT" "PUSH" "POP" "SET" "LOOP"  ; x86
-                   "LDB"                                       ; HPPA
-                   "REM"                                       ; RISC-V
-                   "BREAK" "BYTE" "CALL" "WORD" "MOVE")        ; generic
-                 :test #'string=)))
-    (values (funcall (if create 'intern 'find-symbol)
-                     (if conflictp
-                         (string-downcase string-designator)
-                         (string string-designator))
-                     *backend-instruction-set-package*))))
-
 (defstruct (stmt (:constructor make-stmt (label vop mnemonic operands)))
   (label    nil :read-only t)
   (vop      nil :read-only t)
@@ -1373,6 +1350,10 @@
       #+sb-xc-host (adjust-array output index)
       #-sb-xc-host (sb-kernel:%shrink-vector output index))))
 
+;;; Map of opcode symbol to function that emits it into the byte stream
+;;; (or with the schedulding assembler, into the queue)
+(defglobal *inst-encoder* (make-hash-table :test 'eq))
+
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
@@ -1407,53 +1388,28 @@
             (awhen (stmt-vop statement) (setq **current-vop** it))
             (dolist (label (ensure-list (stmt-label statement)))
               (%emit-label segment **current-vop** label))
-            (when mnemonic
-              (block op
-                (when (char= (char (symbol-name mnemonic) 0) #\.)
-                   ;; potentially a pseudo-op. Any mnemonic can start with a dot,
-                   ;; not just the ones handled here by the generic assembler.
-                  (case mnemonic
-                   (.align
-                    (destructuring-bind (bits &optional (pattern 0)) operands
-                      (%emit-alignment segment **current-vop** bits pattern))
-                    (return-from op))
-                   (.byte ; takes >1 byte, unlike inst BYTE which takes only 1
-                    (dolist (byte operands (return-from op))
-                      (emit-byte segment byte)))
-                   (.lispword
-                    (destructuring-bind (val) operands
-                      #+little-endian
-                      (loop for i below sb-vm:n-word-bits by 8
-                            do (emit-byte segment (ldb (byte 8 i) val)))
-                      #+big-endian
-                      (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
-                            do (emit-byte segment (ldb (byte 8 i) val))))
-                    (return-from op))
-                   (.skip
-                    (destructuring-bind (n-bytes &optional (pattern 0)) operands
-                      (%emit-skip segment n-bytes pattern))
-                    (return-from op))
-                   (.begin-without-scheduling
-                    (aver (not in-without-scheduling))
-                    (setq in-without-scheduling t
-                          was-scheduling (segment-run-scheduler segment))
-                    (when was-scheduling
-                      (schedule-pending-instructions segment)
-                      (setf (segment-run-scheduler segment) nil))
-                    (return-from op))
-                   (.end-without-scheduling
-                    (aver in-without-scheduling)
-                    (setf (segment-run-scheduler segment) was-scheduling
-                          in-without-scheduling nil
-                          was-scheduling nil)
-                    (return-from op))
-                   (.comment ; ignore it
-                    (return-from op))))
-                ;; This seems wrong - if we return from the block named OP,
-                ;; the hooks aren't run - is that OK?
-                (instruction-hooks segment)
-                (apply mnemonic segment
-                       (perform-operand-lowering operands))))))))
+            (case mnemonic
+              (.begin-without-scheduling
+               (aver (not in-without-scheduling))
+               (setq in-without-scheduling t
+                     was-scheduling (segment-run-scheduler segment))
+               (when was-scheduling
+                 (schedule-pending-instructions segment)
+                 (setf (segment-run-scheduler segment) nil)))
+              (.end-without-scheduling
+               (aver in-without-scheduling)
+               (setf (segment-run-scheduler segment) was-scheduling
+                     in-without-scheduling nil
+                     was-scheduling nil))
+               ((nil)) ; ignore
+               (t
+                (let ((encoder (gethash mnemonic *inst-encoder*)))
+                  (cond ((functionp encoder)
+                         (instruction-hooks segment)
+                         (apply encoder segment
+                                (perform-operand-lowering operands)))
+                        (t
+                         (bug "No encoder for ~S" mnemonic))))))))))
   (finalize-segment segment))
 
 ;;; The interface to %ASSEMBLE-SECTIONS
@@ -1585,19 +1541,32 @@
       (sb-c::trace-instruction section-name **current-vop** mnemonic operands
                                (asmstream-tracing-state asmstream)))))
 
-(defmacro inst (&whole whole instruction &rest args &environment env)
+(defmacro inst (&whole whole mnemonic &rest args)
   "Emit the specified instruction to the current segment."
-  (let* ((stringablep (typep instruction '(or symbol string character)))
-         (sym (and stringablep (op-encoder-name instruction))))
-    (cond ((and stringablep
-                (null sym))
-           (warn "Undefined instruction: ~s in~% ~s" instruction whole)
-           `(error "Undefined instruction: ~s in~% ~s" ',instruction ',whole))
-          ((#-sb-xc macro-function #+sb-xc sb-xc:macro-function sym env)
-           `(,sym ,@args))
+  ;;; The test for stringablep is a bit suspicious - if you use a lexical var X
+  ;;; as a computed mnemonic, it should be spelled (INST (PROGN X) ...) I suppose.
+  (let* ((stringablep (typep mnemonic '(or symbol string character)))
+         (sym (and stringablep
+                   (find-symbol (string mnemonic) *backend-instruction-set-package*)))
+         (definedp (nth-value 1 (gethash sym *inst-encoder*))))
+    (cond ((and stringablep (not definedp))
+           ;; %INST can not execute random forms, so MNEMONIC must be a literal to be
+           ;; recognized as a macro instruction. It's basically a lisp macro that can
+           ;; coexist with other identically-named lisp macros or functions.
+           ;; For example, arm64 has {ASR, LSR} as DEFUNs and macro instructions.
+           ;; By using an unusual convention of a symbol with #\: in its name,
+           ;; FIND-SYMBOL reliably tests whether a macro is defined without further
+           ;; using FBOUNDP or MACRO-FUNCTION.
+           (let ((macro (find-symbol (format nil "M:~A" mnemonic)
+                                     *backend-instruction-set-package*)))
+             (when macro
+               (return-from inst `(,macro ,@args))))
+           (warn "Undefined instruction: ~s in~% ~s" mnemonic whole)
+           `(error "Undefined instruction: ~s in~% ~s" ',mnemonic ',whole))
           (t
-           `(%inst ,(if stringablep `',sym `(op-encoder-name ,instruction))
-                   ,@args)))))
+           ;; x86-64 uses computed mnemonics in RAW-INSTANCE-INIT/COMPLEX-DOUBLE
+           ;; and EMIT-SAP-REF.
+           `(%inst ,(if sym `',sym mnemonic) ,@args)))))
 
 ;;; Place INST in the current assembly section (or sometimes SEGMENT)
 ;;; based on *CURRENT-DESTINATION*. The latter occurs in two scenarios:
@@ -1612,7 +1581,13 @@
 ;;;
 (defun %inst (mnemonic &rest operands)
   (declare (symbol mnemonic))
-  (let ((dest *current-destination*))
+  (let ((action (gethash mnemonic *inst-encoder*))
+        (dest *current-destination*))
+    (unless action ; try canonicalizing again
+      (setq mnemonic (find-symbol (string mnemonic)
+                                  *backend-instruction-set-package*)
+            action (gethash mnemonic *inst-encoder*))
+      (aver action))
     (typecase dest
       (cons ; streaming in to the assembler
        (trace-inst dest mnemonic operands)
@@ -1622,8 +1597,8 @@
          (emit dest (if v (cons v inst) inst))))
       (segment ; streaming out of the assembler
        (instruction-hooks dest)
-       (apply mnemonic dest (perform-operand-lowering operands)))))
-  (values))
+       (apply action dest (perform-operand-lowering operands)))))
+  mnemonic)
 
 (defun emit-label (label)
   "Emit LABEL at this location in the current section."
@@ -1788,9 +1763,12 @@
                (:big-endian forms))
            ',name)))))
 
+(defun %def-inst-encoder (symbol &optional thing)
+  (setf (gethash symbol *inst-encoder*)
+        (or thing (gethash symbol *inst-encoder*))))
+
 (defmacro define-instruction (name lambda-list &rest options)
-  (binding* ((sym-name (symbol-name name))
-             (defun-name (op-encoder-name sym-name t))
+  (binding* ((fun-name (intern (symbol-name name) *backend-instruction-set-package*))
              (segment-name (car lambda-list))
              (vop-name nil)
              (emitter nil)
@@ -1860,7 +1838,8 @@
                   `((when (segment-run-scheduler ,segment-name)
                       (schedule-pending-instructions ,segment-name))
                     ,@emitter))
-            (let ((flet-name (make-symbol (concatenate 'string "ENCODE-" sym-name)))
+            (let ((flet-name (make-symbol (concatenate 'string "ENCODE-"
+                                                       (string fun-name))))
                   (inst-name '#:inst))
               (setf emitter `((flet ((,flet-name (,segment-name)
                                        ,@emitter))
@@ -1881,13 +1860,18 @@
                                     (,flet-name ,segment-name)))))))))
     `(progn
        #-sb-xc-host ; The disassembler is not used on the host.
-       (setf (get ',defun-name 'sb-disassem::instruction-flavors)
+       (setf (get ',fun-name 'sb-disassem::instruction-flavors)
              (list ,@pdefs))
-       ,(when emitter
-          `(defun ,defun-name (,segment-name ,@(cdr lambda-list))
-             (declare ,@decls)
-             (let ,(and vop-name `((,vop-name **current-vop**)))
-               ,@emitter))))))
+       ,@(when emitter
+           `((eval-when (:compile-toplevel) (%def-inst-encoder ',fun-name))
+             (%def-inst-encoder
+              ',fun-name
+              (named-lambda ,(string fun-name)
+                  (,segment-name ,@(cdr lambda-list))
+                (declare ,@decls)
+                (let ,(and vop-name `((,vop-name **current-vop**)))
+                  ,@emitter)))))
+       ',fun-name)))
 
 (defun instruction-hooks (segment)
   (let ((postits (segment-postits segment)))
@@ -1895,5 +1879,39 @@
     (dolist (postit postits)
       (emit-back-patch segment 0 postit))))
 
+;;; This was convenient as merely a shorthand for DEFMACRO, but it can't be now
+;;; because for example, "NOT" on the Alpha is a macro, conflicting with CL:NOT.
+;;; git revision 8d21b520d9 seems to imply that using MAKE-MACRO-LAMBDA to create
+;;; anonymous macros somehow failed.
 (defmacro define-instruction-macro (name lambda-list &body body)
-  `(defmacro ,(op-encoder-name name t) ,lambda-list ,@body))
+  (let ((macro (package-symbolicate
+                *backend-instruction-set-package* "M:" name)))
+    `(progn
+       ;; Ensure that it does not exist as a directly encodable instruction
+       (remhash ',(find-symbol (string name) *backend-instruction-set-package*)
+                *inst-encoder*)
+       (defmacro ,macro ,lambda-list ,@body))))
+
+(%def-inst-encoder '.align
+                   (lambda (segment bits &optional (pattern 0))
+                     (%emit-alignment segment **current-vop** bits pattern)))
+(%def-inst-encoder '.byte
+                   (lambda (segment &rest bytes)
+                     (dolist (byte bytes) (emit-byte segment byte))))
+(%def-inst-encoder '.coverage-mark
+                   (lambda (segment &rest junk)
+                     (declare (ignore segment junk))
+                     (error "Can't get here")))
+(%def-inst-encoder '.skip
+                    (lambda (segment n-bytes &optional (pattern 0))
+                      (%emit-skip segment n-bytes pattern)))
+(%def-inst-encoder '.lispword
+                   (lambda (segment val)
+                     #+little-endian
+                     (loop for i below sb-vm:n-word-bits by 8
+                           do (emit-byte segment (ldb (byte 8 i) val)))
+                     #+big-endian
+                     (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
+                           do (emit-byte segment (ldb (byte 8 i) val)))))
+(%def-inst-encoder '.comment
+                   (lambda (segment &rest junk) (declare (ignore segment junk))))

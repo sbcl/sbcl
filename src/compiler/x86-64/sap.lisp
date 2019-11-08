@@ -232,7 +232,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:result-types ,type)
                     (:node-var node)
                     (:vop-var vop)
-                    (:generator 3 (emit-sap-ref ,size ',(sb-assem::op-encoder-name ref-insn)
+                    (:generator 3 (emit-sap-ref ,size ',ref-insn
                                                 ',modifier result (ea sap offset) node vop)))
                   (define-vop (,ref-name-c)
                     (:translate ,ref-name)
@@ -244,7 +244,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
                     (:result-types ,type)
                     (:node-var node)
                     (:vop-var vop)
-                    (:generator 2 (emit-sap-ref ,size ',(sb-assem::op-encoder-name ref-insn)
+                    (:generator 2 (emit-sap-ref ,size ',ref-insn
                                                 ',modifier result (ea offset sap) node vop)))
                   (define-vop (,set-name)
                     (:translate ,set-name)

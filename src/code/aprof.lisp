@@ -82,7 +82,7 @@
                 #:reg-imm-data
                 #:reg/mem-imm-data
                 #:add #:xadd #:inc #:mov #:lea #:cmp #:xor #:jmp
-                #:|push| #:|pop| #:|or| #:|call| #:|break|))
+                #:call #:break))
 
 (in-package #:sb-aprof)
 (setf (system-package-p *package*) t)
@@ -271,7 +271,7 @@
                        (advance-if (and (eq opcode 'mov) (pseudoatomic-flag-p))
                                    +state-begin-pa+))))
                    (#.+state-begin-pa+
-                    (cond ((eq opcode '|push|)
+                    (cond ((eq opcode 'push)
                            ;; Known huge allocation goes straight to C call
                            (setq size (ldb (byte 32 8) dchunk))
                            (advance +state-trampoline-arg+))
@@ -442,7 +442,7 @@
                             (t
                              (fail))))
                      (t
-                      (advance-if (and (eq opcode '|or|)
+                      (advance-if (and (eq opcode 'or)
                                        ;; TODO: AVER correct register as well
                                        (not lowtag))
                                   +state-wide-then-lowtag+)
@@ -465,13 +465,13 @@
                    (#.+state-end-pa+
                     (advance-if (eq opcode 'jmp) +state-test-interrupted+))
                    (#.+state-test-interrupted+
-                    (advance-if (eq opcode '|break|) +state-pa-trap+))
+                    (advance-if (eq opcode 'break) +state-pa-trap+))
                    (#.+state-pa-trap+
                     (infer-layout opcode ea))
                    (#.+state-trampoline-arg+
-                    (advance-if (eq opcode '|call|) +state-called+))
+                    (advance-if (eq opcode 'call) +state-called+))
                    (#.+state-called+
-                    (cond ((and (eq opcode '|pop|) (<= #x58 opcode-byte #x5F))
+                    (cond ((and (eq opcode 'pop) (<= #x58 opcode-byte #x5F))
                            (setq target-reg
                                  (+ (if (logtest +rex-b+ (dstate-inst-properties dstate))
                                         8 0)
@@ -487,7 +487,7 @@
                                         (null (machine-ea-disp ea)))
                                    +state-widetag-only+)
                        (setq widetag (logand (reg/mem-imm-data 0 dstate) #xFF)))
-                      (|or|
+                      (or
                            (if (eql opcode-byte #x0C)
                                ;; OR AL, $byte (2 byte encoding)
                                (setq lowtag (ldb (byte 8 8) dchunk))

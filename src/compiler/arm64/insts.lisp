@@ -2555,7 +2555,7 @@
             (case type
               (:fixup
                ;; Use the WORD emitter which knows how to emit fixups
-               `(|word| ,(apply #'make-fixup val)))
+               `(word ,(apply #'make-fixup val)))
               (t
                ;; Could add pseudo-ops for .WORD, .INT, .QUAD, .OCTA just like gcc has.
                ;; But it works fine to emit as a sequence of bytes

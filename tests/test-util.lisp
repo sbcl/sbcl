@@ -871,7 +871,7 @@
 ;;; Take a list of lists and assemble them as though they are
 ;;; instructions inside the body of a vop. There is no need
 ;;; to use the INST macro in front of each list.
-;;; As a special case, an atom is the symbol LABEL, it will be
+;;; As a special case, if an atom is the symbol LABEL, it will be
 ;;; changed to a generated label. At most one such atom may appear.
 (defun assemble (instructions)
   (let ((segment (sb-assem:make-segment))
@@ -884,9 +884,7 @@
                    (setq label (sb-assem:gen-label))
                    (rplaca cell label)))
                inst)
-         (apply #'sb-assem::%inst
-                (sb-assem::op-encoder-name (car inst))
-                (cdr inst)))
+         (apply #'sb-assem::%inst (car inst) (cdr inst)))
        (when label
          (sb-assem::%emit-label segment nil label)))
     (sb-assem:segment-buffer

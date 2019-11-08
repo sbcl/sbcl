@@ -101,6 +101,13 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (list* (load-time-value(gensym)) :if-exists x))
 
+(import '(sb-vm::temp-reg-tn sb-vm::thread-base-tn
+          sb-vm::thread-pseudo-atomic-bits-slot sb-vm::thread-alloc-region-slot
+          sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
+          sb-vm:cons-size sb-vm:n-word-bytes
+          sb-vm::ea sb-vm:nil-value
+          sb-vm:list-pointer-lowtag sb-vm:bignum-widetag))
+
 #-win32
 (with-test (:name :aprof-list-length-2)
   ;; Rather than figuring out how to get some minimal piece of Lisp code to
@@ -109,20 +116,16 @@ sb-vm::
   ;; (This special case for 2 conses caused aprof not to recognize the pattern)
   (let ((bytes
          (test-util:assemble
-          ;; our reader extension is semi-useless in that you can't read
-          ;; a symbol that didn't exist in the designated package, which is why
-          ;; some mnemonics below are spelled using string quotes.
-          sb-vm::
-          `(("INC" :qword ,(ea 1024 temp-reg-tn) :lock)
+          `((inc :qword ,(ea 1024 temp-reg-tn) :lock)
             (mov ,(ea (* thread-pseudo-atomic-bits-slot 8) thread-base-tn) ,rbp-tn)
             (mov ,r10-tn ,(ea (* thread-alloc-region-slot 8) thread-base-tn))
-            ("LEA" ,temp-reg-tn ,(ea (* 2 cons-size n-word-bytes) r10-tn))
+            (lea ,temp-reg-tn ,(ea (* 2 cons-size n-word-bytes) r10-tn))
             (cmp ,temp-reg-tn ,(ea (* (1+ thread-alloc-region-slot) 8) thread-base-tn))
             (jmp :a label)
             (mov ,(ea (* thread-alloc-region-slot 8) thread-base-tn) ,temp-reg-tn)
             (mov ,r9-tn ,(ea -56 rbp-tn)) ; arbitrary load
             (mov ,(ea r10-tn) ,r9-tn)     ; store to newly allocated cons
-            ("LEA" ,r9-tn ,(ea (+ 16 list-pointer-lowtag) r10-tn))
+            (lea ,r9-tn ,(ea (+ 16 list-pointer-lowtag) r10-tn))
             (mov ,(ea 8 r10-tn) ,r9-tn)
             (mov ,(ea 16 r10-tn) ,rsi-tn)
             (mov :dword ,(ea 24 r10-tn) ,nil-value)
@@ -141,11 +144,10 @@ sb-vm::
 (with-test (:name :aprof-bignum)
   (let ((bytes
          (test-util:assemble
-          sb-vm::
-          `(("INC" :qword ,(ea 1024 temp-reg-tn) :lock)
+          `((inc :qword ,(ea 1024 temp-reg-tn) :lock)
             (mov ,(ea (* thread-pseudo-atomic-bits-slot 8) thread-base-tn) ,rbp-tn)
             (mov ,rcx-tn ,(ea (* thread-alloc-region-slot 8) thread-base-tn))
-            ("LEA" ,temp-reg-tn ,(ea (* 2 n-word-bytes) rcx-tn))
+            (lea ,temp-reg-tn ,(ea (* 2 n-word-bytes) rcx-tn))
             (cmp ,temp-reg-tn ,(ea (* (1+ thread-alloc-region-slot) 8) thread-base-tn))
             (jmp :a label)
             (mov ,(ea (* thread-alloc-region-slot 8) thread-base-tn) ,temp-reg-tn)

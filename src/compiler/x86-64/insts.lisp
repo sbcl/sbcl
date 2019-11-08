@@ -3481,12 +3481,11 @@
         (setf (label-usedp (label+addend-label disp)) t))))))
 
 (defun sb-c::branch-opcode-p (mnemonic)
-  (member mnemonic (load-time-value
-                    (mapcar #'sb-assem::op-encoder-name
-                            '(call ret jmp jrcxz break int iret
-                              loop loopz loopnz syscall
-                              byte word dword)) ; unexplained phenomena
-                    t)))
+  (case mnemonic
+    ((call ret jmp jrcxz break int iret
+      loop loopz loopnz syscall
+      byte word dword) ; unexplained phenomena
+     t)))
 
 ;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
