@@ -101,6 +101,7 @@ sb-vm::
   (declare (optimize sb-c::instrument-consing))
   (list* (load-time-value(gensym)) :if-exists x))
 
+#-win32
 (import '(sb-vm::temp-reg-tn sb-vm::thread-base-tn
           sb-vm::thread-pseudo-atomic-bits-slot sb-vm::thread-alloc-region-slot
           sb-vm::rcx-tn sb-vm::rbp-tn sb-vm::r9-tn sb-vm::r10-tn sb-vm::rsi-tn
