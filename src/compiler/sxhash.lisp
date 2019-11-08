@@ -208,11 +208,12 @@
                 (ensure-symbol-hash x)
                 result)))))
 
-(deftransform symbol-hash* ((object predicate) (symbol null))
+(deftransform symbol-hash* ((object predicate) (symbol null) * :important nil)
   `(symbol-hash* object 'symbolp)) ; annotate that object satisfies SYMBOLP
 (deftransform symbol-hash* ((object predicate)
                             ((and (not null) symbol)
-                             (constant-arg (member nil symbolp))))
+                             (constant-arg (member nil symbolp)))
+                            * :important nil)
   `(symbol-hash* object 'non-null-symbol-p)) ; etc
 
 ;;; These transforms are somehow needed when compiling ARRAY-PSXHASH and

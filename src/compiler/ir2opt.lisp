@@ -691,6 +691,51 @@
               (update-block-succ
                2block (remove-duplicates (cons else-block blocks))))))))))
 
+(defun component-remove-constant (constant constants)
+  (let ((index (position constant constants)))
+    (loop for i from index below (1- (length constants))
+          for next = (aref constants (1+ i))
+          do (setf (aref constants i) next)
+             (cond ((and (constant-p next)
+                         (constant-info next))
+                    (decf (tn-offset (constant-info next))))
+                   ((typep next '(cons t (cons t (cons t null))))
+                    (decf (tn-offset (third next))))))
+    (decf (fill-pointer constants))))
+
+;;; Optimize (svref #(constant array) safe-index) into accessing the code constants directly,
+;;; saving on one memory indirection.
+;;; TODO: Can optimize any array
+#+x86-64
+(defoptimizer (vop-optimize (sb-vm::data-vector-ref-with-offset/simple-vector
+                             sb-vm::data-vector-ref-with-offset/simple-array-fixnum
+                             ))
+    (vop)
+  (let* ((args (vop-args vop))
+         (array (tn-ref-tn args))
+         (index (tn-ref-tn (tn-ref-across args)))
+         (constants (ir2-component-constants (component-info *component-being-compiled*)))
+         (first-constant))
+    (when (and (eq (tn-kind array) :constant)
+               (tn-leaf array)
+               (not (tn-ref-next (tn-reads array))))
+      (component-remove-constant (tn-leaf array) constants)
+      (setf (tn-offset array) (length constants))
+      (loop for x across (tn-value array)
+            for constant = (setf first-constant (make-constant x))
+            then (make-constant x)
+            do (vector-push-extend constant constants))
+      (setf (tn-leaf array) first-constant
+            (constant-info first-constant) array)
+      (emit-and-insert-vop (vop-node vop)
+                           (vop-block vop)
+                           (template-or-lose 'sb-vm::data-vector-ref-with-offset/constant-simple-vector)
+                           (reference-tn-list (list array index) nil)
+                           (reference-tn (tn-ref-tn (vop-results vop)) t)
+                           vop
+                           (vop-codegen-info vop))
+      (delete-vop vop))))
+
 (defun run-vop-optimizers (component)
   (do-ir2-blocks (block component)
     (do-vops vop block

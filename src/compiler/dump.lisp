@@ -958,9 +958,9 @@
             (cons
              (ecase (car entry)
                (:constant ; anything that has not been wrapped in a #<CONSTANT>
-                (dump-object (cdr entry) fasl-output))
+                (dump-object (cadr entry) fasl-output))
                (:entry
-                (let* ((info (sb-c::leaf-info (cdr entry)))
+                (let* ((info (sb-c::leaf-info (cadr entry)))
                        (handle (gethash info
                                         (fasl-output-entry-table
                                          fasl-output))))
@@ -972,12 +972,12 @@
                     (patches (cons info i))
                     (dump-fop 'fop-misc-trap fasl-output)))))
                (:load-time-value
-                (dump-push (cdr entry) fasl-output))
+                (dump-push (cadr entry) fasl-output))
                (:fdefinition
-                (dump-object (cdr entry) fasl-output)
+                (dump-object (cadr entry) fasl-output)
                 (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
-                (dump-object (cdr entry) fasl-output)
+                (dump-object (cadr entry) fasl-output)
                 (dump-fop 'fop-known-fun fasl-output))))
             (null
              (dump-fop 'fop-misc-trap fasl-output)))))
@@ -1055,7 +1055,7 @@
          (code-handle
           ;; fill in the placeholder elements of constants
           ;; with the NAME, ARGLIST, TYPE, INFO slots of each simple-fun.
-          (let ((constants (sb-c::ir2-component-constants 2comp))
+          (let ((constants (sb-c:ir2-component-constants 2comp))
                 (wordindex (+ sb-vm:code-constants-offset
                               (* sb-vm:code-slots-per-simple-fun nfuns))))
             (dolist (entry entries)
@@ -1063,13 +1063,13 @@
               ;; See also MAKE-CORE-COMPONENT which does the same thing.
               (decf wordindex 4)
               (setf (aref constants (+ wordindex sb-vm:simple-fun-name-slot))
-                    `(:constant . ,(sb-c::entry-info-name entry))
+                    `(:constant ,(sb-c::entry-info-name entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-arglist-slot))
-                    `(:constant . ,(sb-c::entry-info-arguments entry))
+                    `(:constant ,(sb-c::entry-info-arguments entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-source-slot))
-                    `(:constant . ,(sb-c::entry-info-form/doc entry))
+                    `(:constant ,(sb-c::entry-info-form/doc entry))
                     (aref constants (+ wordindex sb-vm:simple-fun-info-slot))
-                    `(:constant . ,(sb-c::entry-info-type/xref entry))))
+                    `(:constant ,(sb-c::entry-info-type/xref entry))))
             (dump-code-object component code-segment code-length fixups file)))
          (fun-index nfuns))
 

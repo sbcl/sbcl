@@ -217,6 +217,20 @@
   (def-full-data-vector-frobs simple-array-unsigned-byte-63 unsigned-num
     unsigned-reg))
 
+(define-vop (data-vector-ref-with-offset/constant-simple-vector)
+  (:policy :fast-safe)
+  (:args (object :scs (constant))
+         (index :scs (any-reg)))
+  (:temporary (:sc unsigned-reg) array)
+  (:info offset)
+  (:arg-types simple-vector tagged-num (:constant fixnum))
+  (:results (value :scs (descriptor-reg any-reg immediate)))
+  (:result-types *)
+  (:generator 3
+    (inst lea array object)
+    (inst mov value (ea (* offset n-word-bytes) array
+                        index (ash 1 (- word-shift n-fixnum-tag-bits))))))
+
 (define-full-compare-and-swap %compare-and-swap-svref simple-vector
   vector-data-offset other-pointer-lowtag
   (descriptor-reg any-reg) *

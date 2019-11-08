@@ -263,7 +263,7 @@
          (constants (ir2-component-constants component)))
     (setf (tn-offset res) (fill-pointer constants)
           (tn-type res) type)
-    (vector-push-extend (cons :load-time-value handle) constants)
+    (vector-push-extend (list :load-time-value handle res) constants)
     (push-in tn-next res (ir2-component-constant-tns component))
     res))
 
@@ -294,7 +294,7 @@
     (do ((i 0 (1+ i)))
         ((= i (length constants))
          (setf (tn-offset res) i)
-         (vector-push-extend (cons kind info) constants))
+         (vector-push-extend (list kind info res) constants))
       (let ((entry (aref constants i)))
         (when (and (consp entry)
                    (eq (car entry) kind)

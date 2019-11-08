@@ -386,13 +386,19 @@
                 (if (symbolp what)
                     what
                     (symbolicate (function-name (first what))
-                                 "-" (second what) "-OPTIMIZER")))))
+                                 "-"
+                                 (if (consp (second what))
+                                     (caadr what)
+                                     (second what))
+                                 "-OPTIMIZER")))))
     (if (typep what '(cons (eql vop-optimize)))
         `(progn
            (defun ,name (,lambda-list)
              ,@body)
-           (setf (vop-info-optimizer (template-or-lose ',(second what)))
-                 #',name))
+           ,@(loop for what in (ensure-list (second what))
+                   collect
+                   `(setf (vop-info-optimizer (template-or-lose ',what))
+                          #',name)))
         (binding* (((forms decls) (parse-body body nil))
                    ((var-decls more-decls) (extract-var-decls decls vars))
                    ;; In case the BODY declares IGNORE of the formal NODE var,

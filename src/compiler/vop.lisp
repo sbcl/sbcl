@@ -323,19 +323,20 @@
   ;; constant pool. A non-immediate :CONSTANT TN with offset 0 refers
   ;; to the constant in element 0, etc. Normal constants are
   ;; represented by the placing the CONSTANT leaf in this vector. A
-  ;; load-time constant is distinguished by being a cons (KIND .
-  ;; WHAT). KIND is a keyword indicating how the constant is computed,
-  ;; and WHAT is some context.
+  ;; load-time constant is distinguished by being a cons
+  ;; (KIND WHAT TN).
+  ;; KIND is a keyword indicating how the constant is computed, and
+  ;; WHAT is some context.
   ;;
   ;; These load-time constants are recognized:
   ;;
-  ;; (:entry . <function>)
+  ;; (:entry <function>)
   ;;    Is replaced by the code pointer for the specified function.
   ;;    This is how compiled code (including DEFUN) gets its hands on
   ;;    a function. <function> is the XEP lambda for the called
   ;;    function; its LEAF-INFO should be an ENTRY-INFO structure.
   ;;
-  ;; (:label . <label>)
+  ;; (:label <label>)
   ;;    Is replaced with the byte offset of that label from the start
   ;;    of the code vector (including the header length.)
   ;;

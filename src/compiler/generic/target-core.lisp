@@ -265,13 +265,13 @@
               (list
                (ecase (car const)
                  (:entry
-                  (reference-core-fun code-obj index (cdr const) object))
+                  (reference-core-fun code-obj index (cadr const) object))
                  (:fdefinition
                   (setf (code-header-ref code-obj index)
-                        (find-or-create-fdefn (cdr const))))
+                        (find-or-create-fdefn (cadr const))))
                  (:known-fun
                   (setf (code-header-ref code-obj index)
-                        (%coerce-name-to-fun (cdr const)))))))))))
+                        (%coerce-name-to-fun (cadr const)))))))))))
   (values))
 
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified

@@ -499,6 +499,7 @@
          (jmp-inst (find-inst #xE9 inst-space))
          (cond-jmp-inst (find-inst #x800f inst-space))
          (lea-inst (find-inst #x8D inst-space))
+         (address (get-lisp-obj-address code))
          (text-start (sap-int (code-instructions code)))
          (text-end (+ text-start (%code-text-size code)))
          (sap (int-sap start-address)))
@@ -509,7 +510,7 @@
      (lambda (dchunk inst)
        (flet ((includep (target)
                 ;; Self-relative (to the code object) operands are ignored.
-                (and (or (< target text-start) (>= target text-end))
+                (and (or (< target address) (>= target text-end))
                      (funcall predicate target))))
          (cond ((or (eq inst jmp-inst) (eq inst call-inst))
                 (let ((operand (+ (near-jump-displacement dchunk dstate)
