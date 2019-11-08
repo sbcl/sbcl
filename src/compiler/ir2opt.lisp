@@ -472,28 +472,28 @@
 
 ;;; Turn CMP X,Y BRANCH-IF M CMP X,Y BRANCH-IF N
 ;;; into CMP X,Y BRANCH-IF M BRANCH-IF N
-(defun ir2-optimize-comparisons (component)
-  (do-ir2-blocks (block component)
-    (do-vops branch-if block
-      (when (eq (vop-name branch-if) 'branch-if)
-        (let ((prev (vop-prev branch-if)))
-          (when (and prev
-                     (memq (vop-name prev) *comparison-vops*))
-            (let ((next (next-vop branch-if))
-                  transpose)
-              (when (and next
-                         (memq (vop-name next) *comparison-vops*)
-                         (or (vop-args-equal prev next)
-                             (and (or (setf transpose
-                                            (memq (vop-name prev) *commutative-comparison-vops*))
-                                      (memq (vop-name next) *commutative-comparison-vops*))
-                                  (vop-args-equal prev next t))))
-                (when transpose
-                  ;; Could flip the flags for non-commutative operations
-                  (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
-                        for arg in (nreverse (vop-arg-list prev))
-                        do (change-tn-ref-tn tn-ref arg)))
-                (delete-vop next)))))))))
+;; while it's portable the VOPs are not validated for
+;; compatibility on other backends yet.
+#+(or arm arm64 x86 x86-64)
+(defoptimizer (vop-optimize branch-if) (branch-if)
+  (let ((prev (vop-prev branch-if)))
+    (when (and prev
+               (memq (vop-name prev) *comparison-vops*))
+      (let ((next (next-vop branch-if))
+            transpose)
+        (when (and next
+                   (memq (vop-name next) *comparison-vops*)
+                   (or (vop-args-equal prev next)
+                       (and (or (setf transpose
+                                      (memq (vop-name prev) *commutative-comparison-vops*))
+                                (memq (vop-name next) *commutative-comparison-vops*))
+                            (vop-args-equal prev next t))))
+          (when transpose
+            ;; Could flip the flags for non-commutative operations
+            (loop for tn-ref = (vop-args prev) then (tn-ref-across tn-ref)
+                  for arg in (nreverse (vop-arg-list prev))
+                  do (change-tn-ref-tn tn-ref arg)))
+          (delete-vop next))))))
 
 ;;; If 2BLOCK ends in an IF-EQ (or similar) + BRANCH-IF where the second operand
 ;;; of the test is an immediate value, then return the conditional vop.
@@ -691,6 +691,13 @@
               (update-block-succ
                2block (remove-duplicates (cons else-block blocks))))))))))
 
+(defun run-vop-optimizers (component)
+  (do-ir2-blocks (block component)
+    (do-vops vop block
+      (let ((optimizer (vop-info-optimizer (vop-info vop))))
+        (when optimizer
+          (funcall optimizer vop))))))
+
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
@@ -698,10 +705,7 @@
     ;; affects whether the last if/else is recognizable.
     #+(or x86 x86-64) (convert-if-else-chains component)
     (convert-cmovs component)
-    #+(or arm arm64 x86 x86-64)
-    ;; while it's portable the VOPs are not validated for
-    ;; compatibility on other backends yet.
-    (ir2-optimize-comparisons component)
+    (run-vop-optimizers component)
     (delete-unused-ir2-blocks component))
 
   (values))

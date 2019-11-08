@@ -378,8 +378,7 @@
                               &optional (node (sb-xc:gensym) node-p)
                               &rest vars)
                         &body body)
-  (binding* ((name
-              (flet ((function-name (name)
+  (let ((name (flet ((function-name (name)
                        (etypecase name
                          (symbol name)
                          ((cons (eql setf) (cons symbol null))
@@ -387,32 +386,38 @@
                 (if (symbolp what)
                     what
                     (symbolicate (function-name (first what))
-                                 "-" (second what) "-OPTIMIZER"))))
-             ((forms decls) (parse-body body nil))
-             ((var-decls more-decls) (extract-var-decls decls vars))
-             ;; In case the BODY declares IGNORE of the formal NODE var,
-             ;; we rebind it from N-NODE and never reference it from BINDS.
-             (n-node (make-symbol "NODE"))
-             ((binds lambda-vars gensyms)
-              (parse-deftransform lambda-list n-node
-                                  `(return-from ,name nil))))
-    (declare (ignore lambda-vars))
-    `(progn
-       ;; We can't stuff the BINDS as &AUX vars into the lambda list
-       ;; because there can be a RETURN-FROM in there.
-       (defun ,name (,n-node ,@vars)
-         ,@(if var-decls (list var-decls))
-         (let* (,@binds ,@(if node-p `((,node ,n-node))))
-           ;; Syntax requires naming NODE even if undesired if VARS
-           ;; are present, so in that case make NODE ignorable.
-           (declare (ignorable ,@(if (and vars node-p) `(,node))
-                               ,@gensyms))
-           ,@more-decls ,@forms))
-       ,@(when (consp what)
-           `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
-                          (symbolicate "FUN-INFO-" (second what)))
-                       (fun-info-or-lose ',(first what)))
-                      #',name))))))
+                                 "-" (second what) "-OPTIMIZER")))))
+    (if (typep what '(cons (eql vop-optimize)))
+        `(progn
+           (defun ,name (,lambda-list)
+             ,@body)
+           (setf (vop-info-optimizer (template-or-lose ',(second what)))
+                 #',name))
+        (binding* (((forms decls) (parse-body body nil))
+                   ((var-decls more-decls) (extract-var-decls decls vars))
+                   ;; In case the BODY declares IGNORE of the formal NODE var,
+                   ;; we rebind it from N-NODE and never reference it from BINDS.
+                   (n-node (make-symbol "NODE"))
+                   ((binds lambda-vars gensyms)
+                    (parse-deftransform lambda-list n-node
+                                        `(return-from ,name nil))))
+          (declare (ignore lambda-vars))
+          `(progn
+             ;; We can't stuff the BINDS as &AUX vars into the lambda list
+             ;; because there can be a RETURN-FROM in there.
+             (defun ,name (,n-node ,@vars)
+               ,@(if var-decls (list var-decls))
+               (let* (,@binds ,@(if node-p `((,node ,n-node))))
+                 ;; Syntax requires naming NODE even if undesired if VARS
+                 ;; are present, so in that case make NODE ignorable.
+                 (declare (ignorable ,@(if (and vars node-p) `(,node))
+                                     ,@gensyms))
+                 ,@more-decls ,@forms))
+             ,@(when (consp what)
+                 `((setf (,(let ((*package* (sb-xc:symbol-package 'fun-info)))
+                             (symbolicate "FUN-INFO-" (second what)))
+                          (fun-info-or-lose ',(first what)))
+                         #',name))))))))
 
 ;;;; IR groveling macros
 
