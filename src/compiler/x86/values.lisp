@@ -25,6 +25,7 @@
             )
   (:temporary (:sc any-reg :offset esi-offset) esi)
   (:temporary (:sc any-reg :offset edi-offset) edi)
+  (:temporary (:sc descriptor-reg) temp-dword)
   (:ignore r-moved-ptrs)
   (:generator 1
     (move edi last-nipped-ptr)
@@ -33,12 +34,13 @@
     (inst sub edi n-word-bytes)
     (inst cmp esp-tn esi)
     (inst jmp :a done)
-    (inst std)
     LOOP
-    (inst movs :dword)
+    (inst mov temp-dword (make-ea :dword :base esi))
+    (inst mov (make-ea :dword :base edi) temp-dword)
+    (inst sub esi n-word-bytes)
+    (inst sub edi n-word-bytes)
     (inst cmp esp-tn esi)
     (inst jmp :be loop)
-    (inst cld)
     DONE
     (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
     (inst sub edi esi)
