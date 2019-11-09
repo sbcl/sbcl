@@ -3211,6 +3211,13 @@ is :ANY, the function name is not checked."
              (lvar-value lvar))
     t))
 
+(defun process-lvar-type-annotation (lvar annotation)
+  (let ((type (lvar-type-annotation-type annotation)))
+    (unless (types-equal-or-intersect (lvar-type lvar) type)
+      (%compile-time-type-error-warn annotation (type-specifier type)
+                                     (type-specifier (lvar-type lvar))
+                                     (lvar-all-sources lvar)))))
+
 (defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))
                (lvar-fun-is
@@ -3234,7 +3241,9 @@ is :ANY, the function name is not checked."
                     (lvar-function-designator-annotation
                      (check-function-designator-lvar lvar annot))
                     (lvar-function-annotation
-                     (check-function-lvar lvar annot)))
+                     (check-function-lvar lvar annot))
+                    (lvar-type-annotation
+                     (process-lvar-type-annotation lvar annot)))
               (setf (lvar-annotation-fired annot) t))))))
 
 (defun add-annotation (lvar annotation)

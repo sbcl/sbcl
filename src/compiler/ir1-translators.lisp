@@ -1027,7 +1027,10 @@ care."
 ;;; THE with some options for the CAST
 (def-ir1-translator the* (((value-type &key context silent-conflict
                                        derive-type-only
-                                       truly) form)
+                                       truly
+                                       source-path
+                                       use-annotations)
+                           form)
                           start next result)
   (let ((value-type (values-specifier-type value-type)))
     (cond (derive-type-only
@@ -1050,8 +1053,17 @@ care."
                                          (t
                                           new-uses))
                                    value-type)))))
+          (use-annotations
+           (ir1-convert start next result form)
+           (when result
+             (add-annotation result (make-lvar-type-annotation :type value-type
+                                                               :source-path
+                                                               (or source-path
+                                                                   *current-path*)))))
           (t
            (let* ((policy (lexenv-policy *lexenv*))
+                  (*current-path* (or source-path
+                                      *current-path*))
                   (cast (the-in-policy value-type form (if truly
                                                            **zero-typecheck-policy**
                                                            policy)

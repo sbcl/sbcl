@@ -95,7 +95,8 @@
   (dependent-annotations nil))
 
 ;;; These are used for annottating a LVAR with information that can't
-;;; be expressed using types.
+;;; be expressed using types or if the CAST semantics are undesirable
+;;; (type derivation, runtime errors).
 ;;; Right now it's basically used for tracking constants and checking
 ;;; them for things like proper sequence, or valid type specifier.
 (defstruct lvar-annotation
@@ -139,11 +140,15 @@
   (result-specs nil :type list)
   type)
 
-(defstruct (lvar-function-annotation
-             (:include lvar-annotation)
-             (:copier nil))
+(defstruct (lvar-type-annotation
+            (:include lvar-annotation)
+            (:copier nil))
   type
   context)
+
+(defstruct (lvar-function-annotation
+            (:include lvar-type-annotation)
+            (:copier nil)))
 
 (defmethod print-object ((x lvar) stream)
   (print-unreadable-object (x stream :type t :identity t)
