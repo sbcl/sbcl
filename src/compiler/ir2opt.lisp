@@ -706,10 +706,9 @@
 ;;; Optimize (svref #(constant array) safe-index) into accessing the code constants directly,
 ;;; saving on one memory indirection.
 ;;; TODO: Can optimize any array
-#+x86-64
+#+(and x86-64 (or)) ;; Performance benefits are unclear, while the vectors can't be shared across different code objects.
 (defoptimizer (vop-optimize (sb-vm::data-vector-ref-with-offset/simple-vector
-                             sb-vm::data-vector-ref-with-offset/simple-array-fixnum
-                             ))
+                             sb-vm::data-vector-ref-with-offset/simple-array-fixnum))
     (vop)
   (let* ((args (vop-args vop))
          (array (tn-ref-tn args))
