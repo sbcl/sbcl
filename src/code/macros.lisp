@@ -500,14 +500,12 @@ symbol-case giving up: case=((V U) (F))
                       (aver (eql (aref bins index) 0)) ; no collisions
                       (setf (aref bins index) symbol
                             (aref values index) value)))))
-              (when (every #'fixnump values)
-                (setq values (sb-xc:coerce values '(simple-array fixnum (*)))))
               (return-from expand-symbol-case
                 `(let ((,hash 0)
                        (,symbol ,keyform))
                    (if (and ,is-hashable (eq ,symbol (svref ,bins (setq ,hash ,calc-hash))))
                        (truly-the ,(type-specifier (apply #'type-union types))
-                                  (aref ,values ,hash))
+                                  (aref ,(sb-c::coerce-to-smallest-eltype values) ,hash))
                        ,(if errorp
                             ;; coalescing of simple-vectors in a saved core
                             ;; could eliminate repeated data from the same
