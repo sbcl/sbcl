@@ -1341,7 +1341,8 @@
   (private-constraints     nil :type (or null (array t 1)))
   ;; The FOP handle of the lexical variable represented by LAMBDA-VAR
   ;; in the fopcompiler.
-  (fop-value nil))
+  (fop-value nil)
+  source-form)
 (defprinter (lambda-var :identity t)
   %source-name
   #+sb-show id

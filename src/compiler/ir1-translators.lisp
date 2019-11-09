@@ -1032,7 +1032,9 @@ care."
                                        use-annotations)
                            form)
                           start next result)
-  (let ((value-type (values-specifier-type value-type)))
+  (let ((value-type (if (ctype-p value-type)
+                        value-type
+                        (values-specifier-type value-type))))
     (cond (derive-type-only
            ;; For something where we really know the type and need no mismatch checking,
            ;; e.g. structure accessors
@@ -1080,6 +1082,11 @@ care."
           do (add-annotation
               result
               annotation))))
+
+(def-ir1-translator with-source-form ((source-form form)
+                                      start next result)
+  (let ((*current-path* (ensure-source-path source-form)))
+    (ir1-convert start next result form)))
 
 (def-ir1-translator bound-cast ((array bound index) start next result)
   (let ((check-bound-tran (make-ctran))

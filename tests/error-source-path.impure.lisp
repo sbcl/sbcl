@@ -101,6 +101,23 @@
    (defclass foo () ((x :type string :initform (+ 1 5))))
    (4 0 3)))
 
+(with-test (:name (:source-path :&key :initform))
+  (assert-condition-source-paths
+   (defun foo (&key (x 15))
+     (declare (float x))
+     x)
+   (1 2))
+  (assert-condition-source-paths
+   (defun foo (&key (x /))
+     (declare (float x))
+     x)
+   (1 2))
+  (assert-condition-source-paths
+   (defun foo (&key (x (print 16)))
+     (declare (float x))
+     x)
+   (1 1 2)))
+
 (with-test (:name (:source-path defgeneric :lambda-list))
   (assert-condition-source-paths
    (defgeneric foo (x x))

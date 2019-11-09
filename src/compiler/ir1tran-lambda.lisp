@@ -103,8 +103,9 @@
     (collect ((vars)
               (aux-vars)
               (aux-vals))
-      (flet ((add-var (name)
+      (flet ((add-var (name &optional source-form)
                (let ((var (varify-lambda-arg name)))
+                 (setf (lambda-var-source-form var) source-form)
                  (vars var)
                  var))
              (add-info (var kind &key (default nil defaultp) suppliedp-var key)
@@ -136,7 +137,7 @@
         (dolist (spec keys)
           (multiple-value-bind (keyword name default suppliedp-var defaultp)
               (parse-key-arg-spec spec)
-            (apply #'add-info (add-var name) :keyword
+            (apply #'add-info (add-var name spec) :keyword
                    :suppliedp-var (first suppliedp-var)
                    :key keyword
                    (when defaultp (list :default default)))))
@@ -565,8 +566,14 @@
                   (setq found-allow-p t)
                   (setq clause
                         (append clause `((setq ,n-allowp ,n-value-temp)))))
-
-                (temps `(,n-value ,default))
+                (temps `(,n-value ,(if (and default
+                                            (neq (lambda-var-type key) *universal-type*))
+                                       `(the* (,(lambda-var-type key)
+                                               :use-annotations t
+                                               :source-path ,(get-source-path
+                                                              (lambda-var-source-form key)))
+                                              ,default)
+                                       default)))
                 (tests clause)))
 
             (unless allowp
@@ -685,7 +692,9 @@
              (supplied-p (arg-info-supplied-p info))
              ;; was: (format nil "~A-DEFAULTING-TEMP" (leaf-source-name key))
              (n-val (make-symbol ".DEFAULTING-TEMP."))
-             (val-temp (make-lambda-var :%source-name n-val)))
+             (val-temp (make-lambda-var :%source-name n-val))
+             (default `(with-source-form ,(lambda-var-source-form key)
+                         ,default)))
         (main-vars val-temp)
         (bind-vars key)
         (cond ((or hairy-default supplied-p)
@@ -715,7 +724,7 @@
                    (bind-vars supplied-p)
                    (bind-vals n-supplied))))
               (t
-               (main-vals (arg-info-default info))
+               (main-vals default)
                (bind-vals n-val)))))
 
     (let* ((main-entry (ir1-convert-lambda-body
