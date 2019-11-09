@@ -93,6 +93,14 @@
   (assert-condition-source-paths (declare (1)) (1))
   (assert-condition-source-paths (declare (type integer) (1)) (2)))
 
+(with-test (:name (:source-path defclass :slot :type :initform))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type string :initform 1)))
+   (0 3))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type string :initform (+ 1 5))))
+   (4 0 3)))
+
 (with-test (:name (:source-path defgeneric :lambda-list))
   (assert-condition-source-paths
    (defgeneric foo (x x))
