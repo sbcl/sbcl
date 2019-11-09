@@ -1356,8 +1356,6 @@
                 (inst lea dst (make-ea :dword :base ecx :index ecx))
                 (pseudo-atomic (:elide-if stack-allocate-p)
                                (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-                               ;; Set decrement mode (successive args at lower addresses)
-                               (inst std)
                                ;; Set up the result.
                                (move result dst)
                                ;; Jump into the middle of the loop, 'cause that's where we want
@@ -1370,14 +1368,14 @@
                                (storew dst dst -1 list-pointer-lowtag)
                                (emit-label enter)
                                ;; Grab one value and stash it in the car of this cons.
-                               (inst lods eax)
+                               (inst mov eax (make-ea :dword :base src))
+                               (inst sub src n-word-bytes)
                                (storew eax dst 0 list-pointer-lowtag)
                                ;; Go back for more.
                                (inst sub ecx n-word-bytes)
                                (inst jmp :nz loop)
                                ;; NIL out the last cons.
-                               (storew nil-value dst 1 list-pointer-lowtag)
-                               (inst cld))
+                               (storew nil-value dst 1 list-pointer-lowtag))
                 (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
