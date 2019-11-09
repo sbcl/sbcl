@@ -47,7 +47,7 @@
 
   ;; Save the count, the return address and restore the frame pointer,
   ;; because the loop is going to destroy them.
-  (inst mov edx ecx)
+  (inst push ecx)
   (inst mov eax (make-ea :dword :base ebp-tn
                          :disp (frame-byte-offset return-pc-save-offset)))
   (inst mov ebp-tn (make-ea :dword :base ebp-tn
@@ -56,18 +56,19 @@
   ;; we have to be careful not to clobber values before we've read
   ;; them. Because the stack builds down, we are copying to a larger
   ;; address. Therefore, we need to iterate from larger addresses to
-  ;; smaller addresses. pfw-this says copy ecx words from esi to edi
-  ;; counting down.
-  (inst shr ecx (1- n-lowtag-bits))
-  (inst std)                            ; count down
+  ;; smaller addresses.
   (inst sub esi n-word-bytes)
   (inst lea edi (make-ea :dword :base ebx :disp (- n-word-bytes)))
-  (inst rep)
-  (inst movs :dword)
-  (inst cld)
+  COPY-LOOP
+  (inst mov edx (make-ea :dword :base esi))
+  (inst sub esi n-word-bytes)
+  (inst mov (make-ea :dword :base edi) edx)
+  (inst sub edi n-word-bytes)
+  (inst sub ecx (fixnumize 1))
+  (inst jmp :nz copy-loop)
 
   ;; Restore the count.
-  (inst mov ecx edx)
+  (inst pop ecx)
 
   ;; Set the stack top to the last result.
   (inst lea esp-tn (make-ea :dword :base edi :disp n-word-bytes))
@@ -158,27 +159,31 @@
   (inst jmp :le REGISTER-ARGS)
 
   ;; Save the OLD-FP and RETURN-PC because the blit is going to trash
-  ;; those stack locations. Save the ECX, because the loop is going to
-  ;; trash it.
+  ;; those stack locations. Save ECX and EAX, because the loop is
+  ;; going to trash them.
   (pushw ebp-tn (frame-word-offset ocfp-save-offset))
   (loadw ebx ebp-tn (frame-word-offset return-pc-save-offset))
   (inst push ecx)
+  (inst push eax)
 
   ;; Do the blit. Because we are coping from smaller addresses to
   ;; larger addresses, we have to start at the largest pair and work
   ;; our way down.
-  (inst shr ecx (1- n-lowtag-bits))
-  (inst std)                            ; count down
   (inst lea edi (make-ea :dword :base ebp-tn :disp (frame-byte-offset 0)))
   (inst sub esi (fixnumize 1))
-  (inst rep)
-  (inst movs :dword)
-  (inst cld)
+  COPY-LOOP
+  (inst mov eax (make-ea :dword :base esi))
+  (inst sub esi n-word-bytes)
+  (inst mov (make-ea :dword :base edi) eax)
+  (inst sub edi n-word-bytes)
+  (inst sub ecx (fixnumize 1))
+  (inst jmp :nz copy-loop)
 
   ;; Load the register arguments carefully.
   (loadw edx ebp-tn (frame-word-offset ocfp-save-offset))
 
-  ;; Restore OLD-FP and ECX.
+  ;; Restore OLD-FP, ECX and EAX.
+  (inst pop eax)
   (inst pop ecx)
   ;; Overwrites a1
   (popw ebp-tn (frame-word-offset ocfp-save-offset))
@@ -551,3 +556,61 @@
   (inst pop edx-tn)
   (inst pop eax-tn)
   (inst ret 12)) ; remove 3 stack args
+
+#|
+    Turns out that setting the direction flag not only requires trapping
+    into microcode, but also prevents the processor from using its fast REP
+    MOVS mode, falling back to word-by-word copy instead.
+
+    This patch replaces almost every use of STD + REP MOVS + CLD with a a
+    simple word-wise loop. The one use in default-unknown-values remains for
+    now, because the logic in there is complex enough to require some
+    thinking to untangle.
+
+    An inline loop is faster than STD + REP MOVS + CLD, no matter the number
+    of words to copy, on all microarchitectures I've tested: P6, Pentium M,
+    Core, Ivy Bridge, Haswell and Zen.
+
+    A possible optimization is to use MOVAPS/MOVUPS if available to copy 16
+    bytes at a time, but that requires runtime CPUID checking, as x86
+    doesn't include SSE in its baseline features.
+
+    Testcase for benchmarking (here the tail-call-variable path, the results
+    for the other paths will be similar):
+        (defun sink (&rest x)
+          (declare (ignore x))
+          nil)
+        (defun foo (f x)
+          (declare (optimize speed) (type function f))
+          (apply f x))
+        (let ((list (make-list *SOME-SIZE* :initial-element 5)))
+          (time
+           (dotimes (_ 100000000)
+             (foo #'sink list))))
+
+    Performance counters on Haswell for (defvar *SOME-SIZE* 4), before:
+              4 889,34 msec task-clock:u
+        17 667 385 758      cycles:u
+        11 739 853 382      instructions:u
+         2 363 529 234      branches:u
+             6 884 040      branch-misses:u
+    After:
+              1 420,13 msec task-clock:u
+         5 062 214 204      cycles:u
+        13 953 180 368      instructions:u
+         2 766 006 753      branches:u
+             7 413 325      branch-misses:u
+
+    For (defvar *SOME-SIZE* 15), same hardware, before:
+              6 015,25 msec task-clock:u
+        21 262 810 113      cycles:u
+        20 540 217 689      instructions:u
+         4 563 619 868      branches:u
+             6 911 595      branch-misses:u
+    After:
+              2 632,55 msec task-clock:u
+         9 443 084 906      cycles:u
+        29 353 187 880      instructions:u
+         6 065 994 889      branches:u
+             6 974 505      branch-misses:u
+|#
