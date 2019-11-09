@@ -1083,9 +1083,12 @@ care."
               result
               annotation))))
 
-(def-ir1-translator with-source-form ((source-form form)
+(def-ir1-translator with-source-form (((&key source-form
+                                             source-path) form)
                                       start next result)
-  (let ((*current-path* (ensure-source-path source-form)))
+  (let ((*current-path* (or source-path
+                            (get-source-path source-form)
+                            *current-path*)))
     (ir1-convert start next result form)))
 
 (def-ir1-translator bound-cast ((array bound index) start next result)
@@ -1123,7 +1126,11 @@ care."
       (info :function :macro-function 'the*)
       (lambda (whole env)
         (declare (ignore env))
-        `(the ,(caadr whole) ,@(cddr whole))))
+        `(the ,(caadr whole) ,@(cddr whole)))
+      (info :function :macro-function 'with-source-form)
+      (lambda (whole env)
+        (declare (ignore env))
+                `(progn ,@ (cddr whole))))
 
 ;;;; SETQ
 

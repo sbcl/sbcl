@@ -3212,11 +3212,20 @@ is :ANY, the function name is not checked."
     t))
 
 (defun process-lvar-type-annotation (lvar annotation)
-  (let ((type (lvar-type-annotation-type annotation)))
-    (unless (types-equal-or-intersect (lvar-type lvar) type)
-      (%compile-time-type-error-warn annotation (type-specifier type)
-                                     (type-specifier (lvar-type lvar))
-                                     (lvar-all-sources lvar)))))
+  (let ((type (lvar-type-annotation-type annotation))
+        (uses (lvar-uses lvar)))
+    (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
+           (%compile-time-type-error-warn annotation (type-specifier type)
+                                          (type-specifier (lvar-type lvar))
+                                          (lvar-all-sources lvar)))
+          ((consp uses)
+           (loop for use in uses
+                 for dtype = (node-derived-type use)
+                 unless (values-types-equal-or-intersect dtype type)
+                 do (%compile-time-type-error-warn annotation
+                                                   (type-specifier type)
+                                                   (type-specifier dtype)
+                                                   (list (node-source-form use))))))))
 
 (defun process-annotations (lvar)
   (unless (and (combination-p (lvar-dest lvar))

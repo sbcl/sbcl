@@ -253,6 +253,10 @@
         (with-single-package-locked-error
             (:symbol it "defining ~s as an accessor for ~s structure" name))))))
 
+;;; Since DSDs live a long time for inheritance purposes don't attach
+;;; the source path to them directly.
+(defvar *dsd-source-path*)
+
 ;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
 ;;; This monster has exactly one inline use in the final image,
@@ -299,6 +303,7 @@
                   ;; on the NAME slot, we can be a little more clear.
                   (error "DEFSTRUCT: ~S is not a symbol." name)))
          (dd (make-defstruct-description null-env-p name))
+         (*dsd-source-path* nil)
          ((classoid inherits) (parse-defstruct dd options slot-descriptions))
          (constructor-definitions
           (mapcar (lambda (ctor)
@@ -894,6 +899,8 @@ unless :NAMED is also specified.")))
                          (pack-dsd-bits index read-only safe-p
                                         always-boundp rsd-index)
                          default)))
+      #-sb-xc-host
+      (push (cons dsd (sb-c::ensure-source-path spec)) *dsd-source-path*)
       (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
       dsd)))
 
@@ -1769,85 +1776,105 @@ or they must be declared locally notinline at each call site.~@:>"
     (dd args &aux (creator (ecase (dd-type dd)
                              (structure #'instance-constructor-form)
                              ((list vector) #'typed-constructor-form))))
-  (when (eq args :default)
-    (let ((lambda-list (mapcar (lambda (dsd)
-                                 (let* ((temp (copy-symbol (dsd-name dsd)))
-                                        (keyword (keywordicate temp)))
-                                   `((,keyword ,temp) ,(dsd-default dsd))))
-                               (dd-slots dd))))
-      (return-from structure-ctor-lambda-parts
-        `((&key ,@lambda-list)
+  (flet ((default-value (dsd)
+           (let ((default (dsd-default dsd))
+                 (type (dsd-type dsd))
+                 (source-path (and (boundp '*dsd-source-path*)
+                                   (cdr (assq dsd *dsd-source-path*)))))
+             (cond ((and default
+                         (neq type t))
+                    `(the* (,type :source-path ,source-path
+                                  :use-annotations t)
+                           ,default))
+                   ((and default source-path)
+                    `(sb-c::with-source-form
+                         (:source-path ,source-path)
+                         ,default))
+                   (t
+                    default)))))
+    (when (eq args :default)
+      (let ((lambda-list (mapcar (lambda (dsd)
+                                   (let* ((temp (copy-symbol (dsd-name dsd)))
+                                          (keyword (keywordicate temp)))
+                                     `((,keyword ,temp)
+                                       ,(default-value dsd))))
+                                 (dd-slots dd))))
+        (return-from structure-ctor-lambda-parts
+          `((&key ,@lambda-list)
+            (declare (explicit-check))
+            ,(funcall creator dd
+                      (mapcar (lambda (dsd arg)
+                                (let ((type (dsd-type dsd))
+                                      (var (cadar arg)))
+                                  (if (eq type t)
+                                      var
+                                      `(the* (,type :context
+                                              (:struct ,(dd-name dd) . ,(dsd-name dsd)))
+                                             ,var))))
+                              (dd-slots dd) lambda-list))))))
+    (destructuring-bind (llks &optional req opt rest keys aux) args
+      (collect ((vars (copy-list req))  ; list of bound vars
+                (aux-vars)
+                (skipped-vars))
+        (dolist (binding aux)
+          (let ((name (if (listp binding) (car binding) binding)))
+            (aux-vars name)
+            (unless (typep binding '(cons t cons))
+              (skipped-vars name))))
+        (macrolet ((rewrite (input key parse)
+                     `(mapcar
+                       (lambda (arg)
+                         (multiple-value-bind (,@key var def sup-p) (,parse arg)
+                           (declare (ignore ,@key def))
+                           (rewrite-1 arg var sup-p)))
+                       ,input)))
+          (flet ((rewrite-1 (arg var sup-p-var)
+                   (vars var)
+                   (when sup-p-var (vars (car sup-p-var)))
+                   (let* ((slot (unless (member var (aux-vars) :test #'string=)
+                                  (find var (dd-slots dd)
+                                        :key #'dsd-name :test #'string=)))
+                          (default (and slot (dsd-default slot))))
+                     ;; If VAR initializes a slot and did not have a default in
+                     ;; the lambda list, and DSD-DEFAULT is not NIL,
+                     ;; then change the lambda-list's default for the variable.
+                     ;; Always prefer to insert (CAR ARG) if ARG was a list
+                     ;; so that (:KEY var) syntax is preserved.
+                     (if (and slot (not (typep arg '(cons t cons)))
+                              default)
+                         `(,(if (consp arg) (car arg) var)
+                           ,(default-value slot)
+                           ,@sup-p-var)
+                         arg))))        ; keep it as it was
+            ;; Can we substitute symbols that are not EQ to symbols
+            ;; naming slots, so we don't have to compare by STRING= later?
+            ;; Probably not because other symbols could reference them.
+            (setq opt (rewrite opt () parse-optional-arg-spec))
+            (when rest (vars (car rest)))
+            (setq keys (rewrite keys (key) parse-key-arg-spec))
+            (dolist (arg (aux-vars)) (vars arg))))
+        `(,(sb-c::make-lambda-list
+            llks nil req opt rest keys
+            ;; &AUX vars which do not initialize a slot are not mentioned
+            ;; in the lambda list, though it's not clear what to do if
+            ;; subsequent bindings refer to the deleted ones.
+            ;; And worse, what if it's SETQd - is that even legal?
+            (remove-if (lambda (x) (not (typep x '(cons t cons)))) aux))
           (declare (explicit-check))
-          ,(funcall creator dd
-                    (mapcar (lambda (dsd arg)
-                              (let ((type (dsd-type dsd))
-                                    (var (cadar arg)))
-                                (if (eq type t)
-                                    var
-                                    `(the* (,type :context
-                                                  (:struct ,(dd-name dd) . ,(dsd-name dsd)))
-                                           ,var))))
-                            (dd-slots dd) lambda-list))))))
-  (destructuring-bind (llks &optional req opt rest keys aux) args
-    (collect ((vars (copy-list req)) ; list of bound vars
-              (aux-vars)
-              (skipped-vars))
-      (dolist (binding aux)
-        (let ((name (if (listp binding) (car binding) binding)))
-          (aux-vars name)
-          (unless (typep binding '(cons t cons))
-            (skipped-vars name))))
-      (macrolet ((rewrite (input key parse)
-                   `(mapcar
-                     (lambda (arg)
-                       (multiple-value-bind (,@key var def sup-p) (,parse arg)
-                         (declare (ignore ,@key def))
-                         (rewrite-1 arg var sup-p)))
-                     ,input)))
-        (flet ((rewrite-1 (arg var sup-p-var)
-                 (vars var)
-                 (when sup-p-var (vars (car sup-p-var)))
-                 (let* ((slot (unless (member var (aux-vars) :test #'string=)
-                                (find var (dd-slots dd)
-                                      :key #'dsd-name :test #'string=)))
-                        (default (and slot (dsd-default slot))))
-                   ;; If VAR initializes a slot and did not have a default in
-                   ;; the lambda list, and DSD-DEFAULT is not NIL,
-                   ;; then change the lambda-list's default for the variable.
-                   ;; Always prefer to insert (CAR ARG) if ARG was a list
-                   ;; so that (:KEY var) syntax is preserved.
-                   (if (and slot (not (typep arg '(cons t cons))) default)
-                       `(,(if (consp arg) (car arg) var) ,default ,@sup-p-var)
-                       arg)))) ; keep it as it was
-          ;; Can we substitute symbols that are not EQ to symbols
-          ;; naming slots, so we don't have to compare by STRING= later?
-          ;; Probably not because other symbols could reference them.
-          (setq opt (rewrite opt () parse-optional-arg-spec))
-          (when rest (vars (car rest)))
-          (setq keys (rewrite keys (key) parse-key-arg-spec))
-          (dolist (arg (aux-vars)) (vars arg))))
-      `(,(sb-c::make-lambda-list
-          llks nil req opt rest keys
-          ;; &AUX vars which do not initialize a slot are not mentioned
-          ;; in the lambda list, though it's not clear what to do if
-          ;; subsequent bindings refer to the deleted ones.
-          ;; And worse, what if it's SETQd - is that even legal?
-          (remove-if (lambda (x) (not (typep x '(cons t cons)))) aux))
-        (declare (explicit-check))
-        ,(funcall
-          creator dd
-          (mapcar
-           (lambda (slot &aux (name (dsd-name slot)))
-             (if (find name (skipped-vars) :test #'string=)
-                 ;; CLHS 3.4.6 Boa Lambda Lists
-                 '.do-not-initialize-slot.
-                 (let* ((type (dsd-type slot))
-                        (found (member (dsd-name slot) (vars) :test #'string=))
-                        (initform (if found (car found) (dsd-default slot))))
-                   ;; We can ignore the DD-ELEMENT-TYPE
-                   ;; because the container itself will check.
-                   (if (eq type t) initform `(the ,type ,initform)))))
-           (dd-slots dd)))))))
+          ,(funcall
+            creator dd
+            (mapcar
+             (lambda (slot &aux (name (dsd-name slot)))
+               (if (find name (skipped-vars) :test #'string=)
+                   ;; CLHS 3.4.6 Boa Lambda Lists
+                   '.do-not-initialize-slot.
+                   (let* ((type (dsd-type slot))
+                          (found (member (dsd-name slot) (vars) :test #'string=))
+                          (initform (if found (car found) (dsd-default slot))))
+                     ;; We can ignore the DD-ELEMENT-TYPE
+                     ;; because the container itself will check.
+                     (if (eq type t) initform `(the ,type ,initform)))))
+             (dd-slots dd))))))))
 
 (defun accessor-definitions (dd *pending-defstruct-type*)
   (loop for dsd in (dd-slots dd)

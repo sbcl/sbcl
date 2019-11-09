@@ -7,6 +7,8 @@ changes relative to sbcl-1.5.8:
     ** CASE and ECASE can be optimized into a jump table on the x86[-64]
        backends with arbitrary result forms provided that the clause keys
        are either all fixnums, all characters, or all symbols.
+  * enhancements: more thorough compile type checking of various initforms
+    (defclass, &key, defstruct).
 
 changes in sbcl-1.5.8 relative to sbcl-1.5.7:
   * platform support:

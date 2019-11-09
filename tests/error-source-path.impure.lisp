@@ -118,6 +118,20 @@
      x)
    (1 1 2)))
 
+(with-test (:name (:source-path :defstruct :initform))
+  (assert-condition-source-paths
+   (defstruct f
+     (x (print t) :type fixnum))
+   (2))
+  (assert-condition-source-paths
+   (defstruct f
+     (x 33 :type cons))
+   (2))
+  (assert-condition-source-paths
+   (defstruct f
+     (x mm))
+   (2)))
+
 (with-test (:name (:source-path defgeneric :lambda-list))
   (assert-condition-source-paths
    (defgeneric foo (x x))
