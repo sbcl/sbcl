@@ -441,3 +441,57 @@
                          :wait t)))
     (setf stop t)
     (mapc #'sb-thread:join-thread threads)))
+
+#-win32
+(progn
+  (define-alien-type nil
+      (struct rlimit
+              (cur unsigned-long)
+              (max unsigned-long)))
+
+  (define-alien-routine "getrlimit"
+      int
+    (resource int)
+    (limit (* (struct rlimit))))
+
+  (define-alien-routine "setrlimit"
+      int
+    (resource int)
+    (limit (* (struct rlimit))))
+
+  (defconstant +rlimit-nofile+ 7)
+
+  (defun get-fd-limit ()
+    (with-alien ((resource (struct rlimit)))
+      (unless (zerop (getrlimit +rlimit-nofile+ (alien-sap resource)))
+        (sb-posix:syscall-error 'getrlimit))
+      (values (slot resource 'cur)
+              (slot resource 'max))))
+
+  (defun set-fd-limit (soft hard)
+    (with-alien ((limit (struct rlimit)))
+      (setf (slot  limit 'cur) soft
+            (slot limit 'max) hard)
+      (unless (zerop (setrlimit +rlimit-nofile+ (alien-sap limit)))
+        (sb-posix:syscall-error 'setrlimit))
+      (values soft hard))))
+
+#-win32
+(with-test (:name (run-program :child-fd-leak))
+  (multiple-value-bind (soft hard) (get-fd-limit)
+    (unless (> soft 2)
+      (error "Cannot perform test with a max-fd limit of less than 2."))
+
+    ;; Duplicate stdin at the maximum possible fd.
+    (sb-posix:dup2 0 (1- soft))
+
+    ;; Now lower the max-fd limit so that the (open) duped fd is above
+    ;; the limit.
+    (set-fd-limit (1- soft) hard)
+    (let* ((fd-path (concatenate 'string "/dev/fd/" (princ-to-string (1- soft))))
+           (process (run-program "test" (list "-e" fd-path) :search t)))
+      ;; If RUN-PROGRAM correctly closed all open file descriptors,
+      ;; the stdin dup will not exist, otherwise we have an fd leak.
+      (assert (not (zerop (process-exit-code process)))
+              ()
+              "File descriptor above the max-fd limit from parent not closed in child process."))))
