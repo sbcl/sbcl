@@ -329,7 +329,8 @@
                      (lambda-var-p (ref-leaf node)))
             (let ((type (single-value-type int)))
               (when (and (member-type-p type)
-                         (eql 1 (member-type-size type)))
+                         (eql (member-type-size type) 1)
+                         (not (preserve-single-use-debug-var-p node (ref-leaf node))))
                 (change-ref-leaf node (find-constant
                                        (first (member-type-members type)))))))
           (reoptimize-lvar lvar)))))
