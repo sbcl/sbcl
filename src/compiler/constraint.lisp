@@ -79,13 +79,23 @@
   ;;     of ARRAY or VAR, while Y is either the lambda-var of VAR or a
   ;;     constant.
   (kind nil :type (member typep < > eql
-                          array-in-bounds-p))
+                          array-in-bounds-p
+                          equality))
   ;; The operands to the relation.
   (x nil :type lambda-var)
   (y nil :type constraint-y)
   ;; If true, negates the sense of the constraint, so the relation
   ;; does *not* hold.
   (not-p nil :type boolean))
+
+(defstruct (equality-constraint
+            (:include constraint)
+            (:constructor make-equality-constraint
+                (number operator x y not-p
+                 &aux (kind 'equality))))
+
+  (operator nil :type symbol))
+
 
 ;;; Historically, CMUCL and SBCL have used a sparse set implementation
 ;;; for which most operations are O(n) (see sset.lisp), but at the
@@ -675,6 +685,50 @@
               (values 'array-in-bounds-p array-var index-constant)
               (values 'array-in-bounds-p index-var array-var)))))))
 
+(defun find-equality-constraint (operator x y not-p)
+  (let ((constraints (lambda-var-equality-constraints x)))
+    (when constraints
+      (loop for con across constraints
+            when (and (eq (equality-constraint-operator con) operator)
+                      (eq (constraint-not-p con) not-p)
+                      (eq (constraint-y con) y))
+            return con))))
+
+(defun find-or-create-equality-constraint (operator x y not-p)
+  (or (find-equality-constraint operator x y not-p)
+      (let ((new (make-equality-constraint (length *constraint-universe*)
+                                           operator
+                                           x y not-p)))
+        (vector-push-extend new *constraint-universe* (1+ (length *constraint-universe*)))
+        (flet ((add (var)
+                 (conset-adjoin new (lambda-var-constraints var))
+                 (macrolet ((ensure-vec (place)
+                              `(or ,place
+                                   (setf ,place
+                                         (make-array 8 :adjustable t :fill-pointer 0)))))
+                   (vector-push-extend new (ensure-vec (lambda-var-equality-constraints var)))
+                   (vector-push-extend new (ensure-vec (lambda-var-inheritable-constraints var))))))
+          (add x)
+          (when (lambda-var-p y)
+            (add y)))
+        new)))
+
+(defun add-equality-constraints (operator args constraints consequent-constraints alternative-constraints)
+  (case operator
+    ((eq eql)
+     (when (= (length args) 2)
+       (let* ((x (ok-lvar-lambda-var (first args) constraints))
+              (second (second args))
+              (y (if (constant-lvar-p second)
+                     (find-constant (lvar-value second))
+                     (ok-lvar-lambda-var second constraints))))
+         (when (and x y)
+           ;; TODO: inherit constraints
+           (let ((con (find-or-create-equality-constraint operator x y nil))
+                 (not-con (find-or-create-equality-constraint operator x y t)))
+             (conset-adjoin con consequent-constraints)
+             (conset-adjoin not-con alternative-constraints))))))))
+
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
 (defun add-test-constraints (use if constraints)
@@ -704,6 +758,8 @@
                           (lvar-fun-name
                            (basic-combination-fun use))))
                    (args (basic-combination-args use)))
+               (add-equality-constraints name args
+                                         constraints consequent-constraints alternative-constraints)
                (case name
                  ((%typep %instance-typep)
                   (let ((type (second args)))
@@ -919,6 +975,10 @@
                (other (if (eq x leaf) y x))
                (kind (constraint-kind con)))
           (case kind
+            (equality
+             (unless (eq (ref-constraints ref)
+                         (pushnew con (ref-constraints ref)))
+               (reoptimize-lvar (node-lvar ref))))
             (typep
              (if not-p
                  (if (member-type-p other)
