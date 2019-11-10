@@ -1385,7 +1385,7 @@
                (ea (frame-byte-offset (tn-offset float)) rbp-tn)))
         (descriptor-reg
          (inst mov :dword lo-bits
-               (make-ea-for-object-slot float double-float-value-slot
+               (object-slot-ea float double-float-value-slot
                                         other-pointer-lowtag))))))
 
 

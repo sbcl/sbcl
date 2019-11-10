@@ -2113,9 +2113,7 @@ constant shift greater than word length")))
               (inst and r (constantize mask))))
            (t
             (inst mov r mask)
-            (inst and r (make-ea-for-object-slot x
-                                                 bignum-digits-offset
-                                                 other-pointer-lowtag))))))
+            (inst and r (object-slot-ea x bignum-digits-offset other-pointer-lowtag))))))
 
 ;; Specialised mask-signed-field VOPs.
 (flet ((shift-unshift (reg width)

@@ -294,8 +294,7 @@
         (inst sub temp (+ (ash 2 n-widetag-bits) bignum-widetag))
         (inst jmp :ne nope)
         ;; Compare the second digit to zero (in TEMP).
-        (inst cmp (make-ea-for-object-slot value (1+ bignum-digits-offset)
-                                           other-pointer-lowtag)
+        (inst cmp (object-slot-ea value (1+ bignum-digits-offset) other-pointer-lowtag)
               temp)
         (inst jmp :z yep) ; All zeros, its an (unsigned-byte 64).
         (inst jmp nope)

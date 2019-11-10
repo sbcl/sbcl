@@ -98,7 +98,7 @@
                 (int-avx2-reg 0)
                 (t 0)))
          y simd-pack-256-tag-slot other-pointer-lowtag)
-     (let ((ea (make-ea-for-object-slot
+     (let ((ea (object-slot-ea
                 y simd-pack-256-p0-slot other-pointer-lowtag)))
        (if (float-avx2-p x)
            (inst vmovups ea x)
@@ -111,7 +111,7 @@
   (:results (y :scs (int-avx2-reg double-avx2-reg single-avx2-reg)))
   (:note "pointer to AVX2 coercion")
   (:generator 2
-    (let ((ea (make-ea-for-object-slot x simd-pack-256-p0-slot other-pointer-lowtag)))
+    (let ((ea (object-slot-ea x simd-pack-256-p0-slot other-pointer-lowtag)))
       (if (float-avx2-p y)
           (inst vmovups y ea)
           (inst vmovdqu y ea)))))

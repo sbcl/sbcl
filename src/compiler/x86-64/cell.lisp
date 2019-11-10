@@ -54,11 +54,9 @@
                   (inst push object)))
            (invoke-asm-routine 'call 'code-header-set vop))
           ((equal name '(setf %funcallable-instance-fun))
-           (gen-cell-set (make-ea-for-object-slot object offset lowtag)
-                         value nil vop t))
+           (gen-cell-set (object-slot-ea object offset lowtag) value nil vop t))
           (t
-           (gen-cell-set (make-ea-for-object-slot object offset lowtag)
-                         value nil)))))
+           (gen-cell-set (object-slot-ea object offset lowtag) value nil)))))
 
 ;; INIT-SLOT has to know about the :COMPACT-INSTANCE-HEADER feature.
 (define-vop (init-slot set-slot)
@@ -105,7 +103,7 @@
     (gen-cell-set (cond ((sc-is object immediate)
                          (symbol-slot-ea (tn-value object) symbol-value-slot))
                         (t
-                         (make-ea-for-object-slot object symbol-value-slot
+                         (object-slot-ea object symbol-value-slot
                                                   other-pointer-lowtag)))
                   value nil)))
 
@@ -349,7 +347,7 @@
     (:args (symbol :scs (descriptor-reg)))
     (:conditional :ne)
     (:generator 9
-      (inst cmp :dword (make-ea-for-object-slot
+      (inst cmp :dword (object-slot-ea
                  symbol symbol-value-slot other-pointer-lowtag)
             unbound-marker-widetag))))
 

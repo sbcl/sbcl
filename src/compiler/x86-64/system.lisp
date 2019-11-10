@@ -330,7 +330,7 @@
   (inst lea :dword temp (ea (- list-pointer-lowtag) result))
   (inst test :byte temp lowtag-mask)
   (inst cmov :e result
-        (make-ea-for-object-slot result cons-cdr-slot list-pointer-lowtag)))
+        (object-slot-ea result cons-cdr-slot list-pointer-lowtag)))
 
 (define-vop (symbol-info-vector)
   (:policy :fast-safe)

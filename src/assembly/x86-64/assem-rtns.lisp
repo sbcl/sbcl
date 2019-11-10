@@ -290,7 +290,7 @@
     (inst test catch catch)             ; check for NULL pointer
     (inst jmp :z error))
 
-  (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
+  (inst cmp target (object-slot-ea catch catch-block-tag-slot 0))
   (inst jmp :e EXIT)
 
   (loadw catch catch catch-block-previous-catch-slot)
@@ -329,7 +329,7 @@
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
-        (make-ea-for-object-slot block unwind-block-uwp-slot 0))
+        (object-slot-ea block unwind-block-uwp-slot 0))
   ;; If a match, return to conitext in arg block.
   (inst jmp :e DO-EXIT)
 

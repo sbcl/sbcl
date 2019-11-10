@@ -117,7 +117,7 @@
       (storew (make-fixup 'uwp-seh-handler :assembly-routine)
               uwp unwind-block-seh-frame-handler-slot)
       (inst lea seh-frame
-            (make-ea-for-object-slot uwp
+            (object-slot-ea uwp
                                      unwind-block-next-seh-frame-slot 0))
       (inst mov (make-ea :dword :disp 0) seh-frame :fs))
     (store-tl-symbol-value uwp *current-unwind-protect-block* tls)))

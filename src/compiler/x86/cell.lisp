@@ -223,7 +223,7 @@
   (:args (object :scs (descriptor-reg)))
   (:conditional :ne)
   (:generator 9
-    (inst cmp (make-ea-for-object-slot object symbol-value-slot
+    (inst cmp (object-slot-ea object symbol-value-slot
                                        other-pointer-lowtag)
           unbound-marker-widetag)))
 

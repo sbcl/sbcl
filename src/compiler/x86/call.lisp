@@ -906,10 +906,10 @@
                          '(make-ea :dword :disp
                            (+ nil-value (static-fun-offset fun))))
                         ((t)
-                         '(make-ea-for-object-slot eax fdefn-raw-addr-slot
+                         '(object-slot-ea eax fdefn-raw-addr-slot
                            other-pointer-lowtag))
                         ((nil)
-                         '(make-ea-for-object-slot eax closure-fun-slot
+                         '(object-slot-ea eax closure-fun-slot
                            fun-pointer-lowtag))))
                ,@(ecase return
                    (:fixed

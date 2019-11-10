@@ -372,7 +372,7 @@
 
 ;;; And the float variants.
 
-(defun make-ea-for-float-ref (object index offset element-size
+(defun float-ref-ea (object index offset element-size
                               &key (scale 1) (complex-offset 0))
   (sc-case index
     (immediate
@@ -402,7 +402,7 @@
   (:result-types single-float)
   (:generator 5
    (with-empty-tn@fp-top(value)
-     (inst fld (make-ea-for-float-ref object index offset 4)))))
+     (inst fld (float-ref-ea object index offset 4)))))
 
 (define-vop (data-vector-set-with-offset/simple-array-single-float)
   (:note "inline array store")
@@ -421,14 +421,14 @@
   (:generator 5
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fst (make-ea-for-float-ref object index offset 4))
+           (inst fst (float-ref-ea object index offset 4))
            (unless (zerop (tn-offset result))
              ;; Value is in ST0 but not result.
              (inst fst result)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fst (make-ea-for-float-ref object index offset 4))
+           (inst fst (float-ref-ea object index offset 4))
            (cond ((zerop (tn-offset result))
                   ;; The result is in ST0.
                   (inst fst value))
@@ -453,7 +453,7 @@
   (:result-types double-float)
   (:generator 7
    (with-empty-tn@fp-top(value)
-     (inst fldd (make-ea-for-float-ref object index offset 8 :scale 2)))))
+     (inst fldd (float-ref-ea object index offset 8 :scale 2)))))
 
 (define-vop (data-vector-set-with-offset/simple-array-double-float)
   (:note "inline array store")
@@ -472,14 +472,14 @@
   (:generator 20
     (cond ((zerop (tn-offset value))
            ;; Value is in ST0.
-           (inst fstd (make-ea-for-float-ref object index offset 8 :scale 2))
+           (inst fstd (float-ref-ea object index offset 8 :scale 2))
            (unless (zerop (tn-offset result))
                    ;; Value is in ST0 but not result.
                    (inst fstd result)))
           (t
            ;; Value is not in ST0.
            (inst fxch value)
-           (inst fstd (make-ea-for-float-ref object index offset 8 :scale 2))
+           (inst fstd (float-ref-ea object index offset 8 :scale 2))
            (cond ((zerop (tn-offset result))
                   ;; The result is in ST0.
                   (inst fstd value))
@@ -506,11 +506,11 @@
   (:generator 5
     (let ((real-tn (complex-single-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fld (make-ea-for-float-ref object index offset 8 :scale 2))))
+        (inst fld (float-ref-ea object index offset 8 :scale 2))))
     (let ((imag-tn (complex-single-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
         ;; FIXME
-        (inst fld (make-ea-for-float-ref object index offset 8
+        (inst fld (float-ref-ea object index offset 8
                                          :scale 2 :complex-offset 4))))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-single-float)
@@ -532,14 +532,14 @@
           (result-real (complex-single-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fst (make-ea-for-float-ref object index offset 8 :scale 2))
+             (inst fst (float-ref-ea object index offset 8 :scale 2))
              (unless (zerop (tn-offset result-real))
                ;; Value is in ST0 but not result.
                (inst fst result-real)))
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fst (make-ea-for-float-ref object index offset 8 :scale 2))
+             (inst fst (float-ref-ea object index offset 8 :scale 2))
              (cond ((zerop (tn-offset result-real))
                     ;; The result is in ST0.
                     (inst fst value-real))
@@ -551,7 +551,7 @@
     (let ((value-imag (complex-single-reg-imag-tn value))
           (result-imag (complex-single-reg-imag-tn result)))
       (inst fxch value-imag)
-      (inst fst (make-ea-for-float-ref object index offset 8
+      (inst fst (float-ref-ea object index offset 8
                                        :scale 2 :complex-offset 4))
       (unless (location= value-imag result-imag)
         (inst fst result-imag))
@@ -572,10 +572,10 @@
   (:generator 7
     (let ((real-tn (complex-double-reg-real-tn value)))
       (with-empty-tn@fp-top (real-tn)
-        (inst fldd (make-ea-for-float-ref object index offset 16 :scale 4)))
+        (inst fldd (float-ref-ea object index offset 16 :scale 4)))
     (let ((imag-tn (complex-double-reg-imag-tn value)))
       (with-empty-tn@fp-top (imag-tn)
-        (inst fldd (make-ea-for-float-ref object index offset 16
+        (inst fldd (float-ref-ea object index offset 16
                                           :scale 4 :complex-offset 8)))))))
 
 (define-vop (data-vector-set-with-offset/simple-array-complex-double-float)
@@ -597,7 +597,7 @@
           (result-real (complex-double-reg-real-tn result)))
       (cond ((zerop (tn-offset value-real))
              ;; Value is in ST0.
-             (inst fstd (make-ea-for-float-ref object index offset 16
+             (inst fstd (float-ref-ea object index offset 16
                                                :scale 4))
              (unless (zerop (tn-offset result-real))
                ;; Value is in ST0 but not result.
@@ -605,7 +605,7 @@
             (t
              ;; Value is not in ST0.
              (inst fxch value-real)
-             (inst fstd (make-ea-for-float-ref object index offset 16
+             (inst fstd (float-ref-ea object index offset 16
                                                :scale 4))
              (cond ((zerop (tn-offset result-real))
                     ;; The result is in ST0.
@@ -618,7 +618,7 @@
     (let ((value-imag (complex-double-reg-imag-tn value))
           (result-imag (complex-double-reg-imag-tn result)))
       (inst fxch value-imag)
-      (inst fstd (make-ea-for-float-ref object index offset 16
+      (inst fstd (float-ref-ea object index offset 16
                                         :scale 4 :complex-offset 8))
       (unless (location= value-imag result-imag)
         (inst fstd result-imag))

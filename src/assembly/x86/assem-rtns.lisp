@@ -195,7 +195,7 @@
   (inst push ebx)
 
   ;; And jump into the function.
-  (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag))
+  (inst jmp (object-slot-ea eax closure-fun-slot fun-pointer-lowtag))
 
   ;; All the arguments fit in registers, so load them.
   REGISTER-ARGS
@@ -211,7 +211,7 @@
   (pushw ebp-tn (frame-word-offset return-pc-save-offset))
 
   ;; And away we go.
-  (inst jmp (make-ea-for-object-slot eax closure-fun-slot fun-pointer-lowtag)))
+  (inst jmp (object-slot-ea eax closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine (throw
                           (:return-style :raw))
@@ -240,7 +240,7 @@
     (inst test catch catch)             ; check for NULL pointer
     (inst jmp :z error))
 
-  (inst cmp target (make-ea-for-object-slot catch catch-block-tag-slot 0))
+  (inst cmp target (object-slot-ea catch catch-block-tag-slot 0))
   (inst jmp :e EXIT)
 
   (loadw catch catch catch-block-previous-catch-slot)
@@ -275,7 +275,7 @@
   ;; Does *CURRENT-UNWIND-PROTECT-BLOCK* match the value stored in
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
-        (make-ea-for-object-slot block unwind-block-uwp-slot 0))
+        (object-slot-ea block unwind-block-uwp-slot 0))
   ;; If a match, return to context in arg block.
   (inst jmp :e DO-EXIT)
 
@@ -297,7 +297,7 @@
   ;; be saved on the stack: the block in edx-tn, start in ebx-tn, and
   ;; count in ecx-tn.
 
-  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 
 ;;;; Win32 non-local exit noise
@@ -355,7 +355,7 @@
 
   ;; Nlx-entry expects the arg start in ebx-tn and the arg count
   ;; in ecx-tn.  Fortunately, that's where they are already.
-  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 ;;;; Win32 UWP block SEH interface.
 
@@ -438,7 +438,7 @@
   (inst xor ecx-tn ecx-tn)
   (inst mov ebx-tn ebp-tn)
   (loadw ebp-tn block unwind-block-cfp-slot)
-  (inst jmp (make-ea-for-object-slot block unwind-block-entry-pc-slot 0)))
+  (inst jmp (object-slot-ea block unwind-block-entry-pc-slot 0)))
 
 #+win32
 (define-assembly-routine (continue-unwind

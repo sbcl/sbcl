@@ -79,8 +79,7 @@
   (:variant-vars offset lowtag)
   (:policy :fast-safe)
   (:generator 4
-    (gen-cell-set (make-ea-for-object-slot object offset lowtag)
-                  value nil)))
+    (gen-cell-set (object-slot-ea object offset lowtag) value nil)))
 
 ;;; X86 special
 (define-vop (cell-xadd)
@@ -92,7 +91,7 @@
   (:policy :fast-safe)
   (:generator 4
     (move result value)
-    (inst xadd (make-ea-for-object-slot object offset lowtag) result :lock)))
+    (inst xadd (object-slot-ea object offset lowtag) result :lock)))
 
 (define-vop (cell-xsub cell-xadd)
   (:args (object)
@@ -108,7 +107,7 @@
      (t
       (move result value)
       (inst neg result)))
-    (inst xadd (make-ea-for-object-slot object offset lowtag) result :lock)))
+    (inst xadd (object-slot-ea object offset lowtag) result :lock)))
 
 (define-vop (atomic-inc-symbol-global-value cell-xadd)
   (:translate %atomic-inc-symbol-global-value)
@@ -169,7 +168,7 @@
                                 (inst sub newval delta))
                         `(inst lea newval (ea rax delta))))
                (inst cmpxchg
-                     (make-ea-for-object-slot cell ,slot list-pointer-lowtag)
+                     (object-slot-ea cell ,slot list-pointer-lowtag)
                      newval :lock)
                (inst jmp :ne retry)
                (inst mov result rax)))))))

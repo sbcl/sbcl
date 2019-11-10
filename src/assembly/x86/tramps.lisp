@@ -19,10 +19,10 @@
     (closure-tramp (:return-style :none))
     ()
   (loadw eax-tn eax-tn fdefn-fun-slot other-pointer-lowtag)
-  (inst jmp (make-ea-for-object-slot eax-tn closure-fun-slot fun-pointer-lowtag)))
+  (inst jmp (object-slot-ea eax-tn closure-fun-slot fun-pointer-lowtag)))
 
 (define-assembly-routine
     (funcallable-instance-tramp (:return-style :none))
     ()
   (loadw eax-tn eax-tn funcallable-instance-function-slot fun-pointer-lowtag)
-  (inst jmp (make-ea-for-object-slot eax-tn closure-fun-slot fun-pointer-lowtag)))
+  (inst jmp (object-slot-ea eax-tn closure-fun-slot fun-pointer-lowtag)))

@@ -49,28 +49,28 @@
   ;; 16 byte alignment.
   `(inst and ,tn -16))
 
-(defmacro make-ea-for-object-slot (ptr slot lowtag &optional (size :dword))
+(defmacro object-slot-ea (ptr slot lowtag &optional (size :dword))
   `(make-ea ,size :base ,ptr :disp (- (* ,slot n-word-bytes) ,lowtag)))
 
 (defmacro loadw (value ptr &optional (slot 0) (lowtag 0))
-  `(inst mov ,value (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+  `(inst mov ,value (object-slot-ea ,ptr ,slot ,lowtag)))
 
 (defmacro storew (value ptr &optional (slot 0) (lowtag 0))
   (once-only ((value value))
-    `(inst mov (make-ea-for-object-slot ,ptr ,slot ,lowtag) ,value)))
+    `(inst mov (object-slot-ea ,ptr ,slot ,lowtag) ,value)))
 
 ;;; A handy utility for storing widetags.
 (defun store-widetag (value ptr &optional (slot 0) (lowtag 0))
-  (inst mov (make-ea-for-object-slot
+  (inst mov (object-slot-ea
              ptr slot lowtag
              (if (typep value '(and integer (not (unsigned-byte 8)))) :word :byte))
         value))
 
 (defmacro pushw (ptr &optional (slot 0) (lowtag 0))
-  `(inst push (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+  `(inst push (object-slot-ea ,ptr ,slot ,lowtag)))
 
 (defmacro popw (ptr &optional (slot 0) (lowtag 0))
-  `(inst pop (make-ea-for-object-slot ,ptr ,slot ,lowtag)))
+  `(inst pop (object-slot-ea ,ptr ,slot ,lowtag)))
 
 (defmacro make-ea-for-vector-data (object &key (size :dword) (offset 0)
                                    index (scale (ash (width-bits size) -3)))
@@ -101,8 +101,7 @@
 #+sb-thread
 (progn
 (defmacro tls-index-of (symbol)
-  `(make-ea-for-object-slot ,symbol ,sb-vm:symbol-tls-index-slot
-                            ,other-pointer-lowtag))
+  `(object-slot-ea ,symbol ,sb-vm:symbol-tls-index-slot ,other-pointer-lowtag))
 (defmacro make-ea-for-symbol-tls-index (symbol)
   (declare (type symbol symbol))
   `(make-ea :dword

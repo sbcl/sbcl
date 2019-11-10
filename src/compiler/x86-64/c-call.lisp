@@ -338,7 +338,7 @@
   #+win32 (inst add rsp-tn #x20)       ;MS_ABI: remove shadow space
   #+sb-safepoint
   ;; Zero the saved CSP
-  (inst xor (make-ea-for-object-slot thread-base-tn thread-saved-csp-offset 0)
+  (inst xor (object-slot-ea thread-base-tn thread-saved-csp-offset 0)
         rsp-tn))
 
 (define-vop (alloc-number-stack-space)

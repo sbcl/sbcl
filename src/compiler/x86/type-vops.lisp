@@ -215,7 +215,7 @@
                                 :disp (- other-pointer-lowtag)))
       (inst test al-tn lowtag-mask)
       (inst jmp :ne nope)
-      (inst cmp (make-ea-for-object-slot value 0 other-pointer-lowtag)
+      (inst cmp (object-slot-ea value 0 other-pointer-lowtag)
             (+ (ash 1 n-widetag-bits) bignum-widetag))
       (inst jmp (if not-p :ne :e) target))
     NOT-TARGET))
@@ -253,7 +253,7 @@
         (inst sub eax-tn (+ (ash 2 n-widetag-bits) bignum-widetag))
         (inst jmp :ne nope)
         ;; Compare the second digit to zero (in EAX).
-        (inst cmp (make-ea-for-object-slot value (1+ bignum-digits-offset)
+        (inst cmp (object-slot-ea value (1+ bignum-digits-offset)
                                            other-pointer-lowtag) eax-tn)
         (inst jmp :z yep) ; All zeros, its an (unsigned-byte 32).
         (inst jmp nope)

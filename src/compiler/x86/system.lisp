@@ -235,7 +235,7 @@
     (inst lea eax (make-ea :dword :base res :disp (- list-pointer-lowtag)))
     (emit-optimized-test-inst eax lowtag-mask)
     (inst cmov :e res
-          (make-ea-for-object-slot res cons-cdr-slot list-pointer-lowtag))))
+          (object-slot-ea res cons-cdr-slot list-pointer-lowtag))))
 (define-vop (symbol-plist)
   (:policy :fast-safe)
   (:translate symbol-plist)
