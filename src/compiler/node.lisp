@@ -1340,7 +1340,7 @@
   (inheritable-constraints nil :type (or null (array t 1)))
   (private-constraints     nil :type (or null (array t 1)))
   (equality-constraints    nil :type (or null (array t 1)))
-  
+
   ;; The FOP handle of the lexical variable represented by LAMBDA-VAR
   ;; in the fopcompiler.
   (fop-value nil)

@@ -145,18 +145,31 @@
             (sb-cold::exit-process 1))))
       (values))))
 
-;;; Actually compile
-(let ((sb-xc:*compile-print* nil))
-  (if (make-host-2-parallelism)
-      (funcall 'parallel-make-host-2 (make-host-2-parallelism))
-      (let ((total
-             (count-if (lambda (x) (not (find :not-target (cdr x))))
-                       (get-stems-and-flags 2)))
-            (n 0)
-            (sb-xc:*compile-verbose* nil))
-        (with-math-journal
-         (do-stems-and-flags (stem flags 2)
-           (unless (position :not-target flags)
-             (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))
-             (target-compile-stem stem flags)
-             (terpri)))))))
+;;; See whether we're in individual file mode
+(cond
+  ((boundp 'cl-user::*compile-files*)
+   (let ((files
+          (mapcar (lambda (x) (concatenate 'string "src/" x))
+                  (symbol-value 'cl-user::*compile-files*))))
+     (with-compilation-unit ()
+       (do-stems-and-flags (stem flags 2)
+         (unless (position :not-target flags)
+           (let* ((*compile-for-effect-only* (not (member stem files :test #'string=)))
+                  (sb-xc:*compile-print* (not sb-xc:*compile-print*)))
+             (target-compile-stem stem flags)))))))
+  (t
+   ;; Actually compile
+   (let ((sb-xc:*compile-print* nil))
+     (if (make-host-2-parallelism)
+         (funcall 'parallel-make-host-2 (make-host-2-parallelism))
+         (let ((total
+                (count-if (lambda (x) (not (find :not-target (cdr x))))
+                          (get-stems-and-flags 2)))
+               (n 0)
+               (sb-xc:*compile-verbose* nil))
+           (with-math-journal
+            (do-stems-and-flags (stem flags 2)
+              (unless (position :not-target flags)
+                (format t "~&[~D/~D] ~A" (incf n) total (stem-remap-target stem))
+                (target-compile-stem stem flags)
+                (terpri)))))))))

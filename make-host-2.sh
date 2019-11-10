@@ -47,6 +47,14 @@ rm -f output/after-xc.core
 # the only disadvantage seems to be the extra time required to reload
 # the fasl files into the new host Lisp, and that doesn't seem to be
 # an enormously important disadvantage, either.)
+if [ $# -gt 0 ]
+then
+    files=\'\(\"$1\"\) # FIXME: create string-quoted list of each arg individually
+    echo //compiling $files
+    echo '(defvar *compile-files* '${files}')(load "make-host-2.lisp")' | $SBCL_XC_HOST
+    exit
+fi
+
 echo //running cross-compiler to create target object files
 echo '(load "loader.lisp") (load-sbcl-file "make-host-2.lisp")' | $SBCL_XC_HOST
 
