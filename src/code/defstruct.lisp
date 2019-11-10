@@ -535,6 +535,7 @@
 
 ;;; Parse a single DEFSTRUCT option and store the results in DD.
 (defun parse-1-dd-option (option dd seen-options)
+  (declare (type (unsigned-byte #.(length +dd-option-names+)) seen-options))
   (let* ((keyword (first option))
          (bit (position keyword +dd-option-names+))
          (args (rest option))
@@ -625,6 +626,7 @@ requires exactly~;accepts at most~] one argument" keyword syntax-group)
 (defun parse-defstruct-options (options dd)
   (let ((seen-options 0)
         (named-p nil))
+    (declare (type (unsigned-byte #.(length +dd-option-names+)) seen-options))
     (dolist (option options)
       (if (eq option :named)
           (setf named-p t (dd-named dd) t)
@@ -693,9 +695,13 @@ unless :NAMED is also specified.")))
                                   `((,(symbolicate "MAKE-" name) . :default))))
                             (boa-ctors))))))
 
-      (flet ((option-present-p (bit-name)
-               (logbitp (position bit-name +dd-option-names+) seen-options)))
-        (declare (inline option-present-p))
+      ;; POSITION is constant-foldable, but folding happens _after_ transforming to
+      ;; a CASE expression which is surprising. CASE could invoke either POINTERP
+      ;; or NON-NULL-SYMBOL-P would would need to be emulated in the cross-compiler.
+      ;; That's easy to do, but it's even easier to reduce to a constant via macro
+      ;; as it doesn't require the extra support functions.
+      (macrolet ((option-present-p (bit-name)
+                   `(logbitp ,(position bit-name +dd-option-names+) seen-options)))
         (when (and (not (option-present-p :predicate))
                    (or (dd-class-p dd) named-p))
           (setf (dd-predicate-name dd) (symbolicate name "-P")))

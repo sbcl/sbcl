@@ -1240,6 +1240,7 @@ possibly temporarily, because it might be used internally."
                "%HASH-TABLE-ALIST"
                "HASH-TABLE-EQUALP"
                "READ-EVALUATED-FORM" "READ-EVALUATED-FORM-OF-TYPE"
+               "PICK-BEST-SYMBOL-HASH-BITS"
 
                "MAKE-UNPRINTABLE-OBJECT"
                "POSSIBLY-BASE-STRINGIZE"

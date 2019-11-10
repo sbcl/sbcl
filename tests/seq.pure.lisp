@@ -464,3 +464,16 @@
               (count 1 x)))))
     (ctu:assert-no-consing (funcall f #(1 2 3 4)))
     (ctu:assert-no-consing (funcall f '(1 2 3 4)))))
+
+(with-test (:name :hash-based-position)
+  (let* ((items '(a b c d d d h e f b g b))
+         (f (checked-compile
+             `(lambda (x) (position x ',items))))
+         (g (checked-compile
+             `(lambda (x) (position x ',items :from-end t)))))
+    (dolist (x items)
+      ;; opaque-identify prevents optimizing the POSITION call
+      (assert (= (funcall f x) (position x (opaque-identity items))))
+      (assert (= (funcall g x) (position x (opaque-identity items) :from-end t))))
+    (assert (not (funcall f 'blah)))
+    (assert (not (funcall g 'blah)))))

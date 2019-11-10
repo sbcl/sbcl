@@ -2166,32 +2166,61 @@
                                               ,test-form))))))
   (define-find-position find 0)
   (define-find-position position 1
-   ((let ((max-inline 10))
-      ;; Destructive modification of constants is illegal.
-      ;; Therefore if this sequence would have been output as a code header
-      ;; constant, its contents can't change. We don't need to reference
-      ;; the sequence itself to compare elements.
-      ;; Later transforms will change EQL to EQ if appropriate.
-      (when (and const-seq
-                 (member effective-test '(eql eq))
-                 (not start) (not end) (not key)
-                 (or (not from-end) (constant-lvar-p from-end))
-                 (cond ((listp const-seq)
-                        (not (nthcdr max-inline const-seq)))
-                       ((vectorp const-seq)
-                        (<= (length const-seq) max-inline))))
-        (let ((clauses (loop for x in (coerce const-seq 'list)
-                             for i from 0
-                             collect `((,effective-test item ',x) ,i))))
-          ;; It seems silly to use :from-end and a constant list
-          ;; in a way where it actually matters (duplicate elements),
-          ;; but we either have to do it right or not do it.
-          (when (and from-end (lvar-value from-end))
-            (setq clauses (nreverse clauses)))
-          (return-from position
-                       `(lambda (item sequence &rest junk)
-                          (declare (ignore sequence junk))
-                          (cond ,@clauses)))))))))
+    ;; Destructive modification of constants is illegal.
+    ;; Therefore if this sequence would have been output as a code header
+    ;; constant, its contents can't change. We don't need to reference
+    ;; the sequence itself to compare elements.
+    ;; There are two transforms to try in this situation:
+    ;; 1) Use CASE if the sequence contains only perfectly-hashed symbols.
+    ;;    There is no upper limit on the sequence length- as it increases,
+    ;;    so does the bias against using a series of IFs.  In fact, CASE
+    ;;    might even consider the constant-returning mode to allow
+    ;;    some hash colllisions, which it doesn't currently.
+    ;; 2) Otherwise, use COND, not to exceed some length limit.
+   ((when (and const-seq
+               (member effective-test '(eql eq))
+               (not start) (not end) (not key)
+               (or (not from-end) (constant-lvar-p from-end)))
+      (let ((items (coerce const-seq 'list))
+            ;; It seems silly to use :from-end and a constant list
+            ;; in a way where it actually matters (with repeated elements),
+            ;; but we either have to do it right or not do it.
+            (reversedp (and from-end (lvar-value from-end))))
+        (when (every #'symbolp items)
+          ;; PICK-BEST will stupidly hash dups and call that a collision.
+          (when (= (pick-best-symbol-hash-bits (remove-duplicates items) 'sxhash) 1)
+            ;; Construct a map from symbol to position so that correct results
+            ;; are obtained for :from-end, and/or with duplicates present.
+            ;; Precomputing it is easier than trying to roll the logic into the
+            ;; production of the result form. :TEST can be ignored.
+            (let ((map (loop for x in items for i from 0
+                             collect (cons x i)))
+                  (clauses)
+                  (seen))
+              (dolist (x (if reversedp (reverse map) map))
+                (let ((sym (car x)))
+                  (unless (member sym seen)
+                    ;; NIL and T need wrapping in () since they should not signify
+                    ;; an empty list of keys or the "otherwise" case respectively.
+                    (push (list (if (member sym '(nil t)) (list sym) sym) (cdr x))
+                          clauses)
+                    (push sym seen))))
+              ;; CASE could decide not to use hash-based lookup, as there is a
+              ;; minimum item count cutoff, but that's ok, the code is good either way.
+              (return-from position
+                `(lambda (item sequence &rest rest)
+                   (declare (ignore sequence rest))
+                   (case item ,@(nreverse clauses)))))))
+        (unless (nthcdr 10 items)
+          (let ((clauses (loop for x in items for i from 0
+                               ;; Later transforms will change EQL to EQ if appropriate.
+                               collect `((,effective-test item ',x) ,i))))
+            ;; FIXME: dups cause more than one test on the same key because IR1
+            ;; doesn't propagate information about which IFs can't possibly match.
+            (return-from position
+              `(lambda (item sequence &rest rest)
+                 (declare (ignore sequence rest))
+                 (cond ,@(if reversedp (nreverse clauses) clauses)))))))))))
 
 (macrolet ((define-find-position-if (fun-name values-index)
              `(deftransform ,fun-name ((predicate sequence &key

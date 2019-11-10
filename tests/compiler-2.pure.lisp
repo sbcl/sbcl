@@ -32,8 +32,10 @@
   (checked-compile '(lambda (x)
                       (ash 1 (position x #(a b c ))))
                    :allow-style-warnings t)
+  ;; The sequence must contain a mixture of symbols and non-symbols
+  ;; to call %FIND-POSITION. If only symbols, it makes no calls.
   (let ((f (checked-compile '(lambda (x)
-                              (position x '(a b c d e f g h i j k l m))))))
+                              (position x '(1 2 3 a b c 4 5 6 d e f g))))))
     ;; test should be EQ, not EQL
     (assert (or (find (symbol-function 'eq)
                       (ctu:find-code-constants f :type 'sb-kernel:simple-fun))
