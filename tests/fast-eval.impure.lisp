@@ -187,7 +187,7 @@
   (defun no-vals () (values))
 
   (handler-case (let ((x (the integer (no-vals)))) x)
-    (simple-error ())
+    (type-error ())
     (:no-error () (error "Should have gotten an ERROR")))
 
   (defmacro nice-macro (a b)

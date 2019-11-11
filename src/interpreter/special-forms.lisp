@@ -285,9 +285,7 @@
        ;; Unlike ENFORCE-TYPE, this returns all VALUES though only one
        ;; was expected. This should not cons except on error.
        (enforce-single-type (type &rest values)
-         (cond ((null values)
-                (values))
-               ((itypep (first values) type)
+         (cond ((itypep (first values) type)
                 (apply #'values values))
                (t
                 (error 'type-error
