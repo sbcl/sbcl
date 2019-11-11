@@ -48,10 +48,12 @@
                    :value-tn-ref value-tn-ref)))
 
 (defun %test-immediate (value temp target not-p immediate)
-  (assemble ()
-    (inst and temp value widetag-mask)
-    (inst cmp temp immediate)
-    (inst b (if not-p :ne :eq) target)))
+  (cond ((= immediate unbound-marker-widetag)
+         (inst cmp value immediate))
+        (t
+         (inst and temp value widetag-mask)
+         (inst cmp temp immediate)))
+  (inst b (if not-p :ne :eq) target))
 
 (defun %test-lowtag (value temp target not-p lowtag)
   (assemble ()
