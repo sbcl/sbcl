@@ -2133,6 +2133,10 @@
                                              from-end (start 0) end
                                              key test test-not)
                                        (t (or list vector) &rest t))
+                (when (and (constant-lvar-p sequence)
+                           (zerop (length (lvar-value sequence))))
+                  (return-from ,fun-name
+                    '(lambda (&rest args) (declare (ignore args)) nil)))
                 (let ((effective-test
                        (unless test-not
                          (if test (lvar-fun-name* test) 'eql)))

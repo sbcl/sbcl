@@ -1288,4 +1288,7 @@
   (checked-compile '(lambda (l) (some #'opaque-id-again l)))
   (assert (= *macro-invocations* 2)))
 
+(with-test (:name :position-empty-seq)
+  (assert (not (funcall (checked-compile '(lambda (x) (position x #()))) 1))))
+
 ;;; success
