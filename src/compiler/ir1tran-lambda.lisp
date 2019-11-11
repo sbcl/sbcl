@@ -523,7 +523,6 @@
               (n-value-temp (sb-xc:gensym "N-VALUE-TEMP-"))
               (n-allowp (sb-xc:gensym "N-ALLOWP-"))
               (n-lose (sb-xc:gensym "N-LOSE-"))
-              (n-losep (sb-xc:gensym "N-LOSEP-"))
               (allowp (or (optional-dispatch-allowp res)
                           (policy *lexenv* (zerop safety))))
               (found-allow-p nil))
@@ -578,14 +577,12 @@
 
             (unless allowp
               (temps n-allowp
-                     (list n-lose 0)
-                     (list n-losep 0))
+                     (list n-lose '(make-unbound-marker)))
               (unless found-allow-p
                 (tests `((eq ,n-key :allow-other-keys)
                          (setq ,n-allowp ,n-value-temp))))
               (tests `(t
-                       (setq ,n-lose ,n-key
-                             ,n-losep 1))))
+                       (setq ,n-lose ,n-key))))
 
             (body
              `(when (oddp ,n-count)
@@ -614,7 +611,8 @@
 
             (unless allowp
               (let ((location (make-restart-location)))
-                (body `(if (and (/= ,n-losep 0) (not ,n-allowp))
+                (body `(if (and (not (unbound-marker-p ,n-lose))
+                                (not ,n-allowp))
                            (%unknown-key-arg-error ,n-lose ,location)
                            (restart-point ,location))))))))
 
