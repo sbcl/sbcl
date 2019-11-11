@@ -785,29 +785,37 @@ symbol-case giving up: case=((V U) (F))
                                       ',expected-type ',keys)))
                          (go ,again))))))))))
 
-  ;; Bypass all TYPEP handling if every clause of [E]TYPECASE is a MEMBER type.
-  ;; More importantly, try to use the fancy expansion for symbols as keys.
-  (let ((default (if (eq (caar clauses) 't) (car clauses)))
-        (implement-as name)
-        (new-clauses))
-  (when (member name '(typecase etypecase))
-    (dolist (clause (reverse (if default (cdr clauses) clauses))
-                    (setq clauses (if default (cons default new-clauses) new-clauses)
-                          implement-as 'case))
-      ;; clause is ((TYPEP #:x (QUOTE <sometype>)) NIL forms*)
-      (destructuring-bind ((typep thing type-expr) . consequent) clause
-        (declare (ignore thing))
-        (unless (and (typep type-expr '(cons (eql quote) (cons t null)))
-                     (eq typep 'typep))
-          (bug "TYPECASE expander glitch"))
-        (let* ((spec (second type-expr))
-               (keys (case (if (listp spec) (car spec))
-                       (eql (when (singleton-p (cdr spec)) (list (cadr spec))))
-                       (member (when (proper-list-p (cdr spec)) (cdr spec))))))
-          (unless keys (return))
-          (push (cons `(or ,@(mapcar (lambda (x) `(eql ,keyform-value ',x)) keys))
-                      consequent)
-                new-clauses)))))
+  (let ((implement-as name)
+        (original-keys keys))
+    (when (member name '(typecase etypecase))
+      ;; Bypass all TYPEP handling if every clause of [E]TYPECASE is a MEMBER type.
+      ;; More importantly, try to use the fancy expansion for symbols as keys.
+      (let ((default (if (eq (caar clauses) 't) (car clauses)))
+            (new-clauses))
+        (collect ((new-keys))
+          (dolist (clause (reverse (if default (cdr clauses) clauses))
+                          (setq clauses (if default (cons default new-clauses) new-clauses)
+                                keys (new-keys)
+                                implement-as 'case))
+            ;; clause is ((TYPEP #:x (QUOTE <sometype>)) NIL forms*)
+            (destructuring-bind ((typep thing type-expr) . consequent) clause
+              (declare (ignore thing))
+              (unless (and (typep type-expr '(cons (eql quote) (cons t null)))
+                           (eq typep 'typep))
+                (bug "TYPECASE expander glitch"))
+              (let* ((spec (second type-expr))
+                     (clause-keys
+                      (case (if (listp spec) (car spec))
+                        (eql (when (singleton-p (cdr spec)) (list (cadr spec))))
+                        (member (when (proper-list-p (cdr spec)) (cdr spec))))))
+                (unless clause-keys (return))
+                (dolist (key clause-keys)
+                  (unless (member key (new-keys))
+                    (new-keys key)))
+                (push (cons `(or ,@(mapcar (lambda (x) `(eql ,keyform-value ',x))
+                                           clause-keys))
+                            consequent)
+                      new-clauses)))))))
 
     ;; Efficiently expanding CASE over symbols depends on CASE over integers being
     ;; translated as a jump table. If it's not - as on most backends - then we use
@@ -825,7 +833,7 @@ symbol-case giving up: case=((V U) (F))
                  `((t (,(ecase name
                           (etypecase 'etypecase-failure)
                           (ecase 'ecase-failure))
-                       ,keyform-value ',keys))))))))
+                       ,keyform-value ',original-keys))))))))
 
 (sb-xc:defmacro case (keyform &body cases)
   "CASE Keyform {({(Key*) | Key} Form*)}*

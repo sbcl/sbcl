@@ -324,26 +324,26 @@
 (defun contains (item tree)
   (contains-if (lambda (node) (eq node item)) tree))
 
+(defun uses-symbol-hash-p (tree)
+  (contains-if (lambda (x)
+                 (and (symbolp x)
+                      (or (string= x "SYMBOL-HASH")
+                          (string= x "SYMBOL-HASH*"))))
+               tree))
+
 (with-test (:name :symbol-case-conservatively-fail)
-  (flet ((uses-symbol-hash-p (tree)
-           (contains-if (lambda (x)
-                          (and (symbolp x)
-                               (or (string= x "SYMBOL-HASH")
-                                   (string= x "SYMBOL-HASH*"))))
-                        tree)))
-    (assert (not (uses-symbol-hash-p
-                  (handler-bind ((style-warning #'muffle-warning))
-                    (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2) (a 3)))))))
-    (assert (uses-symbol-hash-p
-             (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2)))))))
+  (assert (not (uses-symbol-hash-p
+                (handler-bind ((style-warning #'muffle-warning))
+                  (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2) (a 3)))))))
+  (assert (uses-symbol-hash-p
+           (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2))))))
 
 (with-test (:name :typecase-to-case)
   (let ((expansion
          (macroexpand-1 '(typecase x
-                          ((eql a) (f1))
-                          ((member b c d e) (f2))))))
-    (assert (contains 'eql expansion))
-    (assert (not (contains 'typep expansion)))))
+                          ((member a b c) 1)
+                          ((member d e f) 2)))))
+    (assert (uses-symbol-hash-p expansion))))
 
 (with-test (:name :symbol-case-default-form)
   (let ((f (checked-compile
