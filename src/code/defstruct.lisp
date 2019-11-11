@@ -1790,6 +1790,7 @@ or they must be declared locally notinline at each call site.~@:>"
              (cond ((and default
                          (neq type t))
                     `(the* (,type :source-path ,source-path
+                                  :context :initform
                                   :use-annotations t)
                            ,default))
                    ((and default source-path)

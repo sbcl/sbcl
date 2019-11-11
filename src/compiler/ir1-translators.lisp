@@ -1058,10 +1058,12 @@ care."
           (use-annotations
            (ir1-convert start next result form)
            (when result
-             (add-annotation result (make-lvar-type-annotation :type value-type
-                                                               :source-path
-                                                               (or source-path
-                                                                   *current-path*)))))
+             (add-annotation result
+                             (make-lvar-type-annotation :type value-type
+                                                        :source-path
+                                                        (or source-path
+                                                            *current-path*)
+                                                        :context context))))
           (t
            (let* ((policy (lexenv-policy *lexenv*))
                   (*current-path* (or source-path
