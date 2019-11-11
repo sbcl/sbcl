@@ -155,7 +155,7 @@
        (do-stems-and-flags (stem flags 2)
          (unless (position :not-target flags)
            (let* ((*compile-for-effect-only* (not (member stem files :test #'string=)))
-                  (sb-xc:*compile-print* (not sb-xc:*compile-print*)))
+                  (sb-xc:*compile-print* (not *compile-for-effect-only*)))
              (target-compile-stem stem flags)))))))
   (t
    ;; Actually compile
