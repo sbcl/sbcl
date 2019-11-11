@@ -311,23 +311,39 @@
             :allow-style-warnings t)))
     (assert (eql (funcall f 'b) 2))))
 
+(defun contains-if (predicate tree)
+  (let (seen)
+    (nsubst-if nil
+               (lambda (x)
+                 (when (funcall predicate x)
+                   (setq seen t))
+                 nil)
+               tree)
+    seen))
+
+(defun contains (item tree)
+  (contains-if (lambda (node) (eq node item)) tree))
+
 (with-test (:name :symbol-case-conservatively-fail)
   (flet ((uses-symbol-hash-p (tree)
-           (let (seen)
-             (nsubst-if nil
-                        (lambda (x)
-                          (when (and (symbolp x)
-                                     (or (string= x "SYMBOL-HASH")
-                                         (string= x "SYMBOL-HASH*")))
-                            (setq seen t))
-                          nil)
-                        tree)
-             seen)))
+           (contains-if (lambda (x)
+                          (and (symbolp x)
+                               (or (string= x "SYMBOL-HASH")
+                                   (string= x "SYMBOL-HASH*"))))
+                        tree)))
     (assert (not (uses-symbol-hash-p
                   (handler-bind ((style-warning #'muffle-warning))
                     (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2) (a 3)))))))
     (assert (uses-symbol-hash-p
              (macroexpand-1 '(case x ((a b c) 1) ((e d f) 2)))))))
+
+(with-test (:name :typecase-to-case)
+  (let ((expansion
+         (macroexpand-1 '(typecase x
+                          ((eql a) (f1))
+                          ((member b c d e) (f2))))))
+    (assert (contains 'eql expansion))
+    (assert (not (contains 'typep expansion)))))
 
 (with-test (:name :symbol-case-default-form)
   (let ((f (checked-compile

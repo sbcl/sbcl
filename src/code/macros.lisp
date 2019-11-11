@@ -785,23 +785,47 @@ symbol-case giving up: case=((V U) (F))
                                       ',expected-type ',keys)))
                          (go ,again))))))))))
 
-  ;; Efficiently expanding CASE over symbols depends on CASE over integers being
-  ;; translated as a jump table. If it's not - as on most backends - then we use
-  ;; the customary expansion as a series of IF tests.
-  ;; Production code rarely uses CCASE, and the expansion differs such that
-  ;; it doesn't seem worth the effort to handle it as a jump table.
-  (when (and (member name '(case ecase)) (every #'symbolp keys))
-    (awhen (expand-symbol-case keyform clauses keys errorp 'sxhash)
-      (return-from case-body-aux it)))
+  ;; Bypass all TYPEP handling if every clause of [E]TYPECASE is a MEMBER type.
+  ;; More importantly, try to use the fancy expansion for symbols as keys.
+  (let ((default (if (eq (caar clauses) 't) (car clauses)))
+        (implement-as name)
+        (new-clauses))
+  (when (member name '(typecase etypecase))
+    (dolist (clause (reverse (if default (cdr clauses) clauses))
+                    (setq clauses (if default (cons default new-clauses) new-clauses)
+                          implement-as 'case))
+      ;; clause is ((TYPEP #:x (QUOTE <sometype>)) NIL forms*)
+      (destructuring-bind ((typep thing type-expr) . consequent) clause
+        (declare (ignore thing))
+        (unless (and (typep type-expr '(cons (eql quote) (cons t null)))
+                     (eq typep 'typep))
+          (bug "TYPECASE expander glitch"))
+        (let* ((spec (second type-expr))
+               (keys (case (if (listp spec) (car spec))
+                       (eql (when (singleton-p (cdr spec)) (list (cadr spec))))
+                       (member (when (proper-list-p (cdr spec)) (cdr spec))))))
+          (unless keys (return))
+          (push (cons `(or ,@(mapcar (lambda (x) `(eql ,keyform-value ',x)) keys))
+                      consequent)
+                new-clauses)))))
 
-  `(let ((,keyform-value ,keyform))
-     (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
-     (cond ,@(nreverse clauses)
-           ,@(when errorp
-               `((t (,(ecase name
-                        (etypecase 'etypecase-failure)
-                        (ecase 'ecase-failure))
-                     ,keyform-value ',keys)))))))
+    ;; Efficiently expanding CASE over symbols depends on CASE over integers being
+    ;; translated as a jump table. If it's not - as on most backends - then we use
+    ;; the customary expansion as a series of IF tests.
+    ;; Production code rarely uses CCASE, and the expansion differs such that
+    ;; it doesn't seem worth the effort to handle it as a jump table.
+    (when (and (member implement-as '(case ecase)) (every #'symbolp keys))
+      (awhen (expand-symbol-case keyform clauses keys errorp 'sxhash)
+        (return-from case-body-aux it)))
+
+    `(let ((,keyform-value ,keyform))
+       (declare (ignorable ,keyform-value)) ; e.g. (CASE KEY (T))
+       (cond ,@(nreverse clauses)
+             ,@(when errorp
+                 `((t (,(ecase name
+                          (etypecase 'etypecase-failure)
+                          (ecase 'ecase-failure))
+                       ,keyform-value ',keys))))))))
 
 (sb-xc:defmacro case (keyform &body cases)
   "CASE Keyform {({(Key*) | Key} Form*)}*
