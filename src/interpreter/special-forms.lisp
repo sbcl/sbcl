@@ -286,8 +286,7 @@
        ;; was expected. This should not cons except on error.
        (enforce-single-type (type &rest values)
          (cond ((null values)
-                (error "~S received no values"
-                       (list 'the (specifier-from-checkfun type))))
+                (values))
                ((itypep (first values) type)
                 (apply #'values values))
                (t
