@@ -23,6 +23,7 @@
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
+            sb-vm::gpr-tn-p sb-c::tn-reads sb-c::tn-writes
             #+avx2 sb-vm::avx2-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 
@@ -3486,8 +3487,8 @@
       byte word dword) ; unexplained phenomena
      t)))
 
-;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
-;; to store a coverage mark in the OFFSETth byte beyond LABEL.
+;;; Replace the STATEMENT with an instruction to store a coverage mark
+;;; in the OFFSETth byte beyond LABEL.
 (defun sb-c::replace-coverage-instruction (statement label offset)
   (setf (stmt-mnemonic statement) 'mov
         (stmt-operands statement) `(:byte ,(rip-relative-ea label offset) 1)))
@@ -3509,3 +3510,95 @@
                                :offset (reg-id-num (reg-id reg)))
                reg)))
     (%make-ea-dont-use size disp (fix base) (fix index) scale)))
+
+(defun parse-2-operands (stmt)
+  (let* ((operands (stmt-operands stmt))
+         (first (car operands))
+         (size (cond ((is-size-p first) (pop operands) first)
+                     (t :qword))))
+    (values size (pop operands) (pop operands))))
+
+(defun smaller-of (size1 size2)
+  (if (or (eq size1 :dword) (eq size2 :dword)) :dword :qword))
+
+;;; TODO: all of these start with PARSE-2-OPERANDS. It might be better
+;;; if the driving loop could do that.
+;;; It's supposed to be backend-agnostic, so maybe it will need to be
+;;; two steps: prepare a statement for rule testing, and test a rule
+;;; for applicability.
+
+;;; A :QWORD load followed by a shift or a mask that clears the upper 32 bits
+;;; can use a :DWORD load.
+;;; (Recognizing the 3-instruction pattern of MOV + SAR + AND could also work)
+;;; The second instruction could probably be any :dword-sized operation.
+(defpattern "load :qword -> :dword" ((mov) (shr and)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (declare (ignore src2))
+    (when (and (gpr-tn-p dst1)
+               (location= dst2 dst1)
+               (eq size1 :qword)
+               (eq size2 :dword))
+      (setf (stmt-operands stmt) `(:dword ,dst1 ,src1))
+      next)))
+
+;;; "AND r, imm1" + "AND r, imm2" -> "AND r, (imm1 & imm2)"
+(defpattern "and + and -> and" ((and) (and)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (gpr-tn-p dst1)
+               (location= dst2 dst1)
+               (member size1 '(:qword :dword))
+               (typep src1 '(signed-byte 32))
+               (member size2 '(:dword :qword))
+               (typep src2 '(signed-byte 32)))
+      (setf (stmt-operands next)
+            `(,(smaller-of size1 size2) ,dst2 ,(logand src1 src2)))
+      (add-stmt-labels next (stmt-labels stmt))
+      (delete-stmt stmt)
+      next)))
+
+;;; "fixnumize" + "SHR reg, N" where N > n-tag-bits skips the fixnumize.
+;;; (could generalize: masking out N bits with AND, following by shifting
+;;; out N low bits can eliminate the AND)
+(defpattern "fixnumize + shr -> shr" ((and) (sar shr)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (gpr-tn-p dst1)
+               (location= dst2 dst1)
+               (eq size1 :qword)
+               (eql src1 (lognot sb-vm:fixnum-tag-mask))
+               (member size2 '(:dword :qword))
+               (typep src2 `(integer ,sb-vm:n-fixnum-tag-bits 63)))
+      (add-stmt-labels next (stmt-labels stmt))
+      (delete-stmt stmt)
+      next)))
+
+;;; SAR + AND can change the shift operand from :QWORD to :DWORD
+;;; if the AND operand size is :DWORD and the shift would not see
+;;; any of the upper 32 bits.
+;;;  e.g. shift of 1: consumes source bit indices 1 .. 63
+;;;       shift of 2: consumes source bit indices 2 .. 63
+;;;       etc
+;;; if mask has N bits, then the highest (inclusive) bit index consumed
+;;; from the unshifted source is shift_amount + N - 1.
+;;; If that number is <= 31 then we can use a :dword shift.
+(defpattern "sar + and -> shr :dword" ((sar) (and)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (gpr-tn-p dst1)
+               (location= dst2 dst1)
+               (eq size1 :qword)
+               (typep src1 '(integer 1 63))
+               (eq size2 :dword)
+               (typep src2 '(unsigned-byte 31)))
+      (let ((max-dst1-bit-index (+ src1 (integer-length src2) -1)))
+        ;; If source bit 31 is in the result, and the operand size gets reduced
+        ;; to :DWORD and the shift is signed, it would wrongly replicate the
+        ;; sign bit across the :DWORD register.
+        ;; It makes me nervous to think about correctness in that case,
+        ;; so I'm constraining this to 31 bits, not 32.
+        (when (<= max-dst1-bit-index 30)
+          (setf (stmt-mnemonic stmt) 'shr
+                (stmt-operands stmt) `(:dword ,dst1 ,src1))
+          next)))))

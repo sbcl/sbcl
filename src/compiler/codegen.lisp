@@ -266,6 +266,7 @@
 ;; Collect "static" count of number of times each vop is employed.
 ;; (as opposed to "dynamic" - how many times its code is hit at runtime)
 (defglobal *static-vop-usage-counts* nil)
+(defparameter *do-instcombine-pass* t)
 
 (defun generate-code (component)
   (when *compiler-trace-output*
@@ -330,6 +331,10 @@
                   (t
                    (funcall gen vop)))))))
 
+    (when *do-instcombine-pass*
+      #+x86-64
+      (sb-assem::combine-instructions (asmstream-code-section asmstream)))
+
     ;; Jump tables precede the coverage mark bytes to simplify locating
     ;; them in trans_code().
     (emit-jump-tables)
@@ -381,7 +386,7 @@
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))
         (previous-mark))
-    (do ((statement (stmt-next (sb-assem::section-head (asmstream-code-section asmstream)))
+    (do ((statement (stmt-next (section-start (asmstream-code-section asmstream)))
                     (stmt-next statement)))
         ((null statement))
       (dolist (item (ensure-list (stmt-labels statement)))

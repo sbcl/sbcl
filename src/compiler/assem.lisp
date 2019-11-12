@@ -286,20 +286,8 @@
 (defun make-section ()
   (let ((first (make-stmt nil nil :ignore nil)))
     (cons first first)))
-(defun section-head (section) (car section))
+(defun section-start (section) (car section))
 (defun section-tail (section) (cdr section))
-
-(defun print-section-contents (section)
-  (do ((statement (section-head section) (stmt-next statement))
-       (i 0))
-      ((null statement))
-    (let ((*print-pretty* nil))
-      (format t "~d: ~@[~a: ~]~a~{ ~a~}~%"
-              i
-              (stmt-labels statement)
-              (stmt-mnemonic statement)
-              (stmt-operands statement)))
-    (incf i)))
 
 ;;; Insert STMT after PREDECESSOR.
 (defun insert-stmt (stmt predecessor)
@@ -345,6 +333,10 @@
           (multiple-value-bind (mnemonic operands)
               (if (consp thing) (values (car thing) (cdr thing)) thing)
             (unless (member mnemonic '(.align .byte .skip .coverage-mark))
+              ;; This automatically gets the .QWORD pseudo-op which we use on x86-64
+              ;; to create jump tables, but it's sort of unfortunate that the mnemonic
+              ;; is specific to that backend. It should probably be .LISPWORD instead.
+              ;; Anyway, the good news is that jump tables flag all the labels as used.
               (dolist (operand operands)
                 (if (label-p operand)
                     (setf (label-usedp operand) t)
@@ -1316,9 +1308,9 @@
 
 
 ;;;; interface to the rest of the compiler
-(defun dump-symbolic-asm (statements stream &aux last-vop)
+(defun dump-symbolic-asm (section stream &aux last-vop all-labels)
   (format stream "~3&Assembler input:~%")
-  (do ((statement (stmt-next statements) (stmt-next statements)))
+  (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
       ((null statement))
     (unless (functionp (stmt-mnemonic statement))
       (binding* ((vop (stmt-vop statement) :exit-if-null))
@@ -1327,11 +1319,14 @@
                   (sb-c::vop-info-name (sb-c::vop-info vop))))
         (setq last-vop vop))
       (awhen (stmt-labels statement)
-        (format stream "~{~A: ~}~%" (ensure-list it)))
+        (let ((list (ensure-list it)))
+          (setq all-labels (append list all-labels))
+          (format stream "~{~A: ~}~%" list)))
       (let ((*print-pretty* nil))
         (format stream "    ~:@(~A~) ~{~A~^, ~}~%"
                 (stmt-mnemonic statement)
                 (stmt-operands statement)))))
+  (format t "# Used labels: ~A~%" (remove-if-not #'label-usedp all-labels))
   (format stream "# end of input~%"))
 
 ;;; Append all sections, returning the first section.
@@ -1339,7 +1334,7 @@
   (let* ((first-section (car sections))
          (last-stmt (section-tail first-section)))
     (dolist (section (cdr sections) first-section)
-      (let ((head (section-head section)))
+      (let ((head (section-start section)))
         (aver (eq (stmt-mnemonic head) :ignore))
         (when (stmt-next head)
           (setf (stmt-next last-stmt) (stmt-next head)
@@ -1380,7 +1375,7 @@
     (when (and sb-c::*compiler-trace-output*
                (memq :symbolic-asm sb-c::*compile-trace-targets*))
       (dump-symbolic-asm section sb-c::*compiler-trace-output*))
-    (do ((statement (stmt-next (section-head section)) (stmt-next statement)))
+    (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
         ((null statement))
       (awhen (stmt-vop statement) (setq **current-vop** it))
       (dolist (label (ensure-list (stmt-labels statement)))
@@ -1875,3 +1870,64 @@
                      #+big-endian
                      (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
                            do (emit-byte segment (ldb (byte 8 i) val)))))
+
+;;;; Peephole pass
+
+;;; Return T only if STATEMENT has a label which is potentially a branch
+;;; target, and not merely labeled to store a location of interest.
+(defun labeled-statement-p (statement &aux (labels (stmt-labels statement)))
+  (if (listp labels) (some #'label-usedp labels) (label-usedp labels)))
+
+(defmacro defpattern (name (opcodes1 opcodes2) lambda-list &body body)
+  `(%defpattern ,name ',opcodes1 ',opcodes2 (lambda ,lambda-list ,@body)))
+
+(defparameter *show-peephole-transforms-p* nil)
+(defglobal *asm-pattern-matchers* nil)
+(defglobal *asm-pattern-matchers-invoked* (make-array 20))
+(defun %defpattern (name opcodes1 opcodes2 applicator)
+  (let ((index (length *asm-pattern-matchers*)))
+    (push (list opcodes1 opcodes2  applicator index name)
+          *asm-pattern-matchers*)))
+
+(defun combine-instructions (section)
+  ;; Triply nested loop:
+  ;;   - repeatedly scan until no further changes
+  ;;   -   looking for a pattern that starts at each instruction
+  ;;   -      for all possible rules that match on opcodes
+  ;; This is a greedy algorithm, it could do the wrong thing
+  ;; by applying rules that make other rules impossible to apply,
+  ;; but that seems unlikely.
+  (loop
+    (let* ((any-changes)
+           (stmt nil)
+           (next (section-start section)))
+      (loop
+        (setq stmt next next (stmt-next stmt))
+        (unless next (return))
+        ;; All the patterns examine exactly 2 instructions for now.
+        ;; It should be possible to create a pattern that matches a sequence
+        ;; of 3 or more instruction or has intervening random stuff
+        ;; (e.g. "MOV reg, ea" + ? + "CMP reg, val") provided that the "?"
+        ;; does not interact with instructions around it.
+        (unless (labeled-statement-p next)
+          (let ((op (stmt-mnemonic stmt))
+                (next-op (stmt-mnemonic next)))
+            ;; Look for a rule that can be applied
+            (dolist (rule *asm-pattern-matchers*)
+              (destructuring-bind (opcodes1 opcodes2 . action) rule
+                ;; Don't return from the innermost loop until finding a rule that accepts
+                ;; the statement. If the match on opcodes alone is deemed a hit, but the
+                ;; rule fails, we would not try other rules that could have applied.
+                (when (and (member op opcodes1) (member next-op opcodes2))
+                  (let ((new-next (funcall (car action) stmt next)))
+                    (when new-next
+                      (incf (aref *asm-pattern-matchers-invoked* (cadr action)))
+                      (when *show-peephole-transforms-p*
+                        (format t "~&applied ~a~%" (caddr action)))
+                      ;; The rule returns any non-deleted statement. It could be any
+                      ;; line of the pattern. Skip backwards to ensure that we see
+                      ;; patterns with next's predecessor as the first instruction.
+                      (setq next (stmt-prev new-next)
+                            any-changes t)
+                      (return)))))))))
+      (unless any-changes (return)))))

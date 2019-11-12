@@ -537,3 +537,31 @@
               (assert (eq (funcall f input)
                           (let ((cell (assoc input cases)))
                             (if cell (cadr cell) :feep)))))))))))
+
+(defun count-assembly-lines (f)
+  (length (split-string (with-output-to-string (string)
+                          (disassemble f :stream string))
+                        #\newline)))
+
+(with-test (:name :peephole-optimizations-1)
+  ;; The test does not check that both the load and the shift
+  ;; have been sized as :dword instead of :qword, but it should.
+  (let ((f '(lambda (x)
+             ;; eliminate arg count check, type check
+             (declare (optimize speed (safety 0)))
+             (ldb (byte 3 0) (sb-kernel:symbol-hash x)))))
+    (let ((unoptimized (let ((sb-c::*do-instcombine-pass* nil))
+                         (checked-compile f)))
+          (instcombined (checked-compile f)))
+      (assert (= (count-assembly-lines instcombined)
+                 (- (count-assembly-lines unoptimized) 1)))))
+
+  (let ((f '(lambda (x)
+             ;; eliminate arg count check, type check
+             (declare (optimize speed (safety 0)))
+             (ldb (byte 5 2) (sb-kernel:symbol-hash x)))))
+    (let ((unoptimized (let ((sb-c::*do-instcombine-pass* nil))
+                         (checked-compile f)))
+          (instcombined (checked-compile f)))
+      (assert (= (count-assembly-lines instcombined)
+                 (- (count-assembly-lines unoptimized) 2))))))
