@@ -994,8 +994,7 @@
 ;;; A label can refer to things near enough it using the addend.
 (defstruct (label+addend (:constructor make-label+addend (label addend))
                          (:predicate nil)
-                         (:copier nil)
-                         (:include label))
+                         (:copier nil))
   (label nil :type label)
   (addend 0 :type (signed-byte 32)))
 
