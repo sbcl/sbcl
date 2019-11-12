@@ -263,45 +263,97 @@
   (setf *next-inst-id* 0))
 ;;;
 
-;;; Instructions are streamed into a SECTION before (optionally combining
+;;; Instructions are streamed into a section before (optionally combining
 ;;; sections and) assembling into a SEGMENT.
-;;; The SECTION representation is just a list: (INDEX . BUFFERS).
-;;; Each BUFFER is a simple-vector.
-;;; Because the elsewhere section and unboxed data section often hold nothing,
-;;; we start with an empty vector to avoid waste.
-(defun make-section () (list 0 #()))
-(defmacro section-buf-chain (section) `(cdr ,section))
-(defmacro section-buf-index (section) `(car ,section))
-(defmacro section-last-buf (section) `(cadr ,section))
+(defstruct (stmt (:constructor make-stmt (labels vop mnemonic operands)))
+  (labels)
+  (vop)
+  (mnemonic)
+  (operands)
+  (prev)
+  (next))
+(declaim (freeze-type stmt))
+(defmethod print-object ((stmt stmt) stream)
+  (print-unreadable-object (stmt stream :type t :identity t)
+    (awhen (stmt-labels stmt)
+      (princ it stream)
+      (write-char #\space stream))
+    (princ (stmt-mnemonic stmt) stream)))
+
+;;; A section is just a doubly-linked list of statements with a head and
+;;; tail pointer to allow insertion anywhere,
+;;; and a dummy head node to avoid special-casing an empty section.
+(defun make-section ()
+  (let ((first (make-stmt nil nil :ignore nil)))
+    (cons first first)))
+(defun section-head (section) (car section))
+(defun section-tail (section) (cdr section))
+
+(defun print-section-contents (section)
+  (do ((statement (section-head section) (stmt-next statement))
+       (i 0))
+      ((null statement))
+    (let ((*print-pretty* nil))
+      (format t "~d: ~@[~a: ~]~a~{ ~a~}~%"
+              i
+              (stmt-labels statement)
+              (stmt-mnemonic statement)
+              (stmt-operands statement)))
+    (incf i)))
+
+;;; Insert STMT after PREDECESSOR.
+(defun insert-stmt (stmt predecessor)
+  (let ((successor (stmt-next predecessor)))
+    (setf (stmt-next predecessor) stmt
+          (stmt-prev stmt) predecessor
+          (stmt-next stmt) successor)
+    (when successor
+      (stmt-prev successor) stmt))
+  stmt)
+
+(defun delete-stmt (stmt)
+  (let ((prev (stmt-prev stmt))
+        (next (stmt-next stmt)))
+    (aver prev)
+    (setf (stmt-next prev) next)
+    (when next
+      (setf (stmt-prev next) prev))))
+
+(defun add-stmt-labels (statement more-labels)
+  (let ((list (nconc (ensure-list (stmt-labels statement))
+                     (ensure-list more-labels))))
+    (setf (stmt-labels statement)
+          (if (singleton-p list) (car list) list))))
+
+;;; This is used only to keep track of which vops emit which insts.
+(defvar **current-vop**)
+
 (defun emit (section &rest things)
   ;; each element of THINGS can be:
-  ;; - a list (symbol . args) for a machine instruction or assembler directive
   ;; - a label
+  ;; - a list (mnemonic . operands) for a machine instruction or assembler directive
   ;; - a function to emit a postit
-  (dolist (thing things section)
-    (let ((vector (the simple-vector (section-last-buf section)))
-          (index (section-buf-index section)))
-      (unless (< index (length vector))
-        ;; We double the size, but rather than copying the old data into the new,
-        ;; just grow the chain of vectors. No need to materialize a single vector.
-        (let ((new-vector (make-array (max 10 (* (length vector) 2)))))
-          (if (= (length vector) 0)
-              (rplaca (cdr section) new-vector)
-              (push new-vector (cdr section)))
-          (setq vector new-vector
-                index 0)))
-      (unless (typep thing '(or function label))
-        (let ((inst thing))
-          (let ((vop (car inst)))
-            (when (sb-c::vop-p vop) (pop inst)))
-          (unless (member (car inst) '(.align .byte .skip .coverage-mark))
-            (dolist (operand (cdr inst))
-              (if (label-p operand)
-                  (setf (label-usedp operand) t)
-                  ;; backend decides what labels are used
-                  (%mark-used-labels operand))))))
-      (setf (aref vector index) thing)
-      (setf (section-buf-index section) (1+ index)))))
+  (let ((last (section-tail section))
+        (vop (if (boundp '**current-vop**) **current-vop**)))
+    (dolist (thing things (rplacd section last))
+      (if (label-p thing) ; Accumulate multiple labels until the next instruction
+          (if (stmt-mnemonic last)
+              (setq last (insert-stmt (make-stmt thing vop nil nil) last))
+              (let ((old (stmt-labels last)) (new (list thing)))
+                (setf (stmt-labels last)
+                      (if (label-p old) (cons old new) (nconc old new)))))
+          (multiple-value-bind (mnemonic operands)
+              (if (consp thing) (values (car thing) (cdr thing)) thing)
+            (unless (member mnemonic '(.align .byte .skip .coverage-mark))
+              (dolist (operand operands)
+                (if (label-p operand)
+                    (setf (label-usedp operand) t)
+                    ;; backend decides what labels are used
+                    (%mark-used-labels operand))))
+            (if (stmt-mnemonic last)
+                (setq last (insert-stmt (make-stmt nil vop mnemonic operands) last))
+                (setf (stmt-mnemonic last) mnemonic
+                      (stmt-operands last) operands)))))))
 
 #-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
@@ -325,9 +377,6 @@
 ;;; This holds either the current section (if writing symbolic assembly)
 ;;; or current segment (if machine-encoding). Use ASSEMBLE to change it.
 (defvar *current-destination*)
-;;; Just like *CURRENT-DESTINATION* except this holds the current vop.
-;;; This is used only to keep track of which vops emit which insts.
-(defvar **current-vop**)
 
 (defmacro assemble ((&optional dest vop &key labels) &body body
                     &environment env)
@@ -1267,88 +1316,39 @@
 
 
 ;;;; interface to the rest of the compiler
-(defstruct (stmt (:constructor make-stmt (label vop mnemonic operands)))
-  (label    nil :read-only t)
-  (vop      nil :read-only t)
-  (mnemonic nil :read-only t)
-  (operands nil :read-only t))
-(declaim (freeze-type stmt))
-
 (defun dump-symbolic-asm (statements stream &aux last-vop)
   (format stream "~3&Assembler input:~%")
-  (dovector (statement statements)
-    (unless (functionp statement)
+  (do ((statement (stmt-next statements) (stmt-next statements)))
+      ((null statement))
+    (unless (functionp (stmt-mnemonic statement))
       (binding* ((vop (stmt-vop statement) :exit-if-null))
         (unless (eq vop last-vop)
           (format stream "# ~A~%"
                   (sb-c::vop-info-name (sb-c::vop-info vop))))
         (setq last-vop vop))
-      (let ((label (stmt-label statement)))
-        (when label
-          (format stream "~{~A: ~}~%" (ensure-list label))))
+      (awhen (stmt-labels statement)
+        (format stream "~{~A: ~}~%" (ensure-list it)))
       (let ((*print-pretty* nil))
         (format stream "    ~:@(~A~) ~{~A~^, ~}~%"
                 (stmt-mnemonic statement)
                 (stmt-operands statement)))))
   (format stream "# end of input~%"))
 
-;;; Append all buffer chains of all sections, placing them in forward order.
-;;; This should really be performed BEFORE we do the coverage mark lowering,
-;;; as it would certainly make that pass easier given that the purpose
-;;; of the combining step is to regularize the representation.
-(defun combine-sections (sections)
-  (let ((index 0))
-    ;; Compute an upper bound on the output vector length.
-    ;; It will be shortened when done.
-    (dolist (section sections)
-      (let ((chain (section-buf-chain section)))
-        (incf index (+ (section-buf-index section)
-                       (reduce #'+ (cdr chain) :key #'length)))))
-    ;; Each stmt in the output will be (<LBL> <VOP> MNEMONIC . STUFF)
-    ;; where <LBL> is either a label or possibly empty list of labels.
-    ;; <VOP> can be a VOP or NIL.
-    ;; Or the whole stmt can be a function.
-    (let ((output (make-array index :initial-element 0))
-          (current-stmt))
-      (setq index 0)
-      (flet ((emit-stmt ()
-               (destructuring-bind (label &optional vop mnemonic . operands) current-stmt
-                 (setf (aref output index) (make-stmt label vop mnemonic operands)
-                       current-stmt nil)
-                 (incf index))))
-        (dolist (section sections)
-          (let ((last-buf (car (section-buf-chain section)))
-                (last-len (section-buf-index section)))
-            (dolist (buffer (reverse (section-buf-chain section)))
-              ;; All buffers except maybe the last completely are full.
-              (dotimes (i (if (eq buffer last-buf) last-len (length buffer)))
-                (let ((thing (svref buffer i)))
-                  (etypecase thing
-                    (label
-                     (let ((ll (list thing)))
-                       (cond ((null current-stmt) (setf current-stmt ll))
-                             ((atom (car current-stmt)) ; upgrade label to a list
-                              (setf (car current-stmt) (cons (car current-stmt) ll)))
-                             (t (nconc (car current-stmt) ll)))))
-                    (cons
-                     (let ((inst
-                            (if (sb-c::vop-p (car thing)) thing (cons nil thing))))
-                       (if current-stmt
-                           (setf (cdr current-stmt) inst)       ; labeled
-                           (setf current-stmt (cons nil inst))) ; unlabeled
-                       (emit-stmt)))
-                    ;; Let's make sure that functions don't appear when unexpected.
-                    (function
-                     (when current-stmt
-                       ;; It must be a label only, because upon seeing a mnemonic
-                       ;; we would have emitted the complete statement.
-                       (emit-stmt))
-                     (setf (aref output index) thing)
-                     (incf index))))))))
-        ;; There is potentially a trailing label
-        (when current-stmt (emit-stmt)))
-      #+sb-xc-host (adjust-array output index)
-      #-sb-xc-host (sb-kernel:%shrink-vector output index))))
+;;; Append all sections, returning the first section.
+(defun append-sections (sections)
+  (let* ((first-section (car sections))
+         (last-stmt (section-tail first-section)))
+    (dolist (section (cdr sections) first-section)
+      (let ((head (section-head section)))
+        (aver (eq (stmt-mnemonic head) :ignore))
+        (when (stmt-next head)
+          (setf (stmt-next last-stmt) (stmt-next head)
+                (stmt-prev (stmt-next head)) last-stmt)
+          (setf last-stmt (section-tail section)))
+        ;; Make this section empty since its contents
+        ;; are already accounted for.
+        (setf (stmt-next head) nil)))
+    (rplacd first-section last-stmt)))
 
 ;;; Map of opcode symbol to function that emits it into the byte stream
 ;;; (or with the schedulding assembler, into the queue)
@@ -1357,7 +1357,7 @@
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
 (defun %assemble-sections (segment &rest inputs)
   (let ((**current-vop** nil)
-        (statements (combine-sections inputs))
+        (section (append-sections inputs))
         (in-without-scheduling)
         (was-scheduling))
     ;; HEADER-SKEW is 1 word (in bytes) if the boxed code header word count is odd.
@@ -1379,15 +1379,16 @@
     (setf (segment-collect-dynamic-statistics segment) *collect-dynamic-statistics*)
     (when (and sb-c::*compiler-trace-output*
                (memq :symbolic-asm sb-c::*compile-trace-targets*))
-      (dump-symbolic-asm statements sb-c::*compiler-trace-output*))
-    (dovector (statement statements)
-      (if (functionp statement)
-          (%emit-postit segment statement)
-          (let ((mnemonic (stmt-mnemonic statement))
-                (operands (stmt-operands statement)))
-            (awhen (stmt-vop statement) (setq **current-vop** it))
-            (dolist (label (ensure-list (stmt-label statement)))
-              (%emit-label segment **current-vop** label))
+      (dump-symbolic-asm section sb-c::*compiler-trace-output*))
+    (do ((statement (stmt-next (section-head section)) (stmt-next statement)))
+        ((null statement))
+      (awhen (stmt-vop statement) (setq **current-vop** it))
+      (dolist (label (ensure-list (stmt-labels statement)))
+        (%emit-label segment **current-vop** label))
+      (let ((mnemonic (stmt-mnemonic statement))
+            (operands (stmt-operands statement)))
+        (if (functionp mnemonic)
+            (%emit-postit segment mnemonic)
             (case mnemonic
               (.begin-without-scheduling
                (aver (not in-without-scheduling))
@@ -1495,42 +1496,6 @@
 #-x86-64
 (defun perform-operand-lowering (operands) operands)
 
-(defun truncate-section-to-length (section)
-  (setf (section-last-buf section)
-        (subseq (section-last-buf section) 0 (section-buf-index section))))
-
-;;; Tack SECOND on to the end of FIRST, and reset SECOND to be empty.
-;;; Typically for appending the elsewhere section to the regular section.
-(defun join-sections (first second)
-  ;; Truncate the first section's last buffer to its in-use length
-  (truncate-section-to-length first)
-  ;; Extend FIRST's chain of buffers with those in SECOND
-  (setf (section-buf-chain first) (nconc (section-buf-chain second)
-                                         (section-buf-chain first)))
-  ;; Set the in-use length of the buffer that is now the final buffer
-  ;; in FIRST's chain of buffers with the in-use length from SECOND.
-  (setf (section-buf-index first) (section-buf-index second))
-  ;; Clear out SECOND
-  (setf (section-buf-chain second) (list #())
-        (section-buf-index second) 0))
-
-;;; Produce a unified vector of the section contents.
-;;; Might be useful for something, but not at present.
-(defun section-contents (section)
-  (let* ((last-buffer-length (section-buf-index section))
-         (chain (section-buf-chain section))
-         (total-length (+ last-buffer-length
-                          ;; all but the last must be completely full
-                          (reduce #'+ (cdr chain) :key #'length)))
-         (contents (make-array total-length))
-         (start total-length))
-    (decf start last-buffer-length)
-    (replace contents (car chain) :start1 start)
-    (dolist (buf (cdr chain) contents)
-      (setq last-buffer-length (length buf))
-      (decf start last-buffer-length)
-      (replace contents buf :start1 start))))
-
 (defun trace-inst (section mnemonic operands)
   (when sb-c::*compiler-trace-output*
     (let* ((asmstream *asmstream*)
@@ -1591,10 +1556,7 @@
     (typecase dest
       (cons ; streaming in to the assembler
        (trace-inst dest mnemonic operands)
-       (let ((v **current-vop**)
-             (inst `(,mnemonic . ,operands)))
-         (aver (typep v '(or null sb-c::vop)))
-         (emit dest (if v (cons v inst) inst))))
+       (emit dest (cons mnemonic operands)))
       (segment ; streaming out of the assembler
        (instruction-hooks dest)
        (apply action dest (perform-operand-lowering operands)))))
@@ -1913,5 +1875,3 @@
                      #+big-endian
                      (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
                            do (emit-byte segment (ldb (byte 8 i) val)))))
-(%def-inst-encoder '.comment
-                   (lambda (segment &rest junk) (declare (ignore segment junk))))

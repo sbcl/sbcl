@@ -2587,6 +2587,6 @@
 
 ;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
-(defun sb-c::replace-coverage-instruction (inst-buffer inst-index label offset)
-  (setf (svref inst-buffer inst-index)
-        `(mov ,(make-ea :byte :disp `(+ ,label ,offset)) 1)))
+(defun sb-c::replace-coverage-instruction (statement label offset)
+  (setf (stmt-mnemonic statement) 'mov
+        (stmt-operands statement) `(,(make-ea :byte :disp `(+ ,label ,offset)) 1)))

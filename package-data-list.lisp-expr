@@ -156,7 +156,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "ASMSTREAM-ELSEWHERE-LABEL"
                "ASMSTREAM-CONSTANT-TABLE"
                "ASMSTREAM-CONSTANT-VECTOR"
-               "JOIN-SECTIONS" "ASSEMBLE-SECTIONS"
+               "APPEND-SECTIONS" "ASSEMBLE-SECTIONS"
                "EMIT" ".ALIGN" ".BYTE" ".LISPWORD" ".SKIP"
                ".COVERAGE-MARK" ".COMMENT"
                "EMIT-ALIGNMENT" "EMIT-BYTE" "EMIT-BACK-PATCH"
@@ -177,6 +177,9 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "WITHOUT-SCHEDULING"
                "VARIABLE-LENGTH"
                "SEGMENT-COLLECT-DYNAMIC-STATISTICS"
+               "STMT-LABELS" "STMT-MNEMONIC" "STMT-OPERANDS"
+               "STMT-PREV" "STMT-NEXT"
+               "ADD-STMT-LABELS" "DELETE-STMT"
 
                ;; FIXME: These are in the SB-ASSEM package now, but
                ;; (left over from CMU CL) are defined in files which

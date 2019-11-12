@@ -3488,9 +3488,10 @@
 
 ;; Replace the INST-INDEXth element in INST-BUFFER with an instruction
 ;; to store a coverage mark in the OFFSETth byte beyond LABEL.
-(defun sb-c::replace-coverage-instruction (inst-buffer inst-index label offset)
-  (setf (svref inst-buffer inst-index)
-        `(mov :byte ,(rip-relative-ea label offset) 1)))
+(defun sb-c::replace-coverage-instruction (statement label offset)
+  (setf (stmt-mnemonic statement) 'mov
+        (stmt-operands statement) `(:byte ,(rip-relative-ea label offset) 1)))
+
 
 ;;; This constructor is for broken 3rd-party library code. It's fine that we have
 ;;; some degree of backward-compatibility, but it's another entirely to say that

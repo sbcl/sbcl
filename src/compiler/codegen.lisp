@@ -330,9 +330,6 @@
                   (t
                    (funcall gen vop)))))))
 
-    ;; Truncate the final assembly code buffer to length
-    (sb-assem::truncate-section-to-length (asmstream-code-section asmstream))
-
     ;; Jump tables precede the coverage mark bytes to simplify locating
     ;; them in trans_code().
     (emit-jump-tables)
@@ -384,36 +381,32 @@
         ;; vector of lists of original source paths covered
         (src-paths (make-array 10 :fill-pointer 0))
         (previous-mark))
-    (dolist (buffer (reverse (sb-assem::section-buf-chain
-                              (asmstream-code-section asmstream))))
-      (dotimes (i (length buffer))
-        (let ((item (svref buffer i)))
-          (typecase item
-           (label
-            (when (label-usedp item) ; control can transfer to here
-              (setq previous-mark nil)))
-           (function ; this can do anything, who knows
-            (setq previous-mark nil))
-           (t
-            (let ((mnemonic (first item)))
-              (when (vop-p mnemonic)
-                (pop item)
-                (setq mnemonic (first item)))
-              (cond ((branch-opcode-p mnemonic) ; control flow kills mark combining
-                     (setq previous-mark nil))
-                    ((eq mnemonic '.coverage-mark)
-                     (let ((path (second item)))
-                       (cond ((not previous-mark) ; record a new path
-                              (let ((mark-index
-                                     (vector-push-extend (list path) src-paths)))
-                                ;; have the backend lower it into a real instruction
-                                (replace-coverage-instruction buffer i label mark-index))
-                              (setq previous-mark t))
-                             (t ; record that the already-emitted mark pertains
-                                ; to an additional source path
-                              (push path (elt src-paths (1- (fill-pointer src-paths))))
-                              ;; turn this line into a (virtual) no-op
-                              (rplaca item '.comment))))))))))))
+    (do ((statement (stmt-next (sb-assem::section-head (asmstream-code-section asmstream)))
+                    (stmt-next statement)))
+        ((null statement))
+      (dolist (item (ensure-list (stmt-labels statement)))
+        (when (label-usedp item) ; control can transfer to here
+          (setq previous-mark nil)))
+      (let ((mnemonic (stmt-mnemonic statement)))
+        (if (functionp mnemonic) ; this can do anything, who knows
+            (setq previous-mark nil)
+            (cond ((branch-opcode-p mnemonic) ; control flow kills mark combining
+                   (setq previous-mark nil))
+                  ((eq mnemonic '.coverage-mark)
+                   (let ((path (car (stmt-operands statement))))
+                     (cond ((not previous-mark) ; record a new path
+                            (let ((mark-index
+                                   (vector-push-extend (list path) src-paths)))
+                              ;; have the backend lower it into a real instruction
+                              (replace-coverage-instruction statement label mark-index))
+                            (setq previous-mark statement))
+                           (t ; record that the already-emitted mark pertains
+                            ;; to an additional source path
+                            (push path (elt src-paths (1- (fill-pointer src-paths))))
+                            (add-stmt-labels previous-mark (stmt-labels statement))
+                            (let ((predecessor (stmt-prev statement)))
+                              (delete-stmt statement)
+                              (setq statement predecessor))))))))))
     ;; Allocate space in the data section for coverage marks
     (let ((mark-index (length src-paths)))
       (when (plusp mark-index)

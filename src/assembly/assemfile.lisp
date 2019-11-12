@@ -156,8 +156,8 @@
          ;; by GENERATE-ERROR-CODE were interposed between those.
          #-arm
          (let ((asmstream *asmstream*))
-           (join-sections (asmstream-code-section asmstream)
-                          (asmstream-elsewhere-section asmstream)))
+           (append-sections (list (asmstream-code-section asmstream)
+                                  (asmstream-elsewhere-section asmstream))))
          (emit-alignment sb-vm:n-lowtag-bits
                          ;; EMIT-LONG-NOP does not exist for (not x86-64)
                          #+x86-64 :long-nop))
