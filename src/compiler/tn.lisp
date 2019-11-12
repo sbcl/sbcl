@@ -298,9 +298,9 @@
       (let ((entry (aref constants i)))
         (when (and (consp entry)
                    (eq (car entry) kind)
-                   (or (eq (cdr entry) info)
+                   (or (eq (cadr entry) info)
                        (and (consp info)
-                            (equal (cdr entry) info))))
+                            (equal (cadr entry) info))))
           (setf (tn-offset res) i)
           (return))))
 
