@@ -1830,7 +1830,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
                           (dolist (var vars)
                             ;; CLHS says "bound and then made to have no value" -- user
                             ;; should not be able to tell the difference between that and this.
-                            (about-to-modify-symbol-value var 'progv)
+                            (about-to-modify-symbol-value var 'makunbound)
                             (%primitive dynbind unbound-marker var))))
                       (,bind (vars vals)
                         (declare (optimize (speed 2) (debug 0)

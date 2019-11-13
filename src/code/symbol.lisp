@@ -542,7 +542,11 @@ distinct from the global value. Can also be SETF."
                       (eq kind :unknown))
                  (with-single-package-locked-error
                      (:symbol symbol "setting the value of ~S"))
-                 nil))
+                 nil)
+                ((eq action 'makunbound)
+                 (with-single-package-locked-error (:symbol symbol "unbinding the symbol ~A")
+                   (when (eq (info :variable :always-bound symbol) :always-bound)
+                     (values "Can't ~@?" nil)))))
         (when what
           (if continue
               (cerror "Modify the constant." what (describe-action) symbol)

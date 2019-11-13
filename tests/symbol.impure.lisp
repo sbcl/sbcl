@@ -222,3 +222,13 @@
 
 (with-test (:name (:defconstant :no-eval-of-docstring))
   (assert-error (defconstant #.(gensym) 10 (print "docstring"))))
+
+(defvar *always-bound* 10)
+(declaim (sb-ext:always-bound *always-bound*))
+
+(with-test (:name :progv-unbind-always-bound)
+  (checked-compile-and-assert
+   ()
+   '(lambda (vars vals)
+     (progv vars vals))
+   (('(*always-bound*) nil) (condition 'error))))

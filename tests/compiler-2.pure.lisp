@@ -2503,5 +2503,5 @@
    ()
    `(lambda (&key (pred (constantly 44)))
       (declare (type function pred))
-      (funcall (the funcall pred)))
+      (funcall pred))
    (() 44)))

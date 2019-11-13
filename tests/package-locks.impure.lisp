@@ -666,3 +666,12 @@
 (with-test (:name :unintern-nil)
   (assert-error (unintern nil 'test)
                 package-locked-error))
+
+(with-test (:name :progv-unbind)
+  (checked-compile-and-assert
+   ()
+   '(lambda (vars vals)
+     (progv vars vals))
+   (('(test:*special*) nil) (condition 'symbol-package-locked-error))))
+
+
