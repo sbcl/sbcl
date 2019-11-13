@@ -2497,3 +2497,11 @@
                 (push obj dup-fdefns))
               (push name names)))))
       (assert (not dup-fdefns)))))
+
+(with-test (:name :map-all-lvar-dests)
+  (checked-compile-and-assert
+   ()
+   `(lambda (&key (pred (constantly 44)))
+      (declare (type function pred))
+      (funcall (the funcall pred)))
+   (() 44)))

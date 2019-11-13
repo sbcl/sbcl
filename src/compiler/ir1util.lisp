@@ -2997,7 +2997,7 @@ is :ANY, the function name is not checked."
 
 ;;; If the dest is a LET variable use the variable refs.
 (defun map-all-lvar-dests (lvar fun)
-  (let ((dest (principal-lvar-dest lvar)))
+  (multiple-value-bind (dest lvar) (principal-lvar-dest-and-lvar lvar)
     (if (and (combination-p dest)
              (eq (combination-kind dest) :local))
         (let ((var (lvar-lambda-var lvar)))
