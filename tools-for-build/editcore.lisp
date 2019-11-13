@@ -34,7 +34,7 @@
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
                 #:map-segment-instructions #:inst-name
                 #:dstate-next-addr #:dstate-cur-offs)
-  (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:|call|
+  (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:call
                 #:get-gpr #:reg-name)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
