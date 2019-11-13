@@ -428,6 +428,25 @@
       (bug "Unknown list item seek transform: name=~S, key-functions=~S variant=~S"
            function-name key-functions variant)))
 
+;;; There is no open-code limit on this transform if it succeeds.
+(defun memq-translation-as-case (items node)
+  (let ((items (lvar-value items)))
+    (when (and (proper-list-p items)
+               (every #'symbolp items)
+               (let ((uniqued (remove-duplicates items)))
+                 ;; Reject if there are duplicates because I don't care.
+                 (and (= (length uniqued) (length items))
+                      (= 1 (pick-best-symbol-hash-bits uniqued 'sxhash)))))
+      (if (if-p node)
+          ;; Special variant for predication of (MEMBER x '(list-of-symbols) :test #'eq)
+          ;; which lets CASE see that it doesn't need a vector of return values.
+          ;; The value delivered to an IF node must be a list because MEMBER and MEMQ
+          ;; are declared in fndb to return a list. If it were just the symbol T,
+          ;; then type inference would get all whacky on you.
+          `(case item (,items '(t)))
+          `(case item
+             ,@(maplist (lambda (list) `((,(car list)) ',list)) items))))))
+
 (defparameter *list-open-code-limit* 128)
 
 (defun transform-list-item-seek (name item list key test test-not node)
@@ -439,6 +458,16 @@
   ;; Ditto for KEY IDENTITY.
   (when (and key (lvar-fun-is key '(identity)))
     (setf key nil))
+
+  (awhen (and (eq name 'member)
+              ;; If the test was EQL, we've already changed it to NIL.
+              (or (not test) (lvar-fun-is test '(eq)))
+              (not test-not) ; keep it simple, no other keywords allowed
+              (not key)
+              (constant-lvar-p list)
+              (memq-translation-as-case list node))
+    (return-from transform-list-item-seek it))
+
   ;; Key can legally be NIL, but if it's NIL for sure we pretend it's
   ;; not there at all. If it might be NIL, make up a form to that
   ;; ensures it is a function.
@@ -588,23 +617,14 @@
   (def rassoc t))
 
 (deftransform memq ((item list) (t (constant-arg list)) * :node node)
-  (cond ((and (if-p (node-dest node))
-              (let ((list (lvar-value list)))
-                (and (every #'symbolp list)
-                     (= 1 (pick-best-symbol-hash-bits (remove-duplicates list)
-                                                      'sxhash)))))
-         ;; The value delivered to the IF node _must_ be a list because MEMQ
-         ;; is declared in fndb to return a list. If it were just the symbol T,
-         ;; then type inference would go awry.
-         `(case item (,(lvar-value list) '(t))))
-        (t
-         (labels ((rec (tail)
-                    (if tail
-                        `(if (eq item ',(car tail))
-                             ',tail
-                             ,(rec (cdr tail)))
-                        nil)))
-           (rec (lvar-value list))))))
+  (or (memq-translation-as-case list node)
+      (labels ((rec (tail)
+                 (if tail
+                     `(if (eq item ',(car tail))
+                          ',tail
+                          ,(rec (cdr tail)))
+                     nil)))
+        (rec (lvar-value list)))))
 
 ;;; A similar transform used to apply to MEMBER and ASSOC, but since
 ;;; TRANSFORM-LIST-ITEM-SEEK now takes care of them those transform
