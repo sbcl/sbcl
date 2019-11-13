@@ -230,21 +230,20 @@ Examples:
 (defun summarize-compilation-unit (abort-p)
   (let (summary)
     (unless abort-p
-      (handler-bind ((style-warning #'compiler-style-warning-handler)
-                     (warning #'compiler-warning-handler))
-
-        (let ((undefs (sort *undefined-warnings* #'string<
-                            :key (lambda (x)
-                                   (let ((x (undefined-warning-name x)))
-                                     (if (symbolp x)
-                                         (symbol-name x)
-                                         (prin1-to-string x))))))
-              (*last-message-count* (list* 0 nil nil))
-              (*last-error-context* nil))
+      (let ((undefs (sort *undefined-warnings* #'string<
+                          :key (lambda (x)
+                                 (let ((x (undefined-warning-name x)))
+                                   (if (symbolp x)
+                                       (symbol-name x)
+                                       (prin1-to-string x))))))
+            (*last-message-count* (list* 0 nil nil))
+            (*last-error-context* nil))
+        (handler-bind ((style-warning #'compiler-style-warning-handler)
+                       (warning #'compiler-warning-handler))
           (dolist (kind '(:variable :function :type))
             (let ((names (mapcar #'undefined-warning-name
-                                   (remove kind undefs :test #'neq
-                                           :key #'undefined-warning-kind))))
+                                 (remove kind undefs :test #'neq
+                                                     :key #'undefined-warning-kind))))
               (when names (push (cons kind names) summary))))
           (dolist (undef undefs)
             (let ((name (undefined-warning-name undef))
