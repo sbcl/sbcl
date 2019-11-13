@@ -17,13 +17,16 @@
 (with-test (:name :weak-vector)
   (let ((a *weak-vect*)
         (random-symbol (make-symbol "FRED")))
-    (setf (aref a 0) (cons 'foo 'bar)
-          (aref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
-          (aref a 2) 'interned-symbol
-          (aref a 3) random-symbol
-          (aref a 4) 18
-          (aref a 5) (+ most-positive-fixnum 1 (random 100) (random 100))
-          (aref a 6) (make-hash-table))
+    (flet ((x ()
+             (setf (aref a 0) (cons 'foo 'bar)
+                   (aref a 1) (format nil "Time is: ~D~%" (get-internal-real-time))
+                   (aref a 2) 'interned-symbol
+                   (aref a 3) random-symbol
+                   (aref a 4) 18
+                   (aref a 5) (+ most-positive-fixnum 1 (random 100) (random 100))
+                   (aref a 6) (make-hash-table))))
+      (declare (notinline x)) ;; Leave all the values below the stack pointer for
+      (x))                    ;; scrub-control-stack to work
     (assert (weak-vector-p a))
     (sb-sys:scrub-control-stack)
     (gc)
