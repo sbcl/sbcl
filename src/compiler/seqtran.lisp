@@ -432,10 +432,11 @@
 (defun memq-translation-as-case (items node)
   (let ((items (lvar-value items)))
     (when (and (proper-list-p items)
-               (every #'symbolp items)
                (let ((uniqued (remove-duplicates items)))
-                 ;; Reject if there are duplicates because I don't care.
-                 (and (= (length uniqued) (length items))
+                 (and (cdddr uniqued) ; require > 3 items
+                      (= (length uniqued) (length items)) ; and no duplicates
+                      (every #'symbolp items) ; and all symbols
+                      ;; Reject if can't be perfectly hashed
                       (= 1 (pick-best-symbol-hash-bits uniqued 'sxhash)))))
       (if (if-p node)
           ;; Special variant for predication of (MEMBER x '(list-of-symbols) :test #'eq)

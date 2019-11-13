@@ -348,6 +348,8 @@ symbol-case giving up: case=((V U) (F))
 
 (defun pick-best-symbol-hash-bits (symbols hash-fun
                                    &optional (maxbits sb-vm:n-positive-fixnum-bits))
+  (unless symbols
+    (bug "Give me some symbols")) ; it beats getting division by zero error
   (let* ((nsymbols (length symbols))
         (nhashes (power-of-two-ceiling nsymbols))
         (smallest-nbits (1- (integer-length nhashes)))
