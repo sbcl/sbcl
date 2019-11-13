@@ -352,14 +352,14 @@ symbol-case giving up: case=((V U) (F))
     (bug "Give me some symbols")) ; it beats getting division by zero error
   (let* ((nsymbols (length symbols))
         (nhashes (power-of-two-ceiling nsymbols))
-        (smallest-nbits (1- (integer-length nhashes)))
+        (smallest-nbits (max 2 (- (integer-length nhashes) 2)))
         (nbits smallest-nbits)
         (hashes (mapcar hash-fun symbols))
         (best-bytepos nil)
         ;; "best" means smallest
         (best-max-bin-count sb-xc:most-positive-fixnum) ; sentinel value
         (best-average sb-xc:most-positive-fixnum))
-    (dotimes (try 2 (values best-max-bin-count best-bytepos))
+    (dotimes (try 3 (values best-max-bin-count best-bytepos))
       (let ((bin-counts (make-array (ash 1 nbits) :initial-element 0)))
         (dotimes (pos (- (1+ maxbits) nbits))
           (fill bin-counts 0)
@@ -505,8 +505,9 @@ symbol-case giving up: case=((V U) (F))
                       (setf (aref bins index) symbol
                             (aref values index) value)))))
               (return-from expand-symbol-case
-                `(let ((,hash 0)
-                       (,symbol ,keyform))
+                ;; FIXME: figure out how to eliminate the dead store.
+                ;; If hash gets used, then we store into it later, killing the initial store.
+                `(let ((,symbol ,keyform) (,hash 0))
                    (if (and ,is-hashable (eq ,symbol (svref ,bins (setq ,hash ,calc-hash))))
                        ,(if (singleton-p clauses)
                             `',single-value
@@ -616,6 +617,24 @@ symbol-case giving up: case=((V U) (F))
                 (when (eql (svref (nth i sym-vectors) hash) 0)
                   (setf (svref (nth i sym-vectors) hash) (car item))
                   (return))))))
+
+        ;; If there is only one clause (plus possibly a default), then hash
+        ;; collisions do not need to be disambiguated. Hence it can be implemented
+        ;; as one or two array lookups.
+        (when (singleton-p clauses)
+          (return-from expand-symbol-case
+            `(let ((,symbol ,keyform) (,hash 0))
+               (if (and ,is-hashable
+                        ,(ecase maxprobes
+                           (1 `(eq (svref ,(elt sym-vectors 0) (setq ,hash ,calc-hash))
+                                   ,symbol))
+                           (2 `(or (eq (svref ,(elt sym-vectors 0) (setq ,hash ,calc-hash))
+                                       ,symbol)
+                                   (eq (svref ,(elt sym-vectors 1) ,hash) ,symbol)))))
+                   (progn ,@(cdar clauses))
+                   ,(if errorp
+                        `(ecase-failure ,symbol ,(coerce keys 'simple-vector))
+                        `(progn ,@(cddr default)))))))
 
         ;; Produce the COND
         ;; But no other backend supports multiway branching,

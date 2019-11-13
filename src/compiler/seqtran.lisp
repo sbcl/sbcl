@@ -436,9 +436,9 @@
                  (and (cdddr uniqued) ; require > 3 items
                       (= (length uniqued) (length items)) ; and no duplicates
                       (every #'symbolp items) ; and all symbols
-                      ;; Reject if can't be perfectly hashed
-                      (= 1 (pick-best-symbol-hash-bits uniqued 'sxhash)))))
-      (if (if-p node)
+                      ;; Reject if can't be hashed with at most 2 items per bin
+                      (<= (pick-best-symbol-hash-bits uniqued 'sxhash) 2))))
+      (if (if-p (node-dest node))
           ;; Special variant for predication of (MEMBER x '(list-of-symbols) :test #'eq)
           ;; which lets CASE see that it doesn't need a vector of return values.
           ;; The value delivered to an IF node must be a list because MEMBER and MEMQ

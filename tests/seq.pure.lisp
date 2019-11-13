@@ -477,3 +477,22 @@
       (assert (= (funcall g x) (position x (opaque-identity items) :from-end t))))
     (assert (not (funcall f 'blah)))
     (assert (not (funcall g 'blah)))))
+
+(with-test (:name :position-empty-seq)
+  (assert (not (funcall (checked-compile '(lambda (x) (position x #()))) 1))))
+
+(with-test (:name :hash-based-memq)
+  (let* ((f (checked-compile
+             '(lambda (x)
+               (if (member x '(and not or :and :not :or)) t nil))))
+         (consts (ctu:find-code-constants f :type 'vector)))
+    (assert (= (length consts) 2))
+    ;; This is unfortunately a change-detector (if we alter SXHASH)
+    (assert (or (and (equalp (first consts) #(and not or 0))
+                     (equalp (second consts) #(:and :not :or 0)))
+                (and (equalp (second consts) #(and not or 0))
+                     (equalp (first consts) #(:and :not :or 0)))))))
+
+(with-test (:name :memq-empty-seq)
+  (assert (not (funcall (checked-compile '(lambda (x) (member x '()))) 1)))
+  (assert (not (funcall (checked-compile '(lambda (x) (sb-int:memq x '()))) 1))))
