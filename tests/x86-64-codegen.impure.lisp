@@ -565,3 +565,9 @@
           (instcombined (checked-compile f)))
       (assert (= (count-assembly-lines instcombined)
                  (- (count-assembly-lines unoptimized) 2))))))
+
+(with-test (:name :array-subtype-dispatch-table)
+  (assert (eql (sb-kernel:code-jump-table-words
+                (sb-kernel:fun-code-header #'sb-kernel:vector-subseq*))
+               ;; n-widetags divided by 4, plus jump table count word.
+               65)))

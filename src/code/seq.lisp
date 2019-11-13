@@ -470,7 +470,7 @@
 ;;;; SUBSEQ
 ;;;;
 
-(!define-array-dispatch vector-subseq-dispatch (array start end)
+(!define-array-dispatch :jump-table vector-subseq-dispatch (array start end)
   (declare (optimize speed (safety 0)))
   (declare (type index start end))
   (subseq array start end))
@@ -484,6 +484,12 @@
   (declare (type index start)
            (type (or null index) end)
            (optimize speed))
+  ;; This seems suboptimal in that type checking is performed in the XEP
+  ;; but we also have fallback cases in the dispatch table for catching
+  ;; all invalid widetags. Otoh, WITH-ARRAY-DATA needs to dtrt too.
+  ;; So maybe the dispatch table could dispatch to the specialization
+  ;; that handles everything needed for each widetag.
+  ;; This "outer" use of WITH-ARRAY-DATA would be removed.
   (with-array-data ((data sequence)
                     (start start)
                     (end end)
@@ -1351,7 +1357,9 @@ many elements are copied."
          (apply #'%map nil #'f ,sequences)
          (loop (f)))))
 
-(!define-array-dispatch vector-map-into (data start end fun sequences)
+;;; seqtran can generate code which accesses the array of specialized
+;;; functions, so we need the array for this, not a jump table.
+(!define-array-dispatch :call vector-map-into (data start end fun sequences)
   (declare (type index start end)
            (type function fun)
            (type list sequences))
