@@ -350,3 +350,17 @@
             '(lambda (x)
               (case x ((a b c) 1) ((d e f) 2) (t #*10101))))))
     (assert (equal (funcall f 30) #*10101))))
+
+(with-test (:name :memq-as-case)
+  (let* ((f (checked-compile
+             '(lambda (x)
+               (if (sb-int:memq x '(a b c d e f g h i j k l m n o p)) 1 2))))
+         (code (sb-kernel:fun-code-header f))
+         (constant
+           (sb-kernel:code-header-ref
+            code
+            (+ sb-vm:code-constants-offset sb-vm:code-slots-per-simple-fun))))
+    ;; should have a vector of symbols, not references to each symbol
+    (assert (vectorp constant))
+    (assert (eql (funcall f 'j) 1))
+    (assert (eql (funcall f 42) 2))))

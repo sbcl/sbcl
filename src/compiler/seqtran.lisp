@@ -587,14 +587,24 @@
   (def member t)
   (def rassoc t))
 
-(deftransform memq ((item list) (t (constant-arg list)))
-  (labels ((rec (tail)
-             (if tail
-                 `(if (eq item ',(car tail))
-                      ',tail
-                      ,(rec (cdr tail)))
-                 nil)))
-    (rec (lvar-value list))))
+(deftransform memq ((item list) (t (constant-arg list)) * :node node)
+  (cond ((and (if-p (node-dest node))
+              (let ((list (lvar-value list)))
+                (and (every #'symbolp list)
+                     (= 1 (pick-best-symbol-hash-bits (remove-duplicates list)
+                                                      'sxhash)))))
+         ;; The value delivered to the IF node _must_ be a list because MEMQ
+         ;; is declared in fndb to return a list. If it were just the symbol T,
+         ;; then type inference would go awry.
+         `(case item (,(lvar-value list) '(t))))
+        (t
+         (labels ((rec (tail)
+                    (if tail
+                        `(if (eq item ',(car tail))
+                             ',tail
+                             ,(rec (cdr tail)))
+                        nil)))
+           (rec (lvar-value list))))))
 
 ;;; A similar transform used to apply to MEMBER and ASSOC, but since
 ;;; TRANSFORM-LIST-ITEM-SEEK now takes care of them those transform

@@ -489,11 +489,13 @@ symbol-case giving up: case=((V U) (F))
         (when (= maxprobes 1)
           (block try-table-lookup
             (let ((values (make-array (length bins)))
+                  (single-value) ; only if exactly one clause
                   (types nil))
               (dolist (clause clauses)
                 (multiple-value-bind (trivialp value) (trivial-result-p clause)
                   (unless trivialp
                     (return-from try-table-lookup))
+                  (setq single-value value)
                   (push (ctype-of value) types)
                   (dolist (symbol (car clause))
                     (let ((index (ldb byte (funcall hash-fun symbol))))
@@ -504,8 +506,11 @@ symbol-case giving up: case=((V U) (F))
                 `(let ((,hash 0)
                        (,symbol ,keyform))
                    (if (and ,is-hashable (eq ,symbol (svref ,bins (setq ,hash ,calc-hash))))
-                       (truly-the ,(type-specifier (apply #'type-union types))
-                                  (aref ,(sb-c::coerce-to-smallest-eltype values) ,hash))
+                       ,(if (singleton-p clauses)
+                            `',single-value
+                            `(truly-the ,(type-specifier (apply #'type-union types))
+                                        (aref ,(sb-c::coerce-to-smallest-eltype values)
+                                              ,hash)))
                        ,(if errorp
                             ;; coalescing of simple-vectors in a saved core
                             ;; could eliminate repeated data from the same
