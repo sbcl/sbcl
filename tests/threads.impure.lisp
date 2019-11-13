@@ -627,7 +627,8 @@
         (sb-ext:gc)))
 
 (defparameter *aaa* nil)
-(with-test (:name (:one-thread-runs-gc-while-other-conses :again))
+(with-test (:name (:one-thread-runs-gc-while-other-conses :again)
+            :broken-on :win32)
   (loop for i below 100 do
         (princ "!")
         (force-output)
