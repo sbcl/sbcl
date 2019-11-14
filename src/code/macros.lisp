@@ -662,8 +662,8 @@ symbol-case giving up: case=((V U) (F))
                        (cond ,@(nreverse cond-clauses)
                              ,@(when unused-bins
                                  ;; to make it clear that the number of "ways"
-                                 ;; is the exact right number- I'm hoping this will help
-                                 ;; elide the bounds check in multiway-branch. TBD
+                                 ;; is the exact right number, which avoids a range
+                                 ;; test in multiway-branch.
                                  `(((or ,@(mapcar (lambda (x) `(eql ,hash ,x))
                                                   (nreverse unused-bins)))
                                     (unreachable))))

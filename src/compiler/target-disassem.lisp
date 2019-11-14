@@ -1773,7 +1773,7 @@
     (disassemble-segments segments stream dstate)
     (let ((n (code-jump-table-words code-component)))
       (when (> n 1)
-        (format stream "; Jump table~%")
+        (format stream "; Jump table (~d entries)~%" (1- n))
         (let ((sap (code-instructions code-component)))
           (dotimes (i (1- n))
             (let ((a (sap-ref-word sap (ash (1+ i) sb-vm:word-shift))))
