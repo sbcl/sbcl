@@ -50,8 +50,9 @@
 (define-vop (multiway-branch-if-eq)
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg
   (:args (x :scs (any-reg descriptor-reg)))
-  (:info values labels otherwise)
+  (:info values labels otherwise test-vop-name)
   (:temporary (:sc unsigned-reg) index)
+  (:ignore test-vop-name)
   (:generator 10
     (etypecase (car values)
       (fixnum
