@@ -332,8 +332,8 @@ symbol-case giving up: case=((V U) (F))
 |#
 
 ;;; For the specified symbols, choose bits from the hash producing as near a
-;;; perfect hash function as can be achived without resorting to extraction
-;;; and mixing of discontiguous bits.
+;;; perfect hash function as can be achived without extraction of one
+;;; byte or logxor of two bytes.
 ;;; This will fail to find a unique hash if there are symbols whose names are
 ;;; spelled the same, since their SXHASHes are the same.
 ;;;
@@ -346,46 +346,77 @@ symbol-case giving up: case=((V U) (F))
 ;;; CASE form. Prefer collisions on symbols whose consequent in the CASE
 ;;; is the same, otherwise the expansion becomes convoluted.
 
-(defun pick-best-symbol-hash-bits (symbols hash-fun
-                                   &optional (maxbits sb-vm:n-positive-fixnum-bits))
+(defun pick-best-symbol-hash-bits (symbols
+                                   &optional (hash-fun 'sxhash)
+                                             (maxbytes 2)
+                                             (maxbits sb-vm:n-positive-fixnum-bits))
+  (declare (type (member 1 2) maxbytes))
   (unless symbols
     (bug "Give me some symbols")) ; it beats getting division by zero error
   (let* ((nsymbols (length symbols))
-        (nhashes (power-of-two-ceiling nsymbols))
-        (smallest-nbits (max 2 (- (integer-length nhashes) 2)))
-        (nbits smallest-nbits)
-        (hashes (mapcar hash-fun symbols))
-        (best-bytepos nil)
-        ;; "best" means smallest
-        (best-max-bin-count sb-xc:most-positive-fixnum) ; sentinel value
-        (best-average sb-xc:most-positive-fixnum))
-    (dotimes (try 3 (values best-max-bin-count best-bytepos))
-      (let ((bin-counts (make-array (ash 1 nbits) :initial-element 0)))
-        (dotimes (pos (- (1+ maxbits) nbits))
-          (fill bin-counts 0)
-          (dolist (hash hashes)
-            (incf (aref bin-counts (ldb (byte nbits pos) hash))))
-          ;; Compute the average number of items per bin,
-          ;; looking only at bins that contain something.
-          ;; It does not improve things to increase the total bins
-          ;; without distributing items into at least 1 more bin.
-          (let ((max-bin-count 0) (n-used 0))
-            (dovector (count bin-counts)
-              (when (plusp count) (incf n-used))
-              (setf max-bin-count (max count max-bin-count)))
-            (when (= max-bin-count 1) ; can't beat a perfect hash
-              (return-from pick-best-symbol-hash-bits
-                (values 1 (byte nbits pos))))
-            (let ((average (/ nsymbols n-used)))
-              #+nil (format t "(byte ~d ~d) ~s avg=~a max=~a~%"
-                            nbits pos bin-counts average max-bin-count)
-              (when (or (< max-bin-count best-max-bin-count)
-                        (and (= max-bin-count best-max-bin-count)
-                             (< average best-average)))
-                (setq best-bytepos (byte nbits pos)
-                      best-max-bin-count max-bin-count
-                      best-average average))))))
-      (incf nbits))))
+         (ideal-table-size (power-of-two-ceiling nsymbols))
+         (required-nbits (integer-length (1- ideal-table-size)))
+         ;; If each bin has 2 items in it (which isn't ideal), then the table could
+         ;; be half the "required" minimum size. This occurs with symbol sets such
+         ;; as {AND, NOT, OR, :AND, :NOT, :OR} on account of the fact that hashing
+         ;; by string produces 2 of each hash.
+         (smallest-nbits (max 2 (1- required-nbits)))
+         (largest-nbits (1+ required-nbits)) ; allow double the required minimum
+         (hashes (mapcar hash-fun symbols)))
+    (macrolet ((stats (mixer answer)
+                 ;; Compute the average number of items per bin,
+                 ;; looking only at bins that contain something.
+                 ;; It does not improve things to increase the total bins
+                 ;; without distributing items into at least 1 more bin.
+                 `(progn
+                    (fill bin-counts 0)
+                    (dolist (hash hashes)
+                      (incf (aref bin-counts ,mixer)))
+                    (let ((max-bin-count 0) (n-used 0))
+                      (dovector (count bin-counts)
+                        (when (plusp count) (incf n-used))
+                        (setf max-bin-count (max count max-bin-count)))
+                      (when (= max-bin-count 1) ; can't beat a perfect hash
+                        (return-from try (values 1 ,answer)))
+                      (let ((average (/ nsymbols n-used)))
+                        (when (or (< max-bin-count best-max-bin-count)
+                                  (and (= max-bin-count best-max-bin-count)
+                                       (< average best-average)))
+                          (setq best-answer ,answer
+                                best-max-bin-count max-bin-count
+                                best-average average)))))))
+      (flet ((try-one-byte ()
+               (let ((best-answer nil)
+                     ;; "best" means smallest
+                     (best-max-bin-count sb-xc:most-positive-fixnum) ; sentinel value
+                     (best-average sb-xc:most-positive-fixnum))
+                 (loop named try
+                       for nbits from smallest-nbits to largest-nbits
+                       do (let ((bin-counts (make-array (ash 1 nbits) :initial-element 0)))
+                            (dotimes (pos (- (1+ maxbits) nbits))
+                              (stats (ldb (byte nbits pos) hash) (byte nbits pos))))
+                       finally (return-from try (values best-max-bin-count best-answer)))))
+             (try-two-bytes ()
+               (let ((best-answer nil)
+                     (best-max-bin-count sb-xc:most-positive-fixnum)
+                     (best-average sb-xc:most-positive-fixnum))
+                 (loop named try
+                       for nbits from smallest-nbits to largest-nbits
+                       do (let ((bin-counts (make-array (ash 1 nbits) :initial-element 0)))
+                            (dotimes (pos1 (- (1+ maxbits) nbits))
+                              (dotimes (pos2 pos1)
+                                (stats (logxor (ldb (byte nbits pos1) hash)
+                                               (ldb (byte nbits pos2) hash))
+                                       (vector (byte nbits pos1) (byte nbits pos2))))))
+                        finally (return-from try (values best-max-bin-count best-answer))))))
+        (multiple-value-bind (score1 answer1) (try-one-byte)
+          ;; Return if perfect score, or if caller doesn't want to try using two bytes
+          (if (or (= score1 1) (= maxbytes 1))
+              (values score1 answer1)
+              (multiple-value-bind (score2 answer2) (try-two-bytes)
+                (if (<= score1 score2)
+                    (values score1 answer1) ; not improved
+                    (values score2 answer2))))))))) ; 2 bytes = better
 
 ;;; Turn a case over symbols into a case over their hashes.
 ;;; Regarding the apparently redundant UNREACHABLE branches:
@@ -402,13 +433,17 @@ symbol-case giving up: case=((V U) (F))
 ;;;     SB-VM::MOVE-WORD-ARG
 ;;; without the UNREACHABLE branch, because the expansion otherwise
 ;;; looked as if the COND might return NIL.
-(defun expand-symbol-case (keyform clauses keys errorp hash-fun)
+(defun expand-symbol-case (keyform clauses keys errorp hash-fun &optional (maxbytes 2))
   (declare (ignorable keyform clauses keys errorp))
   ;; for few keys, the clever algorithm  probably gives no better performance
   ;; - and potentially worse - than the CPU's branch predictor.
   (unless (>= (length keys) 6)
     (return-from expand-symbol-case nil))
-  (multiple-value-bind (maxprobes byte) (pick-best-symbol-hash-bits keys hash-fun)
+  (multiple-value-bind (maxprobes byte) (pick-best-symbol-hash-bits keys hash-fun maxbytes)
+    (when (and (vectorp byte) (< (length keys) 9))
+      ;; It took two bytes to hash well enough. That's more fixed overhead,
+      ;; so require more symbols. Otherwise just go back to linear scan.
+      (return-from expand-symbol-case nil))
     ;; (format t "maxprobes ~d byte ~s~%" maxprobes byte)
     (when (> maxprobes 2) ; Give up (for now) if more than 2 keys hash the same.
       #+sb-devel (format t "~&symbol-case giving up: probes=~d byte=~d~%"
@@ -446,7 +481,8 @@ symbol-case giving up: case=((V U) (F))
                          (return-from expand-symbol-case nil))))))
              (reverse clauses)))
            (clause->bins (make-array (length clauses) :initial-element nil))
-           (bins (make-array (ash 1 (byte-size byte)) :initial-element 0))
+           (table-nbits (byte-size (if (vectorp byte) (elt byte 0) byte)))
+           (bins (make-array (ash 1 table-nbits) :initial-element 0))
            (symbol (sb-xc:gensym "S"))
            (hash (sb-xc:gensym "H"))
            (is-hashable
@@ -458,20 +494,23 @@ symbol-case giving up: case=((V U) (F))
             ;; makes a difference. NIL as a possible key mandates choosing SYMBOLP
             ;; but NON-NULL-SYMBOL-P is the quicker test.
             #-x86-64 `(,(if (member nil keys) 'symbolp 'non-null-symbol-p) ,symbol))
+           (sxhash
+             ;; Always access the pre-memoized value in the hash slot.
+             ;; SYMBOL-HASH* reads the word following the header word
+             ;; in any pointer object regardless of lowtag.
+             #+x86-64
+             (if (eq hash-fun 'sxhash) `(symbol-hash* ,symbol nil) `(,hash-fun ,symbol))
+             ;; For others, use SYMBOL-HASH.
+             #-x86-64 `(,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun) ,symbol))
            (calc-hash
-            `(ldb (byte ,(byte-size byte)
-                        ,(byte-position byte))
-                  ;; Always access the pre-memoized value in the hash slot.
-                  ;; SYMBOL-HASH* reads the word following the header word
-                  ;; in any pointer object regardless of lowtag.
-                  #+x86-64
-                  ,(if (eq hash-fun 'sxhash)
-                       `(symbol-hash* ,symbol nil)
-                       `(,hash-fun ,symbol))
-                  ;; For others, use SYMBOL-HASH.
-                  #-x86-64
-                  (,(if (eq hash-fun 'sxhash) 'symbol-hash hash-fun) ,symbol))))
-      (declare (ignorable default))
+             (if (vectorp byte) ; mix 2 bytes
+                 ;; FIXME: this could be performed as ((h >> c1) ^ (h >> c2)) & mask
+                 ;; instead of having two AND operations as it does now.
+                 (let ((b1 (elt byte 0)) (b2 (elt byte 1)))
+                   `(let ((,hash ,sxhash))
+                      (logxor (ldb (byte ,(byte-size b1) ,(byte-position b1)) ,hash)
+                              (ldb (byte ,(byte-size b2) ,(byte-position b2)) ,hash))))
+                 `(ldb (byte ,(byte-size byte) ,(byte-position byte)) ,sxhash))))
 
       (flet ((trivial-result-p (clause)
                ;; Return 2 values: T/NIL if the clause's consequent
@@ -484,7 +523,13 @@ symbol-case giving up: case=((V U) (F))
                              ((self-evaluating-p form) (values t form))
                              (t (values nil nil))))
                      ;; NIL -> T, otherwise -> NIL
-                     (values (not consequent) nil)))))
+                     (values (not consequent) nil))))
+             (hash-bits (symbol)
+               (let ((sxhash (funcall hash-fun symbol)))
+                 (if (vectorp byte)
+                     (logxor (ldb (elt byte 0) sxhash)
+                             (ldb (elt byte 1) sxhash))
+                     (ldb byte sxhash)))))
 
         ;; Try doing an array lookup if the hashing has no collisions and
         ;; every consequent is trivial.
@@ -500,7 +545,7 @@ symbol-case giving up: case=((V U) (F))
                   (setq single-value value)
                   (push (ctype-of value) types)
                   (dolist (symbol (car clause))
-                    (let ((index (ldb byte (funcall hash-fun symbol))))
+                    (let ((index (hash-bits symbol)))
                       (aver (eql (aref bins index) 0)) ; no collisions
                       (setf (aref bins index) symbol
                             (aref values index) value)))))
@@ -528,7 +573,7 @@ symbol-case giving up: case=((V U) (F))
         ;; set of hash bins that it has placed a symbol into.
         (loop for clause in clauses for clause-index from 0
               do (dolist (symbol (car clause))
-                   (let ((masked-hash (ldb byte (funcall hash-fun symbol))))
+                   (let ((masked-hash (hash-bits symbol)))
                      (pushnew masked-hash (aref clause->bins clause-index))
                      (push (cons symbol clause-index) (aref bins masked-hash)))))
         ;; Canonically order each element of clause->bins

@@ -552,14 +552,14 @@
                                                        nil
                                                        0)))
                                       (arg-vals n-value n-supplied)
-                                      `((eq ,n-key ',keyword)
+                                      `((,keyword)
                                         (setq ,n-supplied ,(if supplied-used-p
                                                                t
                                                                1))
                                         (setq ,n-value ,n-value-temp))))
                                    (t
                                     (arg-vals n-value)
-                                    `((eq ,n-key ',keyword)
+                                    `((,keyword)
                                       (setq ,n-value ,n-value-temp))))))
                 (when (and (not allowp) (eq keyword :allow-other-keys))
                   (setq found-allow-p t)
@@ -579,7 +579,7 @@
               (temps n-allowp
                      (list n-lose '(make-unbound-marker)))
               (unless found-allow-p
-                (tests `((eq ,n-key :allow-other-keys)
+                (tests `(:allow-other-keys
                          (setq ,n-allowp ,n-value-temp))))
               (tests `(t
                        (setq ,n-lose ,n-key))))
@@ -598,7 +598,7 @@
                   (decf ,n-index)
                   (setq ,n-key (%more-arg ,n-context ,n-index))
                   (decf ,n-index)
-                  (cond ,@(tests))))
+                  (case ,n-key ,@(tests))))
              #+stack-grows-downward-not-upward
              `(locally (declare (optimize (safety 0)))
                 (loop
@@ -607,7 +607,7 @@
                       (%more-kw-arg ,n-context ,n-index)
                     (declare (ignorable ,n-value-temp ,n-key))
                     (incf ,n-index 2)
-                    (cond ,@(tests))))))
+                    (case ,n-key ,@(tests))))))
 
             (unless allowp
               (let ((location (make-restart-location)))

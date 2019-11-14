@@ -235,13 +235,14 @@
            (etypecase x ; croak on anything but these
             (null (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
             (symbol
-             ;; There had better not be homographs of NIL.
-             ;; See the comment in COMPUTE-SYMBOL-HASH for explanation.
-             (aver (string/= x "NIL"))
-             (let* ((string (coerce (string x) 'simple-string))
-                    (length (length string))
-                    (string-hash (sb-impl::%sxhash-simple-substring string 0 length)))
-               (logand (lognot string-hash) sb-xc:most-positive-fixnum)))
+             (cond ((string= x "NIL") ; :NIL must hash the same as NIL
+                    (ash sb-vm:nil-value (- sb-vm:n-fixnum-tag-bits)))
+                   (t
+                    (let* ((string (coerce (string x) 'simple-string))
+                           (length (length string))
+                           (string-hash
+                             (sb-impl::%sxhash-simple-substring string 0 length)))
+                      (logand (lognot string-hash) sb-xc:most-positive-fixnum)))))
             (sb-xc:fixnum #.+sxhash-fixnum-expr+)
             (single-float #.+sxhash-single-float-expr+)
             (double-float #.+sxhash-double-float-expr+))))

@@ -1532,6 +1532,9 @@ core and return a descriptor to it."
                          sb-vm:extended-symbol-size
                          sb-vm:symbol-size)
                      name :gspace gspace)))
+        ;; All interned symbols need a hash
+        (write-wordindexed handle sb-vm:symbol-hash-slot
+                           (make-fixnum-descriptor (sb-xc:sxhash symbol)))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)

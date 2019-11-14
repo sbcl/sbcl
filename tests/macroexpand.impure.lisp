@@ -285,7 +285,7 @@
                  ((or (eql s 'e) (eql s 'f) (eql s '|a|)) nil :bar))
                '(a b c d e f |a|)
                nil
-               'wonky-hash)))))
+               'wonky-hash 1)))))
     (loop for (expect . inputs) in tests
           do (dolist (input inputs)
                (assert (eql (funcall fun input) expect)))))
@@ -300,7 +300,7 @@
                  ((or (eql s 'b) (eql s 'a) (eql s '|d|)) nil :bar))
                '(a b c d e f |d|)
                nil
-               'wonky-hash)))))
+               'wonky-hash 1)))))
     (loop for (expect . inputs) in tests
           do (dolist (input inputs)
                (assert (eql (funcall fun input) expect))))))
