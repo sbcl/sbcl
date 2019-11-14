@@ -485,6 +485,7 @@ symbol-case giving up: case=((V U) (F))
            (bins (make-array (ash 1 table-nbits) :initial-element 0))
            (symbol (sb-xc:gensym "S"))
            (hash (sb-xc:gensym "H"))
+           (vector (sb-xc:gensym "V"))
            (is-hashable
             ;; For x86-64, any non-immediate object is considered hashable,
             ;; so we only do a lowtag test on the object, though the correct hash
@@ -617,8 +618,7 @@ symbol-case giving up: case=((V U) (F))
                       (delete bin-index (aref clause->bins clause-index))))))))
 
       ;; Compute the COND clauses over the range of hash values.
-      (let ((sym-vectors (loop repeat maxprobes
-                               collect (make-array (length bins) :initial-element 0)))
+      (let ((symbol-vector (make-array (* maxprobes (length bins)) :initial-element 0))
             (cond-clauses))
         ;; For each nonempty bin:
         ;; - If it contains >1 consequent, then arbitrarily pick one symbol to test
@@ -654,14 +654,17 @@ symbol-case giving up: case=((V U) (F))
                                  ,@(action clause-index))))))))
               (when cond-clause (push cond-clause cond-clauses)))))
 
-        ;; Fill in the symbol probing vectors.
+        ;; Fill in the symbol vector. Symbols in a bin are adjacent in the vector.
+        ;; 2 items per bin looks like so: | elt0 | elt1 | elt2 | elt3 | ...
+        ;;                                | <- bin 0 -> | <- bin 1 -> | ...
         (dotimes (hash (length bins))
-          (let ((contents (aref bins hash)))
-            (dolist (item contents)
-              (dotimes (i maxprobes (bug "Messup in CASE vectors for ~S" keys))
-                (when (eql (svref (nth i sym-vectors) hash) 0)
-                  (setf (svref (nth i sym-vectors) hash) (car item))
-                  (return))))))
+          (let ((items (aref bins hash))
+                (index (* hash maxprobes)))
+            (dotimes (i maxprobes)
+              (unless items (return))
+              (setf (aref symbol-vector index) (car (pop items)))
+              (incf index))
+            (when items (bug "Messup in CASE vectors for ~S" keys))))
 
         ;; If there is only one clause (plus possibly a default), then hash
         ;; collisions do not need to be disambiguated. Hence it can be implemented
@@ -671,23 +674,18 @@ symbol-case giving up: case=((V U) (F))
             `(let ((,symbol ,keyform) (,hash 0))
                (if (and ,is-hashable
                         ,(ecase maxprobes
-                           (1 `(eq (svref ,(elt sym-vectors 0) (setq ,hash ,calc-hash))
-                                   ,symbol))
-                           (2 `(or (eq (svref ,(elt sym-vectors 0) (setq ,hash ,calc-hash))
-                                       ,symbol)
-                                   (eq (svref ,(elt sym-vectors 1) ,hash) ,symbol)))))
+                           (1 `(eq (svref ,symbol-vector (setq ,hash ,calc-hash)) ,symbol))
+                           ;; FIXME: see why SVREF on constant vector of symbols would get
+                           ;; >1 header constant unless lexically bound.
+                           (2 `(let ((,vector ,symbol-vector))
+                                 (or (eq (svref ,vector (setq ,hash (ash ,calc-hash 1))) ,symbol)
+                                     (eq (svref ,vector (1+ ,hash)) ,symbol))))))
                    (progn ,@(cdar clauses))
                    ,(if errorp
                         `(ecase-failure ,symbol ,(coerce keys 'simple-vector))
                         `(progn ,@(cddr default)))))))
 
-        ;; Produce the COND
-        ;; But no other backend supports multiway branching,
-        ;; so return now, and not sooner, so that:
-        ;; - we can test the above logic (for AVER failures) on all platforms
-        ;; - no "unreachable code" notes are printed about this function
-        ;;   if we were to return early.
-        ;; So, just joking, maybe don't produce the COND.
+        ;; Produce a COND only if the backend supports the multiway branch vop.
         #+(or x86 x86-64)
         (let ((block (sb-xc:gensym "B"))
               (unused-bins))
@@ -700,9 +698,11 @@ symbol-case giving up: case=((V U) (F))
                  (let ((,hash ,calc-hash))
                    ;; At most two probes are required, and usually just 1
                    (when ,(ecase maxprobes
-                            (1 `(eq (svref ,(elt sym-vectors 0) ,hash) ,symbol))
-                            (2 `(or (eq (svref ,(elt sym-vectors 0) ,hash) ,symbol)
-                                    (eq (svref ,(elt sym-vectors 1) ,hash) ,symbol))))
+                            (1 `(eq (svref ,symbol-vector ,hash) ,symbol))
+                            (2 `(let ((,vector ,symbol-vector)
+                                      (,hash (ash ,hash 1)))
+                                  (or (eq (svref ,vector ,hash) ,symbol)
+                                      (eq (svref ,vector (1+ ,hash)) ,symbol)))))
                      (return-from ,block
                        (cond ,@(nreverse cond-clauses)
                              ,@(when unused-bins
