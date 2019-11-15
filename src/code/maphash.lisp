@@ -29,7 +29,15 @@
 ;;; It is the number of logical pairs in use, so if HWM = 1, then
 ;;; 1 pair is in use occupying physical element indices 2 and 3.
 (defmacro kv-vector-high-water-mark (pairs)
-  `(truly-the index/2 (svref ,pairs 0)))
+  `(truly-the index/2 (data-vector-ref ,pairs 0)))
+
+;;; Hash table iteration does not need to perform bounds checks on access to the
+;;; k/v pair vector.  We used to reload the local variable holding the k/v vector
+;;; on each loop iteration because PUTHASH could assign a new vector at any time.
+;;; It no longer will, provided that the restriction against mutating a table
+;;; (other than the current key) during traversal is obeyed. Even if violated,
+;;; the k/v vector won't shrink. But in any case, we grab the vector once only.
+;;; There are AVERs in the insertion code that the high water mark remains valid.
 
 (define-compiler-macro maphash (&whole form function-designator hash-table
                                 &environment env)
@@ -55,17 +63,11 @@
         ;; :VALUE hash table it's possible that the GC hit after KEY
         ;; was read and now the entry is gone. So check if either the
         ;; key or the value is empty.
-         (let ((,value (aref ,kv-vector ,i)))
-           (unless (empty-ht-slot-p ,value)
-             (let ((,key
-                    ;; I is bounded below by 3, and bounded above by INDEX max,
-                    ;; so (1- I) isn't checked for being an INDEX, but would
-                    ;; nonetheless be checked against the array bound despite
-                    ;; being obviously valid; so we force elision of the test.
-                    (locally (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-                      (aref ,kv-vector (1- ,i)))))
-               (unless (empty-ht-slot-p ,key)
-                 (funcall ,fun ,key ,value)))))))))
+         (let ((,key (data-vector-ref ,kv-vector (1- ,i)))
+               (,value (data-vector-ref ,kv-vector ,i)))
+           (unless (or (empty-ht-slot-p ,key)
+                       (empty-ht-slot-p ,value))
+             (funcall ,fun ,key ,value)))))))
 
 (defun maphash (function-designator hash-table)
   "For each entry in HASH-TABLE, call the designated two-argument function on
@@ -106,14 +108,11 @@ for."
                         (when (> index limit) (return nil))
                         (let ((i index))
                           (incf (truly-the index index) 2)
-                          (let ((value (aref kv-vector i)))
-                            (unless (empty-ht-slot-p value)
-                              (let ((key
-                                     (locally
-                                      (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-                                      (aref kv-vector (1- i)))))
-                                (unless (empty-ht-slot-p key)
-                                  (return (values t key value))))))))))
+                          (let ((key (data-vector-ref kv-vector (1- i)))
+                                (value (data-vector-ref kv-vector i)))
+                            (unless (or (empty-ht-slot-p key)
+                                        (empty-ht-slot-p value))
+                              (return (values t key value))))))))
                 #',name))))
        (macrolet ((,name () '(funcall ,function)))
          ,@body))))

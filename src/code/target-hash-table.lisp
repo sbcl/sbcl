@@ -333,6 +333,10 @@ Examples:
 ;;; or to the hash vector if the table is not weak.
 (defmacro kv-vector-table (pairs) `(svref ,pairs (1- (length ,pairs))))
 
+(declaim (inline set-kv-hwm)) ; can't setf data-vector-ref
+(defun set-kv-hwm (vector hwm) (setf (svref vector 0) hwm))
+(defsetf kv-vector-high-water-mark set-kv-hwm)
+
 (defmacro new-kv-vector (size weakp)
   `(let ((v (make-array (+ (* 2 ,size) kv-pairs-overhead-slots)
                         :initial-element +empty-ht-slot+)))
@@ -656,6 +660,7 @@ multiple threads accessing the same hash-table without locking."
                &aux (mask (1- (length index-vector)))
                     (next-free 0)
                     (hwm (kv-vector-high-water-mark kv-vector)))
+  (declare (simple-vector kv-vector))
   (if hash-vector
       ;; Scan backwards so that chains are in ascending index order.
       (do ((i hwm (1- i))) ((zerop i))
