@@ -1838,7 +1838,7 @@ or they must be declared locally notinline at each call site.~@:>"
                        (lambda (arg)
                          (multiple-value-bind (,@key var def sup-p) (,parse arg)
                            (declare (ignore ,@key def))
-                           (rewrite-1 arg var sup-p pretty)))
+                           (rewrite-1 arg var sup-p ,pretty)))
                        ,input)))
           (labels ((rewrite-1 (arg var sup-p-var pretty)
                      (vars var)
