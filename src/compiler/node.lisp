@@ -521,10 +521,6 @@
   ;;   on me (e.g. by using me as *CURRENT-COMPONENT*, or by pushing
   ;;   LAMBDAs onto my NEW-FUNCTIONALS, as in sbcl-0.pre7.115).
   (info :no-ir2-yet :type (or ir2-component (member :no-ir2-yet :dead)))
-  ;; count of the number of inline expansions we have done while
-  ;; compiling this component, to detect infinite or exponential
-  ;; blowups
-  (inline-expansions 0 :type index)
   ;; a map from combination nodes to things describing how an
   ;; optimization of the node failed. The description is an alist
   ;; (TRANSFORM . ARGS), where TRANSFORM is the structure describing
@@ -1420,6 +1416,10 @@
   var
   (value :prin1 (lvar-uses value)))
 
+(defvar *inline-expansions* nil)
+(declaim (list *inline-expansions*)
+         (always-bound *inline-expansions*))
+
 ;;; The BASIC-COMBINATION structure is used to represent both normal
 ;;; and multiple value combinations. In a let-like function call, this
 ;;; node appears at the end of its block and the body of the called
@@ -1427,8 +1427,8 @@
 (def!struct (basic-combination (:include valued-node)
                                (:constructor nil)
                                (:copier nil))
-  ;; LVAR for the function
-  (fun (missing-arg) :type lvar)
+    ;; LVAR for the function
+    (fun (missing-arg) :type lvar)
   ;; list of LVARs for the args. In a local call, an argument lvar may
   ;; be replaced with NIL to indicate that the corresponding variable
   ;; is unreferenced, and thus no argument value need be passed.
@@ -1451,7 +1451,9 @@
   ;; some kind of information attached to this node by the back end
   ;; or by CHECK-IMPORTANT-RESULT
   (info nil)
-  (step-info))
+  (step-info)
+  ;; A plist of inline expansions
+  (inline-expansions *inline-expansions* :type list :read-only t))
 
 ;;; The COMBINATION node represents all normal function calls,
 ;;; including FUNCALL. This is distinct from BASIC-COMBINATION so that

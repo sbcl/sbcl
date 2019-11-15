@@ -1042,8 +1042,9 @@
                          :source-name source-name
                          :debug-name debug-name))
     ((named-lambda)
-     (let ((name (cadr thing))
-           (lambda-expression `(lambda ,@(cddr thing))))
+     (let* ((name (cadr thing))
+            (lambda-expression `(lambda ,@(cddr thing)))
+            (*inline-expansions* (list name 1 *inline-expansions*)))
        (if (and name (legal-fun-name-p name))
            (let ((defined-fun-res (get-defined-fun name (second lambda-expression)))
                  (res (ir1-convert-lambda lambda-expression

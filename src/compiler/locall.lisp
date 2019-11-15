@@ -404,22 +404,23 @@
 ;;; reference.
 (defun maybe-expand-local-inline (original-functional ref call)
   (if (and (policy call
-                   (and (>= speed space)
-                        (>= speed compilation-speed)))
+               (and (>= speed space)
+                    (>= speed compilation-speed)))
            (not (eq (functional-kind (node-home-lambda call)) :external))
-           (inline-expansion-ok call))
+           (inline-expansion-ok call original-functional))
       (let* ((end (component-last-block (node-component call)))
              (pred (block-prev end)))
         (multiple-value-bind (losing-local-object converted-lambda)
             (catch 'locall-already-let-converted
               (with-ir1-environment-from-node call
-                (let ((*lexenv* (functional-lexenv original-functional)))
+                (let ((*inline-expansions*
+                        (register-inline-expansion original-functional call))
+                      (*lexenv* (functional-lexenv original-functional)))
                   (values nil
                           (ir1-convert-lambda
                            (functional-inline-expansion original-functional)
                            :debug-name (debug-name 'local-inline
-                                                   (leaf-debug-name
-                                                    original-functional)))))))
+                                                   (leaf-%source-name original-functional)))))))
           (cond (losing-local-object
                  (if (functional-p losing-local-object)
                      (let ((*compiler-error-context* call))

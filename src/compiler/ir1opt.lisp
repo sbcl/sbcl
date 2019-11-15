@@ -1086,6 +1086,16 @@
                      (mark-for-deletion succ)))))
         t))))
 
+(defun register-inline-expansion (leaf call)
+  (let* ((name (leaf-%source-name leaf))
+         (calls (basic-combination-inline-expansions call))
+         (recursive (memq name calls)))
+    (cond (recursive
+           (incf (cadr recursive))
+           calls)
+          (t
+           (list* name 1 calls)))))
+
 ;;; This is called both by IR1 conversion and IR1 optimization when
 ;;; they have verified the type signature for the call, and are
 ;;; wondering if something should be done to special-case the call. If
@@ -1129,7 +1139,7 @@
               ((nil maybe-inline) (policy call (zerop space))))
             (defined-fun-p leaf)
             (defined-fun-inline-expansion leaf)
-            (inline-expansion-ok call))
+            (inline-expansion-ok call leaf))
        ;; Inline: if the function has already been converted at another call
        ;; site in this component, we point this REF to the functional. If not,
        ;; we convert the expansion.
@@ -1146,6 +1156,8 @@
                    (and (eq inlinep 'inline) (functional-kind fun)))
                ;; Convert.
                (let* ((name (leaf-source-name leaf))
+                      (*inline-expansions*
+                        (register-inline-expansion leaf call))
                       (res (ir1-convert-inline-expansion
                             name
                             (defined-fun-inline-expansion leaf)

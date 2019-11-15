@@ -2666,36 +2666,27 @@ is :ANY, the function name is not checked."
   (aver (eq (basic-combination-kind call) :local))
   (ref-leaf (lvar-uses (basic-combination-fun call))))
 
-(defvar *inline-expansion-limit* 200
+(defvar *inline-expansion-limit* 50
   "an upper limit on the number of inline function calls that will be expanded
    in any given code object (single function or block compilation)")
 
 ;;; Check whether NODE's component has exceeded its inline expansion
 ;;; limit, and warn if so, returning NIL.
-(defun inline-expansion-ok (node)
-  (let ((expanded (incf (component-inline-expansions
-                         (block-component
-                          (node-block node))))))
-    (cond ((> expanded *inline-expansion-limit*) nil)
+(defun inline-expansion-ok (combination leaf)
+  (let* ((expansions (memq (leaf-%source-name leaf)
+                           (basic-combination-inline-expansions combination)))
+         (expanded (cadr expansions)))
+    (cond ((not expanded))
+          ((> expanded *inline-expansion-limit*) nil)
           ((= expanded *inline-expansion-limit*)
-           ;; FIXME: If the objective is to stop the recursive
-           ;; expansion of inline functions, wouldn't it be more
-           ;; correct to look back through surrounding expansions
-           ;; (which are, I think, stored in the *CURRENT-PATH*, and
-           ;; possibly stored elsewhere too) and suppress expansion
-           ;; and print this warning when the function being proposed
-           ;; for inline expansion is found there? (I don't like the
-           ;; arbitrary numerical limit in principle, and I think
-           ;; it'll be a nuisance in practice if we ever want the
-           ;; compiler to be able to use WITH-COMPILATION-UNIT on
-           ;; arbitrarily huge blocks of code. -- WHN)
-           (let ((*compiler-error-context* node))
+           (let ((*compiler-error-context* combination))
              (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
                                probably trying to~%  ~
                                inline a recursive function."
                               *inline-expansion-limit*))
+           (incf (cadr expansions))
            nil)
-          (t t))))
+          (t))))
 
 ;;; Make sure that FUNCTIONAL is not let-converted or deleted.
 (defun assure-functional-live-p (functional)
