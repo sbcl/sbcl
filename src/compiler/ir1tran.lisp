@@ -35,11 +35,9 @@
     (gethash form *source-paths*)))
 
 (defun ensure-source-path (form)
-  (and (boundp '*source-paths*)
-       (boundp '*current-path*)
-       (or (get-source-path form)
-           (cons (simplify-source-path-form form)
-                 *current-path*))))
+  (or (get-source-path form)
+      (cons (simplify-source-path-form form)
+            *current-path*)))
 
 (defun simplify-source-path-form (form)
   (if (consp form)

@@ -264,7 +264,7 @@
                            :initargs ',initargs  'source ,location ',others)))
               (push (if (eq initform unsupplied)
                         `(list* ,@canon)
-                        `(list* :initfunction ,(make-initfunction initform type)
+                        `(list* :initfunction ,(make-initfunction initform type spec)
                                 ,@canon))
                     canonized-specs))))))
     (nreverse canonized-specs)))
@@ -285,7 +285,8 @@
            (%program-error "Multiple slots named ~S in DEFCLASS ~S."
                            name class-name)))))
 
-(defun make-initfunction (initform &optional (type t))
+(defun make-initfunction (initform &optional (type t)
+                                             source-form)
   (cond ((and (or (eq initform t)
                   (equal initform ''t))
               (neq type t))
@@ -301,12 +302,13 @@
         (t
          (let* ((initform (if (eq type t)
                               initform
-                              `(the* (,type :source-path ,(sb-c::ensure-source-path initform)
-                                            ;; Don't want to insert a cast,
-                                            ;; as a subclass may change the type,
-                                            ;; just report this at compile-time.
-                                            :use-annotations t)
-                                     ,initform)))
+                              `(sb-c::with-source-form ,source-form
+                                (the* (,type :source-form ,initform
+                                       ;; Don't want to insert a cast,
+                                       ;; as a subclass may change the type,
+                                       ;; just report this at compile-time.
+                                             :use-annotations t)
+                                      ,initform))))
                 (entry (assoc initform *initfunctions-for-this-defclass*
                               :test #'equal)))
            (unless entry

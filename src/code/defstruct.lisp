@@ -254,8 +254,8 @@
             (:symbol it "defining ~s as an accessor for ~s structure" name))))))
 
 ;;; Since DSDs live a long time for inheritance purposes don't attach
-;;; the source path to them directly.
-(defvar *dsd-source-path*)
+;;; the source form to them directly.
+(defvar *dsd-source-form*)
 
 ;;; shared logic for host macroexpansion for SB-XC:DEFSTRUCT and
 ;;; cross-compiler macroexpansion for CL:DEFSTRUCT
@@ -303,7 +303,7 @@
                   ;; on the NAME slot, we can be a little more clear.
                   (error "DEFSTRUCT: ~S is not a symbol." name)))
          (dd (make-defstruct-description null-env-p name))
-         (*dsd-source-path* nil)
+         (*dsd-source-form* nil)
          ((classoid inherits) (parse-defstruct dd options slot-descriptions))
          (constructor-definitions
           (mapcar (lambda (ctor)
@@ -906,7 +906,7 @@ unless :NAMED is also specified.")))
                                         always-boundp rsd-index)
                          default)))
       #-sb-xc-host
-      (push (cons dsd (sb-c::ensure-source-path spec)) *dsd-source-path*)
+      (push (cons dsd spec) *dsd-source-form*)
       (setf (dd-slots defstruct) (nconc (dd-slots defstruct) (list dsd)))
       dsd)))
 
@@ -1785,20 +1785,19 @@ or they must be declared locally notinline at each call site.~@:>"
   (labels ((default-value (dsd &optional pretty)
              (let ((default (dsd-default dsd))
                    (type (dsd-type dsd))
-                   (source-path (and (boundp '*dsd-source-path*)
-                                     (cdr (assq dsd *dsd-source-path*)))))
+                   (source-form (and (boundp '*dsd-source-form*)
+                                     (cdr (assq dsd *dsd-source-form*)))))
                (cond ((and default
                            (neq type t)
                            (not pretty))
-                      `(the* (,type :source-path ,source-path
+                      `(the* (,type :source-form ,source-form
                                     :context :initform
                                     :use-annotations t)
                              ,default))
-                     ((and default source-path
+                     ((and default source-form
                            (not pretty))
-                      `(sb-c::with-source-form
-                           (:source-path ,source-path)
-                           ,default))
+                      `(sb-c::with-source-form ,source-form
+                                               ,default))
                      (t
                       default))))
            (parse (&optional pretty)

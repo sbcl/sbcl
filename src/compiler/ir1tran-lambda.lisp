@@ -569,8 +569,7 @@
                                             (neq (lambda-var-type key) *universal-type*))
                                        `(the* (,(lambda-var-type key)
                                                :use-annotations t
-                                               :source-path ,(get-source-path
-                                                              (lambda-var-source-form key)))
+                                               :source-form ,(lambda-var-source-form key))
                                               ,default)
                                        default)))
                 (tests clause)))
@@ -691,7 +690,7 @@
              ;; was: (format nil "~A-DEFAULTING-TEMP" (leaf-source-name key))
              (n-val (make-symbol ".DEFAULTING-TEMP."))
              (val-temp (make-lambda-var :%source-name n-val))
-             (default `(with-source-form (:source-form ,(lambda-var-source-form key))
+             (default `(with-source-form ,(lambda-var-source-form key)
                          ,default)))
         (main-vars val-temp)
         (bind-vars key)

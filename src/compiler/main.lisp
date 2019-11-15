@@ -1435,7 +1435,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                   (when compile-time-too
                     (eval-compile-toplevel (list form) path))
                   (cond ((deferrable-tlf-p form)
-                         (push (vector *source-paths* *policy* *handled-conditions*
+                         (push (vector (copy-hash-table *source-paths*)
+                                       *policy* *handled-conditions*
                                        *disabled-package-locks* *lexenv* form path)
                                (queued-tlfs)))
                         (t
@@ -1446,6 +1447,14 @@ necessary, since type inference may take arbitrarily long to converge.")
                            (convert-and-maybe-compile form path)))))))))))
 
   (values))
+
+(defun copy-hash-table (hash-table)
+  (let ((new (make-hash-table :test (hash-table-test hash-table)
+                              :size (hash-table-size hash-table))))
+    (maphash (lambda (key value)
+               (setf (gethash key new) value))
+             hash-table)
+    new))
 
 ;;;; load time value support
 ;;;;
