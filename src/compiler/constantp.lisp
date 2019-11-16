@@ -230,6 +230,19 @@
              (constant-form-value* values)
            (constant-form-value* (car (last forms)))))
 
+(!defconstantp with-source-form (source-form form)
+   :test (constantp* form)
+   :eval (constant-form-value* form))
+
+(!defconstantp the* (options form)
+   :test (destructuring-bind (type &key use-annotations
+                              &allow-other-keys)
+             options
+           (declare (ignore type))
+           (and use-annotations
+                (constantp* form)))
+   :eval (constant-form-value* form))
+
 ;;;
 
 (macrolet
@@ -258,9 +271,9 @@
   (defun constant-special-form-value (form environment envp)
     (let ((result))
       (tagbody
-       (setq result (expand-cases 2 (return-from constant-special-form-value
-                                      (values nil nil))))
-       (return-from constant-special-form-value (values t result))
+         (setq result (expand-cases 2 (return-from constant-special-form-value
+                                        (values nil nil))))
+         (return-from constant-special-form-value (values t result))
        fail))
     ;; Mutatation of FORM could cause failure. It's user error, not a bug.
     (error "CONSTANT-FORM-VALUE called with invalid expression ~S" form)))
