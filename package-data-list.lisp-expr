@@ -489,13 +489,13 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
       :use ("CL" "SB-EXT" "SB-INT" "SB-KERNEL" "SB-SYS" "SB-VM")
       :import-from (("SB-C"
                      "DEBUG-SOURCE-NAMESTRING"
-                     "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
+                     "DEBUG-SOURCE-CREATED"
                      "MAKE-DEBUG-SOURCE"
                      "DEBUG-SOURCE" "DEBUG-SOURCE-P"
                      "CORE-DEBUG-SOURCE" "CORE-DEBUG-SOURCE-P"
                      "CORE-DEBUG-SOURCE-FORM"))
       :reexport ("DEBUG-SOURCE-NAMESTRING"
-                 "DEBUG-SOURCE-CREATED" "DEBUG-SOURCE-COMPILED"
+                 "DEBUG-SOURCE-CREATED"
                  "DEBUG-SOURCE" "DEBUG-SOURCE-P")
       :export ("ACTIVATE-BREAKPOINT"
                "AMBIGUOUS-DEBUG-VARS" "AMBIGUOUS-VAR-NAME" "BREAKPOINT"
