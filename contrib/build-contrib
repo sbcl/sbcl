@@ -1,0 +1,9 @@
+#!/bin/sh
+
+mkdir -p ../obj/asdf-cache/$@/
+
+if $GNUMAKE -j1 -C $@ test < /dev/null 2>&1 && touch ../obj/asdf-cache/$@/test-passed.test-report ; then
+	:
+else
+	exit $?
+fi | tee ../output/building-contrib.$@

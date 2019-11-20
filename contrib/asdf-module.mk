@@ -29,7 +29,6 @@ export CC SBCL EXTRA_CFLAGS
 all: $(FASL) $(ASD)
 
 $(FASL)::
-	$(MAKE) -C ../asdf
 	$(SBCL) --eval '(setf (sb-ext:readtable-base-char-preference *readtable*) :both)' \
 		--load ../asdf-stub.lisp \
 		--eval '(asdf::build-asdf-contrib "$(SYSTEM)")'

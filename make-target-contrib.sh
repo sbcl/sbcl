@@ -55,41 +55,20 @@ export SBCL SBCL_BUILDING_CONTRIB
 # as SB-RT and SB-GROVEL, but FIXME: there's probably a better
 # solution.  -- CSR, 2003-05-30
 if [ -z "$DONT_CLEAN_SBCL_CONTRIB" ] ; then
-  find contrib/ obj/asdf-cache/ obj/sbcl-home/contrib/ \
-    \( -name '*.fasl' -o \
-       -name '*.FASL' -o \
-       -name 'foo.c' -o \
-       -name 'FOO.C' -o \
-       -name 'a.out' -o \
-       -name 'A.OUT' -o \
-       -name 'alien.so' -o \
-       -name 'ALIEN.SO' -o \
-       -name '*.o' -o \
-       -name '*.O' \) \
-    -print | xargs rm -f
+  rm -fr obj/sbcl-home/contrib/
+  rm -fr obj/asdf-cache/
 fi
 
 find output -name 'building-contrib.*' -print | xargs rm -f
 
 # Ignore all source registries.
 if [ -z "$*" ]; then
-    contribs_to_build="`cd contrib ; echo *`"
+    $GNUMAKE $SBCL_MAKE_JOBS -C contrib
 else
-    contribs_to_build="$*"
+    for x in "$@"; do
+        $GNUMAKE -C contrib $x.fasl
+    done
 fi
-
-for i in $contribs_to_build; do
-    test -d contrib/$i && test -f contrib/$i/Makefile || continue;
-    test -f contrib/$i/test-passed && rm contrib/$i/test-passed # remove old convention
-    test -f obj/asdf-cache/$i/test-passed.test-report && rm obj/asdf-cache/$i/test-passed.test-report
-    mkdir -p obj/asdf-cache/$i/
-    # hack to get exit codes right.
-    if $GNUMAKE -C contrib/$i test < /dev/null 2>&1 && touch obj/asdf-cache/$i/test-passed.test-report ; then
-	:
-    else
-	exit $?
-    fi | tee output/building-contrib.`basename $i` 
-done
 
 # Otherwise report expected failures:
 HEADER_HAS_BEEN_PRINTED=false
