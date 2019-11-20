@@ -589,28 +589,28 @@
              (foo #'sink list))))
 
     Performance counters on Haswell for (defvar *SOME-SIZE* 4), before:
-              4 889,34 msec task-clock:u
-        17 667 385 758      cycles:u
-        11 739 853 382      instructions:u
-         2 363 529 234      branches:u
-             6 884 040      branch-misses:u
+              4 889,34 msec task-clock:u
+        17 667 385 758      cycles:u
+        11 739 853 382      instructions:u
+         2 363 529 234      branches:u
+             6 884 040      branch-misses:u
     After:
-              1 420,13 msec task-clock:u
-         5 062 214 204      cycles:u
-        13 953 180 368      instructions:u
-         2 766 006 753      branches:u
-             7 413 325      branch-misses:u
+              1 420,13 msec task-clock:u
+         5 062 214 204      cycles:u
+        13 953 180 368      instructions:u
+         2 766 006 753      branches:u
+             7 413 325      branch-misses:u
 
     For (defvar *SOME-SIZE* 15), same hardware, before:
-              6 015,25 msec task-clock:u
-        21 262 810 113      cycles:u
-        20 540 217 689      instructions:u
-         4 563 619 868      branches:u
-             6 911 595      branch-misses:u
+              6 015,25 msec task-clock:u
+        21 262 810 113      cycles:u
+        20 540 217 689      instructions:u
+         4 563 619 868      branches:u
+             6 911 595      branch-misses:u
     After:
-              2 632,55 msec task-clock:u
-         9 443 084 906      cycles:u
-        29 353 187 880      instructions:u
-         6 065 994 889      branches:u
-             6 974 505      branch-misses:u
+              2 632,55 msec task-clock:u
+         9 443 084 906      cycles:u
+        29 353 187 880      instructions:u
+         6 065 994 889      branches:u
+             6 974 505      branch-misses:u
 |#
