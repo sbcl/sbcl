@@ -280,6 +280,8 @@
     #-fp-and-pc-standard-save compiled-debug-fun-cfp-saved-pc
     #+unwind-to-frame-and-call-vop compiled-debug-fun-bsp-save))
 
+;;; If you add more subtypes here, be sure to amend the set of
+;;; predefined layout FOP codes in src/code/fop
 (def!struct (compiled-debug-fun-optional (:include compiled-debug-fun)
                                          #-sb-xc-host (:pure t)
                                          (:copier nil)
