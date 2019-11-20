@@ -687,3 +687,16 @@
                      (format t "~x -> ~d (~a)~%"
                              ptr index (sb-kernel:make-lisp-obj tagged-fun))))))
             (assert (= count n))))))))
+
+(with-test (:name :repeatable-fasl)
+  (with-scratch-file (output1 "fasl")
+    (compile-file "bug-414.lisp" ; compile this file, why not
+                  ::output-file output1 :verbose nil :print nil)
+    (with-scratch-file (output2 "fasl")
+      (compile-file "bug-414.lisp" ; compile this file, why not
+                    ::output-file output2 :verbose nil :print nil)
+      (with-open-file (fasl1 output1 :element-type '(unsigned-byte 8))
+        (with-open-file (fasl2 output2 :element-type '(unsigned-byte 8))
+          (assert (= (file-length fasl1) (file-length fasl2)))
+          (loop repeat (file-length fasl1)
+                do (assert (= (read-byte fasl1) (read-byte fasl2)))))))))

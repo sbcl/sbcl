@@ -464,8 +464,7 @@ sb-c::
 (defun coalesce-debug-info ()
   (flet ((debug-source= (a b)
            (and (equal (debug-source-plist a) (debug-source-plist b))
-                (eql (debug-source-created a) (debug-source-created b))
-                (eql (debug-source-compiled a) (debug-source-compiled b)))))
+                (eql (debug-source-created a) (debug-source-created b)))))
     ;; Coalesce the following:
     ;;  DEBUG-INFO-SOURCE, DEBUG-FUN-NAME
     ;;  SIMPLE-FUN-ARGLIST, SIMPLE-FUN-TYPE

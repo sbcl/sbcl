@@ -306,7 +306,6 @@
   (let ((file-info (get-toplevelish-file-info info)))
     (multiple-value-call
         (if function #'sb-c::make-core-debug-source #'make-debug-source)
-     :compiled (source-info-start-time info)
      :namestring (or *source-namestring*
                      (make-file-info-namestring
                       (let ((pathname

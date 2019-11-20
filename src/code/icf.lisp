@@ -364,14 +364,9 @@
                                      (keyfn (x)
                                        #+64-bit
                                        (%code-serialno x)
-                                       ;; Creation time is an estimate of order, but
-                                       ;; frankly we shouldn't be storing times anyway,
-                                       ;; as it causes irreproducible builds.
-                                       ;; But I don't know what else to do.
+                                       ;; 32-bit code objects will need another slot
                                        #-64-bit
-                                       (sb-c::debug-source-compiled
-                                        (sb-c::compiled-debug-info-source
-                                         (%code-debug-info x))))
+                                       (bug "Need to pick a deterministic order key for ~A" x))
                                      (compare (a b)
                                        (let ((exported-a (exported-p a))
                                              (exported-b (exported-p b) ))
