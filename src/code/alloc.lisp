@@ -478,8 +478,12 @@
     ;; Use ATOMIC-INCF on the serialno to get automatic wraparound,
     ;; and not because atomicity makes things deterministic, which it doesn't
     ;; if there are several threads allocating code.
-    ;; TODO: this unnecessarily calls CODE-HEADER-SET if code cards use soft
-    ;; marking. Maybe pin the object and use (SETF SAP-REF-WORD) instead.
+    (with-pinned-objects (code)
+      (setf (sap-ref-word (int-sap (get-lisp-obj-address code))
+                          (- (ash code-boxed-size-slot word-shift) other-pointer-lowtag))
+            (logior #+64-bit (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
+                                     most-positive-word)
+                    (ash boxed word-shift))))
 
     ;; FIXME: Sort out 64-bit and cheneygc.
     #+(and 64-bit cheneygc)
@@ -487,10 +491,4 @@
           (%make-lisp-obj
            (logior (ash total-words 32)
                    sb-vm:code-header-widetag)))
-    (setf (code-header-ref code code-boxed-size-slot)
-          (%make-lisp-obj
-           (logior (ash boxed word-shift)
-                   #+64-bit
-                   (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
-                           most-positive-word))))
     code))

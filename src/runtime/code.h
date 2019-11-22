@@ -75,6 +75,12 @@ static inline char* code_text_start(struct code* code) {
 static inline int code_text_size(struct code* c) {
     return N_WORD_BYTES * code_total_nwords(c) - code_boxed_len(c) - code_trailer_len(c);
 }
+/// Return the text start, unless the boxed size has not yet been assigned.
+/// In the latter case, the text start would seem to be the object address,
+/// and reading a word there as if it were the jump table size would be wrong.
+static inline lispobj* code_jumptable_start(struct code* code) {
+    return code->boxed_size ? (lispobj*)code_text_start(code) : 0;
+}
 
 // How many elements in 'code->constants[]' are taken by each simple-fun
 #define CODE_SLOTS_PER_SIMPLE_FUN 4

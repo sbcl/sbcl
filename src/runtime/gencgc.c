@@ -2840,7 +2840,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 {
                 struct code *code = (struct code *) where;
                 sword_t nheader_words = code_header_words(code);
-                gc_assert(fixnump(where[1])); // code_size
+                gc_assert(fixnump(where[1])); // boxed size
                 /* Verify the boxed section of the code data block */
                 state->min_pointee_gen = 8; // initialize to "positive infinity"
                 verify_range(where + 2, nheader_words - 2, state);
