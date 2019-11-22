@@ -135,6 +135,7 @@
   (declare (ignore type state))
   (list (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number nargs-offset)
         (make-wired-tn* 'unsigned-byte-32 unsigned-reg-sc-number nl3-offset)
+        (make-normal-tn (primitive-type-or-lose 'double-float))
         'move-int-args-to-double))
 
 #-arm-softfp

@@ -731,12 +731,12 @@
         (cond
           #+arm-softfp
           ((and lvar
-                (proper-list-of-length-p result-tns 3)
-                (symbolp (third result-tns)))
+                (fourth result-tns))
            (emit-template call block
-                          (template-or-lose (third result-tns))
-                          (reference-tn-list (butlast result-tns) nil)
-                          (reference-tn (car (ir2-lvar-locs (lvar-info lvar))) t)))
+                          (template-or-lose (fourth result-tns))
+                          (reference-tn-list (butlast result-tns 2) nil)
+                          (reference-tn (third result-tns) t))
+           (move-lvar-result call block (list (third result-tns)) lvar))
           (t
            (move-lvar-result call block result-tns lvar)))))))
 
