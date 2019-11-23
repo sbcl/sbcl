@@ -11,6 +11,10 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+# Most of our shell tests write a few files into the source tree which is bad,
+# but this script is especially bad because it spews out dozens of files.
+export TEST_BASEDIR=${TMPDIR:-/tmp}
+
 . ./subr.sh
 
 use_test_subdirectory

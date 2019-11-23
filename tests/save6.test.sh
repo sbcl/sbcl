@@ -1,3 +1,4 @@
+export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 use_test_subdirectory

@@ -1,5 +1,7 @@
+export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
+sourcefile=`pwd -P`/heap-reloc/embiggen.lisp
 use_test_subdirectory
 
 tmpcore=$TEST_FILESTEM.core
@@ -13,7 +15,7 @@ tmpcore=$TEST_FILESTEM.core
 # all pointer slots. I believe that it was a coincidence that my test croaked
 # specifically while scanning layout-of-layout. It could have been any
 # structure having a slot holding a bignum EQ to its own layout-bitmap.
-run_sbcl --load ../heap-reloc/embiggen.lisp <<EOF
+run_sbcl --load ${sourcefile} <<EOF
   #+gencgc (setf (extern-alien "verify_gens" char) 0)
   (save-lisp-and-die "$tmpcore")
 EOF
