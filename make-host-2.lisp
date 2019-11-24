@@ -51,13 +51,16 @@
              (eq (sb-int:info :function :where-from s) :assumed))
       (error "INLINE declaration for an undefined function: ~S?" s)))
 
-;; enable this too see which vops were or weren't used
-#+nil
-(when (hash-table-p sb-c::*static-vop-usage-counts*)
-  (format t "Vops used:~%")
-  (dolist (cell (sort (sb-int:%hash-table-alist sb-c::*static-vop-usage-counts*)
-                      #'> :key #'cdr))
-    (format t "~6d ~s~%" (cdr cell) (car cell))))
+(with-open-file (output "output/cold-vop-usage.txt"
+                        :direction :output :if-exists :supersede)
+  (sb-int:dohash ((name vop) sb-c::*backend-parsed-vops*)
+    (declare (ignore vop))
+    (format output "~7d ~s~%"
+            (gethash name sb-c::*static-vop-usage-counts* 0)
+            ;; change SB-XC symbols back to their normal counterpart
+            (if (string= (cl:package-name (cl:symbol-package name)) "SB-XC")
+                (find-symbol (string name) "COMMON-LISP")
+                name))))
 
 (when sb-c::*track-full-called-fnames*
   (let (possibly-suspicious likely-suspicious)

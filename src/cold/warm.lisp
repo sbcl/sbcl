@@ -75,6 +75,14 @@
                  "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
                  expr actual)))))))))
 
+(when (if (boundp '*compile-files-p*) *compile-files-p* t)
+  (with-open-file (output "output/cold-vop-usage.txt")
+    (setq sb-c::*static-vop-usage-counts* (make-hash-table))
+    (loop (let ((line (read-line output nil)))
+            (unless line (return))
+            (let ((count (read-from-string line))
+                  (name (read-from-string line t nil :start 8)))
+              (setf (gethash name sb-c::*static-vop-usage-counts*) count))))))
 
 ;;;; compiling and loading more of the system
 
@@ -175,3 +183,13 @@
                                       (write-to-string c :escape nil))
                           (cerror "Finish warm compile ignoring the problem" c)))))
         (with-compilation-unit () (do-srcs group)))))))
+
+(when (if (boundp '*compile-files-p*) *compile-files-p* t)
+  (with-open-file (output "output/warm-vop-usage.txt"
+                          :direction :output :if-exists :supersede)
+    (let (list)
+      (sb-int:dohash ((name vop) sb-c::*backend-parsed-vops*)
+        (declare (ignore vop))
+        (push (cons (gethash name sb-c::*static-vop-usage-counts* 0) name) list))
+      (dolist (cell (sort list #'> :key #'car))
+        (format output "~7d ~s~%" (car cell) (cdr cell))))))
