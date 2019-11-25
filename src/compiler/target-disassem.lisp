@@ -792,7 +792,9 @@
         (loop with insts = (code-instructions code)
               for i from 1 below (code-jump-table-words code)
               do (pushnew (cons (sap-ref-word insts (ash i sb-vm:word-shift)) nil)
-                          labels :key #'car))))
+                          labels :key #'car
+                          ;; FIXME: compiler uses EQ instead of EQL unless forced
+                          :test #'=))))
     ;; Return the new list
     (setf (dstate-labels dstate) labels)))
 
