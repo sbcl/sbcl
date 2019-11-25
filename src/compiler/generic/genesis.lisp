@@ -1449,8 +1449,7 @@ core and return a descriptor to it."
                      :%used-by-list (list-to-core (cddr cell))))
       ;; finally, assign *PACKAGE* since it supposed to be always-bound
       ;; and various things assume that it is. e.g. FIND-PACKAGE has an
-      ;; (IF (BOUNDP '*PACKAGE*)) test which the compiler could elide as
-      ;; tautologically true if it wanted to.
+      ;; (IF (BOUNDP '*PACKAGE*)) test which the compiler elides.
       (cold-set '*package* (find-cold-package "COMMON-LISP-USER")))))
 
 (defvar *uninterned-symbol-table* (make-hash-table :test #'equal))
@@ -1502,6 +1501,7 @@ core and return a descriptor to it."
 
 ;;; Return a handle on an interned symbol. If necessary allocate the
 ;;; symbol and record its home package.
+(defvar core-file-name)
 (defun cold-intern (symbol
                     &key (access nil)
                          (gspace (symbol-value *cold-symbol-gspace*))
@@ -1533,8 +1533,11 @@ core and return a descriptor to it."
                          sb-vm:symbol-size)
                      name :gspace gspace)))
         ;; All interned symbols need a hash
-        (write-wordindexed handle sb-vm:symbol-hash-slot
-                           (make-fixnum-descriptor (sb-xc:sxhash symbol)))
+        (when core-file-name
+          ;; If not writing a core file, do not try to call SB-XC:SXHASH
+          ;; as it might not be defined (as when running make-c-runtime)
+          (write-wordindexed handle sb-vm:symbol-hash-slot
+                             (make-fixnum-descriptor (sb-xc:sxhash symbol))))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
@@ -1582,7 +1585,6 @@ core and return a descriptor to it."
     (setf (gethash (descriptor-bits nil-val) *cold-symbols*) nil
           (get nil 'cold-intern-info) nil-val)))
 
-(defvar core-file-name)
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
 (defun initialize-static-space ()
