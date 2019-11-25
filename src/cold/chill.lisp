@@ -19,6 +19,15 @@
   (:use "CL"))
 (in-package "SB-COLD")
 
+(defstruct package-data name doc shadow export reexport import-from use)
+(export 'package-data)
+(dolist (data (with-open-file (f "package-data-list.lisp-expr") (read f)))
+  (labels ((flatten (tree)
+             (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
+                     tree)))
+    (let ((*package* (find-package (package-data-name data))))
+      (export (mapcar 'intern (flatten (package-data-export data)))))))
+
 (sb-ext:unlock-package "CL")
 (rename-package "COMMON-LISP" "COMMON-LISP"
                 (cons "SB-XC" (package-nicknames "CL")))
@@ -34,7 +43,7 @@
   (values)) ; ignore the $ as if it weren't there
 (compile 'read-target-float)
 ;;; We need the #! readtable modifications.
-(load (merge-pathnames "shebang.lisp" *load-truename*))
+(load (merge-pathnames "shebang.lisp" *load-pathname*))
 ;;; ... applied to the default readtable
 (set-dispatch-macro-character #\# #\+ #'read-targ-feature-expr)
 (set-dispatch-macro-character #\# #\- #'read-targ-feature-expr)
@@ -45,15 +54,11 @@
 (setf sb-cold:*shebang-backend-subfeatures* sb-c:*backend-subfeatures*)
 
 ;; Restore !DEFINE-LOAD-TIME-GLOBAL macro
-(export 'sb-int::!define-load-time-global 'sb-int)
 (setf (macro-function 'sb-int::!define-load-time-global)
       (macro-function 'sb-ext:define-load-time-global))
 
-(export '(sb-int::!cold-init-forms
-          sb-int::/show sb-int::/noshow sb-int::/show0 sb-int::/noshow0)
-        'sb-int)
-
-(defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms))
+(unless (fboundp 'sb-int:!cold-init-forms)
+  (defmacro sb-int:!cold-init-forms (&rest forms) `(progn ,@forms)))
 
 ;; If :sb-show is present, then these symbols are fboundp.
 ;; Otherwise define them as no-ops.
@@ -62,15 +67,3 @@
   (setf (macro-function 'sb-int:/noshow) (macro-function 'sb-int:/show)
         (macro-function 'sb-int:/show0) (macro-function 'sb-int:/show)
         (macro-function 'sb-int:/noshow0) (macro-function 'sb-int:/show)))
-
-(unless (find-package "SB-COLD")
-  (make-package "SB-COLD" :use '("CL")))
-(in-package "SB-COLD")
-(defstruct package-data name doc shadow export reexport import-from use)
-(export 'package-data)
-(dolist (data (with-open-file (f "package-data-list.lisp-expr") (read f)))
-  (labels ((flatten (tree)
-             (mapcan (lambda (x) (if (listp x) (flatten x) (list x)))
-                     tree)))
-    (let ((*package* (find-package (package-data-name data))))
-      (export (mapcar 'intern (flatten (package-data-export data)))))))

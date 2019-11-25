@@ -1,5 +1,9 @@
 (("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
  ("case.pure.lisp" "tests/case-test.lisp")
+ ("chill.test.sh"
+  "src/cold/chill.lisp"
+  "src/cold/shebang.lisp"
+  "package-data-list.lisp-expr")
  ("clos.impure.lisp"
   "contrib/sb-cltl2.fasl"
   "tests/package-ctor-bug.lisp"
