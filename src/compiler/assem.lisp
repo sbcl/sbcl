@@ -1823,11 +1823,10 @@
            `((eval-when (:compile-toplevel) (%def-inst-encoder ',fun-name))
              (%def-inst-encoder
               ',fun-name
-              (named-lambda ,(string fun-name)
-                  (,segment-name ,@(cdr lambda-list))
+              (named-lambda ,(string fun-name) (,segment-name ,@(cdr lambda-list))
                 (declare ,@decls)
                 (let ,(and vop-name `((,vop-name **current-vop**)))
-                  ,@emitter)))))
+                  (block ,fun-name ,@emitter))))))
        ',fun-name)))
 
 (defun instruction-hooks (segment)
