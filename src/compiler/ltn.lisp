@@ -221,12 +221,13 @@
 ;;; of LVAR's DEST, and called in the order that the lvarss are
 ;;; received. Otherwise the IR2-BLOCK-POPPED and
 ;;; IR2-COMPONENT-VALUES-FOO would get all messed up.
-(defun annotate-unknown-values-lvar (lvar &optional unused-count)
+(defun annotate-unknown-values-lvar (lvar &optional unused-count
+                                                    unused-sp)
   (declare (type lvar lvar))
   (aver (not (lvar-dynamic-extent lvar)))
   (let ((2lvar (make-ir2-lvar nil)))
     (setf (ir2-lvar-kind 2lvar) :unknown)
-    (setf (ir2-lvar-locs 2lvar) (make-unknown-values-locations unused-count))
+    (setf (ir2-lvar-locs 2lvar) (make-unknown-values-locations unused-count unused-sp))
     (setf (lvar-info lvar) 2lvar))
 
   ;; The CAST chain with corresponding lvars constitute the same
@@ -386,8 +387,10 @@
           (t
            (setf (basic-combination-info call) :full)
            (annotate-fun-lvar (basic-combination-fun call) nil)
-           (dolist (arg (reverse args))
-             (annotate-unknown-values-lvar arg t)))))
+           (loop for (arg . prev) on (reverse args)
+                 do
+                 ;; Only the first argument's CSP is used
+                 (annotate-unknown-values-lvar arg t prev)))))
 
   (values))
 
@@ -469,13 +472,21 @@
 ;;; constants :-()
 (defoptimizer (%pop-values ltn-annotate) ((%lvar) node ltn-policy)
   (declare (ignore %lvar node ltn-policy)))
-(defoptimizer (%nip-values ltn-annotate) ((last-nipped last-preserved
-                                                       &rest moved)
-                                          node ltn-policy)
-  (declare (ignore last-nipped last-preserved moved node ltn-policy)))
-(defoptimizer (%dummy-dx-alloc ltn-annotate) ((target source)
-                                              node ltn-policy)
+(defoptimizer (%dummy-dx-alloc ltn-annotate) ((target source) node ltn-policy)
   (declare (ignore target source node ltn-policy)))
+
+(defoptimizer (%nip-values ltn-annotate) ((&rest lvars)
+                                          node ltn-policy)
+  (declare (ignore node ltn-policy))
+  ;; Undo the optimization performed by LTN-ANALYZE-MV-CALL,
+  ;; which only uses the CSP of the first argument.
+  (loop for lvar-lvar in lvars
+        for lvar = (lvar-value lvar-lvar)
+        for locs = (ir2-lvar-locs (lvar-info lvar))
+        when (and locs
+                  (eq (tn-kind (car locs)) :unused))
+        do
+        (setf (car locs) (make-stack-pointer-tn))))
 
 
 ;;;; known call annotation

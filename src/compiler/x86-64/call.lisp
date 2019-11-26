@@ -167,7 +167,7 @@
          (system-area-pointer sap-stack
                               ancestor-frame-ref/system-area-pointer
                               ancestor-frame-set/system-area-pointer))))
-
+(defvar *new* nil)
 (define-vop (xep-allocate-frame)
   (:info start-lab)
   (:generator 1
@@ -181,7 +181,8 @@
     (inst .skip (* (1- simple-fun-insts-offset) n-word-bytes))
     ;; The start of the actual code.
     ;; Save the return-pc.
-    (popw rbp-tn (frame-word-offset return-pc-save-offset))))
+    (unless *new*
+     (popw rbp-tn (frame-word-offset return-pc-save-offset)))))
 
 (defun emit-lea (target source disp)
   (if (eql disp 0)
@@ -390,12 +391,14 @@
         (unused-count-p (eq (tn-kind count) :unused)))
     (when (sb-kernel:values-type-may-be-single-value-p type)
       (inst jmp :c variable-values)
-      (cond ((location= start (first *register-arg-tns*))
+      (cond ((eq (tn-kind start) :unused)
+             (inst push (first *register-arg-tns*)))
+            ((location= start (first *register-arg-tns*))
              (inst push (first *register-arg-tns*))
              (inst lea start (ea n-word-bytes rsp-tn)))
             (t (inst mov start rsp-tn)
                (inst push (first *register-arg-tns*))))
-      (unless (eq (tn-kind count) :unused)
+      (unless unused-count-p
         (inst mov count (fixnumize 1)))
       (inst jmp done)
       (emit-label variable-values))
@@ -422,7 +425,8 @@
       for i downfrom -1
       for j below (sb-kernel:values-type-max-value-count type)
       do (storew arg args i))
-    (move start args)
+    (unless (eq (tn-kind start) :unused)
+     (move start args))
     (unless unused-count-p
       (move count nargs))
 

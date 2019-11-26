@@ -61,7 +61,8 @@
   (:results (start :from :load) (count))
   (:info nvals)
   (:generator 20
-    (move start rsp-tn)
+    (unless (eq (tn-kind start) :unused)
+      (move start rsp-tn))
     (do ((val vals (tn-ref-across val)))
         ((null val))
       (inst push (let ((value (encode-value-if-immediate (tn-ref-tn val))))
@@ -85,7 +86,9 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    (move start rsp-tn)                 ; WARN pointing 1 below
+    
+    (unless (eq (tn-kind start) :unused)
+      (move start rsp-tn))               ; WARN pointing 1 below
 
     LOOP
     (inst cmp list nil-value)
@@ -144,7 +147,8 @@
     (if (location= loop-index num)
         (inst shl num (- word-shift n-fixnum-tag-bits))
         (inst lea loop-index (ea nil num (ash 1 (- word-shift n-fixnum-tag-bits)))))
-    (inst mov start rsp-tn)
+    (unless (eq (tn-kind start) :unused)
+      (inst mov start rsp-tn))
     (inst test rcx-tn rcx-tn)
     (inst jmp :z DONE)  ; check for 0 count?
 

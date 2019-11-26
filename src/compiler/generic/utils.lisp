@@ -134,10 +134,15 @@
 
 ;;; Return a list of TNs that can be used to represent an unknown-values
 ;;; continuation within a function.
-(defun make-unknown-values-locations (&optional unused-count)
+(defun make-unknown-values-locations (&optional unused-count unused-sp)
   (declare (ignorable unused-count))
-  (list (make-stack-pointer-tn)
-        (cond #+x86-64 ;; needs support from receive-unknown-values
+  (list (cond #+x86-64
+              ;; needs support from receive-unknown-values, push-values, %more-arg-values
+              (unused-sp
+               (sb-c::make-unused-tn))
+              (t
+               (make-stack-pointer-tn)))
+        (cond #+x86-64
               (unused-count
                (sb-c::make-unused-tn))
               (t

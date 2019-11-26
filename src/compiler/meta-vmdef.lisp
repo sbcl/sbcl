@@ -340,7 +340,8 @@
   ;; call/return VOPs
   (move-args nil :type (member nil :local-call :full-call :known-return))
   (args-var '.args. :type symbol)
-  (results-var '.results. :type symbol))
+  (results-var '.results. :type symbol)
+  (before-load :unspecified :type (or (member :unspecified) list)))
 (defprinter (vop-parse)
   name
   (inherits :test inherits)
@@ -367,7 +368,7 @@
 ;;; The list of slots in the structure, not including the OPERANDS slot.
 ;;; Order here is insignificant; it happens to be alphabetical.
 (defglobal vop-parse-slot-names
-    '(arg-types args args-var body conditional-p cost guard ignores info-args inherits
+    '(arg-types args args-var before-load body conditional-p cost guard ignores info-args inherits
       ltn-policy more-args more-results move-args name node-var note result-types
       results results-var save-p source-location temps translate variant variant-vars vop-var))
 ;; A sanity-check. Of course if this fails, the likelihood is that you can't even
@@ -723,7 +724,8 @@
         (n-args (vop-parse-args-var parse))
         (n-results (vop-parse-results-var parse))
         (operands (vop-parse-operands parse))
-        (n-info (gensym)) (n-variant (gensym)))
+        (n-info (gensym)) (n-variant (gensym))
+        (dummy (gensym)))
     (collect ((binds)
               (loads)
               (saves))
@@ -751,23 +753,28 @@
                 ,@(access-operands (vop-parse-args parse)
                                    (vop-parse-more-args parse)
                                    n-args)
-                  ,@(access-operands (vop-parse-results parse)
-                                     (vop-parse-more-results parse)
-                                     n-results)
-                  ,@(access-operands (vop-parse-temps parse) nil
-                                     `(vop-temps ,n-vop))
-                  ,@(when (vop-parse-info-args parse)
-                      `((,n-info (vop-codegen-info ,n-vop))
-                        ,@(mapcar (lambda (x) `(,x (pop ,n-info)))
-                                  (vop-parse-info-args parse))))
-                  ,@(when (vop-parse-variant-vars parse)
-                      `((,n-variant (vop-info-variant (vop-info ,n-vop)))
-                        ,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
-                                  (vop-parse-variant-vars parse))))
-                  ,@(when (vop-parse-node-var parse)
-                      `((,(vop-parse-node-var parse) (vop-node ,n-vop))))
-                  ,@(binds))
-           (declare (ignore ,@(vop-parse-ignores parse))
+                ,@(access-operands (vop-parse-results parse)
+                                   (vop-parse-more-results parse)
+                                   n-results)
+                ,@(access-operands (vop-parse-temps parse) nil
+                                   `(vop-temps ,n-vop))
+                ,@(when (vop-parse-info-args parse)
+                    `((,n-info (vop-codegen-info ,n-vop))
+                      ,@(mapcar (lambda (x) `(,x (pop ,n-info)))
+                                (vop-parse-info-args parse))))
+                ,@(when (vop-parse-variant-vars parse)
+                    `((,n-variant (vop-info-variant (vop-info ,n-vop)))
+                      ,@(mapcar (lambda (x) `(,x (pop ,n-variant)))
+                                (vop-parse-variant-vars parse))))
+                ,@(when (vop-parse-node-var parse)
+                    `((,(vop-parse-node-var parse) (vop-node ,n-vop))))
+                ,@(and (neq (vop-parse-before-load parse) :unspecified)
+                       `((,dummy (progn
+                                   ,@(vop-parse-before-load parse)))))
+                ,@(binds))
+           (declare (ignore ,@(vop-parse-ignores parse)
+                            ,@(and (neq (vop-parse-before-load parse) :unspecified)
+                                   `(,dummy)))
                     (ignorable ,n-args ,n-results))
            ,@(loads)
            (assemble ()
@@ -973,7 +980,9 @@
         (:generator
             (setf (vop-parse-cost parse)
                   (vop-spec-arg spec 'unsigned-byte 1 nil))
-          (setf (vop-parse-body parse) (cddr spec)))
+         (setf (vop-parse-body parse) (cddr spec)))
+        (:before-load
+         (setf (vop-parse-before-load parse) (cdr spec)))
         (:info
          (setf (vop-parse-info-args parse) (rest spec)))
         (:ignore
