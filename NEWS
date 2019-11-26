@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.8:
+changes in sbcl-1.5.9 relative to sbcl-1.5.8:
   * platform support:
     ** a message intended to be more helpful will be displayed for an mmap
        failure on OpenBSD.
