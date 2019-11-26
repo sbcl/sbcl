@@ -3212,11 +3212,18 @@ is :ANY, the function name is not checked."
     t))
 
 (defun process-lvar-type-annotation (lvar annotation)
-  (let ((type (lvar-type-annotation-type annotation))
-        (uses (lvar-uses lvar))
-        (condition (if (eq (lvar-type-annotation-context annotation) :initform)
-                       'slot-initform-type-style-warning
+  (let* ((uses (lvar-uses lvar))
+         (condition (case (lvar-type-annotation-context annotation)
+                      (:initform
+                       (if (policy (if (consp uses)
+                                       (car uses)
+                                       uses)
+                               (zerop type-check))
+                           'slot-initform-type-style-warning
+                           (return-from process-lvar-type-annotation)))
+                      (t
                        'sb-int:type-warning)))
+         (type (lvar-type-annotation-type annotation)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
            (%compile-time-type-error-warn annotation (type-specifier type)
                                           (type-specifier (lvar-type lvar))
