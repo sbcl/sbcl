@@ -14,6 +14,8 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
+run_compiler=`pwd`/run-compiler.sh
+export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./expect.sh
 . ./subr.sh
 
@@ -30,7 +32,7 @@ PUNT=$EXIT_TEST_WIN
 
 build_so() (
   echo building $1.so
-  /bin/sh ../run-compiler.sh -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
+  /bin/sh ${run_compiler} -sbcl-pic -sbcl-shared "$1.c" -o "$1.so"
 )
 
 # We want to bail out in case any of these Unix programs fails.
