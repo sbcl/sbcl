@@ -135,7 +135,7 @@
 ;;; Return a list of TNs that can be used to represent an unknown-values
 ;;; continuation within a function.
 (defun make-unknown-values-locations (&optional unused-count unused-sp)
-  (declare (ignorable unused-count))
+  (declare (ignorable unused-count unused-sp))
   (list (cond #+x86-64
               ;; needs support from receive-unknown-values, push-values, %more-arg-values
               (unused-sp

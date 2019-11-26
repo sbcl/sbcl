@@ -86,7 +86,7 @@
   (:save-p :compute-only)
   (:generator 0
     (move list arg)
-    
+
     (unless (eq (tn-kind start) :unused)
       (move start rsp-tn))               ; WARN pointing 1 below
 
