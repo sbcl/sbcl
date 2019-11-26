@@ -1,14 +1,37 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.5.8:
+  * platform support:
+    ** a message intended to be more helpful will be displayed for an mmap
+       failure on OpenBSD.
+    ** the soft-float ABI on ARM32 is better supported, in particular in
+       returning double floats from calls into C.
   * optimizations:
     ** CASE and ECASE with symbols as keys may be optimized into a vector
        lookup if all result forms are quoted or self-evaluating objects.
     ** CASE and ECASE can be optimized into a jump table on the x86[-64]
        backends with arbitrary result forms provided that the clause keys
        are either all fixnums, all characters, or all symbols.
+    ** a number of forms are converted to use CASE in circumstances where that
+       makes sense, including calls to POSITION, MEMQ and MEMBER, and TYPECASE
+       where the types are MEMBER/EQL types.
+    ** POSITION of a variable symbol in a constant sequence of symbols is
+       converted to CASE and thence to a jump table.
+    ** TYPECASE of a variable where the clauses are member types is converted
+       to CASE and thence to a jump table.
+    ** a number of slow instructions are no longer used on x86 and x86-64
+       machines.  (Thanks to Fanael Linithien)
+    ** the compiler is better at tracking the implications of branches after
+       EQ and EQL tests.
+    ** parsing &KEY lists is slightly less register-intensive.
+    ** a pattern-based peephole optimizer pass has been added, running some
+       simple transformations on the x86-64 backend.
   * enhancements: more thorough compile-time type checking of various
     initforms (defclass, &key, defstruct).
+  * bug fix: unions of complicated CONS types are less likely to cause an
+    infinite loop.  (lp#1799719)
+  * bug fix: DESCRIBE on functions not named by extended function designators
+    no longer signals a type error.  (lp#1850531, reported by Michal Herda)
 
 changes in sbcl-1.5.8 relative to sbcl-1.5.7:
   * platform support:
