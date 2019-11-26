@@ -601,9 +601,7 @@ during backtrace.
   ;; Possibly not the best place for this definition, but other accessors
   ;; for primitive objects are here too.
   (defun code-jump-table-words (code)
-    (declare (code-component code) (ignorable code))
-    #-(or x86 x86-64) 0
-    #+(or x86 x86-64)
+    (declare (code-component code))
     (if (eql (code-header-ref code code-boxed-size-slot) 0)
         0
         (with-pinned-objects (code)

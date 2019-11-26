@@ -150,7 +150,6 @@
   ;; Other backends will probably need relative jump tables instead
   ;; of absolute tables because of the problem of needing to load
   ;; the LIP register prior to loading an arbitrary PC.
-  #+(or x86 x86-64)
   (let* ((asmstream *asmstream*)
          (constants (asmstream-constant-vector asmstream))
          (section (asmstream-data-section asmstream))
