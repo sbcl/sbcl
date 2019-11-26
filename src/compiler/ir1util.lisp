@@ -3215,7 +3215,7 @@ is :ANY, the function name is not checked."
   (let ((type (lvar-type-annotation-type annotation))
         (uses (lvar-uses lvar))
         (condition (if (eq (lvar-type-annotation-context annotation) :initform)
-                       'sb-int:type-style-warning
+                       'slot-initform-type-style-warning
                        'sb-int:type-warning)))
     (cond ((not (types-equal-or-intersect (lvar-type lvar) type))
            (%compile-time-type-error-warn annotation (type-specifier type)

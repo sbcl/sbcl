@@ -928,6 +928,7 @@
 (define-condition type-style-warning (reference-condition simple-style-warning)
   ()
   (:default-initargs :references '((:sbcl :node "Handling of Types"))))
+(define-condition slot-initform-type-style-warning (type-style-warning) ())
 
 (define-condition local-argument-mismatch (reference-condition simple-warning)
   ()
