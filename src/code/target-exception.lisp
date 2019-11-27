@@ -100,7 +100,7 @@
           (cast
            (sap-alien (deref (slot record 'exception-information) 1)
                       (* char))
-           c-string))))
+           system-string))))
 
 (define-condition exception (error)
   ((code :initarg :code :reader exception-code)
