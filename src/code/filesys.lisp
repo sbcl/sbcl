@@ -990,7 +990,7 @@ Experimental: interface subject to change."
            #'cont
            (lambda (sub)
              (when (pattern-matches this (last-directory-piece sub))
-               (funcall #'cont sub))))
+               (cont sub))))
        directory
        :files nil
        :directories t

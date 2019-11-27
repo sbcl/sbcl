@@ -1229,9 +1229,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (setf (component-name component) (debug-name 'initial-component debug-name-tail)
           (component-kind component) :initial)
     (let* ((fun (let ((*allow-instrumenting* t))
-                  (funcall #'ir1-convert-lambdalike
-                           lambda-expression
-                           :source-name source-name)))
+                  (ir1-convert-lambdalike lambda-expression
+                                          :source-name source-name)))
            ;; Convert the XEP using the policy of the real function. Otherwise
            ;; the wrong policy will be used for deciding whether to type-check
            ;; the parameters of the real function (via CONVERT-CALL /
