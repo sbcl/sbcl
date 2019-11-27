@@ -1308,26 +1308,45 @@
 
 
 ;;;; interface to the rest of the compiler
-(defun dump-symbolic-asm (section stream &aux last-vop all-labels)
-  (format stream "~3&Assembler input:~%")
+
+;;; Return T only if STATEMENT has a label which is potentially a branch
+;;; target, and not merely labeled to store a location of interest.
+(defun labeled-statement-p (statement &aux (labels (stmt-labels statement)))
+  (if (listp labels) (some #'label-usedp labels) (label-usedp labels)))
+
+(defun dump-symbolic-asm (section stream &aux last-vop all-labels (n 0))
+  (format stream "~2&Assembler input:~%")
   (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
       ((null statement))
-    (unless (functionp (stmt-mnemonic statement))
-      (binding* ((vop (stmt-vop statement) :exit-if-null))
-        (unless (eq vop last-vop)
-          (format stream "# ~A~%"
-                  (sb-c::vop-info-name (sb-c::vop-info vop))))
-        (setq last-vop vop))
-      (awhen (stmt-labels statement)
-        (let ((list (ensure-list it)))
-          (setq all-labels (append list all-labels))
-          (format stream "~{~A: ~}~%" list)))
-      (let ((*print-pretty* nil))
-        (format stream "    ~:@(~A~) ~{~A~^, ~}~%"
-                (stmt-mnemonic statement)
-                (stmt-operands statement)))))
-  (format t "# Used labels: ~A~%" (remove-if-not #'label-usedp all-labels))
-  (format stream "# end of input~%"))
+    (cond ((functionp (stmt-mnemonic statement))
+           (format stream "# postit~%"))
+          (t
+           (incf n)
+           (binding* ((vop (stmt-vop statement) :exit-if-null))
+             (unless (eq vop last-vop)
+               (format stream "## ~A~%"
+                       (sb-c::vop-info-name (sb-c::vop-info vop))))
+             (setq last-vop vop))
+           (awhen (stmt-labels statement)
+             (let ((list (ensure-list it))
+                   (usedp (labeled-statement-p statement)))
+               (setq all-labels (append list all-labels))
+               (format stream "~A~{~A: ~}~A~%"
+                       (if usedp "" "# ")
+                       list
+                       (if usedp "" " (notused)"))))
+           (let ((*print-pretty* nil))
+             (format stream "    ~:@(~A~) ~{~A~^, ~}~%"
+                     (stmt-mnemonic statement)
+                     (stmt-operands statement))))))
+  (let ((*print-length* nil)
+        (*print-pretty* t)
+        (*print-right-margin* 80))
+    (format stream "# Unused labels:~%~A~%"
+            ;; it comes out in approximately numeric order when reversed
+            (nreverse (remove-if #'label-usedp all-labels))))
+  (format stream "# end of input~%")
+  n)
 
 ;;; Append all sections, returning the first section.
 (defun append-sections (sections)
@@ -1871,11 +1890,6 @@
                            do (emit-byte segment (ldb (byte 8 i) val)))))
 
 ;;;; Peephole pass
-
-;;; Return T only if STATEMENT has a label which is potentially a branch
-;;; target, and not merely labeled to store a location of interest.
-(defun labeled-statement-p (statement &aux (labels (stmt-labels statement)))
-  (if (listp labels) (some #'label-usedp labels) (label-usedp labels)))
 
 (defmacro defpattern (name (opcodes1 opcodes2) lambda-list &body body)
   `(%defpattern ,name ',opcodes1 ',opcodes2 (lambda ,lambda-list ,@body)))

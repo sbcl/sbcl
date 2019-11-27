@@ -3602,3 +3602,38 @@
           (setf (stmt-mnemonic stmt) 'shr
                 (stmt-operands stmt) `(:dword ,dst1 ,src1))
           next)))))
+
+(defun reg= (a b) ; Return T if A and B are the same register
+  ;; NIL is allowed for base and/or index of an EA.
+  (if (not a) (not b) (and b (location= a b))))
+
+(defun ea= (a b) ; Return  T if A and B are the same EA
+  (and (eql (ea-scale a) (ea-scale b))
+       (reg= (ea-index a) (ea-index b))
+       (reg= (ea-base a) (ea-base b))
+       (eql (ea-disp a) (ea-disp b))))
+
+(defun alias-p (a b) ; Return T if A and B are the same anything
+  ;; There are other ways for A and B to alias: an EA for a stack TN as an
+  ;; obvious example, but less obviously EAs whose registers alias.
+  ;; At worst, we'll skip instcombine in such situations.
+  (etypecase b
+    (tn (and (tn-p a) (location= a b)))
+    (ea (and (ea-p a) (ea= a b)))
+    ((or fixup number) nil)))
+
+(defpattern "mov dst,src + mov src,dst elim" ((mov) (mov)) (stmt next)
+  (binding* (((size1 dst1 src1) (parse-2-operands stmt))
+             ((size2 dst2 src2) (parse-2-operands next)))
+    (when (and (eq size1 :qword)
+               (eq size2 :qword)
+               (alias-p dst2 src1)
+               (alias-p dst1 src2))
+      #+nil
+      (let ((mode (cond ((and (gpr-tn-p src1) (gpr-tn-p src2)) "r->r,r->r")
+                        ((gpr-tn-p src1) "r->m,m->r")
+                        (t "m->r,r->m"))))
+        (format t "~&MOV elim ~a~@{ ~s~}~%" mode src1 dst1 src2 dst2))
+      (add-stmt-labels stmt (stmt-labels next))
+      (delete-stmt next)
+      stmt)))

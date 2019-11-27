@@ -466,10 +466,17 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 
 ;;;; Memory barrier support
 
+;;; Some of these might not really have to inhibit 'instcombine'
+;;; but conservatively it's always the right choice.
+;;; Certainly for redundant move elimination of the reg->reg, reg->reg form
+;;; the barrier is irrelevant, but (a) that won't happen, and (b) we never
+;;; had an instcombine pass so who cares if occasionally it fails to apply?
 (define-vop (%compiler-barrier)
   (:policy :fast-safe)
   (:translate %compiler-barrier)
-  (:generator 3))
+  (:generator 3
+    ;; inhibit instcombine across any barrier
+    (inst .skip 0)))
 
 (define-vop (%memory-barrier)
   (:policy :fast-safe)
@@ -480,17 +487,23 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
 (define-vop (%read-barrier)
   (:policy :fast-safe)
   (:translate %read-barrier)
-  (:generator 3))
+  (:generator 3
+    ;; inhibit instcombine across any barrier
+    (inst .skip 0)))
 
 (define-vop (%write-barrier)
   (:policy :fast-safe)
   (:translate %write-barrier)
-  (:generator 3))
+  (:generator 3
+    ;; inhibit instcombine across any barrier
+    (inst .skip 0)))
 
 (define-vop (%data-dependency-barrier)
   (:policy :fast-safe)
   (:translate %data-dependency-barrier)
-  (:generator 3))
+  (:generator 3
+    ;; inhibit instcombine across any barrier
+    (inst .skip 0)))
 
 (define-vop (pause)
   (:translate spin-loop-hint)
