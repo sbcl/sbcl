@@ -206,7 +206,9 @@
                                    (inst lea r (ea (- y) x)))
                                   (t
                                    (move r x)
-                                   (inst sub r (constantize y))))))
+                                   (if (eql y 1)
+                                       (inst dec r)
+                                       (inst sub r (constantize y)))))))
                  `(define-binop - 4 sub
                     :c/fixnum=>fixnum ((let ((y (fixnumize y))) ,emit))
                     :c/signed=>signed (,emit)
