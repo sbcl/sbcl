@@ -78,8 +78,7 @@
 
 (define-arg-type signed-imm-data
   :prefilter (lambda (dstate)
-               (let ((width (inst-operand-size dstate)))
-                 (read-signed-suffix (width-bits width) dstate))))
+               (read-signed-suffix (width-bits (inst-operand-size dstate)) dstate)))
 
 (define-arg-type imm-byte
   :prefilter (lambda (dstate)
@@ -230,7 +229,7 @@
                                      :include simple
                                      :default-printer '(:name
                                                         :tab accum ", " imm))
-  (imm :type 'imm-data))
+  (imm :type 'signed-imm-data))
 
 (define-instruction-format (reg-no-width 8 :default-printer '(:name :tab reg))
   (op    :field (byte 5 3))
@@ -291,7 +290,7 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
-  (imm     :type 'imm-data))
+  (imm     :type 'signed-imm-data))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (define-instruction-format
@@ -763,7 +762,7 @@
 
 (define-instruction mov (segment dst src &optional prefix)
   ;; immediate to register
-  (:printer reg ((op #b1011) (imm nil :type 'imm-data))
+  (:printer reg ((op #b1011) (imm nil :type 'signed-imm-data))
             '(:name :tab reg ", " imm))
   ;; absolute mem to/from accumulator
   (:printer simple-dir ((op #b101000) (imm nil :type 'imm-addr))
