@@ -80,13 +80,23 @@
             (exception-information (array system-area-pointer
                                           #.+exception-maximum-parameters+))))
 
-;;; DBG_PRINTEXCEPTION_C shouldn'tbe fatal, and even if it is related to
+;;; DBG_PRINTEXCEPTION_C shouldn't be fatal, and even if it is related to
 ;;; something bad, better to print the message than just fail with no info
 (defun dbg-printexception-c (record)
   (when (= (slot record 'number-parameters) 2)
     ;; (sap-int (deref (slot record 'exception-information) 0)) =
     ;; length of string including 0-terminator
     (warn "DBG_PRINTEXCEPTION_C: ~a"
+          (cast
+           (sap-alien (deref (slot record 'exception-information) 1)
+                      (* char))
+           c-string))))
+
+(defun dbg-printexception-wide-c (record)
+  (when (= (slot record 'number-parameters) 4)
+    ;; (sap-alien (deref (slot record 'exception-information) 3)) =
+    ;; WideCharToMultiByte string
+    (warn "DBG_PRINTEXCEPTION_WIDE_C: ~a"
           (cast
            (sap-alien (deref (slot record 'exception-information) 1)
                       (* char))
@@ -127,6 +137,8 @@
            (error condition-name))
           ((= code +dbg-printexception-c+)
            (dbg-printexception-c record))
+          ((= code +dbg-printexception-wide-c+)
+           (dbg-printexception-wide-c record))
           (t
            (cerror "Return from the exception handler"
                    'exception :context context-sap :record exception-record-sap

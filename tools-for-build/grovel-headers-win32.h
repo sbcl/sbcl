@@ -87,6 +87,7 @@
     defconstant("+exception-single-step+", EXCEPTION_SINGLE_STEP);
     defconstant("+exception-stack-overflow+", EXCEPTION_STACK_OVERFLOW);
     defconstant("+dbg-printexception-c+", DBG_PRINTEXCEPTION_C);
+    defconstant("+dbg-printexception-wide-c+", DBG_PRINTEXCEPTION_WIDE_C);
 
     defconstant("+exception-maximum-parameters+", EXCEPTION_MAXIMUM_PARAMETERS);
 
