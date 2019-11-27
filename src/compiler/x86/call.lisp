@@ -403,12 +403,12 @@
                    (inst mov (second default) eax-tn))
                  (inst jmp defaulting-done)))))))
       (t
-       ;; 91 bytes for this branch.
        (let ((regs-defaulted (gen-label))
              (restore-edi (gen-label))
              (no-stack-args (gen-label))
              (default-stack-vals (gen-label))
-             (count-okay (gen-label)))
+             (count-okay (gen-label))
+             (copy-loop (gen-label)))
          (note-this-location vop :unknown-return)
          ;; Branch off to the MV case.
          (inst jmp :c regs-defaulted)
@@ -427,8 +427,7 @@
          ;; Load EAX with NIL so we can quickly store it, and set up
          ;; stuff for the loop.
          (inst mov eax-tn nil-value)
-         (inst std)
-         (inst mov ecx-tn (- nvals register-arg-count))
+         (inst mov ecx-tn (fixnumize (- nvals register-arg-count)))
          ;; Jump into the default loop.
          (inst jmp default-stack-vals)
          ;; The regs are defaulted. We need to copy any stack arguments,
@@ -458,10 +457,15 @@
                         :disp (frame-byte-offset
                                (+ sp->fp-offset register-arg-count))))
          ;; Do the copy.
-         (inst shr ecx-tn word-shift)   ; make word count
-         (inst std)
-         (inst rep)
-         (inst movs :dword)
+         (inst push edx-tn)
+         (emit-label copy-loop)
+         (inst mov edx-tn (make-ea :dword :base esi-tn))
+         (inst sub esi-tn n-word-bytes)
+         (inst mov (make-ea :dword :base edi-tn) edx-tn)
+         (inst sub edi-tn n-word-bytes)
+         (inst sub ecx-tn (fixnumize 1))
+         (inst jmp :nz copy-loop)
+         (inst pop edx-tn)
          ;; Restore ESI.
          (loadw esi-tn ebx-tn (frame-word-offset (+ sp->fp-offset 2)))
          ;; Now we have to default the remaining args. Find out how many.
@@ -470,18 +474,18 @@
          ;; If none, then just blow out of here.
          (inst jmp :le restore-edi)
          (inst mov ecx-tn eax-tn)
-         (inst shr ecx-tn word-shift)   ; word count
          ;; Load EAX with NIL for fast storing.
          (inst mov eax-tn nil-value)
          ;; Do the store.
          (emit-label default-stack-vals)
-         (inst rep)
-         (inst stos eax-tn)
+         (inst mov (make-ea :dword :base edi-tn) eax-tn)
+         (inst sub edi-tn n-word-bytes)
+         (inst sub ecx-tn (fixnumize 1))
+         (inst jmp :nz default-stack-vals)
          ;; Restore EDI, and reset the stack.
          (emit-label restore-edi)
          (loadw edi-tn ebx-tn (frame-word-offset (+ sp->fp-offset 1)))
-         (inst mov esp-tn ebx-tn)
-         (inst cld)))))
+         (inst mov esp-tn ebx-tn)))))
   (values))
 
 ;;;; unknown values receiving
