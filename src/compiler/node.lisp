@@ -94,7 +94,7 @@
   (annotations nil)
   (dependent-annotations nil))
 
-;;; These are used for annottating a LVAR with information that can't
+;;; These are used for annotating a LVAR with information that can't
 ;;; be expressed using types or if the CAST semantics are undesirable
 ;;; (type derivation, runtime errors).
 ;;; Right now it's basically used for tracking constants and checking
