@@ -50,17 +50,17 @@
 (define-vop (multiway-branch-if-eq)
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg
   (:args (x :scs (any-reg descriptor-reg)))
-  (:info values labels otherwise test-vop-name)
+  (:info labels otherwise key-type keys test-vop-name)
   (:temporary (:sc unsigned-reg) index)
   (:ignore test-vop-name)
   (:generator 10
-    (etypecase (car values)
-      (fixnum
-       (let* ((min (reduce #'min values))
-              (max (reduce #'max values))
-              (vector (make-array (1+ (- max min)) :initial-element otherwise)))
-         (mapc (lambda (value label) (setf (aref vector (- value min)) label))
-               values labels)
+    (let* ((min (reduce #'min keys))
+           (max (reduce #'max keys))
+           (vector (make-array (1+ (- max min)) :initial-element otherwise)))
+      (mapc (lambda (key label) (setf (aref vector (- key min)) label))
+            keys labels)
+      (ecase key-type
+       (fixnum
          (inst test x fixnum-tag-mask)
          (inst jmp :ne otherwise)
          (if (= min 0)
@@ -68,16 +68,10 @@
              (inst lea index (make-ea :dword :base x :disp (fixnumize (- min)))))
          (inst cmp index (fixnumize (- max min)))
          (inst jmp :a otherwise)
-         (let ((table (register-inline-constant :jump-table (coerce vector 'list))))
+         (let ((table (register-inline-constant :jump-table vector)))
            (inst jmp (make-ea :dword :disp (ea-disp table)
-                              :index index :scale 1)))))
-      (character
-       (let* ((min (reduce #'min values :key #'sb-xc:char-code))
-              (max (reduce #'max values :key #'sb-xc:char-code))
-              (vector (make-array (1+ (- max min)) :initial-element otherwise)))
-         (mapc (lambda (value label)
-                 (setf (aref vector (- (sb-xc:char-code value) min)) label))
-               values labels)
+                              :index index :scale 1))))
+       (character
          (inst mov index x)
          (inst and index widetag-mask)
          (inst cmp index character-widetag)
@@ -87,7 +81,7 @@
          (inst sub index min)
          (inst cmp index (- max min))
          (inst jmp :a otherwise)
-         (let ((table (register-inline-constant :jump-table (coerce vector 'list))))
+         (let ((table (register-inline-constant :jump-table vector)))
            (inst jmp (make-ea :dword :disp (ea-disp table)
                               :index index :scale 4))))))))
 

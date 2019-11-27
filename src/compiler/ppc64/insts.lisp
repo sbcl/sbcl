@@ -1027,6 +1027,34 @@
                    (:dependencies (reads ra) ,@other-reads
                     (writes rt) ,@other-writes)
                    (:emitter
+                    ;; To compute the address of a jump-table label in the unboxed code data,
+                    ;; we add LIP := CODE-TN + imm. The 'imm' must fit in a (signed-byte 16)
+                    ;; because we're only using the ADDI instruction, not also ADDIS.
+                    ;; It might be better if CODE-TN pointed to CODE-INSTRUCTIONS rather than
+                    ;; the base of the code so that boxed constants could be referenced
+                    ;; using negative offsets and unboxed constants with positive.
+                    ;; This probably works already, with perhaps a minor alteration
+                    ;; to plausible_base_register(), maybe not even that.
+                    ;; As long as LIP is greater than CODE-TN, we should be OK.
+                    ;; And of course it would be best if we never moved on-stack code at all.
+                    ,@(when (eq fixup :l)
+                        `((when (and (typep si 'fixup) (label-p (fixup-offset si)))
+                            (return-from ,name
+                             (emit-back-patch
+                              segment 4
+                              (lambda (segment posn)
+                                (declare (ignore posn))
+                                (let ((offset-from-code-tn
+                                       (+ (component-header-length)
+                                          (- (segment-header-skew segment))
+                                          (- code-tn-lowtag)
+                                          (label-position (fixup-offset si)))))
+                                  (unless (typep offset-from-code-tn '(signed-byte 16))
+                                    (bug "Jump table offset overflow"))
+                                  (emit-d-form-inst
+                                   segment ,op (reg-tn-encoding rt)
+                                   ,(if allow-r0 '(reg-tn-encoding ra) '(reg-or-0 ra))
+                                   offset-from-code-tn))))))))
                     (when (typep si 'fixup)
                       (ecase ,fixup
                         ((:ha :l) (note-fixup segment ,fixup si)))
@@ -2307,11 +2335,6 @@
   (let ((label (gen-label)))
     (values label label)))
 
-#+ppc64
-(defun sort-inline-constants (constants)
-  (stable-sort constants #'> :key (lambda (constant)
-                                    (size-nbyte (caar constant)))))
-
 (defun size-nbyte (size)
   (ecase size
     (:byte     1)
@@ -2320,16 +2343,49 @@
     (:dword    8)
     (:qword   16)))
 
-#+ppc64
+(defun align-of (constant)
+  (case (car constant)
+    (:jump-table n-word-bytes)
+    (t (size-nbyte (car constant)))))
+
+(defun sort-inline-constants (constants)
+  (stable-sort constants #'> :key (lambda (x) (align-of (car x)))))
+
+(define-instruction #+64-bit .dword #-64-bit .word (segment &rest vals)
+  (:emitter
+   (dolist (val vals)
+     (cond ((label-p val)
+            ;; note a fixup prior to writing the backpatch so that the fixup's
+            ;; position is the location counter at the patch point
+            (note-fixup segment (or #+64-bit :absolute64 :absolute) (make-fixup nil :code-object 0))
+            (emit-back-patch
+             segment
+             n-word-bytes
+             (lambda (segment posn)
+               (declare (ignore posn)) ; don't care where the fixup itself is
+               ;; The addend subtracts other-pointer-lowtag even on ppc64 where
+               ;; code-tn does not have a lowtag. That's because the apply-fixups
+               ;; does not care about code-tn. It only knows to add this value
+               ;; to (GET-LISP-OBJ-ADDRESS CODE).
+               (#+64-bit emit-dword #-64-bit emit-word
+                         segment
+                         (+ (- other-pointer-lowtag)
+                            (component-header-length)
+                            (- (segment-header-skew segment))
+                            (label-position val))))))
+           (t
+            (#+64-bit emit-dword #-64-bit emit-word segment val))))))
+
 (defun emit-inline-constant (section constant label)
-  (let* ((type (car constant))
-         (size (size-nbyte type)))
+  (let ((size (align-of constant)))
     (emit section
           `(.align ,(integer-length (1- size)))
           label
-          (let* ((val (cdr constant))
-                 (bytes (loop repeat size
-                              collect (prog1 (ldb (byte 8 0) val)
-                                        (setf val (ash val -8))))))
-            #+big-endian (setq bytes (nreverse bytes))
-            `(.byte ,@bytes)))))
+          (if (eq (car constant) :jump-table)
+              `(#+64-bit .dword #-64-bit .word ,@(coerce (cdr constant) 'list))
+              (let* ((val (cdr constant))
+                     (bytes (loop repeat size
+                                  collect (prog1 (ldb (byte 8 0) val)
+                                            (setf val (ash val -8))))))
+                #+big-endian (setq bytes (nreverse bytes))
+                `(.byte ,@bytes))))))

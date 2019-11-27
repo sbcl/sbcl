@@ -306,7 +306,8 @@ trans_code(struct code *code)
     struct code *new_code = (struct code *) native_pointer(l_new_code);
     uword_t displacement = l_new_code - l_code;
 
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || \
+    defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
     // Fixup absolute jump tables. These aren't recorded in code->fixups
     // because we don't need to denote an arbitrary set of places in the code.
     // The count alone suffices. A GC immediately after creating the code

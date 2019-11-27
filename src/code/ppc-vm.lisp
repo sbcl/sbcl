@@ -10,7 +10,7 @@
 
 ;;;; FIXUP-CODE-OBJECT
 
-(defconstant-eqx +fixup-kinds+ #(:absolute :b :ba :ha :l) #'equalp)
+(defconstant-eqx +fixup-kinds+ #(:absolute :absolute64 :b :ba :ha :l) #'equalp)
 (!with-bigvec-or-sap
 (defun fixup-code-object (code offset fixup kind flavor)
   (declare (type index offset))
@@ -20,7 +20,10 @@
   (let ((sap (code-instructions code)))
     (ecase kind
        (:absolute
-        (setf (sap-ref-32 sap offset) fixup))
+        ;; There is an implicit addend currently stored in the fixup location.
+        (incf (sap-ref-32 sap offset) fixup))
+       (:absolute64
+        (incf (sap-ref-64 sap offset) fixup))
        (:b
         (error "Can't deal with CALL fixups, yet."))
        (:ba

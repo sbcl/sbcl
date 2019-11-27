@@ -210,6 +210,29 @@
 
 ;;; Dump a component to core. We pass in the assembler fixups, code
 ;;; vector and node info.
+
+;;; Note that it is critical that the new code object not be movable after
+;;; copying in unboxed bytes and prior to fixing up those bytes.
+;;; Why: suppose the object has a jump table initially filled with addends of
+;;; 0x1000, 0x1100, 0x1200 representing the label offsets. If GC moves the object,
+;;; it adds the amount of movement to those labels. If it moves by, say +0x5000,
+;;; then the addends get mangled into 0x6000, 0x6100, 0x6200.
+;;; When we then add those addends to the virtual address of the code to
+;;; perform fixup application, the resulting addresses are all wrong.
+;
+;;; While GC might be made to use a heuristic to decide whether the label offsets
+;;; had been fixed up at all, it would be fragile nonetheless, because an offset
+;;; could theoretically resemble a valid address on machines where code resides
+;;; at low addresses in an object whose size is large. e.g. for an object which
+;;; spans the range 0x10000..0x30000 in memory, and the word 0x11000 in the jump
+;;; table, does that word represent an already-fixed-up label offset of 0x01000,
+;;; or an un-fixed-up value which needs to become 0x21000 ? It's ambiguous.
+;;; We could add 1 bit to the code object signifying that fixups had beeen applied
+;;; for the first time. But that complication is not needed, as long as we keep the
+;;; code pinned. That suffices because prior to copying in anything, all bytes
+;;; are 0, so the jump table count is 0.
+;;; Similar considerations pertain to x86[-64] fixups within the machine code.
+
 (defun make-core-component (component segment length fixup-notes object)
   (declare (type component component)
            (type segment segment)

@@ -243,9 +243,20 @@ ptrans_code(lispobj thing)
     memcpy(new, code, nwords * sizeof(lispobj));
 
     lispobj result = make_lispobj(new, OTHER_POINTER_LOWTAG);
-
-    /* Put in forwarding pointers for all the functions. */
     uword_t displacement = result - thing;
+
+#if defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
+    // Fixup absolute jump tables. These aren't recorded in code->fixups
+    // because we don't need to denote an arbitrary set of places in the code.
+    // The count alone suffices. A GC immediately after creating the code
+    // could cause us to observe some 0 words here. Those should be ignored.
+    lispobj* jump_table = code_jumptable_start(new);
+    int count = jump_table ? *jump_table : 0;
+    int i;
+    for (i = 1; i < count; ++i)
+        if (jump_table[i]) jump_table[i] += displacement;
+#endif
+    /* Put in forwarding pointers for all the functions. */
     for_each_simple_fun(i, newfunc, new, 1, {
         lispobj* old = (lispobj*)LOW_WORD((char*)newfunc - displacement);
         *old = make_lispobj(newfunc, FUN_POINTER_LOWTAG);

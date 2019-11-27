@@ -2550,7 +2550,7 @@
           `(.align ,(integer-length (1- size)))
           label
           (if (eq (car constant) :jump-table)
-              `(.dword ,@(cdr constant))
+              `(.dword ,@(coerce (cdr constant) 'list))
               `(.byte ,@(let ((val (cdr constant)))
                           (loop repeat size
                                 collect (prog1 (ldb (byte 8 0) val)

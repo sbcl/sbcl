@@ -64,29 +64,30 @@
   ;; TODO: also accept signed-reg, unsigned-reg, character-reg
   ;; also, could probably tighten up the TN lifetime to avoid a move
   (:args (x :scs (any-reg descriptor-reg)))
-  (:info values labels otherwise test-vop-name)
+  (:info labels otherwise key-type keys test-vop-name)
   (:temporary (:sc unsigned-reg) table)
   (:args-var x-tn-ref)
   (:generator 10
-    (let ((key-type (tn-ref-type x-tn-ref))
-          (ea))
-      (etypecase (car values)
+    (let* ((key-derived-type (tn-ref-type x-tn-ref))
+           (ea)
+           (min (reduce #'min keys))
+           (max (reduce #'max keys))
+           (vector (make-array (1+ (- max min)) :initial-element otherwise))
+           ;; This fixnumize won't overflow because ir2opt won't use
+           ;; a multiway-branch unless all keys are char or fixnum.
+           ;; But what if MIN is MOST-NEGATIVE-FIXNUM ????
+           (-min (fixnumize (- min))))
+      (mapc (lambda (key label) (setf (aref vector (- key min)) label))
+            keys labels)
+      (ecase key-type
         (fixnum
-         (let* ((min (reduce #'min values))
-                (max (reduce #'max values))
-                (vector (make-array (1+ (- max min)) :initial-element otherwise))
-                ;; This fixnumize won't overflow because ir2opt won't use
-                ;; a multiway-branch unless all keys are char or fixnum.
-                (-min (fixnumize (- min))))
-           (mapc (lambda (value label) (setf (aref vector (- value min)) label))
-                 values labels)
            (cond
              ((and (typep (* min (- sb-vm:n-word-bytes)) '(signed-byte 32))
-                   (typep key-type 'numeric-type)
-                   (csubtypep key-type (specifier-type 'fixnum))
+                   (typep key-derived-type 'numeric-type)
+                   (csubtypep key-derived-type (specifier-type 'fixnum))
                    ;; There could be some dead code if the ranges don't line up.
-                   (>= (numeric-type-low key-type) min)
-                   (<= (numeric-type-high key-type) max))
+                   (>= (numeric-type-low key-derived-type) min)
+                   (<= (numeric-type-high key-derived-type) max))
               (setq ea (ea (* min (- sb-vm:n-word-bytes)) table x 4)))
              (t
               ;; First exclude out-of-bounds values because there's no harm
@@ -106,15 +107,9 @@
                 (inst test :byte x fixnum-tag-mask)
                 (inst jmp :ne otherwise))
               (setq ea (ea table temp-reg-tn 4))))
-            (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
-            (inst jmp ea)))
+            (inst lea table (register-inline-constant :jump-table vector))
+            (inst jmp ea))
         (character
-         (let* ((min (reduce #'min values :key #'sb-xc:char-code))
-                (max (reduce #'max values :key #'sb-xc:char-code))
-                (vector (make-array (1+ (- max min)) :initial-element otherwise)))
-           (mapc (lambda (value label)
-                   (setf (aref vector (- (sb-xc:char-code value) min)) label))
-                 values labels)
            ;; Same as above, but test the widetag before shifting it out.
            (unless (member test-vop-name '(fast-char=/character/c
                                            fast-if-eq-character/c))
@@ -126,8 +121,8 @@
              (inst sub :dword temp-reg-tn min))
            (inst cmp temp-reg-tn (- max min))
            (inst jmp :a otherwise)
-           (inst lea table (register-inline-constant :jump-table (coerce vector 'list)))
-           (inst jmp (ea table temp-reg-tn 8))))))))
+           (inst lea table (register-inline-constant :jump-table vector))
+           (inst jmp (ea table temp-reg-tn 8)))))))
 
 (define-load-time-global *cmov-ptype-representation-vop*
   (mapcan (lambda (entry)

@@ -529,6 +529,9 @@
               for j of-type index from ptr below debug-info-index
               do (setf (code-header-ref code i) (svref stack j)))
         (with-pinned-objects (code)
+          ;; * DO * NOT * SEPARATE * THESE * TWO * STEPS *
+          ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
+          ;; regading the corresponding use therein of WITH-PINNED-OBJECTS.
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
           (sb-c::apply-fasl-fixups stack code n-fixups))
         #-sb-xc-host

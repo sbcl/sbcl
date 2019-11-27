@@ -3463,7 +3463,7 @@
           `(.align ,(integer-length (1- size)))
           label
           (if (eq (car constant) :jump-table)
-              `(.qword ,@(cdr constant))
+              `(.qword ,@(coerce (cdr constant) 'list))
               ;; Could add pseudo-ops for .WORD, .INT, .OCTA just like gcc has.
               ;; But it works fine to emit as a sequence of bytes
               `(.byte ,@(let ((val (cdr constant)))
