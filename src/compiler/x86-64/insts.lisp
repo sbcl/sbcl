@@ -3513,10 +3513,15 @@
 
 (defun parse-2-operands (stmt)
   (let* ((operands (stmt-operands stmt))
-         (first (car operands))
-         (size (cond ((is-size-p first) (pop operands) first)
-                     (t :qword))))
-    (values size (pop operands) (pop operands))))
+         (size (let* ((first (car operands))
+                      (second (cadr operands)))
+                 (cond ((is-size-p first) (pop operands) first)
+                       ;; This next case is noise to support obsolete REG-IN-SIZE
+                       ((or (register-p first) (register-p second))
+                        (matching-operand-size first second)) ; FIXME: remove
+                       (t :qword)))))
+    ;; Recompute first + second because potentially popped one.
+    (values size (first operands) (second operands))))
 
 (defun smaller-of (size1 size2)
   (if (or (eq size1 :dword) (eq size2 :dword)) :dword :qword))
@@ -3620,7 +3625,7 @@
   (etypecase b
     (tn (and (tn-p a) (location= a b)))
     (ea (and (ea-p a) (ea= a b)))
-    ((or fixup number) nil)))
+    ((or fixup number reg) nil)))
 
 (defpattern "mov dst,src + mov src,dst elim" ((mov) (mov)) (stmt next)
   (binding* (((size1 dst1 src1) (parse-2-operands stmt))
