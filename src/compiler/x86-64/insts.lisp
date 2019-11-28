@@ -1961,10 +1961,13 @@
     (:printer accum-reg/mem ((op '(#b1111011 #b111))))
     (:emitter (emit* segment dst src #b111))))
 
-(define-instruction bswap (segment dst)
+(define-instruction bswap (segment maybe-size &optional (reg nil regp))
   (:printer ext-reg-no-width ((op #b11001)))
   (:emitter
-   (let ((size (operand-size dst)))
+   (multiple-value-bind (size dst)
+       (if regp
+           (values maybe-size reg)
+           (let ((reg maybe-size)) (values (operand-size reg) reg)))
      (aver (member size '(:dword :qword)))
      (emit-prefixes segment dst nil size)
      (emit-byte segment #x0f)
