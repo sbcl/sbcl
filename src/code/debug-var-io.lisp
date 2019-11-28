@@ -209,7 +209,10 @@
                             :element-type '(unsigned-byte 8)
                             :fill-pointer 0 :adjustable t))
         (tempbuf (make-array 8 :element-type '(unsigned-byte 8)
-                               :fill-pointer 0)))
+                               :fill-pointer 0))
+        (length (length input))
+        #-sb-xc-host
+        (input (truly-the simple-array (%array-data input))))
     (flet ((compare (index1 index2 end &aux (start1 index1))
              (loop
               (when (or (eql index2 end)
@@ -218,47 +221,47 @@
               (incf index1)
               (incf index2))))
       (loop with pos of-type index = 0
-            while (< pos (length input))
+            while (< pos length)
             do
-        (let ((match-start 0)
-              (match-len 2))
-          ;; limit the lookback amount to make the running time n^2 in input
-          ;; length instead of n^3.
-          (loop for start from (max 0 (- pos 4000)) below pos
-                do
-            (let ((this-len (compare start pos (length input))))
-              (when (> this-len match-len)
-                (setq match-start start match-len this-len))))
-          (let ((offset (- pos match-start)))
-            ;; Length = 3 is emitted as symbol-2 followed by a single byte
-            ;; for the offset. Longer lengths are written as symbol-1 and
-            ;; then two varint-encoded values. We first determine whether
-            ;; writing the back-reference is shorter than the source bytes.
-            (cond ((and (> match-len 3)
-                        (progn (setf (fill-pointer tempbuf) 0)
-                               (write-var-integer offset tempbuf)
-                               (write-var-integer match-len tempbuf)
-                               (< (1+ (fill-pointer tempbuf)) match-len)))
-                   ;; marker symbol if followed by 0 would represent a literal
-                   (aver (/= (aref tempbuf 0) 0))
-                   (vector-push-extend lz-symbol-1 output)
-                   (dovector (elt tempbuf) (vector-push-extend elt output))
-                   (incf pos match-len))
-                  ((and (= match-len 3) (< offset 256))
-                   (vector-push-extend lz-symbol-2 output)
-                   (vector-push-extend offset output)
-                   (incf pos 3))
-                  (t
-                   (let ((byte (aref input pos)))
-                     (incf pos)
-                     (vector-push-extend byte output)
-                     (when (or (= byte lz-symbol-1) (= byte lz-symbol-2))
-                       (vector-push-extend 0 output)))))))))
+            (let ((match-start 0)
+                  (match-len 2))
+              ;; limit the lookback amount to make the running time n^2 in input
+              ;; length instead of n^3.
+              (loop for start from (max 0 (- pos 4000)) below pos
+                    do
+                    (let ((this-len (compare start pos length)))
+                      (when (> this-len match-len)
+                        (setq match-start start match-len this-len))))
+              (let ((offset (- pos match-start)))
+                ;; Length = 3 is emitted as symbol-2 followed by a single byte
+                ;; for the offset. Longer lengths are written as symbol-1 and
+                ;; then two varint-encoded values. We first determine whether
+                ;; writing the back-reference is shorter than the source bytes.
+                (cond ((and (> match-len 3)
+                            (progn (setf (fill-pointer tempbuf) 0)
+                                   (write-var-integer offset tempbuf)
+                                   (write-var-integer match-len tempbuf)
+                                   (< (1+ (fill-pointer tempbuf)) match-len)))
+                       ;; marker symbol if followed by 0 would represent a literal
+                       (aver (/= (aref tempbuf 0) 0))
+                       (vector-push-extend lz-symbol-1 output)
+                       (dovector (elt tempbuf) (vector-push-extend elt output))
+                       (incf pos match-len))
+                      ((and (= match-len 3) (< offset 256))
+                       (vector-push-extend lz-symbol-2 output)
+                       (vector-push-extend offset output)
+                       (incf pos 3))
+                      (t
+                       (let ((byte (aref input pos)))
+                         (incf pos)
+                         (vector-push-extend byte output)
+                         (when (or (= byte lz-symbol-1) (= byte lz-symbol-2))
+                           (vector-push-extend 0 output)))))))))
     (let ((result
-           #+sb-xc-host
-           (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
-           #-sb-xc-host
-           (%shrink-vector (%array-data output) (fill-pointer output))))
+            #+sb-xc-host
+            (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
+            #-sb-xc-host
+            (%shrink-vector (%array-data output) (fill-pointer output))))
       #+(or)
       (aver (equalp input (lz-decompress result)))
       result)))
