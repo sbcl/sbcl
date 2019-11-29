@@ -213,7 +213,7 @@
          ,entry))))
 
 (defun enqueue-newline (stream kind)
-  (let* ((depth (length (pretty-stream-pending-blocks stream)))
+  (let* ((depth (pretty-stream-pending-blocks-length stream))
          (newline (enqueue stream newline :kind kind :depth depth)))
     (dolist (entry (pretty-stream-queue-tail stream))
       (when (and (not (eq newline entry))
@@ -251,15 +251,15 @@
     (pretty-sout stream prefix 0 (length prefix)))
   (unless (typep suffix 'simple-string)
     (setq suffix (coerce suffix '(simple-array character (*)))))
-  (let* ((pending-blocks (pretty-stream-pending-blocks stream))
-         (start (enqueue stream block-start
-                         :prefix (and per-line-p prefix)
-                         :suffix suffix
-                         :depth (length pending-blocks))))
-    (setf (pretty-stream-pending-blocks stream)
-          (cons start pending-blocks))))
+  (let ((start (enqueue stream block-start
+                        :prefix (and per-line-p prefix)
+                        :suffix suffix
+                        :depth (pretty-stream-pending-blocks-length stream))))
+    (push start (pretty-stream-pending-blocks stream))
+    (incf (pretty-stream-pending-blocks-length stream))))
 
 (defun end-logical-block (stream)
+  (decf (pretty-stream-pending-blocks-length stream))
   (let* ((start (pop (pretty-stream-pending-blocks stream)))
          (suffix (block-start-suffix start))
          (end (enqueue stream block-end :suffix suffix)))

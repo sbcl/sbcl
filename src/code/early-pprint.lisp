@@ -179,4 +179,5 @@
   (queue-tail nil :type list)
   (queue-head nil :type list)
   ;; Block-start queue entries in effect at the queue head.
-  (pending-blocks nil :type list))
+  (pending-blocks nil :type list)
+  (pending-blocks-length 0 :type index))
