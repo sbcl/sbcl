@@ -907,7 +907,7 @@
           (total-code-size 0)
           (pp-state (cons (make-hash-table :test 'equal)
                           ;; copy no entries for macros/special-operators (flet, etc)
-                          (sb-pretty::make-pprint-dispatch-table)))
+                          (sb-pretty::make-pprint-dispatch-table nil nil nil)))
           (prev-namestring "")
           (n-linker-relocs 0)
           (seen-fdefns nil)

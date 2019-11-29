@@ -16,7 +16,8 @@
 ;; a type-specifier.
 (sb-xc:defstruct (pprint-dispatch-table
                   (:conc-name pp-dispatch-)
-                  (:constructor make-pprint-dispatch-table (&optional entries))
+                  (:constructor make-pprint-dispatch-table
+                      (entries number-matchable-p only-initial-entries))
                   (:copier nil) ; needs a deep copy
                   (:predicate nil))
   ;; A list of all the entries (except for CONS entries below) in highest
@@ -28,7 +29,8 @@
   (cons-entries (make-hash-table :test 'eql) :read-only t)
   ;; NIL if this this table can't match any numeric type.
   ;; The conservative value is T.
-  (number-matchable-p nil))
+  (number-matchable-p nil)
+  (only-initial-entries nil :type boolean))
 
 (declaim (freeze-type pprint-dispatch-table))
 

@@ -644,7 +644,7 @@
  ("src/code/pprint" :not-host) ; defines WITH-PRETTY-STREAM needed by 'print'
  ("src/code/reader" :not-host) ; needs "code/readtable"
  ("src/code/print" :not-host)
- 
+
  ("src/code/target-stream"     :not-host) ; needs WHITESPACEP from "code/reader"
  #-win32
  ("src/code/unix-pathname"     :not-host)

@@ -17,7 +17,7 @@
 ;;;; are order-preserving - unless they are of the form (CONS (EQL x)).
 ;;;; This is not a requirement in general, but is quite reasonable.
 (with-test (:name :pprint-dispatch-order-preserving)
-  (let ((tbl (sb-pretty::make-pprint-dispatch-table)))
+  (let ((tbl (sb-pretty::make-pprint-dispatch-table nil nil nil)))
     (handler-bind ((warning #'muffle-warning)) ; nonexistent types
       ;; use EVAL because there are *two* warnings to muffle: first time
       ;; is when the compiler sees a symbol used as an unknown type-specifier,

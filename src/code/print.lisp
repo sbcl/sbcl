@@ -54,7 +54,7 @@ Does not affect the cases that are already controlled by *PRINT-LENGTH*")
    style conditional newlines are turned on, and all indentations are
    turned off. If NIL, never use miser mode.")
 (defvar *print-pprint-dispatch*
-  (sb-pretty::make-pprint-dispatch-table) ; for type-correctness
+  (sb-pretty::make-pprint-dispatch-table nil nil nil) ; for type-correctness
   "The pprint-dispatch-table that controls how to pretty-print objects.")
 (defparameter *suppress-print-errors* nil
   "Suppress printer errors when the condition is of the type designated by this

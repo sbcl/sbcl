@@ -780,7 +780,9 @@ line break."
 (defun copy-pprint-dispatch (&optional (table *print-pprint-dispatch*))
   (declare (type (or pprint-dispatch-table null) table))
   (let* ((orig (or table *initial-pprint-dispatch-table*))
-         (new (make-pprint-dispatch-table (copy-list (pp-dispatch-entries orig)))))
+         (new (make-pprint-dispatch-table (copy-list (pp-dispatch-entries orig))
+                                          (pp-dispatch-number-matchable-p orig)
+                                          (pp-dispatch-only-initial-entries orig))))
     (replace/eql-hash-table (pp-dispatch-cons-entries new)
                             (pp-dispatch-cons-entries orig))
     new))
@@ -792,16 +794,19 @@ line break."
           (when (or (not (numberp object)) (pp-dispatch-number-matchable-p table))
             (let ((cons-entry
                    (and (consp object)
-                        (gethash (car object) (pp-dispatch-cons-entries table)))))
-              (if (not cons-entry)
-                  (dolist (entry (pp-dispatch-entries table) nil)
-                    (when (funcall (pprint-dispatch-entry-test-fn entry) object)
-                      (return entry)))
-                  (dolist (entry (pp-dispatch-entries table) cons-entry)
-                    (when (entry< entry cons-entry)
-                      (return cons-entry))
-                    (when (funcall (pprint-dispatch-entry-test-fn entry) object)
-                      (return entry))))))))
+                        (sb-impl::gethash/eql (car object) (pp-dispatch-cons-entries table) nil))))
+              (cond ((not cons-entry)
+                     (dolist (entry (pp-dispatch-entries table) nil)
+                       (when (funcall (pprint-dispatch-entry-test-fn entry) object)
+                         (return entry))))
+                    ((pp-dispatch-only-initial-entries table)
+                     cons-entry)
+                    (t
+                     (dolist (entry (pp-dispatch-entries table) cons-entry)
+                       (when (entry< entry cons-entry)
+                         (return cons-entry))
+                       (when (funcall (pprint-dispatch-entry-test-fn entry) object)
+                         (return entry)))))))))
     (if entry
         (values (pprint-dispatch-entry-fun entry) t)
         (values #'output-ugly-object nil))))
@@ -869,7 +874,8 @@ line break."
             (if function
                 (setf (gethash key hashtable) entry)
                 (remhash key hashtable))))
-        (setf (pp-dispatch-entries table)
+        (setf (pp-dispatch-only-initial-entries table) nil
+              (pp-dispatch-entries table)
               (let ((list (delete type (pp-dispatch-entries table)
                                   :key #'pprint-dispatch-entry-type
                                   :test #'equal)))
@@ -1442,11 +1448,13 @@ line break."
   ;; it's going to be set to a copy of *INITIAL-PP-D-T* below because
   ;; it's used in WITH-STANDARD-IO-SYNTAX, and condition reportery
   ;; possibly performed in the following extent may use W-S-IO-SYNTAX.
-  (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table))
+  (setf *standard-pprint-dispatch-table* (make-pprint-dispatch-table nil nil nil))
   (setf *initial-pprint-dispatch-table* nil)
-  (let ((*print-pprint-dispatch* (make-pprint-dispatch-table)))
+  (let ((*print-pprint-dispatch* (make-pprint-dispatch-table nil nil nil)))
     (/show0 "doing SET-PPRINT-DISPATCH for regular types")
-    (set-pprint-dispatch '(and array (not (or string bit-vector))) 'pprint-array)
+    ;; Assign a lower priority than for the cons entries below, making
+    ;; fewer type tests when dispatching.
+    (set-pprint-dispatch '(and array (not (or string bit-vector))) 'pprint-array -1)
     ;; MACRO-FUNCTION must have effectively higher priority than FBOUNDP.
     ;; The implementation happens to check identical priorities in the order added,
     ;; but that's unspecified behavior.  Both must be _strictly_ lower than the
@@ -1461,7 +1469,6 @@ line break."
     (set-pprint-dispatch 'sb-impl::comma 'pprint-unquoting-comma -3)
     ;; cons cells with interesting things for the car
     (/show0 "doing SET-PPRINT-DISPATCH for CONS with interesting CAR")
-
     (dolist (magic-form '((lambda pprint-lambda)
                           ((declare declaim) pprint-declare)
 
@@ -1513,7 +1520,8 @@ line break."
       ;; The sharing of dispatch entries is inconsequential.
       (set-pprint-dispatch `(cons (member ,@(ensure-list (first magic-form))))
                            (second magic-form)))
-    (setf *initial-pprint-dispatch-table* *print-pprint-dispatch*))
+    (setf (pp-dispatch-only-initial-entries *print-pprint-dispatch*) t
+          *initial-pprint-dispatch-table* *print-pprint-dispatch*))
 
   (setf *standard-pprint-dispatch-table*
         (copy-pprint-dispatch *initial-pprint-dispatch-table*))
