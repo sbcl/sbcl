@@ -376,7 +376,9 @@ EXPERIMENTAL: Interface subject to change."
                  ;; partially to blame?
                  (or (not (eq :cpu profiling)) (profiled-thread-p self)))
         (sb-thread::with-system-mutex (*profiler-lock* :without-gcing t)
-          (let ((samples *samples*))
+          (let ((samples *samples*)
+                ;; Don't touch the circularity hash-table
+                *print-circle*)
             (when (and samples
                        (< (samples-trace-count samples)
                           (samples-max-samples samples)))
