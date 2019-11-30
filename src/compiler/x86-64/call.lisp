@@ -1116,47 +1116,45 @@
     ;; otherwise, we'd be accessing values below SP, and that's no good
     ;; if a signal interrupts this code sequence.  In that case, store
     ;; the final value in rsp after the stack-stack memmove loop.
-    (inst lea (if (<= fixed (sb-allocated-size 'stack))
-                  rsp-tn
-                  source)
-          (ea (* n-word-bytes (- (+ sp->fp-offset fixed) (sb-allocated-size 'stack)))
-              rbp-tn temp (ash 1 (- word-shift n-fixnum-tag-bits))))
+    (let* ((delta (- fixed (sb-allocated-size 'stack)))
+           (loop (gen-label))
+           (fixnum->word (ash 1 (- word-shift n-fixnum-tag-bits)))
+           (below (plusp delta)))
+      (inst lea (if below source rsp-tn)
+            (ea (* n-word-bytes (+ sp->fp-offset delta))
+                rbp-tn temp fixnum->word))
 
-    ;; Now: nargs>=1 && nargs>fixed
+      ;; Now: nargs>=1 && nargs>fixed
 
-    (cond ((< fixed register-arg-count)
-           ;; the code above only moves the final value of rsp in
-           ;; rsp directly if that condition is satisfied.  Currently,
-           ;; r-a-c is 3, so the aver is OK. If the calling convention
-           ;; ever changes, the logic above with LEA will have to be
-           ;; adjusted.
-           (aver (<= fixed (sb-allocated-size 'stack)))
-           ;; We must stop when we run out of stack args, not when we
-           ;; run out of more args.
-           ;; Number to copy = nargs-3
-           ;; Save the original count of args.
-           (inst mov rbx-tn rcx-tn)
-           (inst sub rbx-tn (fixnumize register-arg-count))
-           ;; Everything of interest in registers.
-           (inst jmp :be DO-REGS))
-          (t
-           ;; Number to copy = nargs-fixed
-           (inst lea rbx-tn (ea (- (fixnumize fixed)) rcx-tn))))
+      (cond ((< fixed register-arg-count)
+             ;; the code above only moves the final value of rsp in
+             ;; rsp directly if that condition is satisfied.  Currently,
+             ;; r-a-c is 3, so the aver is OK. If the calling convention
+             ;; ever changes, the logic above with LEA will have to be
+             ;; adjusted.
+             (aver (<= fixed (sb-allocated-size 'stack)))
+             ;; We must stop when we run out of stack args, not when we
+             ;; run out of more args.
+             ;; Number to copy = nargs-3
+             ;; Save the original count of args.
+             (inst mov rbx-tn rcx-tn)
+             (inst sub rbx-tn (fixnumize register-arg-count))
+             ;; Everything of interest in registers.
+             (inst jmp :be DO-REGS))
+            (t
+             ;; Number to copy = nargs-fixed
+             (inst lea rbx-tn (ea (- (fixnumize fixed)) rcx-tn))))
 
-    ;; Initialize R8 to be the end of args.
-    ;; Swap with SP if necessary to mirror the previous condition
-    (inst lea (if (<= fixed (sb-allocated-size 'stack))
-                  source
-                  rsp-tn)
-          (ea (* sp->fp-offset n-word-bytes)
-              rbp-tn temp (ash 1 (- word-shift n-fixnum-tag-bits))))
+      ;; Initialize R8 to be the end of args.
+      ;; Swap with SP if necessary to mirror the previous condition
+      (unless (zerop delta)
+        (inst lea (if below rsp-tn source)
+              (ea (* sp->fp-offset n-word-bytes)
+                  rbp-tn temp fixnum->word)))
 
-    ;; src: rbp + temp + sp->fp
-    ;; dst: rbp + temp + sp->fp + (fixed - [stack-size])
-    (let ((delta (- fixed (sb-allocated-size 'stack)))
-          (loop (gen-label))
-          (fixnum->word (ash 1 (- word-shift n-fixnum-tag-bits))))
-      (cond ((zerop delta)) ; no-op move
+      ;; src: rbp + temp + sp->fp
+      ;; dst: rbp + temp + sp->fp + (fixed - [stack-size])
+      (cond ((zerop delta))             ; no-op move
             ((minusp delta)
              ;; dst is lower than src, copy forward
              (zeroize copy-index)
