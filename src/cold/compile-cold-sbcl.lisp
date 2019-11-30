@@ -99,7 +99,7 @@
                (decf subprocess-count))
              (show-log (pid logsuffix label)
                (format t "~a~%" label)
-               (with-open-file (f (format nil "~d.~a" pid logsuffix))
+               (with-open-file (f (format nil "output/~d.~a" pid logsuffix))
                  (loop (let ((line (read-line f nil)))
                          (unless line (return))
                          (write-string line)
@@ -118,10 +118,10 @@
                    (when (zerop pid)
                      (let ((pid (sb-cold::getpid)))
                        (let ((*standard-output*
-                              (open (format nil "~d.out" pid)
+                              (open (format nil "output/~d.out" pid)
                                     :direction :output :if-exists :supersede))
                              (*error-output*
-                              (open (format nil "~d.err" pid)
+                              (open (format nil "output/~d.err" pid)
                                     :direction :output :if-exists :supersede)))
                          (handler-case (target-compile-stem stem flags)
                            (error (e)
