@@ -1736,8 +1736,7 @@
            (declare (type segment ,segment-arg) ,@(arg-types))
            ,@(ecase sb-c:*backend-byte-order*
                (:little-endian (nreverse forms))
-               (:big-endian forms))
-           ',name)))))
+               (:big-endian forms)))))))
 
 (defun %def-inst-encoder (symbol &optional thing)
   (setf (gethash symbol *inst-encoder*)

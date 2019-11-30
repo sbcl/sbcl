@@ -32,7 +32,7 @@
   "tests/custom-sysinit.lisp"
   "tests/custom-userinit.lisp")
  ("kill-non-lisp-thread.impure.lisp" "tests/kill-non-lisp-thread.so")
- ("load.pure.lisp" 
+ ("load.pure.lisp"
   "tests/data/wonky1.lisp")
  ("unicode-breaking.pure.lisp"
   "tests/data/GraphemeBreakTest.txt"
