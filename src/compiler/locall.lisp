@@ -195,13 +195,10 @@
           (declare (type index ,n-supplied)
                    (ignorable ,n-supplied))
           (cond
-            ,@(loop for previous-n = (1- min) then n
-                    for ((ep . n) . next) on used-eps
+            ,@(loop for ((ep . n) . next) on used-eps
                     collect
                     (cond (next
-                           `(,(if (= (1+ previous-n) n)
-                                  `(eql ,n-supplied ,n)
-                                  `(<= ,n-supplied ,n))
+                           `((eq ,n-supplied ,n)
                              (%funcall ,ep ,@(subseq temps 0 n))))
                           (more
                            (with-unique-names (n-context n-count)
