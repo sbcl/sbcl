@@ -1199,8 +1199,16 @@
           (return))
 
         ;; Don't deposit any more than there are.
-        (inst cmp :dword rcx-tn (fixnumize i))
-        (inst jmp :eq DONE)))
+        #.(assert (= register-arg-count 3))
+        (cond ((> fixed 0)
+               (inst cmp :dword rcx-tn (fixnumize i))
+               (inst jmp :eq DONE))
+              ;; Use a single comparison for 1 and 2
+              ((= i 1)
+               (inst cmp :dword rcx-tn (fixnumize 2))
+               (inst jmp :l DONE))
+              (t
+               (inst jmp :eq DONE)))))
 
     (inst jmp DONE)
 
