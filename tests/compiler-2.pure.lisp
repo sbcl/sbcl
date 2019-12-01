@@ -2505,3 +2505,12 @@
       (declare (type function pred))
       (funcall pred))
    (() 44)))
+
+(with-test (:name (:lvar-fun-name :constant-leaf-not-constant-lvar-plvar-constant-p))
+  (assert (nth-value 1
+                     (checked-compile
+                      `(lambda ()
+                         (funcall
+                          (the (function (t) t) ,(lambda ()))))
+                      :allow-warnings t
+                      :allow-style-warnings t))))

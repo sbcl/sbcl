@@ -200,7 +200,9 @@
                            lvar-type)))
          (fun-name (cond ((or (fun-type-p lvar-type)
                               (functional-p leaf))
-                          (cond ((constant-lvar-p lvar)
+                          (cond ((or (constant-lvar-p lvar)
+                                     ;; A constant may fail some checks in constant-lvar-p
+                                     (constant-p leaf))
                                  (let ((value (lvar-value lvar)))
                                    (etypecase value
                                      #-sb-xc-host
