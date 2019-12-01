@@ -9,6 +9,7 @@ jobs:
     strategy: 
       matrix: 
         options: [--with-sb-thread, --without-sb-thread]
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v1
