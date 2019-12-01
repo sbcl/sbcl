@@ -1,7 +1,7 @@
 #!/bin/sh -e
 
 if [ ! -e ansi-test ]; then
-   git clone -–depth 1 https://github.com/sbcl/ansi-test.git
+   git clone --depth 1 https://github.com/sbcl/ansi-test.git
 fi
 
 cd ansi-test
