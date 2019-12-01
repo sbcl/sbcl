@@ -1,0 +1,38 @@
+name: Windows
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: windows-latest    
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: install host sbcl
+      run: |
+        cinst sbcl -source tools-for-build
+        echo "::add-path::/c/Program Files/Steel Bank Common Lisp/1.4.14"
+    - name: build
+      env:
+        SBCL_HOME: "/c/Program Files/Steel Bank Common Lisp/1.4.14"
+      run: |
+        bash ./make.sh --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+    - name: make installer
+      run: |
+        bash ./make-windows-installer.sh
+        bash -c "mkdir sbcl-windows-installer; mv output/*msi sbcl-windows-installer"
+    - name: save installer
+      uses: actions/upload-artifact@v1
+      with:
+        name: sbcl-windows-installer
+        path: sbcl-windows-installer
+    - name: tests
+      working-directory: tests
+      run: bash ./run-tests.sh
+    - name: ansi-tests
+      working-directory: tests
+      run: bash ./ansi-tests.sh
+        
+      
+    

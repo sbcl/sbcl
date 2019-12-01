@@ -1,0 +1,24 @@
+name: Linux
+
+on: [push]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    strategy: 
+      matrix: 
+        options: [--with-sb-thread, --without-sb-thread]
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host sbcl
+      run: sudo apt-get -qq -y install sbcl libcapstone-dev
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh ${{ matrix.options }} --xc-host='sbcl --lose-on-corruption --disable-ldb --disable-debugger'
+    - name: test
+      run: cd tests; ./run-tests.sh
+    - name: ansi-test
+      run: cd tests; ./ansi-tests.sh
