@@ -426,7 +426,7 @@
 (defmethod slot-missing
            ((class t) instance slot-name operation &optional new-value)
   (error "~@<When attempting to ~A, the slot ~S is missing from the ~
-          object ~S.~@:>"
+          object ~S.~@[~%~a~]~@:>"
          (ecase operation
            (slot-value "read the slot's value (slot-value)")
            (setf (format nil
@@ -435,7 +435,16 @@
            (slot-boundp "test to see whether slot is bound (SLOT-BOUNDP)")
            (slot-makunbound "make the slot unbound (SLOT-MAKUNBOUND)"))
          slot-name
-         instance))
+         instance
+         (let ((slot (and (typep class 'slot-class)
+                          (find slot-name (class-slots class)
+                                :key #'slot-definition-name
+                                :test #'string-equal))))
+           (when slot
+             (format nil "It has a slot ~/sb-ext:print-symbol-with-prefix/, while ~
+                         ~/sb-ext:print-symbol-with-prefix/ is requested."
+                     (slot-definition-name slot)
+                     slot-name)))))
 
 (defmethod slot-unbound ((class t) instance slot-name)
   (restart-case
