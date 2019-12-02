@@ -54,8 +54,8 @@
   (:temporary (:sc unsigned-reg) index)
   (:ignore test-vop-name)
   (:generator 10
-    (let* ((min (reduce #'min keys))
-           (max (reduce #'max keys))
+    (let* ((min (car keys)) ; keys are sorted
+           (max (car (last keys)))
            (vector (make-array (1+ (- max min)) :initial-element otherwise)))
       (mapc (lambda (key label) (setf (aref vector (- key min)) label))
             keys labels)

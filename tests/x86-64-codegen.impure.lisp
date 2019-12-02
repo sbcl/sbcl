@@ -580,3 +580,30 @@ sb-vm::(define-vop (cl-user::test)
    (inst mov rax-tn rcx-tn)))
 (with-test (:name :mov-mov-elim-ignore-resized-reg) ; just don't crash
   (checked-compile '(lambda () (sb-sys:%primitive test) 0)))
+
+(defstruct a)
+(defstruct (achild (:include a)))
+(defstruct (agrandchild (:include achild)))
+(defstruct (achild2 (:include a)))
+(defstruct b)
+(defstruct c)
+(defstruct d)
+(defstruct e)
+(defstruct (echild (:include e)))
+(defstruct f)
+
+(declaim (freeze-type a b c d e f))
+(defun typecase-jump-table (x)
+  (typecase x
+    (a 'is-a)
+    (b 'is-b)
+    (c 'is-c)
+    ((or d e) 'is-d-or-e)
+    (f 'is-f)))
+(compile 'typecase-jump-table)
+
+(with-test (:name :typecase-jump-table)
+  (assert (eql (sb-kernel:code-jump-table-words
+                (sb-kernel:fun-code-header #'typecase-jump-table))
+               ;; 6 cases including NIL return, plus the size
+               7)))

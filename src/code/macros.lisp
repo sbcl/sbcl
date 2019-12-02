@@ -346,15 +346,14 @@ symbol-case giving up: case=((V U) (F))
 ;;; CASE form. Prefer collisions on symbols whose consequent in the CASE
 ;;; is the same, otherwise the expansion becomes convoluted.
 
-(defun pick-best-symbol-hash-bits (symbols
-                                   &optional (hash-fun 'sxhash)
+(defun pick-best-sxhash-bits (keys &optional (hash-fun 'sxhash)
                                              (maxbytes 2)
                                              (maxbits sb-vm:n-positive-fixnum-bits))
   (declare (type (member 1 2) maxbytes))
-  (unless symbols
-    (bug "Give me some symbols")) ; it beats getting division by zero error
-  (let* ((nsymbols (length symbols))
-         (ideal-table-size (power-of-two-ceiling nsymbols))
+  (unless keys
+    (bug "Give me some objects")) ; it beats getting division by zero error
+  (let* ((nkeys (length keys))
+         (ideal-table-size (power-of-two-ceiling nkeys))
          (required-nbits (integer-length (1- ideal-table-size)))
          ;; If each bin has 2 items in it (which isn't ideal), then the table could
          ;; be half the "required" minimum size. This occurs with symbol sets such
@@ -362,7 +361,7 @@ symbol-case giving up: case=((V U) (F))
          ;; by string produces 2 of each hash.
          (smallest-nbits (max 2 (1- required-nbits)))
          (largest-nbits (1+ required-nbits)) ; allow double the required minimum
-         (hashes (mapcar hash-fun symbols)))
+         (hashes (mapcar hash-fun keys)))
     (macrolet ((stats (mixer answer)
                  ;; Compute the average number of items per bin,
                  ;; looking only at bins that contain something.
@@ -378,7 +377,7 @@ symbol-case giving up: case=((V U) (F))
                         (setf max-bin-count (max count max-bin-count)))
                       (when (= max-bin-count 1) ; can't beat a perfect hash
                         (return-from try (values 1 ,answer)))
-                      (let ((average (/ nsymbols n-used)))
+                      (let ((average (/ nkeys n-used)))
                         (when (or (< max-bin-count best-max-bin-count)
                                   (and (= max-bin-count best-max-bin-count)
                                        (< average best-average)))
@@ -418,6 +417,127 @@ symbol-case giving up: case=((V U) (F))
                     (values score1 answer1) ; not improved
                     (values score2 answer2))))))))) ; 2 bytes = better
 
+(defun build-sealed-struct-typecase-map (type-unions)
+  (let* ((layout-lists
+          (mapcar (lambda (x) (mapcar #'find-layout x)) type-unions))
+         (byte (nth-value 1
+                (pick-best-sxhash-bits (apply #'append layout-lists)
+                                       #'layout-clos-hash 1)))
+         (bin-count (ash 1 (byte-size byte)))
+         (array (make-array (1+ bin-count) :initial-element nil))
+         (mask (1- bin-count))
+         (seen))
+    (setf (aref array 0) (logior (ash mask 6) (byte-position byte)))
+    (loop for layout-list in layout-lists
+          for i from 1
+          do (dolist (layout layout-list)
+               (unless (member layout seen) ; in case of dups / overlaps
+                 (push layout seen))
+               (let ((bin (1+ (logand (ash (layout-clos-hash layout)
+                                           (- (the (mod #.sb-vm:n-word-bits)
+                                                   (byte-position byte))))
+                                      (the (and fixnum unsigned-byte) mask)))))
+                 (setf (aref array bin)
+                       (nconc (aref array bin) (list (cons layout i)))))))
+    array))
+
+(sb-xc:defmacro %sealed-struct-typecase-index (cases object)
+  `(if (%instancep ,object)
+       (locally (declare (optimize (safety 0)))
+         ;; When the second argument to LOAD-TIME-VALUE is T in COMPILE (but not COMPILE-FILE)
+         ;; then element 0 of the vector is used as a compile-time constant and we'll wire in
+         ;; the shift and mask which produces an even better instruction sequence.
+         ;; This is pretty awesome and I did not know that we would do that.
+         (let* ((array (load-time-value (build-sealed-struct-typecase-map ',cases) t))
+                (layout (%instance-layout ,object))
+                (hash-spec (the fixnum (svref array 0)))
+                (shift (ldb (byte ,(integer-length (1- sb-vm:n-word-bits)) 0)
+                            hash-spec)))
+           (the (mod ,(1+ (length cases)))
+                ;; DOLIST performs a leading test, but we're OK with a cell
+                ;; that is NIL. It'll miss and then exit at the end of the loop.
+                ;; This potentially avoids one comparison vs NIL if we hit immediately.
+                (let ((list (svref array
+                                   (1+ (logand (ash (layout-clos-hash layout) (- shift))
+                                               (ash hash-spec -6))))))
+                  (loop (let ((cell (car list)))
+                          (cond ((eq layout (car cell)) (return (cdr cell)))
+                                ((null (setq list (cdr list))) (return 0)))))))))
+       0))
+
+;;; Given an arbitrary TYPECASE, see if it is a discriminator over
+;;; an assortment of structure-object subtypes. If it is, potentially turn it
+;;; into a dispatch based on layout-clos-hash.
+;;; The decision to use a hash-based lookup should depend on the number of types
+;;; matched, but if there are a lot of types matched all rooted at a common
+;;; ancestor, it is not beneficial.
+;;;
+;;; The expansion currently works only with sealed classoids.
+;;; Making it work with unsealed classoids isn't too tough.
+;;; The dispatch will look something like a PCL cache but simpler.
+;;; First of all, there's no reason we can't use stable hashes
+;;; for structure layouts, because an incompatibly redefined structure
+;;; (which is unportable to begin with), doesn't require a new hash.
+;;; In fact as far as I can tell, redefining a standard class doesn't require a new hash
+;;; because the obsolete layout always gets clobbered to 0, and cache lookups always check
+;;; for a match on both the hash and the layout.
+(defun expand-struct-typecase (keyform temp normal-clauses type-specs default errorp
+                               &aux (n-root-types 0) (exhaustive-list))
+  (flet ((discover-subtypes (specifier)
+           (let* ((parse (specifier-type specifier))
+                  (worklist
+                   (cond ((structure-classoid-p parse) (list parse))
+                         ((and (union-type-p parse)
+                               (every #'structure-classoid-p (union-type-types parse)))
+                          (copy-list (union-type-types parse)))
+                         (t
+                          (return-from discover-subtypes nil)))))
+             ;; Assume that each "root" type would require its own test based
+             ;; on %instance-layout of self and ancestor and that all root types
+             ;; are disjoint. This may not be true if a later one includes
+             ;; an earlier one.
+             (incf n-root-types (length worklist))
+             (collect ((visited))
+               (loop (unless worklist (return))
+                     (let ((classoid (pop worklist)))
+                       (visited classoid)
+                       (awhen (classoid-subclasses classoid)
+                         (dohash ((classoid layout) it)
+                           (declare (ignore layout))
+                           (unless (or (member classoid (visited))
+                                       (member classoid worklist))
+                             (setf worklist (nconc worklist (list classoid))))))))
+               (setf exhaustive-list (union (visited) exhaustive-list))
+               (visited)))))
+    (let ((classoid-lists (mapcar #'discover-subtypes type-specs)))
+      (when (or (some #'null classoid-lists)
+                (< n-root-types 6)
+                ;; Given something like:
+                ;; (typecase x
+                ;;   ((or parent1 parent2 parent3) ...)
+                ;;   ((or parent4 parent5 parent6) ...)
+                ;; where eaach parent has dozens of children (directly or indirectly),
+                ;; it may be worse to use a hash-based lookup.
+                (> (length exhaustive-list) (* 3 n-root-types)))
+        (return-from expand-struct-typecase))
+      (if (every (lambda (classoids)
+                   (every (lambda (classoid)
+                            (eq (classoid-state classoid) :sealed))
+                          classoids))
+                 classoid-lists)
+          `(let ((,temp ,keyform))
+             (case (%sealed-struct-typecase-index
+                    ,(mapcar (lambda (list) (mapcar #'classoid-name list))
+                             classoid-lists)
+                    ,temp)
+               ,@(loop for i from 1 for clause in normal-clauses
+                       collect `(,i ,@(cddr clause)))
+               (0 ,@(if errorp
+                        `((etypecase-failure ,temp ',type-specs))
+                        (cddr default)))))
+          ;; not done
+          nil))))
+
 ;;; Turn a case over symbols into a case over their hashes.
 ;;; Regarding the apparently redundant UNREACHABLE branches:
 ;;; The first one causes the total number of ways to be (ASH 1 NBITS) exactly.
@@ -439,7 +559,7 @@ symbol-case giving up: case=((V U) (F))
   ;; - and potentially worse - than the CPU's branch predictor.
   (unless (>= (length keys) 6)
     (return-from expand-symbol-case nil))
-  (multiple-value-bind (maxprobes byte) (pick-best-symbol-hash-bits keys hash-fun maxbytes)
+  (multiple-value-bind (maxprobes byte) (pick-best-sxhash-bits keys hash-fun maxbytes)
     (when (and (vectorp byte) (< (length keys) 9))
       ;; It took two bytes to hash well enough. That's more fixed overhead,
       ;; so require more symbols. Otherwise just go back to linear scan.
@@ -861,13 +981,11 @@ symbol-case giving up: case=((V U) (F))
     (when (member name '(typecase etypecase))
       ;; Bypass all TYPEP handling if every clause of [E]TYPECASE is a MEMBER type.
       ;; More importantly, try to use the fancy expansion for symbols as keys.
-      (let ((default (if (eq (caar clauses) 't) (car clauses)))
-            (new-clauses))
+      (let* ((default (if (eq (caar clauses) 't) (car clauses)))
+             (normal-clauses (reverse (if default (cdr clauses) clauses)))
+             (new-clauses))
         (collect ((new-keys))
-          (dolist (clause (reverse (if default (cdr clauses) clauses))
-                          (setq clauses (if default (cons default new-clauses) new-clauses)
-                                keys (new-keys)
-                                implement-as 'case))
+          (dolist (clause normal-clauses)
             ;; clause is ((TYPEP #:x (QUOTE <sometype>)) NIL forms*)
             (destructuring-bind ((typep thing type-expr) . consequent) clause
               (declare (ignore thing))
@@ -878,15 +996,27 @@ symbol-case giving up: case=((V U) (F))
                      (clause-keys
                       (case (if (listp spec) (car spec))
                         (eql (when (singleton-p (cdr spec)) (list (cadr spec))))
-                        (member (when (proper-list-p (cdr spec)) (cdr spec))))))
-                (unless clause-keys (return))
-                (dolist (key clause-keys)
-                  (unless (member key (new-keys))
-                    (new-keys key)))
-                (push (cons `(or ,@(mapcar (lambda (x) `(eql ,keyform-value ',x))
-                                           clause-keys))
-                            consequent)
-                      new-clauses)))))))
+                        (member (when (proper-list-p (cdr spec)) (cdr spec)))
+                        (t :fail))))
+                (cond ((eq clause-keys :fail)
+                       (setq new-clauses :fail))
+                      ((neq new-clauses :fail)
+                       (dolist (key clause-keys)
+                         (unless (member key (new-keys))
+                           (new-keys key)))
+                       (push (cons `(or ,@(mapcar (lambda (x) `(eql ,keyform-value ',x))
+                                                  clause-keys))
+                                   consequent)
+                             new-clauses))))))
+          (acond ((neq new-clauses :fail)
+                  ;; all TYPECASE clauses were convertible to CASE clauses
+                  (setq clauses (if default (cons default new-clauses) new-clauses)
+                        keys (new-keys)
+                        implement-as 'case))
+                 #+(vop-named sb-c:multiway-branch-if-eq)
+                 ((expand-struct-typecase keyform keyform-value normal-clauses keys
+                                          default errorp)
+                  (return-from case-body-aux it))))))
 
     ;; Efficiently expanding CASE over symbols depends on CASE over integers being
     ;; translated as a jump table. If it's not - as on most backends - then we use

@@ -437,7 +437,7 @@
                       (= (length uniqued) (length items)) ; and no duplicates
                       (every #'symbolp items) ; and all symbols
                       ;; Reject if can't be hashed with at most 2 items per bin
-                      (<= (pick-best-symbol-hash-bits uniqued 'sxhash) 2))))
+                      (<= (pick-best-sxhash-bits uniqued 'sxhash) 2))))
       (if (if-p (node-dest node))
           ;; Special variant for predication of (MEMBER x '(list-of-symbols) :test #'eq)
           ;; which lets CASE see that it doesn't need a vector of return values.
@@ -2226,7 +2226,7 @@
             (reversedp (and from-end (lvar-value from-end))))
         (when (every #'symbolp items)
           ;; PICK-BEST will stupidly hash dups and call that a collision.
-          (when (= (pick-best-symbol-hash-bits (remove-duplicates items) 'sxhash) 1)
+          (when (= (pick-best-sxhash-bits (remove-duplicates items) 'sxhash) 1)
             ;; Construct a map from symbol to position so that correct results
             ;; are obtained for :from-end, and/or with duplicates present.
             ;; Precomputing it is easier than trying to roll the logic into the

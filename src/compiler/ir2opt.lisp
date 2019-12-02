@@ -672,7 +672,7 @@
         (binding* (((chain delete-blocks) (longest-if-else-chain head))
                    (culled-chain (should-use-jump-table-p chain) :exit-if-null)
                    (node (vop-node head))
-                   (src (tn-ref-tn (vop-args head))))
+                   (src-ref (vop-args head)))
           (flet ((delete-test (vop)
                    ;; delete 1 to 4 vops starting at VOP, depending on whether
                    ;; there is an initial MOVE and/or final BRANCH,
@@ -689,18 +689,43 @@
               (aver (null (ir2-block-start-vop 2block)))
               ;; The block can't be reached, and goes nowhere.
               (update-block-succ 2block nil)))
-          ;; Unzip the alist
           (destructuring-bind (clauses else-block test-vop-name) culled-chain
-            (let* ((keys (mapcar #'car clauses))
-                   (key-type (if (characterp (car keys)) 'character 'fixnum))
-                   (blocks (mapcar #'cdr clauses))
+            (let* ((key-type (if (characterp (caar clauses)) 'character 'fixnum))
+                   (clause-keyfn (if (eq key-type 'character)
+                                     (lambda (x) (sb-xc:char-code (car x)))
+                                     #'car))
+                   ;; Sort and unzip the alist
+                   (ordered (sort (copy-list clauses) #'< :key clause-keyfn))
+                   (keys (mapcar clause-keyfn ordered))
+                   (blocks (mapcar #'cdr ordered))
                    (labels (mapcar #'ir2-block-%label blocks))
                    (otherwise (ir2-block-%label else-block)))
-              (when (eq key-type 'character)
-                (setq keys (mapcar #'sb-xc:char-code keys)))
+              ;; Sometimes an IR1 optimization hampers detection of the original comparands
+              ;; making it seem like not all branches were covered. If we have this in source:
+              ;;   (CASE (TRULY-THE (MOD 4 X)) (1 ...) (2 ...) (3 ...) (0 'THING))
+              ;; then we will see IF nodes testing all of 1, 2, 3, 0, and an otherwise of NIL.
+              ;; But if the 0 case returns NIL, then the final branch of the COND resembles
+              ;; ((EQL #:G1 '0) NIL NIL) which is flushed because both consequents of the IF
+              ;; do the same thing. So then we'll only see IF nodes for 1, 2, 3.
+              ;; This is bad because it doesn't allow elision of the bounds check on the
+              ;; multiway branch. So if the derived type has one more possibility at either end,
+              ;; add it in directing flow to the OTHERWISE label.
+              ;; This could be unkindly construed as a kludge.
+              (let ((key-derived-type (tn-ref-type src-ref)))
+                (when (and (eq key-type 'fixnum)
+                           (typep key-derived-type 'numeric-type)
+                           (csubtypep key-derived-type (specifier-type 'fixnum)))
+                  (let ((min (car keys))
+                        (max (car (last keys))))
+                    (when (eql min (1+ (numeric-type-low key-derived-type)))
+                      (push (numeric-type-low key-derived-type) keys)
+                      (push otherwise labels))
+                    (when (eql max (1- (numeric-type-high key-derived-type)))
+                      (setf keys (nconc keys (list (numeric-type-high key-derived-type))))
+                      (setf labels (nconc labels (list otherwise)))))))
               (emit-and-insert-vop node 2block
                                    (template-or-lose 'multiway-branch-if-eq)
-                                   (reference-tn src nil) nil nil
+                                   (reference-tn (tn-ref-tn src-ref) nil) nil nil
                                    (list labels otherwise key-type keys test-vop-name))
               ;; De-duplicate the successor blocks and update the flowgraph.
               ;; The ELSE block could be identical to any of the THEN blocks.

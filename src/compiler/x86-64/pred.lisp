@@ -70,8 +70,8 @@
   (:generator 10
     (let* ((key-derived-type (tn-ref-type x-tn-ref))
            (ea)
-           (min (reduce #'min keys))
-           (max (reduce #'max keys))
+           (min (car keys)) ; keys are sorted
+           (max (car (last keys)))
            (vector (make-array (1+ (- max min)) :initial-element otherwise))
            ;; This fixnumize won't overflow because ir2opt won't use
            ;; a multiway-branch unless all keys are char or fixnum.
