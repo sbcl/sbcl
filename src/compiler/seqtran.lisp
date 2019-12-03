@@ -2248,13 +2248,26 @@
               (return-from position
                 `(lambda (item sequence &rest rest)
                    (declare (ignore sequence rest))
-                   (case item ,@(nreverse clauses)))))))
+                   (case item
+                     ,@(nreverse clauses)
+                     ;; This CASE looks like it could return NIL, which is potentially
+                     ;; in conflict with the derived type of POSITION when we have already
+                     ;; determined that the item is in the list. So the fallthrough
+                     ;; value has to be numeric. It's actually unreachable.
+                     ,@(when (csubtypep (lvar-type item) (specifier-type `(member ,@seen)))
+                         `(((t 0))))))))))
         (unless (nthcdr 10 items)
           (let ((clauses (loop for x in items for i from 0
                                ;; Later transforms will change EQL to EQ if appropriate.
                                collect `((,effective-test item ',x) ,i))))
             ;; FIXME: dups cause more than one test on the same key because IR1
             ;; doesn't propagate information about which IFs can't possibly match.
+            ;; FIXME: suffers from same type derivation issue as above.
+            ;;        e.g. (- (position (the (member 10 20) x) #(1 2 5 10 15 20 30)))
+            ;; -> "Constant NIL conflicts with its asserted type NUMBER."
+            ;; But a fix for the general case (with any :TEST) has to figure out
+            ;; whether the returned value must definitely be non-NIL before doing
+            ;; the same thing as above which we claim is unreachable.
             (return-from position
               `(lambda (item sequence &rest rest)
                  (declare (ignore sequence rest))

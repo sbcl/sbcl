@@ -478,6 +478,12 @@
     (assert (not (funcall f 'blah)))
     (assert (not (funcall g 'blah)))))
 
+(with-test (:name :hash-based-position-type-derivation)
+  ;; should neither crash nor warn about NIL being fed into ASH
+  (checked-compile '(lambda (x)
+                     (declare (type (member a b) x))
+                     (ash 1 (position x #(a b c d d e f))))))
+
 (with-test (:name :position-empty-seq)
   (assert (not (funcall (checked-compile '(lambda (x) (position x #()))) 1))))
 
