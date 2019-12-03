@@ -38,13 +38,18 @@
   (:arg-types signed-num)
   (:result-types signed-num))
 
+;;; logical or arithmetic negation
 (defun emit-inline-neg (op arg result vop &optional fixnump)
   (declare (ignore vop))
-  ;; If ARG and RESULT are the same register, then the initial and final MOVEs
+  ;; If ARG and RESULT are the same location, then the initial and final MOVEs
   ;; are both no-ops. If different locations and not both memory,
   ;; then the initial move is a physical move and the final is a no-op.
   ;; If both are stack locations, then compute the answer in temp-reg-tn.
-  (let ((reg (if (or (gpr-tn-p arg) (gpr-tn-p result)) result temp-reg-tn)))
+  ;; (REG might be a stack location, not necessarily a GPR in this emitter.
+  ;; It's just a naming convention that is consistent with other emitters)
+  (let ((reg (if (or (alias-p arg result) (gpr-tn-p arg) (gpr-tn-p result))
+                 result
+                 temp-reg-tn)))
     (move reg arg)
     (case op
       (not (if fixnump (inst xor reg (fixnumize -1)) (inst not reg)))
@@ -298,6 +303,31 @@
     (rotatef x y)) ; weird! why did IR1 not flip the args?
   (values x y))
 
+(defun emit-inline-smul (op x y result vop dummy taggedp) ; signed multiply
+  (declare (ignore op dummy))
+  (multiple-value-setq (x y) (prepare-alu-operands 'mul x y vop 'identity t))
+  (aver (not (integerp x)))
+  (let ((constant-y (integerp y))) ; don't need to unscale Y if true
+    (when (and constant-y (not (typep y '(signed-byte 32))))
+      (setq y (register-inline-constant :qword y)))
+    (let ((reg (if (gpr-tn-p result) result temp-reg-tn)))
+      (cond ((integerp y)
+             (inst imul reg x y))
+            ((alias-p reg y)
+             (when taggedp
+               (inst sar reg n-fixnum-tag-bits))
+             (inst imul reg x)
+             ;; If all operands are LOCATION= then both args got unfixnumized
+             ;; by the preceding SAR, so re-fixnumize the result.
+             (when (and (alias-p reg x) taggedp)
+               (inst shl reg n-fixnum-tag-bits)))
+            (t
+             (move reg x) ; this can't clobber Y
+             (when (and (not constant-y) taggedp)
+               (inst sar reg n-fixnum-tag-bits))
+             (inst imul reg y)))
+      (move result reg))))
+
 ;;; Special handling of add on the x86; can sometimes use lea to avoid a
 ;;; register move, otherwise it uses add.
 ;;;
@@ -322,14 +352,8 @@
 
   (macrolet ((op () 'op)) ; shield OP from being treated as literal by INST macro
     (let* ((y-is-reg-or-imm32 (or (gpr-tn-p y) (typep y '(signed-byte 32))))
-           (commutative (eq op 'add))
-           (reg (if (and (gpr-tn-p result)
-                         (or commutative
-                             (not (tn-p y))
-                             (not (location= result y))))
-                    result
-                    temp-reg-tn)))
-      (when (and (tn-p x) (location= result x))
+           (commutative (eq op 'add)))
+      (when (alias-p result x)
         (cond ((eql y -1) (inst dec x))
               ((eql y +1) (inst inc x))
               ((or (gpr-tn-p x) y-is-reg-or-imm32)
@@ -339,7 +363,7 @@
                (inst mov temp-reg-tn y)
                (inst (op) x temp-reg-tn)))
         (return-from emit-inline-add-sub))
-      (when (and (tn-p y) (location= result y) commutative)
+      (when (and (alias-p result y) commutative)
         ;; Result in the same location as Y can happen because we no longer specify
         ;; that RESULT is live from (:ARGUMENT 0).
         (cond ((or (gpr-tn-p x) (gpr-tn-p y))
@@ -348,16 +372,22 @@
                (inst mov temp-reg-tn x)
                (inst (op) y temp-reg-tn)))
         (return-from emit-inline-add-sub))
-      (cond ((and (eq op 'add) ; LEA can't do subtraction
-                  (gpr-tn-p x) y-is-reg-or-imm32) ; register + (register | imm32)
-             (inst lea reg (if (fixnump y) (ea y x) (ea x y))))
-            (t
-             ;; If commutative, then neither X nor Y is an alias of RESULT.
-             ;; If non-commutative, then RESULT could be Y, in which case REG is
-             ;; TEMP-REG-TN so that we don't trash Y by moving X into it.
-             (inst mov reg x)
-             (inst (op) reg y)))
-      (move result reg))))
+      (let ((reg (if (and (gpr-tn-p result)
+                          ;; If Y aliases RESULT in SUB, then an initial (move reg x)
+                          ;; could clobber Y.
+                          (or commutative (not (alias-p result y))))
+                     result
+                     temp-reg-tn)))
+        (cond ((and (eq op 'add) ; LEA can't do subtraction
+                    (gpr-tn-p x) y-is-reg-or-imm32) ; register + (register | imm32)
+               (inst lea reg (if (fixnump y) (ea y x) (ea x y))))
+              (t
+               ;; If commutative, then neither X nor Y is an alias of RESULT.
+               ;; If non-commutative, then RESULT could be Y, in which case REG is
+               ;; TEMP-REG-TN so that we don't trash Y by moving X into it.
+               (inst mov reg x)
+               (inst (op) reg y)))
+        (move result reg)))))
 
 ;;; FIXME: we shouldn't need 12 variants, plus the modular variants, for what should
 ;;; be 1 vop. Certainly + and - can be done by one vop which examines lvar-fun-name.
@@ -365,9 +395,10 @@
 ;;; consumed anyway. When I tried to do those simplifications, the modular vops went
 ;;; haywire because they inherit from vops of particular names.
 (macrolet ((def (fun-name name name/c scs primtype type cost
-                          &optional (val-xform 'identity)
+                          &optional (val-xform 'identity) &rest extra
                           &aux (note (format nil "inline ~(~a~) arithmetic" type))
-                               (op (ecase fun-name (+ 'add) (- 'sub))))
+                               (op (ecase fun-name (+ 'add) (- 'sub) (* 'mul)))
+                               (emit (if (eq op 'mul) 'emit-inline-smul 'emit-inline-add-sub)))
              ;; Avoid some unnecessary code in the vop generator by specifying
              ;; ":load-if nil" everywhere. This is not about semantics -
              ;; it's just removing code that would be unreachable.
@@ -382,7 +413,7 @@
                   (:vop-var vop) ;; (:node-var node)
                   (:note ,note)
                   (:generator ,(1+ cost)
-                   (emit-inline-add-sub ',op x y r vop ',val-xform)))
+                   (,emit ',op x y r vop ',val-xform ,@extra)))
                 (define-vop (,name/c fast-safe-arith-op)
                   (:translate ,fun-name)
                   (:args (x :scs ,scs :target r :load-if nil))
@@ -393,7 +424,7 @@
                   (:vop-var vop) ;; (:node-var node)
                   (:note ,note)
                   (:generator ,cost
-                   (emit-inline-add-sub ',op x (,val-xform y) r vop ',val-xform))))))
+                   (,emit ',op x (,val-xform y) r vop ',val-xform ,@extra))))))
   (def + fast-+/fixnum=>fixnum fast-+-c/fixnum=>fixnum
        (any-reg control-stack) tagged-num fixnum 1 fixnumize)
   (def + fast-+/signed=>signed fast-+-c/signed=>signed
@@ -407,6 +438,12 @@
        (signed-reg signed-stack) signed-num (signed-byte 64) 3)
   (def - fast--/unsigned=>unsigned fast---c/unsigned=>unsigned
        (unsigned-reg unsigned-stack) unsigned-num (unsigned-byte 64) 3)
+
+  (def * fast-*/fixnum=>fixnum fast-*-c/fixnum=>fixnum
+       (any-reg control-stack) tagged-num fixnum 1 identity t)
+  (def * fast-*/signed=>signed fast-*-c/signed=>signed
+       (signed-reg signed-stack) signed-num (signed-byte 64) 3 identity nil)
+  ;; unsigned is different because MUL always uses RAX:RDX as 1st operand.
   )
 
 ;;;; Special logand cases: (logand signed unsigned) => unsigned
@@ -440,69 +477,6 @@
   (:arg-types unsigned-num signed-num))
 
 ;;;; multiplication and division
-
-(define-vop (fast-*/fixnum=>fixnum fast-safe-arith-op)
-  (:translate *)
-  ;; We need different loading characteristics.
-  (:args (x :scs (any-reg) :target r)
-         (y :scs (any-reg control-stack)))
-  (:arg-types tagged-num tagged-num)
-  (:results (r :scs (any-reg) :from (:argument 0)))
-  (:result-types tagged-num)
-  (:note "inline fixnum arithmetic")
-  (:generator 4
-    (move r x)
-    (inst sar r n-fixnum-tag-bits)
-    (inst imul r y)))
-
-(define-vop (fast-*-c/fixnum=>fixnum fast-safe-arith-op)
-  (:translate *)
-  ;; We need different loading characteristics.
-  (:args (x :scs (any-reg)
-            :load-if (or (not (typep y '(signed-byte 32)))
-                         (not (sc-is x any-reg control-stack)))))
-  (:info y)
-  (:arg-types tagged-num (:constant fixnum))
-  (:results (r :scs (any-reg)))
-  (:result-types tagged-num)
-  (:note "inline fixnum arithmetic")
-  (:generator 3
-    (cond ((typep y '(signed-byte 32))
-           (inst imul r x y))
-          (t
-           (move r x)
-           (inst imul r (register-inline-constant :qword y))))))
-
-(define-vop (fast-*/signed=>signed fast-safe-arith-op)
-  (:translate *)
-  ;; We need different loading characteristics.
-  (:args (x :scs (signed-reg) :target r)
-         (y :scs (signed-reg signed-stack)))
-  (:arg-types signed-num signed-num)
-  (:results (r :scs (signed-reg) :from (:argument 0)))
-  (:result-types signed-num)
-  (:note "inline (signed-byte 64) arithmetic")
-  (:generator 5
-    (move r x)
-    (inst imul r y)))
-
-(define-vop (fast-*-c/signed=>signed fast-safe-arith-op)
-  (:translate *)
-  ;; We need different loading characteristics.
-  (:args (x :scs (signed-reg)
-            :load-if (or (not (typep y '(signed-byte 32)))
-                         (not (sc-is x signed-reg signed-stack)))))
-  (:info y)
-  (:arg-types signed-num (:constant (signed-byte 64)))
-  (:results (r :scs (signed-reg)))
-  (:result-types signed-num)
-  (:note "inline (signed-byte 64) arithmetic")
-  (:generator 4
-    (cond ((typep y '(signed-byte 32))
-           (inst imul r x y))
-          (t
-           (move r x)
-           (inst imul r (register-inline-constant :qword y))))))
 
 (define-vop (fast-*/unsigned=>unsigned fast-safe-arith-op)
   (:translate *)

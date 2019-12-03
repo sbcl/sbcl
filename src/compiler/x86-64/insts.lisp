@@ -16,7 +16,7 @@
   ;; Imports from this package into SB-VM
   (import '(conditional-opcode
             plausible-signed-imm32-operand-p
-            ea-p ea-base ea-index size-nbyte
+            ea-p ea-base ea-index size-nbyte alias-p
             ea make-ea ea-disp rip-relative-ea) "SB-VM")
   ;; Imports from SB-VM into this package
   #+sb-simd-pack-256
