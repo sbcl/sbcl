@@ -25,58 +25,65 @@
   (:policy :fast-safe))
 
 (define-vop (fixnum-unop fast-safe-arith-op)
-  (:args (x :scs (any-reg) :target res))
-  (:results (res :scs (any-reg)))
+  (:args (x :scs (any-reg control-stack) :target res :load-if nil))
+  (:results (res :scs (any-reg control-stack) :load-if nil))
   (:note "inline fixnum arithmetic")
   (:arg-types tagged-num)
   (:result-types tagged-num))
 
 (define-vop (signed-unop fast-safe-arith-op)
-  (:args (x :scs (signed-reg) :target res))
-  (:results (res :scs (signed-reg)))
+  (:args (x :scs (signed-reg signed-stack) :target res :load-if nil))
+  (:results (res :scs (signed-reg signed-stack) :load-if nil))
   (:note "inline (signed-byte 64) arithmetic")
   (:arg-types signed-num)
   (:result-types signed-num))
 
+(defun emit-inline-neg (op arg result vop &optional fixnump)
+  (declare (ignore vop))
+  ;; If ARG and RESULT are the same register, then the initial and final MOVEs
+  ;; are both no-ops. If different locations and not both memory,
+  ;; then the initial move is a physical move and the final is a no-op.
+  ;; If both are stack locations, then compute the answer in temp-reg-tn.
+  (let ((reg (if (or (gpr-tn-p arg) (gpr-tn-p result)) result temp-reg-tn)))
+    (move reg arg)
+    (case op
+      (not (if fixnump (inst xor reg (fixnumize -1)) (inst not reg)))
+      (neg (inst neg reg)))
+    (move result reg)))
+
 (define-vop (fast-negate/fixnum fixnum-unop)
   (:translate %negate)
-  (:generator 1
-    (move res x)
-    (inst neg res)))
+  (:vop-var vop)
+  (:generator 1 (emit-inline-neg 'neg x res vop)))
 
 (define-vop (fast-negate/signed signed-unop)
   (:translate %negate)
-  (:generator 2
-    (move res x)
-    (inst neg res)))
+  (:vop-var vop)
+  (:generator 2 (emit-inline-neg 'neg x res vop)))
 
 (define-vop (fast-negate/unsigned signed-unop)
-  (:args (x :scs (unsigned-reg) :target res))
+  (:args (x :scs (unsigned-reg unsigned-stack) :target res :load-if nil))
   (:arg-types unsigned-num)
   (:translate %negate)
-  (:generator 3
-    (move res x)
-    (inst neg res)))
+  (:vop-var vop)
+  (:generator 3 (emit-inline-neg 'neg x res vop)))
 
 (define-vop (fast-negate/signed-unsigned signed-unop)
-  (:results (res :scs (unsigned-reg)))
+  (:results (res :scs (unsigned-reg unsigned-stack) :load-if nil))
   (:result-types unsigned-num)
   (:translate %negate)
-  (:generator 3
-    (move res x)
-    (inst neg res)))
+  (:vop-var vop)
+  (:generator 3 (emit-inline-neg 'neg x res vop)))
 
 (define-vop (fast-lognot/fixnum fixnum-unop)
   (:translate lognot)
-  (:generator 1
-    (move res x)
-    (inst xor res (fixnumize -1))))
+  (:vop-var vop)
+  (:generator 1 (emit-inline-neg 'not x res vop t)))
 
 (define-vop (fast-lognot/signed signed-unop)
   (:translate lognot)
-  (:generator 2
-    (move res x)
-    (inst not res)))
+  (:vop-var vop)
+  (:generator 2 (emit-inline-neg 'not x res vop nil)))
 
 ;;;; binary fixnum operations
 
