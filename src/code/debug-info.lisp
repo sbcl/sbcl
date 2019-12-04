@@ -131,7 +131,9 @@
   ;; (because it doesn't transform correctly under package renaming).
   ;; Check whether this slot's data might have the same problem that
   ;; that slot's data did.
-  (blocks nil :type (or (simple-array (unsigned-byte 8) (*)) null))
+  (blocks nil :type (or (simple-array (unsigned-byte 8) (*))
+                        (simple-array (signed-byte 8) (*))
+                        null))
   ;; a vector describing the variables that the argument values are
   ;; stored in within this function. The locations are represented by
   ;; the ordinal number of the entry in the VARIABLES slot value. The

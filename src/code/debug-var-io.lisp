@@ -204,14 +204,13 @@
 ;;; A somewhat bad (slow and not-very-squishy) compressor
 ;;; that gets between 15% and 20% space savings in debug blocks.
 ;;; Lengthy input may be compressible by as much as 3:1.
-(declaim (ftype (sfunction ((array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+(declaim (ftype (sfunction ((array (unsigned-byte 8) 1))
+                           (or (simple-array (unsigned-byte 8) 1)
+                               (simple-array (signed-byte 8) 1)))
                 lz-compress))
 (defun lz-compress (input)
   (if (> (length input) +max-lz-size+)
-      #+sb-xc-host
       (sb-xc:coerce input '(simple-array (unsigned-byte 8) (*)))
-      #-sb-xc-host
-      (%shrink-vector (%array-data input) (length input))
       (let* ((length (length input))
              (output (make-array length
                                  :element-type '(unsigned-byte 8)
@@ -265,11 +264,14 @@
                              (when (or (= byte lz-symbol-1) (= byte lz-symbol-2))
                                (vector-push-extend 0 output)))))))))
         (let ((result
-                #+sb-xc-host
-                (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
-                #-sb-xc-host
-                (if (> (length output) +max-lz-size+)
-                    (%shrink-vector input length)
+                (if (>= (length output) length)
+                    (map-into (sb-xc:make-array length :element-type '(signed-byte 8))
+                              (lambda (x)
+                                (mask-signed-field 8 (the (unsigned-byte 8) x)))
+                              input)
+                    #+sb-xc-host
+                    (sb-xc:coerce output '(simple-array (unsigned-byte 8) (*)))
+                    #-sb-xc-host
                     (%shrink-vector (%array-data output) (fill-pointer output)))))
           #+(or)
           (aver (equalp input (lz-decompress result)))
@@ -277,43 +279,51 @@
 
 #-sb-xc-host
 (progn
-(declaim (ftype (sfunction ((simple-array (unsigned-byte 8) 1)) (simple-array (unsigned-byte 8) 1))
+(declaim (ftype (sfunction ((or (simple-array (unsigned-byte 8) 1)
+                                (simple-array (signed-byte 8) 1)))
+                           (simple-array (unsigned-byte 8) 1))
                 lz-decompress))
 (defun lz-decompress (input)
-  (if (> (length input) +max-lz-size+)
-      input
-      (let* ((length (length input))
-             (output (make-array (* length 2)
-                                 :element-type '(unsigned-byte 8)
-                                 :fill-pointer 0 :adjustable t))
-             (inpos 0))
-        (flet ((copy (offset length)
-                 (let ((index (- (fill-pointer output) offset)))
-                   (dotimes (i length)
-                     (vector-push-extend (aref output index) output)
-                     (incf index)))))
-          (loop while (< inpos length)
-                do
-                (let ((byte (aref input inpos)))
-                  (incf inpos)
-                  (cond ((= byte lz-symbol-1) ; general case
-                         (let ((byte (aref input inpos)))
-                           (cond ((= byte 0) ; literal symbol
-                                  (incf inpos)
-                                  (vector-push-extend lz-symbol-1 output))
-                                 (t
-                                  (binding* (((offset new-inpos)
-                                              (read-var-integer input inpos))
-                                             ((len new-new-inpos)
-                                              (read-var-integer input new-inpos)))
-                                    (setf inpos new-new-inpos)
-                                    (copy offset len))))))
-                        ((= byte lz-symbol-2) ; special case
-                         (let ((offset (aref input inpos)))
-                           (incf inpos)
-                           (if (= offset 0) ; literal symbol
-                               (vector-push-extend lz-symbol-2 output)
-                               (copy offset 3))))
-                        (t
-                         (vector-push-extend byte output))))))
-        (%shrink-vector (%array-data output) (fill-pointer output))))))
+  (cond ((typep input '(simple-array (signed-byte 8) 1))
+         ;; Uncompressed
+         (let ((result (make-array (length input) :element-type '(unsigned-byte 8))))
+           (ub8-bash-copy input 0 result 0 (length input))
+           result))
+        ((> (length input) +max-lz-size+)
+         input)
+        (t
+         (let* ((length (length input))
+                (output (make-array (* length 2)
+                                    :element-type '(unsigned-byte 8)
+                                    :fill-pointer 0 :adjustable t))
+                (inpos 0))
+           (flet ((copy (offset length)
+                    (let ((index (- (fill-pointer output) offset)))
+                      (dotimes (i length)
+                        (vector-push-extend (aref output index) output)
+                        (incf index)))))
+             (loop while (< inpos length)
+                   do
+                   (let ((byte (aref input inpos)))
+                     (incf inpos)
+                     (cond ((= byte lz-symbol-1) ; general case
+                            (let ((byte (aref input inpos)))
+                              (cond ((= byte 0) ; literal symbol
+                                     (incf inpos)
+                                     (vector-push-extend lz-symbol-1 output))
+                                    (t
+                                     (binding* (((offset new-inpos)
+                                                 (read-var-integer input inpos))
+                                                ((len new-new-inpos)
+                                                 (read-var-integer input new-inpos)))
+                                       (setf inpos new-new-inpos)
+                                       (copy offset len))))))
+                           ((= byte lz-symbol-2) ; special case
+                            (let ((offset (aref input inpos)))
+                              (incf inpos)
+                              (if (= offset 0) ; literal symbol
+                                  (vector-push-extend lz-symbol-2 output)
+                                  (copy offset 3))))
+                           (t
+                            (vector-push-extend byte output))))))
+           (%shrink-vector (%array-data output) (fill-pointer output)))))))
