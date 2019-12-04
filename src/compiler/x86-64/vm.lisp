@@ -530,7 +530,9 @@
          (t
           (values :default nil))))
       (logbitp
-       (if (valid-funtype '((mod 64) (or word signed-word)) '*)
+       (if (or
+            (valid-funtype '((mod 64) word) '*)
+            (valid-funtype '((mod 64) signed-word) '*))
            (values :transform '(lambda (index integer) (%logbitp index integer)))
            (values :default nil)))
       (t
