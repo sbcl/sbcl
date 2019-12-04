@@ -530,17 +530,9 @@
          (t
           (values :default nil))))
       (logbitp
-       (cond
-         ((or (and (valid-funtype '#.`((integer 0 ,(- 63 n-fixnum-tag-bits))
-                                       fixnum) '*)
-                   (sb-c::constant-lvar-p
-                    (first (sb-c::basic-combination-args node))))
-              (valid-funtype '((integer 0 63) (signed-byte 64)) '*)
-              (valid-funtype '((integer 0 63) (unsigned-byte 64)) '*))
-          (values :transform '(lambda (index integer)
-                               (%logbitp integer index))))
-         (t
-          (values :default nil))))
+       (if (valid-funtype '((mod 64) (or word signed-word)) '*)
+           (values :transform '(lambda (index integer) (%logbitp index integer)))
+           (values :default nil)))
       (t
        (values :default nil)))))
 

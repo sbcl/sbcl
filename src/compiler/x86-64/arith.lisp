@@ -1337,51 +1337,59 @@ constant shift greater than word length")))
                            nil)))))))
   (define-logtest-vops))
 
-(defknown %logbitp (integer unsigned-byte) boolean
+;;; %LOGBITP has the same argument order as ordinary LOGBITP which is * backwards *
+;;; relative to every other architecture.
+;;; I suspect the others have a predilection for placing codegen info args last.
+(defknown %logbitp ((mod 64) (or signed-word word)) boolean
   (movable foldable flushable always-translatable))
 
 ;;; only for constant folding within the compiler
-(defun %logbitp (integer index)
+(defun %logbitp (index integer)
+  (declare (notinline logbitp))
+  ;; Normally an "intepreter stub" is implemented in terms of itself, not in terms
+  ;; of the public function. But this has to work in the cross-compiler too.
+  ;; A way to do that is define a version of %LOGBITP in cross-misc.
+  ;; Then brings a new problem: inconsistent argument order across the architectures.
   (logbitp index integer))
 
-;;; too much work to do the non-constant case (maybe?)
-(define-vop (fast-logbitp-c/fixnum fast-conditional-c/fixnum)
+;;; Normally we define a spectrum of vops to handle {unsigned,signed,any}-reg and
+;;; constant/non-constant operands. That's often unnecessary. Certainly for this vop.
+(define-vop (%logbitp fast-safe-arith-op)
   (:translate %logbitp)
   (:conditional :c)
-  (:arg-types tagged-num (:constant (integer 0 #.(- 63 n-fixnum-tag-bits))))
+  (:args (bit :scs (signed-reg signed-stack unsigned-reg unsigned-stack
+                    any-reg control-stack) :load-if nil)
+         ;; CONSTANT here is to allow integers exceeding a fixnum which get NIL
+         ;; from IMMEDIATE-CONSTANT-SC. This is only an issue for vops which don't
+         ;; take a codegen info for the constant.
+         ;; IMMEDIATE is always allowed and pertains to fixnum-sized constants.
+         (int :scs (constant signed-reg signed-stack unsigned-reg unsigned-stack)
+              :load-if nil))
+  (:arg-types untagged-num untagged-num)
   (:generator 4
-    (let ((bit (+ y n-fixnum-tag-bits)))
-      (inst bt (if (<= bit 31) :dword :qword) x bit))))
+    (when (sc-is int constant immediate) (setq int (tn-value int)))
+    ;; Force INT to be a RIP-relative operand if it is a constant.
+    (let ((word (if (integerp int) (register-inline-constant :qword int) int))
+          (bit (cond ((sc-is bit signed-reg unsigned-reg) bit)
+                     (t (inst mov :dword temp-reg-tn bit)
+                        (when (sc-is bit any-reg control-stack)
+                          (inst shr :dword temp-reg-tn n-fixnum-tag-bits))
+                        temp-reg-tn))))
+      (inst bt word bit))))
 
-(define-vop (fast-logbitp/signed fast-conditional/signed)
-  (:args (x :scs (signed-reg signed-stack))
-         (y :scs (signed-reg)))
+(define-vop (%logbitp/c fast-safe-arith-op)
   (:translate %logbitp)
   (:conditional :c)
-  (:generator 6
-    (inst bt x y)))
-
-(define-vop (fast-logbitp-c/signed fast-conditional-c/signed)
-  (:translate %logbitp)
-  (:conditional :c)
-  (:arg-types signed-num (:constant (integer 0 63)))
-  (:generator 5
-    (inst bt x y)))
-
-(define-vop (fast-logbitp/unsigned fast-conditional/unsigned)
-  (:args (x :scs (unsigned-reg unsigned-stack))
-         (y :scs (unsigned-reg)))
-  (:translate %logbitp)
-  (:conditional :c)
-  (:generator 6
-    (inst bt x y)))
-
-(define-vop (fast-logbitp-c/unsigned fast-conditional-c/unsigned)
-  (:translate %logbitp)
-  (:conditional :c)
-  (:arg-types unsigned-num (:constant (integer 0 63)))
-  (:generator 5
-    (inst bt x y)))
+  (:info bit)
+  (:args (int :scs (signed-reg signed-stack unsigned-reg unsigned-stack
+                    any-reg control-stack) :load-if nil))
+  (:arg-types (:constant (mod 64)) untagged-num)
+  (:generator 1
+    (when (sc-is int any-reg control-stack)
+      ;; Adjust the index up by something.
+      ;; Reading beyond the sign bit is the same as reading the sign bit.
+      (setf bit (min (1- n-word-bits) (+ bit n-fixnum-tag-bits))))
+    (inst bt (if (<= bit 31) :dword :qword) int bit)))
 
 (defun emit-optimized-cmp (x y)
   (if (and (gpr-tn-p x) (eql y 0))
