@@ -1063,8 +1063,17 @@
         (princ (vop-codegen-info vop)))
        (t
         (princ (with-simple-output-to-string (stream)
-                 (let ((*print-level* 1)
-                       (*print-length* 3))
+                 ;; Current print depth varies based on whether PRINT-VOP
+                 ;; is called by DESCRIBE-IR2-COMPONENT or TRACE-INSTRUCTION,
+                 ;; so any fixed value of *PRINT-LEVEL* changes its effect
+                 ;; depending on the call context. Resetting depth to 0 seems
+                 ;; like the best way to get consistent output.
+                 ;; We shouldn't bind the printer limits to NIL, because
+                 ;; hairy internal objects such as PHYSENV can be printed.
+                 ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
+                 (let (#-sb-xc-host (*current-level-in-print* 0)
+                       (*print-level* 2)
+                       (*print-length* 4))
                    (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))))
       (pprint-newline :linear))
     (when (vop-results vop)
