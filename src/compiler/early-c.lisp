@@ -116,6 +116,8 @@
 (defvar *compiler-note-count*)
 ;;; Bind this to a stream to capture various internal debugging output.
 (defvar *compiler-trace-output* nil)
+;;; These are the default, but the list can also include
+;;; :pre-ir2-optimize and :symbolic-asm.
 (defvar *compile-trace-targets* '(:ir1 :ir2 :vop :disassemble))
 (defvar *constraint-universe*)
 (defvar *current-path*)
@@ -346,6 +348,14 @@ the stack without triggering overflow protection.")
     (list (make-hash-table :test 'equal :synchronized t)))
   (declaim (type (cons hash-table) *code-coverage-info*)))
 
+(deftype id-array ()
+  '(and (array t (*))
+        ;; Might as well be as specific as we can.
+        ;; Really it should be (satisfies array-has-fill-pointer-p)
+        ;; but that predicate is not total (errors on NIL).
+        ;; And who knows what the host considers "simple".
+        #-sb-xc-host (not simple-array)))
+
 (defstruct (compilation (:copier nil)
                         (:predicate nil)
                         (:conc-name ""))
@@ -353,19 +363,6 @@ the stack without triggering overflow protection.")
   (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)
-  ;; Bidrectional map between IR1/IR2/assembler abstractions
-  ;; and a corresponding small integer identifier. One direction could be done
-  ;; by adding the integer ID as an object slot, but we want both directions.
-  ;; These could just as well be scoped by WITH-IR1-NAMESPACE, but
-  ;; since it's primarily a debugging tool, it's nicer to have
-  ;; a wider unique scope by ID.
-  (objmap-obj-to-id   (make-hash-table :test 'eq) :read-only t)
-  (objmap-id-to-cont  (make-array 10) :type simple-vector) ; number -> CTRAN or LVAR
-  (objmap-id-to-tn    (make-array 10) :type simple-vector) ; number -> TN
-  (objmap-id-to-label (make-array 10) :type simple-vector) ; number -> LABEL
-  (objmap-cont-num    0 :type fixnum)
-  (objmap-tn-id       0 :type fixnum)
-  (objmap-label-id    0 :type fixnum)
   ;; if emitting a cfasl, the fasl stream to that
   (compile-toplevel-object nil :read-only t)
   ;; these are all historical baggage from here down,
@@ -373,7 +370,20 @@ the stack without triggering overflow protection.")
   (block-compile nil :type (member nil t :specified))
   ;; When block compiling, used by PROCESS-FORM to accumulate top level
   ;; lambdas resulting from compiling subforms. (In reverse order.)
-  (toplevel-lambdas nil :type list))
+  (toplevel-lambdas nil :type list)
+
+  ;; Bidrectional map between IR1/IR2/assembler abstractions and a corresponding
+  ;; small integer or string identifier. One direction could be done by adding
+  ;; the ID as slot to each object, but we want both directions.
+  ;; These could just as well be scoped by WITH-IR1-NAMESPACE, but
+  ;; since it's primarily a debugging tool, it's nicer to have
+  ;; a wider unique scope by ID.
+  (objmap-obj-to-id      (make-hash-table :test 'eq) :read-only t)
+  (objmap-id-to-cont     nil :type (or null id-array)) ; number -> CTRAN or LVAR
+  (objmap-id-to-ir2block nil :type (or null id-array)) ; number -> IR2-BLOCK
+  (objmap-id-to-tn       nil :type (or null id-array)) ; number -> TN
+  (objmap-id-to-label    nil :type (or null id-array)) ; number -> LABEL
+  )
 
 (defvar *compilation*)
 (declaim (type compilation *compilation*))

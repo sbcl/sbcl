@@ -575,6 +575,9 @@ necessary, since type inference may take arbitrarily long to converge.")
             (maybe-mumble "copy ")
             (copy-propagate component))
 
+          (when *compiler-trace-output*
+            (format *compiler-trace-output*
+                    "~|~%;;;; component: ~S~2%" (component-name component)))
           (ir2-optimize component)
 
           (select-representations component)
@@ -608,7 +611,8 @@ necessary, since type inference may take arbitrarily long to converge.")
           (optimize-constant-loads component)
           (when *compiler-trace-output*
             (when (memq :ir1 *compile-trace-targets*)
-              (describe-component component *compiler-trace-output*))
+              (let ((*standard-output* *compiler-trace-output*))
+                (print-all-blocks component)))
             (when (memq :ir2 *compile-trace-targets*)
              (describe-ir2-component component *compiler-trace-output*)))
 
@@ -619,11 +623,13 @@ necessary, since type inference may take arbitrarily long to converge.")
                       (and (memq :vop *compile-trace-targets*)
                            *compiler-trace-output*)))
                 (generate-code component))
+            (declare (ignorable text-length fun-table))
 
             (let ((bytes (sb-assem:segment-contents-as-vector segment))
                   (object *compile-object*)
                   (*elsewhere-label* elsewhere-label)) ; KLUDGE
 
+              #-sb-xc-host
               (when (and *compiler-trace-output*
                          (memq :disassemble *compile-trace-targets*))
                 (let ((ranges
@@ -633,10 +639,8 @@ necessary, since type inference may take arbitrarily long to converge.")
                                                  sb-vm:word-shift))
                                          (or (cadr list) text-length)))
                                  fun-table)))
-                  (declare (ignorable ranges))
                   (format *compiler-trace-output*
                           "~|~%disassembly of code for ~S~2%" component)
-                  #-sb-xc-host
                   (sb-disassem:disassemble-assem-segment
                    bytes ranges *compiler-trace-output*)))
 
@@ -784,13 +788,6 @@ necessary, since type inference may take arbitrarily long to converge.")
   (values))
 
 ;;;; trace output
-
-;;; Print out some useful info about COMPONENT to STREAM.
-(defun describe-component (component *standard-output*)
-  (declare (type component component))
-  (format t "~|~%;;;; component: ~S~2%" (component-name component))
-  (print-all-blocks component)
-  (values))
 
 (defun describe-ir2-component (component *standard-output*)
   (format t "~%~|~%;;;; IR2 component: ~S~2%" (component-name component))

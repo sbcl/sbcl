@@ -844,30 +844,74 @@
 
 ;;;; data structure dumping routines
 
+;;; IR2 blocks don't get a convenient number until LIFETIME-ANALYZE which is
+;;; too late when trying to talk about an ir2 block during IR2-OPTIMIZE.
+;;; So instead of accessing them by the block-number, use an opaque ID.
+;;; And avoid confusion with all the other opaque IDs flying around
+;;; by using alphabetics instead.
+;;; Generate this numbering sequence for up to 5 alphabetic "digits":
+;;; A..Z, AA,AB ... AZ, BA ... BZ, ZA .. ZZ, AAA, AAB ...
+(defun id->string (id)
+  (declare (type (integer 1 *) id))
+  (flet ((n-digit-string (n-digits val)
+           (let ((str (make-string n-digits :element-type 'base-char)))
+             (loop for i downfrom (1- n-digits) to 0
+                   do (multiple-value-bind (quo rem) (floor val 26)
+                        (setf (aref str i) (code-char (+ (char-code #\A) rem))
+                              val quo)))
+             str)))
+    (do ((min 0) (n-digits 1 (1+ n-digits)))
+        (nil)
+      (let ((span (expt 26 n-digits)))
+        (when (<= id (+ min span))
+          (return (n-digit-string n-digits (- id (1+ min)))))
+        (incf min span)))))
+;;; Invert the above mapping
+(defun string->id (string)
+  (let ((val 0))
+    (dotimes (i (length string))
+      (setq val (+ (* val 26) (- (char-code (char string i)) (char-code #\A)))))
+    (dotimes (i (1- (length string)))
+      (incf val (expt 26 (1+ i))))
+    (1+ val)))
+
+(eval-when (#+sb-xc :compile-toplevel)
+  (loop for i from 1 to 1000 ; sanity check the stringifying algorithm
+        do (assert (= (string->id (id->string i)) i))))
+
 ;;; When we print CONTINUATIONs and TNs, we assign them small numeric
 ;;; IDs so that we can get a handle on anonymous objects given a
 ;;; printout.
-(macrolet ((def (array-getter fto ffrom) ; "to" = to number/id, resp. "from"
-             `(progn
-                (defun ,fto (x)
-                  (let* ((map *compilation*)
-                         (ht (objmap-obj-to-id map)))
-                    (or (values (gethash x ht))
-                        (let ((array (,array-getter map))
-                              (num (incf (,(symbolicate "OBJMAP-" fto) map))))
-                          (when (>= num (length array))
-                            (let ((new (adjust-array array (* (length array) 2))))
-                              (fill array nil)
-                              (setf array new (,array-getter map) array)))
-                          (setf (svref array num) x)
-                          (setf (gethash x ht) num)))))
-
-                (defun ,ffrom (num)
-                  (let ((array (,array-getter *compilation*)))
-                    (and (< num (length array)) (svref array num)))))))
-  (def objmap-id-to-cont cont-num num-cont)
-  (def objmap-id-to-tn tn-id id-tn)
-  (def objmap-id-to-label label-id id-label))
+(macrolet ((def (array-getter fto ffrom type) ; "to" = to number/id, resp. "from"
+             (let ((xform (if (eq array-getter 'objmap-id-to-ir2block)
+                              'id->string
+                              'identity)))
+               `(progn
+                  (export '(,fto ,ffrom))
+                  (defun ,fto (x)
+                    (declare (type ,type x))
+                    (let* ((map *compilation*)
+                           (ht (objmap-obj-to-id map)))
+                      (or (gethash x ht)
+                          (let ((array (,array-getter map)))
+                            (when (null array)
+                              (setf array (make-array 20 :fill-pointer 0
+                                                      :adjustable t)
+                                    (,array-getter map) array))
+                            (setf (gethash x ht)
+                                  (,xform (1+ (vector-push-extend x array))))))))
+                  (defun ,ffrom (num)
+                    (let ((array (,array-getter *compilation*)))
+                      ,@(when (eq array-getter 'objmap-id-to-ir2block)
+                          '((setq num (string->id num))))
+                      ;; numbers start from 1, not 0
+                      (and (< (1- num) (length array)) (aref array (1- num)))))))))
+  (def objmap-id-to-cont %cont-num num-cont (or ctran lvar))
+  (def objmap-id-to-ir2block ir2-block-id id-ir2-block ir2-block)
+  (def objmap-id-to-tn tn-id id-tn tn)
+  (def objmap-id-to-label label-id id-label label))
+;; Do not give NIL a continuation number
+(defun cont-num (x) (if x (%cont-num x)))
 
 ;;; Print a terse one-line description of LEAF.
 (defun print-leaf (leaf &optional (stream *standard-output*))
@@ -923,7 +967,7 @@
 (defun print-nodes (block)
   (setq block (block-or-lose block))
   (pprint-logical-block (nil nil)
-    (format t "~:@_IR1 block ~D start c~D"
+    (format t "~:@_IR1 block ~D~@[ start c~D~]"
             (block-number block) (cont-num (block-start block)))
     (when (block-delete-p block)
       (format t " <deleted>"))
@@ -1073,7 +1117,7 @@
                  ;; See also the comment above FUNCALL-WITH-DEBUG-IO-SYNTAX.
                  (let (#-sb-xc-host (*current-level-in-print* 0)
                        (*print-level* 2)
-                       (*print-length* 4))
+                       (*print-length* 15))
                    (format stream "{~{~S~^ ~}} " (vop-codegen-info vop)))))))
       (pprint-newline :linear))
     (when (vop-results vop)
@@ -1087,9 +1131,15 @@
   (pprint-logical-block (*standard-output* nil)
     (cond
       ((eq (block-info (ir2-block-block block)) block)
-       (format t "~:@_IR2 block ~D start c~D~:@_"
+       (format t "~:@_IR2 block ~A~@[(#~d)~]~@[ start c~D~]~:@_"
+               (ir2-block-id block)
                (ir2-block-number block)
                (cont-num (block-start (ir2-block-block block))))
+       (when (boundp '*2block-info*)
+         (let ((info (gethash block *2block-info*)))
+           (format t "pred=~:A succ=~:A~:@_"
+                   (mapcar #'ir2-block-id (car info))
+                   (mapcar #'ir2-block-id (cdr info)))))
        (let ((label (ir2-block-%label block)))
          (when label
            (format t "L~D:~:@_" (label-id label)))))
@@ -1124,7 +1174,7 @@
          do (pprint-logical-block (*standard-output* nil)
               (if full
                   (print-nodes block)
-                  (format t "IR1 block ~D start c~D"
+                  (format t "IR1 block ~D~@[ start c~D~]"
                           (block-number block)
                           (cont-num (block-start block))))
               (pprint-indent :block 4)

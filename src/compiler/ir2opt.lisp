@@ -786,6 +786,13 @@
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))
     (initialize-ir2-blocks-flow-info component)
+    (when (and *compiler-trace-output*
+               (member :pre-ir2-optimize *compile-trace-targets*))
+      (let ((*standard-output* *compiler-trace-output*))
+        ;; We really ought to print the IR1 before IR2 but this achieves its
+        ;; purpose of helping figure out what changes were made to IR2.
+        (format t "~&Before IR2-optimize:~%")
+        (print-ir2-blocks component)))
     ;; Look for if/else chains before cmovs, because a cmov
     ;; affects whether the last if/else is recognizable.
     #+(or ppc ppc64 x86 x86-64) (convert-if-else-chains component)
