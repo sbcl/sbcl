@@ -392,25 +392,31 @@
         (when (label-usedp item) ; control can transfer to here
           (setq previous-mark nil)))
       (let ((mnemonic (stmt-mnemonic statement)))
-        (if (functionp mnemonic) ; this can do anything, who knows
-            (setq previous-mark nil)
-            (cond ((branch-opcode-p mnemonic) ; control flow kills mark combining
-                   (setq previous-mark nil))
-                  ((eq mnemonic '.coverage-mark)
-                   (let ((path (car (stmt-operands statement))))
-                     (cond ((not previous-mark) ; record a new path
-                            (let ((mark-index
-                                   (vector-push-extend (list path) src-paths)))
-                              ;; have the backend lower it into a real instruction
-                              (replace-coverage-instruction statement label mark-index))
+        (typecase mnemonic
+         (function ; this can do anything, who knows
+          (setq previous-mark nil))
+         (string) ; a comment can be ignored
+         (t
+          (cond ((branch-opcode-p mnemonic) ; control flow kills mark combining
+                 (setq previous-mark nil))
+                ((eq mnemonic '.coverage-mark)
+                 (let ((path (car (stmt-operands statement))))
+                   (cond ((not previous-mark) ; record a new path
+                          (let ((mark-index
+                                 (vector-push-extend (list path) src-paths)))
+                            ;; have the backend lower it into a real instruction
+                            (replace-coverage-instruction statement label mark-index))
                             (setq previous-mark statement))
                            (t ; record that the already-emitted mark pertains
                             ;; to an additional source path
                             (push path (elt src-paths (1- (fill-pointer src-paths))))
-                            (add-stmt-labels previous-mark (stmt-labels statement))
-                            (let ((predecessor (stmt-prev statement)))
-                              (delete-stmt statement)
-                              (setq statement predecessor))))))))))
+                            ;; Clobber this statement. Do not try to remove it and
+                            ;; combine its labels into the previous statement.
+                            ;; Doing that could move a label into an earlier IR2 block
+                            ;; which crashes when dumping locations.
+                            (setf (stmt-mnemonic statement) nil
+                                  (stmt-operands statement) nil))))))))))
+
     ;; Allocate space in the data section for coverage marks
     (let ((mark-index (length src-paths)))
       (when (plusp mark-index)
