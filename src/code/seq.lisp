@@ -1423,17 +1423,15 @@ many elements are copied."
            (setf (car node) (apply really-fun args))
            (setf node (cdr node)))))
       (sequence
-       (multiple-value-bind (iter limit from-end)
+       (multiple-value-bind (iter limit from-end step endp elt set)
            (sb-sequence:make-sequence-iterator result-sequence)
+         (declare (ignore elt) (type function step endp set))
          (map-into-lambda sequences (&rest args)
            (declare (truly-dynamic-extent args) (optimize speed))
-           (when (sb-sequence:iterator-endp result-sequence
-                                            iter limit from-end)
+           (when (funcall endp result-sequence iter limit from-end)
              (return-from map-into result-sequence))
-           (setf (sb-sequence:iterator-element result-sequence iter)
-                 (apply really-fun args))
-           (setf iter (sb-sequence:iterator-step result-sequence
-                                                           iter from-end)))))))
+           (funcall set (apply really-fun args) result-sequence iter)
+           (setf iter (funcall step result-sequence iter from-end)))))))
   result-sequence)
 
 ;;;; REDUCE
