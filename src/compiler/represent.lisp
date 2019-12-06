@@ -462,10 +462,12 @@
                        (change-tn-ref-tn op temp)
                        (cond
                          ((not write-p)
-                          (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
-                                                                    op)
-                                         res)
-                                     op-tn temp))
+                          (or
+                           (coerce-from-constant op temp)
+                           (emit-move (or (maybe-move-from-fixnum+-1 op-tn temp
+                                                                     op)
+                                          res)
+                                      op-tn temp)))
                          ((and (null (tn-reads op-tn))
                                (eq (tn-kind op-tn) :normal)))
                          (t
@@ -596,6 +598,15 @@
                                                   ,sb-xc:most-positive-fixnum)))
              (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
+(defun coerce-from-constant (x-tn-ref y)
+  (when (and (sc-is y sb-vm::descriptor-reg)
+             (tn-ref-type x-tn-ref))
+    (multiple-value-bind (constantp value) (type-singleton-p (tn-ref-type x-tn-ref))
+      (when constantp
+        (change-tn-ref-tn x-tn-ref
+                          (make-constant-tn (find-constant value) t))
+        t))))
+
 ;;; Scan the IR2 looking for move operations that need to be replaced
 ;;; with special-case VOPs and emitting coercion VOPs for operands of
 ;;; normal VOPs. We delete moves to TNs that are never read at this
@@ -621,8 +632,8 @@
                        (eq (tn-kind y) :normal))
                   (delete-vop vop))
                  ((eq res info))
+                 ((coerce-from-constant args y))
                  (res
-
                   (let ((res (or (maybe-move-from-fixnum+-1 x y
                                                             args)
                                  res)))

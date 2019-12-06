@@ -2525,3 +2525,24 @@
          (logbitp 26 p2))
     ((3) nil)
     (((ash 1 26)) t)))
+
+(with-test (:name :vop-return-constant-boxing)
+  (checked-compile
+   `(lambda (x)
+      (declare (optimize speed))
+      (setf (aref (the (simple-array double-float (*)) x) 0)
+            10d0))
+   :allow-notes nil)
+  (checked-compile
+   `(lambda (x)
+      (declare (optimize speed))
+      (setf (aref (the (simple-array sb-vm:word (*)) x) 0)
+            (1- (expt 2 sb-vm:n-word-bits))))
+   :allow-notes nil)
+  (checked-compile
+   `(lambda (x y)
+      (declare (optimize speed))
+      (setf (svref y 0)
+            (setf (aref (the (simple-array double-float (*)) x) 0)
+                  10d0)))
+   :allow-notes nil))

@@ -216,10 +216,13 @@
 ;;; Create a constant TN. The backend dependent
 ;;; IMMEDIATE-CONSTANT-SC function is used to determine whether the
 ;;; constant has an immediate representation.
-(defun make-constant-tn (constant)
+(defun make-constant-tn (constant &optional force-boxed)
   (declare (type constant constant))
   (or (leaf-info constant)
-      (multiple-value-bind (immed null-offset) (immediate-constant-sc (constant-value constant))
+      (multiple-value-bind (immed null-offset)
+          (if force-boxed
+              (values nil nil)
+              (immediate-constant-sc (constant-value constant)))
         (if null-offset
             (setf (leaf-info constant)
                   (component-live-tn
