@@ -713,7 +713,9 @@
             (add y)))
         new)))
 
-(defun add-equality-constraints (operator args constraints consequent-constraints alternative-constraints)
+(defun add-equality-constraints (operator args constraints
+                                 consequent-constraints
+                                 alternative-constraints)
   (case operator
     ((eq eql)
      (when (= (length args) 2)
@@ -728,6 +730,11 @@
                  (not-con (find-or-create-equality-constraint operator x y t)))
              (conset-adjoin con consequent-constraints)
              (conset-adjoin not-con alternative-constraints))))))))
+
+(defun add-eq-constraint (var lvar gen)
+  (let ((var2 (ok-lvar-lambda-var lvar gen)))
+    (when var2
+      (conset-adjoin (find-or-create-equality-constraint 'eq var var2 nil) gen))))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
@@ -1127,7 +1134,8 @@
            (unless (eq type *universal-type*)
              (conset-add-constraint gen 'typep var type nil)))
          (unless (policy node (> compilation-speed speed))
-           (maybe-add-eql-var-var-constraint var (set-value node) gen))))
+           (maybe-add-eql-var-var-constraint var (set-value node) gen))
+         (add-eq-constraint var (set-value node) gen)))
       (combination
        (when (eq (combination-kind node) :known)
          (binding* ((info (combination-fun-info node) :exit-if-null)

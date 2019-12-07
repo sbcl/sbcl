@@ -2341,17 +2341,6 @@
    ((0.0) (condition 'type-error))
       ((1d0) 1d0)))
 
-#+sb-unicode
-(with-test (:name :base-char-p-constraint-propagation)
-  (assert
-   (equal (sb-kernel:%simple-fun-type
-           (checked-compile
-            '(lambda (x)
-              (if (sb-kernel:base-char-p x)
-                  (characterp x)
-                  t))))
-          '(function (t) (values (member t) &optional)))))
-
 (declaim (inline inline-fun-arg-mismatch))
 (defun inline-fun-arg-mismatch (x)
   (declare (optimize (debug 0)))
