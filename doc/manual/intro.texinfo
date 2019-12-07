@@ -495,7 +495,7 @@ shock.
 @item Art Of Metaobject Programming, by Gregor Kiczales et al.
 Currently the prime source of information on the Common Lisp Metaobject
 Protocol, which is supported by SBCL. Section 2 (Chapters 5 and 6) are
-freely available at @uref{http://www.lisp.org/mop/}.
+freely available at @uref{http://mop.lisp.se/www.alu.org/mop/}.
 
 @end table
 
