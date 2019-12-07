@@ -1056,6 +1056,15 @@ Form: C   Context: EVAL; lexically bound
 \(LET* ((A A) (B A) (C B) (B C))
   (DECLARE (SPECIAL A B))
   (LIST A B C))")))
+
+(test-util:with-test (:name (:walk defclass :type :initform))
+  ;; A slot with :TYPE and :INITFORM causes SB-C::WITH-SOURCE-FORM to
+  ;; appear in the expansion which didn't have a walker template at
+  ;; some point. We just make sure walking the form doesn't signal an
+  ;; error.
+  (with-output-to-string (*standard-output*)
+    (take-it-out-for-a-test-walk
+     (defclass foo () ((%bar :type integer :initform 'string))))))
 
 ;;;; more tests
 
