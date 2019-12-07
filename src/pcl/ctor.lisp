@@ -145,7 +145,7 @@
 
 ;;; Reset CTOR to use a default function that will compute an
 ;;; optimized constructor function when called.
-(defun install-initial-constructor (ctor &key force-p)
+(defun install-initial-constructor (ctor &optional force-p)
   (when (or force-p (ctor-class ctor))
     (setf (ctor-class ctor) nil
           (ctor-state ctor) 'initial)
@@ -190,7 +190,7 @@
 ;;; Keep this a separate function for testing.
 (defun make-ctor (function-name class-name initargs safe-p)
   (let ((ctor (%make-ctor 'ctor class-name nil initargs nil safe-p)))
-    (install-initial-constructor ctor :force-p t)
+    (install-initial-constructor ctor t)
     (setf (gethash function-name *all-ctors*) ctor)
     ctor))
 
@@ -201,7 +201,7 @@
 
 (defun make-allocator (function-name class-name)
   (let ((ctor (%make-ctor 'allocator class-name nil nil nil nil)))
-    (install-initial-constructor ctor :force-p t)
+    (install-initial-constructor ctor t)
     (setf (gethash function-name *all-ctors*) ctor)
     ctor))
 
@@ -765,21 +765,20 @@
          (declare #.*optimize-speed*)
          (block nil
            (when (layout-invalid ,wrapper)
-             (install-initial-constructor ,ctor)
+             (install-initial-constructor ,ctor t)
              (return (funcall ,ctor ,@(make-ctor-parameter-list ctor))))
            ,(wrap-in-allocate-forms ctor body early-unbound-markers-p)))
        locations
        names
        t))))
 
-(defun optimizing-allocator-generator
-    (ctor)
+(defun optimizing-allocator-generator (ctor)
   (let ((wrapper (class-wrapper (ctor-class ctor))))
     `(lambda ()
        (declare #.*optimize-speed*)
        (block nil
          (when (layout-invalid ,wrapper)
-           (install-initial-constructor ,ctor)
+           (install-initial-constructor ,ctor t)
            (return (funcall ,ctor)))
          ,(wrap-in-allocate-forms ctor nil t)))))
 
