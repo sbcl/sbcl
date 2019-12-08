@@ -288,7 +288,7 @@
   (let ((first (make-stmt nil nil :ignore nil)))
     (cons first first)))
 (defun section-start (section) (car section))
-(defun section-tail (section) (cdr section))
+(defmacro section-tail (section) `(cdr ,section))
 
 ;;; Insert STMT after PREDECESSOR.
 (defun insert-stmt (stmt predecessor)
@@ -325,7 +325,7 @@
   ;; - a function to emit a postit
   (let ((last (section-tail section))
         (vop (if (boundp '**current-vop**) **current-vop**)))
-    (dolist (thing things (setf (cdr section) last))
+    (dolist (thing things (setf (section-tail section) last))
       (if (label-p thing) ; Accumulate multiple labels until the next instruction
           (if (stmt-mnemonic last)
               (setq last (insert-stmt (make-stmt thing vop nil nil) last))
@@ -1359,8 +1359,9 @@
         (setf (stmt-next last-stmt) (stmt-next head)
               (stmt-prev (stmt-next head)) last-stmt)
         (setf last-stmt (section-tail second)))
-      (setf (stmt-next head) nil))
-    (rplacd first last-stmt))
+      (setf (stmt-next head) nil
+            (section-tail second) head))
+    (setf (section-tail first) last-stmt))
   first)
 
 ;;; Map of opcode symbol to function that emits it into the byte stream
@@ -1430,11 +1431,8 @@
   (let* ((n-entries (length simple-fun-labels))
          (trailer-len (* (+ n-entries 1) 4))
          (end-text (gen-label))
-         (octets
-          (segment-buffer
-           (%assemble
-            segment
-            (append-sections
+         (combined
+           (append-sections
              (append-sections (asmstream-data-section asmstream)
                               (asmstream-code-section asmstream))
              (let ((section (asmstream-elsewhere-section asmstream)))
@@ -1443,7 +1441,8 @@
                      `(.align 2)
                      `(.skip ,trailer-len)
                      `(.align ,sb-vm:n-lowtag-bits))
-               section))))))
+               section)))
+         (octets (segment-buffer (%assemble segment combined))))
     (flet ((store-ub16 (index val)
              (multiple-value-bind (b0 b1)
                  #+little-endian
