@@ -731,6 +731,10 @@
   write-p
   (vop :test vop :prin1 (vop-info-name (vop-info vop))))
 
+(declaim (inline vop-name))
+(defun vop-name (vop)
+  (declare (type vop vop))
+  (vop-info-name (vop-info vop)))
 
 ;;;; SBs and SCs
 

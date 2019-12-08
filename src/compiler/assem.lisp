@@ -270,6 +270,7 @@
   (vop)
   (mnemonic)
   (operands)
+  (plist) ; put anything you want here for later passes such as instcombine
   (prev)
   (next))
 (declaim (freeze-type stmt))
@@ -316,6 +317,7 @@
 ;;; This is used only to keep track of which vops emit which insts.
 (defvar **current-vop**)
 
+;;; Return the final statement emitted.
 (defun emit (section &rest things)
   ;; each element of THINGS can be:
   ;; - a label
@@ -323,7 +325,7 @@
   ;; - a function to emit a postit
   (let ((last (section-tail section))
         (vop (if (boundp '**current-vop**) **current-vop**)))
-    (dolist (thing things (rplacd section last))
+    (dolist (thing things (setf (cdr section) last))
       (if (label-p thing) ; Accumulate multiple labels until the next instruction
           (if (stmt-mnemonic last)
               (setq last (insert-stmt (make-stmt thing vop nil nil) last))
@@ -1348,30 +1350,26 @@
   (format stream "# end of input~%")
   n)
 
-;;; Append all sections, returning the first section.
-(defun append-sections (sections)
-  (let* ((first-section (car sections))
-         (last-stmt (section-tail first-section)))
-    (dolist (section (cdr sections) first-section)
-      (let ((head (section-start section)))
-        (aver (eq (stmt-mnemonic head) :ignore))
-        (when (stmt-next head)
-          (setf (stmt-next last-stmt) (stmt-next head)
-                (stmt-prev (stmt-next head)) last-stmt)
-          (setf last-stmt (section-tail section)))
-        ;; Make this section empty since its contents
-        ;; are already accounted for.
-        (setf (stmt-next head) nil)))
-    (rplacd first-section last-stmt)))
+;;; Append SECOND to the end of FIRST, make SECOND empty, and return FIRST.
+(defun append-sections (first second)
+  (let ((last-stmt (section-tail first)))
+    (let ((head (section-start second)))
+      (aver (eq (stmt-mnemonic head) :ignore))
+      (when (stmt-next head)
+        (setf (stmt-next last-stmt) (stmt-next head)
+              (stmt-prev (stmt-next head)) last-stmt)
+        (setf last-stmt (section-tail second)))
+      (setf (stmt-next head) nil))
+    (rplacd first last-stmt))
+  first)
 
 ;;; Map of opcode symbol to function that emits it into the byte stream
 ;;; (or with the schedulding assembler, into the queue)
 (defglobal *inst-encoder* (make-hash-table :test 'eq))
 
 ;;; Combine INPUTS into one assembly stream and assemble into SEGMENT
-(defun %assemble-sections (segment &rest inputs)
+(defun %assemble (segment section)
   (let ((**current-vop** nil)
-        (section (append-sections inputs))
         (in-without-scheduling)
         (was-scheduling))
     ;; HEADER-SKEW is 1 word (in bytes) if the boxed code header word count is odd.
@@ -1427,23 +1425,25 @@
                          (bug "No encoder for ~S" mnemonic))))))))))
   (finalize-segment segment))
 
-;;; The interface to %ASSEMBLE-SECTIONS
+;;; The interface to %ASSEMBLE
 (defun assemble-sections (asmstream simple-fun-labels segment)
   (let* ((n-entries (length simple-fun-labels))
          (trailer-len (* (+ n-entries 1) 4))
          (end-text (gen-label))
          (octets
           (segment-buffer
-           (%assemble-sections
+           (%assemble
             segment
-            (asmstream-data-section asmstream)
-            (asmstream-code-section asmstream)
-            (asmstream-elsewhere-section asmstream)
-            (emit (make-section)
-                  end-text
-                  `(.align 2)
-                  `(.skip ,trailer-len)
-                  `(.align ,sb-vm:n-lowtag-bits))))))
+            (append-sections
+             (append-sections (asmstream-data-section asmstream)
+                              (asmstream-code-section asmstream))
+             (let ((section (asmstream-elsewhere-section asmstream)))
+               (emit section
+                     end-text
+                     `(.align 2)
+                     `(.skip ,trailer-len)
+                     `(.align ,sb-vm:n-lowtag-bits))
+               section))))))
     (flet ((store-ub16 (index val)
              (multiple-value-bind (b0 b1)
                  #+little-endian
@@ -1573,8 +1573,7 @@
        (emit dest (cons mnemonic operands)))
       (segment ; streaming out of the assembler
        (instruction-hooks dest)
-       (apply action dest (perform-operand-lowering operands)))))
-  mnemonic)
+       (apply action dest (perform-operand-lowering operands))))))
 
 (defun emit-label (label)
   "Emit LABEL at this location in the current section."
@@ -1897,9 +1896,14 @@
 (defglobal *asm-pattern-matchers* nil)
 (defglobal *asm-pattern-matchers-invoked* (make-array 20 :initial-element 0))
 (defun %defpattern (name opcodes1 opcodes2 applicator)
-  (let ((index (length *asm-pattern-matchers*)))
-    (push (list opcodes1 opcodes2  applicator index name)
-          *asm-pattern-matchers*)))
+  (let ((entry (find name *asm-pattern-matchers* :test #'string= :key #'fifth)))
+    (if entry
+        (setf (first entry) opcodes1
+              (second entry) opcodes2
+              (third entry) applicator)
+        (let* ((index (length *asm-pattern-matchers*))
+               (entry (list opcodes1 opcodes2  applicator index name)))
+          (push entry *asm-pattern-matchers*)))))
 
 (defun combine-instructions (section)
   ;; Triply nested loop:
