@@ -63,6 +63,10 @@
       (t
        (inst mov dst src)))))
 
+(defun 32bit-move (dst src)
+  (unless (location= dst src)
+    (inst mov :dword dst src)))
+
 (defmacro object-slot-ea (ptr slot lowtag)
   `(ea (- (* ,slot n-word-bytes) ,lowtag) ,ptr))
 (defmacro tls-index-of (sym)

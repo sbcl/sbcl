@@ -19,22 +19,48 @@
 ;;;; moves and coercions
 
 ;;; Move a tagged char to an untagged representation.
+;;; The best possible instruction sequences for various X and Y SC's are:
+;;; * reg-to-reg: dword move, then shift
+;;; * reg-to-mem: dword move to temp, shift temp, store as qword
+;;; * mem-to-reg: misaligned dword load (read 4 bytes at byte index 1)
+;;; * mem-to-mem: misaligned dword load to temp, store as a qword
+;;;
+;;; Since there's no such thing as a 3-byte load, the misaligned loads
+;;; overrun a naturally aligned :dword within the :qword, but that's fine.
+;;; However, we can't actually implement that because we lack a way to
+;;; create an arbitrary EA given a stack TN. So, instead do:
+;;; * mem-to-reg: dword load, shift
+;;; * mem-to-mem: dword load to temp, shift temp, store as a qword
+(defun untagify-char (dst src shift)
+  (if (and (location= src dst) (stack-tn-p dst)) ; shift right in memory
+      (inst shr :dword dst shift)
+      (let ((reg (if (stack-tn-p dst) temp-reg-tn dst)))
+        (32bit-move reg src)
+        (inst shr :dword reg shift)
+        (when (stack-tn-p dst) ; store as qword to ensure upper bytes are 0
+          (inst mov dst temp-reg-tn)))))
 (define-vop (move-to-character)
-  (:args (x :scs (any-reg descriptor-reg) :target y
-            :load-if (not (location= x y))))
-  (:results (y :scs (character-reg)
-               :load-if (not (location= x y))))
+  (:args (x :scs (any-reg descriptor-reg control-stack) :target y :load-if nil))
+  (:results (y :scs (character-reg character-stack) :load-if nil))
   (:note "character untagging")
-  (:generator 1
-    (cond ((and (sc-is y character-reg) (sc-is x any-reg descriptor-reg))
-           (unless (location= x y)
-             (inst mov :dword y x)))
-          (t
-           (move y x)))
-    (inst shr :dword y n-widetag-bits)))
+  (:generator 1 (untagify-char y x n-widetag-bits)))
 (define-move-vop move-to-character :move
   (any-reg)
   (character-reg))
+
+;;; Move a tagged character in an {ANY|DESCRIPTOR}-REG or control stack
+;;; to a fixnum in those same SCs.  This is untaggeding and fixnumizing
+;;; in one right shift, not a right + left shift.
+;;; ASSUMPTION: the topmost bit in character-widetag is 0
+(eval-when (:compile-toplevel) ; Verify assumption.
+  (assert (not (logbitp 7 character-widetag))))
+(define-vop (tagged-char-code) ; valid only if N-FIXNUM-TAG-BITS = 1
+  (:args (x :scs (any-reg descriptor-reg control-stack) :target y :load-if nil))
+  (:results (y :scs (any-reg control-stack) :load-if nil))
+  (:note "character untagging")
+  (:generator 1
+    (untagify-char y x (- n-widetag-bits n-fixnum-tag-bits))
+    (when (> n-fixnum-tag-bits 1) (inst and :dword y fixnum-tag-mask))))
 
 ;;; Move an untagged char to a tagged representation.
 (define-vop (move-from-character)
@@ -51,15 +77,18 @@
   (any-reg descriptor-reg))
 
 ;;; Move untagged character values.
+(defun move-raw-char-code (dst src) ; move SRC to DST
+  (unless (location= src dst)
+    ;; Aways store as :qword to stack (storing the upper 32 zero bits) so that
+    ;; loading as either :dword or :qword is ok.
+    ;; We can see immediate constants here which become untagged integers.
+    (inst mov (if (stack-tn-p dst) :qword :dword) dst
+          (encode-value-if-immediate src nil))))
 (define-vop (character-move)
-  (:args (x :target y
-            :scs (character-reg)
-            :load-if (not (location= x y))))
-  (:results (y :scs (character-reg character-stack)
-               :load-if (not (location= x y))))
+  (:args (x :target y :scs (character-reg character-stack) :load-if nil))
+  (:results (y :scs (character-reg character-stack) :load-if nil))
   (:note "character move")
-  (:generator 0
-    (move y x)))
+  (:generator 0 (move-raw-char-code y x)))
 (define-move-vop character-move :move
   (character-reg) (character-reg character-stack))
 
@@ -92,32 +121,20 @@
 (define-vop (char-code)
   (:translate char-code)
   (:policy :fast-safe)
-  (:args (ch :scs (character-reg character-stack) :target res))
+  (:args (ch :scs (character-reg character-stack) :target res :load-if nil))
   (:arg-types character)
-  (:results (res :scs (unsigned-reg)))
+  (:results (res :scs (unsigned-reg unsigned-stack) :load-if nil))
   (:result-types positive-fixnum)
-  (:generator 1
-    (move res ch))) ; FIXME: shouldn't this be :dword ?
+  (:generator 1 (move-raw-char-code res ch)))
 
 (define-vop (code-char)
   (:translate code-char)
   (:policy :fast-safe)
-  (:args (code :scs (unsigned-reg unsigned-stack) :target res))
+  (:args (code :scs (unsigned-reg unsigned-stack) :target res :load-if nil))
   (:arg-types positive-fixnum)
-  (:results (res :scs (character-reg)))
+  (:results (res :scs (character-reg character-stack) :load-if nil))
   (:result-types character)
-  (:generator 1
-    ;; While we could use a byte-sized move here for non-unicode builds,
-    ;; I think it's better to move 32 bits from source to destination either way.
-    ;; The non-unicode case used to perform two moves - first CODE into EAX and then
-    ;; AL to result. I think it was blindly copied from the 32-bit vm definition.
-    ;; The 32-bit vm could use both the low and high byte subregisters of a word-sized
-    ;; register, thus you had to carefully avoid affecting other bits of the physical
-    ;; destination register. And since not all source registers had an accessible 8-bit
-    ;; subregister, it forced going through one of EAX,EBX,ECX,EDX.
-    ;; Those considerations do not pertain to the 64-bit vm.
-    (unless (location= code res)
-      (inst mov :dword res code))))
+  (:generator 1 (move-raw-char-code res code)))
 
 ;;; comparison of CHARACTERs
 (define-vop (character-compare)
@@ -199,3 +216,10 @@
   (:policy :fast-safe)
   (:generator 2
     (inst cmp :dword value base-char-code-limit)))
+
+;;; Replace the triple (MOVE-TO-CHARACTER CHAR-CODE MOVE-FROM-WORD/FIXNUM)
+;;; with just the TAGGED-CHAR-CODE vop.
+(defoptimizer (sb-c::vop-optimize move-to-character) (vop)
+  (when (and (sb-c:next-vop-is vop 'char-code)
+             (sb-c:next-vop-is (sb-c:vop-next vop) 'move-from-word/fixnum))
+    (sb-c:replace-vops 3 vop 'tagged-char-code)))

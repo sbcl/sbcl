@@ -470,7 +470,7 @@
         (setf (vop-prev next) prev)
         (setf (ir2-block-last-vop block) prev)))
 
-  (values))
+  nil)
 
 ;;; Return a list of N normal TNs of the specified primitive type.
 (defun make-n-tns (n ptype)

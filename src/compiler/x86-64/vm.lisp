@@ -372,6 +372,10 @@
 (defun xmm-tn-p (thing)
   (and (tn-p thing)
        (eq (sb-name (sc-sb (tn-sc thing))) 'float-registers)))
+;;; Return true if THING is on the stack (in whatever storage class).
+(defun stack-tn-p (thing)
+  (and (tn-p thing)
+       (eq (sb-name (sc-sb (tn-sc thing))) 'stack)))
 
 ;; A register that's never used by the code generator, and can therefore
 ;; be used as an assembly temporary in cases where a VOP :TEMPORARY can't

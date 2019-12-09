@@ -23,7 +23,7 @@
   (import '(sb-vm::int-avx2-reg sb-vm::double-avx2-reg sb-vm::single-avx2-reg))
   (import '(sb-vm::tn-byte-offset sb-vm::tn-reg sb-vm::reg-name
             sb-vm::frame-byte-offset sb-vm::rip-tn sb-vm::rbp-tn
-            sb-vm::gpr-tn-p sb-c::tn-reads sb-c::tn-writes
+            sb-vm::gpr-tn-p sb-vm::stack-tn-p sb-c::tn-reads sb-c::tn-writes
             #+avx2 sb-vm::avx2-reg
             sb-vm::registers sb-vm::float-registers sb-vm::stack))) ; SB names
 

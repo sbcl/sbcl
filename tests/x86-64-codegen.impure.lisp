@@ -607,3 +607,16 @@ sb-vm::(define-vop (cl-user::test)
                 (sb-kernel:fun-code-header #'typecase-jump-table))
                ;; 6 cases including NIL return, plus the size
                7)))
+
+(defun assert-thereis-line (lambda expect)
+  (let ((f (checked-compile lambda)))
+    (assert
+     (loop for line in (split-string (with-output-to-string (string)
+                                       (disassemble f :stream string))
+                                     #\newline)
+           ;; very brittle, as it looks for a specific register
+           thereis (search expect line)))))
+
+(with-test (:name :char-code-is-single-shr)
+  (assert-thereis-line '(lambda (x) (char-code (truly-the character x)))
+                       "SHR EDX, 7"))

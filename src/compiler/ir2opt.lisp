@@ -19,6 +19,8 @@
 ;;; For blocks it's a cons with (pred . succ)
 ;;; For labels it maps to the label block
 (defvar *2block-info*)
+(defmacro vop-predecessors (vop) `(car (gethash ,vop *2block-info*)))
+(defmacro vop-successors (vop) `(cdr (gethash ,vop *2block-info*)))
 
 (defun initialize-ir2-blocks-flow-info (component)
   (labels ((block-last-2block (block)
@@ -65,7 +67,7 @@
                 (remove 2block (car info)))))
       (setf (cdr info) succ)
       (dolist (new succ)
-        (pushnew 2block (car (gethash new *2block-info*)))))))
+        (pushnew 2block (vop-predecessors new))))))
 
 ;;;; Conditional move insertion support code
 (defun move-value-target (2block)
@@ -394,11 +396,6 @@
                                     (start-vop (ir2-block-next block))))))))
         (delete-fall-through-jumps component)))))
 
-(defmacro do-vops (vop ir2-block &body body)
-  `(do ((,vop (ir2-block-start-vop ,ir2-block) (vop-next ,vop)))
-       ((null ,vop))
-     ,@body))
-
 (defun next-vop (vop)
   (or (vop-next vop)
       (let ((next-block (ir2-block-next (vop-block vop))))
@@ -593,7 +590,7 @@
                       (tn-value (tn-ref-tn (tn-ref-across (vop-args conditional))))
                       ;; "-eq-/C" vops take a codegen arg
                       (car (vop-codegen-info conditional))))
-             (else-block-predecessors (car (gethash else-block *2block-info*)))
+             (else-block-predecessors (vop-predecessors else-block))
              (else-vop (ir2-block-start-vop else-block)))
          (push (cons val then-block) chain)
          ;; If ELSE block has more than one predecessor, that's OK,
@@ -759,21 +756,71 @@
             do (vector-push-extend constant constants))
       (setf (tn-leaf array) first-constant
             (constant-info first-constant) array)
-      (emit-and-insert-vop (vop-node vop)
+      (prog1
+          (emit-and-insert-vop (vop-node vop)
                            (vop-block vop)
                            (template-or-lose 'sb-vm::data-vector-ref-with-offset/constant-simple-vector)
                            (reference-tn-list (list array index) nil)
                            (reference-tn (tn-ref-tn (vop-results vop)) t)
                            vop
                            (vop-codegen-info vop))
-      (delete-vop vop))))
+        (delete-vop vop)))))
+
+(defun very-temporary-p (tn)
+  (let ((writes (tn-writes tn))
+        (reads (tn-reads tn)))
+    (and writes reads (not (tn-ref-next writes)) (not (tn-ref-next reads)))))
+
+(defun next-vop-is (vop name)
+  (let ((next (vop-next vop)))
+    (and next (eq (vop-name next) name))))
+
+;;; Possibly replace HOWMANY vops starting at FIRST with a vop named REPLACEMENT.
+;;; Each deleted vop must have exactly one argument and one result.
+;;; - There must be no way to begin execution in the middle of the pattern.
+;;;   For now we'll require that the vops have the same IR2 block,
+;;;   which is a more restrictive condition.
+;;; - The argument to each successive vop must be the result of its predecessor.
+;;; - There must be no other refs to TNs which are to be deleted.
+;;;
+;;; On the x86 backends this can potentially form the basis of an optimization
+;;; which folds together a memory read from {CAR, CDR, INSTANCE-REF} etc with
+;;; a following integer comparison and/or fixnum tag test as long as the base object
+;;; is in a register (so we get the load as part of the instruction).
+(defun replace-vops (howmany first replacement)
+  (flet ((can-replace (vop &aux (result (tn-ref-tn (vop-results vop)))
+                                (next (vop-next vop)))
+           (and (eq (vop-block vop) (vop-block next))
+                (very-temporary-p result)
+                (eq (tn-ref-tn (vop-args next)) result))))
+    (let ((last (ecase howmany
+                  (2 (when (can-replace first)
+                       (vop-next first)))
+                  (3 (when (and (can-replace first)
+                                (can-replace (vop-next first)))
+                       (vop-next (vop-next first)))))))
+      (when last
+        (let ((new (emit-and-insert-vop (vop-node first)
+                                        (vop-block first)
+                                        (template-or-lose replacement)
+                                        (reference-tn (tn-ref-tn (vop-args first)) nil)
+                                        (reference-tn (tn-ref-tn (vop-results last)) t)
+                                        first))) ; insert before this
+          (dotimes (i (1- howmany)) ; if 3, replace 2 "NEXT"'s and then first, etc
+            (delete-vop (vop-next first)))
+          (delete-vop first)
+          new))))) ; return suitable value for RUN-VOP-OPTIMIZERS
 
 (defun run-vop-optimizers (component)
   (do-ir2-blocks (block component)
-    (do-vops vop block
-      (let ((optimizer (vop-info-optimizer (vop-info vop))))
-        (when optimizer
-          (funcall optimizer vop))))))
+    (let ((vop (ir2-block-start-vop block)))
+      (loop (unless vop (return))
+            ;; Avoid following the NEXT pointer of a deleted vop, which despite
+            ;; possibly being accidentally correct, is dubious.
+            ;; Optimizer must return NIL or a VOP whence to resume scanning.
+            (setq vop (or (awhen (vop-info-optimizer (vop-info vop))
+                            (funcall it vop))
+                          (vop-next vop)))))))
 
 (defun ir2-optimize (component)
   (let ((*2block-info* (make-hash-table :test #'eq)))

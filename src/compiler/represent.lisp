@@ -722,6 +722,9 @@
 
     (do-ir2-blocks (block component)
       (emit-moves-and-coercions block))
+    ;; Give the optimizers a second opportunity to alter newly inserted vops
+    ;; by looking for patterns that have a shorter expression as a single vop.
+    (run-vop-optimizers component)
 
     (macrolet ((frob (slot restricted)
                  `(do ((tn (,slot 2comp) (tn-next tn)))
