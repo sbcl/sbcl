@@ -295,9 +295,7 @@
         (bits (descriptor-bits des))
         (lowtag (descriptor-lowtag des)))
     (print-unreadable-object (des stream :type t)
-      (cond ((eq gspace :load-time-value)
-             (format stream "for LTV ~D" (descriptor-word-offset des)))
-            ((is-fixnum-lowtag lowtag)
+      (cond ((is-fixnum-lowtag lowtag)
              (format stream "for fixnum: ~W" (descriptor-fixnum des)))
             ((is-other-immediate-lowtag lowtag)
              (format stream
@@ -2259,10 +2257,10 @@ core and return a descriptor to it."
   #+c-headers-only (declare (ignore name arglist forms))
   #-c-headers-only
   (let* ((code (get name 'opcode))
-         (argc (aref (car **fop-signatures**) code))
+         (argc (aref (car **fop-signatures**)
+                     (or code
+                         (error "~S is not a defined FOP." name))))
          (fname (symbolicate "COLD-" name)))
-    (unless code
-      (error "~S is not a defined FOP." name))
     (aver (= (length arglist) argc))
     `(progn
        (defun ,fname (.fasl-input. ,@arglist)
@@ -3763,8 +3761,6 @@ III. initially undefined function references (alphabetically):
   (named-let recurse ((x descriptor))
     (when (cold-null x)
       (return-from recurse nil))
-    (when (eq (descriptor-gspace x) :load-time-value)
-      (error "Can't warm a deferred LTV placeholder"))
     (when (is-fixnum-lowtag (descriptor-lowtag x))
       (return-from recurse (descriptor-fixnum x)))
     #+64-bit

@@ -172,10 +172,7 @@
   (let ((alien-type (lvar-type alien)))
     (unless (alien-type-type-p alien-type)
       (give-up-ir1-transform))
-    (let ((alien-type (alien-type-type-alien-type alien-type)))
-      (if (alien-type-p alien-type)
-          alien-type
-          (give-up-ir1-transform)))))
+    (alien-type-type-alien-type alien-type)))
 
 (defun find-deref-element-type (alien)
   (let ((alien-type (find-deref-alien-type alien)))
