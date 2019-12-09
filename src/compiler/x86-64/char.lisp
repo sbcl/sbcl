@@ -83,7 +83,10 @@
     ;; loading as either :dword or :qword is ok.
     ;; We can see immediate constants here which become untagged integers.
     (inst mov (if (stack-tn-p dst) :qword :dword) dst
-          (encode-value-if-immediate src nil))))
+          (cond ((stack-tn-p src)
+                 (inst mov :qword temp-reg-tn src)
+                 temp-reg-tn)
+                ((encode-value-if-immediate src nil))))))
 (define-vop (character-move)
   (:args (x :target y :scs (character-reg character-stack) :load-if nil))
   (:results (y :scs (character-reg character-stack) :load-if nil))
