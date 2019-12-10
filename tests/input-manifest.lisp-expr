@@ -1,4 +1,6 @@
-(("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
+(("aprof.impure.lisp"
+  "src/code/aprof.lisp")
+ ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
  ("case.pure.lisp" "tests/case-test.lisp")
  ("chill.test.sh"
   "src/cold/chill.lisp"
@@ -27,24 +29,20 @@
   "tests/symbol-macrolet-test.lisp")
  ("debug.impure.lisp" "tests/bug-414.lisp")
  ("elfcore.test.sh" "src/runtime/shrinkwrap-sbcl")
+ ("filesys.pure.lisp"
+  "exists")
  ("init.test.sh"
   "contrib/sb-introspect.fasl"
   "tests/custom-sysinit.lisp"
   "tests/custom-userinit.lisp")
  ("kill-non-lisp-thread.impure.lisp" "tests/kill-non-lisp-thread.so")
- ("load.pure.lisp"
-  "tests/data/wonky1.lisp")
- ("unicode-breaking.pure.lisp"
-  "tests/data/GraphemeBreakTest.txt"
-  "tests/data/WordBreakTest.txt"
-  "tests/data/SentenceBreakTest.txt"
-  "tests/data/LineBreakTest.txt"
-  "tests/data/line-break-exceptions.lisp-expr")
  ("load.impure.lisp"
   "tests/parallel-fasl-load-test.lisp"
   "tests/data/wonky1.lisp"
   "tests/data/wonky2.lisp"
   "tests/data/wonky3.lisp")
+ ("load.pure.lisp"
+  "tests/data/wonky1.lisp")
  ("octets.pure.lisp"
   "tests/data/compile-file-pos.lisp"
   "tests/data/compile-file-pos-utf16be.lisp")
@@ -55,9 +53,12 @@
   "tests/alloca.so"
   "tests/threads-foreign.so")
  ("threads.test.sh" "tests/condition-wait-sigcont.lisp")
- ("undefined-classoid-bug.test.sh"
-  "tests/undefined-classoid-bug-1.lisp"
-  "tests/undefined-classoid-bug-2.lisp")
+ ("unicode-breaking.pure.lisp"
+  "tests/data/GraphemeBreakTest.txt"
+  "tests/data/WordBreakTest.txt"
+  "tests/data/SentenceBreakTest.txt"
+  "tests/data/LineBreakTest.txt"
+  "tests/data/line-break-exceptions.lisp-expr")
  ("unicode-collation.pure.lisp" "tests/data/CollationTest_SHIFTED_SHORT.txt")
  ("unicode-normalization.pure.lisp" "tests/data/NormalizationTest.txt")
  ("unicode-properties.pure.lisp"
@@ -74,5 +75,6 @@
   "tests/data/GraphemeBreakProperty.txt"
   "tests/data/WordBreakProperty.txt"
   "tests/data/SentenceBreakProperty.txt")
- ("filesys.pure.lisp"
-  "exists"))
+ ("undefined-classoid-bug.test.sh"
+  "tests/undefined-classoid-bug-1.lisp"
+  "tests/undefined-classoid-bug-2.lisp"))

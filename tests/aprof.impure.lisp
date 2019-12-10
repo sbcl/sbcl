@@ -177,3 +177,11 @@ sb-vm::
       (when (search "THIS-STRUCT" line) (setq seen-this t))
       (when (search "THAT-STRUCT" line) (setq seen-that t)))
     (assert (and seen-this seen-that))))
+
+#-win32
+(with-test (:name :aprof-brutal-test)
+  (with-scratch-file (fasl "fasl")
+    (sb-aprof:aprof-run (lambda () (compile-file "../src/code/aprof"
+                                                 :output-file fasl
+                                                 :print nil :verbose nil))
+                        :stream (make-broadcast-stream))))

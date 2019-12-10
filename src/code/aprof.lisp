@@ -371,7 +371,7 @@
                                        (not (machine-ea-index ea))
                                        (machine-ea-disp ea))) ; ignore
                                  (t (fail)))))))
-                      (|or|
+                      (or
                        (cond ((and (not lowtag)
                                    (eq (reg/mem-imm-data 0 dstate) sb-vm:list-pointer-lowtag))
                               (return-from infer-type (values 'list size)))
