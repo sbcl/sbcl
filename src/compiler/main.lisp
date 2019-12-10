@@ -293,6 +293,7 @@ Examples:
                  (zerop *compiler-warning-count*)
                  (zerop *compiler-style-warning-count*)
                  (zerop *compiler-note-count*))
+      (fresh-line *error-output*)
       (pprint-logical-block (*error-output* nil :per-line-prefix "; ")
         (format *error-output* "~&compilation unit ~:[finished~;aborted~]"
                 abort-p)
