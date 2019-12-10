@@ -599,7 +599,7 @@
              (template-or-lose 'sb-vm::move-from-fixnum-1))))))
 
 (defun coerce-from-constant (x-tn-ref y)
-  (when (and (sc-is y sb-vm::descriptor-reg)
+  (when (and (sc-is y sb-vm::descriptor-reg sb-vm::control-stack)
              (tn-ref-type x-tn-ref))
     (multiple-value-bind (constantp value) (type-singleton-p (tn-ref-type x-tn-ref))
       (when constantp

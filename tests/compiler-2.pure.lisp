@@ -2534,6 +2534,14 @@
       (setf (svref y 0)
             (setf (aref (the (simple-array double-float (*)) x) 0)
                   10d0)))
+   :allow-notes nil)
+  (checked-compile
+   `(lambda (f a)
+      (declare (optimize speed))
+      (funcall (the function f)
+               1 2 3 4 5 6 7 8 9 10
+               (setf (aref (the (simple-array double-float (*)) a) 0)
+                     10d0)))
    :allow-notes nil))
 
 (with-test (:name :make-constant-tn-force-boxed)
