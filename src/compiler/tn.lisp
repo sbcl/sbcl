@@ -220,9 +220,7 @@
   (declare (type constant constant))
   (or (leaf-info constant)
       (multiple-value-bind (immed null-offset)
-          (if force-boxed
-              (values nil nil)
-              (immediate-constant-sc (constant-value constant)))
+          (immediate-constant-sc (constant-value constant))
         (if null-offset
             (setf (leaf-info constant)
                   (component-live-tn
@@ -232,13 +230,16 @@
             (let* ((boxed (or (not immed)
                               (boxed-immediate-sc-p immed)))
                    (component (component-info *component-being-compiled*))
-                   ;; If a constant have either an immediate or boxed
+                   ;; If a constant has either an immediate or boxed
                    ;; representation (e.g. double-float) postpone the SC
                    ;; choice until SELECT-REPRESENTATIONS.
-                   (sc (and boxed
-                            (if immed
-                                (svref *backend-sc-numbers* immed)
-                                (sc-or-lose 'constant))))
+                   (sc (cond (boxed
+                              (if immed
+                                  (svref *backend-sc-numbers* immed)
+                                  (sc-or-lose 'constant)))
+                             (force-boxed
+                              (setf immed nil)
+                              (sc-or-lose 'constant))))
                    (res (make-tn 0 :constant (primitive-type (leaf-type constant)) sc)))
               ;; Objects of type SYMBOL can be immediate but they still go in the constants
               ;; because liveness depends on pointer tracing without looking at code-fixups.

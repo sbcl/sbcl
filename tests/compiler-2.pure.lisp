@@ -2535,3 +2535,11 @@
             (setf (aref (the (simple-array double-float (*)) x) 0)
                   10d0)))
    :allow-notes nil))
+
+(with-test (:name :make-constant-tn-force-boxed)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (declare (type character c))
+      (list 1 1 1 1 1 1 1 1 1 1 1 (the (eql #\() c)))
+   ((#\() '(1 1 1 1 1 1 1 1 1 1 1 #\() :test #'equal)))
