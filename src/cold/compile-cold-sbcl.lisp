@@ -32,7 +32,9 @@
   ;; The difference between init'ing the XC policy vs just proclaiming
   ;; is that INIT makes the settings stick in the baseline policy,
   ;; which affects POLICY-COLD-INIT-OR-RESANIFY.
-  (sb-c::init-xc-policy #+cons-profiling '((sb-c::instrument-consing 2)))
+  (sb-c::init-xc-policy (if (member :cons-profiling sb-xc:*features*)
+                            '((sb-c::instrument-consing 2))
+                            '()))
   (sb-xc:proclaim
      `(optimize
        (compilation-speed 1)

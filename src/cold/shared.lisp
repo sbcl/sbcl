@@ -246,7 +246,7 @@
 (defvar *build-features* (let ((filename "build-features.lisp-expr"))
                            (when (probe-file filename)
                              (read-from-file filename))))
-(dolist (target-feature '(:sb-after-xc-core :cons-profiling))
+(dolist (target-feature '(:sb-after-xc-core))
   (when (member target-feature sb-xc:*features*)
     (setf sb-xc:*features* (delete target-feature sb-xc:*features*))
     ;; If you use --fancy and --with-sb-after-xc-core you might
@@ -301,6 +301,7 @@
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
          ("(and relocatable-heap win32)"
           "Relocatable heap requires (not win32)")
+         ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")
          ("(and sb-linkable-runtime (not sb-dynamic-core))"
           ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
          ("(and sb-linkable-runtime (not (or x86 x86-64)))"
