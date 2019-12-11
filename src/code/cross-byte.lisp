@@ -30,6 +30,16 @@
 (defun sb-xc:ldb (cross-byte int)
   (cl:ldb (uncross-byte cross-byte) int))
 
+(define-compiler-macro sb-xc:ldb (&whole whole byte int)
+  (if (typep byte '(cons (eql sb-xc:byte) (cons t (cons t null))))
+      `(cl:ldb (cl:byte ,(second byte) ,(third byte)) ,int)
+      whole))
+
+(define-compiler-macro sb-xc:dpb (&whole whole new byte int)
+  (if (typep byte '(cons (eql sb-xc:byte) (cons t (cons t null))))
+      `(cl:dpb ,new (cl:byte ,(second byte) ,(third byte)) ,int)
+      whole))
+
 (defun sb-xc:ldb-test (cross-byte int)
   (cl:ldb-test (uncross-byte cross-byte) int))
 
