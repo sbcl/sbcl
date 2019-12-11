@@ -14,13 +14,16 @@
 
 ;;; various environment inquiries
 
+;;; Compute the target's value of CL:*FEATURES* be deleting non-target features.
+;;; - :CONS-PROFILING   is used only to assign a compiler policy which persists
+;;;                     into the default baseline policy. It has no relevance post-build
+;;;                     in as much as policy can be changed later arbitrarily.
+;;; - :GCC-TLS          is not a Lisp feature- it's just freeloading off the means
+;;;                     by which additional #defines get into "genesis/config.h".
+;;; - :SB-AFTER-XC-CORE is merely a build option.
+;;; - :SB-XC            indicates the build phase and must not persist.
 (defparameter *features*
-   ;; The :SB-XC keyword indicates the build phase and is not intended
-   ;; to persist into the target.
-   ;; GCC_TLS is not a Lisp feature- it's just freeloading off the means
-   ;; by which additional #defines get into "genesis/config.h".
-   ;; Literally nothing except C code tests for it.
-   '#.(remove-if (lambda (x) (member x '(:sb-xc :gcc-tls :cons-profiling)))
+   '#.(remove-if (lambda (x) (member x '(:cons-profiling :gcc-tls :sb-after-xc-core :sb-xc)))
                  sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")

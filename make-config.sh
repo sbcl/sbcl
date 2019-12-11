@@ -37,8 +37,7 @@ bad_option() {
 
 WITH_FEATURES=""
 WITHOUT_FEATURES=""
-FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals"
-BUILD_FEATURES=""
+FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
 
 fancy=false
 some_options=false
@@ -53,7 +52,7 @@ do
         optarg=`expr "X$option" : '[^=]*=\(.*\)'` || optarg_ok=false
         option=`expr "X$option" : 'X\([^=]*=\).*'`
         ;;
-      --with*|--build*)
+      --with*)
         optarg=`expr "X$option" : 'X--[^-]*-\(.*\)'` \
             || bad_option "Malformed feature toggle: $option"
         option=`expr "X$option" : 'X\(--[^-]*\).*'`
@@ -92,12 +91,8 @@ do
 	;;
       --fancy)
         WITH_FEATURES="$WITH_FEATURES $FANCY_FEATURES"
-        BUILD_FEATURES="$BUILD_FEATURES :sb-after-xc-core"
         # Lower down we add :sb-thread for platforms where it can be built.
         fancy=true
-        ;;
-      --build)
-        BUILD_FEATURES="$BUILD_FEATURES :$optarg"
         ;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""
@@ -450,13 +445,6 @@ case "$sbcl_os" in
         fi
     ;;
 esac
-
-bf=`pwd`/build-features.lisp-expr
-echo //initializing $bf
-echo ';;;; This is a machine-generated file.' > $bf
-echo ';;;; Please do not edit it by hand.' >> $bf
-echo ';;;; See make-config.sh.' >> $bf
-echo "($BUILD_FEATURES)" >> $bf
 
 ltf=`pwd`/local-target-features.lisp-expr
 echo //initializing $ltf

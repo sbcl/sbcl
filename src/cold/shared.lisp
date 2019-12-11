@@ -243,20 +243,6 @@
         (cons arch (sort (remove-duplicates (remove arch target-feature-list))
                          #'string<))))
 
-(defvar *build-features* (let ((filename "build-features.lisp-expr"))
-                           (when (probe-file filename)
-                             (read-from-file filename))))
-(dolist (target-feature '(:sb-after-xc-core))
-  (when (member target-feature sb-xc:*features*)
-    (setf sb-xc:*features* (delete target-feature sb-xc:*features*))
-    ;; If you use --fancy and --with-sb-after-xc-core you might
-    ;; add the feature twice if you don't use pushnew
-    (pushnew target-feature *build-features*)))
-
-;; We update the host's features, because a build-feature is essentially
-;; an option to check in the host enviroment
-(setf *features* (append *build-features* *features*))
-
 (defvar *shebang-backend-subfeatures*
   (let* ((default-subfeatures nil)
          (customizer-file-name "customize-backend-subfeatures.lisp")
