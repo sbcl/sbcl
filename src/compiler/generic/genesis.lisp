@@ -3411,7 +3411,7 @@ III. initially undefined function references (alphabetically):
         (funcall (if (eql sizeof-usage 2) #'(setf bvref-16) #'(setf bvref-32))
                  usage ptes (+ pte-offset sb-vm:n-word-bytes))))
     (when verbose
-      (format t "~d boxed pages, ~d code pages~%" n-mixed n-code))
+      (format t "movable dynamic space: ~d boxed pages, ~d code pages~%" n-mixed n-code))
     (force-output core-file)
     (let ((posn (file-position core-file)))
       (file-position core-file (* sb-c:+backend-page-bytes+ (1+ data-page)))

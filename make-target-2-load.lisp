@@ -1,5 +1,11 @@
 ;;; Do warm init without compiling files.
 
+;;; Get back to a reasonable state where all of the compiler works,
+;;; as does SB-VM:HEXDUMP and MAP-ALLOCATED-OBJECTS, etc.
+;;; before trying to define any more functions.
+(defvar *compile-files-p* nil)
+(load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
+
 ;;; There's a fair amount of machinery which is needed only at cold
 ;;; init time, and should be discarded before freezing the final
 ;;; system. We discard it by uninterning the associated symbols.
@@ -68,6 +74,7 @@
                 (fmakunbound symbol)
                 (unintern symbol package))))))
   (sb-int:dohash ((k v) sb-c::*backend-parsed-vops*)
+    (declare (ignore k))
     (setf (sb-c::vop-parse-body v) nil))
   result)
 
@@ -108,15 +115,10 @@ Please check that all strings which were not recognizable to the compiler
         ;; This is for display only, I don't check the result.
         ;; NOTE: this symbol doesn't become external until after fasload.
         #+gencgc (when (fboundp 'sb-ext::search-roots)
-                   (sb-ext::search-roots wps :static)))
+                   (sb-ext::search-roots wps :criterion :static)))
       wps)))
 
 (progn
-  (defvar *compile-files-p* nil)
-  "about to LOAD warm.lisp (with *compile-files-p* = NIL)")
-
-(progn
-  (load (merge-pathnames "src/cold/warm.lisp" *load-pathname*))
   ;; See the giant comment at the bottom of this file
   ;; concerning the need for this GC.
   (gc :full t)
