@@ -1894,19 +1894,14 @@ SPEED and COMPILATION-SPEED optimization values, and the
                   (open-fasl-output coutput-file-name
                                     (namestring input-pathname))))
           (when trace-file
-            (if (streamp trace-file)
-                (setf *compiler-trace-output* trace-file)
-                (let* ((default-trace-file-pathname
-                         (make-pathname :type "trace" :defaults input-pathname))
-                       (trace-file-pathname
-                         (if (eql trace-file t)
-                             default-trace-file-pathname
-                             (merge-pathnames trace-file
-                                              default-trace-file-pathname))))
-                  (setf *compiler-trace-output*
-                        (open trace-file-pathname
-                              :if-exists :supersede
-                              :direction :output)))))
+            (setf *compiler-trace-output*
+                  (if (streamp trace-file)
+                      trace-file
+                      (open (merge-pathnames
+                             (if (eql trace-file t) "" trace-file)
+                             (make-pathname :type "trace" :defaults
+                                            (fasl-output-stream fasl-output)))
+                            :if-exists :supersede :direction :output))))
 
           (when sb-xc:*compile-verbose*
             (print-compile-start-note source-info))
@@ -1932,7 +1927,8 @@ SPEED and COMPILATION-SPEED optimization values, and the
       (when sb-xc:*compile-verbose*
         (print-compile-end-note source-info (not abort-p)))
 
-      (when *compiler-trace-output*
+      ;; Don't nuke stdout if you use :trace-file *standard-output*
+      (when (and trace-file (not (streamp trace-file)))
         (close *compiler-trace-output*)))
 
     ;; CLHS says that the first value is NIL if the "file could not
