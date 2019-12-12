@@ -1928,8 +1928,6 @@
                                        t)
                  (%delete-lvar-use ref)
                  (add-lvar-use cast lvar)))))
-      (setf (node-derived-type ref) *wild-type*)
-      (change-ref-leaf ref (find-constant nil))
       (delete-ref ref)
       (unlink-node ref)
       (when (return-p dest)
