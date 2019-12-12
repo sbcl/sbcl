@@ -828,7 +828,7 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
     if (!AVERLAX(VirtualQuery(addr, &mem_info, sizeof mem_info)))
         return 0;
 
-    if ((mem_info.State == MEM_RESERVE) && (mem_info.RegionSize >=len)) {
+    if ((mem_info.State == MEM_RESERVE) && (mem_info.RegionSize >= len)) {
         /* It would be correct to return here. However, support for Wine
          * is beneficial, and Wine has a strange behavior in this
          * department. It reports all memory below KERNEL32.DLL as
@@ -840,23 +840,36 @@ os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
          * actually free.
          */
         VirtualAlloc(addr, len, MEM_RESERVE, PAGE_EXECUTE_READWRITE);
-        /* If it is wine, the second call has succeded, and now the region
+        /* If it is wine, the second call has succeeded, and now the region
          * is really reserved. */
         return addr;
     }
 
+    DWORD mode;
     if (mem_info.State == MEM_RESERVE) {
         fprintf(stderr, "validation of reserved space too short.\n");
         fflush(stderr);
         /* Oddly, we do not treat this assertion as fatal; hence also the
          * provision for MEM_RESERVE in the following code, I suppose: */
+        mode = MEM_COMMIT;
+    } else {
+        mode = MEM_RESERVE;
     }
 
-    os_vm_address_t actual;
+    os_vm_address_t actual = VirtualAlloc(addr, len, mode, PAGE_EXECUTE_READWRITE);
 
-    if (!AVERLAX(actual = VirtualAlloc(addr, len, (mem_info.State == MEM_RESERVE)?
-                                       MEM_COMMIT: MEM_RESERVE, PAGE_EXECUTE_READWRITE)))
-        return 0;
+    if (!actual) {
+        if (!(attributes & MOVABLE)) {
+            fprintf(stderr,
+                    "VirtualAlloc: wanted %lu bytes at %p, actually mapped at %p\n",
+                    (unsigned long) len, addr, actual);
+            fflush(stderr);
+            return 0;
+        }
+
+        return AVERLAX(VirtualAlloc(NULL, len, mode, PAGE_EXECUTE_READWRITE));
+    }
+
     return actual;
 }
 

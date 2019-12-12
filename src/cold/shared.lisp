@@ -285,8 +285,6 @@
           "No execute object file format feature defined")
          ("(and sb-dynamic-core (not linkage-table))"
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
-         ("(and relocatable-heap win32)"
-          "Relocatable heap requires (not win32)")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")
          ("(and sb-linkable-runtime (not sb-dynamic-core))"
           ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
