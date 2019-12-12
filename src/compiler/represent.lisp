@@ -607,6 +607,86 @@
                           (make-constant-tn (find-constant value) t))
         t))))
 
+(defun split-ir2-block (vop)
+  (cond ((vop-next vop)
+         (with-ir1-environment-from-node (vop-node vop)
+           (let* ((2block (vop-block vop))
+                  (succ (ir2-block-block 2block))
+                  (start (make-ctran))
+                  (block (ctran-starts-block start))
+                  (no-op-node (make-no-op))
+                  (new-2block (make-ir2-block block))
+                  (vop-next (vop-next vop)))
+             (link-node-to-previous-ctran no-op-node start)
+             (setf (block-info block) new-2block)
+             (add-to-emit-order new-2block (ir2-block-prev 2block))
+             (loop for pred-block in (block-pred succ)
+                   do
+                   (change-block-successor pred-block succ block))
+             (setf (block-last block) no-op-node)
+             (setf (ir2-block-start-vop new-2block) vop
+                   (ir2-block-last-vop new-2block) vop
+                   (ir2-block-start-vop 2block) vop-next)
+
+             (shiftf (ir2-block-%label new-2block)
+                     (ir2-block-%label 2block)
+                     (gen-label))
+             (shiftf (ir2-block-%trampoline-label new-2block)
+                     (ir2-block-%trampoline-label 2block)
+                     nil)
+             (setf (vop-block vop) new-2block
+                   (vop-next vop) nil
+                   (vop-prev vop-next) nil)
+             (link-blocks block succ)
+             2block)))
+        (t
+         (let* ((2block (vop-block vop))
+                (next (ir2-block-next 2block)))
+           (unless (ir2-block-%label next)
+             (setf (ir2-block-%label next) (gen-label)))
+           next))))
+
+;;; If a MOVE about to be coerced is going to another MOVE, the
+;;; result of which is compatible with the original TN, jump directly
+;;; after that move without performing any coercions.
+(defun jump-over-move-coercion (vop x y block)
+  (let* ((reads (tn-reads y))
+         (dest-vop (and reads
+                        (not (tn-ref-next reads))
+                        (tn-ref-vop reads)))
+         branch)
+    (when (and dest-vop
+               (vop-info-move-vop-p (vop-info dest-vop))
+               (eq (ir2-block-start-vop (vop-block dest-vop)) dest-vop)
+               (let ((last (ir2-block-last-vop block))
+                     (dest-block (vop-block dest-vop)))
+                 (or (and (eq last vop)
+                          (eq (ir2-block-next block) dest-block))
+                     (and last
+                          (eq (vop-next vop) last)
+                          (eq (vop-name last) 'branch)
+                          (eq (car (vop-codegen-info last)) (ir2-block-%label dest-block))
+                          (setf branch last)))))
+      (let ((dest (tn-ref-tn (vop-results dest-vop))))
+        (when (eq (find-move-vop x nil (tn-sc dest) (tn-primitive-type dest)
+                                 #'sc-move-vops)
+                  (vop-info vop))
+          (let ((new-block (split-ir2-block dest-vop)))
+            (if branch
+                (setf (vop-codegen-info branch) (list (ir2-block-%label new-block)))
+                (emit-and-insert-vop (vop-node vop)
+                                     block
+                                     (template-or-lose 'branch)
+                                     nil
+                                     nil
+                                     nil
+                                     (list (ir2-block-%label new-block))))
+            (change-tn-ref-tn (vop-results vop) dest)
+            (let ((1block (ir2-block-block block)))
+              (change-block-successor 1block (car (block-succ 1block))
+                                      (ir2-block-block new-block)))
+            t))))))
+
 ;;; Scan the IR2 looking for move operations that need to be replaced
 ;;; with special-case VOPs and emitting coercion VOPs for operands of
 ;;; normal VOPs. We delete moves to TNs that are never read at this
@@ -618,8 +698,7 @@
             (vop-next vop)))
       ((null vop))
     (let ((info (vop-info vop))
-          (node (vop-node vop))
-          (block (vop-block vop)))
+          (node (vop-node vop)))
       (cond
         ((eq (vop-info-name info) 'move)
          (let* ((args (vop-args vop))
@@ -634,14 +713,16 @@
                  ((eq res info))
                  ((coerce-from-constant args y))
                  (res
-                  (let ((res (or (maybe-move-from-fixnum+-1 x y
-                                                            args)
-                                 res)))
-                    (when (>= (vop-info-cost res)
-                              *efficiency-note-cost-threshold*)
-                      (maybe-emit-coerce-efficiency-note res args y))
-                    (emit-move-template node block res x y vop)
-                    (delete-vop vop)))
+                  (or
+                   (jump-over-move-coercion vop x y block)
+                   (let ((res (or (maybe-move-from-fixnum+-1 x y
+                                                             args)
+                                  res)))
+                     (when (>= (vop-info-cost res)
+                               *efficiency-note-cost-threshold*)
+                       (maybe-emit-coerce-efficiency-note res args y))
+                     (emit-move-template node (vop-block vop) res x y vop)
+                     (delete-vop vop))))
                  (t
                   (coerce-vop-operands vop)))))
         ((vop-info-move-args info)

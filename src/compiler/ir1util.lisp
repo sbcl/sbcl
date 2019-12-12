@@ -1983,7 +1983,8 @@
          (setf (basic-var-sets var)
                (delete node (basic-var-sets var)))))
       (cast
-       (flush-dest (cast-value node)))))
+       (flush-dest (cast-value node)))
+      (no-op)))
 
   (remove-from-dfo block)
   (values))

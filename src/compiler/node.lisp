@@ -1612,6 +1612,9 @@
   #+sb-show id
   (entry :test entry)
   (value :test value))
+
+(def!struct (no-op (:include node)
+                   (:copier nil)))
 
 ;;; a helper for the POLICY macro, defined late here so that the
 ;;; various type tests can be inlined

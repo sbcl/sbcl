@@ -1046,7 +1046,9 @@
              (format t "cast v~D ~A[~S -> ~S]" (cont-num value)
                      (if (cast-%type-check node) #\+ #\-)
                      (cast-type-to-check node)
-                     (cast-asserted-type node)))))
+                     (cast-asserted-type node))))
+          (no-op
+           (princ "no-op")))
         (pprint-newline :mandatory)))
 
     (awhen (block-info block)

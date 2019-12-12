@@ -2551,3 +2551,29 @@
       (declare (type character c))
       (list 1 1 1 1 1 1 1 1 1 1 1 (the (eql #\() c)))
    ((#\() '(1 1 1 1 1 1 1 1 1 1 1 #\() :test #'equal)))
+
+(with-test (:name :jump-over-move-coercion
+            :serial t
+            :skipped-on :interpreter)
+  (let ((f (checked-compile
+            '(lambda (number)
+              (declare ((or fixnum double-float single-float) number))
+              (cond ((typep number 'double-float)
+                     number)
+                    ((typep number 'single-float)
+                     (coerce number 'double-float))
+                    ((typep number 'fixnum)
+                     (coerce number 'double-float)))))))
+    (ctu:assert-no-consing (funcall f 1d0)))
+  (let ((f (checked-compile
+            '(lambda (v number)
+              (declare ((or fixnum double-float single-float) number))
+              (setf (svref v 0)
+               (cond ((typep number 'double-float)
+                      number)
+                     ((typep number 'single-float)
+                      (coerce number 'double-float))
+                     ((typep number 'fixnum)
+                      (coerce number 'double-float))))))))
+    (let ((v (vector 0)))
+      (ctu:assert-no-consing (funcall f v 1d0)))))
