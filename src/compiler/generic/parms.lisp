@@ -93,7 +93,7 @@
                           ;; TODO: linkage-table could move with code, if the CPU
                           ;; prefers PC-relative jumps, and we emit better code
                           ;; (which we don't- for x86 we jmp via RBX always)
-                          #+relocatable-heap (member space '(fixedobj varyobj)))
+                          (member space '(fixedobj varyobj)))
                         (start ptr)
                         (end (+ ptr size)))
                    (setf ptr end)
@@ -116,7 +116,7 @@
                                       ,(- end start)))))))))))
       `(progn
          ,@small-space-forms
-         ,(defconstantish (or #+relocatable-heap t) 'dynamic-space-start
+         ,(defconstantish t 'dynamic-space-start
             (or dynamic-space-start* ptr))
          (defconstant default-dynamic-space-size
            ;; Build-time make-config.sh option "--dynamic-space-size" overrides

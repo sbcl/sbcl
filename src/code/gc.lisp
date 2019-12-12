@@ -13,7 +13,7 @@
 
 ;;;; DYNAMIC-USAGE and friends
 
-#+(and relocatable-heap gencgc)
+#+gencgc
 (define-alien-variable ("DYNAMIC_SPACE_START" sb-vm:dynamic-space-start) os-vm-size-t)
 #-sb-fluid
 (declaim (inline current-dynamic-space-start))

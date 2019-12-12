@@ -24,12 +24,10 @@
 #include "validate.h"
 #include "interr.h"                     /* for declaration of lose */
 
-#if defined(LISP_FEATURE_RELOCATABLE_HEAP)
 #ifdef LISP_FEATURE_CHENEYGC
 uword_t DYNAMIC_0_SPACE_START, DYNAMIC_1_SPACE_START;
 #else
 uword_t DYNAMIC_SPACE_START;
-#endif
 #endif
 
 uword_t asm_routines_start, asm_routines_end;
@@ -128,17 +126,6 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
 void
 allocate_lisp_dynamic_space(boolean did_preinit)
 {
-#ifndef LISP_FEATURE_RELOCATABLE_HEAP
-    // Allocate the largest space(s) first,
-    // since if that fails, it's game over.
-#ifdef LISP_FEATURE_GENCGC
-    ensure_space(NOT_MOVABLE, DYNAMIC_SPACE_START  , dynamic_space_size);
-#else
-    ensure_space(NOT_MOVABLE, DYNAMIC_0_SPACE_START, dynamic_space_size);
-    ensure_space(NOT_MOVABLE, DYNAMIC_1_SPACE_START, dynamic_space_size);
-#endif
-#endif
-
     // Small spaces can be allocated after large spaces are.
     // The above code is only utilized when heap relocation is disabled.
     // And when so, failure to allocate dynamic space is fatal.

@@ -252,10 +252,6 @@ struct heap_adjust {
     int n_relocs_rel; // relative
 };
 
-#ifndef LISP_FEATURE_RELOCATABLE_HEAP
-#define adjust_word(ignore,thing) thing
-#define relocate_heap(ignore)
-#else
 #include "genesis/gc-tables.h"
 #include "genesis/cons.h"
 #include "genesis/hash-table.h"
@@ -629,7 +625,6 @@ set_adjustment(struct heap_adjust* adj,
     adj->range[j].delta = actual_addr - desired_addr;
     adj->n_ranges = j+1;
 }
-#endif
 
 #if defined(LISP_FEATURE_ELF) && defined(LISP_FEATURE_IMMOBILE_SPACE)
     extern int apply_pie_relocs(long,long,int);
@@ -739,9 +734,7 @@ process_directory(int count, struct ndir_entry *entry,
         if (id < 1 || id > MAX_CORE_SPACE_ID)
             lose("unknown space ID %ld addr %p", id, (void*)addr);
 
-#ifndef LISP_FEATURE_RELOCATABLE_HEAP
-        int enforce_address = 1;
-#elif defined(LISP_FEATURE_IMMOBILE_SPACE)
+#ifdef LISP_FEATURE_IMMOBILE_SPACE
         // Enforce address of readonly, static, immobile varyobj
         int enforce_address = id != DYNAMIC_CORE_SPACE_ID
           && id != IMMOBILE_FIXEDOBJ_CORE_SPACE_ID
@@ -775,7 +768,6 @@ process_directory(int count, struct ndir_entry *entry,
         if (len != 0) {
             spaces[id].len = len;
             uword_t __attribute__((unused)) aligned_start;
-#ifdef LISP_FEATURE_RELOCATABLE_HEAP
             // Try to map at address requested by the core file.
             size_t request = spaces[id].desired_size;
             int sub_2gb_flag = (request & 1);
@@ -843,7 +835,6 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
                 break;
             }
-#endif /* LISP_FEATURE_RELOCATABLE_HEAP */
 
             sword_t offset = os_vm_page_size * (1 + entry->data_page);
             if (compressed)
@@ -901,7 +892,6 @@ process_directory(int count, struct ndir_entry *entry,
     asm_routines_end = asm_routines_start +
       N_WORD_BYTES * sizetab[CODE_HEADER_WIDETAG]((lispobj*)asm_routines_start);
 
-#ifdef LISP_FEATURE_RELOCATABLE_HEAP
 #  ifdef LISP_FEATURE_GENCGC
     set_adjustment(adj, DYNAMIC_SPACE_START, // actual
                    spaces[DYNAMIC_CORE_SPACE_ID].base, // expected
@@ -929,7 +919,6 @@ process_directory(int count, struct ndir_entry *entry,
 Please report this as a bug");
         relocate_heap(adj);
     }
-#endif
 
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     /* Now determine page characteristics (such as object spacing)

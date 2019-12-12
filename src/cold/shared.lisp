@@ -298,8 +298,6 @@
           "At most one interpreter can be selected")
          ("(and immobile-space (not x86-64))"
           ":IMMOBILE-SPACE is supported only on x86-64")
-         ("(and immobile-space (not relocatable-heap))"
-          ":IMMOBILE-SPACE requires :RELOCATABLE-HEAP")
          ("(and compact-instance-header (not immobile-space))"
           ":COMPACT-INSTANCE-HEADER requires :IMMOBILE-SPACE feature")
          ("(and immobile-code (not immobile-space))"

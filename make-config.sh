@@ -616,13 +616,6 @@ case "$sbcl_os" in
         exit 1
         ;;
 esac
-case "$sbcl_os" in
-    win32)
-        ;;
-    *)
-        printf ' :relocatable-heap' >> $ltf
-        ;;
-esac
 cd "$original_dir"
 
 # FIXME: Things like :c-stack-grows-..., etc, should be
