@@ -5,6 +5,7 @@ SBCL Hacking Guide
 
 Table of Contests
 
+* Modifying
 * Patch Submissions
 * Coding Style
   * Reader Conditionals
@@ -13,6 +14,19 @@ Table of Contests
   * Error and Warning Messages
   * Format Strings
 * Writing Tests
+
+Modifying
+=========
+
+To change the code at run-time the :SB-DEVEL is almost always
+necessary, otherwise a lot of macros, functions, and variables do not
+survive in the final image.
+"./make-target-2.sh --load-with-sb-devel" can resave the core with
+sb-devel without recompiling the whole thing, but probably a better
+idea is to put it into customize-target-features.lisp.
+
+The :SB-DYNAMIC-CORE feature allows the C runtime to be rebuilt
+without requiring genesis/make-target-2 to be redone.
 
 Patch Submissions
 =================
