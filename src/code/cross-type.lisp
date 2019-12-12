@@ -119,6 +119,12 @@
               (if result
                   (recurse (cdr obj) (cons-type-cdr-type type))
                   (values nil certain)))))
+       ;; An empty (OR) produces a warning under CCL, and the warning as worded
+       ;; is a tad wrong: "Clause ((OR) ...) shadowed by (CONS-TYPE ...)".
+       ;; "Shadowed by" would imply that if you match the shadowing clause, then
+       ;; you will match (and not execute) the shadowed clause.
+       ;; But the empty (OR) should match nothing, so, what's up with that?
+       ;; Maybe we can define host-side types named simd-pack-blah deftyped to NIL?
        ((or #+sb-simd-pack simd-pack-type
             #+sb-simd-pack-256 simd-pack-256-type)
         (values nil t))

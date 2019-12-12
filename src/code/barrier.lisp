@@ -14,6 +14,9 @@
 
 ;;;; Interpreter stubs for the various barrier functions
 
+;;; If no memory barrier vops exist, then the %{mumble}-BARRIER function is an inline
+;;; function that does nothing. If the vops exist, then the same function
+;;; is always translated with a vop, and the DEFUN is merely an interpreter stub.
 #-(vop-named sb-vm:%memory-barrier)
 (progn
 ;;; Assert correctness of build order. (Need not be exhaustive)
@@ -21,15 +24,20 @@
 (declaim (inline sb-vm:%compiler-barrier sb-vm:%memory-barrier
                  sb-vm:%read-barrier sb-vm:%write-barrier
                  sb-vm:%data-dependency-barrier)))
-(macrolet ((def (name)
-             `(defun ,name ()
-                #+(vop-named sb-vm:%memory-barrier) (,name)
-                (values))))
-  (def sb-vm:%compiler-barrier)
-  (def sb-vm:%memory-barrier)
-  (def sb-vm:%read-barrier)
-  (def sb-vm:%write-barrier)
-  (def sb-vm:%data-dependency-barrier))
+
+;;; Because of cross-compiler madness, avoid defining inline functions
+;;; inside a macrolet.
+;;; TODO: fix that problem once and for all, and put this back into a less insane form.
+(progn
+  .
+  #.(loop for name in '(sb-vm:%compiler-barrier
+                        sb-vm:%memory-barrier
+                        sb-vm:%read-barrier
+                        sb-vm:%write-barrier
+                        sb-vm:%data-dependency-barrier)
+          collect `(defun ,name ()
+                     #+(vop-named sb-vm:%memory-barrier) (,name)
+                     (values))))
 
 ;;;; The actual barrier macro and support
 (defmacro barrier ((kind) &body forms)
