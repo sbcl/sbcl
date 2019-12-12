@@ -195,7 +195,9 @@
                 (cond (absolute
                        (cons :absolute directory))
                       (directory
-                       (cons :relative directory)))
+                       (cons :relative directory))
+                      (as-directory
+                       '(:absolute)))
                 (first name-and-type)
                 (second name-and-type)
                 nil)))))
