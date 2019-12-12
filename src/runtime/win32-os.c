@@ -673,6 +673,9 @@ int os_preinit(char *argv[], char *envp[])
         lose("TLS slot assertion failed: slot 63 is unavailable "
              "(last TlsAlloc() returned %u)",key);
     }
+#else
+    (void) argv; /* unused */
+    (void) envp; /* unused */
 #endif
     return 0;
 }
@@ -728,14 +731,12 @@ int fprintf(FILE*stream,const char*fmt,...)
 
 int os_number_of_processors = 1;
 
-BOOL WINAPI CancelIoEx(HANDLE handle, LPOVERLAPPED overlapped);
-typeof(CancelIoEx) *ptr_CancelIoEx;
-BOOL WINAPI CancelSynchronousIo(HANDLE threadHandle);
-typeof(CancelSynchronousIo) *ptr_CancelSynchronousIo;
+BOOL (*ptr_CancelIoEx)(HANDLE /*handle*/, LPOVERLAPPED /*overlapped*/);
+BOOL (*ptr_CancelSynchronousIo)(HANDLE /*threadHandle*/);
 
 #define RESOLVE(hmodule,fn)                     \
     do {                                        \
-        ptr_##fn = (typeof(ptr_##fn))           \
+        ptr_##fn = (typeof(ptr_##fn)) (void *)  \
             GetProcAddress(hmodule,#fn);        \
     } while (0)
 
@@ -1396,7 +1397,7 @@ handle_exception(EXCEPTION_RECORD *exception_record,
     context.sigmask = self ? self->os_thread->blocked_signal_set : 0;
 #endif
 
-    os_context_register_t oldbp = NULL;
+    os_context_register_t oldbp = 0;
     if (self) {
         oldbp = self ? self->carried_base_pointer : 0;
         self->carried_base_pointer
