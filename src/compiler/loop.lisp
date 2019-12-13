@@ -97,19 +97,20 @@
 ;;; assigned yet, since the target of the exit must be in a superior
 ;;; loop.
 ;;;
-;;; We find the blocks by doing a forward walk from the head of the
+;;; We find the blocks by doing a backward walk from the tails of the
 ;;; loop and from any exits of nested loops.  The walks from inferior
-;;; loop exits are necessary because the walks from the head terminate
-;;; when they encounter a block in an inferior loop.
+;;; loop exits are necessary because the walks from the tails
+;;; terminate when they encounter a block in an inferior loop.
 (defun find-loop-blocks (loop)
   (dolist (sub-loop (loop-inferiors loop))
     (find-loop-blocks sub-loop))
 
-  (find-blocks-from-here (loop-head loop) loop)
+  (dolist (tail (loop-tail loop))
+    (find-blocks-from-here tail loop))
   (dolist (sub-loop (loop-inferiors loop))
     (dolist (exit (loop-exits sub-loop))
-      (dolist (succ (block-succ exit))
-        (find-blocks-from-here succ loop))))
+      (dolist (pred (block-pred exit))
+        (find-blocks-from-here pred loop))))
 
   (collect ((exits))
     (dolist (sub-loop (loop-inferiors loop))
@@ -131,17 +132,17 @@
 ;;; FIND-BLOCKS-FROM-HERE  --  Internal
 ;;;
 ;;; This function does a graph walk to find the blocks directly within
-;;; LOOP that can be reached by a forward walk from BLOCK.  If BLOCK
+;;; LOOP that can be reached by a backward walk from BLOCK.  If BLOCK
 ;;; is already in a loop or is not dominated by the LOOP-HEAD, then we
 ;;; return.  Otherwise, we add the block to the BLOCKS for LOOP and
-;;; recurse on its successors.
+;;; recurse on its predecessors.
 (defun find-blocks-from-here (block loop)
   (when (and (not (block-loop block))
              (dominates-p (loop-head loop) block))
     (setf (block-loop block) loop)
     (shiftf (block-loop-next block) (loop-blocks loop) block)
-    (dolist (succ (block-succ block))
-      (find-blocks-from-here succ loop))))
+    (dolist (pred (block-pred block))
+      (find-blocks-from-here pred loop))))
 
 
 ;;; NOTE-LOOP-HEAD  --  Internal
