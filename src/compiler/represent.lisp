@@ -668,10 +668,11 @@
                           (eq (car (vop-codegen-info last)) (ir2-block-%label dest-block))
                           (setf branch last)))))
       (let ((dest (tn-ref-tn (vop-results dest-vop))))
-        (when (eq (find-move-vop x nil (tn-sc dest) (tn-primitive-type dest)
-                                 #'sc-move-vops)
-                  (vop-info vop))
-          (let ((new-block (split-ir2-block dest-vop)))
+        (when (and (eq (tn-sc x) (tn-sc dest))
+                   (eq (find-move-vop x nil (tn-sc dest) (tn-primitive-type dest) #'sc-move-vops)
+                       (vop-info vop)))
+          (let ((new-block (split-ir2-block dest-vop))
+                (1block (ir2-block-block block)))
             (if branch
                 (setf (vop-codegen-info branch) (list (ir2-block-%label new-block)))
                 (emit-and-insert-vop (vop-node vop)
@@ -682,9 +683,8 @@
                                      nil
                                      (list (ir2-block-%label new-block))))
             (change-tn-ref-tn (vop-results vop) dest)
-            (let ((1block (ir2-block-block block)))
-              (change-block-successor 1block (car (block-succ 1block))
-                                      (ir2-block-block new-block)))
+            (change-block-successor 1block (car (block-succ 1block))
+                                    (ir2-block-block new-block))
             t))))))
 
 ;;; Scan the IR2 looking for move operations that need to be replaced

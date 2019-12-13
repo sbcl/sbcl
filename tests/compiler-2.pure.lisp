@@ -2577,3 +2577,13 @@
                       (coerce number 'double-float))))))))
     (let ((v (vector 0)))
       (ctu:assert-no-consing (funcall f v 1d0)))))
+
+(with-test (:name :jump-over-move-coercion-match-type)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (type (or sb-vm:word sb-vm:signed-word) a))
+         (declare (type (and fixnum unsigned-byte) b))
+         (lognand (max 0 a) b))
+    (((expt 2 (1- sb-vm:n-word-bits)) #xFFFFFF) -1)
+    (((1- (expt 2 (1- sb-vm:n-word-bits))) #xFFFFFF) -16777216)))
