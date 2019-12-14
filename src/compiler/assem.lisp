@@ -37,10 +37,6 @@
   ;; definitions were not compiled with the scheduler turned on, this
   ;; has no effect.
   (run-scheduler nil)
-  ;; If a function, then this is funcalled for each inst emitted with
-  ;; the segment, the VOP, the name of the inst (as a string), and the
-  ;; inst arguments.
-  (inst-hook nil :type (or function null))
   ;; what position does this correspond to? Initially, positions and
   ;; indexes are the same, but after we start collapsing choosers,
   ;; positions can change while indexes stay the same.
@@ -346,7 +342,8 @@
                     (%mark-used-labels operand))))
             (if (stmt-mnemonic last)
                 (setq last (insert-stmt (make-stmt nil vop mnemonic operands) last))
-                (setf (stmt-mnemonic last) mnemonic
+                (setf (stmt-vop last) (or (stmt-vop last) vop)
+                      (stmt-mnemonic last) mnemonic
                       (stmt-operands last) operands)))))))
 
 #-(or x86-64 x86)
@@ -357,7 +354,7 @@
   (data-section (make-section) :read-only t)
   (code-section (make-section) :read-only t)
   (elsewhere-section (make-section) :read-only t)
-  (elsewhere-label (gen-label) :read-only t)
+  (elsewhere-label (gen-label "elsewhere start") :read-only t)
   (inter-function-padding :normal :type (member :normal :nop))
   ;; for collecting unique "unboxed constants" prior to placing them
   ;; into the data section
@@ -1318,29 +1315,30 @@
 
 (defun dump-symbolic-asm (section stream &aux last-vop all-labels (n 0))
   (format stream "~2&Assembler input:~%")
-  (do ((statement (stmt-next (section-start section)) (stmt-next statement)))
+  (do ((statement (stmt-next (section-start section)) (stmt-next statement))
+       (*print-pretty* nil))
       ((null statement))
-    (cond ((functionp (stmt-mnemonic statement))
-           (format stream "# postit~%"))
-          (t
-           (incf n)
-           (binding* ((vop (stmt-vop statement) :exit-if-null))
-             (unless (eq vop last-vop)
-               (format stream "## ~A~%"
-                       (sb-c::vop-info-name (sb-c::vop-info vop))))
-             (setq last-vop vop))
-           (awhen (stmt-labels statement)
-             (let ((list (ensure-list it))
-                   (usedp (labeled-statement-p statement)))
-               (setq all-labels (append list all-labels))
-               (format stream "~A~{~A: ~}~A~%"
-                       (if usedp "" "# ")
-                       list
-                       (if usedp "" " (notused)"))))
-           (let ((*print-pretty* nil))
-             (format stream "    ~:@(~A~) ~{~A~^, ~}~%"
-                     (stmt-mnemonic statement)
-                     (stmt-operands statement))))))
+    (incf n)
+    (binding* ((vop (stmt-vop statement) :exit-if-null))
+      (unless (eq vop last-vop)
+        (format stream "## ~A~%" (sb-c::vop-info-name (sb-c::vop-info vop))))
+      (setq last-vop vop))
+    (let ((op (stmt-mnemonic statement))
+          (eol-comment ""))
+      (awhen (stmt-labels statement)
+        (let ((list (ensure-list it))
+              (usedp (labeled-statement-p statement)))
+          (setq all-labels (append list all-labels)
+                eol-comment (format nil " # ~{~@[~A~^, ~]~}"
+                                    (mapcar #'label-comment list)))
+          (format stream "~A~{~A: ~}~A~%"
+                  (if usedp "" "# ")
+                  list
+                  (if usedp "" " (notused)"))))
+      (if (functionp op)
+          (format stream "# postit ~S~A~%" op eol-comment)
+          (format stream "    ~:@(~A~) ~{~A~^, ~}~A~%"
+                  op (stmt-operands statement) eol-comment))))
   (let ((*print-length* nil)
         (*print-pretty* t)
         (*print-right-margin* 80))
@@ -1619,7 +1617,6 @@
       (emit-back-patch segment 0 postit)))
   (setf (segment-final-index segment) (segment-current-index segment))
   (setf (segment-final-posn segment) (segment-current-posn segment))
-  (setf (segment-inst-hook segment) nil)
   (compress-output segment)
   (finalize-positions segment)
   (process-back-patches segment)

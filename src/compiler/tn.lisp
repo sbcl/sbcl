@@ -408,12 +408,12 @@
   (declare (type cblock block))
   (let ((2block (block-info block)))
     (or (ir2-block-%label 2block)
-        (setf (ir2-block-%label 2block) (gen-label)))))
+        (setf (ir2-block-%label 2block) (gen-label "basic block")))))
 (defun block-trampoline (block)
   (declare (type cblock block))
   (let ((2block (block-info block)))
     (or (ir2-block-%trampoline-label 2block)
-        (setf (ir2-block-%trampoline-label 2block) (gen-label)))))
+        (setf (ir2-block-%trampoline-label 2block) (gen-label "trampoline")))))
 
 ;;; Return true if Block is emitted immediately after the block ended by Node.
 (defun drop-thru-p (node block)

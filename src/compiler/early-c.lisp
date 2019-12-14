@@ -118,7 +118,7 @@
 (defvar *compiler-trace-output* nil)
 ;;; These are the default, but the list can also include
 ;;; :pre-ir2-optimize and :symbolic-asm.
-(defvar *compile-trace-targets* '(:ir1 :ir2 :vop :disassemble))
+(defvar *compile-trace-targets* '(:ir1 :ir2 :vop :symbolic-asm :disassemble))
 (defvar *constraint-universe*)
 (defvar *current-path*)
 (defvar *current-component*)

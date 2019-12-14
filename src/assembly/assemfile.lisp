@@ -68,8 +68,7 @@
                 `(.align ,sb-vm:n-lowtag-bits))
           (let ((segment (assemble-sections
                           asmstream nil
-                          (make-segment :inst-hook (default-segment-inst-hook)
-                                        :run-scheduler nil))))
+                          (make-segment :run-scheduler nil))))
             (dump-assembler-routines segment
                                      (segment-buffer segment)
                                      (sb-assem::segment-fixup-notes segment)

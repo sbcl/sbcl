@@ -100,9 +100,6 @@
            (block-home-lambda
             (block-next (component-head *component-being-compiled*))))
           (or (> speed compilation-speed) (> space compilation-speed))))
-(defun default-segment-inst-hook ()
-  (and *compiler-trace-output*
-       #'trace-instruction))
 
 ;;; Some platforms support unboxed constants immediately following the boxed
 ;;; code header. Such platform must implement supporting 4 functions:
@@ -304,7 +301,7 @@
                                  alignp)))
           (let ((env (block-physenv 1block)))
             (unless (eq env prev-env)
-              (let ((lab (gen-label)))
+              (let ((lab (gen-label "physenv elsewhere start")))
                 (setf (ir2-physenv-elsewhere-start (physenv-info env))
                       lab)
                 (emit (asmstream-elsewhere-section asmstream) lab))
@@ -355,8 +352,7 @@
           (assemble-sections asmstream
                              simple-fun-labels
                              (make-segment :header-skew skew
-                                           :run-scheduler (default-segment-run-scheduler)
-                                           :inst-hook (default-segment-inst-hook)))
+                                           :run-scheduler (default-segment-run-scheduler)))
         (values segment text-length fun-table
                 (asmstream-elsewhere-label asmstream) fixup-notes)))))
 

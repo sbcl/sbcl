@@ -61,8 +61,9 @@
   (posn nil :type (or index null)))
 
 (defstruct (label (:include annotation)
-                   (:constructor gen-label ())
+                   (:constructor gen-label (&optional comment))
                    (:copier nil))
+  (comment)
   (usedp nil :type boolean)) ; whether it was ever used as a branch target
 
 (defmethod print-object ((label label) stream)
