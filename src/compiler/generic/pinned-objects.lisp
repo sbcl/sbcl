@@ -19,7 +19,7 @@ Useful for e.g. foreign calls where another thread may trigger
 garbage collection."
      #-gencgc "  This is currently implemented by disabling GC")
   #-gencgc
-  `(progn ,@objects (without-gcing ,@body))
+  `(progn ,@objects (,(if objects 'without-gcing 'progn) ,@body))
   #+(and gencgc (not (or x86 x86-64)))
   `(let ((*pinned-objects* (list* ,@objects *pinned-objects*)))
      (declare (truly-dynamic-extent *pinned-objects*))

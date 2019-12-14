@@ -552,9 +552,8 @@
 
     (rewind-current-segment dstate segment)
 
-    (#-gencgc progn
-     #+gencgc with-pinned-objects #+gencgc ((seg-object (dstate-segment dstate))
-                                              (dstate-scratch-buf dstate))
+    (with-pinned-objects (#+gencgc (seg-object (dstate-segment dstate))
+                          #+gencgc (dstate-scratch-buf dstate))
      #+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
      ;; Now commence disssembly of instructions
