@@ -48,7 +48,7 @@
          (p2 (%simd-pack-256-2 x))
          (p3 (%simd-pack-256-3 x)))
     (cond ((= p0 p1 p2 p3 0)
-           (inst vxorps y y))
+           (inst vxorps y y y))
           ((= p0 p1 p2 p3 (ldb (byte 64 0) -1))
            (inst vpcmpeqd y y y))
           (t
