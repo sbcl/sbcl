@@ -527,20 +527,19 @@
       ;; For 8-byte words and 7-byte dchunks, we use SAP-REF-WORD, which reads
       ;; 8 bytes, so make sure the number of bytes to go is 8,
       ;; never mind that dchunk-bits is less.
-      `(cond ((< bytes-remaining sb-vm:n-word-bytes)
-              (setf (dstate-scratch-buf ,state) 0)
-              (let ((scratch-buf (int-sap (get-lisp-obj-address ,state)))
-                    (scratch-offs (- (ash (+ (get-dsd-index disassem-state scratch-buf)
-                                             sb-vm:instance-slots-offset)
-                                          sb-vm:word-shift)
-                                     sb-vm:instance-pointer-lowtag)))
-                (%byte-blt (dstate-segment-sap ,state) (dstate-cur-offs ,state)
-                           scratch-buf scratch-offs
-                           (+ scratch-offs bytes-remaining))
-                (sap-ref-word scratch-buf scratch-offs)))
-             (t
-              (logand (sap-ref-word (dstate-segment-sap ,state) (dstate-cur-offs ,state))
-                      dchunk-one)))
+      `(logand (if (>= bytes-remaining sb-vm:n-word-bytes)
+                   (sap-ref-word (dstate-segment-sap ,state) (dstate-cur-offs ,state))
+                   (let ((scratch-buf
+                          (sap+ (int-sap (get-lisp-obj-address ,state))
+                                (- (ash (+ (get-dsd-index disassem-state scratch-buf)
+                                           sb-vm:instance-slots-offset)
+                                        sb-vm:word-shift)
+                                   sb-vm:instance-pointer-lowtag))))
+                     (setf (dstate-scratch-buf ,state) 0)
+                     (%byte-blt (dstate-segment-sap ,state) (dstate-cur-offs ,state)
+                                scratch-buf 0 bytes-remaining)
+                     (sap-ref-word scratch-buf 0)))
+               dchunk-one)
       ;; This was some sort of meagre attempt to be endian-agnostic.
       ;; Perhaps it should just use SAP-REF-n directly?
       `(the dchunk (sap-ref-int (dstate-segment-sap ,state)
@@ -573,6 +572,44 @@
                    (t (apply fun dstate ; > 2 subfields
                              (loop for i from 3 below item-length
                                    collect (extract-byte i))))))))))
+
+;;; Decode the instruction at the current ofset in the segment of DSTATE.
+;;; Call this only when all of the following hold:
+;;;  - *DISASSEM-INST-SPACE* has been constructed
+;;;  - the code object referenced in the DSTATE is pinned
+;;;  - the instructions are not so near the end of the code that buffer overrun
+;;;    could occur. Since any code object containing at least one simple-fun has
+;;;    8 bytes of trailer data, this is safe under normal circumstances.
+(defun disassemble-instruction (dstate)
+  (declare (type disassem-state dstate))
+  (setf (dstate-inst-properties dstate) 0)
+  (setf (dstate-filtered-arg-pool-in-use dstate) nil)
+  (loop
+   ;; There is no point to using GET-DCHUNK. How many bytes remain is unknown.
+   (let* ((chunk (logand (sap-ref-word (dstate-segment-sap dstate)
+                                       (dstate-cur-offs dstate))
+                         dchunk-one))
+          (inst (find-inst chunk *disassem-inst-space*)))
+     (aver inst)
+     (let ((offs (+ (dstate-cur-offs dstate) (inst-length inst))))
+       (setf (dstate-next-offs dstate) offs)
+       (apply-prefilters dstate inst chunk)
+       ;; Grab the revised NEXT-OFFS
+       (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
+       ;; Return the first instruction which has a printer.
+       ;; On the x86 architecture, this would skip over segment override
+       ;; prefixes, and the LOCK, REX, REP prefixes, etc.
+       (awhen (inst-printer inst)
+         (funcall it chunk inst nil dstate)
+         ;; This won't deal with a prefix (i.e. printerless) instruction that
+         ;; also has a "control" function.
+         ;; That's probably not a meaningful combination.
+         (awhen (inst-control inst)
+           (funcall it chunk inst nil dstate)
+           ;; FIXME: we're not returning the opaque bytes in any way
+           (setf (dstate-cur-offs dstate) (dstate-next-offs dstate)))
+         (return (prog1 (cons (inst-name inst) (nreverse (dstate-operands dstate)))
+                   (setf (dstate-operands dstate) nil))))))))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
@@ -638,6 +675,7 @@
                                     (dstate-cur-offs dstate)))
                 (chunk (get-dchunk dstate))
                 (fun-prefix-p (call-fun-hooks chunk stream dstate)))
+           (declare (index bytes-remaining))
            (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
                (setf prefix-p fun-prefix-p)
                (let ((inst (find-inst chunk ispace)))
@@ -1952,6 +1990,7 @@
           (setq val (logior (ash val 8) (sap-ref-8 sap offset)))
           (incf offset increment)))))
 
+;;; Extract a trailing field starting at NEXT-OFFS, and update NEXT-OFFS.
 (defun read-suffix (length dstate)
   (declare (type (member 8 16 32 64) length)
            (type disassem-state dstate)
@@ -1989,8 +2028,7 @@
   nil)
 
 (defun princ16 (value stream)
-  (when stream
-    (write value :stream stream :radix t :base 16 :escape nil)))
+  (write value :stream stream :radix t :base 16 :escape nil))
 
 ;;; Store a note about the lisp constant at LOCATION in the code object
 ;;; being disassembled, to be printed as an end-of-line comment.

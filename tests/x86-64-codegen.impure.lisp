@@ -11,6 +11,9 @@
 
 #-x86-64 (sb-ext:exit :code 104)
 
+;;; Assert that save-lisp-and-die didn't accidentally recreate the inst space
+(assert (null sb-disassem::*disassem-inst-space*))
+
 (load "compiler-test-util.lisp")
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
@@ -620,3 +623,37 @@ sb-vm::(define-vop (cl-user::test)
 (with-test (:name :char-code-is-single-shr)
   (assert-thereis-line '(lambda (x) (char-code (truly-the character x)))
                        "SHR EDX, 7"))
+
+(import '(sb-x86-64-asm::get-gpr sb-x86-64-asm::machine-ea))
+(with-test (:name :simple-fun-instruction-model)
+  (let ((rax (get-gpr :qword sb-vm::rax-offset))
+        (eax (get-gpr :dword sb-vm::rax-offset))
+        (al  (get-gpr :byte  sb-vm::rax-offset))
+        (rcx (get-gpr :qword sb-vm::rcx-offset))
+        (rdx (get-gpr :qword sb-vm::rdx-offset))
+        (rsp (get-gpr :qword sb-vm::rsp-offset))
+        (rbp (get-gpr :qword sb-vm::rbp-offset)))
+    (flet ((compare (a b)
+             (and (eql (car a) (car b)) ; PC offs
+                  (string= (cadr a) (cadr b)) ; inst name
+                  (equalp (cddr a) (cddr b)))))
+      (mapc (lambda (a b)
+              (unless (compare a b)
+                (error "Didn't match: ~S ~S" a b)))
+            (get-simple-fun-instruction-model #'car)
+            `(( 0 pop (#s(machine-ea :base 5 :disp 8) . :qword))
+              ( 3 cmp ,rcx 2)
+              ( 7 jmp :ne 29)
+              ( 9 mov ,rsp ,rbp)
+              (12 lea ,eax (#s(machine-ea :base 2 :disp -7) . :dword))
+              (15 test ,al 15)
+              (17 jmp :ne +5) ; = PC offs 24
+              (19 mov ,rax ,rdx)
+              (22 jmp +4) ; = PC offs 28
+              (24 break 71)
+              (28 mov ,rdx (#s(machine-ea :base 0 :disp -7) . :qword))
+              (32 mov ,rsp ,rbp)
+              (35 clc)
+              (36 pop ,rbp)
+              (37 ret)
+              (38 break 16))))))

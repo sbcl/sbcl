@@ -581,12 +581,24 @@
                   (tab (dstate-argument-column dstate) stream))
                 (local-print-name ()
                   (when stream (princ (inst-print-name inst) stream)))
+                (local-print-arg-separator ()
+                  (when stream (princ ", " stream)))
                 (local-write-char (ch)
                   (when stream (write-char ch stream)))
-                (local-princ (thing)
+                (local-princ-symbol (thing)
+                  ;; This special case is reqired so that decoding x86 JMP and CMOV
+                  ;; to an instruction model does not insert a superfluous symbol.
+                  ;; I hope this is right. We really only want to elide symbols
+                  ;; that are not inside a :COND or other selector.
                   (when stream (princ thing stream)))
+                (local-princ (thing)
+                  (if stream
+                      (princ thing stream)
+                      (push thing (dstate-operands dstate))))
                 (local-princ16 (thing)
-                  (princ16 thing stream))
+                  (if stream
+                      (princ16 thing stream)
+                      (push thing (dstate-operands dstate))))
                 (local-call-arg-printer (arg printer)
                   (funcall printer arg stream dstate))
                 (local-call-global-printer (fun)
@@ -602,8 +614,8 @@
                 (adjust-label (val adjust-fun)
                   (funcall adjust-fun val dstate)))
            (declare (ignorable #'local-tab-to-arg-column
-                               #'local-print-name
-                               #'local-princ #'local-princ16
+                               #'local-print-name #'local-print-arg-separator
+                               #'local-princ #'local-princ16 #'local-princ-symbol
                                #'local-write-char
                                #'local-call-arg-printer
                                #'local-call-global-printer
@@ -611,7 +623,8 @@
                                #'local-filtered-value
                                #'lookup-label #'adjust-label)
                     (inline local-tab-to-arg-column
-                            local-princ local-princ16
+                            local-print-arg-separator
+                            local-princ local-princ16 local-princ-symbol
                             local-call-arg-printer local-call-global-printer
                             local-filtered-value local-extract
                             lookup-label adjust-label))
@@ -769,7 +782,15 @@
         ((symbolp source)
          (compile-print source funstate))
         ((atom source)
-         `(local-princ ',source))
+         ;; Skip the argument separator if disassembling into a model.
+         ;; The ", " string is quite consistenet amongst backends.
+         ;; Making this any more general - such as never printing strings
+         ;; into a model - would be prone to information loss.
+         (if (and (stringp source) (string= source ", "))
+             `(local-print-arg-separator)
+             `(local-princ ',source)))
+        ((eq (car source) 'quote)
+         `(,(if (symbolp (cadr source)) 'local-princ-symbol 'local-princ) ,source))
         ((eq (car source) :using)
          (let ((f (cadr source)))
           (unless (typep f '(or string (cons (eql function) (cons symbol null))))
@@ -785,8 +806,6 @@
               (when (>= ,form 0)
                 (local-write-char #\+))
               (local-princ ,form))))
-        ((eq (car source) 'quote)
-         `(local-princ ,source))
         ((eq (car source) 'function)
          `(local-call-global-printer ,source))
         ((eq (car source) :cond)

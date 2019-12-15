@@ -148,12 +148,18 @@
 
 (define-arg-type displacement
   :sign-extend t
-  :use-label (lambda (value dstate) (+ (dstate-next-addr dstate) value))
+  :use-label (lambda (value dstate)
+               (if (sb-disassem::dstate-absolutize-jumps dstate)
+                   (+ (dstate-next-addr dstate) value)
+                   value))
   :printer (lambda (value stream dstate)
-             (or #+immobile-space
-                 (and (integerp value) (maybe-note-lisp-callee value dstate))
-                 (maybe-note-assembler-routine value nil dstate))
-             (print-label value stream dstate)))
+             (cond (stream
+                    (or #+immobile-space
+                        (and (integerp value) (maybe-note-lisp-callee value dstate))
+                        (maybe-note-assembler-routine value nil dstate))
+                    (print-label value stream dstate))
+                   (t
+                    (push value (dstate-operands dstate))))))
 
 (define-arg-type accum
   :printer (lambda (value stream dstate)
@@ -1175,7 +1181,11 @@
   (emit-byte seg (+ byte (reg-encoding reg seg))))
 
 (defmethod print-object ((reg reg) stream)
-  (write-string (reg-name reg) stream))
+  (if *print-readably*
+      ;; cross-compiled DEFMETHOD can't use call-next-method
+      #+sb-xc (default-structure-print reg stream *current-level-in-print*)
+      #-sb-xc (call-next-method)
+      (write-string (reg-name reg) stream)))
 
 ;;; The GPR for any size and register number is a unique atom. Return it.
 (defun get-gpr (size number)

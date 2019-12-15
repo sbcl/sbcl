@@ -29,6 +29,7 @@
            #:checked-compile-capturing-source-paths
            #:checked-compile-condition-source-paths
            #:assemble
+           #:get-simple-fun-instruction-model
 
            #:scratch-file-name
            #:with-scratch-file
@@ -889,3 +890,22 @@
          (sb-assem::%emit-label segment nil label)))
     (sb-assem:segment-buffer
      (sb-assem:finalize-segment segment))))
+
+(defun get-simple-fun-instruction-model (fun)
+  (declare (type sb-kernel:simple-fun fun))
+  (sb-disassem:get-inst-space) ; for effect
+  (let* ((code (sb-kernel:fun-code-header fun))
+         (segment (sb-disassem:make-code-segment code
+                                                 (sb-sys:sap- (sb-vm:simple-fun-entry-sap fun)
+                                                              (sb-kernel:code-instructions code))
+                                                 (sb-kernel:%simple-fun-text-len fun)))
+         (dstate (sb-disassem:make-dstate nil)))
+    (setf (sb-disassem::dstate-absolutize-jumps dstate) nil
+          (sb-disassem:dstate-segment dstate) segment
+          (sb-disassem:dstate-segment-sap dstate) (funcall (sb-disassem:seg-sap-maker segment)))
+    (sb-int:collect ((result))
+      (loop (let ((pc (sb-disassem:dstate-cur-offs dstate)))
+              (result (cons pc (sb-disassem:disassemble-instruction dstate))))
+            (when (>= (sb-disassem:dstate-cur-offs dstate) (sb-disassem:seg-length segment))
+              (return)))
+      (result))))

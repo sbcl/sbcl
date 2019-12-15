@@ -65,8 +65,11 @@
   ;; the current segment
   (segment nil :type (or null segment))
   ;; true if disassembling non-lisp code, which disables interpretation
-  ;; of  bytes after a trap instruction as SC+OFFSETs.
+  ;; of bytes after a trap instruction as SC+OFFSETs.
   (foreign-code-p nil)
+  ;; true (the default) if PC-relative jumps should be decoded as absolute.
+  ;; No effect if the target disassembler does not implement the choice.
+  (absolutize-jumps t)
   ;; what to align to in most cases
   (alignment sb-vm:n-word-bytes :type alignment)
   (byte-order sb-c:*backend-byte-order*
