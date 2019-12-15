@@ -783,7 +783,7 @@
          (compile-print source funstate))
         ((atom source)
          ;; Skip the argument separator if disassembling into a model.
-         ;; The ", " string is quite consistenet amongst backends.
+         ;; The ", " string is quite consistent amongst backends.
          ;; Making this any more general - such as never printing strings
          ;; into a model - would be prone to information loss.
          (if (and (stringp source) (string= source ", "))
