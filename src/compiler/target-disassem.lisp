@@ -518,6 +518,62 @@
     (sb-c::push-in filtered-arg-next arg (dstate-filtered-arg-pool-in-use dstate))
     arg))
 
+(defmacro get-dchunk (state)
+  (if (= sb-assem:+inst-alignment-bytes+ 1)
+      ;; Don't read beyond the segment. This can occur with DISASSEMBLE-MEMORY
+      ;; on a function whose code ends in pad bytes that are not an integral
+      ;; number of instructions, and maybe you're so unlucky as to be
+      ;; on the exact last page of your heap.
+      ;; For 8-byte words and 7-byte dchunks, we use SAP-REF-WORD, which reads
+      ;; 8 bytes, so make sure the number of bytes to go is 8,
+      ;; never mind that dchunk-bits is less.
+      `(cond ((< bytes-remaining sb-vm:n-word-bytes)
+              (setf (dstate-scratch-buf ,state) 0)
+              (let ((scratch-buf (int-sap (get-lisp-obj-address ,state)))
+                    (scratch-offs (- (ash (+ (get-dsd-index disassem-state scratch-buf)
+                                             sb-vm:instance-slots-offset)
+                                          sb-vm:word-shift)
+                                     sb-vm:instance-pointer-lowtag)))
+                (%byte-blt (dstate-segment-sap ,state) (dstate-cur-offs ,state)
+                           scratch-buf scratch-offs
+                           (+ scratch-offs bytes-remaining))
+                (sap-ref-word scratch-buf scratch-offs)))
+             (t
+              (logand (sap-ref-word (dstate-segment-sap ,state) (dstate-cur-offs ,state))
+                      dchunk-one)))
+      ;; This was some sort of meagre attempt to be endian-agnostic.
+      ;; Perhaps it should just use SAP-REF-n directly?
+      `(the dchunk (sap-ref-int (dstate-segment-sap ,state)
+                                (dstate-cur-offs ,state)
+                                (ecase dchunk-bits (32 4) (64 8))
+                                (dstate-byte-order ,state)))))
+
+;;; Apply field prefilters, parsing any additional suffix bytes as needed for
+;;; variable-length instructions.
+;;; Store results into DSTATE and update the next-offs accordingly.
+(defun apply-prefilters (dstate inst chunk)
+  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
+  (dolist (item (inst-prefilters inst))
+    ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
+    (flet ((extract-byte (spec-index)
+             (let* ((byte-spec (svref item spec-index))
+                    (integer (dchunk-extract chunk byte-spec)))
+               (if (svref item 2) ; SIGN-EXTEND-P
+                   (sign-extend integer (byte-size byte-spec))
+                   integer))))
+          (let ((item-length (length item))
+                (fun (the function (svref item 1))))
+            (setf (svref (dstate-filtered-values dstate) (svref item 0))
+                  (case item-length
+                   (2 (funcall fun dstate)) ; no subfields
+                   (3 (bug "Bogus prefilter"))
+                   (4 (funcall fun dstate (extract-byte 3))) ; one subfield
+                   (5 (funcall fun dstate ; two subfields
+                               (extract-byte 3) (extract-byte 4)))
+                   (t (apply fun dstate ; > 2 subfields
+                             (loop for i from 3 below item-length
+                                   collect (extract-byte i))))))))))
+
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
 ;;; Additionally, unless STREAM is NIL, several items are output to it:
@@ -552,8 +608,10 @@
 
     (rewind-current-segment dstate segment)
 
+    ;; Do not pin anything yet if using cheneygc, as that would inhibit GC
+    ;; with a larger scope than intended.
     (with-pinned-objects (#+gencgc (seg-object (dstate-segment dstate))
-                          #+gencgc (dstate-scratch-buf dstate))
+                          #+gencgc dstate) ; for SAP access to SCRATCH-BUF
      #+gencgc (setf (dstate-segment-sap dstate) (funcall (seg-sap-maker segment)))
 
      ;; Now commence disssembly of instructions
@@ -578,30 +636,7 @@
         (with-pinned-segment
          (let* ((bytes-remaining (- (seg-length (dstate-segment dstate))
                                     (dstate-cur-offs dstate)))
-                (chunk
-                 (if (= sb-assem:+inst-alignment-bytes+ 1)
-                     ;; Don't read beyond the segment. This can occur with DISASSEMBLE-MEMORY
-                     ;; on a function whose code ends in pad bytes that are not an integral
-                     ;; number of instructions, and maybe you're so unlucky as to be
-                     ;; on the exact last page of your heap.
-                     ;; For 8-byte words and 7-byte dchunks, we use SAP-REF-WORD, which reads
-                     ;; 8 bytes, so make sure the number of bytes to go is 8,
-                     ;; never mind that dchunk-bits is less.
-                     (if (< bytes-remaining sb-vm:n-word-bytes)
-                         (let ((temp (dstate-scratch-buf dstate)))
-                           (setf (%vector-raw-bits temp 0) 0)
-                           (%byte-blt (dstate-segment-sap dstate) (dstate-cur-offs dstate)
-                                      temp 0 bytes-remaining)
-                           (sap-ref-word (vector-sap temp) 0))
-                         (logand (sap-ref-word (dstate-segment-sap dstate)
-                                               (dstate-cur-offs dstate))
-                                 dchunk-one))
-                     (the dchunk
-                          (sap-ref-int (dstate-segment-sap dstate)
-                                       (dstate-cur-offs dstate)
-                                       (ecase dchunk-bits (32 4) (64 8))
-                                       (dstate-byte-order dstate)))))
-
+                (chunk (get-dchunk dstate))
                 (fun-prefix-p (call-fun-hooks chunk stream dstate)))
            (if (> (dstate-next-offs dstate) (dstate-cur-offs dstate))
                (setf prefix-p fun-prefix-p)
@@ -622,37 +657,13 @@
                        (t
                         (setf (dstate-inst dstate) inst)
                         (setf (dstate-next-offs dstate)
-                              (+ (dstate-cur-offs dstate)
-                                 (inst-length inst)))
+                              (+ (dstate-cur-offs dstate) (inst-length inst)))
+                        (when stream
+                          (print-inst (inst-length inst) stream dstate
+                                      :trailing-space nil))
                         (let ((orig-next (dstate-next-offs dstate)))
-                          (when stream
-                            (print-inst (inst-length inst) stream dstate
-                                        :trailing-space nil))
-
-                          (dolist (item (inst-prefilters inst))
-                            (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-                            ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
-                            (flet ((extract-byte (spec-index)
-                                     (let* ((byte-spec (svref item spec-index))
-                                            (integer (dchunk-extract chunk byte-spec)))
-                                       (if (svref item 2) ; SIGN-EXTEND-P
-                                           (sign-extend integer (byte-size byte-spec))
-                                           integer))))
-                              (let ((item-length (length item))
-                                    (fun (the function (svref item 1))))
-                                (setf (svref (dstate-filtered-values dstate) (svref item 0))
-                                      (case item-length
-                                        (2 (funcall fun dstate)) ; no subfields
-                                        (3 (bug "Bogus prefilter"))
-                                        (4 (funcall fun dstate (extract-byte 3))) ; one subfield
-                                        (5 (funcall fun dstate ; two subfields
-                                                    (extract-byte 3) (extract-byte 4)))
-                                        (t (apply fun dstate ; > 2 subfields
-                                                  (loop for i from 3 below item-length
-                                                        collect (extract-byte i)))))))))
-
+                          (apply-prefilters dstate inst chunk)
                           (setf prefix-p (null (inst-printer inst)))
-
                           (when stream
                             ;; Print any instruction bytes recognized by
                             ;; the prefilter which calls read-suffix and
