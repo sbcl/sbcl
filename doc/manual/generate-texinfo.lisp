@@ -26,15 +26,6 @@
                 nil)
                ((find name result :test #'string= :key #'car)
                 nil)
-               ((not (probe-file (merge-pathnames
-                                  (make-pathname
-                                   :directory (list :relative name)
-                                   :name "test-passed"
-                                   :type "test-report")
-                                  *asdf-object-cache-directory*)))
-                (error "The documented contrib ~A seems to have ~
-                        failed its tests."
-                       name))
                (t
                 t))
         collect (cons name package) into result
