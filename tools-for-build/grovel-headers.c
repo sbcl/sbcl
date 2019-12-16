@@ -253,7 +253,7 @@ main(int argc, char __attribute__((unused)) *argv[])
 
     defconstant("sc-nprocessors-onln", _SC_NPROCESSORS_ONLN);
 
-    printf(";;; for wait3(2) in run-program.lisp\n");
+    printf(";;; for waitpid() in run-program.lisp\n");
 #ifdef WCONTINUED
     defconstant("wcontinued", WCONTINUED);
 #else

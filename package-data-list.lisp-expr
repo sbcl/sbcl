@@ -3022,7 +3022,7 @@ no guarantees of interface stability."
                "UNIX-READ" "UNIX-READDIR" "UNIX-READLINK" "UNIX-REALPATH"
                "UNIX-RENAME" "UNIX-SELECT" "UNIX-STAT" "UNIX-UID"
                "UNIX-UNLINK" "UNIX-WRITE"
-               "WCONTINUED" "WNOHANG" "WSTOPPED" "WUNTRACED"
+               "WCONTINUED" "WNOHANG" "WUNTRACED"
                "W_OK" "X_OK"
 
                ;; signals

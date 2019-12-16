@@ -213,9 +213,6 @@ F(vhangup)
 #endif
 F(wait)
 F(waitpid)
-#if !defined(SOLARIS) ||  defined(SOLARIS25)
-F(wait3)
-#endif
 F(write)
 F(writev)
 

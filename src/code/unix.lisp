@@ -1216,13 +1216,3 @@ the UNIX epoch (January 1st 1970.)"
   (alien-funcall
    (extern-alien "sb_dirent_name" (function c-string system-area-pointer))
    ent))
-
-;;;; A magic constant for wait3().
-;;;;
-;;;; FIXME: This used to be defined in run-program.lisp as
-;;;; (defconstant wait-wstopped #-svr4 #o177 #+svr4 wait-wuntraced)
-;;;; According to some of the man pages, the #o177 is part of the API
-;;;; for wait3(); that said, under SunOS there is a WSTOPPED thing in
-;;;; the headers that may or may not be the same thing. To be
-;;;; investigated. -- CSR, 2002-03-25
-(defconstant wstopped #o177)

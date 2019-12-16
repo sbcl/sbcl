@@ -84,7 +84,7 @@
 (defconstant epipe 32) ; #x20
 (defconstant ewouldblock 11) ; #xb
 
-;;; for wait3(2) in run-program.lisp
+;;; for waitpid() in run-program.lisp
 (defconstant wnohang 1) ; #x1
 (defconstant wuntraced 2) ; #x2
 

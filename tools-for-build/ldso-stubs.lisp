@@ -313,7 +313,6 @@ ldso_stub__ ## fct: ;                  \\
                    #-hpux "tzname"
                    "unlink"
                    "utimes"
-                   "wait3"
                    "waitpid"
                    "write")
                  ;; These aren't needed on the X86 because they're microcoded into the

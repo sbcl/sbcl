@@ -85,7 +85,7 @@
 (defconstant ewouldblock 11) ; #xb
 
 (defconstant sc-nprocessors-onln 84) ; #x54
-;;; for wait3(2) in run-program.lisp
+;;; for waitpid() in run-program.lisp
 (defconstant wcontinued 8) ; #x8
 (defconstant wnohang 1) ; #x1
 (defconstant wuntraced 2) ; #x2
