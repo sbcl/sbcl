@@ -85,6 +85,10 @@
   ;;   (mod (* line-size line-hash) (length vector))).
   (mask 0 :type fixnum)
   ;; Current probe-depth needed in the cache.
+  ;; translation: the number of misses to permit on any lookup,
+  ;; or equivalently, one less than the max probes needed on success.
+  ;; Storing n-misses instead of max-probes seems to be a microoptimization
+  ;; to avoid one DECF operation in EMIT-CACHE-LOOKUP.
   (depth 0 :type index)
   ;; Maximum allowed probe-depth before the cache needs to expand.
   (limit 0 :type index))
@@ -103,15 +107,6 @@
   ;; to get the MOD, and (- line-size) gives right the number of zero
   ;; bits at the low end.
   (logand (1- vector-length) (- line-size)))
-
-(defun cache-statistics (cache)
-  (let* ((vector (cache-vector cache))
-         (size (length vector))
-         (line-size (cache-line-size cache))
-         (total-lines (/ size line-size)))
-    (values (loop for i from 0 by line-size below size
-                  count (neq (svref vector i) '..empty..))
-            total-lines (cache-depth cache) (cache-limit cache))))
 
 ;;; Don't allocate insanely huge caches: this is 4096 lines for a
 ;;; value cache with 8-15 keys -- probably "big enough for anyone",
@@ -150,6 +145,8 @@
                                                   old depth))))))
 
 ;;; Compute the starting index of the next cache line in the cache vector.
+;;; TODO: by adding at most LIMIT more cache lines on the right, we can avoid
+;;; wraparound, thus removing the LOGAND from computation of the next index.
 (declaim (inline next-cache-index))
 (defun next-cache-index (mask index line-size)
   (declare (type word index line-size mask))
@@ -327,6 +324,8 @@
     (if (<= length +cache-vector-max-length+)
         (%make-cache :key-count key-count
                      :line-size line-size
+                     ;; TODO: change to use unbound marker here.
+                     ;; It is more efficient to check for than a symbol on any backend.
                      :vector (make-array length :initial-element '..empty..)
                      :value value
                      :mask (compute-cache-mask length line-size)
@@ -537,3 +536,82 @@
                              "Multiple appearances of ~S." layouts)
                      (setf (gethash layouts table) t)))
                cache)))
+
+(defun cache-statistics (cache &optional compute-histogram)
+  (let* ((vector (cache-vector cache))
+         (size (length vector))
+         (line-size (cache-line-size cache))
+         (total-lines (/ size line-size))
+         (total-n-keys 0) ; a "key" is a tuple of layouts
+         (n-dirty 0) ; lines that have ..empty.. but are not wholly empty
+         (n-obsolete 0) ; lines that need to be evicted due to 0 in a layout-clos-hash
+         (histogram
+           (when compute-histogram
+             (make-array (1+ (cache-limit cache)) :initial-element 0))))
+    (if compute-histogram ; this conses, so don't do it when just printing a cache
+        (loop for i from 0 by line-size below size
+              unless (eq (svref vector i) '..empty..)
+              do (let* ((layouts (loop for j from 0 repeat (cache-key-count cache)
+                                       collect (svref vector (+ i j))))
+                        (index (compute-cache-index cache layouts))
+                        (n-misses 0))
+                   (cond ((find '..empty.. layouts)
+                          (incf n-dirty))
+                         ((find 0 layouts :key #'layout-clos-hash)
+                          (incf n-obsolete))
+                         (t
+                          (incf total-n-keys)
+                          (dotimes (n (1+ (cache-depth cache))
+                                      (error "Tuple ~S not found" layouts))
+                            (when (eq index i) (return)) ; hit
+                            (incf n-misses)
+                            (setq index (next-cache-index (cache-mask cache)
+                                                          index
+                                                          (cache-line-size cache))))
+                          (incf (aref histogram n-misses))))))
+        (loop for i from 0 by line-size below size
+              unless (eq (svref vector i) '..empty..)
+              do (incf total-n-keys)))
+    (values total-n-keys total-lines n-dirty n-obsolete histogram)))
+
+(defun summarize-cache-statistics (&optional show-all)
+  (format t "     Ct  Cap  Bad Probe Histogram~%")
+  (format t "   ---- ---- ---- ----- ---------~%")
+  (let* ((caches
+           (mapcar (lambda (cache)
+                     (multiple-value-bind (count capacity n-dirty n-obsolete histogram)
+                         (cache-statistics cache t)
+                       (list histogram count capacity n-dirty n-obsolete cache)))
+                   (sb-vm::list-allocated-objects :all :test #'cache-p)))
+         (n 0)
+         (n-shown 0)
+         (histogram-column-width
+           (loop for (histogram) in caches
+                 maximize (length (write-to-string histogram)))))
+    (dolist (row (sort caches #'> :key #'second)) ; by descending COUNT
+      (incf n)
+      (destructuring-bind (histogram count capacity n-dirty n-obsolete cache) row
+        ;; maybe show "wasteful" ones too (if not show-all)?
+        ;; i.e. perhaps if load factor is less than 1/4th of capacity
+        (when (or show-all
+                  (> (cache-depth cache) 0)
+                  (plusp n-dirty)
+                  (plusp n-obsolete))
+          (incf n-shown)
+          (let* ((total-n-probes
+                   (loop for i from 0 below (length histogram)
+                         ;; n-probes = 1+ n-misses
+                         sum (* (aref histogram i) (1+ i))))
+                 (avgprobes
+                   (when (and (/= count 0) (/= total-n-probes 0))
+                     (/ total-n-probes count))))
+            (format t "~A~A ~4d ~4d ~4d ~4,3f ~vA ~S~%"
+                    (if (plusp n-dirty) #\? #\space)
+                    (if (plusp n-obsolete) #\! #\space)
+                    count capacity (+ n-dirty n-obsolete)
+                    avgprobes
+                    (+ histogram-column-width 2) histogram
+                    cache)))))
+    (format t "~d caches~@[, ~d not shown~]~%"
+            n
+            (if (> n n-shown) (- n n-shown)))))
