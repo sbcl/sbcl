@@ -97,7 +97,7 @@
 ;; wraps (TRULY-THE <type> ...) around %INSTANCE-REF,
 ;; so <type> had best be defined at that point.
 (def!type layout-clos-hash () `(integer 0 ,layout-clos-hash-limit))
-(declaim (ftype (sfunction () layout-clos-hash) random-layout-clos-hash))
+(declaim (ftype (sfunction (t) layout-clos-hash) randomish-layout-clos-hash))
 
 ;;; Careful here: if you add more bits, then adjust the bit packing for
 ;;; 64-bit layouts which also store LENGTH + DEPTHOID in the same word.
@@ -145,17 +145,17 @@
 
 ;;; 32-bit is not done yet. Three slots are still used, instead of two.
 
-(def!struct (layout #+64-bit
-                    (:constructor
-                        ;; Accept a specific subset of keywords
-                     %make-layout (classoid %bits &key inherits bitmap info invalid
-                                            depth2-ancestor depth3-ancestor depth4-ancestor))
-                    #-64-bit
-                    (:constructor
-                     make-layout (classoid &key flags clos-hash invalid
-                                  inherits depthoid length info bitmap
-                                  depth2-ancestor depth3-ancestor depth4-ancestor))
-                    (:copier nil))
+(def!struct (layout
+             #+64-bit
+             ;; Accept a specific subset of keywords
+             (:constructor %make-layout (clos-hash classoid %bits
+                                         &key inherits bitmap info invalid
+                                           depth2-ancestor depth3-ancestor depth4-ancestor))
+             #-64-bit
+             (:constructor make-layout (clos-hash classoid
+                                        &key flags invalid inherits depthoid length info bitmap
+                                          depth2-ancestor depth3-ancestor depth4-ancestor))
+             (:copier nil))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
   #+64-bit (%bits 0 :type (signed-byte #.sb-vm:n-word-bits))
@@ -164,7 +164,7 @@
   #-64-bit (flags 0 :type fixnum :read-only nil)
 
   ;; a pseudo-random hash value for use by CLOS.
-  (clos-hash (random-layout-clos-hash) :type layout-clos-hash)
+  (clos-hash (missing-arg) :type layout-clos-hash) ; this no longer defaults to a random number
   ;; the class that this is a layout for
   (classoid (missing-arg) :type classoid)
   ;; The value of this slot can be:
@@ -238,12 +238,12 @@
     (:length   `(ldb (byte 28 4) ,bits))
     (:flags    `(ldb (byte 4 0) ,bits))))
 
-(defmacro make-layout (classoid &rest rest &key depthoid length flags &allow-other-keys)
+(defmacro make-layout (clos-hash classoid &rest rest &key depthoid length flags &allow-other-keys)
   (setq rest (copy-list rest))
   (remf rest :depthoid)
   (remf rest :length)
   (remf rest :flags)
-  `(%make-layout ,classoid (pack-layout-bits ,depthoid ,length ,flags) ,@rest))
+  `(%make-layout ,clos-hash ,classoid (pack-layout-bits ,depthoid ,length ,flags) ,@rest))
 
 (declaim (inline layout-length layout-flags))
 #+sb-xc-host

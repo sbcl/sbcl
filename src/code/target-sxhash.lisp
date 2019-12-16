@@ -110,17 +110,6 @@
           mask))
 
 
-(defun %sxhash-simple-string (x)
-  (declare (optimize speed))
-  (declare (type simple-string x))
-  ;; KLUDGE: this FLET is a workaround (suggested by APD) for presence
-  ;; of let conversion in the cross compiler, which otherwise causes
-  ;; strongly suboptimal register allocation.
-  (flet ((trick (x)
-           (%sxhash-simple-substring x 0 (length x))))
-    (declare (notinline trick))
-    (trick x)))
-
 ;;; This is an out-of-line callable entrypoint that the compiler can
 ;;; transform SXHASH into when hashing a non-simple string.
 (defun %sxhash-string (x)

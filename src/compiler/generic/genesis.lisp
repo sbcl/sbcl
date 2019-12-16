@@ -1151,12 +1151,10 @@ core and return a descriptor to it."
      :length (make-fixnum-descriptor length)
      :flags (make-fixnum-descriptor flags))
 
-    ;; Don't set the CLOS hash value: done in cold-init instead.
-    ;;
     ;; Set other slot values.
-    ;;
     ;; leave CLASSOID uninitialized for now
     (write-slots result *host-layout-of-layout*
+     :clos-hash (make-fixnum-descriptor (sb-impl::randomish-layout-clos-hash name))
      :invalid *nil-descriptor*
      :inherits inherits
      :info *nil-descriptor*

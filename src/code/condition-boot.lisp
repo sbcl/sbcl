@@ -26,6 +26,7 @@
                 (%compiler-define-condition
                  ',name ',direct-supers
                  ,(make-layout
+                   (randomish-layout-clos-hash name)
                    (make-undefined-classoid name)
                    :flags +condition-layout-flag+
                    :inherits (map 'vector #'find-layout (cons t inherits))

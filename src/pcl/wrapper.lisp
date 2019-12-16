@@ -30,8 +30,9 @@
   `(classoid-pcl-class (layout-classoid ,wrapper)))
 
 (declaim (inline make-wrapper-internal))
-(defun make-wrapper-internal (&key (bitmap -1) length classoid)
-  (make-layout classoid :length length :invalid nil
+(defun make-wrapper-internal (hash &key (bitmap -1) length classoid)
+  (make-layout hash classoid
+               :length length :invalid nil
                :flags +pcl-object-layout-flag+ :bitmap bitmap))
 
 ;;; This is called in BRAID when we are making wrappers for classes
@@ -48,10 +49,10 @@
         (aver layout)
         layout))
      (t
-      (make-wrapper-internal
-       :length length
-       :classoid (make-standard-classoid
-                  :name name :pcl-class class))))))
+      (make-wrapper-internal (randomish-layout-clos-hash name)
+                             :length length
+                             :classoid (make-standard-classoid
+                                        :name name :pcl-class class))))))
 
 ;;; In SBCL, as in CMU CL, the layouts (a.k.a wrappers) for built-in
 ;;; and structure classes already exist when PCL is initialized, so we
@@ -64,20 +65,22 @@
   (cond
     ((or (typep class 'std-class)
          (typep class 'forward-referenced-class))
-     (make-wrapper-internal
-      :length length
-      :classoid
-      (let ((owrap (class-wrapper class)))
-        (cond (owrap
-               (layout-classoid owrap))
-              ((or (*subtypep (class-of class) *the-class-standard-class*)
-                   (*subtypep (class-of class) *the-class-funcallable-standard-class*)
-                   (typep class 'forward-referenced-class))
-               (let ((name (slot-value class 'name)))
-                 (make-standard-classoid :pcl-class class
-                                         :name (and (symbolp name) name))))
-              (t
-               (bug "Got to T branch in ~S" 'make-wrapper))))))
+     (let* ((name)
+            (classoid
+             (let ((owrap (class-wrapper class)))
+               (cond (owrap
+                      (layout-classoid owrap))
+                     ((or (*subtypep (class-of class) *the-class-standard-class*)
+                          (*subtypep (class-of class) *the-class-funcallable-standard-class*)
+                          (typep class 'forward-referenced-class))
+                      (setq name (slot-value class 'name))
+                      (make-standard-classoid :pcl-class class
+                                              :name (and (symbolp name) name)))
+                     (t
+                      (bug "Got to T branch in ~S" 'make-wrapper))))))
+       (make-wrapper-internal (randomish-layout-clos-hash name)
+                              :length length
+                              :classoid classoid)))
     (t
      (let* ((found (find-classoid (slot-value class 'name)))
             (layout (classoid-layout found)))

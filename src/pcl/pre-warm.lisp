@@ -98,7 +98,7 @@
                 (cell (sb-kernel::make-classoid-cell name classoid))
                 (layout
                  (make-layout
-                  classoid
+                  (randomish-layout-clos-hash name) classoid
                   :inherits (map 'vector #'find-layout
                                  (cons t (if fun-p '(function))))
                   :length 0 ; don't care

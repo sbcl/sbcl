@@ -63,3 +63,14 @@
 ;;;            (format t "collision: ~S ~S~%" string (gethash hash ht)))
 ;;;          (setf (gethash hash ht) string))))
 ;;;     (format t "final count=~W~%" (hash-table-count ht)))
+
+(defun %sxhash-simple-string (x)
+  (declare (optimize speed))
+  (declare (type simple-string x))
+  ;; KLUDGE: this FLET is a workaround (suggested by APD) for presence
+  ;; of let conversion in the cross compiler, which otherwise causes
+  ;; strongly suboptimal register allocation.
+  (flet ((trick (x)
+           (%sxhash-simple-substring x 0 (length x))))
+    (declare (notinline trick))
+    (trick x)))

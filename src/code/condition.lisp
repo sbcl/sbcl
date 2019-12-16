@@ -73,7 +73,8 @@
     (if (and olayout
              (not (mismatch (layout-inherits olayout) new-inherits)))
         olayout
-        (make-layout (make-undefined-classoid name)
+        (make-layout (randomish-layout-clos-hash name)
+                     (make-undefined-classoid name)
                      :flags +condition-layout-flag+
                      :inherits new-inherits
                      :depthoid -1

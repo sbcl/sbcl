@@ -46,6 +46,8 @@
 ;;; pseudo-random values to come the same way in the target even when
 ;;; we make minor changes to the system, in order to reduce the
 ;;; mysteriousness of possible CLOS bugs.
+;;; However, we now try very hard to use deterministic hashes
+;;; based on the characters in the name of the class, if a symbol.
 (define-load-time-global *layout-clos-hash-random-state*
     (make-random-state))
 
@@ -62,9 +64,11 @@
   #-sb-xc-host (progn
                  (/show0 "processing *!INITIAL-LAYOUTS*")
                  (setq *forward-referenced-layouts* (make-hash-table :test 'equal))
-                 (setq *layout-clos-hash-random-state* (make-random-state))
                  (dovector (x *!initial-layouts*)
-                   (setf (layout-clos-hash (cdr x)) (random-layout-clos-hash))
+                   (let ((expected (randomish-layout-clos-hash (car x)))
+                         (actual (layout-clos-hash (cdr x))))
+                     (unless (= actual expected)
+                       (bug "XC layout hash calculation failed")))
                    (setf (gethash (car x) *forward-referenced-layouts*)
                          (cdr x)))
                  (/show0 "done processing *!INITIAL-LAYOUTS*")))
@@ -84,19 +88,23 @@
 
 ;;;; support for the hash values used by CLOS when working with LAYOUTs
 
-(defun random-layout-clos-hash ()
-  ;; FIXME: I'm not sure why this expression is (1+ (RANDOM FOO)),
-  ;; returning a strictly positive value. I copied it verbatim from
-  ;; CMU CL INITIALIZE-LAYOUT-HASH, so presumably it works, but I
-  ;; dunno whether the hash values are really supposed to be 1-based.
-  ;; They're declared as INDEX.. Or is this a hack to try to avoid
-  ;; having to use bignum arithmetic? Or what? An explanation would be
-  ;; nice.
-  ;;
-  ;; an explanation is provided in Kiczales and Rodriguez, "Efficient
-  ;; Method Dispatch in PCL", 1990.  -- CSR, 2005-11-30
-  (1+ (random (1- layout-clos-hash-limit)
-              *layout-clos-hash-random-state*)))
+(defun randomish-layout-clos-hash (name)
+  ;; A hash of 0 occurs with probability 1 in 2^25 for a 32-bit hash
+  ;; or 2^58 for a 64-bit hash. It must be changed to something else
+  ;; because 0 has means that the layout is invalid.
+  ;; See paper by Kiczales and Rodriguez, "Efficient Method Dispatch in PCL", 1990
+  (1+ (if (typep name '(and symbol (not null)))
+          (let ((package (sb-xc:symbol-package name)))
+            ;; TODO: We should use murmur_hash (in the C runtime)
+            ;; for better hashiness than our sxhash on strings.
+            (rem (logxor (sb-impl::%sxhash-simple-string
+                          (cond #+sb-xc ((eq package *cl-package*) "COMMON-LISP")
+                                ((not package) "uninterned")
+                                (t (package-name package))))
+                         (sb-impl::%sxhash-simple-string
+                          (symbol-name name)))
+                 (1- layout-clos-hash-limit)))
+          (random (1- layout-clos-hash-limit) *layout-clos-hash-random-state*))))
 
 ;;; If we can't find any existing layout, then we create a new one
 ;;; storing it in *FORWARD-REFERENCED-LAYOUTS*. In classic CMU CL, we
@@ -118,6 +126,7 @@
         (or (and classoid (classoid-layout classoid))
             (values (ensure-gethash name table
                                     (make-layout
+                                     (randomish-layout-clos-hash name)
                                      (or classoid
                                          (make-undefined-classoid name))))))))))
 
