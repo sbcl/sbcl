@@ -3470,8 +3470,20 @@
                                           (eq (constraint-y con) leaf2))
                                      (and (eq (constraint-x con) leaf2)
                                           (eq (constraint-y con) leaf1))))
-                       return con)))
-          (find-constraint ref1))))))
+                       return con))
+               (has-sets (leaf)
+                 (and (lambda-var-p leaf)
+                      (lambda-var-sets leaf))))
+          (let ((ref1-con (find-constraint ref1)))
+            (when (and ref1-con
+                       ;; If the variables are set both references
+                       ;; need to have the same constraint, otherwise
+                       ;; one the references may be done before the
+                       ;; set.
+                       (or (and (not (has-sets leaf1))
+                                (not (has-sets leaf2)))
+                           (eq ref1-con (find-constraint ref2))))
+              ref1-con)))))))
 
 ;;; If X and Y are the same leaf, then the result is true. Otherwise,
 ;;; if there is no intersection between the types of the arguments,

@@ -33,3 +33,15 @@
            (checked-compile
             '(lambda (x) (let (y) (setq y x) (eql y x)))))
           '(function (t) (values (member t) &optional)))))
+
+(with-test (:name :setq-lvar-substition)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare ((integer 0 10) a)
+                  (fixnum b))
+         (let ((c b))
+           (setq b a)
+           (eql c b)))
+    ((0 2) nil)
+    ((0 0) t)))
