@@ -164,7 +164,7 @@
                          ;; Maybe we should escalate more warnings to errors
                          ;; (see HANDLER-BIND for SIMPLE-WARNING below)
                          ;; rather than asking what to do here?
-                         #+x86-64 ;; this should complete without warnings
+                         #+(or x86 x86-64) ;; these should complete without warnings
                          (cerror "Ignore warnings" "Compile completed with warnings")))
                   (unless (handler-bind
                               ((sb-kernel:redefinition-with-defgeneric
