@@ -77,9 +77,10 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
                    (alien-funcall (extern-alien "_exit" (function (values) int)) 0))
                   (t
                    (setq sb-c::*static-vop-usage-counts* (make-hash-table))
-                   (pure-runner (list (concatenate 'string file ".lisp"))
-                                (if (search "-cload" file) 'cload-test 'load-test)
-                                (make-broadcast-stream))
+                   (let ((*features* (cons :parallel-test-runner *features*)))
+                     (pure-runner (list (concatenate 'string file ".lisp"))
+                                  (if (search "-cload" file) 'cload-test 'load-test)
+                                  (make-broadcast-stream)))
                    (with-open-file (output (format nil "$logdir/~a.vop-usage" file)
                                            :direction :output)
                      (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)

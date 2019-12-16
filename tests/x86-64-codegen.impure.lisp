@@ -11,9 +11,6 @@
 
 #-x86-64 (sb-ext:exit :code 104)
 
-;;; Assert that save-lisp-and-die didn't accidentally recreate the inst space
-(assert (null sb-disassem::*disassem-inst-space*))
-
 (load "compiler-test-util.lisp")
 (defun disasm (safety expr &optional (remove-epilogue t))
   ;; This lambda has a name because if it doesn't, then the name
