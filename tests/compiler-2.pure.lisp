@@ -2594,6 +2594,6 @@
    '(lambda (a b)
      (declare ((integer 0 10) b) (optimize (safety 0) (debug 2)))
      (if (< a 0)
-         (if (< a 10)
+         (if (< a -10)
              (if (let ((x a)) (eval a) (setf b x) nil) 0 a)
              b)))))
