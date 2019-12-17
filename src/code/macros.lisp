@@ -441,6 +441,11 @@ symbol-case giving up: case=((V U) (F))
                          (nconc (aref array bin) (list (cons layout i))))))))
     array))
 
+;;; FIXME: now that structure classoid hashes are computable at compile-time,
+;;; we can do ever better in this expander: if the hash is perfect,
+;;; then do not iterate over candidates, just flatten the array into
+;;;   #(<LAYOUT> case-index #<LAYOUT> case-index ...)
+;;; then test for a hit on the indexed layout, get the case-index, and jump.
 (sb-xc:defmacro %sealed-struct-typecase-index (cases object)
   `(if (%instancep ,object)
        (locally (declare (optimize (safety 0)))
@@ -448,7 +453,7 @@ symbol-case giving up: case=((V U) (F))
          ;; then element 0 of the vector is used as a compile-time constant and we'll wire in
          ;; the shift and mask which produces an even better instruction sequence.
          ;; This is pretty awesome and I did not know that we would do that.
-         (let* ((array (load-time-value (build-sealed-struct-typecase-map ',cases) t))
+         (let* ((array ,(build-sealed-struct-typecase-map cases))
                 (layout (%instance-layout ,object))
                 (hash-spec (the fixnum (svref array 0)))
                 (shift (ldb (byte ,(integer-length (1- sb-vm:n-word-bits)) 0)

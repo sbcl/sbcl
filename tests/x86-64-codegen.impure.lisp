@@ -657,3 +657,16 @@ sb-vm::(define-vop (cl-user::test)
               (36 pop ,rbp)
               (37 ret)
               (38 break 16))))))
+
+(with-test (:name :typep-compiled-with-jump-table)
+  ;; Expect to reference the CTYPE layout because %%TYPEP declares its argument
+  ;; to be that.  Expect to reference the UNKNOWN-TYPE layout because of an
+  ;; explicit call to UNKNOWN-TYPE-P. I do not know why NUMERIC-TYPE is there.
+  (let ((names
+          (mapcar (lambda (x)
+                    (sb-kernel:classoid-name (sb-kernel:layout-classoid x)))
+                  (ctu:find-code-constants #'sb-kernel:%%typep :type 'sb-kernel:layout))))
+    (assert (null (set-difference names
+                                  '(sb-kernel:ctype
+                                    sb-kernel:unknown-type
+                                    sb-kernel:numeric-type))))))

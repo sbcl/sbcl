@@ -32,6 +32,9 @@
   (declare (explicit-check))
   (%%typep object (specifier-type specifier)))
 
+;;; probably not the right place for this declamation. The benefits
+;;; should be more widespread.
+(declaim (freeze-type ctype))
 (defun %%typep (object type &optional (strict t))
  (declare (type ctype type))
  (named-let recurse ((object object) (type type))
