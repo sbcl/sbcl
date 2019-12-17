@@ -106,6 +106,9 @@
     (assert (not (eq (array-element-type object) nil))))
   nil)
 
+(defun data-vector-ref-with-offset (array index offset)
+  (svref array (+ index offset)))
+
 (defun %negate (number)
   (sb-xc:- number))
 

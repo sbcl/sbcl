@@ -97,3 +97,9 @@
 ;;; FIXME: this no longer holds methods, but it seems to have an effect
 ;;; on the caching of a discriminating function for PRINT-OBJECT
 (defvar *!delayed-defmethod-args* nil)
+
+;;; This exists only to show that the cross-compiler can constant-fold
+;;; a constant index into a literal array without crashing.
+(defun !test-svref-folding ()
+  (let ((z #(42 test)))
+    (if (< (svref z 0) 100) t nil)))
