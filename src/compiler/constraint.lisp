@@ -65,7 +65,7 @@
   ;;     X is a LAMBDA-VAR and Y is a CTYPE. The value of X is
   ;;     constrained to be of type Y.
   ;;
-  ;; > or <
+  ;; >, <, or =
   ;;     X is a lambda-var and Y is a CTYPE. The relation holds
   ;;     between X and some object of type Y.
   ;;
@@ -78,7 +78,7 @@
   ;;     (array-in-bounds-p array 10) X can be either the lambda-var
   ;;     of ARRAY or VAR, while Y is either the lambda-var of VAR or a
   ;;     constant.
-  (kind nil :type (member typep < > eql
+  (kind nil :type (member typep < > = eql
                           array-in-bounds-p
                           equality))
   ;; The operands to the relation.
@@ -832,6 +832,16 @@
                           (add name var1 (lvar-type arg2) nil))
                         (when var2
                           (add (if (eq name '<) '> '<) var2 (lvar-type arg1) nil))))))
+                 (=
+                  (when (= (length args) 2)
+                    (let* ((arg1 (first args))
+                           (var1 (ok-lvar-lambda-var arg1 constraints))
+                           (arg2 (second args))
+                           (var2 (ok-lvar-lambda-var arg2 constraints)))
+                      (when var1
+                        (add name var1 (lvar-type arg2) nil))
+                      (when var2
+                        (add name var2 (lvar-type arg1) nil)))))
                  (t
                   (add-combination-test-constraints use constraints
                                                     consequent-constraints
@@ -930,6 +940,22 @@
           (modified-numeric-type x :low new-bound)
           (modified-numeric-type x :high new-bound)))))
 
+(defun constrain-real-to-integer (y greater or-equal)
+  (declare (type numeric-type y))
+  (flet ((exclude (x)
+           (cond ((not x) nil)
+                 (or-equal x)
+                 (t (list x))))
+         (bound (x)
+           (if greater
+               (numeric-type-low x)
+               (numeric-type-high x))))
+    (let ((bound (exclude (bound y))))
+      (when bound
+        (if greater
+            (make-numeric-type :low bound)
+            (make-numeric-type :high bound))))))
+
 ;;; Return true if LEAF is "visible" from NODE.
 (defun leaf-visible-from-node-p (leaf node)
   (cond
@@ -1017,17 +1043,31 @@
                         (setq res (type-approx-intersection2
                                    res other-type))))))))
             ((< >)
-             (cond
-               ((and (integer-type-p res) (integer-type-p y))
-                (let ((greater (eq kind '>)))
-                  (let ((greater (if not-p (not greater) greater)))
-                    (setq res
-                          (constrain-integer-type res y greater not-p)))))
-               ((and (float-type-p res) (float-type-p y))
-                (let ((greater (eq kind '>)))
-                  (let ((greater (if not-p (not greater) greater)))
-                    (setq res
-                          (constrain-float-type res y greater not-p)))))))))))
+             (let* ((greater (eq kind '>))
+                    (greater (if not-p (not greater) greater)))
+               (cond
+                 ((and (integer-type-p res) (integer-type-p y))
+                  (setq res
+                        (constrain-integer-type res y greater not-p)))
+                 ((and (float-type-p res) (float-type-p y))
+                  (setq res
+                        (constrain-float-type res y greater not-p)))
+                 ((integer-type-p y)
+                  (let ((type (constrain-real-to-integer y greater not-p)))
+                    (when type
+                      (setf res
+                            (type-approx-intersection2 res type))))))))
+            (=
+             (when (and (numeric-type-p y)
+                        (not not-p))
+               (setf res
+                     (type-approx-intersection2 res
+                                                (type-union (make-numeric-type :low (numeric-type-low y)
+                                                                               :high (numeric-type-high y))
+                                                            (make-numeric-type :complexp :complex
+                                                                               :class 'float
+                                                                               :low (numeric-type-low y)
+                                                                               :high (numeric-type-high y)))))))))))
     (cond ((and (if-p (node-dest ref))
                 (or (xset-member-p nil not-set)
                     (csubtypep (specifier-type 'null) not-res)))

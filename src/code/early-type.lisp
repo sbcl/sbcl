@@ -299,6 +299,29 @@
               (let ((spec (if (= i 1) 'bit `(unsigned-byte ,i))))
                 (setf (svref v i) (int-type 0 (1- (ash 1 i))))))))))
 
+;;; Coerce a numeric type bound to the given type while handling
+;;; exclusive bounds.
+(defun coerce-numeric-bound (bound type)
+  (flet ((c (thing)
+           (case type
+             (rational (rational thing))
+             ((float single-float)
+              (cond #-sb-xc-host
+                    ((<= sb-xc:most-negative-single-float thing sb-xc:most-positive-single-float)
+                     (coerce thing 'single-float))
+                    (t
+                     (return-from coerce-numeric-bound))))
+             (double-float
+              (cond #-sb-xc-host
+                    ((<= sb-xc:most-negative-double-float thing sb-xc:most-positive-double-float)
+                     (coerce thing 'double-float))
+                    (t
+                     (return-from coerce-numeric-bound)))))))
+    (when bound
+      (if (consp bound)
+          (list (c (car bound)))
+          (c bound)))))
+
 (declaim (inline bounds-unbounded-p))
 (defun bounds-unbounded-p (low high)
   (and (null low) (eq high low)))
@@ -320,26 +343,33 @@
 (defun make-numeric-type (&key class format (complexp :real) low high
                                enumerable)
   (declare (type (member integer rational float nil) class))
-  (macrolet ((unionize (things initargs)
+  (macrolet ((unionize (types classes initargs)
                `(let (types)
-                  (dolist (thing ',things (apply #'type-union types))
-                    (let ((low (coerce-numeric-bound low thing))
-                          (high (coerce-numeric-bound high thing)))
-                      (push (make-numeric-type
-                             ,@initargs
-                             :complexp complexp :low low :high high :enumerable enumerable)
-                            types))))))
+                  (loop for thing in ',types
+                        for class in ',classes
+                        do
+                        (let ((low (coerce-numeric-bound low thing))
+                              (high (coerce-numeric-bound high thing)))
+                          (push (make-numeric-type
+                                 ,@initargs
+                                 :class class
+                                 :complexp complexp :low low :high high :enumerable enumerable)
+                                types)))
+                  (apply #'type-union types))))
     (when (and (null class) (member complexp '(:real :complex)))
       (return-from make-numeric-type
         (if (bounds-unbounded-p low high)
             (specifier-type 'real)
-            (unionize (rational float) (:class thing :format format)))))
+            (unionize (rational single-float double-float)
+                      (rational float float)
+                      (:format format)))))
     (when (and (eql class 'float) (member complexp '(:complex :real)) (eql format nil))
       (return-from make-numeric-type
         (if (bounds-unbounded-p low high)
             (specifier-type 'float)
             (unionize (single-float double-float #+long-float (error "long-float"))
-                      (:class 'float :format thing))))))
+                      (float float)
+                      (:format thing))))))
   (multiple-value-bind (low high)
       (case class
         (integer

@@ -750,8 +750,7 @@
         ((zerop x)
          ;; The answer is negative infinity, but we are supposed to
           ;; signal divide-by-zero, so do the actual division
-         (/ $-1.0d0 x)
-         )
+         (/ $-1.0d0 x))
         (t
           (logb-finite x))))
 

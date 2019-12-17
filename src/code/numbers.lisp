@@ -1282,7 +1282,7 @@ and the number of 0 bits if INTEGER is negative."
             (if (eql gcd 1)
                 (values x y)
                 (values (truncate x gcd) (truncate y gcd)))
-          (build-ratio num (truly-the (not (integer 0 1)) den))))))
+          (build-ratio num den)))))
 (declaim (notinline fixnum-gcd))
 
 (defun two-arg-/ (x y)

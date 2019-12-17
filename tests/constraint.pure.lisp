@@ -45,3 +45,21 @@
            (eql c b)))
     ((0 2) nil)
     ((0 0) t)))
+
+(with-test (:name :number-comparisons)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (a)
+              (if (< a 0)
+                  (typep a '(integer 0 10))
+                  nil))))
+          '(function (t) (values null &optional))))
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (a)
+              (if (= a 30)
+                  (typep a '(integer 0 10))
+                  nil))))
+          '(function (t) (values null &optional)))))

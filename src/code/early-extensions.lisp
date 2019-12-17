@@ -879,19 +879,6 @@ NOTE: This interface is experimental and subject to change."
   (if (consp x)
       (destructuring-bind (result) x result)
       x))
-
-;;; Coerce a numeric type bound to the given type while handling
-;;; exclusive bounds.
-(defun coerce-numeric-bound (bound type)
-  (flet ((c (thing)
-           (case type
-             (rational (rational thing))
-             (t (coerce thing type)))))
-    (when bound
-      (if (consp bound)
-          (list (c (car bound)))
-          (c bound)))))
-
 
 ;;;; utilities for two-VALUES predicates
 
