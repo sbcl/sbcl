@@ -69,16 +69,13 @@
                  (unless (or (eq block tail)
                              (eq (block-component block) c))
                    (barf "~S is not in ~S." block c)))
-               #|
-               (when (or (loop-blocks c) (loop-inferiors c))
+
                (do-blocks (block c :both)
-               (setf (block-flag block) nil))
-               (check-loop-consistency c nil)
+                 (setf (block-flag block) nil))
+               (check-loop-consistency (component-outer-loop c) nil)
                (do-blocks (block c :both)
-               (unless (block-flag block)
-               (barf "~S was not in any loop." block))))
-               |#
-               ))
+                 (unless (block-flag block)
+                   (barf "~S was not in any loop." block)))))
            (check-fun-consistency components)
 
            (dolist (c components)
@@ -244,12 +241,11 @@
 
 ;;;; loop consistency checking
 
-#|
 ;;; Descend through the loop nesting and check that the tree is well-formed
 ;;; and that all blocks in the loops are known blocks. We also mark each block
 ;;; that we see so that we can do a check later to detect blocks that weren't
 ;;; in any loop.
-(declaim (ftype (function (loop (or loop null)) (values)) check-loop-consistency))
+(declaim (ftype (function (cloop (or cloop null)) (values)) check-loop-consistency))
 (defun check-loop-consistency (loop superior)
   (unless (eq (loop-superior loop) superior)
     (barf "wrong superior in ~S, should be ~S" loop superior))
@@ -278,7 +274,7 @@
   (values))
 
 ;;; Check that Block is either in Loop or an inferior.
-(declaim (ftype (function (block loop) (values)) check-loop-block))
+(declaim (ftype (function (cblock cloop) (values)) check-loop-block))
 (defun check-loop-block (block loop)
   (unless (gethash block *seen-blocks*)
     (barf "unseen block ~S in loop info for ~S" block loop))
@@ -290,8 +286,6 @@
     (unless (walk loop)
       (barf "~S is in loop info for ~S but not in the loop." block loop)))
   (values))
-
-|#
 
 ;;; Check a block for consistency at the general flow-graph level, and
 ;;; call CHECK-NODE-CONSISTENCY on each node to locally check for
