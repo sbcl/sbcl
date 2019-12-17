@@ -669,4 +669,5 @@ sb-vm::(define-vop (cl-user::test)
     (assert (null (set-difference names
                                   '(sb-kernel:ctype
                                     sb-kernel:unknown-type
-                                    sb-kernel:numeric-type))))))
+                                    sb-kernel:numeric-type
+                                    #+win32 null))))))
