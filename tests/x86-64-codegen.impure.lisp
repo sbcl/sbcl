@@ -670,4 +670,4 @@ sb-vm::(define-vop (cl-user::test)
                                   '(sb-kernel:ctype
                                     sb-kernel:unknown-type
                                     sb-kernel:numeric-type
-                                    #+win32 null))))))
+                                    #-immobile-space null))))))

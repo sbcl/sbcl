@@ -109,6 +109,9 @@
 (defun data-vector-ref-with-offset (array index offset)
   (svref array (+ index offset)))
 
+(defun data-vector-ref (array index)
+  (svref array index))
+
 (defun %negate (number)
   (sb-xc:- number))
 
