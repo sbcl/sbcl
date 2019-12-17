@@ -1773,6 +1773,8 @@
 ;;; We should never emit a call to %typep-wrapper
 (defknown %typep-wrapper (t t (or type-specifier ctype)) t
   (movable flushable always-translatable))
+(defknown %type-constraint (t (or type-specifier ctype)) t
+    (always-translatable))
 
 ;;; An identity wrapper to avoid complaints about constant modification
 (defknown ltv-wrapper (t) t

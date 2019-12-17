@@ -187,6 +187,22 @@
               (t
                (delay-ir1-transform node :constraint)
                'test-value)))))
+
+(deftransform %type-constraint ((x type) * * :node node)
+  (delay-ir1-transform node :constraint)
+  nil)
+
+(defoptimizer (%type-constraint constraint-propagate) ((x type) node gen)
+  (declare (ignore node))
+  (let ((var (ok-lvar-lambda-var x gen)))
+    (when var
+      (let ((type (lvar-value type)))
+        (list (list 'typep var
+                    (if (ctype-p type)
+                        type
+                        (handler-case (careful-specifier-type type)
+                          (t () nil)))
+                    nil))))))
 
 ;;;; standard type predicates, i.e. those defined in package COMMON-LISP,
 ;;;; plus at least one oddball (%INSTANCEP)

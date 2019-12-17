@@ -2597,3 +2597,25 @@
          (if (< a -10)
              (if (let ((x a)) (eval a) (setf b x) nil) 0 a)
              b)))))
+
+(with-test (:name :typecase-to-case-preserves-type)
+  (let ((f (checked-compile
+            '(lambda (x)
+              ;; This illustrates another possible improvement-
+              ;; there are not actually 6 different slot indices
+              ;; that we might load. Some of them are the same
+              (typecase x
+                (sb-pretty:pprint-dispatch-table (sb-pretty::pp-dispatch-entries x))
+                (sb-impl::comma (sb-impl::comma-expr x))
+                (sb-vm:primitive-object (sb-vm:primitive-object-slots x))
+                (sb-kernel:defstruct-description (sb-kernel::dd-name x))
+                (sb-kernel:lexenv (sb-c::lexenv-vars x))
+                (broadcast-stream (broadcast-stream-streams x))
+                (t :none))))))
+    ;; There should be no #<layout> referenced directly from the code header.
+    ;; There is of course a vector of layouts in there to compare against.
+    (assert (not (ctu:find-code-constants f :type 'sb-kernel:layout)))
+    ;; The function had better work.
+    (assert (eq (funcall f 'wat) :none))
+    (assert (equal (funcall f (make-broadcast-stream *error-output*))
+                   (list *error-output*)))))

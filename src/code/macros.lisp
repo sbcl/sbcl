@@ -531,7 +531,10 @@ symbol-case giving up: case=((V U) (F))
                              classoid-lists)
                     ,temp)
                ,@(loop for i from 1 for clause in normal-clauses
-                       collect `(,i ,@(cddr clause)))
+                       collect `(,i
+                                 ;; CLAUSE is ((TYPEP #:G 'a-type) NIL . forms)
+                                 (sb-c::%type-constraint ,temp ,(third (car clause)))
+                                 ,@(cddr clause)))
                (0 ,@(if errorp
                         `((etypecase-failure ,temp ',type-specs))
                         (cddr default)))))
