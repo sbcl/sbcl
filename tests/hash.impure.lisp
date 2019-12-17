@@ -272,7 +272,10 @@
 
 (defmacro alloc (&body body)
   "Execute BODY and try to reduce the chance of leaking a conservative root."
-  #+sb-thread `(sb-thread:join-thread (sb-thread:make-thread (lambda () ,@body)))
+  #+sb-thread `(sb-thread:join-thread
+                (sb-thread:make-thread
+                 (lambda ()
+                   (call-and-scrub-stack (lambda () ,@body)))))
   #-sb-thread `(call-and-scrub-stack (lambda () ,@body)))
 
 (with-test (:name (:hash-table :weakness :eql :numbers))
