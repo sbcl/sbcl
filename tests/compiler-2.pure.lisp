@@ -2588,6 +2588,7 @@
     (((expt 2 (1- sb-vm:n-word-bits)) #xFFFFFF) -1)
     (((1- (expt 2 (1- sb-vm:n-word-bits))) #xFFFFFF) -16777216)))
 
+;;; Example from lp# 1856715
 (with-test (:name :instcombine-delete-last-stmt)
   (checked-compile
    '(lambda (a b)
