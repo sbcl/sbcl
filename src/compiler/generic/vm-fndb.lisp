@@ -290,7 +290,7 @@
 
 (defknown %make-complex (real real) complex
   (flushable movable))
-(defknown %make-ratio (rational rational) ratio
+(defknown %make-ratio (integer integer) ratio
   (flushable movable))
 (defknown make-value-cell (t) t
   (flushable movable))
