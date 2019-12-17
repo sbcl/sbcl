@@ -286,6 +286,21 @@
 (defun section-start (section) (car section))
 (defmacro section-tail (section) `(cdr ,section))
 
+(defstruct asmstream
+  (data-section (make-section) :read-only t)
+  (code-section (make-section) :read-only t)
+  (elsewhere-section (make-section) :read-only t)
+  (elsewhere-label (gen-label "elsewhere start") :read-only t)
+  (inter-function-padding :normal :type (member :normal :nop))
+  ;; for collecting unique "unboxed constants" prior to placing them
+  ;; into the data section
+  (constant-table (make-hash-table :test #'equal) :read-only t)
+  (constant-vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t)
+  ;; tracking where we last wrote an instruction so that SB-C::TRACE-INSTRUCTION
+  ;; can print "in the {x} section" whenever it changes.
+  (tracing-state (list nil nil) :read-only t)) ; segment and vop
+(declaim (freeze-type asmstream))
+
 ;;; Insert STMT after PREDECESSOR.
 (defun insert-stmt (stmt predecessor)
   (let ((successor (stmt-next predecessor)))
@@ -300,6 +315,12 @@
   (let ((prev (stmt-prev stmt))
         (next (stmt-next stmt)))
     (aver prev)
+    ;; KLUDGE: we're not passing around the section, but instcombine only
+    ;; runs on the code section, so check whether we're deleting the last
+    ;; statement in that section, and fix the last pointer if so.
+    (let ((section (asmstream-code-section *asmstream*)))
+      (when (eq (section-tail section) stmt)
+        (setf (section-tail section) prev)))
     (setf (stmt-next prev) next)
     (when next
       (setf (stmt-prev next) prev))))
@@ -349,21 +370,6 @@
 #-(or x86-64 x86)
 (defun %mark-used-labels (operand) ; default implementation
   (declare (ignore operand)))
-
-(defstruct asmstream
-  (data-section (make-section) :read-only t)
-  (code-section (make-section) :read-only t)
-  (elsewhere-section (make-section) :read-only t)
-  (elsewhere-label (gen-label "elsewhere start") :read-only t)
-  (inter-function-padding :normal :type (member :normal :nop))
-  ;; for collecting unique "unboxed constants" prior to placing them
-  ;; into the data section
-  (constant-table (make-hash-table :test #'equal) :read-only t)
-  (constant-vector (make-array 16 :adjustable t :fill-pointer 0) :read-only t)
-  ;; tracking where we last wrote an instruction so that SB-C::TRACE-INSTRUCTION
-  ;; can print "in the {x} section" whenever it changes.
-  (tracing-state (list nil nil) :read-only t)) ; segment and vop
-(declaim (freeze-type asmstream))
 
 ;;; This holds either the current section (if writing symbolic assembly)
 ;;; or current segment (if machine-encoding). Use ASSEMBLE to change it.

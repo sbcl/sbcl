@@ -2587,3 +2587,12 @@
          (lognand (max 0 a) b))
     (((expt 2 (1- sb-vm:n-word-bits)) #xFFFFFF) -1)
     (((1- (expt 2 (1- sb-vm:n-word-bits))) #xFFFFFF) -16777216)))
+
+(with-test (:name :instcombine-delete-last-stmt)
+  (checked-compile
+   '(lambda (a b)
+     (declare ((integer 0 10) b) (optimize (safety 0) (debug 2)))
+     (if (< a 0)
+         (if (< a 10)
+             (if (let ((x a)) (eval a) (setf b x) nil) 0 a)
+             b)))))
