@@ -488,7 +488,14 @@
                           (setf test nil)
                           'eq)
                          ((and (not test) (not test-not))
-                          (when (eq-comparable-type-p (lvar-type item))
+                          (when (cond ((or (neq name 'adjoin)
+                                           (not key))
+                                       (eq-comparable-type-p (lvar-type item)))
+                                      (t
+                                       (let ((type (lvar-fun-type key)))
+                                         (when (fun-type-p type)
+                                           (eq-comparable-type-p
+                                            (single-value-type (fun-type-returns type)))))))
                             'eq))))
            (funs (delete nil (list (when key (list key 'key))
                                    (when test (list test 'test))

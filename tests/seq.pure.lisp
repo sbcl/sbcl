@@ -500,3 +500,10 @@
 (with-test (:name :memq-empty-seq)
   (assert (not (funcall (checked-compile '(lambda (x) (member x '()))) 1)))
   (assert (not (funcall (checked-compile '(lambda (x) (sb-int:memq x '()))) 1))))
+
+(with-test (:name :adjoin-key-eq-comparable)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x y)
+         (adjoin (list x) y :key 'car))
+    ((3d0 '((3d0))) '((3d0)) :test #'equal)))
