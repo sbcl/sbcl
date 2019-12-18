@@ -625,7 +625,8 @@
 (defun type-approximate-interval (type)
   (declare (type ctype type))
   (let ((types (prepare-arg-for-derive-type type))
-        (result nil))
+        (result nil)
+        complex)
     (dolist (type types)
       (let ((type (typecase type
                     (member-type type
@@ -636,13 +637,15 @@
                     (t
                      type))))
         (unless (numeric-type-p type)
-          (return-from type-approximate-interval nil))
+          (return-from type-approximate-interval (values nil nil)))
         (let ((interval (numeric-type->interval type)))
+          (when (eq (numeric-type-complexp type) :complex)
+            (setf complex t))
           (setq result
                 (if result
                     (interval-approximate-union result interval)
                     interval)))))
-    result))
+    (values result complex)))
 
 (defun copy-interval-limit (limit)
   (if (numberp limit)
@@ -3895,21 +3898,28 @@
                                  '((and (not (maybe-float-lvar-p x))
                                         (not (maybe-float-lvar-p y))))))
                     ,reflexive-p
-                    (let ((ix (or (type-approximate-interval (lvar-type x))
-                                  (give-up-ir1-transform)))
-                          (iy (or (type-approximate-interval (lvar-type y))
-                                  (give-up-ir1-transform))))
-                      (cond (,surely-true
-                             t)
-                            (,surely-false
-                             nil)
-                            ((and (constant-lvar-p x)
-                                  (not (constant-lvar-p y)))
-                             `(,',inverse y x))
-                            (t
-                             (give-up-ir1-transform))))))))
+                    (multiple-value-bind (ix x-complex)
+                        (type-approximate-interval (lvar-type x))
+                      (unless ix
+                        (give-up-ir1-transform))
+                      (multiple-value-bind (iy y-complex)
+                          (type-approximate-interval (lvar-type y))
+                        (unless iy
+                          (give-up-ir1-transform))
+                        (cond ((and (or (not x-complex)
+                                        (interval-contains-p 0 ix))
+                                    (or (not y-complex)
+                                        (interval-contains-p 0 iy))
+                                    ,surely-true)
+                               t)
+                              (,surely-false
+                               nil)
+                              ((and (constant-lvar-p x)
+                                    (not (constant-lvar-p y)))
+                               `(,',inverse y x))
+                              (t
+                               (give-up-ir1-transform)))))))))
   (def = = t (interval-= ix iy) (interval-/= ix iy))
-  (def /= /= nil (interval-/= ix iy) (interval-= ix iy))
   (def < > nil (interval-< ix iy) (interval->= ix iy))
   (def > < nil (interval-< iy ix) (interval->= iy ix))
   (def <= >= t (interval->= iy ix) (interval-< iy ix))

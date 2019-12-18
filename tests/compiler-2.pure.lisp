@@ -2609,3 +2609,12 @@
     (assert (eq (funcall f 'wat) :none))
     (assert (equal (funcall f (make-broadcast-stream *error-output*))
                    (list *error-output*)))))
+
+
+(with-test (:name :=-interval-derivation-and-complex)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p1)
+         (declare ((complex (integer -1 -1)) p1))
+         (= -1 p1))
+    ((#C(-1 -1)) nil)))
