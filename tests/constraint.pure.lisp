@@ -63,3 +63,13 @@
                   (typep a '(integer 0 10))
                   nil))))
           '(function (t) (values null &optional)))))
+
+(with-test (:name :=-constraint-complex-no-bounds)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p)
+	(let ((x #c(1 2)))
+          (when (= x p)
+            x)))
+    ((#c(1 2)) #c(1 2))
+    ((#c(2 1)) nil)))

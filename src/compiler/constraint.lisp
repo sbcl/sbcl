@@ -1065,7 +1065,6 @@
                                                 (type-union (make-numeric-type :low (numeric-type-low y)
                                                                                :high (numeric-type-high y))
                                                             (make-numeric-type :complexp :complex
-                                                                               :class 'float
                                                                                :low (numeric-type-low y)
                                                                                :high (numeric-type-high y)))))))))))
     (cond ((and (if-p (node-dest ref))
