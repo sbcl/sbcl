@@ -1055,6 +1055,18 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
         page_table[page].type = SINGLE_OBJECT_FLAG | page_type_flag;
         page_table[page].gen = gc_alloc_generation;
     }
+    // Store a filler so that a linear heap walk does not try to examine
+    // these pages cons-by-cons (or whatever they happen to look like).
+    // A concurrent walk would probably crash anyway, and most certainly
+    // will if it uses the page tables while this allocation is partway
+    // through assigning bytes_used per page.
+    // The fix for that is clear: MAP-OBJECTS-IN-RANGE should acquire
+    // free_pages_lock when computing the extent of a contiguous block.
+    // Anyway it's best if the new page resembles a valid object ASAP.
+    uword_t nwords = nbytes >> WORD_SHIFT;
+    lispobj* addr = (lispobj*)page_address(first_page);
+    *addr = (nwords - 1) << N_WIDETAG_BITS | FILLER_WIDETAG;
+
     os_vm_size_t scan_start_offset = 0;
     for (page = first_page; page < last_page; ++page) {
         set_page_scan_start_offset(page, scan_start_offset);
@@ -1069,20 +1081,18 @@ gc_alloc_large(sword_t nbytes, int page_type_flag, struct alloc_region *alloc_re
     bytes_allocated += nbytes;
     generations[gc_alloc_generation].bytes_allocated += nbytes;
 
+    ret = thread_mutex_unlock(&free_pages_lock);
+    gc_assert(ret == 0);
+
     /* Add the region to the new_areas if requested. */
     if (BOXED_PAGE_FLAG & page_type_flag)
         add_new_area(first_page, 0, nbytes);
 
-    ret = thread_mutex_unlock(&free_pages_lock);
-    gc_assert(ret == 0);
-
-    /* FIXME: zero-fill prior to setting bytes_used so that concurrent
-     * heap walk does not see random detritus on pages which may have
-     * previously held unboxed data. But we want to keep this expensive
-     * step outside of the mutex scope */
     zero_dirty_pages(first_page, last_page);
+    // page may have not needed zeroing, but first word was stored
+    *addr = 0;
 
-    return page_address(first_page);
+    return addr;
 }
 
 void
