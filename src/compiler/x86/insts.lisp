@@ -2531,13 +2531,14 @@
             (emit-back-patch
              segment
              4
-             (lambda (segment posn)
-               (declare (ignore posn)) ; don't care where the fixup itself is
-               (emit-dword segment
-                           (+ (component-header-length)
-                              (- (segment-header-skew segment))
-                              (- other-pointer-lowtag)
-                              (label-position val))))))
+             (let ((val val)) ; capture the current label
+               (lambda (segment posn)
+                 (declare (ignore posn)) ; don't care where the fixup itself is
+                 (emit-dword segment
+                             (+ (component-header-length)
+                                (- (segment-header-skew segment))
+                                (- other-pointer-lowtag)
+                                (label-position val)))))))
            (t
             (emit-dword segment val))))))
 
