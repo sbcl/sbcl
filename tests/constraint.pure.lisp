@@ -68,7 +68,7 @@
   (checked-compile-and-assert
       ()
       `(lambda (p)
-	(let ((x #c(1 2)))
+        (let ((x #c(1 2)))
           (when (= x p)
             x)))
     ((#c(1 2)) #c(1 2))
