@@ -84,11 +84,7 @@
   ;; is just a means to avoid inheriting symbols that are not supposed to be in the CL:
   ;; package but might be due to non-ansi-compliance of the host.
   (def-it *cl-package* "COMMON-LISP")
-  (def-it *keyword-package* "KEYWORD")
-  #+sb-xc-host
-  (def-it *xc-package* "SB-XC")
-  #+sb-xc-host
-  (def-it *xc-strict-cl-package* "XC-STRICT-CL"))
+  (def-it *keyword-package* "KEYWORD"))
 
 (declaim (inline singleton-p))
 (defun singleton-p (list)
