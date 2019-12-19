@@ -199,76 +199,77 @@
         (push '(:direct-default-initargs nil) canonized-options))
       (values (or metaclass 'standard-class) (nreverse canonized-options))))
 
-(defun canonize-defclass-slots (class-name slots env)
-  (let (canonized-specs)
-    (dolist (spec slots)
-      (with-current-source-form (spec)
-        (let* ((location (sb-c::make-definition-source-location)))
-          (when (atom spec)
-            (setf spec (list spec)))
-          (when (and (cdr spec) (null (cddr spec)))
-            (%program-error "~@<in DEFCLASS ~S, the slot specification ~S ~
-                          is invalid; the probable intended meaning may ~
-                          be achieved by specifiying ~S instead.~:>"
-                            class-name spec `(,(car spec) :initform ,(cadr spec))))
-          (let* ((name (car spec))
-                 (plist (cdr spec))
-                 (readers ())
-                 (writers ())
-                 (initargs ())
-                 (others ())
-                 (unsupplied (list nil))
-                 (type t)
-                 (initform unsupplied))
-            (check-slot-name-for-defclass name class-name env)
-            (push name *slot-names-for-this-defclass*)
-            (flet ((note-reader (x)
-                     (unless (symbolp x)
-                       (%program-error "Slot reader name ~S for slot ~S in ~
-                                     DEFCLASS ~S is not a symbol."
-                                       x name class-name))
-                     (push x readers)
-                     (push x *readers-for-this-defclass*))
-                   (note-writer (x)
-                     (push x writers)
-                     (push x *writers-for-this-defclass*)))
-              (doplist (key val) plist
-                (case key
-                  (:accessor (note-reader val) (note-writer `(setf ,val)))
-                  (:reader   (note-reader val))
-                  (:writer   (note-writer val))
-                  (:initarg
-                   (unless (symbolp val)
-                     (%program-error "Slot initarg name ~S for slot ~S in ~
-                                   DEFCLASS ~S is not a symbol."
-                                     val name class-name))
-                   (push val initargs))
-                  (otherwise
-                   (when (member key '(:initform :allocation :type :documentation))
-                     (when (eq key :initform)
-                       (setf initform val))
-                     (when (eq key :type)
-                       (setf type val))
-                     (when (get-properties others (list key))
-                       (%program-error "Duplicate slot option ~S for slot ~
-                                     ~S in DEFCLASS ~S."
-                                       key name class-name)))
-                   ;; For non-standard options multiple entries go in a list
-                   (push val (getf others key))))))
-            ;; Unwrap singleton lists (AMOP 5.4.2)
-            (do ((head others (cddr head)))
-                ((null head))
-              (unless (cdr (second head))
-                (setf (second head) (car (second head)))))
-            (let ((canon `(:name ',name :readers ',readers :writers ',writers
-                           :initargs ',initargs  'source ,location ',others)))
-              (push (if (eq initform unsupplied)
-                        `(list* ,@canon)
-                        `(list* :initfunction ,(make-initfunction initform type spec)
-                                ,@canon))
-                    canonized-specs))))))
-    (nreverse canonized-specs)))
+(defun canonize-defclass-slot (class-name spec env)
+  (let ((location (sb-c::make-definition-source-location))
+        (spec (sb-int:ensure-list spec)))
+    (when (and (cdr spec) (null (cddr spec)))
+      (%program-error "~@<in DEFCLASS ~S, the slot specification ~S ~
+                       is invalid; the probable intended meaning may ~
+                       be achieved by specifiying ~S instead.~:>"
+                      class-name spec `(,(car spec) :initform ,(cadr spec))))
+    (let* ((name (car spec))
+           (plist (cdr spec))
+           (readers ())
+           (writers ())
+           (initargs ())
+           (others ())
+           (unsupplied (list nil))
+           (type t)
+           (initform unsupplied))
+      (check-slot-name-for-defclass name class-name env)
+      (push name *slot-names-for-this-defclass*)
+      (flet ((note-reader (x)
+               (unless (symbolp x)
+                 (%program-error "Slot reader name ~S for slot ~S in ~
+                                  DEFCLASS ~S is not a symbol."
+                                 x name class-name))
+               (push x readers)
+               (push x *readers-for-this-defclass*))
+             (note-writer (x)
+               (push x writers)
+               (push x *writers-for-this-defclass*)))
+        (doplist (key val) plist
+          (case key
+            (:accessor (note-reader val) (note-writer `(setf ,val)))
+            (:reader   (note-reader val))
+            (:writer   (note-writer val))
+            (:initarg
+             (unless (symbolp val)
+               (%program-error "Slot initarg name ~S for slot ~S in ~
+                                DEFCLASS ~S is not a symbol."
+                               val name class-name))
+             (push val initargs))
+            ((:initform :type :allocation :documentation)
+             (case key
+               (:initform
+                (setf initform val))
+               (:type
+                (setf type val)))
+             (when (get-properties others (list key))
+               (%program-error "Duplicate slot option ~S for slot ~
+                                ~S in DEFCLASS ~S."
+                               key name class-name))
+             (push val (getf others key)))
+            (otherwise
+             ;; For non-standard options multiple entries go in a list
+             (push val (getf others key))))))
+      ;; Unwrap singleton lists (AMOP 5.4.2)
+      (do ((head others (cddr head)))
+          ((null head))
+        (unless (cdr (second head))
+          (setf (second head) (car (second head)))))
+      (let ((canon `(:name ',name :readers ',readers :writers ',writers
+                     :initargs ',initargs  'source ,location ',others)))
+        (if (eq initform unsupplied)
+            `(list* ,@canon)
+            `(list* :initfunction ,(make-initfunction initform type spec)
+                    ,@canon))))))
 
+(defun canonize-defclass-slots (class-name slots env)
+  (map 'list (lambda (spec)
+               (with-current-source-form (spec)
+                 (canonize-defclass-slot class-name spec env)))
+       slots))
 
 (defun check-slot-name-for-defclass (name class-name env)
   (flet ((slot-name-illegal (reason)
