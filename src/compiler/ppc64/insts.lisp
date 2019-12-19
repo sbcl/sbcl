@@ -2351,39 +2351,13 @@
 (defun sort-inline-constants (constants)
   (stable-sort constants #'> :key (lambda (x) (align-of (car x)))))
 
-(define-instruction #+64-bit .dword #-64-bit .word (segment &rest vals)
-  (:emitter
-   (dolist (val vals)
-     (cond ((label-p val)
-            ;; note a fixup prior to writing the backpatch so that the fixup's
-            ;; position is the location counter at the patch point
-            (note-fixup segment (or #+64-bit :absolute64 :absolute) (make-fixup nil :code-object 0))
-            (emit-back-patch
-             segment
-             n-word-bytes
-             (let ((val val)) ; capture the current label
-               (lambda (segment posn)
-                 (declare (ignore posn)) ; don't care where the fixup itself is
-                 ;; The addend subtracts other-pointer-lowtag even on ppc64 where
-                 ;; code-tn does not have a lowtag. That's because the apply-fixups
-                 ;; does not care about code-tn. It only knows to add this value
-                 ;; to (GET-LISP-OBJ-ADDRESS CODE).
-                 (#+64-bit emit-dword #-64-bit emit-word
-                           segment
-                           (+ (- other-pointer-lowtag)
-                              (component-header-length)
-                              (- (segment-header-skew segment))
-                              (label-position val)))))))
-           (t
-            (#+64-bit emit-dword #-64-bit emit-word segment val))))))
-
 (defun emit-inline-constant (section constant label)
   (let ((size (align-of constant)))
     (emit section
           `(.align ,(integer-length (1- size)))
           label
           (if (eq (car constant) :jump-table)
-              `(#+64-bit .dword #-64-bit .word ,@(coerce (cdr constant) 'list))
+              `(.lispword ,@(coerce (cdr constant) 'list))
               (let* ((val (cdr constant))
                      (bytes (loop repeat size
                                   collect (prog1 (ldb (byte 8 0) val)

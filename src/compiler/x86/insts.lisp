@@ -2518,30 +2518,6 @@
   ;; Each constant is ((size . bits) . label)
   (stable-sort constants #'> :key (lambda (x) (align-of (car x)))))
 
-(define-instruction .dword (segment &rest vals)
-  (:emitter
-   (dolist (val vals)
-     (cond ((label-p val)
-            ;; note a fixup prior to writing the backpatch so that the fixup's
-            ;; position is the location counter at the patch point
-            ;; (i.e. prior to skipping 8 bytes)
-            ;; This fixup is *not* recorded in code->fixups. Instead, trans_code()
-            ;; will fixup a counted initial subsequence of unboxed words.
-            (note-fixup segment :absolute (make-fixup nil :code-object 0))
-            (emit-back-patch
-             segment
-             4
-             (let ((val val)) ; capture the current label
-               (lambda (segment posn)
-                 (declare (ignore posn)) ; don't care where the fixup itself is
-                 (emit-dword segment
-                             (+ (component-header-length)
-                                (- (segment-header-skew segment))
-                                (- other-pointer-lowtag)
-                                (label-position val)))))))
-           (t
-            (emit-dword segment val))))))
-
 (defun emit-inline-constant (section constant label)
   ;; See comment at CANONICALIZE-INLINE-CONSTANT about how we are
   ;; careless with the distinction between alignment and size.
@@ -2551,7 +2527,7 @@
           `(.align ,(integer-length (1- size)))
           label
           (if (eq (car constant) :jump-table)
-              `(.dword ,@(coerce (cdr constant) 'list))
+              `(.lispword ,@(coerce (cdr constant) 'list))
               `(.byte ,@(let ((val (cdr constant)))
                           (loop repeat size
                                 collect (prog1 (ldb (byte 8 0) val)

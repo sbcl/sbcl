@@ -1880,14 +1880,40 @@
 (%def-inst-encoder '.skip
                     (lambda (segment n-bytes &optional (pattern 0))
                       (%emit-skip segment n-bytes pattern)))
-(%def-inst-encoder '.lispword
-                   (lambda (segment val)
-                     #+little-endian
-                     (loop for i below sb-vm:n-word-bits by 8
-                           do (emit-byte segment (ldb (byte 8 i) val)))
-                     #+big-endian
-                     (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
-                           do (emit-byte segment (ldb (byte 8 i) val)))))
+(%def-inst-encoder
+ '.lispword
+ (lambda (segment &rest vals)
+   (flet ((emit-bytes (segment val)
+            #+little-endian
+            (loop for i below sb-vm:n-word-bits by 8
+                  do (emit-byte segment (ldb (byte 8 i) val)))
+            #+big-endian
+            (loop for i from (- sb-vm:n-word-bits 8) downto 0 by 8
+                  do (emit-byte segment (ldb (byte 8 i) val)))))
+     (dolist (val vals)
+       (cond ((label-p val)
+              ;; note a fixup prior to writing the backpatch so that the fixup's
+              ;; position is the location counter at the patch point
+              ;; (i.e. prior to skipping 8 bytes)
+              ;; This fixup is *not* recorded in code->fixups. Instead, trans_code()
+              ;; will fixup a counted initial subsequence of unboxed words.
+              ;; Q: why are fixup notes a "compiler" abstractions?
+              ;; They seem pretty assembler-related to me.
+              (sb-c:note-fixup segment (or #+64-bit :absolute64 :absolute)
+                               (sb-c:make-fixup nil :code-object 0))
+              (emit-back-patch
+               segment
+               sb-vm:n-word-bytes
+               (let ((val val)) ; capture the current label
+                 (lambda (segment posn)
+                   (declare (ignore posn)) ; don't care where the fixup itself is
+                   (emit-bytes segment
+                               (+ (sb-c:component-header-length)
+                                  (- (segment-header-skew segment))
+                                  (- sb-vm:other-pointer-lowtag)
+                                  (label-position val)))))))
+             (t
+              (emit-bytes segment val)))))))
 
 ;;;; Peephole pass
 
