@@ -70,6 +70,20 @@
                (return))))
         (specifier-type type-specifier)))))
 
+(defun check-slot-type-specifier (specifier slot-name context)
+  ;; This signals an error for malformed type specifiers and
+  ;; deprecation warnings for deprecated types but does nothing for
+  ;; unknown types.
+  (with-current-source-form (specifier)
+    (handler-case
+        (and (specifier-type specifier)
+             (sb-impl::%check-deprecated-type specifier))
+      (parse-unknown-type ())
+      (error (condition)
+        (destructuring-bind (operator . class-name) context
+          (%program-error "Invalid :TYPE for slot ~S in ~S ~S: ~A."
+                          slot-name operator class-name condition))))))
+
 ;;; These functions are used as method for types which need a complex
 ;;; subtypep method to handle some superclasses, but cover a subtree
 ;;; of the type graph (i.e. there is no simple way for any other type

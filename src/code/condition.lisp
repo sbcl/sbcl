@@ -400,61 +400,64 @@
               (all-readers nil append)
               (all-writers nil append))
       (dolist (spec slot-specs)
-        (when (keywordp spec)
-          (warn "Keyword slot name indicates probable syntax error:~%  ~S"
-                spec))
-        (let* ((spec (if (consp spec) spec (list spec)))
-               (slot-name (first spec))
-               (allocation :instance)
-               (initform-p nil)
-               documentation
-               initform)
-          (collect ((initargs)
-                    (readers)
-                    (writers))
-            (do ((options (rest spec) (cddr options)))
-                ((null options))
-              (unless (and (consp options) (consp (cdr options)))
-                (error "malformed condition slot spec:~%  ~S." spec))
-              (let ((arg (second options)))
-                (case (first options)
-                  (:reader (readers arg))
-                  (:writer (writers arg))
-                  (:accessor
-                   (readers arg)
-                   (writers `(setf ,arg)))
-                  (:initform
-                   (when initform-p
-                     (error "more than one :INITFORM in ~S" spec))
-                   (setq initform-p t)
-                   (setq initform arg))
-                  (:initarg (initargs arg))
-                  (:allocation
-                   (setq allocation arg))
-                  (:documentation
-                   (when documentation
-                     (error "more than one :DOCUMENTATION in ~S" spec))
-                   (unless (stringp arg)
-                     (error "slot :DOCUMENTATION argument is not a string: ~S"
-                            arg))
-                   (setq documentation arg))
-                  (:type)
-                  (t
-                   (error "unknown slot option:~%  ~S" (first options))))))
+        (with-current-source-form (spec)
+          (when (keywordp spec)
+            (warn "Keyword slot name indicates probable syntax error:~%  ~S"
+                  spec))
+          (let* ((spec (if (consp spec) spec (list spec)))
+                 (slot-name (first spec))
+                 (allocation :instance)
+                 (initform-p nil)
+                 documentation
+                 initform)
+            (collect ((initargs)
+                      (readers)
+                      (writers))
+              (do ((options (rest spec) (cddr options)))
+                  ((null options))
+                (unless (and (consp options) (consp (cdr options)))
+                  (error "malformed condition slot spec:~%  ~S." spec))
+                (let ((arg (second options)))
+                  (case (first options)
+                    (:reader (readers arg))
+                    (:writer (writers arg))
+                    (:accessor
+                     (readers arg)
+                     (writers `(setf ,arg)))
+                    (:initform
+                     (when initform-p
+                       (error "more than one :INITFORM in ~S" spec))
+                     (setq initform-p t)
+                     (setq initform arg))
+                    (:initarg (initargs arg))
+                    (:allocation
+                     (setq allocation arg))
+                    (:documentation
+                     (when documentation
+                       (error "more than one :DOCUMENTATION in ~S" spec))
+                     (unless (stringp arg)
+                       (error "slot :DOCUMENTATION argument is not a string: ~S"
+                              arg))
+                     (setq documentation arg))
+                    (:type
+                     (check-slot-type-specifier
+                      arg slot-name (cons 'define-condition name)))
+                    (t
+                     (error "unknown slot option:~%  ~S" (first options))))))
 
-            (all-readers (readers))
-            (all-writers (writers))
-            (slots `(make-condition-slot
-                     :name ',slot-name
-                     :initargs ',(initargs)
-                     :readers ',(readers)
-                     :writers ',(writers)
-                     :initform-p ',initform-p
-                     :documentation ',documentation
-                     :initform ,(when initform-p `',initform)
-                     :initfunction ,(when initform-p
-                                      `#'(lambda () ,initform))
-                     :allocation ',allocation)))))
+              (all-readers (readers))
+              (all-writers (writers))
+              (slots `(make-condition-slot
+                       :name ',slot-name
+                       :initargs ',(initargs)
+                       :readers ',(readers)
+                       :writers ',(writers)
+                       :initform-p ',initform-p
+                       :documentation ',documentation
+                       :initform ,(when initform-p `',initform)
+                       :initfunction ,(when initform-p
+                                        `#'(lambda () ,initform))
+                       :allocation ',allocation))))))
 
       (dolist (option options)
         (unless (consp option)

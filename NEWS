@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-1.5.9
+  * enhancement: malformed type specifiers and occurrences of deprecated types
+    in :TYPE initargs of DEFCLASS and DEFINE-CONDITION slot specifications
+    are detected and result in compile-time errors and warnings respectively.
+
 changes in sbcl-1.5.9 relative to sbcl-1.5.8:
   * platform support:
     ** a message intended to be more helpful will be displayed for an mmap

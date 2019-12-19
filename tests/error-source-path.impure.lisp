@@ -101,6 +101,20 @@
    (defclass foo () ((x :type string :initform (+ 1 5))))
    (4 0 3)))
 
+(with-test (:name (:source-path defclass :slot :type :malformed))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type 1)))
+   (0 3))
+  (assert-condition-source-paths
+   (defclass foo () ((x :type (null cons))))
+   (2 0 3))
+  (assert-condition-source-paths
+   (define-condition foo () ((x :type 1)))
+   (0 3))
+  (assert-condition-source-paths
+   (define-condition foo () ((x :type (null cons))))
+   (2 0 3)))
+
 (with-test (:name (:source-path :&key :initform))
   (assert-condition-source-paths
    (defun foo (&key (x 15))
@@ -152,6 +166,16 @@
   (assert-condition-source-paths
    (defmethod using-deprecated ((thing deprecated-class)))
    (0 2)))
+
+(with-test (:name (:source-path defclass deprecated :slot :type))
+  (assert-condition-source-paths
+   (defclass foo ()
+     ((bar :type deprecated-class)))
+   (0 3))
+  (assert-condition-source-paths
+   (define-condition foo ()
+     ((bar :type deprecated-class)))
+   (0 3)))
 
 (with-test (:name (:source-path defmethod :walk-body))
   (assert-condition-source-paths
