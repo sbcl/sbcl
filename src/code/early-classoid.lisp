@@ -513,7 +513,8 @@
 (defun summarize-layouts ()
   (let ((prev -1))
     (dolist (layout (sort (loop for v being each hash-value
-                                of (classoid-subclasses (find-classoid 't)))
+                                of (classoid-subclasses (find-classoid 't))
+                                collect v)
                           #'< :key #'sb-kernel::layout-flags))
       (let ((flags (sb-kernel::layout-flags layout)))
         (unless (= flags prev)
