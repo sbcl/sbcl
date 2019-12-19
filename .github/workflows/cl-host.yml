@@ -52,20 +52,20 @@ jobs:
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: ./make.sh --xc-host='clisp -on-error exit'
 
-  # abcl:
+  abcl:
 
-  #   runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-  #   steps:
-  #   - uses: actions/checkout@v1
-  #   - name: instal host abcl
-  #     run: |
-  #       wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/abcl.jar
-  #       echo '(setf system::*invoke-debugger-hook* (lambda (c fun) (princ c) (top-level::backtrace-command 100) (exit :status 1)))' > ~/.abclrc
-  #   - name: build
-  #     env:  
-  #       SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
-  #     run: ./make.sh --xc-host='java -jar abcl.jar'
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host abcl
+      run: |
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/abcl.jar
+        echo '(setf system::*invoke-debugger-hook* (lambda (c fun) (princ c) (top-level::backtrace-command 100) (exit :status 1)))' > ~/.abclrc
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh --xc-host='java -jar abcl.jar'
     
   ccl:
 
