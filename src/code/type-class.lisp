@@ -377,6 +377,13 @@
                    (dd-slots (find-defstruct-description type-name))
                    :key #'dsd-name)))
 
+;;; Compute a SAP to the specified slot in INSTANCE.
+(defmacro struct-slot-sap (instance type-name slot-name)
+  `(sap+ (int-sap (get-lisp-obj-address ,instance))
+         (- (ash (+ (get-dsd-index ,type-name ,slot-name) sb-vm:instance-slots-offset)
+                 sb-vm:word-shift)
+            sb-vm:instance-pointer-lowtag)))
+
 (defmacro define-type-class (name &key inherits
                                      (enumerable (unless inherits (must-supply-this))
                                                  enumerable-supplied-p)

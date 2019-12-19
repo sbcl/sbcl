@@ -527,18 +527,14 @@
       ;; For 8-byte words and 7-byte dchunks, we use SAP-REF-WORD, which reads
       ;; 8 bytes, so make sure the number of bytes to go is 8,
       ;; never mind that dchunk-bits is less.
-      `(logand (if (>= bytes-remaining sb-vm:n-word-bytes)
-                   (sap-ref-word (dstate-segment-sap ,state) (dstate-cur-offs ,state))
-                   (let ((scratch-buf
-                          (sap+ (int-sap (get-lisp-obj-address ,state))
-                                (- (ash (+ (get-dsd-index disassem-state scratch-buf)
-                                           sb-vm:instance-slots-offset)
-                                        sb-vm:word-shift)
-                                   sb-vm:instance-pointer-lowtag))))
-                     (setf (dstate-scratch-buf ,state) 0)
-                     (%byte-blt (dstate-segment-sap ,state) (dstate-cur-offs ,state)
-                                scratch-buf 0 bytes-remaining)
-                     (sap-ref-word scratch-buf 0)))
+      `(logand (cond ((>= bytes-remaining sb-vm:n-word-bytes)
+                      (sap-ref-word (dstate-segment-sap ,state) (dstate-cur-offs ,state)))
+                     (t
+                      (setf (dstate-scratch-buf ,state) 0)
+                      (%byte-blt (dstate-segment-sap ,state) (dstate-cur-offs ,state)
+                                 (struct-slot-sap ,state disassem-state scratch-buf) 0
+                                 bytes-remaining)
+                      (dstate-scratch-buf ,state)))
                dchunk-one)
       ;; This was some sort of meagre attempt to be endian-agnostic.
       ;; Perhaps it should just use SAP-REF-n directly?

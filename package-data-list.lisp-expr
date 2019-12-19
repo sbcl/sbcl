@@ -2060,6 +2060,7 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                                    "SIMD-PACK-256-TYPE-ELEMENT-TYPE")
                "STACK-REF" "STREAM-DESIGNATOR" "STRING-DESIGNATOR"
                "STRING-FILL*"
+               "STRUCT-SLOT-SAP"
                "STRUCTURE-CTOR-LAMBDA-PARTS"
                "STRUCTURE-INSTANCE-ACCESSOR-P"
                "SUB-GC"
