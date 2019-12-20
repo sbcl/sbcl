@@ -88,6 +88,12 @@ EOF
   fi
 done
 
+if [ -z "$*" ]; then
+    contribs_to_build="`cd contrib ; echo *`"
+else
+    contribs_to_build="$*"
+fi
+
 # Sometimes people used to see the "No tests failed." output from the last
 # DEFTEST in contrib self-tests and think that's all that is. So...
 HEADER_HAS_BEEN_PRINTED=false
