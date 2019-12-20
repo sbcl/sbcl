@@ -1686,27 +1686,11 @@ core and return a descriptor to it."
                        (cold-cons (cold-intern (car layout)) (cdr layout)))
                      (sort-cold-layouts))))
 
-  #+sb-thread
-  (let ((bindings sb-kernel::*!thread-initial-bindings*))
-    ;; Assign the initialization vector for create_thread_struct()
-    (cold-set 'sb-thread::*thread-initial-bindings*
-              (vector-in-core
-               (mapcar (lambda (pair &aux (name (car pair)))
-                         ;; Sanity check - no overlap with GC/interrupt controls
-                         (aver (not (member name sb-vm::!per-thread-c-interface-symbols)))
-                         (let* ((name (cold-intern name))
-                                (value (cdr pair))
-                                (initform
-                                 (cond ((symbolp value)
-                                        (cold-intern value))
-                                       ((is-fixnum-lowtag (descriptor-lowtag value))
-                                        value)
-                                       (t
-                                        (bug "Unsupported thread-local initform")))))
-                           (if (null value) name (cold-cons initform name))))
-                       bindings)))
-    (dolist (binding bindings)
-      (ensure-symbol-tls-index (car (ensure-list binding))))
+  #+sb-thread ; assign TLS indices to known-thread-locals
+  (let ((symbols (host-object-from-core
+                  (cold-symbol-value 'sb-thread::*!genesis-thread-local-specials*))))
+    (assert (null (intersection symbols sb-vm::!per-thread-c-interface-symbols)))
+    (mapc 'ensure-symbol-tls-index symbols)
     (cold-set 'sb-vm::*free-tls-index*
               (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift))))
 

@@ -16,9 +16,6 @@
   (declare (special *muffled-warnings*))
   (typep warning *muffled-warnings*))
 
-;; Host lisp does not need a value for this, so start it out as NIL.
-(define-load-time-global **initial-handler-clusters** nil)
-
 ;;; Each cluster is an alist of the form
 ;;;
 ;;;  ((TYPE-TEST1 . HANDLER1) (TYPE-TEST2 . HANDLER2) ...)
@@ -33,23 +30,16 @@
 ;;;
 ;;; Lists to which *HANDLER-CLUSTERS* is bound generally have dynamic
 ;;; extent.
-#+sb-thread (!define-thread-local *handler-clusters* **initial-handler-clusters**)
-#-sb-thread (defvar *handler-clusters* **initial-handler-clusters**)
-
-;;; a list of lists of currently active RESTART instances. maintained
-;;; by RESTART-BIND.
-(!define-thread-local *restart-clusters* nil)
 
 (defun !target-error-cold-init ()
+  ;; Anonymous lambdas are too complicated to dump as constants in genesis.
+  ;; (that's sad, I wish we could do something about it)
   (setq **initial-handler-clusters**
         `(((,(find-classoid-cell 'warning :create t)
             .
             ,(named-lambda "MAYBE-MUFFLE" (warning)
                (when (muffle-warning-p warning)
-                 (muffle-warning warning)))))))
-  ;;; If multithreaded, *HANDLER-CLUSTERS* is #<unbound> at this point.
-  ;;; This SETQ assigns to TLS since the value is not no-tls-value-marker.
-  (setq *handler-clusters* **initial-handler-clusters**))
+                 (muffle-warning warning))))))))
 
 (defmethod print-object ((restart restart) stream)
   (if *print-escape*

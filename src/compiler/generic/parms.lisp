@@ -211,10 +211,6 @@
     ;; dynamic runtime linking support
     #+sb-dynamic-core +required-foreign-symbols+
 
-    ;; List of Lisp specials bindings made by create_thread_struct()
-    ;; excluding the names in !PER-THREAD-C-INTERFACE-SYMBOLS.
-    sb-thread::*thread-initial-bindings*
-
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order
     ;;; to (perhaps) micro-optimize access in Lisp.

@@ -394,7 +394,9 @@ during backtrace.
   ;; makes it "off" by N-FIXNUM-TAG-BITS, which is bothersome,
   ;; so there's a transform on SYMBOL-TLS-INDEX to make it sane.
   #+(and sb-thread (not 64-bit))
-  (tls-index :ref-known (flushable) :ref-trans %symbol-tls-index))
+  (tls-index :type (and fixnum unsigned-byte) ; too generous still?
+             :ref-known (flushable)
+             :ref-trans %symbol-tls-index))
 
 (define-primitive-object (complex-single-float
                           :lowtag other-pointer-lowtag

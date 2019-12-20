@@ -22,6 +22,9 @@
 #-sb-thread
 (defvar *stepping* 0)
 
+#-sb-xc-host
+(progn
+
 ;; Used for implementing the STEP-OUT restart. The step-wrapper will
 ;; bind this to :MAYBE, before calling the wrapped code. When
 ;; unwinding, the wrapper will check whether it's been set to T. If
@@ -34,8 +37,6 @@
 ;; 'step.lisp' is too late, because 'step' is compiled in warm load,
 ;; but the REPL calls DISABLE-STEPPING right way.
 ;; Adding a file of target-only code for these isn't worth the trouble.
-#-sb-xc-host
-(progn
 (symbol-macrolet ((place
                    #+sb-thread (sb-thread::thread-stepping)
                    #-sb-thread *stepping*))

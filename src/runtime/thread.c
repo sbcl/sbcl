@@ -846,27 +846,6 @@ create_thread_struct(lispobj start_routine) {
 #  define INITIALIZE_TLS(sym,val) SYMBOL(sym)->value = val
 #endif
 #include "genesis/thread-init.inc"
-#ifdef LISP_FEATURE_SB_THREAD
-    /* Each initial binding is a cons whose car is a symbol evaluated as if
-     * by SYMBOL-GLOBAL-VALUE (unsafely), and whose cdr is the target symbol.
-     * In particular, we will obligingly assign the unbound-marker.
-     * An atom implies NIL for the value. */
-    struct vector* tls_init = VECTOR(SYMBOL(THREAD_INITIAL_BINDINGS)->value);
-    for (i = 0; i < tls_init->length; i += make_fixnum(1)) {
-        lispobj binding = tls_init->data[fixnum_value(i)];
-        lispobj value = NIL;
-        if (listp(binding)) {
-            lispobj val_form = CONS(binding)->car;
-            value = fixnump(val_form) ? val_form : SYMBOL(val_form)->value;
-            binding = CONS(binding)->cdr;
-        }
-        struct symbol* sym = SYMBOL(binding);
-        write_TLS_index(tls_index_of(sym), value, th, sym);
-    }
-    /* If a symbol assigned above had a TLS index of 0, then it'll
-     * mess up th->no_tls_value_marker. Fail now if that happened. */
-    gc_assert(th->no_tls_value_marker == NO_TLS_VALUE_MARKER_WIDETAG);
-#endif
     th->no_tls_value_marker = start_routine;
 
 #if defined(LISP_FEATURE_WIN32)

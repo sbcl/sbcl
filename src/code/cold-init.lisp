@@ -74,6 +74,10 @@
   (/show "testing '/SHOW" *print-length* *print-level*) ; show anything
   (unless (!c-runtime-noinform-p)
     (write-string "COLD-INIT... "))
+  ;; Establish **initial-handler-clusters**
+  (show-and-call sb-kernel::!target-error-cold-init)
+  ;; And now *CURRENT-THREAD* and *HANDLER-CLUSTERS*
+  (sb-thread::init-initial-thread)
 
   ;; Assert that FBOUNDP doesn't choke when its answer is NIL.
   ;; It was fine if T because in that case the legality of the arg is certain.
@@ -83,13 +87,7 @@
   ;; Anyone might call RANDOM to initialize a hash value or something;
   ;; and there's nothing which needs to be initialized in order for
   ;; this to be initialized, so we initialize it right away.
-  ;; Indeed, INIT-INITIAL-THREAD needs a random number.
   (show-and-call !random-cold-init)
-
-  ;; Ensure that *CURRENT-THREAD* and *HANDLER-CLUSTERS* have sane values.
-  ;; create_thread_struct() assigned NIL/unbound-marker respectively.
-  (sb-thread::init-initial-thread)
-  (show-and-call sb-kernel::!target-error-cold-init)
 
   ;; Putting data in a synchronized hashtable (*PACKAGE-NAMES*)
   ;; requires that the main thread be properly initialized.

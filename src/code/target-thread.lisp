@@ -268,12 +268,14 @@ created and old ones may exit at any time."
         *make-thread-lock* (make-mutex :name "Make-Thread Lock"))
   (let ((thread (%make-thread :name "main thread"
                               :%alive-p t)))
+    ;; Run the macro-generated function which writes some values into the TLS,
+    ;; most especially *CURRENT-THREAD*.
+    (initialize-tls thread)
     (setf (thread-os-thread thread) (current-thread-os-thread)
           (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
           (thread-primitive-thread thread) (sap-int (current-thread-sap))
-          *initial-thread* thread
-          *current-thread* thread)
-    (grab-mutex (thread-result-lock *initial-thread*))
+          *initial-thread* thread)
+    (grab-mutex (thread-result-lock thread))
     ;; Either *all-threads* is empty or it contains exactly one thread
     ;; in case we are in reinit since saving core with multiple
     ;; threads doesn't work.
@@ -1519,11 +1521,11 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
+  (initialize-tls thread)
   ;; Can't initiate GC before *current-thread* is set, otherwise the
   ;; locks grabbed by SUB-GC wouldn't function.
   ;; Other threads can GC with impunity.
-  (setf *current-thread* thread ; is thread-local already
-        (thread-os-thread thread) (current-thread-os-thread)
+  (setf (thread-os-thread thread) (current-thread-os-thread)
         (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
         (thread-primitive-thread thread) (sap-int (current-thread-sap)))
   ;; *ALLOC-SIGNAL* is made thread-local by create_thread_struct()
@@ -2019,6 +2021,67 @@ mechanism for inter-thread communication."
           (values nil nil))))
 
 
+
+;;; Note all thread-local specials by storing the names into this cold fasl
+;;; We should makunbound the list, but that would make after-xc core unhappy.
+(defparameter *!genesis-thread-local-specials*
+  '#.(mapcar #'car *!thread-local-specials*))
+
+;;; Initialize thread-local special vars other than the GC control specials.
+;;; globaldb should indicate that the variable is both :always-thread-local
+;;; (which says that the TLS index is nonzero), and :always-bound (which says that
+;;; the value in TLS is not UNBOUND-MARKER).
+;;; Here's the problem: Some of the backends implement those semantics as dictated
+;;; by globaldb - assigning into TLS even if the current TLS value is NO_TLS_VALUE;
+;;; while others do not make use of that information, and will therefore assign into
+;;; the global value if the TLS value is NO_TLS_VALUE.
+;;; This can not be "corrected" by genesis - there is no TLS when genesis executes.
+;;; The only way to do this reliably is to compute the address of the thread-local
+;;; storage slot, and use (SETF SAP-REF-LISPOBJ)
+;;; (Nor is #+(vop-translates ensure-symbol-tls-index) a reliable indicator that the
+;;; SET vop will assign into a thread-local symbol that currently has no TLS value.)
+
+;;; Note also that this is called by REINIT, which _should_ reinitialize
+;;; the *CURRENT-THREAD* but should _NOT_ reinitialize anything else.
+;;; That's actually kind of weird, but it's necessary to ensure that *RESTART-CLUSTERS*
+;;; does not get clobbered if there were any restarts available.
+;;; There's a SAVE-LISP-AND-DIE test which asserts that you can resume
+;;; from a failed save.
+;;; It might behoove us to pass in a flag as to whether this is coming from REINIT,
+;;; but INIT-INITIAL-THREAD doesn't know either. We'd have to plumb a new flag
+;;; down all the way from SAVE.
+(defun initialize-tls (thread)
+  #-sb-thread
+  ;; *CURRENT-THREAD* is known always bound, so BOUNDP would be T
+  ;; We need to see whether it's really boundp.
+  (if (unbound-marker-p
+       ;; but apparently some backends don't actually optimize out
+       ;; the BOUNDP check, so we have to use an unsafe read.
+       (locally (declare (optimize (safety 0)))
+         (sb-ext:symbol-global-value '*current-thread*)))
+      (macrolet ((expand ()
+                   `(setf ,@(apply #'append *!thread-local-specials*))))
+        (expand))
+      (setf *current-thread* thread))
+  ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison's sake
+  #+sb-thread
+  (let ((sap (current-thread-sap)))
+    (if (= (sap-ref-word sap (symbol-tls-index '*current-thread*))
+           sb-vm:no-tls-value-marker-widetag)
+        ;; TODO: figure out how to give all of the thread-local-specials a known wired-tls-index.
+        ;; This produces laughably bad code on x86-64:
+        ;;     48C1E808         SHR RAX, 8      ; shift out the widetag
+        ;;     48D1E0           SHL RAX, 1      ; fixnumize
+        ;;     48C1F818         SAR RAX, 24     ; get the upper 32 bits of the original header
+        ;;     48D1F8           SAR RAX, 1      ; unfixnumize
+        ;; In the grand scheme of things, it's not a huge problem.
+        (macrolet ((expand ()
+                     `(setf ,@(loop for (var form) in *!thread-local-specials*
+                                    append `((sap-ref-lispobj sap (symbol-tls-index ',var))
+                                             ,form)))))
+          (expand))
+        (setf *current-thread* thread)))
+  nil)
 
 ;;;; Stepping
 

@@ -90,37 +90,28 @@
                (declare (ignorable obj env))
                ,target-expr))))))
 
-;;; Define a variable that is initialized in create_thread_struct() before any
-;;; Lisp code can execute. In particular, *RESTART-CLUSTERS* and *HANDLER-CLUSTERS*
-;;; should have a value before anything else happens.
-;;; While thread-local vars are generally useful, this is not the implementation
-;;; that would exist in the target system, if exposed more generally.
-;;; (Among the issues is the very restricted initialization form)
-(defmacro !define-thread-local (name initform &optional docstring)
-  (check-type initform (or fixnum symbol))
-  #-sb-thread `(progn
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                    (setf (info :variable :always-bound ',name) :always-bound))
-                  ;; DEFPARAMETER, not DEFVAR, because genesis can do it
-                  (defparameter ,name ,initform ,docstring))
-  #+sb-thread `(progn
-                  ;; Genesis can handle !%DEFINE-THREAD-LOCAL
-                  #-sb-xc-host (!%define-thread-local ',name ',initform)
-                  (eval-when (:compile-toplevel :load-toplevel :execute)
-                    (setf (info :variable :wired-tls ',name) :always-thread-local)
-                    (setf (info :variable :always-bound ',name) :always-bound))
-                  (defvar ,name ,initform ,docstring)))
-
-;;; Note that this mechanism for creation of thread-locals complements the
-;;; mechanism for initializing variables that affect GC and interrupts.
-;;; Those other thread-locals are defined with an ordinary DEFVAR, but the
-;;; full list of such symbols is enumerated by !PER-THREAD-C-INTERFACE-SYMBOLS
-;;; which specifies both the list and the initial value of each symbol.
-(defvar *!thread-initial-bindings* nil)
-#+sb-xc-host
-(setf (get '!%define-thread-local :sb-cold-funcall-handler/for-effect)
-      (lambda (name initsym)
-        (push `(,name . ,initsym) *!thread-initial-bindings*)))
+;;; Define a variable that is assigned into TLS either in INIT-INITIAL-THREAD
+;;; or NEW-LISP-THREAD-TRAMPOLINE before any other Lisp code runs.
+;;; !COLD-INIT gets these assignents via INIT-INITIAL-THREAD.
+;;; In particular, *RESTART-CLUSTERS* and *HANDLER-CLUSTERS* need a value prior
+;;; to running into any errors, or else you've got twice the trouble.
+;;;
+;;; There are other thread-locals which are used by C code, and those are all
+;;; defined in !PER-THREAD-C-INTERFACE-SYMBOLS. Those other symbols must have
+;;; initial values of either a fixnum or a static symbol (typically T or NIL).
+;;;
+;;; In contrast, !DEFINE-THREAD-LOCAL allows more-or-less an arbitrary form,
+;;; subject to being evaluable without need of values computed later of course.
+(defvar sb-thread::*!thread-local-specials* nil)
 #-sb-xc-host
-(defun !%define-thread-local (dummy1 dummy2) ; to avoid warning
-  (declare (ignore dummy1 dummy2)))
+(defmacro !define-thread-local (name initform &optional docstring)
+  `(locally
+       (declare (notinline (setf info)))
+     (defvar ,name (error "~S had no value in cold-init" ',name) ,docstring)
+     (eval-when (:compile-toplevel :load-toplevel :execute)
+       (setf sb-thread::*!thread-local-specials*
+             (append sb-thread::*!thread-local-specials* '((,name ,initform))))
+       ;; Does it help anything to choose the TLS index now? Probably not,
+       ;; we'll use a symbol-tls fixup almost everywhere except in INITIALIZE-TLS.
+       #+sb-thread (setf (info :variable :wired-tls ',name) :always-thread-local)
+       (setf (info :variable :always-bound ',name) :always-bound))))
