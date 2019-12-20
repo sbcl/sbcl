@@ -2093,3 +2093,51 @@ mechanism for inter-thread communication."
   (setf (sap-ref-lispobj (current-thread-sap)
                          (* sb-vm::thread-stepping-slot sb-vm:n-word-bytes))
         value))
+
+;;;; Diagnostic tool
+
+#+(and sb-thread sb-devel)
+(defun dump-thread ()
+  (let* ((primobj (find 'sb-vm::thread sb-vm::*primitive-objects*
+                        :key #'sb-vm::primitive-object-name))
+         (slots (sb-vm::primitive-object-slots primobj))
+         (sap (current-thread-sap))
+         (names (make-array (sb-vm::primitive-object-length primobj) :initial-element "")))
+    (dolist (slot slots)
+      (setf (aref names (sb-vm::slot-offset slot)) (sb-vm::slot-name slot)))
+    (flet ((safely-read (sap offset)
+             (let ((word (sap-ref-word sap offset)))
+               (cond ((= word sb-vm:no-tls-value-marker-widetag) :no-tls-value)
+                     ((= word sb-vm:unbound-marker-widetag) :unbound)
+                     (t (sap-ref-lispobj sap offset)))))
+           (show (tlsindex val)
+             (if (< (ash tlsindex (- sb-vm:word-shift)) (length names))
+                 (format t " ~3d ~30a : ~x~%"
+                         (ash tlsindex (- sb-vm:word-shift))
+                         (aref names (ash tlsindex (- sb-vm:word-shift)))
+                         val)
+                 (let ((*print-right-margin* 128)
+                       (*print-lines* 4))
+                   (format t " ~3d ~30a : ~s~%"
+                           (ash tlsindex (- sb-vm:word-shift))
+                           (sb-ext::find-symbol-from-tls-index tlsindex)
+                           val)))))
+      (format t "~&TLS: (base=~x)~%" (sap-int sap))
+      (loop for tlsindex from sb-vm:n-word-bytes below
+            (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
+            by sb-vm:n-word-bytes
+            do (if (< tlsindex (ash (length slots) sb-vm:word-shift))
+                   (show tlsindex (sap-ref-word sap tlsindex))
+                   (let ((val (safely-read sap tlsindex)))
+                     (unless (eq val :no-tls-value)
+                       (show tlsindex val)))))
+      (let ((from (descriptor-sap sb-vm:*binding-stack-start*))
+            (to (binding-stack-pointer-sap)))
+        (format t "~%Binding stack: (depth ~d)~%"
+                (/ (sap- to from) (* sb-vm:binding-size sb-vm:n-word-bytes)))
+        (loop
+          (when (sap>= from to) (return))
+          (let ((val (safely-read from 0))
+                (tlsindex (sap-ref-word from sb-vm:n-word-bytes)))
+            (show tlsindex val))
+          (setq from (sap+ from (* sb-vm:binding-size sb-vm:n-word-bytes))))))))
