@@ -799,8 +799,7 @@ core and return a descriptor to it."
     des))
 
 (defun write-double-float-bits (address index x)
-  (ecase sb-vm:n-word-bits
-    (32
+  #-64-bit
      (let ((high-bits (double-float-high-bits x))
            (low-bits (double-float-low-bits x)))
        #+little-endian
@@ -808,9 +807,9 @@ core and return a descriptor to it."
               (write-wordindexed/raw address (1+ index) high-bits))
        #+big-endian
        (progn (write-wordindexed/raw address index high-bits)
-              (write-wordindexed/raw address (1+ index) low-bits))))
-    (64
-     (write-wordindexed/raw address index (double-float-bits x))))
+              (write-wordindexed/raw address (1+ index) low-bits)))
+  #+64-bit
+     (write-wordindexed/raw address index (double-float-bits x))
   address)
 
 (defun float-to-core (x)
@@ -925,8 +924,8 @@ core and return a descriptor to it."
 (defun cold-vector-len (vector)
   (descriptor-fixnum (read-wordindexed vector sb-vm:vector-length-slot)))
 (defun cold-svref (vector i)
-  (read-wordindexed vector (+ (if (integerp i) i (descriptor-fixnum i))
-                              sb-vm:vector-data-offset)))
+  (declare (type index i))
+  (read-wordindexed vector (+ i sb-vm:vector-data-offset)))
 (defun cold-vector-elements-eq (a b)
   (and (eql (cold-vector-len a) (cold-vector-len b))
        (dotimes (k (cold-vector-len a) t)
@@ -3390,8 +3389,14 @@ III. initially undefined function references (alphabetically):
                               (:mixed (incf n-mixed) #b01))
                             0)))
         (setf (bvref-word ptes pte-offset) (logior sso type-bits))
-        (funcall (if (eql sizeof-usage 2) #'(setf bvref-16) #'(setf bvref-32))
-                 usage ptes (+ pte-offset sb-vm:n-word-bytes))))
+        (macrolet ((setter ()
+                     ;; KLUDGE to avoid compiler note about one or the other
+                     ;; branch of this IF being unreachable.
+                     (declare (notinline typep))
+                     (if (typep sb-vm:gencgc-card-bytes '(unsigned-byte 16))
+                         '#'(setf bvref-16)
+                         '#'(setf bvref-32))))
+          (funcall (setter) usage ptes (+ pte-offset sb-vm:n-word-bytes)))))
     (when verbose
       (format t "movable dynamic space: ~d boxed pages, ~d code pages~%" n-mixed n-code))
     (force-output core-file)
