@@ -71,14 +71,20 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142538F94B20 CMOVEQ RDX, [#x204BF938]  ; *PRINT-BASE*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
-  (assert (= (length (disasm 0 '*print-base*)) 3))
+  (let ((text (disasm 0 '*print-base*)))
+    (assert (= (length text) 3)) ; number of lines
+    ;; two lines should be annotated with *PRINT-BASE*
+    (assert (= (loop for line in text count (search "*PRINT-BASE*" line)) 2)))
 
   ;; When symbol SC is CONSTANT:
   ;;    498B9578290000     MOV RDX, [R13+disp]       ; tls: FOO
   ;;    488B059EFFFFFF     MOV RAX, [RIP-98]         ; 'FOO
   ;;    83FA61             CMP EDX, 97
   ;;    480F4450F9         CMOVEQ RDX, [RAX-7]
-  (assert (= (length (disasm 0 'foo)) 4)))
+  (let ((text (disasm 0 'foo)))
+    (assert (= (length text) 4))
+    ;; two lines should be annotated with FOO
+    (assert (= (loop for line in text count (search "FOO" line)) 2))))
 
 (defvar *blub*) ; immobile space
 (defvar blub)   ; dynamic space
@@ -94,7 +100,10 @@
   ;;    83FA61             CMP EDX, 97
   ;;    480F44142518A24C20 CMOVEQ RDX, [#x204CA218] ; *BLUB*
   ;; (TODO: could use "CMOVEQ RDX, [RIP-n]" in immobile code)
-  (assert (= (length (disasm 0 '*blub*)) 4))
+  (let ((text (disasm 0 '*blub*)))
+    (assert (= (length text) 4))
+    ;; two lines should be annotated with *BLUB*
+    (assert (= (loop for line in text count (search "*BLUB*" line)) 2)))
 
   ;; When symbol SC is constant:
   ;;    488B05B3FFFFFF     MOV RAX, [RIP-77]          ; 'BLUB"

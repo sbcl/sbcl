@@ -363,8 +363,15 @@
                     (symbol
                      (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))))
                (when symbol
+                 ;; Q: what's the difference between "tls_index:" and "tls:" (below)?
                  (note (lambda (stream) (format stream "tls_index: ~S" symbol))
                        dstate))))
+            ((and (not base-reg) (not index-reg) disp)
+             (let ((addr (+ disp ; guess that DISP points to a symbol-value slot
+                            (- (ash sb-vm:symbol-value-slot sb-vm:word-shift))
+                            sb-vm:other-pointer-lowtag)))
+               (awhen (guess-symbol (lambda (s) (= (get-lisp-obj-address s) addr)))
+                 (note (lambda (stream) (format stream "~A" it)) dstate))))
             ((and (eql base-reg #.(tn-offset sb-vm::thread-base-tn))
                   (not (dstate-getprop dstate +fs-segment+)) ; not system TLS
                   (not index-reg) ; no index
