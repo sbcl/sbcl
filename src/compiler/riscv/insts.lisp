@@ -206,17 +206,17 @@
    (lambda (segment posn)
      (emit-j-inst segment (relative-offset target posn) lr #b1101111))))
 
-(defun emit-long-jump-at-fun (lr target)
-  (lambda (segment posn)
-    (declare (ignore posn))
-    (emit-back-patch
-     segment 8
-     (lambda (segment posn)
-       (multiple-value-bind (hi lo)
-           (u-and-i-inst-immediate (relative-offset target posn))
-         (assemble (segment)
-           (inst auipc lip-tn hi)
-           (inst jalr lr lip-tn lo)))))))
+(defconstant-eqx jalr-printer
+    '(:name :tab rd ", " rs1 ", " imm i-annotation)
+  #'equal)
+
+(define-instruction jalr (segment lr rs offset)
+  (:printer i ((funct3 #b000)
+               (opcode #b1100111)
+               (i-annotation nil :type 'jalr-annotation))
+            jalr-printer)
+  (:emitter
+   (emit-i-inst segment offset rs #b000 lr #b1100111)))
 
 ;;; For unconditional jumps, we either emit a one instruction or two
 ;;; instruction sequence.
@@ -239,17 +239,17 @@
            t))
        (emit-long-jump-at-fun lr target))))))
 
-(defconstant-eqx jalr-printer
-    '(:name :tab rd ", " rs1 ", " imm i-annotation)
-  #'equal)
-
-(define-instruction jalr (segment lr rs offset)
-  (:printer i ((funct3 #b000)
-               (opcode #b1100111)
-               (i-annotation nil :type 'jalr-annotation))
-            jalr-printer)
-  (:emitter
-   (emit-i-inst segment offset rs #b000 lr #b1100111)))
+(defun emit-long-jump-at-fun (lr target)
+  (lambda (segment posn)
+    (declare (ignore posn))
+    (emit-back-patch
+     segment 8
+     (lambda (segment posn)
+       (multiple-value-bind (hi lo)
+           (u-and-i-inst-immediate (relative-offset target posn))
+         (assemble (segment)
+           (inst auipc lip-tn hi)
+           (inst jalr lr lip-tn lo)))))))
 
 (define-instruction-macro j (target)
   `(inst jal zero-tn ,target))
