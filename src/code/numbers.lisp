@@ -1238,7 +1238,7 @@ and the number of 0 bits if INTEGER is negative."
                  (setq v (- temp)))
              (setq temp (- u v))
              (when (zerop temp)
-               (return (the (integer 0 #.(1+ most-positive-fixnum)) (ash u k)))))))
+               (return (the (integer 0 #.(1+ sb-xc:most-positive-fixnum)) (ash u k)))))))
       (declare (type (mod #.sb-vm:n-word-bits) k)
                (type sb-vm:signed-word u v)))))
 

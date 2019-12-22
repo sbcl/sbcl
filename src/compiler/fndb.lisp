@@ -279,7 +279,7 @@
 
 (defknown gcd (&rest integer) unsigned-byte
   (movable foldable flushable))
-(defknown sb-kernel::fixnum-gcd (fixnum fixnum) (integer 0 #.(1+ most-positive-fixnum))
+(defknown sb-kernel::fixnum-gcd (fixnum fixnum) (integer 0 #.(1+ sb-xc:most-positive-fixnum))
     (movable foldable flushable))
 
 (defknown lcm (&rest integer) unsigned-byte
