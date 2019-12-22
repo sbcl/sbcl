@@ -395,9 +395,9 @@
         `(progn
            (defun ,name (,lambda-list)
              ,@body)
-           ,@(loop for what in (ensure-list (second what))
+           ,@(loop for vop-name in (ensure-list (second what))
                    collect
-                   `(setf (vop-info-optimizer (template-or-lose ',what))
+                   `(setf (vop-info-optimizer (template-or-lose ',vop-name))
                           #',name)))
         (binding* (((forms decls) (parse-body body nil))
                    ((var-decls more-decls) (extract-var-decls decls vars))
