@@ -286,7 +286,11 @@ sufficiently motivated to do lengthy fixes."
          (if shared-info
              (setf (info :function :info name) shared-info)
              (setf (gethash info ht) info))))))
-  (sb-c::coalesce-debug-info) ; Share even more things
+
+  ;; Don't try to assign header slots of code objects. Any of them could be in
+  ;; readonly space. It's not worth the trouble to try to figure out which aren't.
+  #-cheneygc (sb-c::coalesce-debug-info) ; Share even more things
+
   #+sb-fasteval (sb-interpreter::flush-everything)
   (tune-hashtable-sizes-of-all-packages))
 
