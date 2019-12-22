@@ -96,7 +96,7 @@
             c))))))
 
 ;;; This test pertains only to the compact-instance-header feature.
-#-compact-instance-header (exit :code 104)
+;;; It should pass regardless of the feature presence though.
 
 ;;; Everything from here down to the WITH-TEST is the setup to try
 ;;; to hit "implausible layout" in verify_gc() which would occur
