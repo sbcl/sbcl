@@ -554,7 +554,7 @@ standard Lisp readtable when NIL."
 
 ;; A list of available TOKEN-BUFs
 (declaim (type (or null token-buf) *token-buf-pool*))
-(!define-thread-local *token-buf-pool* nil)
+(define-thread-local *token-buf-pool* nil)
 
 (defun reset-read-buffer (buffer)
   ;; Turn BUFFER into an empty read buffer.

@@ -1186,7 +1186,6 @@ possibly temporarily, because it might be used internally."
                ;; bootstrapping magic of a different kind, wherein things happen
                ;; as they ordinarily do, plus during second genesis.
                "!DEFINE-LOAD-TIME-GLOBAL"
-               "!DEFINE-THREAD-LOCAL"
                "*!REMOVABLE-SYMBOLS*"
 
                ;; bootstrapping macro whose effect is to delay until warm load.

@@ -150,11 +150,13 @@
     sb-unix::signal-handler-callback)
   #'equal)
 
-;;; Static symbols that C code must be able to assign to,
+;;; (potentially) static symbols that C code must be able to assign to,
 ;;; as contrasted with static for other reasons such as:
 ;;;  - garbage collections roots (namely NIL)
 ;;;  - other symbols that Lisp codegen must hardwire (T)
 ;;;  - static for efficiency of access but need not be
+;;; On #+sb-thread builds, these are not static, because access to them
+;;; is via the TLS, not the symbol.
 (defconstant-eqx !per-thread-c-interface-symbols
   `((*free-interrupt-context-index* 0)
     (sb-sys:*allow-with-interrupts* t)

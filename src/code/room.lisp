@@ -1442,7 +1442,7 @@ We could try a few things to mitigate this:
         (prev 0))
     (dolist (x list)
       (let ((n  (ash (sb-kernel:symbol-tls-index x) (- sb-vm:word-shift))))
-        (when (and (> n sb-thread::tls-index-start)
+        (when (and (> n sb-vm::primitive-thread-object-length)
                    (> n (1+ prev)))
           (format t "(unused)~%"))
         (format t "~5d = ~s~%" n x)

@@ -270,7 +270,7 @@ created and old ones may exit at any time."
                               :%alive-p t)))
     ;; Run the macro-generated function which writes some values into the TLS,
     ;; most especially *CURRENT-THREAD*.
-    (initialize-tls thread)
+    (init-thread-local-storage thread)
     (setf (thread-os-thread thread) (current-thread-os-thread)
           (thread-stack-end thread) (get-lisp-obj-address sb-vm:*control-stack-end*)
           (thread-primitive-thread thread) (sap-int (current-thread-sap))
@@ -1521,7 +1521,7 @@ session."
 ;;; All threads other than the initial thread start via this function.
 #+sb-thread
 (defun new-lisp-thread-trampoline (thread setup-sem real-function arguments)
-  (initialize-tls thread)
+  (init-thread-local-storage thread)
   ;; Can't initiate GC before *current-thread* is set, otherwise the
   ;; locks grabbed by SUB-GC wouldn't function.
   ;; Other threads can GC with impunity.
@@ -1957,7 +1957,8 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
          ;; (There's no reason this couldn't work on any thread now.)
          (sap (int-sap (thread-primitive-thread *current-thread*)))
          (list))
-        ((< index (ash tls-index-start sb-vm:word-shift)) list)
+        ((< index (ash sb-vm::primitive-thread-object-length sb-vm:word-shift))
+         list)
       (let ((obj (sap-ref-lispobj sap index)))
         (when (and obj ; don't bother returning NIL
                    (sb-vm:is-lisp-pointer (get-lisp-obj-address obj))
@@ -2022,11 +2023,6 @@ mechanism for inter-thread communication."
 
 
 
-;;; Note all thread-local specials by storing the names into this cold fasl
-;;; We should makunbound the list, but that would make after-xc core unhappy.
-(defparameter *!genesis-thread-local-specials*
-  '#.(mapcar #'car *!thread-local-specials*))
-
 ;;; Initialize thread-local special vars other than the GC control specials.
 ;;; globaldb should indicate that the variable is both :always-thread-local
 ;;; (which says that the TLS index is nonzero), and :always-bound (which says that
@@ -2050,38 +2046,43 @@ mechanism for inter-thread communication."
 ;;; It might behoove us to pass in a flag as to whether this is coming from REINIT,
 ;;; but INIT-INITIAL-THREAD doesn't know either. We'd have to plumb a new flag
 ;;; down all the way from SAVE.
-(defun initialize-tls (thread)
+(defun init-thread-local-storage (thread)
+  ;; In addition to wanting the expressly unsafe variant of SYMBOL-VALUE, any error
+  ;; signaled such as invalid-arg-count would just go totally wrong at this point.
+  (declare (optimize (safety 0)))
   #-sb-thread
   ;; *CURRENT-THREAD* is known always bound, so BOUNDP would be T
   ;; We need to see whether it's really boundp.
-  (if (unbound-marker-p
-       ;; but apparently some backends don't actually optimize out
-       ;; the BOUNDP check, so we have to use an unsafe read.
-       (locally (declare (optimize (safety 0)))
-         (sb-ext:symbol-global-value '*current-thread*)))
+  (if (unbound-marker-p *current-thread*)
       (macrolet ((expand ()
-                   `(setf ,@(apply #'append *!thread-local-specials*))))
+                   `(setf ,@(apply #'append (cdr *thread-local-specials*)))))
         (expand))
       (setf *current-thread* thread))
   ;; See %SET-SYMBOL-VALUE-IN-THREAD for comparison's sake
   #+sb-thread
   (let ((sap (current-thread-sap)))
-    (if (= (sap-ref-word sap (symbol-tls-index '*current-thread*))
-           sb-vm:no-tls-value-marker-widetag)
-        ;; TODO: figure out how to give all of the thread-local-specials a known wired-tls-index.
-        ;; This produces laughably bad code on x86-64:
-        ;;     48C1E808         SHR RAX, 8      ; shift out the widetag
-        ;;     48D1E0           SHL RAX, 1      ; fixnumize
-        ;;     48C1F818         SAR RAX, 24     ; get the upper 32 bits of the original header
-        ;;     48D1F8           SAR RAX, 1      ; unfixnumize
-        ;; In the grand scheme of things, it's not a huge problem.
-        (macrolet ((expand ()
-                     `(setf ,@(loop for (var form) in *!thread-local-specials*
-                                    append `((sap-ref-lispobj sap (symbol-tls-index ',var))
-                                             ,form)))))
-          (expand))
-        (setf *current-thread* thread)))
+    (macrolet ((expand ()
+                 `(if (= (sap-ref-word sap ,(info :variable :wired-tls '*current-thread*))
+                         sb-vm:no-tls-value-marker-widetag)
+                      (setf ,@(loop for (var form) in (cdr *thread-local-specials*)
+                                    for index = (info :variable :wired-tls var)
+                                    append `((sap-ref-lispobj sap ,index) ,form)))
+                      (setf *current-thread* thread))))
+      (expand)))
   nil)
+
+(eval-when (:compile-toplevel)
+  ;; Inform genesis of the index <-> symbol mapping made by DEFINE-THREAD-LOCAL
+  (with-open-file (output "output/tls-init.lisp-expr"
+                          :direction :output :if-exists :supersede)
+    (let ((list (mapcar (lambda (x &aux (symbol (car x)))
+                          (cons (info :variable :wired-tls symbol) symbol))
+                        (cdr *thread-local-specials*)))
+          (*package* *keyword-package*))
+      (write list :stream output :readably t)))
+  ;; Prevent further use of DEFINE-THREAD-LOCAL after compiling this file
+  ;; because the definition of INIT-THREAD-LOCAL-STORAGE is now frozen.
+  (setf *thread-local-specials* (cons :final (cdr *thread-local-specials*))))
 
 ;;;; Stepping
 
@@ -2102,7 +2103,8 @@ mechanism for inter-thread communication."
                         :key #'sb-vm::primitive-object-name))
          (slots (sb-vm::primitive-object-slots primobj))
          (sap (current-thread-sap))
-         (names (make-array (sb-vm::primitive-object-length primobj) :initial-element "")))
+         (thread-obj-len (sb-vm::primitive-object-length primobj))
+         (names (make-array thread-obj-len :initial-element "")))
     (dolist (slot slots)
       (setf (aref names (sb-vm::slot-offset slot)) (sb-vm::slot-name slot)))
     (flet ((safely-read (sap offset)
@@ -2110,9 +2112,9 @@ mechanism for inter-thread communication."
                (cond ((= word sb-vm:no-tls-value-marker-widetag) :no-tls-value)
                      ((= word sb-vm:unbound-marker-widetag) :unbound)
                      (t (sap-ref-lispobj sap offset)))))
-           (show (tlsindex val)
-             (if (< (ash tlsindex (- sb-vm:word-shift)) (length names))
-                 (format t " ~3d ~30a : ~x~%"
+           (show (tlsindex val &optional thread-slot-p)
+             (if thread-slot-p
+                 (format t " ~3d ~30a : #x~x~%"
                          (ash tlsindex (- sb-vm:word-shift))
                          (aref names (ash tlsindex (- sb-vm:word-shift)))
                          val)
@@ -2126,8 +2128,8 @@ mechanism for inter-thread communication."
       (loop for tlsindex from sb-vm:n-word-bytes below
             (ash sb-vm::*free-tls-index* sb-vm:n-fixnum-tag-bits)
             by sb-vm:n-word-bytes
-            do (if (< tlsindex (ash (length slots) sb-vm:word-shift))
-                   (show tlsindex (sap-ref-word sap tlsindex))
+            do (if (< tlsindex (ash thread-obj-len sb-vm:word-shift))
+                   (show tlsindex (sap-ref-word sap tlsindex) t)
                    (let ((val (safely-read sap tlsindex)))
                      (unless (eq val :no-tls-value)
                        (show tlsindex val)))))

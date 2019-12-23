@@ -576,12 +576,6 @@ during backtrace.
   ;; then stuff them at the end, for lack of any place better.
   . #.*thread-trailer-slots*)
 
-;;; Compute the smallest TLS index that will be assigned to a special variable
-;;; that does not map onto a thread slot.
-;;; Given N thread slots, the tls indices are 0..N-1 scaled by word-shift.
-;;; This constant is the index prior to scaling.
-#+sb-thread (defconstant sb-thread::tls-index-start primitive-thread-object-length)
-
 (defconstant code-header-size-shift #+64-bit 32 #-64-bit n-widetag-bits)
 (declaim (inline code-object-size code-header-words %code-code-size))
 #-sb-xc-host

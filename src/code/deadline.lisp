@@ -27,7 +27,7 @@
 
 ;;; Current DEADLINE or NIL.
 (declaim (type (or deadline null) *deadline*))
-(!define-thread-local *deadline* nil)
+(define-thread-local *deadline* nil)
 
 (declaim (inline seconds-to-internal-time))
 (defun seconds-to-internal-time (seconds)

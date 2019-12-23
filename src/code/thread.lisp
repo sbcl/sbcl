@@ -11,10 +11,10 @@
 
 (in-package "SB-THREAD")
 
-(!define-thread-local *current-thread*
-      ;; This initform is magical - !DEFINE-THREAD-LOCAL stuffs the initial
-      ;; value form into a SETQ in INITIALIZE-TLS, and the name of its first
-      ;; and only argument is THREAD.
+(sb-impl::define-thread-local *current-thread*
+      ;; This initform is magical - DEFINE-THREAD-LOCAL stuffs the initial
+      ;; value form into a SETQ in INIT-THREAD-LOCAL-STORAGE, and the name
+      ;; of its first and only argument is THREAD.
       thread
       "Bound in each thread to the thread itself.")
 (declaim (type thread *current-thread*))

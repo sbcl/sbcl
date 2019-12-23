@@ -942,7 +942,7 @@ core and return a descriptor to it."
 #+sb-thread
 (progn
   ;; Simulate *FREE-TLS-INDEX*. This is a word count, not a displacement.
-  (defvar *genesis-tls-counter* sb-thread::tls-index-start)
+  (defvar *genesis-tls-counter* sb-vm::primitive-thread-object-length)
   ;; Assign SYMBOL the tls-index INDEX. SYMBOL must be a descriptor.
   ;; This is a backend support routine, but the style within this file
   ;; is to conditionalize by the target features.
@@ -1544,7 +1544,7 @@ core and return a descriptor to it."
            pkg-info handle package symbol))
         #+sb-thread
         (let ((index (info :variable :wired-tls symbol)))
-          (when (integerp index) ; thread slot
+          (when (integerp index) ; thread slot or known TLS
             (cold-assign-tls-index handle index)))
         (when (eq package *keyword-package*)
           (cold-set handle handle))
@@ -1605,8 +1605,14 @@ core and return a descriptor to it."
 
   ;; Assign TLS indices of C interface symbols
   #+sb-thread
-  (dolist (binding sb-vm::!per-thread-c-interface-symbols)
-    (ensure-symbol-tls-index (car (ensure-list binding))))
+  (progn
+    (dolist (binding sb-vm::!per-thread-c-interface-symbols)
+      (ensure-symbol-tls-index (car (ensure-list binding))))
+    ;; Assign other known TLS indices
+    (when core-file-name ; skip it in make-host-1
+      (dolist (pair (sb-cold:read-from-file "output/tls-init.lisp-expr"))
+        (destructuring-bind (tls-index . symbol) pair
+          (aver (eql tls-index (ensure-symbol-tls-index symbol)))))))
 
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
@@ -1685,13 +1691,9 @@ core and return a descriptor to it."
                        (cold-cons (cold-intern (car layout)) (cdr layout)))
                      (sort-cold-layouts))))
 
-  #+sb-thread ; assign TLS indices to known-thread-locals
-  (let ((symbols (host-object-from-core
-                  (cold-symbol-value 'sb-thread::*!genesis-thread-local-specials*))))
-    (assert (null (intersection symbols sb-vm::!per-thread-c-interface-symbols)))
-    (mapc 'ensure-symbol-tls-index symbols)
-    (cold-set 'sb-vm::*free-tls-index*
-              (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift))))
+  #+sb-thread
+  (cold-set 'sb-vm::*free-tls-index*
+            (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift)))
 
   #+64-bit
   (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))

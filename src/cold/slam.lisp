@@ -53,6 +53,12 @@
 (define-condition sb-kernel:redefinition-with-deftransform (style-warning)
   ((transform :initarg :transform)))
 
+(defvar *original-thread-local-specials* (cdr sb-thread::*thread-local-specials*))
+(setq sb-thread::*thread-local-specials*
+      ;; Do a shallow copy-tree. DEFINE-THREAD-LOCAL can perform destructive modification
+      (cons :not-final (mapcar (lambda (x) (list (car x) (cadr x)))
+                               *original-thread-local-specials*)))
+
 (do-stems-and-flags (stem flags 2)
   (unless (position :not-target flags)
     (let ((srcname (stem-source-path stem))
@@ -66,3 +72,9 @@
                                         ".trace")
                            srcname))))
         (target-compile-stem stem flags)))))
+
+(when (and (eq (car sb-thread::*thread-local-specials*) :not-final)
+           (not (equal (cdr  sb-thread::*thread-local-specials*)
+                       *original-thread-local-specials*)))
+  (sb-int:style-warn "Detected modified thread-local-specials.
+Slam may not have recompiled everything as required."))

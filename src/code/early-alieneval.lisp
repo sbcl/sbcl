@@ -11,7 +11,7 @@
 
 (defglobal *alien-type-classes* (make-hash-table :test 'eq))
 
-#-sb-xc-host (!define-thread-local *saved-fp* nil)
+#-sb-xc-host (sb-impl::define-thread-local *saved-fp* nil)
 
 (defvar *new-auxiliary-types* nil)
 

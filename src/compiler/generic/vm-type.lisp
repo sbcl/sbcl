@@ -342,14 +342,14 @@
 (defun sb-vm::symbol-always-has-tls-index-p (symbol)
   (not (null (info :variable :wired-tls symbol))))
 
-;; Return T if SYMBOL will always have a thread-local value.
-;; True of variables defined by !DEFINE-THREAD-LOCAL and thread slots.
-;; As an optimization, set and ref are permitted (but not required)
-;; to avoid checking for no-tls-value.
+;;; Return T if SYMBOL will always have a value in its TLS cell that is
+;;; not EQ to NO-TLS-VALUE-MARKER-WIDETAG. As an optimization, set and ref
+;;; are permitted (but not required) to avoid checking for it.
+;;; This will be true of all C interface symbols, 'struct thread' slots,
+;;; and any variable defined by DEFINE-THREAD-LOCAL.
 (defun sb-vm::symbol-always-has-tls-value-p (symbol)
-  (let ((where (info :variable :wired-tls symbol)))
-    (or (fixnump where) ; thread slots
-        (eq where :always-thread-local)))) ; everything else
+  (typep (info :variable :wired-tls symbol)
+         '(or (eql :always-thread-local) fixnum)))
 
 #+(or x86 x86-64)
 (defun sb-vm::displacement-bounds (lowtag element-size data-offset)

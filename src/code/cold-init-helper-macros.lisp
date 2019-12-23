@@ -89,29 +89,3 @@
            `((defmethod make-load-form ((obj ,class-name) &optional env)
                (declare (ignorable obj env))
                ,target-expr))))))
-
-;;; Define a variable that is assigned into TLS either in INIT-INITIAL-THREAD
-;;; or NEW-LISP-THREAD-TRAMPOLINE before any other Lisp code runs.
-;;; !COLD-INIT gets these assignents via INIT-INITIAL-THREAD.
-;;; In particular, *RESTART-CLUSTERS* and *HANDLER-CLUSTERS* need a value prior
-;;; to running into any errors, or else you've got twice the trouble.
-;;;
-;;; There are other thread-locals which are used by C code, and those are all
-;;; defined in !PER-THREAD-C-INTERFACE-SYMBOLS. Those other symbols must have
-;;; initial values of either a fixnum or a static symbol (typically T or NIL).
-;;;
-;;; In contrast, !DEFINE-THREAD-LOCAL allows more-or-less an arbitrary form,
-;;; subject to being evaluable without need of values computed later of course.
-(defvar sb-thread::*!thread-local-specials* nil)
-#-sb-xc-host
-(defmacro !define-thread-local (name initform &optional docstring)
-  `(locally
-       (declare (notinline (setf info)))
-     (defvar ,name (error "~S had no value in cold-init" ',name) ,docstring)
-     (eval-when (:compile-toplevel :load-toplevel :execute)
-       (setf sb-thread::*!thread-local-specials*
-             (append sb-thread::*!thread-local-specials* '((,name ,initform))))
-       ;; Does it help anything to choose the TLS index now? Probably not,
-       ;; we'll use a symbol-tls fixup almost everywhere except in INITIALIZE-TLS.
-       #+sb-thread (setf (info :variable :wired-tls ',name) :always-thread-local)
-       (setf (info :variable :always-bound ',name) :always-bound))))
