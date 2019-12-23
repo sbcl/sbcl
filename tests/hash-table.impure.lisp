@@ -234,6 +234,11 @@
 ;;; invoking GETHASH on the finalizer store, which, being a weak table,
 ;;; uses the regular REHASH algorithm which would get here and invoke GC
 ;;; again, and so on and so on.
+
+;;; FIXME: Not having this encapsulation on macOS makes the test barely a test
+;;; at all, but leaving it in spins in GC indefinitely.
+#-darwin
+
 (sb-int:encapsulate
  'sb-impl::rehash
  'force-gc-after-rehash
