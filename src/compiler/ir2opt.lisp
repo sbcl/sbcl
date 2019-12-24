@@ -195,8 +195,10 @@
                        (not (and (eq from *backend-t-primitive-type*)
                                  (memq (primitive-type-name to)
                                        '(#+64-bit sb-vm::unsigned-byte-64
+                                         #+64-bit sb-vm::unsigned-byte-63
                                          #+64-bit sb-vm::signed-byte-64
                                          #-64-bit sb-vm::unsigned-byte-32
+                                         #-64-bit sb-vm::unsigned-byte-31
                                          #-64-bit sb-vm::signed-byte-32
                                          #-64-bit single-float
                                          double-float
