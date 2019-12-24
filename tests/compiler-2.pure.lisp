@@ -2618,3 +2618,15 @@
          (declare ((complex (integer -1 -1)) p1))
          (= -1 p1))
     ((#C(-1 -1)) nil)))
+
+(with-test (:name :cmov-move-hoisting)
+  (checked-compile-and-assert
+      ()
+      `(lambda (p)
+         (declare ((or (eql 0.0)
+                       sb-vm:word) p))
+         (if (> p 51250)
+             p
+             1))
+    ((0.0) 1)
+    ((#1=(1- (expt 2 sb-vm:n-word-bits))) #1#)))

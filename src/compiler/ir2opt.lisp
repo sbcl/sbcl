@@ -185,11 +185,31 @@
             (when not-p
               (rotatef value-a value-b)
               (rotatef arg-a arg-b))
-            (convert-one-cmov cmove-vop value-a arg-a
-                              value-b arg-b
-                              target  res
-                              flags info
-                              label vop node 2block)))))))
+            (flet ((safe-coercion-p (from to)
+                     (let ((from (tn-primitive-type from))
+                           (to (tn-primitive-type to)))
+                       ;; These moves will be repositioned before the test VOP,
+                       ;; which may be restricting their type.
+                       ;; Avoid the moves that may touch memory and
+                       ;; thus fail on immediate values.
+                       (not (and (eq from *backend-t-primitive-type*)
+                                 (memq (primitive-type-name to)
+                                       '(#+64-bit sb-vm::unsigned-byte-64
+                                         #+64-bit sb-vm::signed-byte-64
+                                         #-64-bit sb-vm::unsigned-byte-32
+                                         #-64-bit sb-vm::signed-byte-32
+                                         #-64-bit single-float
+                                         double-float
+                                         complex-single-float
+                                         complex-double-float
+                                         system-area-pointer)))))))
+              (if (and (safe-coercion-p value-a arg-a)
+                       (safe-coercion-p value-b arg-b))
+                  (convert-one-cmov cmove-vop value-a arg-a
+                                    value-b arg-b
+                                    target  res
+                                    flags info
+                                    label vop node 2block)))))))))
 
 (defun convert-cmovs (component)
   (do-ir2-blocks (2block component (values))
