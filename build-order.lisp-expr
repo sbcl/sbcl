@@ -210,7 +210,7 @@
  ("src/code/pred" :not-host)
  ("src/compiler/generic/pinned-objects" :not-host)
 
- ("src/code/string-hash")
+ ("src/code/string-hash" :c-headers)
  ("src/code/target-sxhash" :not-host) ; needs most-fooative-foo-float constants
 
  ("src/code/list"   :not-host)
