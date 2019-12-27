@@ -427,8 +427,7 @@
 
 ;;; Determine the object path for a stem/flags/mode combination.
 (defun stem-object-path (stem flags mode)
-  (multiple-value-bind
-        (obj-prefix obj-suffix)
+  (multiple-value-bind (obj-prefix obj-suffix)
       (ecase mode
         (:host-compile
          ;; On some xc hosts, it's impossible to LOAD a fasl file unless it
@@ -438,10 +437,11 @@
          (values *host-obj-prefix*
                  (concatenate 'string "."
                               (pathname-type (compile-file-pathname stem)))))
-        (:target-compile (values *target-obj-prefix*
-                                 (if (find :assem flags)
-                                     *target-assem-obj-suffix*
-                                     *target-obj-suffix*))))
+        (:target-compile
+         (values *target-obj-prefix*
+                 (cond ((find :extra-artifact flags) "")
+                       ((find :assem flags) *target-assem-obj-suffix*)
+                       (t *target-obj-suffix*)))))
     (concatenate 'string obj-prefix (stem-remap-target stem) obj-suffix)))
 (compile 'stem-object-path)
 

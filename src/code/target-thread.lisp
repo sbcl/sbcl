@@ -2073,13 +2073,15 @@ mechanism for inter-thread communication."
 
 (eval-when (:compile-toplevel)
   ;; Inform genesis of the index <-> symbol mapping made by DEFINE-THREAD-LOCAL
-  (with-open-file (output "output/tls-init.lisp-expr"
+  (with-open-file (output (sb-cold::stem-object-path "tls-init.lisp-expr"
+                                                     '(:extra-artifact) :target-compile)
                           :direction :output :if-exists :supersede)
     (let ((list (mapcar (lambda (x &aux (symbol (car x)))
                           (cons (info :variable :wired-tls symbol) symbol))
                         (cdr *thread-local-specials*)))
           (*package* *keyword-package*))
-      (write list :stream output :readably t)))
+      (write list :stream output :readably t)
+      (terpri output)))
   ;; Prevent further use of DEFINE-THREAD-LOCAL after compiling this file
   ;; because the definition of INIT-THREAD-LOCAL-STORAGE is now frozen.
   (setf *thread-local-specials* (cons :final (cdr *thread-local-specials*))))

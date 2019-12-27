@@ -1582,7 +1582,7 @@ core and return a descriptor to it."
 
 ;;; Since the initial symbols must be allocated before we can intern
 ;;; anything else, we intern those here. We also set the value of T.
-(defun initialize-static-space ()
+(defun initialize-static-space (tls-init)
   "Initialize the cold load symbol-hacking data structures."
   ;; NIL did not have its package assigned. Do that now.
   (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
@@ -1609,10 +1609,9 @@ core and return a descriptor to it."
     (dolist (binding sb-vm::!per-thread-c-interface-symbols)
       (ensure-symbol-tls-index (car (ensure-list binding))))
     ;; Assign other known TLS indices
-    (when core-file-name ; skip it in make-host-1
-      (dolist (pair (sb-cold:read-from-file "output/tls-init.lisp-expr"))
-        (destructuring-bind (tls-index . symbol) pair
-          (aver (eql tls-index (ensure-symbol-tls-index symbol)))))))
+    (dolist (pair tls-init)
+      (destructuring-bind (tls-index . symbol) pair
+        (aver (eql tls-index (ensure-symbol-tls-index symbol))))))
 
   ;; Establish the value of T.
   (let ((t-symbol (cold-intern t :gspace *static*)))
@@ -3497,7 +3496,7 @@ III. initially undefined function references (alphabetically):
 ;;;   CORE-FILE-NAME gets a Lisp core.
 ;;;   C-HEADER-DIR-NAME gets the path in which to place generated headers
 ;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
-(defun sb-cold:genesis (&key object-file-names
+(defun sb-cold:genesis (&key object-file-names tls-init
                              core-file-name c-header-dir-name map-file-name
                              symbol-table-file-name (verbose t))
   (declare (ignorable symbol-table-file-name))
@@ -3590,7 +3589,7 @@ III. initially undefined function references (alphabetically):
       ;; Prepare for cold load.
       (initialize-layouts)
       (initialize-packages)
-      (initialize-static-space)
+      (initialize-static-space tls-init)
 
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
