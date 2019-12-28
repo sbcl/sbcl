@@ -189,32 +189,6 @@
 (with-test (:name (join-thread :self-join))
   (assert-error (join-thread *current-thread*) join-thread-error))
 
-;;; We had appalling scaling properties for a while.  Make sure they
-;;; don't reappear.
-(defun scaling-test (function &optional (nthreads 5))
-  "Execute FUNCTION with NTHREADS lurking to slow it down."
-  (let ((queue (make-waitqueue))
-        (mutex (make-mutex)))
-    ;; Start NTHREADS idle threads.
-    (dotimes (i nthreads)
-      (make-join-thread (lambda ()
-                          (with-mutex (mutex)
-                            (condition-wait queue mutex))
-                          (abort-thread))))
-    (prog1 (runtime (funcall function))
-      (condition-broadcast queue))))
-
-(defun fact (n)
-  "A function that does work with the CPU."
-  (if (zerop n) 1 (* n (fact (1- n)))))
-(compile 'fact)
-(with-test (:name :lurking-threads)
-  (let ((work (lambda () (fact 15000))))
-    (let ((zero (scaling-test work 0))
-          (four (scaling-test work 4)))
-      ;; a slightly weak assertion, but good enough for starters.
-      (assert (< four (* 2 zero))))))
-
 ;;; For one of the interupt-thread tests, we want a foreign function
 ;;; that does not make syscalls
 
