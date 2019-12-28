@@ -8,6 +8,8 @@ changes relative to sbcl-1.5.9
   * enhancement: malformed type specifiers and occurrences of deprecated types
     in :TYPE initargs of DEFCLASS and DEFINE-CONDITION slot specifications
     are detected and result in compile-time errors and warnings respectively.
+  * enhancement: parallel contrib building, controlled by SBCL_MAKE_JOBS=-jX
+    the same as for the C runtime.
   * bug fix: add a walker template for WITH-SOURCE-FORM.
   * bug fix: start the summary of a compilation unit on a fresh line.  (Thanks
     to Zach Beane)
