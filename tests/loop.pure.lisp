@@ -23,46 +23,56 @@
 
 ;;; Bug 81, reported by Wolfhard Buss on cmucl-help 2001-02-14, was
 ;;; fixed by Alexey Dejneka's patch on sbcl-devel 2001-09-30.
-(assert (equal '(0.0 1.0 2.0 3.0)
-               (loop with (a . b) of-type float = '(0.0 . 1.0)
-                     and (c . d) of-type float = '(2.0 . 3.0)
-                     return (list a b c d))))
+(with-test (:name :loop-destructuring-bind)
+  ;; FIXME: should this produce a warning? I don't see why.
+  ;; caught STYLE-WARNING:
+  ;;   This is not a FLOAT:
+  ;;    NIL
+  (declare (muffle-conditions style-warning))
+  (assert (equal '(0.0 1.0 2.0 3.0)
+                 (loop with (a . b) of-type float = '(0.0 . 1.0)
+                       and (c . d) of-type float = '(2.0 . 3.0)
+                       return (list a b c d)))))
 
 ;;; a bug reported and fixed by Alexey Dejneka sbcl-devel 2001-10-05:
 ;;; The type declarations should apply, hence under Python's
 ;;; declarations-are-assertions rule, the code should signal a type
 ;;; error. (Except when running interpreted code)
 #+#.(cl:if (cl:eq sb-ext:*evaluator-mode* :compile) '(and) '(or))
-(assert (typep (nth-value 1
-                          (ignore-errors
-                            (funcall (lambda ()
-                                       (loop with (a . b)
-                                             of-type float = '(5 . 5)
-                                             return (list a b))))))
-               'type-error))
+(with-test (:name :loop-type-decl)
+  (declare (muffle-conditions style-warning))
+  (assert (typep (nth-value 1
+                            (ignore-errors
+                              (funcall (lambda ()
+                                         (loop with (a . b)
+                                               of-type float = '(5 . 5)
+                                               return (list a b))))))
+                 'type-error)))
 
 ;;; bug 103, reported by Arthur Lemmens sbcl-devel 2001-05-05,
 ;;; fixed by Alexey Dejneka patch sbcl-devel 2001-10-05:
 ;;; LOOP syntax requires that forms after INITIALLY, FINALLY, and DO
 ;;; must be compound forms.
-(multiple-value-bind (function warnings-p failure-p)
-    (compile nil
-             '(lambda ()
-                (loop while t do
-                      *print-level*
-                      (print t))))
-  (declare (ignore function warnings-p))
-  (assert failure-p))
+(with-test (:name :loop-syntax-err)
+  (multiple-value-bind (function warnings-p failure-p)
+      (compile nil
+               '(lambda ()
+                  (loop while t do
+                        *print-level*
+                        (print t))))
+    (declare (ignore function warnings-p))
+    (assert failure-p)))
 
 ;;; a bug reported by Paul F. Dietz (in his ANSI test suite):
 ;;; duplicate bindings in LOOP must signal errors of type
 ;;; PROGRAM-ERROR.
-(assert (typep (nth-value 1
-                          (ignore-errors
-                            (funcall (lambda ()
-                                       (loop for (a . a) in '((1 . 2) (3 . 4))
-                                             return a)))))
-               'program-error))
+(with-test (:name :loop-duplicate-binding)
+  (assert (typep (nth-value 1
+                            (ignore-errors
+                              (funcall (lambda ()
+                                         (loop for (a . a) in '((1 . 2) (3 . 4))
+                                               return a)))))
+                 'program-error)))
 
 ;;; similar to gcl/ansi-test LOOP.1.27, and fixed at the same time:
 (assert (equal (loop for x downto 7 by 2 from 13 collect x) '(13 11 9 7)))
@@ -115,24 +125,28 @@
 (assert (= (loop with (a . nil) = '(1 2) return a) 1))
 (assert (equal (loop with (nil . a) = '(1 2) return a) '(2)))
 
-(multiple-value-bind (result error)
-    (ignore-errors
-      (loop for i in '(1 2 3) collect i always (< i 4)))
-  (assert (null result))
-  (assert (typep error 'program-error)))
-(assert (equal
-         (loop for i in '(1 2 3) collect i into foo always (< i 4)
-               finally (return foo))
-         '(1 2 3)))
-(assert (equal
-         (loop for i in '(1 2 3) collect i into foo always (= i 4)
-               finally (return foo))
-         nil))
-(multiple-value-bind (result error)
-    (ignore-errors
-      (loop for i in '(1 2 3) always (< i 4) collect i))
-  (assert (null result))
-  (assert (typep error 'program-error)))
+(with-test (:name :loop-invalid-collector-1)
+  (multiple-value-bind (result error)
+      (ignore-errors
+        (loop for i in '(1 2 3) collect i always (< i 4)))
+    (assert (null result))
+    (assert (typep error 'program-error))))
+(with-test (:name :loop-invalid-collector-2)
+  (assert (equal
+           (loop for i in '(1 2 3) collect i into foo always (< i 4)
+                 finally (return foo))
+           '(1 2 3))))
+(with-test (:name :loop-invalid-collector-3)
+  (assert (equal
+           (loop for i in '(1 2 3) collect i into foo always (= i 4)
+                 finally (return foo))
+           nil)))
+(with-test (:name :loop-invalid-collector-4)
+  (multiple-value-bind (result error)
+      (ignore-errors
+        (loop for i in '(1 2 3) always (< i 4) collect i))
+    (assert (null result))
+    (assert (typep error 'program-error))))
 (assert (equal
          (loop for i in '(1 2 3) always (< i 4) collect i into foo
                finally (return foo))
@@ -141,26 +155,29 @@
          (loop for i in '(1 2 3) always (= i 4) collect i into foo
                finally (return foo))
          nil))
-(multiple-value-bind (result error)
-    (ignore-errors
-      (loop for i in '(1 2 3) thereis (= i 3) collect i))
-  (assert (null result))
-  (assert (typep error 'program-error)))
+(with-test (:name :loop-invalid-collector-5)
+  (multiple-value-bind (result error)
+      (ignore-errors
+        (loop for i in '(1 2 3) thereis (= i 3) collect i))
+    (assert (null result))
+    (assert (typep error 'program-error))))
 
-(multiple-value-bind (result error)
-    (ignore-errors
-      (loop with i = 1 for x from 1 to 3 collect x into i))
-  (assert (null result))
-  (assert (typep error 'program-error)))
-(multiple-value-bind (result error)
-    ;; this one has a plausible interpretation in terms of LET*, but
-    ;; ANSI seems specifically to disallow it
-    (ignore-errors
-      (loop with i = 1 with i = (1+ i)
-            for x from 1 to 3
-            collect (+ x i)))
-  (assert (null result))
-  (assert (typep error 'program-error)))
+(with-test (:name :loop-invalid-collector-6)
+    (multiple-value-bind (result error)
+      (ignore-errors
+        (loop with i = 1 for x from 1 to 3 collect x into i))
+    (assert (null result))
+    (assert (typep error 'program-error))))
+(with-test (:name :loop-invalid-collector-7)
+  (multiple-value-bind (result error)
+      ;; this one has a plausible interpretation in terms of LET*, but
+      ;; ANSI seems specifically to disallow it
+      (ignore-errors
+        (loop with i = 1 with i = (1+ i)
+              for x from 1 to 3
+              collect (+ x i)))
+    (assert (null result))
+    (assert (typep error 'program-error))))
 
 (let ((it 'z))
   (assert (equal
@@ -181,28 +198,35 @@
                 type-error))
 
 ;; arithmetic indexes can be NIL or symbols.
-(assert (equal (loop for nil from 0 to 2 collect nil)
-               '(nil nil nil)))
-(assert (equal (loop for nil to 2 collect nil)
-               '(nil nil nil)))
+(with-test (:name :loop-anonymous-arithmetic-index)
+  ;; FIXME: these produce style-warnings. If they're acceptable, they should not warn.
+  (declare (muffle-conditions style-warning))
+  (assert (equal (loop for nil from 0 to 2 collect nil)
+                 '(nil nil nil)))
+  (assert (equal (loop for nil to 2 collect nil)
+                 '(nil nil nil))))
 
 ;; although allowed by the loop syntax definition in 6.2/LOOP,
 ;; 6.1.2.1.1 says: "The variable var is bound to the value of form1 in
 ;; the first iteration[...]"; since we can't bind (i j) to anything,
 ;; we give a program error.
-(multiple-value-bind (function warnings-p failure-p)
-    (compile nil
-             `(lambda ()
-                (loop for (i j) from 4 to 6 collect nil)))
-  (assert failure-p))
+(with-test (:name :statically-observable-destructuring-problem-1)
+  (multiple-value-bind (function warnings-p failure-p)
+      (compile nil
+               `(lambda ()
+                  (loop for (i j) from 4 to 6 collect nil)))
+    (declare (ignore function warnings-p))
+    (assert failure-p)))
 
 ;; ...and another for indexes without FROM forms (these are treated
 ;; differently by the loop code right now
-(multiple-value-bind (function warnings-p failure-p)
-    (compile nil
-             `(lambda ()
-                (loop for (i j) to 6 collect nil)))
-  (assert failure-p))
+(with-test (:name :statically-observable-destructuring-problem-2)
+  (multiple-value-bind (function warnings-p failure-p)
+      (compile nil
+               `(lambda ()
+                  (loop for (i j) to 6 collect nil)))
+    (declare (ignore function warnings-p))
+    (assert failure-p)))
 
 (assert
  (equal
@@ -239,7 +263,9 @@
 
 ;;; Loop variable with a range excluding 0, reported by Andras Simon.
 ;;; (Used to signal an error during macroexpansion.)
-(assert (not (loop with foo of-type (single-float 1.0 2.0) = 1.5 do (return))))
+(with-test (:name :loop-var-range-excludes-zero)
+  (assert (not (loop with foo of-type (single-float 1.0 2.0) = 1.5
+                     do (progn foo (return))))))
 
 ;;; 1.0.26.12 used to signal a bogus type error for this.
 (loop with x of-type (simple-vector 1) = (make-array '(1))
@@ -414,6 +440,7 @@
                     sb-ext:compiler-note))
 
 (with-test (:name :with-destructuring)
+  (declare (muffle-conditions style-warning)) ; why?
   (assert (= (loop with ((a . b)) = '((1 . 2))
                    return (+ a b))
              3))
