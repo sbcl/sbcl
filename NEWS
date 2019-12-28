@@ -1,9 +1,39 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-1.5.9
+  * minor incompatible change: heap relocation now works on Windows.  Since
+    this feature now works on all platforms, it is enabled unconditionally and
+    the :RELOCATABLE-HEAP symbol no longer appears on *FEATURES* in any
+    builds.  (Thanks to Luís Borges de Oliveira)
   * enhancement: malformed type specifiers and occurrences of deprecated types
     in :TYPE initargs of DEFCLASS and DEFINE-CONDITION slot specifications
     are detected and result in compile-time errors and warnings respectively.
+  * bug fix: add a walker template for WITH-SOURCE-FORM.
+  * bug fix: start the summary of a compilation unit on a fresh line.  (Thanks
+    to Zach Beane)
+  * bug fix: on Windows, PARSE-NATIVE-NAMESTRING produces an absolute
+    directory when parsing a bare drive name and :AS-DIRECTORY is specified.
+    (Thanks to Luís Borges de Oliveira)
+  * bug fix: on RISCV, the runtime is linked with libz if the core compression
+    feature is requested.  (Thanks to Andreas Schwab)
+  * bug fix: ADJOIN using an EQL test and a KEY function only transforms into
+    an EQ test if the key function returns values for which EQ and EQL are
+    guaranteed to be the same.
+  * optimizations:
+    ** the instruction sequence for multiple-value calls is more
+       efficient on x86-64.
+    ** the direction flag is now unused on x86 and x86-64 when handling
+       an unknown number of return values.  (Thanks to Fanael Linithien)
+    ** the x86-64 backend is better able to use memory operands for arithmetic
+       operations.
+    ** compilation of TYPECASE to a jump table is enabled when all the types
+       being tested are frozen.
+    ** compilation of CASE and ECASE into a jump table has been implemented on
+       32- and 64-bit powerpc platforms.
+    ** the implementation of Unicode normalization has been sped up.
+    ** pretty-printing dispatch on conses is faster, particularly with the
+       standard pretty-print dispatch table.  Deeply-nested forms should also
+       pretty-print faster.
 
 changes in sbcl-1.5.9 relative to sbcl-1.5.8:
   * platform support:
