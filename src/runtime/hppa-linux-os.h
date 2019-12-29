@@ -1,7 +1,7 @@
 #ifndef _HPPA_LINUX_OS_H
 #define _HPPA_LINUX_OS_H
 
-typedef struct ucontext os_context_t;
+typedef struct ucontext_t os_context_t;
 /* FIXME: This will change if the parisc-linux people implement
    wide-sigcontext for 32-bit kernels */
 typedef unsigned long os_context_register_t;
