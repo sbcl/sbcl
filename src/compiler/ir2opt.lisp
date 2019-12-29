@@ -506,6 +506,39 @@
                   do (change-tn-ref-tn tn-ref arg)))
           (delete-vop next))))))
 
+(defun next-start-vop (block)
+  (loop for 2block = block then (ir2-block-next 2block)
+        while (and 2block
+                   (= (length (vop-predecessors 2block)) 1))
+        when (ir2-block-start-vop 2block) return it))
+
+(defun branch-destination (branch &optional (true t))
+  (destructuring-bind (label not-p flags) (vop-codegen-info branch)
+    (declare (ignore flags))
+    (if (eq not-p true)
+        (next-start-vop (ir2-block-next (vop-block branch)))
+        (next-start-vop (gethash label *2block-info*)))))
+
+(defoptimizer (vop-optimize if-eq) (if-eq)
+  (when (boundp '*2block-info*)
+    (let ((branch-if (vop-next if-eq)))
+      (when (and branch-if
+                 (eq (vop-name branch-if) 'branch-if))
+        (let* ((args (vop-args if-eq))
+               (x (tn-ref-tn args))
+               (y (tn-ref-tn (tn-ref-across args))))
+          (when (constant-tn-p y)
+            (let ((move (branch-destination branch-if)))
+              (when (and move
+                         (eq (vop-name move) 'move))
+                (let* ((args (vop-args move))
+                       (from (tn-ref-tn args)))
+                  (when (and (constant-tn-p from)
+                             (eq (tn-leaf y)
+                                 (tn-leaf from)))
+                    (change-tn-ref-tn args x))))))
+          nil)))))
+
 ;;; If 2BLOCK ends in an IF-EQ (or similar) + BRANCH-IF where the second operand
 ;;; of the test is an immediate value, then return the conditional vop.
 ;;; There may optionally be a MOVE vop prior to the conditional test,
