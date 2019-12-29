@@ -60,7 +60,7 @@ os_context_register_addr(os_context_t *context, int offset)
         zero = 0;
         return &zero;
     } else {
-        return &(((struct sigcontext *) &(context->uc_mcontext))->sc_gr[offset]);
+        return &context->uc_mcontext.sc_gr[offset];
     }
 }
 
@@ -68,19 +68,19 @@ os_context_register_t *
 os_context_pc_addr(os_context_t *context)
 {
     /* Why do I get all the silly ports? -- CSR, 2002-08-11 */
-    return &(((struct sigcontext *) &(context->uc_mcontext))->sc_iaoq[0]);
+    return &context->uc_mcontext.sc_iaoq[0];
 }
 
 os_context_register_t *
 os_context_npc_addr(os_context_t *context)
 {
-    return &(((struct sigcontext *) &(context->uc_mcontext))->sc_iaoq[1]);
+    return &context->uc_mcontext.sc_iaoq[1];
 }
 
 sigset_t *
 os_context_sigmask_addr(os_context_t *context)
 {
-    return &(context->uc_sigmask);
+    return &context->uc_sigmask;
 }
 
 void
