@@ -13,7 +13,7 @@ LINKFLAGS += -v
 NM = ./linux-nm
 
 ASSEM_SRC = hppa-assem.S ldso-stubs.S
-ARCH_SRC = hppa-arch.c undefineds.c
+ARCH_SRC = hppa-arch.c
 
 OS_SRC = linux-os.c linux-mman.c hppa-linux-os.c
 OS_LIBS = -ldl
