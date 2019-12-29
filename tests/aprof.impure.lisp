@@ -74,11 +74,10 @@ sb-vm::
            (words (- (/ bytes n-word-bytes) vector-data-offset)))
       (instrument-alloc bytes node)
       (pseudo-atomic ()
-       (allocation result bytes node nil other-pointer-lowtag)
-       (storew* simple-array-unsigned-byte-64-widetag result 0
-                other-pointer-lowtag t)
-       (storew* (fixnumize words) result vector-length-slot
-                other-pointer-lowtag t)))))
+       (allocation result bytes node nil 0)
+       (storew* simple-array-unsigned-byte-64-widetag result 0 0 t)
+       (storew* (fixnumize words) result vector-length-slot 0 t)
+       (inst or :byte result other-pointer-lowtag)))))
 
 (with-test (:name :aprof-smoketest-large-vector-to-upper-register
             :fails-on :win32)
@@ -109,56 +108,6 @@ sb-vm::
           sb-vm::ea sb-vm:nil-value
           sb-vm:list-pointer-lowtag sb-vm:bignum-widetag))
 
-#-win32
-(with-test (:name :aprof-list-length-2)
-  ;; Rather than figuring out how to get some minimal piece of Lisp code to
-  ;; compile into exactly these instruction encodings below which caused aprof
-  ;; to fail, just check the assembled code directly.
-  ;; (This special case for 2 conses caused aprof not to recognize the pattern)
-  (let ((bytes
-         (test-util:assemble
-          `((inc :qword ,(ea 1024 temp-reg-tn) :lock)
-            (mov ,(ea (* thread-pseudo-atomic-bits-slot 8) thread-base-tn) ,rbp-tn)
-            (mov ,r10-tn ,(ea (* thread-alloc-region-slot 8) thread-base-tn))
-            (lea ,temp-reg-tn ,(ea (* 2 cons-size n-word-bytes) r10-tn))
-            (cmp ,temp-reg-tn ,(ea (* (1+ thread-alloc-region-slot) 8) thread-base-tn))
-            (jmp :a label)
-            (mov ,(ea (* thread-alloc-region-slot 8) thread-base-tn) ,temp-reg-tn)
-            (mov ,r9-tn ,(ea -56 rbp-tn)) ; arbitrary load
-            (mov ,(ea r10-tn) ,r9-tn)     ; store to newly allocated cons
-            (lea ,r9-tn ,(ea (+ 16 list-pointer-lowtag) r10-tn))
-            (mov ,(ea 8 r10-tn) ,r9-tn)
-            (mov ,(ea 16 r10-tn) ,rsi-tn)
-            (mov :dword ,(ea 24 r10-tn) ,nil-value)
-            (or :byte ,r10-tn ,list-pointer-lowtag)))))
-    (sb-sys:with-pinned-objects (bytes)
-      (multiple-value-bind (type size)
-          (sb-aprof::infer-type (sb-sys:sap-int (sb-sys:vector-sap bytes)) bytes)
-        (assert (eq type 'list))
-        (assert (= size (* 2 sb-vm:cons-size sb-vm:n-word-bytes))))))
-  (compile 'f1)
-  (compile 'f2)
-  (assert (= (sb-aprof:aprof-run #'f1 :stream nil) 32))
-  (assert (= (sb-aprof:aprof-run #'f2 :stream nil) 32)))
-
-#-win32
-(with-test (:name :aprof-bignum)
-  (let ((bytes
-         (test-util:assemble
-          `((inc :qword ,(ea 1024 temp-reg-tn) :lock)
-            (mov ,(ea (* thread-pseudo-atomic-bits-slot 8) thread-base-tn) ,rbp-tn)
-            (mov ,rcx-tn ,(ea (* thread-alloc-region-slot 8) thread-base-tn))
-            (lea ,temp-reg-tn ,(ea (* 2 n-word-bytes) rcx-tn))
-            (cmp ,temp-reg-tn ,(ea (* (1+ thread-alloc-region-slot) 8) thread-base-tn))
-            (jmp :a label)
-            (mov ,(ea (* thread-alloc-region-slot 8) thread-base-tn) ,temp-reg-tn)
-            (mov :word ,(ea rcx-tn) ,(logior #x100 bignum-widetag))))))
-    (sb-sys:with-pinned-objects (bytes)
-      (multiple-value-bind (type size)
-          (sb-aprof::infer-type (sb-sys:sap-int (sb-sys:vector-sap bytes)) bytes)
-        (assert (eq type 'bignum))
-        (assert (= size (* 2 sb-vm:n-word-bytes)))))))
-
 (defstruct this-struct)
 (defstruct that-struct)
 (declaim (inline make-this-struct make-that-struct))
@@ -181,7 +130,9 @@ sb-vm::
 #-win32
 (with-test (:name :aprof-brutal-test)
   (with-scratch-file (fasl "fasl")
-    (sb-aprof:aprof-run (lambda () (compile-file "../src/code/aprof"
+    ;; Just compile anything that exercises the compiler.
+    ;; This is only useful if the compiler was compiled with cons profiling.
+    (sb-aprof:aprof-run (lambda () (compile-file "../src/code/shaketree"
                                                  :output-file fasl
                                                  :print nil :verbose nil))
                         :stream (make-broadcast-stream))))
