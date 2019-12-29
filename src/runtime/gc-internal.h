@@ -122,7 +122,6 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
               lispobj bitmap, uword_t arg);
 
 extern int simple_fun_index(struct code*, struct simple_fun*);
-extern lispobj simple_fun_name(struct simple_fun*);
 
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 static inline lispobj funinstance_layout(lispobj* funinstance_ptr) { // native ptr

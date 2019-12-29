@@ -1612,14 +1612,6 @@ int simple_fun_index(struct code* code, struct simple_fun *fun)
     return -1;
 }
 
-lispobj simple_fun_name(struct simple_fun* fun)
-{
-    struct code* code = (struct code*)fun_code_header((lispobj*)fun);
-    int index = simple_fun_index(code, fun);
-    if (index < 0) return 0;
-    return code->constants[CODE_SLOTS_PER_SIMPLE_FUN*index];
-}
-
 /* Helper for valid_lisp_pointer_p (below) and
  * conservative_root_p (gencgc).
  *
