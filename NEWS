@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-1.5.9:
+changes in sbcl-2.0.0 relative to sbcl-1.5.9:
   * minor incompatible change: heap relocation now works on Windows.  Since
     this feature now works on all platforms, it is enabled unconditionally and
     the :RELOCATABLE-HEAP symbol no longer appears on *FEATURES* in any
