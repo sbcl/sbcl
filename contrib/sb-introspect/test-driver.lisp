@@ -349,12 +349,6 @@
     (tai '*print-base* :heap '(:space :immobile))
   t)
 
-(deftest allocation-information.2c
-  ;; This is a a test of SBCL genesis that leverages sb-introspect.
-    (tai (sb-kernel::find-fdefn (elt sb-vm:+static-fdefns+ 0))
-         :heap '(:space #+immobile-code :immobile #-immobile-code :static))
-  t)
-
 (deftest allocation-information.3
     (tai 42 :immediate nil)
   t)

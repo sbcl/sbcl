@@ -168,8 +168,14 @@
 
 #+immobile-space
 (with-test (:name :generation-of-fdefn)
+  ;; generation-of broke when fdefns stopped storing a generation in word 0
   (assert (= (sb-kernel:generation-of (sb-kernel::find-fdefn 'car))
              sb-vm:+pseudo-static-generation+)))
+
+(with-test (:name :static-fdefn-space)
+  (sb-int:dovector (name sb-vm:+static-fdefns+)
+    (assert (eq (sb-ext:heap-allocated-p (sb-kernel::find-fdefn name))
+                (or #+immobile-code :immobile :static)))))
 
 ;;; SB-EXT:GENERATION-* accessors returned bogus values for generation > 0
 (with-test (:name :bug-529014 :skipped-on (not :gencgc))
