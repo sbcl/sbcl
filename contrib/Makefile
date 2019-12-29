@@ -34,7 +34,7 @@ sb-executable.fasl: asdf.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-gmp.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-mpfr.fasl: asdf.fasl sb-rt.fasl
+sb-mpfr.fasl: asdf.fasl sb-gmp.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-queue.fasl: asdf.fasl sb-concurrency.fasl
 	sh ./build-contrib $(basename $(@F))
