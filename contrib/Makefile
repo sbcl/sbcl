@@ -12,9 +12,9 @@ sb-rt.fasl: asdf.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-posix.fasl: asdf.fasl sb-grovel.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-bsd-sockets.fasl: asdf.fasl sb-rt.fasl sb-posix.fasl
+sb-bsd-sockets.fasl: asdf.fasl sb-grovel.fasl sb-posix.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-cltl2.fasl: asdf.fasl sb-rt.fasl sb-posix.fasl
+sb-cltl2.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-aclrepl.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
@@ -26,7 +26,7 @@ sb-introspect.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-capstone.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-md5.fasl: asdf.fasl sb-gmp.fasl sb-rt.fasl
+sb-md5.fasl: asdf.fasl sb-gmp.fasl sb-rotate-byte.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-cover.fasl: asdf.fasl sb-md5.fasl
 	sh ./build-contrib $(basename $(@F))
@@ -40,5 +40,5 @@ sb-queue.fasl: asdf.fasl sb-concurrency.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-rotate-byte.fasl: asdf.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-simple-streams.fasl: asdf.fasl sb-posix.fasl sb-bsd-sockets.fasl
+sb-simple-streams.fasl: asdf.fasl sb-posix.fasl sb-bsd-sockets.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
