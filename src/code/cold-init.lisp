@@ -348,12 +348,12 @@ process to continue normally."
   (setf sb-alien::*default-c-string-external-format* nil)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
-    (finalizers-reinit)
-    ;; Create *CURRENT-THREAD* first, since initializing a stream calls
-    ;; ALLOC-BUFFER which calls FINALIZE which acquires **FINALIZER-STORE-LOCK**
-    ;; which needs a valid thread in order to grab a mutex.
+    ;; Until *CURRENT-THREAD* has been set, nothing the slightest bit complicated
+    ;; can be called, as pretty much anything can assume that it is set.
     (sb-thread::init-initial-thread)
-    ;; Initialize streams first, so that any errors can be printed later
+    ;; Initializing the standard streams calls ALLOC-BUFFER which calls FINALIZE
+    (finalizers-reinit)
+    ;; Initialize streams next, so that any errors can be printed
     (stream-reinit t)
     (os-cold-init-or-reinit)
     (thread-init-or-reinit)
