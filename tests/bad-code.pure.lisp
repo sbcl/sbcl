@@ -484,3 +484,11 @@
                     args))
                :allow-style-warnings t
                :allow-warnings t))))
+
+(with-test (:name :keyword-type-checking)
+  (assert
+   (nth-value 2
+              (checked-compile
+               `(lambda (x)
+                  (make-array 10 (list x) x))
+               :allow-warnings t))))

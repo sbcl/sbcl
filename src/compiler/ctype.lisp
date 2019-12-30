@@ -297,7 +297,9 @@ and no value was provided for it." name))))))))))
       (let ((k (first key))
             (v (second key)))
         (cond
-          ((not (check-arg-type k (specifier-type 'symbol) n)))
+          ((not (types-equal-or-intersect (lvar-type k) (specifier-type 'symbol)))
+           (note-lossage "The ~:R argument of type ~s cannot be used as a keyword."
+                         n (type-specifier (lvar-type k))))
           ((not (constant-lvar-p k))
            (setf unknown-keys t)
            ;; An unknown key may turn out to be :ALLOW-OTHER-KEYS at runtime,
