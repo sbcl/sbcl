@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.0:
+  * minor incompatible change: some symbols have been removed from *FEATURES*
+    based on a determination of which should be impermissible to examine
+    via #+ and #- reader macros in user-written code.
+
 changes in sbcl-2.0.0 relative to sbcl-1.5.9:
   * minor incompatible change: heap relocation now works on Windows.  Since
     this feature now works on all platforms, it is enabled unconditionally and

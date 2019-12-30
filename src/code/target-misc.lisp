@@ -27,6 +27,7 @@
                  sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")
+(defconstant !sbcl-architecture #.(sb-cold::target-platform-keyword))
 
 (defun machine-instance ()
   "Return a string giving the name of the local machine."

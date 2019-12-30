@@ -61,7 +61,7 @@ echo //doing warm init - load and dump phase
  --lose-on-corruption $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit \
  --eval "(progn ${devel})" \
  --eval '(sb-fasl::!warm-load "make-target-2-load.lisp")' \
- --eval '(progn #+gencgc(setf (extern-alien "gc_coalesce_string_literals" char) 2))' \
+ --eval '(setf (extern-alien "gc_coalesce_string_literals" char) 2)' \
  --eval '(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))'
 

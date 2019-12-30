@@ -311,10 +311,11 @@
 ;; nonetheless, opportunities for sharing abound.
 (defconstant +vector-shareable-nonstd+ #x200)
 
-;;; This is so that COMPILE-FILE knows that things like :ALLOW-OTHER-KEYS
-;;; can be immediate constants.
+;;; This header bit is set for symbols which were present in the pristine core.
+;;; The backend may emit different code when referencing such symbols.
+;;; For x86-64, symbols with this bit set may be assumed to have been
+;;; allocated in immobile space.
 ;;; Note also that sb-fasteval uses 2 bits of the symbol header.
-#+(and immobile-space (not immobile-symbols))
 (defconstant +initial-core-symbol-bit+ 8) ; bit index, not bit value
 
 #+immobile-space

@@ -670,7 +670,7 @@ functions when called with no arguments."
            (let ((c (fun-code-header
                      ;; Immobile code might use relative fixups which won't work
                      ;; when the code gets copied.
-                     (let ((sb-c::*compile-to-memory-space* :dynamic))
+                     (let ((sb-c:*compile-to-memory-space* :dynamic))
                        (compile nil
                                 `(lambda (&rest args)
                                    ;; The code constants will be overwritten in the copy.

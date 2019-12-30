@@ -45,7 +45,8 @@ sb-ext::(declaim (unmuffle-conditions sb-kernel:redefinition-warning))
     (setf *central-registry* nil)))
 
 (defun build-asdf-contrib (system)
-  (push :sb-building-contrib *features*)
+  (setq *features*
+        (append '(:sb-building-contrib) sb-impl:+internal-features+ *features*))
   (setup-asdf-contrib)
   (let* ((name (string-downcase system))
          (sbcl-pwd (getenv-pathname "SBCL_PWD" :ensure-directory t))
