@@ -503,20 +503,19 @@
       (print-bytes (+ prefix-len alignment) stream dstate))
     (incf (dstate-next-offs dstate) alignment)))
 
-(defstruct (filtered-arg (:copier nil) (:predicate nil) (:constructor nil))
-  next)
-;;; Return an arbitrary object (one that is a subtype of FILTERED-ARG)
-;;; that is automatically returned to the dstate's filtered-arg-pool
+;;; Return an object that is automatically returned to the dstate's filtered-arg-pool
 ;;; after disassembly of the current instruction.
-;;; Any given disassembler backend must use the same constructor for
-;;; its filtered args that participate in the pool.
+;;; Any given disassembler backend must use the same constructor for its filtered args
+;;; that participate in the pool, and must manually initialize those objects, because
+;;; the value could be a recycled one from the pool.
 (defun new-filtered-arg (dstate constructor)
-  (let ((arg (dstate-filtered-arg-pool-free dstate)))
-    (if arg
-        (setf (dstate-filtered-arg-pool-free dstate) (filtered-arg-next arg))
-        (setf arg (funcall constructor)))
-    (sb-c::push-in filtered-arg-next arg (dstate-filtered-arg-pool-in-use dstate))
-    arg))
+  (let ((list (dstate-filtered-arg-pool-free dstate)))
+    (unless list
+      (setf list (list (funcall constructor))))
+    (prog1 (car list)
+      (setf (dstate-filtered-arg-pool-free dstate) (cdr list))
+      (setf (cdr list) (dstate-filtered-arg-pool-in-use dstate)
+            (dstate-filtered-arg-pool-in-use dstate) list))))
 
 (defmacro get-dchunk (state)
   (if (= sb-assem:+inst-alignment-bytes+ 1)
@@ -737,12 +736,9 @@
           (print-notes-and-newline stream dstate))
         (setf (dstate-output-state dstate) nil))
       (unless prefix-p
-        (let ((arg (dstate-filtered-arg-pool-in-use dstate)))
-          (loop (unless arg (return))
-                (let ((saved-next (filtered-arg-next arg)))
-                  (sb-c::push-in filtered-arg-next arg
-                                 (dstate-filtered-arg-pool-free dstate))
-                  (setq arg saved-next))))
+        (setf (dstate-filtered-arg-pool-free dstate)
+              (nconc (dstate-filtered-arg-pool-free dstate)
+                     (dstate-filtered-arg-pool-in-use dstate)))
         (setf (dstate-filtered-arg-pool-in-use dstate) nil)
         (setf (dstate-inst-properties dstate) 0)))))))
 

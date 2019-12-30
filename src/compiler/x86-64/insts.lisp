@@ -425,7 +425,7 @@
   (width   :field (byte 1 0)    :type 'width)
   (reg/mem :fields (list (byte 2 14) (byte 3 8))
            :type 'reg/mem :reader regrm-inst-r/m)
-  (reg     :field (byte 3 11)   :type 'reg :reader regrm-inst-reg)
+  (reg     :field (byte 3 11)   :type 'reg)
   ;; optional fields
   (imm))
 
@@ -435,7 +435,7 @@
                             :default-printer
                             `(:name :tab ,(swap-if 'dir 'reg/mem ", " 'reg)))
   (op  :field (byte 6 2))
-  (dir :field (byte 1 1) :reader regrm-direction-bit))
+  (dir :field (byte 1 1)))
 
 ;;; Same as reg-reg/mem, but uses the reg field as a second op code.
 (define-instruction-format (reg/mem 16
@@ -469,8 +469,7 @@
                                         :default-printer
                                         '(:name :tab reg/mem ", " imm))
   (reg/mem :type 'sized-reg/mem)
-  (imm     :type 'signed-imm-data/asm-routine
-           :reader reg/mem-imm-data))
+  (imm     :type 'signed-imm-data/asm-routine))
 
 ;;; Same as reg/mem, but with using the accumulator in the default printer
 (define-instruction-format
@@ -486,9 +485,8 @@
   (prefix  :field (byte 8 0)    :value #x0F)
   (op      :field (byte 7 9))
   (width   :field (byte 1 8)    :type 'width)
-  (reg/mem :fields (list (byte 2 22) (byte 3 16))
-           :type 'reg/mem  :reader ext-regrm-inst-r/m)
-  (reg     :field (byte 3 19)   :type 'reg :reader ext-regrm-inst-reg)
+  (reg/mem :fields (list (byte 2 22) (byte 3 16)) :type 'reg/mem)
+  (reg     :field (byte 3 19)   :type 'reg)
   ;; optional fields
   (imm))
 

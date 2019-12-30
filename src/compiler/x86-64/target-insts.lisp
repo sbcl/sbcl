@@ -58,10 +58,16 @@
 (defun reg-imm-data (dchunk dstate) dchunk
   (aref (sb-disassem::dstate-filtered-values dstate) 4))
 
-(defstruct (machine-ea (:include sb-disassem::filtered-arg)
-                       (:copier nil)
+(defstruct (machine-ea (:copier nil)
                        (:constructor %make-machine-ea))
-  base disp index scale)
+  ;; possible TODO: base,index,scale could be packed thusly in 13 bits:
+  ;;  2 bits for scale
+  ;;  1 bit for base register non-NULL
+  ;;  4 bits for base register number
+  ;;  1 bit for base-register-is-RIP
+  ;;  1 bit for index register non-NULL
+  ;;  4 bits for index register number
+  disp base index scale)
 
 (defun reg-num (reg) (reg-id-num (reg-id reg)))
 
@@ -426,6 +432,7 @@
        ;; But ordinarily we get the string. Either way, the r/m arg reveals the
        ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
        ;; because the EA was computed in a prefilter.
+       ;; (the instruction format is known because LEA has exactly one format)
        (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
                       width stream dstate)
        (setq addr value)
