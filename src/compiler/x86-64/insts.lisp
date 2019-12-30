@@ -196,6 +196,7 @@
                  (setf width :dword))
                (read-signed-suffix (* (size-nbyte width) n-byte-bits) dstate))
   :printer (lambda (value stream dstate)
+             (declare (notinline sb-disassem::inst-name))
              (if (not stream) ; won't have a DSTATE-INST in this case, maybe fix that?
                  (push value (dstate-operands dstate))
                  (let ((opcode (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)))
