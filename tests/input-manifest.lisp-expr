@@ -1,5 +1,6 @@
 (("aprof.impure.lisp"
-  "src/code/aprof.lisp")
+  "src/code/aprof.lisp"
+  "src/code/shaketree.lisp")
  ("bit-vector.impure.lisp" "contrib/sb-posix.fasl")
  ("case.pure.lisp" "tests/case-test.lisp")
  ("chill.test.sh"
