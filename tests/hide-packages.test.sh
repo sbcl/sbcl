@@ -4,6 +4,11 @@
 
 set -e
 
+# +INTERNAL-FEATURES+ is a constant, so use a roundabout way of
+# clobbering it that avoids a compiler warning and a runtime error.
+CLOBBER_INTERNAL_FEATURES="(handler-bind ((simple-error #'continue))
+  (sb-kernel:set-symbol-global-value (eval ''sb-impl:+internal-features+) nil))"
+
 ### Test 1: assert that no package name string has a reference from any
 ### heap object aside from the package itself.
 ### Because SAVE-LISP-AND-DIE coalesces strings, this test provides confidence
@@ -20,6 +25,7 @@ run_sbcl <<EOF
   ;; This form needs to obfuscate the spellings of victim symbols, or else
   ;; they end up in the *SOURCE-INFO* for this file, which is pinned while
   ;; loading the file, which would enliven the symbols.
+  $CLOBBER_INTERNAL_FEATURES
   (dolist (x '("EVAL" "THREAD" "UNICODE"))
     (let ((sym (find-symbol (concatenate 'string '(#\S #\B #\-) x) "KEYWORD")))
       (when sym
@@ -69,6 +75,7 @@ run_sbcl <<EOF
 
 (defun rename-all-packages ()
   ;; Remove features that are also names of packages.
+  $CLOBBER_INTERNAL_FEATURES
   (dolist (x '("EVAL" "THREAD" "UNICODE"))
     (let ((sym (find-symbol (concatenate 'string *pkg-prefix* x) "KEYWORD")))
       (when sym
