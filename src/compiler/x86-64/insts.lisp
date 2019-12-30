@@ -196,10 +196,18 @@
                  (setf width :dword))
                (read-signed-suffix (* (size-nbyte width) n-byte-bits) dstate))
   :printer (lambda (value stream dstate)
-             (cond ((not stream) (push value (dstate-operands dstate)))
-                   ((maybe-note-static-symbol value dstate)
-                    (princ16 value stream))
-                   (t (princ value stream)))))
+             (if (not stream) ; won't have a DSTATE-INST in this case, maybe fix that?
+                 (push value (dstate-operands dstate))
+                 (let ((opcode (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)))
+                       (size (inst-operand-size dstate)))
+                   (if (and (or (and (eq opcode 'cmp) (eq size :qword))
+                                ;; Slight bug still- MOV to memory of :DWORD could be writing
+                                ;; a raw slot or anything. Only a :QWORD could be a symbol, however
+                                ;; the size when moving to register is :DWORD.
+                                (and (eq opcode 'mov) (memq size '(:dword :qword))))
+                            (maybe-note-static-symbol value dstate))
+                       (princ16 value stream)
+                       (princ value stream))))))
 
 (define-arg-type signed-imm-data/asm-routine
   :type 'signed-imm-data

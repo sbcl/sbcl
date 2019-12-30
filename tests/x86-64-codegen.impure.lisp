@@ -680,3 +680,14 @@ sb-vm::(define-vop (cl-user::test)
                                     sb-kernel:unknown-type
                                     sb-kernel:numeric-type
                                     #-immobile-space null))))))
+
+;; lp#1857861
+(with-test (:name :undecoded-immediate-data)
+  (let ((f (compile nil '(lambda (x) (when (floatp x) 0.0))))
+        (expect (format nil ", ~D" sb-vm:single-float-widetag)))
+     (loop for line in (split-string (with-output-to-string (string)
+                                       (disassemble f :stream string))
+                                     #\newline)
+             thereis (let ((p (search expect line)))
+                       ;; expect no end-of-line comment
+                       (and p (not (find #\; line :start p)))))))
