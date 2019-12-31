@@ -326,7 +326,7 @@ print_garbage(lispobj *from_space, lispobj *from_space_free_pointer)
 
 /* weak pointers */
 
-static sword_t
+sword_t
 scav_weak_pointer(lispobj *where, lispobj object)
 {
     /* Do not let GC scavenge the value slot of the weak pointer */
@@ -353,7 +353,6 @@ void
 gc_init(void)
 {
     weakobj_init();
-    scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 }
 
 /* noise to manipulate the gc trigger stuff */

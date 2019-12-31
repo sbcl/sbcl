@@ -1511,7 +1511,7 @@ copy_unboxed_object(lispobj object, sword_t nwords)
  * weak pointers
  */
 
-static sword_t
+sword_t
 scav_weak_pointer(lispobj *where, lispobj __attribute__((unused)) object)
 {
     struct weak_pointer * wp = (struct weak_pointer*)where;
@@ -3886,8 +3886,6 @@ static void gc_allocate_ptes()
     weakobj_init();
     hopscotch_create(&pinned_objects, HOPSCOTCH_HASH_FUN_DEFAULT, 0 /* hashset */,
                      32 /* logical bin count */, 0 /* default range */);
-
-    scavtab[WEAK_POINTER_WIDETAG] = scav_weak_pointer;
 
     bytes_allocated = 0;
 

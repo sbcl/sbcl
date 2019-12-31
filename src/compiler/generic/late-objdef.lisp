@@ -75,7 +75,7 @@
     (character "immediate")
     (sap "unboxed")
     (unbound-marker "immediate")
-    (weak-pointer "lose" "weak_pointer" "boxed")
+    (weak-pointer "weak_pointer" "weak_pointer" "boxed")
     (instance "instance" "lose" "short_boxed")
     (fdefn "fdefn")
 
@@ -211,7 +211,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                               (if (= (mod i 4) 3) 0 31)
                               prefix (or x "lose") (< i (length contents))))
              (format stream "~%};~%")))
-      (write-table "sword_t (*scavtab[256])(lispobj *where, lispobj object)"
+      (write-table "sword_t (*const scavtab[256])(lispobj *where, lispobj object)"
                    "scav_" scavtab)
       (format stream "static void (*scav_ptr[4])(lispobj *where, lispobj object)~
  = {~{~%  (void(*)(lispobj*,lispobj))scav_~A_pointer~^,~}~%};~%"

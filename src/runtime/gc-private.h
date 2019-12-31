@@ -71,7 +71,7 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
     return make_lispobj(new, lowtag_of(object));
 }
 
-extern sword_t (*scavtab[256])(lispobj *where, lispobj object);
+extern sword_t (*const scavtab[256])(lispobj *where, lispobj object);
 extern struct cons *weak_vectors; /* in gc-common.c */
 extern struct hash_table *weak_hash_tables; /* in gc-common.c */
 
