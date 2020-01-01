@@ -24,6 +24,8 @@
            ;; and we should build with both, which is to say that dynamic-core is not
            ;; an additional yes/no choice.
            :SB-DYNAMIC-CORE
+           ;; Can't use s-l-a-d :compression safely witout it
+           :SB-CORE-COMPRESSION
            ;; Features that are also in *features-potentially-affecting-fasl-format*
            ;; and would probably mess up something if made non-public,
            ;; though I don't think they should all be public.
