@@ -1051,36 +1051,18 @@ avoiding atexit(3) hooks, etc. Otherwise exit(2) is called."
 #-win32
 (progn
 
-  #-sb-fluid (declaim (inline get-time-of-day))
+  (declaim (inline get-time-of-day))
   (defun get-time-of-day ()
     "Return the number of seconds and microseconds since the beginning of
 the UNIX epoch (January 1st 1970.)"
-    #+(or darwin netbsd)
     (with-alien ((tv (struct timeval)))
-      ;; CLH: FIXME! This seems to be a MacOS bug, but on x86-64/darwin,
-      ;; gettimeofday occasionally fails. passing in a null pointer for the
-      ;; timezone struct seems to work around the problem. NS notes: Darwin
-      ;; manpage says the timezone is not used anymore in their implementation
-      ;; at all.
-      (syscall* ("sb_gettimeofday" (* (struct timeval))
-                                (* (struct timezone)))
+      (syscall* ("sb_gettimeofday" (* (struct timeval)))
                 (values (slot tv 'tv-sec)
                         (slot tv 'tv-usec))
-                (addr tv)
-                nil))
-    #-(or darwin netbsd)
-    (with-alien ((tv (struct timeval))
-                 (tz (struct timezone)))
-      (syscall* ("sb_gettimeofday" (* (struct timeval))
-                                (* (struct timezone)))
-                (values (slot tv 'tv-sec)
-                        (slot tv 'tv-usec))
-                (addr tv)
-                (addr tz))))
+                (addr tv))))
 
   (declaim (inline system-internal-run-time
                    system-real-time-values))
-
   (defun system-real-time-values ()
     (multiple-value-bind (sec usec) (get-time-of-day)
       (declare (type unsigned-byte sec) (type (unsigned-byte 31) usec))

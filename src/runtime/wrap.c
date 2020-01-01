@@ -443,28 +443,6 @@ int sb_select(int top_fd, DWORD *read_set, DWORD *write_set, DWORD *except_set, 
     }
     return polling_write;
 }
-
-/*
- * Windows doesn't have gettimeofday(), and we need it for the compiler,
- * for serve-event, and for a couple other things. We don't need a timezone
- * yet, however, and the closest we can easily get to a timeval is the
- * seconds part. So that's what we do.
- */
-#define UNIX_EPOCH_FILETIME 116444736000000000ULL
-
-int sb_gettimeofday(long *timeval, long *timezone)
-{
-    FILETIME ft;
-    ULARGE_INTEGER uft;
-    GetSystemTimeAsFileTime(&ft);
-    uft.LowPart = ft.dwLowDateTime;
-    uft.HighPart = ft.dwHighDateTime;
-    uft.QuadPart -= UNIX_EPOCH_FILETIME;
-    timeval[0] = uft.QuadPart / 10000000;
-    timeval[1] = (uft.QuadPart % 10000000)/10;
-
-    return 0;
-}
 #endif
 
 
@@ -551,9 +529,9 @@ int sb_getrusage(int who, struct rusage *rusage)
         return getrusage(who, rusage);
 }
 
-int sb_gettimeofday(struct timeval *tp, void *tzp)
+int sb_gettimeofday(struct timeval *tp)
 {
-        return gettimeofday(tp, tzp);
+        return gettimeofday(tp, NULL);
 }
 
 #ifndef LISP_FEATURE_DARWIN /* reimplements nanosleep in darwin-os.c  */
