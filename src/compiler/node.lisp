@@ -438,7 +438,9 @@
                         (head
                          tail &aux
                          (last-block tail)
-                         (outer-loop (make-loop :kind :outer :head head)))))
+                         (outer-loop (make-loop :kind :outer
+                                                :head head
+                                                :tail (list tail))))))
   ;; unique ID for debugging
   #+sb-show (id (new-object-id) :read-only t)
   ;; space where this component will be allocated in
