@@ -2458,7 +2458,8 @@
     (assert (equal type1 (sb-kernel:%simple-fun-type g)))
     (assert (equal type0 (sb-kernel:%simple-fun-type h)))))
 
-(test-util:with-test (:name :bug-308921)
+(test-util:with-test (:name :bug-308921
+                      :broken-on :sbcl)
   (let ((*check-consistency* t))
     (ctu:file-compile
      `((let ((exported-symbols-alist
