@@ -2124,7 +2124,9 @@ mechanism for inter-thread communication."
                        (*print-lines* 4))
                    (format t " ~3d ~30a : ~s~%"
                            (ash tlsindex (- sb-vm:word-shift))
-                           (sb-ext::find-symbol-from-tls-index tlsindex)
+                           ;; FIND-SYMBOL-FROM-TLS-INDEX uses MAP-ALLOCATED-OBJECTS
+                           ;; which is not defined during cross-compilation.
+                           (funcall 'sb-ext::find-symbol-from-tls-index tlsindex)
                            val)))))
       (format t "~&TLS: (base=~x)~%" (sap-int sap))
       (loop for tlsindex from sb-vm:n-word-bytes below
