@@ -462,7 +462,7 @@ enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
 /* If 'addr' points to an immobile object, then make the object
    live by promotion. But if the object is not in the generation
    being collected, do nothing */
-void immobile_space_preserve_pointer(void* addr)
+boolean immobile_space_preserve_pointer(void* addr)
 {
     unsigned char genmask = compacting_p() ? 1<<from_space : 0xff;
     lispobj* object_start;
@@ -496,7 +496,9 @@ void immobile_space_preserve_pointer(void* addr)
             && (lispobj*)addr < object_start + fixedobj_page_obj_size(page_index)
             && (properly_tagged_descriptor_p(addr, object_start)
                 || widetag_of(object_start) == FUNCALLABLE_INSTANCE_WIDETAG);
-    } else return;
+    } else {
+      return 0;
+    }
     if (valid && (!compacting_p() ||
                   __immobile_obj_gen_bits(object_start) == from_space)) {
         dprintf((logfile,"immobile obj @ %p (<- %p) is conservatively live\n",
@@ -505,7 +507,9 @@ void immobile_space_preserve_pointer(void* addr)
             enliven_immobile_obj(object_start, 0);
         else
             gc_mark_obj(compute_lispobj(object_start));
+        return 1;
     }
+    return 0;
 }
 
 // Loop over the newly-live objects, scavenging them for pointers.

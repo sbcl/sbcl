@@ -668,7 +668,7 @@ The cases can be broken down as follows:
    zero-fill was a waste.
 
  - closures and everything else except arrays are basically structure-like
-   and have the same issue. Ffixed-sized objects are simple though - e.g. value-cells
+   and have the same issue. Fixed-sized objects are simple though - e.g. value-cells
    can move the store of the 1 word payload inside pseudo-atomic if it isn't already.
    Thusly, any value-cell could go on a non-prezeroed page.
 
@@ -2141,7 +2141,7 @@ pin_object(lispobj object)
  * It is also assumed that the current gc_alloc() region has been
  * flushed and the tables updated. */
 
-static void NO_SANITIZE_MEMORY
+static boolean NO_SANITIZE_MEMORY
 preserve_pointer(void *addr)
 {
     page_index_t page = find_page_index(addr);
@@ -2151,10 +2151,11 @@ preserve_pointer(void *addr)
         // because it's inlined. Either is a no-op if no immobile space.
         if (immobile_space_p((lispobj)addr))
             return immobile_space_preserve_pointer(addr);
-        return;
+        return 0;
     }
     lispobj *object_start = conservative_root_p((lispobj)addr, page);
     if (object_start) pin_object(compute_lispobj(object_start));
+    return object_start != 0;
 }
 #endif
 
