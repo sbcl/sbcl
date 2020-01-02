@@ -1,3 +1,5 @@
+(setf (extern-alien "gc_allocate_dirty" char) 1)
+
 (load "test-util.lisp")
 (load "assertoid.lisp")
 (load "compiler-test-util.lisp")

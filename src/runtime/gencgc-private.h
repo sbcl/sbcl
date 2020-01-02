@@ -12,7 +12,7 @@
 #ifndef _GENCGC_PRIVATE_H_
 #define _GENCGC_PRIVATE_H_
 
-void zero_dirty_pages(page_index_t start, page_index_t end);
+void zero_dirty_pages(page_index_t start, page_index_t end, int page_type);
 
 /// There is some additional cleverness that could potentially be had -
 /// the "need_to_zero" bit (a/k/a "page dirty") is obviously 1 if the page

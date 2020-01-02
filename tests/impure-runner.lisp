@@ -1,3 +1,5 @@
+(setf (extern-alien "gc_allocate_dirty" char) 1)
+
 (with-compilation-unit ()
   (load "test-util")
   (load "assertoid"))

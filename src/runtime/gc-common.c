@@ -1647,7 +1647,10 @@ properly_tagged_p_internal(lispobj pointer, lispobj *start_addr)
     if (lowtag && make_lispobj(start_addr, lowtag) == pointer)
         return 1; // instant win
 
-    if (widetag == CODE_HEADER_WIDETAG) {
+    // debug_info must be assigned prior to examining a code object for simple-funs.
+    // This is how we distinguish objects that are partyway through construction.
+    // It would be wrong to read garbage bytes from the simple-fun table.
+    if (widetag == CODE_HEADER_WIDETAG && ((struct code*)start_addr)->debug_info) {
         if (functionp(pointer)) {
             lispobj* potential_fun = FUNCTION(pointer);
             if (widetag_of(potential_fun) == SIMPLE_FUN_WIDETAG &&

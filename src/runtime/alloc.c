@@ -68,6 +68,9 @@ lispobj alloc_code_object (unsigned total_words)
 #endif
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
+    code->boxed_size = 0;
+    code->debug_info = 0;
+    ((lispobj*)code)[total_words-1] = 0; // zeroize the simple-fun table count
     return make_lispobj(code, OTHER_POINTER_LOWTAG);
 }
 #endif

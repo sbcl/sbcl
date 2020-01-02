@@ -259,10 +259,17 @@
       (with-pinned-objects (code-obj)
         (let ((bytes (the (simple-array assembly-unit 1)
                           (segment-contents-as-vector segment))))
-          ;; By design, until the last 2 unboxed bytes of CODE-OBJ contain a
-          ;; nonzero value, GC will not see any simple-funs therein.
+          ;; Note that this does not have to take care to ensure atomicity
+          ;; of the store to the final word of unboxed data. Even if BYTE-BLT were
+          ;; interrupted in between the store of any individual byte, this code
+          ;; is GC-safe because we no longer need to know where simple-funs are embedded
+          ;; within the object to trace pointers. We *do* need to know where the funs
+          ;; are when transporting the object, but it's currently pinned.
           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
         (apply-core-fixups fixup-notes code-obj))
+      ;; Enforce that the final unboxed data word is published to memory
+      ;; before the debug-info is set.
+      (sb-thread:barrier (:write))
 
       ;; Don't need code pinned now
       (let* ((entries (ir2-component-entries 2comp))
@@ -282,6 +289,8 @@
             (note-fun entry-info fun object))))
 
       (push debug-info (core-object-debug-info object))
+      ;; Assign debug-info last. A code object that has no debug-info will never
+      ;; have its fun table accessed in conservative_root_p() or pin_object().
       (setf (%code-debug-info code-obj) debug-info)
 
       (do ((index sb-vm:code-constants-offset (1+ index)))

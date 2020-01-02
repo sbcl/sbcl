@@ -1340,14 +1340,12 @@ int* code_component_order;
  * 'coreparse' causes all pages in dynamic space to be pseudo-static, but
  * each immobile object stores its own generation, so this must be done at
  * save time, or else it would require touching every object on startup */
-void prepare_immobile_space_for_save(lispobj init_function, boolean verbose)
+void prepare_immobile_space_for_save(boolean verbose)
 {
     if (verbose) {
         printf("[defragmenting immobile space... ");
         fflush(stdout);
     }
-    // Assert that defrag will not move the init_function
-    gc_assert(!immobile_space_p(init_function));
     defrag_immobile_space(verbose);
 
     lispobj* obj = (lispobj*)FIXEDOBJ_SPACE_START;

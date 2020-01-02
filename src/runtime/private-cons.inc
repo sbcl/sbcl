@@ -84,7 +84,7 @@ static struct cons* private_cons_impl()
         gc_assert(!page_table[page].write_protected);
         page_table[page].gen = 0;
         page_table[page].type = UNBOXED_PAGE_FLAG;
-        zero_dirty_pages(page, page);
+        zero_dirty_pages(page, page, 0);
         page_index_t tail = private_cons_page_chain;
         page_header->car = 0; // unused
         page_header->cdr = (lispobj)(tail >= 0 ? page_address(tail) : 0);

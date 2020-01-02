@@ -470,14 +470,27 @@
                        -1 code-header-widetag other-pointer-lowtag)))
 
     (with-pinned-objects (code)
-      ;; The 1st slot beyond the header stores the boxed header size in bytes
-      ;; as an untagged number, which has the same representation as a tagged
-      ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
-      ;; This slot must be 0 prior to writing any pointer descriptors
-      ;; into the object.
-      (setf (sap-ref-word (int-sap (get-lisp-obj-address code))
-                          (- (ash code-boxed-size-slot word-shift) other-pointer-lowtag))
-            (ash boxed word-shift)))
+      (let ((sap (sap+ (int-sap (get-lisp-obj-address code))
+                       (- other-pointer-lowtag))))
+        ;; The immobile space allocator pre-zeroes, and also it needs a nonzero
+        ;; value in the boxed word count because otherwise it looks like
+        ;; an immobile space page filler. So don't do any more zeroing there.
+        ;; (Could dead immobile objects be converted to use FILLER-WIDETAG instead?)
+        (unless (immobile-space-obj-p code)
+          ;; Before writing the boxed word count, zeroize up to and including 1 word
+          ;; after the boxed header so that all point words can be safely read
+          ;; by GC and so the jump table count word is 0.
+          (loop for byte-index from (ash boxed word-shift) downto (ash 2 word-shift)
+                by n-word-bytes
+                do (setf (sap-ref-word sap byte-index) 0)))
+        ;; The 1st slot beyond the header stores the boxed header size in bytes
+        ;; as an untagged number, which has the same representation as a tagged
+        ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
+        ;; This boxed-size MUST be 0 prior to writing any pointers into the object
+        ;; because the boxed words will not necessarily have been pre-zeroed;
+        ;; scavenging them prior to zeroing them out would see wild pointers.
+        (setf (sap-ref-word sap (ash code-boxed-size-slot word-shift))
+              (ash boxed word-shift))))
 
     ;; FIXME: Sort out 64-bit and cheneygc.
     #+(and 64-bit cheneygc)

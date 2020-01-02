@@ -524,7 +524,6 @@
                     (if (oddp header) :immobile :dynamic)
                     (align-up n-boxed-words sb-c::code-boxed-words-align)
                     n-code-bytes)))
-        (setf (%code-debug-info code) (svref stack debug-info-index))
         (loop for i of-type index from sb-vm:code-constants-offset
               for j of-type index from ptr below debug-info-index
               do (setf (code-header-ref code i) (svref stack j)))
@@ -534,6 +533,10 @@
           ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS.
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
           (sb-c::apply-fasl-fixups stack code n-fixups))
+        (sb-thread:barrier (:write))
+        ;; Assign debug-info last. A code object that has no debug-info will never
+        ;; have its fun table accessed in conservative_root_p() or pin_object().
+        (setf (%code-debug-info code) (svref stack debug-info-index))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
