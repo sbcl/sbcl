@@ -1582,6 +1582,7 @@ core and return a descriptor to it."
 ;;; anything else, we intern those here. We also set the value of T.
 (defun initialize-static-space (tls-init)
   "Initialize the cold load symbol-hacking data structures."
+  (declare (ignorable tls-init))
   ;; NIL did not have its package assigned. Do that now.
   (let ((target-cl-pkg-info (gethash "COMMON-LISP" *cold-package-symbols*)))
     ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
