@@ -41,7 +41,8 @@
 ;;; a pointer to the coverage marks since their location is implicit.
 (defun code-coverage-marks (code)
   (let ((insts (sb-kernel:code-instructions code)))
-    (sb-sys:sap+ insts (ash (sb-sys:sap-ref-word insts 0) sb-vm:word-shift))))
+    (sb-sys:sap+ insts (ash (sb-kernel:code-jump-table-words code)
+                            sb-vm:word-shift))))
 
 ;;; Retun just the list of soure paths in CODE that are marked covered.
 (defun get-coverage (code)

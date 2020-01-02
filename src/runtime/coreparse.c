@@ -461,7 +461,7 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
             // Fixup absolute jump table
             lispobj* jump_table = code_jumptable_start(code);
-            int count = jump_table ? *jump_table : 0;
+            int count = jumptable_count(jump_table);
             int i;
             for (i = 1; i < count; ++i) adjust_word_at(jump_table+i, adj);
 #endif

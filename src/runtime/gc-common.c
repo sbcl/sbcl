@@ -313,7 +313,7 @@ trans_code(struct code *code)
     // The count alone suffices. A GC immediately after creating the code
     // could cause us to observe some 0 words here. Those should be ignored.
     lispobj* jump_table = code_jumptable_start(new_code);
-    int count = jump_table ? *jump_table : 0;
+    int count = jumptable_count(jump_table);
     int i;
     for (i = 1; i < count; ++i)
         if (jump_table[i]) jump_table[i] += displacement;

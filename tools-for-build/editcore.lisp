@@ -823,7 +823,7 @@
          (max-end 0))
     ;; There is *always* at least 1 word of unboxed data now
     (aver (eq (caar ranges) :data))
-    (let ((jump-table-size (sap-ref-word text-sap 0))
+    (let ((jump-table-size (code-jump-table-words code))
           (total-nwords (cdr (pop ranges))))
       (cond ((> jump-table-size 1)
              (format output "# jump table~%")

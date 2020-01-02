@@ -81,6 +81,15 @@ static inline int code_text_size(struct code* c) {
 static inline lispobj* code_jumptable_start(struct code* code) {
     return code->boxed_size ? (lispobj*)code_text_start(code) : 0;
 }
+static inline unsigned int jumptable_count(lispobj* table) {
+    // extract low 14 bits regardless of machine word size
+    return table ? *table & 0x3FFF : 0;
+}
+static inline unsigned int code_serialno(struct code* code) {
+    // extract next 18 bits regardless of machine word size
+    lispobj* table = code_jumptable_start(code);
+    return table ? *table >> 14 : 0;
+}
 
 // How many elements in 'code->constants[]' are taken by each simple-fun
 #define CODE_SLOTS_PER_SIMPLE_FUN 4

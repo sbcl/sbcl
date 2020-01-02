@@ -2066,7 +2066,7 @@ static void defrag_immobile_space(boolean verbose)
                     // Fix any absolute jump tables
                     lispobj* jump_table =
                         code_jumptable_start((struct code*)tempspace_addr((void*)new_vaddr));
-                    int count = jump_table ? *jump_table : 0;
+                    int count = jumptable_count(jump_table);
                     int i;
                     for (i = 1; i < count; ++i)
                         if (jump_table[i]) jump_table[i] += displacement;

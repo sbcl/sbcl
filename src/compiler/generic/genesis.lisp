@@ -626,14 +626,12 @@
          (gen-shift (if (= widetag sb-vm:fdefn-widetag) 8 24)))
     (write-wordindexed/raw des 0 (logior (ash gen gen-shift) header-word))))
 
-(defun write-code-header-words (descriptor boxed unboxed serialno)
-  #-64-bit (setq serialno 0)
+(defun write-code-header-words (descriptor boxed unboxed)
   (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
     (write-header-word descriptor
                        (logior (ash total-words sb-vm::code-header-size-shift)
                                sb-vm:code-header-widetag)))
-  (write-wordindexed/raw descriptor 1
-                         (logior (ash serialno 32) (* boxed sb-vm:n-word-bytes))))
+  (write-wordindexed/raw descriptor 1 (* boxed sb-vm:n-word-bytes)))
 
 (defun write-header-data+tag (des header-data widetag)
   (write-header-word des (logior (ash header-data sb-vm:n-widetag-bits)
@@ -1694,7 +1692,6 @@ core and return a descriptor to it."
   (cold-set 'sb-vm::*free-tls-index*
             (make-descriptor (ash *genesis-tls-counter* sb-vm:word-shift)))
 
-  #+64-bit
   (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
 
   (dolist (symbol sb-impl::*cache-vector-symbols*)
@@ -2088,6 +2085,9 @@ core and return a descriptor to it."
 (defvar *code-fixup-notes*)
 (defvar *allocation-point-fixup-notes*)
 
+(defun code-jump-table-words (code)
+  (ldb (byte 14 0) (read-bits-wordindexed code (code-header-words code))))
+
 (declaim (ftype (sfunction (descriptor sb-vm:word sb-vm:word keyword keyword)
                            descriptor)
                 cold-fixup))
@@ -2125,9 +2125,7 @@ core and return a descriptor to it."
               (setf (bvref-32 gspace-data gspace-byte-offset)
                     (the (unsigned-byte 32) addr))
               #+x86
-              (let ((n-jump-table-words
-                     (read-bits-wordindexed code-object
-                                            (code-header-words code-object))))
+              (let ((n-jump-table-words (code-jump-table-words code-object)))
                 ;; Absolute fixups are recorded if within the object for x86.
                 (and in-dynamic-space
                      (< obj-start-addr addr code-end-addr)
@@ -2144,7 +2142,8 @@ core and return a descriptor to it."
              (:absolute64
               (setf (bvref-64 gspace-data gspace-byte-offset)
                     (the (unsigned-byte 64) addr))
-              ;; Never record it. (FIXME: this is a problem for relocatable heap)
+              ;; Never record it. These fixups are used only for jump table entries,
+              ;; which are automatically adjusted if core relocation happens.
               nil)
              (:relative ; (used for arguments to X86 relative CALL instruction)
               (let ((diff (- addr (+ gspace-base gspace-byte-offset 4)))) ; 4 = size of rel32off
@@ -2575,8 +2574,7 @@ core and return a descriptor to it."
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
-    (write-code-header-words des aligned-n-boxed-words code-size
-                             (incf *code-serialno*))
+    (write-code-header-words des aligned-n-boxed-words code-size)
     (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
     (do ((index (1- n-boxed-words) (1- index)))
         ((< index sb-vm:code-constants-offset))
@@ -2589,6 +2587,11 @@ core and return a descriptor to it."
            (end (+ start code-size)))
       (read-bigvec-as-sequence-or-die (descriptor-mem des) (fasl-input-stream)
                                       :start start :end end)
+      (let ((jumptable-word (read-bits-wordindexed des aligned-n-boxed-words)))
+        (aver (zerop (ash jumptable-word -14)))
+        ;; assign serialno
+        (write-wordindexed/raw des aligned-n-boxed-words
+                               (logior (ash (incf *code-serialno*) 14) jumptable-word)))
       (when *show-pre-fixup-code-p*
         (format *trace-output*
                 "~&LOAD-CODE: ~d header words, ~d code bytes.~%"
@@ -2662,7 +2665,7 @@ core and return a descriptor to it."
                   (+ (ash header-n-words sb-vm:word-shift) length)
                   sb-vm:other-pointer-lowtag)))
     (setf *cold-assembler-obj* asm-code)
-    (write-code-header-words asm-code header-n-words rounded-length 0)
+    (write-code-header-words asm-code header-n-words rounded-length)
     (let ((start (+ (descriptor-byte-offset asm-code)
                     (ash header-n-words sb-vm:word-shift))))
       (read-bigvec-as-sequence-or-die (descriptor-mem asm-code)

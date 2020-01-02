@@ -468,22 +468,16 @@
                        ;; subtract 1 because var-alloc always adds 1 word
                        ;; for the header, which is not right for code objects.
                        -1 code-header-widetag other-pointer-lowtag)))
-    ;; The 1st slot beyond the header stores the boxed header size in bytes
-    ;; as an untagged number, which has the same representation as a tagged
-    ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
-    ;; This slot is allowed to be 0 prior to writing any pointer descriptors
-    ;; into the object.
-    ;;
-    ;; If 64-bit words, assign a serial number unless the space is NIL.
-    ;; Use ATOMIC-INCF on the serialno to get automatic wraparound,
-    ;; and not because atomicity makes things deterministic, which it doesn't
-    ;; if there are several threads allocating code.
+
     (with-pinned-objects (code)
+      ;; The 1st slot beyond the header stores the boxed header size in bytes
+      ;; as an untagged number, which has the same representation as a tagged
+      ;; value denoting a word count if WORD-SHIFT = N-FIXNUM-TAG-BITS.
+      ;; This slot must be 0 prior to writing any pointer descriptors
+      ;; into the object.
       (setf (sap-ref-word (int-sap (get-lisp-obj-address code))
                           (- (ash code-boxed-size-slot word-shift) other-pointer-lowtag))
-            (logior #+64-bit (logand (ash (atomic-incf sb-fasl::*code-serialno*) 32)
-                                     most-positive-word)
-                    (ash boxed word-shift))))
+            (ash boxed word-shift)))
 
     ;; FIXME: Sort out 64-bit and cheneygc.
     #+(and 64-bit cheneygc)
