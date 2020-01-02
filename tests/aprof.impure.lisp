@@ -13,8 +13,7 @@
 
 (with-test (:name :aprof-smoketest-struct
             ;; reverse-engineering the allocation instructions fails but should not
-            :fails-on (or (not :immobile-space)
-                          :sb-safepoint))
+            :fails-on (not :immobile-space))
   (let ((nbytes
          (sb-aprof:aprof-run
             (checked-compile
