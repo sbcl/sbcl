@@ -712,7 +712,7 @@ necessary, since type inference may take arbitrarily long to converge.")
 
     (when *loop-analyze*
       (dfo-as-needed component)
-      (maybe-mumber "Dom ")
+      (maybe-mumble "Dom ")
       (find-dominators component)
       (maybe-mumble "Loop ")
       (loop-analyze component))
