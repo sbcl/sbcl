@@ -2244,13 +2244,21 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     fake_foreign_function_call(context);
 
     /* To allow debugging memory faults in signal handlers and such. */
+    char* pc = (char*)*os_context_pc_addr(context);
+    struct code* code = (struct code*)component_ptr_from_pc(pc);
+    unsigned int offset = code ? pc - (char*)code : 0;
 #ifdef ARCH_HAS_STACK_POINTER
-    corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p, fp=%p, sp=%p) tid %#lx",
-                                      addr,
-                                      *os_context_pc_addr(context),
-                                      os_context_frame_pointer(context),
-                                      *os_context_sp_addr(context),
-                                      thread_self()); // = 0 if -sb-thread
+    if (offset)
+        corruption_warning_and_maybe_lose(
+            "Memory fault at %p (pc=%p [code %p+0x%X ID 0x%x], fp=%p, sp=%p) tid %#lx",
+            addr, pc, code, offset, code_serialno(code),
+            os_context_frame_pointer(context),
+            *os_context_sp_addr(context), thread_self()); // = 0 if -sb-thread
+    else
+        corruption_warning_and_maybe_lose(
+            "Memory fault at %p (pc=%p, fp=%p, sp=%p) tid %#lx",
+            addr, pc, os_context_frame_pointer(context),
+            *os_context_sp_addr(context), thread_self()); // = 0 if -sb-thread
 #else
     corruption_warning_and_maybe_lose("Memory fault at %p (pc=%p)",
                                       addr, *os_context_pc_addr(context));
