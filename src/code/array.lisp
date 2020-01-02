@@ -1093,6 +1093,8 @@ of specialized arrays is supported."
 
 ;;;; fill pointer frobbing stuff
 
+(setf (info :function :predicate-truth-constraint 'array-has-fill-pointer-p)
+      '(and vector (not simple-array)))
 (declaim (inline array-has-fill-pointer-p))
 (defun array-has-fill-pointer-p (array)
   "Return T if the given ARRAY has a fill pointer, or NIL otherwise."

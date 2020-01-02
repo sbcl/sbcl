@@ -1628,6 +1628,7 @@
   (case predicate-name
    (keywordp (literal-ctype *satisfies-keywordp-type*))
    (legal-fun-name-p (literal-ctype *fun-name-type*))
+   (adjustable-array-p (specifier-type '(and array (not simple-array))))
    (t (%make-hairy-type whole))))
 
 ;;;; negation types

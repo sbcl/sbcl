@@ -2880,7 +2880,7 @@
 (with-test (:name (compile :hairy-array-element-type-derivation))
   (checked-compile
    '(lambda (x)
-     (declare (type (and simple-string (satisfies array-has-fill-pointer-p)) x))
+     (declare (type (and simple-string (satisfies eval)) x))
      (array-element-type x))))
 
 (with-test (:name (compile &rest :derive-type 1))

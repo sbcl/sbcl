@@ -1874,3 +1874,8 @@
     ((array) node gen)
   (declare (ignore gen))
   (values array (specifier-type '(and array (not (simple-array * (*)))))))
+
+(defoptimizer (%array-fill-pointer-p constraint-propagate-if)
+    ((array) node gen)
+  (declare (ignore gen))
+  (values array (specifier-type '(and vector (not simple-array)))))
