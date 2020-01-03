@@ -385,7 +385,7 @@ the stack without triggering overflow protection.")
   (objmap-id-to-label    nil :type (or null id-array)) ; number -> LABEL
   )
 
-(defvar *compilation*)
+(sb-impl::define-thread-local *compilation*)
 (declaim (type compilation *compilation*))
 
 (in-package "SB-ALIEN")
