@@ -96,7 +96,7 @@
            ;; written on a "let's get it to work" basis.
            ;; These seem to be the variables that need
            ;; bindings for PROCESS-DECLS to work
-           ;; (*FREE-FUNS* and *FREE-VARS* so that
+           ;; (*IR1-NAMESPACE* so that
            ;; references to free functions and variables
            ;; in the declarations can be noted;
            ;; *UNDEFINED-WARNINGS* so that warnings about
@@ -104,8 +104,7 @@
            ;; then thrown away, as it happens]). -- CSR,
            ;; 2002-10-24
            (let* ((sb-c:*lexenv* lexenv)
-                  (sb-c::*free-funs* (make-hash-table :test 'equal))
-                  (sb-c::*free-vars* (make-hash-table :test 'eq))
+                  (sb-c::*ir1-namespace* (sb-c::make-ir1-namespace))
                   (sb-c::*undefined-warnings* nil))
              ;; FIXME: VALUES declaration
              (sb-c::process-decls decls

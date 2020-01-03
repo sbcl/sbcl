@@ -752,27 +752,27 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;;; global data structures entirely when possible and consing up the
 ;;;; others from scratch instead of clearing and reusing them?
 
-;;; Clear the INFO in constants in the *FREE-VARS*, etc. In
+;;; Clear the INFO in constants in the *IR1-NAMESPACE*, etc. In
 ;;; addition to allowing stuff to be reclaimed, this is required for
 ;;; correct assignment of constant offsets, since we need to assign a
 ;;; new offset for each component. We don't clear the FUNCTIONAL-INFO
 ;;; slots, since they are used to keep track of functions across
 ;;; component boundaries.
-(defun clear-constant-info ()
+(defun clear-constant-info (&aux (ns *ir1-namespace*))
   (maphash (lambda (k v)
              (declare (ignore k))
              (setf (leaf-info v) nil))
-           *constants*)
+           (constants ns))
   (maphash (lambda (k v)
              (declare (ignore k))
              (when (constant-p v)
                (setf (leaf-info v) nil)))
-           *free-vars*)
+           (free-vars ns))
   (values))
 
 ;;; Blow away the REFS for all global variables, and let COMPONENT
 ;;; be recycled.
-(defun clear-ir1-info (component)
+(defun clear-ir1-info (component &aux (ns *ir1-namespace*))
   (declare (type component component))
   (labels ((blast (x)
              (maphash (lambda (k v)
@@ -786,9 +786,9 @@ necessary, since type inference may take arbitrarily long to converge.")
                       x))
            (here-p (x)
              (eq (node-component x) component)))
-    (blast *free-vars*)
-    (blast *free-funs*)
-    (blast *constants*))
+    (blast (free-vars ns))
+    (blast (free-funs ns))
+    (blast (constants ns)))
   (values))
 
 ;;;; trace output

@@ -1167,8 +1167,9 @@
 ;;; previous references.
 (defun get-defined-fun (name &optional (lambda-list nil lp))
   (proclaim-as-fun-name name)
-  (when (boundp '*free-funs*)
-    (let ((found (find-free-fun name "shouldn't happen! (defined-fun)")))
+  (when (boundp '*ir1-namespace*)
+    (let ((found (find-free-fun name "shouldn't happen! (defined-fun)"))
+          (free-funs (free-funs *ir1-namespace*)))
       (note-name-defined name :function)
       (cond ((not (defined-fun-p found))
              (aver (not (info :function :inlinep name)))
@@ -1184,11 +1185,11 @@
                                              (ftype-from-lambda-list lambda-list))
                                         (specifier-type 'function))))))
                (substitute-leaf res found)
-               (setf (gethash name *free-funs*) res)))
-            ;; If *FREE-FUNS* has a previously converted definition
+               (setf (gethash name free-funs) res)))
+            ;; If FREE-FUNS has a previously converted definition
             ;; for this name, then blow it away and try again.
             ((defined-fun-functionals found)
-             (remhash name *free-funs*)
+             (remhash name free-funs)
              (get-defined-fun name lambda-list))
             (t found)))))
 

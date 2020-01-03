@@ -158,10 +158,10 @@
                        where
                        (maybe-defined-here name where))))))
 
-;;; Have some DEFINED-FUN-FUNCTIONALS of a *FREE-FUNS* entry become invalid?
+;;; Have some DEFINED-FUN-FUNCTIONALS of a FREE-FUNS entry become invalid?
 ;;; Drop 'em.
 ;;;
-;;; This was added to fix bug 138 in SBCL. It is possible for a *FREE-FUNS*
+;;; This was added to fix bug 138 in SBCL. It is possible for a FREE-FUNS
 ;;; entry to contain a DEFINED-FUN whose DEFINED-FUN-FUNCTIONAL object
 ;;; contained IR1 stuff (NODEs, BLOCKs...) referring to an already compiled
 ;;; (aka "dead") component. When this IR1 stuff was reused in a new component,
@@ -175,7 +175,7 @@
 ;;; BUGS entry also makes it seem like this might not be an issue at all on
 ;;; target.
 (defun clear-invalid-functionals (free-fun)
-  ;; There might be other reasons that *FREE-FUN* entries could
+  ;; There might be other reasons that FREE-FUN entries could
   ;; become invalid, but the only one we've been bitten by so far
   ;; (sbcl-0.pre7.118) is this one:
   (when (defined-fun-p free-fun)
@@ -204,15 +204,15 @@
                      (defined-fun-functionals free-fun)))
     nil))
 
-;;; If NAME already has a valid entry in *FREE-FUNS*, then return
+;;; If NAME already has a valid entry in (FREE-FUNS *IR1-NAMESPACE*), then return
 ;;; the value. Otherwise, make a new GLOBAL-VAR using information from
-;;; the global environment and enter it in *FREE-FUNS*. If NAME
+;;; the global environment and enter it in FREE-FUNS. If NAME
 ;;; names a macro or special form, then we error out using the
 ;;; supplied context which indicates what we were trying to do that
 ;;; demanded a function.
 (declaim (ftype (sfunction (t string) global-var) find-free-fun))
-(defun find-free-fun (name context)
-  (or (let ((old-free-fun (gethash name *free-funs*)))
+(defun find-free-fun (name context &aux (free-funs (free-funs *ir1-namespace*)))
+  (or (let ((old-free-fun (gethash name free-funs)))
         (when old-free-fun
           (clear-invalid-functionals old-free-fun)
           old-free-fun))
@@ -225,7 +225,7 @@
            (check-fun-name name)
            (let ((expansion (fun-name-inline-expansion name))
                  (inlinep (info :function :inlinep name)))
-             (setf (gethash name *free-funs*)
+             (setf (gethash name free-funs)
                    (if (or expansion inlinep)
                        (let ((where (info :function :where-from name)))
                          (make-defined-fun
@@ -255,17 +255,18 @@
            (find-free-fun name context)))))
 
 (defun maybe-find-free-var (name)
-  (let ((found (gethash name *free-vars*)))
+  (let ((found (gethash name (free-vars *ir1-namespace*))))
     (unless (eq found :deprecated)
       found)))
 
 ;;; Return the LEAF node for a global variable reference to NAME. If
-;;; NAME is already entered in *FREE-VARS*, then we just return the
+;;; NAME is already entered in (FREE-VARS *IR1-NAMESPACE*), then we just return the
 ;;; corresponding value. Otherwise, we make a new leaf using
 ;;; information from the global environment and enter it in
-;;; *FREE-VARS*. If the variable is unknown, then we emit a warning.
+;;; FREE-VARS. If the variable is unknown, then we emit a warning.
 (declaim (ftype (sfunction (t) (or leaf cons heap-alien-info)) find-free-var))
-(defun find-free-var (name &aux (existing (gethash name *free-vars*)))
+(defun find-free-var (name &aux (free-vars (free-vars *ir1-namespace*))
+                                (existing (gethash name free-vars)))
   (unless (symbolp name)
     (compiler-error "Variable name is not a symbol: ~S." name))
   (or (when (and existing (neq existing :deprecated))
@@ -283,7 +284,7 @@
           (case deprecation-state
             ((:early :late)
              (check-deprecated-thing 'variable name))))
-        (setf (gethash name *free-vars*)
+        (setf (gethash name free-vars)
               (case kind
                 (:alien
                  (info :variable :alien-info name))

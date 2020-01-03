@@ -1763,15 +1763,15 @@
 ;;; This is called by locall-analyze-fun-1 after it convers a call to
 ;;; FUN into a local call.
 ;;; Presumably, the function can be no longer reused by new calls to
-;;; FUN, so the whole thing has to be removed from *FREE-FUNS*
-(defun note-local-functional (fun)
+;;; FUN, so the whole thing has to be removed from (FREE-FUN *IR1-NAMESPACE*).
+(defun note-local-functional (fun &aux (free-funs (free-funs *ir1-namespace*)))
   (declare (type functional fun))
   (when (and (leaf-has-source-name-p fun)
              (eq (leaf-source-name fun) (functional-debug-name fun)))
     (let* ((name (leaf-source-name fun))
-           (defined-fun (gethash name *free-funs*)))
+           (defined-fun (gethash name free-funs)))
       (when (defined-fun-p defined-fun)
-        (remhash name *free-funs*)))))
+        (remhash name free-funs)))))
 
 ;;; Return functional for DEFINED-FUN which has been converted in policy
 ;;; corresponding to the current one, or NIL if no such functional exists.
@@ -2372,8 +2372,8 @@ is :ANY, the function name is not checked."
   (values))
 
 ;;; Return a LEAF which represents the specified constant object. If
-;;; the object is not in *CONSTANTS*, then we create a new constant
-;;; LEAF and enter it. If we are producing a fasl file, make sure that
+;;; the object is not in (CONSTANTS *IR1-NAMESPACE*), then we create a new
+;;; constant LEAF and enter it. If we are producing a fasl file, make sure that
 ;;; MAKE-LOAD-FORM gets used on any parts of the constant that it
 ;;; needs to be.
 ;;;
@@ -2457,11 +2457,11 @@ is :ANY, the function name is not checked."
       #-sb-xc-host
       (when (and (not faslp) (simple-string-p object))
         (logically-readonlyize object nil))
-      (let ((hashp (and (boundp '*constants*)
+      (let ((hashp (and (boundp '*ir1-namespace*)
                         (if faslp
                             (file-coalesce-p object)
                             (core-coalesce-p object)))))
-        (awhen (and hashp (gethash object *constants*))
+        (awhen (and hashp (gethash object (constants *ir1-namespace*)))
           (return-from find-constant it))
         (when (and faslp (not (sb-fasl:dumpable-layout-p object)))
           (if namep
@@ -2469,7 +2469,7 @@ is :ANY, the function name is not checked."
               (maybe-emit-make-load-forms object)))
         (let ((new (make-constant object)))
           (when hashp
-            (setf (gethash object *constants*) new))
+            (setf (gethash object (constants *ir1-namespace*)) new))
           new)))))
 
 ;;; Return true if X and Y are lvars whose only use is a

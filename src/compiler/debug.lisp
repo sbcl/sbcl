@@ -38,7 +38,7 @@
 ;;; Check everything that we can think of for consistency. When a
 ;;; definite inconsistency is detected, we BARF.
 ;;; Our argument is a list of components, but
-;;; we also look at the *FREE-VARS*, *FREE-FUNS* and *CONSTANTS*.
+;;; we also look at the *IR1-NAMESPACE*.
 ;;;
 ;;; First we do a pre-pass which finds all the CBLOCKs and CLAMBDAs,
 ;;; testing that they are linked together properly and entering them
@@ -46,7 +46,7 @@
 ;;; the actual code and control flow. Finally, we scan the global leaf
 ;;; hashtables, looking for lossage.
 (declaim (ftype (function (list) (values)) check-ir1-consistency))
-(defun check-ir1-consistency (components)
+(defun check-ir1-consistency (components &aux (ns *ir1-namespace*))
   (let ((*seen-blocks* (make-hash-table :test 'eq))
         (*seen-funs* (make-hash-table :test 'eq)))
     (unwind-protect
@@ -92,32 +92,32 @@
                                   (and (global-var-p v)
                                        (member (global-var-kind v)
                                                '(:global :special :unknown))))
-                        (barf "strange *FREE-VARS* entry: ~S" v))
+                        (barf "strange FREE-VARS entry: ~S" v))
                       (when (leaf-p v)
                         (dolist (n (leaf-refs v))
                           (check-node-reached n)))
                       (when (basic-var-p v)
                         (dolist (n (basic-var-sets v))
                           (check-node-reached n))))
-                    *free-vars*)
+                    (free-vars ns))
 
            (maphash (lambda (k v)
                       (declare (ignore k))
                       (unless (constant-p v)
-                        (barf "strange *CONSTANTS* entry: ~S" v))
+                        (barf "strange CONSTANTS entry: ~S" v))
                       (dolist (n (leaf-refs v))
                         (check-node-reached n)))
-                    *constants*)
+                    (constants ns))
 
            (maphash (lambda (k v)
                       (declare (ignore k))
                       (unless (or (functional-p v)
                                   (and (global-var-p v)
                                        (eq (global-var-kind v) :global-function)))
-                        (barf "strange *FREE-FUNS* entry: ~S" v))
+                        (barf "strange FREE-FUNS entry: ~S" v))
                       (dolist (n (leaf-refs v))
                         (check-node-reached n)))
-                    *free-funs*))
+                    (free-funs ns)))
       (clrhash *seen-blocks*)
       (clrhash *seen-funs*))
     (values)))
@@ -941,7 +941,7 @@
     (integer (ctran-block (num-cont thing)))
     (functional (lambda-block (main-entry thing)))
     (null (error "Bad thing: ~S." thing))
-    (symbol (block-or-lose (gethash thing *free-funs*)))))
+    (symbol (block-or-lose (gethash thing (free-funs *ir1-namespace*))))))
 
 ;;; Print cN.
 (defun print-ctran (cont)

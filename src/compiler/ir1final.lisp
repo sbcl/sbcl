@@ -53,10 +53,11 @@
 
 ;;; For each named function with an XEP, note the definition of that
 ;;; name, and add derived type information to the INFO environment. We
-;;; also delete the FUNCTIONAL from *FREE-FUNS* to eliminate the
+;;; also delete the FUNCTIONAL from (FREE-FUNS *IR1-NAMESPACE*) to eliminate the
 ;;; possibility that new references might be converted to it.
 (defun finalize-xep-definition (fun)
   (let* ((leaf (functional-entry-fun fun))
+         (ns *ir1-namespace*)
          (defined-ftype (definition-type leaf)))
     (setf (leaf-type leaf) defined-ftype)
     (when (and (leaf-has-source-name-p leaf)
@@ -65,11 +66,11 @@
       (let ((source-name (leaf-source-name leaf)))
         (let* ((where (info :function :where-from source-name))
                (*compiler-error-context* (lambda-bind (main-entry leaf)))
-               (global-def (gethash source-name *free-funs*))
+               (global-def (gethash source-name (free-funs ns)))
                (global-p (defined-fun-p global-def)))
           (note-name-defined source-name :function)
           (when global-p
-            (remhash source-name *free-funs*))
+            (remhash source-name (free-funs ns)))
           (ecase where
             (:assumed
              (let ((approx-type (info :function :assumed-type source-name)))
@@ -280,7 +281,7 @@
 
   (maphash (lambda (k v)
              (note-assumed-types component k v))
-           *free-funs*)
+           (free-funs *ir1-namespace*))
 
   (ir1-merge-casts component)
   (ir1-optimize-functional-arguments component)

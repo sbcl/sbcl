@@ -88,8 +88,8 @@
   ;; in EVAL-WHEN (:COMPILE) inside something like DEFSTRUCT, in which
   ;; case it's reasonable style. Either way, NAME is no longer a free
   ;; function.)
-  (when (boundp '*free-funs*)       ; when compiling
-    (remhash name *free-funs*))
+  (when (boundp '*ir1-namespace*)       ; when compiling
+    (remhash name (free-funs *ir1-namespace*)))
 
   (values))
 

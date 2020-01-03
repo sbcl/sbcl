@@ -255,7 +255,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
                "*CODE-SEGMENT*"
                "*COMPILATION*"
                "*COMPILE-TO-MEMORY-SPACE*"
-               "*ELSEWHERE*" "*FREE-FUNS*"
+               "*ELSEWHERE*"
                "*LEXENV*"
                "*SUPPRESS-VALUES-DECLARATION*"
 

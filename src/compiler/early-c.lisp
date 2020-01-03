@@ -87,18 +87,18 @@
                           (:copier nil))
   (expansion nil :read-only t))
 
-;;; *FREE-VARS* translates from the names of variables referenced
-;;; globally to the LEAF structures for them. *FREE-FUNS* is like
-;;; *FREE-VARS*, only it deals with function names.
-(defvar *free-vars*)
-(defvar *free-funs*)
-(declaim (type hash-table *free-vars* *free-funs*))
-
-;;; We use the same CONSTANT structure to represent all equal anonymous
-;;; constants. This hashtable translates from constants to the LEAFs that
-;;; represent them.
-(defvar *constants*)
-(declaim (type hash-table *constants*))
+(defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil))
+  ;; FREE-VARS translates from the names of variables referenced
+  ;; globally to the LEAF structures for them.
+  (free-vars (make-hash-table :test 'eq) :read-only t :type hash-table)
+  ;; FREE-FUNS is like FREE-VARS, only it deals with function names.
+  (free-funs (make-hash-table :test 'equal) :read-only t :type hash-table)
+  ;; We use the same CONSTANT structure to represent all equal anonymous
+  ;; constants. This hashtable translates from constants to the LEAFs that
+  ;; represent them.
+  (constants (make-hash-table :test 'equal) :read-only t :type hash-table))
+(sb-impl::define-thread-local *ir1-namespace*)
+(declaim (type ir1-namespace *ir1-namespace*))
 
 ;;; *ALLOW-INSTRUMENTING* controls whether we should allow the
 ;;; insertion of instrumenting code (like a (CATCH ...)) around code

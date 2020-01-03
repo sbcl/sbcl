@@ -184,7 +184,7 @@
 
 (defun process-inline-declaration (name kind)
   (declare (type (and inlinep (not null)) kind))
-  ;; since implicitly it is a function, also scrubs *FREE-FUNS*
+  ;; since implicitly it is a function, also scrubs (FREE-FUNS *IR1-NAMESPACE*)
   (proclaim-as-fun-name name)
   (warn-if-inline-failed/proclaim name kind)
   (setf (info :function :inlinep name) kind))

@@ -602,16 +602,9 @@
         (clrhash ,source-paths)))))
 
 ;;; Bind the hashtables used for keeping track of global variables,
-;;; functions, etc. Also establish condition handlers.
+;;; functions, etc.
 (defmacro with-ir1-namespace (&body forms)
-  `(let ((*free-vars* (make-hash-table :test 'eq))
-         (*free-funs* (make-hash-table :test 'equal))
-         (*constants* (make-hash-table :test 'equal)))
-     (unwind-protect
-          (progn ,@forms)
-       (clrhash *free-funs*)
-       (clrhash *free-vars*)
-       (clrhash *constants*))))
+  `(let ((*ir1-namespace* (make-ir1-namespace))) ,@forms))
 
 ;;; Look up NAME in the lexical environment namespace designated by
 ;;; SLOT, returning the <value, T>, or <NIL, NIL> if no entry. The

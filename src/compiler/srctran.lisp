@@ -5113,8 +5113,8 @@
                (check-deprecated-thing 'variable symbol)
                (case state
                  ((:early :late)
-                  (unless (gethash symbol *free-vars*)
-                    (setf (gethash symbol *free-vars*) :deprecated)))))
+                  (unless (gethash symbol (free-vars *ir1-namespace*))
+                    (setf (gethash symbol (free-vars *ir1-namespace*)) :deprecated)))))
              ;; :global in the test below is redundant if match-kind is :global
              ;; but it's harmless and a convenient way to express this.
              ;; Note that some 3rd-party libraries use variations on DEFCONSTANT
