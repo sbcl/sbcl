@@ -256,6 +256,9 @@
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
+      ;; A very specific store order is necessary to allow using uninitialized memory
+      ;; pages for code. Storing of the debug-info slot does not need the code pinned,
+      ;; but that store must occur between steps 1 and 2.
       (with-pinned-objects (code-obj)
         (let ((bytes (the (simple-array assembly-unit 1)
                           (segment-contents-as-vector segment))))
@@ -266,12 +269,20 @@
           ;; within the object to trace pointers. We *do* need to know where the funs
           ;; are when transporting the object, but it's currently pinned.
           (%byte-blt bytes 0 (code-instructions code-obj) 0 (length bytes)))
+        ;; Enforce that the final unboxed data word is published to memory
+        ;; before the debug-info is set.
+        (sb-thread:barrier (:write))
+        ;; Until debug-info is assigned, it is illegal to create a simple-fun pointer
+        ;; into this object, because the C code assumes that the fun table is in an
+        ;; invalid/incomplete state (i.e. can't be read) until the code has debug-info.
+        ;; That is, C code can't deal with an interior code pointer until the fun-table
+        ;; is valid. This store must occur prior to calling %CODE-ENTRY-POINT, and
+        ;; applying fixups calls %CODE-ENTRY-POINT, so we have to do this before that.
+        (setf (%code-debug-info code-obj) debug-info)
         (apply-core-fixups fixup-notes code-obj))
-      ;; Enforce that the final unboxed data word is published to memory
-      ;; before the debug-info is set.
-      (sb-thread:barrier (:write))
 
       ;; Don't need code pinned now
+      ;; (It will implicitly be pinned on the conservatively scavenged backends)
       (let* ((entries (ir2-component-entries 2comp))
              (fun-index (length entries)))
         (dolist (entry-info entries)
@@ -289,9 +300,6 @@
             (note-fun entry-info fun object))))
 
       (push debug-info (core-object-debug-info object))
-      ;; Assign debug-info last. A code object that has no debug-info will never
-      ;; have its fun table accessed in conservative_root_p() or pin_object().
-      (setf (%code-debug-info code-obj) debug-info)
 
       (do ((index sb-vm:code-constants-offset (1+ index)))
           ((>= index (length constants)))

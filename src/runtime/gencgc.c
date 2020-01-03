@@ -733,7 +733,7 @@ void zero_dirty_pages(page_index_t start, page_index_t end, int page_type) {
 #ifdef LISP_FEATURE_64_BIT
         lispobj word = 0x100 | 5;
 #else
-        lispobj word = 0x100 | 3;
+        lispobj word = 0x100 | 2;
 #endif
         if (must_zero)
             for (i = start; i <= end; i++)

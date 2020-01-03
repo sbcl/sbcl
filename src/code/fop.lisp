@@ -528,15 +528,15 @@
               for j of-type index from ptr below debug-info-index
               do (setf (code-header-ref code i) (svref stack j)))
         (with-pinned-objects (code)
-          ;; * DO * NOT * SEPARATE * THESE * TWO * STEPS *
+          ;; * DO * NOT * SEPARATE * THESE * STEPS *
           ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
-          ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS.
+          ;; concerning the corresponding use therein of WITH-PINNED-OBJECTS etc.
           (read-n-bytes (fasl-input-stream) (code-instructions code) 0 n-code-bytes)
+          (sb-thread:barrier (:write))
+          ;; Assign debug-info last. A code object that has no debug-info will never
+          ;; have its fun table accessed in conservative_root_p() or pin_object().
+          (setf (%code-debug-info code) (svref stack debug-info-index))
           (sb-c::apply-fasl-fixups stack code n-fixups))
-        (sb-thread:barrier (:write))
-        ;; Assign debug-info last. A code object that has no debug-info will never
-        ;; have its fun table accessed in conservative_root_p() or pin_object().
-        (setf (%code-debug-info code) (svref stack debug-info-index))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))
                      '(cons (eql sb-c::coverage-map)))
