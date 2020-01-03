@@ -233,6 +233,7 @@
         ;; In order from best to worst.
         (cond
           ((symbol-always-has-tls-value-p known-symbol)
+           (setq symbol-reg nil)
            (inst mov value (access-wired-tls-val known-symbol)))
           (t
            (cond
@@ -288,7 +289,7 @@
                                 (lambda ()
                                   (load-immediate vop symbol symbol-reg)))
                             vop 'unbound-symbol-error
-                            (if (and immediatep (not staticp))
+                            (if (or (not symbol-reg) (and immediatep (not staticp)))
                                 symbol
                                 symbol-reg))))
             RETRY))))

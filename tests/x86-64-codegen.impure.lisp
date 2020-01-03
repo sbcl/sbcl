@@ -691,3 +691,7 @@ sb-vm::(define-vop (cl-user::test)
              thereis (let ((p (search expect line)))
                        ;; expect no end-of-line comment
                        (and p (not (find #\; line :start p)))))))
+
+(with-test (:name :thread-local-unbound)
+  (let ((c (nth-value 1 (ignore-errors sb-c::*compilation*))))
+    (assert (eq (cell-error-name c) 'sb-c::*compilation*))))
