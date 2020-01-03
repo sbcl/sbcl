@@ -425,14 +425,3 @@
     (sb-thread:join-thread worker-thread)
     (setq working nil)
     (sb-thread:join-thread gc-thread)))
-
-(with-test (:name :alloc-code-non-prezeroed-pages
-            :skipped-on (:not :sb-thread))
-  (let* ((quitit nil)
-         (thread
-           (sb-thread:make-thread
-            (lambda ()
-              (loop do (gc) (sleep 0) (when quitit (return)))))))
-    (loop repeat 30 do (compile nil `(lambda () (print 'hey))))
-    (setq quitit t)
-    (sb-thread:join-thread thread)))
