@@ -220,6 +220,12 @@ EOF
   exit 1
 fi
 
+if ! echo '(lisp-implementation-type)' | $SBCL_XC_HOST; then
+    echo "No working host Common Lisp implementation."
+    echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
+    exit 1
+fi
+
 # Running make.sh with different options without clean.sh in the middle
 # can break things.
 sh clean.sh
@@ -569,7 +575,7 @@ case "$sbcl_os" in
             printf ' :mach-exception-handler' >> $ltf
             darwin_version=`uname -r`
             darwin_version_major=${DARWIN_VERSION_MAJOR:-${darwin_version%%.*}}
-    
+
             if (( 8 < $darwin_version_major )); then
 	        printf ' :inode64' >> $ltf
             fi
@@ -804,4 +810,3 @@ if [ -n "$SBCL_HOST_LOCATION" ]; then
     rsync --delete-after -a output/ "$SBCL_HOST_LOCATION/output/"
     rsync -a local-target-features.lisp-expr version.lisp-expr "$SBCL_HOST_LOCATION/"
 fi
-

@@ -12,9 +12,6 @@ ensure_dirs ()
     done;
 }
 
-. output/prefix.def
-DEFAULT_INSTALL_ROOT=$SBCL_PREFIX
-
 if [ "$OSTYPE" = "cygwin" -o "$OSTYPE" = "msys" ] ; then
     RUNTIME=sbcl.exe
     OLD_RUNTIME=sbcl.exe.old
@@ -22,6 +19,25 @@ else
     RUNTIME=sbcl
     OLD_RUNTIME=sbcl.old
 fi
+
+# Before doing anything else, make sure we have an SBCL to install
+if [ -f src/runtime/$RUNTIME ]; then
+    if [ -f output/sbcl.core ]; then
+        true
+    else
+        echo "output/sbcl.core not found, aborting installation."
+        echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
+        exit 1
+    fi
+else
+    echo "src/runtime/$RUNTIME not found, aborting installation."
+    echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
+    exit 1
+fi
+
+. output/prefix.def
+DEFAULT_INSTALL_ROOT=$SBCL_PREFIX
+
 INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
 MAN_DIR=${MAN_DIR:-"$INSTALL_ROOT"/share/man}
 INFO_DIR=${INFO_DIR:-"$INSTALL_ROOT"/share/info}
@@ -34,19 +50,6 @@ if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo INSTALL_ROOT="$INSTALL_ROOT"
    echo SBCL_HOME="$SBCL_HOME"
    exit 1
-fi
-
-# Before doing anything else, make sure we have an SBCL to install
-if [ -f src/runtime/$RUNTIME ]; then
-    if [ -f output/sbcl.core ]; then
-        true
-    else
-        echo "output/sbcl.core not found, aborting installation."
-        exit 1
-    fi
-else
-    echo "src/runtime/$RUNTIME not found, aborting installation."
-    exit 1
 fi
 
 SBCL_HOME="$INSTALL_ROOT"/lib/sbcl

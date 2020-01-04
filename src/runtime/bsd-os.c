@@ -543,7 +543,7 @@ futex_wake(int *lock_word, int n)
 #endif /* __DragonFly__ */
 
 #ifdef LISP_FEATURE_DARWIN
-/* defined in ppc-darwin-os.c instead */
+/* defined in darwin-os.c instead */
 #elif defined(LISP_FEATURE_FREEBSD)
 #ifndef KERN_PROC_PATHNAME
 #define KERN_PROC_PATHNAME 12
