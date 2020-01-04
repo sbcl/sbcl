@@ -220,6 +220,10 @@ EOF
   exit 1
 fi
 
+mkdir -p output
+echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
+. output/build-config # make come out differently due to escaping
+
 if ! echo '(lisp-implementation-type)' | $SBCL_XC_HOST; then
     echo "No working host Common Lisp implementation."
     echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
@@ -230,7 +234,6 @@ fi
 # can break things.
 sh clean.sh
 
-mkdir -p output
 # Save prefix for make and install.sh.
 echo "SBCL_PREFIX='$SBCL_PREFIX'" > output/prefix.def
 echo "$SBCL_DYNAMIC_SPACE_SIZE" > output/dynamic-space-size.txt
