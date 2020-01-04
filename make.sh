@@ -99,23 +99,6 @@ echo "To install SBCL (more information in INSTALL):"
 echo
 echo "  sh install.sh"
 
-# This is probably the best place to ensure people will see this.
-if test -n "$legacy_xc_spec"
-then
-    echo <<EOF
-******************************************************************************
-**
-**  Old-style XC-host specification detected: '$SBCL_XC_HOST'
-**
-**  Since 1.0.41.45 SBCL expects the XC-host to be specified using
-**  the --xc-host='myhost' command line option, not with a positional
-**  argument. The legacy style still works, but will not be supported
-**  indefinitely. Please update your build procedure.
-**
-******************************************************************************
-EOF
-fi
-
 build_finished=`date`
 echo
 echo "//build started:  $build_started"

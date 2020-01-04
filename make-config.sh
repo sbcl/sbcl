@@ -102,7 +102,7 @@ do
         then
             bad_option "Unknown command-line option to $0: \"$option\""
         else
-            legacy_xc_spec=$option
+            SBCL_XC_HOST=$option
         fi
         ;;
   esac
@@ -118,12 +118,6 @@ then
     echo "ERROR: Both customize-target-features.lisp, and feature-options"
     echo "to make.sh present -- cannot use both at the same time."
     exit 1
-fi
-
-# Previously XC host was provided as a positional argument.
-if test -n "$legacy_xc_spec"
-then
-    SBCL_XC_HOST="$legacy_xc_spec"
 fi
 
 if test "$print_help" = "yes"
@@ -258,7 +252,6 @@ find_gnumake
 
 echo "GNUMAKE=\"$GNUMAKE\"; export GNUMAKE" >> output/build-config
 echo "SBCL_XC_HOST=\"$SBCL_XC_HOST\"; export SBCL_XC_HOST" >> output/build-config
-echo "legacy_xc_spec=\"$legacy_xc_spec\"; export legacy_xc_spec" >> output/build-config
 if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo "SBCL_HOST_LOCATION=\"$SBCL_HOST_LOCATION\"; export SBCL_HOST_LOCATION" >> output/build-config
 fi
