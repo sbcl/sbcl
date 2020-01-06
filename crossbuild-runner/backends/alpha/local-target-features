@@ -1,1 +1,1 @@
-:alpha :unix :elf :linux :cheneygc :64-bit-registers :stack-allocatable-closures :stack-allocatable-lists :stack-allocatable-fixed-objects :little-endian :os-provides-dlopen :os-provides-dladdr :os-provides-putwc :os-provides-suseconds-t :os-provides-getprotoby-r :os-provides-poll
+:alpha :unix :elf :linux :cheneygc :64-bit-registers :stack-allocatable-closures :stack-allocatable-lists :stack-allocatable-fixed-objects :little-endian

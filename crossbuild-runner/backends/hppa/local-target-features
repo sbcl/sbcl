@@ -1,1 +1,1 @@
-:hppa :unix :elf :linux :cheneygc :stack-allocatable-vectors :stack-allocatable-fixed-objects :stack-allocatable-closures :stack-allocatable-lists :big-endian :os-provides-dlopen :os-provides-dladdr :os-provides-putwc :os-provides-blksize-t :os-provides-suseconds-t :os-provides-getprotoby-r :os-provides-poll
+:hppa :unix :elf :linux :cheneygc :stack-allocatable-vectors :stack-allocatable-fixed-objects :stack-allocatable-closures :stack-allocatable-lists :big-endian

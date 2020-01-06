@@ -1,1 +1,1 @@
-:mips :unix :elf :linux :largefile :cheneygc :linkage-table :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :alien-callbacks :little-endian :os-provides-dlopen :os-provides-dladdr :os-provides-putwc :os-provides-blksize-t :os-provides-suseconds-t :os-provides-getprotoby-r :os-provides-poll
+:mips :unix :elf :linux :largefile :cheneygc :linkage-table :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :alien-callbacks :little-endian

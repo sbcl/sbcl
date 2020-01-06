@@ -1,1 +1,1 @@
-:sparc :unix :elf :linux :gencgc :linkage-table :stack-allocatable-closures :stack-allocatable-lists :big-endian :os-provides-dlopen :os-provides-dladdr :os-provides-putwc :os-provides-blksize-t :os-provides-suseconds-t :os-provides-getprotoby-r :os-provides-poll
+:sparc :unix :elf :linux :gencgc :linkage-table :stack-allocatable-closures :stack-allocatable-lists :big-endian
