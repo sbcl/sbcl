@@ -8,7 +8,26 @@
 
 ;;; Remove symbols from CL:*FEATURES* that should not be exposed to users.
 (export 'sb-impl::+internal-features+ 'sb-impl)
-(let ((public-features
+(let* ((non-target-features
+        '(;; :SB-AFTER-XC-CORE is essentially an option flag to make-host-2
+          :SB-AFTER-XC-CORE
+          ;; CONS-PROFILING sets the initial compiler policy which persists
+          ;; into the default baseline policy. It has no relevance post-build
+          ;; in as much as policy can be changed later arbitrarily.
+          :CONS-PROFILING
+          ;; Uses of OS-PROVIDES-DLOPEN and -DLADDR are confined to src/code/foreign.lisp
+          :OS-PROVIDES-DLOPEN :OS-PROVIDES-DLADDR
+          ;; more-or-less confined to serve-event, except for a test which now
+          ;; detects whether COMPUTE-POLLFDS is defined and therefore testable.
+          :OS-PROVIDES-POLL
+          ;; The final batch of symbols is strictly for C. The prefix of
+          ;; "LISP_FEATURE_" on the corresponding #define is unfortunate.
+          :GCC-TLS
+          :RESTORE-FS-SEGMENT-REGISTER-FROM-TLS ; only for 'src/runtime/thread.h'
+          :OS-PROVIDES-BLKSIZE-T ; only for 'src/runtime/wrap.h'
+          :OS-PROVIDES-PUTWC ; only for 'src/runtime/backtrace.c'
+          ))
+       (public-features
         (cons
          sb-impl::!sbcl-architecture
          '(:COMMON-LISP :SBCL :ANSI-CL :IEEE-FLOATING-POINT
@@ -24,7 +43,7 @@
            ;; and we should build with both, which is to say that dynamic-core is not
            ;; an additional yes/no choice.
            :SB-DYNAMIC-CORE
-           ;; Can't use s-l-a-d :compression safely witout it
+           ;; Can't use s-l-a-d :compression safely without it
            :SB-CORE-COMPRESSION
            ;; Features that are also in *features-potentially-affecting-fasl-format*
            ;; and would probably mess up something if made non-public,
@@ -42,9 +61,11 @@
            :PACKAGE-LOCAL-NICKNAMES
            ;; Developer mode features. A release build will never have them,
            ;; hence it makes no difference whether they're public or not.
-           :SB-FLUID :SB-DEVEL))))
+           :SB-FLUID :SB-DEVEL)))
+       (removable-features
+        (append non-target-features public-features)))
   (defconstant sb-impl:+internal-features+
-    (remove-if (lambda (x) (member x public-features)) *features*))
+    (remove-if (lambda (x) (member x removable-features)) *features*))
   (setq *features* (remove-if-not (lambda (x) (member x public-features))
                                   *features*)))
 

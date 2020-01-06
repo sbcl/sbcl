@@ -14,17 +14,9 @@
 
 ;;; various environment inquiries
 
-;;; Compute the target's value of CL:*FEATURES* be deleting non-target features.
-;;; - :CONS-PROFILING   is used only to assign a compiler policy which persists
-;;;                     into the default baseline policy. It has no relevance post-build
-;;;                     in as much as policy can be changed later arbitrarily.
-;;; - :GCC-TLS          is not a Lisp feature- it's just freeloading off the means
-;;;                     by which additional #defines get into "genesis/config.h".
-;;; - :SB-AFTER-XC-CORE is merely a build option.
-;;; - :SB-XC            indicates the build phase and must not persist.
-(defparameter *features*
-   '#.(remove-if (lambda (x) (member x '(:cons-profiling :gcc-tls :sb-after-xc-core :sb-xc)))
-                 sb-xc:*features*)
+;;; This is a tentative list of target features; many are removed later.
+;;; :SB-XC is removed now, because it is plain wrong unless cross-compiling.
+(defparameter *features* '#.(remove :sb-xc sb-xc:*features*)
   "a list of symbols that describe features provided by the
    implementation")
 (defconstant !sbcl-architecture #.(sb-cold::target-platform-keyword))

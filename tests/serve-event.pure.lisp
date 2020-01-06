@@ -11,7 +11,9 @@
 ;;;; absolutely no warranty. See the COPYING and CREDITS files for
 ;;;; more information.
 
-#+os-provides-poll
+(when (find-symbol "COMPUTE-POLLFDS" "SB-IMPL")
+  (push :compute-pollfds-test *features*))
+#+compute-pollfds-test
 (import '(sb-impl::make-handler
           sb-impl::handler-descriptor
           sb-impl::handler-bogus
@@ -20,7 +22,9 @@
 ;; Tests for SERVE-EVENT are somewhat lacking,
 ;; although RUN-PROGRAM exercises some multiplexed I/O.
 ;; At any rate, this tests that the utility function COMPUTE-POLLFDS is sane.
-#+os-provides-poll ; can't use :skipped-on. (sb-unix symbols don't exist)
+;; This can't use :skipped-on because SB-UNIX does not define a POLLFD alien
+;; type nor export the relevant lisp symbols unless the poll() syscall exists.
+#+compute-pollfds-test
 (test-util:with-test (:name :compute-pollfds)
   (labels ((try (list how)
              (multiple-value-bind (pollfds count map)
