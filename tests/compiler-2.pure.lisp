@@ -2637,3 +2637,22 @@
       (max 0 p -1.0))
    ((4801112936349103672) 4801112936349103672)
    ((-9474680540642044437) 0)))
+
+(with-test (:name :logior-derive-type-widening-tail-set-types)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b c)
+         (labels ((q (x y)
+                    (let ((* (lambda () x y)))
+                      (the integer a)))
+                  (p ()
+                    (logior (apply #'q (list a b))
+                            (if b
+                                (return-from p (q b c))
+                                1))))
+           (if c
+               0.0
+               (p))))
+    ((44 nil nil) 45)
+    ((3 2 1) 0.0)
+    ((30 2 nil) 30)))

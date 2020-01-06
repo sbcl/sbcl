@@ -17,7 +17,8 @@
 ;;; is T if the integer can be positive (negative) and NIL if not.
 ;;; Zero counts as positive.
 (defun integer-type-length (type)
-  (if (numeric-type-p type)
+  (if (and (numeric-type-p type)
+           (eq (numeric-type-class type) 'integer))
       (let ((min (numeric-type-low type))
             (max (numeric-type-high type)))
         (values (and min max (max (integer-length min) (integer-length max)))
