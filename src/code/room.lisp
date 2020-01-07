@@ -1091,7 +1091,7 @@ We could try a few things to mitigate this:
                   (,functoid (%funcallable-instance-layout ,obj) ,@more)
                   (,functoid (%funcallable-instance-fun ,obj) ,@more)
                   (ecase (layout-bitmap .l.)
-                    (#.sb-kernel::+layout-all-tagged+
+                    (#.sb-kernel:+layout-all-tagged+
                      (loop for .i. from instance-data-start ; exclude layout
                            to (- (get-closure-length ,obj) funcallable-instance-info-offset)
                            do (,functoid (%funcallable-instance-info ,obj .i.) ,@more)))

@@ -358,7 +358,7 @@
                     (when (emit-make-load-form value)
                       #+sb-xc-host
                       (aver (eql (layout-bitmap (%instance-layout value))
-                                 sb-kernel::+layout-all-tagged+))
+                                 sb-kernel:+layout-all-tagged+))
                       (do-instance-tagged-slot (i value)
                         (grovel (%instance-ref value i)))))
                    (t

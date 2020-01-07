@@ -218,7 +218,7 @@
     (or (and (eql kind sb-vm:funcallable-instance-widetag)
              ;; if the FIN has no raw words then it has no internal trampoline
              (eql (layout-bitmap (%funcallable-instance-layout fun))
-                  sb-kernel::+layout-all-tagged+))
+                  sb-kernel:+layout-all-tagged+))
         (eql kind sb-vm:closure-widetag))))
 
 (defconstant +fsc-layout-bitmap+
