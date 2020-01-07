@@ -60,6 +60,7 @@
     (let ((stm (gensym "STREAM")))
       `(let* ((,stm ,stream))
          (declare (type ,class-name ,stm))
+         (declare (ignorable ,stm))
          (macrolet ((sm (slot-name stream)
                       (declare (ignore stream))
                       #-count-sm
