@@ -103,6 +103,7 @@
 ;;;           the output buffer
 (deftype column ()
   '(and fixnum unsigned-byte))
+(deftype posn () 'fixnum)
 
 (defconstant initial-buffer-size 128)
 

@@ -37,28 +37,3 @@
 #+sb-xc
 (defmethod print-object ((table pprint-dispatch-table) stream)
   (print-unreadable-object (table stream :type t :identity t)))
-
-;;; These structures are mutually referential and we want to compile their
-;;; type-checks efficiently. Essentially the way to do that is define
-;;; each structure during both make-host passes. This is a KLUDGE.
-
-(sb-xc:deftype posn () 'fixnum)
-
-(sb-xc:defstruct (queued-op (:constructor nil)
-                            (:copier nil))
-  (posn 0 :type posn))
-
-(sb-xc:defstruct (block-end (:include queued-op)
-                            (:copier nil))
-  (suffix nil :type (or null simple-string)))
-
-(sb-xc:defstruct (section-start (:include queued-op)
-                                (:constructor nil)
-                                (:copier nil))
-  (depth 0 :type index)
-  (section-end nil :type (or null newline block-end)))
-
-(sb-xc:defstruct (newline (:include section-start)
-                          (:copier nil))
-  (kind (missing-arg)
-        :type (member :linear :fill :miser :literal :mandatory)))

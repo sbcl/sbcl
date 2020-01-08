@@ -11,6 +11,24 @@
 
 (in-package "SB-PRETTY")
 
+;;; Ancestral types
+(defstruct (queued-op (:constructor nil) (:copier nil))
+  (posn 0 :type posn))
+
+(defstruct (block-end (:include queued-op) (:copier nil))
+  (suffix nil :type (or null simple-string)))
+
+(defstruct (section-start (:include queued-op)
+                          (:constructor nil)
+                          (:copier nil))
+  (depth 0 :type index)
+  (section-end nil :type (or null newline block-end)))
+
+(defstruct (newline (:include section-start) (:copier nil))
+  (kind (missing-arg)
+        :type (member :linear :fill :miser :literal :mandatory)))
+(declaim (freeze-type newline))
+
 #-sb-fluid (declaim (inline index-posn posn-index posn-column))
 (defun index-posn (index stream)
   (declare (type index index) (type pretty-stream stream)
@@ -120,6 +138,7 @@
   (suffix-length 0 :type index)
   ;; The line number
   (section-start-line 0 :type index))
+(declaim (freeze-type logical-block))
 
 (defun really-start-logical-block (stream column prefix suffix)
   (let* ((blocks (pretty-stream-blocks stream))
@@ -227,6 +246,7 @@
                         (:copier nil))
   (kind (missing-arg) :type (member :block :current))
   (amount 0 :type fixnum))
+(declaim (freeze-type indentation))
 
 (defun enqueue-indent (stream kind amount)
   (enqueue stream indentation :kind kind :amount amount))
@@ -236,6 +256,7 @@
   (block-end nil :type (or null block-end))
   (prefix nil :type (or null simple-string))
   (suffix nil :type (or null simple-string)))
+(declaim (freeze-type block-start))
 
 (defun start-logical-block (stream prefix per-line-p suffix)
   ;; (In the PPRINT-LOGICAL-BLOCK form which calls us,
@@ -273,6 +294,7 @@
   (relativep nil :type (member t nil))
   (colnum 0 :type column)
   (colinc 0 :type column))
+(declaim (freeze-type queued-op)) ; and all subtypes
 
 (defun enqueue-tab (stream kind colnum colinc)
   (multiple-value-bind (sectionp relativep)
