@@ -408,7 +408,7 @@
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
-  (:info name words type lowtag)
+  (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg) :from (:eval 1)))
   (:temporary (:sc any-reg :from :eval :to (:eval 1)) bytes)
@@ -422,7 +422,6 @@
     (inst lea header                    ; (w-1 << 8) | type
           (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
-    (pseudo-atomic ()
-     (allocation result bytes node)
-     (inst lea result (make-ea :byte :base result :disp lowtag))
+    (pseudo-atomic (:elide-if stack-allocate-p)
+     (allocation result bytes node stack-allocate-p lowtag)
      (storew header result 0 lowtag))))

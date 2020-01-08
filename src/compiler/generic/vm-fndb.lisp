@@ -194,6 +194,8 @@
   (flushable))
 (defknown %make-structure-instance (defstruct-description list &rest t) instance
   (flushable always-translatable))
+(defknown (%copy-instance %copy-instance-slots) (instance instance) instance
+  () :result-arg 0)
 (defknown %instance-layout (instance) layout
   (foldable flushable))
 (defknown %funcallable-instance-layout (funcallable-instance) layout

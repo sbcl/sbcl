@@ -338,6 +338,18 @@
 
 ;;; MAKE-STRUCTURE
 
+;; :stack-allocatable-fixed-objects is necessary but not sufficient
+(with-test (:name :copy-structure-dx :skipped-on (not (or :x86 :x86-64)))
+  (let ((thing sb-impl::*external-formats*))
+    ;; check some preconditions
+    (assert (typep thing 'hash-table))
+    (assert (/= (sb-kernel:layout-bitmap (sb-kernel:%instance-layout thing))
+                sb-kernel:+layout-all-tagged+))
+    (assert-no-consing
+     (sb-int:dx-let ((x (copy-structure thing)))
+       (opaque-identity x)
+       0))))
+
 (declaim (inline make-fp-struct-1))
 (defstruct fp-struct-1
   (s 0.0 :type single-float)

@@ -612,7 +612,7 @@
 (define-vop (var-alloc)
   (:args (extra :scs (any-reg)))
   (:arg-types positive-fixnum)
-  (:info name words type lowtag)
+  (:info name words type lowtag stack-allocate-p)
   (:ignore name)
   (:results (result :scs (descriptor-reg) :from (:eval 1)))
   (:temporary (:sc unsigned-reg :from :eval :to (:eval 1)) bytes)
@@ -630,10 +630,14 @@
       (inst lea operand-size header                    ; (w-1 << 8) | type
             (ea (+ (ash -2 n-widetag-bits) type) header))
       (inst and operand-size bytes (lognot lowtag-mask)))
-      (instrument-alloc bytes node)
-      (pseudo-atomic ()
-       (allocation result bytes node nil lowtag)
-       (storew header result 0 lowtag))))
+      (cond (stack-allocate-p
+             (stack-allocation result bytes lowtag)
+             (storew header result 0 lowtag))
+            (t
+             (instrument-alloc bytes node)
+             (pseudo-atomic ()
+              (allocation result bytes node nil lowtag)
+              (storew header result 0 lowtag))))))
 
 (macrolet ((c-call (name)
              `(let ((c-fun (make-fixup ,name :foreign)))

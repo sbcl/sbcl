@@ -30,6 +30,10 @@
          (dd-slots (lvar-value defstruct-description)))
   #+(and :gencgc :c-stack-is-control-stack)
   t)
+#+(or x86 x86-64)
+(defoptimizer (%make-instance stack-allocate-result) ((n) node dx)
+  (declare (ignore n dx))
+  t)
 
 (defoptimizer ir2-convert-reffer ((object) node block name offset lowtag)
   (let* ((lvar (node-lvar node))
@@ -178,8 +182,12 @@
     (if (constant-lvar-p extra)
         (let ((words (+ (lvar-value extra) words)))
           (emit-fixed-alloc node block name words type lowtag result lvar))
-        (vop var-alloc node block (lvar-tn node block extra) name words
-             type lowtag result))
+        (let ((stack-allocate-p (and lvar (lvar-dynamic-extent lvar))))
+          (when stack-allocate-p
+            (vop current-stack-pointer node block
+                 (ir2-lvar-stack-pointer (lvar-info lvar))))
+          (vop var-alloc node block (lvar-tn node block extra) name words
+               type lowtag stack-allocate-p result)))
     (emit-inits node block name result lowtag inits args)
     (move-lvar-result node block locs lvar)))
 

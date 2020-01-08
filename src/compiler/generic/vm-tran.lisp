@@ -84,6 +84,64 @@
                          sb-vm:bignum-digits-offset
                          index offset))
 
+(deftransform copy-structure ((instance) * * :result result :node node)
+  (let* ((classoid (lvar-type instance))
+         (name (and (structure-classoid-p classoid) (classoid-name classoid)))
+         (layout (and name
+                      (sb-kernel::compiler-layout-ready-p name)
+                      (sb-kernel::compiler-layout-or-lose name)))
+         ;; CLASS-EQ is T if the layout at runtime will be EQ to the
+         ;; layout of the specified type, and not that of a subtype thereof.
+         (class-eq (and name
+                        (eq (classoid-state classoid) :sealed)
+                        (not (classoid-subclasses classoid))))
+         (dd (and class-eq (layout-info layout)))
+         (max-inlined-words 5))
+    (unless (and result ; could be unused result (but entire call wasn't flushed?)
+                 layout
+                 ;; And don't copy if raw slots are present on the precisely GCed backends.
+                 ;; To enable that, we'd want variants for {"all-raw", "all-boxed", "mixed"}
+                 ;; Also note that VAR-ALLOC can not cope with dynamic-extent except where
+                 ;; support has been added (x86oid so far); so requiring an exact type here
+                 ;; causes VAR-ALLOC to become FIXED-ALLOC which works on more architectures.
+                 #-c-stack-is-control-stack
+                 (and dd (eql (layout-bitmap layout) sb-kernel:+layout-all-tagged+))
+                 ;; Definitely do this if copying to stack
+                 (or (lvar-dynamic-extent result)
+                     ;; Or if it's a small fixed number of words
+                     ;; and speed at least as important as size.
+                     (and class-eq
+                          (<= (dd-length dd) max-inlined-words)
+                          (policy node (>= speed space)))))
+      (give-up-ir1-transform))
+    ;; There are some benefits to using the simple case for a known exact type:
+    ;; - the layout can be wired in which might or might not save 1 instruction
+    ;;   depending on whether layouts are in immobile space.
+    ;; - all backends can do this (subject to stack-allocatable-fixed-objects)
+    ;; - for a small number of slots, copying them is inlined
+    (cond ((not dd) ; it's going to be some subtype of NAME
+           `(%copy-instance (%make-instance (%instance-length instance)) instance))
+          ((<= (dd-length dd) max-inlined-words)
+           `(let ((copy (%make-structure-instance ,dd nil)))
+              ;; ASSUMPTION: either %INSTANCE-REF is the correct accessor for this word,
+              ;; or the GC will treat random bit patterns as conservative pointers
+              ;; (i.e. not alter them if %INSTANCE-REF is not the correct accessor)
+              (setf ,@(loop for i from sb-vm:instance-data-start below (dd-length dd)
+                            append `((%instance-ref copy ,i) (%instance-ref instance ,i))))
+              copy))
+          (t
+           `(%copy-instance-slots (%make-structure-instance ,dd nil) instance)))))
+
+(deftransform %instance-length ((instance))
+  (let ((classoid (lvar-type instance)))
+    (if (and (structure-classoid-p classoid)
+             (sb-kernel::compiler-layout-ready-p (classoid-name classoid))
+             (eq (classoid-state classoid) :sealed)
+             ;; TODO: if sealed with subclasses which add no slots, use the fixed length
+             (not (classoid-subclasses classoid)))
+        (dd-length (layout-info (sb-kernel::compiler-layout-or-lose (classoid-name classoid))))
+        (give-up-ir1-transform))))
+
 ;;; The layout is stored in slot 0.
 ;;; *** These next two transforms should be the only code, aside from
 ;;;     some parts of the C runtime, with knowledge of the layout index.

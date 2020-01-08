@@ -140,6 +140,21 @@
                 (t ; bignum - use LOGBITP to avoid consing more bignums
                  (copy-loop (logbitp i bitmap))))))
       res)))
+;;; Like above, but copy all slots (including the LAYOUT) as though boxed.
+;;; If the structure might contain raw slots and the GC is precise,
+;;; this won't ever be called.
+(defun %copy-instance (to from)
+  (declare (structure-object to from) (optimize (safety 0)))
+  (setf (%instance-layout to) (%instance-layout from))
+  (dotimes (i (%instance-length to) to)
+    (setf (%instance-ref to i) (%instance-ref from i))))
+;;; Like %COPY-INSTANCE, but layout was already assigned.
+;;; Similarly, will not be called if raw slots and precise GC.
+(defun %copy-instance-slots (to from)
+  (declare (structure-object to from) (optimize (safety 0)))
+  (loop for i from sb-vm:instance-data-start below (%instance-length to)
+        do (setf (%instance-ref to i) (%instance-ref from i)))
+  to)
 
 ;;; default PRINT-OBJECT method
 

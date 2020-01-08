@@ -467,7 +467,7 @@
            (%primitive var-alloc total-words 'alloc-code
                        ;; subtract 1 because var-alloc always adds 1 word
                        ;; for the header, which is not right for code objects.
-                       -1 code-header-widetag other-pointer-lowtag)))
+                       -1 code-header-widetag other-pointer-lowtag nil)))
 
     (with-pinned-objects (code)
       (let ((sap (sap+ (int-sap (get-lisp-obj-address code))
