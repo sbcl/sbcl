@@ -93,6 +93,7 @@
   (%local-nicknames nil :type (or null (cons simple-vector simple-vector)))
   ;; Definition source location
   (source-location nil :type (or null sb-c:definition-source-location)))
+(sb-xc:proclaim '(freeze-type package-hashtable package))
 (!set-load-form-method package (:xc)
   (lambda (obj env)
     (declare (ignore env))

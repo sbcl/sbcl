@@ -27,6 +27,7 @@
                                  (weight (+ (huffman-node-weight left)
                                             (huffman-node-weight right))))))
   left right)
+(declaim (freeze-type huffman-node))
 
 (defun huffman-weights (corpus)
   (let ((weight-table (make-hash-table :test #'equal)))

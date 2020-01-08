@@ -56,6 +56,7 @@
   (original-source-path nil :type list)
   ;; the lexenv active at the time
   (lexenv nil :type (or null lexenv)))
+(declaim (freeze-type compiler-error-context))
 
 ;;; Delay computing some source information, since it may not actually be ever used
 (defun compiler-error-context-original-source (context)

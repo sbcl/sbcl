@@ -24,6 +24,7 @@
                        (:copier nil)
                        (:predicate opaque-box-p))
   value)
+(declaim (freeze-type opaque-box))
 
 ;;; ANSI limits on compilation
 (defconstant sb-xc:call-arguments-limit sb-xc:most-positive-fixnum
@@ -86,6 +87,7 @@
                           (:predicate nil)
                           (:copier nil))
   (expansion nil :read-only t))
+(declaim (freeze-type dxable-args))
 
 (defstruct (ir1-namespace (:conc-name "") (:copier nil) (:predicate nil))
   ;; FREE-VARS translates from the names of variables referenced
@@ -97,6 +99,8 @@
   ;; constants. This hashtable translates from constants to the LEAFs that
   ;; represent them.
   (constants (make-hash-table :test 'equal) :read-only t :type hash-table))
+(declaim (freeze-type ir1-namespace))
+
 (sb-impl::define-thread-local *ir1-namespace*)
 (declaim (type ir1-namespace *ir1-namespace*))
 
@@ -197,6 +201,7 @@ the stack without triggering overflow protection.")
   ;; where this thing was used. Note that we only record the first
   ;; *UNDEFINED-WARNING-LIMIT* calls.
   (warnings () :type list))
+(declaim (freeze-type undefined-warning))
 
 ;;; Delete any undefined warnings for NAME and KIND. This is for the
 ;;; benefit of the compiler, but it's sometimes called from stuff like
@@ -384,6 +389,7 @@ the stack without triggering overflow protection.")
   (objmap-id-to-tn       nil :type (or null id-array)) ; number -> TN
   (objmap-id-to-label    nil :type (or null id-array)) ; number -> LABEL
   )
+(declaim (freeze-type compilation))
 
 (sb-impl::define-thread-local *compilation*)
 (declaim (type compilation *compilation*))

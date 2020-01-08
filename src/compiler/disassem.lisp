@@ -177,6 +177,7 @@
   (length 0 :type disassem-length)               ; in bytes
 
   (default-printer nil :type list))
+(declaim (freeze-type arg instruction-format))
 
 ;;; A FUNSTATE holds the state of any arguments used in a disassembly
 ;;; function. It is a 2-level alist. The outer list maps each ARG to

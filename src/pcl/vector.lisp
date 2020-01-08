@@ -43,6 +43,7 @@
   (cache nil :type (or cache null))
   (pv-size 0 :type fixnum)
   (slot-name-lists nil :type list))
+(declaim (freeze-type pv-table))
 
 (defun make-pv-table-type-declaration (var)
   `(type pv-table ,var))

@@ -442,6 +442,7 @@ information."
                                (write-string (unprintable-object-string x) s))))
             (:copier nil))
   (string nil :read-only t))
+(declaim (freeze-type unprintable-object))
 
 (defun replace-dynamic-extent-object (obj)
   (if (stack-allocated-p obj)

@@ -83,6 +83,7 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
   (getter nil :read-only t)
   (documentation nil :read-only t)
   (values-documentation nil :read-only t))
+(declaim (freeze-type policy-dependent-quality))
 
 ;;; names of recognized optimization policy qualities
 (declaim (simple-vector **policy-dependent-qualities**))

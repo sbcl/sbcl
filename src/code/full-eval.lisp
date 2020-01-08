@@ -175,6 +175,7 @@
   blocks
   declarations
   native-lexenv)
+(declaim (freeze-type env))
 
 (defun make-env (&key parent vars funs expanders
                  symbol-expansions tags blocks declarations)

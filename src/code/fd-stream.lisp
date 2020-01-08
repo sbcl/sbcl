@@ -818,6 +818,7 @@
   ;; redefining the external format anyway.
   (octets-to-string-fun (missing-arg) :type function)
   (string-to-octets-fun (missing-arg) :type function))
+(declaim (freeze-type external-format))
 
 (defun ef-char-size (ef-entry)
   (if (variable-width-external-format-p ef-entry)

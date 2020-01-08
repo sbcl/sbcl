@@ -769,6 +769,7 @@
   (name (missing-arg) :type symbol :read-only t)
   ;; the type of the argument value
   (type (missing-arg) :type ctype :read-only t))
+(declaim (freeze-type key-info))
 
 ;;; ARGS-TYPE objects are used both to represent VALUES types and
 ;;; to represent FUNCTION types.

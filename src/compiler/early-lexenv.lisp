@@ -62,6 +62,7 @@
   (dependent-qualities 0
    :type (unsigned-byte #.(* (- max-policy-qualities n-policy-primary-qualities)
                              2))))
+(declaim (freeze-type policy))
 
 (defvar *handled-conditions* nil)
 (defvar *disabled-package-locks* nil)

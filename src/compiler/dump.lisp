@@ -75,6 +75,7 @@
   (valid-structures (make-hash-table :test 'eq) :type hash-table)
   ;; DEBUG-SOURCE written at the very beginning
   (source-info nil :type (or null sb-c::debug-source)))
+(declaim (freeze-type fasl-output))
 
 ;;; This structure holds information about a circularity.
 (defstruct (circularity (:copier nil))

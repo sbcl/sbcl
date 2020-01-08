@@ -27,6 +27,7 @@
 (defstruct (counter (:constructor make-counter) (:copier nil))
   (word 0 :type sb-vm:word)
   (overflow 0 :type unsigned-byte))
+(declaim (freeze-type counter))
 
 (defun incf-counter (counter delta)
   ;; When running multi-threaded we can easily get negative numbers for the
@@ -93,6 +94,7 @@
   (encapsulation-fun (missing-arg) :type function :read-only t)
   (read-stats-fun    (missing-arg) :type function :read-only t)
   (clear-stats-fun   (missing-arg) :type function :read-only t))
+(declaim (freeze-type profile-info))
 
 ;;; These variables are used to subtract out the time and consing for
 ;;; recursive and other dynamically nested profiled calls. The total
@@ -134,6 +136,7 @@
   ;; the number of ticks of overhead for profiling that a single
   ;; profiled call adds to the total runtime for the program
   (total (missing-arg) :type single-float :read-only t))
+(declaim (freeze-type overhead))
 (defvar *overhead*)
 (declaim (type overhead *overhead*))
 (makunbound '*overhead*) ; in case we reload this file when tweaking
@@ -346,6 +349,7 @@
   seconds
   consing
   gc-run-time)
+(declaim (freeze-type time-info))
 
 ;;; Return our best guess for the run time in a function, subtracting
 ;;; out factors for profiling overhead. We subtract out the internal

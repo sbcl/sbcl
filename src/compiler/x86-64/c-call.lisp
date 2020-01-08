@@ -21,6 +21,7 @@
   (register-args 0)
   (xmm-args 0)
   (stack-frame-size 0))
+(declaim (freeze-type arg-state))
 
 (defconstant max-int-args #.(length *c-call-register-arg-offsets*))
 (defconstant max-xmm-args #+win32 4 #-win32 8)
@@ -68,6 +69,7 @@
 
 (defstruct (result-state (:copier nil))
   (num-results 0))
+(declaim (freeze-type result-state))
 
 (defun result-reg-offset (slot)
   (ecase slot

@@ -34,6 +34,7 @@
                 (:copier nil)
                 (:constructor !make-reg (id)))
   (id 0 :type (unsigned-byte 8)))
+(declaim (freeze-type reg))
 
 ;;; Default word size for the chip: if the operand size /= :dword
 ;;; we need to output #x66 (or REX) prefix
@@ -1011,6 +1012,7 @@
                          (:copier nil))
   (label nil :type label)
   (addend 0 :type (signed-byte 32)))
+(declaim (freeze-type label+addend))
 
 ;;;; the effective-address (ea) structure
 (defstruct (ea (:constructor %ea (disp base index scale))
@@ -1028,6 +1030,7 @@
   (disp 0 :type (or (unsigned-byte 32) (signed-byte 32) fixup
                     label label+addend)
           :read-only t))
+(declaim (freeze-type ea))
 (defmethod print-object ((ea ea) stream)
   (cond ((or *print-escape* *print-readably*)
          (print-unreadable-object (ea stream :type t)

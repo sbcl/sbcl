@@ -26,6 +26,7 @@
     (kind nil
           :type (member :other :closure :instance :list :code :fdefn)
           :read-only t))
+(declaim (freeze-type room-info))
 
 (defun room-info-type-name (info)
     (if (specialized-array-element-type-properties-p info)

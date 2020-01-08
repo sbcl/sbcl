@@ -83,6 +83,7 @@
   generator
   generator-lambda
   system)
+(declaim (freeze-type fgen))
 
 ;;; *FGENS* stores all the function generators we have so far. Each
 ;;; element is a FGEN structure as implemented below. Don't ever touch this

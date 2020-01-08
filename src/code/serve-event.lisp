@@ -29,6 +29,7 @@
   (function nil :type function)
   ;; T if this descriptor is bogus.
   bogus)
+(declaim (freeze-type handler))
 
 (defstruct (pollfds (:constructor make-pollfds (list))
                     (:copier nil))
@@ -44,6 +45,7 @@
   #+os-provides-poll (n-fds)
   ;; map from index in LIST to index into alien FDS
   #+os-provides-poll (map))
+(declaim (freeze-type pollfds))
 
 (defmethod print-object ((handler handler) stream)
   (print-unreadable-object (handler stream :type t)

@@ -108,6 +108,7 @@
   ;; *COLLECT-DYNAMIC-STATISTICS* but is faster to reference.
   #+sb-dyncount
   (collect-dynamic-statistics nil))
+(declaim (freeze-type segment))
 (defprinter (segment :identity t))
 
 ;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
@@ -234,6 +235,7 @@
   (write-dependents (make-sset) :type sset)
   ;; instructions which read what we write
   (read-dependents (make-sset) :type sset))
+(declaim (freeze-type instruction))
 #+sb-show-assem (defvar *inst-ids* (make-hash-table :test 'eq))
 #+sb-show-assem (defvar *next-inst-id* 0)
 (defmethod print-object ((inst instruction) stream)
@@ -905,6 +907,7 @@
                     (:copier nil))
   ;; the number of bytes of filler here
   (bytes 0 :type index))
+(declaim (freeze-type annotation))
 
 ;;;; output functions
 

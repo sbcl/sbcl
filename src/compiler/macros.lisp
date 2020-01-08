@@ -652,6 +652,7 @@
   ;; If true, a function that gets called with the node that the event
   ;; happened to.
   (action nil :type (or function null)))
+(declaim (freeze-type event-info))
 
 ;;; A hashtable from event names to event-info structures.
 (define-load-time-global *event-info* (make-hash-table :test 'eq))

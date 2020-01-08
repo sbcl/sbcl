@@ -277,6 +277,7 @@
   (scs nil :type (or symbol list) :read-only t)
   ;; If non-null, we are a temp wired to this offset in SC.
   (offset nil :type (or unsigned-byte null) :read-only t))
+(declaim (freeze-type operand-parse))
 
 (defun operand-parse-sc (parse) ; Enforce a single symbol
   (the (and symbol (not null)) (operand-parse-scs parse)))
@@ -342,6 +343,7 @@
   (args-var '.args. :type symbol)
   (results-var '.results. :type symbol)
   (before-load :unspecified :type (or (member :unspecified) list)))
+(declaim (freeze-type vop-parse))
 (defprinter (vop-parse)
   name
   (inherits :test inherits)

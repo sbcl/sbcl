@@ -78,6 +78,7 @@
 
 (defstruct (alloc (:constructor make-alloc (bytes count type pc)))
   bytes count type pc)
+(declaim (freeze-type alloc))
 
 (defvar *allocation-profile-metadata* nil)
 

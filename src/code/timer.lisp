@@ -89,6 +89,7 @@
              (:copier nil))
   (contents nil :type vector   :read-only t)
   (keyfun   nil :type function :read-only t))
+(declaim (freeze-type priority-queue))
 
 (defmethod print-object ((object priority-queue) stream)
   (print-unreadable-object (object stream :type t :identity t)
@@ -144,6 +145,7 @@ future versions."
   (thread             nil :type (or sb-thread:thread boolean))
   (interrupt-function nil :type (or null function))
   (cancel-function    nil :type (or null function)))
+(declaim (freeze-type timer))
 
 (defmethod print-object ((timer timer) stream)
   (let ((name (%timer-name timer)))

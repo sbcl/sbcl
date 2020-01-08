@@ -30,6 +30,7 @@
 (defstruct (xset (:constructor alloc-xset) (:copier nil) (:predicate nil))
   (list-size 0 :type index)
   (data nil :type (or list hash-table)))
+(declaim (freeze-type xset))
 
 (defun xset-count (xset)
   (let ((data (xset-data xset)))

@@ -19,6 +19,7 @@
 
 (defstruct (arg-state (:copier nil))
   (stack-frame-size 0))
+(declaim (freeze-type arg-state))
 
 (define-alien-type-method (integer :arg-tn) (type state)
   (let ((stack-frame-size (arg-state-stack-frame-size state)))
@@ -58,6 +59,7 @@
 
 (defstruct (result-state (:copier nil))
   (num-results 0))
+(declaim (freeze-type result-state))
 
 (defun result-reg-offset (slot)
   (ecase slot

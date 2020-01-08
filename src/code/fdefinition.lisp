@@ -240,6 +240,7 @@
   ;; as a global definition for some function name, but it was
   ;; replaced by an encapsulation of type TYPE.
   (definition nil :type function))
+(declaim (freeze-type encapsulation-info))
 
 ;;; Replace the definition of NAME with a function that calls FUNCTION
 ;;; with the original function and its arguments.

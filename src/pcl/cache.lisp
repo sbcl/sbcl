@@ -92,6 +92,7 @@
   (depth 0 :type index)
   ;; Maximum allowed probe-depth before the cache needs to expand.
   (limit 0 :type index))
+(declaim (freeze-type cache))
 
 (defun compute-cache-mask (vector-length line-size)
   ;; Since both vector-length and line-size are powers of two, we

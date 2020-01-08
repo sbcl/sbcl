@@ -68,6 +68,7 @@
   ;;  1 bit for index register non-NULL
   ;;  4 bits for index register number
   disp base index scale)
+(declaim (freeze-type machine-ea))
 
 (defun reg-num (reg) (reg-id-num (reg-id reg)))
 

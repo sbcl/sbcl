@@ -173,6 +173,7 @@ constructed.
   (flag-variable nil)
   (operations nil)
   (infinity-data nil :read-only t))
+(declaim (sb-ext:freeze-type loop-minimax))
 
 (defconstant-eqx +loop-minimax-type-infinities-alist+
   ;; FIXME: Now that SBCL supports floating point infinities again, we
@@ -291,6 +292,7 @@ code to be loaded.
   iteration-keywords   ; hash table, value = (fn-name . extra-data)
   for-keywords         ; hash table, value = (fn-name . extra-data)
   path-keywords)       ; hash table, value = (fn-name . extra-data)
+(declaim (sb-ext:freeze-type loop-universe))
 (defmethod print-object ((u loop-universe) stream)
   (print-unreadable-object (u stream :type t :identity t)))
 
@@ -504,6 +506,7 @@ code to be loaded.
 ;;; This is the "current" loop context in use when we are expanding a
 ;;; loop. It gets bound on each invocation of LOOP.
   (universe nil :type loop-universe))
+(declaim (sb-ext:freeze-type macro-state))
 
 (defvar *loop*)
 (declaim (type macro-state *loop*))
@@ -1064,6 +1067,7 @@ code to be loaded.
   specified-type
   dtype
   (data nil)) ;collector-specific data
+(declaim (sb-ext:freeze-type loop-collector))
 
 (sb-xc:defmacro with-sum-count (lc &body body)
   (let* ((type (loop-collector-dtype lc))
@@ -1451,6 +1455,7 @@ code to be loaded.
   (inclusive-permitted nil :read-only t)
   (function nil :read-only t)
   (user-data nil :read-only t))
+(declaim (sb-ext:freeze-type loop-path))
 
 (defun add-loop-path (names function universe
                       &key preposition-groups inclusive-permitted user-data)

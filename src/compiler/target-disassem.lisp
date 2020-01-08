@@ -146,6 +146,7 @@
                               (:copier nil))
   (common-id dchunk-zero :type dchunk)  ; applies to *parent's* mask
   (subspace (missing-arg) :type (or inst-space instruction)))
+(declaim (freeze-type inst-space-choice))
 
 ;;;; searching for an instruction in instruction space
 
@@ -301,6 +302,7 @@
   (offset 0 :type offset)
   (fun (missing-arg) :type function)
   (before-address nil :type (member t nil)))
+(declaim (freeze-type offs-hook))
 
 (defmethod print-object ((seg segment) stream)
   (print-unreadable-object (seg stream :type t)

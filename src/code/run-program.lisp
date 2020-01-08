@@ -187,6 +187,7 @@
   #+win32 (handle nil :type (or null (signed-byte 32)))
   #-win32
   serve-event-pipe)
+(declaim (freeze-type process))
 
 (defmethod print-object ((process process) stream)
   (print-unreadable-object (process stream :type t)

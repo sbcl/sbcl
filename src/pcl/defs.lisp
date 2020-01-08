@@ -473,6 +473,7 @@
   (reader (missing-arg) :type function)
   (writer (missing-arg) :type function)
   (boundp (missing-arg) :type function))
+(declaim (freeze-type slot-info))
 
 (defclass standard-direct-slot-definition (standard-slot-definition
                                            direct-slot-definition)

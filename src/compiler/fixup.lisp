@@ -37,3 +37,4 @@
   kind
   fixup
   position)
+(declaim (freeze-type fixup fixup-note))

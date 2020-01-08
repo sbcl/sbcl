@@ -31,6 +31,7 @@
 (defvar *shared-objects*)
 
 (defstruct (shared-object (:copier nil)) pathname namestring handle dont-save)
+(declaim (freeze-type shared-object))
 
 (defun load-shared-object (pathname &key dont-save)
   "Load a shared library / dynamic shared object file / similar foreign

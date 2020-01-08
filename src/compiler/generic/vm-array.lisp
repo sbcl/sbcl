@@ -52,6 +52,7 @@
   ;; which is used for a fixed #\NULL so that when we call out to C
   ;; we don't need to cons a new copy)
   (n-pad-elements (missing-arg) :type index :read-only t))
+(declaim (freeze-type specialized-array-element-type-properties))
 
 (define-load-time-global *specialized-array-element-type-properties*
   (map 'simple-vector

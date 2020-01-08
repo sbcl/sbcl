@@ -1162,8 +1162,7 @@
             (:copier nil)
             (:predicate nil))
   (unread-stuff nil :type boolean))
-
-(declaim (freeze-type echo-stream))
+(declaim (freeze-type two-way-stream))
 
 (defmethod print-object ((x echo-stream) stream)
   (print-unreadable-object (x stream :type t :identity t)
