@@ -162,18 +162,6 @@ the stack without triggering overflow protection.")
 (defmacro with-world-lock (() &body body)
   #+sb-xc-host `(progn ,@body)
   #-sb-xc-host `(sb-thread:with-recursive-lock (**world-lock**) ,@body))
-
-;;; unique ID for the next object created (to let us track object
-;;; identity even across GC, useful for understanding weird compiler
-;;; bugs where something is supposed to be unique but is instead
-;;; exists as duplicate objects)
-#+sb-show
-(progn
-  (defvar *object-id-counter* 0)
-  (defun new-object-id ()
-    (prog1
-        *object-id-counter*
-      (incf *object-id-counter*))))
 
 ;;;; miscellaneous utilities
 
@@ -384,6 +372,9 @@ the stack without triggering overflow protection.")
   ;; since it's primarily a debugging tool, it's nicer to have
   ;; a wider unique scope by ID.
   (objmap-obj-to-id      (make-hash-table :test 'eq) :read-only t)
+  (objmap-id-to-node     nil :type (or null id-array)) ; number -> NODE
+  (objmap-id-to-comp     nil :type (or null id-array)) ; number -> COMPONENT
+  (objmap-id-to-leaf     nil :type (or null id-array)) ; number -> LEAF
   (objmap-id-to-cont     nil :type (or null id-array)) ; number -> CTRAN or LVAR
   (objmap-id-to-ir2block nil :type (or null id-array)) ; number -> IR2-BLOCK
   (objmap-id-to-tn       nil :type (or null id-array)) ; number -> TN

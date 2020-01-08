@@ -902,6 +902,9 @@
                           '((setq num (string->id num))))
                       ;; numbers start from 1, not 0
                       (and (< (1- num) (length array)) (aref array (1- num)))))))))
+  (def objmap-id-to-node node-id id-node node)
+  (def objmap-id-to-comp component-id id-component component)
+  (def objmap-id-to-leaf leaf-id id-leaf leaf)
   (def objmap-id-to-cont %cont-num num-cont (or ctran lvar))
   (def objmap-id-to-ir2block ir2-block-id id-ir2-block ir2-block)
   (def objmap-id-to-tn tn-id id-tn tn)
