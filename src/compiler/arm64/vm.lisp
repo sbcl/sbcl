@@ -372,3 +372,15 @@
 #+sb-thread
 (defconstant pseudo-atomic-interrupted-flag
     (ash list-pointer-lowtag #+little-endian 32 #+big-endian 0))
+
+#+sb-xc-host
+(setq *backend-cross-foldable-predicates*
+      '(char-immediate-p
+        abs-add-sub-immediate-p
+        fixnum-abs-add-sub-immediate-p
+        sb-arm64-asm::add-sub-immediate-p
+        sb-arm64-asm::fixnum-add-sub-immediate-p
+        sb-arm64-asm::encode-logical-immediate
+        sb-arm64-asm::fixnum-encode-logical-immediate
+        bic-encode-immediate
+        bic-fixnum-encode-immediate))

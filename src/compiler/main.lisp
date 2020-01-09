@@ -1635,15 +1635,15 @@ necessary, since type inference may take arbitrarily long to converge.")
                   ;; we should look at *HANDLED-CONDITIONS*.
                   (null *lexenv*))))
              *handled-conditions*))
-       (handle-p (condition ctype)
-         #+sb-xc-host (typep condition (type-specifier ctype))
-         #-sb-xc-host (%%typep condition ctype)))
+       (handle-p (condition type)
+         #+sb-xc-host (cl:typep condition type) ; TYPE is a sexpr
+         #-sb-xc-host (%%typep condition type))) ; TYPE is a CTYPE
   (declare (inline handle-p))
 
   (defun handle-condition-p (condition)
     (dolist (muffle (get-handled-conditions) nil)
-      (destructuring-bind (ctype . restart-name) muffle
-        (when (and (handle-p condition ctype)
+      (destructuring-bind (type . restart-name) muffle
+        (when (and (handle-p condition type)
                    (find-restart restart-name condition))
           (return t)))))
 
@@ -1651,8 +1651,8 @@ necessary, since type inference may take arbitrarily long to converge.")
     (let ((muffles (get-handled-conditions)))
       (aver muffles) ; FIXME: looks redundant with "fell through"
       (dolist (muffle muffles (bug "fell through"))
-        (destructuring-bind (ctype . restart-name) muffle
-          (when (handle-p condition ctype)
+        (destructuring-bind (type . restart-name) muffle
+          (when (handle-p condition type)
             (awhen (find-restart restart-name condition)
               (invoke-restart it)))))))
 

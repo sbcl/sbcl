@@ -16,16 +16,33 @@
 (let ((*features* (cons :sb-xc *features*)))
   (load "src/cold/muffler.lisp"))
 
-;; Avoid forward-reference to an as-yet unknown type.
-;; NB: This is not how you would write this function, if you required
-;; such a thing. It should be (TYPEP X 'CODE-DELETION-NOTE).
-;; Do as I say, not as I do.
-(defun code-deletion-note-p (x)
-  (eq (type-of x) 'sb-ext:code-deletion-note))
+;;; Ordinarily the types carried around as "handled conditions" while compiling
+;;; have been parsed into internal CTYPE objects. However, using parsed objects
+;;; in the cross-compiler was confusing as hell.
+;;; Consider any toplevel form in make-host-2 - it will have constants in it,
+;;; and we need to know if each constant is dumpable. So we call DUMPABLE-LEAFLIKE-P
+;;; which invokes SB-XC:TYPEP. But SB-XC:TYPEP may know nothing of DEBUG-NAME-MARKER
+;;; until that DEFSTRUCT is seen. So how did it ever work? Well, for starters,
+;;; if it's an unknown type, we need to signal a PARSE-UNKNOWN-TYPE condition.
+;;; To signal that, we check whether that condition is in *HANDLED-CONDITIONS*.
+;;; The way we tested that is to unparse the entry and then use CL:TYPEP on the
+;;; specifier.  (rev 2bad5ce54d5692a0 "Represent LEXENV-HANDLED-CONDITIONS as CTYPEs")
+;;; So we had:
+;;;   (HANDLE-CONDITION-P #<PARSE-UNKNOWN-TYPE {1003172603}>)
+;;;   -> (UNION-UNPARSE-TYPE-METHOD #<UNION-TYPE (OR (SATISFIES UNABLE-TO-OPTIMIZE-NOTE-P) ...)>)
+;;;   -> (TYPE= #<UNION-TYPE (OR (SATISFIES UNABLE-TO-OPTIMIZE-NOTE-P) ...)> #<UNION-TYPE LIST>)
+;;;   -> ... lots more frames ...
+;;;   -> (CTYPEP NIL #<HAIRY-TYPE (SATISFIES UNABLE-TO-OPTIMIZE-NOTE-P)>)
+;;; While means while merely unparsing, we have to reason about UNION-TYPE
+;;; and UNKNOWN-TYPE, which might entail invoking (CROSS-TYPEP 'NIL #<an-unknown-type>)
+;;; i.e. we can't even unparse a parsed type without reasoning about whether
+;;; we should signal a condition about the condition we're trying to signal.
+;;; That could only be described as an unmitigated disaster.
+;;; So now, as a special case within the cross-compiler, *HANDLED-CONDITIONS*
+;;; uses type designators instead of parsed types.
 (setq sb-c::*handled-conditions*
-      `((,(sb-kernel:specifier-type
-           '(or (satisfies unable-to-optimize-note-p)
-                (satisfies code-deletion-note-p)))
+      `(((or (satisfies unable-to-optimize-note-p)
+             sb-ext:code-deletion-note)
          . muffle-warning)))
 
 (defun proclaim-target-optimization ()

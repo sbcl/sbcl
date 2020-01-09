@@ -1265,6 +1265,8 @@
 
 ;;;; from the "Streams" chapter:
 
+;;; FIXME: the first 5 of these should be specified to return a particular
+;;; subtype of STREAM, just like MAKE-STRING-{INPUT,OUTPUT}-STREAM do.
 (defknown make-synonym-stream (symbol) stream (flushable))
 (defknown make-broadcast-stream (&rest stream) stream (unsafely-flushable))
 (defknown make-concatenated-stream (&rest stream) stream (unsafely-flushable))

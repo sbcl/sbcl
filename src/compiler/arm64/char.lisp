@@ -112,7 +112,8 @@
   (:conditional :lt))
 
 (defun char-immediate-p (char)
-  (add-sub-immediate-p (sb-xc:char-code char)))
+  (and (characterp char)
+       (add-sub-immediate-p (sb-xc:char-code char))))
 
 (define-vop (character-compare/c)
   (:args (x :scs (character-reg)))

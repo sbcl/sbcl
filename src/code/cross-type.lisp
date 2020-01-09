@@ -43,12 +43,31 @@
          (push symbol *seen-xtypep-preds*)))
   ;; For USAGE = TYPEP, always call the predicate.
   ;; For USAGE = CTYPEP, call it only if it is a foldable function.
-  ;; The major case in which we don't call something for CTYPEP is KEYWORDP
-  ;; which we consider not to be foldable.
-  (and (eq (sb-xc:symbol-package symbol) *cl-package*)
-       (or (eq usage 'sb-xc:typep)
-           (awhen (info :function :info symbol)
-             (sb-c::ir1-attributep (sb-c::fun-info-attributes it) sb-c:foldable)))))
+  ;;
+  ;; Exceptions:
+  ;; 1. CLOSUREP and SIMPLE-FUN-P. These can get called from WEAKEN-TYPE with
+  ;;    a symbol as the argument. It's ok to call either one in that case.
+  ;;
+  ;; 2. UNBOUND-MARKER-P is needed when compiling CLOSURE-EXTRA-VALUES
+  ;;    and maybe some other things too.
+  ;;
+  ;; 3. VECTOR-WITH-FILL-POINTER-P - as long as the argument is not a vector
+  ;;    we can safely say that the answer is NIL.
+  ;;
+  ;; 4. LEGAL-FUN-NAME-P and EXTENDED-FUNCTION-DESIGNATOR-P.
+  ;;    These are harmless enough to call, so why not.
+  ;;
+  ;; 5. Anything else needed by a particular backend.
+  (or (member symbol
+              '(closurep simple-fun-p unbound-marker-p
+                sb-impl::vector-with-fill-pointer-p
+                legal-fun-name-p extended-function-designator-p))
+      (member symbol sb-vm::*backend-cross-foldable-predicates*)
+      (and (eq (sb-xc:symbol-package symbol) *cl-package*)
+           (or (eq usage 'sb-xc:typep)
+               (awhen (info :function :info symbol)
+                 (sb-c::ir1-attributep (sb-c::fun-info-attributes it)
+                                       sb-c:foldable))))))
 
 ;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
 ;;; be of type TYPE when instantiated on the target SBCL. Since this
@@ -60,6 +79,7 @@
 ;;; The logic is a mixture of the code for CTYPEP as defined in src/code/late-type
 ;;; and %%TYPEP as defined in src/code/typep.
 ;;; The order of clauses is fairly symmetrical with that of %%TYPEP.
+(defvar *xtypep-uncertainty-action* 'warn) ; {BREAK WARN STYLE-WARN ERROR NIL}
 (defun cross-typep (caller host-object type)
   (declare (type (member sb-xc:typep ctypep) caller))
   (when (or (cl:floatp host-object) (cl:complexp host-object))
@@ -67,7 +87,17 @@
   (named-let recurse ((obj host-object) (type type))
     (flet ((unimplemented ()
              (bug "Incomplete implementation of ~S ~S ~S" caller obj type))
-           (uncertain ()
+           (uncertain (&optional thing
+                       &aux (allow-uncertain
+                             (and (hairy-type-p thing)
+                                  (equal (hairy-type-specifier thing)
+                                         '(satisfies keywordp)))))
+             (awhen (and *xtypep-uncertainty-action* (not allow-uncertain))
+               ;; can't even backtrace if the printing of a something involving
+               ;; uncertainty involves uncertainty.
+               (let ((*xtypep-uncertainty-action* nil))
+                 (funcall it "Should not happen: (TYPEP '~S '~S)"
+                          obj (type-specifier type))))
              (values nil nil)))
       (etypecase type
        (named-type
@@ -135,7 +165,7 @@
         (multiple-value-bind (res win) (recurse obj (negation-type-type type))
           (if win
               (values (not res) t)
-              (uncertain))))
+              (uncertain (negation-type-type type)))))
        ;; Test BUILT-IN before falling into the CLASSOID case
        (built-in-classoid
         (ecase (classoid-name type)
@@ -201,14 +231,24 @@
                 ;; So unfortunately we still munst handle a few cases without parsing,
                 ;; but fewer than before, and then some after parsing.
                 ((and (symbolp obj)
-                      (member spec '(;; these occur during make-host-1
-                                     hash-table lexenv sb-c::abstract-lexenv
-                                     condition restart
-                                     sb-assem::label
-                                     ;; in addition to the above, these occur in make-host-2
-                                     interpreted-function
-                                     synonym-stream
-                                     )))
+                      (member
+                       spec
+                       (if (member :sb-xc sb-xc:*features*)
+                           ;; If :sb-xc is present, then we're cross-compiling.
+                           ;; There should not be forward references to INTERPRETED-FUNCTION.
+                           ;; I honestly don't know what's going wrong!
+                           '(interpreted-function
+                             condition)
+                           ;; If :sb-xc is absent, then we're either running CL:COMPILE
+                           ;; or CL:LOAD in make-host-1.
+                           ;; It is permissible to make forward references to the following
+                           ;; subtypes of structure-object in make-host-1.
+                           '(hash-table lexenv sb-c::abstract-lexenv
+                             condition restart
+                             synonym-stream
+                             ;; why on earth is LABEL needed here?
+                             sb-assem::label))))
+                 #+nil (format t "~&(XTYPEP '~S '~S) -> (NIL T)~%" obj spec)
                  (values nil t))
                 (t
                  (uncertain)))))
@@ -224,7 +264,7 @@
                              ((eq (sb-xc:symbol-package obj) *keyword-package*)
                               (values t t)) ; certainly yes
                              (t
-                              (uncertain))))
+                              (uncertain type))))
                       ((acceptable-cross-typep-pred predicate caller)
                        (values (funcall predicate obj) t))
                       (t
@@ -268,6 +308,7 @@
 (defun ctypep (obj ctype)
   (declare (type ctype ctype))
   (multiple-value-bind (answer certain) (cross-typep 'ctypep obj ctype)
+    ;; FIXME: I think we can (AVER CERTAIN) at this point.
     (if (or certain
             ;; Allow uncertainty only if the type contains a SATISFIES
             (block contains-satisfies

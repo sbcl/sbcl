@@ -768,8 +768,22 @@
   (fixnum-add-sub-immediate-p (abs n)))
 
 (defun abs-add-sub-immediate-p (n)
-  (or (add-sub-immediate-p (abs n))
-      (add-sub-immediate-p (ldb (byte n-word-bits 0) (- n)))))
+  ;; In the cross-compiler, stack traces such as the following can occur:
+  ;; 0: (HOST-SB-KERNEL:%NEGATE #.(MAKE-DOUBLE-FLOAT #x7FEFFFFF #xFFFFFFFF))
+  ;; 1: (SB-VM::ABS-ADD-SUB-IMMEDIATE-P #.(MAKE-DOUBLE-FLOAT #x7FEFFFFF #xFFFFFFFF))
+  ;; 2: ((LABELS RECURSE :IN CROSS-TYPEP) #.(MAKE-DOUBLE-FLOAT #x7FEFFFFF #xFFFFFFFF)
+  ;;     #<HAIRY-TYPE (SATISFIES SB-VM::ABS-ADD-SUB-IMMEDIATE-P)>)
+  ;; 3: (CTYPEP #.(MAKE-DOUBLE-FLOAT #x7FEFFFFF #xFFFFFFFF)
+  ;;     #<HAIRY-TYPE (SATISFIES SB-VM::ABS-ADD-SUB-IMMEDIATE-P)>)
+  ;; 4: (SB-C::CHECK-ARG-TYPE #<SB-C::LVAR 1 {1008A71AD3}>
+  ;;     #<CONSTANT-TYPE (CONSTANT-ARG (SATISFIES SB-VM::ABS-ADD-SUB-IMMEDIATE-P))> 2)
+  ;; The target compiler will avoid using this predicate, for the wrong reason.
+  ;; It avoids it because it thinks it's not foldable.
+  ;; If it did call it, then it would get a bogus (but permissible) answer, namely:
+  ;;  (ctypep 0 (specifier-type '(satisfies abs-add-sub-immediate-p))) => NIL,NIL
+  (and (integerp n)
+       (or (add-sub-immediate-p (abs n))
+           (add-sub-immediate-p (ldb (byte n-word-bits 0) (- n))))))
 
 (define-vop (fast-conditional/fixnum fast-conditional)
   (:args (x :scs (any-reg))
