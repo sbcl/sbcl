@@ -267,6 +267,18 @@
   '(non-null-symbol-p x))
 (deftransform non-null-symbol-p ((object) (symbol) * :important nil)
   `(not (eq object nil)))
+;;; CLHS: http://www.lispworks.com/documentation/HyperSpec/Body/t_symbol.htm#symbol
+;;;   "The consequences are undefined if an attempt is made to alter the home package
+;;;    of a symbol external in the COMMON-LISP package or the KEYWORD package."
+;;; Therefore, we can constant-fold if the symbol-package is one of those two.
+;;; Interestingly, we don't need any transform for (NOT SYMBOL)
+;;; because IR1-TRANSFORM-TYPE-PREDICATE knows that the intersection of the type
+;;; implied by KEYWORDP with any type that does not intersect SYMBOL is NIL.
+(deftransform keywordp ((x) ((constant-arg symbol)))
+  (let ((pkg (sb-xc:symbol-package (lvar-value x))))
+    (cond ((eq pkg *cl-package*) 'nil)
+          ((eq pkg *keyword-package*) 't)
+          (t (give-up-ir1-transform)))))
 
 ;;;; TYPEP source transform
 

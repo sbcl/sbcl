@@ -190,12 +190,7 @@
 (defknown copy-symbol (symbol &optional t) symbol (flushable))
 (defknown gensym (&optional (or string unsigned-byte)) symbol ())
 (defknown symbol-package (symbol) (or package null) (flushable))
-;;; It should be ok to fold KEYWORDP because uninterning a keyword invokes undefined behavior:
-;;;  "The consequences are undefined if an attempt is made to alter the home package
-;;;  of a symbol external in the COMMON-LISP package or the KEYWORD package."
-;;; http://www.lispworks.com/documentation/HyperSpec/Body/t_symbol.htm#symbol
-;;; Hence this cautionary annotation below is misguided.
-(defknown keywordp (t) boolean (flushable))       ; If someone uninterns it...
+(defknown keywordp (t) boolean (flushable)) ; semi-foldable, see src/compiler/typetran
 
 ;;;; from the "Packages" chapter:
 

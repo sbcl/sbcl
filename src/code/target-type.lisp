@@ -109,11 +109,23 @@
                 (values (not res) t)
                 (values nil nil))))
          (satisfies
-          ;; If the SATISFIES function is not foldable, we cannot answer!
-          (let* ((form `(,(second hairy-spec) ',obj)))
-            (multiple-value-bind (ok result)
-                (sb-c::constant-function-call-p form nil nil)
-              (values (not (null result)) ok)))))))))
+          (let ((predicate (second hairy-spec)))
+            (case predicate
+             (keywordp ; answer with certainty sometimes
+              ;; Keep in sync with KEYWORDP test in src/code/cross-type
+              (cond ((or (not (symbolp obj))
+                         (eq (sb-xc:symbol-package obj) *cl-package*))
+                     (values nil t)) ; certainly no
+                    ((eq (sb-xc:symbol-package obj) *keyword-package*)
+                     (values t t)) ; certainly yes
+                    (t
+                     (values nil nil)))) ; can't decide
+             (t
+              ;; If the SATISFIES function is not foldable, we cannot answer!
+              (let ((form `(,predicate ',obj)))
+                (multiple-value-bind (ok result)
+                    (sb-c::constant-function-call-p form nil nil)
+                  (values (not (null result)) ok))))))))))))
 
 ;;;; miscellaneous interfaces
 

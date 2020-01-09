@@ -216,9 +216,19 @@
         (let ((spec (hairy-type-specifier type)))
           (if (cl:typep spec '(cons (eql satisfies) (cons symbol null)))
               (let ((predicate (cadr spec)))
-                (if (acceptable-cross-typep-pred predicate caller)
-                    (values (funcall predicate obj) t)
-                    (uncertain)))
+                ;; Keep in sync with KEYWORDP test in src/code/target-type
+                (cond ((eq predicate 'keywordp)
+                       (cond ((or (not (symbolp obj))
+                                  (eq (sb-xc:symbol-package obj) *cl-package*))
+                              (values nil t)) ; certainly no
+                             ((eq (sb-xc:symbol-package obj) *keyword-package*)
+                              (values t t)) ; certainly yes
+                             (t
+                              (uncertain))))
+                      ((acceptable-cross-typep-pred predicate caller)
+                       (values (funcall predicate obj) t))
+                      (t
+                       (uncertain))))
               (unimplemented))))))))
 
 ;;; This is an incomplete TYPEP which runs at cross-compile time to
