@@ -823,13 +823,17 @@
 ;;; y) = (exp (* y (log x))). However, computations done this way
 ;;; have too much roundoff. Thus we have to do it the hard way.
 (defun safe-expt (x y)
-  #+sb-xc-host (when (< (abs y) 10000) (expt x y))
-  #-sb-xc-host
-  (handler-case
-      (when (< (abs y) 10000)
-        (expt x y))
-    (error ()
-      nil)))
+  (when (and (numberp x) (numberp y))
+    (handler-case
+        (when (< (abs y) 10000)
+          (expt x y))
+      ;; Currently we can hide unanticipated errors (such as failure to use SB-XC: math
+      ;; when cross-compiling) as well as the anticipated potential problem of overflow.
+      ;; So don't handle anything when cross-compiling.
+      ;; FIXME: I think this should not handle ERROR, but just FLOATING-POINT-OVERFLOW.
+      (#+sb-xc-host nil
+       #-sb-xc-host error ()
+        nil))))
 
 ;;; Handle the case when x >= 1.
 (defun interval-expt-> (x y)
