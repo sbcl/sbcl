@@ -1407,7 +1407,8 @@ We could try a few things to mitigate this:
                                 ;; pass NIL explicitly if T crashes on you
                                 (decode t))
   (multiple-value-bind (obj addr count)
-      (if (integerp thing)
+      (if (typep thing 'word) ; ambiguous in the edge case, but assume it's
+          ;; an address (though you might be trying to dump a bignum's data)
           (values nil thing (if wordsp n-words 1))
           (values
            thing
