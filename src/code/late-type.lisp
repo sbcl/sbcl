@@ -479,7 +479,7 @@
   (type= (constant-type-type type1) (constant-type-type type2)))
 
 (def-type-translator constant-arg ((:context context) type)
-  (make-constant-type :type (single-value-specifier-type-r context type)))
+  (make-constant-type :type (single-value-specifier-type type context)))
 
 ;;; Return the lambda-list-like type specification corresponding
 ;;; to an ARGS-TYPE.
@@ -512,7 +512,7 @@
 
 (defun translate-fun-type (context args result
                            &key designator)
-  (let ((result (coerce-to-values (values-specifier-type-r context result))))
+  (let ((result (coerce-to-values (basic-parse-typespec result context))))
     (cond ((neq args '*)
            (multiple-value-bind (llks required optional rest keywords)
                (parse-args-types context args :function-type)
@@ -1805,7 +1805,7 @@
   (type= (negation-type-type type1) (negation-type-type type2)))
 
 (def-type-translator not :list ((:context context) typespec)
-  (type-negation (specifier-type-r context typespec)))
+  (type-negation (specifier-type typespec context)))
 
 ;;;; numeric types
 
@@ -2192,7 +2192,7 @@
                           (bug "~@<(known bug #145): The type ~S is too hairy to be ~
 used for a COMPLEX component.~:@>"
                                typespec)))))))
-        (let ((ctype (specifier-type-r context typespec)))
+        (let ((ctype (specifier-type typespec context)))
           (do-complex ctype)))))
 
 ;;; If X is *, return NIL, otherwise return the bound, which must be a
@@ -3064,6 +3064,8 @@ used for a COMPLEX component.~:@>"
 ;;; mechanically unparsed.
 (define-type-method (intersection :unparse) (type)
   (declare (type ctype type))
+  ;; If perhaps the magic intersection types were interned, then
+  ;; we could compare by EQ here instead of parsing in order to unparse.
   (or (find type '(ratio keyword compiled-function) :key #'specifier-type :test #'type=)
       `(and ,@(mapcar #'type-specifier (intersection-type-types type)))))
 
@@ -3188,7 +3190,7 @@ used for a COMPLEX component.~:@>"
                      (type-intersection accumulator union))))))))
 
 (def-type-translator and :list ((:context context) &rest type-specifiers)
-  (%type-intersection (mapcar (lambda (x) (specifier-type-r context x))
+  (%type-intersection (mapcar (lambda (x) (specifier-type x context))
                               type-specifiers)))
 
 ;;;; union types
@@ -3445,7 +3447,7 @@ used for a COMPLEX component.~:@>"
                                (type-intersection type1 t2))))))))
 
 (def-type-translator or :list ((:context context) &rest type-specifiers)
-  (let ((type (%type-union (mapcar (lambda (x) (specifier-type-r context x))
+  (let ((type (%type-union (mapcar (lambda (x) (specifier-type x context))
                                    type-specifiers))))
     (if (union-type-p type)
         (sb-kernel::simplify-array-unions type)
@@ -3455,8 +3457,8 @@ used for a COMPLEX component.~:@>"
 
 (def-type-translator cons ((:context context)
                             &optional (car-type-spec '*) (cdr-type-spec '*))
-  (let ((car-type (single-value-specifier-type-r context car-type-spec))
-        (cdr-type (single-value-specifier-type-r context cdr-type-spec)))
+  (let ((car-type (single-value-specifier-type car-type-spec context))
+        (cdr-type (single-value-specifier-type cdr-type-spec context)))
     (make-cons-type car-type cdr-type)))
 
 (define-type-method (cons :negate) (type)
@@ -3749,7 +3751,7 @@ used for a COMPLEX component.~:@>"
                                        (dimensions '*))
   (let ((eltype (if (eq element-type '*)
                     *wild-type*
-                    (specifier-type-r context element-type))))
+                    (specifier-type element-type context))))
     (make-array-type (canonical-array-dimensions dimensions)
                      :complexp :maybe
                      :element-type eltype
@@ -3761,7 +3763,7 @@ used for a COMPLEX component.~:@>"
                                               (dimensions '*))
   (let ((eltype (if (eq element-type '*)
                     *wild-type*
-                    (specifier-type-r context element-type))))
+                    (specifier-type element-type context))))
    (make-array-type (canonical-array-dimensions dimensions)
                     :complexp nil
                     :element-type eltype

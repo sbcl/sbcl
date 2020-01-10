@@ -132,11 +132,11 @@
                                   '(&optional &rest &key &allow-other-keys))))
        :silent t)
    (flet ((parse-list (list)
-            (mapcar (lambda (x) (single-value-specifier-type-r context x))
+            (mapcar (lambda (x) (single-value-specifier-type x context))
                     list)))
     (let ((required (parse-list required))
           (optional (parse-list optional))
-          (rest (when rest (single-value-specifier-type-r context (car rest))))
+          (rest (when rest (single-value-specifier-type (car rest) context)))
           (keywords
            (collect ((key-info))
              (dolist (key keys)
@@ -151,7 +151,7 @@
                    ;; MAKE-KEY-INFO will complain if KWD is not a symbol.
                    ;; That's good enough - we don't need an extra check here.
                    :name kwd
-                   :type (single-value-specifier-type-r context (second key))))))
+                   :type (single-value-specifier-type (second key) context)))))
              (key-info))))
       (multiple-value-bind (required optional rest)
           (canonicalize-args-type-args required optional rest
@@ -832,10 +832,24 @@
 (defvar *pending-defstruct-type*)
 (declaim (type classoid *pending-defstruct-type*))
 
-;;; The recursive ("-R" suffixed) entry point for this function
-;;; should be used for each nested parser invocation.
-(defun values-specifier-type-r (context type-specifier)
-  (declare (type cons context))
+;;; Parsing of type specifiers comes in many variations:
+;;;  SINGLE-VALUE-SPECIFIER-TYPE:
+;;;    disallow VALUES even if single value, but allow *
+;;;  SPECIFIER-TYPE:
+;;;    disallow (VALUES ...) even if single value, and disallow *
+;;;  VALUES-SPECIFIER-TYPE:
+;;;    allow VALUES and *
+;;; TYPE-OR-NIL-IF-UNKNOWN:
+;;;    like SPECIFIER-TYPE, but return NIL if contains unknown
+;;; all the above are funneled through BASIC-PARSE-TYPESPEC.
+
+;;; The recursive %PARSE-TYPE function is used for nested invocations
+;;; of type spec parsing, passing the outermost context through on each call.
+;;; Callers should use the BASIC-PARSE-TYPESPEC interface.
+(defmacro make-parse-type-context (outermost-type) `(cons ,outermost-type t))
+(defmacro typespec-cacheable (context) `(cdr ,context))
+(defun %parse-type (type-specifier context)
+  ;;(declare (type parse-type-context context))
   (labels ((fail (spec) ; Q: Shouldn't this signal a TYPE-ERROR ?
              #-sb-xc-host(declare (optimize allow-non-returning-tail-call))
              (error "bad thing to be a type specifier: ~
@@ -867,14 +881,14 @@
                        (sb-mop:eql-specializer-object type-specifier)))
                      (t (fail x))))))
     (when (typep type-specifier 'instance)
-      (return-from values-specifier-type-r (instance-to-ctype type-specifier)))
+      (return-from %parse-type (instance-to-ctype type-specifier)))
     (when (atom type-specifier)
       ;; Try to bypass the cache, which avoids using a cache line for standard
       ;; atomic specifiers. This is a trade-off- cache seek might be faster,
       ;; but this solves the problem that a full call to (TYPEP #\A 'FIXNUM)
       ;; consed a cache line every time the cache missed on FIXNUM (etc).
       (awhen (info :type :builtin type-specifier)
-        (return-from values-specifier-type-r it)))
+        (return-from %parse-type it)))
     (!values-specifier-type-memo-wrapper
      (lambda ()
        (labels
@@ -884,7 +898,7 @@
                                  (info :type :builtin head)
                                  (return (fail spec)))))
               (when (deprecated-thing-p 'type head)
-                (setf (cdr context) nil)
+                (setf (typespec-cacheable context) nil)
                 (signal 'parse-deprecated-type :specifier spec))
               (when (atom spec)
                 ;; If spec is non-atomic, the :BUILTIN value is inapplicable.
@@ -895,7 +909,7 @@
                 (when (boundp '*pending-defstruct-type*)
                   (let ((classoid *pending-defstruct-type*))
                     (when (eq (classoid-name classoid) spec)
-                      (setf (cdr context) nil) ; don't cache
+                      (setf (typespec-cacheable context) nil)
                       (return classoid))))
                 (case (info :type :kind spec)
                   (:instance (return (find-classoid spec)))
@@ -919,51 +933,63 @@
               ;; SPEC has a legal form, so return an unknown type.
               (signal 'parse-unknown-type :specifier spec)
              UNKNOWN
-              (setf (cdr context) nil)
+              (setf (typespec-cacheable context) nil)
               (return (make-unknown-type :specifier spec)))))
         (let ((result (recurse (uncross type-specifier))))
-          (if (cdr context) ; cacheable
+          (if (typespec-cacheable context) ; cacheable
               result
               ;; (The RETURN-FROM here inhibits caching; this makes sense
               ;; not only from a compiler diagnostics point of view,
               ;; but also for proper workingness of VALID-TYPE-SPECIFIER-P.
-              (return-from values-specifier-type-r result)))))
+              (return-from %parse-type result)))))
      type-specifier)))
+(defun basic-parse-typespec (type-specifier context)
+  ;;(declare (type parse-type-context context))
+  (let ((parse (%parse-type type-specifier context)))
+    ;; I'm seeing the types &OPTIONAL-AND-&KEY-IN-LAMBDA-LIST,
+    ;; SIMPLE-ERROR, DISASSEM-STATE, FRAME as non-cacheable
+    ;; during make-host-2; and much, much more during make-target-2.
+    #+nil
+    (unless (typespec-cacheable context)
+      (format t "~&non-cacheable: ~S ~%" type-specifier))
+    parse))
+;;; This takes no CONTEXT (which implies lack of recursion) because
+;;; you can't reasonably place a VALUES type inside another type.
 (defun values-specifier-type (type-specifier)
-  (dx-let ((context (cons type-specifier t)))
-    (values-specifier-type-r context type-specifier)))
+  (dx-let ((context (make-parse-type-context type-specifier)))
+    (basic-parse-typespec type-specifier context)))
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
-(defun specifier-type-r (context type-specifier)
-  (let ((ctype (values-specifier-type-r context type-specifier)))
+(defun specifier-type (type-specifier &optional context)
+  (let ((ctype
+         (if context
+             (basic-parse-typespec type-specifier context)
+             (dx-let ((context (make-parse-type-context type-specifier)))
+               (basic-parse-typespec type-specifier context)))))
     (when (values-type-p ctype)
       (error "VALUES type illegal in this context:~% ~
                ~/sb-impl:print-type-specifier/"
              type-specifier))
     ctype))
-(defun specifier-type (type-specifier)
-  (dx-let ((context (cons type-specifier t)))
-    (specifier-type-r context type-specifier)))
+
+(defun single-value-specifier-type (x &optional context)
+  (if (eq x '*)
+      *universal-type*
+      (specifier-type x context)))
 
 ;;; Parse TYPE-SPECIFIER, returning NIL if any sub-part of it is unknown
 (defun type-or-nil-if-unknown (type-specifier &optional allow-values)
-  (dx-let ((context (cons type-specifier t)))
-    (let ((result (values-specifier-type-r context type-specifier)))
+  (dx-let ((context (make-parse-type-context type-specifier)))
+    (let ((result (basic-parse-typespec type-specifier context)))
       (when (and (not allow-values) (values-type-p result))
         (error "VALUES type illegal in this context:~%  ~S" type-specifier))
       ;; If it was non-cacheable, either it contained a deprecated type
       ;; or unknown type, or was a pending defstruct definition.
-      (if (and (not (cdr context)) (contains-unknown-type-p result))
+      (if (and (not (typespec-cacheable context))
+               (contains-unknown-type-p result))
           nil
           result))))
-
-(defun single-value-specifier-type-r (context x)
-  (if (eq x '*) *universal-type* (specifier-type-r context x)))
-(defun single-value-specifier-type (x)
-  (if (eq x '*)
-      *universal-type*
-      (specifier-type x)))
 
 (defun typexpand-1 (type-specifier &optional env)
   "Takes and expands a type specifier once like MACROEXPAND-1.

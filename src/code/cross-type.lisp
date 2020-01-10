@@ -92,11 +92,12 @@
                              (and (hairy-type-p thing)
                                   (equal (hairy-type-specifier thing)
                                          '(satisfies keywordp)))))
-             (awhen (and *xtypep-uncertainty-action* (not allow-uncertain))
+             (when (and *xtypep-uncertainty-action* (not allow-uncertain))
                ;; can't even backtrace if the printing of a something involving
                ;; uncertainty involves uncertainty.
-               (let ((*xtypep-uncertainty-action* nil))
-                 (funcall it "Should not happen: (TYPEP '~S '~S)"
+               (let* ((action *xtypep-uncertainty-action*)
+                      (*xtypep-uncertainty-action* nil))
+                 (funcall action "Should not happen: (TYPEP '~S '~S)"
                           obj (type-specifier type))))
              (values nil nil)))
       (etypecase type
