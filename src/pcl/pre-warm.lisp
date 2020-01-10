@@ -93,6 +93,28 @@
     (short-method-combination short-method-combination-p)))
 
 #+sb-xc-host
+(progn
+;;; Create #<SB-KERNEL::CONDITION-CLASSOID CONDITION>
+;;; so that we can successfully parse the type specifier
+;;; CONDITION-DESIGNATOR-HEAD which expands to
+;;; (or format-control symbol condition sb-pcl::condition-class).
+;;; Compiling any ERROR or WARN call eagerly looks up and re-parses
+;;; the global ftype, and we don't want to see unknown types.
+(let* ((name 'condition)
+       (classoid (sb-kernel::make-condition-classoid :name name))
+       (cell (sb-kernel::make-classoid-cell name classoid))
+       (layout (make-layout
+                (randomish-layout-clos-hash name)
+                classoid
+                :inherits (vector (find-layout 't))
+                :depthoid 1
+                :length (+ sb-vm:instance-data-start 2)
+                :invalid nil)))
+  (setf (classoid-layout classoid) layout
+        (info :type :classoid-cell name) cell
+        (info :type :kind name) :instance))
+
+;;; Create classoids that correspond with some CLOS classes
 (flet ((create-fake-classoid (name fun-p)
          (let* ((classoid (make-standard-classoid :name name))
                 (cell (sb-kernel::make-classoid-cell name classoid))
@@ -118,6 +140,7 @@
       (create-fake-classoid name
                             (memq name '(standard-generic-function
                                          generic-function))))))
+) ; end PROGN
 
 ;;; BIG FAT WARNING: These predicates can't in general be called prior to the
 ;;; definition of the class which they test. However in carefully controlled

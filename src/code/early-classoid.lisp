@@ -52,7 +52,8 @@
   (slots () :type list)
   ;; a list of (NAME . INDEX) pairs for accessors of included structures
   (inherited-accessor-alist () :type list)
-  ;; number of elements including the layout itself (minimum=1)
+  ;; number of data words, including the layout itself if the layout
+  ;; requires an entire word (when no immobile-space)
   (length 0 :type index)
   ;; General kind of implementation.
   (type 'structure :type (member structure vector list

@@ -232,10 +232,11 @@ the stack without triggering overflow protection.")
                 :format-arguments (list symbol)))
   (values))
 
-(defstruct (debug-name-marker (:print-function print-debug-name-marker)
-                              ;; make these satisfy SB-XC:INSTANCEP
-                              #+sb-xc-host (:include structure!object)
-                              (:copier nil)))
+;;; This is DEF!STRUCT so that when SB-C:DUMPABLE-LEAFLIKE-P invokes
+;;; SB-XC:TYPEP in make-host-2, it does not need need to signal PARSE-UNKNOWN
+;;; for each and every constant seen up until this structure gets defined.
+(def!struct (debug-name-marker (:print-function print-debug-name-marker)
+                               (:copier nil)))
 
 (defvar *debug-name-level* 4)
 (defvar *debug-name-length* 12)

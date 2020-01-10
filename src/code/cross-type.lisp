@@ -236,10 +236,9 @@
                        spec
                        (if (member :sb-xc sb-xc:*features*)
                            ;; If :sb-xc is present, then we're cross-compiling.
-                           ;; There should not be forward references to INTERPRETED-FUNCTION.
-                           ;; I honestly don't know what's going wrong!
-                           '(interpreted-function
-                             condition)
+                           ;; While there may be other unknown types parsed, CROSS-TYPEP
+                           ;; should never see anything except INTERPRETED-FUNCTION.
+                           '(interpreted-function)
                            ;; If :sb-xc is absent, then we're either running CL:COMPILE
                            ;; or CL:LOAD in make-host-1.
                            ;; It is permissible to make forward references to the following
