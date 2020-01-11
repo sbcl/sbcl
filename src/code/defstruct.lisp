@@ -330,6 +330,7 @@
               `((defmethod print-object ((,x ,name) ,s)
                   (funcall #',fname ,x ,s
                            ,@(if depthp `(*current-level-in-print*)))))))))
+    (declare (ignore classoid))
     ;; Return a list of forms
     (if (dd-class-p dd)
          `(,@(when (eq expanding-into-code-for :target)
@@ -353,7 +354,7 @@
                             ,@(awhen (dd-predicate-name dd)
                                 `((sb-c:xdefun ,(dd-predicate-name dd) :predicate (object)
                                     (typep object ',(dd-name dd)))))
-                            ,@(accessor-definitions dd classoid))))
+                            ,@(accessor-definitions dd))))
                      (if (and delayp (not (compiler-layout-ready-p name)))
                          `((sb-impl::%simple-eval ',(cons 'progn defuns)
                                                   (make-null-lexenv)))
@@ -716,53 +717,44 @@ unless :NAMED is also specified.")))
 ;;; info.
 (defun parse-defstruct (dd options slot-descriptions)
   (declare (type defstruct-description dd))
-  (let ((option-bits (parse-defstruct-options options dd)))
+  (let* ((option-bits (parse-defstruct-options options dd))
+         (inherits
+          (if (dd-class-p dd)
+              #+sb-xc-host (!inherits-for-structure dd)
+              #-sb-xc-host
+              (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
+                                                        'structure-object))))
+                (concatenate 'simple-vector
+                             (layout-inherits super) (vector super)))))
+         (proto-classoid
+          (if (dd-class-p dd)
+              (let* ((classoid (make-structure-classoid :name (dd-name dd)))
+                     (layout (make-layout (randomish-layout-clos-hash (dd-name dd))
+                                          classoid :inherits inherits)))
+                (setf (layout-invalid layout) nil
+                      (classoid-layout classoid) layout)
+                classoid))))
+    ;; Type parsing should be done assuming that prototype classoid
+    ;; exists, which fixes a problem when redefining a DEFTYPE which
+    ;; appeared to be a raw slot. e.g.
+    ;;   (DEFTYPE X () 'SINGLE-FLOAT) and later (DEFSTRUCT X (A 0 :TYPE X)).
+    ;; This is probably undefined behavior, but at least we'll not crash.
+    ;; Also make self-referential definitions not signal PARSE-UNKNOWN-TYPE
+    ;; on slots whose :TYPE option allows an instance of itself
     (when (dd-include dd)
-      (frob-dd-inclusion-stuff dd option-bits))
+      (frob-dd-inclusion-stuff proto-classoid dd option-bits))
     (when (stringp (car slot-descriptions))
       (setf (dd-doc dd) (pop slot-descriptions)))
-    (let* ((inherits
-            (if (dd-class-p dd)
-                #+sb-xc-host (!inherits-for-structure dd)
-                #-sb-xc-host
-                (let ((super (compiler-layout-or-lose (or (first (dd-include dd))
-                                                          'structure-object))))
-                  (concatenate 'simple-vector
-                               (layout-inherits super) (vector super)))))
-           (proto-classoid
-            (if (dd-class-p dd)
-                (let* ((classoid (make-structure-classoid :name (dd-name dd)))
-                       (layout (make-layout (randomish-layout-clos-hash (dd-name dd))
-                                            classoid :inherits inherits)))
-                  (setf (layout-invalid layout) nil
-                        (classoid-layout classoid) layout)
-                  classoid))))
-      ;; Bind *pending-defstruct-type* to this classoid, which fixes a problem
-      ;; when redefining a DEFTYPE which appeared to be a raw slot. e.g.
-      ;;   (DEFTYPE X () 'SINGLE-FLOAT) and later (DEFSTRUCT X (A 0 :TYPE X)).
-      ;; This is probably undefined behavior, but at least we'll not crash.
-      ;; Also make self-referential definitions not signal PARSE-UNKNOWN-TYPE
-      ;; on slots whose :TYPE option allows an instance of itself
-      (flet ((parse-slots ()
-               (dolist (slot-description slot-descriptions)
-                 (parse-1-dsd dd slot-description))))
-        (if (dd-class-p dd)
-            (progn
-              (when (info :type :kind (dd-name dd))
-                ;; It could be buried anywhere in a complicated type expression.
-                ;; There's no way to clear selectively, so just flush the cache.
-                (values-specifier-type-cache-clear))
-              (let ((*pending-defstruct-type* proto-classoid))
-                (parse-slots)))
-            (parse-slots)))
-      (values proto-classoid inherits))))
+    (dolist (slot-description slot-descriptions)
+      (parse-1-dsd proto-classoid dd slot-description))
+    (values proto-classoid inherits)))
 
 ;;;; stuff to parse slot descriptions
 
 ;;; Parse a slot description for DEFSTRUCT, add it to the description
 ;;; and return it. If supplied, INCLUDED-SLOT is used to get the default,
 ;;; type, and read-only flag for the new slot.
-(defun parse-1-dsd (defstruct spec &optional included-slot
+(defun parse-1-dsd (proto-classoid defstruct spec &optional included-slot
                     &aux accessor-name (always-boundp t) (safe-p t)
                          rsd-index index)
   #-sb-xc-host (declare (muffle-conditions style-warning))
@@ -867,7 +859,8 @@ unless :NAMED is also specified.")))
           (t
            ;; Compute the index of this DSD. First decide whether the slot is raw.
            (setf rsd-index (and (eq (dd-type defstruct) 'structure)
-                                (structure-raw-slot-data-index type)))
+                                (structure-raw-slot-data-index
+                                 type proto-classoid)))
            (let ((n-words
                   (if rsd-index
                       (let ((rsd (svref *raw-slot-data* rsd-index)))
@@ -914,23 +907,29 @@ unless :NAMED is also specified.")))
 ;;; When a value of type TYPE is stored in a structure, should it be
 ;;; stored in a raw slot?  Return the index of the matching RAW-SLOT-DATA
 ;;; if TYPE should be stored in a raw slot, or NIL if not.
-(defun structure-raw-slot-data-index (type)
+(defun structure-raw-slot-data-index (slot-type proto-classoid)
   ;; If TYPE isn't a subtype of NUMBER, it can't go in a raw slot.
   ;; In the negative case (which is most often), doing 1 SUBTYPEP test
   ;; beats doing 5 or 6.
-  ;; During self-build, first test whether the type can hold NIL,
-  ;; as it avoid a bootstrapping problem. But before testing that,
-  ;; check that the type is fully defined, as otherwise it requires
-  ;; extra complexity in CROSS-TYPEP.
-  ;; Skip it normally, since SUBTYPEP NUMBER is sufficient.
-  (when (and #+sb-xc-host (not (sb-xc:typep nil type))
-             (sb-xc:subtypep type 'number)
-             ;; FIXNUMs and smaller go in tagged slots, not raw slots
-             (not (sb-xc:subtypep type 'fixnum)))
-    (dotimes (i (length *raw-slot-data*))
-      (let ((data (svref *raw-slot-data* i)))
-        (when (sb-xc:subtypep type (raw-slot-data-raw-type data))
-          (return i))))))
+
+  ;; First test whether the type can hold NIL. This avoids a bootstrapping
+  ;; problem involving forward references to undefined types,
+  ;; because we want never to pass unknown types into CROSS-TYPEP.
+  ;; But also, don't call SB-XC:TYPEP on a type-specifier because it does
+  ;; not receive a type-context which specifies the proto-classoid.
+  #+sb-xc-host
+  (when (and (typep slot-type '(cons (eql or))) (member 'null slot-type))
+    (return-from structure-raw-slot-data-index nil))
+
+  (let* ((context (make-type-context slot-type proto-classoid nil))
+         (ctype (specifier-type slot-type context))) ; Parse once only
+    (when (and (csubtypep ctype (specifier-type 'number))
+               ;; FIXNUMs and smaller go in tagged slots, not raw slots
+               (not (csubtypep ctype (specifier-type 'fixnum))))
+      (dotimes (i (length *raw-slot-data*))
+        (let ((data (svref *raw-slot-data* i)))
+          (when (csubtypep ctype (specifier-type (raw-slot-data-raw-type data)))
+            (return i)))))))
 
 (defun typed-structure-info-or-lose (name)
   (or (info :typed-structure :info name)
@@ -938,7 +937,7 @@ unless :NAMED is also specified.")))
 
 ;;; Process any included slots pretty much like they were specified.
 ;;; Also inherit various other attributes.
-(defun frob-dd-inclusion-stuff (dd option-bits)
+(defun frob-dd-inclusion-stuff (proto-classoid dd option-bits)
   (destructuring-bind (included-name &rest modified-slots) (dd-include dd)
     (let* ((type (dd-type dd))
            (included-structure
@@ -1006,7 +1005,7 @@ unless :NAMED is also specified.")))
                            (dsd-index included-slot))
                      (dd-inherited-accessor-alist dd)
                      :test #'eq :key #'car))
-          (let ((new-slot (parse-1-dsd dd modified included-slot)))
+          (let ((new-slot (parse-1-dsd proto-classoid dd modified included-slot)))
             (when (and (dsd-safe-p included-slot) (not (dsd-safe-p new-slot)))
               ;; XXX: notify?
               )))))))
@@ -1892,7 +1891,7 @@ or they must be declared locally notinline at each call site.~@:>"
                          (if (eq type t) initform `(the ,type ,initform)))))
                  (dd-slots dd))))))))))
 
-(defun accessor-definitions (dd *pending-defstruct-type*)
+(defun accessor-definitions (dd)
   (loop for dsd in (dd-slots dd)
         for accessor-name = (dsd-accessor-name dsd)
         unless (accessor-inherited-data accessor-name dd)
@@ -2052,11 +2051,7 @@ or they must be declared locally notinline at each call site.~@:>"
     `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
            (%compiler-defstruct ',dd ',(!inherits-for-structure dd)))
-         ;; None of the alternate-metaclass structures allow specifying a type
-         ;; for any of their slots, so one of the reasons for passing a classoid
-         ;; to ACCESSOR-DEFINITIONS is irrelevant. The other reason, redefinition,
-         ;; is not even possible. But we have to pass something.
-         ,@(accessor-definitions dd (make-undefined-classoid class-name))
+         ,@(accessor-definitions dd)
          ,@(when constructor
              `((defun ,constructor (,@slot-names &aux (object ,raw-maker-form))
                  ,@(mapcar (lambda (dsd)
