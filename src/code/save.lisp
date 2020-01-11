@@ -388,8 +388,9 @@ sufficiently motivated to do lengthy fixes."
                     ;; ctype, because that's already a canonical object.
                     (not (minusp (type-hash-value part)))))
              (coalesce (type &aux
-                             ;; Deal with ctypes instances whose unparser fails.
-                             (spec (ignore-errors (type-specifier type))))
+                               ;; Deal with ctypes instances whose unparser fails.
+                               (spec (and (not (contains-unknown-type-p type))
+                                          (ignore-errors (type-specifier type)))))
                ;; There are ctypes that unparse to the same s-expression
                ;; but are *NOT* TYPE=. Some examples:
                ;;   classoid LIST  vs UNION-TYPE LIST  = (OR CONS NULL)
