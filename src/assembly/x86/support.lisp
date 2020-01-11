@@ -30,7 +30,7 @@
      (values
       `((inst call (make-fixup ',name :assembly-routine)))
       nil))
-    (:full-call
+    ((:full-call :full-call-no-return)
      (values
       `((note-this-location ,vop :call-site)
         (inst call (make-fixup ',name :assembly-routine))
@@ -44,4 +44,4 @@
     (:full-call
      `((inst clc)
        (inst ret)))
-    (:none)))
+    ((:none :full-call-no-return))))

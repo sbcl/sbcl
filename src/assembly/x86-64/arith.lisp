@@ -72,9 +72,13 @@
 
                  (:res res (descriptor-reg any-reg) rdx-offset)
 
-                 (:temp rax unsigned-reg rax-offset)
+                 ;; + and - can make do with only 1 temp.
+                 ;; RCX is always needed for lisp call.
+                 ,@(if (eq fun '*)
+                       '((:temp rax unsigned-reg rax-offset)))
                  (:temp rcx unsigned-reg rcx-offset))
-                (both-fixnum-p rax x y)
+                ;; AL encodes in one byte less than CL
+                (both-fixnum-p ,(if (eq fun '*) 'rax 'rcx) x y)
                 (inst jmp :nz DO-STATIC-FUN)    ; no - do generic
 
                 ,@body

@@ -16,7 +16,7 @@
 (macrolet ((define-generic-arith-routine ((fun cost) &body body)
              `(define-assembly-routine (,(symbolicate "GENERIC-" fun)
                                         (:cost ,cost)
-                                        (:return-style :full-call)
+                                        (:return-style :full-call-no-return)
                                         (:translate ,fun)
                                         (:policy :safe)
                                         (:save-p t))
@@ -25,12 +25,16 @@
 
                  (:res res (descriptor-reg any-reg) edx-offset)
 
-                 (:temp eax unsigned-reg eax-offset)
+                 ,@(if (eq fun '*)
+                       '((:temp eax unsigned-reg eax-offset)))
                  (:temp ecx unsigned-reg ecx-offset))
 
-                (inst mov ecx x)
-                (inst or ecx y)
-                (inst test ecx fixnum-tag-mask)  ; both fixnums?
+                ,@(multiple-value-bind (reg byte)
+                      (if (eq fun '*) (values 'eax 'al-tn) (values 'ecx 'cl-tn))
+                    `((inst mov ,reg x)
+                      (inst or ,reg y)
+                      (inst test ,byte fixnum-tag-mask))) ; both fixnums?
+
                 (inst jmp :nz DO-STATIC-FUN)     ; no - do generic
 
                 ,@body
