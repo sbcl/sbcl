@@ -339,6 +339,10 @@
 
 (defmacro sb-format:tokens (string) string)
 
+(defmacro sb-thread::with-recursive-system-lock ((lock) &body body)
+  (declare (ignore lock))
+  `(progn ,@body))
+
 ;;; Used by our lockfree memoization functions (define-hash-cache)
 (defmacro sb-thread:barrier ((kind) &body body)
   (declare (ignore kind))

@@ -75,7 +75,7 @@ any time."
        #'with-system-mutex-thunk
        ,mutex)))
 
-;; Similar to above. The host doesn't need this one at all.
+;; Similar to above.
 #-sb-xc-host
 (defmacro with-recursive-system-lock ((lock) &body body)
   `(dx-flet ((recursive-system-lock-thunk () ,@body))

@@ -839,6 +839,21 @@
   (proto-classoid nil :read-only t)
   (cacheable t))
 
+;;; Maintain a table of symbols designating unknown types that have any references
+;;; to them, making it easy to inquire whether such things exist. This is at a lower
+;;; layer than the parser cache - it's a cache of the constructor itself - so we'll
+;;; sitll signal that an unknown specifier is unknown on each reparse of the same.
+;;; But as long as any reference enlivens the relevant CTYPE, we'll return that object.
+(defglobal **unknown-type-atoms**
+    ;; I think it's safe to say that if the host is SBCL, we can employ a weak table.
+    ;; SBCL has had weak tables since Sep 2006 (git rev 1479483c5f).
+    ;; For other hosts, just use an ordinary hash-table.
+    ;; This table isn't specified as synchronized because we need to wrap the lock
+    ;; around a read/modify/write. GETHASH and PUTHASH can't do that themselves.
+    ;; Not that it would matter anyway - weak tables are always synchronized.
+    (let ((weakness #+(or (not sb-xc-host) host-quirks-sbcl) '(:weakness :value)))
+      (apply #'make-hash-table :test 'eq weakness)))
+
 ;;; Parsing of type specifiers comes in many variations:
 ;;;  SINGLE-VALUE-SPECIFIER-TYPE:
 ;;;    disallow VALUES even if single value, but allow *
@@ -902,7 +917,14 @@
     (signal 'parse-unknown-type :specifier spec)
   UNKNOWN
     (setf (type-context-cacheable context) nil)
-    (return (make-unknown-type :specifier spec))))
+    (return (if (atom spec)
+                (let ((table **unknown-type-atoms**))
+                  (sb-thread::with-recursive-system-lock ((sb-impl::hash-table-lock table))
+                    (or (gethash spec table)
+                        (progn #+sb-xc-host (format t "~&; NEW UNKNOWN-TYPE ~S~%" spec)
+                               (setf (gethash spec table)
+                                     (make-unknown-type :specifier spec))))))
+                (make-unknown-type :specifier spec)))))
 
 (defun basic-parse-typespec (type-specifier context)
   (declare (type type-context context))
