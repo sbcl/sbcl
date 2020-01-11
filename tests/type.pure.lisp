@@ -607,6 +607,16 @@
                              (and array (not simple-array))))))
                  (specifier-type 'simple-string))))
 
+(with-test (:name :values-*-illegal)
+  (dolist (x '((values *)
+               (values *)
+               (values * bit)
+               (values bit *)
+               (values bit &optional *)
+               (values bit &rest *)
+               (values bit &rest *)))
+    (assert-error (sb-kernel:values-specifier-type x))))
+
 (with-test (:name :classoids-as-type-specifiers)
   (dolist (classoid (list (find-classoid 'integer)
                           (find-class 'integer)))

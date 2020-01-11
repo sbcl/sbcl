@@ -118,9 +118,17 @@
                                        (subseq optional 0 (1+ last-not-rest))))
                                 rest))))
 
-;; CONTEXT is the cookie passed down from the outermost surrounding call
-;; of VALUES-SPECIFIER-TYPE. INNER-CONTEXT-KIND is an indicator of whether
-;; we are currently parsing a FUNCTION or a VALUES compound type specifier.
+;;; CONTEXT is the cookie passed down from the outermost surrounding call
+;;; of BASIC-PARSE-TYPE. INNER-CONTEXT-KIND is an indicator of whether
+;;; we are currently parsing a FUNCTION or a VALUES compound type specifier.
+
+;;; Why do we allow * for items in a list for FUNCTION type? I don't know
+;;; and I don't think we should.
+;;; VALUES is quite clear that it's not allowed. FUNCTION is less clear,
+;;; but * is not a type specifier, it is merely a way to write something in a place
+;;; where a specifier requires a positional argument that you don't want to supply,
+;;; but must supply in order to supply following arguments.
+;;; I would bet we're overly permissive.
 (defun parse-args-types (context lambda-listy-thing inner-context-kind)
   (multiple-value-bind (llks required optional rest keys)
       (parse-lambda-list
@@ -131,12 +139,15 @@
                  (:function-type (lambda-list-keyword-mask
                                   '(&optional &rest &key &allow-other-keys))))
        :silent t)
-   (flet ((parse-list (list)
-            (mapcar (lambda (x) (single-value-specifier-type x context))
-                    list)))
+   (labels ((parse-list (list) (mapcar #'parse-one list))
+            (parse-one (x)
+              (if (eq inner-context-kind :function-type)
+                  (single-value-specifier-type x context) ; allow *
+                  ;; "* is not permitted as an argument to the VALUES type specifier."
+                  (specifier-type x context 'values)))) ; forbid *
     (let ((required (parse-list required))
           (optional (parse-list optional))
-          (rest (when rest (single-value-specifier-type (car rest) context)))
+          (rest (when rest (parse-one (car rest))))
           (keywords
            (collect ((key-info))
              (dolist (key keys)
@@ -1005,19 +1016,33 @@
 
 ;;; This is like VALUES-SPECIFIER-TYPE, except that we guarantee to
 ;;; never return a VALUES type.
-(defun specifier-type (type-specifier &optional context)
+;;; CONTEXT is either an instance of TYPE-CONTEXT or NIL.
+;;; SUBCONTEXT is a symbol denoting the head of the current expression, or NIL.
+(defun specifier-type (type-specifier &optional context subcontext)
   (let ((ctype
          (if context
              (basic-parse-typespec type-specifier context)
              (dx-let ((context (make-type-context type-specifier)))
                (basic-parse-typespec type-specifier context)))))
     (when (values-type-p ctype)
-      ;; It bothers me that we print a message implying that * is a values type
-      ;; (in places it can't be used). Is there something else we could say
-      ;; instead such as "* is illegal as a type specifier"?
-      (error "VALUES type illegal in this context:~% ~
+      ;; We have to see how it was spelled to give an intelligent message.
+      ;; If it's instance of VALUES-TYPE, then it was spelled as VALUES
+      ;; whereas if it isn't, the user either spelled it as (VALUES) or *.
+      ;; The case where this heuristic doesn't work is a DEFTYPE that expands
+      ;; to *, but that's not worth worrying about.
+      (cond ((or (%values-type-p ctype) (consp type-specifier))
+             (error "VALUES type illegal in this context:~% ~
                ~/sb-impl:print-type-specifier/"
-             type-specifier))
+                  type-specifier))
+            (subcontext
+             (error "* is not permitted as an argument to the ~S type specifier"
+                    subcontext))
+            (t
+             (error "* is not permitted as a type specifier~@[ in the context ~S~]"
+                    ;; If the entire surrounding context is * then there's not much
+                    ;; else to say. Otherwise, show the original expression.
+                    (when (and context (neq (type-context-spec context) '*))
+                      (type-context-spec context))))))
     ctype))
 
 (defun single-value-specifier-type (x &optional context)
@@ -1028,9 +1053,9 @@
 ;;; Parse TYPE-SPECIFIER, returning NIL if any sub-part of it is unknown
 (defun type-or-nil-if-unknown (type-specifier &optional allow-values)
   (dx-let ((context (make-type-context type-specifier)))
-    (let ((result (basic-parse-typespec type-specifier context)))
-      (when (and (not allow-values) (values-type-p result))
-        (error "VALUES type illegal in this context:~%  ~S" type-specifier))
+    (let ((result (if allow-values
+                      (basic-parse-typespec type-specifier context)
+                      (specifier-type type-specifier context))))
       ;; If it was non-cacheable, either it contained a deprecated type
       ;; or unknown type, or was a pending defstruct definition.
       (if (and (not (type-context-cacheable context))

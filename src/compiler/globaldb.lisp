@@ -282,7 +282,7 @@
   :type-spec (or null deprecation-info))
 
 ;;; Why are these here? It seems like the wrong place.
-(declaim (ftype (sfunction (t &optional t) ctype) specifier-type)
+(declaim (ftype (sfunction (t &optional t symbol) ctype) specifier-type)
          (ftype (sfunction (t) ctype) ctype-of sb-kernel::ctype-of-array))
 
 ;;; the ASSUMED-TYPE for this function, if we have to infer the type

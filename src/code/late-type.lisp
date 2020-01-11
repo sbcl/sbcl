@@ -550,13 +550,11 @@
   (translate-fun-type context args result :designator t))
 
 (def-type-translator values :list ((:context context) &rest values)
-  (if (eq values '*)
-      *wild-type*
-      (multiple-value-bind (llks required optional rest)
-          (parse-args-types context values :values-type)
-        (if (plusp llks)
-            (make-values-type :required required :optional optional :rest rest)
-            (make-short-values-type required)))))
+  (multiple-value-bind (llks required optional rest)
+      (parse-args-types context values :values-type)
+    (if (plusp llks)
+        (make-values-type :required required :optional optional :rest rest)
+        (make-short-values-type required))))
 
 ;;;; VALUES types interfaces
 ;;;;
@@ -1619,6 +1617,8 @@
       (values nil nil)))
 
 (def-type-translator satisfies :list (&whole whole predicate-name)
+  ;; "* may appear as the argument to a SATISFIES type specifier, but it
+  ;;  indicates the literal symbol *" (which in practice is not useful)
   (unless (symbolp predicate-name)
     (error 'simple-type-error
            :datum predicate-name
@@ -1805,7 +1805,8 @@
   (type= (negation-type-type type1) (negation-type-type type2)))
 
 (def-type-translator not :list ((:context context) typespec)
-  (type-negation (specifier-type typespec context)))
+  ;; "* is not permitted as an argument to the NOT type specifier."
+  (type-negation (specifier-type typespec context 'not)))
 
 ;;;; numeric types
 
@@ -3017,6 +3018,8 @@ used for a COMPLEX component.~:@>"
       (values nil t)))
 
 (def-type-translator member :list (&rest members)
+  ;; "* may appear as an argument to a MEMBER type specifier, but it indicates the
+  ;;  literal symbol *, and does not represent an unspecified value."
   (if members
       (let (ms numbers char-codes)
         (dolist (m (remove-duplicates members))
@@ -3190,7 +3193,8 @@ used for a COMPLEX component.~:@>"
                      (type-intersection accumulator union))))))))
 
 (def-type-translator and :list ((:context context) &rest type-specifiers)
-  (%type-intersection (mapcar (lambda (x) (specifier-type x context))
+  ;; "* is not permitted as an argument to the AND type specifier."
+  (%type-intersection (mapcar (lambda (x) (specifier-type x context 'and))
                               type-specifiers)))
 
 ;;;; union types
@@ -3447,7 +3451,8 @@ used for a COMPLEX component.~:@>"
                                (type-intersection type1 t2))))))))
 
 (def-type-translator or :list ((:context context) &rest type-specifiers)
-  (let ((type (%type-union (mapcar (lambda (x) (specifier-type x context))
+  ;; "* is not permitted as an argument to the OR type specifier."
+  (let ((type (%type-union (mapcar (lambda (x) (specifier-type x context 'or))
                                    type-specifiers))))
     (if (union-type-p type)
         (sb-kernel::simplify-array-unions type)
