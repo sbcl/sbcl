@@ -39,7 +39,10 @@
             .
             ,(named-lambda "MAYBE-MUFFLE" (warning)
                (when (muffle-warning-p warning)
-                 (muffle-warning warning))))))))
+                 (muffle-warning warning))))
+           (,(find-classoid-cell 'step-condition)
+            .
+            sb-impl::invoke-stepper)))))
 
 (defmethod print-object ((restart restart) stream)
   (if *print-escape*

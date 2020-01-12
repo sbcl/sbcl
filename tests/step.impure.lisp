@@ -299,36 +299,28 @@
     (assert (equal expected (reverse results)))))
 
 (with-test (:name :step-into)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-into)))
+  (test-step-into))
 
 (with-test (:name :step-next)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-      (test-step-next)))
+  (test-step-next))
 
 (with-test (:name :step-out)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-out)))
+  (test-step-out))
 
 (with-test (:name :step-start-from-break)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-start-from-break)))
+  (test-step-start-from-break))
 
 (with-test (:name :step-frame)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-frame)))
+  (test-step-frame))
 
 (with-test (:name :step-backtrace)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-backtrace)))
+  (test-step-backtrace))
 
 (with-test (:name :step-next/2)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-next/2)))
+  (test-step-next/2))
 
 (with-test (:name :step-out/2)
-  (handler-bind ((step-condition #'sb-impl::invoke-stepper))
-    (test-step-out/2)))
+  (test-step-out/2))
 
 (with-test (:name :static-fun-step)
   (handler-bind ((step-form-condition
