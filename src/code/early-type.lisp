@@ -937,17 +937,23 @@
                                      (make-unknown-type :specifier spec))))))
                 (make-unknown-type :specifier spec)))))
 
+;;; BASIC-PARSE-TYPESPEC can grok some simple cases that involve turning an object
+;;; used as a type specifier into an internalized type object (which might be
+;;; the selfsame object, in the case of a CLASSOID).
 (defun basic-parse-typespec (type-specifier context)
   (declare (type type-context context))
-  (flet ((classoid-to-ctype (classoid)
-           ;; Hmm, perhaps this should signal PARSE-UNKNOWN-TYPE
-           ;; if CLASSOID is an instance of UNDEFINED-CLASSOID ?
-           ;; Can that happen?
-           (or (and (built-in-classoid-p classoid)
-                    (built-in-classoid-translation classoid))
-               classoid)))
-
-    (when (typep type-specifier 'instance)
+  (when (typep type-specifier 'instance)
+    ;; An instance never needs the type parser cache, because it almost always
+    ;; represents itself or a slot in itself.
+    (flet ((classoid-to-ctype (classoid)
+             ;; A few classoids have translations,
+             ;; e.g. the classoid CONS is a CONS-TYPE.
+             ;; Hmm, perhaps this should signal PARSE-UNKNOWN-TYPE
+             ;; if CLASSOID is an instance of UNDEFINED-CLASSOID ?
+             ;; Can that happen?
+             (or (and (built-in-classoid-p classoid)
+                      (built-in-classoid-translation classoid))
+                 classoid)))
       (return-from basic-parse-typespec
        (cond ((classoid-p type-specifier) (classoid-to-ctype type-specifier))
              ;; Avoid TYPEP on SB-MOP:EQL-SPECIALIZER and CLASS because
@@ -957,34 +963,36 @@
              ;; Moreover, we don't require the host to support MOP.
              #-sb-xc-host
              ((sb-pcl::classp type-specifier)
+              ;; A CLOS class is translated to its CLASSOID, or the classoid's translation.
               (classoid-to-ctype (sb-pcl::class-classoid type-specifier)))
              #-sb-xc-host
              ((sb-pcl::eql-specializer-p type-specifier)
-              ;; FIXME: these aren't always cached. Should they be?
-              ;; It seems so, as "parsing" constructs a new object.
-              ;; Perhaps better, the EQL specializer itself could store
-              ;; (by memoizing, if not precomputing) a CTYPE
-              (make-eql-type (sb-mop:eql-specializer-object type-specifier)))
-             (t (fail type-specifier)))))
-
-    (when (atom type-specifier)
-      ;; Try to bypass the cache, which avoids using a cache line for standard
-      ;; atomic specifiers. This is a trade-off- cache seek might be faster,
-      ;; but this solves the problem that a full call to (TYPEP #\A 'FIXNUM)
-      ;; consed a cache line every time the cache missed on FIXNUM (etc).
-      (awhen (info :type :builtin type-specifier)
+              ;; EQL specializers are are seldom used and not 100% portable,
+              ;; though they are part of the AMOP.
+              ;; See https://sourceforge.net/p/sbcl/mailman/message/11217378/
+              ;; We implement the notion that an EQL-SPECIALIZER has-a CTYPE.
+              ;; A cleverer way would be to say that EQL-SPECIALIZER is-a CTYPE,
+              ;; but that would involve far-reaching and unnecessary changes.
+              (sb-pcl::eql-specializer-to-ctype type-specifier))
+             (t (fail type-specifier))))))
+  (when (atom type-specifier)
+    ;; Try to bypass the cache, which avoids using a cache line for standard
+    ;; atomic specifiers. This is a trade-off- cache seek might be faster,
+    ;; but this solves the problem that a full call to (TYPEP #\A 'FIXNUM)
+    ;; consed a cache line every time the cache missed on FIXNUM (etc).
+    (awhen (info :type :builtin type-specifier)
         (return-from basic-parse-typespec it)))
 
-    ;; If CONTEXT was non-cacheable as supplied, the cache is bypassed
-    ;; for any nested lookup, and we don't insert the result.
-    (if (not (type-context-cacheable context))
-        (%parse-type (uncross type-specifier) context)
-        ;; Otherwise, try for a cache hit first, and usually update the cache.
-        (!values-specifier-type-memo-wrapper
-         (lambda ()
-           (let ((answer (%parse-type (uncross type-specifier) context)))
-             (if (type-context-cacheable context)
-                 answer
+  ;; If CONTEXT was non-cacheable as supplied, the cache is bypassed
+  ;; for any nested lookup, and we don't insert the result.
+  (if (not (type-context-cacheable context))
+      (%parse-type (uncross type-specifier) context)
+      ;; Otherwise, try for a cache hit first, and usually update the cache.
+      (!values-specifier-type-memo-wrapper
+       (lambda ()
+         (let ((answer (%parse-type (uncross type-specifier) context)))
+           (if (type-context-cacheable context)
+               answer
                  ;; Lookup was cacheable, but result isn't.
                  ;; Non-caching ensures that we see every occurrence of an unknown
                  ;; type no matter how deeply nested it is in the expression.
@@ -1000,12 +1008,12 @@
                  ;; DISASSEM-STATE comes from building **TYPE-SPEC-INTERR-SYMBOLS**
                  ;; where we have a fixed list of types which get assigned single-byte
                  ;; error codes.
-                 (progn
+               (progn
                    #+nil
                    (unless (type-context-cacheable context)
                      (format t "~&non-cacheable: ~S ~%" type-specifier))
                    (return-from basic-parse-typespec answer)))))
-         type-specifier))))
+       type-specifier)))
 ) ; end MACROLET
 
 ;;; This takes no CONTEXT (which implies lack of recursion) because

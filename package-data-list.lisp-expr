@@ -3472,7 +3472,7 @@ SBCL itself"
  (sb-mop:class-finalized-p
   sb-mop:class-prototype
   sb-mop:class-slots
-  sb-mop:eql-specializer-object
+  sb-pcl::eql-specializer-to-ctype
   sb-mop:finalize-inheritance
   sb-mop:generic-function-name
   (setf sb-mop:generic-function-name)
