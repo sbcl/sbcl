@@ -189,6 +189,7 @@
     ;;   4 words for ALLOC-XSET
     ;;   1 cons in MAKE-EQL-TYPE
     ;;   1 cons in ADD-TO-XSET
+    #-interpreter
     (ctu:assert-no-consing (typep 4.0 spec))))
 
 ;;; BUG #334, relating to programmatic addition of slots to a class
