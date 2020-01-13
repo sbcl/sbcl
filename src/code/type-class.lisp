@@ -352,9 +352,24 @@
 
 (defmacro define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
-  (let ((name (symbolicate class "-" method "-TYPE-METHOD")))
+  (let ((name (symbolicate class "-" method "-TYPE-METHOD"))
+        (arg-restriction
+          (case class
+           (classoid 'classoid)
+           (number 'numeric-type)
+           (function 'fun-type)
+           (alien 'alien-type-type)
+           ;; hairy could reparse the specifier into anything
+           (hairy (if (eq method :simple-subtypep) t 'hairy-type))
+           (t (symbolicate class "-TYPE")))))
     `(progn
        (defun ,name ,lambda-list
+         ,@(cond ((member method '(:unparse :negate :singleton-p))
+                  `((declare (type ,arg-restriction ,(car lambda-list)))))
+                 ((and (member method '(:simple-intersection2 :simple-union2
+                                        :simple-subtypep :simple-=))
+                       (not more-methods))
+                  `((declare (type ,arg-restriction ,(car lambda-list) ,(cadr lambda-list))))))
          ,@body)
        (!cold-init-forms
         ,@(mapcar (lambda (method)
