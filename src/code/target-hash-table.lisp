@@ -656,11 +656,12 @@ multiple threads accessing the same hash-table without locking."
           (setf (aref next-vector i) (aref index-vector bucket)
                 (aref index-vector bucket) i))))
 
-(defun rehash (kv-vector hash-vector index-vector next-vector
+(defun rehash (kv-vector hash-vector index-vector next-vector table
                &aux (mask (1- (length index-vector)))
                     (next-free 0)
                     (hwm (kv-vector-high-water-mark kv-vector)))
   (declare (simple-vector kv-vector))
+  (declare (ignorable table))
   (if hash-vector
       ;; Scan backwards so that chains are in ascending index order.
       (do ((i hwm (1- i))) ((zerop i))
@@ -831,7 +832,7 @@ multiple threads accessing the same hash-table without locking."
              :start1 2 :start2 2 :end2 (* 2 (1+ hwm)))
 
     (let ((next-free (rehash new-kv-vector new-hash-vector
-                             new-index-vector new-next-vector)))
+                             new-index-vector new-next-vector table)))
       (setf (hash-table-pairs table)        new-kv-vector
             (hash-table-hash-vector table)  new-hash-vector
             (hash-table-index-vector table) new-index-vector
@@ -1144,7 +1145,8 @@ nnnn 1_    any       linear scan
                (setf (hash-table-next-free-kv hash-table)
                      (rehash kv-vector (hash-table-hash-vector hash-table)
                              (fill (hash-table-index-vector hash-table) 0)
-                             (hash-table-next-vector hash-table)))
+                             (hash-table-next-vector hash-table)
+                             hash-table))
                ;; Empty cells will have been placed in the ordinary freelist,
                ;; so clear the list of GC-smashed cells.
                (setf (hash-table-smashed-cells hash-table) nil)
