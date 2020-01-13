@@ -38,6 +38,7 @@ WITH_FEATURES=""
 WITHOUT_FEATURES=""
 FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
 
+perform_host_lisp_check=yes
 fancy=false
 some_options=false
 for option
@@ -92,6 +93,9 @@ do
         WITH_FEATURES="$WITH_FEATURES $FANCY_FEATURES"
         # Lower down we add :sb-thread for platforms where it can be built.
         fancy=true
+        ;;
+      --no-host-lisp-check)
+        perform_host_lisp_check=no
         ;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""
@@ -217,10 +221,13 @@ mkdir -p output
 echo "SBCL_TEST_HOST=\"$SBCL_XC_HOST\"" > output/build-config
 . output/build-config # may come out differently due to escaping
 
-if ! echo '(lisp-implementation-type)' | $SBCL_TEST_HOST; then
-    echo "No working host Common Lisp implementation."
-    echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
-    exit 1
+if $perform_host_lisp_check = yes
+then
+    if ! echo '(lisp-implementation-type)' | $SBCL_TEST_HOST; then
+        echo "No working host Common Lisp implementation."
+        echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
+        exit 1
+    fi
 fi
 
 # Running make.sh with different options without clean.sh in the middle
