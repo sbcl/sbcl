@@ -1972,45 +1972,6 @@ or they must be declared locally notinline at each call site.~@:>"
           (dd-type dd) dd-type)
     dd))
 
-;;; make !DEFSTRUCT-WITH-ALTERNATE-METACLASS compilable by the host
-;;; lisp, installing the information we need to reason about the
-;;; structures (layouts and classoids).
-;;;
-;;; FIXME: we should share the parsing and the DD construction between
-;;; this and the cross-compiler version, but my brain was too small to
-;;; get that right.  -- CSR, 2006-09-14
-#+sb-xc-host
-(defmacro !defstruct-with-alternate-metaclass
-    (class-name &key
-                (slot-names (missing-arg))
-                (constructor (missing-arg))
-                (superclass-name (missing-arg))
-                (metaclass-name (missing-arg))
-                (metaclass-constructor (missing-arg))
-                (dd-type (missing-arg)))
-
-  (declare (type (and list (not null)) slot-names))
-  (declare (type (and symbol (not null))
-                 superclass-name
-                 metaclass-name
-                 metaclass-constructor))
-  (declare (symbol constructor)) ; NIL for none
-  (declare (type (member structure funcallable-structure) dd-type))
-  (declare (ignore constructor))
-
-  (let* ((dd (make-dd-with-alternate-metaclass
-              :class-name class-name
-              :slot-names slot-names
-              :superclass-name superclass-name
-              :metaclass-name metaclass-name
-              :metaclass-constructor metaclass-constructor
-              :dd-type dd-type)))
-    `(eval-when (:compile-toplevel :load-toplevel :execute)
-       ;; COMPILER-DEFSTRUCT informs the compiler of all the
-       ;; source-transforms for slot access. They can exist
-       ;; despite lack of ftype information.
-       (%compiler-defstruct ',dd ',(!inherits-for-structure dd)))))
-
 (sb-xc:defmacro !defstruct-with-alternate-metaclass
     (class-name &key
                 (slot-names (missing-arg))
