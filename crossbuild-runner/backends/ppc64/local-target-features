@@ -1,1 +1,1 @@
-:ppc64 :unix :elf :linux :64-bit :gencgc :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :linkage-table :compare-and-swap-vops :alien-callbacks :big-endian :sb-dynamic-core
+:ppc64 :unix :elf :linux :64-bit :gencgc :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :linkage-table :compare-and-swap-vops :alien-callbacks :big-endian :sb-dynamic-core :sb-thread :sb-futex

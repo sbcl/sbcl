@@ -486,7 +486,7 @@ case "$sbcl_os" in
             x86 | x86-64)
 		printf ' :sb-futex :largefile' >> $ltf
 		;;
-            ppc | arm64)
+            ppc | ppc64 | arm64)
 		printf ' :sb-futex' >> $ltf
 		;;
         esac
