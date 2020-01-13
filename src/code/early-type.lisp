@@ -932,7 +932,9 @@
                 (let ((table **unknown-type-atoms**))
                   (sb-thread::with-recursive-system-lock ((sb-impl::hash-table-lock table))
                     (or (gethash spec table)
-                        (progn #+sb-xc-host (format t "~&; NEW UNKNOWN-TYPE ~S~%" spec)
+                        (progn #+sb-xc-host
+                               (when *compile-print*
+                                 (format t "~&; NEW UNKNOWN-TYPE ~S~%" spec))
                                (setf (gethash spec table)
                                      (make-unknown-type :specifier spec))))))
                 (make-unknown-type :specifier spec)))))

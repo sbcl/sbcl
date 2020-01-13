@@ -221,7 +221,7 @@ mkdir -p output
 echo "SBCL_TEST_HOST=\"$SBCL_XC_HOST\"" > output/build-config
 . output/build-config # may come out differently due to escaping
 
-if $perform_host_lisp_check = yes
+if [ $perform_host_lisp_check = yes ]
 then
     if ! echo '(lisp-implementation-type)' | $SBCL_TEST_HOST; then
         echo "No working host Common Lisp implementation."
