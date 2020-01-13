@@ -41,6 +41,8 @@
 ;; seals the class before the run of the cross-compiler gets to doing the declaim
 ;; because 'target-misc' is cross-compiled before 'early-full-eval' is.
 (declaim (freeze-type interpreted-function))
+(deftype compiled-function ()
+  '(and function (not interpreted-function)))
 
 (defun make-interpreted-function
       (&key name lambda-list env declarations documentation body source-location

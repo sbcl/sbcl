@@ -119,8 +119,8 @@
 (sb-xc:deftype simple-bit-vector (&optional size)
   `(simple-array bit (,size)))
 
-(sb-xc:deftype compiled-function ()
-  '(and function #+(or sb-eval sb-fasteval) (not interpreted-function)))
+#-(or sb-eval sb-fasteval)
+(sb-xc:deftype compiled-function () 'function)
 
 ;;; Stub type in case there are no interpreted functions
 #-(or sb-eval sb-fasteval) (sb-xc:deftype interpreted-function () nil)

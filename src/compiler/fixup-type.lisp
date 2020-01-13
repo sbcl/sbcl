@@ -10,3 +10,8 @@
       sb-vm:*specialized-array-element-type-properties*))
 
 (!defun-from-collected-cold-init-forms !fixup-type-cold-init)
+
+#-sb-xc-host
+(let ((spec 'compiled-function))
+  (setf (info :type :builtin spec) (specifier-type spec)
+        (info :type :kind spec) :primitive))

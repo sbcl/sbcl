@@ -236,9 +236,8 @@
                        spec
                        (if (member :sb-xc sb-xc:*features*)
                            ;; If :sb-xc is present, then we're cross-compiling.
-                           ;; While there may be other unknown types parsed, CROSS-TYPEP
-                           ;; should never see anything except INTERPRETED-FUNCTION.
-                           '(interpreted-function)
+                           ;; CROSS-TYPEP should not see any unknowns.
+                           '()
                            ;; If :sb-xc is absent, then we're either running CL:COMPILE
                            ;; or CL:LOAD in make-host-1.
                            ;; It is permissible to make forward references to the following

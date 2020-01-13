@@ -36,7 +36,8 @@
 (/show0 "precomputing built-in symbol type specifiers")
 (!precompute-types
  (remove-if (lambda (x)
-              (memq x '(hash-table package pathname random-state readtable)))
+              (memq x '(compiled-function hash-table package pathname
+                        random-state readtable)))
             *!standard-type-names*))
 
 #+sb-xc-host (setf *type-system-initialized* t)
