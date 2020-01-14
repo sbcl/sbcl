@@ -363,37 +363,22 @@
   (declare (type component component))
   (aver-live-component component)
   (loop
-    (let* ((new-functional (pop (component-new-functionals component)))
-           (functional (or new-functional
-                           (pop (component-reanalyze-functionals component)))))
-      (unless functional
+    (let* ((new (pop (component-new-functionals component)))
+           (fun (or new (pop (component-reanalyze-functionals component)))))
+      (unless fun
         (return))
-      (let ((kind (functional-kind functional)))
-        (cond ((or (functional-somewhat-letlike-p functional)
-                   (memq kind '(:deleted :zombie)))
-               (values)) ; nothing to do
-              ((and (null (leaf-refs functional)) (eq kind nil)
-                    (not (functional-entry-fun functional)))
-               (delete-functional functional))
+      (let ((kind (functional-kind fun)))
+        (cond ((or (functional-somewhat-letlike-p fun)
+                   (memq kind '(:deleted :zombie))))
+              ((and (null (leaf-refs fun)) (eq kind nil)
+                    (not (functional-entry-fun fun)))
+               (delete-functional fun))
               (t
-               ;; Fix/check FUNCTIONAL's relationship to COMPONENT-LAMDBAS.
-               (cond ((not (lambda-p functional))
-                      ;; Since FUNCTIONAL isn't a LAMBDA, this doesn't
-                      ;; apply: no-op.
-                      (values))
-                     (new-functional ; FUNCTIONAL came from
-                                     ; NEW-FUNCTIONALS, hence is new.
-                      ;; FUNCTIONAL becomes part of COMPONENT-LAMBDAS now.
-                      (aver (not (member functional
-                                         (component-lambdas component))))
-                      (push functional (component-lambdas component)))
-                     (t ; FUNCTIONAL is old.
-                      ;; FUNCTIONAL should be in COMPONENT-LAMBDAS already.
-                      (aver (member functional (component-lambdas
-                                                component)))))
-               (locall-analyze-fun-1 functional)
-               (when (lambda-p functional)
-                 (maybe-let-convert functional component)))))))
+               (when (and new (lambda-p fun))
+                 (push fun (component-lambdas component)))
+               (locall-analyze-fun-1 fun)
+               (when (lambda-p fun)
+                 (maybe-let-convert fun component)))))))
   (values))
 
 (defun locall-analyze-clambdas-until-done (clambdas)
