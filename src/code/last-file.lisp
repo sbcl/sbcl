@@ -40,7 +40,7 @@
                    (*print-readably* t)
                    (classoid-name (classoid-name (car pair)))
                    (*package* (cl:symbol-package classoid-name)))
-              (format output "~/print-symbol-with-prefix/ (~%" classoid-name)
+              (format output "~/sb-ext:print-symbol-with-prefix/ (~%" classoid-name)
               (dolist (dsd (dd-slots dd) (format output ")~%"))
                 (format output "  (~d ~S ~S)~%"
                         (sb-kernel::dsd-bits dsd)
