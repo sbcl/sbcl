@@ -23,3 +23,27 @@
         do (error "SB-XC:SXHASH computed wrong answer for ~S. Got ~x should be ~x"
                   object hash (sxhash object))))
 (check-compile-time-sxhashes)
+
+(eval-when (:compile-toplevel) ;; Inform genesis of all defstructs
+  (with-open-file (output (sb-cold:stem-object-path "defstructs.lisp-expr"
+                                                    '(:extra-artifact) :target-compile)
+                          :direction :output :if-exists :supersede)
+    (dolist (root '(structure-object function))
+      (dolist (pair (sort (%hash-table-alist
+                           (classoid-subclasses (find-classoid root)))
+                          #'string<
+                          ;; pair = (#<classoid> . #<layout>)
+                          :key (lambda (pair) (classoid-name (car pair)))))
+        (let ((dd (layout-info (cdr pair))))
+          (when dd
+            (let* ((*print-pretty* nil) ; output should be insensitive to host pprint
+                   (*print-readably* t)
+                   (classoid-name (classoid-name (car pair)))
+                   (*package* (cl:symbol-package classoid-name)))
+              (format output "~/print-symbol-with-prefix/ (~%" classoid-name)
+              (dolist (dsd (dd-slots dd) (format output ")~%"))
+                (format output "  (~d ~S ~S)~%"
+                        (sb-kernel::dsd-bits dsd)
+                        (dsd-name dsd)
+                        (dsd-accessor-name dsd))))))))
+    (format output ";; EOF~%")))

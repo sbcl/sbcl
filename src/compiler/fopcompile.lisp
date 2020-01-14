@@ -193,7 +193,8 @@
                   ;; as dumpable literals.
                   (and (eq function 'sb-impl::%defun) (fopcompilable-p (fourth form)))
                   (member function '(sb-pcl::!trivial-defmethod
-                                     sb-kernel::%defstruct))
+                                     sb-kernel::%defstruct
+                                     sb-thread:make-mutex))
                   ;; allow DEF{CONSTANT,PARAMETER} only if the value form is ok
                   (and (member function '(%defconstant sb-impl::%defparameter))
                        (fopcompilable-p (third form)))

@@ -137,7 +137,6 @@
  ("src/code/early-fasl" :c-headers)
 
  ("src/code/defbangstruct" :c-headers)
- ("src/code/early-thread" :c-headers)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
@@ -171,6 +170,7 @@
  ;; 'info-vector' is needed at least as early as 'fdefinition' so that the
  ;; inlined INFO-VECTOR-FDEFINITION is available to %COERCE-CALLABLE-TO-FUN.
  ("src/code/signal" :not-host)
+ ("src/code/sysmacs" :not-host)
  ("src/code/target-lfhash" :not-host)
  ("src/compiler/info-vector" :c-headers)
  ("src/compiler/globaldb" :c-headers)
@@ -178,9 +178,6 @@
  ("src/code/primordial-type" :c-headers)
  ("src/code/early-classoid" :c-headers)
  ("src/code/early-alieneval" :c-headers)  ; for funs and vars needed at build and run time
-
- ("src/code/sysmacs" :not-host)
-
  ("src/code/target-error" :not-host)
 
  ;; "src/code/toplevel.lisp" is the first to need this. It's generated

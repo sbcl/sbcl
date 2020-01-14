@@ -48,8 +48,7 @@
 ;;;; sufficient, though interaction between parallel intern and use-package
 ;;;; needs to be considered with some care.
 
-(!define-load-time-global *package-graph-lock*
-    #.(sb-thread:make-mutex :name "Package Graph Lock"))
+(!define-load-time-global *package-graph-lock* (sb-thread:make-mutex :name "Package Graph Lock"))
 
 (defmacro with-package-graph ((&key) &body forms)
   ;; FIXME: Since name conflicts can be signalled while holding the

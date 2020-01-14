@@ -225,3 +225,14 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
       (format stream "#undef size_pointer~%")
       (format stream "#undef size_unboxed~%")))
   (format stream "#endif~%"))
+
+;;; AVLNODE is primitive-object-like because it is needed by C code that looks up
+;;; entries in the tree of lisp threads.  But objdef doesn't have SB-XC:DEFSTRUCT
+;;; working, and I'm reluctant to create yet another 'something-thread' file to
+;;; put this in, not to mention that SB-THREAD is the wrong package anyway.
+(in-package "SB-THREAD")
+(sb-xc:defstruct (avlnode (:constructor avlnode (key data left right)))
+  (left  nil :read-only t)
+  (right nil :read-only t)
+  (key   0   :read-only t :type sb-vm:word)
+  data)

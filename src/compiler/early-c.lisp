@@ -153,7 +153,7 @@ the stack without triggering overflow protection.")
 ;;; Assigning a literal object enables genesis to dump and load it
 ;;; without need of a cold-init function.
 #-sb-xc-host
-(!define-load-time-global **world-lock** #.(sb-thread:make-mutex :name "World Lock"))
+(!define-load-time-global **world-lock** (sb-thread:make-mutex :name "World Lock"))
 
 #-sb-xc-host
 (define-load-time-global *static-linker-lock*

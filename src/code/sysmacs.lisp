@@ -273,3 +273,21 @@ maintained."
                (incf ,index))
               (t
                (return ,result)))))))
+
+(in-package "SB-THREAD")
+
+(defmacro with-system-mutex ((mutex &key without-gcing allow-with-interrupts)
+                                    &body body)
+  `(dx-flet ((with-system-mutex-thunk () ,@body))
+     (,(cond (without-gcing
+               'call-with-system-mutex/without-gcing)
+             (allow-with-interrupts
+              'call-with-system-mutex/allow-with-interrupts)
+             (t
+              'call-with-system-mutex))
+       #'with-system-mutex-thunk
+       ,mutex)))
+
+(defmacro with-recursive-system-lock ((lock) &body body)
+  `(dx-flet ((recursive-system-lock-thunk () ,@body))
+     (call-with-recursive-system-lock #'recursive-system-lock-thunk ,lock)))

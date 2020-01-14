@@ -426,6 +426,7 @@
 (compile 'stem-source-path)
 
 ;;; Determine the object path for a stem/flags/mode combination.
+(export 'stem-object-path)
 (defun stem-object-path (stem flags mode)
   (multiple-value-bind (obj-prefix obj-suffix)
       (ecase mode

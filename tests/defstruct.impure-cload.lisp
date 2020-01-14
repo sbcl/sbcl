@@ -49,3 +49,12 @@
     (assert (= (length layouts) 3))
     (assert (find (sb-kernel:find-layout 'sb-pretty::newline)
                   layouts))))
+
+(with-test (:name :mutex-owner-typecheck)
+  (let ((layouts
+         (ctu:find-code-constants #'(setf sb-thread::mutex-%owner)
+                                  :type 'sb-kernel:layout)))
+    ;; expect 2 layouts: one for THREAD, one for MUTEX
+    (assert (= (length layouts) 2))
+    (assert (find (sb-kernel:find-layout 'sb-thread:thread)
+                  layouts))))

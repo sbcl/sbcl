@@ -709,14 +709,23 @@
   (defun cold-layout-flags (layout)
     (descriptor-fixnum (read-slot layout *host-layout-of-layout* :flags))))
 
+(defvar *layout-deferred-instances*)
 ;; Make a structure and set the header word and layout.
 ;; LAYOUT-LENGTH is as returned by the like-named function.
 (defun allocate-struct
-    (gspace layout &optional (layout-length (cold-layout-length layout))
+    (gspace layout &optional (layout-length
+                              (etypecase layout
+                                (symbol (+ sb-vm:instance-data-start
+                                           (length (get layout 'dd-slots))))
+                                (descriptor
+                                 (cold-layout-length layout))))
                              is-layout)
   ;; Count +1 for the header word when allocating.
   (let ((des (allocate-object gspace (1+ layout-length)
                               sb-vm:instance-pointer-lowtag is-layout)))
+    (when (symbolp layout)
+      (push des (gethash layout *layout-deferred-instances*))
+      (setq layout (make-fixnum-descriptor 0)))
     ;; Length as stored in the header is the exact number of useful words
     ;; that follow, as is customary. A padding word, if any is not "useful"
     (write-header-word
@@ -1115,20 +1124,20 @@ core and return a descriptor to it."
          (sb-vm::sign-extend (read-bits-wordindexed cold-object index)
                              sb-vm:n-word-bits))))))
 
-(defun extract-dd-slots-from-core (cold-dd) ; descriptor to a defstruct-description
-  (let* ((host-dd-layout (find-layout 'defstruct-description))
-         (name (read-slot cold-dd host-dd-layout :name))
-         (slots (read-slot cold-dd host-dd-layout :slots))
-         (host-dsd-layout (find-layout 'defstruct-slot-description))
-         (result))
-    (loop while (not (cold-null slots))
-          do (let* ((dsd (cold-car slots))
-                    (name (warm-symbol (read-slot dsd host-dsd-layout :name)))
-                    (acc (warm-symbol (read-slot dsd host-dsd-layout :accessor-name)))
-                    (bits (descriptor-fixnum (read-slot dsd host-dsd-layout :bits))))
-               (push (sb-kernel::make-dsd name nil acc bits nil) result)
-               (setq slots (cold-cdr slots))))
-    (setf (get (warm-symbol name) 'dd-slots) (nreverse result))))
+(defun read-structure-definitions ()
+  (with-open-file (stream (sb-cold:stem-object-path
+                           "defstructs.lisp-expr" '(:extra-artifact) :target-compile))
+    (loop
+     (let ((ch (peek-char t stream)))
+       (when (char= ch #\;)
+         (return))
+       (let* ((classoid-name (read stream))
+             (*package* (find-package (cl:symbol-package classoid-name))))
+         (setf (get classoid-name 'dd-slots)
+               (mapcar (lambda (x)
+                         (destructuring-bind (bits name acc) x
+                           (sb-kernel::make-dsd name nil acc bits nil)))
+                       (read stream))))))))
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
@@ -1160,6 +1169,10 @@ core and return a descriptor to it."
       ;; but for type-correctness this slot needs to be a simple-vector.
      :equalp-tests *simple-vector-0-descriptor*
      :slot-list *nil-descriptor*)
+
+    (awhen (gethash name *layout-deferred-instances*)
+      (dolist (instance it (remhash name *layout-deferred-instances*))
+        (set-instance-layout instance result)))
 
     (when (member name '(null list symbol))
       ;; Assign an empty slot-table.  Why this is done only for three
@@ -2480,7 +2493,16 @@ core and return a descriptor to it."
             (let* ((des (first args))
                    (spec (if (descriptor-p des) (host-object-from-core des) des)))
               (ctype-to-core spec (funcall fun spec))))
-           (t (call fun :sb-cold-funcall-handler/for-value args)))
+           (sb-thread:make-mutex
+            (aver (eq (car args) :name))
+            (write-slots (allocate-struct *dynamic*
+                                          (gethash 'sb-thread:mutex *cold-layouts*
+                                                   'sb-thread:mutex))
+                         'sb-thread:mutex
+                         :name (cadr args)
+                         :%owner *nil-descriptor*))
+           (t
+            (call fun :sb-cold-funcall-handler/for-value args)))
           (let ((counter *load-time-value-counter*))
             (push (cold-list (cold-intern :load-time-value) fun
                              (number-to-core counter)) *!cold-toplevels*)
@@ -2495,7 +2517,6 @@ core and return a descriptor to it."
             (sb-impl::%defun (apply #'cold-fset args))
             (sb-pcl::!trivial-defmethod (apply #'cold-defmethod args))
             (sb-kernel::%defstruct
-             (extract-dd-slots-from-core (car args)) ; "Learn" the metadata
              (push args *known-structure-classoids*)
              (push (apply #'cold-list (cold-intern 'defstruct) args)
                    *!cold-toplevels*))
@@ -3569,6 +3590,7 @@ III. initially undefined function references (alphabetically):
            (*simple-vector-0-descriptor*)
            (*c-callable-fdefn-vector*)
            (*known-structure-classoids* nil)
+           (*layout-deferred-instances* (make-hash-table :test 'eq))
            (*classoid-cells* (make-hash-table :test 'eq))
            (*ctype-cache* (make-hash-table :test 'equal))
            (*cold-layouts* (make-hash-table :test 'eq)) ; symbol -> cold-layout
@@ -3594,6 +3616,7 @@ III. initially undefined function references (alphabetically):
       (initialize-layouts)
       (initialize-packages)
       (initialize-static-space tls-init)
+      (when core-file-name (read-structure-definitions))
 
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
