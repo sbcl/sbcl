@@ -191,6 +191,11 @@
 
 ;;; Try to minimize/conceal any non-standardness of the host Common Lisp.
 #-sbcl (load "src/cold/ansify.lisp")
+#+sbcl (let ((ext (find-package "SB-EXT")))
+         ;; prevent things from working by accident when they would not work in
+         ;; ANSI lisp, e.g. ~/print-symbol-with-prefix/ (missing SB-EXT:)
+         (when (member ext (package-use-list "CL-USER"))
+           (unuse-package ext "CL-USER")))
 
 ;;;; Do not put SBCL-specific things in 'ansify'. Put them here.
 ;;;; And there had better not be a reason that SBCL needs ansification.
