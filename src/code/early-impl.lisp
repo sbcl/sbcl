@@ -71,6 +71,3 @@
 an implementation of EVAL that calls the compiler will be used. If set
 to :INTERPRET, an interpreter will be used.")
 (declaim (always-bound *evaluator-mode*))
-(defvar *eval-source-context* nil)
-(defvar *eval-tlf-index* nil)
-(defvar *eval-source-info* nil)

@@ -103,3 +103,9 @@
         (if name
             (namestring name)
             nil))))
+
+(in-package "SB-IMPL")
+
+(defvar *eval-source-context* nil)
+(defvar *eval-tlf-index* nil)
+(defvar *eval-source-info* nil)
