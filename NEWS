@@ -1,11 +1,13 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.0:
+  * enhancement: CMUCL-style block compilation support has been added, allowing whole program optimization. (experimental)
   * minor incompatible change: some symbols have been removed from *FEATURES*
     based on a determination of which should be impermissible to examine
     via #+ and #- reader macros in user-written code.
   * optimization: DEFSTRUCT copiers including COPY-STRUCTURE are able to
     stack-allocate the result when declared dynamic-extent.
+  * bug fix: loop analysis code more robust. In particular, loop nesting depth is computed more accurately, improving the register allocation around loops. 
 
 changes in sbcl-2.0.0 relative to sbcl-1.5.9:
   * minor incompatible change: heap relocation now works on Windows.  Since
