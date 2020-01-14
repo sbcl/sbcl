@@ -416,3 +416,7 @@
              sb-vm::fp-complex-single-zero-sc-number))
   (assert (= (sb-vm::immediate-constant-sc (complex $0.0d0 $0.0d0))
              sb-vm::fp-complex-double-zero-sc-number)))
+
+;;; Unparse a union of (up to) 4 things depending on :sb-unicode as 2 things.
+(assert (equal (type-specifier (specifier-type '(or string null)))
+               '(or string null)))

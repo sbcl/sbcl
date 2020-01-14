@@ -3304,7 +3304,17 @@ used for a COMPLEX component.~:@>"
     ((unparse-string-type type 'simple-string))
     ((unparse-string-type type 'string))
     ((type= type (specifier-type 'complex)) 'complex)
-    (t `(or ,@(mapcar #'type-specifier (union-type-types type))))))
+    (t
+     ;; If NULL is in the union, and deleting it reduces the union to either an atom
+     ;; or a list whose head is [SIMPLE-]STRING, then return (OR X NULL).
+     ;; This simplifies (OR FLOAT NULL) and other things in the above exceptions.
+     (let ((type-without-null
+            (when (find (specifier-type 'null) (union-type-types type))
+              (type-specifier (type-difference type (specifier-type 'null))))))
+       (if (or (and (atom type-without-null) type-without-null)
+               (typep type-without-null '(cons (member string simple-string))))
+           `(or ,type-without-null null)
+           `(or ,@(mapcar #'type-specifier (union-type-types type))))))))
 
 ;;; Two union types are equal if they are each subtypes of each
 ;;; other. We need to be this clever because our complex subtypep
