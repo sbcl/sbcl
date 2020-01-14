@@ -13,11 +13,6 @@
 
 (defparameter *eval-calls* 0) ; initialized by genesis
 
-(defvar *eval-source-context* nil)
-
-(defvar *eval-tlf-index* nil)
-(defvar *eval-source-info* nil)
-
 ;;;; Turns EXPR into a lambda-form we can pass to COMPILE. Returns
 ;;;; a secondary value of T if we must call the resulting function
 ;;;; to evaluate EXPR -- if EXPR is already a lambda form, there's

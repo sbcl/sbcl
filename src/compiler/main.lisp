@@ -1716,7 +1716,10 @@ necessary, since type inference may take arbitrarily long to converge.")
            (declare (ignore error))
            (return-from sub-compile-file (values t t t))))
         (*current-path* nil)
-        (sb-xc:*gensym-counter* 0))
+        (sb-xc:*gensym-counter* 0)
+        (sb-impl::*eval-source-info* nil)
+        (sb-impl::*eval-tlf-index* nil)
+        (sb-impl::*eval-source-context* nil))
     (handler-case
         (handler-bind (((satisfies handle-condition-p) #'handle-condition-handler))
           (with-compilation-values
