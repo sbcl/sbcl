@@ -3274,6 +3274,7 @@ core and return a descriptor to it."
     (let ((sections '("assembler routines"
                       "defined functions"
                       "undefined functions"
+                      "classoids"
                       "layouts"
                       "type specifiers"
                       "symbols")))
@@ -3327,20 +3328,40 @@ III. initially undefined function references (alphabetically):
                             (t (string< a b))))
                     :key (lambda (x) (fun-name-block-name (cadr x))))))
 
-    (format t "~%~|~%IV. layout names:~2%")
+    (format t "~%~|~%IV. classoids:
+
+      CELL   CLASSOID  NAME
+========== ==========  ====~%")
+
+    (dolist (x (sort (%hash-table-alist *classoid-cells*) #'string< :key #'car))
+      (destructuring-bind (name . cell) x
+        (format t "~10,'0x ~:[          ~:;~:*~10,'0X~]  ~S~%"
+                (descriptor-bits cell)
+                (let ((classoid
+                       (read-slot cell (find-layout 'sb-kernel::classoid-cell) :classoid)))
+                  (unless (cold-null classoid) (descriptor-bits classoid)))
+                name)))
+
+    (format t "~%~|~%V. layout names:~2%")
     (dolist (x (sort-cold-layouts))
       (let* ((des (cdr x))
              (inherits (read-slot des *host-layout-of-layout* :inherits)))
         (format t "~8,'0X: ~S[~D]~%~10T~:S~%" (descriptor-bits des) (car x)
                   (cold-layout-length des) (listify-cold-inherits inherits))))
 
-    (format t "~%~|~%V. parsed type specifiers:~2%")
+    (format t "~%~|~%VI. parsed type specifiers:~2%")
     (mapc (lambda (cell)
-            (format t "~X: ~S~%" (descriptor-bits (cdr cell)) (car cell)))
+            (format t "~X: [~vx] ~S~%"
+                    (descriptor-bits (cdr cell))
+                    (* 2 sb-vm:n-word-bytes)
+                    (ldb (byte sb-vm:n-word-bits 0)
+                         (descriptor-fixnum (read-slot (cdr cell)
+                                                       'sb-kernel:ctype :hash-value)))
+                    (car cell)))
           (sort (%hash-table-alist *ctype-cache*) #'<
                 :key (lambda (x) (descriptor-bits (cdr x))))))
 
-    (format t "~%~|~%VI. symbols (numerically):~2%")
+    (format t "~%~|~%VII. symbols (numerically):~2%")
     (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
           (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
