@@ -699,7 +699,7 @@
                                       (sleep 0.1)
                                       (send-gc))))
                  threads)
-           (sleep 4))
+           (sleep 3))
       (mapc #'terminate-thread threads))))
 
 (with-test (:name :test-%thread-local-references)
