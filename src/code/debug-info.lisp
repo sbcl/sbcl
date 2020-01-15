@@ -468,7 +468,7 @@
                                                            :read-only t)
   ;; A vector of character ranges than span each subform in the TLF,
   ;; reset to empty for each one, updated by form-tracking-stream-observer.
-  (subforms nil :type (or null (vector t)) :read-only t :read-only t)
+  (subforms nil :type (or null (vector t)) :read-only t)
   ;; A list of objects about which the compile may/would/should have signaled
   ;; a style-warning in the :compile-toplevel situation, so we don't do it
   ;; again in the :load-toplevel situation.
