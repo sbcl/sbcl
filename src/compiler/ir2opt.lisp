@@ -519,6 +519,7 @@
         (next-start-vop (ir2-block-next (vop-block branch)))
         (next-start-vop (gethash label *2block-info*)))))
 
+#+(or) ;; sometimes causes the TN to be spilled, disable until it's figured out why
 (defoptimizer (vop-optimize if-eq) (if-eq)
   (when (boundp '*2block-info*)
     (let ((branch-if (vop-next if-eq)))

@@ -2656,3 +2656,11 @@
     ((44 nil nil) 45)
     ((3 2 1) 0.0)
     ((30 2 nil) 30)))
+
+(with-test (:name :if-eq-optimization-consistency)
+  (let ((sb-c::*check-consistency* t))
+    (checked-compile-and-assert
+     ()
+     `(lambda ()
+        (eval (and (if (eval 0) (eval 0) (eval 0)) t)))
+     (() t))))
