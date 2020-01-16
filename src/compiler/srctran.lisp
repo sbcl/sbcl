@@ -4359,6 +4359,10 @@
       (unless (>= alignment bits)
         (give-up-ir1-transform))
       `(ash numerator ,(- bits)))))
+
+(deftransforms (rational rationalize) ((x) (rational))
+  'x)
+
 
 ;;;; transforming APPLY
 
