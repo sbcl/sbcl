@@ -3335,7 +3335,7 @@ III. initially undefined function references (alphabetically):
 
     (dolist (x (sort (%hash-table-alist *classoid-cells*) #'string< :key #'car))
       (destructuring-bind (name . cell) x
-        (format t "~10,'0x ~:[          ~:;~:*~10,'0X~]  ~S~%"
+        (format t "~10,'0x ~:[          ~;~:*~10,'0X~]  ~S~%"
                 (descriptor-bits cell)
                 (let ((classoid
                        (read-slot cell (find-layout 'sb-kernel::classoid-cell) :classoid)))
