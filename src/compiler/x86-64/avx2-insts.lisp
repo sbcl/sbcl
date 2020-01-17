@@ -1,9 +1,5 @@
 (in-package "SB-X86-64-ASM")
 
-(defun !make-avx2-id (index)
-  (declare (type (mod 16) index))
-  (logior (ash index 3) 3))
-
 (defun get-avx2 (number)
   (svref (load-time-value
           (coerce (loop for i from 0 below 16

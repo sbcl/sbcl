@@ -1124,6 +1124,10 @@
   (declare (type (mod 16) index))
   (logior (ash index 3) 1)) ; low bit = FPR, not GPR
 
+(defun !make-avx2-id (index)
+  (declare (type (mod 16) index))
+  (logior (ash index 3) 3))
+
 (declaim (inline is-gpr-id-p gpr-id-size-class reg-id-num))
 (defun is-gpr-id-p (reg-id)
   (not (logbitp 0 reg-id)))
