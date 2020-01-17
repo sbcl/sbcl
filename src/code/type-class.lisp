@@ -25,7 +25,22 @@
 #-sb-xc
 (progn (defvar *ctype-lcg-state* 1)
        (defvar *ctype-hash-state* (make-random-state))
-       (defvar *type-classes* (make-array 20 :fill-pointer 0)))
+       ;; There are 5 bits in a type-class index, so at most 32 type-classes
+       ;; of which about 17 are currently defined.
+       (defvar *type-classes* (make-array 32 :fill-pointer 0))
+       ;; We track for each type-class whether it has any descendant class.
+       ;; Inheritance is implemented by copying the vtable from an ancestor
+       ;; to the descendant at the time the descendant is defined.
+       ;; So the following minimal example might not do what you expect:
+       ;;  (DEFINE-TYPE-CLASS ROOT)
+       ;;  (DEFINE-TYPE-CLASS CHILD :INHERITS ROOT)
+       ;;  (DEFINE-TYPE-METHOD (ROOT :SOME-METHOD) ...)
+       ;; CHILD fails to copy a pointer to SOME-METHOD.
+       ;; This is subtle and perhaps unintuitive. As such, we guard against
+       ;; it by preventing DEFINE-TYPE-METHOD after use of :INHERITS.
+       (defvar *type-class-was-inherited*
+         (make-array 32 :element-type 'bit :initial-element 0)))
+
 #+sb-xc
 (macrolet ((def ()
              (let ((classes (make-array 32 :initial-element nil))
@@ -361,6 +376,12 @@
            (hairy (if (eq method :simple-subtypep) t 'hairy-type))
            (t (symbolicate class "-TYPE")))))
     `(progn
+       #+sb-xc-host
+       (when (plusp (bit *type-class-was-inherited* (type-class-name->id ',class)))
+         ;; This disallows one case that would be ok - a method definition for
+         ;; both an ancestor and its descendants on some method.
+         ;; Too bad for you- this throws the baby out with the bathwater.
+         (error "Can't define-type-method for class ~s: already inherited" ',class))
        (defun ,name ,lambda-list
          ,@(cond ((member method '(:unparse :negate :singleton-p))
                   `((declare (type ,arg-restriction ,(car lambda-list)))))
@@ -398,13 +419,17 @@
             sb-vm:instance-pointer-lowtag)))
 
 (defmacro define-type-class (name &key inherits
-                                     (enumerable (unless inherits (must-supply-this))
+                                     (enumerable (unless inherits (missing-arg))
                                                  enumerable-supplied-p)
                                      (might-contain-other-types
-                                      (unless inherits (must-supply-this))
+                                      (unless inherits (missing-arg))
                                       might-contain-other-types-supplied-p))
   (let ((make-it
-         `(let ,(if inherits `((parent (type-class-or-lose ',inherits))))
+         `(let* ,(if inherits `((parent-index (type-class-name->id ',inherits))
+                                (parent (aref *type-classes* parent-index))))
+            #+sb-xc-host
+            ,@(when inherits
+                `((setf (bit *type-class-was-inherited* parent-index) 1)))
             (make-type-class
              :name ',name
              :enumerable-p ,(if enumerable-supplied-p
@@ -420,13 +445,12 @@
                                 (,(!type-class-fun-slot name) parent))))))))
     #+sb-xc-host
     `(progn
-       (if (find ',name *type-classes* :key #'type-class-name)
-         ;; Careful: type-classes are very complicated things to redefine.
-         ;; For the sake of parallelized make-host-1 we have to allow it
-         ;; not to be an error to get here, but we can't overwrite anything.
-         (style-warn "Not redefining type-class ~S" ',name)
-         (vector-push-extend ,make-it *type-classes*))
-       ;; I have no idea what compiler bug could be fixed by adding a form here,
+       ;; Careful: type-classes are very complicated things to redefine.
+       ;; For the sake of parallelized make-host-1 we have to allow
+       ;; redefinition, but it has to be a no-op.
+       (unless (find ',name *type-classes* :key #'type-class-name)
+         (vector-push ,make-it *type-classes*))
+       ;; I have no idea what compiler bug could be worked around by adding a form here,
        ;; but this certainly achieves something, somehow.
        #+host-quirks-cmu (print (aref *type-classes* (1- (length *type-classes*)))))
 
