@@ -424,6 +424,15 @@
               ;; to runtime use. So don't do it.
               (error "Won't do (RATIONAL ~S) due to possible precision loss" x))))))
 
+(defun rationalize (x)
+  (if (rationalp x)
+      x
+      (with-memoized-math-op (rationalize x)
+        (multiple-value-bind (whole frac) (cl:ftruncate (realnumify x))
+          (if (cl:zerop frac)
+              (cl:rationalize whole)
+              (error "Won't do (RATIONALIZE ~S) due to possible precision loss" x))))))
+
 (defun coerce (object type)
   ;; OBJECT is validated prior to testing the quick bail out case, because supposing
   ;; that we accidentally got a host complex number or float, and we accidentally got
@@ -441,7 +450,7 @@
                 (vector (destructuring-bind (et) (cdr type) et)))))
       (return-from coerce
         (sb-xc:make-array (length object) :element-type et
-                          :initial-contents object))))
+                                          :initial-contents object))))
   (unless (numberp object)
     (return-from coerce (cl:coerce object type)))
   (when (member type '(integer rational real))

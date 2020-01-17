@@ -4363,6 +4363,32 @@
 (deftransforms (rational rationalize) ((x) (rational))
   'x)
 
+(defoptimizer (rational derive-type) ((x))
+  (one-arg-derive-type x (lambda (type)
+                           (flet ((%rational (bound)
+                                    (typecase bound
+                                      (cons (list (rational (car bound))))
+                                      (null nil)
+                                      (t (rational bound)))))
+                             (make-numeric-type
+                              :class 'rational
+                              :low (%rational (numeric-type-low type))
+                              :high (%rational (numeric-type-high type)))))
+                       #'rational))
+
+(defoptimizer (rationalize derive-type) ((x))
+  (one-arg-derive-type x (lambda (type)
+                           (flet ((%rationalize (bound)
+                                    (typecase bound
+                                      (cons (list (rationalize (car bound))))
+                                      (null nil)
+                                      (t (rationalize bound)))))
+                             (make-numeric-type
+                              :class 'rational
+                              :low (%rationalize (numeric-type-low type))
+                              :high (%rationalize (numeric-type-high type)))))
+                       #'rationalize))
+
 
 ;;;; transforming APPLY
 
