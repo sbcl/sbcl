@@ -285,8 +285,7 @@
 ;;; away as with the merger of SB-PCL:CLASS and CL:CLASS it's no
 ;;; longer necessary)
 (def!struct (classoid
-             (:include ctype
-                       (class-info (type-class-or-lose 'classoid)))
+             (:include ctype)
              (:constructor nil)
              (:copier nil)
              #-no-ansi-print-object
@@ -332,32 +331,6 @@
 (defun layout-classoid-name (x)
   (classoid-name (layout-classoid x)))
 
-;;; A helper to make classoid (and named-type) hash values stable.
-;;; For other ctypes, generally improve the randomness of the hash.
-;;; (The host uses at most 21 bits of randomness. See CTYPE-RANDOM)
-#+sb-xc
-(defun !improve-ctype-hash (obj type-class-name)
-  (let ((hash (case type-class-name
-                (named
-                 (interned-type-hash (named-type-name obj) 'named))
-                (classoid
-                 (interned-type-hash (classoid-name obj)))
-                (t
-                 (interned-type-hash))))
-        ;; Preserve the interned-p and type=-optimization bits
-        ;; by affecting only bits under the ctype-hash-mask.
-        ;; Upper 5 hash bits might be an index into SAETP array
-        ;; (if this ctype is exactly a type to which upgrade occurs)
-        (nbits (- (integer-length +ctype-hash-mask+)
-                  +ctype-saetp-index-bits+)))
-    (macrolet ((slot-index ()
-                 (let* ((dd (find-defstruct-description 'ctype))
-                        (dsd (find 'hash-value (dd-slots dd) :key #'dsd-name)))
-                   (dsd-index dsd))))
-      (setf (%instance-ref obj (slot-index))
-            (dpb hash (byte nbits 0) (type-hash-value obj)))))
-  obj)
-
 ;;;; object types to represent classes
 
 ;;; An UNDEFINED-CLASSOID is a cookie we make up to stick in forward
@@ -365,7 +338,8 @@
 (def!struct (undefined-classoid
              (:include classoid)
              (:copier nil)
-             (:constructor make-undefined-classoid (name))))
+             (:constructor make-undefined-classoid
+                 (name &aux (%bits (pack-ctype-bits classoid name))))))
 
 ;;; BUILT-IN-CLASS is used to represent the standard classes that
 ;;; aren't defined with DEFSTRUCT and other specially implemented
@@ -387,8 +361,8 @@
 
 (def!struct (condition-classoid (:include classoid)
                                 (:copier nil)
-                                (:constructor %make-condition-classoid
-                                    (hash-value name)))
+                                (:constructor make-condition-classoid
+                                    (&key name &aux (%bits (pack-ctype-bits classoid name)))))
   ;; list of CONDITION-SLOT structures for the direct slots of this
   ;; class
   (slots nil :type list)
@@ -412,8 +386,6 @@
   ;; Values for these slots must be computed in the dynamic
   ;; environment of MAKE-CONDITION.
   (hairy-slots nil :type list))
-(defun make-condition-classoid (&key name)
-  (%make-condition-classoid (interned-type-hash name) name))
 
 ;;;; classoid namespace
 
@@ -466,13 +438,16 @@
 ;;; FUNCALLABLE-STANDARD-CLASS.
 (def!struct (standard-classoid (:include classoid)
                                (:copier nil)
-                               (:constructor make-standard-classoid))
+                               (:constructor make-standard-classoid
+                                   (&key name pcl-class
+                                    &aux (%bits (pack-ctype-bits classoid name)))))
   old-layouts)
 ;;; a metaclass for classes which aren't standardlike but will never
 ;;; change either.
 (def!struct (static-classoid (:include classoid)
                              (:copier nil)
-                             (:constructor make-static-classoid)))
+                             (:constructor make-static-classoid
+                                 (&key name &aux (%bits (pack-ctype-bits classoid name))))))
 
 (declaim (freeze-type built-in-classoid condition-classoid
                       standard-classoid static-classoid))

@@ -65,7 +65,7 @@
 ;;; An UNKNOWN-TYPE is a type not known to the type system (not yet
 ;;; defined). We make this distinction since we don't want to complain
 ;;; about types that are hairy but defined.
-(defstruct (unknown-type (:include hairy-type)
+(defstruct (unknown-type (:include hairy-type (%bits (pack-ctype-bits hairy)))
                          (:copier nil)))
 
 (defun maybe-reparse-specifier (type)
@@ -88,8 +88,7 @@
          (setf ,type ,new-type)
          t))))
 
-(defstruct (negation-type (:include ctype
-                                    (class-info (type-class-or-lose 'negation)))
+(defstruct (negation-type (:include ctype (%bits (pack-ctype-bits negation)))
                           (:copier nil)
                           (:constructor make-negation-type (type)))
   (type (missing-arg) :type ctype :read-only t))
@@ -170,8 +169,7 @@
         (values llks required optional rest keywords))))))
 
 (defstruct (values-type
-            (:include args-type
-                      (class-info (type-class-or-lose 'values)))
+            (:include args-type (%bits (pack-ctype-bits values)))
             (:constructor %make-values-type)
             (:predicate %values-type-p)
             (:copier nil)))
@@ -228,7 +226,7 @@
 #+sb-xc-host
 (defvar *interned-fun-types*
   (flet ((fun-type (n)
-           (!make-interned-fun-type (interned-type-hash)
+           (!make-interned-fun-type (pack-interned-ctype-bits 'function)
                                     (make-list n :initial-element *universal-type*)
                                     nil nil nil nil nil nil *wild-type*)))
     (vector (fun-type 0) (fun-type 1) (fun-type 2) (fun-type 3))))
@@ -266,8 +264,7 @@
 ;;; type specifiers used within the compiler. (It represents something
 ;;; that the compiler knows to be a constant.)
 (defstruct (constant-type
-            (:include ctype
-                      (class-info (type-class-or-lose 'constant)))
+            (:include ctype (%bits (pack-ctype-bits constant)))
             (:copier nil))
   ;; The type which the argument must be a constant instance of for this type
   ;; specifier to win.
@@ -278,10 +275,9 @@
 
 (defun interned-numeric-type (specifier &rest args)
   (apply '%make-numeric-type
-         :hash-value (interned-type-hash
-                      nil nil
-                      (when specifier
-                        (sb-vm::saetp-index-or-lose specifier)))
+         :%bits (pack-interned-ctype-bits
+                 'number nil
+                 (when specifier (sb-vm::saetp-index-or-lose specifier)))
          args))
 
 #+sb-xc-host
@@ -512,7 +508,7 @@
       (macrolet ((range (low high &optional saetp-index)
                    `(return-from make-character-set-type
                       (literal-ctype (!make-interned-character-set-type
-                                      (interned-type-hash nil nil ,saetp-index)
+                                      (pack-interned-ctype-bits 'character-set nil ,saetp-index)
                                       '((,low . ,high)))
                                      (character-set ((,low . ,high)))))))
         (let* ((pair (car pairs))
@@ -544,8 +540,8 @@
 (progn
 (defvar *interned-array-types*
   (labels ((make-1 (type-index dims complexp type)
-             (aver (= (!ctype-saetp-index type) type-index))
-             (!make-interned-array-type (interned-type-hash nil 'array)
+             (aver (= (type-saetp-index type) type-index))
+             (!make-interned-array-type (pack-interned-ctype-bits 'array)
                                         dims complexp type type))
            (make-all (element-type type-index array)
              (replace array
@@ -614,7 +610,7 @@
            (or (and (eq dimensions '*) (neq complexp t))
                (typep dimensions '(cons (eql *) null))))
       (let ((res (svref (literal-ctype-vector *interned-array-types*)
-                        (+ (* (!ctype-saetp-index element-type) 5)
+                        (+ (* (type-saetp-index element-type) 5)
                            (if (listp dimensions) 0 3)
                            (ecase complexp ((nil) 0) ((:maybe) 1) ((t) 2))))))
         (aver (eq (array-type-element-type res) element-type))
@@ -665,9 +661,8 @@
              (unless unpaired
                (macrolet ((member-type (&rest elts)
                             `(literal-ctype
-                              (!make-interned-member-type (interned-type-hash)
-                                                          (xset-from-list ',elts)
-                                                          nil)
+                              (!make-interned-member-type
+                               (pack-interned-ctype-bits 'member) (xset-from-list ',elts) nil)
                               (member ,@elts))))
                  (let ((elts (xset-data xset)))
                    (when (singleton-p elts)
@@ -741,7 +736,7 @@
         ;; but it improves the hit rate in the function caches.
         ((and (type= car-type *universal-type*)
               (type= cdr-type *universal-type*))
-         (literal-ctype (!make-interned-cons-type (interned-type-hash)
+         (literal-ctype (!make-interned-cons-type (pack-interned-ctype-bits 'cons)
                                                   *universal-type*
                                                   *universal-type*)
                         cons))
@@ -751,7 +746,7 @@
 ;;; A SIMD-PACK-TYPE is used to represent a SIMD-PACK type.
 #+sb-simd-pack
 (defstruct (simd-pack-type
-            (:include ctype (class-info (type-class-or-lose 'simd-pack)))
+            (:include ctype (%bits (pack-ctype-bits simd-pack)))
             (:constructor %make-simd-pack-type (element-type))
             (:copier nil))
   (element-type (missing-arg)
@@ -760,7 +755,7 @@
 
 #+sb-simd-pack-256
 (defstruct (simd-pack-256-type
-            (:include ctype (class-info (type-class-or-lose 'simd-pack-256)))
+            (:include ctype (%bits (pack-ctype-bits simd-pack-256)))
             (:constructor %make-simd-pack-256-type (element-type))
             (:copier nil))
   (element-type (missing-arg)
@@ -973,8 +968,12 @@
               ;; though they are part of the AMOP.
               ;; See https://sourceforge.net/p/sbcl/mailman/message/11217378/
               ;; We implement the notion that an EQL-SPECIALIZER has-a CTYPE.
-              ;; A cleverer way would be to say that EQL-SPECIALIZER is-a CTYPE,
-              ;; but that would involve far-reaching and unnecessary changes.
+              ;; You might think that a cleverer way would be to say that
+              ;; EQL-SPECIALIZER is-a CTYPE, i.e. incorporating EQL-SPECIALIZER
+              ;; objects into the type machinary. Well, that's a problem -
+              ;; it would mess up admissibility of the TYPE= optimization.
+              ;; We don't want to create another way of representing
+              ;; the type NULL = (MEMBER NIL), for example.
               (sb-pcl::eql-specializer-to-ctype type-specifier))
              (t (fail type-specifier))))))
   (when (atom type-specifier)

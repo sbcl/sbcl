@@ -14,22 +14,31 @@
 (define-type-class named :enumerable nil :might-contain-other-types nil)
 
 (macrolet ((frob (type global-sym)
-            `(progn
-               #+sb-xc-host
-               (progn (defvar ,global-sym
-                        (!make-named-type (interned-type-hash ',type 'named
-                                             ,(case type
-                                                ((nil t)
-                                                 `(sb-vm::saetp-index-or-lose ',type))
-                                                (* 31)))
-                                          ',type))
-                      ;; Make it known as a constant in the cross-compiler.
-                      (setf (info :variable :kind ',global-sym) :constant))
-               (!cold-init-forms
-                #+sb-xc (sb-c::%defconstant ',global-sym ,global-sym
-                                            (sb-c::source-location))
-                (setf (info :type :builtin ',type) ,global-sym
-                      (info :type :kind ',type) :primitive)))))
+             (let* ((name-hash (%sxhash-simple-string (string type)))
+                    ;; Toggle some bits so that the hash is not equal to the hash
+                    ;; for a classoid of this name (relevant for named type T only)
+                    (perturbed-bit-string
+                     (let ((string (format nil "~32,'0b" name-hash)))
+                       (concatenate 'string
+                                    (subseq string 0 22) (reverse (subseq string 22)))))
+                    (bits `(pack-interned-ctype-bits
+                            'named
+                            ,(parse-integer perturbed-bit-string :radix 2)
+                            ,(case type
+                              ((*) 31)
+                              ((nil t) (sb-vm::saetp-index-or-lose type))
+                              (t nil)))))
+               (declare (ignorable bits)) ; not used in XC
+               `(progn
+                  #+sb-xc-host
+                  (progn (defvar ,global-sym (!make-named-type ,bits ',type))
+                         ;; Make it known as a constant in the cross-compiler.
+                         (setf (info :variable :kind ',global-sym) :constant))
+                  (!cold-init-forms
+                   #+sb-xc (sb-c::%defconstant ',global-sym ,global-sym
+                                               (sb-c::source-location))
+                   (setf (info :type :builtin ',type) ,global-sym
+                         (info :type :kind ',type) :primitive))))))
    ;; KLUDGE: In ANSI, * isn't really the name of a type, it's just a
    ;; special symbol which can be stuck in some places where an
    ;; ordinary type can go, e.g. (ARRAY * 1) instead of (ARRAY T 1).
@@ -69,11 +78,11 @@
 ;;; On the other hand, either of these points may not be sources of
 ;;; inefficiency, and the latter if implemented might have undesirable
 ;;; user-visible ramifications, though it seems unlikely.
-(defstruct (hairy-type (:include ctype
-                        (class-info (type-class-or-lose 'hairy)))
-                       (:constructor %make-hairy-type (specifier))
+(defstruct (hairy-type (:include ctype)
+                       (:constructor %make-hairy-type
+                           (specifier &aux (%bits (pack-ctype-bits hairy))))
                        (:constructor !make-interned-hairy-type
-                           (specifier &aux (hash-value (interned-type-hash))))
+                           (specifier &aux (%bits (pack-interned-ctype-bits 'hairy))))
                        (:copier nil))
   ;; the Common Lisp type-specifier of the type we represent
   (specifier nil :type t :read-only t))

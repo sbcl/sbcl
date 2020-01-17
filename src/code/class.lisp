@@ -525,10 +525,8 @@ between the ~A definition and the ~A definition"
 ;;; don't have a corresponding class.
 (def!struct (structure-classoid (:include classoid)
                                 (:copier nil)
-                                (:constructor %make-structure-classoid
-                                    (hash-value name))))
-(defun make-structure-classoid (&key name)
-  (%make-structure-classoid (interned-type-hash name) name))
+                                (:constructor make-structure-classoid
+                                    (&key name &aux (%bits (pack-ctype-bits classoid name))))))
 
 ;;;; classoid namespace
 
@@ -1171,7 +1169,7 @@ between the ~A definition and the ~A definition"
                      (setf (classoid-cell-classoid
                             (find-classoid-cell name :create t))
                            (!make-built-in-classoid
-                             :hash-value (interned-type-hash name)
+                             :%bits (pack-ctype-bits classoid name)
                              :name name
                              :translation (if trans-p :initializing nil)
                              :direct-superclasses

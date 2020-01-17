@@ -177,7 +177,7 @@
                                  :key 'sb-pcl:slot-definition-name))))))
     ;; metaclass = structure-class
     ;; FUN-TYPE inherits CTYPE
-    (check 'sb-kernel:fun-type 'sb-kernel:ctype 'sb-kernel::class-info)
+    (check 'sb-kernel:fun-type 'sb-kernel:ctype 'sb-kernel::%bits)
     ;; metaclass = condition-class
     ;; REDEFINITION-WITH-DEFMETHOD inherits REDEFINITION-WARNING
     (check 'sb-kernel:redefinition-with-defmethod

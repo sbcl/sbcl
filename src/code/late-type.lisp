@@ -92,12 +92,12 @@
 ;;; chance to run, instead of immediately returning NIL, T.
 (defun delegate-complex-subtypep-arg2 (type1 type2)
   (let ((subtypep-arg1
-         (type-class-complex-subtypep-arg1 (type-class-info type1))))
+         (type-class-complex-subtypep-arg1 (type-class type1))))
     (if subtypep-arg1
         (funcall subtypep-arg1 type1 type2)
         (values nil t))))
 (defun delegate-complex-intersection2 (type1 type2)
-  (let ((method (type-class-complex-intersection2 (type-class-info type1))))
+  (let ((method (type-class-complex-intersection2 (type-class type1))))
     (if (and method (not (eq method #'delegate-complex-intersection2)))
         (funcall method type2 type1)
         (hierarchical-intersection2 type1 type2))))
@@ -998,9 +998,10 @@
         ;; and at least one is interned, then return no and certainty.
         ;; Most of the interned CTYPEs admit this optimization,
         ;; NUMERIC and MEMBER types do as well.
-        ((and (minusp (logior (type-hash-value type1) (type-hash-value type2)))
-              (logtest (logand (type-hash-value type1) (type-hash-value type2))
-                       +type-admits-type=-optimization+))
+        ((and (logtest +type-internedp+
+                       (logior (type-hash-value type1) (type-hash-value type2)))
+              (logtest +type-admits-type=-optimization+
+                       (logand (type-hash-value type1) (type-hash-value type2))))
          (values nil t))
         (t
          (memoize (!invoke-type-method :simple-= :complex-= type1 type2)))))
@@ -1010,7 +1011,7 @@
   (logtest (type-hash-value ctype) +type-admits-type=-optimization+))
 
 (defun ctype-interned-p (ctype)
-  (minusp (type-hash-value ctype)))
+  (logtest (type-hash-value ctype) +type-internedp+))
 
 ;;; Not exactly the negation of TYPE=, since when the relationship is
 ;;; uncertain, we still return NIL, NIL. This is useful in cases where
@@ -1170,7 +1171,7 @@
 ;;; object.
 (defun type-specifier (type)
   (declare (type ctype type))
-  (funcall (type-class-unparse (type-class-info type)) type))
+  (funcall (type-class-unparse (type-class type)) type))
 
 ;;; Don't try to define a print method until it's actually gonna work!
 ;;; (Otherwise this would be near the DEFSTRUCT)
@@ -1183,14 +1184,14 @@
                              :values 1)
               ((type eq))
   (declare (type ctype type))
-  (funcall (type-class-negate (type-class-info type)) type))
+  (funcall (type-class-negate (type-class type)) type))
 
 (defun-cached (type-singleton-p :hash-function #'type-hash-value
                              :hash-bits 8
                              :values 2)
               ((type eq))
   (declare (type ctype type))
-  (let ((function (type-class-singleton-p (type-class-info type))))
+  (let ((function (type-class-singleton-p (type-class type))))
     (if function
         (funcall function type)
         (values nil nil))))
@@ -1812,11 +1813,15 @@
 
 (declaim (inline numeric-type-equal))
 (defun numeric-type-equal (type1 type2)
+  ;; TODO: these 3 can be packed into an integer which makes for just 1 comparison.
+  ;; (Maybe if 64-bit words use the %BITS slot which has plenty of unused bits)
   (and (eq (numeric-type-class type1) (numeric-type-class type2))
        (eq (numeric-type-format type1) (numeric-type-format type2))
        (eq (numeric-type-complexp type1) (numeric-type-complexp type2))))
 
 (define-type-method (number :simple-=) (type1 type2)
+  ;; TODO: construct the hash bits for NUMBER types using a deterministic hash of
+  ;; the low + high bounds. Then TYPE= can be true only if the hashes are =.
   (values
    (and (numeric-type-equal type1 type2)
         (equalp (numeric-type-low type1) (numeric-type-low type2))

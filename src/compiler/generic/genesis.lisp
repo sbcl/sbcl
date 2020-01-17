@@ -1243,13 +1243,6 @@ core and return a descriptor to it."
                  (typecase obj
                    (xset (struct-to-core obj nil))
                    (ctype (ctype-to-core (type-specifier obj) obj)))))))
-    (let ((type-class-vector
-           (cold-symbol-value 'sb-kernel::*type-classes*))
-          (index (position (sb-kernel::type-class-info obj)
-                           sb-kernel::*type-classes*)))
-      ;; Push this instance into the list of fixups for its type class
-      (cold-svset type-class-vector index
-                  (cold-cons result (cold-svref type-class-vector index))))
     (if (classoid-p obj)
         ;; Place this classoid into its clasoid-cell.
         (let ((cell (cold-find-classoid-cell (classoid-name obj) :create t)))
@@ -1266,20 +1259,16 @@ core and return a descriptor to it."
          (target-layout (or (gethash host-type *cold-layouts*)
                             (error "No target layout for ~S" obj)))
          (simple-slots
-          ;; Precompute the list of slot indices which should assign
-          ;; a fixed value rather than reflect the value in the host object.
-          ;; Importantly, the CLASS-INFO slot (basically a vtable) in CTYPE
-          ;; instances makes no sense to externalize.
+          ;; Precompute a list of slots that should be initialized to a
+          ;; trivially dumpable constant in lieu of whatever complicated
+          ;; substructure it currently holds.
           (typecase obj
            (classoid
-            `((,(get-dsd-index built-in-classoid sb-kernel::class-info) . nil)
-              (,(get-dsd-index built-in-classoid sb-kernel::subclasses) . nil)
+            `((,(get-dsd-index built-in-classoid sb-kernel::subclasses) . nil)
               ;; Even though (gethash (classoid-name obj) *cold-layouts*) may exist,
               ;; we nonetheless must set LAYOUT to NIL or else warm build fails
               ;; in the twisty maze of class initializations.
-              (,(get-dsd-index built-in-classoid layout) . nil)))
-           (ctype
-            `((,(get-dsd-index ctype sb-kernel::class-info) . nil)))))
+              (,(get-dsd-index built-in-classoid layout) . nil)))))
          (result (allocate-struct *dynamic* target-layout))
          (dd-slots (type-dd-slots-or-lose host-type)))
     ;; Dump the slots.
@@ -3354,9 +3343,7 @@ III. initially undefined function references (alphabetically):
             (format t "~X: [~vx] ~S~%"
                     (descriptor-bits (cdr cell))
                     (* 2 sb-vm:n-word-bytes)
-                    (ldb (byte sb-vm:n-word-bits 0)
-                         (descriptor-fixnum (read-slot (cdr cell)
-                                                       'sb-kernel:ctype :hash-value)))
+                    (read-slot (cdr cell) 'sb-kernel:ctype :%bits)
                     (car cell)))
           (sort (%hash-table-alist *ctype-cache*) #'<
                 :key (lambda (x) (descriptor-bits (cdr x))))))
@@ -3671,10 +3658,6 @@ III. initially undefined function references (alphabetically):
       (dolist (exported-name
                (sb-cold:read-from-file "common-lisp-exports.lisp-expr"))
         (cold-intern (intern exported-name *cl-package*) :access :external))
-
-      ;; Create SB-KERNEL::*TYPE-CLASSES* as an array of NIL
-      (cold-set (cold-intern 'sb-kernel::*type-classes*)
-                (vector-in-core (make-list (length sb-kernel::*type-classes*))))
 
       ;; Make LOGICALLY-READONLYIZE no longer a no-op
       (setf (symbol-function 'logically-readonlyize)

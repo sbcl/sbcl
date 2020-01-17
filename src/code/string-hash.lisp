@@ -47,7 +47,8 @@
                      (simple-base-string (guts))
                      ((simple-array character (*)) (guts)))
 
-      #+sb-xc-host (guts) ; just do it, don't care about loop unswitching
+      ;; just do it, don't care about loop unswitching or simple-ness of the string.
+      #+sb-xc-host (guts)
 
       (set-result (+ result (ash result 3)))
       (set-result (logxor result (ash result -11)))
@@ -66,7 +67,9 @@
 
 (defun %sxhash-simple-string (x)
   (declare (optimize speed))
-  (declare (type simple-string x))
+  ;; Don't care if the host uses non-simple strings where SBCL would always
+  ;; have had a simple-string, notably SYMBOL-NAME and PACKAGE-NAME.
+  (declare (type #+sb-xc-host string #-sb-xc-host simple-string x))
   ;; KLUDGE: this FLET is a workaround (suggested by APD) for presence
   ;; of let conversion in the cross compiler, which otherwise causes
   ;; strongly suboptimal register allocation.
