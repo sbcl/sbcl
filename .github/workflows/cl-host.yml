@@ -81,3 +81,21 @@ jobs:
       env:  
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
       run: ./make.sh --xc-host='ccl-host/lx86cl64 --batch'
+
+  cmucl:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: instal host cmucl
+      run: |
+        mkdir cmucl
+        cd cmucl
+        wget -q https://github.com/sbcl/sbcl/releases/download/sbcl-1.4.14/cmucl.tar.bz2
+        tar xf cmucl.tar.bz2
+      working-directory: /tmp/
+    - name: build
+      env:  
+        SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
+      run: ./make.sh --xc-host='/tmp/cmucl/bin/lisp -batch'
