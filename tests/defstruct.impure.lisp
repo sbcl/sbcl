@@ -1435,3 +1435,16 @@ redefinition."
   ;; object (specifically NIL) meets the test for the slot.
   (assert (macroexpand-1
            '(defstruct strangestruct (a nil :type (satisfies plusp))))))
+
+
+(defstruct foo4130 bar)
+(test-util:with-test (:name :duplicated-slot-names)
+      (flet ((assert-that (expect form)
+               (multiple-value-bind (ret error) (ignore-errors (eval form))
+                 (assert (not ret))
+                 (assert (string= (princ-to-string error)
+                                  expect)))))
+    (assert-that "duplicate slot name BAR"
+                 `(defstruct foo4131 bar bar))
+    (assert-that "slot name BAR duplicated via included FOO4130"
+                 `(defstruct (foo4132 (:include foo4130)) bar))))

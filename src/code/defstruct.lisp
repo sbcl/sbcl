@@ -790,16 +790,17 @@ unless :NAMED is also specified.")))
                            spec)))
 
     (when (find name (dd-slots defstruct) :test #'string= :key #'dsd-name)
-      (let* ((parent (find-defstruct-description (first (dd-include defstruct))))
-             (included? (find name
-                              (dd-slots parent)
-                              :key #'dsd-name
-                              :test #'string=)))
+      (let* ((parent-name (first (dd-include defstruct)))
+             (parent (and parent-name (find-defstruct-description parent-name)))
+             (included? (and parent (find name
+                                          (dd-slots parent)
+                                          :key #'dsd-name
+                                          :test #'string=))))
         (if included?
-          (%program-error "slot name ~s duplicated via included ~a"
-                          name
-                          (dd-name parent))
-          (%program-error "duplicate slot name ~S" name))))
+            (%program-error "slot name ~s duplicated via included ~a"
+                            name
+                            (dd-name parent))
+            (%program-error "duplicate slot name ~S" name))))
 
     (setf accessor-name (if (dd-conc-name defstruct)
                             (symbolicate (dd-conc-name defstruct) name)
