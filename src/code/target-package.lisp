@@ -534,6 +534,57 @@ error if any of PACKAGES is not a valid package designator."
     (print-unreadable-object (package stream :type t :identity (not name))
       (if name (prin1 name stream) (write-string "(deleted)" stream)))))
 
+;;; Perform (GETHASH NAME TABLE) and then unwrap the value if it is a list.
+;;; List vs nonlist disambiguates a nickname from the primary name.
+;;; And never return the symbol :DELETED.
+(declaim (inline %get-package))
+(defun %get-package (name table)
+  (let ((found (info-gethash name table)))
+    (cond ((listp found) (car found))
+          ((neq found :deleted) found))))
+
+;;; This is undocumented and unexported for now, but the idea is that by
+;;; making this a generic function then packages with custom package classes
+;;; could hook into this to provide their own resolution.
+;;; (Any such generic solution will turn the performance to crap, so let's not)
+(declaim (inline find-package-using-package))
+(defun find-package-using-package (package-designator base)
+  (let ((string (typecase package-designator
+                  (package
+                   (return-from find-package-using-package package-designator))
+                  (symbol (symbol-name package-designator))
+                  (string package-designator)
+                  (character (string package-designator))
+                  (t
+                   (sb-c::%type-check-error package-designator '(or character package string symbol) nil)))))
+    (or (and base
+             (package-%local-nicknames base)
+             (pkgnick-search-by-name string base))
+        (%get-package string *package-names*))))
+
+(defun find-package (package-designator)
+  "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
+must be a string designator, in which case the package it names is located and returned.
+
+As an SBCL extension, the current package may affect the way a package name is
+resolved: if the current package has local nicknames specified, package names
+matching those are resolved to the packages associated with them instead.
+
+Example:
+
+  (defpackage :a)
+  (defpackage :example (:use :cl) (:local-nicknames (:x :a)))
+  (let ((*package* (find-package :example)))
+    (find-package :x)) => #<PACKAGE A>
+
+See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
+REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
+  (declare (explicit-check))
+  ;; We had a BOUNDP check on *PACKAGE* here, but it's effectless due to the
+  ;; always-bound proclamation.
+  (find-package-using-package package-designator *package*))
+(declaim (notinline find-package-using-package))
+
 ;;; ANSI says (in the definition of DELETE-PACKAGE) that these, and
 ;;; most other operations, are unspecified for deleted packages. We
 ;;; just do the easy thing and signal errors in that case.
@@ -739,58 +790,6 @@ Experimental: interface subject to change."
 (defun debootstrap-package (&optional condition)
   (declare (ignore condition))
   (bug "No such thing as DEBOOTSTRAP-PACKAGE"))
-
-(defun find-package (package-designator)
-  "If PACKAGE-DESIGNATOR is a package, it is returned. Otherwise PACKAGE-DESIGNATOR
-must be a string designator, in which case the package it names is located and returned.
-
-As an SBCL extension, the current package may affect the way a package name is
-resolved: if the current package has local nicknames specified, package names
-matching those are resolved to the packages associated with them instead.
-
-Example:
-
-  (defpackage :a)
-  (defpackage :example (:use :cl) (:local-nicknames (:x :a)))
-  (let ((*package* (find-package :example)))
-    (find-package :x)) => #<PACKAGE A>
-
-See also: ADD-PACKAGE-LOCAL-NICKNAME, PACKAGE-LOCAL-NICKNAMES,
-REMOVE-PACKAGE-LOCAL-NICKNAME, and the DEFPACKAGE option :LOCAL-NICKNAMES."
-  ;: We had a BOUNDP check on *PACKAGE* here, but it's effectless due to the
-  ;; always-bound proclamation.
-  (truly-the (or null package) ; force elision of return value type check
-    (find-package-using-package package-designator *package*)))
-
-;;; Perform (GETHASH NAME TABLE) and then unwrap the value if it is a list.
-;;; List vs nonlist disambiguates a nickname from the primary name.
-;;; And never return the symbol :DELETED.
-(defun %get-package (name table)
-  (let ((found (info-gethash name table)))
-    (cond ((listp found) (car found))
-          ((neq found :deleted) found))))
-
-;;; This is undocumented and unexported for now, but the idea is that by
-;;; making this a generic function then packages with custom package classes
-;;; could hook into this to provide their own resolution.
-;;; (Any such generic solution will turn the performance to crap, so let's not)
-(defun find-package-using-package (package-designator base)
-  (typecase package-designator
-    (package package-designator)
-    ;; Rather than use STRINGIFY-STRING-DESIGNATOR, we check type by hand
-    ;; to avoid consing a new simple-base-string if the designator is one
-    ;; that would undergo coercion entailing allocation.
-    ((or symbol string character)
-     (let ((string (string package-designator)))
-       (or (and base
-                (package-%local-nicknames base)
-                (pkgnick-search-by-name string base))
-           (%get-package string *package-names*))))
-    ;; Is there a fundamental reason we don't declare the FTYPE
-    ;; of FIND-PACKAGE-USING-PACKAGE letting the compiler do the checking?
-    (t (error 'type-error
-                :datum package-designator
-                :expected-type '(or character package string symbol)))))
 
 ;;; Return a list of packages given a package designator or list of
 ;;; package designators, or die trying.
