@@ -1507,7 +1507,7 @@
   ;; the union of the node-derived-type of all uses of the result
   ;; other than by a local call, intersected with the result's
   ;; asserted-type. If there are no non-call uses, this is
-  ;; *EMPTY-TYPE*
+  ;; *EMPTY-TYPE*.
   (result-type *wild-type* :type ctype))
 (defprinter (creturn :conc-name return- :identity t)
   lambda

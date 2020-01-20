@@ -988,6 +988,10 @@
 ;;; Handle the value semantics of LET conversion. Delete FUN's return
 ;;; node, and change the control flow to transfer to NEXT-BLOCK
 ;;; instead. Move all the uses of the result lvar to CALL's lvar.
+;;;
+;;; We also intersect the derived type of the CALL with the derived
+;;; type of all the dummy continuation's uses. This serves mainly to
+;;; propagate TRULY-THE through LETs.
 (defun move-return-uses (fun call next-block)
   (declare (type clambda fun) (type basic-combination call)
            (type cblock next-block))
