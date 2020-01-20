@@ -1535,17 +1535,6 @@
 
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
-  ;; KLUDGE: All this ASH optimization is suppressed under CMU CL for
-  ;; some bignum cases because as of version 2.4.6 for Debian and 18d,
-  ;; CMU CL blows up on (ASH 1000000000 -100000000000) (i.e. ASH of
-  ;; two bignums yielding zero) and it's hard to avoid that
-  ;; calculation in here.
-  #+host-quirks-cmu
-  (when (and (or (typep (numeric-type-low n-type) 'bignum)
-                 (typep (numeric-type-high n-type) 'bignum))
-             (or (typep (numeric-type-low shift) 'bignum)
-                 (typep (numeric-type-high shift) 'bignum)))
-    (return-from ash-derive-type-aux *universal-type*))
   (flet ((ash-outer (n s)
            (when (and (fixnump s)
                       (<= s 64)

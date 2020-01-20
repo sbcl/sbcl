@@ -13,9 +13,7 @@
 
 (define-condition cross-type-warning (warning)
   ((call :initarg :call :reader cross-type-warning-call)
-   (message :reader cross-type-warning-message
-            #+host-quirks-cmu :initarg #+host-quirks-cmu :message ; (to stop bogus non-STYLE WARNING)
-            ))
+   (message :reader cross-type-warning-message))
   (:report (lambda (c s)
              (format
               s
@@ -26,9 +24,7 @@
 ;;; This warning is signaled when giving up on a type calculation
 ;;; during cross-compilation.
 (define-condition cross-type-giving-up (cross-type-warning)
-  ((message :initform "giving up conservatively"
-            #+host-quirks-cmu :reader #+host-quirks-cmu #.(gensym) ; (to stop bogus non-STYLE WARNING)
-            )))
+  ((message :initform "giving up conservatively")))
 
 ;; Return T if SYMBOL is a predicate acceptable for use in a SATISFIES type
 ;; specifier. We assume that anything in CL: is allowed.

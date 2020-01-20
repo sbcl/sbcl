@@ -405,12 +405,7 @@
  ;; "code/late-type", and SB-XC:TYPEP, defined in "code/cross-type",
  ;; and SPECIALIZE-ARRAY-TYPE, defined in "compiler/generic/vm-type",
  ;; and SB-XC:PROCLAIM, defined in "src/compiler/proclaim"
-
- ;; KLUDGE: do we still need the special hack for cmucl?
- ("src/code/defstruct"  :c-headers
-  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
-                (cl:find :cmucl cl:*features*))
-        :ignore-failure-p))
+ ("src/code/defstruct"  :c-headers)
  ("src/code/target-defstruct" :not-host)
 
  ;; ALIEN-VALUE has to be defined as a class (done by DEFSTRUCT
@@ -478,11 +473,7 @@
   #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
                 (cl:find :abcl cl:*features*))
         :ignore-failure-p))
- ;; KLUDGE: do we still need the special hack for cmucl?
- ("src/compiler/ir1util"
-  #.(cl:if (and (cl:find :sb-xc-host cl:*features*)
-                (cl:find :cmucl cl:*features*))
-        :ignore-failure-p))
+ ("src/compiler/ir1util")
  ("src/compiler/callable-args")
  ("src/compiler/ir1opt")
  ("src/compiler/loop")
