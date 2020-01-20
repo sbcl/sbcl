@@ -1326,10 +1326,7 @@ due to normal completion or a non-local exit such as THROW)."
      `(flet ((,cleanup-fun ()
                ,@cleanup
                (values)))
-        ;; FIXME: If we ever get DYNAMIC-EXTENT working, then
-        ;; ,CLEANUP-FUN should probably be declared DYNAMIC-EXTENT,
-        ;; and something can be done to make %ESCAPE-FUN have
-        ;; dynamic extent too.
+        ;; FIXME: Maybe %ESCAPE-FUN could dynamic extent too.
         (declare (dynamic-extent #',cleanup-fun))
         (block ,drop-thru-tag
           (multiple-value-bind (,next ,start ,count)

@@ -859,6 +859,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 ;;;   This gives the effect of rebinding around each file.
 ;;; which doesn't seem to be true now. Check to make sure that if
 ;;; such rebinding is necessary, it's still done somewhere.
+;;; FIXME: We will want to have a way to process multiple files again
+;;; for the sake of block compilation.
 (defun get-source-stream (info)
   (declare (type source-info info))
   (or (source-info-stream info)
