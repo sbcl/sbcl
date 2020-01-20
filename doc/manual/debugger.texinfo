@@ -306,27 +306,13 @@ Sometimes the compiler introduces new functions that are used to
 implement a user function, but are not directly specified in the
 source. This is mostly done for argument type and count checking.
 
-@c FIXME: the following bits talked about block-compilation, but
-@c we don't currently support it...
-
-@c With recursive
-@c or block compiled
-@c functions, an additional @code{:EXTERNAL} frame
-@c may appear before the frame representing the first call to the
-@c recursive function
-@c or entry to the compiled block.
-@c This is a
-@c consequence of the way the compiler works: there is
-@c nothing odd with your program. You will also see @code{:CLEANUP}
-@c frames during the execution of @code{unwind-protect} cleanup
-@c code.
-
-With recursive functions, an additional @code{external} frame may
-appear before the frame representing the first call to the recursive
-function. This is a consequence of the way the compiler works: there
-is nothing odd with your program. You may also see @code{cleanup}
-frames during the execution of @code{unwind-protect} cleanup code, and
-@code{optional} for variable argument entry points.
+With recursive or block compiled functions, an additional
+@code{external} frame may appear before the frame representing the first
+call to the recursive function or entry to the compiled block. This is a
+consequence of the way the compiler works: there is nothing odd with
+your program. You may also see @code{cleanup} frames during the
+execution of @code{unwind-protect} cleanup code, and @code{optional} for
+variable argument entry points.
 
 @node  Debug Tail Recursion
 @comment  node-name,  next,  previous,  up
