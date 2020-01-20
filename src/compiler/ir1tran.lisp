@@ -841,38 +841,7 @@
                             #+sb-xc-host "during XC macroexpansion"))
                      form
                      '*break-on-signals*))))
-    (handler-bind (;; KLUDGE: CMU CL in its wisdom (version 2.4.6 for Debian
-                   ;; Linux, anyway) raises a CL:WARNING condition (not a
-                   ;; CL:STYLE-WARNING) for undefined symbols when converting
-                   ;; interpreted functions, causing COMPILE-FILE to think the
-                   ;; file has a real problem, causing COMPILE-FILE to return
-                   ;; FAILURE-P set (not just WARNINGS-P set). Since undefined
-                   ;; symbol warnings are often harmless forward references,
-                   ;; and since it'd be inordinately painful to try to
-                   ;; eliminate all such forward references, these warnings
-                   ;; are basically unavoidable. Thus, we need to coerce the
-                   ;; system to work through them, and this code does so, by
-                   ;; crudely suppressing all warnings in cross-compilation
-                   ;; macroexpansion. -- WHN 19990412
-                   #+host-quirks-cmu
-                   (warning (lambda (c)
-                              (compiler-notify
-                               "~@<~A~:@_~
-                                ~A~:@_~
-                                ~@<(KLUDGE: That was a non-STYLE WARNING. ~
-                                   Ordinarily that would cause compilation to ~
-                                   fail. However, since we're running under ~
-                                   CMU CL, and since CMU CL emits non-STYLE ~
-                                   warnings for safe, hard-to-fix things (e.g. ~
-                                   references to not-yet-defined functions) ~
-                                   we're going to have to ignore it and ~
-                                   proceed anyway. Hopefully we're not ~
-                                   ignoring anything  horrible here..)~:@>~:>"
-                               (wherestring)
-                               c)
-                              (muffle-warning)
-                              (bug "no MUFFLE-WARNING restart")))
-                   (error
+    (handler-bind ((error
                      (lambda (c)
                        (cond
                          (cmacro
