@@ -66,9 +66,3 @@
 #+(and cmu sparc)
 (ext:set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
 
-;;;; OpenMCL issues
-
-;;; This issue in OpenMCL led to some SBCL bug reports ca. late 2003.
-#+openmcl
-(unless (ignore-errors (funcall (constantly t) 1 2 3))
-  (error "please find a binary that understands CONSTANTLY to build from"))
