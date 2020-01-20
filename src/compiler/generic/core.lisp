@@ -15,7 +15,6 @@
 ;;; references during in-core compilation.
 (defstruct (core-object
             (:constructor make-core-object (ephemeral))
-            #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t :identity t))))
             (:copier nil))

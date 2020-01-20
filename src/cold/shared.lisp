@@ -624,7 +624,7 @@
 (compile 'compile-stem)
 
 (defparameter *host-quirks*
-  (or #+cmu  '(:host-quirks-cmu :no-ansi-print-object)
+  (or #+cmu  '(:host-quirks-cmu)
       #+ecl  '(:host-quirks-ecl)
       #+sbcl '(:host-quirks-sbcl))) ; not so much a "quirk", but consistent anyway
 

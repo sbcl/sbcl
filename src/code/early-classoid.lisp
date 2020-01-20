@@ -288,7 +288,6 @@
              (:include ctype)
              (:constructor nil)
              (:copier nil)
-             #-no-ansi-print-object
              (:print-object
               (lambda (class stream)
                 (let ((name (classoid-name class)))
@@ -394,7 +393,6 @@
 (def!struct (classoid-cell
              (:copier nil)
              (:constructor make-classoid-cell (name &optional classoid))
-             #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
                                 (prin1 (classoid-cell-name s) stream)))))

@@ -174,7 +174,6 @@ the stack without triggering overflow protection.")
        (!define-load-time-global *type-cache-nonce* 0))
 
 (defstruct (undefined-warning
-            #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t)
                                (prin1 (undefined-warning-name x) s))))

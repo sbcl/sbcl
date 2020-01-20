@@ -71,8 +71,7 @@
 ;;; (This is also what shows up as an ENVIRONMENT value in macroexpansion.)
 #-sb-fluid (declaim (inline internal-make-lexenv)) ; only called in one place
 (defstruct (lexenv
-             (:include abstract-lexenv)
-             #-no-ansi-print-object
+            (:include abstract-lexenv)
              (:print-function
               (lambda (lexenv stream depth)
                 (if (null-lexenv-p lexenv)

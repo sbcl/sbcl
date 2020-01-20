@@ -34,7 +34,6 @@
 
 (in-package "SB-IMPL")
 
-#-no-ansi-print-object
 (defmethod print-object ((x meta-info) stream)
   (print-unreadable-object (x stream)
     (format stream "~S ~S, ~D" (meta-info-category x) (meta-info-kind x)

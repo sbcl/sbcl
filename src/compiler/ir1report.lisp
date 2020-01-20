@@ -32,7 +32,6 @@
 ;;; this end, we convert source forms to strings so that source forms
 ;;; that contain IR1 references (e.g. %DEFUN) don't hold onto the IR.
 (defstruct (compiler-error-context
-            #-no-ansi-print-object
             (:print-object (lambda (x stream)
                              (print-unreadable-object (x stream :type t))))
             (:copier nil))

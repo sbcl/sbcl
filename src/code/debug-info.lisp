@@ -443,7 +443,6 @@
 ;;; given file.
 (defstruct (file-info
              (:copier nil)
-             #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object (s stream :type t)
                                 (princ (file-info-name s) stream)))))
@@ -484,7 +483,6 @@
 ;;; The SOURCE-INFO structure provides a handle on all the source
 ;;; information for an entire compilation.
 (defstruct (source-info
-             #-no-ansi-print-object
              (:print-object (lambda (s stream)
                               (print-unreadable-object
                                   (s stream :type t :identity t))))

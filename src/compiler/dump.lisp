@@ -21,7 +21,6 @@
 ;;; know about dumping to a fasl file. (We need to objectify the
 ;;; state because the fasdumper must be reentrant.)
 (defstruct (fasl-output
-            #-no-ansi-print-object
             (:print-object (lambda (x s)
                              (print-unreadable-object (x s :type t)
                                (prin1 (namestring (fasl-output-stream x))

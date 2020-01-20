@@ -99,7 +99,6 @@
 ;;; "same kind".
 (defstruct (type-class
              (:copier nil)
-             #-no-ansi-print-object
              (:print-object (lambda (x stream)
                               (print-unreadable-object (x stream :type t)
                                 (prin1 (type-class-name x) stream)))))

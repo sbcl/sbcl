@@ -39,19 +39,10 @@
   (setf system::*inhibit-floating-point-underflow* t))
 
 ;;;; CMU CL issues
-
-;;; CMU CL, at least as of 18b, doesn't support PRINT-OBJECT. In
-;;; particular, it refuses to compile :PRINT-OBJECT options to
-;;; DEFSTRUCT, so we need to conditionalize such options on the
-;;; :NO-ANSI-PRINT-OBJECT feature in order to get the code to compile.
-;;; (It also fails to do anything useful with DEFMETHOD PRINT-OBJECT,
-;;; but that doesn't matter much, since it doesn't stop the
-;;; cross-compiler from working.)
 #+cmu
 (progn
   (setq *compile-print* nil) ; too much noise, can't see the actual warnings
-  ;; #'IN-HOST-COMPILATION-MODE will push :NO-ANSI-PRINT-OBJECT into SB-XC:*FEATURES*
-  (warn "CMU CL doesn't support the :PRINT-OBJECT option to DEFSTRUCT.~%"))
+)
 
 ;;; This is apparently quite old, according to
 ;;; <http://tunes.org/~nef/logs/lisp/03.10.22>:
