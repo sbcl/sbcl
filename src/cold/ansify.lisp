@@ -15,17 +15,3 @@
 (progn
   (setq *compile-print* nil) ; too much noise, can't see the actual warnings
 )
-
-;;; This is apparently quite old, according to
-;;; <http://tunes.org/~nef/logs/lisp/03.10.22>:
-;;;   <dan`b> (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".
-;;;   <dan`b> the warning relates to a random vinary produced from cvs of
-;;;           around feb 2000, the corresponding sources to which I never found
-;;; (But it seems harmless to leave it here forever just in case.)
-#+(and cmu alpha)
-(unless (ignore-errors (read-from-string "1.0l0"))
-  (error "CMUCL on Alpha can't read floats in the format \"1.0l0\".  Patch your core file~%~%"))
-
-#+(and cmu sparc)
-(ext:set-floating-point-modes :traps '(:overflow :invalid :divide-by-zero))
-
