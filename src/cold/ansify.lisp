@@ -10,34 +10,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;;; CLISP issues
-
-;;; as explained on #lisp ca. October 2003:
-;;;   <Krystof> chandler: nope, I'm blaming another clisp bug
-;;;   <Krystof> [8]> least-positive-short-float
-;;;   <Krystof> 2.93874s-39
-;;;   <Krystof> [9]> (coerce * 'single-float)
-;;;   <Krystof> 0.0
-;;;   <chandler> aah
-;;;   <mwh> "oops"
-;;;   <Krystof> yep
-;;;   <mwh> tried that on clisp from fink:
-;;;   <mwh> [1]> least-positive-short-float
-;;;   <mwh> 2.93874s-39
-;;;   <mwh> [2]> (coerce * 'single-float)
-;;;   <mwh> *** - floating point underflow
-;;;   <Krystof> yeah
-;;;   <mwh> shall i not try to build sbcl with that?
-;;;   <Krystof> if you turn off underflow traps, then you get 0.0
-;;;   <mwh> well, that makes sense, i guess
-;;;   <Krystof> #+clisp
-;;;   <Krystof> (ext:without-package-lock ("SYSTEM")
-;;;   <Krystof>   (setf system::*inhibit-floating-point-underflow* t))
-;;;   <Krystof> (in src/cold/ansify.lisp)
-#+clisp
-(ext:without-package-lock ("SYSTEM")
-  (setf system::*inhibit-floating-point-underflow* t))
-
 ;;;; CMU CL issues
 #+cmu
 (progn
