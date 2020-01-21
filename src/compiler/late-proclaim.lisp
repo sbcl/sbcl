@@ -25,36 +25,3 @@
 (!cold-init-forms (makunbound '*queued-proclaims*))
 
 (!defun-from-collected-cold-init-forms !late-proclaim-cold-init)
-
-;;; This function is only for host's use during parallel make-host-1.
-;;; It restores things to a state which avoids some redefinition problems.
-;;; I think a better approach would be to blow away all SB- packages and
-;;; start over with fasl loading. The current technique requires very
-;;; specific knowledge of what things to destroy, and I don't like it.
-#+sb-xc-host
-(defun annihilate-globaldb ()
-  (fill sb-kernel::*type-classes* nil)
-  ;; As far as the host is concerned, *TYPE-CLASSES* has no proclaimed type,
-  ;; but in the target it is a (SIMPLE-VECTOR 32), so has no fill pointer.
-  ;; This function is not compiled for the target though.
-  (setf (fill-pointer sb-kernel::*type-classes*) 0)
-  (fill sb-kernel::*type-class-was-inherited* 0)
-  (drop-all-hash-caches)
-  ;; this one is sneakily a hash-table buried inside a closure.
-  (sb-kernel::values-specifier-type-cache-clear)
-  (do-all-symbols (s)
-    (when (get s :sb-xc-globaldb-info)
-      (remf (symbol-plist s) :sb-xc-globaldb-info)))
-  (fill (symbol-value 'sb-impl::*info-types*) nil)
-  (clrhash (symbol-value 'sb-kernel::*forward-referenced-layouts*))
-  (clrhash *backend-template-names*)
-  (clrhash *backend-parsed-vops*)
-  (setf sb-kernel:*type-system-initialized* nil)
-  (makunbound '*backend-primitive-type-names*)
-  (makunbound '*backend-primitive-type-aliases*)
-  (makunbound '*backend-type-predicates-grouped*)
-  (makunbound '*backend-predicate-types*)
-  (makunbound '*backend-type-predicates*)
-  (makunbound 'sb-vm::*specialized-array-element-type-properties*)
-  (makunbound 'sb-kernel::*parsed-specialized-array-element-types*)
-  (makunbound 'sb-kernel::*interned-array-types*))

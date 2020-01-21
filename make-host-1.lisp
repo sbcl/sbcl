@@ -154,19 +154,11 @@
 
 (maybe-with-compilation-unit
  (let ((*feature-evaluation-results* nil))
+  ;; If make-host-1 is parallelized, it will produce host fasls without loading
+  ;; them. The host will have interpreted definitions of most everything,
+  ;; which is OK because writing out the C headers is not compute-intensive.
   (load-or-cload-xcompiler #'host-cload-stem)
   (write-feature-eval-results))
-
- ;; Let's check that the type system, and various other things, are
- ;; reasonably sane. (It's easy to spend a long time wandering around
- ;; confused trying to debug cross-compilation if it isn't.)
- (let ((*readtable* *xc-readtable*)
-       (*load-verbose* t))
-   (with-math-journal
-     (load "tests/type.before-xc.lisp")
-     (load "tests/info.before-xc.lisp")
-     (load "tests/vm.before-xc.lisp")))
-
  ;; propagate structure offset and other information to the C runtime
  ;; support code.
  (load "tools-for-build/corefile.lisp" :verbose nil)
