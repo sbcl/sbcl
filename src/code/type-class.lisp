@@ -335,12 +335,12 @@
 (eval-when (:compile-toplevel)
   (assert (= (length (dd-slots (find-defstruct-description 'type-class)))
              ;; there exist two boolean slots, plus NAME
-             (+ (length !type-class-fun-slots) 3))))
+             (+ (length type-class-fun-slots) 3))))
 
 ;; Unfortunately redundant with the slots in the DEF!STRUCT,
 ;; but allows asserting about correctness of the constructor
 ;; without relying on introspection in host Lisp.
-(defconstant-eqx !type-class-fun-slots
+(defconstant-eqx type-class-fun-slots
     '(simple-subtypep
       complex-subtypep-arg1
       complex-subtypep-arg2
@@ -356,11 +356,11 @@
   #'equal)
 
 (eval-when (#-sb-xc :compile-toplevel :load-toplevel :execute)
-  (defun !type-class-fun-slot (name)
-    (unless (member name !type-class-fun-slots
+  (defun type-class-fun-slot (name)
+    (unless (member name type-class-fun-slots
                     :key (if (keywordp name) 'keywordicate 'identity))
       (warn "Undefined type-class method ~S" name))
-    (symbolicate "TYPE-CLASS-" name)))
+    (package-symbolicate "SB-KERNEL" "TYPE-CLASS-" name)))
 
 (defmacro define-type-method ((class method &rest more-methods)
                                lambda-list &body body)
@@ -391,7 +391,7 @@
          ,@body)
        (!cold-init-forms
         ,@(mapcar (lambda (method)
-                    `(setf (,(!type-class-fun-slot method)
+                    `(setf (,(type-class-fun-slot method)
                             (type-class-or-lose ',class))
                            #',name))
                   (cons method more-methods)))
@@ -439,9 +439,9 @@
                   might-contain-other-types
                   `(type-class-might-contain-other-types-p parent))
              ,@(when inherits
-                 (loop for name in !type-class-fun-slots
+                 (loop for name in type-class-fun-slots
                        append `(,(keywordicate name)
-                                (,(!type-class-fun-slot name) parent))))))))
+                                (,(type-class-fun-slot name) parent))))))))
     #+sb-xc-host
     `(progn
        ;; Careful: type-classes are very complicated things to redefine.
@@ -515,10 +515,10 @@
     (once-only ((class1 `(type-class ,left))
                 (class2 `(type-class ,right)))
       `(if (eq ,class1 ,class2)
-           (funcall (,(!type-class-fun-slot simple) ,class1) ,left ,right)
-           (acond ((,(!type-class-fun-slot complex-arg2) ,class2)
+           (funcall (,(type-class-fun-slot simple) ,class1) ,left ,right)
+           (acond ((,(type-class-fun-slot complex-arg2) ,class2)
                    (funcall it ,left ,right))
-                  ((,(!type-class-fun-slot complex-arg1) ,class1)
+                  ((,(type-class-fun-slot complex-arg1) ,class1)
                    ;; if COMPLEX-ARG1 method was provided, the method accepts
                    ;; the arguments exactly as given. Otherwise, flip them.
                    (funcall it ,@(if complex-arg1-p
