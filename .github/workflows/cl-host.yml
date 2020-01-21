@@ -45,8 +45,8 @@ jobs:
     - uses: actions/checkout@v1
     - name: instal host clisp
       run: |
-        sudo apt-get update
-        sudo apt-get install clisp
+        sudo apt-get -qq update | true
+        sudo apt-get -qq install clisp
     - name: build
       env:  
         SBCL_MAKE_TARGET_2_OPTIONS: --disable-ldb --disable-debugger
