@@ -1662,12 +1662,10 @@
    (:verbose t)
    (:print t)
    (:external-format external-format-designator)
-   (:progress t)
 
    ;; extensions
    (:trace-file t)
    (:block-compile t)
-   (:entry-points list)
    (:emit-cfasl t))
   (values (or pathname null) boolean boolean))
 

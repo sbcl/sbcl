@@ -264,13 +264,9 @@ evaluated as a PROGN."
       `(progn
          (eval-when (:compile-toplevel)
            (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
-         ,(if (sb-c::block-compilation-non-entry-point name)
-              `(progn
-                 ,named-lambda
-                 ',name)
-              `(%defun ',name ,named-lambda
-                       ,@(when (or inline-thing extra-info) `(,inline-thing))
-                       ,@(when extra-info `(,extra-info))))
+         (%defun ',name ,named-lambda
+                 ,@(when (or inline-thing extra-info) `(,inline-thing))
+                 ,@(when extra-info `(,extra-info)))
          ;; This warning, if produced, comes after the DEFUN happens.
          ;; When compiling, there's no real difference, but when interpreting,
          ;; if there is a handler for style-warning that nonlocally exits,
@@ -281,12 +277,6 @@ evaluated as a PROGN."
                  (sb-c::warn-if-setf-macro ',name))
                ',name)))))))
 
-;;; This is one of the major places where the semantics of block
-;;; compilation is handled.  Substitution for global names is totally
-;;; inhibited if (block-compile *compilation*) is NIL.  And if
-;;; (block-compile *compilation*) is true and entry points are
-;;; specified, then we don't install global definitions for non-entry
-;;; functions (effectively turning them into local lexical functions.)
   (sb-xc:defmacro defun (&environment env name lambda-list &body body)
     "Define a function at top level."
     (check-designator name defun)

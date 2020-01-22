@@ -739,8 +739,7 @@
       (let ((tlf-num (source-path-tlf-number
                       (node-source-path (lambda-bind lambda)))))
         (if component-tlf-num
-            (aver (or (block-compile *compilation*)
-                      (= component-tlf-num tlf-num)))
+            (aver (= component-tlf-num tlf-num))
             (setf component-tlf-num tlf-num))
         (push (compute-1-debug-fun lambda var-locs) dfuns)))
     (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))

@@ -1020,14 +1020,6 @@
           ((typep expr '(or (cons (eql declare)) string))) ; DECL | DOCSTRING
           (t (return nil)))))
 
-(defun block-compilation-non-entry-point (name)
-  (and (boundp 'sb-c::*compilation*)
-       (let* ((compilation sb-c::*compilation*)
-              (entry-points (sb-c::entry-points compilation)))
-         (and (sb-c::block-compile compilation)
-              entry-points
-              (not (member name entry-points :test #'equal))))))
-
 ;;; helper for LAMBDA-like things, to massage them into a form
 ;;; suitable for IR1-CONVERT-LAMBDA.
 (defun ir1-convert-lambdalike (thing
@@ -1054,8 +1046,6 @@
                  (info (info :function :info name)))
              (when (has-toplevelness-decl lambda-expression)
                (setf (functional-top-level-defun-p res) t))
-             ;; FIXME: Should non-entry block compiled defuns have
-             ;; this propagate?
              (assert-global-function-definition-type name res)
              (push res (defined-fun-functionals defined-fun-res))
              (unless (or
@@ -1071,18 +1061,11 @@
                                (fun-info-ltn-annotate info)
                                (fun-info-ir2-convert info)
                                (fun-info-optimizer info))))
-               (if (block-compile *compilation*)
-                   (substitute-leaf res defined-fun-res)
-                   (substitute-leaf-if
-                    (lambda (ref)
-                      (policy ref (> recognize-self-calls 0)))
-                    res defined-fun-res)))
-             (if (and (functional-top-level-defun-p res)
-                      (block-compilation-non-entry-point name))
-                 ;; Insert an empty lambda to get flushed instead, so
-                 ;; we don't confuse locall with a stray ref.
-                 (ir1-convert-lambda '(lambda ()))
-                 res))
+               (substitute-leaf-if
+                (lambda (ref)
+                  (policy ref (> recognize-self-calls 0)))
+                res defined-fun-res))
+             res)
            (ir1-convert-lambda lambda-expression
                                :maybe-add-debug-catch t
                                :debug-name
@@ -1186,8 +1169,7 @@
 ;;; previous references.
 (defun get-defined-fun (name &optional (lambda-list nil lp))
   (proclaim-as-fun-name name)
-  (when #+sb-xc-host (not *compile-time-eval*)
-        #-sb-xc-host (boundp '*ir1-namespace*)
+  (when (boundp '*ir1-namespace*)
     (let ((found (find-free-fun name "shouldn't happen! (defined-fun)"))
           (free-funs (free-funs *ir1-namespace*)))
       (note-name-defined name :function)
@@ -1388,9 +1370,9 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 
     (become-defined-fun-name name)
 
-    ;;
-    ;; If there is a type from a previous definition, blast it, since it is
-    ;; obsolete.
+    ;; old CMU CL comment:
+    ;;   If there is a type from a previous definition, blast it,
+    ;;   since it is obsolete.
     (when (and defined-fun (neq :declared (leaf-where-from defined-fun)))
       (setf (leaf-type defined-fun)
             ;; FIXME: If this is a block compilation thing, shouldn't

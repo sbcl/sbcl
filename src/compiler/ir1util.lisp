@@ -1780,12 +1780,6 @@
 ;;; environment and is in the current component.
 (defun defined-fun-functional (defined-fun)
   (let ((functionals (defined-fun-functionals defined-fun)))
-    ;; FIXME: If we are block compiling, forget about finding the
-    ;; right functional. Just pick the first one we see and hope
-    ;; people don't mix inlined functions and policy with block
-    ;; compiling. (For now)
-    (when (block-compile *compilation*)
-      (return-from defined-fun-functional (first functionals)))
     (when functionals
       (let* ((sample (car functionals))
              (there (lambda-parent (if (lambda-p sample)
