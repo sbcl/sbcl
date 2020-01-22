@@ -387,6 +387,9 @@
 ;;; There was a minor glitch in the typecase->case optimizer causing
 ;;; duplicate layouts to appear, but the correct clause was picked
 ;;; by good fortune. Assert that there are no duplicates now.
+#+#.(cl:if (cl:gethash 'sb-c:multiway-branch-if-eq sb-c::*backend-template-names*)
+         '(:and)
+         '(:or))
 (with-test (:name :sealed-struct-typecase-map)
   (let (all-layouts)
     (sb-int:dovector (bin (subseq (sb-impl::build-sealed-struct-typecase-map
