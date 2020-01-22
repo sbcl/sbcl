@@ -52,7 +52,7 @@
 ;; Because this is not performance-critical, we can just punt to a function.
 ;; If no contents given, explicitly 0-fill in case element-type upgrades to T
 ;; and would get a default of NIL where we would use 0 in our specialization.
-(defun sb-xc:make-array (dims &key (element-type (missing-arg))
+(defun sb-xc:make-array (dims &key (element-type 't)
                                    (initial-contents nil contentsp)
                                    (initial-element 0))
   ;; ECL fails to compile MAKE-ARRAY when keyword args are not literal keywords. e.g.:
@@ -64,7 +64,7 @@
   ;;  The key (IF SELECT :INITIAL-CONTENTS :INITIAL-ELEMENT) is not allowed"
   #+host-quirks-ecl (declare (notinline cl:make-array))
 
-  (aver (not (member element-type '(t nil))))
+  (aver element-type)
   ;; Canonicalize
   (setq element-type (type-specifier (specifier-type element-type)))
   ;; Expressed type must be _exactly_ one of the supported ones.
@@ -78,7 +78,8 @@
                               :element-type element-type
                               (if contentsp :initial-contents :initial-element)
                               (if contentsp initial-contents initial-element))))
-    (setf (gethash array sb-cold::*array-to-specialization*) element-type)
+    (unless (eq element-type 't)
+      (setf (gethash array sb-cold::*array-to-specialization*) element-type))
     array))
 (defun sb-xc:array-element-type (array)
   (cond ((gethash array sb-cold::*array-to-specialization*))
