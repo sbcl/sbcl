@@ -65,6 +65,12 @@ echo //doing warm init - load and dump phase
  --eval '(let ((sb-ext:*invoke-debugger-hook* (prog1 sb-ext:*invoke-debugger-hook* (sb-ext:enable-debugger))))
  (sb-ext:save-lisp-and-die "output/sbcl.core"))'
 
+# Confirm that default evaluation strategy is :INTERPRET if sb-fasteval was built
+src/runtime/sbcl --core output/sbcl.core --lose-on-corruption --noinform \
+  --no-sysinit --no-userinit --disable-debugger \
+  --eval '(when (find-package "SB-INTERPRETER") (assert (eq *evaluator-mode* :interpret)))' \
+  --quit
+
 echo //checking for leftover cold-init symbols
 ./src/runtime/sbcl --core output/sbcl.core \
  --lose-on-corruption --noinform $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit --eval '

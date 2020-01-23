@@ -408,7 +408,7 @@ Please check that all strings which were not recognizable to the compiler
           (if winp (unintern symbol "CL-USER") (return)))))
 
 (setq sb-c:*compile-to-memory-space* :auto)
-(when (find-package "SB-FASTEVAL") (setq sb-ext:*evaluator-mode* :interpret))
+(when (find-package "SB-INTERPRETER") (setq sb-ext:*evaluator-mode* :interpret))
 ;; folding doesn't actually do anything unless the backend supports it,
 ;; but the interface exists no matter what.
 (sb-ext:fold-identical-code :aggressive t :preserve-docstrings t)
