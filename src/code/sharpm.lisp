@@ -370,9 +370,15 @@
        ((:or or) (some #'featurep (cdr x)))
        (t
         (error "unknown operator in feature expression: ~S." x))))
-    (symbol (not (null (memq x *features*))))
+    (symbol
+     (let ((present (memq x *features*)))
+       (cond (present
+              t)
+             ((and (boundp '+internal-features+)
+                   (memq x +internal-features+))
+              (warn "~s is no longer present in ~s" x '*features*)))))
     (t
-      (error "invalid feature expression: ~S" x))))
+     (error "invalid feature expression: ~S" x))))
 
 (defun sharp-plus-minus (stream sub-char numarg)
     (ignore-numarg sub-char numarg)

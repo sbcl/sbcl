@@ -69,6 +69,7 @@ sb-ext::(declaim (unmuffle-conditions sb-kernel:redefinition-warning))
     (concatenate-files input-fasls module.fasl)))
 
 (defun test-asdf-contrib (system)
-  (pushnew :sb-testing-contrib *features*)
+  (setq *features*
+        (append '(:sb-testing-contrib) sb-impl:+internal-features+ *features*))
   (setup-asdf-contrib)
   (asdf:test-system system))
