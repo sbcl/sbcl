@@ -1124,9 +1124,8 @@ core and return a descriptor to it."
          (sb-vm::sign-extend (read-bits-wordindexed cold-object index)
                              sb-vm:n-word-bits))))))
 
-(defun read-structure-definitions ()
-  (with-open-file (stream (sb-cold:stem-object-path
-                           "defstructs.lisp-expr" '(:extra-artifact) :target-compile))
+(defun read-structure-definitions (pathname)
+  (with-open-file (stream pathname)
     (loop
      (let ((ch (peek-char t stream)))
        (when (char= ch #\;)
@@ -3530,6 +3529,7 @@ III. initially undefined function references (alphabetically):
 ;;;   C-HEADER-DIR-NAME gets the path in which to place generated headers
 ;;;   MAP-FILE-NAME gets the name of the textual 'cold-sbcl.map' file
 (defun sb-cold:genesis (&key object-file-names tls-init
+                             defstruct-descriptions
                              core-file-name c-header-dir-name map-file-name
                              symbol-table-file-name (verbose t))
   (declare (ignorable symbol-table-file-name))
@@ -3624,7 +3624,8 @@ III. initially undefined function references (alphabetically):
       (initialize-layouts)
       (initialize-packages)
       (initialize-static-space tls-init)
-      (when core-file-name (read-structure-definitions))
+      (when core-file-name
+        (read-structure-definitions defstruct-descriptions))
 
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))

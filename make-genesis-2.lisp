@@ -14,6 +14,8 @@
                                   (push (stem-object-path stem flags :target-compile)
                                         list)))
                               (nreverse list))
+         :defstruct-descriptions (stem-object-path
+                                  "defstructs.lisp-expr" '(:extra-artifact) :target-compile)
          :tls-init (read-from-file
                     (stem-object-path "tls-init.lisp-expr"
                                       '(:extra-artifact) :target-compile))
