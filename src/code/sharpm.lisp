@@ -375,7 +375,7 @@
        (cond (present
               t)
              ((and (boundp '+internal-features+)
-                   (memq x +internal-features+))
+                   (memq x (symbol-value '+internal-features+)))
               (warn "~s is no longer present in ~s" x '*features*)))))
     (t
      (error "invalid feature expression: ~S" x))))
