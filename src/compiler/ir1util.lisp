@@ -2667,17 +2667,17 @@ is :ANY, the function name is not checked."
 ;;; Check whether NODE's component has exceeded its inline expansion
 ;;; limit, and warn if so, returning NIL.
 (defun inline-expansion-ok (combination leaf)
-  (let* ((expansions (memq (leaf-%source-name leaf)
+  (let* ((name (leaf-%source-name leaf))
+         (expansions (memq name
                            (basic-combination-inline-expansions combination)))
          (expanded (cadr expansions)))
     (cond ((not expanded))
           ((> expanded *inline-expansion-limit*) nil)
           ((= expanded *inline-expansion-limit*)
            (let ((*compiler-error-context* combination))
-             (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded, ~
-                               probably trying to~%  ~
-                               inline a recursive function."
-                              *inline-expansion-limit*))
+             (compiler-notify "*INLINE-EXPANSION-LIMIT* (~W) was exceeded ~
+                               while inlining ~s"
+                              *inline-expansion-limit* name))
            (incf (cadr expansions))
            nil)
           (t))))
