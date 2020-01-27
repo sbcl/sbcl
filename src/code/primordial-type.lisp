@@ -84,5 +84,6 @@
                        (:constructor !make-interned-hairy-type
                            (specifier &aux (%bits (pack-interned-ctype-bits 'hairy))))
                        (:copier nil))
-  ;; the Common Lisp type-specifier of the type we represent
+  ;; the Common Lisp type-specifier of the type we represent.
+  ;; For other than an unknown type, this must be a (SATISFIES f) expression.
   (specifier nil :type t :read-only t))

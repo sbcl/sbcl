@@ -91,41 +91,23 @@
            (values nil nil))))
     (hairy-type
      ;; Now the tricky stuff.
-     (let* ((hairy-spec (hairy-type-specifier type))
-            (symbol (if (consp hairy-spec) (car hairy-spec) hairy-spec)))
-       (ecase symbol
-         (and
-          (if (atom hairy-spec)
-              (values t t)
-              (dolist (spec (cdr hairy-spec) (values t t))
-                (multiple-value-bind (res win)
-                    (ctypep obj (specifier-type spec))
-                  (unless win (return (values nil nil)))
-                  (unless res (return (values nil t)))))))
-         (not
-          (multiple-value-bind (res win)
-              (ctypep obj (specifier-type (cadr hairy-spec)))
-            (if win
-                (values (not res) t)
-                (values nil nil))))
-         (satisfies
-          (let ((predicate (second hairy-spec)))
-            (case predicate
-             (keywordp ; answer with certainty sometimes
-              ;; Keep in sync with KEYWORDP test in src/code/cross-type
-              (cond ((or (not (symbolp obj))
-                         (eq (sb-xc:symbol-package obj) *cl-package*))
-                     (values nil t)) ; certainly no
-                    ((eq (sb-xc:symbol-package obj) *keyword-package*)
-                     (values t t)) ; certainly yes
-                    (t
-                     (values nil nil)))) ; can't decide
-             (t
-              ;; If the SATISFIES function is not foldable, we cannot answer!
-              (let ((form `(,predicate ',obj)))
-                (multiple-value-bind (ok result)
-                    (sb-c::constant-function-call-p form nil nil)
-                  (values (not (null result)) ok))))))))))))
+     (let ((predicate (cadr (hairy-type-specifier type))))
+       (case predicate
+         (keywordp ; answer with certainty sometimes
+          ;; Keep in sync with KEYWORDP test in src/code/cross-type
+          (cond ((or (not (symbolp obj))
+                     (eq (sb-xc:symbol-package obj) *cl-package*))
+                 (values nil t)) ; certainly no
+                ((eq (sb-xc:symbol-package obj) *keyword-package*)
+                 (values t t)) ; certainly yes
+                (t
+                 (values nil nil)))) ; can't decide
+         (t
+          ;; If the SATISFIES function is not foldable, we cannot answer!
+          (let ((form `(,predicate ',obj)))
+            (multiple-value-bind (ok result)
+                (sb-c::constant-function-call-p form nil nil)
+              (values (not (null result)) ok)))))))))
 
 ;;;; miscellaneous interfaces
 

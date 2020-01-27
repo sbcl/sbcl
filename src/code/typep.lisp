@@ -133,25 +133,10 @@
     (negation-type
      (not (recurse object (negation-type-type type))))
     (hairy-type
-     ;; Now the tricky stuff.
-     (let* ((hairy-spec (hairy-type-specifier type))
-            (symbol (car hairy-spec)))
-       (ecase symbol
-         (and
-          (every (lambda (spec) (recurse object (specifier-type spec)))
-                 (rest hairy-spec)))
-         ;; Note: it should be safe to skip OR here, because union
-         ;; types can always be represented as UNION-TYPE in general
-         ;; or other CTYPEs in special cases; we never need to use
-         ;; HAIRY-TYPE for them.
-         (not
-          (unless (proper-list-of-length-p hairy-spec 2)
-            (error "invalid type specifier: ~S" hairy-spec))
-          (not (recurse object (specifier-type (cadr hairy-spec)))))
-         (satisfies
-          (unless (proper-list-of-length-p hairy-spec 2)
-            (error "invalid type specifier: ~S" hairy-spec))
-          (and (funcall (symbol-function (cadr hairy-spec)) object) t)))))
+     ;; Must be a SATISFIES type
+     (when (funcall (symbol-function (cadr (hairy-type-specifier type)))
+                    object)
+       t))
     (alien-type-type
      (sb-alien-internals:alien-typep object (alien-type-type-alien-type type)))
     (fun-type
