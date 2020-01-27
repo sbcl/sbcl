@@ -114,3 +114,15 @@
                  '(sb-c:lambda-with-lexenv
                    (:declare ((muffle-conditions compiler-note))) (x)
                    (block some-inline-fun (- x))))))
+
+(defun typecase-test (node)
+  (typecase node
+   (sb-c::bind 'a)
+   (sb-c::cast 'b)
+   (sb-c::cif 'c)
+   (sb-c::cset 'd)
+   (sb-c::ref 'e)
+   (sb-kernel:layout 'winner)))
+
+(with-test (:name :interpreted-type-constraint)
+  (assert (eq (typecase-test (sb-kernel:find-layout 'cons)) 'winner)))

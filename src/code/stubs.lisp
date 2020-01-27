@@ -159,3 +159,9 @@
   (declare (explicit-check)) ; actually, not
   (declare (ignore satisfies))
   (symbol-hash* x nil))
+
+;;; TYPECASE could expand to contain a call to this function.
+;;; The interpreter can ignore it, it is just compiler magic.
+(defun sb-c::%type-constraint (var type)
+  (declare (ignore var type))
+  nil)
