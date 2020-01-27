@@ -11,7 +11,6 @@
 
 (in-package "SB-KERNEL")
 
-(!begin-collecting-cold-init-forms)
 
 ;;; If TYPE is a type that we can do a compile-time test on, then
 ;;; return whether the object is of that type as the first value and
@@ -227,7 +226,6 @@
                      :element-type etype
                      :specialized-element-type etype)))
 
-(!defun-from-collected-cold-init-forms !target-type-cold-init)
 
 ;;;; Some functions for examining the type system
 ;;;; which are not needed during self-build.

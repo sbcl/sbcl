@@ -41,6 +41,10 @@
 
 (defmacro !defun-from-collected-cold-init-forms (name)
   #+sb-xc `(progn
+             ,(unless *!cold-init-forms*
+                ;; This error means: you don't understand the cold-init code
+                ;; as well as you should, so please fix something.
+                (error "(DEFUN ~s) has no forms" name))
              (defun ,name ()
                ,@(reverse *!cold-init-forms*)
                (values))

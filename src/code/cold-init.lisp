@@ -125,7 +125,6 @@
   (show-and-call !early-type-cold-init)
   (show-and-call !late-type-cold-init)
   (show-and-call !alien-type-cold-init)
-  (show-and-call !target-type-cold-init)
   ;; FIXME: It would be tidy to make sure that that these cold init
   ;; functions are called in the same relative order as the toplevel
   ;; forms of the corresponding source files.
