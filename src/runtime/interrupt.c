@@ -2246,8 +2246,8 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     /* To allow debugging memory faults in signal handlers and such. */
     char* pc = (char*)*os_context_pc_addr(context);
     struct code* code = (struct code*)component_ptr_from_pc(pc);
-    unsigned int offset = code ? pc - (char*)code : 0;
 #ifdef ARCH_HAS_STACK_POINTER
+    unsigned int offset = code ? pc - (char*)code : 0;
     if (offset)
         corruption_warning_and_maybe_lose(
             "Memory fault at %p (pc=%p [code %p+0x%X ID 0x%x], fp=%p, sp=%p) tid %#lx",
