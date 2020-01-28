@@ -270,9 +270,9 @@
 (defconstant +type-hash-mask+
   #.(cl:logandc2 (cl:ldb (cl:byte 27 0) -1) (cl:mask-field (cl:byte 2 20) -1)))
 
+(defmacro type-class-id (ctype) `(ldb (byte 5 27) (type-%bits ,ctype)))
 (defmacro type-class (ctype)
-  `(truly-the type-class
-              (aref *type-classes* (ldb (byte 5 27) (type-%bits ,ctype)))))
+  `(truly-the type-class (aref *type-classes* (type-class-id ,ctype))))
 
 (declaim (inline type-hash-value))
 (defun type-hash-value (ctype) (ldb (byte 27 0) (type-%bits ctype)))
@@ -852,41 +852,87 @@
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
 
 ;;; CAUTION: unhygienic macro specifically designed to expand into body code
-;;; for either CTYPEP (compiler-typep) or CROSS-TYPEP (cross-compiler-[c]typep)
-(defmacro ctypep-macro (&rest more-clauses)
-  `(named-let recurse ((obj obj) (type type))
-     (flet ((test-keywordp ()
-              ;; answer with certainty sometimes
-              (cond ((or (not (symbolp obj))
-                         (let ((pkg (sb-xc:symbol-package obj)))
-                           (or (eq pkg *cl-package*)
-                               ;; The user can't re-home our symbols in KEYWORD.
-                               (system-package-p pkg))))
-                     (values nil t)) ; certainly no
-                    ((eq (sb-xc:symbol-package obj) *keyword-package*)
-                     (values t t)) ; certainly yes
-                    (t
-                     (values nil nil))))) ; can't decide
-       (etypecase type
-         ;; Standard AND, NOT, OR combinators
-         (union-type
-          (any/type #'recurse obj (union-type-types type)))
-         (intersection-type
-          (every/type #'recurse obj (intersection-type-types type)))
-         (negation-type
-          (multiple-value-bind (result certain) (recurse obj (negation-type-type type))
-            (if certain
-                (values (not result) t)
-                (values nil nil))))
-         ;; CONS is basically an AND type and can be handled generically here.
-         ;; This is correct in the cross-compiler so long as there are no atoms
-         ;; in the host that represent target conses or vice-versa.
-         (cons-type
-          (if (atom obj)
-              (values nil t)
-              (multiple-value-bind (result certain)
-                  (recurse (car obj) (cons-type-car-type type))
-                (if result
-                    (recurse (cdr obj) (cons-type-cdr-type type))
-                    (values nil certain)))))
-         ,@more-clauses))))
+;;; for TYPEP, CTYPEP (compiler-typep), or CROSS-TYPEP (cross-compiler-[c]typep)
+(defmacro typep-impl-macro ((thing &key (defaults t)) &rest more-clauses &aux seen)
+  (labels ((convert-clause (clause)
+             (let ((metatype (car clause)))
+               `(,(if (and (consp metatype) (eq (car metatype) 'or))
+                      (mapcar #'metatype-name->class-id (cdr metatype))
+                      (list (metatype-name->class-id metatype)))
+                 (let ((type (truly-the ,metatype type))) ,@(cdr clause)))))
+           (metatype-name->class-id (name)
+             ;; See also DEFINE-TYPE-METHOD which needs the inverse mapping.
+             ;; Maybe it should be stored globally in an alist?
+             (let* ((type-class-name
+                      (case name
+                        ((values-type constant-type)
+                         (bug "Unexpected type ~S in CTYPEP-MACRO" name))
+                        (classoid 'classoid)
+                        (numeric-type 'number)
+                        (fun-type 'function)
+                        (alien-type-type 'alien)
+                        ;; remove "-TYPE" suffix from name of type's type to get
+                        ;; name of type-class.
+                        (t (intern (subseq (string name) 0 (- (length (string name)) 5))
+                                   "SB-KERNEL"))))
+                    (id (type-class-name->id type-class-name)))
+               (when (member type-class-name seen)
+                 (bug "Duplicated type-class: ~S" name))
+               (push type-class-name seen)
+               id)))
+    (let ((clauses
+            (append
+             (when defaults
+               `(;; Standard AND, NOT, OR combinators
+                 (union-type
+                  (any/type #'recurse ,thing (union-type-types type)))
+                 (intersection-type
+                  (every/type #'recurse ,thing (intersection-type-types type)))
+                 (negation-type
+                  (multiple-value-bind (result certain)
+                      (recurse ,thing (negation-type-type type))
+                    (if certain
+                        (values (not result) t)
+                        (values nil nil))))
+                 ;; CONS is basically an AND type and can be handled generically here.
+                 ;; This is correct in the cross-compiler so long as there are no atoms
+                 ;; in the host that represent target conses or vice-versa.
+                 (cons-type
+                  (if (atom ,thing)
+                      (values nil t)
+                      (multiple-value-bind (result certain)
+                          (recurse (car ,thing) (cons-type-car-type type))
+                        (if result
+                            (recurse (cdr ,thing) (cons-type-cdr-type type))
+                            (values nil certain)))))))
+             more-clauses)))
+      `(named-let recurse ((,thing ,thing) (type type))
+         (flet ((test-keywordp ()
+                  ;; answer with certainty sometimes
+                  (cond ((or (not (symbolp ,thing))
+                             (let ((pkg (sb-xc:symbol-package ,thing)))
+                               (or (eq pkg *cl-package*)
+                                   ;; The user can't re-home our symbols in KEYWORD.
+                                   (and pkg (system-package-p pkg)))))
+                         (values nil t)) ; certainly no
+                        ((eq (sb-xc:symbol-package ,thing) *keyword-package*)
+                         (values t t)) ; certainly yes
+                        (t
+                         (values nil nil))))) ; can't decide
+           ;; It should always work to dispatch by class-id, but ALIEN-TYPE-TYPE
+           ;; is a problem in the cross-compiler due to not having a type-class-id
+           ;; when 'src/code/cross-type' is compiled. I briefly tried moving
+           ;; it later, but then class-init failed to compile.
+           #+sb-xc-host
+           (etypecase type ,@clauses)
+           #-sb-xc-host
+           (case (truly-the (mod ,(length *type-classes*)) (type-class-id type))
+             ,@(let ((clauses (mapcar #'convert-clause clauses)))
+                 (let ((absent (loop for class across *type-classes*
+                                     unless (or (member (type-class-name class)
+                                                        '(values constant))
+                                                (member (type-class-name class) seen))
+                                     collect class)))
+                   (when absent
+                     (error "Unhandled type-classes: ~S" absent)))
+                 clauses)))))))

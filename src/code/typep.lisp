@@ -37,8 +37,7 @@
 (declaim (freeze-type ctype))
 (defun %%typep (object type &optional (strict t))
  (declare (type ctype type))
- (named-let recurse ((object object) (type type))
-  (etypecase type
+ (typep-impl-macro (object :defaults nil)
     (named-type
      (ecase (named-type-name type)
        ((* t) t)
@@ -66,16 +65,6 @@
                     (let ((dim (car want)))
                       (and (or (eq dim '*) (eq dim (length object)))
                            (not (cdr want)))))))
-          ;; FIXME: treatment of compound types involving unknown types
-          ;; is generally bogus throughout the system, e.g.
-          ;;   (TYPEP MY-ARRAY '(ARRAY (OR BAD1 BAD2) *)) => T
-          ;; because (OR BAD1 BAD2) is not represented as an UNKNOWN-TYPE,
-          ;; and has specialized type '*.
-          ;; One way to fix this is that every CTYPE needs a bit to indicate
-          ;; whether any subpart of it is unknown, or else when parsing,
-          ;; we should always return an UNKNOWN if any subpart is unknown,
-          ;; or else any time we use a CTYPE, we do a deep traversal
-          ;; to detect embedded UNKNOWNs (which seems bad for performance).
           (if (unknown-type-p (array-type-element-type type))
               ;; better to fail this way than to get bogosities like
               ;;   (TYPEP (MAKE-ARRAY 11) '(ARRAY SOME-UNDEFINED-TYPE)) => T
@@ -123,31 +112,32 @@
     (character-set-type
      (and (characterp object)
           (character-in-charset-p object type)))
-    (unknown-type
-     ;; Parse it again to make sure it's really undefined.
-     (let ((reparse (specifier-type (unknown-type-specifier type))))
-       (if (typep reparse 'unknown-type)
-           (error "unknown type specifier: ~S"
-                  (unknown-type-specifier reparse))
-           (recurse object reparse))))
     (negation-type
      (not (recurse object (negation-type-type type))))
     (hairy-type
-     ;; Must be a SATISFIES type
-     (when (funcall (symbol-function (cadr (hairy-type-specifier type)))
-                    object)
-       t))
+     (if (unknown-type-p type)
+         ;; Parse it again to make sure it's really undefined.
+         (let ((reparse (specifier-type (unknown-type-specifier type))))
+           (if (typep reparse 'unknown-type)
+               (error "unknown type specifier: ~S" (unknown-type-specifier reparse))
+               (recurse object reparse)))
+         ;; Must be a SATISFIES type
+         (when (funcall (symbol-function (cadr (hairy-type-specifier type)))
+                        object)
+           t)))
     (alien-type-type
      (sb-alien-internals:alien-typep object (alien-type-type-alien-type type)))
     (fun-type
-     (case strict
-      ((functionp) (functionp object)) ; least strict
-      ((nil) ; medium strict
-       (and (functionp object)
-            (csubtypep (specifier-type (sb-impl::%fun-type object)) type)))
-      (t ; strict
-       (error "Function types are not a legal argument to TYPEP:~%  ~S"
-              (type-specifier type))))))))
+     (if (fun-designator-type-p type)
+         (bug "%%TYPEP got ~S" type)
+         (case strict
+           ((functionp) (functionp object)) ; least strict
+           ((nil) ; medium strict
+            (and (functionp object)
+                 (csubtypep (specifier-type (sb-impl::%fun-type object)) type)))
+           (t ; strict
+            (error "Function types are not a legal argument to TYPEP:~%  ~S"
+                   (type-specifier type))))))))
 
 (defun cached-typep (cache object)
   (let* ((type (cdr cache))
@@ -257,12 +247,11 @@
 ;;;
 (defun ctypep (obj type)
   (declare (type ctype type))
-  (ctypep-macro
+  (typep-impl-macro (obj)
     ((or numeric-type
          named-type
          member-type
          character-set-type
-         built-in-classoid
          #+sb-simd-pack simd-pack-type
          #+sb-simd-pack-256 simd-pack-256-type)
      (values (%%typep obj type)
@@ -272,42 +261,38 @@
          (values nil (not (arrayp obj)))
          (values (%%typep obj type) t)))
     (classoid
-     (if (if (csubtypep type (specifier-type 'function))
-             (funcallable-instance-p obj)
-             (%instancep obj))
-         (if (eq (classoid-layout type)
-                 (info :type :compiler-layout (classoid-name type)))
-             (values (sb-xc:typep obj type) t)
-             (values nil nil))
-         (values nil t)))
-    (fun-designator-type
-     (typecase obj
-       (symbol (values nil nil))
-       (function
-        (csubtypep (specifier-type (%simple-fun-type (sb-kernel:%fun-fun obj)))
-                   type))
-       (t (values nil t))))
+     (if (built-in-classoid-p type)
+         (values (%%typep obj type) t)
+         (if (if (csubtypep type (specifier-type 'function))
+                 (funcallable-instance-p obj)
+                 (%instancep obj))
+             (if (eq (classoid-layout type)
+                     (info :type :compiler-layout (classoid-name type)))
+                 (values (sb-xc:typep obj type) t)
+                 (values nil nil))
+             (values nil t))))
     (fun-type
-     (if (functionp obj)
-         (csubtypep (specifier-type (%simple-fun-type (sb-kernel:%fun-fun obj)))
-                    type)
-         (values nil t)))
-    (unknown-type
-     (values nil nil))
+     (cond ((and (symbolp obj) (fun-designator-type-p type))
+            (values nil nil))
+           ((functionp obj)
+            (csubtypep (specifier-type (%simple-fun-type (%fun-fun obj))) type))
+           (t (values nil t))))
     (alien-type-type
      (values (alien-typep obj (alien-type-type-alien-type type)) t))
     (hairy-type
-     ;; Now the tricky stuff.
-     (let ((predicate (cadr (hairy-type-specifier type))))
-       (case predicate
-         (keywordp
-          (test-keywordp))
-         (t
-          ;; If the SATISFIES function is not foldable, we cannot answer!
-          (let ((form `(,predicate ',obj)))
-            (multiple-value-bind (ok result)
-                (sb-c::constant-function-call-p form nil nil)
-              (values (not (null result)) ok)))))))))
+     (if (unknown-type-p type)
+         (values nil nil)
+         ;; Now the tricky stuff.
+         (let ((predicate (cadr (hairy-type-specifier type))))
+           (case predicate
+             (keywordp
+              (test-keywordp))
+             (t
+              ;; If the SATISFIES function is not foldable, we cannot answer!
+              (dx-let ((form `(,predicate ',obj)))
+                (multiple-value-bind (ok result)
+                    (sb-c::constant-function-call-p form nil nil)
+                  (values (not (null result)) ok))))))))))
 
 ;;;; miscellaneous interfaces
 

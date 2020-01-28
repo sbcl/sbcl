@@ -92,7 +92,7 @@
   (when (or (cl:floatp obj) (cl:complexp obj))
     (error "Can't happen"))
   (multiple-value-bind (answer certain)
-     (ctypep-macro
+     (typep-impl-macro (obj)
        (named-type
         (ecase (named-type-name type)
           ((t) (values t t)) ; universal supertype
@@ -139,37 +139,36 @@
        (character-set-type
         ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
         (values (and (characterp obj) (character-in-charset-p obj type)) t))
-       ;; Test BUILT-IN before falling into the CLASSOID case
-       (built-in-classoid
-        (ecase (classoid-name type)
-          (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
-          (function
-           (if (functionp obj)
-               (uncertain)
-               ;; probably not a function. What about FMT-CONTROL instances?
+       (classoid ; = {built-in,structure,condition,standard,static}-classoid
+        (if (built-in-classoid-p type)
+            (ecase (classoid-name type)
+              (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
+              (function
+               (if (functionp obj)
+                   (uncertain)
+                   ;; probably not a function. What about FMT-CONTROL instances?
+                   (values nil t)))
+              ((system-area-pointer stream fdefn weak-pointer file-stream
+                code-component lra)
                (values nil t)))
-          ((system-area-pointer stream fdefn weak-pointer file-stream
-            code-component lra)
-           (values nil t)))) ; nothing could be this type
-       (classoid ; = {structure,condition,standard,static}-classoid
-        (if (not (%instancep obj))
-            (values nil t) ; false certainly
-            (let ((name (classoid-name type)))
-              (if (and (cl:find-class name nil) ; see if the host knows the type
-                       ;; and it's in our object hierarchy
-                       (cl:subtypep name 'structure!object))
-                  (values (cl:typep obj name) t)
-                  (unimplemented)))))
-       ;; Test FUN-DESIGNATOR before falling into the FUN-TYPE case
-       (fun-designator-type (values (typep obj '(or symbol function)) t))
+            (if (not (%instancep obj))
+                (values nil t) ; false certainly
+                (let ((name (classoid-name type)))
+                  (if (and (cl:find-class name nil) ; see if the host knows the type
+                           ;; and it's in our object hierarchy
+                           (cl:subtypep name 'structure!object))
+                      (values (cl:typep obj name) t)
+                      (unimplemented))))))
        (fun-type
-        ;; FUNCTION is not a specifier suitable for discrimination,
-        ;; thus TYPEP is not allowed to determine whether an object
-        ;; is in a particular subtype of function.
-        ;; But be lenient when the object is not a function.
-        (if (and (functionp obj) (eq caller 'sb-xc:typep))
-            (error "TYPEP called with function type")
-            (values (functionp obj) t)))
+        (if (fun-designator-type-p type)
+             (values (typep obj '(or symbol function)) t)
+             ;; FUNCTION is not a specifier suitable for discrimination,
+             ;; thus TYPEP is not allowed to determine whether an object
+             ;; is in a particular subtype of function.
+             ;; But be lenient when the object is not a function.
+             (if (and (functionp obj) (eq caller 'sb-xc:typep))
+                 (error "TYPEP called with function type")
+                 (values (functionp obj) t))))
        (alien-type-type (if (null obj) (values nil t) (unimplemented)))
        ;; Test UNKNOWN before falling into the HAIRY case
        (unknown-type
