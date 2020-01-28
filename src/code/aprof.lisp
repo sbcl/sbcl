@@ -168,6 +168,10 @@
 ;;; Templates to try in order.  The one for unknown headered objects should be last
 ;;; so that we try to match a store to the header word if possible.
 (defglobal *allocation-templates* nil)
+;;; Running sb-aprof with #+sb-show is not an important concern,
+;;; and I don't care to fix it. It gets an error here:
+;;; "don't know how to dump R13 (default MAKE-LOAD-FORM method called)."
+#-sb-show
 (setq *allocation-templates*
       `((array ;; also array-header
                (xadd $free $size)

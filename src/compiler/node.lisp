@@ -543,7 +543,6 @@
   (sset-number 0 :type fixnum)))
 (defprinter (component :identity t)
   name
-  #+sb-show id
   (reanalyze :test reanalyze))
 
 (declaim (inline reoptimize-component))
@@ -814,7 +813,6 @@
              :pretty-ir-printer
              (pretty-print-global-var structure stream))
   %source-name
-  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (defined-type :test (not (eq defined-type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -851,7 +849,6 @@
 (defprinter (defined-fun :identity t
              :pretty-ir-printer (pretty-print-global-var structure stream))
   %source-name
-  #+sb-show id
   inlinep
   (functionals :test functionals))
 
@@ -1024,8 +1021,7 @@
 (defprinter (functional :identity t
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
-  %debug-name
-  #+sb-show id)
+  %debug-name)
 
 (defun leaf-debug-name (leaf)
   (if (functional-p leaf)
@@ -1146,7 +1142,6 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #+sb-show id
   kind
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
@@ -1228,7 +1223,6 @@
              :pretty-ir-printer (pretty-print-functional structure stream))
   %source-name
   %debug-name
-  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   arglist
@@ -1339,7 +1333,6 @@
   source-form)
 (defprinter (lambda-var :identity t)
   %source-name
-  #+sb-show id
   (type :test (not (eq type *universal-type*)))
   (where-from :test (not (eq where-from :assumed)))
   (flags :test (not (zerop flags))
@@ -1378,7 +1371,6 @@
   ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
   constraints)
 (defprinter (ref :identity t)
-  #+sb-show id
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
 
@@ -1462,7 +1454,6 @@
                          (:constructor make-combination (fun))
                          (:copier nil)))
 (defprinter (combination :identity t)
-  #+sb-show id
   (fun :prin1 (lvar-uses fun))
   (args :prin1 (mapcar (lambda (x)
                          (if x
@@ -1585,8 +1576,7 @@
   (exits nil :type list)
   ;; The cleanup for this entry. NULL only temporarily.
   (cleanup nil :type (or cleanup null)))
-(defprinter (entry :identity t)
-  #+sb-show id)
+(defprinter (entry :identity t))
 
 ;;; The EXIT node marks the place at which exit code would be emitted,
 ;;; if necessary. This is interposed between the uses of the exit
@@ -1607,7 +1597,6 @@
   (value nil :type (or lvar null))
   (nlx-info nil :type (or nlx-info null)))
 (defprinter (exit :identity t)
-  #+sb-show id
   (entry :test entry)
   (value :test value))
 
