@@ -388,7 +388,6 @@
  ("src/code/late-type" :c-headers)
  ;; Compile target-only stuff after all defglobals like *CONS-T-T-TYPE*
  ;; and all type-classes are defined.
- ("src/code/target-type" :not-host)
  ("src/code/deftypes-for-target" :c-headers)
 
  ;; defines IR1-ATTRIBUTES macro, needed by proclaim.lisp
