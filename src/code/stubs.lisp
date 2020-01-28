@@ -165,3 +165,9 @@
 (defun sb-c::%type-constraint (var type)
   (declare (ignore var type))
   nil)
+(eval-when (:compile-toplevel)
+  ;; Defining %TYPE-CONSTRAINT issues a full warning because TYPE's type
+  ;; is (OR TYPE-SPECIFIER CTYPE), and TYPE-SPECIFIER is
+  ;; (OR LIST SYMBOL CLASSOID CLASS), and CLASS isn't known, and you can't
+  ;; define it because it's a standard symbol.
+  (setq sb-c::*undefined-warnings* nil))
