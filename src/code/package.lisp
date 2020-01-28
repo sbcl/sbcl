@@ -102,8 +102,8 @@
 
 (defconstant +initial-package-bits+ 2) ; for genesis
 
+#-sb-xc-host
 (defmacro system-package-p (package) ; SBCL stuff excluding CL and KEYWORD
-  #+sb-xc-host `(eql (mismatch "SB-" (package-name ,package)) 3)
-  #-sb-xc-host `(logbitp 1 (package-%bits ,package)))
+  `(logbitp 1 (package-%bits ,package)))
 
 (defmacro package-lock (package) `(logbitp 0 (package-%bits ,package)))

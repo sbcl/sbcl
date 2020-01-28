@@ -850,3 +850,43 @@
 (define-type-class character-set :enumerable nil
                     :might-contain-other-types nil)
 (!defun-from-collected-cold-init-forms !type-class-cold-init)
+
+;;; CAUTION: unhygienic macro specifically designed to expand into body code
+;;; for either CTYPEP (compiler-typep) or CROSS-TYPEP (cross-compiler-[c]typep)
+(defmacro ctypep-macro (&rest more-clauses)
+  `(named-let recurse ((obj obj) (type type))
+     (flet ((test-keywordp ()
+              ;; answer with certainty sometimes
+              (cond ((or (not (symbolp obj))
+                         (let ((pkg (sb-xc:symbol-package obj)))
+                           (or (eq pkg *cl-package*)
+                               ;; The user can't re-home our symbols in KEYWORD.
+                               (system-package-p pkg))))
+                     (values nil t)) ; certainly no
+                    ((eq (sb-xc:symbol-package obj) *keyword-package*)
+                     (values t t)) ; certainly yes
+                    (t
+                     (values nil nil))))) ; can't decide
+       (etypecase type
+         ;; Standard AND, NOT, OR combinators
+         (union-type
+          (any/type #'recurse obj (union-type-types type)))
+         (intersection-type
+          (every/type #'recurse obj (intersection-type-types type)))
+         (negation-type
+          (multiple-value-bind (result certain) (recurse obj (negation-type-type type))
+            (if certain
+                (values (not result) t)
+                (values nil nil))))
+         ;; CONS is basically an AND type and can be handled generically here.
+         ;; This is correct in the cross-compiler so long as there are no atoms
+         ;; in the host that represent target conses or vice-versa.
+         (cons-type
+          (if (atom obj)
+              (values nil t)
+              (multiple-value-bind (result certain)
+                  (recurse (car obj) (cons-type-car-type type))
+                (if result
+                    (recurse (cdr obj) (cons-type-cdr-type type))
+                    (values nil certain)))))
+         ,@more-clauses))))

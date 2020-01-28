@@ -65,38 +65,34 @@
                  (sb-c::ir1-attributep (sb-c::fun-info-attributes it)
                                        sb-c:foldable))))))
 
-;;; This is like TYPEP, except that it asks whether HOST-OBJECT would
-;;; be of type TYPE when instantiated on the target SBCL. Since this
+;;; Return true of any SBCL-internal package.
+;;; Defined here so that CROSS-TYPEP can use it.
+;;; The target variant of this is in src/code/package.
+(defmacro system-package-p (package)
+  `(eql (mismatch "SB-" (package-name ,package)) 3))
+
+;;; This is like TYPEP, except that it asks whether OBJ (a host object acting
+;;; as a proxy for some logically equivalent object in the target sytem)
+;;; would be of type TYPE when instantiated on the target SBCL. Since this
 ;;; is hard to determine in some cases, and since in other cases we
 ;;; just haven't bothered to try, it needs to return two values, just
 ;;; like SUBTYPEP: the first value for its conservative opinion (never
 ;;; T unless it's certain) and the second value to tell whether it's
 ;;; certain.
-;;; The logic is a mixture of the code for CTYPEP as defined in src/code/late-type
-;;; and %%TYPEP as defined in src/code/typep.
+;;; The logic is a mixture of the code for CTYPEP and %%TYPEP
+;;; because it handles both.
 ;;; The order of clauses is fairly symmetrical with that of %%TYPEP.
 (defvar *xtypep-uncertainty-action* 'warn) ; {BREAK WARN STYLE-WARN ERROR NIL}
-(defun cross-typep (caller host-object type)
+(macrolet ((unimplemented ()
+             '(bug "Incomplete implementation of ~S ~S ~S" caller obj type))
+           (uncertain ()
+             '(values nil nil)))
+(defun cross-typep (caller obj type)
   (declare (type (member sb-xc:typep ctypep) caller))
-  (when (or (cl:floatp host-object) (cl:complexp host-object))
+  (when (or (cl:floatp obj) (cl:complexp obj))
     (error "Can't happen"))
-  (named-let recurse ((obj host-object) (type type))
-    (flet ((unimplemented ()
-             (bug "Incomplete implementation of ~S ~S ~S" caller obj type))
-           (uncertain (&optional thing
-                       &aux (allow-uncertain
-                             (and (hairy-type-p thing)
-                                  (equal (hairy-type-specifier thing)
-                                         '(satisfies keywordp)))))
-             (when (and *xtypep-uncertainty-action* (not allow-uncertain))
-               ;; can't even backtrace if the printing of a something involving
-               ;; uncertainty involves uncertainty.
-               (let* ((action *xtypep-uncertainty-action*)
-                      (*xtypep-uncertainty-action* nil))
-                 (funcall action "Should not happen: (TYPEP '~S '~S)"
-                          obj (type-specifier type))))
-             (values nil nil)))
-      (etypecase type
+  (multiple-value-bind (answer certain)
+     (ctypep-macro
        (named-type
         (ecase (named-type-name type)
           ((t) (values t t)) ; universal supertype
@@ -131,21 +127,6 @@
                 t))
        (member-type
         (values (if (member-type-member-p obj type) t) t))
-       (compound-type
-        (funcall (etypecase type
-                  (intersection-type #'every/type)
-                  (union-type #'any/type))
-                 #'recurse
-                 obj
-                 (compound-type-types type)))
-       (cons-type
-        (if (not (consp obj))
-            (values nil t)
-            (multiple-value-bind (result certain)
-                (recurse (car obj) (cons-type-car-type type))
-              (if result
-                  (recurse (cdr obj) (cons-type-cdr-type type))
-                  (values nil certain)))))
        ;; An empty (OR) produces a warning under CCL, and the warning as worded
        ;; is a tad wrong: "Clause ((OR) ...) shadowed by (CONS-TYPE ...)".
        ;; "Shadowed by" would imply that if you match the shadowing clause, then
@@ -158,11 +139,6 @@
        (character-set-type
         ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
         (values (and (characterp obj) (character-in-charset-p obj type)) t))
-       (negation-type
-        (multiple-value-bind (res win) (recurse obj (negation-type-type type))
-          (if win
-              (values (not res) t)
-              (uncertain (negation-type-type type)))))
        ;; Test BUILT-IN before falling into the CLASSOID case
        (built-in-classoid
         (ecase (classoid-name type)
@@ -253,18 +229,19 @@
               (let ((predicate (cadr spec)))
                 ;; Keep in sync with KEYWORDP test in src/code/target-type
                 (cond ((eq predicate 'keywordp)
-                       (cond ((or (not (symbolp obj))
-                                  (eq (sb-xc:symbol-package obj) *cl-package*))
-                              (values nil t)) ; certainly no
-                             ((eq (sb-xc:symbol-package obj) *keyword-package*)
-                              (values t t)) ; certainly yes
-                             (t
-                              (uncertain type))))
+                       (test-keywordp))
                       ((acceptable-cross-typep-pred predicate caller)
                        (values (funcall predicate obj) t))
                       (t
                        (uncertain))))
-              (unimplemented))))))))
+              (unimplemented)))))
+    (when (and (not certain) *xtypep-uncertainty-action*)
+      ;; can't even backtrace if the printing of a something involving
+      ;; uncertainty involves uncertainty.
+      (let* ((action *xtypep-uncertainty-action*)
+             (*xtypep-uncertainty-action* nil))
+        (funcall action "CROSS-TYPEP uncertain: ~S ~S ~S" caller obj type)))
+    (values answer certain))))
 
 ;;; This is an incomplete TYPEP which runs at cross-compile time to
 ;;; tell whether OBJECT is the host Lisp representation of a target

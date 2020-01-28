@@ -255,13 +255,9 @@
 ;;; in both the current and compiler environments, and that the
 ;;; INCLUDES be the same.
 ;;;
-;;; KLUDGE: This should probably be a type method instead of a big
-;;; ETYPECASE. But then the type method system should probably be CLOS
-;;; too, and until that happens wedging more stuff into it might be
-;;; messy. So I've left it a big ETYPECASE. -- 2001-03-16
 (defun ctypep (obj type)
   (declare (type ctype type))
-  (etypecase type
+  (ctypep-macro
     ((or numeric-type
          named-type
          member-type
@@ -275,15 +271,6 @@
      (if (contains-unknown-type-p type)
          (values nil (not (arrayp obj)))
          (values (%%typep obj type) t)))
-    (cons-type
-     ;; Do not use %%TYPEP because of SATISFIES
-     (if (consp obj)
-         (multiple-value-bind (typep valid)
-             (ctypep (car obj) (cons-type-car-type type))
-           (if typep
-               (ctypep (cdr obj) (cons-type-cdr-type type))
-               (values nil valid)))
-         (values nil t)))
     (classoid
      (if (if (csubtypep type (specifier-type 'function))
              (funcallable-instance-p obj)
@@ -293,13 +280,6 @@
              (values (sb-xc:typep obj type) t)
              (values nil nil))
          (values nil t)))
-    (compound-type
-     (funcall (etypecase type
-                (intersection-type #'every/type)
-                (union-type #'any/type))
-              #'ctypep
-              obj
-              (compound-type-types type)))
     (fun-designator-type
      (typecase obj
        (symbol (values nil nil))
@@ -316,25 +296,12 @@
      (values nil nil))
     (alien-type-type
      (values (alien-typep obj (alien-type-type-alien-type type)) t))
-    (negation-type
-     (multiple-value-bind (res win)
-         (ctypep obj (negation-type-type type))
-       (if win
-           (values (not res) t)
-           (values nil nil))))
     (hairy-type
      ;; Now the tricky stuff.
      (let ((predicate (cadr (hairy-type-specifier type))))
        (case predicate
-         (keywordp ; answer with certainty sometimes
-          ;; Keep in sync with KEYWORDP test in src/code/cross-type
-          (cond ((or (not (symbolp obj))
-                     (eq (sb-xc:symbol-package obj) *cl-package*))
-                 (values nil t)) ; certainly no
-                ((eq (sb-xc:symbol-package obj) *keyword-package*)
-                 (values t t)) ; certainly yes
-                (t
-                 (values nil nil)))) ; can't decide
+         (keywordp
+          (test-keywordp))
          (t
           ;; If the SATISFIES function is not foldable, we cannot answer!
           (let ((form `(,predicate ',obj)))

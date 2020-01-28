@@ -416,8 +416,6 @@
  ;; CHECK-FUN-NAME defined in proclaim.lisp.
  ("src/code/force-delayed-defbangstructs" :c-headers)
 
- ("src/code/typep" :not-host)
-
  ("src/compiler/compiler-error")
 
  ("src/code/type-init")
@@ -427,6 +425,7 @@
 
  ;; These define target types needed by fndb.lisp.
  ("src/code/package" :c-headers)
+ ("src/code/typep" :not-host)
  ("src/code/random")
  ("src/code/hash-table" :c-headers)
  ("src/code/readtable")
