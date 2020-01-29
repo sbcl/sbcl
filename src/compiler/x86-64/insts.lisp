@@ -202,11 +202,17 @@
                  (push value (dstate-operands dstate))
                  (let ((opcode (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)))
                        (size (inst-operand-size dstate)))
-                   (if (and (or (and (eq opcode 'cmp) (eq size :qword))
-                                ;; Slight bug still- MOV to memory of :DWORD could be writing
-                                ;; a raw slot or anything. Only a :QWORD could be a symbol, however
-                                ;; the size when moving to register is :DWORD.
-                                (and (eq opcode 'mov) (memq size '(:dword :qword))))
+                   ;; Slight bugs still- MOV to memory of :DWORD could be writing
+                   ;; a raw slot or anything. Only a :QWORD could be a symbol, however
+                   ;; the size when moving to register is :DWORD.
+                   ;; And CMP could be comparing "raw" data from SAP-REF-32, except that
+                   ;; in practice it can't because the compiler is too stupid to do it,
+                   ;; and will fixnumize the loaded value.
+                   ;; If this is too eager in printing random constants as lisp objects,
+                   ;; there is another tactic we could use: only consider something a pointer
+                   ;; if it is in a location corresponding to an absolute code fixup.
+                   (if (and (memq size '(:dword :qword))
+                            (memq opcode '(mov cmp))
                             (maybe-note-static-symbol value dstate))
                        (princ16 value stream)
                        (princ value stream))))))
