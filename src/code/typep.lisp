@@ -293,6 +293,11 @@
                 (multiple-value-bind (ok result)
                     (sb-c::constant-function-call-p form nil nil)
                   (values (not (null result)) ok))))))))))
+
+;;; :SB-XREF-FOR-INTERNALS hangs on to more symbols. It is not also the intent
+;;; to retain all toplevel definitions whether subsequently needed or not.
+;;; That's an unfortunate side-effect; this macro is done being used now.
+(fmakunbound 'typep-impl-macro)
 
 ;;;; miscellaneous interfaces
 
