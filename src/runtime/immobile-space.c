@@ -991,8 +991,7 @@ sweep_fixedobj_pages(int raise)
                   fixedobj_pages[page].free_index = (char*)obj - page_base;
                 hole = obj;
                 n_holes ++;
-            } else if ((gen = __immobile_obj_gen_bits(obj) & ~OBJ_WRITTEN_FLAG)
-                       == discard_gen) { // trash
+            } else if ((gen = __immobile_obj_gen_bits(obj)) == discard_gen) { // trash
                 for (word_idx=obj_size_words-1 ; word_idx > 0 ; --word_idx)
                     obj[word_idx] = 0;
                 goto trash_it;
@@ -1105,8 +1104,7 @@ sweep_varyobj_pages(int raise)
             lispobj word = *obj;
             size = sizetab[header_widetag(word)](obj);
             if (filler_obj_p(obj)) { // do nothing
-            } else if ((gen = __immobile_obj_gen_bits(obj) & ~OBJ_WRITTEN_FLAG)
-                       == discard_gen) {
+            } else if ((gen = __immobile_obj_gen_bits(obj)) == discard_gen) {
                 make_filler(obj, size * N_WORD_BYTES);
             } else if (gen == keep_gen) {
                 assign_generation(obj, gen = new_gen);
