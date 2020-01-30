@@ -16,8 +16,6 @@
 export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
-set -e # exit on error
-
 run_sbcl --noinform <<EOF
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
@@ -28,6 +26,8 @@ if [ $status != 0 ]; then # test can't be executed
     # we don't have a way to exit shell tests with "inapplicable" as the result
     exit $EXIT_TEST_WIN
 fi
+
+set -e # exit on error
 
 # If running in a test sandbox that doesn't provide Make but has already
 # provided the necessary executable file, just use that.
