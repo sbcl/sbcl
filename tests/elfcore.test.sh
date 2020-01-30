@@ -17,6 +17,7 @@ export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 run_sbcl --noinform <<EOF
+  #+sb-dynamic-core
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
  (exit :code 2) ; otherwise
@@ -57,6 +58,8 @@ run_sbcl --noinform <<EOF
   (save-lisp-and-die "${tmpcore}")
 EOF
 
+m_arg=`run_sbcl_with_args --noinform --eval '(progn #+sb-core-compression (princ "-lz") #+x86 (princ "-m32"))' --quit`
+
 (cd $SBCL_PWD/../src/runtime ; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \
   ${tmpcore} $TEST_DIRECTORY/elfcore-test.s
@@ -66,7 +69,7 @@ run_sbcl --script ../tools-for-build/editcore.lisp split \
 ./run-compiler.sh -no-pie -g -o $TEST_DIRECTORY/elfcore-test \
   $TEST_DIRECTORY/elfcore-test.s \
   $TEST_DIRECTORY/elfcore-test-core.o \
-  $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread
+  $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread ${m_arg}
 
 $TEST_DIRECTORY/elfcore-test --eval '(assert (zerop (f 1 2 3)))' --quit
 echo Custom core: PASS
