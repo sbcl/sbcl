@@ -135,6 +135,16 @@ use_test_subdirectory () {
     trap "cleanup_test_subdirectory" EXIT
 }
 
+# Do the above but without changing the current directory
+create_test_subdirectory () {
+    if test -d "$TEST_DIRECTORY"
+    then
+        cleanup_test_subdirectory
+    fi
+    mkdir "$TEST_DIRECTORY"
+    trap "cleanup_test_subdirectory" EXIT
+}
+
 cleanup_test_subdirectory () {
     cd "$SBCL_PWD"
     ( set -f; rm -r "$TEST_DIRECTORY" )

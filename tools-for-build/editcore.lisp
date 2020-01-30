@@ -596,7 +596,7 @@
                                       (signed-sap-ref-8 sap (+ offs 2))
                                       (reg-name (get-gpr :qword reg)))))
                    (push (list* (1- (dstate-cur-offs dstate)) 8 "mov" text) list)))
-                ((and (eq (inst-name inst) '|call|) ; match "call qword ptr [addr]"
+                ((and (eq (inst-name inst) 'call) ; match "call qword ptr [addr]"
                       (eql (ldb (byte 24 0) (sap-ref-32 sap offs))
                            #x2514FF)) ; ModRM+SIB encodes disp32, no base, no index
                  ;; This form of call instruction is employed for asm routines when
