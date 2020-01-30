@@ -3467,6 +3467,7 @@ SBCL itself"
   compute-applicable-methods
   slot-makunbound
   make-load-form-saving-slots
+  sb-vm::primitive-object-size
   sb-vm::remove-static-links)
  ;; CLOS implementation
  (sb-mop:class-finalized-p

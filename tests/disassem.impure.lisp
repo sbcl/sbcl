@@ -45,6 +45,13 @@
   (with-output-to-string (s)
     (sb-c:dis (defmethod hello ((self cons)) "here i am") s)))
 
+(with-test (:name :lp-bug-1861418)
+  (disassemble '(lambda ()
+                 (let* ((*s* 692985202))
+                   (declare (special *s*))
+                   0))
+               :stream (make-string-output-stream)))
+
 ;;; This can be used to verify that all of the instruction printers respond
 ;;; correctly (or at least, produce no characters on *standard-output*)
 ;;; when given NIL as a stream.

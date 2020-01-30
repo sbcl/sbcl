@@ -188,7 +188,8 @@
 ;;; unless it looks like an address.
 #+immobile-space
 (defun maybe-note-lisp-callee (value dstate)
-  (awhen (and (typep value 'word) (sb-vm::find-called-object value))
+  (awhen (and (typep value 'word)
+              (sb-disassem::find-code-constant-from-interior-pointer value dstate))
     (note (lambda (stream) (princ it stream)) dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)

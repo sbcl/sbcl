@@ -2071,6 +2071,40 @@
           (t
            (values nil nil)))))
 
+(defun find-code-constant-from-interior-pointer (value dstate)
+  (let* ((seg (dstate-segment dstate))
+         (code (seg-code seg)))
+    (when code
+      (let ((callables (seg-code-callables seg)))
+        (when (eq callables :?)
+          (setq callables nil)
+          (loop for i from sb-vm:code-constants-offset below (code-header-words code)
+                do (let* ((const (code-header-ref code i))
+                          (fun (typecase const
+                                 (fdefn (fdefn-fun const))
+                                 (function const))))
+                     ;; This collection will only make sense for immobile objects,
+                     ;; but it's fine to collect it.
+                     (when (fdefn-p const)
+                       (push const callables))
+                     (when (functionp fun)
+                       (push fun callables))))
+          ;; Sorting downward finds the right entry point if there are multiple callees
+          ;; in a code object using the trivial algorithm below.
+          (setf callables (sort callables #'> :key
+                                ;; KLUDGE: need a stub, #'GET-LISP-OBJ-ADDRESS won't work
+                                (lambda (x) (get-lisp-obj-address x)))
+                (seg-code-callables seg) callables))
+        (dolist (thing callables)
+          (when (<= (logandc2 (get-lisp-obj-address thing) sb-vm:lowtag-mask)
+                    value
+                    (let ((base-obj
+                            (if (simple-fun-p thing) (fun-code-header thing) thing)))
+                      (+ (logandc2 (get-lisp-obj-address base-obj) sb-vm:lowtag-mask)
+                         (sb-vm::primitive-object-size base-obj)
+                         -1)))
+            (return thing)))))))
+
 ;;; If the memory address located NIL-BYTE-OFFSET bytes from the
 ;;; constant NIL is a valid slot in a symbol, store a note describing
 ;;; which symbol and slot, to be printed as an end-of-line comment

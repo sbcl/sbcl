@@ -40,6 +40,8 @@
   (virtual-location 0 :type address)
   (storage-info nil :type (or null storage-info))
   (code nil :type (or null code-component))
+  ;; list of function and fdefn constants extracted from code header
+  (code-callables :?)
   ;; the byte offset beyond CODE-INSTRUCTIONS of CODE which
   ;; corresponds to offset 0 in this segment
   (initial-offset 0 :type index)
