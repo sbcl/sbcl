@@ -200,7 +200,10 @@ find_page_index(void *addr)
 static inline boolean pinned_p(lispobj obj, page_index_t page)
 {
     extern struct hopscotch_table pinned_objects;
-    gc_dcheck(compacting_p());
+    // FIXME: this gets called if !compacting_p,
+    // but most people don't run with extra debug assertions,
+    // and if you enable them, you'll pretty quickly crash here.
+    // gc_dcheck(compacting_p());
 #if !GENCGC_IS_PRECISE
     return page_has_smallobj_pins(page)
         && hopscotch_containsp(&pinned_objects, obj);

@@ -139,7 +139,6 @@ static inline boolean filler_obj_p(lispobj __attribute__((unused)) *obj) { retur
 extern void enliven_immobile_obj(lispobj*,int);
 
 #define IMMOBILE_OBJ_VISITED_FLAG    0x10
-#define IMMOBILE_OBJ_GENERATION_MASK 0x0f // mask off the VISITED flag
 
 // Immobile object header word:
 //                 generation byte --|    |-- widetag
@@ -158,40 +157,37 @@ extern void enliven_immobile_obj(lispobj*,int);
 // Shifting a 1 bit left by the contents of the generation byte
 // must not overflow a register.
 
-// Note: this does not work on a SIMPLE-FUN
-// because a simple-fun header does not contain a generation.
-#define __immobile_obj_generation(x) (__immobile_obj_gen_bits(x) & IMMOBILE_OBJ_GENERATION_MASK)
+// Mask off the VISITED flag to get the generation number
+#define immobile_obj_generation(x) (immobile_obj_gen_bits(x) & 0xf)
 
 #ifdef LISP_FEATURE_LITTLE_ENDIAN
+// Return the generation bits which means the generation number
+// in the 4 low bits (there's 1 excess bit) and the VISITED flag.
 static inline int immobile_obj_gen_bits(lispobj* obj) // native pointer
 {
+    // When debugging, assert that we're called only on a headered object
+    // whose header contains a generation byte.
+    gc_dcheck(!embedded_obj_p(widetag_of(obj)));
     char gen;
     switch (widetag_of(obj)) {
     default:
         gen = ((generation_index_t*)obj)[3]; break;
-    case SIMPLE_FUN_WIDETAG:
-        gen = ((generation_index_t*)fun_code_header(obj))[3]; break;
     case FDEFN_WIDETAG:
         gen = ((generation_index_t*)obj)[1]; break;
     }
     return gen & 0x1F;
 }
-// Slightly faster variant when we know that the object can't be a simple-fun,
-// such as when walking the immobile space.
-static inline int __immobile_obj_gen_bits(lispobj* obj) // native pointer
-{
-    int byte = widetag_of(obj) == FDEFN_WIDETAG ? 1 : 3;
-    return ((generation_index_t*)obj)[byte] & 0x1F;
-}
 // Turn a grey node black.
 static inline void set_visited(lispobj* obj)
 {
+    gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
+    gc_dcheck(immobile_obj_gen_bits(obj) == new_space);
     int byte = widetag_of(obj) == FDEFN_WIDETAG ? 1 : 3;
-    gc_dcheck(__immobile_obj_gen_bits(obj) == new_space);
     ((generation_index_t*)obj)[byte] |= IMMOBILE_OBJ_VISITED_FLAG;
 }
 static inline void assign_generation(lispobj* obj, generation_index_t gen)
 {
+    gc_dcheck(widetag_of(obj) != SIMPLE_FUN_WIDETAG);
     int byte = widetag_of(obj) == FDEFN_WIDETAG ? 1 : 3;
     generation_index_t* ptr = (generation_index_t*)obj + byte;
     // Clear the VISITED flag, assign a new generation, preserving the three
@@ -220,7 +216,7 @@ static inline boolean weak_pointer_breakable_p(struct weak_pointer *wp)
     return is_lisp_pointer(pointee) && (from_space_p(pointee)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
          || (immobile_space_p(pointee) &&
-             immobile_obj_gen_bits(native_pointer(pointee)) == from_space)
+             immobile_obj_gen_bits(base_pointer(pointee)) == from_space)
 #endif
             );
 }

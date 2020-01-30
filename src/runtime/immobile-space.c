@@ -166,7 +166,7 @@ void check_varyobj_pages();
 unsigned char varyobj_page_gens_augmented(low_page_index_t page_index)
 {
   return (varyobj_pages[page_index].scan_start_offset <= DOUBLEWORDS_PER_PAGE
-          ? 0 : (1<<__immobile_obj_generation(varyobj_scan_start(page_index))))
+          ? 0 : (1<<immobile_obj_generation(varyobj_scan_start(page_index))))
          | varyobj_pages[page_index].generations;
 }
 
@@ -409,9 +409,8 @@ void update_immobile_nursery_bits()
 void
 enliven_immobile_obj(lispobj *ptr, int rescan) // a native pointer
 {
-    if (widetag_of(ptr) == SIMPLE_FUN_WIDETAG)
-        ptr = fun_code_header(ptr);
-    gc_assert(__immobile_obj_gen_bits(ptr) == from_space);
+    gc_assert(widetag_of(ptr) != SIMPLE_FUN_WIDETAG); // can't enliven interior pointer
+    gc_assert(immobile_obj_gen_bits(ptr) == from_space);
     int pointerish = !leaf_obj_widetag_p(widetag_of(ptr));
     int bits = (pointerish ? 0 : IMMOBILE_OBJ_VISITED_FLAG);
     // enlivening makes the object appear as if written, so that
@@ -500,7 +499,7 @@ boolean immobile_space_preserve_pointer(void* addr)
       return 0;
     }
     if (valid && (!compacting_p() ||
-                  __immobile_obj_gen_bits(object_start) == from_space)) {
+                  immobile_obj_gen_bits(object_start) == from_space)) {
         dprintf((logfile,"immobile obj @ %p (<- %p) is conservatively live\n",
                  object_start, addr));
         if (compacting_p())
@@ -529,7 +528,7 @@ static void full_scavenge_immobile_newspace()
         lispobj* obj    = fixedobj_page_address(page);
         lispobj* limit  = compute_fixedobj_limit(obj, obj_spacing);
         do {
-            if (!fixnump(*obj) && __immobile_obj_gen_bits(obj) == new_space) {
+            if (!fixnump(*obj) && immobile_obj_gen_bits(obj) == new_space) {
                 set_visited(obj);
                 lispobj header = *obj;
                 scavtab[header_widetag(header)](obj, header);
@@ -552,7 +551,7 @@ static void full_scavenge_immobile_newspace()
             int n_words;
             for ( ; obj < limit ; obj += n_words ) {
                 lispobj header = *obj;
-                if (__immobile_obj_gen_bits(obj) == new_space) {
+                if (immobile_obj_gen_bits(obj) == new_space) {
                     set_visited(obj);
                     n_words = scavtab[header_widetag(header)](obj, header);
                 } else {
@@ -606,7 +605,7 @@ void scavenge_immobile_newspace()
                   --immobile_scav_queue_count;
               // FIXME: should not enqueue already-visited objects,
               // but a gc_assert() that it wasn't visited fails.
-              if (!(__immobile_obj_gen_bits(obj) & IMMOBILE_OBJ_VISITED_FLAG)) {
+              if (!(immobile_obj_gen_bits(obj) & IMMOBILE_OBJ_VISITED_FLAG)) {
                 set_visited(obj);
                 lispobj header = *obj;
                 scavtab[header_widetag(header)](obj, header);
@@ -662,7 +661,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
         // no conses, so any fixnum where a header could be is not a live
         // object.
         do {
-            if (!fixnump(*obj) && (genmask >> (gen=__immobile_obj_gen_bits(obj)) & 1)) {
+            if (!fixnump(*obj) && (genmask >> (gen=immobile_obj_gen_bits(obj)) & 1)) {
                 if (gen == new_space) { set_visited(obj); }
                 lispobj header = *obj;
                 scavtab[header_widetag(header)](obj, header);
@@ -684,7 +683,7 @@ scavenge_immobile_roots(generation_index_t min_gen, generation_index_t max_gen)
                 lispobj header = *obj;
                 // scav_code_header will do nothing if the object isn't
                 // marked as written.
-                if (genmask >> (gen=__immobile_obj_gen_bits(obj)) & 1) {
+                if (genmask >> (gen=immobile_obj_gen_bits(obj)) & 1) {
                     if (gen == new_space) { set_visited(obj); }
                     n_words = scavtab[header_widetag(header)](obj, header);
                 } else {
@@ -737,9 +736,7 @@ pointee_gen(lispobj thing, int keep_gen, int new_gen)
         if (gen == PSEUDO_STATIC_GENERATION+1) // scratch gen
             gen = new_gen; // is actually this
     } else if (immobile_space_p(thing)) {
-        // Use the general variant of immobile_obj_gen_bits
-        // because the pointed-to object could be anything.
-        gen = immobile_obj_gen_bits(native_pointer(thing));
+        gen = immobile_obj_gen_bits(base_pointer(thing));
         if (gen == keep_gen) // keep gen
             gen = new_gen; // is actually this
     }
@@ -867,7 +864,7 @@ static inline boolean can_wp_fixedobj_page(page_index_t page, int keep_gen, int 
     do {
         if (!fixnump(*obj) && // an object header
             fixedobj_points_to_younger_p(obj, obj_size_words,
-                                         __immobile_obj_generation(obj),
+                                         immobile_obj_generation(obj),
                                          keep_gen, new_gen))
             return 0;
     } while (NEXT_FIXEDOBJ(obj, obj_spacing) <= limit);
@@ -888,7 +885,7 @@ static inline boolean can_wp_varyobj_page(page_index_t page, int keep_gen, int n
         gc_assert(other_immediate_lowtag_p(*obj));
         if (!filler_obj_p(obj) &&
             varyobj_points_to_younger_p(obj,
-                                        __immobile_obj_generation(obj),
+                                        immobile_obj_generation(obj),
                                         keep_gen, new_gen,
                                         (os_vm_address_t)begin,
                                         (os_vm_address_t)end))
@@ -991,7 +988,7 @@ sweep_fixedobj_pages(int raise)
                   fixedobj_pages[page].free_index = (char*)obj - page_base;
                 hole = obj;
                 n_holes ++;
-            } else if ((gen = __immobile_obj_gen_bits(obj)) == discard_gen) { // trash
+            } else if ((gen = immobile_obj_gen_bits(obj)) == discard_gen) { // trash
                 for (word_idx=obj_size_words-1 ; word_idx > 0 ; --word_idx)
                     obj[word_idx] = 0;
                 goto trash_it;
@@ -1085,7 +1082,7 @@ sweep_varyobj_pages(int raise)
             if (wp_it // If we wanted to try write-protecting this page,
                 // and the object starting before this page is strictly older
                 // than the generation that we're moving retained objects into
-                && (gen = __immobile_obj_gen_bits(obj)) > new_gen
+                && (gen = immobile_obj_gen_bits(obj)) > new_gen
                 // and it contains an old->young pointer
                 && varyobj_points_to_younger_p(obj, gen, keep_gen, new_gen,
                                                (os_vm_address_t)page_base,
@@ -1104,7 +1101,7 @@ sweep_varyobj_pages(int raise)
             lispobj word = *obj;
             size = sizetab[header_widetag(word)](obj);
             if (filler_obj_p(obj)) { // do nothing
-            } else if ((gen = __immobile_obj_gen_bits(obj)) == discard_gen) {
+            } else if ((gen = immobile_obj_gen_bits(obj)) == discard_gen) {
                 make_filler(obj, size * N_WORD_BYTES);
             } else if (gen == keep_gen) {
                 assign_generation(obj, gen = new_gen);
@@ -1225,7 +1222,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
                 fixedobj_pages[page].attr.parts.obj_size = size;
                 fixedobj_pages[page].attr.parts.obj_align
                   = immobile_obj_spacing(header, obj, size);
-                fixedobj_pages[page].gens |= 1 << __immobile_obj_gen_bits(obj);
+                fixedobj_pages[page].gens |= 1 << immobile_obj_gen_bits(obj);
                 if (gen != 0 && ENABLE_PAGE_PROTECTION)
                     fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
                 break;
@@ -1253,7 +1250,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
         low_page_index_t first_page = find_varyobj_page_index(obj);
         last_page = find_varyobj_page_index(obj+n_words-1);
         // Only the page with this object header gets a bit in its gen mask.
-        varyobj_pages[first_page].generations |= 1<<__immobile_obj_gen_bits(obj);
+        varyobj_pages[first_page].generations |= 1<<immobile_obj_gen_bits(obj);
         // For each page touched by this object, set the page's
         // scan_start_offset, unless it was already set.
         int page;
@@ -1312,7 +1309,7 @@ void prepare_immobile_space_for_final_gc()
             lispobj* limit = (lispobj*)((uword_t)obj + IMMOBILE_CARD_BYTES);
             for ( ; obj < limit ; obj += sizetab[widetag_of(obj)](obj) )
                 if (other_immediate_lowtag_p(*obj) &&
-                    __immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
+                    immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
                     assign_generation(obj, HIGHEST_NORMAL_GENERATION);
             fixedobj_pages[page].gens = (mask & ~(1<<PSEUDO_STATIC_GENERATION))
                                         | 1<<HIGHEST_NORMAL_GENERATION;
@@ -1322,7 +1319,7 @@ void prepare_immobile_space_for_final_gc()
     lispobj* obj = (lispobj*)VARYOBJ_SPACE_START;
     lispobj* limit = varyobj_free_pointer;
     for ( ; obj < limit ; obj += sizetab[widetag_of(obj)](obj) ) {
-        if (__immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
+        if (immobile_obj_gen_bits(obj) == PSEUDO_STATIC_GENERATION)
             assign_generation(obj, HIGHEST_NORMAL_GENERATION);
     }
     int max_page = find_varyobj_page_index(limit-1);
@@ -2329,7 +2326,7 @@ void check_fixedobj_page(int page,
   do {
       header = *obj;
       if (!fixnump(header)) {
-          int gen = __immobile_obj_gen_bits(obj);
+          int gen = immobile_obj_gen_bits(obj);
           gc_assert(0 <= gen && gen <= PSEUDO_STATIC_GENERATION);
           genmask |= 1<<gen;
           if (fixedobj_points_to_younger_p(obj, obj_size, gen, keep_gen, new_gen)) {
@@ -2485,7 +2482,7 @@ void check_varyobj_pages()
       if (limit > freeptr) limit = freeptr;
       int mask = 0;
       for ( ; obj < limit ; obj += sizetab[widetag_of(obj)](obj) ) {
-          int gen = __immobile_obj_gen_bits(obj);
+          int gen = immobile_obj_gen_bits(obj);
           if (filler_obj_p(obj)) {
               gc_assert(gen == 0);
           } else {

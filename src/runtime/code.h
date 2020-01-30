@@ -144,6 +144,21 @@ static inline lispobj fun_code_tagged(lispobj* fun) {
     return make_lispobj(fun_code_header(fun), OTHER_POINTER_LOWTAG);
 }
 
+#ifdef RETURN_PC_WIDETAG
+#define embedded_obj_p(tag) (tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG)
+#else
+#define embedded_obj_p(tag) (tag==SIMPLE_FUN_WIDETAG)
+#endif
+/* Convert from a lispobj with lowtag bits to the starting address
+ * of the heap object. */
+static inline lispobj *
+base_pointer(lispobj ptr)
+{
+    lispobj *obj = native_pointer(ptr);
+    int widetag = widetag_of(obj);
+    return embedded_obj_p(widetag) ? fun_code_header(obj) : obj;
+}
+
 #if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
 # define fun_self_from_baseptr(simple_fun) (lispobj)simple_fun->insts
 # define fun_self_from_taggedptr(funptr) \

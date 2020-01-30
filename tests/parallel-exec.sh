@@ -29,6 +29,9 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
         (missing-usage)
         (losing))
     (labels ((wait ()
+               ;; Though far from elegant, this is an easy way to figure out
+               ;; which tests are getting stuck, if any are.
+               #+nil (format t "Runner is waiting on: ~S~%" subprocess-list)
                (multiple-value-bind (pid status) (sb-posix:wait)
                  (decf subprocess-count)
                  (let ((process (assoc pid subprocess-list)))

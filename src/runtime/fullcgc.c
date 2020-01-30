@@ -167,12 +167,6 @@ static inline int cons_markedp(lispobj pointer) {
     return (bits[index / 8] >> (index % 8)) & 1;
 }
 
-#ifdef RETURN_PC_WIDETAG
-#define embedded_obj_p(tag) tag==RETURN_PC_WIDETAG || tag==SIMPLE_FUN_WIDETAG
-#else
-#define embedded_obj_p(tag) tag==SIMPLE_FUN_WIDETAG
-#endif
-
 /* Return true if OBJ has already survived the current GC. */
 static inline int pointer_survived_gc_yet(lispobj pointer)
 {
@@ -463,7 +457,8 @@ static int sweep_mode = 1;
     if (sweep_mode & 1) { erase; } }
 
 #ifndef LISP_FEATURE_IMMOBILE_SPACE
-#define __immobile_obj_gen_bits(x) (lose("No page index?"),0)
+#undef immobile_obj_gen_bits
+#define immobile_obj_gen_bits(x) (lose("No page index?"),0)
 #else
 static void sweep_fixedobj_pages(long *zeroed)
 {
@@ -485,7 +480,7 @@ static void sweep_fixedobj_pages(long *zeroed)
             } else if (header & markbit) { // live object
                 *obj = header ^ markbit;
             } else {
-                NOTE_GARBAGE(__immobile_obj_gen_bits(obj), obj, nwords, zeroed,
+                NOTE_GARBAGE(immobile_obj_gen_bits(obj), obj, nwords, zeroed,
                              memset(obj, 0, nwords * N_WORD_BYTES));
             }
         }
@@ -531,7 +526,7 @@ static uword_t sweep(lispobj* where, lispobj* end, uword_t arg)
                 if (!filler_obj_p((lispobj*)code)) {
                     page_index_t page = find_page_index(where);
                     int gen = page >= 0 ? page_table[page].gen
-                      : __immobile_obj_gen_bits(where);
+                      : immobile_obj_gen_bits(where);
                     NOTE_GARBAGE(gen, where, nwords, zeroed, {
                         code->boxed_size = 0;
                         code->header = (nwords << CODE_HEADER_SIZE_SHIFT)

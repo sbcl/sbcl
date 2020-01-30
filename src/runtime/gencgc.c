@@ -2284,16 +2284,20 @@ update_page_write_prot(page_index_t page)
             // looks like simple-fun-widetag. We can't naively back up to the
             // underlying code object since the alleged header might not be one.
             int pointee_gen = gen; // Make comparison fail if we fall through
-            if (functionp((lispobj)ptr) && header_widetag(header) == SIMPLE_FUN_WIDETAG) {
-                lispobj* code = fun_code_header(FUNCTION((lispobj)ptr));
-                // This is a heuristic, since we're not actually looking for
-                // an object boundary. Precise scanning of 'page' would obviate
-                // the guard conditions here.
-                if (immobile_space_p((lispobj)code)
-                    && widetag_of(code) == CODE_HEADER_WIDETAG)
-                    pointee_gen = __immobile_obj_generation(code);
-            } else {
-                pointee_gen = __immobile_obj_generation(native_pointer((lispobj)ptr));
+            switch (header_widetag(header)) {
+            case SIMPLE_FUN_WIDETAG:
+                if (functionp((lispobj)ptr)) {
+                    lispobj* code = fun_code_header(FUNCTION((lispobj)ptr));
+                    // This is a heuristic, since we're not actually looking for
+                    // an object boundary. Precise scanning of 'page' would obviate
+                    // the guard conditions here.
+                    if (immobile_space_p((lispobj)code)
+                        && widetag_of(code) == CODE_HEADER_WIDETAG)
+                        pointee_gen = immobile_obj_generation(code);
+                }
+                break;
+            default:
+                pointee_gen = immobile_obj_generation(native_pointer((lispobj)ptr));
             }
             // A bogus generation number implies a not-really-pointer,
             // but it won't cause misbehavior.
@@ -2788,8 +2792,7 @@ generation_index_t gc_gen_of(lispobj obj, int defaultval) {
     if (page >= 0) return page_table[page].gen;
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     if (immobile_space_p(obj))
-        return immobile_obj_gen_bits(native_pointer(obj))
-            & IMMOBILE_OBJ_GENERATION_MASK;
+        return immobile_obj_generation(base_pointer(obj));
 #endif
     return defaultval;
 }
