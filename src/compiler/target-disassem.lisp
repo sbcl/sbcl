@@ -1168,7 +1168,28 @@
                     (stream (truly-the (or null stream) stream))
                     (dstate (truly-the disassem-state dstate)))
        (macrolet ((local-format-arg (arg fmt)
-                    `(funcall (formatter ,fmt) stream ,arg)))
+                    `(funcall (formatter ,fmt) stream ,arg))
+                  (local-call-arg-printer (arg fun)
+                    ;; If FUN is literally #<FUNCTION THING>, try to turn it back to
+                    ;; its name so that we can indirect through an FDEFN, thus allowing
+                    ;; redefinition of THING when debugging the disassembler.
+                    ;; I looked at how this worked in CMUCL, and it also used to wire
+                    ;; in the function object. That was a bug, not a feature, imho.
+                    ;; The proper solution is probably to expand the defining macros
+                    ;; differently. But some esoteric use might rely on lexical capture.
+                    ;; I hope not, though this technique doesn't affect such a use.
+                    ;; Another possible solution is to turn ARG-TYPEs into first-class
+                    ;; objects, storing function in that object, and always calling
+                    ;; the function in it (and allowing redefinition of ARG-TYPEs).
+                    ;; That's tricky because the relation between an arg an its type
+                    ;; is lost after parsing,
+                    ;; because the type is purely a logical construct.
+                    (if (and (simple-fun-p fun)
+                             (symbolp (%simple-fun-name fun))
+                             (eq (symbol-package (%simple-fun-name fun))
+                                 sb-assem::*backend-instruction-set-package*))
+                        `(,(%simple-fun-name fun) ,arg stream dstate)
+                        `(funcall ,fun ,arg stream dstate))))
          ;; All the LOCAL-foo functions print nothing if stream is nil
          (flet ((local-tab-to-arg-column ()
                   (tab (dstate-argument-column dstate) stream))
@@ -1192,8 +1213,6 @@
                   (if stream
                       (princ16 thing stream)
                       (push thing (dstate-operands dstate))))
-                (local-call-arg-printer (arg printer)
-                  (funcall printer arg stream dstate))
                 (local-call-global-printer (fun)
                   (funcall fun chunk inst stream dstate))
                 (local-filtered-value (offset)
@@ -1210,7 +1229,6 @@
                                #'local-print-name #'local-print-arg-separator
                                #'local-princ #'local-princ16 #'local-princ-symbol
                                #'local-write-char
-                               #'local-call-arg-printer
                                #'local-call-global-printer
                                #'local-extract
                                #'local-filtered-value
@@ -1218,7 +1236,7 @@
                     (inline local-tab-to-arg-column
                             local-print-arg-separator
                             local-princ local-princ16 local-princ-symbol
-                            local-call-arg-printer local-call-global-printer
+                            local-call-global-printer
                             local-filtered-value local-extract
                             lookup-label adjust-label))
            :body)))))
