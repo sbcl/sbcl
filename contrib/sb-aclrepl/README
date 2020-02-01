@@ -16,12 +16,13 @@ EXAMPLE ~/.sbclrc FILE
 ======================
 
 (ignore-errors (require 'sb-aclrepl))
-
+(require "asdf")
 (when (find-package 'sb-aclrepl)
   (push :aclrepl cl:*features*))
 #+aclrepl
 (progn
-  (setq sb-aclrepl:*max-history* 100)
+  (setq sb-aclrepl:*max-history* 100
+        sb-aclrepl:*exit-on-eof*  t)
   (setf (sb-aclrepl:alias "asdc")
        #'(lambda (sys) (asdf:operate 'asdf:compile-op sys)))
   (sb-aclrepl:alias "l" (sys) (asdf:operate 'asdf:load-op sys))
