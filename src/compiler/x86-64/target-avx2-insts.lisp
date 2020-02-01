@@ -21,7 +21,7 @@
          (name (reg-name reg)))
     (if stream
         (write-string name stream)
-        (push name (dstate-operands dstate)))))
+        (operand name dstate))))
 
 (defun print-ymmreg/mem (value stream dstate)
   (if (machine-ea-p value)

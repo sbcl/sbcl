@@ -78,7 +78,8 @@
               :type (member :big-endian :little-endian))
   ;; current instruction as found in instruction space
   (inst)
-  (operands)
+  (operands (make-array 10) :read-only t) ; enough for anybody
+  (n-operands 0)
   ;; for user code to track decoded bits, cleared each time after a
   ;; non-prefix instruction is processed
   (inst-properties 0 :type fixnum)

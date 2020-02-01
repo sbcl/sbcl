@@ -160,7 +160,7 @@
                         (maybe-note-assembler-routine value nil dstate))
                     (print-label value stream dstate))
                    (t
-                    (push value (dstate-operands dstate))))))
+                    (operand value dstate)))))
 
 (define-arg-type accum
   :printer (lambda (value stream dstate)
@@ -199,7 +199,7 @@
   :printer (lambda (value stream dstate)
              (declare (notinline sb-disassem::inst-name))
              (if (not stream) ; won't have a DSTATE-INST in this case, maybe fix that?
-                 (push value (dstate-operands dstate))
+                 (operand value dstate)
                  (let ((opcode (sb-disassem::inst-name (sb-disassem::dstate-inst dstate)))
                        (size (inst-operand-size dstate)))
                    ;; Slight bugs still- MOV to memory of :DWORD could be writing
@@ -320,7 +320,7 @@
                                       (type (or null stream) stream))
                              (if stream
                                  (format stream ,format-string value)
-                                 (push value (dstate-operands dstate)))))))
+                                 (operand value dstate))))))
   (define-sse-shuffle-arg-type sse-shuffle-pattern-2-2 "#b~2,'0B")
   (define-sse-shuffle-arg-type sse-shuffle-pattern-8-4 "#4r~4,4,'0R"))
 

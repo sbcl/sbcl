@@ -90,7 +90,7 @@
                            num))))
     (if stream
         (princ (reg-name reg) stream)
-        (push reg (dstate-operands dstate))))
+        (operand reg dstate)))
   ;; XXX plus should do some source-var notes
   )
 
@@ -174,7 +174,7 @@
          (name (reg-name reg)))
     (if stream
         (write-string name stream)
-        (push name (dstate-operands dstate)))))
+        (operand name dstate))))
 
 (defun print-xmmreg/mem (value stream dstate)
   (if (machine-ea-p value)
@@ -193,7 +193,7 @@
     (note (lambda (stream) (princ it stream)) dstate)))
 
 (defun print-imm/asm-routine (value stream dstate)
-  (cond ((not stream) (push value (dstate-operands dstate)))
+  (cond ((not stream) (operand value dstate))
         ((or #+immobile-space (maybe-note-lisp-callee value dstate)
              (maybe-note-assembler-routine value nil dstate)
              (maybe-note-static-symbol value dstate))
@@ -290,7 +290,7 @@
            (type disassem-state dstate))
   (when (null stream)
     (return-from print-mem-ref
-      (push (cons value width) (dstate-operands dstate))))
+      (operand (cons value width) dstate)))
   (let ((base-reg (machine-ea-base value))
         (disp (machine-ea-disp value))
         (index-reg (machine-ea-index value))
@@ -411,37 +411,41 @@
 ;; Figure out whether LEA should print its EA with just the stuff in brackets,
 ;; or additionally show the EA as either a label or a hex literal.
 (defun lea-print-ea (value stream dstate)
-  (let ((width (inst-operand-size dstate))
-        (addr nil)
-        (fmt "= #x~x"))
-    (etypecase value
-      (machine-ea
-       ;; Indicate to PRINT-MEM-REF that this is not a memory access.
-       (print-mem-ref :compute value width stream dstate)
-       (when (eq (machine-ea-base value) :rip)
-         (setq addr (+ (dstate-next-addr dstate) (machine-ea-disp value)))))
+  (let* ((width (inst-operand-size dstate))
+         (addr
+          (etypecase value
+           (machine-ea
+            ;; Indicate to PRINT-MEM-REF that this is not a memory access.
+            (print-mem-ref :compute value width stream dstate)
+            (when (eq (machine-ea-base value) :rip)
+              (+ (dstate-next-addr dstate) (machine-ea-disp value))))
 
-      ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
-      (reg (print-reg-with-width value width stream dstate))
+           ((or string integer)
+            ;; A label for the EA should not print as itself, but as the decomposed
+            ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
+            ;; We can see an INTEGER here because LEA-COMPUTE-LABEL is always called
+            ;; on the operand to LEA, and it will compute an absolute address based
+            ;; off RIP when possible. If :use-labels NIL was specified, there is
+            ;; no hashtable of address to string, so we get the address.
+            ;; But ordinarily we get the string. Either way, the r/m arg reveals the
+            ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
+            ;; because the EA was computed in a prefilter.
+            ;; (the instruction format is known because LEA has exactly one format)
+            (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
+                           width stream dstate)
+            value)
 
-      ((or string integer)
-       ;; A label for the EA should not print as itself, but as the decomposed
-       ;; addressing mode so that [ADDR] and [RIP+disp] are unmistakable.
-       ;; We can see an INTEGER here because LEA-COMPUTE-LABEL is always called
-       ;; on the operand to LEA, and it will compute an absolute address based
-       ;; off RIP when possible. If :use-labels NIL was specified, there is
-       ;; no hashtable of address to string, so we get the address.
-       ;; But ordinarily we get the string. Either way, the r/m arg reveals the
-       ;; EA calculation. DCHUNK-ZERO is a meaningless value - any would do -
-       ;; because the EA was computed in a prefilter.
-       ;; (the instruction format is known because LEA has exactly one format)
-       (print-mem-ref :compute (regrm-inst-r/m dchunk-zero dstate)
-                      width stream dstate)
-       (setq addr value)
-       (when (stringp value) (setq fmt "= ~A"))))
-    (when addr
+           ;; LEA Rx,Ry is an illegal encoding, but we'll show it as-is.
+           ;; When we used integers instead of REG to represent registers, this case
+           ;; overlapped with the preceding. It's nice that it no longer does.
+           (reg
+            (print-reg-with-width value width stream dstate)
+            nil))))
+
+    (when (and addr stream) ; no end-of-line comments if storing into dstate
       (unless (maybe-note-assembler-routine addr nil dstate)
-        (note (lambda (s) (format s fmt addr)) dstate)))))
+        (note (lambda (s) (format s (if (stringp addr) "= ~A" "= #x~x") addr))
+              dstate)))))
 
 ;;;; interrupt instructions
 

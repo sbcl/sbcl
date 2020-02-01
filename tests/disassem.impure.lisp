@@ -83,6 +83,6 @@
                (declare (type dchunk chunk) (type instruction inst))
                (awhen (inst-printer inst)
                  (funcall it chunk inst nil dstate)
-                 (setf (dstate-operands dstate) nil)))
+                 (setf (dstate-n-operands dstate) 0)))
              seg dstate nil))))))
   (format t " done~%"))

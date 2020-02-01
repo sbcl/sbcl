@@ -570,6 +570,11 @@
                              (loop for i from 3 below item-length
                                    collect (extract-byte i))))))))))
 
+(defun operand (thing dstate)
+  (let ((index (dstate-n-operands dstate)))
+    (setf (aref (dstate-operands dstate) index) thing
+          (dstate-n-operands dstate) (1+ index))))
+
 ;;; Decode the instruction at the current ofset in the segment of DSTATE.
 ;;; Call this only when all of the following hold:
 ;;;  - *DISASSEM-INST-SPACE* has been constructed
@@ -605,8 +610,10 @@
            (funcall it chunk inst nil dstate)
            ;; FIXME: we're not returning the opaque bytes in any way
            (setf (dstate-cur-offs dstate) (dstate-next-offs dstate)))
-         (return (prog1 (cons (inst-name inst) (nreverse (dstate-operands dstate)))
-                   (setf (dstate-operands dstate) nil))))))))
+         (return (prog1 (cons (inst-name inst)
+                              (replace (make-list (dstate-n-operands dstate))
+                                       (dstate-operands dstate)))
+                   (setf (dstate-n-operands dstate) 0))))))))
 
 ;;; Iterate through the instructions in SEGMENT, calling FUNCTION for
 ;;; each instruction, with arguments of CHUNK, STREAM, and DSTATE.
@@ -1208,11 +1215,11 @@
                 (local-princ (thing)
                   (if stream
                       (princ thing stream)
-                      (push thing (dstate-operands dstate))))
+                      (operand thing dstate)))
                 (local-princ16 (thing)
                   (if stream
                       (princ16 thing stream)
-                      (push thing (dstate-operands dstate))))
+                      (operand thing dstate)))
                 (local-call-global-printer (fun)
                   (funcall fun chunk inst stream dstate))
                 (local-filtered-value (offset)
