@@ -716,6 +716,14 @@
                                         ;; we want to avoid reading it.
                                         (the index ,(or c-length 'length))
                                         ,n-words-form))))
+    (when (and c-length
+               fill-pointer
+               (csubtypep (lvar-type fill-pointer) (specifier-type 'index))
+               (not (types-equal-or-intersect (lvar-type fill-pointer)
+                                              (specifier-type `(integer 0 ,c-length)))))
+      (abort-ir1-transform "Invalid fill-pointer ~s for a vector of length ~s."
+                           (type-specifier (lvar-type fill-pointer))
+                           c-length))
     (flet ((eliminate-keywords ()
              (eliminate-keyword-args
               call 1
@@ -725,15 +733,6 @@
                 (:adjustable adjustable)
                 (:fill-pointer fill-pointer))))
            (with-alloc-form (&optional data-wrapper)
-             (when (and c-length
-                        fill-pointer
-                        (csubtypep (lvar-type fill-pointer) (specifier-type 'index))
-                        (not (types-equal-or-intersect (lvar-type fill-pointer)
-                                                       (specifier-type `(integer 0 ,c-length)))))
-               (compiler-warn "Invalid fill-pointer ~s for a vector of length ~s."
-                              (type-specifier (lvar-type fill-pointer))
-                              c-length)
-               (give-up-ir1-transform))
              (cond (complex
                     (let* ((constant-fill-pointer-p (constant-lvar-p fill-pointer))
                            (fill-pointer-value (and constant-fill-pointer-p
@@ -1043,7 +1042,7 @@
                 (not (proper-list-p dims)))
         (give-up-ir1-transform))
       (unless (check-array-dimensions dims call)
-          (give-up-ir1-transform))
+        (give-up-ir1-transform))
       (cond ((singleton-p dims)
              (transform-make-array-vector (car dims) element-type
                                           initial-element initial-contents call

@@ -2667,3 +2667,10 @@
      `(lambda ()
         (eval (and (if (eval 0) (eval 0) (eval 0)) t)))
      (() t))))
+
+(with-test (:name :make-array-half-finished-transform)
+  (checked-compile-and-assert
+      (:allow-warnings t)
+      `(lambda ()
+         (make-array 6 :fill-pointer 33))
+    (() (condition '(not program-error)))))
