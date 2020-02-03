@@ -138,7 +138,7 @@
         (values nil t))
        (character-set-type
         ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
-        (values (and (characterp obj) (character-in-charset-p obj type)) t))
+        (values (test-character-type type) t))
        (classoid ; = {built-in,structure,condition,standard,static}-classoid
         (if (built-in-classoid-p type)
             (ecase (classoid-name type)

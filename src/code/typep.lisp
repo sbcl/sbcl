@@ -110,8 +110,7 @@
                  (name (nth tag *simd-pack-element-types*)))
             (not (not (member name (simd-pack-256-type-element-type type)))))))
     (character-set-type
-     (and (characterp object)
-          (character-in-charset-p object type)))
+     (test-character-type type))
     (negation-type
      (not (recurse object (negation-type-type type))))
     (hairy-type

@@ -918,7 +918,14 @@
                         ((eq (sb-xc:symbol-package ,thing) *keyword-package*)
                          (values t t)) ; certainly yes
                         (t
-                         (values nil nil))))) ; can't decide
+                         (values nil nil)))) ; can't decide
+                (test-character-type (type)
+                  (when (characterp ,thing)
+                    (let ((code (sb-xc:char-code ,thing)))
+                      (dolist (pair (character-set-type-pairs type) nil)
+                        (destructuring-bind (low . high) pair
+                          (when (<= low code high)
+                            (return t))))))))
            ;; It should always work to dispatch by class-id, but ALIEN-TYPE-TYPE
            ;; is a problem in the cross-compiler due to not having a type-class-id
            ;; when 'src/code/cross-type' is compiled. I briefly tried moving
@@ -936,3 +943,43 @@
                    (when absent
                      (error "Unhandled type-classes: ~S" absent)))
                  clauses)))))))
+
+;;; Common logic for %%TYPEP and CROSS-TYPEP to test numeric types
+(defmacro number-typep (object type)
+  `(let ((object ,object) (type ,type))
+     (and (numberp object)
+          (let ((num (if (complexp object) (realpart object) object)))
+            (ecase (numeric-type-class type)
+              (integer (and (integerp num)
+                            ;; If the type is (COMPLEX INTEGER), it can
+                            ;; only match the object if both real and imag
+                            ;; parts are integers.
+                            (or (not (complexp object))
+                                (integerp (imagpart object)))))
+              (rational (rationalp num))
+              (float
+               (ecase (numeric-type-format type)
+                 ;; (short-float (typep num 'short-float))
+                 (single-float (typep num 'single-float))
+                 (double-float (typep num 'double-float))
+                 ;; (long-float (typep num 'long-float))
+                 ((nil) (floatp num))))
+              ((nil) t)))
+          (flet ((bound-test (val)
+                   (and (let ((low (numeric-type-low type)))
+                          (cond ((null low) t)
+                                ((listp low) (sb-xc:> val (car low)))
+                                (t (sb-xc:>= val low))))
+                        (let ((high (numeric-type-high type)))
+                          (cond ((null high) t)
+                                ((listp high) (sb-xc:< val (car high)))
+                                (t (sb-xc:<= val high)))))))
+            (ecase (numeric-type-complexp type)
+              ((nil) t)
+              (:complex
+               (and (complexp object)
+                    (bound-test (realpart object))
+                    (bound-test (imagpart object))))
+              (:real
+               (and (not (complexp object))
+                    (bound-test object))))))))
