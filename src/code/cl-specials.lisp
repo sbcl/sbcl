@@ -121,7 +121,7 @@
                        cl:*query-io*
                        cl:*terminal-io*))
 
-(declaim (type (or function symbol) cl:*debugger-hook* cl:*macroexpand-hook*))
+(declaim (type sb-kernel:function-designator cl:*debugger-hook* cl:*macroexpand-hook*))
 
 (declaim (type unsigned-byte cl:*gensym-counter*))
 

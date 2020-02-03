@@ -390,7 +390,7 @@
 (define-type-method (function :simple-union2) (type1 type2)
   (if (or (fun-designator-type-p type1)
           (fun-designator-type-p type2))
-      (specifier-type '(or function symbol))
+      (specifier-type 'function-designator)
       (specifier-type 'function)))
 
 (define-type-method (function :simple-intersection2) (type1 type2)
@@ -533,10 +533,11 @@
                                 :returns result
                                 :designator designator))))
           ((eq result *wild-type*)
-           (specifier-type
-            (if designator
-                'callable
-                'function)))
+           (if designator
+               ;; Do not put 'FUNCTION-DESIGNATOR here!
+               ;; (Since this is the parser for FUNCTION-DESIGNATOR)
+               (specifier-type '(or function symbol))
+               (specifier-type 'function)))
           (t
            (make-fun-type :wild-args t :returns result
                           :designator designator)))))
@@ -3400,7 +3401,7 @@ used for a COMPLEX component.~:@>"
   ;;
   ;; Ouch. - CSR, 2002-04-10
   (cond ((fun-designator-type-p type1)
-         (type= type2 (specifier-type 'callable)))
+         (type= type2 (specifier-type 'function-designator)))
         (t
          (multiple-value-bind (sub-value sub-certain?)
              (type= type1

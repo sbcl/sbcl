@@ -210,11 +210,6 @@
 (sb-xc:deftype external-format-designator ()
   '(or keyword (cons keyword)))
 
-;;; a thing that can be passed to FUNCALL & friends
-;;;
-;;; FIXME: should be FUNCTION-DESIGNATOR?
-(sb-xc:deftype callable () '(or function symbol))
-
 ;;; decomposing floats into integers
 (sb-xc:deftype single-float-exponent ()
   `(integer ,(- sb-vm:single-float-normal-exponent-min

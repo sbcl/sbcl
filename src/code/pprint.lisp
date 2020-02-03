@@ -743,7 +743,7 @@ line break."
   ;; T iff one of the original entries.
   (initial-p (null *initial-pprint-dispatch-table*) :type boolean :read-only t)
   ;; and the associated function
-  (fun nil :type callable :read-only t))
+  (fun nil :type function-designator :read-only t))
 
 (declaim (freeze-type pprint-dispatch-entry))
 
@@ -864,7 +864,7 @@ line break."
 ;; (cons (eql foo) cons) and (cons (eql foo) bit-vector) as two FOO entries.
 (defun set-pprint-dispatch (type function &optional
                             (priority 0) (table *print-pprint-dispatch*))
-  (declare (type (or null callable) function)
+  (declare (type function-designator function)
            (type real priority)
            (type pprint-dispatch-table table))
   (declare (explicit-check))

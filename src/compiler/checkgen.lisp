@@ -193,9 +193,9 @@
 (defun maybe-weaken-check (type policy)
   (declare (type ctype type))
   (typecase type
-    ;; Can't do much funcational type checking at run-time
+    ;; Can't do much functional type checking at run-time
     (fun-designator-type
-     (specifier-type '(or function symbol)))
+     (specifier-type 'function-designator))
     (fun-type
      (specifier-type 'function))
     (t
@@ -469,7 +469,7 @@
                    ,(internal-type-error-call temp
                                               (if (fun-designator-type-p type-to-report)
                                                   ;; Simplify
-                                                  (specifier-type 'callable)
+                                                  (specifier-type 'function-designator)
                                                   type-to-report)
                                               (cast-context cast))))))
           temps
