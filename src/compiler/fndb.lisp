@@ -1265,19 +1265,20 @@
 
 ;;;; from the "Streams" chapter:
 
-;;; FIXME: the first 5 of these should be specified to return a particular
-;;; subtype of STREAM, just like MAKE-STRING-{INPUT,OUTPUT}-STREAM do.
-(defknown make-synonym-stream (symbol) stream (flushable))
-(defknown make-broadcast-stream (&rest stream) stream (unsafely-flushable))
-(defknown make-concatenated-stream (&rest stream) stream (unsafely-flushable))
-(defknown make-two-way-stream (stream stream) stream (unsafely-flushable))
-(defknown make-echo-stream (stream stream) stream (flushable))
+(defknown make-synonym-stream (symbol) synonym-stream (flushable))
+(defknown make-broadcast-stream (&rest stream) broadcast-stream (unsafely-flushable))
+(defknown make-concatenated-stream (&rest stream) concatenated-stream (unsafely-flushable))
+(defknown make-two-way-stream (stream stream) two-way-stream (unsafely-flushable))
+(defknown make-echo-stream (stream stream) echo-stream (flushable))
 (defknown make-string-input-stream (string &optional index sequence-end)
   sb-impl::string-input-stream
   (flushable))
 (defknown make-string-output-stream (&key (:element-type type-specifier))
   sb-impl::string-output-stream
   (flushable))
+;; FIXME: sb-impl::string-output-stream as the result type causes a few
+;; "CROSS-TYPEP uncertain: CTYPEP T #<UNKNOWN-TYPE STRING-OUTPUT-STREAM>"
+;; warnings which need to be resolved.
 (defknown get-output-stream-string (stream) simple-string ())
 (defknown streamp (t) boolean (movable foldable flushable))
 (defknown stream-element-type (stream) type-specifier ; can it return a CLASS?
