@@ -15,9 +15,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (require :sb-posix)) ; for mmap
-
 (load (merge-pathnames "corefile.lisp" *load-pathname*))
 
 (defpackage "SB-EDITCORE"
@@ -1603,16 +1600,21 @@
                 (unwind-protect
                      (progn
                        (setq ,sap-var
-                             (sb-posix:mmap nil
-                                            (* ,npages +backend-page-bytes+)
-                                            (logior sb-posix:prot-read sb-posix:prot-write)
-                                            sb-posix:map-private
-                                            (sb-sys:fd-stream-fd ,stream)
-                                            ;; Skip the core header
-                                            (+ ,start +backend-page-bytes+)))
+                             (alien-funcall
+                              (extern-alien "load_core_bytes"
+                                            (function system-area-pointer
+                                                      int int unsigned unsigned))
+                              (sb-sys:fd-stream-fd ,stream)
+                              ;; Skip the core header
+                              (+ ,start +backend-page-bytes+)
+                              0 ; place it anywhere
+                              (* ,npages +backend-page-bytes+)))
                        ,@body)
                   (when ,sap-var
-                    (sb-posix:munmap ,sap-var (* ,npages +backend-page-bytes+)))))))
+                    (alien-funcall
+                     (extern-alien "os_invalidate"
+                                   (function void system-area-pointer unsigned))
+                     ,sap-var (* ,npages +backend-page-bytes+)))))))
 
 ;;; Given a native SBCL '.core' file, or one attached to the end of an executable,
 ;;; separate it into pieces.

@@ -956,7 +956,7 @@ os_validate_recommit(os_vm_address_t addr, os_vm_size_t len)
  * thing to maintain).
  */
 
-void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
+void* load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     os_vm_size_t count;
 
@@ -968,6 +968,7 @@ void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 
     count = read(fd, addr, len);
     CRT_AVER( count == len );
+    return (void*)0;
 }
 static DWORD os_protect_modes[8] = {
     PAGE_NOACCESS,

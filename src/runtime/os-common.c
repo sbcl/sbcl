@@ -214,8 +214,9 @@ gc_managed_heap_space_p(lispobj addr)
 
 #ifndef LISP_FEATURE_WIN32
 
-/* Remap a part of an already existing memory mapping from a file */
-void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
+/* Remap a part of an already existing memory mapping from a file,
+ * and/or create a new mapping as need be */
+void* load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 {
     int fail = 0;
 #ifdef LISP_FEATURE_HPUX
@@ -227,7 +228,15 @@ void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
     os_flush_icache(addr, len);
 #else
     os_vm_address_t actual;
-    actual = mmap(addr, len, OS_VM_PROT_ALL, MAP_PRIVATE | MAP_FIXED,
+    actual = mmap(addr, len,
+                  // If mapping to a random address, then the assumption is
+                  // that we're not going to execute the core; nor should we write to it.
+                  // However, the addr=0 case is for 'editcore' which unfortunately _does_
+                  // write the memory. I'd prefer that it not,
+                  // but that's not the concern here.
+                  addr ? OS_VM_PROT_ALL : OS_VM_PROT_READ | OS_VM_PROT_WRITE,
+                  // Do not pass MAP_FIXED with addr of 0, because most OSes disallow that.
+                  MAP_PRIVATE | (addr ? MAP_FIXED : 0),
                   fd, (off_t) offset);
     if (actual == MAP_FAILED) {
         perror("mmap");
@@ -238,6 +247,7 @@ void load_core_bytes(int fd, int offset, os_vm_address_t addr, os_vm_size_t len)
 #endif
     if (fail)
         lose("load_core_bytes(%d,%x,%lx,%x) failed", fd, offset, (long)addr, (int)len);
+    return (void*)actual;
 }
 
 boolean
