@@ -22,6 +22,16 @@
 
 (in-package "SB-COREFILE")
 
+;;; This constant is computed as
+;;;  (logior (ash (char-code #\S) 24)
+;;;          (ash (char-code #\B) 16)
+;;;          (ash (char-code #\C) 8)
+;;;          (char-code #\L))
+;;; But it needs to use SB-XC:CHAR-CODE when cross-compiling,
+;;; so it's not easily shared between genesis and editcore
+;;; without a bit of computation by hand.
+(defconstant core-magic #x5342434C)
+
 ;;; magic numbers to identify entries in a core file
 ;;;
 ;;; These are arbitrary words, tested not for being in a particular range,

@@ -31,12 +31,6 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (use-package "SB-COREFILE")) ; not SB-COREFILE
 
-(defconstant core-magic
-  (logior (ash (sb-xc:char-code #\S) 24)
-          (ash (sb-xc:char-code #\B) 16)
-          (ash (sb-xc:char-code #\C) 8)
-          (sb-xc:char-code #\L)))
-
 (defun round-up (number size)
   "Round NUMBER up to be an integral multiple of SIZE."
   (* size (ceiling number size)))

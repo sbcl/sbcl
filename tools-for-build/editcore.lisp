@@ -44,12 +44,6 @@
 (eval-when (:execute)
   (setq *evaluator-mode* :compile))
 
-(defconstant core-magic
-  (logior (ash (char-code #\S) 24)
-          (ash (char-code #\B) 16)
-          (ash (char-code #\C) 8)
-          (char-code #\L)))
-
 ;;; Some high address that won't conflict with any of the ordinary spaces
 ;;; It's more-or-less arbitrary, but we must be able to discern whether a
 ;;; pointer looks like it points to code in case coreparse has to walk the heap.
