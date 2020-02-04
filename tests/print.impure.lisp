@@ -846,3 +846,14 @@
     (declare (notinline format))
     (assert (string= (format nil control) "hi.
 there"))))
+
+(with-test (:name :sharp-s-respect-io-syntax)
+  (let ((s (sb-c::make-definition-source-location)))
+    (let ((str (write-to-string s :escape t :pretty t)))
+      (assert (eql (search "#S(SB-C:DEFINITION-SOURCE-LOCATION" str) 0)))
+    (let ((str (write-to-string s :escape t :pretty nil)))
+      (assert (eql (search "#S(SB-C:DEFINITION-SOURCE-LOCATION" str) 0)))
+    (let ((str (write-to-string s :escape nil :pretty t)))
+      (assert (eql (search "#S(DEFINITION-SOURCE-LOCATION" str) 0)))
+    (let ((str (write-to-string s :escape nil :pretty nil)))
+      (assert (eql (search "#S(DEFINITION-SOURCE-LOCATION" str) 0)))))

@@ -172,7 +172,7 @@
 
 (defun %default-structure-pretty-print (structure stream name dd)
   (pprint-logical-block (stream nil :prefix "#S(" :suffix ")")
-    (prin1 name stream)
+    (write name :stream stream) ; escaped or not, according to printer controls
     (let ((remaining-slots (dd-slots dd)))
       (when remaining-slots
         (write-char #\space stream)
@@ -193,7 +193,7 @@
 (defun %default-structure-ugly-print (structure stream name dd)
   (descend-into (stream)
     (write-string "#S(" stream)
-    (prin1 name stream)
+    (write name :stream stream)
     (do ((index 0 (1+ index))
          (limit (or (and (not *print-readably*) *print-length*)
                     sb-xc:most-positive-fixnum))
