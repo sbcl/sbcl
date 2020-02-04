@@ -163,7 +163,8 @@
                 (= (mismatch string "/tmp/") 5)
                 (= (mismatch string "/var/tmp/") 9)
                 (eql (search "/private/var/folders/" string) 0)
-                (equal string "/proc/self/maps")
+                (string= string "/proc/self/maps")
+                (string= string "exists")
                 (member (stem-of filename) '("compiler-test-util.lisp"
                                              "a.txt" "b.lisp"
                                              "no-such-file")
