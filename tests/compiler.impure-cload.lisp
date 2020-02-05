@@ -599,3 +599,16 @@
 
 (with-test (:name :non-top-level-type-clobbering)
   (assert (non-top-level-type-clobbering2)))
+
+(macrolet ((x () '#(a b c d)))
+  (defun constant-test-1 ()
+    (list (x) (x) (x)))
+  (defun constant-test-2 ()
+    (list (x))))
+
+(with-test (:name :emit-only-unique-constants)
+  (let ((l1 (ctu:find-code-constants #'constant-test-1))
+        (l2 (ctu:find-code-constants #'constant-test-2)))
+    (assert (= (length l1) 1))
+    (assert (= (length l2) 1))
+    (assert (eq (car l1) (car l2)))))

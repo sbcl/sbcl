@@ -2392,7 +2392,8 @@ is :ANY, the function name is not checked."
   ;;  1. layouts go in the hash-table so that a code component references
   ;;     any given layout at most once
   ;;  2. STANDARD-OBJECT layouts use MAKE-LOAD-FORM
-  (let ((faslp (producing-fasl-file)))
+  (let ((faslp (producing-fasl-file))
+        (ns (if (boundp '*ir1-namespace*) *ir1-namespace*)))
     (labels ((core-coalesce-p (x)
                ;; True for things which retain their identity under EQUAL,
                ;; so we can safely share the same CONSTANT leaf between
@@ -2457,19 +2458,23 @@ is :ANY, the function name is not checked."
       #-sb-xc-host
       (when (and (not faslp) (simple-string-p object))
         (logically-readonlyize object nil))
-      (let ((hashp (and (boundp '*ir1-namespace*)
-                        (if faslp
-                            (file-coalesce-p object)
-                            (core-coalesce-p object)))))
-        (awhen (and hashp (gethash object (constants *ir1-namespace*)))
+      ;; Has this identical object been seen before? Bail out early if so.
+      (awhen (and ns (gethash object (eq-constants ns)))
+        (return-from find-constant it))
+      (let ((coalescep (and ns
+                            (if faslp
+                                (file-coalesce-p object)
+                                (core-coalesce-p object)))))
+        (awhen (and coalescep (gethash object (equal-constants ns)))
           (return-from find-constant it))
         (when (and faslp (not (sb-fasl:dumpable-layout-p object)))
           (if namep
               (maybe-emit-make-load-forms object name)
               (maybe-emit-make-load-forms object)))
         (let ((new (make-constant object)))
-          (when hashp
-            (setf (gethash object (constants *ir1-namespace*)) new))
+          (when ns
+            (setf (gethash object (eq-constants ns)) new)
+            (when coalescep (setf (gethash object (equal-constants ns)) new)))
           new)))))
 
 ;;; Return true if X and Y are lvars whose only use is a

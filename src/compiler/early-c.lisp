@@ -95,10 +95,12 @@
   (free-vars (make-hash-table :test 'eq) :read-only t :type hash-table)
   ;; FREE-FUNS is like FREE-VARS, only it deals with function names.
   (free-funs (make-hash-table :test 'equal) :read-only t :type hash-table)
-  ;; We use the same CONSTANT structure to represent all equal anonymous
-  ;; constants. This hashtable translates from constants to the LEAFs that
+  ;; These hashtables translate from constants to the LEAFs that
   ;; represent them.
-  (constants (make-hash-table :test 'equal) :read-only t :type hash-table))
+  ;; Table 1: one entry for each distinct constant (according to object identity)
+  (eq-constants (make-hash-table :test 'eq) :read-only t :type hash-table)
+  ;; Table 2: one entry per EQUAL constant
+  (equal-constants (make-hash-table :test 'equal) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
 (sb-impl::define-thread-local *ir1-namespace*)
