@@ -1113,7 +1113,7 @@ care."
                                   :derived derived
                                   :array array
                                   :bound bound)))
-      (push cast (lvar-dependent-casts array))
+      (push cast (lvar-dependent-nodes array))
       (link-node-to-previous-ctran cast index-ctran)
       (setf (lvar-dest index-lvar) cast)
       (use-continuation cast next result))))

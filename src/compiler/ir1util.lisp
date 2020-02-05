@@ -3069,7 +3069,11 @@ is :ANY, the function name is not checked."
           do (nsubst new old (lvar-function-designator-annotation-deps dep))
           when (lvar-p new)
           do
-          (pushnew dep (lvar-dependent-annotations new))))
+          (pushnew dep (lvar-dependent-annotations new) :test #'eq))
+    (loop for dep in (lvar-dependent-nodes old)
+          when (lvar-p new)
+          do
+          (pushnew dep (lvar-dependent-nodes new) :test #'eq)))
   (when (lvar-p new)
     (setf
      (lvar-annotations new)

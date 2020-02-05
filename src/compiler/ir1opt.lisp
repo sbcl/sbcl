@@ -276,7 +276,7 @@
                    (component (block-component block)))
           (setf (block-reoptimize block) t)
           (reoptimize-component component :maybe))
-        (loop for cast in (lvar-dependent-casts lvar)
+        (loop for cast in (lvar-dependent-nodes lvar)
               unless (or (not (node-p cast))
                          (node-deleted cast))
               do
@@ -679,32 +679,72 @@
 ;; (if ... (if not-nil ...)), splice the correct successor right
 ;; in.
 (defun tension-if-if-1 (node test block)
-  (when (and (eq (block-start-node block) node)
-             (listp (lvar-uses test)))
-    (do-uses (use test)
-      (when (immediately-used-p test use)
-        (let* ((type (single-value-type (node-derived-type use)))
-               (target (if (type= type (specifier-type 'null))
-                           (if-alternative node)
-                           (multiple-value-bind (typep surep)
-                               (ctypep nil type)
-                             (and (not typep) surep
-                                  (if-consequent node))))))
-          (when target
-            (let ((pred (node-block use)))
-              (cond ((listp (lvar-uses test))
-                     (change-block-successor pred block target)
-                     (delete-lvar-use use))
-                    (t
-                     ;; only one use left. Just kill the now-useless
-                     ;; branch to avoid spurious code deletion notes.
-                     (aver (rest (block-succ block)))
-                     (kill-if-branch-1
-                      node test block
-                      (if (eql target (if-alternative node))
-                          (if-consequent node)
-                          (if-alternative node)))
-                     (return-from tension-if-if-1))))))))))
+  (cond ((and (eq (block-start-node block) node)
+              (listp (lvar-uses test)))
+         (do-uses (use test)
+           (when (immediately-used-p test use)
+             (let* ((type (single-value-type (node-derived-type use)))
+                    (target (if (type= type (specifier-type 'null))
+                                (if-alternative node)
+                                (multiple-value-bind (typep surep)
+                                    (ctypep nil type)
+                                  (and (not typep) surep
+                                       (if-consequent node))))))
+               (when target
+                 (let ((pred (node-block use)))
+                   (cond ((listp (lvar-uses test))
+                          (change-block-successor pred block target)
+                          (delete-lvar-use use))
+                         (t
+                          ;; only one use left. Just kill the now-useless
+                          ;; branch to avoid spurious code deletion notes.
+                          (aver (rest (block-succ block)))
+                          (kill-if-branch-1
+                           node test block
+                           (if (eql target (if-alternative node))
+                               (if-consequent node)
+                               (if-alternative node)))
+                          (return-from tension-if-if-1)))))))))
+        ((ref-p (lvar-uses test))
+         ;; TEST goes through a variable that is used by another IF
+         ;; e.g. (or (and x y) z)
+         (let* ((ref (lvar-uses test))
+                (var (ref-leaf ref)))
+           (when (and (lambda-var-p var)
+                      ;; TODO: split the lambda if it has more than one var
+                      (= (length (lambda-vars (lambda-var-home var))) 1)
+                      (let-var-immediately-used-p ref var test)
+                      ;; Rely on constraint propagation to determine
+                      ;; that the var with the value of NIL is never
+                      ;; used outside of the test itself.
+                      ;; Otherwise would need to check if
+                      ;; if-consequent is dominating the remaining references
+                      (loop with null-type = (specifier-type 'null)
+                            for other-ref in (lambda-var-refs var)
+                            for lvar = (node-lvar other-ref)
+                            always (or (eq other-ref ref)
+                                       (not (types-equal-or-intersect (single-value-type (node-derived-type other-ref))
+                                                                      null-type))
+                                       (progn
+                                         (and lvar
+                                              ;; Make sure we get back here after node-derived-type
+                                              (pushnew node (lvar-dependent-nodes lvar)
+                                                       :test #'eq))
+                                         nil))))
+             
+             (let ((lvar (lambda-var-ref-lvar ref)))
+               (when (and lvar
+                          (listp (lvar-uses lvar)))
+                 (do-uses (use lvar)
+                   (let ((block (node-block use)))
+                     (when (and (immediately-used-p lvar use)
+                                (type= (single-value-type (node-derived-type use))
+                                       (specifier-type 'null))
+                                (eq (block-last block) use))
+                       (change-block-successor block
+                                               (car (block-succ block))
+                                               (if-alternative node))
+                       (delete-lvar-use use)))))))))))
 
 ;; Finally, duplicate EQ-nil tests
 (defun duplicate-if-if-1 (node test block)
@@ -1848,6 +1888,13 @@
                     *cl-package*)
                 (info :function :info name)))))))))
 
+(defun let-var-immediately-used-p (ref var lvar)
+  (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
+         (next-node (and next-ctran
+                         (ctran-next next-ctran))))
+    (and (eq next-node ref)
+         (lvar-almost-immediately-used-p lvar))))
+
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's LVAR with the arg lvar.
 ;;;
@@ -1871,11 +1918,7 @@
                ;; But if ARG is used just before the LET
                ;; and then VAR is used immediately,
                ;; the lvar can be substituted.
-               (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
-                      (next-node (and next-ctran
-                                      (ctran-next next-ctran))))
-                 (and (eq next-node ref)
-                      (lvar-almost-immediately-used-p arg))))
+               (let-var-immediately-used-p ref var arg))
            (not (block-delete-p (node-block ref)))
            ;; If the destinatation is dynamic extent, don't substitute unless
            ;; the source is as well.

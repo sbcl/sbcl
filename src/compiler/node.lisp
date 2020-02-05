@@ -90,7 +90,8 @@
   (dynamic-extent nil :type (or null cleanup))
   ;; something or other that the back end annotates this lvar with
   (info nil)
-  (dependent-casts nil)
+  ;; Nodes to reoptimize together with the lvar
+  (dependent-nodes nil)
   (annotations nil)
   (dependent-annotations nil))
 
