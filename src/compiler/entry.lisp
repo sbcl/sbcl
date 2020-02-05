@@ -66,6 +66,8 @@
     (setf (entry-info-xref info) (pack-xref-data (functional-xref internal-fun)))
     (let* ((inline-expansion (functional-inline-expansion internal-fun))
            (form  (if (fasl-output-p *compile-object*)
+                      ;; If compiling to a file, we only store sources if the STORE-SOURCE
+                      ;; quality value is 3. If to memory, any nonzero value will do.
                       (and (policy bind (= store-source-form 3))
                            ;; Downgrade the error to a warning if this was signaled
                            ;; by SB-PCL::DONT-KNOW-HOW-TO-DUMP.
@@ -81,15 +83,19 @@
                                      ;; on MAKE-LOAD-FORM?  Why did we choose to further obfuscate
                                      ;; a condition that was reflectable and instead turn it
                                      ;; into a dumb text string?
-                                     (when (and (typep c 'simple-error)
-                                                (search "know how to dump"
-                                                        (simple-condition-format-control c)))
-                                       ;; This might be worth a full warning. Dunno.
-                                       ;; After all, the user asked to do what can't be done.
-                                       (compiler-style-warn
+                                     (if (and (typep c 'simple-error)
+                                              (stringp (simple-condition-format-control c))
+                                              (search "know how to dump"
+                                                      (simple-condition-format-control c)))
+                                         ;; This might be worth a full warning. Dunno.
+                                         ;; After all, the user asked to do what can't be done.
+                                         (compiler-style-warn
                                         "Can't preserve function source - ~
 missing MAKE-LOAD-FORM methods?")
-                                       (return nil)))))
+                                         (compiler-style-warn
+                                          "Can't preserve function source: ~A"
+                                          (princ-to-string c)))
+                                       (return nil))))
                                (constant-value (find-constant inline-expansion)))))
                       (and (policy bind (> store-source-form 0))
                            inline-expansion)))

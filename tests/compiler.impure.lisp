@@ -2951,3 +2951,27 @@
                                       0)
                                      0))))))))
     (assert (eql (funcall f337 17) 0))))
+
+(defstruct dump-me)
+(defmethod make-load-form ((self dump-me) &optional e)
+  (declare (notinline typep) (ignore e))
+  ;; This error in bad usage of TYPEP would cause SB-C::COMPUTE-ENTRY-INFO
+  ;; to encounter another error:
+  ;; The value
+  ;;   #<SB-FORMAT::FMT-CONTROL "bad thing to be a type specifier: ~/SB-IMPL:PRINT-TYPE-SPECIFIER/">
+  ;; is not of type SEQUENCE
+  ;;
+  (if (typep 'foo (cons 1 2))
+      (make-load-form-saving-slots self)
+      ''i-cant-even))
+
+(with-test (:name :failed-dump-fun-source)
+  (with-scratch-file (fasl "fasl")
+    (let ((error-stream (make-string-output-stream)))
+      (multiple-value-bind (fasl warnings errors)
+          (let ((*error-output* error-stream))
+            (compile-file "bad-mlf-test.lisp" :output-file fasl))
+        (assert (and fasl warnings (not errors)))
+        (assert (search "bad thing to be" (get-output-stream-string error-stream)))
+        (load fasl)
+        (assert (eq (zook) 'hi))))))

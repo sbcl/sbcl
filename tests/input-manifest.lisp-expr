@@ -17,6 +17,7 @@
   "tests/data/wonky2.lisp"
   "tests/data/wonky3.lisp")
  ("compiler.impure.lisp"
+  "tests/bad-mlf-test.lisp"
   "tests/bug204-test.lisp"
   "tests/bug-417.lisp"
   "tests/bug-943953.lisp"
