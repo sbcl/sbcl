@@ -731,7 +731,7 @@
                                               (pushnew node (lvar-dependent-nodes lvar)
                                                        :test #'eq))
                                          nil))))
-             
+
              (let ((lvar (lambda-var-ref-lvar ref)))
                (when (and lvar
                           (listp (lvar-uses lvar)))
