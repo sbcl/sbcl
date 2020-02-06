@@ -103,6 +103,9 @@
 ;;; its applicability, try to install one now.
 ;;; (Question: could not genesis find a predicate for everything?)
 (defun !fixup-print-object-method-guards ()
+  ;; LAYOUT-OF has an ordinary definition appearing later, unless a vop translates
+  ;; it, in which case it has to be inlined because the stub isn't ready for use.
+  #-(vop-translates sb-kernel:layout-of) (declare (notinline layout-of))
   ;; Wouldn't you know, DOVECTOR is in early-extensions,
   ;; and it would need to go in primordial-extensions to use it here.
   (loop for method across (cdr (assoc 'print-object sb-pcl::*!trivial-methods*))
