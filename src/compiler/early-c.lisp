@@ -360,6 +360,9 @@ the stack without triggering overflow protection.")
                         (:predicate nil)
                         (:conc-name ""))
   (fun-names-in-this-file)
+  ;; for constant coalescing across code components, and/or for situations
+  ;; where SIMILARP does not do what you want.
+  (constant-cache)
   (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)

@@ -1279,17 +1279,14 @@ SB-EXT:PACKAGE-LOCKED-ERROR-SYMBOL."))
    "Signaled when an operation in the context of a deadline takes
 longer than permitted by the deadline."))
 
-;;; DEFINE-CONDITION captures the initargs literally. It does no good
-;;; to have the TOKENS macro insert the literal string within the expression
-;;; when the entire point is to AVOID inserting that exact string.
-(define-load-time-global *decl-type-conflict-error-reporter*
-    (sb-format:tokens "Symbol ~/sb-ext:print-symbol-with-prefix/ cannot ~
-     be both the name of a type and the name of a declaration"))
 (define-condition declaration-type-conflict-error (reference-condition
                                                    simple-error)
   ()
   (:default-initargs
-   :format-control *decl-type-conflict-error-reporter*
+   :format-control
+   #.(sb-xc:macroexpand-1 ; stuff in a literal #<fmt-control>
+      '(sb-format:tokens "Symbol ~/sb-ext:print-symbol-with-prefix/ cannot ~
+     be both the name of a type and the name of a declaration"))
    :references '((:ansi-cl :section (3 8 21)))))
 
 ;;; Single stepping conditions

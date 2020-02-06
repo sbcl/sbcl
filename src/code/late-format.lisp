@@ -1382,11 +1382,12 @@
     (values (nreverse symbols)
             (possibly-base-stringize new-string))))
 
+(push '("SB-FORMAT" tokens) *!removable-symbols*)
 (sb-xc:defmacro tokens (string)
   (declare (string string))
   (multiple-value-bind (symbols new-string) (extract-user-fun-directives string)
     (if symbols
-        `(load-time-value (make-fmt-control ,new-string ',symbols) t)
+        (make-fmt-control-proxy new-string symbols)
         (possibly-base-stringize new-string))))
 
 ;;; compile-time checking for argument mismatch.  This code is

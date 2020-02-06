@@ -4586,7 +4586,15 @@
                 (find-constant
                  (cond ((not symbols) new-string)
                        ((fasl-output-p *compile-object*)
-                        (sb-format::make-fmt-control-proxy new-string symbols))
+                        (acond ((assoc string (constant-cache *compilation*) :test 'equal)
+                                (cdr it))
+                               (t
+                                (let ((new (if symbols
+                                               (sb-format::make-fmt-control-proxy
+                                                new-string symbols)
+                                               new-string)))
+                                  (push (cons string new) (constant-cache *compilation*))
+                                  new))))
                        #-sb-xc-host ; no such object as a FMT-CONTROL
                        (t
                         (sb-format::make-fmt-control new-string symbols)))))))))
