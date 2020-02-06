@@ -2371,6 +2371,42 @@ is :ANY, the function name is not checked."
       (change-ref-leaf ref new-leaf)))
   (values))
 
+;;; Do almost the same thing that EQUAL does, but consider strings
+;;; to be dissimilar if their element types differ.
+;;; When cross-compiling, any STRING= strings are similar
+;;; because there is logically only a BASE-STRING type.
+;;; ISTM that the language botched this up by not defining a standard
+;;; predicate which returns T if and only if objects are similar.
+(defun similarp (x y)
+  #+sb-xc-host (equal x y)
+  #-sb-xc-host
+  (named-let recurse ((x x) (y y))
+    (cond ((%eql x y) t)
+          ((consp x)
+           (and (consp y)
+                (recurse (car x) (car y))
+                (recurse (cdr x) (cdr y))))
+          ((stringp x)
+           (and (stringp y)
+                ;; (= (widetag-of ...)) would be too strict, because a simple string
+                ;; can be be similar to a non-simple string.
+                (eq (array-element-type x)
+                    (array-element-type y))
+                (string= x y)))
+          (t ; PATHNAME and BIT-vector can fall back upon EQUAL
+           ;; This could be slightly wrong, but so it always was, because we use
+           ;; (and have used) EQUAL for PATHNAME in SB-C::FIND-CONSTANT, but:
+           ;;   "Two pathnames S and C are similar if all corresponding pathname components are similar."
+           ;; and we readily admit that similarity of strings requires equal element types.
+           ;; So this is slightly dubious:
+           ;; (EQUAL (MAKE-PATHNAME :NAME (COERCE "A" 'SB-KERNEL:SIMPLE-CHARACTER-STRING))
+           ;;        (MAKE-PATHNAME :NAME (COERCE "A" 'BASE-STRING))) => T
+           ;; On the other hand, nothing says that the pathname constructors such as
+           ;; MAKE-PATHNAME and MERGE-PATHNAMES don't convert to a canonical representation
+           ;; which renders them EQUAL when all strings are STRING=.
+           ;; This area of the language spec seems to have been a clusterfsck.
+           (equal x y)))))
+
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in (CONSTANTS *IR1-NAMESPACE*), then we create a new
 ;;; constant LEAF and enter it. If we are producing a fasl file, make sure that
@@ -2418,26 +2454,7 @@ is :ANY, the function name is not checked."
                        (descend x)))))
              (atom-colesce-p (x)
                (or (core-coalesce-p x)
-                   ;; We *could* coalesce base-strings as well,
-                   ;; but we'd need a separate hash-table for
-                   ;; that, since we are not allowed to coalesce
-                   ;; base-strings with non-base-strings.
-                   (typep x
-                          '(or bit-vector
-                            ;; in the cross-compiler, we coalesce
-                            ;; all strings with the same contents,
-                            ;; because we will end up dumping them
-                            ;; as base-strings anyway.  In the
-                            ;; real compiler, we're not allowed to
-                            ;; coalesce regardless of string
-                            ;; specialized element type, so we
-                            ;; KLUDGE by coalescing only character
-                            ;; strings (the common case) and
-                            ;; punting on the other types.
-                            #+sb-xc-host
-                            string
-                            #-sb-xc-host
-                            (vector character)))))
+                   (typep x '(or bit-vector string))))
              (file-coalesce-p (x)
                ;; CLHS 3.2.4.2.2: We are also allowed to coalesce various
                ;; other things when file-compiling.
@@ -2465,8 +2482,10 @@ is :ANY, the function name is not checked."
                             (if faslp
                                 (file-coalesce-p object)
                                 (core-coalesce-p object)))))
-        (awhen (and coalescep (gethash object (equal-constants ns)))
-          (return-from find-constant it))
+        (when coalescep
+          (dolist (candidate (gethash object (similar-constants ns)))
+            (when (similarp (constant-value candidate) object)
+              (return-from find-constant candidate))))
         (when (and faslp (not (sb-fasl:dumpable-layout-p object)))
           (if namep
               (maybe-emit-make-load-forms object name)
@@ -2474,7 +2493,8 @@ is :ANY, the function name is not checked."
         (let ((new (make-constant object)))
           (when ns
             (setf (gethash object (eq-constants ns)) new)
-            (when coalescep (setf (gethash object (equal-constants ns)) new)))
+            (when coalescep
+              (push new (gethash object (similar-constants ns)))))
           new)))))
 
 ;;; Return true if X and Y are lvars whose only use is a

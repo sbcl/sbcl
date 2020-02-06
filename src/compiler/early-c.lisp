@@ -99,8 +99,13 @@
   ;; represent them.
   ;; Table 1: one entry for each distinct constant (according to object identity)
   (eq-constants (make-hash-table :test 'eq) :read-only t :type hash-table)
-  ;; Table 2: one entry per EQUAL constant
-  (equal-constants (make-hash-table :test 'equal) :read-only t :type hash-table))
+  ;; Table 2: one hash-table entry per EQUAL constant,
+  ;; with the caveat that lookups must discriminate amongst constants that
+  ;; are EQUAL but not similar.  The value in the hash-table is a list of candidates
+  ;; (#<constant1> #<constant2> ... #<constantN>) such that CONSTANT-VALUE
+  ;; of each is EQUAL to the key for the hash-table entry, but dissimilar
+  ;; from each other. Notably, strings of different element types can't be similar.
+  (similar-constants (make-hash-table :test 'equal) :read-only t :type hash-table))
 (declaim (freeze-type ir1-namespace))
 
 (sb-impl::define-thread-local *ir1-namespace*)

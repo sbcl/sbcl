@@ -34,12 +34,12 @@
   (varint-buf (make-array 10 :element-type '(unsigned-byte 8) :fill-pointer t))
   ;; hashtables we use to keep track of dumped constants so that we
   ;; can get them from the table rather than dumping them again. The
-  ;; EQUAL-TABLE is used for lists and strings, and the EQ-TABLE is
+  ;; SIMILAR-TABLE is used for lists and strings, and the EQ-TABLE is
   ;; used for everything else. We use a separate EQ table to avoid
   ;; performance pathologies with objects for which EQUAL degenerates
-  ;; to EQL. Everything entered in the EQUAL table is also entered in
+  ;; to EQL. Everything entered in the SIMILAR table is also entered in
   ;; the EQ table.
-  (equal-table (make-hash-table :test 'equal) :type hash-table)
+  (similar-table (make-hash-table :test 'equal) :type hash-table)
   (eq-table (make-hash-table :test 'eq) :type hash-table)
   ;; Hashtable mapping a string to a list of fop-table indices of
   ;; symbols whose name is that string. For any name as compared
@@ -185,21 +185,14 @@
     (dump-fop 'fop-move-to-table fasl-output)
     (incf (fasl-output-table-free fasl-output))))
 
-;;; If X is in File's EQUAL-TABLE, then push the object and return T,
+;;; If X is in File's SIMILAR-TABLE, then push the object and return T,
 ;;; otherwise NIL.
-(defun equal-check-table (x fasl-output)
+(defun similar-check-table (x fasl-output)
   (declare (type fasl-output fasl-output))
-  (let ((handle (gethash x (fasl-output-equal-table fasl-output))))
-    (cond
-     (handle (dump-push handle fasl-output) t)
-     (t nil))))
-(defun string-check-table (x fasl-output)
-  (declare (type fasl-output fasl-output)
-           (type string x))
-  (let ((handle (cdr (assoc
-                      #+sb-xc-host 'base-char ; for repeatable xc fasls
-                      #-sb-xc-host (array-element-type x)
-                      (gethash x (fasl-output-equal-table fasl-output))))))
+  (let ((handle
+         (dolist (candidate (gethash x (fasl-output-similar-table fasl-output)))
+           (when (sb-c::similarp (car candidate) x)
+             (return (cdr candidate))))))
     (cond
      (handle (dump-push handle fasl-output) t)
      (t nil))))
@@ -212,20 +205,10 @@
   (setf (gethash x (fasl-output-eq-table fasl-output))
         (dump-to-table fasl-output))
   (values))
-(defun equal-save-object (x fasl-output)
+(defun similar-save-object (x fasl-output)
   (declare (type fasl-output fasl-output))
   (let ((handle (dump-to-table fasl-output)))
-    (setf (gethash x (fasl-output-equal-table fasl-output)) handle)
-    (setf (gethash x (fasl-output-eq-table fasl-output)) handle))
-  (values))
-(defun string-save-object (x fasl-output)
-  (declare (type fasl-output fasl-output)
-           (type string x))
-  (let ((handle (dump-to-table fasl-output)))
-    (push (cons #+sb-xc-host 'base-char ; repeatable xc fasls
-                #-sb-xc-host (array-element-type x)
-                handle)
-          (gethash x (fasl-output-equal-table fasl-output)))
+    (push (cons x handle) (gethash x (fasl-output-similar-table fasl-output)))
     (setf (gethash x (fasl-output-eq-table fasl-output)) handle))
   (values))
 ;;; Record X in File's CIRCULARITY-TABLE. This is called on objects
@@ -339,9 +322,9 @@
               (cond ((not (coalesce-tree-p x))
                      (dump-list x file)
                      (eq-save-object x file))
-                    ((not (equal-check-table x file))
+                    ((not (similar-check-table x file))
                      (dump-list x file t)
-                     (equal-save-object x file))))
+                     (similar-save-object x file))))
              (layout
               (dump-layout x file)
               (eq-save-object x file))
@@ -364,31 +347,31 @@
               ;; updating the EQ and EQUAL hash tables.
               (dump-array x file))
              (number
-              (unless (equal-check-table x file)
+              (unless (similar-check-table x file)
                 (etypecase x
                   (ratio (dump-ratio x file))
                   (complex (dump-complex x file))
                   (float (dump-float x file))
                   (integer (dump-integer x file)))
-                (equal-save-object x file)))
+                (similar-save-object x file)))
              #+(and (not sb-xc-host) sb-simd-pack)
              (simd-pack
-              (unless (equal-check-table x file)
+              (unless (similar-check-table x file)
                 (dump-fop 'fop-simd-pack file)
                 (dump-integer-as-n-bytes (%simd-pack-tag  x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-low  x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-high x) 8 file))
-              (equal-save-object x file))
+              (similar-save-object x file))
              #+(and (not sb-xc-host) sb-simd-pack-256)
              (simd-pack-256
-              (unless (equal-check-table x file)
+              (unless (similar-check-table x file)
                 (dump-fop 'fop-simd-pack file)
                 (dump-integer-as-n-bytes (logior (%simd-pack-256-tag x) 4) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-256-0 x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-256-1 x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-256-2 x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-256-3 x) 8 file))
-              (equal-save-object x file))
+              (similar-save-object x file))
              (t
               ;; This probably never happens, since bad things tend to
               ;; be detected during IR1 conversion.
@@ -664,9 +647,9 @@
                          ((not coalesce)
                           (dump-list obj file)
                           (eq-save-object obj file))
-                         ((not (equal-check-table obj file))
+                         ((not (similar-check-table obj file))
                           (dump-list obj file t)
-                          (equal-save-object obj file)))))
+                          (similar-save-object obj file)))))
                 (t
                  (sub-dump-object obj file))))))))
 
@@ -712,17 +695,17 @@
       ;; On the host, take all strings to be simple-base-string.
       ;; In the target, really test for simple-base-string.
       (#+sb-xc-host simple-string #-sb-xc-host simple-base-string
-       (unless (string-check-table x file)
+       (unless (similar-check-table x file)
          (dump-fop 'fop-base-string file (length simple-version))
          (dump-chars simple-version file t)
-         (string-save-object x file)))
+         (similar-save-object x file)))
       #-sb-xc-host
       ((simple-array character (*))
        #-sb-unicode (bug "how did we get here?")
-       (unless (string-check-table x file)
+       (unless (similar-check-table x file)
          (dump-fop 'fop-character-string file (length simple-version))
          (dump-chars simple-version file nil)
-         (string-save-object x file)))
+         (similar-save-object x file)))
       ;; SB-XC:SIMPLE-VECTOR will not match an array whose element type
       ;; the host upgraded to T but whose expressed type was not T.
       (sb-xc:simple-vector

@@ -788,7 +788,9 @@ necessary, since type inference may take arbitrarily long to converge.")
              (eq (node-component x) component)))
     (blast (free-vars ns))
     (blast (free-funs ns))
-    (blast (equal-constants ns))
+    ;; There can be more constants to blast when considering them by EQ rather
+    ;; than similarity. But it's totally OK to visit a #<CONSTANT> twice.
+    ;; Its refs will be scanned redundantly, which is harmless.
     (blast (eq-constants ns)))
   (values))
 
