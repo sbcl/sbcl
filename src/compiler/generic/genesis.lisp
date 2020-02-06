@@ -3684,6 +3684,10 @@ III. initially undefined function references (alphabetically):
         (cold-set symbol (list-to-core (nreverse (symbol-value symbol))))
         (makunbound symbol)) ; so no further PUSHes can be done
 
+      ;;; Order all trivial methods so that the first one whose guard
+      ;;; returns T is the most specific method. LAYOUT-DEPTHOID is a valid
+      ;;; sort key for this because we don't have multiple inheritance in
+      ;;; the system object type lattice.
       (cold-set
        'sb-pcl::*!trivial-methods*
        (list-to-core
@@ -3699,12 +3703,13 @@ III. initially undefined function references (alphabetically):
                                       :key (lambda (method)
                                              (class-depthoid (car method))))
                       collect
-                      (cold-list (cold-intern
-                                  (and (null qual) (predicate-for-specializer class)))
-                                 fun
-                                 (cold-intern class)
-                                 (cold-intern qual)
-                                 lambda-list source-loc)))))))
+                      (vector-in-core
+                       (list (cold-intern
+                              (and (null qual) (predicate-for-specializer class)))
+                             (cold-intern qual)
+                             (cold-intern class)
+                             fun
+                             lambda-list source-loc))))))))
 
       ;; Tidy up loose ends left by cold loading. ("Postpare from cold load?")
       (resolve-deferred-known-funs)

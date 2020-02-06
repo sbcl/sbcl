@@ -160,14 +160,19 @@
 
 (defun !incorporate-cross-compiled-methods (gf-name &key except)
   (assert (generic-function-p (fdefinition gf-name)))
-  (loop for (predicate fmf specializer qualifier lambda-list source-loc)
-        ;; Reversing installs less-specific methods first,
-        ;; so that if perchance we crash mid way through the loop,
-        ;; there is (hopefully) at least some installed method that works.
-        across (nreverse (remove-if (lambda (x) (member x except))
-                                    (cdr (assoc gf-name *!trivial-methods*))
-                                    :key #'third))
-        do (multiple-value-bind (specializers arg-info)
+  ;; Reversing installs less-specific methods first,
+  ;; so that if perchance we crash mid way through the loop,
+  ;; there is (hopefully) at least some installed method that works.
+  (dovector (method (nreverse (cdr (assoc gf-name *!trivial-methods*))))
+    ;; METHOD is a vector:
+    ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
+    (let ((qualifier   (svref method 1))
+          (specializer (svref method 2))
+          (fmf         (svref method 3))
+          (lambda-list (svref method 4))
+          (source-loc  (svref method 5)))
+      (unless (member specializer except)
+        (multiple-value-bind (specializers arg-info)
                (ecase gf-name
                  (print-object
                   (values (list (find-class specializer) (find-class t))
@@ -184,7 +189,7 @@
                     mf (method-function-from-fast-function fmf arg-info))
                    mf)
                 plist ,arg-info simple-next-method-call t)
-              source-loc))))
+              source-loc))))))
 (!incorporate-cross-compiled-methods 'make-load-form :except '(layout))
 
 (defmethod make-load-form ((class class) &optional env)

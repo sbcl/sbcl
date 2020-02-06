@@ -65,29 +65,51 @@
   (let ((gf (assoc name *!trivial-methods*)))
     ;; Append the method but don't bother finding a predicate for it.
     ;; Methods occurring in early warm load (notably from SB-FASTEVAL)
-    ;; wil be properly installed when 'pcl/print-object.lisp' is loaded.
+    ;; will be properly installed when 'pcl/print-object.lisp' is loaded.
     (rplacd gf (concatenate 'vector (cdr gf)
-                            (list (list nil lambda specializer qualifier
-                                        lambda-list source-loc))))))
+                            (list (vector nil ; guard
+                                          qualifier specializer lambda
+                                          lambda-list source-loc))))))
 
 ;;; Slow-but-correct logic for single-dispatch sans method combination,
 ;;; allowing exactly one primary method. Methods are sorted most-specific-first,
 ;;; so we can stop looking as soon as a match is found.
+;;; Sorting is performed during genesis.
 (defun !call-a-method (gf-name specialized-arg &rest rest)
   (let* ((methods (the simple-vector
                     (cdr (or (assoc gf-name *!trivial-methods*)
                              (error "No methods on ~S" gf-name)))))
          (applicable-method
-          (find specialized-arg methods
-                :test (lambda (arg method &aux (guard (car method)))
-                        (and (or (functionp guard) (fboundp guard))
-                             (funcall guard arg))))))
-    (unless applicable-method
-      (error "No applicable method for ~S on ~S~%" gf-name
-             (type-of specialized-arg)))
-    ;; The "method" is a list: (GUARD LAMBDA . OTHER-STUFF)
-    ;; Call using no permutation-vector / no precomputed next method.
-    (apply (cadr applicable-method) nil nil specialized-arg rest)))
+           ;; Find a method where the guard returns T. If that fails, find a method
+           ;; which exactly matches TYPE-OF the specialized-arg.
+           ;; It might be nice to rely only on the TYPE-OF test, but then we'd have to
+           ;; concern ourselves with type hierarchies.
+           ;; The "method" is a vector:
+           ;;  #(#<GUARD> QUALIFIER SPECIALIZER #<FMF> LAMBDA-LIST SOURCE-LOC)
+           (or (find-if (lambda (method &aux (guard (svref method 0)))
+                          (and (or (functionp guard) (fboundp guard))
+                               (funcall guard specialized-arg)))
+                        methods)
+               (find (type-of specialized-arg) methods
+                     :key (lambda (x) (svref x 2))))))
+
+    (if applicable-method
+        ;; Call using no permutation-vector / no precomputed next method.
+        (apply (svref applicable-method 3) nil nil specialized-arg rest)
+        (error "No applicable method for ~S on ~S~%" gf-name
+               (type-of specialized-arg)))))
+
+;;; For any "trivial" PRINT-OBJECT method lacking a predicate to determine
+;;; its applicability, try to install one now.
+;;; (Question: could not genesis find a predicate for everything?)
+(defun !fixup-print-object-method-guards ()
+  ;; Wouldn't you know, DOVECTOR is in early-extensions,
+  ;; and it would need to go in primordial-extensions to use it here.
+  (loop for method across (cdr (assoc 'print-object sb-pcl::*!trivial-methods*))
+        unless (svref method 0)
+        do (let ((classoid (find-classoid (elt method 2))))
+             (setf (svref method 0)
+                   (lambda (x) (classoid-typep (layout-of x) classoid x))))))
 
 (defun make-load-form (object &optional environment)
   (!call-a-method 'make-load-form object environment))
