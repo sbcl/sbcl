@@ -168,7 +168,12 @@ call to the constructor is bound to a variable declared
 @code{dynamic-extent}.
 
 @strong{Note}: structures with ``raw'' slots can currently be
-stack-allocated only on x86 and x86-64.
+stack-allocated only on x86 and x86-64. A ``raw'' slot is one whose
+declared type is a subtype of exactly one of: @code{double-float},
+@code{single-float}, @code{(complex double-float)}, @code{(complex single-float)},
+or @code{sb-ext:word}; but as an exception to the preceding, any subtype
+of @code{fixnum} is not stored as raw despite also being a subtype
+of @code{sb-ext:word}.
 
 @item
 all of the above when they appear as initial parts of another
