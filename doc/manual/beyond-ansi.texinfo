@@ -463,6 +463,26 @@ class named @code{t}.  Also, ANSI specifies that classes with metaclass
 also that the class named @code{t} is the universal superclass,
 inconsistent with it being a @code{built-in-class}.
 
+@item
+@findex @cl{change-class}
+@findex @cl{defclass}
+@findex @sbmop{ensure-class}
+@findex @sbmop{ensure-class-using-class}
+@findex @sbmop{slot-value-using-class}
+@findex @setf{@sbmop{slot-value-using-class}}
+@findex @sbmop{slot-boundp-using-class}
+@findex @sbmop{slot-definition-allocation}
+uses of @code{change-class} and redefinitions of classes with
+@code{defclass} (or the functional interfaces @code{ensure-class} or
+@code{ensure-class-using-class}) must ensure that for each slot with
+allocation @code{:instance} or @code{:class}, the set of applicable
+methods on the @code{slot-value-using-class} family of generic
+functions is the same before and after the change.
+
+This is required for correct operation of the protocol to update
+instances for the new or redefined class, and can be seen as part of
+the contract of the @code{:instance} or @code{:class} allocations.
+
 @end itemize
 
 @subsection Metaobject Protocol Extensions

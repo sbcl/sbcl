@@ -1,5 +1,9 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.1:
+  * bug fix: in CHANGE-CLASS, handle non-standard slot-value-using-class for
+    :INSTANCE and :CLASS slots better.  (reported by Shinmera on #sbcl)
+
 changes in sbcl-2.0.1 relative to sbcl-2.0.0:
   * minor incompatible change: some symbols have been removed from *FEATURES*
     based on a determination of which should be impermissible to examine

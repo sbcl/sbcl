@@ -465,11 +465,13 @@
 (defstruct (slot-info
             (:copier nil)
             (:constructor make-slot-info
-                (&key slotd typecheck
+                (&key slotd typecheck allocation location
                  (reader (uninitialized-accessor-function :reader slotd))
                  (writer (uninitialized-accessor-function :writer slotd))
                  (boundp (uninitialized-accessor-function :boundp slotd)))))
   (typecheck nil :type (or null function))
+  (allocation nil)
+  (location nil)
   (reader (missing-arg) :type function)
   (writer (missing-arg) :type function)
   (boundp (missing-arg) :type function))
