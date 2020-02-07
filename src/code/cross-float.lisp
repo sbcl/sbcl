@@ -240,7 +240,7 @@
                               (ash bits -32) (ldb (byte 32 0) bits))))))
       (let ((authoritative-answer
               (multiple-value-list
-               (host-sb-kernel::with-float-traps-masked (:overflow)
+               (host-sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
                  (apply (intern (string fun) "CL")
                         (mapcar (lambda (x)
                                   (etypecase x
@@ -594,16 +594,10 @@
                       #.(make-flonum #x5F000000 'single-float))
                      ((and (eql base $2d0) (eql power 63))
                       #.(make-flonum #x43E0000000000000 'double-float))
-                     ((and (eql base $10d0) (eql power -324))
-                      $0.0d0)
-                     ((and (eql base $10d0) (eql power 307))
-                      $1.0d307)
-                     ((and (eql base $10d0) (eql power -309))
-                      #.(make-flonum #xB8157268FDAF 'double-float))
-                     ((and (eql base $10d0) (eql power 322))
+                     ((and (eql base $10d0) (>= power 322))
                       (make-flonum :+infinity 'double-float))
                      (t
-                      (error "Unhandled case in EXPT"))))))))
+                      (cl:expt (realnumify base) power))))))))
 
 (defun %unary-truncate (number)
   (typecase number
@@ -633,9 +627,6 @@
   (validate-args f)
   (with-memoized-math-op (scale-float (list f ex))
     (make-flonum (cl:scale-float (let ((val (realnumify f)))
-                                   ;; FIXME: CMUCL warns (correctly)
-                                   ;; about a type conflict without
-                                   ;; this but we don't.
                                    (assert (floatp val))
                                    val)
                                  ex)
@@ -659,12 +650,16 @@
     ;; * (log 2d0 2d0) => 1.0d0
     ;; * (log 2s0 2s0) => 1.0
     (let ((format (pick-result-format number (if base-p base 0))))
-      (make-flonum (if base-p
-                       (cl:log (realnumify number) (realnumify base))
-                       (cl:log (realnumify number)))
-                   (if (eq format 'rational) ; neither arg was floating-point
-                       'single-float
-                       format)))))
+      (if (zerop number)
+          (make-flonum :-infinity (if (eq format 'rational)
+                                      'single-float
+                                      format))
+          (make-flonum (if base-p
+                           (cl:log (realnumify number) (realnumify base))
+                           (cl:log (realnumify number)))
+                       (if (eq format 'rational) ; neither arg was floating-point
+                           'single-float
+                           format))))))
 
 ;;;;
 

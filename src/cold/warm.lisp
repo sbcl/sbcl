@@ -65,7 +65,7 @@
       ;; Ensure that we're reading the correct variant of the file
       ;; in case there is more than one set of floating-point formats.
       (assert (eq (read stream) :default))
-      (sb-kernel::with-float-traps-masked (:overflow)
+      (sb-kernel::with-float-traps-masked (:overflow :divide-by-zero)
         (let ((*package* (find-package "SB-KERNEL")))
           (dolist (expr (read stream))
             (destructuring-bind (fun args . result) expr
