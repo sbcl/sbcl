@@ -25,8 +25,7 @@
           :GCC-TLS
           :RESTORE-FS-SEGMENT-REGISTER-FROM-TLS ; only for 'src/runtime/thread.h'
           :OS-PROVIDES-BLKSIZE-T ; only for 'src/runtime/wrap.h'
-          :OS-PROVIDES-PUTWC ; only for 'src/runtime/backtrace.c'
-          ))
+          :OS-PROVIDES-PUTWC)) ; only for 'src/runtime/backtrace.c'
        (public-features
         (cons
          sb-impl::!sbcl-architecture
@@ -34,6 +33,7 @@
            :64-BIT ; choice of word size. 32-bit if absent
            :BIG-ENDIAN :LITTLE-ENDIAN ; endianness: pick one and only one
            :BSD :UNIX :LINUX :WIN32 :DARWIN :SUNOS :ANDROID ; OS: pick one or more
+           :FREEBSD :OPENBSD :NETBSD :DRAGONFLY :HAIKU :HPUX
            :MACH-O :ELF ; obj file format: pick zero or one
            ;; I would argue that this should not be exposed,
            ;; but I would also anticipate blowblack from removing it.
