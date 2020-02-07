@@ -627,7 +627,7 @@
   (validate-args f)
   (with-memoized-math-op (scale-float (list f ex))
     (make-flonum (cl:scale-float (let ((val (realnumify f)))
-                                   (assert (floatp val))
+                                   (assert (cl:floatp val))
                                    val)
                                  ex)
                  (flonum-format f))))
