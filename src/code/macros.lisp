@@ -11,6 +11,356 @@
 
 (in-package "SB-IMPL")
 
+;;;; DEFUN
+
+;;; Should we save the inline expansion of the function named NAME?
+(defun save-inline-expansion-p (name)
+  (or
+   ;; the normal reason for saving the inline expansion
+   (let ((inlinep (info :function :inlinep name)))
+     (member inlinep '(inline maybe-inline)))
+   ;; another reason for saving the inline expansion: If the
+   ;; ANSI-recommended idiom
+   ;;   (DECLAIM (INLINE FOO))
+   ;;   (DEFUN FOO ..)
+   ;;   (DECLAIM (NOTINLINE FOO))
+   ;; has been used, and then we later do another
+   ;;   (DEFUN FOO ..)
+   ;; without a preceding
+   ;;   (DECLAIM (INLINE FOO))
+   ;; what should we do with the old inline expansion when we see the
+   ;; new DEFUN? Overwriting it with the new definition seems like
+   ;; the only unsurprising choice.
+   (nth-value 1 (fun-name-inline-expansion name))))
+
+(defun extract-dx-args (lambda-list decl-forms)
+  (let (dx-decls)
+    (dolist (form decl-forms)
+      (dolist (expr (cdr form))
+        (when (eq (car expr) 'dynamic-extent)
+          (setf dx-decls (union dx-decls (cdr expr))))))
+    (unless dx-decls
+      (return-from extract-dx-args nil))
+    ;; TODO: in addition to ":SILENT T" supressing warnings, PARSE-LAMBDA-LIST
+    ;; needs to allow :CONDITION-CLASS = NIL to ask that no errors be signaled.
+    ;; An indicator can be returned so that at worst the code below does nothing.
+    (multiple-value-bind (llks required optional rest key aux)
+        (parse-lambda-list lambda-list :silent t)
+      (declare (ignore llks rest))
+      ;; We enforce uniqueness of the symbols in the union of REQUIRED,
+      ;; OPTIONAL, REST, KEY (including any supplied-p variables),
+      ;; but there may be an AUX binding shadowing a lambda binding.
+      ;; This affects something like:
+      ;;  (LAMBDA (X &AUX (X (MAKE-FOO X))) (DECLARE (DYNAMIC-EXTENT X))
+      ;; in which the decl does not pertain to argument X.
+      (let ((arg-index 0) caller-dxable)
+        (labels ((examine (sym dx-note)
+                   (when (and (member sym dx-decls) (not (shadowed-p sym)))
+                     (push dx-note caller-dxable))
+                   (incf arg-index))
+                 (shadowed-p (sym)
+                   (dolist (binding aux)
+                     (when (eq (if (listp binding) (car binding) binding) sym)
+                       (return t)))))
+          (dolist (spec required)
+            (examine spec arg-index))
+          (dolist (spec optional)
+            (examine (if (listp spec) (car spec) spec) arg-index))
+          (dolist (spec key)
+            (multiple-value-bind (keyword var) (parse-key-arg-spec spec)
+              (examine var keyword))))
+        (nreverse caller-dxable)))))
+
+(flet ((defun-expander (env name lambda-list body snippet)
+  (multiple-value-bind (forms decls doc) (parse-body body t)
+    ;; Maybe kill docstring, but only under the cross-compiler.
+    #+(and (not sb-doc) sb-xc-host) (setq doc nil)
+    (let* (;; stuff shared between LAMBDA and INLINE-LAMBDA and NAMED-LAMBDA
+           (lambda-guts `(,@decls (block ,(fun-name-block-name name) ,@forms)))
+           (lambda `(lambda ,lambda-list ,@lambda-guts))
+           (named-lambda `(named-lambda ,name ,lambda-list
+                           ,@(when *top-level-form-p* '((declare (sb-c::top-level-form))))
+                           ,@(when doc (list doc)) ,@lambda-guts))
+           ;; DXABLE-ARGS and SNIPPET are mutually exclusive, so we can sleazily pass
+           ;; whichever exists (if either does) as one parameter to %DEFUN.
+           (extra-info (or snippet (extract-dx-args lambda-list decls)))
+           (inline-thing
+            (cond ((member snippet '(:predicate :copier :accessor)) nil)
+                  ;; If the defstruct snippet is :CONSTRUCTOR, we might have to store
+                  ;; a full inline expansion depending on the lexical environment.
+                  ((save-inline-expansion-p name)
+                  ;; we want to attempt to inline, so complain if we can't
+                   (cond ((sb-c:maybe-inline-syntactic-closure lambda env))
+                         (t
+                          (#+sb-xc-host warn
+                           #-sb-xc-host sb-c:maybe-compiler-notify
+                           "lexical environment too hairy, can't inline DEFUN ~S"
+                           name)
+                          nil))))))
+      (when (and (eq snippet :constructor)
+                 (not (typep inline-thing '(cons (eql sb-c:lambda-with-lexenv)))))
+        ;; constructor in null lexenv need not save the expansion
+        (setq inline-thing nil))
+      (when inline-thing
+        (setq inline-thing (list 'quote inline-thing)))
+      (when (and extra-info (not (keywordp extra-info)))
+        (setq extra-info (list 'quote extra-info)))
+      `(progn
+         (eval-when (:compile-toplevel)
+           (sb-c:%compiler-defun ',name t ,inline-thing ,extra-info))
+         (%defun ',name ,named-lambda
+                 ,@(when (or inline-thing extra-info) `(,inline-thing))
+                 ,@(when extra-info `(,extra-info)))
+         ;; This warning, if produced, comes after the DEFUN happens.
+         ;; When compiling, there's no real difference, but when interpreting,
+         ;; if there is a handler for style-warning that nonlocally exits,
+         ;; it's wrong to have skipped the DEFUN itself, since if there is no
+         ;; function, then the warning ought not to have been issued at all.
+         ,@(when (typep name '(cons (eql setf)))
+             `((eval-when (:compile-toplevel :execute)
+                 (sb-c::warn-if-setf-macro ',name))
+               ',name)))))))
+
+  (sb-xc:defmacro defun (&environment env name lambda-list &body body)
+    "Define a function at top level."
+    (check-designator name defun)
+    #+sb-xc-host
+    (unless (cl:symbol-package (fun-name-block-name name))
+      (warn "DEFUN of uninterned function name ~S (tricky for GENESIS)" name))
+    (defun-expander env name lambda-list body nil))
+
+  ;; extended defun as used by defstruct
+  (sb-xc:defmacro sb-c:xdefun (&environment env name snippet lambda-list &body body)
+    (defun-expander env name lambda-list body snippet)))
+
+;;;; DEFVAR and DEFPARAMETER
+
+(sb-xc:defmacro defvar (var &optional (val nil valp) (doc nil docp))
+  "Define a special variable at top level. Declare the variable
+  SPECIAL and, optionally, initialize it. If the variable already has a
+  value, the old value is not clobbered. The third argument is an optional
+  documentation string for the variable."
+  (check-designator var defvar)
+  ;; Maybe kill docstring, but only under the cross-compiler.
+  #+(and (not sb-doc) sb-xc-host) (setq doc nil)
+  `(progn
+     (eval-when (:compile-toplevel)
+       (%compiler-defvar ',var))
+     (%defvar ',var
+              (sb-c:source-location)
+              ,@(cond ((not valp)
+                       nil)
+                      ((constantp val)
+                       ;; No need to avoid evaluation if it's a constant.
+                       `(',(constant-form-value val)))
+                      (val
+                       `((unless (%boundp ',var) ,val))))
+              ,@(and docp
+                     `(',doc)))))
+
+(sb-xc:defmacro defparameter (var val &optional (doc nil docp))
+  "Define a parameter that is not normally changed by the program,
+  but that may be changed without causing an error. Declare the
+  variable special and sets its value to VAL, overwriting any
+  previous value. The third argument is an optional documentation
+  string for the parameter."
+  (check-designator var defparameter)
+  ;; Maybe kill docstring, but only under the cross-compiler.
+  #+(and (not sb-doc) sb-xc-host) (setq doc nil)
+  `(progn
+     (eval-when (:compile-toplevel)
+       (%compiler-defvar ',var))
+     (%defparameter ',var ,val (sb-c:source-location)
+                    ,@(and docp
+                           `(',doc)))))
+
+(defun %compiler-defglobal (name always-boundp assign-it-p value)
+  (sb-xc:proclaim `(global ,name))
+  (when assign-it-p
+    (set-symbol-global-value name value))
+  (sb-c::process-variable-declaration
+   name 'always-bound
+   ;; don't "weaken" the proclamation if it's in fact always bound now
+   (if (eq (info :variable :always-bound name) :always-bound)
+       :always-bound
+       always-boundp)))
+
+(defun %compiler-defvar (var)
+  (sb-xc:proclaim `(special ,var)))
+
+
+;;;; various conditional constructs
+(flet ((prognify (forms env)
+         (cond ((not forms) nil)
+               ((and (singleton-p forms)
+                     (sb-c:policy env (= sb-c:store-coverage-data 0)))
+                (car forms))
+               (t `(progn ,@forms)))))
+  ;; COND defined in terms of IF
+  (sb-xc:defmacro cond (&rest clauses &environment env)
+    (named-let make-clauses ((clauses clauses))
+      (if (endp clauses)
+          nil
+          (let ((clause (first clauses))
+                (more (rest clauses)))
+            (with-current-source-form (clauses)
+              (if (atom clause)
+                  (error 'simple-type-error
+                         :format-control "COND clause is not a ~S: ~S"
+                         :format-arguments (list 'cons clause)
+                         :expected-type 'cons
+                         :datum clause)
+                  (let ((test (first clause))
+                        (forms (rest clause)))
+                    (if (endp forms)
+                        `(or ,test ,(make-clauses more))
+                        (if (and (eq test t)
+                                 (not more))
+                            ;; THE to preserve non-toplevelness for FOO in
+                            ;;   (COND (T (FOO)))
+                            `(the t ,(prognify forms env))
+                            `(if ,test
+                                 ,(prognify forms env)
+                                 ,(when more (make-clauses more))))))))))))
+
+  (sb-xc:defmacro when (test &body forms &environment env)
+  "If the first argument is true, the rest of the forms are
+evaluated as a PROGN."
+    `(if ,test ,(prognify forms env)))
+
+  (sb-xc:defmacro unless (test &body forms &environment env)
+  "If the first argument is not true, the rest of the forms are
+evaluated as a PROGN."
+    `(if ,test nil ,(prognify forms env))))
+
+
+(sb-xc:defmacro return (&optional (value nil))
+  `(return-from nil ,value))
+
+;;;; various sequencing constructs
+(flet ((prog-expansion-from-let (varlist body-decls let)
+         (multiple-value-bind (body decls) (parse-body body-decls nil)
+           `(block nil
+              (,let ,varlist
+                ,@decls
+                (tagbody ,@body))))))
+  (sb-xc:defmacro prog (varlist &body body-decls)
+    (prog-expansion-from-let varlist body-decls 'let))
+  (sb-xc:defmacro prog* (varlist &body body-decls)
+    (prog-expansion-from-let varlist body-decls 'let*)))
+
+(sb-xc:defmacro prog1 (result &body body)
+  (let ((n-result (gensym)))
+    `(let ((,n-result ,result))
+       ,@body
+       ,n-result)))
+
+(sb-xc:defmacro prog2 (form1 result &body body)
+  `(prog1 (progn ,form1 ,result) ,@body))
+
+;; AND and OR are defined in terms of IF.
+(sb-xc:defmacro and (&rest forms)
+  (named-let expand-forms ((nested nil) (forms forms) (ignore-last nil))
+    (cond ((endp forms) t)
+          ((endp (rest forms))
+           (let ((car (car forms)))
+             (cond (nested
+                    car)
+                   (t
+                    ;; Preserve non-toplevelness of the form!
+                    `(the t ,car)))))
+          ((and ignore-last
+                (endp (cddr forms)))
+           (car forms))
+          ;; Better code that way, since the result will only have two
+          ;; values, NIL or the last form, and the precedeing tests
+          ;; will only be used for jumps
+          ((and (not nested) (cddr forms))
+           `(if ,(expand-forms t forms t)
+                ,@(last forms)))
+          (t
+           `(if ,(first forms)
+                ,(expand-forms t (rest forms) ignore-last))))))
+
+(sb-xc:defmacro or (&rest forms)
+  (named-let expand-forms ((nested nil) (forms forms))
+    (cond ((endp forms) nil)
+          ((endp (rest forms))
+           ;; Preserve non-toplevelness of the form!
+           (let ((car (car forms))) (if nested car `(the t ,car))))
+          (t
+           (let ((n-result (gensym)))
+             `(let ((,n-result ,(first forms)))
+                (if ,n-result
+                    ,n-result
+                    ,(expand-forms t (rest forms)))))))))
+
+
+;;;; Multiple value macros:
+
+;;; All the multiple-value receiving forms are defined in terms of
+;;; MULTIPLE-VALUE-CALL.
+(flet ((validate-vars (vars)
+         (with-current-source-form (vars)
+           (unless (and (listp vars) (every #'symbolp vars))
+             (error "Vars is not a list of symbols: ~S" vars)))))
+
+(sb-xc:defmacro multiple-value-bind (vars value-form &body body)
+  (validate-vars vars)
+  (if (= (length vars) 1)
+      ;; Not only does it look nicer to reduce to LET in this special case,
+      ;; if might produce better code or at least compile quicker.
+      ;; Certainly for the evaluator it's preferable.
+      `(let ((,(car vars) ,value-form))
+         ,@body)
+      (let ((ignore (sb-xc:gensym)))
+        `(multiple-value-call #'(lambda (&optional ,@(mapcar #'list vars)
+                                         &rest ,ignore)
+                                  (declare (ignore ,ignore))
+                                  ,@body)
+                              ,value-form))))
+
+(sb-xc:defmacro multiple-value-setq (vars value-form)
+  (validate-vars vars)
+  ;; MULTIPLE-VALUE-SETQ is required to always return just the primary
+  ;; value of the value-from, even if there are no vars. (SETF VALUES)
+  ;; in turn is required to return as many values as there are
+  ;; value-places, hence this:
+  (if vars
+      `(values (setf (values ,@vars) ,value-form))
+      `(values ,value-form))))
+
+(sb-xc:defmacro multiple-value-list (value-form)
+  `(multiple-value-call #'list ,value-form))
+
+(sb-xc:defmacro nth-value (n form &environment env)
+  "Evaluate FORM and return the Nth value (zero based)
+ without consing a temporary list of values."
+  ;; FIXME: The above is true, if slightly misleading.  The
+  ;; MULTIPLE-VALUE-BIND idiom [ as opposed to MULTIPLE-VALUE-CALL
+  ;; (LAMBDA (&REST VALUES) (NTH N VALUES)) ] does indeed not cons at
+  ;; runtime.  However, for large N (say N = 200), COMPILE on such a
+  ;; form will take longer than can be described as adequate, as the
+  ;; optional dispatch mechanism for the M-V-B gets increasingly
+  ;; hairy.
+  (let ((val (and (sb-xc:constantp n env) (constant-form-value n env))))
+    (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64 riscv) ;; better DEFAULT-UNKNOWN-VALUES
+                                          1000
+                                          10))) ; Arbitrary limit.
+        (let ((dummy-list (make-gensym-list val))
+              (keeper (sb-xc:gensym "KEEPER")))
+          `(multiple-value-bind (,@dummy-list ,keeper) ,form
+             (declare (ignore ,@dummy-list))
+             ,keeper))
+      ;; &MORE conversion handily deals with non-constant N,
+      ;; avoiding the unstylish practice of inserting FORM into the
+      ;; expansion more than once to pick off a few small values.
+      ;; This is not as good as above, because it uses TAIL-CALL-VARIABLE.
+        `(multiple-value-call
+             (lambda (n &rest list) (nth (truly-the index n) list))
+           (the index ,n) ,form))))
+
+
 ;;;; ASSERT and CHECK-TYPE
 
 ;;; ASSERT is written this way, to call ASSERT-ERROR, because of how
@@ -21,10 +371,6 @@
 ;;; to do a significant amount of work at runtime allocating and
 ;;; deallocating the closures regardless of whether they were ever
 ;;; needed.
-;;;
-;;; ASSERT-ERROR isn't defined until a later file because it uses the
-;;; macro RESTART-CASE, which isn't defined until a later file.
-;;;
 (sb-xc:defmacro assert (test-form &optional places datum &rest arguments
                             &environment env)
   "Signals an error if the value of TEST-FORM is NIL. Returns NIL.
@@ -111,9 +457,6 @@
 ;;; needed. Because it would be nice if CHECK-TYPE were cheap to use,
 ;;; and some things (e.g., READ-CHAR) can't afford this excessive
 ;;; consing, we bend backwards a little.
-;;;
-;;; CHECK-TYPE-ERROR isn't defined until a later file because it uses
-;;; the macro RESTART-CASE, which isn't defined until a later file.
 (sb-xc:defmacro check-type (place type &optional type-string
                                 &environment env)
   "Signal a restartable error of type TYPE-ERROR if the value of PLACE
@@ -960,9 +1303,6 @@ symbol-case giving up: case=((V U) (F))
 ;;; compiled. RESTART-CASE has forms with closures that the compiler
 ;;; causes to be generated at the top of any function using the case
 ;;; macros, regardless of whether they are needed.
-;;;
-;;; The CASE-BODY-ERROR function is defined later, when the
-;;; RESTART-CASE macro has been defined.
 (defun case-body-aux (name keyform keyform-value clauses keys
                       errorp proceedp expected-type)
   (when proceedp ; CCASE or CTYPECASE
@@ -1174,34 +1514,152 @@ symbol-case giving up: case=((V U) (F))
              (close ,var))
            (get-output-stream-string ,var)))))
 
-;;;; miscellaneous macros
+;;;; Iteration macros:
 
-(sb-xc:defmacro nth-value (n form &environment env)
-  "Evaluate FORM and return the Nth value (zero based)
- without consing a temporary list of values."
-  ;; FIXME: The above is true, if slightly misleading.  The
-  ;; MULTIPLE-VALUE-BIND idiom [ as opposed to MULTIPLE-VALUE-CALL
-  ;; (LAMBDA (&REST VALUES) (NTH N VALUES)) ] does indeed not cons at
-  ;; runtime.  However, for large N (say N = 200), COMPILE on such a
-  ;; form will take longer than can be described as adequate, as the
-  ;; optional dispatch mechanism for the M-V-B gets increasingly
-  ;; hairy.
-  (let ((val (and (sb-xc:constantp n env) (constant-form-value n env))))
-    (if (and (integerp val) (<= 0 val (or #+(or x86-64 arm64 riscv) ;; better DEFAULT-UNKNOWN-VALUES
-                                          1000
-                                          10))) ; Arbitrary limit.
-        (let ((dummy-list (make-gensym-list val))
-              (keeper (sb-xc:gensym "KEEPER")))
-          `(multiple-value-bind (,@dummy-list ,keeper) ,form
-             (declare (ignore ,@dummy-list))
-             ,keeper))
-      ;; &MORE conversion handily deals with non-constant N,
-      ;; avoiding the unstylish practice of inserting FORM into the
-      ;; expansion more than once to pick off a few small values.
-      ;; This is not as good as above, because it uses TAIL-CALL-VARIABLE.
-        `(multiple-value-call
-             (lambda (n &rest list) (nth (truly-the index n) list))
-           (the index ,n) ,form))))
+(flet
+    ((frob-do-body (varlist endlist decls-and-code bind step name block)
+       ;; Check for illegal old-style DO.
+       (when (not (listp varlist))
+         (with-current-source-form (varlist)
+           (error "~@<Ill-formed ~S variable list -- possibly illegal ~
+                   old style DO?~@:>"
+                  name)))
+       (when (atom endlist)
+         (with-current-source-form (endlist)
+           (error "~@<Ill-formed ~S end test list -- possibly illegal ~
+                  old style DO?~@:>"
+                  name)))
+       (collect ((steps))
+         (let ((inits
+                (with-current-source-form (varlist)
+                  (mapcar (lambda (var)
+                            (with-current-source-form (var)
+                              (or (cond ((symbolp var) var)
+                                        ((listp var)
+                                         (unless (symbolp (first var))
+                                           (error "~S step variable is not a symbol: ~S"
+                                                  name (first var)))
+                                         (case (length var)
+                                           ((1 2) var)
+                                           (3 (steps (first var) (third var))
+                                              (list (first var) (second var))))))
+                                  (error "~S is an illegal form for a ~S varlist."
+                                         var name))))
+                          varlist))))
+           (multiple-value-bind (code decls) (parse-body decls-and-code nil)
+             (let ((label-1 (sb-xc:gensym)) (label-2 (sb-xc:gensym)))
+               `(block ,block
+                  (,bind ,inits
+                    ,@decls
+                    (tagbody
+                     (go ,label-2)
+                     ,label-1
+                     (tagbody ,@code)
+                     (,step ,@(steps))
+                     ,label-2
+                     (unless ,(first endlist) (go ,label-1))
+                     (return-from ,block (progn ,@(rest endlist))))))))))))
+
+  ;; This is like DO, except it has no implicit NIL block.
+  (sb-xc:defmacro do-anonymous (varlist endlist &rest body)
+    (frob-do-body varlist endlist body 'let 'psetq 'do-anonymous (sb-xc:gensym)))
+
+  (sb-xc:defmacro do (varlist endlist &body body)
+  "DO ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
+  Iteration construct. Each Var is initialized in parallel to the value of the
+  specified Init form. On subsequent iterations, the Vars are assigned the
+  value of the Step form (if any) in parallel. The Test is evaluated before
+  each evaluation of the body Forms. When the Test is true, the Exit-Forms
+  are evaluated as a PROGN, with the result being the value of the DO. A block
+  named NIL is established around the entire expansion, allowing RETURN to be
+  used as an alternate exit mechanism."
+  (frob-do-body varlist endlist body 'let 'psetq 'do nil))
+
+  (sb-xc:defmacro do* (varlist endlist &body body)
+  "DO* ({(Var [Init] [Step])}*) (Test Exit-Form*) Declaration* Form*
+  Iteration construct. Each Var is initialized sequentially (like LET*) to the
+  value of the specified Init form. On subsequent iterations, the Vars are
+  sequentially assigned the value of the Step form (if any). The Test is
+  evaluated before each evaluation of the body Forms. When the Test is true,
+  the Exit-Forms are evaluated as a PROGN, with the result being the value
+  of the DO. A block named NIL is established around the entire expansion,
+  allowing RETURN to be used as an alternate exit mechanism."
+  (frob-do-body varlist endlist body 'let* 'setq 'do* nil)))
+
+(sb-xc:defmacro dotimes ((var count &optional (result nil)) &body body)
+  ;; A nice optimization would be that if VAR is never referenced,
+  ;; it's slightly more efficient to count backwards, but that's tricky.
+  (let ((c (if (integerp count) count (sb-xc:gensym))))
+    `(do ((,var 0 (1+ ,var))
+          ,@(if (symbolp c) `((,c (the integer ,count)))))
+         ((>= ,var ,c) ,result)
+       (declare (type unsigned-byte ,var))
+       ,@body)))
+
+(sb-xc:defmacro dolist ((var list &optional (result nil)) &body body &environment env)
+  ;; We repeatedly bind the var instead of setting it so that we never
+  ;; have to give the var an arbitrary value such as NIL (which might
+  ;; conflict with a declaration). If there is a result form, we
+  ;; introduce a gratuitous binding of the variable to NIL without the
+  ;; declarations, then evaluate the result form in that
+  ;; environment. We spuriously reference the gratuitous variable,
+  ;; since we don't want to use IGNORABLE on what might be a special
+  ;; var.
+  (binding* (((forms decls) (parse-body body nil))
+             (n-list (gensym "N-LIST"))
+             (start (gensym "START"))
+             ((clist members clist-ok)
+              (with-current-source-form (list)
+                (cond
+                  ((sb-xc:constantp list env)
+                   (binding* ((value (constant-form-value list env))
+                              ((all dot) (list-members value :max-length 20)))
+                     (when (eql dot t)
+                       ;; Full warning is too much: the user may terminate the loop
+                       ;; early enough. Contents are still right, though.
+                       (style-warn "Dotted list ~S in DOLIST." value))
+                     (if (eql dot :maybe)
+                         (values value nil nil)
+                         (values value all t))))
+                  ((and (consp list) (eq 'list (car list))
+                        (every (lambda (arg) (sb-xc:constantp arg env)) (cdr list)))
+                   (let ((values (mapcar (lambda (arg) (constant-form-value arg env)) (cdr list))))
+                     (values values values t)))
+                  (t
+                   (values nil nil nil))))))
+    `(block nil
+       (let ((,n-list ,(if clist-ok (list 'quote clist) list)))
+         (tagbody
+            ,start
+            (unless (endp ,n-list)
+              (let ((,var ,(if clist-ok
+                               `(truly-the (member ,@members) (car ,n-list))
+                               `(car ,n-list))))
+                ,@decls
+                (setq ,n-list (cdr ,n-list))
+                (tagbody ,@forms))
+              (go ,start))))
+       ,(if result
+            `(let ((,var nil))
+               ;; Filter out TYPE declarations (VAR gets bound to NIL,
+               ;; and might have a conflicting type declaration) and
+               ;; IGNORE (VAR might be ignored in the loop body, but
+               ;; it's used in the result form).
+               ,@(filter-dolist-declarations decls)
+               ,var
+               ,result)
+            nil))))
+
+
+;;;; Miscellaneous macros:
+
+(sb-xc:defmacro lambda (&whole whole args &body body)
+  (declare (ignore args body))
+  `#',whole)
+
+(sb-xc:defmacro named-lambda (&whole whole name args &body body)
+  (declare (ignore name args body))
+  `#',whole)
 
 (sb-xc:defmacro declaim (&rest specs)
   "DECLAIM Declaration*
@@ -1228,12 +1686,6 @@ symbol-case giving up: case=((V U) (F))
         (let ((fun (make-symbol "THUNK")))
           `(dx-flet ((,fun () ,@body)) (,@call #',fun)))
         call)))
-
-(sb-xc:defmacro ignore-errors (&rest forms)
-  "Execute FORMS handling ERROR conditions, returning the result of the last
-  form, or (VALUES NIL the-ERROR-that-was-caught) if an ERROR was handled."
-  `(handler-case (progn ,@forms)
-     (error (condition) (values nil condition))))
 
 ;; A macroexpander helper. Not sure where else to put this.
 (defun funarg-bind/call-forms (funarg arg-forms)

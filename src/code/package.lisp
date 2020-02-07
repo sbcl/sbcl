@@ -107,3 +107,10 @@
   `(logbitp 1 (package-%bits ,package)))
 
 (defmacro package-lock (package) `(logbitp 0 (package-%bits ,package)))
+
+;;;; IN-PACKAGE
+(sb-xc:proclaim '(special *package*))
+(sb-xc:defmacro in-package (string-designator)
+  (let ((string (string string-designator)))
+    `(eval-when (:compile-toplevel :load-toplevel :execute)
+       (setq *package* (find-undeleted-package-or-lose ,string)))))

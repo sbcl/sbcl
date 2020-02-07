@@ -688,9 +688,6 @@
  ;; maybe call it FORCE-DELAYED-PROCLAIMS?
  ("src/compiler/late-proclaim")
 
- ;; fundamental target macros (e.g. CL:DO and CL:DEFUN) and support
- ;; for them
- ("src/code/defboot")
  ("src/code/setf")
  ("src/code/macros")
  ("src/code/loop")

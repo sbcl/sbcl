@@ -361,7 +361,7 @@
 (with-test (:name (handler-bind :no-sloppy-semantics))
   (multiple-value-bind (fun failure-p)
       (checked-compile '(lambda (x)
-                         (sb-impl::%handler-bind
+                         (sb-kernel::%handler-bind
                           ((condition (function (lambda (c) (print c)) garb)))
                           (print x)))
                        :allow-failure t)
