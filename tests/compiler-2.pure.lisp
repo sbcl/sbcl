@@ -2679,7 +2679,6 @@
   (checked-compile-and-assert
       ()
       `(lambda ()
-         (declare (optimize (debug 2)))
          (let (x)
            (when x
              (setq x 1))
