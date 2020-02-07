@@ -632,7 +632,13 @@
 (defun scale-float (f ex)
   (validate-args f)
   (with-memoized-math-op (scale-float (list f ex))
-    (make-flonum (cl:scale-float (realnumify f) ex)
+    (make-flonum (cl:scale-float (let ((val (realnumify f)))
+                                   ;; FIXME: CMUCL warns (correctly)
+                                   ;; about a type conflict without
+                                   ;; this but we don't.
+                                   (assert (floatp val))
+                                   val)
+                                 ex)
                  (flonum-format f))))
 
 (defun scale-single-float (f ex)
