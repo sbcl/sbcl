@@ -797,8 +797,24 @@
               (ir1-convert-srctran start next result lexical-def form))
              (t
               (aver (and (consp lexical-def) (eq (car lexical-def) 'macro)))
-              (ir1-convert start next result
-                           (careful-expand-macro (cdr lexical-def) form))))))
+              ;; Unlike inline expansion, macroexpansion is not optional,
+              ;; but we clearly can't recurse forever.
+              (let ((expansions (memq lexical-def *inline-expansions*)))
+                (if (<= (or (cadr expansions) 0) *inline-expansion-limit*)
+                    (let ((*inline-expansions*
+                            (if expansions
+                                (progn (incf (cadr expansions))
+                                       *inline-expansions*)
+                                (list* lexical-def 1 *inline-expansions*))))
+                      (ir1-convert start next result
+                                   (careful-expand-macro (cdr lexical-def) form)))
+                    (progn
+                      (compiler-warn "Recursion limit reached while expanding local macro ~
+~/sb-ext:print-symbol-with-prefix/" op)
+                      ;; Treat it as an global function, which is probably
+                      ;; what was intended. The expansion thus far could be wrong,
+                      ;; but that's not our problem.
+                      (ir1-convert-global-functoid start next result form op))))))))
         ((or (atom op) (not (eq (car op) 'lambda)))
          (compiler-error "illegal function call"))
         (t
