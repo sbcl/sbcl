@@ -19,7 +19,7 @@
                         (:constructor
                          make-instruction (name format-name print-name
                                            length mask id printer labeller
-                                           prefilters control))
+                                           prefilter control))
                         (:copier nil))
   (name nil :type symbol :read-only t)
   (format-name nil :type (or symbol string) :read-only t)
@@ -31,8 +31,8 @@
 
   (print-name nil :type symbol :read-only t)
 
-  ;; disassembly "functions"
-  (prefilters nil :type list :read-only t)
+  ;; disassembly methods
+  (prefilter nil :type function :read-only t)
   (labeller nil :type (or list vector) :read-only t)
   (printer nil :type (or null function) :read-only t)
   (control nil :type (or null function) :read-only t)
@@ -544,32 +544,6 @@
                                 (ecase dchunk-bits (32 4) (64 8))
                                 (dstate-byte-order ,state)))))
 
-;;; Apply field prefilters, parsing any additional suffix bytes as needed for
-;;; variable-length instructions.
-;;; Store results into DSTATE and update the next-offs accordingly.
-(defun apply-prefilters (dstate inst chunk)
-  (declare (optimize (sb-c::insert-array-bounds-checks 0)))
-  (dolist (item (inst-prefilters inst))
-    ;; item = #(INDEX FUNCTION SIGN-EXTEND-P BYTE-SPEC ...).
-    (flet ((extract-byte (spec-index)
-             (let* ((byte-spec (svref item spec-index))
-                    (integer (dchunk-extract chunk byte-spec)))
-               (if (svref item 2) ; SIGN-EXTEND-P
-                   (sign-extend integer (byte-size byte-spec))
-                   integer))))
-          (let ((item-length (length item))
-                (fun (the function (svref item 1))))
-            (setf (svref (dstate-filtered-values dstate) (svref item 0))
-                  (case item-length
-                   (2 (funcall fun dstate)) ; no subfields
-                   (3 (bug "Bogus prefilter"))
-                   (4 (funcall fun dstate (extract-byte 3))) ; one subfield
-                   (5 (funcall fun dstate ; two subfields
-                               (extract-byte 3) (extract-byte 4)))
-                   (t (apply fun dstate ; > 2 subfields
-                             (loop for i from 3 below item-length
-                                   collect (extract-byte i))))))))))
-
 (defun operand (thing dstate)
   (let ((index (dstate-n-operands dstate)))
     (setf (aref (dstate-operands dstate) index) thing
@@ -595,7 +569,7 @@
      (aver inst)
      (let ((offs (+ (dstate-cur-offs dstate) (inst-length inst))))
        (setf (dstate-next-offs dstate) offs)
-       (apply-prefilters dstate inst chunk)
+       (funcall (inst-prefilter inst) dstate chunk)
        ;; Grab the revised NEXT-OFFS
        (setf (dstate-cur-offs dstate) (dstate-next-offs dstate))
        ;; Return the first instruction which has a printer.
@@ -704,7 +678,7 @@
                           (print-inst (inst-length inst) stream dstate
                                       :trailing-space nil))
                         (let ((orig-next (dstate-next-offs dstate)))
-                          (apply-prefilters dstate inst chunk)
+                          (funcall (inst-prefilter inst) dstate chunk)
                           (setf prefix-p (null (inst-printer inst)))
                           (when stream
                             ;; Print any instruction bytes recognized by
@@ -1282,7 +1256,7 @@
                               printer)
                      (find-printer-fun it args cache (list base-name index)))
                    (collect-labelish-operands args cache)
-                   (collect-prefiltering-args args cache)
+                   (compute-prefilter args cache)
                    control))))))
 
 (defun !compile-inst-printers ()
@@ -2713,21 +2687,53 @@
                      (lengths)
                      error-byte))))))
 
-;; A prefilter set is a list of vectors specifying bytes to extract
-;; and a function to call on the extracted value(s).
-;; EQUALP lists of vectors can be coalesced, since they're immutable.
-(defun collect-prefiltering-args (args cache)
-  (awhen (remove-if-not #'arg-prefilter args)
-    (let ((repr
-           (mapcar (lambda (arg &aux (bytes (arg-fields arg)))
-                     (coerce (list* (posq arg args)
-                                    (arg-prefilter arg)
-                                    (and bytes (cons (arg-sign-extend-p arg) bytes)))
-                             'vector))
-                   it))
-          (table (assq :prefilter cache)))
-      (or (find repr (cdr table) :test 'equalp)
-          (car (push repr (cdr table)))))))
+;;; Compute a lambda which receives a DSTATE and DCHUNK, and for each arg
+;;; in ARGS that gets some calculation performed, performs all such
+;;; calculations.
+;;; Arguments with no field specification can be used to parse suffix bytes.
+;;; The lambda stores all results into DSTATE and possibly updates NEXT-OFFS.
+(defun compute-prefilter (args cache)
+  (let ((repr
+         ;; Start with an abstract representation of all the
+         ;; filtering actions performed in ARGS.
+         (mapcan (lambda (arg)
+                   (awhen (arg-prefilter arg)
+                     (list (list* it
+                                  (posq arg args)
+                                  (arg-sign-extend-p arg)
+                                  (arg-fields arg)))))
+                 args)))
+    (when (null repr)
+      (return-from compute-prefilter
+        (lambda (x y)
+          ;; do nothing at all, as efficiently as possible
+          (declare (optimize (safety 0)) (ignore x y)))))
+    ;; Try to find a lambda that matches the abstract representation
+    (awhen (assoc repr (cdr (assq :prefilter cache)) :test 'equal)
+      (return-from compute-prefilter (cdr it)))
+    (let* ((actions
+            (mapcan
+             (lambda (filter-spec)
+               (destructuring-bind (function arg-index sign-extend . fields) filter-spec
+                 `((svref (dstate-filtered-values dstate) ,arg-index)
+                   (funcall
+                    ,function
+                    dstate
+                    ,@(mapcar (lambda (byte)
+                                (let ((int `(dchunk-extract chunk ',byte)))
+                                  (if sign-extend
+                                      `(sign-extend ,int ,(byte-size byte))
+                                      int)))
+                              fields)))))
+             repr))
+           (compiled
+            (compile nil `(lambda (dstate chunk)
+                            (let ((chunk (truly-the dchunk chunk))
+                                  (dstate (truly-the dstate dstate)))
+                              (declare (ignorable chunk))
+                              (setf ,@actions))))))
+      (push (cons repr compiled) (cdr (assq :prefilter cache)))
+      compiled)))
 
 (defun !remove-bootstrap-symbols ()
   ;; Remove compile-time-only metadata. This preserves compatibility with the
