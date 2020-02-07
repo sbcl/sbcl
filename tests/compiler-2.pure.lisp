@@ -2674,3 +2674,20 @@
       `(lambda ()
          (make-array 6 :fill-pointer 33))
     (() (condition '(not program-error)))))
+
+(with-test (:name :nested-if+let)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (declare (optimize (debug 2)))
+         (let (x)
+           (when x
+             (setq x 1))
+           (let ((y (if x
+                        t
+                        nil)))
+             (if y
+                 y
+                 (let ((x x))
+                   x)))))
+      (() nil)))

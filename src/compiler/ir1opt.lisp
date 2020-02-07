@@ -705,46 +705,49 @@
                                (if-consequent node)
                                (if-alternative node)))
                           (return-from tension-if-if-1)))))))))
-        ((ref-p (lvar-uses test))
-         ;; TEST goes through a variable that is used by another IF
-         ;; e.g. (or (and x y) z)
-         (let* ((ref (lvar-uses test))
-                (var (ref-leaf ref)))
-           (when (and (lambda-var-p var)
-                      ;; TODO: split the lambda if it has more than one var
-                      (= (length (lambda-vars (lambda-var-home var))) 1)
-                      (let-var-immediately-used-p ref var test)
-                      ;; Rely on constraint propagation to determine
-                      ;; that the var with the value of NIL is never
-                      ;; used outside of the test itself.
-                      ;; Otherwise would need to check if
-                      ;; if-consequent is dominating the remaining references
-                      (loop with null-type = (specifier-type 'null)
-                            for other-ref in (lambda-var-refs var)
-                            for lvar = (node-lvar other-ref)
-                            always (or (eq other-ref ref)
-                                       (not (types-equal-or-intersect (single-value-type (node-derived-type other-ref))
-                                                                      null-type))
-                                       (progn
-                                         (and lvar
-                                              ;; Make sure we get back here after node-derived-type
-                                              (pushnew node (lvar-dependent-nodes lvar)
-                                                       :test #'eq))
-                                         nil))))
-
-             (let ((lvar (lambda-var-ref-lvar ref)))
-               (when (and lvar
-                          (listp (lvar-uses lvar)))
-                 (do-uses (use lvar)
-                   (let ((block (node-block use)))
-                     (when (and (immediately-used-p lvar use)
-                                (type= (single-value-type (node-derived-type use))
-                                       (specifier-type 'null))
-                                (eq (block-last block) use))
-                       (change-block-successor block
-                                               (car (block-succ block))
-                                               (if-alternative node))
-                       (delete-lvar-use use)))))))))))
+        ;; Goes awry if the LET is deleted and its lambda-children are
+        ;; also deleted, even though there's a jump into them.
+        ;; See compiler-2.pure/:nested-if+let.
+        ;; ((ref-p (lvar-uses test))
+        ;;  ;; TEST goes through a variable that is used by another IF
+        ;;  ;; e.g. (or (and x y) z)
+        ;;  (let* ((ref (lvar-uses test))
+        ;;         (var (ref-leaf ref)))
+        ;;    (when (and (lambda-var-p var)
+        ;;               ;; TODO: split the lambda if it has more than one var
+        ;;               (= (length (lambda-vars (lambda-var-home var))) 1)
+        ;;               (let-var-immediately-used-p ref var test)
+        ;;               ;; Rely on constraint propagation to determine
+        ;;               ;; that the var with the value of NIL is never
+        ;;               ;; used outside of the test itself.
+        ;;               ;; Otherwise would need to check if
+        ;;               ;; if-consequent is dominating the remaining references
+        ;;               (loop with null-type = (specifier-type 'null)
+        ;;                     for other-ref in (lambda-var-refs var)
+        ;;                     for lvar = (node-lvar other-ref)
+        ;;                     always (or (eq other-ref ref)
+        ;;                                (not (types-equal-or-intersect (single-value-type (node-derived-type other-ref))
+        ;;                                                               null-type))
+        ;;                                (progn
+        ;;                                  (and lvar
+        ;;                                       ;; Make sure we get back here after node-derived-type
+        ;;                                       (pushnew node (lvar-dependent-nodes lvar)
+        ;;                                                :test #'eq))
+        ;;                                  nil))))
+        ;;      (let ((lvar (lambda-var-ref-lvar ref)))
+        ;;        (when (and lvar
+        ;;                   (listp (lvar-uses lvar)))
+        ;;          (do-uses (use lvar)
+        ;;            (let ((block (node-block use)))
+        ;;              (when (and (immediately-used-p lvar use)
+        ;;                         (type= (single-value-type (node-derived-type use))
+        ;;                                (specifier-type 'null))
+        ;;                         (eq (block-last block) use))
+        ;;                (change-block-successor block
+        ;;                                        (car (block-succ block))
+        ;;                                        (if-alternative node))
+        ;;                (delete-lvar-use use)))))))))
+        ))
 
 ;; Finally, duplicate EQ-nil tests
 (defun duplicate-if-if-1 (node test block)
