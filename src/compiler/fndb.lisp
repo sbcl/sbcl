@@ -285,14 +285,9 @@
 (defknown lcm (&rest integer) unsigned-byte
     (movable foldable flushable))
 
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defknown exp (number) irrational
-  (movable foldable flushable recursive)
-  :derive-type #'result-type-float-contagion)
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defknown exp (number) irrational
   (movable foldable flushable recursive))
+
 
 (defknown expt (number number) number
   (movable foldable flushable recursive))
@@ -308,25 +303,6 @@
 (defknown cis (real) (complex float)
   (movable foldable flushable))
 
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
-(defknown (sin cos) (number)
-  (or (float $-1.0 $1.0) (complex float))
-  (movable foldable flushable recursive)
-  :derive-type #'result-type-float-contagion)
-
-(defknown atan
-  (number &optional real) irrational
-  (movable foldable unsafely-flushable recursive)
-  :derive-type #'result-type-float-contagion)
-
-(defknown (tan sinh cosh tanh asinh)
-  (number) irrational (movable foldable flushable recursive)
-  :derive-type #'result-type-float-contagion)
-) ; PROGN
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
 (defknown (sin cos) (number)
   (or (float $-1.0 $1.0) (complex float))
   (movable foldable flushable recursive))
@@ -337,7 +313,6 @@
 
 (defknown (tan sinh cosh tanh asinh)
   (number) irrational (movable foldable flushable recursive))
-) ; PROGN
 
 (defknown (asin acos acosh atanh)
   (number) irrational

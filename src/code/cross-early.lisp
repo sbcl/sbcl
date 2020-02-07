@@ -106,21 +106,6 @@
 ;;; ZEROP is needer sooner than the rest of the cross-float. (Not sure why exactly)
 (declaim (inline zerop))
 (defun zerop (x) (if (rationalp x) (= x 0) (xfloat-zerop x)))
-;;; Same thing with FLOOR
-(macrolet ((define (name float-fun)
-             `(progn
-                (declaim (inline ,name))
-                (defun ,name (number &optional (divisor 1))
-                  (if (and (rationalp number) (rationalp divisor))
-                      (,(intern (string name) "CL") number divisor)
-                      (,float-fun number divisor)))
-                (defun ,float-fun (number divisor)
-                  (declare (ignore number divisor))
-                  (error "Unimplemented")))))
-  (define floor xfloat-floor)
-  (define ceiling xfloat-ceiling)
-  (define truncate xfloat-truncate)
-  (define round xfloat-round))
 
 (defmethod make-load-form ((self target-num) &optional env)
   (declare (ignore env))

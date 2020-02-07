@@ -322,9 +322,7 @@
                     `(,',fun ,x 1)))))
   (deffrob truncate)
   (deffrob round)
-  #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (deffrob floor)
-  #-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (deffrob ceiling))
 
 ;;; This used to be a source transform (hence the lack of restrictions
@@ -426,8 +424,7 @@
 
 (defun make-interval (&key low high)
   (labels ((normalize-bound (val)
-             (cond #-sb-xc-host
-                   ((and (floatp val)
+             (cond ((and (floatp val)
                          (float-infinity-p val))
                     ;; Handle infinities.
                     nil)
@@ -993,7 +990,7 @@
                   ;; to watch out for positive or negative infinity.
                   (if (floatp (type-bound-number x))
                       (if y-low-p
-                          (- (float-sign (type-bound-number x) $0.0))
+                          (sb-xc:- (float-sign (type-bound-number x) $0.0))
                           (float-sign (type-bound-number x) $0.0))
                       0))
                  ((zerop (type-bound-number y))
@@ -1001,7 +998,7 @@
                   nil)
                  ((and (numberp x) (zerop x))
                   ;; Zero divided by anything is zero, but don't lose the sign
-                  (/ x (signum (type-bound-number y))))
+                  (sb-xc:/ x (signum (type-bound-number y))))
                  (t
                   (bound-binop sb-xc:/ x y)))))
     (let ((top-range (interval-range-info top))
@@ -1093,8 +1090,8 @@
                     ;; Open intervals cannot be =
                     (return-from interval-= nil))))
          ;; Both intervals refer to the same point
-         (= (bound (interval-high x)) (bound (interval-low x))
-            (bound (interval-high y)) (bound (interval-low y))))))
+         (sb-xc:= (bound (interval-high x)) (bound (interval-low x))
+                  (bound (interval-high y)) (bound (interval-low y))))))
 
 ;;; Return T if X /= Y
 (defun interval-/= (x y)
@@ -1116,7 +1113,7 @@
 ;;; Compute the square of an interval.
 (defun interval-sqr (x)
   (declare (type interval x))
-  (interval-func (lambda (x) (* x x)) (interval-abs x)))
+  (interval-func (lambda (x) (sb-xc:* x x)) (interval-abs x)))
 
 ;;;; numeric DERIVE-TYPE methods
 
@@ -1349,68 +1346,15 @@
     (derive (lvar-type arg1) (lvar-type arg2)
             (same-leaf-ref-p arg1 arg2))))
 
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
-(defoptimizer (+ derive-type) ((x y))
-  (derive-integer-type
-   x y
-   #'(lambda (x y)
-       (flet ((frob (x y)
-                (if (and x y)
-                    (+ x y)
-                    nil)))
-         (values (frob (numeric-type-low x) (numeric-type-low y))
-                 (frob (numeric-type-high x) (numeric-type-high y)))))))
-
-(defoptimizer (- derive-type) ((x y))
-  (derive-integer-type
-   x y
-   #'(lambda (x y)
-       (flet ((frob (x y)
-                (if (and x y)
-                    (- x y)
-                    nil)))
-         (values (frob (numeric-type-low x) (numeric-type-high y))
-                 (frob (numeric-type-high x) (numeric-type-low y)))))))
-
-(defoptimizer (* derive-type) ((x y))
-  (derive-integer-type
-   x y
-   #'(lambda (x y)
-       (let ((x-low (numeric-type-low x))
-             (x-high (numeric-type-high x))
-             (y-low (numeric-type-low y))
-             (y-high (numeric-type-high y)))
-         (cond ((not (and x-low y-low))
-                (values nil nil))
-               ((or (minusp x-low) (minusp y-low))
-                (if (and x-high y-high)
-                    (let ((max (* (max (abs x-low) (abs x-high))
-                                  (max (abs y-low) (abs y-high)))))
-                      (values (- max) max))
-                    (values nil nil)))
-               (t
-                (values (* x-low y-low)
-                        (if (and x-high y-high)
-                            (* x-high y-high)
-                            nil))))))))
-
-(defoptimizer (/ derive-type) ((x y))
-  (numeric-contagion (lvar-type x) (lvar-type y)))
-
-) ; PROGN
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
 (defun +-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
            (numeric-type-real-p y))
       (let ((result
-             (if same-arg
-                 (let ((x-int (numeric-type->interval x)))
-                   (interval-add x-int x-int))
-                 (interval-add (numeric-type->interval x)
-                               (numeric-type->interval y))))
+              (if same-arg
+                  (let ((x-int (numeric-type->interval x)))
+                    (interval-add x-int x-int))
+                  (interval-add (numeric-type->interval x)
+                                (numeric-type->interval y))))
             (result-type (numeric-contagion x y)))
         ;; If the result type is a float, we need to be sure to coerce
         ;; the bounds into the correct type.
@@ -1433,17 +1377,17 @@
       (numeric-contagion x y)))
 
 (defoptimizer (+ derive-type) ((x y))
-  (two-arg-derive-type x y #'+-derive-type-aux #'+))
+  (two-arg-derive-type x y #'+-derive-type-aux #'sb-xc:+))
 
 (defun --derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
            (numeric-type-real-p y))
       (let ((result
-             ;; (- X X) is always 0.
-             (if same-arg
-                 (make-interval :low 0 :high 0)
-                 (interval-sub (numeric-type->interval x)
-                               (numeric-type->interval y))))
+              ;; (- X X) is always 0.
+              (if same-arg
+                  (make-interval :low 0 :high 0)
+                  (interval-sub (numeric-type->interval x)
+                                (numeric-type->interval y))))
             (result-type (numeric-contagion x y)))
         ;; If the result type is a float, we need to be sure to coerce
         ;; the bounds into the correct type.
@@ -1466,17 +1410,17 @@
       (numeric-contagion x y)))
 
 (defoptimizer (- derive-type) ((x y))
-  (two-arg-derive-type x y #'--derive-type-aux #'-))
+  (two-arg-derive-type x y #'--derive-type-aux #'sb-xc:-))
 
 (defun *-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
            (numeric-type-real-p y))
       (let ((result
-             ;; (* X X) is always positive, so take care to do it right.
-             (if same-arg
-                 (interval-sqr (numeric-type->interval x))
-                 (interval-mul (numeric-type->interval x)
-                               (numeric-type->interval y))))
+              ;; (* X X) is always positive, so take care to do it right.
+              (if same-arg
+                  (interval-sqr (numeric-type->interval x))
+                  (interval-mul (numeric-type->interval x)
+                                (numeric-type->interval y))))
             (result-type (numeric-contagion x y)))
         ;; If the result type is a float, we need to be sure to coerce
         ;; the bounds into the correct type.
@@ -1498,21 +1442,21 @@
       (numeric-contagion x y)))
 
 (defoptimizer (* derive-type) ((x y))
-  (two-arg-derive-type x y #'*-derive-type-aux #'*))
+  (two-arg-derive-type x y #'*-derive-type-aux #'sb-xc:*))
 
 (defun /-derive-type-aux (x y same-arg)
   (if (and (numeric-type-real-p x)
            (numeric-type-real-p y))
       (let ((result
-             ;; (/ X X) is always 1, except if X can contain 0. In
-             ;; that case, we shouldn't optimize the division away
-             ;; because we want 0/0 to signal an error.
-             (if (and same-arg
-                      (not (interval-contains-p
-                            0 (interval-closure (numeric-type->interval y)))))
-                 (make-interval :low 1 :high 1)
-                 (interval-div (numeric-type->interval x)
-                               (numeric-type->interval y))))
+              ;; (/ X X) is always 1, except if X can contain 0. In
+              ;; that case, we shouldn't optimize the division away
+              ;; because we want 0/0 to signal an error.
+              (if (and same-arg
+                       (not (interval-contains-p
+                             0 (interval-closure (numeric-type->interval y)))))
+                  (make-interval :low 1 :high 1)
+                  (interval-div (numeric-type->interval x)
+                                (numeric-type->interval y))))
             (result-type (numeric-contagion x y)))
         ;; If the result type is a float, we need to be sure to coerce
         ;; the bounds into the correct type.
@@ -1529,9 +1473,7 @@
       (numeric-contagion x y)))
 
 (defoptimizer (/ derive-type) ((x y))
-  (two-arg-derive-type x y #'/-derive-type-aux #'/))
-
-) ; PROGN
+  (two-arg-derive-type x y #'/-derive-type-aux #'sb-xc:/))
 
 (defun ash-derive-type-aux (n-type shift same-arg)
   (declare (ignore same-arg))
@@ -1568,17 +1510,6 @@
 (defoptimizer (ash derive-type) ((n shift))
   (two-arg-derive-type n shift #'ash-derive-type-aux #'ash))
 
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(macrolet ((frob (fun)
-             `#'(lambda (type type2)
-                  (declare (ignore type2))
-                  (let ((lo (numeric-type-low type))
-                        (hi (numeric-type-high type)))
-                    (values (if hi (,fun hi) nil) (if lo (,fun lo) nil))))))
-
-  (defoptimizer (%negate derive-type) ((num))
-    (derive-integer-type num num (frob -))))
-
 (defun lognot-derive-type-aux (int)
   (derive-integer-type-aux int int
                            (lambda (type type2)
@@ -1593,11 +1524,10 @@
 (defoptimizer (lognot derive-type) ((int))
   (lognot-derive-type-aux (lvar-type int)))
 
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (%negate derive-type) ((num))
   (flet ((negate-bound (b)
            (and b
-                (set-bound (- (type-bound-number b))
+                (set-bound (sb-xc:- (type-bound-number b))
                            (consp b)))))
     (one-arg-derive-type num
                          (lambda (type)
@@ -1605,29 +1535,8 @@
                             type
                             :low (negate-bound (numeric-type-high type))
                             :high (negate-bound (numeric-type-low type))))
-                         #'-)))
+                         #'sb-xc:-)))
 
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defoptimizer (abs derive-type) ((num))
-  (let ((type (lvar-type num)))
-    (if (and (numeric-type-p type)
-             (eq (numeric-type-class type) 'integer)
-             (eq (numeric-type-complexp type) :real))
-        (let ((lo (numeric-type-low type))
-              (hi (numeric-type-high type)))
-          (make-numeric-type :class 'integer :complexp :real
-                             :low (cond ((and hi (minusp hi))
-                                         (abs hi))
-                                        (lo
-                                         (max 0 lo))
-                                        (t
-                                         0))
-                             :high (if (and hi lo)
-                                       (max (abs hi) (abs lo))
-                                       nil)))
-        (numeric-contagion type type))))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun abs-derive-type-aux (type)
   (cond ((eq (numeric-type-complexp type) :complex)
          ;; The absolute value of a complex number is always a
@@ -1656,32 +1565,8 @@
             :high (coerce-and-truncate-floats
                    (interval-high abs-bnd) bound-type))))))
 
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (abs derive-type) ((num))
   (one-arg-derive-type num #'abs-derive-type-aux #'abs))
-
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defoptimizer (truncate derive-type) ((number divisor))
-  (let ((number-type (lvar-type number))
-        (divisor-type (lvar-type divisor))
-        (integer-type (specifier-type 'integer)))
-    (if (and (numeric-type-p number-type)
-             (csubtypep number-type integer-type)
-             (numeric-type-p divisor-type)
-             (csubtypep divisor-type integer-type))
-        (let ((number-low (numeric-type-low number-type))
-              (number-high (numeric-type-high number-type))
-              (divisor-low (numeric-type-low divisor-type))
-              (divisor-high (numeric-type-high divisor-type)))
-          (values-specifier-type
-           `(values ,(integer-truncate-derive-type number-low number-high
-                                                   divisor-low divisor-high)
-                    ,(integer-rem-derive-type number-low number-high
-                                              divisor-low divisor-high))))
-        *universal-type*)))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(progn
 
 (defun rem-result-type (number-type divisor-type)
   ;; Figure out what the remainder type is. The remainder is an
@@ -2250,7 +2135,6 @@
      (destructuring-bind (neg pos) (interval-split 0 num t t)
        (interval-merge-pair (truncate-rem-bound neg div)
                             (truncate-rem-bound pos div))))))
-) ; PROGN
 
 ;;; Derive useful information about the range. Returns three values:
 ;;; - '+ if its positive, '- negative, or nil if it overlaps 0.
@@ -2327,54 +2211,6 @@
              ;; anything about the result.
              `integer)))))
 
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defun integer-rem-derive-type
-       (number-low number-high divisor-low divisor-high)
-  (if (and divisor-low divisor-high)
-      ;; We know the range of the divisor, and the remainder must be
-      ;; smaller than the divisor. We can tell the sign of the
-      ;; remainder if we know the sign of the number.
-      (let ((divisor-max (1- (max (abs divisor-low) (abs divisor-high)))))
-        `(integer ,(if (or (null number-low)
-                           (minusp number-low))
-                       (- divisor-max)
-                       0)
-                  ,(if (or (null number-high)
-                           (plusp number-high))
-                       divisor-max
-                       0)))
-      ;; The divisor is potentially either very positive or very
-      ;; negative. Therefore, the remainder is unbounded, but we might
-      ;; be able to tell something about the sign from the number.
-      `(integer ,(if (and number-low (not (minusp number-low)))
-                     ;; The number we are dividing is positive.
-                     ;; Therefore, the remainder must be positive.
-                     0
-                     '*)
-                ,(if (and number-high (not (plusp number-high)))
-                     ;; The number we are dividing is negative.
-                     ;; Therefore, the remainder must be negative.
-                     0
-                     '*))))
-
-#+sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-(defoptimizer (random derive-type) ((bound &optional state))
-  (declare (ignore state))
-  (let ((type (lvar-type bound)))
-    (when (numeric-type-p type)
-      (let ((class (numeric-type-class type))
-            (high (numeric-type-high type))
-            (format (numeric-type-format type)))
-        (make-numeric-type
-         :class class
-         :format format
-         :low (coerce 0 (or format class 'real))
-         :high (cond ((not high) nil)
-                     ((eq class 'integer) (max (1- high) 0))
-                     ((or (consp high) (zerop high)) high)
-                     (t `(,high))))))))
-
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defun random-derive-type-aux (type)
   (let ((class (numeric-type-class type))
         (high (numeric-type-high type))
@@ -2388,7 +2224,6 @@
                      ((or (consp high) (zerop high)) high)
                      (t `(,high))))))
 
-#-sb-xc-host ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
 (defoptimizer (random derive-type) ((bound &optional state))
   (declare (ignore state))
   (one-arg-derive-type bound #'random-derive-type-aux nil))
@@ -4130,8 +3965,8 @@
                       (not-constants arg))
                     (:no-error (value)
                       ;; Some backends have no float traps
-                      (cond #+(and (or arm arm64)
-                                    (not sb-xc-host))
+                      (cond #+(and (or arm arm64 riscv)
+                                   (not sb-xc-host))
                             ((or (and (floatp value)
                                       (float-infinity-or-nan-p value))
                                  (and (complex-float-p value)

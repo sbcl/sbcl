@@ -192,6 +192,10 @@
     "COERCE" "EXP" "EXPT" "LOG" "SIGNUM" "IMAGPART" "REALPART"
     "ZEROP" "ABS" "SIGNUM" "FLOAT-SIGN"
     "CEILING" "FLOOR" "ROUND" "TRUNCATE" "MOD" "REM"
+    ;; We always want irrational functions to use target floats.
+    "ACOS" "ACOSH" "ASIN" "ASINH" "ATAN" "ATANH"  "CIS" "CONJUGATE"
+    "COS" "COSH"  "FCEILING" "FFLOOR" "FROUND" "FTRUNCATE"
+    "PHASE" "RATIONALIZE" "SIN" "SINH" "SQRT" "TAN" "TANH"
     ;;
     "SXHASH" ; must package-qualify if you mean CL:SXHASH
     ;;
@@ -233,11 +237,6 @@
 ;;; see by default, so that using them by accident fails.
 (defparameter *undefineds*
   '("SYMBOL-PACKAGE"
-    ;; Irrational functions are never used in the cross-compiler (yet).
-    ;; Prove that by making them undefined.
-    "ACOS" "ACOSH" "ASIN" "ASINH" "ATAN" "ATANH"  "CIS" "CONJUGATE"
-    "COS" "COSH"  "FCEILING" "FFLOOR" "FROUND" "FTRUNCATE"
-    "PHASE" "RATIONALIZE" "SIN" "SINH" "SQRT" "TAN" "TANH"
     ;; Float decoding: don't want to see these used either.
     "DECODE-FLOAT" "INTEGER-DECODE-FLOAT"
     "FLOAT-DIGITS" "FLOAT-PRECISION" "FLOAT-RADIX"

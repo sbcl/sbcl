@@ -65,15 +65,19 @@
       ;; Ensure that we're reading the correct variant of the file
       ;; in case there is more than one set of floating-point formats.
       (assert (eq (read stream) :default))
-      (let ((*package* (find-package "SB-KERNEL")))
-        (dolist (expr (read stream))
-          (destructuring-bind (fun args result) expr
-            (let ((actual (apply fun (sb-int:ensure-list args))))
-              (unless (eql actual result)
-                (#+sb-devel cerror #+sb-devel ""
-                 #-sb-devel format #-sb-devel t
-                 "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
-                 expr actual)))))))))
+      (sb-kernel::with-float-traps-masked (:overflow)
+        (let ((*package* (find-package "SB-KERNEL")))
+          (dolist (expr (read stream))
+            (destructuring-bind (fun args . result) expr
+              (let ((result (if (eq (first result) 'sb-kernel::&values)
+                                (rest result)
+                                result))
+                    (actual (multiple-value-list (apply fun (sb-int:ensure-list args)))))
+                (unless (equalp actual result)
+                  (#+sb-devel cerror #+sb-devel ""
+                   #-sb-devel format #-sb-devel t
+                   "FLOAT CACHE LINE ~S vs COMPUTED ~S~%"
+                   expr actual))))))))))
 
 (when (if (boundp '*compile-files-p*) *compile-files-p* t)
   (with-open-file (output "output/cold-vop-usage.txt" :if-does-not-exist nil)

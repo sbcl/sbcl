@@ -900,13 +900,8 @@
 ;;; into the result instead, if appropriate.
 (defun constrain-float-type (x y greater or-equal)
   (declare (type numeric-type x y))
-  (declare (ignorable x y greater or-equal)) ; for CROSS-FLOAT-INFINITY-KLUDGE
-
   (aver (eql (numeric-type-class x) 'float))
   (aver (eql (numeric-type-class y) 'float))
-  #+sb-xc-host                    ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
-  x
-  #-sb-xc-host                    ; (See CROSS-FLOAT-INFINITY-KLUDGE.)
   (labels ((exclude (x)
              (cond ((not x) nil)
                    (or-equal x)
@@ -919,13 +914,13 @@
            (tighter-p (x ref)
              (cond ((null x) nil)
                    ((null ref) t)
-                   ((= (type-bound-number x) (type-bound-number ref))
+                   ((sb-xc:= (type-bound-number x) (type-bound-number ref))
                     ;; X is tighter if X is an open bound and REF is not
                     (and (consp x) (not (consp ref))))
                    (greater
-                    (< (type-bound-number ref) (type-bound-number x)))
+                    (sb-xc:< (type-bound-number ref) (type-bound-number x)))
                    (t
-                    (> (type-bound-number ref) (type-bound-number x))))))
+                    (sb-xc:> (type-bound-number ref) (type-bound-number x))))))
     (let* ((x-bound (bound x))
            (y-bound (exclude (bound y)))
            (new-bound (cond ((not x-bound)
