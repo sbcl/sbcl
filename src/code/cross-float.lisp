@@ -302,9 +302,7 @@
     (float-ops-cache-insert key values table))
   (apply #'values values))
 
-(defmacro with-memoized-math-op ((name key-expr &optional (n-values 1)) calculation)
-  (unless (= n-values 1)
-    (error "multiple values not working with memoization yet"))
+(defmacro with-memoized-math-op ((name key-expr) calculation)
   `(dx-let ((cache-key (cons ',(intern (string name) "CL") ,key-expr)))
      (multiple-value-bind (answer foundp) (gethash cache-key (get-float-ops-cache))
        (if foundp
