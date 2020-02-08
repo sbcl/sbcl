@@ -597,7 +597,8 @@
                      ((and (eql base $10d0) (>= power 322))
                       (make-flonum :+infinity 'double-float))
                      (t
-                      (cl:expt (realnumify base) power))))))))
+                      (make-flonum (cl:expt (realnumify base) power)
+                                   (pick-result-format base power)))))))))
 
 (defun %unary-truncate (number)
   (typecase number
