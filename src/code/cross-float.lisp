@@ -350,7 +350,7 @@
                                      mantissa)))
                ;; Subtract the exponent bias and account for discrepancy in binary
                ;; point placement in the IEEE representation and the CL function
-               (decf exp (+ (floor max-exp 2) mantissa-nbits))
+               (decf exp (+ (cl:floor max-exp 2) mantissa-nbits))
                (let ((value (cl:scale-float (cl:coerce mantissa host-type) exp)))
                  (if (logbitp (1- format-nbits) bits) (cl:- value) value))))))
     (ecase (flonum-format x)
@@ -620,6 +620,7 @@
      (error "Unimplemented."))))
 
 (defun cis (number)
+  (declare (ignore number))
   (error "Unimplemented."))
 
 (defun scale-float (f ex)
