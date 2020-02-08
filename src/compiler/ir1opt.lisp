@@ -1888,11 +1888,13 @@
                 (info :function :info name)))))))))
 
 (defun let-var-immediately-used-p (ref var lvar)
-  (let* ((next-ctran (node-next (lambda-bind (lambda-var-home var))))
-         (next-node (and next-ctran
-                         (ctran-next next-ctran))))
-    (and (eq next-node ref)
-         (lvar-almost-immediately-used-p lvar))))
+  (let ((bind (lambda-bind (lambda-var-home var))))
+    (when bind
+      (let* ((next-ctran (node-next bind))
+             (next-node (and next-ctran
+                             (ctran-next next-ctran))))
+        (and (eq next-node ref)
+             (lvar-almost-immediately-used-p lvar))))))
 
 ;;; If we have a non-set LET var with a single use, then (if possible)
 ;;; replace the variable reference's LVAR with the arg lvar.

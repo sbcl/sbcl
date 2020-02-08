@@ -2690,3 +2690,15 @@
                  (let ((x x))
                    x)))))
       (() nil)))
+
+(with-test (:name :let-var-immediately-used-p-deleted-lambda)
+  (checked-compile-and-assert
+   ()
+   `(lambda (c)
+      (if (and nil
+               (or
+                (zerop (count (unwind-protect 1) '(1)))
+                c))
+          1
+          0))
+   ((2) 0)))
