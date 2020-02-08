@@ -2685,10 +2685,6 @@ is :ANY, the function name is not checked."
   (aver (eq (basic-combination-kind call) :local))
   (ref-leaf (lvar-uses (basic-combination-fun call))))
 
-(defvar *inline-expansion-limit* 50
-  "an upper limit on the number of inline function calls that will be expanded
-   in any given code object (single function or block compilation)")
-
 ;;; Check whether NODE's component has exceeded its inline expansion
 ;;; limit, and warn if so, returning NIL.
 (defun inline-expansion-ok (combination leaf)
