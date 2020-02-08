@@ -261,7 +261,6 @@
          (result-lvar (make-lvar)))
 
     (awhen (lexenv-lambda *lexenv*)
-      (push lambda (lambda-children it))
       (setf (lambda-parent lambda) it))
 
     ;; just to check: This function should fail internal assertions if
