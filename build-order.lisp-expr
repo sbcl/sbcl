@@ -223,7 +223,6 @@
  ("src/code/early-time" :c-headers)
  ("src/code/unix" :not-host)
  #+win32 ("src/code/win32" :not-host)
- #+mach  ("src/code/mach"     :not-host)
 
  #+android ("src/code/android-os" :not-host)
  #+sunos ("src/code/sunos-os" :not-host)
