@@ -377,9 +377,10 @@
         (node-ends-block node)))))
 
 (defun lexenv-contains-lambda (lambda parent-lexenv)
-  (loop for lexenv = (lambda-call-lexenv lambda)
+  (loop for lexenv = (lambda-lexenv lambda)
         then (let ((lambda (lexenv-lambda lexenv)))
-               (and (lambda-call-lexenv lambda)))
+               (and lambda
+                    (lambda-call-lexenv lambda)))
         while lexenv
         thereis
         (loop for parent = lexenv then (lexenv-parent parent)
@@ -1145,7 +1146,8 @@
                           (lexenv-disabled-package-locks default))
                          (policy (lexenv-policy default))
                          (user-data (lexenv-user-data default))
-                         (flushable (lexenv-flushable default)))
+                         (flushable (lexenv-flushable default))
+                         (parent default))
   (macrolet ((frob (var slot)
                `(let ((old (,slot default)))
                   (if ,var
@@ -1162,7 +1164,7 @@
      cleanup handled-conditions disabled-package-locks
      policy
      user-data
-     default)))
+     parent)))
 
 ;;; Makes a LEXENV, suitable for using in a MACROLET introduced
 ;;; macroexpander

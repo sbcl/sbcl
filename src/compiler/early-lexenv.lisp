@@ -81,7 +81,7 @@
              (:copier nil)
              (:constructor make-null-lexenv ())
              (:constructor make-almost-null-lexenv (%policy handled-conditions
-                                                    flushable))
+                                                    flushable lambda parent))
              (:constructor make-package-lock-lexenv
                            (disabled-package-locks %policy
                             &aux (handled-conditions nil)))
