@@ -2702,3 +2702,17 @@
           1
           0))
    ((2) 0)))
+
+(with-test (:name :dce-local-functions)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (block out
+           (labels ((mmm (z vars)
+                      (when vars
+                        (mmm z vars))))
+             (mmm 1 (progn
+                      (dotimes (a 1) (return-from out 10))
+                      (dotimes (b 3) (catch 'b))))
+             (dotimes (c 3) (catch 'c)))))
+    (() 10)))

@@ -40,7 +40,9 @@
        ;; question, but the LAMBDA-BIND would be NIL, so just ignore
        ;; :DELETED and :ZOMBIE CLAMBDAs here.
        (unless (member (functional-kind leaf)
-                       '(:deleted :zombie))
+                       '(:deleted :zombie
+                         ;; Follow actual combinations, not refs
+                         :mv-let :let :assignment))
          (when (eq (lambda-component leaf)
                    (node-component ref))
            (dce-analyze-one-fun leaf))))
@@ -61,7 +63,11 @@
     (do-nodes (node nil block)
       (typecase node
         (ref
-         (dce-analyze-ref node))))
+         (dce-analyze-ref node))
+        (basic-combination
+         (when (eq (basic-combination-kind node) :local)
+           (dce-analyze-one-fun
+            (ref-leaf (lvar-use (basic-combination-fun node))))))))
 
     (dolist (succ (block-succ block))
       (dce-analyze-block succ))))
