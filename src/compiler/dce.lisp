@@ -66,11 +66,15 @@
          (dce-analyze-ref node))
         (basic-combination
          (when (eq (basic-combination-kind node) :local)
-           (dce-analyze-one-fun
-            (ref-leaf (lvar-use (basic-combination-fun node))))))))
-
-    (dolist (succ (block-succ block))
-      (dce-analyze-block succ))))
+           (let ((fun (ref-leaf (lvar-use (basic-combination-fun node)))))
+             (unless (memq (functional-kind fun) '(:deleted :zombie))
+               (dce-analyze-one-fun fun)))))))
+    (loop for (succ . next) on (block-succ block)
+          if next
+          do (dce-analyze-block succ)
+          else
+          ;; Tail call the last block
+          return (dce-analyze-block succ))))
 
 (defun dce-analyze-one-fun (clambda)
   (dce-analyze-block
