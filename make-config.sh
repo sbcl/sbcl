@@ -690,7 +690,7 @@ elif [ "$sbcl_arch" = "mips" ]; then
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table' >> $ltf
+    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,

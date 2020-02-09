@@ -189,6 +189,9 @@ void os_link_runtime()
 
         link_target += LINKAGE_TABLE_ENTRY_SIZE;
     }
+#ifdef BOXED_REGION
+    SYMBOL(BOXED_REGION)->value = (lispobj)gc_alloc_region;
+#endif
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
 }
 

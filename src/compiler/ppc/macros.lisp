@@ -193,20 +193,15 @@
           (move temp-tn size)))
 
     #-sb-thread
-    (inst lr flag-tn (make-fixup "gc_alloc_region" :foreign))
-    #-sb-thread
-    (inst lwz result-tn flag-tn 0)
-    #+sb-thread
-    (inst lwz result-tn thread-base-tn (* thread-alloc-region-slot
-                                          n-word-bytes))
+    (progn (load-symbol-value flag-tn boxed-region)
+           (inst lwz result-tn flag-tn 0) ; result <- region free pointer
+           (inst lwz flag-tn flag-tn 4))  ; flag <- region end
 
-       ;; we can optimize this to only use one fixup here, once we get
-       ;; it working
-       ;; (inst lr ,flag-tn (make-fixup "gc_alloc_region" :foreign 4))
-       ;; (inst lwz ,flag-tn ,flag-tn 0)
-    #-sb-thread (inst lwz flag-tn flag-tn 4)
-    #+sb-thread (inst lwz flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
-                                                    n-word-bytes))
+    #+sb-thread
+    (progn (inst lwz result-tn thread-base-tn (* thread-alloc-region-slot
+                                                 n-word-bytes))
+           (inst lwz flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
+                                               n-word-bytes)))
 
     (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
@@ -229,12 +224,10 @@
          (inst tw :lgt result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
-         ;; #-sb-thread three #+sb-thread one machine instruction.
-         ;; The lr of a fixup counts as two instructions.
+         ;; one machine instructions if #+sb-thread, or 2 instructions if not.
          #-sb-thread
-         (inst lr flag-tn (make-fixup "gc_alloc_region" :foreign))
-         #-sb-thread
-         (inst stw result-tn flag-tn 0)
+         (progn (load-symbol-value flag-tn boxed-region)
+                (inst stw result-tn flag-tn 0))
          #+sb-thread
          (inst stw result-tn thread-base-tn (* thread-alloc-region-slot
                                                n-word-bytes)))
