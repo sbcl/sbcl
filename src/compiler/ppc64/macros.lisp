@@ -42,65 +42,44 @@
   (defun store-tls-index (reg symbol)
     (inst stw reg symbol (- #+little-endian 4 other-pointer-lowtag))))
 
-(macrolet
-    ((frob (slot)
-       (let ((loader (intern (concatenate 'simple-string
-                                          "LOAD-SYMBOL-"
-                                          (string slot))))
-             (storer (intern (concatenate 'simple-string
-                                          "STORE-SYMBOL-"
-                                          (string slot))))
-             (offset (intern (concatenate 'simple-string
-                                          "SYMBOL-"
-                                          (string slot)
-                                          "-SLOT")
-                             (find-package "SB-VM"))))
-         `(progn
-            (defmacro ,loader (reg symbol)
-              `(progn
-                 ;; Work around the usual lowtag subtraction problem.
-                 (inst li temp-reg-tn
-                       (+ (static-symbol-offset ',symbol)
-                          (ash ,',offset word-shift)
-                          (- other-pointer-lowtag)))
-                 (inst ldx ,reg null-tn temp-reg-tn)))
-            (defmacro ,storer (reg symbol)
-              `(progn
-                 (inst li temp-reg-tn
-                       (+ (static-symbol-offset ',symbol)
-                          (ash ,',offset word-shift)
-                          (- other-pointer-lowtag)))
-                 (inst stdx ,reg null-tn temp-reg-tn)))))))
-  (frob value)
-  (frob function)
+(defmacro load-symbol-value (reg symbol)
+  ;; Work around the usual lowtag subtraction problem.
+  `(progn
+     (inst li temp-reg-tn (+ (static-symbol-offset ',symbol)
+                             (ash symbol-value-slot word-shift)
+                             (- other-pointer-lowtag)))
+     (inst ldx ,reg null-tn temp-reg-tn)))
+(defmacro store-symbol-value (reg symbol)
+  `(progn
+     (inst li temp-reg-tn (+ (static-symbol-offset ',symbol)
+                             (ash symbol-value-slot word-shift)
+                             (- other-pointer-lowtag)))
+     (inst stdx ,reg null-tn temp-reg-tn)))
 
-  ;; FIXME: These are only good for static-symbols, so why not
-  ;; statically-allocate the static-symbol TLS slot indices at
-  ;; cross-compile time so we can just use a fixed offset within the
-  ;; TLS block instead of mucking about with the extra memory access
-  ;; (and temp register, for stores)?
-  #+sb-thread
-  (defmacro load-tl-symbol-value (reg symbol)
-    `(progn
-       (inst lwz ,reg null-tn
-             (+ (static-symbol-offset ',symbol)
-                (- #+little-endian 4 other-pointer-lowtag)))
-       (inst ldx ,reg thread-base-tn ,reg)))
-  #-sb-thread
-  (defmacro load-tl-symbol-value (reg symbol)
-    `(load-symbol-value ,reg ,symbol))
-
-  #+sb-thread
-  (defmacro store-tl-symbol-value (reg symbol temp)
-    `(progn
-       (inst lwz ,temp null-tn
-             (+ (static-symbol-offset ',symbol)
-                (- #+little-endian 4 other-pointer-lowtag)))
-       (inst stdx ,reg thread-base-tn ,temp)))
-  #-sb-thread
-  (defmacro store-tl-symbol-value (reg symbol temp)
-    (declare (ignore temp))
-    `(store-symbol-value ,reg ,symbol)))
+;; FIXME: These are only good for static-symbols, so why not
+;; statically-allocate the static-symbol TLS slot indices at
+;; cross-compile time so we can just use a fixed offset within the
+;; TLS block instead of mucking about with the extra memory access
+;; (and temp register, for stores)?
+#+sb-thread
+(progn
+(defmacro load-tl-symbol-value (reg symbol)
+  `(progn
+     (inst lwz ,reg null-tn (+ (static-symbol-offset ',symbol)
+                               (- #+little-endian 4 other-pointer-lowtag)))
+     (inst ldx ,reg thread-base-tn ,reg)))
+(defmacro store-tl-symbol-value (reg symbol temp)
+  `(progn
+     (inst lwz ,temp null-tn (+ (static-symbol-offset ',symbol)
+                                (- #+little-endian 4 other-pointer-lowtag)))
+     (inst stdx ,reg thread-base-tn ,temp))))
+#-sb-thread
+(progn
+(defmacro load-tl-symbol-value (reg symbol)
+  `(load-symbol-value ,reg ,symbol))
+(defmacro store-tl-symbol-value (reg symbol temp)
+  (declare (ignore temp))
+  `(store-symbol-value ,reg ,symbol)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
