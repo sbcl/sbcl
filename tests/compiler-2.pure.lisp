@@ -2735,3 +2735,22 @@
                        (go p)))
                   2))))
     ((1) 1)))
+
+(with-test (:name :ir1-optimize-constant-fold-before-giving-up)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a)
+         (+ 2 (- (let ((sum 0))
+                   (declare (type fixnum sum))
+                   (block nil
+                     (tagbody
+                      next
+                        (cond ((>= sum '0)
+                               (go end))
+                              (a
+                               (ceiling 1 (unwind-protect 0))
+                               (incf sum)))
+                        (go next)
+                      end))
+                   sum))))
+    ((1) 2)))

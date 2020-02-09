@@ -417,17 +417,21 @@
                  (unless (join-successor-if-possible block)
                    (return)))
               (remove-equivalent-blocks block)
-              (when (and (not fastp) (block-reoptimize block) (block-component block))
+              (when (and (block-reoptimize block) (block-component block))
                 (aver (not (block-delete-p block)))
-                (ir1-optimize-block block)
-                ;; Force any preceding IFs to get reoptimized, since
-                ;; some optimizations depend on the shape of the
-                ;; consequent blocks, not just IF-TEST.
-                (loop for pred in (block-pred block)
-                      for last = (block-last pred)
-                      when (and (block-type-check pred)
-                                (if-p last))
-                      do (reoptimize-node last)))
+                (cond (fastp
+                       (ir1-optimize-block-fast block))
+                      (t
+                       (ir1-optimize-block block)
+                       ;; Force any preceding IFs to get reoptimized, since
+                       ;; some optimizations depend on the shape of the
+                       ;; consequent blocks, not just IF-TEST.
+                       (when (block-reoptimize block)
+                         (loop for pred in (block-pred block)
+                               for last = (block-last pred)
+                               when (and (block-type-check pred)
+                                         (if-p last))
+                               do (reoptimize-node last))))))
 
               (cond ((and (block-delete-p block) (block-component block))
                      (setq block (clean-component component block)))
@@ -437,6 +441,40 @@
              (setq block (block-next block))))
 
   (values))
+
+(defun ir1-optimize-last-effort (component)
+  (declare (type component component))
+  (loop while (shiftf (component-reoptimize component) nil)
+        do
+        (do-blocks (block component)
+          (when (block-reoptimize block)
+            (ir1-optimize-block-fast block)))))
+
+(defun ir1-optimize-block-fast (block)
+  (declare (type cblock block))
+  (setf (block-reoptimize block) nil)
+  (do-nodes (node nil block :restart-p t)
+    (when (node-reoptimize node)
+      (setf (node-reoptimize node) nil)
+      (typecase node
+        (combination
+         (ir1-optimize-combination-fast node))))))
+
+;;; Only handle constant folding, some VOPs do not work
+;;; on constants.
+(defun ir1-optimize-combination-fast (node)
+  (let ((args (basic-combination-args node))
+        (info (basic-combination-fun-info node))
+        (kind (basic-combination-kind node)))
+    (case kind
+      (:known
+       (cond ((constant-fold-call-p node)
+              (constant-fold-call node))
+             ((and (ir1-attributep (fun-info-attributes info) commutative)
+                   (= (length args) 2)
+                   (constant-lvar-p (first args))
+                   (not (constant-lvar-p (second args))))
+              (setf (basic-combination-args node) (nreverse args))))))))
 
 ;;; Loop over the nodes in BLOCK, acting on (and clearing) REOPTIMIZE
 ;;; flags.

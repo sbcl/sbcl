@@ -389,6 +389,8 @@ necessary, since type inference may take arbitrarily long to converge.")
 (defevent ir1-optimize-until-done "IR1-OPTIMIZE-UNTIL-DONE called")
 (defevent ir1-optimize-maxed-out "hit *MAX-OPTIMIZE-ITERATIONS* limit")
 
+
+
 ;;; Repeatedly optimize COMPONENT until no further optimizations can
 ;;; be found or we hit our iteration limit. When we hit the limit, we
 ;;; clear the component and block REOPTIMIZE flags to discourage the
@@ -419,9 +421,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                      (setq count 0))
                     (t
                      (event ir1-optimize-maxed-out)
-                     (setf (component-reoptimize component) nil)
-                     (do-blocks (block component)
-                       (setf (block-reoptimize block) nil))
+                     (ir1-optimize-last-effort component)
                      (return)))))
            ((retry-delayed-ir1-transforms :optimize)
             (setf count 0)
@@ -429,7 +429,8 @@ necessary, since type inference may take arbitrarily long to converge.")
            (t
             (maybe-mumble " ")
             (return)))
-     (setq fastp (>= count *max-optimize-iterations*))
+     (when (setq fastp (>= count *max-optimize-iterations*))
+       (ir1-optimize-last-effort component))
      (maybe-mumble (if fastp "-" ".")))
     (when cleared-reanalyze
       (setf (component-reanalyze component) t)))
