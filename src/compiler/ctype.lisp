@@ -371,9 +371,11 @@ and no value was provided for it." name))))))))))
            :keywords (keys)
            :keyp (optional-dispatch-keyp functional)
            :allowp (optional-dispatch-allowp functional)
-           :returns (tail-set-type
-                     (lambda-tail-set
-                      (optional-dispatch-main-entry functional))))))))
+           :returns (let ((tail-set (lambda-tail-set
+                                     (optional-dispatch-main-entry functional))))
+                      (if tail-set
+                          (tail-set-type tail-set)
+                          *wild-type*)))))))
 
 ;;;; approximate function types
 ;;;;

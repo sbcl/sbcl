@@ -463,6 +463,7 @@ necessary, since type inference may take arbitrarily long to converge.")
                (component-reanalyze-functionals component))
        (maybe-mumble "Locall ")
        (locall-analyze-component component))
+     (eliminate-dead-code component)
      (dfo-as-needed component)
      (when *constraint-propagate*
        (maybe-mumble "Constraint ")
