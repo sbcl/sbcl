@@ -1131,7 +1131,6 @@
   ;; we will still have caller's lexenv to figure out which cleanup is
   ;; in effect.
   (call-lexenv nil :type (or lexenv null))
-  (parent nil :type (or clambda null))
   (allow-instrumenting *allow-instrumenting* :type boolean)
   ;; True if this is a system introduced lambda: it may contain user code, but
   ;; the lambda itself is not, and the bindings introduced by it are considered

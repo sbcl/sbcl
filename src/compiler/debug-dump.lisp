@@ -387,16 +387,6 @@
   (make-sc+offset (sc-number (tn-sc tn))
                   (tn-offset tn)))
 
-(defun lambda-ancestor-p (maybe-ancestor maybe-descendant)
-  (declare (type clambda maybe-ancestor)
-           (type (or clambda null) maybe-descendant))
-  (loop
-     (when (eq maybe-ancestor maybe-descendant)
-       (return t))
-     (setf maybe-descendant (lambda-parent maybe-descendant))
-     (when (null maybe-descendant)
-       (return nil))))
-
 ;;; Dump info to represent VAR's location being TN. ID is an integer
 ;;; that makes VAR's name unique in the function. BUFFER is the vector
 ;;; we stick the result in. If MINIMAL, we suppress name dumping, and
@@ -430,7 +420,8 @@
                         (null (basic-var-sets var))))
                (not (gethash tn (ir2-component-spilled-tns
                                  (component-info *component-being-compiled*))))
-               (lambda-ancestor-p (lambda-var-home var) fun))
+               (lexenv-contains-lambda fun
+                                       (lambda-lexenv (lambda-var-home var))))
       (setq flags (logior flags compiled-debug-var-environment-live)))
     (when save-tn
       (setq flags (logior flags compiled-debug-var-save-loc-p)))

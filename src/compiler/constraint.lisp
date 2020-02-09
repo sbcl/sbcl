@@ -954,15 +954,10 @@
 ;;; Return true if LEAF is "visible" from NODE.
 (defun leaf-visible-from-node-p (leaf node)
   (cond
-   ((lambda-var-p leaf)
-    ;; A LAMBDA-VAR is visible iif it is homed in a CLAMBDA that is an
-    ;; ancestor for NODE.
-    (let ((leaf-lambda (lambda-var-home leaf)))
-      (loop for lambda = (node-home-lambda node)
-            then (lambda-parent lambda)
-            while lambda
-            when (eq lambda leaf-lambda)
-            return t)))
+    ((lambda-var-p leaf)
+     (and (find leaf (lexenv-vars (node-lexenv node))
+                :key #'cdr :test #'eq)
+          t))
    ;; FIXME: Check on FUNCTIONALs (CLAMBDAs and OPTIONAL-DISPATCHes),
    ;; not just LAMBDA-VARs.
    (t

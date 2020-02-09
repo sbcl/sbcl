@@ -301,7 +301,7 @@
   ;; if we're finding something in the real lexenv, we don't have a
   ;; bound declaration and so we specifically don't want to return
   ;; a special object that declarations can attach to, just the name.
-  (and env (find var (mapcar #'car (sb-c::lexenv-vars env)))))
+  (and env (find var (sb-c::lexenv-vars env) :key #'car)))
 
 (defun variable-symbol-macro-p (var env)
   ;; FIXME: crufty return convention
