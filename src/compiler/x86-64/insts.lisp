@@ -3412,10 +3412,7 @@
       #+(and sb-simd-pack-256 (not sb-xc-host))
       (simd-pack-256
        (setq constant
-             (list :avx2 (logior (%simd-pack-256-0 first)
-                                 (ash (%simd-pack-256-1 first) 64)
-                                 (ash (%simd-pack-256-2 first) 128)
-                                 (ash (%simd-pack-256-3 first) 192)))))))
+             (sb-vm::%simd-pack-256-inline-constant first)))))
   (destructuring-bind (type value) constant
     (ecase type
       ((:byte :word :dword :qword)

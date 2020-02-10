@@ -360,24 +360,28 @@
                 (dump-fop 'fop-simd-pack file)
                 (dump-integer-as-n-bytes (%simd-pack-tag  x) 8 file)
                 (dump-integer-as-n-bytes (%simd-pack-low  x) 8 file)
-                (dump-integer-as-n-bytes (%simd-pack-high x) 8 file))
-              (similar-save-object x file))
+                (dump-integer-as-n-bytes (%simd-pack-high x) 8 file)
+                (similar-save-object x file)))
              #+(and (not sb-xc-host) sb-simd-pack-256)
              (simd-pack-256
               (unless (similar-check-table x file)
-                (dump-fop 'fop-simd-pack file)
-                (dump-integer-as-n-bytes (logior (%simd-pack-256-tag x) 4) 8 file)
-                (dump-integer-as-n-bytes (%simd-pack-256-0 x) 8 file)
-                (dump-integer-as-n-bytes (%simd-pack-256-1 x) 8 file)
-                (dump-integer-as-n-bytes (%simd-pack-256-2 x) 8 file)
-                (dump-integer-as-n-bytes (%simd-pack-256-3 x) 8 file))
-              (similar-save-object x file))
+                (dump-simd-pack-256 x file)
+                (similar-save-object x file)))
              (t
               ;; This probably never happens, since bad things tend to
               ;; be detected during IR1 conversion.
               (error "This object cannot be dumped into a fasl file:~% ~S"
                      x))))))
   (values))
+
+#+(and (not sb-xc-host) sb-simd-pack-256)
+(defun dump-simd-pack-256 (x file)
+  (dump-fop 'fop-simd-pack file)
+  (dump-integer-as-n-bytes (logior (%simd-pack-256-tag x) 4) 8 file)
+  (dump-integer-as-n-bytes (%simd-pack-256-0 x) 8 file)
+  (dump-integer-as-n-bytes (%simd-pack-256-1 x) 8 file)
+  (dump-integer-as-n-bytes (%simd-pack-256-2 x) 8 file)
+  (dump-integer-as-n-bytes (%simd-pack-256-3 x) 8 file))
 
 ;;; Dump an object of any type by dispatching to the correct
 ;;; type-specific dumping function. We pick off immediate objects,

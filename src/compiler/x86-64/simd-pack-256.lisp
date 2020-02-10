@@ -370,4 +370,10 @@
   (values (%simd-pack-256-double-item pack 0)
           (%simd-pack-256-double-item pack 1)
           (%simd-pack-256-double-item pack 2)
-          (%simd-pack-256-double-item pack 3))))
+          (%simd-pack-256-double-item pack 3)))
+
+(defun %simd-pack-256-inline-constant (pack)
+  (list :avx2 (logior (%simd-pack-256-0 pack)
+                      (ash (%simd-pack-256-1 pack) 64)
+                      (ash (%simd-pack-256-2 pack) 128)
+                      (ash (%simd-pack-256-3 pack) 192)))))
