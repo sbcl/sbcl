@@ -447,7 +447,8 @@
   (loop while (shiftf (component-reoptimize component) nil)
         do
         (do-blocks (block component)
-          (when (block-reoptimize block)
+          (when (and (block-reoptimize block)
+                     (block-type-check block))
             (ir1-optimize-block-fast block)))))
 
 (defun ir1-optimize-block-fast (block)
