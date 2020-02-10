@@ -11,44 +11,50 @@
 
 (in-package "SB-VM")
 
-;;; #+SB-ASSEMBLING as we don't need VOPS, just the asm routines:
-;;; these are out-of-line versions called by VOPs.
-(fmakunbound 'define-per-register-allocation-routines)
-(defmacro define-per-register-allocation-routines ()
-  #+sb-assembling
-  ;; Don't include r11 or r13 since those are temp and thread-base respectively
-  '(progn (def rax) (def rcx) (def rdx) (def rbx) (def rsi) (def rdi)
-          (def r8) (def r9) (def r10) (def r12) (def r14) (def r15)))
-
 ;;;; Signed and unsigned bignums from word-sized integers. Argument
 ;;;; and return in the same register. No VOPs, as these are only used
 ;;;; as out-of-line versions: MOVE-FROM-[UN]SIGNED VOPs handle the
 ;;;; fixnum cases inline.
+#+sb-assembling
 (macrolet
-    ((def (reg)
-       `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg))
+    ((signed (reg avx)
+       `(define-assembly-routine (,(symbolicate "ALLOC-SIGNED-BIGNUM-IN-" reg
+                                                (if avx "-AVX2" "")))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst push number)
-          (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
-          (popw number bignum-digits-offset other-pointer-lowtag))))
-  (define-per-register-allocation-routines))
-
-(macrolet
-    ((def (reg)
-       `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg))
+          (let (#+avx2
+                (*avx-registers-used-p* ,avx))
+            (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil))
+          (popw number bignum-digits-offset other-pointer-lowtag)))
+     (unsigned (reg avx)
+       `(define-assembly-routine (,(symbolicate "ALLOC-UNSIGNED-BIGNUM-IN-" reg
+                                                (if avx "-AVX2" "")))
             ((:temp number unsigned-reg ,(symbolicate reg "-OFFSET")))
           (inst ror number (1+ n-fixnum-tag-bits)) ; restore unrotated value
           (inst push number)
-          (inst test number number) ; rotates do not update SF
+          (inst test number number)     ; rotates do not update SF
           (inst jmp :ns one-word-bignum)
-          ;; Two word bignum
-          (alloc-other number bignum-widetag (+ bignum-digits-offset 2) nil)
+          (let (#+avx2
+                (*avx-registers-used-p* ,avx))
+            ;; Two word bignum
+            (alloc-other number bignum-widetag (+ bignum-digits-offset 2) nil))
           (popw number bignum-digits-offset other-pointer-lowtag)
           (inst ret)
           ONE-WORD-BIGNUM
           (alloc-other number bignum-widetag (+ bignum-digits-offset 1) nil)
-          (popw number bignum-digits-offset other-pointer-lowtag))))
-  (define-per-register-allocation-routines))
+          (popw number bignum-digits-offset other-pointer-lowtag)))
+     (define (op &optional avx)
+       ;; Don't include r11 or r13 since those are temp and thread-base respectively
+       `(progn
+          ,@(loop for reg in '(rax rcx rdx rbx rsi rdi
+                               r8 r9 r10 r12 r14 r15)
+                  collect `(,op ,reg ,avx)))))
+  (define signed)
+  (define unsigned)
+  #+avx2
+  (define signed t)
+  #+avx2
+  (define unsigned t))
 
 #+sb-thread
 (define-assembly-routine (alloc-tls-index

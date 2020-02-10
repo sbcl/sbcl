@@ -248,14 +248,20 @@
 (eval-when (:compile-toplevel :execute)
   ;; Don't use a macro for this, because define-vop is weird.
   (defun bignum-from-reg (tn signedp)
-    `(aref ',(map 'vector
+    (flet ((make-vector (suffix)
+             (map 'vector
                   (lambda (x)
                     ;; At present R11 can not occur here,
                     ;; but let's be future-proof and allow for it.
                     (unless (member x '(rsp rbp) :test 'string=)
-                      (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x)))
-                  +qword-register-names+)
-           (tn-offset ,tn))))
+                      (symbolicate "ALLOC-" signedp "-BIGNUM-IN-" x suffix)))
+                  +qword-register-names+)))
+      `(aref (cond #+avx2
+                   ((avx-registers-used-p)
+                    ',(make-vector "-AVX2"))
+                   (t
+                    ',(make-vector "")))
+             (tn-offset ,tn)))))
 
 ;;; Convert an untagged signed word to a lispobj -- fixnum or bignum
 ;;; as the case may be. Fixnum case inline, bignum case in an assembly

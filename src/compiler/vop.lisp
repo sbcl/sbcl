@@ -363,7 +363,9 @@
   ;; setup-dynamic-count-info. (But only if we are generating code to
   ;; collect dynamic statistics.)
   #+sb-dyncount
-  (dyncount-info nil :type (or null dyncount-info)))
+  (dyncount-info nil :type (or null dyncount-info))
+  #+avx2
+  (avx2-used-p nil))
 
 ;;; An ENTRY-INFO condenses all the information that the dumper needs
 ;;; to create each XEP's function entry data structure. ENTRY-INFO
