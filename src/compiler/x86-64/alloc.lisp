@@ -36,6 +36,20 @@
   (tagify alloc-tn rsp-tn lowtag)
   (values))
 
+#+avx2
+(defun avx-registers-used-p ()
+  (when (and #+sb-xc-host (boundp '*component-being-compiled*))
+    (let ((comp (component-info *component-being-compiled*)))
+      (flet ((used-p (tn)
+               (do ((tn tn (sb-c::tn-next tn)))
+                   ((null tn))
+                 (when (sc-is tn avx2-reg
+                              int-avx2-reg
+                              double-avx2-reg single-avx2-reg)
+                   (return-from avx-registers-used-p t)))))
+        (used-p (sb-c::ir2-component-normal-tns comp))
+        (used-p (sb-c::ir2-component-wired-tns comp))))))
+
 (defun %alloc-tramp (node result-tn size lowtag)
   (cond ((typep size '(and integer (not (signed-byte 32))))
          ;; MOV accepts large immediate operands, PUSH does not
@@ -48,7 +62,12 @@
   ;; But the assembly routine is hand-written, not generated, and it has to match,
   ;; so there's not much that can be done to generalize it.
   (let ((to-r11 (location= result-tn r11-tn)))
-    (invoke-asm-routine 'call (if to-r11 'alloc-tramp-r11 'alloc-tramp) node)
+    (invoke-asm-routine 'call (cond
+                                #+avx2
+                                ((avx-registers-used-p)
+                                 (if to-r11 'alloc-tramp-r11-avx2 'alloc-tramp-avx2))
+                                (t
+                                 (if to-r11 'alloc-tramp-r11 'alloc-tramp))) node)
     (unless to-r11
       (inst pop result-tn)))
   (unless (eql lowtag 0)

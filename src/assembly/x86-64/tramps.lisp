@@ -8,7 +8,11 @@
 (macrolet
     ((def ((name c-name pseudo-atomic &key do-not-preserve (stack-delta 0))
            move-arg
-           move-result)
+           move-result
+           &optional
+           (float-move 'movaps)
+           (float-size 16)
+           (float-sc 'single-reg))
        `(define-assembly-routine
             (,name (:return-style :none))
             ()
@@ -28,21 +32,20 @@
                                     `(inst ,op ,reg)))))
                      (map-floats (op)
                        `(progn
-                          ,@(loop for i by 16
-                                  for float in
-                                  '(float0-tn float1-tn float2-tn float3-tn
-                                    float4-tn float5-tn float6-tn float7-tn
-                                    float8-tn float9-tn float10-tn float11-tn
-                                    float12-tn float13-tn float14-tn float15-tn)
+                          ,@(loop for i by ,float-size
+                                  for offset below 16
+                                  for float = (make-random-tn :kind :normal
+                                                              :sc (sc-or-lose ',float-sc)
+                                                              :offset offset)
                                   collect
                                   (if (eql op 'pop)
-                                      `(inst movaps ,float (ea ,i rsp-tn))
-                                      `(inst movaps (ea ,i rsp-tn) ,float))))))
+                                      `(inst ,',float-move ,float (ea ,i rsp-tn))
+                                      `(inst ,',float-move (ea ,i rsp-tn) ,float))))))
             (inst cld)
             (inst push rbp-tn)
             (inst mov rbp-tn rsp-tn)
-            (inst and rsp-tn (- (* n-word-bytes 2)))
-            (inst sub rsp-tn (* 16 16))
+            (inst and rsp-tn (- ,float-size))
+            (inst sub rsp-tn (* 16 ,float-size))
             (map-floats push)
             (map-registers push)
             ,@move-arg
@@ -66,6 +69,23 @@
     ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
     ((inst mov r11-tn rax-tn))) ; result
 
+  #+avx2
+  (progn
+    (def (alloc-tramp-avx2 "alloc" nil)
+        ((inst mov rdi-tn (ea 16 rbp-tn))) 
+      ((inst mov (ea 16 rbp-tn) rax-tn))
+      vmovaps
+      32
+      avx2-reg)
+    (def (alloc-tramp-r11-avx2 "alloc" nil
+                               :do-not-preserve (r11-tn)
+                               :stack-delta 8) ;; remove the size parameter
+        ((inst mov rdi-tn (ea 16 rbp-tn)))     ; arg
+      ((inst mov r11-tn rax-tn))
+        vmovaps
+        32
+        avx2-reg))
+  
   #+immobile-space
   (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
     () ; no arg
