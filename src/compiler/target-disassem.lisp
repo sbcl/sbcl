@@ -1264,7 +1264,7 @@
         (cache (list (list :printer) (list :prefilter) (list :labeller))))
     (do-symbols (symbol package)
       (awhen (get symbol 'instruction-flavors)
-        (setf (get symbol 'instruction-flavors)
+        (setf (get symbol 'instructions)
               (collect-inst-variants symbol package it cache))))
     (unless (sb-impl::!c-runtime-noinform-p)
       (format t "~&Disassembler: ~{~D printers, ~D prefilters, ~D labelers~}~%"
@@ -1277,8 +1277,7 @@
     (when (or force (null ispace))
       (let ((insts nil))
         (do-symbols (symbol package)
-          (setq insts (nconc (copy-list (get symbol 'instruction-flavors))
-                             insts)))
+          (setq insts (nconc (copy-list (get symbol 'instructions)) insts)))
         (setf ispace (build-inst-space insts)))
       (setf *disassem-inst-space* ispace))
     ispace))
@@ -2736,6 +2735,10 @@
       compiled)))
 
 (defun !remove-bootstrap-symbols ()
+  ;; Remove INSTRUCTION-FLAVORS properties, which are the inputs to
+  ;; computing the INSTRUCTION instances.
+  (do-symbols (symbol sb-assem::*backend-instruction-set-package*)
+    (remf (symbol-plist symbol) 'instruction-flavors))
   ;; Remove compile-time-only metadata. This preserves compatibility with the
   ;; older disassembler macros which wrapped GEN-ARG-TYPE-DEF-FORM and such
   ;; in (EVAL-WHEN (:COMPILE-TOPLEVEL :EXECUTE)), which in turn required that
