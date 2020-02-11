@@ -597,26 +597,17 @@
     (values)))
 
 ;;; Add FUNCTIONAL to the COMPONENT-REANALYZE-FUNCTIONALS, unless it's
-;;; some trivial type for which reanalysis is a trivial no-op, or
-;;; unless it doesn't belong in this component at all.
+;;; some trivial type for which reanalysis is a trivial no-op.
 ;;;
 ;;; FUNCTIONAL is returned.
 (defun maybe-reanalyze-functional (functional)
-
   (aver (not (eql (functional-kind functional) :deleted))) ; bug 148
   (aver-live-component *current-component*)
-
   ;; When FUNCTIONAL is of a type for which reanalysis isn't a trivial
   ;; no-op
   (when (typep functional '(or optional-dispatch clambda))
-
-    ;; When FUNCTIONAL knows its component
-    (when (lambda-p functional)
-      (aver (eql (lambda-component functional) *current-component*)))
-
     (pushnew functional
              (component-reanalyze-functionals *current-component*)))
-
   functional)
 
 ;;; Generate a REF node for LEAF, frobbing the LEAF structure as

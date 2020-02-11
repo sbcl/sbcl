@@ -368,11 +368,15 @@ the stack without triggering overflow protection.")
   (sset-counter 1 :type fixnum)
   ;; if emitting a cfasl, the fasl stream to that
   (compile-toplevel-object nil :read-only t)
-  ;; these are all historical baggage from here down,
-  ;; unused unless we ever decide to fix block compilation
+  ;; The current block compilation state.  These are initialized to
+  ;; the :Block-Compile and :Entry-Points arguments that COMPILE-FILE
+  ;; was called with.  Subsequent START-BLOCK or END-BLOCK
+  ;; declarations alter the values.
   (block-compile nil :type (member nil t :specified))
-  ;; When block compiling, used by PROCESS-FORM to accumulate top level
-  ;; lambdas resulting from compiling subforms. (In reverse order.)
+  (entry-points nil :type list)
+  ;; When block compiling, used by PROCESS-FORM to accumulate top
+  ;; level lambdas resulting from compiling subforms. (In reverse
+  ;; order.)
   (toplevel-lambdas nil :type list)
 
   ;; Bidrectional map between IR1/IR2/assembler abstractions and a corresponding

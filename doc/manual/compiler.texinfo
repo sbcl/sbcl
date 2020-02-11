@@ -17,6 +17,7 @@ separate that they have their own chapter, @ref{Efficiency}.
 * Compiler Errors::
 * Open Coding and Inline Expansion::
 * Interpreter::
+* Advanced Compiler Use and Efficiency Hints::
 @end menu
 
 @node  Diagnostic Messages
@@ -1126,3 +1127,17 @@ Unlike in some other Lisp implementations, in SBCL interpreted code is
 not safer or more debuggable than compiled code.
 
 @include var-sb-ext-star-evaluator-mode-star.texinfo
+
+@node  Advanced Compiler Use and Efficiency Hints
+@comment  node-name,  next,  previous,  up
+@section Advanced Compiler Use and Efficiency Hints
+For more advanced usages of the compiler, please see the chapter of the
+same name in the CMUCL manual. Many aspects of the compiler have stayed
+exactly the same, and there is a much more detailed explanation of the
+compiler's behavior and how to maximally optimize code in their
+manual. In particular, while SBCL no longer supports byte-code
+compilation, it does support CMUCL's block compilation facility allowing
+whole program optimization and increased use of the local call
+convention. We do not currently support the @code{start-block} and
+@code{end-block} declarations, although we do support the same arguments
+to @code{compile-file} regarding block compilation.

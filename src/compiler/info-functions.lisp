@@ -89,7 +89,8 @@
   ;; case it's reasonable style. Either way, NAME is no longer a free
   ;; function.)
   (when (boundp '*ir1-namespace*)       ; when compiling
-    (remhash name (free-funs *ir1-namespace*)))
+    (unless (block-compile *compilation*)
+      (remhash name (free-funs *ir1-namespace*))))
 
   (values))
 
