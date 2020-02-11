@@ -72,7 +72,7 @@
   #+avx2
   (progn
     (def (alloc-tramp-avx2 "alloc" nil)
-        ((inst mov rdi-tn (ea 16 rbp-tn))) 
+        ((inst mov rdi-tn (ea 16 rbp-tn)))
       ((inst mov (ea 16 rbp-tn) rax-tn))
       vmovaps
       32
@@ -85,7 +85,7 @@
         vmovaps
         32
         avx2-reg))
-  
+
   #+immobile-space
   (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
     () ; no arg
