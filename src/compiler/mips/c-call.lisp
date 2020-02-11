@@ -252,7 +252,7 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (inst jal (make-fixup "call_into_c" :foreign))
-      (move cfunc function t)
+      (emit-nop-or-move cfunc function)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 

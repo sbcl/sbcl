@@ -137,7 +137,7 @@
       ;; Is it a fixnum?
       (inst and temp value fixnum-tag-mask)
       (inst beq temp fixnum)
-      (move temp value t)
+      (emit-nop-or-move temp value)
 
       ;; If not, is it an other pointer?
       (inst and temp value lowtag-mask)

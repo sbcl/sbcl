@@ -23,15 +23,21 @@
 
 ;;; Instruction-like macros.
 
-(defmacro move (dst src &optional (always-emit-code-p nil))
-  "Move SRC into DST (unless they are location= and ALWAYS-EMIT-CODE-P
-is nil)."
+(defmacro move (dst src)
+  "Move SRC into DST unless they are location="
+  (once-only ((n-dst dst)
+              (n-src src))
+    `(unless (location= ,n-dst ,n-src)
+       (inst move ,n-dst ,n-src))))
+(defmacro emit-nop-or-move (dst src)
+  "Move SRC into DST, but if they are location= then emit a NOP"
   (once-only ((n-dst dst)
               (n-src src))
     `(if (location= ,n-dst ,n-src)
-         (when ,always-emit-code-p
-           (inst nop))
+         (inst nop)
          (inst move ,n-dst ,n-src))))
+(defmacro zeroize (reg)
+  `(inst move ,reg zero-tn))
 
 (defmacro def-mem-op (op inst shift load)
   `(defmacro ,op (object base &optional (offset 0) (lowtag 0))
@@ -82,7 +88,7 @@ byte-ordering issues."
      (inst addu ,lip ,function (- (ash simple-fun-insts-offset word-shift)
                                    fun-pointer-lowtag))
      (inst j ,lip)
-     (move code-tn ,function t)))
+     (emit-nop-or-move code-tn ,function)))
 
 (defmacro lisp-return (return-pc lip &key (offset 0) (frob-code t))
   "Return to RETURN-PC.  LIP is an interior-reg temporary."
@@ -91,7 +97,7 @@ byte-ordering issues."
            (- (* (1+ ,offset) n-word-bytes) other-pointer-lowtag))
      (inst j ,lip)
      ,(if frob-code
-          `(move code-tn ,return-pc t)
+          `(emit-nop-or-move code-tn ,return-pc)
           '(inst nop))))
 
 

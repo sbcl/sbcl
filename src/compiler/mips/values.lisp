@@ -143,7 +143,7 @@
        (inst addu src context skip)))
     (move count num)
     (inst beq num done)
-    (move start csp-tn t)
+    (emit-nop-or-move start csp-tn)
     (move dst csp-tn)
     (inst addu csp-tn count)
     LOOP

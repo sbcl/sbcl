@@ -215,4 +215,4 @@
 
   EXIT
   (inst j (make-fixup 'unwind :assembly-routine))
-  (move target catch t))
+  (emit-nop-or-move target catch))

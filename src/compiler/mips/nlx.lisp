@@ -156,7 +156,7 @@
           ((= nvals 1)
            (let ((no-values (gen-label)))
              (inst beq count no-values)
-             (move (tn-ref-tn values) null-tn t)
+             (inst move (tn-ref-tn values) null-tn)
              (loadw (tn-ref-tn values) start)
              (emit-label no-values)))
           (t

@@ -67,7 +67,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (define-assembly-routine (generic--
@@ -116,7 +116,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 
@@ -195,7 +195,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (macrolet
@@ -319,7 +319,7 @@
           ,cmp
 
           (inst ,(if not-p 'beq 'bne) temp DONE)
-          (move res null-tn t)
+          (inst move res null-tn)
           (load-symbol res t)
 
           DONE
@@ -330,7 +330,7 @@
           (inst li nargs (fixnumize 2))
           (move ocfp cfp-tn)
           (inst j lip)
-          (move cfp-tn csp-tn t))))
+          (inst move cfp-tn csp-tn))))
 
   (define-cond-assem-rtn generic-< < two-arg-< (inst slt temp x y) t)
   (define-cond-assem-rtn generic-<= <= two-arg-<= (inst slt temp x y) nil)
@@ -361,7 +361,7 @@
   (inst nop)
 
   (inst bne x y DONE)
-  (move res null-tn t)
+  (inst move res null-tn)
 
   RETURN-T
   (load-symbol res t)
@@ -374,7 +374,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (define-assembly-routine (generic-=
@@ -399,7 +399,7 @@
   (inst nop)
 
   (inst bne x y DONE)
-  (move res null-tn t)
+  (inst move res null-tn)
   (load-symbol res t)
 
   DONE
@@ -410,7 +410,7 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
 
 
 (define-assembly-routine (generic-/=
@@ -435,7 +435,7 @@
   (inst nop)
 
   (inst beq x y DONE)
-  (move res null-tn t)
+  (inst move res null-tn)
   (load-symbol res t)
 
   DONE
@@ -446,4 +446,4 @@
   (inst li nargs (fixnumize 2))
   (move ocfp cfp-tn)
   (inst j lip)
-  (move cfp-tn csp-tn t))
+  (inst move cfp-tn csp-tn))
