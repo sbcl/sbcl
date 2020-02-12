@@ -991,7 +991,7 @@
   ;; INLINEP will always be NIL as well.)
   (inline-expansion nil :type list)
   ;; the lexical environment that the INLINE-EXPANSION should be converted in
-  (lexenv *lexenv* :type lexenv)
+  (lexenv *lexenv* :type lexenv :read-only t)
   ;; the original function or macro lambda list, or :UNSPECIFIED if
   ;; this is a compiler created function
   (arg-documentation nil :type (or list (member :unspecified)))
@@ -1195,6 +1195,7 @@
   ;; true if &KEY was specified (which doesn't necessarily mean that
   ;; there are any &KEY arguments..)
   (keyp nil :type boolean)
+  (source-path)
   ;; the number of required arguments. This is the smallest legal
   ;; number of arguments.
   (min-args 0 :type unsigned-byte)

@@ -886,9 +886,7 @@
                                      :keyp keyp
                                      :%source-name source-name
                                      :%debug-name debug-name
-                                     :plist `(:ir1-environment
-                                              (,*lexenv*
-                                               ,*current-path*))))
+                                     :source-path *current-path*))
         (min (or (position-if #'lambda-var-arg-info vars) (length vars))))
     (aver-live-component *current-component*)
     (ir1-convert-hairy-args res () () () () vars nil body aux-vars aux-vals
@@ -1431,7 +1429,6 @@ is potentially harmful to any already-compiled callers using (SAFETY 0)."
 (defun optional-dispatch-entry-point-fun (dispatcher n)
   (declare (type optional-dispatch dispatcher)
            (type unsigned-byte n))
-  (let* ((env (getf (optional-dispatch-plist dispatcher) :ir1-environment))
-         (*lexenv* (first env))
-         (*current-path* (second env)))
+  (let ((*lexenv* (functional-lexenv dispatcher))
+        (*current-path* (optional-dispatch-source-path dispatcher)))
     (force (nth n (optional-dispatch-entry-points dispatcher)))))
