@@ -953,7 +953,8 @@
      (inst addu reg zero-tn value))
     ((or (signed-byte 32) (unsigned-byte 32))
      (inst lui reg (ldb (byte 16 16) value))
-     (inst or reg (ldb (byte 16 0) value)))
+     (when (logtest byte #xFFFF)
+       (inst or reg (ldb (byte 16 0) value))))
     (fixup
      (inst lui reg value)
      (inst addu reg value))))
