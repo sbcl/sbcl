@@ -2764,3 +2764,16 @@
     (('otherwise) 1)
     ((nil) 4)
     ((t) 3)))
+
+(with-test (:name :unreachable-component-propagate-let-args)
+  (checked-compile-and-assert
+      ()
+      `(lambda ()
+         (let ((p 0))
+           (flet ((f (&key)
+                    (flet ((g (&optional
+                                 (z
+                                  (return-from f (+ (dotimes (i 0 0)) p))))
+                             p))))))
+               p))
+    (() 0)))
