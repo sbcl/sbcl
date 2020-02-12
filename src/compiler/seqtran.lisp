@@ -2245,9 +2245,12 @@
               (dolist (x (if reversedp (reverse map) map))
                 (let ((sym (car x)))
                   (unless (member sym seen)
-                    ;; NIL and T need wrapping in () since they should not signify
+                    ;; NIL, T, OTHERWISE need wrapping in () since they should not signify
                     ;; an empty list of keys or the "otherwise" case respectively.
-                    (push (list (if (member sym '(nil t)) (list sym) sym) (cdr x))
+                    (push (list (if (memq sym '(nil t otherwise))
+                                    (list sym)
+                                    sym)
+                                (cdr x))
                           clauses)
                     (push sym seen))))
               ;; CASE could decide not to use hash-based lookup, as there is a

@@ -2754,3 +2754,13 @@
                       end))
                    sum))))
     ((1) 2)))
+
+(with-test (:name :position-case-otherwise)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (position x '(a otherwise b t nil)))
+    (('a) 0)
+    (('otherwise) 1)
+    ((nil) 4)
+    ((t) 3)))
