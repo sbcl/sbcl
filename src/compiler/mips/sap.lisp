@@ -107,17 +107,30 @@
 (define-vop (pointer+)
   (:translate sap+)
   (:args (ptr :scs (sap-reg))
-         (offset :scs (signed-reg immediate)))
+         (offset :scs (signed-reg)))
   (:arg-types system-area-pointer signed-num)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:policy :fast-safe)
-  (:generator 1
-    (sc-case offset
-      (signed-reg
-       (inst addu res ptr offset))
-      (immediate
-       (inst addu res ptr (tn-value offset))))))
+  (:generator 2 (inst addu res ptr offset)))
+(define-vop (pointer+/c)
+  (:translate sap+)
+  (:args (ptr :scs (sap-reg)))
+  (:info offset)
+  (:arg-types system-area-pointer (:constant (signed-byte 16)))
+  (:results (res :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:policy :fast-safe)
+  ;; This generator is only superficially identical to the above because
+  ;; assembly code need not distinguish between 'addiu' and 'addu' even though
+  ;; technically those are different opcodes. The native assembler also
+  ;; doesn't mind if you use an immediate operand to 'addu'.
+  ;; But adding a constant is "cheaper" only if it doesn't require an "li"
+  ;; instruction to produce all the bits, which the native assembler will
+  ;; synthesize using reg $at. If we declared a single vop that took a 2nd arg
+  ;; of either immediate or signed-reg, then we've have to declare a temp
+  ;; (because $at is not a permanent temp in lisp) usually going to waste.
+  (:generator 1 (inst addu res ptr offset)))
 
 (define-vop (pointer-)
   (:translate sap-)

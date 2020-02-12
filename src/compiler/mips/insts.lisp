@@ -352,6 +352,12 @@
   (:emitter
    (emit-math-inst segment dst src1 src2 #b100000 #b001000)))
 
+;;; Note: ADDU doesn't really mean "unsigned" when used with an immediate operand.
+;;; From the processor manual: "ALL arithmetic immediate values are sign-extended.
+;;; After that, they are handled as signed or unsigned 32 bit numbers,
+;;; depending upon the instruction. The only difference between signed and unsigned
+;;; instructions is that signed instructions can generate an overflow exception
+;;; and unsigned instructions can not."
 (define-instruction addu (segment dst src1 &optional src2)
   (:declare (type tn dst)
             (type (or tn (signed-byte 16) fixup null) src1 src2))
