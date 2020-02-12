@@ -737,7 +737,7 @@
   (deftest readlink.error.2
       (let* ((non-link-pathname (make-pathname :name "readlink.error.2"
                                                :defaults *test-directory*))
-             (fd (sb-posix:open non-link-pathname sb-posix::o-creat)))
+             (fd (sb-posix:open non-link-pathname sb-posix:o-creat #o777)))
         (unwind-protect
              (handler-case (sb-posix:readlink non-link-pathname)
                (sb-posix:syscall-error (c)
@@ -795,7 +795,7 @@
                                     '(:relative "readlink.error.7")
                                     :name "readlink.error.7")
                                    *test-directory*))
-             (fd (sb-posix:open non-link-pathname sb-posix::o-creat)))
+             (fd (sb-posix:open non-link-pathname sb-posix:o-creat #o777)))
         (unwind-protect
              (handler-case (sb-posix:readlink impossible-pathname)
                (sb-posix:syscall-error (c)
