@@ -196,7 +196,15 @@ Also does not descend into structures, which EQUALP does."
                   (vals entry))
           (format s "Actual value~P: ~
                       ~{~S~^~%~15t~}.~%"
-                  (length r) r)))))
+                  (length r) r)
+          (when (and (typep (car r) 'condition) (sb-int:singleton-p r))
+            ;; Show something more useful than
+            ;;  "Actual value: #<SB-INT:SIMPLE-PROGRAM-ERROR "invalid number of arguments: ~S" {1002825433}>"
+            (princ (car r))
+            (fresh-line)
+            ;; And in case even that's not enough, show all slots of the condition.
+            (sb-vm:hexdump (car r))
+            (terpri))))))
   (when (not (pend entry)) *test*))
 
 (defun continue-testing ()
