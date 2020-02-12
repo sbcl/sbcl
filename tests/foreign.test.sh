@@ -262,6 +262,8 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
   (note "/renamed back to originals")
 
   ;; test late resolution
+  (eval-when (:compile-toplevel :load-toplevel :execute)
+   (setq *features* (union *features* sb-impl:+internal-features+)))
   #+linkage-table
   (progn
     (note "/starting linkage table tests")
@@ -316,6 +318,8 @@ test_save() {
     echo testing save $1
     x="$1"
     run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
+(eval-when (:compile-toplevel :load-toplevel :execute)
+ (setq *features* (union *features* sb-impl:+internal-features+)))
 #+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$x.core")
 (sb-ext:exit :code 22) ; catch this
 EOF
