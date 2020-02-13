@@ -3259,9 +3259,10 @@ core and return a descriptor to it."
                       "classoids"
                       "layouts"
                       "type specifiers"
-                      "symbols")))
+                      "symbols"
+                      #+sb-dynamic-core "linkage table")))
       (dotimes (i (length sections))
-        (format t "~4<~@R.~> ~A~%" (1+ i) (nth i sections))))
+        (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
     (format t "I. assembler routines defined in core image:~2%")
     (dolist (routine *cold-assembler-routines*)
@@ -3341,9 +3342,21 @@ III. initially undefined function references (alphabetically):
           (sort (%hash-table-alist *ctype-cache*) #'<
                 :key (lambda (x) (descriptor-bits (cdr x))))))
 
-    (format t "~%~|~%VII. symbols (numerically):~2%")
-    (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
-          (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
+  (format t "~%~|~%VII. symbols (numerically):~2%")
+  (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
+        (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
+
+  #+sb-dynamic-core
+  (progn
+    (format t "~%~|~%VIII. linkage table:~2%")
+    (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
+                         #'< :key #'cdr))
+      (let ((name (car entry)))
+        (format t " ~:[   ~;(D)~] ~8x = ~a~%"
+                (listp name)
+                (+ sb-vm:linkage-table-space-start
+                   (* (cdr entry) sb-vm:linkage-table-entry-size))
+                (car (ensure-list name))))))
 
   (values))
 
