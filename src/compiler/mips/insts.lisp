@@ -74,18 +74,25 @@
 
 (define-arg-type reg
   :printer #'(lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let ((regname (aref *reg-symbols* value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'registers regname dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (define-arg-type load-store-annotation
   :printer (lambda (value stream dstate)
-             (declare (ignore stream))
-             (destructuring-bind (reg offset) value
-               (when (= reg sb-vm::code-offset)
-                 (note-code-constant offset dstate)))))
+             ;; We don't need to print anything if not disassembling
+             ;; to text, because rs + immediate were already shown.
+             ;; The load-store-annotation is overlayed on those fields
+             ;; (which I didn't think was allowed at all)
+             (when stream
+               (destructuring-bind (reg offset) value
+                 (when (= reg sb-vm::code-offset)
+                   (note-code-constant offset dstate))))))
 
 (defparameter *float-reg-symbols*
   (coerce
@@ -94,11 +101,14 @@
 
 (define-arg-type fp-reg
   :printer #'(lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let ((regname (aref *float-reg-symbols* value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'float-registers regname dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'float-registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (define-arg-type control-reg :printer "(CR:#x~X)")
 
@@ -120,15 +130,15 @@
 
 (define-arg-type float-format
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (stream stream)
-                        (fixnum value))
-               (princ (case value
-                        (0 's)
-                        (1 'd)
-                        (4 'w)
-                        (t '?))
-                      stream)))
+               (declare (fixnum value))
+               (let ((char (case value
+                             (0 's)
+                             (1 'd)
+                             (4 'w)
+                             (t '?))))
+                 (if stream
+                     (princ char stream)
+                     (operand char dstate)))))
 
 (defconstant-eqx compare-kinds
   '(:f :un :eq :ueq :olt :ult :ole :ule :sf :ngle :seq :ngl :lt :nge :le :ngt)
@@ -217,8 +227,11 @@
   (defparameter jump-printer
     #'(lambda (value stream dstate)
         (let ((addr (ash value 2)))
-          (maybe-note-assembler-routine addr t dstate)
-          (write addr :base 16 :radix t :stream stream)))))
+          (cond (stream
+                 (maybe-note-assembler-routine addr t dstate)
+                 (write addr :base 16 :radix t :stream stream))
+                (t
+                 (operand addr dstate)))))))
 
 (define-instruction-format (jump 32 :default-printer '(:name :tab target))
   (op :field (byte 6 26))
