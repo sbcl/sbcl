@@ -2069,13 +2069,14 @@ pair_interior_pointer(os_context_t *context, uword_t pointer,
     }
 #if 0
     if (*register_pair >= 0)
-        fprintf(stderr, "p_i_p: %-3s=%#lx based on %s=%lx + %lx\n",
-                regname, pointer,
+        fprintf(stderr, "pair_interior_ptr: %-3s=%p based on %s=%p + %x\n",
+                regname, (void*)pointer,
                 lisp_register_names[*register_pair],
-                *os_context_register_addr(context, *register_pair),
-                *saved_offset);
+                (void*)(((uword_t)*os_context_register_addr(context, *register_pair))
+                        & ~LOWTAG_MASK),
+                (int)*saved_offset);
     else
-        fprintf(stderr, "p_i_p: %-3s=%#lx not based\n", regname, pointer);
+        fprintf(stderr, "pair_interior_ptr: %-3s=%#lx not based\n", regname, pointer);
 #endif
 }
 
