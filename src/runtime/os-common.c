@@ -195,6 +195,13 @@ void os_link_runtime()
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
 }
 
+void os_unlink_runtime()
+{
+#ifdef BOXED_REGION
+    SYMBOL(BOXED_REGION)->value = UNBOUND_MARKER_WIDETAG;
+#endif
+}
+
 boolean
 gc_managed_heap_space_p(lispobj addr)
 {

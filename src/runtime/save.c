@@ -550,6 +550,7 @@ save(char *filename, lispobj init_function, boolean prepend_runtime,
      * too late to remove old references from the binding stack.
      * There's probably no safe way to do that from Lisp */
     unwind_binding_stack();
+    os_unlink_runtime();
     return save_to_filehandle(file, filename, init_function, prepend_runtime,
                               save_runtime_options,
                               compressed ? compressed : COMPRESSION_LEVEL_NONE);

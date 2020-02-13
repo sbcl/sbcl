@@ -4465,6 +4465,7 @@ gc_and_save(char *filename, boolean prepend_runtime,
 #ifdef LISP_FEATURE_X86_64
     untune_asm_routines_for_microarch();
 #endif
+    os_unlink_runtime();
 
     /* The number of dynamic space pages saved is based on the allocation
      * pointer, while the number of PTEs is based on next_free_page.
