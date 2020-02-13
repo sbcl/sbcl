@@ -126,8 +126,7 @@
   (:results (res :scs (any-reg descriptor-reg)))
   (:policy :fast-safe)
   (:generator 1
-    (inst bic res ptr lowtag-mask)
-    (inst mov res (lsr res 1))))
+    (inst bic res ptr fixnum-tag-mask)))
 
 ;;;; Allocation
 

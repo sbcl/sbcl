@@ -1315,7 +1315,7 @@ possibly temporarily, because it might be used internally."
                "STRUCTURE-INITARG-NOT-KEYWORD" "CONSTANT-MODIFIED"
 
                ;; ..and DEFTYPEs..
-               "HASH"
+               "HASH-CODE"
                "INDEX" "LOAD/STORE-INDEX"
                "SIGNED-BYTE-WITH-A-BITE-OUT"
                "UNSIGNED-BYTE-WITH-A-BITE-OUT"

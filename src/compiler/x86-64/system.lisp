@@ -239,8 +239,7 @@
   (:policy :fast-safe)
   (:generator 1
     (move res ptr)
-    (inst and res (constantize (dpb -1 (byte (- n-word-bits n-fixnum-tag-bits 1)
-                                             n-fixnum-tag-bits) 0)))))
+    (inst and res (lognot fixnum-tag-mask))))
 
 ;;;; allocation
 

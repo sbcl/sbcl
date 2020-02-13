@@ -96,22 +96,22 @@
 
 ;;;; miscellaneous "sub-primitives"
 
-(defknown pointer-hash (t) hash (flushable))
+(defknown pointer-hash (t) fixnum (flushable))
 
 (defknown %sp-string-compare
   (simple-string index (or null index) simple-string index (or null index))
   (values index fixnum)
   (foldable flushable))
 
-(defknown %sxhash-string (string) hash (foldable flushable))
-(defknown %sxhash-simple-string (simple-string) hash (foldable flushable))
+(defknown %sxhash-string (string) hash-code (foldable flushable))
+(defknown %sxhash-simple-string (simple-string) hash-code (foldable flushable))
 
-(defknown (%sxhash-simple-substring) (simple-string index index) hash
+(defknown (%sxhash-simple-substring) (simple-string index index) hash-code
   (foldable flushable))
-(defknown (compute-symbol-hash) (simple-string index) hash
+(defknown (compute-symbol-hash) (simple-string index) hash-code
   (foldable flushable))
 
-(defknown symbol-hash (symbol) hash
+(defknown symbol-hash (symbol) hash-code
   (flushable movable))
 ;;; This unusual accessor will read the word at SYMBOL-HASH-SLOT in any
 ;;; object, not only symbols. The result is meaningful only if the object
@@ -121,9 +121,9 @@
 ;;; to be anything except NIL. That predicate would be IDENTITY,
 ;;; which is not terribly helpful from a code generation stance.
 (defknown symbol-hash* (t (member nil symbolp non-null-symbol-p))
-  hash (flushable movable always-translatable))
+  hash-code (flushable movable always-translatable))
 
-(defknown %set-symbol-hash (symbol hash)
+(defknown %set-symbol-hash (symbol hash-code)
   t ())
 
 (defknown symbol-info-vector (symbol) (or null simple-vector))

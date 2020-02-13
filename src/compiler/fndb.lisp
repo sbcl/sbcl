@@ -1039,8 +1039,8 @@
   (foldable flushable))
 (defknown hash-table-size (hash-table) index (flushable))
 (defknown hash-table-test (hash-table) symbol (foldable flushable))
-(defknown sxhash (t) hash (foldable flushable))
-(defknown psxhash (t &optional t) hash (foldable flushable))
+(defknown sxhash (t) hash-code (foldable flushable))
+(defknown psxhash (t &optional t) hash-code (foldable flushable))
 (defknown hash-table-equalp (hash-table hash-table) boolean (foldable flushable))
 ;; To avoid emitting code to test for nil-function-returned
 (defknown (sb-impl::signal-corrupt-hash-table

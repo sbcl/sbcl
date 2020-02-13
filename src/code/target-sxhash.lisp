@@ -127,7 +127,7 @@
 ;;;; the SXHASH function
 
 ;; simple cases
-(declaim (ftype (sfunction (integer) hash) sxhash-bignum))
+(declaim (ftype (sfunction (integer) hash-code) sxhash-bignum))
 
 (defun new-instance-hash-code ()
   ;; ANSI SXHASH wants us to make a good-faith effort to produce

@@ -565,7 +565,7 @@ NOTE: This interface is experimental and subject to change."
          (line-type (let ((n (+ nargs nvalues)))
                       (if (<= n 3) 'cons `(simple-vector ,n))))
          (bind-hashval
-          `((,hashval (the (signed-byte #.sb-vm:n-fixnum-bits)
+          `((,hashval (the sb-xc:fixnum
                            (funcall ,hash-function ,@arg-vars)))
             (,cache ,var-name)))
          (probe-it
@@ -574,7 +574,7 @@ NOTE: This interface is experimental and subject to change."
                (let ((,hashval ,hashval) ; gets clobbered in probe loop
                      (,cache (truly-the ,cache-type ,cache)))
                  ;; FIXME: redundant?
-                 (declare (type (signed-byte #.sb-vm:n-fixnum-bits) ,hashval))
+                 (declare (type sb-xc:fixnum ,hashval))
                  (loop repeat 2
                     do (let ((,entry
                               (svref ,cache

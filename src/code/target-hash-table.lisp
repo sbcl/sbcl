@@ -122,7 +122,7 @@
 
 #-sb-fluid (declaim (inline eq-hash))
 (defun eq-hash (key)
-  (declare (values hash (member t nil)))
+  (declare (values fixnum (member t nil)))
   ;; I think it would be ok to pick off SYMBOL here and use its hash slot
   ;; as far as semantics are concerned, but EQ-hash is supposed to be
   ;; the lightest-weight in terms of speed, so I'm letting everything use
@@ -133,7 +133,7 @@
 
 #-sb-fluid (declaim (inline eql-hash))
 (defun eql-hash (key)
-  (declare (values hash (member t nil)))
+  (declare (values fixnum (member t nil)))
   (if (%other-pointer-subtype-p
        key
        ;; SYMBOL is listed here so that we can hash symbols address-insensitively.
@@ -164,7 +164,7 @@
 
 #-sb-fluid (declaim (inline equal-hash))
 (defun equal-hash (key)
-  (declare (values hash (member t nil)))
+  (declare (values fixnum (member t nil)))
   (typecase key
     ;; For some types the definition of EQUAL implies a special hash
     ((or string cons number bit-vector pathname)
@@ -183,7 +183,7 @@
      (eq-hash key))))
 
 (defun equalp-hash (key)
-  (declare (values hash (member t nil)))
+  (declare (values fixnum (member t nil)))
   (typecase key
     ;; Types requiring special treatment. Note that PATHNAME and
     ;; HASH-TABLE are caught by the STRUCTURE-OBJECT test.
@@ -213,7 +213,7 @@
   (truly-the index (logand mask hash)))
 (declaim (inline pointer-hash->bucket))
 (defun pointer-hash->bucket (hash mask)
-  (declare (type hash hash mask))
+  (declare (fixnum hash) (hash-code mask))
   (truly-the index (logand mask (prefuzz-hash hash))))
 
 ;;;; user-defined hash table tests
@@ -1030,7 +1030,7 @@ nnnn 1_    any       linear scan
      (with-pinned-objects (key)
        (binding* (,@(ht-hash-setup std-fn)
                   (eq-test ,(ht-probing-should-use-eq std-fn)))
-         (declare (hash hash0))
+         (declare (fixnum hash0))
          (flet ((hash-search (&aux ,@(ht-probe-setup std-fn))
                   (declare (index/2 index))
                   ;; Search next-vector chain for a matching key.
@@ -1188,7 +1188,7 @@ nnnn 1_    any       linear scan
                 (address-sensitive-p
                  (unless (logtest (hash-table-flags hash-table) hash-table-userfun-flag)
                    address-sensitive-p))
-                (hash (prefuzz-hash (the hash hash0))))
+                (hash (prefuzz-hash (the fixnum hash0))))
        ;; It would be ideal if we were consistent about all tables NOT having
        ;; synchronization unless created with ":SYNCHRONIZED T".
        ;; But removing the implicit synchronization from weak tables looks tricky
@@ -1379,7 +1379,7 @@ nnnn 1_    any       linear scan
                     ,@(ht-hash-setup std-fn)
                     ,@(ht-probe-setup std-fn)
                     (eq-test ,(ht-probing-should-use-eq std-fn)))
-           (declare (hash hash0) (index/2 index))
+           (declare (fixnum hash0) (index/2 index))
            ;; Search next-vector chain for a matching key.
            (if eq-test
                ;; TODO: consider unrolling a few times like in %GETHASH
@@ -1518,7 +1518,7 @@ nnnn 1_    any       linear scan
                   ,@(ht-hash-setup std-fn)
                   ,@(ht-probe-setup std-fn)
                   (eq-test ,(ht-probing-should-use-eq std-fn)))
-         (declare (hash hash0) (index/2 index) (ignore probe-limit))
+         (declare (fixnum hash0) (index/2 index) (ignore probe-limit))
          (block done
            (cond ((zerop index)) ; bucket is empty
                  (,(ht-key-compare std-fn 'index)
