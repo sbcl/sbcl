@@ -2728,7 +2728,7 @@
            (compiled
             (compile nil `(lambda (dstate chunk)
                             (let ((chunk (truly-the dchunk chunk))
-                                  (dstate (truly-the dstate dstate)))
+                                  (dstate (truly-the disassem-state dstate)))
                               (declare (ignorable chunk))
                               (setf ,@actions))))))
       (push (cons repr compiled) (cdr (assq :prefilter cache)))
