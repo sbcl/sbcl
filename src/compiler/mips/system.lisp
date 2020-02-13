@@ -126,10 +126,11 @@
   (:translate pointer-hash)
   (:args (ptr :scs (any-reg descriptor-reg)))
   (:results (res :scs (any-reg descriptor-reg)))
+  (:temporary (:scs (non-descriptor-reg)) temp)
   (:policy :fast-safe)
   (:generator 1
-    (inst sll res ptr n-fixnum-tag-bits)
-    (inst srl res res n-fixnum-tag-bits)))
+    (inst li temp (lognot fixnum-tag-mask))
+    (inst and res ptr temp)))
 
 
 ;;;; Allocation

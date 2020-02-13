@@ -19,9 +19,12 @@
              `(combine-directives
                (%tokenize-control-string string 0 (length string) nil)
                t)))
-  #+sb-xc-host
+  ;; MIPS: What is this I can't even.  There are so many things going wrong
+  ;; and one of them is pointer-hash, and despite the fix to it, the format cache
+  ;; is still getting corrupted, and so you can't print anything to help debug.
+  #+(or sb-xc-host mips)
   (defun tokenize-control-string (string) (compute-it))
-  #-sb-xc-host
+  #-(or sb-xc-host mips)
   (defun-cached (tokenize-control-string
                  :memoizer memoize
                  :hash-bits 7
