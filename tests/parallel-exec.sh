@@ -86,8 +86,11 @@ TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl
                                   (make-broadcast-stream)))
                    (with-open-file (output (format nil "$logdir/~a.vop-usage" file)
                                            :direction :output)
-                     (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
-                       (format output "~7d ~s~%" count name)))
+                     ;; There's an impure test that screws with the default pprint dispatch
+                     ;; table such that integers don't print normally (and can't be parsed).
+                     (let ((*print-pretty* nil))
+                       (sb-int:dohash ((name count) sb-c::*static-vop-usage-counts*)
+                         (format output "~7d ~s~%" count name))))
                    (exit :code (if (unexpected-failures) 1 104)))))
           (format t "~A: pid ~d~%" file pid)
           (incf subprocess-count)
