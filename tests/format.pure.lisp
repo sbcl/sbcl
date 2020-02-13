@@ -130,7 +130,8 @@
   ;; CLEAR-OUTPUT should work, but doesn't
   (file-position string-stream 0))
 
-(with-test (:name :cached-tokenized-string)
+(with-test (:name :cached-tokenized-string
+            :skipped-on :interpreter)
   (let ((stream (make-string-output-stream)))
     (ctu:assert-no-consing (format-to-string-stream 45678 stream))))
 

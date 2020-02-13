@@ -15,22 +15,26 @@
 ;;; control string in a loop, not to avoid re-tokenizing all strings that
 ;;; happen to be STRING= to that string.
 ;;; (Might we want to bypass the cache when compile-time tokenizing?)
-(macrolet ((compute-it ()
-             `(combine-directives
-               (%tokenize-control-string string 0 (length string) nil)
-               t)))
-  ;; MIPS: What is this I can't even.  There are so many things going wrong
-  ;; and one of them is pointer-hash, and despite the fix to it, the format cache
-  ;; is still getting corrupted, and so you can't print anything to help debug.
-  #+(or sb-xc-host mips)
-  (defun tokenize-control-string (string) (compute-it))
-  #-(or sb-xc-host mips)
-  (defun-cached (tokenize-control-string
-                 :memoizer memoize
-                 :hash-bits 7
-                 :hash-function #'pointer-hash)
-      ((string eq))
-    (declare (simple-string string))
+
+;; MIPS: What is this I can't even.  There are so many things going wrong
+;; and one of them is pointer-hash, and despite the fix to it, the format cache
+;; is still getting corrupted, and so you can't print anything to help debug.
+#+(or sb-xc-host mips)
+(defun tokenize-control-string (string)
+  (combine-directives
+   (%tokenize-control-string string 0 (length string) nil)
+   t))
+#-(or sb-xc-host mips)
+(defun-cached (tokenize-control-string
+               :memoizer memoize
+               :hash-bits 7
+               :hash-function #'pointer-hash)
+              ((string eq))
+  (declare (simple-string string))
+  (macrolet ((compute-it ()
+               `(combine-directives
+                 (%tokenize-control-string string 0 (length string) nil)
+                 t)))
     (if (logtest (get-header-data string)
                  ;; shareable = readonly
                  (logior sb-vm:+vector-shareable+
