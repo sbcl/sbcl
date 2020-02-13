@@ -2244,9 +2244,9 @@ lisp_memory_fault_error(os_context_t *context, os_vm_address_t addr)
     fake_foreign_function_call(context);
 
     /* To allow debugging memory faults in signal handlers and such. */
+#ifdef ARCH_HAS_STACK_POINTER
     char* pc = (char*)*os_context_pc_addr(context);
     struct code* code = (struct code*)component_ptr_from_pc(pc);
-#ifdef ARCH_HAS_STACK_POINTER
     unsigned int offset = code ? pc - (char*)code : 0;
     if (offset)
         corruption_warning_and_maybe_lose(
