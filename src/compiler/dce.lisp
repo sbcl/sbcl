@@ -76,7 +76,20 @@
           ;; Tail call the last block
           return (dce-analyze-block succ))))
 
+(defun dce-analyze-optional-dispatch (optional-dispatch)
+  (flet ((analyze (fun)
+           (when (and fun
+                      (not (memq (functional-kind fun) '(:deleted :zombie))))
+             (dce-analyze-one-fun fun))))
+    (loop for fun in (optional-dispatch-entry-points optional-dispatch)
+          do (analyze (and (promise-ready-p fun)
+                           (force fun))))
+    (analyze (optional-dispatch-more-entry optional-dispatch))))
+
 (defun dce-analyze-one-fun (clambda)
+  (when (and (eq (functional-kind clambda) :external)
+             (optional-dispatch-p (functional-entry-fun clambda)))
+    (dce-analyze-optional-dispatch (functional-entry-fun clambda)))
   (dce-analyze-block
    (node-block
     (lambda-bind clambda))))

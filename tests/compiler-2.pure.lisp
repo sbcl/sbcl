@@ -2775,5 +2775,20 @@
                                  (z
                                   (return-from f (+ (dotimes (i 0 0)) p))))
                              p))))))
-               p))
+           p))
     (() 0)))
+
+(with-test (:name :dce-through-optional-dispatch)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (flet ((z (&optional a)
+                  (declare (ignore a))
+                  123))
+           (let ((z #'z))
+             (when x
+               (unless x
+                 (setf z 10)))
+                   (funcall z))))
+    ((nil) 123)
+    ((t) 123)))
