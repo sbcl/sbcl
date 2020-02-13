@@ -794,7 +794,7 @@
   #'equalp)
 
 (define-instruction j (segment target)
-  (:declare (type (or tn fixup) target))
+  (:declare (type tn target))
   (:printer register ((op special-op) (rt 0) (rd 0) (funct #b001000))
             j-printer)
   (:printer jump ((op #b000010)) j-printer)
@@ -802,19 +802,11 @@
   (:dependencies (reads target))
   (:delay 1)
   (:emitter
-   (etypecase target
-     (tn
       (emit-register-inst segment special-op (reg-tn-encoding target)
-                          0 0 0 #b001000))
-     (fixup
-      (note-fixup segment :lui target)
-      (emit-immediate-inst segment #b001111 0 28 0)
-      (note-fixup segment :addi target)
-      (emit-immediate-inst segment #b001001 28 28 0)
-      (emit-register-inst segment special-op 28 0 0 0 #b001000)))))
+                          0 0 0 #b001000)))
 
 (define-instruction jal (segment reg-or-target &optional target)
-  (:declare (type (or null tn fixup) target)
+  (:declare (type (or null tn) target)
             (type (or tn fixup) reg-or-target))
   (:printer register ((op special-op) (rt 0) (funct #b001001)) j-printer)
   (:printer jump ((op #b000011)) j-printer)
@@ -831,17 +823,8 @@
    (unless target
      (setf target reg-or-target
            reg-or-target lip-tn))
-   (etypecase target
-     (tn
-      (emit-register-inst segment special-op (reg-tn-encoding target) 0
-                          (reg-tn-encoding reg-or-target) 0 #b001001))
-     (fixup
-      (note-fixup segment :lui target)
-      (emit-immediate-inst segment #b001111 0 28 0)
-      (note-fixup segment :addi target)
-      (emit-immediate-inst segment #b001001 28 28 0)
-      (emit-register-inst segment special-op 28 0
-                          (reg-tn-encoding reg-or-target) 0 #b001001)))))
+   (emit-register-inst segment special-op (reg-tn-encoding target) 0
+                       (reg-tn-encoding reg-or-target) 0 #b001001)))
 
 (define-instruction bc1f (segment target)
   (:declare (type label target))

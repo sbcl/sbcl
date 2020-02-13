@@ -142,7 +142,6 @@
   (:temporary (:scs (non-descriptor-reg)) type)
   (:results (result :scs (descriptor-reg)))
   (:generator 38
-    (let ((normal-fn (gen-label)))
       (load-type type function (- fun-pointer-lowtag))
       (inst nop)
       (inst xor type simple-fun-widetag)
@@ -150,11 +149,20 @@
       (inst addu lip function
             (- (ash simple-fun-insts-offset word-shift)
                fun-pointer-lowtag))
+      ;; XXX: it is questionable to load LIP with a value that is not an
+      ;; interior pointer relative to a boxed register. If there were any
+      ;; tagged pointer below LIP, then LIP might get "fixed" (i.e. ruined)
+      ;; by a GC if interrupted after this instruction. And it's even more
+      ;; questionable because 'li' is in fact two instructions.
+      ;; However, there are mitigating factors:
+      ;;   - there should be no boxed objects at a lower address.
+      ;;   - lack of thread support makes a GC interrupt somewhat unlikely,
+      ;;     (though any interrupt could call into lisp, also unlikely)
       (inst li lip (make-fixup 'closure-tramp :assembly-routine))
-      (emit-label normal-fn)
+    NORMAL-FN
       (storew lip fdefn fdefn-raw-addr-slot other-pointer-lowtag)
       (storew function fdefn fdefn-fun-slot other-pointer-lowtag)
-      (move result function))))
+      (move result function)))
 
 (define-vop (fdefn-makunbound)
   (:policy :fast-safe)

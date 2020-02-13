@@ -16,9 +16,10 @@
   (ecase style
     ((:raw :none)
      (values
-      `((inst jal (make-fixup ',name :assembly-routine))
+      `((inst li fixup (make-fixup ',name :assembly-routine))
+        (inst j fixup)
         (inst nop))
-      `()))
+      `((:temporary (:sc any-reg) fixup))))
     (:full-call
      (let ((temp (make-symbol "TEMP"))
            (nfp-save (make-symbol "NFP-SAVE"))
@@ -30,7 +31,8 @@
               (store-stack-tn ,nfp-save cur-nfp))
             (inst compute-lra-from-code ,lra code-tn lra-label ,temp)
             (note-next-instruction ,vop :call-site)
-            (inst j (make-fixup ',name :assembly-routine))
+            (inst li fixup (make-fixup ',name :assembly-routine))
+            (inst j fixup)
             (inst nop)
             (without-scheduling ()
               (emit-return-pc lra-label)
@@ -48,6 +50,7 @@
                       ,lra)
           (:temporary (:scs (control-stack) :offset nfp-save-offset)
                       ,nfp-save)
+          (:temporary (:sc any-reg) fixup)
           (:save-p t)))))))
 
 (defun generate-return-sequence (style)

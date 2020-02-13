@@ -872,6 +872,7 @@ default-value-8
   (:temporary (:sc any-reg :offset lexenv-offset :from (:argument 1)) lexenv)
   (:temporary (:sc any-reg :offset ocfp-offset :from (:argument 2)) ocfp)
   (:temporary (:sc any-reg :offset lra-offset :from (:argument 3)) lra)
+  (:temporary (:sc any-reg :offset nl3-offset) temp)
 
   (:vop-var vop)
 
@@ -885,7 +886,8 @@ default-value-8
 
     ;; Clear the number stack if anything is there and jump to the
     ;; assembly-routine that does the bliting.
-    (inst j (make-fixup 'tail-call-variable :assembly-routine))
+    (inst li temp (make-fixup 'tail-call-variable :assembly-routine))
+    (inst j temp)
     (let ((cur-nfp (current-nfp-tn vop)))
       (if cur-nfp
         (inst addu nsp-tn cur-nfp
@@ -989,12 +991,12 @@ default-value-8
   (:temporary (:sc any-reg :offset nl0-offset :from (:argument 2)) vals)
   (:temporary (:sc any-reg :offset nargs-offset :from (:argument 3)) nvals)
   (:temporary (:sc descriptor-reg :offset a0-offset) a0)
+  (:temporary (:sc any-reg :offset nl3-offset) temp)
   (:temporary (:scs (interior-reg)) lip)
 
   (:vop-var vop)
 
   (:generator 13
-    (let ((not-single (gen-label)))
       ;; Clear the number stack.
       (let ((cur-nfp (current-nfp-tn vop)))
         (when cur-nfp
@@ -1012,13 +1014,14 @@ default-value-8
       (lisp-return lra-arg lip :offset 2)
 
       ;; Nope, not the single case.
-      (emit-label not-single)
+    NOT-SINGLE
       (move ocfp ocfp-arg)
       (move lra lra-arg)
       (move vals vals-arg)
 
-      (inst j (make-fixup 'return-multiple :assembly-routine))
-      (emit-nop-or-move nvals nvals-arg))))
+      (inst li temp (make-fixup 'return-multiple :assembly-routine))
+      (inst j temp)
+      (emit-nop-or-move nvals nvals-arg)))
 
 ;;;; XEP hackery:
 

@@ -214,5 +214,6 @@
   (loadw catch catch catch-block-previous-catch-slot)
 
   EXIT
-  (inst j (make-fixup 'unwind :assembly-routine))
-  (emit-nop-or-move target catch))
+  (inst li target (make-fixup 'unwind :assembly-routine))
+  (inst j target)
+  (inst move target catch))

@@ -56,7 +56,7 @@
 #define t9 $25
 #define k0 $26
 #define k1 $27
-#define gp $28
+//#define gp $28
 #define sp $29
 #define s8 $30
 #define ra $31
@@ -120,8 +120,7 @@ symbol:
 	.mask	0xc0ff0000, -8
 	sw	ra, framesize-8(sp)
 	sw	s8, framesize-12(sp)
-	/* No .cprestore, we don't want automatic gp restauration. */
-	sw	gp, framesize-16(sp)
+	/* No .cprestore, we don't want automatic gp restoration. */
 	sw	s7, framesize-20(sp)
 	sw	s6, framesize-24(sp)
 	sw	s5, framesize-28(sp)
@@ -194,9 +193,6 @@ lra:	.word	RETURN_PC_WIDETAG
 
 	/* Single value return spot. */
 
-	/* Nested lisp -> C calls may have clobbered gp. */
-	lw	gp, framesize-16(sp)
-
 	/* Mark us as in C land. */
 	sw	reg_CSP, foreign_function_call_active
 
@@ -248,19 +244,6 @@ lra:	.word	RETURN_PC_WIDETAG
  * Transfering control from Lisp into C
  */
  	NESTED(call_into_c, 0, ra)
-	/* The C stack frame was already set up from lisp, and the
-	   argument registers as well. We have to fake the correct
-	   gp value for this function, though. */
-	.set	noreorder
-	/* reg_NL3 is AT. */
-	.set	noat
-	lui	gp, %hi(_gp_disp)
-	addiu	gp, %lo(_gp_disp)
-	lui	reg_NL3, %hi(call_into_c)
-	addiu	reg_NL3, %lo(call_into_c)
-	addu	gp, reg_NL3
-	.set	at
-	.set	reorder
 
 	/* Setup the lisp stack. */
 	move	reg_OCFP, reg_CFP
@@ -282,7 +265,6 @@ lra:	.word	RETURN_PC_WIDETAG
         sw      reg_OCFP, (reg_CFP)
 	sw	reg_NFP, 4(reg_CFP)
 	sw	reg_CODE, 8(reg_CFP)
-	sw	gp, 12(reg_CFP) // should this be saved? on the control stack?
 
 	/* Save LISP state. */
 	subu	reg_A0, reg_ALLOC, 1
@@ -301,8 +283,6 @@ lra:	.word	RETURN_PC_WIDETAG
 	/* Into C land we go. */
 	move    t9, reg_CFUNC		# reg_ALLOC
 	jalr	t9
-
-	lw	gp, 12(reg_CFP)
 
 	/* Pass 64bit return value to lisp land. */
 	move	reg_NL0, v0		# reg_CFUNC
