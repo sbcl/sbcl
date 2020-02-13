@@ -1,1 +1,1 @@
-:mips :unix :elf :linux :largefile :cheneygc :linkage-table :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :alien-callbacks :little-endian
+:mips :unix :elf :linux :largefile :cheneygc :linkage-table :sb-dynamic-core :stack-allocatable-closures :stack-allocatable-vectors :stack-allocatable-lists :stack-allocatable-fixed-objects :alien-callbacks :little-endian

@@ -683,7 +683,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
-    printf ' :cheneygc :linkage-table' >> $ltf
+    printf ' :cheneygc :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf

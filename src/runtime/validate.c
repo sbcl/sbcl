@@ -100,6 +100,13 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
       { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE },
       { STATIC_SPACE_START, STATIC_SPACE_SIZE },
 #ifdef LISP_FEATURE_LINKAGE_TABLE
+      // TODO: if the linkage table were placed just below static space (above
+      // readonly space) and linkage entries were allocated from the end of the
+      // space downward, then a good number of entries would be accessible relative
+      // to NIL which could avoid some extra instructions. This is relevant on
+      // load/store architectures where all calls to C are indirected through a
+      // call_into_c trampoline that first entails loading the address of
+      // that trampoline and then the address of the real callee.
       { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE },
 #endif
     };

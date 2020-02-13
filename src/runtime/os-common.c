@@ -189,6 +189,10 @@ void os_link_runtime()
 
         link_target += LINKAGE_TABLE_ENTRY_SIZE;
     }
+#ifdef CALL_INTO_C
+    extern long call_into_c();
+    SYMBOL(CALL_INTO_C)->value = (lispobj)call_into_c;
+#endif
 #ifdef BOXED_REGION
     SYMBOL(BOXED_REGION)->value = (lispobj)gc_alloc_region;
 #endif
@@ -197,6 +201,9 @@ void os_link_runtime()
 
 void os_unlink_runtime()
 {
+#ifdef CALL_INTO_C
+    SYMBOL(CALL_INTO_C)->value = UNBOUND_MARKER_WIDETAG;
+#endif
 #ifdef BOXED_REGION
     SYMBOL(BOXED_REGION)->value = UNBOUND_MARKER_WIDETAG;
 #endif

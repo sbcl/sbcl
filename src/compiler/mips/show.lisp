@@ -27,7 +27,7 @@
         (store-stack-tn nfp-save cur-nfp))
       (move nl0 object)
       (inst li cfunc (make-fixup "debug_print" :foreign))
-      (inst li tramp (make-fixup "call_into_c" :foreign))
+      (load-symbol-value tramp call-into-c)
       (inst jal tramp)
       (inst subu nsp-tn 16)
       (inst addu nsp-tn 16)

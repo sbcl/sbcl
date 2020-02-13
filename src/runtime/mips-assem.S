@@ -273,16 +273,25 @@ lra:	.word	RETURN_PC_WIDETAG
 	sw	reg_CSP, current_control_stack_pointer
 	sw	reg_CFP, current_control_frame_pointer
 
+	/* from the ABI: "When calling position independent functions
+	   $25 must cotain the address of the called function." */
+	lw	$25, (reg_CFUNC) /* sb-dynamic-core indirection */
+
 	/* Check for interrupt */
 	.set	noreorder
 	bgez	reg_NL4, 1f
+	/* Don't put the following 'subu' in the delay slot of the 'bgez'
+	 * because reg_ALLOC is $25 which now contains the callee address */
+	nop
 	subu	reg_ALLOC, 1
 	break	0x0, trap_PendingInterrupt
+	// load $25 again if 'bgez' was not taken (and reg_ALLOC was trashed)
+	lw	$25, (reg_CFUNC) /* sb-dynamic-core indirection */
+	nop
 1:	.set	reorder
 
 	/* Into C land we go. */
-	move    t9, reg_CFUNC		# reg_ALLOC
-	jalr	t9
+	jalr	$25
 
 	/* Pass 64bit return value to lisp land. */
 	move	reg_NL0, v0		# reg_CFUNC

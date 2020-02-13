@@ -103,7 +103,7 @@
 
   (defconstant linkage-table-space-start #x70000000)
   (defconstant linkage-table-space-end   #x71000000)
-  (defconstant linkage-table-entry-size 16)
+  (defconstant linkage-table-entry-size 4)
 
   ;; C stack grows downward from 0x80000000
   )
@@ -138,7 +138,9 @@
 ;;; space directly after the static symbols.  That way, the raw-addr
 ;;; can be loaded directly out of them by indirecting relative to NIL.
 (defconstant-eqx +static-symbols+
-  `#(,@+common-static-symbols+)
+  `#(,@+common-static-symbols+
+     ;; could turn this into a lisp asm routine probably
+     call-into-c)
   #'equalp)
 
 (defconstant-eqx +static-fdefns+
