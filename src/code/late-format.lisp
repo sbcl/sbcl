@@ -15,18 +15,25 @@
 ;;; control string in a loop, not to avoid re-tokenizing all strings that
 ;;; happen to be STRING= to that string.
 ;;; (Might we want to bypass the cache when compile-time tokenizing?)
-(defun-cached (tokenize-control-string
-               :hash-bits 7
-               :hash-function #+sb-xc-host
-                              (lambda (x) (declare (ignore x)) 1)
-                              #-sb-xc-host #'pointer-hash)
-    ;; Due to string mutability, the comparator is STRING=
-    ;; even though the hash is address-based.
-    ((string string=))
-  (declare (simple-string string))
-  (combine-directives
-   (%tokenize-control-string string 0 (length string) nil)
-   t))
+(macrolet ((compute-it ()
+             `(combine-directives
+               (%tokenize-control-string string 0 (length string) nil)
+               t)))
+  #+sb-xc-host
+  (defun tokenize-control-string (string) (compute-it))
+  #-sb-xc-host
+  (defun-cached (tokenize-control-string
+                 :memoizer memoize
+                 :hash-bits 7
+                 :hash-function #'pointer-hash)
+      ((string eq))
+    (declare (simple-string string))
+    (if (logtest (get-header-data string)
+                 ;; shareable = readonly
+                 (logior sb-vm:+vector-shareable+
+                         sb-vm:+vector-shareable-nonstd+))
+        (memoize (compute-it))
+        (compute-it))))
 
 ;;; If at some point I can figure out how to *CORRECTLY* utilize
 ;;; non-simple strings, then the INDEX and END will bound the parse.
