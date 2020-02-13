@@ -92,11 +92,13 @@
 (define-arg-type reg
   :printer
   (lambda (value stream dstate)
-    (declare (type stream stream) (fixnum value))
     (let ((regname (aref reg-symbols value)))
-      (princ regname stream)
-      (maybe-note-associated-storage-ref value 'registers regname dstate)
-      (maybe-add-notes value dstate))))
+      (cond (stream
+             (princ regname stream)
+             (maybe-note-associated-storage-ref value 'registers regname dstate)
+             (maybe-add-notes value dstate))
+            (t
+             (operand regname dstate))))))
 
 (defparameter float-reg-symbols
   #.(coerce
@@ -105,14 +107,13 @@
 
 (define-arg-type fp-reg
   :printer #'(lambda (value stream dstate)
-               (declare (type stream stream) (fixnum value))
                (let ((regname (aref float-reg-symbols value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value
-                  'float-registers
-                  regname
-                  dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'float-registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (define-arg-type ds-field
   :prefilter (lambda (dstate value)
@@ -128,10 +129,10 @@
 
 (define-arg-type bo-field
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (type stream stream)
-                        (type fixnum value))
-               (princ (svref bo-kind-names value) stream)))
+               (let ((thing (svref bo-kind-names value)))
+                 (if stream
+                     (princ thing stream)
+                     (operand thing dstate)))))
 
 (define-compiler-macro valid-bo-encoding (&whole form enc)
   (declare (notinline valid-bo-encoding))
@@ -179,22 +180,25 @@
 
 (define-arg-type bi-field
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (type stream stream)
-                        (type (unsigned-byte 5) value))
+               (declare (type (unsigned-byte 5) value))
                (let* ((bitname (svref cr-bit-names (logand 3 value)))
                       (crfield (ash value -2)))
                  (declare (type (unsigned-byte 3) crfield))
-                 (if (= crfield 0)
-                   (princ bitname stream)
-                   (princ (list (svref cr-field-names crfield) bitname) stream)))))
+                 (let ((operand
+                         (if (= crfield 0)
+                             bitname
+                             (list (svref cr-field-names crfield) bitname))))
+                   (if stream
+                       (princ operand stream)
+                       (operand operand dstate))))))
 
 (define-arg-type crf
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (type stream stream)
-                        (type (unsigned-byte 3) value))
-               (princ (svref cr-field-names value) stream)))
+               (declare (type (unsigned-byte 3) value))
+               (let ((operand (svref cr-field-names value)))
+                 (if stream
+                     (princ operand stream)
+                     (operand operand dstate)))))
 
 (define-arg-type relative-label
   :sign-extend t
@@ -217,12 +221,12 @@
 (define-arg-type to-field
   :sign-extend nil
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (type stream stream)
-                        (type fixnum value))
-               (princ (or (car (rassoc value trap-values-alist))
-                          value)
-                      stream)))
+               (declare (type fixnum value))
+               (let ((operand (or (car (rassoc value trap-values-alist))
+                                  value)))
+                 (if stream
+                     (princ operand stream)
+                     (operand operand dstate)))))
 
 (defun emit-conditional-branch (segment bo bi target &optional aa-p lk-p)
   (declare (type boolean aa-p lk-p))
@@ -287,19 +291,21 @@
 
 (define-arg-type spr
   :printer #'(lambda (value stream dstate)
-               (declare (ignore dstate)
-                        (type (unsigned-byte 10) value))
-               (let* ((name (car (rassoc value +spr-numbers-alist+))))
-                   (if name
-                     (princ name stream)
-                     (princ value stream)))))
+               (declare (type (unsigned-byte 10) value))
+               (let* ((name (car (rassoc value +spr-numbers-alist+)))
+                      (operand (or name value)))
+                 (if stream
+                     (princ operand stream)
+                     (operand operand dstate)))))
 
 #-sb-xc-host ; no definition of MAYBE-NOTE-ASSEMBLER-ROUTINE
 (defparameter jump-printer
     #'(lambda (value stream dstate)
         (let ((addr (ash value 2)))
           (maybe-note-assembler-routine addr t dstate)
-          (write addr :base 16 :radix t :stream stream))))
+          (if stream
+              (write addr :base 16 :radix t :stream stream)
+              (operand addr dstate)))))
 
 
 
