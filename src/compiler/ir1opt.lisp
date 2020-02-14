@@ -752,6 +752,7 @@
            (when (and (lambda-var-p var)
                       ;; TODO: split the lambda if it has more than one var
                       (= (length (lambda-vars (lambda-var-home var))) 1)
+                      (eq (lambda-kind (lambda-var-home var)) :let)
                       (let-var-immediately-used-p ref var test)
                       ;; Rely on constraint propagation to determine
                       ;; that the var with the value of NIL is never
