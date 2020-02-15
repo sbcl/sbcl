@@ -21,13 +21,6 @@
 ;;; if necessary, until the cross-compiler's DEFTYPE machinery has been
 ;;; set up.
 
-;;; FIXME: This code was created by cut-and-paste from the
-;;; corresponding code for DEF!MACRO. DEF!TYPE and DEF!MACRO are
-;;; currently very parallel, and if we ever manage to rationalize the
-;;; use of UNCROSS in the cross-compiler, they should become
-;;; completely parallel, at which time they should be merged to
-;;; eliminate the duplicate code.
-
 (defmacro def!type (name &rest rest)
   ;; Attempting to define a type named by a CL symbol is an error.
   ;; Therefore NAME is wrong if it uncrosses to something other than itself.
