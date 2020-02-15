@@ -2975,3 +2975,26 @@
         (assert (search "bad thing to be" (get-output-stream-string error-stream)))
         (load fasl)
         (assert (eq (zook) 'hi))))))
+
+(with-test (:name :block-compile)
+  (with-scratch-file (fasl "fasl")
+    (compile-file "block-compile-test.lisp" :output-file fasl :block-compile t)
+    (load fasl)
+    ;; Make sure the defuns all get compiled into the same code
+    ;; component.
+    (assert (and (eq (sb-kernel::fun-code-header #'baz2)
+                     (sb-kernel::fun-code-header #'bar2))
+                 (eq (sb-kernel::fun-code-header #'baz2)
+                     (sb-kernel::fun-code-header #'foo2))))))
+
+(with-test (:name (:block-compile :entry-point))
+  (with-scratch-file (fasl "fasl")
+    (compile-file "block-compile-test-2.lisp" :output-file fasl :block-compile t :entry-points '(foo1))
+    (load fasl)
+    ;; Ensure bar1 gets let-converted into FOO1 and disappears.
+    (assert (not (fboundp 'bar1)))
+    (assert (eql (foo1 10 1) 3628800))
+    (let ((code (sb-kernel::fun-code-header #'foo1)))
+      (assert (= (sb-kernel::code-n-entries code) 1))
+      (assert (eq (aref (sb-kernel::code-entry-points code) 0)
+                  #'foo1)))))
