@@ -22,7 +22,7 @@
       (if (fboundp s)
           (when (documentation s 'function)
             (incf n))))
-    (assert (= n 594))))
+    (assert (= n 595))))
 
 ;;;; tests of interface machinery
 
