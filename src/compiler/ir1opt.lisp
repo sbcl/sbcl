@@ -750,8 +750,7 @@
          (let* ((ref (lvar-uses test))
                 (var (ref-leaf ref)))
            (when (and (lambda-var-p var)
-                      ;; TODO: split the lambda if it has more than one var
-                      (= (length (lambda-vars (lambda-var-home var))) 1)
+                      (not (lambda-var-specvar var))
                       (eq (lambda-kind (lambda-var-home var)) :let)
                       (let-var-immediately-used-p ref var test)
                       ;; Rely on constraint propagation to determine
@@ -760,7 +759,7 @@
                       ;; Otherwise would need to check if
                       ;; if-consequent is dominating the remaining references
                       (loop with null-type = (specifier-type 'null)
-                            for other-ref in (lambda-var-refs var)
+                            for other-ref in (leaf-refs var)
                             for lvar = (node-lvar other-ref)
                             always (or (eq other-ref ref)
                                        (not (types-equal-or-intersect (single-value-type (node-derived-type other-ref))
@@ -771,7 +770,9 @@
                                               (pushnew node (lvar-dependent-nodes lvar)
                                                        :test #'eq))
                                          nil))))
-             (let ((lvar (lambda-var-ref-lvar ref)))
+             (let* ((lvar (lambda-var-ref-lvar ref))
+                    (lambda (lambda-var-home var))
+                    (good-lambda-shape (= (length (lambda-vars lambda)) 1)))
                (when (and lvar
                           (listp (lvar-uses lvar)))
                  (do-uses (use lvar)
@@ -779,11 +780,76 @@
                      (when (and (immediately-used-p lvar use)
                                 (type= (single-value-type (node-derived-type use))
                                        (specifier-type 'null))
-                                (eq (block-last block) use))
+                                (eq (block-last block) use)
+                                (or good-lambda-shape
+                                    (setf good-lambda-shape (split-let var lambda))))
                        (change-block-successor block
                                                (car (block-succ block))
                                                (if-alternative node))
                        (delete-lvar-use use)))))))))))
+
+;;; Split the last variable into a separate lambda.
+(defun split-let (var original-lambda)
+  (let* ((ref (car (leaf-refs original-lambda)))
+         (call (and ref
+                    (node-lvar ref)
+                    (lvar-dest (node-lvar ref))))
+         (vars (lambda-vars original-lambda)))
+    (when (and call
+               (eq var (car (last vars)))
+               (notany #'lambda-var-specvar vars))
+      (or (= (count-if #'identity (combination-args call)) 1)
+          (with-ir1-environment-from-node call
+            (let* ((penultimate (lvar-uses (car (last (combination-args call) 2))))
+                   (penultimate (if (consp penultimate)
+                                    (car penultimate)
+                                    penultimate))
+                   (next-block (or (node-ends-block penultimate)
+                                   (car (block-succ (node-block penultimate)))))
+                   (ctran (make-ctran))
+                   (new-block (make-block-key :start ctran
+                                              :pred (block-pred next-block)
+                                              :succ (list next-block)))
+                   (bind (make-bind))
+                   (vars (butlast vars))
+                   (lambda (make-lambda :vars vars
+                                        :kind :let
+                                        :bind bind
+                                        :home (lambda-home original-lambda)
+                                        :%source-name 'split
+                                        :%debug-name `(split ,(lambda-%debug-name original-lambda))))
+                   (ref (make-ref lambda))
+                   (args (butlast (combination-args call))))
+              (push lambda (lambda-lets (lambda-home original-lambda)))
+              (push ref (lambda-refs lambda))
+              (setf (combination-args call) (last (combination-args call)))
+              (setf (lambda-vars original-lambda) (last (lambda-vars original-lambda))
+                    (lambda-tail-set lambda) (make-tail-set :funs (list lambda)))
+              (setf (bind-lambda bind) lambda)
+              (loop for var in vars
+                    do (setf (lambda-var-home var) lambda))
+              (setf (ctran-block ctran) new-block)
+              (loop for pred in (block-pred next-block)
+                    do (setf (block-succ pred)
+                             (list new-block)))
+              (setf (block-last new-block) bind)
+              (setf (block-pred next-block) (list new-block))
+              (add-to-dfo new-block (block-prev next-block))
+              (link-node-to-previous-ctran bind ctran)
+              (let* ((lambda-lvar (make-lvar))
+                     (call (make-combination lambda-lvar)))
+                (setf (node-reoptimize call) nil
+                      (node-reoptimize ref) nil)
+                (use-lvar ref lambda-lvar)
+                (setf (lvar-dest lambda-lvar) call)
+                (insert-node-before-no-split bind call)
+                (setf (combination-kind call) :local
+                      (combination-args call) args)
+                (loop for arg in args
+                      when arg
+                      do (setf (lvar-dest arg) call))
+                (insert-node-before-no-split call ref))
+              t))))))
 
 ;; Finally, duplicate EQ-nil tests
 (defun duplicate-if-if-1 (node test block)
