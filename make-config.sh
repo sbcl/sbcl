@@ -512,7 +512,7 @@ case "$sbcl_os" in
         link_or_copy hpux-os.h target-os.h
         ;;
     haiku)
-        printf ' :unix :elf :haiku :sb-dynamic-core' >> $ltf
+        printf ' :unix :elf :haiku' >> $ltf
         link_or_copy Config.$sbcl_arch-haiku Config
         link_or_copy $sbcl_arch-haiku-os.h target-arch-os.h
         link_or_copy haiku-os.h target-os.h
@@ -611,7 +611,7 @@ case "$sbcl_os" in
         #
         # (Of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless:)
-        printf ' :sb-dynamic-core :os-provides-dlopen' >> $ltf
+        printf ' :os-provides-dlopen' >> $ltf
         printf ' :sb-thread :sb-safepoint :sb-thruption :sb-wtimer' >> $ltf
         printf ' :sb-safepoint-strictly' >> $ltf
         #
@@ -657,7 +657,7 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :fp-and-pc-standard-save' >> $ltf
     case "$sbcl_os" in
     linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
-        printf ' :linkage-table' >> $ltf
+        printf ' :linkage-table :sb-dynamic-core' >> $ltf
     esac
     if [ "$sbcl_os" = "win32" ]; then
         # of course it doesn't provide dlopen, but there is
@@ -669,7 +669,8 @@ if [ "$sbcl_arch" = "x86" ]; then
         sh tools-for-build/openbsd-sigcontext.sh > src/runtime/openbsd-sigcontext.h
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
-    printf ' :64-bit :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack :linkage-table' >> $ltf
+    printf ' :64-bit :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
+    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf

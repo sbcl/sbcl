@@ -358,6 +358,7 @@ GNAME(funcall1_switching_stack):
 	
 	.align	align_16byte,0x90
 GNAME(call_into_lisp_first_time):
+GNAME(lspmain):
 	pushl	%ebp		# Save old frame pointer.
 	movl	%esp,%ebp	# Establish new frame.
 #ifndef LISP_FEATURE_WIN32
@@ -694,9 +695,15 @@ DEFINE_ALLOC_TO_REG(alloc_16_to_edi,%edi,$16)
 #ifdef LISP_FEATURE_SB_THREAD
 #define START_REGION %fs:THREAD_ALLOC_REGION_OFFSET
 #else
-#define START_REGION GNAME(gc_alloc_region)
+#define START_REGION (8+STATIC_SPACE_START)
 #endif
 
+/* FIXME: there's no reason these can't be lisp assembler routines.
+ * Currently, because they aren't, there's a KLUDGE in genesis to change
+ * the #define for STATIC_SPACE_START solely because of a discrepancy
+ * in C syntax versus what the assembler accepts.
+ * Whoever fixes this to use the lisp assembler should remove
+ * the corresponding KLUDGE */
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_WIN32)
 #define ALLOC_OVERFLOW(size,scratch)				\
 	movl SBCL_THREAD_BASE_EA, scratch;			\

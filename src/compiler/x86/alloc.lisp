@@ -78,9 +78,8 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes thread-alloc-region-slot)
-                    ;; not a foreign-dataref because we don't support
-                    ;; dynamic core + no threads.
-                    #-sb-thread (make-fixup "gc_alloc_region" :foreign)))
+                    #-sb-thread (+ static-space-start
+                                   (ash vector-data-offset word-shift))))
          (end-addr
             ;; thread->alloc_region.end_addr
            (make-ea :dword
@@ -88,7 +87,8 @@
                               scratch-tn)
                     :disp
                     #+sb-thread (* n-word-bytes (1+ thread-alloc-region-slot))
-                    #-sb-thread (make-fixup "gc_alloc_region" :foreign 4))))
+                    #-sb-thread (+ static-space-start
+                                   (ash (1+ vector-data-offset) word-shift)))))
     (unless (and (tn-p size) (location= alloc-tn size))
       (inst mov alloc-tn size))
     #+(and sb-thread win32)
@@ -151,9 +151,6 @@
   (cond
     (dynamic-extent
      (stack-allocation alloc-tn size lowtag))
-    ;; Inline allocation can't work if (and (not sb-thread) sb-dynamic-core)
-    ;; because boxed_region points to the linkage table, not the alloc region.
-    #+(or sb-thread (not sb-dynamic-core))
     ((or (null node) (policy node (>= speed space)))
      (allocation-inline alloc-tn size))
     (t
