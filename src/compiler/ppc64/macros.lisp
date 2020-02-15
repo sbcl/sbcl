@@ -215,21 +215,28 @@
     (inst ori result-tn result-tn lowtag)
     (return-from allocation))
 
-  (let ((imm-size (typep size '(unsigned-byte 15)))
-        (region (+ #+sb-thread (* thread-alloc-region-slot n-word-bytes))))
+  (binding* ((imm-size (typep size '(unsigned-byte 15)))
+             ((region-base-tn field-offset)
+               #-sb-thread (values thread-base-tn ; will be STATIC-SPACE-START
+                                   ;; skip over the array header
+                                   (* 2 n-word-bytes))
+               #+sb-thread (values thread-base-tn
+                                   (* thread-alloc-region-slot n-word-bytes))))
+
+    ;; use a spare register because of the usual problem that lw & sw only allow
+    ;; displacements that are a multiple of 4. Otherwise NULL-TN would do.
+    ;; STATIC-SPACE-START can be put into the register using exactly 1 instruction
+    ;; without referencing a code constant, whereas computing the actual base
+    ;; address of the struct would use an LIS + ORI.
+    #-sb-thread (inst lr thread-base-tn static-space-start)
 
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)
           (inst lr temp-tn size)
           (move temp-tn size)))
 
-    ;; thread-base-tn will point directly to the C variable if no thread
-    #-sb-thread
-    (progn (inst lr thread-base-tn (make-fixup "gc_alloc_region" :foreign-dataref))
-           (inst ld thread-base-tn thread-base-tn 0)) ; because sb-dynamic-core
-
-    (inst ld result-tn thread-base-tn region)
-    (inst ld flag-tn thread-base-tn (+ region n-word-bytes)) ; region->end_addr
+    (inst ld result-tn region-base-tn field-offset)
+    (inst ld flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
 
     (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
@@ -253,7 +260,7 @@
 
          ;; The C code depends on this instruction sequence taking up
          ;; one machine instruction.
-         (inst std result-tn thread-base-tn region))
+         (inst std result-tn region-base-tn field-offset))
 
        ;; Should the allocation trap above have fired, the runtime
        ;; arranges for execution to resume here, just after where we

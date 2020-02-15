@@ -1555,6 +1555,12 @@ core and return a descriptor to it."
 ;;; It might be nice to put NIL on a readonly page by itself to prevent unsafe
 ;;; code from destroying the world with (RPLACx nil 'kablooey)
 (defun make-nil-descriptor ()
+  ;; 8 words are placed prior to NIL to contain the 'struct alloc_region'.
+  ;; See also (DEFCONSTANT NIL-VALUE) in early-objdef.
+  #+(and gencgc (not sb-thread))
+  (allocate-vector #-64-bit sb-vm:simple-array-signed-byte-32-widetag
+                   #+64-bit sb-vm:simple-array-signed-byte-64-widetag
+                   6 6 *static*)
   (let* ((des (allocate-header+object *static* sb-vm:symbol-size 0))
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                      (* 2 sb-vm:n-word-bytes)
@@ -3169,10 +3175,7 @@ core and return a descriptor to it."
             (if *static*                ; if we ran GENESIS
               ;; We actually ran GENESIS, use the real value.
               (descriptor-bits (cold-intern symbol))
-              ;; We didn't run GENESIS, so guess at the address.
-              (+ sb-vm:static-space-start
-                 sb-vm:n-word-bytes
-                 sb-vm:other-pointer-lowtag
+              (+ sb-vm:nil-value
                  (if symbol (sb-vm:static-symbol-offset symbol) 0)))))
   #+sb-thread
   (dolist (binding sb-vm::!per-thread-c-interface-symbols)
@@ -3214,9 +3217,7 @@ core and return a descriptor to it."
               ;; We actually ran GENESIS, use the real value.
               (descriptor-bits (cold-fdefinition-object symbol))
               ;; We didn't run GENESIS, so guess at the address.
-              (+ sb-vm:static-space-start
-                 sb-vm:n-word-bytes
-                 sb-vm:other-pointer-lowtag
+              (+ sb-vm:nil-value
                  (* (length sb-vm:+static-symbols+)
                     (sb-vm:pad-data-block sb-vm:symbol-size))
                  (* index (sb-vm:pad-data-block sb-vm:fdefn-size)))))))

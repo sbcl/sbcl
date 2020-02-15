@@ -129,9 +129,6 @@
 ;; The space-register holding the C text segment.
 (defconstant c-text-space 4)
 
-;;; the X86 port defines *nil-value* as (+ *target-static-space-start* #xB)
-;;; here, but it seems to be the only port that needs to know the
-;;; location of NIL from lisp.
 
 ;;;; other miscellaneous constants
 

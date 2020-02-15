@@ -101,4 +101,9 @@ static inline enum prot_mode protection_mode(page_index_t page) {
 #endif
 }
 
+// FIXME: should be "#ifndef LISP_FEATURE_SB_THREAD" but not all platforms
+// have been converted to reference a 'struct alloc_region' in static space
+#if !defined LISP_FEATURE_SB_THREAD && (defined LISP_FEATURE_PPC||defined LISP_FEATURE_PPC64)
+#define SINGLE_THREAD_BOXED_REGION (struct alloc_region*)(STATIC_SPACE_START + 2*N_WORD_BYTES)
+#endif
 #endif /* _GENCGC_PRIVATE_H_ */

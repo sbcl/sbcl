@@ -3778,6 +3778,9 @@ collect_garbage(generation_index_t last_gen)
      *   in a unithread build.
      * So we need to close them for those two cases.
      */
+#ifdef SINGLE_THREAD_BOXED_REGION
+    ensure_region_closed(SINGLE_THREAD_BOXED_REGION, BOXED_PAGE_FLAG);
+#endif
     struct thread *th;
     for_each_thread(th) {
         ensure_region_closed(&th->alloc_region, BOXED_PAGE_FLAG);
@@ -4158,6 +4161,8 @@ alloc(sword_t nbytes)
     struct thread *thread = arch_os_get_current_thread();
 #ifdef LISP_FEATURE_SB_THREAD
     struct alloc_region *region = &thread->alloc_region;
+#elif defined SINGLE_THREAD_BOXED_REGION
+    struct alloc_region *region = SINGLE_THREAD_BOXED_REGION;
 #else
     struct alloc_region *region = &boxed_region;
 #endif
@@ -4448,6 +4453,9 @@ gc_and_save(char *filename, boolean prepend_runtime,
     prepare_for_final_gc();
     gencgc_alloc_start_page = 0;
     collect_garbage(HIGHEST_NORMAL_GENERATION+1);
+#ifdef SINGLE_THREAD_BOXED_REGION // clean up static-space object pre-save.
+    gc_init_region(SINGLE_THREAD_BOXED_REGION);
+#endif
     /* All global allocation regions should be empty */
     ASSERT_REGIONS_CLOSED();
     // Enforce (rather, warn for lack of) self-containedness of the heap

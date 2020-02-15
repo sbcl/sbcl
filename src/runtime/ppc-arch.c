@@ -463,14 +463,8 @@ handle_allocation_trap(os_context_t * context)
 
     undo_fake_foreign_function_call(context);
 
-    /* Skip the allocation trap (1 instruction) and the store of the
-     * updated free pointer back to the allocation region
-     * (1 or 2 instructions) for a total of 2 or 3 instructions */
-#if defined LISP_FEATURE_SB_THREAD || defined LISP_FEATURE_64_BIT
+    // Skip 2 instructions: the trap, and the writeback of free pointer
     (*os_context_pc_addr(context)) = (uword_t)(pc + 2);
-#else
-    (*os_context_pc_addr(context)) = (uword_t)(pc + 3);
-#endif
     return 1; // handled
 }
 #endif

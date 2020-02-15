@@ -2192,16 +2192,20 @@
 #+64-bit
 (defun %lr (reg value)
   (etypecase value
-    ((signed-byte 16)
-     (inst li reg value))
-    ((unsigned-byte 16)
-     (inst lhz reg code-tn (register-inline-constant value :halfword)))
-    ((signed-byte 32)
-     (inst lwa reg code-tn (register-inline-constant value :word)))
-    ((unsigned-byte 32)
-     (inst lwz reg code-tn (register-inline-constant value :word)))
-    ((or (signed-byte 64) (unsigned-byte 64))
-     (inst ld reg code-tn (register-inline-constant value :dword)))
+    (integer
+     (etypecase value
+       ((signed-byte 16)
+        (inst li reg value))
+       ((unsigned-byte 16)
+        (inst lhz reg code-tn (register-inline-constant value :halfword)))
+       ((signed-byte 32)
+        (if (not (logtest value #xFFFF))
+            (inst lis reg (ash value -16))
+            (inst lwa reg code-tn (register-inline-constant value :word))))
+       ((unsigned-byte 32)
+        (inst lwz reg code-tn (register-inline-constant value :word)))
+       ((or (signed-byte 64) (unsigned-byte 64))
+        (inst ld reg code-tn (register-inline-constant value :dword)))))
     (fixup
      (inst lis reg value)
      (inst addi reg reg value))))

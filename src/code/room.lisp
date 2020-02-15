@@ -439,14 +439,18 @@ We could try a few things to mitigate this:
        ;; Static space starts with NIL, which requires special
        ;; handling, as the header and alignment are slightly off.
        (multiple-value-bind (start end) (%space-bounds space)
+         (declare (ignore start))
          ;; This "8" is very magical. It happens to work for both
          ;; word sizes, even though symbols differ in length
          ;; (they can be either 6 or 7 words).
          (funcall fun nil symbol-widetag (* 8 n-word-bytes))
-         (map-objects-in-range fun
-                               (+ (ash (* 8 n-word-bytes) (- n-fixnum-tag-bits))
-                                  start)
-                               end)))
+         ;; more magic: go to the next object following NIL, which works
+         ;; regardless of whether there is an object before NIL.
+         (let ((start (+ (logandc2 sb-vm:nil-value sb-vm:lowtag-mask)
+                         (ash 6 sb-vm:word-shift))))
+           (map-objects-in-range fun
+                                 (ash start (- sb-vm:n-fixnum-tag-bits))
+                                 end))))
 
       ((:read-only #-gencgc :dynamic)
        ;; Read-only space (and dynamic space on cheneygc) is a block

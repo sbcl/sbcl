@@ -193,9 +193,6 @@ void os_link_runtime()
     extern long call_into_c();
     SYMBOL(CALL_INTO_C)->value = (lispobj)call_into_c;
 #endif
-#ifdef BOXED_REGION
-    SYMBOL(BOXED_REGION)->value = (lispobj)gc_alloc_region;
-#endif
 #endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
 }
 
@@ -203,9 +200,6 @@ void os_unlink_runtime()
 {
 #ifdef CALL_INTO_C
     SYMBOL(CALL_INTO_C)->value = UNBOUND_MARKER_WIDETAG;
-#endif
-#ifdef BOXED_REGION
-    SYMBOL(BOXED_REGION)->value = UNBOUND_MARKER_WIDETAG;
 #endif
 }
 

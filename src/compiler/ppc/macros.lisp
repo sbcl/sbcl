@@ -186,22 +186,23 @@
              (inst addi alloc-tn alloc-tn size)
              (inst add alloc-tn alloc-tn size)))
   #+gencgc
-  (let ((imm-size (typep size '(unsigned-byte 15))))
+  (binding*  ((imm-size (typep size '(unsigned-byte 15)))
+              ((region-base-tn field-offset)
+               #-sb-thread (values null-tn
+                                   (- (+ static-space-start
+                                         ;; skip over the array header
+                                         (* 2 n-word-bytes))
+                                      nil-value))
+               #+sb-thread (values thread-base-tn
+                                   (* thread-alloc-region-slot n-word-bytes))))
+
     (unless imm-size ; Make temp-tn be the size
       (if (numberp size)
           (inst lr temp-tn size)
           (move temp-tn size)))
 
-    #-sb-thread
-    (progn (load-symbol-value flag-tn boxed-region)
-           (inst lwz result-tn flag-tn 0) ; result <- region free pointer
-           (inst lwz flag-tn flag-tn 4))  ; flag <- region end
-
-    #+sb-thread
-    (progn (inst lwz result-tn thread-base-tn (* thread-alloc-region-slot
-                                                 n-word-bytes))
-           (inst lwz flag-tn thread-base-tn (* (1+ thread-alloc-region-slot)
-                                               n-word-bytes)))
+    (inst lwz result-tn region-base-tn field-offset)
+    (inst lwz flag-tn region-base-tn (+ field-offset n-word-bytes)) ; region->end_addr
 
     (without-scheduling ()
          ;; CAUTION: The C code depends on the exact order of
@@ -224,13 +225,8 @@
          (inst tw :lgt result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
-         ;; one machine instructions if #+sb-thread, or 2 instructions if not.
-         #-sb-thread
-         (progn (load-symbol-value flag-tn boxed-region)
-                (inst stw result-tn flag-tn 0))
-         #+sb-thread
-         (inst stw result-tn thread-base-tn (* thread-alloc-region-slot
-                                               n-word-bytes)))
+         ;; one machine instruction.
+         (inst stw result-tn region-base-tn field-offset))
 
        ;; Should the allocation trap above have fired, the runtime
        ;; arranges for execution to resume here, just after where we

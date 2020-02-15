@@ -86,7 +86,13 @@
     other-pointer-lowtag))
 
 (defconstant nil-value
-    (+ static-space-start n-word-bytes other-pointer-lowtag))
+    (+ static-space-start
+       ;; boxed_region precedes NIL
+       ;; 8 is the number of words to reserve at the beginning of static space
+       ;; prior to the words of NIL.
+       ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
+       #+(and gencgc (not sb-thread)) (ash 8 word-shift)
+       n-word-bytes other-pointer-lowtag))
 
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
