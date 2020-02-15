@@ -1059,11 +1059,7 @@
         ;; determining the direction of copying.
         (unless (= src-word dst-word)
           (give-up-ir1-transform))
-        ;; FIXME: The cross-compiler doesn't optimize TRUNCATE properly,
-        ;; so we have to do its work here.
-        `(let ((end (+ ,src-word ,(if (= n-elems-per-word 1)
-                                      'length
-                                      `(truncate (the index length) ,n-elems-per-word)))))
+        `(let ((end (+ ,src-word (truncate (the index length) ,n-elems-per-word))))
            (declare (type index end))
            ;; Handle any bits at the end.
            (when (logtest length (1- ,n-elems-per-word))
