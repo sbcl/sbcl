@@ -17,7 +17,7 @@ export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 run_sbcl --noinform <<EOF
-  #+(and sb-dynamic-core elf)
+  #+(and sb-dynamic-core elf sb-thread)
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
  (exit :code 2) ; otherwise
@@ -58,7 +58,7 @@ run_sbcl --noinform <<EOF
   (save-lisp-and-die "${tmpcore}")
 EOF
 
-m_arg=`run_sbcl_with_args --noinform --eval '(progn #+sb-core-compression (princ "-lz") #+x86 (princ "-m32"))' --quit`
+m_arg=`run_sbcl_with_args --noinform --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
 
 (cd $SBCL_PWD/../src/runtime ; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \
