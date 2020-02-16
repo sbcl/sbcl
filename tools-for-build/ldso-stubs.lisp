@@ -61,7 +61,7 @@ ldso_stub__~A: ;                                \\
   #-(or sparc hppa ppc64)
   (format stream "LDSO_STUBIFY(~A)~%" fct))
 
-(defvar *preludes* '("
+(defvar *preludes* (list "
 /* This is an automatically generated file, please do not hand-edit it.
  * See the program tools-for-build/ldso-stubs.lisp. */
 
@@ -95,15 +95,17 @@ ldso_stub__ ## fct:                   ; \\
 #endif
         .text"
 
-#+(and (or x86 x86-64) (not darwin)) "
+#+(and (or x86 x86-64) (not darwin))
+(format nil "
 #define LDSO_STUBIFY(fct)                       \\
         .align 16 ;                             \\
 .globl ldso_stub__ ## fct ;                     \\
         .type    ldso_stub__ ## fct,@function ; \\
 ldso_stub__ ## fct: ;                           \\
-        jmp fct ;                               \\
+        jmp fct~a ;                               \\
 .L ## fct ## e1: ;                              \\
         .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
+        (or #+(and x86-64 sb-dynamic-core (not win32)) "@PLT" ""))
 
 #+(and linux alpha) "
 #define LDSO_STUBIFY(fct)                       \\
