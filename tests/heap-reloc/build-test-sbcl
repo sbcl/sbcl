@@ -1,6 +1,6 @@
 (cd ../../src/runtime ; make -s libsbcl.a)
 
-m_arg=`../../run-sbcl.sh --noinform --eval '(progn #+sb-core-compression (princ "-lz") #+x86 (princ "-m32"))' --quit`
+m_arg=`../../run-sbcl.sh --noinform --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
 
 # Insert CFLAGS in case they contain -fsanitize=memory, for example.
 # Specify that some symbols are undefined so that the complete
