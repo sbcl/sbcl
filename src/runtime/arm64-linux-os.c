@@ -111,3 +111,10 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
         = (os_vm_address_t)(((uintptr_t) address) + length);
     __clear_cache(address, end_address);
 }
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+int _stat(const char *pathname, struct stat *sb) {return stat(pathname, sb); }
+int _lstat(const char *pathname, struct stat *sb) { return lstat(pathname, sb); }
+int _fstat(int fd, struct stat *sb) { return fstat(fd, sb); }

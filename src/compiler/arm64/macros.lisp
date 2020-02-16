@@ -223,8 +223,8 @@
                   size)
               #-sb-thread
               (progn
-                (load-inline-constant ,flag-tn '(:fixup "gc_alloc_region" :foreign) ,lip)
-                (inst ldp ,result-tn ,flag-tn (@ ,flag-tn)))
+                (load-immediate-word ,flag-tn static-space-start)
+                (inst ldp ,result-tn ,flag-tn (@ ,flag-tn (* 2 n-word-bytes))))
               #+sb-thread
               (inst ldp ,result-tn ,flag-tn (@ thread-tn
                                                (* n-word-bytes thread-alloc-region-slot)))
@@ -233,9 +233,8 @@
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
               #-sb-thread
-              (progn
-                (load-inline-constant ,flag-tn '(:fixup "gc_alloc_region" :foreign) ,lip)
-                (storew ,result-tn ,flag-tn))
+              (inst str ,result-tn (@ null-tn  (- (+ static-space-start (* 2 n-word-bytes))
+                                                  nil-value)))
               #+sb-thread
               (storew ,result-tn thread-tn thread-alloc-region-slot)
 
