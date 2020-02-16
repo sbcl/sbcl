@@ -17,7 +17,7 @@ export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
 run_sbcl --noinform <<EOF
-  #+sb-dynamic-core
+  #+(and sb-dynamic-core elf)
   (let ((s (find-symbol "IMMOBILE-SPACE-OBJ-P" "SB-KERNEL")))
     (when (and s (funcall s #'car)) (exit :code 0))) ; good
  (exit :code 2) ; otherwise
