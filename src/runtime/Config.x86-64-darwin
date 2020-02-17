@@ -39,7 +39,7 @@ ifdef LISP_FEATURE_SB_LINKABLE_RUNTIME
   USE_LIBSBCL = -Wl,-force_load libsbcl.a
 endif
 
-ASSEM_SRC = x86-64-assem.S ldso-stubs.S
+ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 
 LINKFLAGS += -arch x86_64 -dynamic -twolevel_namespace -bind_at_load -pagezero_size 0x100000

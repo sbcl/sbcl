@@ -13,7 +13,7 @@ CFLAGS += -m32
 LINKFLAGS += -rdynamic -m32
 NM = ./linux-nm
 
-ASSEM_SRC = ppc-assem.S ldso-stubs.S
+ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c
 
 OS_SRC = linux-os.c linux-mman.c ppc-linux-os.c

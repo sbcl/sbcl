@@ -112,6 +112,13 @@ os_flush_icache(os_vm_address_t address, os_vm_size_t length)
     __clear_cache(address, end_address);
 }
 
+// To avoid "Missing required foreign symbol" errors in os_link_runtime()
+// the executable must actually depend on libm. It would not require libm,
+// despite -lm in the link step, if there is no reference to a libm symbol
+// observable to the linker. Any one symbol suffices to resolve all of them.
+#include <math.h>
+const long libm_anchor = (long)acos;
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
