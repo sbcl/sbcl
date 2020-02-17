@@ -43,7 +43,7 @@ chmod u+x "${tmpcore}2"
 EOF
 status=$?
 rm "$tmpcore" "${tmpcore}2"
-if [ $status != 42 ]; then
+if [ $status -ne 42 ]; then
     echo "re-saved executable used wrong memory size options"
     exit 1
 fi

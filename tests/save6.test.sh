@@ -25,7 +25,7 @@ chmod u+x "$tmpcore"
 EOF
 status=$?
 rm "$tmpcore"
-if [ $status != 42 ]; then
+if [ $status -ne 42 ]; then
     echo "saving runtime options from executable failed"
     exit 1
 fi

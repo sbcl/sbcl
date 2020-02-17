@@ -29,7 +29,7 @@ run_sbcl <<EOF
         sb-impl::*sysinit-pathname-function* 'custom-sysinit-pathname)
   (save-lisp-and-die "$tmpcore")
 EOF
-if [ $? != 0 ]; then
+if [ $? -ne 0 ]; then
     echo "failure saving core"
     exit 1
 fi

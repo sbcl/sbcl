@@ -10,7 +10,7 @@ featurep() {
     bin="$1-test"
     rm -f $bin
     $GNUMAKE $bin -I ../src/runtime > /dev/null 2>&1 && echo "input" | ./$bin> /dev/null 2>&1
-    if [ "$?" = 104 ]
+    if [ "$?" -eq 104 ]
     then
         printf " :$1"
     fi
