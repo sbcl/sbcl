@@ -33,6 +33,6 @@ featurep os-provides-getprotoby-r
 
 featurep os-provides-poll
 
-if [ $sbcl_arch == arm ] ; then
+if [ "$sbcl_arch" = arm ] ; then
    featurep arm-softfp
 fi
