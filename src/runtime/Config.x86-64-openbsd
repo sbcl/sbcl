@@ -10,6 +10,14 @@
 # files for more information.
 
 include Config.x86-64-bsd
-include Config.generic-openbsd
+## FIXME: should have the following include, but it inserts no-pie
+## which I'm trying to avoid (because PIE executables work!)
+# include Config.generic-openbsd
 
-ASSEM_SRC += ldso-stubs.S
+LINKFLAGS += -Wl,-z,wxneeded
+OS_LIBS += -lutil
+
+ifdef LISP_FEATURE_SB_THREAD
+CFLAGS += -pthread -DOS_THREAD_STACK
+OS_LIBS += -pthread
+endif
