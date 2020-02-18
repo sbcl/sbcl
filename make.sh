@@ -24,7 +24,7 @@ export LANG LC_ALL
 # thing" when run on the target machine, with the minor caveat that
 # any --xc-host parameter should be suitable for the host machine
 # instead of the target.
-sh make-config.sh "$@" || exit $?
+sh make-config.sh --check-host-lisp "$@" || exit $?
 
 . output/prefix.def
 . output/build-config

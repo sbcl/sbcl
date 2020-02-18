@@ -38,7 +38,7 @@ WITH_FEATURES=""
 WITHOUT_FEATURES=""
 FANCY_FEATURES=":sb-core-compression :sb-xref-for-internals :sb-after-xc-core"
 
-perform_host_lisp_check=yes
+perform_host_lisp_check=no
 fancy=false
 some_options=false
 for option
@@ -94,8 +94,8 @@ do
         # Lower down we add :sb-thread for platforms where it can be built.
         fancy=true
         ;;
-      --no-host-lisp-check)
-        perform_host_lisp_check=no
+      --check-host-lisp)
+        perform_host_lisp_check=yes
         ;;
       -*)
         bad_option "Unknown command-line option to $0: \"$option\""

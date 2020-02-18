@@ -42,7 +42,7 @@ ENV=$3  # if you need to set SBCL_ARCH,CFLAGS,etc remotely
 set -ex
 
 ssh $ssh_port_opt $host cd $root \; $checkout '&&' \
-  $ENV sh make-config.sh $config_options --no-host-lisp-check '&&' \
+  $ENV sh make-config.sh $config_options '&&' \
   mv version.lisp-expr remote-version.lisp-expr
 scp $scp_port_opt $host:$root/{remote-version.lisp-expr,local-target-features.lisp-expr,output/build-id.inc} .
 mv build-id.inc output
