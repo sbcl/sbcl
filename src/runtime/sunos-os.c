@@ -23,7 +23,7 @@
 #endif
 
 #ifdef LISP_FEATURE_GENCGC
-#include "gencgc-internal.h"
+#include "gc-internal.h"
 #endif
 
 #ifdef LISP_FEATURE_SB_WTIMER

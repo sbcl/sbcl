@@ -19,7 +19,7 @@
 #include "target-arch.h"
 
 /* FIXME: Stolen from CMUCL. Investigate. */
-typedef unsigned long os_vm_address_t;
+typedef char* os_vm_address_t;
 typedef size_t os_vm_size_t;
 typedef off_t os_vm_offset_t;
 typedef int os_vm_prot_t;

@@ -195,7 +195,7 @@ static void cached_deallocate(char* mem, int zero_fill_length)
         os_deallocate(cached_alloc[line] - ALLOCATION_OVERHEAD,
                       usable_size(cached_alloc[line]) + ALLOCATION_OVERHEAD);
     }
-    bzero(mem, zero_fill_length);
+    memset(mem, 0, zero_fill_length);
     cached_alloc[line] = mem;
 }
 
@@ -382,7 +382,7 @@ void hopscotch_destroy(tableptr ht)
 void hopscotch_reset(tableptr ht)
 {
     if (need_to_zero(ht)) {
-        bzero(ht->keys, ht->mem_size);
+        memset(ht->keys, 0, ht->mem_size);
         ht->count = 0;
     }
     // If the size exceeds twice the final size from the prior run,

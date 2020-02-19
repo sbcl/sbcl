@@ -9,7 +9,7 @@ GREP = ggrep
 #CFLAGS = -xarch=generic64 -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENTRANT -fno-omit-frame-pointer
 #ASFLAGS = -xarch=generic64 -Wall
 
-ASSEM_SRC = x86-64-assem.S ldso-stubs.S
+ASSEM_SRC = x86-64-assem.S
 ARCH_SRC = x86-64-arch.c
 
 OS_SRC = sunos-os.c x86-64-sunos-os.c
