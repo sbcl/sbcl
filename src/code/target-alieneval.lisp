@@ -246,10 +246,10 @@ interpreted depends on TYPE:
 Examples:
 
   (defvar *foo* (make-alien (array char 10)))
-  (type-of *foo*)                 ; => (alien (* (array (signed 8) 10)))
-  (setf (deref (deref foo) 0) 10) ; => 10
+  (type-of *foo*)                   ; => (alien (* (array (signed 8) 10)))
+  (setf (deref (deref *foo*) 0) 10) ; => 10
 
-  (make-alien char 12)            ; => (alien (* (signed 8)))"
+  (make-alien char 12)              ; => (alien (* (signed 8)))"
   (let ((alien-type (if (alien-type-p type)
                         type
                         (parse-alien-type type env))))
