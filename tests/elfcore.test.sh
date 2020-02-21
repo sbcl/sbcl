@@ -58,7 +58,7 @@ run_sbcl --noinform <<EOF
   (save-lisp-and-die "${tmpcore}")
 EOF
 
-m_arg=`run_sbcl_with_args --noinform --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
+m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
 
 (cd $SBCL_PWD/../src/runtime ; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \
@@ -71,7 +71,7 @@ run_sbcl --script ../tools-for-build/editcore.lisp split \
   $TEST_DIRECTORY/elfcore-test-core.o \
   $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread ${m_arg}
 
-$TEST_DIRECTORY/elfcore-test --eval '(assert (zerop (f 1 2 3)))' --quit
+$TEST_DIRECTORY/elfcore-test $SBCL_ARGS --eval '(assert (zerop (f 1 2 3)))' --quit
 echo Custom core: PASS
 
 exit $EXIT_TEST_WIN

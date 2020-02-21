@@ -1,7 +1,8 @@
 (cd ../../src/runtime ; make -s libsbcl.a)
 
-m_arg=`../../run-sbcl.sh --noinform --eval '(progn #+x86 (princ " -m32"))' --quit`
-libs=`../../run-sbcl.sh --noinform --eval '(progn #+sb-core-compression (princ " -lz"))' --quit`
+lisp="../../run-sbcl.sh $SBCL_ARGS"
+m_arg=`$lisp --eval '(progn #+x86 (princ " -m32"))' --quit`
+libs=`$lisp --eval '(progn #+sb-core-compression (princ " -lz"))' --quit`
 
 # Insert CFLAGS in case they contain -fsanitize=memory, for example.
 # Specify that some symbols are undefined so that the complete
