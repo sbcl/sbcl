@@ -63,7 +63,8 @@
           for value = (if (= (widetag-of c) sb-vm:value-cell-widetag)
                           (value-cell-ref c)
                           c)
-          when (typep value type)
+          when (and (not (eql value 0)) ;; alignment zeros
+                    (typep value type))
           collect value)))
 
 (defun collect-consing-stats (thunk times)
