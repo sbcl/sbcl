@@ -223,7 +223,9 @@ echo "SBCL_TEST_HOST=\"$SBCL_XC_HOST\"" > output/build-config
 
 if [ $perform_host_lisp_check = yes ]
 then
-    if ! echo '(lisp-implementation-type)' | $SBCL_TEST_HOST; then
+    if echo '(lisp-implementation-type)' | $SBCL_TEST_HOST; then
+        :
+    else
         echo "No working host Common Lisp implementation."
         echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
         exit 1
@@ -442,7 +444,7 @@ case "$sbcl_os" in
         ;;
     openbsd)
         # openbsd 6.0 and newer restrict mmap of RWX pages
-        if [ $(uname -r | tr -d .) -gt 60 ]; then
+        if [ `uname -r | tr -d .` -gt 60 ]; then
             rm -f tools-for-build/mmap-rwx
             LDFLAGS="$LDFLAGS -Wl,-zwxneeded" $GNUMAKE -C tools-for-build mmap-rwx -I ../src/runtime
             if ! ./tools-for-build/mmap-rwx; then
