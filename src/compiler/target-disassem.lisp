@@ -2589,7 +2589,8 @@
     (note (lambda (s) (prin1 symbol s)) dstate)))
 
 (defun get-internal-error-name (errnum)
-  (cadr (svref sb-c:+backend-internal-errors+ errnum)))
+  (and (array-in-bounds-p sb-c:+backend-internal-errors+ errnum)
+       (cadr (svref sb-c:+backend-internal-errors+ errnum))))
 
 (defun get-random-tn-name (sc+offset)
   (let ((sc (sb-c:sc+offset-scn sc+offset))
@@ -2640,10 +2641,10 @@
                   (incf (dstate-cur-offs dstate) num)))
               (emit-note (note)
                 (when note
-                  (note note dstate))))
+                  (note (string note) dstate))))
          (when error-byte
            (emit-err-arg))
-         (emit-note (symbol-name (get-internal-error-name errnum)))
+         (emit-note (get-internal-error-name errnum))
          (dolist (sc+offset sc+offsets)
            (emit-err-arg)
            (if (= (sb-c:sc+offset-scn sc+offset) sb-vm:constant-sc-number)
