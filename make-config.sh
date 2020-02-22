@@ -223,7 +223,9 @@ echo "SBCL_TEST_HOST=\"$SBCL_XC_HOST\"" > output/build-config
 
 if [ $perform_host_lisp_check = yes ]
 then
-    if [ ! echo '(lisp-implementation-type)' | $SBCL_TEST_HOST ]; then
+    if echo '(lisp-implementation-type)' | $SBCL_TEST_HOST; then
+        :
+    else
         echo "No working host Common Lisp implementation."
         echo 'See ./INSTALL, the "SOURCE DISTRIBUTION" section'
         exit 1
