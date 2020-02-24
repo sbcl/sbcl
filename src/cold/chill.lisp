@@ -19,6 +19,8 @@
   (:use "CL"))
 (in-package "SB-COLD")
 
+(setq *features* (union *features* sb-impl:+internal-features+))
+
 (defstruct package-data name doc shadow export reexport import-from use)
 (export 'package-data)
 (dolist (data (with-open-file (f "package-data-list.lisp-expr") (read f)))
