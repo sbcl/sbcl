@@ -57,6 +57,8 @@
            "WHO-SPECIALIZES-GENERALLY"))
 
 (in-package :sb-introspect)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (system-package-p *package*) t))
 
 ;;;; Internal interface for SBCL debug info
 

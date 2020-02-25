@@ -136,6 +136,8 @@
    #:cs-open-for-target))
 
 (in-package "SB-CAPSTONE")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defun try-load-shared-object (pathname)
   (handler-case

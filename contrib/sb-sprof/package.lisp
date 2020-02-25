@@ -22,3 +22,5 @@
    #:*sample-interval* #:*max-samples* #:*alloc-interval*
    #:start-profiling #:stop-profiling #:with-profiling
    #:reset))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-SPROF")) t))

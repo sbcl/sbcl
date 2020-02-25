@@ -27,6 +27,8 @@
            ;; libc routines
            #:getenv #:strtod
            ))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-POSIX")) t))
 
 #+win32
 (sb-alien:load-shared-object "msvcrt.dll")

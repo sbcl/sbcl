@@ -15,6 +15,8 @@
            #:store-coverage-data))
 
 (in-package #:sb-cover)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defmacro code-coverage-hashtable () `(car sb-c:*code-coverage-info*))
 

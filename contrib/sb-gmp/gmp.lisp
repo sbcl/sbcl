@@ -56,6 +56,8 @@
    ))
 
 (in-package "SB-GMP")
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defvar *gmp-disabled* nil)
 

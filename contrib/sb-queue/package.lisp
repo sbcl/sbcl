@@ -23,3 +23,5 @@
    "QUEUE-EMPTY-P"
    "QUEUE-NAME"
    "QUEUEP"))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p (find-package "SB-QUEUE")) t))

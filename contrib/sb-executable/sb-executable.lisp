@@ -5,6 +5,8 @@
   )
 
 (cl:in-package :sb-executable)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defvar *stream-buffer-size* 8192)
 (defun copy-stream (from to &key (element-type (stream-element-type from) element-type-passed-p))

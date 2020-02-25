@@ -68,6 +68,8 @@
    #:md5sum-sequence #:md5sum-string #:md5sum-stream #:md5sum-file))
 
 (in-package sb-md5)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 #+cmu
 (eval-when (:compile-toplevel)

@@ -27,6 +27,8 @@
   (:documentation "The MIT regression tester"))
 
 (in-package :sb-rt)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setf (sb-int:system-package-p *package*) t))
 
 (defvar *test* nil "Current test name")
 (defvar *do-tests-when-defined* nil)
