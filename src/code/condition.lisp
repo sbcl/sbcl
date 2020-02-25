@@ -1539,7 +1539,9 @@ the usual naming convention (names like *FOO*) for special variables"
              (format stream "Undefined alien: ~S"
                      (undefined-alien-symbol warning)))))
 
-#+(or sb-eval sb-fasteval)
+;;; Formerly this was guarded by "#+(or sb-eval sb-fasteval)", but
+;;; why would someone build with no interpreter? And if they did,
+;;; would they really care that one extra condition definition exists?
 (define-condition lexical-environment-too-complex (style-warning)
   ((form :initarg :form :reader lexical-environment-too-complex-form)
    (lexenv :initarg :lexenv :reader lexical-environment-too-complex-lexenv))

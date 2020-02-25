@@ -4941,7 +4941,7 @@ This can help you produce more deterministic output for FASLs."))
      #+sbcl
      '(sb-c::simple-compiler-note
        "&OPTIONAL and &KEY found in the same lambda list: ~S"
-       #+sb-eval sb-kernel:lexical-environment-too-complex
+       sb-kernel:lexical-environment-too-complex
        sb-kernel:undefined-alien-style-warning
        sb-grovel-unknown-constant-condition ; defined above.
        sb-ext:implicit-generic-function-warning ;; Controversial.
