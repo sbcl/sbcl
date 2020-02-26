@@ -89,11 +89,11 @@
   ;; dynamic-space-free-pointer increments only when a page is full.
   ;; Using boxed_region directly is finer-grained.
   #+(and (not sb-thread) gencgc)
-  (progn #+(or x86 x86-64 ppc ppc64) ; new way: alloc_region is in static space
+  (progn #+(or arm arm64 x86 x86-64 ppc ppc64) ; new way: alloc_region is in static space
          (ash (sb-sys:sap-ref-word (sb-sys:int-sap sb-vm:static-space-start)
                                    (* 2 sb-vm:n-word-bytes))
               (- (1+ sb-vm:word-shift)))
-         #-(or x86 x86-64 ppc ppc64) ; old way: alloc_region is in C data
+         #-(or arm arm64 x86 x86-64 ppc ppc64) ; old way: alloc_region is in C data
          (ash (extern-alien "gc_alloc_region" unsigned-long)
               (- (1+ sb-vm:word-shift))))
   ;; threads imply gencgc. use the per-thread alloc region pointer

@@ -328,6 +328,8 @@ alloc_tramp:
         add     r6, r4, #8*4
         str     r6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
 
+	@@ The following comment is misleading: GC won't need to see
+	@@ anything when we're pseudo-atomic.
         @@ Create a new frame and save descriptor regs on the stack
 	@@ for the GC to see.
         str     reg_CFP, [r4, #0]

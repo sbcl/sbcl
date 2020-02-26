@@ -201,20 +201,20 @@
 
 #+gencgc
 (defun allocation-tramp (alloc-tn size back-label)
-  (let ((fixup (gen-label)))
+  (let ((boxed-region (- (+ static-space-start (* 2 n-word-bytes))
+                         nil-value)))
     (when (integerp size)
       (load-immediate-word alloc-tn size))
-    (inst word (logior #xe92d0000
+    ;; Using the native stack is OK - the register values have fixnum nature.
+    (inst word (logior #xe92d0000 ; PUSH {rN, lr}
                        (ash 1 (if (integerp size) (tn-offset alloc-tn) (tn-offset size)))
                        (ash 1 (tn-offset lr-tn))))
-    (inst load-from-label alloc-tn alloc-tn fixup)
+    (inst ldr alloc-tn (@ null-tn (+ boxed-region (* 4 n-word-bytes))))
     (inst blx alloc-tn)
-    (inst word (logior #xe8bd0000
+    (inst word (logior #xe8bd0000 ; POP {rN, lr}
                        (ash 1 (tn-offset alloc-tn))
                        (ash 1 (tn-offset lr-tn))))
-    (inst b back-label)
-    (emit-label fixup)
-    (inst word (make-fixup "alloc_tramp" :foreign))))
+    (inst b back-label)))
 
 (defmacro allocation (result-tn size lowtag &key flag-tn
                                                  stack-allocate-p)
@@ -246,19 +246,18 @@
             (store-symbol-value ,flag-tn *allocation-pointer*))
            #+gencgc
            (t
-            (let ((fixup (gen-label))
+            (let ((boxed-region (- (+ static-space-start (* 2 n-word-bytes))
+                                   nil-value))
                   (alloc (gen-label))
                   (back-from-alloc (gen-label)))
-              (inst load-from-label ,flag-tn ,flag-tn FIXUP)
-              (loadw ,result-tn ,flag-tn)
-              (loadw ,flag-tn ,flag-tn 1)
+              (inst ldr ,result-tn (@ null-tn boxed-region)) ; free ptr
+              (inst ldr ,flag-tn (@ null-tn (+ boxed-region n-word-bytes))) ; end ptr
               (if (integerp ,size)
                   (composite-immediate-instruction add ,result-tn ,result-tn ,size)
                   (inst add ,result-tn ,result-tn ,size))
               (inst cmp ,result-tn ,flag-tn)
               (inst b :hi ALLOC)
-              (inst load-from-label ,flag-tn ,flag-tn FIXUP)
-              (storew ,result-tn ,flag-tn)
+              (inst str ,result-tn (@ null-tn boxed-region)) ; free ptr
 
               (if (integerp ,size)
                   (composite-immediate-instruction sub ,result-tn ,result-tn ,size)
@@ -270,9 +269,7 @@
 
               (assemble (:elsewhere)
                 (emit-label ALLOC)
-                (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)
-                (emit-label FIXUP)
-                (inst word (make-fixup "gc_alloc_region" :foreign))))))))
+                (allocation-tramp ,result-tn ,size BACK-FROM-ALLOC)))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)

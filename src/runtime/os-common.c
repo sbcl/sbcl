@@ -189,6 +189,11 @@ void os_link_runtime()
 
         link_target += LINKAGE_TABLE_ENTRY_SIZE;
     }
+#ifdef LISP_FEATURE_ARM
+    lispobj* static_space = (lispobj*)STATIC_SPACE_START;
+    extern uword_t alloc_tramp(uword_t);
+    static_space[6] = (lispobj)&alloc_tramp; // for LR rN, [NULL, #k] ; BLX rN
+#endif
 #ifdef CALL_INTO_C
     extern long call_into_c();
     SYMBOL(CALL_INTO_C)->value = (lispobj)call_into_c;
@@ -201,6 +206,8 @@ void os_unlink_runtime()
 #ifdef CALL_INTO_C
     SYMBOL(CALL_INTO_C)->value = UNBOUND_MARKER_WIDETAG;
 #endif
+    lispobj* static_space = (lispobj*)STATIC_SPACE_START;
+    static_space[6] = 0;
 }
 
 boolean
