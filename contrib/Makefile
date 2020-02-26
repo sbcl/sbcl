@@ -26,7 +26,7 @@ sb-introspect.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-capstone.fasl: asdf.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
-sb-md5.fasl: asdf.fasl sb-gmp.fasl sb-rotate-byte.fasl sb-rt.fasl
+sb-md5.fasl: asdf.fasl sb-rotate-byte.fasl sb-rt.fasl
 	sh ./build-contrib $(basename $(@F))
 sb-cover.fasl: asdf.fasl sb-md5.fasl
 	sh ./build-contrib $(basename $(@F))
