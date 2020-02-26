@@ -148,7 +148,7 @@ code:
         (case type
           ((:integer :errno)
            (as-c "#ifdef" cname)
-           (printf "(cl:defconstant ~A %ld \"~A\")" lispname doc
+           (printf "(cl:defconstant ~A %ld~@[ \"~A\"~])" lispname doc
                    (word-cast cname))
            (when (eql type :errno)
              (printf "(cl:setf (get '~A 'errno) t)" lispname))
@@ -156,7 +156,7 @@ code:
            (printf "(sb-int:style-warn \"Couldn't grovel for ~~A (unknown to the C compiler).\" \"~A\")" cname)
            (as-c "#endif"))
           ((:integer-no-check)
-           (printf "(cl:defconstant ~A %ld \"~A\")" lispname doc (word-cast cname)))
+           (printf "(cl:defconstant ~A %ld~@[ \"~A\"~])" lispname doc (word-cast cname)))
           (:enum
            (c-for-enum lispname cname export))
           (:type
