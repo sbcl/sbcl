@@ -593,7 +593,9 @@
                      ((and (eql base $2d0) (eql power 63))
                       #.(make-flonum #x43E0000000000000 'double-float))
                      ((and (eql base $10d0) (>= power 322))
-                      (make-flonum :+infinity 'double-float))
+                      #.(make-flonum :+infinity 'double-float))
+                     ((and (eql base $10d0) (eql power -309))
+                      #.(make-flonum #xB8157268FDAF 'double-float))
                      (t
                       (make-flonum (cl:expt (realnumify base) power)
                                    (pick-result-format base power)))))))))
