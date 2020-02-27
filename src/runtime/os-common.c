@@ -206,8 +206,10 @@ void os_unlink_runtime()
 #ifdef CALL_INTO_C
     SYMBOL(CALL_INTO_C)->value = UNBOUND_MARKER_WIDETAG;
 #endif
+#ifdef LISP_FEATURE_ARM
     lispobj* static_space = (lispobj*)STATIC_SPACE_START;
     static_space[6] = 0;
+#endif
 }
 
 boolean
