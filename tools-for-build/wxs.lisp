@@ -9,6 +9,11 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
+;;;; Restore internal-features. Needed to package libsbcl files if
+;;;; sb-linkable-runtime is enabled.
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (setq *features* (union *features* sb-impl:+internal-features+)))
+
 ;;;; XML generation
 
 (defvar *indent-level* 0)
