@@ -82,7 +82,7 @@
       ;; metaclass.
       (mapc #'sb-int:check-deprecated-type direct-superclasses)
       (sb-int:check-deprecated-type metaclass)
-      (let ((canonical-slots (canonize-defclass-slots name direct-slots env))
+      (let ((canonical-slots (canonize-defclass-slots name metaclass direct-slots env))
             ;; DEFSTRUCT-P should be true if the class is defined
             ;; with a metaclass STRUCTURE-CLASS, so that a DEFSTRUCT
             ;; is compiled for the class.
@@ -199,7 +199,7 @@
         (push '(:direct-default-initargs nil) canonized-options))
       (values (or metaclass 'standard-class) (nreverse canonized-options))))
 
-(defun canonize-defclass-slot (class-name spec env)
+(defun canonize-defclass-slot (class-name metaclass spec env)
   (let ((location (sb-c::make-definition-source-location))
         (spec (sb-int:ensure-list spec)))
     (when (and (cdr spec) (null (cddr spec)))
@@ -244,9 +244,10 @@
                (:initform
                 (setf initform val))
                (:type
-                (sb-kernel::check-slot-type-specifier
-                 val name (cons 'defclass class-name))
-                (setf type val)))
+                (when (eq metaclass 'standard-class)
+                  (sb-kernel::check-slot-type-specifier
+                   val name (cons 'defclass class-name))
+                  (setf type val))))
              (when (get-properties others (list key))
                (%program-error "Duplicate slot option ~S for slot ~
                                 ~S in DEFCLASS ~S."
@@ -267,10 +268,10 @@
             `(list* :initfunction ,(make-initfunction initform type spec)
                     ,@canon))))))
 
-(defun canonize-defclass-slots (class-name slots env)
+(defun canonize-defclass-slots (class-name metaclass slots env)
   (map 'list (lambda (spec)
                (with-current-source-form (spec)
-                 (canonize-defclass-slot class-name spec env)))
+                 (canonize-defclass-slot class-name metaclass spec env)))
        slots))
 
 (defun check-slot-name-for-defclass (name class-name env)
