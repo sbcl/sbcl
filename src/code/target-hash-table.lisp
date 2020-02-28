@@ -910,7 +910,7 @@ if there is no such entry. Entries can be added using SETF."
     `((index-vector (hash-table-index-vector hash-table))
       ;; BUCKET is the masked hash code which acts as the index into index-vector
       (bucket (mask-hash hash (1- (length index-vector))))
-      ;; INDEX is the index into the pairs vector obtains from the index-vector
+      ;; INDEX is the index into the pairs vector obtained from the index-vector
       (index (aref index-vector bucket))
       (next-vector (hash-table-next-vector hash-table))
       ;; Binding of HASH-VECTOR would be flushed for EQ and EQL tables
@@ -947,13 +947,64 @@ if there is no such entry. Entries can be added using SETF."
        ;; to use EQ as the comparator.
        '(eq (hash-table-test hash-table) 'eq))))
 
-  (defun ht-key-compare (std-fn pair-index &optional endp-test)
+  ;; Keyword args:
+  ;; - ENDP-TEST when true says that the probing loop is unrolled, and a test
+  ;;   for the end of the chain is ORed into the key comparison.
+  ;;   At worst, we compare the key against the value 0 (in the 0th element
+  ;;   of the k/v vector) which is just a dummy value, since filled indices
+  ;;   begin at 1.
+  ;; - HASH-TEST when :STRICT (the default) says that for tables with hash vectors,
+  ;;   we can use the computed hash as a guard before calling the predicate,
+  ;;   and (AREF HASH-VECTOR i) is definitely not +MAGIC-HASH-VECTOR-VALUE+
+  ;;   in that case.
+  ;;   If HASH-TEST is :PERMISSIVE, then the stored value might be the magic
+  ;;   value which is considered a match to anything.
+  ;;
+  ;; GETHASH and PUTHASH always know whether to look in HASH-VECTOR or not,
+  ;; because for any given key, either it does or does not have an address-based
+  ;; hash. The probing loop is unswitched on that grounds. If the hash isn't an
+  ;; address, then we compare hashes before calling a predicate. If the hash is
+  ;; an address, then we devolve to EQ in the loop, and never compare hashes.
+  ;; Hence, unswitching should result in a performance gain for EQUAL and EQUALP
+  ;; that become like EQ, as well as eliding any expensive predicate call where
+  ;; the result would be NIL.
+  ;;
+  ;; The :PERMISSIVE hash check is needed in REMHASH, which performs one
+  ;; key comparison prior to unswitching the remainder of the probing loop.
+  ;; This is due to the first entry in a chain needing to be handled separately.
+  ;; Consider it like destructively deleting the initial cons in a list - RPLACD
+  ;; can't do that operation. So the first comparison might be on a key whose
+  ;; stored hash is +MAGIC-HASH-VECTOR-VALUE+.  Just ignore that stored hash.
+  ;;
+  ;; Also, a minor exception to the above: EQL tables don't compare hashes
+  ;; because no performance gain is obtained. The hash vector exists solely
+  ;; to inform GC whether each key was hashed address-sensitively.
+  (defun ht-key-compare (std-fn pair-index &key endp-test (hash-test :strict))
+    (declare (type (member :strict :permissive) hash-test))
     ;; STD-FN = NIL says that's definitely a user-defined hash function,
     ;; and * says that it could be either standard or user-defined.
-    (let* ((hashcompare
+    (let* ((is-same-hash `(= hash (aref hash-vector ,pair-index)))
+           (hashcompare
             (case std-fn
-              ((equal equalp nil) `(= hash (aref hash-vector ,pair-index)))
-              ((*) `(or (null hash-vector) (= hash (aref hash-vector ,pair-index))))))
+              ((equal equalp)
+               (if (eq hash-test :strict)
+                   is-same-hash
+                   `(let ((stored-hash (aref hash-vector ,pair-index)))
+                      (or (= stored-hash hash)
+                          (= stored-hash +magic-hash-vector-value+)))))
+              ;; We do not give users a way to have some keys be address-sensitive
+              ;; when they define their own hash function. Therefore, _any_ user-defined
+              ;; table has a hash-vector, even if comparison is done by EQ.
+              ;; (You might want EQ comparison on "intelligent" hashes as opposed
+              ;; to "opaque" hashes like an address or stable randomly-assigned value.)
+              ;; Moreover, every hash-value in the vector is something other than
+              ;; +MAGIC-HASH-VECTOR-VALUE+, because nothing is address-based.
+              ;; The nuance of address-based versus EQ-based is subtle,
+              ;; but hopefully the variable naming in the code is clear enough now.
+              ((nil) is-same-hash)
+              ((*)
+               (error "Obsolete case - remove me?") ; was it for weak tables maybe?
+               `(or (null hash-vector) ,is-same-hash))))
            (keycompare
             (case std-fn
               ;; Use the inline EQL function
@@ -1036,7 +1087,7 @@ nnnn 1_    any       linear scan
                   ;; Search next-vector chain for a matching key.
                   (if eq-test
                       (macrolet ((probe ()
-                                   '(if ,(ht-key-compare 'eq 'index t)
+                                   '(if ,(ht-key-compare 'eq 'index :endp-test t)
                                         (return index)
                                         (ht-probe-advance index))))
                         (loop (probe) (probe) (probe) (probe)
@@ -1049,7 +1100,7 @@ nnnn 1_    any       linear scan
                       ;; if this branch is unconditionally left in.
                       ,(unless (eq std-fn 'eq)
                          `(macrolet ((probe ()
-                                       '(if ,(ht-key-compare std-fn 'index t)
+                                       '(if ,(ht-key-compare std-fn 'index :endp-test t)
                                             (return index)
                                             (ht-probe-advance index))))
                             ;; In the case of EQL, we get most bang-for-buck (performance per
@@ -1521,7 +1572,7 @@ nnnn 1_    any       linear scan
          (declare (fixnum hash0) (index/2 index) (ignore probe-limit))
          (block done
            (cond ((zerop index)) ; bucket is empty
-                 (,(ht-key-compare std-fn 'index)
+                 (,(ht-key-compare std-fn 'index :hash-test :permissive)
                   ;; Removing the key at the header of the chain is exceptional
                   ;; because it has no predecessor,
                   (setf (aref index-vector bucket) (aref next-vector index))

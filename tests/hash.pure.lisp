@@ -264,3 +264,33 @@
       ;; S1 and S2 used to be STRING/= prior to making
       ;; %HASH-TABLE-ALIST iterate backwards.
       (assert (string= s1 s2)))))
+
+(defun test-this-object (table-kind object)
+  (let ((store (make-hash-table :test table-kind)))
+    (setf (gethash object store) '(1 2 3))
+    (assert (equal (gethash object store) '(1 2 3)))
+    (assert (remhash object store))
+    (assert (= (hash-table-count store) 0))))
+
+;; https://bugs.launchpad.net/sbcl/+bug/1865094
+(with-test (:name :remhash-eq-comparable-in-equal-table)
+  ;; These objects are all hashed by their address,
+  ;; so their stored hash value is the magic marker.
+  (test-this-object 'equal (make-hash-table))
+  (test-this-object 'equal (sb-kernel:find-defstruct-description 'sb-c::node))
+  (test-this-object 'equal #'car)
+  (test-this-object 'equal (sb-sys:int-sap 0))
+  ;; a CLASS is not hashed address-sensitively, so this wasn't
+  ;; actually subject to the bug. Try it anyway.
+  (test-this-object 'equal (find-class 'class)))
+
+(with-test (:name :remhash-eq-comparable-in-equalp-table)
+  ;; EQUALP tables worked a little better, because more objects have
+  ;; are hashed non-address-sensitively by EQUALP-HASH relative to EQUAL-HASH,
+  ;; and those objects have comparators that descend.
+  ;; However, there are still some things hashed by address:
+  (test-this-object 'equalp (make-weak-pointer "bleep"))
+  (test-this-object 'equalp (sb-kernel::find-fdefn 'cons))
+  (test-this-object 'equalp #'car)
+  (test-this-object 'equalp (constantly 5))
+  (test-this-object 'equal (sb-sys:int-sap 0)))
