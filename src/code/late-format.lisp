@@ -15,16 +15,12 @@
 ;;; control string in a loop, not to avoid re-tokenizing all strings that
 ;;; happen to be STRING= to that string.
 ;;; (Might we want to bypass the cache when compile-time tokenizing?)
-
-;; MIPS: What is this I can't even.  There are so many things going wrong
-;; and one of them is pointer-hash, and despite the fix to it, the format cache
-;; is still getting corrupted, and so you can't print anything to help debug.
-#+(or sb-xc-host mips)
+#+sb-xc-host
 (defun tokenize-control-string (string)
   (combine-directives
    (%tokenize-control-string string 0 (length string) nil)
    t))
-#-(or sb-xc-host mips)
+#-sb-xc-host
 (defun-cached (tokenize-control-string
                :memoizer memoize
                :hash-bits 7

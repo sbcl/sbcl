@@ -1696,9 +1696,6 @@ core and return a descriptor to it."
 
   (cold-set '*code-serialno* (make-fixnum-descriptor (1+ *code-serialno*)))
 
-  (dolist (symbol sb-impl::*cache-vector-symbols*)
-    (cold-set symbol *nil-descriptor*))
-
   ;; Put the C-callable fdefns into the static-fdefn vector if #+immobile-code.
   #+immobile-code
   (loop for i from 0 for sym in sb-vm::+c-callable-fdefns+
