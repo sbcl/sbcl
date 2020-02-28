@@ -711,6 +711,18 @@
         do (setf (compiled-debug-fun-next fun) next))
   (car sorted))
 
+(defun empty-fun-p (fun)
+  (let* ((2block (block-info (lambda-block fun)))
+         (start (ir2-block-start-vop 2block))
+         (next (ir2-block-next 2block)))
+    (and
+     start
+     (eq start (ir2-block-last-vop 2block))
+     (eq (vop-name start) 'note-environment-start)
+     next
+     (neq (ir2-block-physenv 2block)
+          (ir2-block-physenv next)))))
+
 ;;; Return a DEBUG-INFO structure describing COMPONENT. This has to be
 ;;; called after assembly so that source map information is available.
 (defun debug-info-for-component (component)
@@ -726,14 +738,15 @@
                                 :adjustable t))
         component-tlf-num)
     (dolist (lambda (component-lambdas component))
-      (clrhash var-locs)
-      (let ((tlf-num (source-path-tlf-number
-                      (node-source-path (lambda-bind lambda)))))
-        (if component-tlf-num
-            (aver (or (block-compile *compilation*)
-                      (= component-tlf-num tlf-num)))
-            (setf component-tlf-num tlf-num))
-        (push (compute-1-debug-fun lambda var-locs) dfuns)))
+      (unless (empty-fun-p lambda)
+       (clrhash var-locs)
+       (let ((tlf-num (source-path-tlf-number
+                       (node-source-path (lambda-bind lambda)))))
+         (if component-tlf-num
+             (aver (or (block-compile *compilation*)
+                       (= component-tlf-num tlf-num)))
+             (setf component-tlf-num tlf-num))
+         (push (compute-1-debug-fun lambda var-locs) dfuns))))
     (let* ((sorted (sort dfuns #'< :key #'compiled-debug-fun-offset))
            (fun-map (compute-debug-fun-map sorted)))
       (make-compiled-debug-info
