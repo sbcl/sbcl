@@ -10,7 +10,11 @@ changes relative to sbcl-2.0.1:
   * bug fix: in CHANGE-CLASS, handle non-standard slot-value-using-class for
     :INSTANCE and :CLASS slots better.  (reported by Shinmera on #sbcl)
   * bug fix: REMHASH in an EQUAL or EQUALP hash-table works correctly on a
-    key for which EQUAL (respectively EQUALP) is reduced to EQ. (lp#1865094)
+    key for which EQUAL (respectively EQUALP) is reduced to EQ.  (lp#1865094)
+  * bug fix: do not emit a warning for DEFCLASS slots with mismatched :TYPE
+    and :INITFORM when the class has a non-standard metaclass.
+  * bug fix: DISASSEMBLE on SPARC is less likely to spuriously annotate code
+    sequences as error traps.
 
 changes in sbcl-2.0.1 relative to sbcl-2.0.0:
   * minor incompatible change: some symbols have been removed from *FEATURES*
