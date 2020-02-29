@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.1:
+changes in sbcl-2.0.2 relative to sbcl-2.0.1:
   * new feature: CMUCL-style block compilation support has been added,
     allowing whole program optimization. It has been documented in a new
     section of the manual entitled "Advanced Compiler Use and Efficiency
