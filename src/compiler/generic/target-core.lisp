@@ -209,6 +209,9 @@
            (type index i))
   (let* ((info (leaf-info fun))
          (found (gethash info (core-object-entry-table object))))
+    ;; A  core component should not have cross-component references.
+    ;; If it could, then the entries would have placed into one component.
+    (aver found)
     (if found
         (setf (code-header-ref code-obj i) found)
         (push (cons code-obj i)
@@ -303,22 +306,21 @@
 
       (do ((index sb-vm:code-constants-offset (1+ index)))
           ((>= index (length constants)))
-        (let ((const (aref constants index)))
-            (etypecase const
-              (null)
-              (constant
-               (setf (code-header-ref code-obj index)
-                     (constant-value const)))
-              (list
-               (ecase (car const)
-                 (:entry
-                  (reference-core-fun code-obj index (cadr const) object))
-                 (:fdefinition
-                  (setf (code-header-ref code-obj index)
-                        (find-or-create-fdefn (cadr const))))
-                 (:known-fun
-                  (setf (code-header-ref code-obj index)
-                        (%coerce-name-to-fun (cadr const)))))))))))
+        (let* ((const (aref constants index))
+               (kind (if (listp const) (car const) const)))
+          (case kind
+            (:entry
+             (reference-core-fun code-obj index (cadr const) object))
+            ((nil))
+            (t
+             (setf (code-header-ref code-obj index)
+                   (etypecase kind
+                     ((eql :fdefinition)
+                      (find-or-create-fdefn (cadr const)))
+                     ((eql :known-fun)
+                      (%coerce-name-to-fun (cadr const)))
+                     (constant
+                      (constant-value const))))))))))
   (values))
 
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
