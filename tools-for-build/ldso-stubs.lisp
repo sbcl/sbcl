@@ -378,7 +378,14 @@ ldso_stub__ ## fct: ;                  \\
     (dolist (stub *stubs*)
       (check-type stub string)
       (ldso-stubify (incf i) stub f)))
-  #-(or ppc64) ; this file contains no code
+  ;; For some platforms, the 'ldso-stubs.S' file never gets assembled, and
+  ;; so it doesn't really matter what it contains.
+  ;; But on SunOS (as installed on the gcc compiler farm machine that I used)
+  ;; the compiler driver command ("gcc") invokes GNU cpp and/or cc1 but uses
+  ;; the Sun assembler. That assembler can't parse "%progbits", nor "@progbits"
+  ;; in .section (see https://sourceware.org/binutils/docs/as/Section.html)
+  ;; so let's just leave it out.
+  #-sunos
   (format f "
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.

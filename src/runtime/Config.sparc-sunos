@@ -11,7 +11,7 @@
 
 CC = gcc
 CFLAGS += -DSVR4 -D_REENTRANT
-ASFLAGS = -g -Wall -DSVR4 -Wa,-xarch=v8plus
+ASFLAGS = -g -DSVR4 -Wa,-xarch=v8plus
 LINKFLAGS += -v
 NM = nm -t x -p 
 
