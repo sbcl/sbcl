@@ -286,7 +286,7 @@ are present in the debugger, see @ref{Debugger Policy Control}.
 If a function is defined by @code{defun} it will appear in backtrace
 by that name. Functions defined by @code{labels} and @code{flet} will
 appear as @code{(FLET @var{name})} and @code{(LABELS @var{name})} respectively.
-Anonymous lambdas will appear as @code{(LAMDBA @var{lambda-list})}.
+Anonymous lambdas will appear as @code{(LAMBDA @var{lambda-list})}.
 
 @menu
 * Entry Point Details::
@@ -402,7 +402,7 @@ quality.
 
 In the last two cases, the values of argument variables are
 accessible, but may be incorrect.  For more details on when variable
-values are accessible, @ref{Variable Value Availability}.
+values are accessible, see @ref{Variable Value Availability}.
 
 It is possible for an interrupt to happen when a function call or
 return is in progress.  The debugger may then flame out with some
@@ -892,7 +892,7 @@ is of the same type as SBCL expects the stack frame to return.
 @deffn {Debugger Command} @nopkg{restart-frame}
 Restarts execution of the current stack frame. This command is
 available when the @code{debug} optimization quality is greater than
-both @code{speed} and @code{space} and when the frame is for is a global
+both @code{speed} and @code{space} and when the frame is for a global
 function. If the function is redefined in the debugger before the frame
 is restarted, the new function will be used.
 @end deffn
