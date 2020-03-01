@@ -262,10 +262,6 @@
 ;;;   :POLICY - A form which is supplied to the POLICY macro to determine
 ;;;             whether this transformation is appropriate. If the result
 ;;;             is false, then the transform automatically gives up.
-;;;   :EVAL-NAME
-;;;           - The name and argument/result types are actually forms to be
-;;;             evaluated. Useful for getting closures that transform similar
-;;;             functions.
 ;;;   :DEFUN-ONLY
 ;;;           - Don't actually instantiate a transform, instead just DEFUN
 ;;;             Name with the specified transform definition function. This
@@ -279,11 +275,9 @@
 (defmacro deftransform (name (lambda-list &optional (arg-types '*)
                                           (result-type '*)
                                           &key result policy node defun-only
-                                          eval-name (important :slightly))
+                                          (important :slightly))
                              &body body-decls-doc)
   (declare (type (member nil :slightly t) important))
-  (when (and eval-name defun-only)
-    (error "can't specify both DEFUN-ONLY and EVAL-NAME"))
   (multiple-value-bind (body decls doc) (parse-body body-decls-doc t)
     (let ((n-node (or node (make-symbol "NODE")))
           (n-decls (sb-xc:gensym))
@@ -298,9 +292,7 @@
                   (declare (ignorable ,@(mapcar #'car bindings)))
                   (declare (lambda-list (node)))
                   ,@decls
-                  ,@(and defun-only
-                         doc
-                         `(,doc))
+                  ,@(and defun-only doc `(,doc))
                   ;; What purpose does it serve to allow the transform's body
                   ;; to return decls as a second value? They would go in the
                   ;; right place if simply returned as part of the expression.
@@ -316,12 +308,9 @@
           (if defun-only
               `(defun ,name ,@stuff)
               `(%deftransform
-                ,(if eval-name name `',name)
-                ,(if eval-name
-                     ``(function ,,arg-types ,,result-type)
-                     `'(function ,arg-types ,result-type))
-                (named-lambda ,(if eval-name "xform" `(deftransform ,name))
-                  ,@stuff)
+                ',name
+                '(function ,arg-types ,result-type)
+                (named-lambda (deftransform ,name) ,@stuff)
                 ,doc
                 ,important
                 ,(and policy
