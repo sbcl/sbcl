@@ -666,11 +666,6 @@
   (let* ((element-type (sb-vm:saetp-specifier saetp))
          (element-ctype (sb-vm:saetp-ctype saetp))
          (n-bits (sb-vm:saetp-n-bits saetp))
-         (basher-name (format nil "UB~D-BASH-FILL" n-bits))
-         (basher (or (find-symbol basher-name #.(find-package "SB-KERNEL"))
-                     (abort-ir1-transform
-                      "Unknown fill basher, please report to sbcl-devel: ~A"
-                      basher-name)))
          (kind (cond ((sb-vm:saetp-fixnum-p saetp) :tagged)
                      ((member element-type '(character base-char)) :char)
                      ((eq element-type 'single-float) :single-float)
@@ -681,81 +676,86 @@
                       :complex-single-float)
                      (t
                       (aver (integer-type-p element-ctype))
-                      :bits)))
-         ;; BASH-VALUE is a word that we can repeatedly smash
-         ;; on the array: for less-than-word sized elements it
-         ;; contains multiple copies of the fill item.
-         (bash-value
-           (if (constant-lvar-p item)
-               (let ((tmp (lvar-value item)))
-                 (unless (ctypep tmp element-ctype)
-                   (abort-ir1-transform "~S is not ~S" tmp element-type))
-                 (let* ((bits
-                          (ldb (byte n-bits 0)
-                               (ecase kind
-                                 (:tagged
-                                  (ash tmp sb-vm:n-fixnum-tag-bits))
-                                 (:char
-                                  (char-code tmp))
-                                 (:bits
-                                  tmp)
-                                 (:single-float
-                                  (single-float-bits tmp))
-                                 #+64-bit
-                                 (:double-float
-                                  (double-float-bits tmp))
-                                 #+64-bit
-                                 (:complex-single-float
-                                  #+big-endian
-                                  (logior (ash (single-float-bits (realpart tmp)) 32)
-                                          (ldb (byte 32 0)
-                                               (single-float-bits (imagpart tmp))))
-                                  #+little-endian
-                                  (logior (ash (single-float-bits (imagpart tmp)) 32)
-                                          (ldb (byte 32 0)
-                                               (single-float-bits (realpart tmp))))))))
-                        (res bits))
-                   (loop for i of-type sb-vm:word from n-bits by n-bits
-                         until (= i sb-vm:n-word-bits)
-                         do (setf res (ldb (byte sb-vm:n-word-bits 0)
-                                           (logior res (ash bits i)))))
-                   res))
-               (progn
-                 (when node
-                   (delay-ir1-transform node :constraint))
-                 (if (and (eq kind :bits)
-                          (= n-bits 1))
-                     `(ldb (byte ,sb-vm:n-word-bits 0) (- item))
-                     `(let ((res (ldb (byte ,n-bits 0)
-                                      ,(ecase kind
-                                         (:tagged
-                                          `(ash item ,sb-vm:n-fixnum-tag-bits))
-                                         (:char
-                                          `(char-code item))
-                                         (:bits
-                                          `item)
-                                         (:single-float
-                                          `(single-float-bits item))
-                                         #+64-bit
-                                         (:double-float
-                                          `(double-float-bits item))
-                                         #+64-bit
-                                         (:complex-single-float
-                                          #+big-endian
-                                          `(logior (ash (single-float-bits (realpart item)) 32)
-                                                   (ldb (byte 32 0)
-                                                        (single-float-bits (imagpart item))))
-                                          #+little-endian
-                                          `(logior (ash (single-float-bits (imagpart item)) 32)
-                                                   (ldb (byte 32 0)
-                                                        (single-float-bits (realpart item)))))))))
-                        (declare (type sb-vm:word res))
-                        ,@(loop for i of-type sb-vm:word = n-bits then (* 2 i)
-                                until (= i sb-vm:n-word-bits)
-                                collect
-                                `(setf res (dpb res (byte ,i ,i) res)))
-                        res))))))
-    (values basher bash-value)))
+                      :bits))))
+    (if (constant-lvar-p item)
+        (let* ((basher-name (format nil "UB~D-BASH-FILL" n-bits))
+               (basher (or (find-symbol basher-name #.(find-package "SB-KERNEL"))
+                           (abort-ir1-transform
+                            "Unknown fill basher, please report to sbcl-devel: ~A"
+                            basher-name)))
+               (tmp (lvar-value item)))
+          (unless (ctypep tmp element-ctype)
+            (abort-ir1-transform "~S is not ~S" tmp element-type))
+          (values
+           basher
+           ;; Construct a word that we can repeatedly smash
+           ;; on the array: for less-than-word sized elements it
+           ;; contains multiple copies of the fill item.
+           (let* ((bits
+                    (ldb (byte n-bits 0)
+                         (ecase kind
+                           (:tagged
+                            (ash tmp sb-vm:n-fixnum-tag-bits))
+                           (:char
+                            (char-code tmp))
+                           (:bits
+                            tmp)
+                           (:single-float
+                            (single-float-bits tmp))
+                           #+64-bit
+                           (:double-float
+                            (double-float-bits tmp))
+                           #+64-bit
+                           (:complex-single-float
+                            #+big-endian
+                            (logior (ash (single-float-bits (realpart tmp)) 32)
+                                    (ldb (byte 32 0)
+                                         (single-float-bits (imagpart tmp))))
+                            #+little-endian
+                            (logior (ash (single-float-bits (imagpart tmp)) 32)
+                                    (ldb (byte 32 0)
+                                         (single-float-bits (realpart tmp))))))))
+                  (res bits))
+             (loop for i of-type sb-vm:word from n-bits by n-bits
+                   until (= i sb-vm:n-word-bits)
+                   do (setf res (ldb (byte sb-vm:n-word-bits 0)
+                                     (logior res (ash bits i)))))
+             res)))
+        (progn
+          (when node
+            (delay-ir1-transform node :constraint))
+          (let* ((with
+                   (ecase kind
+                     (:tagged
+                      'fixnum)
+                     (:char
+                      (format nil "UB~A" n-bits))
+                     (:bits
+                      (cond ((not (csubtypep element-ctype (specifier-type 'unsigned-byte)))
+                             (format nil "SB~A" n-bits))
+                            ((= n-bits sb-vm:n-word-bits)
+                             'word)
+                            (t
+                             (format nil "UB~A" n-bits))))
+                     (:single-float
+                      'single-float)
+                     #+64-bit
+                     (:double-float
+                      'double-float)
+                     #+64-bit
+                     (:complex-single-float
+                      'complex-single-float)))
+                 (basher-name (if (eq with 'word)
+                                  (format nil "UB~D-BASH-FILL" n-bits)
+                                  (format nil "UB~D-BASH-FILL-WITH-~A" n-bits with))))
+            (values
+             (or (find-symbol basher-name #.(find-package "SB-KERNEL"))
+                 (abort-ir1-transform
+                  "Unknown fill basher, please report to sbcl-devel: ~A"
+                  basher-name))
+             (if (eq kind :char)
+                 '(char-code item)
+                 'item)))))))
 
 (deftransform fill ((seq item &key (start 0) (end nil))
                     (vector t &key (:start t) (:end t))

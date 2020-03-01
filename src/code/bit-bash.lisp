@@ -586,6 +586,89 @@
         ;; FIXERS must come first so their inline expansions are available
         ;; for the bashers.
         finally (return `(progn ,@fixers ,@bashers)))
+
+(defmacro !define-constant-byte-bashers (bitsize type value-transformer &optional (name type))
+  (let* ((max-bytes sb-xc:most-positive-fixnum)
+         (offset `(integer 0 ,max-bytes))
+         (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
+         (array-fill-name (intern (format nil "UB~D-BASH-FILL-WITH-~A" bitsize name) (find-package "SB-KERNEL"))))
+    `(progn
+       (defknown ,array-fill-name (,type simple-unboxed-array ,offset ,offset)
+           simple-unboxed-array
+           ()
+         :result-arg 1)
+       (defun ,array-fill-name (value dst dst-offset length)
+         (declare (type ,type value) (type ,offset dst-offset length))
+         (declare (optimize (speed 3) (safety 1)))
+         (,constant-bash-name dst dst-offset length (,value-transformer value)
+                              #'%vector-raw-bits #'%set-vector-raw-bits)
+         dst))))
+
+(macrolet ((def ()
+             `(progn
+                ,@(loop for n-bits = 1 then (* n-bits 2)
+                        until (= n-bits n-word-bits)
+                        collect
+                        `(!define-constant-byte-bashers ,n-bits
+                             (unsigned-byte ,n-bits)
+                             (lambda (value)
+                               ,@(loop for i = n-bits then (* 2 i)
+                                       until (= i sb-vm:n-word-bits)
+                                       collect
+                                       `(setf value (dpb value (byte ,i ,i) value))))
+                             ,(format nil "UB~A" n-bits))
+                        collect
+                        `(!define-constant-byte-bashers ,n-bits
+                             (signed-byte ,n-bits)
+                             (lambda (value)
+                               (let ((value (ldb (byte ,n-bits 0) value)))
+                                 ,@(loop for i = n-bits then (* 2 i)
+                                         until (= i sb-vm:n-word-bits)
+                                         collect
+                                         `(setf value (dpb value (byte ,i ,i) value)))))
+                             ,(format nil "SB~A" n-bits)))
+                (!define-constant-byte-bashers ,n-word-bits
+                    (signed-byte ,n-word-bits)
+                    (lambda (value)
+                      (ldb (byte ,n-word-bits 0) value))
+                    ,(format nil "SB~A" n-word-bits)))))
+  (def))
+
+(!define-constant-byte-bashers #.n-word-bits
+    fixnum
+    (lambda (value)
+      (ldb (byte #.n-word-bits 0) (ash value n-fixnum-tag-bits))))
+
+(!define-constant-byte-bashers 32
+    single-float
+    (lambda (value)
+      (let ((bits (ldb (byte 32 0) (single-float-bits value))))
+        #+64-bit
+        (dpb bits (byte 32 32) bits)
+        #-64-bit
+        bits)))
+
+#+64-bit
+(!define-constant-byte-bashers 64
+    double-float
+    double-float-bits)
+
+#+64-bit
+(!define-constant-byte-bashers 64
+    (complex single-float)
+    (lambda (item)
+      #+big-endian
+      (logior (ash (ldb (byte 32 0)
+                        (single-float-bits (realpart item))) 32)
+              (ldb (byte 32 0)
+                   (single-float-bits (imagpart item))))
+      #+little-endian
+      (logior (ash (ldb (byte 32 0)
+                        (single-float-bits (imagpart item))) 32)
+              (ldb (byte 32 0)
+                   (single-float-bits (realpart item)))))
+    complex-single-float)
+
 
 ;;;; Bashing-Style search for bits
 ;;;;

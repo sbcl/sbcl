@@ -2144,6 +2144,18 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "UB32-BASH-FILL" "SYSTEM-AREA-UB32-FILL"
                "UB64-BASH-FILL" "SYSTEM-AREA-UB64-FILL"
 
+               "UB1-BASH-FILL-WITH-UB1" "UB1-BASH-FILL-WITH-SB1"
+               "UB2-BASH-FILL-WITH-UB2" "UB2-BASH-FILL-WITH-SB2"
+               "UB4-BASH-FILL-WITH-UB4" "UB4-BASH-FILL-WITH-SB4"
+               "UB8-BASH-FILL-WITH-UB8" "UB8-BASH-FILL-WITH-SB8"
+               "UB16-BASH-FILL-WITH-UB16" "UB16-BASH-FILL-WITH-SB16"
+               "UB32-BASH-FILL-WITH-UB32" "UB32-BASH-FILL-WITH-SB32"
+               "UB64-BASH-FILL-WITH-SB64"
+               "UB32-BASH-FILL-WITH-FIXNUM" "UB64-BASH-FILL-WITH-FIXNUM"
+               "UB32-BASH-FILL-WITH-SINGLE-FLOAT"
+               "UB64-BASH-FILL-WITH-DOUBLE-FLOAT"
+               "UB64-BASH-FILL-WITH-COMPLEX-SINGLE-FLOAT"
+
                ;; bit bash copiers
                "UB1-BASH-COPY" "SYSTEM-AREA-UB1-COPY"
                "COPY-UB1-TO-SYSTEM-AREA" "COPY-UB1-FROM-SYSTEM-AREA"

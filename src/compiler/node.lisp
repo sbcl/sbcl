@@ -924,7 +924,7 @@
   ;;    Similar to NIL, but requires greater caution, since local call
   ;;    analysis may create new references to this function. Also, the
   ;;    function cannot be deleted even if it has *no* references. The
-  ;;    OPTIONAL-DISPATCH is in the LAMDBA-OPTIONAL-DISPATCH.
+  ;;    OPTIONAL-DISPATCH is in the LAMBDA-OPTIONAL-DISPATCH.
   ;;
   ;;    :EXTERNAL
   ;;    an external entry point lambda. The function it is an entry
