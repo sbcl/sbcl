@@ -729,7 +729,9 @@
                      (:tagged
                       'fixnum)
                      (:char
-                      (format nil "UB~A" n-bits))
+                      (if (= n-bits sb-vm:n-word-bits)
+                          'word
+                          (format nil "UB~A" n-bits)))
                      (:bits
                       (cond ((not (csubtypep element-ctype (specifier-type 'unsigned-byte)))
                              (format nil "SB~A" n-bits))
