@@ -777,16 +777,25 @@
               ;; KLUDGE: WITH-ARRAY data in its full glory is going to mess up
               ;; dynamic-extent for MAKE-ARRAY :INITIAL-ELEMENT initialization.
               (if (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
-                  `(let* ((len (length seq))
-                          (end (or end len))
-                          (bound (1+ end)))
-                     ;; Minor abuse CHECK-BOUND for bounds checking.
-                     ;; (- END START) may still end up negative, but
-                     ;; the basher handle that.
-                     (,basher ,bash-value seq
-                              (check-bound seq bound start)
-                              (- (if end (check-bound seq bound end) len)
-                                 start)))
+                  `(block nil
+                     (tagbody
+                        (let* ((len (length seq))
+                               (end (cond (end
+                                           (when (> end len)
+                                             (go bad-index))
+                                           end)
+                                          (len))))
+                          (return (,basher ,bash-value seq
+                                           ,(if (or (not start)
+                                                    (and (constant-lvar-p start)
+                                                         (eql (lvar-value start) 0)))
+                                                0
+                                                `(if (> start end)
+                                                     (go bad-index)
+                                                     start))
+                                           (- end start))))
+                      bad-index
+                        (sequence-bounding-indices-bad-error seq start end)))
                   `(with-array-data ((data seq)
                                      (start start)
                                      (end end)

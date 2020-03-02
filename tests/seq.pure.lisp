@@ -506,4 +506,14 @@
       ()
       `(lambda (x y)
          (adjoin (list x) y :key 'car))
-    ((3d0 '((3d0))) '((3d0)) :test #'equal)))
+      ((3d0 '((3d0))) '((3d0)) :test #'equal)))
+
+(with-test (:name :fill-transform-bounds-checks)
+  (checked-compile-and-assert
+      (:optimize :default)
+      `(lambda (item start end)
+         (fill (make-array 3 :element-type '(unsigned-byte 8)) item :start start :end end))
+    ((2 0 nil) #(2 2 2) :test #'equalp)
+    ((2 10 10)  (condition 'sb-kernel:bounding-indices-bad-error))
+    ((2 2 1)  (condition 'sb-kernel:bounding-indices-bad-error))
+    ((2 10 nil)  (condition 'sb-kernel:bounding-indices-bad-error))))
