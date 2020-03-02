@@ -160,7 +160,6 @@
 (defmacro !define-byte-bashers (bitsize)
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
-         (byte-count `(integer 1 (,bytes-per-word)))
          (max-bytes sb-xc:most-positive-fixnum)
          (offset `(integer 0 ,max-bytes))
          (max-word-offset (ceiling max-bytes bytes-per-word))
@@ -196,16 +195,15 @@
             (if (zerop n-words)
                 ,(unless (= bytes-per-word 1)
                   `(unless (zerop length)
-                    (locally (declare (type ,byte-count length))
-                      (funcall dst-set-fn dst dst-word-offset
-                               (if (= length ,bytes-per-word)
-                                   value
-                                   (let ((mask (shift-towards-end
-                                                (start-mask (* length ,bitsize))
-                                                (* dst-byte-offset ,bitsize))))
-                                     (word-logical-or (word-logical-and value mask)
-                                                      (word-logical-andc2 (funcall dst-ref-fn dst dst-word-offset)
-                                                                          mask))))))))
+                     (funcall dst-set-fn dst dst-word-offset
+                              (if (>= length ,bytes-per-word)
+                                  value
+                                  (let ((mask (shift-towards-end
+                                               (start-mask (* length ,bitsize))
+                                               (* dst-byte-offset ,bitsize))))
+                                    (word-logical-or (word-logical-and value mask)
+                                                     (word-logical-andc2 (funcall dst-ref-fn dst dst-word-offset)
+                                                                         mask)))))))
                 (let ((interior (floor (- length final-bytes) ,bytes-per-word)))
                   ,@(unless (= bytes-per-word 1)
                      `((unless (zerop dst-byte-offset)
@@ -275,7 +273,7 @@
                     ((zerop length)
                      ;; We're not writing anything.  This is really easy.
                      )
-                    ((= length ,bytes-per-word)
+                    ((>= length ,bytes-per-word)
                      ;; DST-BYTE-OFFSET must be equal to zero, or we would be
                      ;; writing multiple words.  If SRC-BYTE-OFFSET is also zero,
                      ;; the we just transfer the single word.  Otherwise we have
@@ -295,45 +293,44 @@
                        `((t
                           ;; We are only writing some portion of the destination word.
                           ;; We still don't know whether we need one or two source words.
-                          (locally (declare (type ,byte-count length))
-                            (let ((mask (shift-towards-end (start-mask (* length ,bitsize))
-                                                           (* dst-byte-offset ,bitsize)))
-                                  (orig (funcall dst-ref-fn dst dst-word-offset))
-                                  (value (if (> src-byte-offset dst-byte-offset)
-                                             ;; The source starts further
-                                             ;; into the word than does the
-                                             ;; destination, so the source
-                                             ;; could extend into the next
-                                             ;; word.  If it does, we have
-                                             ;; to merge the two words, and
-                                             ;; it not, we can just shift
-                                             ;; the first word.
-                                             (let ((src-byte-shift (- src-byte-offset
-                                                                      dst-byte-offset)))
-                                               (if (> (+ src-byte-offset length) ,bytes-per-word)
-                                                   (word-logical-or
-                                                    (shift-towards-start
-                                                     (funcall src-ref-fn src src-word-offset)
-                                                     (* src-byte-shift ,bitsize))
-                                                    (shift-towards-end
-                                                     (funcall src-ref-fn src (1+ src-word-offset))
-                                                     (* (- src-byte-shift) ,bitsize)))
-                                                   (shift-towards-start (funcall src-ref-fn src src-word-offset)
-                                                                        (* src-byte-shift ,bitsize))))
-                                             ;; The destination starts further
-                                             ;; into the word than does the
-                                             ;; source, so we know the source
-                                             ;; cannot extend into a second
-                                             ;; word (or else the destination
-                                             ;; would too, and we wouldn't be
-                                             ;; in this branch).
-                                             (shift-towards-end
-                                              (funcall src-ref-fn src src-word-offset)
-                                              (* (- dst-byte-offset src-byte-offset) ,bitsize)))))
-                              (declare (type word mask orig value))
-                              (funcall dst-set-fn dst dst-word-offset
-                                       (word-logical-or (word-logical-and value mask)
-                                                        (word-logical-andc2 orig mask))))))))))
+                          (let ((mask (shift-towards-end (start-mask (* length ,bitsize))
+                                                         (* dst-byte-offset ,bitsize)))
+                                (orig (funcall dst-ref-fn dst dst-word-offset))
+                                (value (if (> src-byte-offset dst-byte-offset)
+                                           ;; The source starts further
+                                           ;; into the word than does the
+                                           ;; destination, so the source
+                                           ;; could extend into the next
+                                           ;; word.  If it does, we have
+                                           ;; to merge the two words, and
+                                           ;; it not, we can just shift
+                                           ;; the first word.
+                                           (let ((src-byte-shift (- src-byte-offset
+                                                                    dst-byte-offset)))
+                                             (if (> (+ src-byte-offset length) ,bytes-per-word)
+                                                 (word-logical-or
+                                                  (shift-towards-start
+                                                   (funcall src-ref-fn src src-word-offset)
+                                                   (* src-byte-shift ,bitsize))
+                                                  (shift-towards-end
+                                                   (funcall src-ref-fn src (1+ src-word-offset))
+                                                   (* (- src-byte-shift) ,bitsize)))
+                                                 (shift-towards-start (funcall src-ref-fn src src-word-offset)
+                                                                      (* src-byte-shift ,bitsize))))
+                                           ;; The destination starts further
+                                           ;; into the word than does the
+                                           ;; source, so we know the source
+                                           ;; cannot extend into a second
+                                           ;; word (or else the destination
+                                           ;; would too, and we wouldn't be
+                                           ;; in this branch).
+                                           (shift-towards-end
+                                            (funcall src-ref-fn src src-word-offset)
+                                            (* (- dst-byte-offset src-byte-offset) ,bitsize)))))
+                            (declare (type word mask orig value))
+                            (funcall dst-set-fn dst dst-word-offset
+                                     (word-logical-or (word-logical-and value mask)
+                                                      (word-logical-andc2 orig mask)))))))))
                  ((= src-byte-offset dst-byte-offset)
                   ;; The source and destination are aligned, so shifting
                   ;; is unnecessary.  But we have to pick the direction
