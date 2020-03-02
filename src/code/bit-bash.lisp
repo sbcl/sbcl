@@ -643,7 +643,8 @@
 #+64-bit
 (!define-constant-byte-bashers 64
     double-float
-    double-float-bits)
+    (lambda (value)
+      (ldb (byte 64 0) (double-float-bits value))))
 
 #+64-bit
 (!define-constant-byte-bashers 64
