@@ -321,7 +321,8 @@
     (storew code-tn cfp-tn 2)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
-    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
+    ;; Storing NULL-TN will put at least one 1 bit somewhere into the word
+    (store-foreign-symbol-value null-tn "foreign_function_call_active" temp)
     #-gencgc
     (progn
       (load-symbol-value temp *allocation-pointer*)

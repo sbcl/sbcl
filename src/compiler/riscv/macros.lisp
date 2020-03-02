@@ -41,15 +41,26 @@
             (ash symbol-value-slot word-shift)
             (- other-pointer-lowtag))))
 
+;;; TODO: these two macros would benefit from linkage-table space being
+;;; located below static space with linkage entries allocated downward
+;;; from the end. Then the sequence would reduce to 2 instructions:
+;;;    lw temp (k)$NULL
+;;;    lw dest, (0)$TEMP
 (defun load-foreign-symbol-value (dest symbol temp)
-  (let ((fixup (make-fixup symbol :foreign)))
+  (aver (string/= symbol "foreign_function_call_active"))
+  (let ((fixup (make-fixup symbol :foreign-dataref)))
     (inst lui temp fixup)
-    (inst #-64-bit lw #+64-bit ld dest temp fixup)))
+    (inst #-64-bit lw #+64-bit ld temp temp fixup)
+    (inst #-64-bit lw #+64-bit ld dest temp 0)))
 
 (defun store-foreign-symbol-value (src symbol temp)
-  (let ((fixup (make-fixup symbol :foreign)))
+  (let ((fixup (make-fixup symbol :foreign-dataref))
+        ;; see comment in globals.c
+        (op (cond #+64-bit ((string/= symbol "foreign_function_call_active") 'sd)
+                  (t 'sw))))
     (inst lui temp fixup)
-    (inst #-64-bit sw #+64-bit sd src temp fixup)))
+    (inst #-64-bit lw #+64-bit ld temp temp fixup)
+    (inst #| silly INST macro |# (progn op) src temp 0)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of
@@ -568,13 +579,13 @@ and
         #+gencgc
         (t
          (let ((alloc (gen-label))
-               (back-from-alloc (gen-label)))
-           ;; FIXME: Can optimize this to direct lui hi + load lo?
-           ;; Hit problems if the second struct member is past the
-           ;; most positive lo offset. Need relaxation.
-           (inst li flag-tn (make-fixup "gc_alloc_region" :foreign))
-           (loadw result-tn flag-tn)
-           (loadw flag-tn flag-tn 1)
+               (back-from-alloc (gen-label))
+               (boxed-region (- (+ static-space-start
+                                   ;; skip over the array header
+                                   (* 2 n-word-bytes))
+                                nil-value)))
+           (loadw result-tn null-tn 0 (- boxed-region))
+           (loadw flag-tn null-tn 1 (- boxed-region))
            (etypecase size
              (short-immediate
               (inst addi result-tn result-tn size))
@@ -584,7 +595,7 @@ and
              (tn
               (inst add result-tn result-tn size)))
            (inst blt flag-tn result-tn alloc)
-           (store-foreign-symbol-value result-tn "gc_alloc_region" flag-tn)
+           (storew result-tn null-tn 0 (- boxed-region))
            (etypecase size
              (short-immediate
               (inst subi result-tn result-tn size))

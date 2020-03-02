@@ -106,6 +106,7 @@ static inline enum prot_mode protection_mode(page_index_t page) {
 #if !defined LISP_FEATURE_SB_THREAD && \
   (defined LISP_FEATURE_ARM||defined LISP_FEATURE_ARM64 \
    ||defined LISP_FEATURE_PPC||defined LISP_FEATURE_PPC64 \
+   ||defined LISP_FEATURE_RISCV \
    ||defined LISP_FEATURE_X86||defined LISP_FEATURE_X86_64)
 #define SINGLE_THREAD_BOXED_REGION (struct alloc_region*)(STATIC_SPACE_START + 2*N_WORD_BYTES)
 #endif

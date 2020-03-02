@@ -52,7 +52,8 @@
          (float-start (- nl-start float-framesize)))
     (inst subi nsp-tn nsp-tn number-framesize)
     (save-to-stack nl-registers nsp-tn nl-start)
-    (store-foreign-symbol-value csp-tn "foreign_function_call_active" nl0)
+    ;; Storing NULL-TN will put at least one 1 bit somewhere into the word
+    (store-foreign-symbol-value null-tn "foreign_function_call_active" nl0)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" nl0)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" nl0)
     ;; Create a new frame and save descriptor regs on the stack for GC
@@ -61,7 +62,16 @@
     (inst addi csp-tn csp-tn lisp-framesize)
     (inst #-64-bit lw #+64-bit ld ca0 nsp-tn nbytes-start)
     (save-to-stack float-registers nsp-tn float-start t)
-    (inst jal lr-tn (make-fixup "alloc" :foreign))
+    ;; Load the address of the C 'alloc' function from the word following
+    ;; the 'boxed_region' which is embedded in a lisp vector in static space.
+    ;; We mustn't affect LIP (as jumping to a fixup would do),
+    ;; or LINKAGE_TEMP_REG (as jumping to a linkage entry would do)
+    ;; because primitive allocators can't mess up any state except that which
+    ;; the caller understands to be the scratch registers or the alloc-tn.
+    ;; This load could be moved backwards, but I'm trying to get it correct
+    ;; before making microscopic improvements.
+    (loadw lr-tn null-tn 6 (- nil-value static-space-start))
+    (inst jalr lr-tn lr-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
     (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)
     (inst subi csp-tn csp-tn lisp-framesize)

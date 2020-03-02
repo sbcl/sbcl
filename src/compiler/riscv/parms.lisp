@@ -106,7 +106,10 @@
 #+gencgc
 (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
-(defconstant linkage-table-entry-size #-64-bit 8 #+64-bit 20)
+;;; FIXME: store data and code entries identically, 1 pointer word for either.
+;;; The extra load needed for call indirection can be performed in the caller.
+;;; (This should be a multiple of n-word-bytes so that data entries are aligned)
+(defconstant linkage-table-entry-size #-64-bit 8 #+64-bit 24)
 
 #+(or linux netbsd)
 (progn

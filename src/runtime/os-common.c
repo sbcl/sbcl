@@ -194,6 +194,11 @@ void os_link_runtime()
     extern uword_t alloc_tramp(uword_t);
     static_space[6] = (lispobj)&alloc_tramp; // for LR rN, [NULL, #k] ; BLX rN
 #endif
+#ifdef LISP_FEATURE_RISCV
+    lispobj* static_space = (lispobj*)STATIC_SPACE_START;
+    extern lispobj alloc(sword_t);
+    static_space[6] = (lispobj)&alloc; // similar idea to above
+#endif
 #ifdef CALL_INTO_C
     extern long call_into_c();
     SYMBOL(CALL_INTO_C)->value = (lispobj)call_into_c;
@@ -206,7 +211,7 @@ void os_unlink_runtime()
 #ifdef CALL_INTO_C
     SYMBOL(CALL_INTO_C)->value = UNBOUND_MARKER_WIDETAG;
 #endif
-#ifdef LISP_FEATURE_ARM
+#if defined LISP_FEATURE_ARM || defined LISP_FEATURE_RISCV
     lispobj* static_space = (lispobj*)STATIC_SPACE_START;
     static_space[6] = 0;
 #endif

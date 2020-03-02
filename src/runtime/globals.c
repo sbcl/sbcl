@@ -23,6 +23,20 @@
 #include "validate.h"
 
 #ifndef LISP_FEATURE_SB_THREAD
+// Access to this variable from Lisp is more confusing than it should be for the 64-bit
+// machines, because they have to use a half-sized store, which if nothing else forces
+// the programmer to have to remember that fact. More critically, some of the uses try
+// to "cheat" a write of 1 by storing from any known nonzero register into this variable
+// under the assumption that any nonzero value is as good as a 1.  That's fine if the low
+// half of the source register is in fact nonzero. But what if the register holds
+// #x8ff00000000 ? Then the clever trick doesn't work. This is not merely a theoretical
+// problem - it happened on x86-64 where thread->pa was set to true by storing the
+// frame pointer ($RBP), but someone optimized the store to a 32-bit store (from $EBP)
+// when the frame pointer could have held a value exactly as illustrated above.
+// Ironically the CPU can do an immediate-to-mememory move, making that perhaps the most
+// egregious example of premature optimization that I had ever witnessed.
+// (That bug was fixed immediately upon discovery)
+// Perhaps this should be turned into a 'uword_t'?
 int foreign_function_call_active;
 #endif
 

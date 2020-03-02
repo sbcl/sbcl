@@ -11,7 +11,6 @@
 
 NM = ./linux-nm
 
-ASSEM_SRC = ldso-stubs.S
 ARCH_SRC = riscv-arch.c
 
 OS_SRC = linux-os.c linux-mman.c riscv-linux-os.c
@@ -19,6 +18,8 @@ OS_LIBS = -ldl
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif
+LINKFLAGS += -Wl,--export-dynamic
+DISABLE_PIE=no
 
 ifdef LISP_FEATURE_LARGEFILE
   CFLAGS += -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64
