@@ -28,40 +28,41 @@
              `(progn
                 (defregset *register-arg-offsets* ,@args)
                 (defconstant register-arg-count ,(length args)))))
-  (defreg zero 0)
-  (defreg lr 1)
-  (defreg nsp 2)
-  (defreg global 3)
-  (defreg thread 4)
-  (defreg lra 5) ; alternate link register
-  (defreg cfp 6)
-  (defreg ocfp 7)
-  (defreg nfp 8)
-  (defreg csp 9)
+                     ; ABI register mnemonic
+  (defreg zero 0)    ; zero
+  (defreg lr 1)      ; ra
+  (defreg nsp 2)     ; sp
+  (defreg global 3)  ; gp
+  (defreg thread 4)  ; tp
+  (defreg lra 5)     ; t0, alternate link register
+  (defreg cfp 6)     ; t1
+  (defreg ocfp 7)    ; t2
+  (defreg nfp 8)     ; s0, callee-saved
+  (defreg csp 9)     ; s1  "
 
-  (defreg a0 10)
-  (defreg nl0 11)
-  (defreg a1 12)
-  (defreg nl1 13)
-  (defreg a2 14)
-  (defreg nl2 15)
-  (defreg a3 16)
-  (defreg nl3 17)
-  (defreg l0 18)
-  (defreg nl4 19)
-  (defreg l1 20)
-  (defreg nl5 21)
-  (defreg l2 22)
-  (defreg nl6 23)
-  (defreg l3 24)
-  (defreg nl7 25)
+  (defreg a0 10)     ; a0, arg
+  (defreg nl0 11)    ; a1
+  (defreg a1 12)     ; a2
+  (defreg nl1 13)    ; a3
+  (defreg a2 14)     ; a4
+  (defreg nl2 15)    ; a5
+  (defreg a3 16)     ; a6
+  (defreg nl3 17)    ; a7
+  (defreg l0 18)     ; s2, callee-saved
+  (defreg nl4 19)    ; s3
+  (defreg l1 20)     ; s4
+  (defreg nl5 21)    ; s5
+  (defreg l2 22)     ; s6
+  (defreg nl6 23)    ; s7
+  (defreg l3 24)     ; s8
+  (defreg nl7 25)    ; s9
 
-  (defreg cfunc 26)
-  (defreg lexenv 27)
-  (defreg null 28)
-  (defreg code 29)
-  (defreg lip 30)
-  (defreg nargs 31)
+  (defreg cfunc 26)  ; s10
+  (defreg lexenv 27) ; s11
+  (defreg null 28)   ; t3
+  (defreg code 29)   ; t4
+  (defreg lip 30)    ; t5
+  (defreg nargs 31)  ; t6
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
   (defregset descriptor-regs a0 a1 a2 a3 l0 l1 l2 l3 ocfp lra lexenv)
