@@ -160,10 +160,7 @@
 (defmacro !define-byte-bashers (bitsize)
   (let* ((bytes-per-word (/ n-word-bits bitsize))
          (byte-offset `(integer 0 (,bytes-per-word)))
-         (max-bytes sb-xc:most-positive-fixnum)
-         (offset `(integer 0 ,max-bytes))
-         (max-word-offset (ceiling max-bytes bytes-per-word))
-         (word-offset `(integer 0 ,max-word-offset))
+         (word-offset `(integer 0 ,(ceiling sb-xc:array-dimension-limit bytes-per-word)))
          (fix-sap-and-offset-name (intern (format nil "FIX-SAP-AND-OFFSET-UB~D" bitsize)))
          (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
          (array-fill-name (intern (format nil "UB~D-BASH-FILL" bitsize) (find-package "SB-KERNEL")))
@@ -233,18 +230,18 @@
         (values))
 
       ;; common uses for constant-byte-bashing
-      (defknown ,array-fill-name (word simple-unboxed-array ,offset ,offset)
+      (defknown ,array-fill-name (word simple-unboxed-array index index)
           simple-unboxed-array
           ()
         :result-arg 1)
       (defun ,array-fill-name (value dst dst-offset length)
-        (declare (type word value) (type ,offset dst-offset length))
+        (declare (type word value) (type index dst-offset length))
         (declare (optimize (speed 3) (safety 1)))
         (,constant-bash-name dst dst-offset length value
                              #'%vector-raw-bits #'%set-vector-raw-bits)
         dst)
       (defun ,system-area-fill-name (value dst dst-offset length)
-        (declare (type word value) (type ,offset dst-offset length))
+        (declare (type word value) (type index dst-offset length))
         (declare (optimize (speed 3) (safety 1)))
         (multiple-value-bind (dst dst-offset) (,fix-sap-and-offset-name dst dst-offset)
           (,constant-bash-name dst dst-offset length value
@@ -535,7 +532,7 @@
 
          ;; common uses for unary-byte-bashing
          (defun ,array-copy-name (src src-offset dst dst-offset length)
-           (declare (type ,offset src-offset dst-offset length))
+           (declare (type index src-offset dst-offset length))
            (locally (declare (optimize (speed 3) (safety 1)))
              (,unary-bash-name src src-offset dst dst-offset length
                                #'%vector-raw-bits
@@ -543,7 +540,7 @@
                                #'%vector-raw-bits)))
 
          (defun ,system-area-copy-name (src src-offset dst dst-offset length)
-           (declare (type ,offset src-offset dst-offset length))
+           (declare (type index src-offset dst-offset length))
            (locally (declare (optimize (speed 3) (safety 1)))
              (multiple-value-bind (src src-offset) (,fix-sap-and-offset-name src src-offset)
                (declare (type system-area-pointer src))
@@ -554,7 +551,7 @@
                                    #'word-sap-ref)))))
 
          (defun ,array-copy-to-system-area-name (src src-offset dst dst-offset length)
-           (declare (type ,offset src-offset dst-offset length))
+           (declare (type index src-offset dst-offset length))
            (locally (declare (optimize (speed 3) (safety 1)))
              (multiple-value-bind (dst dst-offset) (,fix-sap-and-offset-name  dst dst-offset)
                (,unary-bash-name src src-offset dst dst-offset length
@@ -562,7 +559,7 @@
                                  #'%vector-raw-bits))))
 
          (defun ,system-area-copy-to-array-name (src src-offset dst dst-offset length)
-           (declare (type ,offset src-offset dst-offset length))
+           (declare (type index src-offset dst-offset length))
            (locally (declare (optimize (speed 3) (safety 1)))
              (multiple-value-bind (src src-offset) (,fix-sap-and-offset-name src src-offset)
                (,unary-bash-name src src-offset dst dst-offset length
@@ -585,17 +582,15 @@
         finally (return `(progn ,@fixers ,@bashers)))
 
 (defmacro !define-constant-byte-bashers (bitsize type value-transformer &optional (name type))
-  (let* ((max-bytes sb-xc:most-positive-fixnum)
-         (offset `(integer 0 ,max-bytes))
-         (constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
-         (array-fill-name (intern (format nil "UB~D-BASH-FILL-WITH-~A" bitsize name) (find-package "SB-KERNEL"))))
+  (let ((constant-bash-name (intern (format nil "CONSTANT-UB~D-BASH" bitsize) (find-package "SB-KERNEL")))
+        (array-fill-name (intern (format nil "UB~D-BASH-FILL-WITH-~A" bitsize name) (find-package "SB-KERNEL"))))
     `(progn
-       (defknown ,array-fill-name (,type simple-unboxed-array ,offset ,offset)
+       (defknown ,array-fill-name (,type simple-unboxed-array index index)
            simple-unboxed-array
            ()
          :result-arg 1)
        (defun ,array-fill-name (value dst dst-offset length)
-         (declare (type ,type value) (type ,offset dst-offset length))
+         (declare (type ,type value) (type index dst-offset length))
          (declare (optimize (speed 3) (safety 1)))
          (,constant-bash-name dst dst-offset length (,value-transformer value)
                               #'%vector-raw-bits #'%set-vector-raw-bits)
