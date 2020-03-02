@@ -124,12 +124,15 @@ about function addresses and register values.")
 
 (define-arg-type reg
   :printer (lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let ((regname (get-reg-name value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'registers regname dstate)
-                 (maybe-add-notes value dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'registers regname dstate)
+                        (maybe-add-notes value dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (defparameter float-reg-symbols
   #.(coerce
@@ -138,23 +141,29 @@ about function addresses and register values.")
 
 (define-arg-type fp-reg
   :printer (lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let ((regname (aref float-reg-symbols value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'float-registers regname dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'float-registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 ;;; The extended 6 bit floating point register encoding for the double
 ;;; and long instructions of the sparc v9.
 (define-arg-type fp-ext-reg
   :printer (lambda (value stream dstate)
-               (declare (stream stream) (fixnum value))
+               (declare (fixnum value))
                (let* (;; Decode the register number.
                       (value (if (oddp value) (+ value 31) value))
                       (regname (aref float-reg-symbols value)))
-                 (princ regname stream)
-                 (maybe-note-associated-storage-ref
-                  value 'float-registers regname dstate))))
+                 (cond (stream
+                        (princ regname stream)
+                        (maybe-note-associated-storage-ref
+                         value 'float-registers regname dstate))
+                       (t
+                        (operand regname dstate))))))
 
 (define-arg-type relative-label
   :sign-extend t
@@ -252,9 +261,11 @@ about function addresses and register values.")
 
 (define-arg-type integer-condition-register
     :printer (lambda (value stream dstate)
-                 (declare (stream stream) (fixnum value) (ignore dstate))
+                 (declare (fixnum value))
                  (let ((regname (aref integer-condition-reg-symbols value)))
-                   (princ regname stream))))
+                   (if stream
+                       (princ regname stream)
+                       (operand regname dstate)))))
 
 (defconstant-eqx branch-predictions
   '(:pn :pt)
@@ -310,15 +321,19 @@ about function addresses and register values.")
 
 (define-arg-type fp-condition-register
     :printer (lambda (value stream dstate)
-                 (declare (stream stream) (fixnum value) (ignore dstate))
+                 (declare (fixnum value))
                  (let ((regname (aref fp-condition-reg-symbols value)))
-                   (princ regname stream))))
+                   (if stream
+                       (princ regname stream)
+                       (operand regname dstate)))))
 
 (define-arg-type fp-condition-register-shifted
     :printer (lambda (value stream dstate)
-                 (declare (stream stream) (fixnum value) (ignore dstate))
+                 (declare (fixnum value))
                  (let ((regname (aref fp-condition-reg-symbols (ash value -1))))
-                   (princ regname stream))))
+                   (if stream
+                       (princ regname stream)
+                       (operand regname dstate)))))
 
 (defun fp-condition (condition-reg)
   (or (position condition-reg fp-condition-registers)
@@ -484,9 +499,11 @@ about function addresses and register values.")
 
 (define-arg-type cond-move-condition-register
     :printer (lambda (value stream dstate)
-                 (declare (stream stream) (fixnum value) (ignore dstate))
+                 (declare (fixnum value))
                  (let ((regname (aref cond-move-condition-reg-symbols value)))
-                   (princ regname stream))))
+                   (if stream
+                       (princ regname stream)
+                       (operand regname dstate)))))
 
 ;; From the given condition register, figure out what the cc2, cc1,
 ;; and cc0 bits should be.  Return cc2 and cc1/cc0 concatenated.
@@ -559,9 +576,11 @@ about function addresses and register values.")
 
 (define-arg-type register-condition
     :printer (lambda (value stream dstate)
-                 (declare (stream stream) (fixnum value) (ignore dstate))
+                 (declare (fixnum value))
                  (let ((regname (aref cond-move-integer-condition-vec value)))
-                   (princ regname stream))))
+                   (if stream
+                       (princ regname stream)
+                       (operand regname dstate)))))
 
 (defconstant-eqx cond-move-integer-printer
   `(:name rcond :tab rs1 ", " (:choose immed rs2) ", " rd)
