@@ -3548,6 +3548,7 @@
              ((size2 dst2 src2) (parse-2-operands next)))
     (declare (ignore src2))
     (when (and (gpr-tn-p dst1)
+               (tn-p dst2)
                (location= dst2 dst1)
                (eq size1 :qword)
                (eq size2 :dword))
