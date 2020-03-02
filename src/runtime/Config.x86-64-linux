@@ -43,9 +43,7 @@ ifdef LISP_FEATURE_SB_CORE_COMPRESSION
 endif
 
 CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer
-ifeq ($(LISP_FEATURE_SB_DYNAMIC_CORE),1)
-  DISABLE_PIE=no
-endif
+DISABLE_PIE=no
 
 ifdef LISP_FEATURE_IMMOBILE_SPACE
   GC_SRC = fullcgc.c gencgc.c traceroot.c immobile-space.c elf.c

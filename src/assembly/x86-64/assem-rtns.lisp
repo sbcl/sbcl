@@ -372,12 +372,8 @@
     ;; to stack, because we do do not give the register allocator access to it.
     ;; And call_into_lisp saves it as per convention, not that it matters,
     ;; because there's no way to get back into C code anyhow.
-    #+sb-dynamic-core
-    (progn
-      (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign-dataref)))
-      (inst mov thread-base-tn (ea thread-base-tn)))
-    #-sb-dynamic-core
-    (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign)))))
+    (inst mov thread-base-tn (ea (make-fixup "all_threads" :foreign-dataref)))
+    (inst mov thread-base-tn (ea thread-base-tn))))
 
 ;;; Perform a store to code, updating the GC page (card) protection bits.
 ;;; This is not a "good" implementation of soft card marking.

@@ -108,20 +108,6 @@
   (inst push (ea n-word-bytes rbp-tn))
   (inst jmp (ea (- (* closure-fun-slot n-word-bytes) fun-pointer-lowtag) rax)))
 
-#-sb-dynamic-core
-(define-assembly-routine
-    (undefined-alien-tramp (:return-style :none))
-    ()
-  ;; Unlike in the above UNDEFINED-TRAMP, we *should* *not* issue "POP [RBP+8]"
-  ;; because that would overwrite the PC to which the calling function is
-  ;; supposed to return with the address from which this alien call was made
-  ;; (a PC within that same function) since C convention does not arrange
-  ;; for RBP to hold the new frame pointer prior to making a call.
-  ;; This wouldn't matter much because the only restart available is to throw
-  ;; to toplevel, so a lost frame is not hugely important, but it's annoying.
-  (error-call nil 'undefined-alien-fun-error rbx-tn))
-
-#+sb-dynamic-core
 (define-assembly-routine
     (undefined-alien-tramp (:return-style :none))
     ()

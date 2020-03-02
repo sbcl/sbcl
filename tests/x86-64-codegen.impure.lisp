@@ -192,8 +192,7 @@
       (let ((lines (disassembly-lines 'c)))
         (expect "#<FDEFN G>" lines)))))
 
-(with-test (:name :c-call
-            :skipped-on (not :sb-dynamic-core))
+(with-test (:name :c-call)
   (let* ((lines (split-string
                  (with-output-to-string (s)
                    (let ((sb-disassem:*disassem-location-column-width* 0))

@@ -502,13 +502,9 @@
       (progn
         ;; Load 'all_threads' into EDI (which was already spilled)
         ;; as the register with which to access thread slots.
-        #+sb-dynamic-core
-        (progn
-          (inst mov edi-tn
-                (make-ea :dword :disp (make-fixup "all_threads" :foreign-dataref)))
-          (inst mov edi-tn (make-ea :dword :base edi-tn)))
-        #-sb-dynamic-core
-        (inst mov edi-tn (make-ea :dword :disp (make-fixup "all_threads" :foreign))))
+        (inst mov edi-tn
+              (make-ea :dword :disp (make-fixup "all_threads" :foreign-dataref)))
+        (inst mov edi-tn (make-ea :dword :base edi-tn)))
       #+(and win32 sb-thread)
       (inst mov edi-tn (make-ea :dword :disp +win32-tib-arbitrary-field-offset+) :fs)
 

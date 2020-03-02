@@ -39,11 +39,10 @@
 #define GNAME(var) _##var
 #endif
 
-// Produce position-independent code for LISP_FEATURE_SB_DYNAMIC_CORE.
+// Produce position-independent code.
 // macOS does not like the general way we do this, so do something different.
 // I don't know about win32, so conservatively exclude that too.
-#if defined LISP_FEATURE_SB_DYNAMIC_CORE \
-  && !defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_WIN32
+#if !defined LISP_FEATURE_DARWIN && !defined LISP_FEATURE_WIN32
 #define PIC_CALL(x) x@PLT
 #define LOAD_PIC_VAR(x,dest) mov GNAME(x)@GOTPCREL(%rip), dest ; mov (dest), dest
 #else
