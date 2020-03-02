@@ -434,10 +434,11 @@
 
 ;; O_LARGEFILE is always set on 64-bit *nix platforms even though the whole
 ;; flag makes no sense.
+#-win32
 (deftest fcntl.1
-  (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
-    (logtest (sb-posix:fcntl fd sb-posix::f-getfl)
-             sb-posix::o-nonblock))
+    (let ((fd (sb-posix:open "/dev/null" sb-posix::o-nonblock)))
+      (logtest (sb-posix:fcntl fd sb-posix::f-getfl)
+               sb-posix::o-nonblock))
   t)
 
 #-(or hpux win32 netbsd) ; fix: cant handle c-vargs
