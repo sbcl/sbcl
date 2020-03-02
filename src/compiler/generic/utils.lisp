@@ -148,19 +148,6 @@
               (t
                (make-normal-tn *fixnum-primitive-type*)))))
 
-;;; This function is called by the ENTRY-ANALYZE phase, allowing
-;;; VM-dependent initialization of the IR2-COMPONENT structure. We
-;;; push placeholder entries in the CONSTANTS to leave room for
-;;; additional noise in the code object header.
-(defun select-component-format (component)
-  (declare (type component component))
-  (let* ((2comp (component-info component))
-         (n-entries (length (sb-c::ir2-component-entries 2comp)))
-         (consts (ir2-component-constants 2comp)))
-    (dotimes (i (+ code-constants-offset (* sb-vm:code-slots-per-simple-fun n-entries)))
-      (vector-push-extend nil consts)))
-  (values))
-
 (defun error-call (vop error-code &rest values)
   "Cause an error.  ERROR-CODE is the error to cause."
   (emit-error-break vop error-trap (error-number-or-lose error-code) values))

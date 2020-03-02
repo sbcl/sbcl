@@ -1019,7 +1019,7 @@
                          name
                          ;; Calls to immobile space fdefns won't use this constant,
                          ;; but it needs to exist for GC's pointer tracing.
-                         (make-load-time-constant-tn :fdefinition name))
+                         (make-load-time-constant-tn :named-call name))
                      name)))
           (t
            (values (lvar-tn node block lvar) nil)))))

@@ -337,7 +337,7 @@
     (try '(cdr obj) '("hi" . 1) '("hi"))))
 
 (with-test (:name :huge-code :skipped-on (not :immobile-code))
-  (sb-vm::allocate-code-object :immobile 4 (* 2 1024 1024)))
+  (sb-vm::allocate-code-object :immobile 0 4 (* 2 1024 1024)))
 
 (defun bbb (x y z)
   ;; I don't want the number of expected comparisons to depend on whether

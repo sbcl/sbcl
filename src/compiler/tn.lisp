@@ -216,11 +216,15 @@
 ;;; Create a constant TN. The backend dependent
 ;;; IMMEDIATE-CONSTANT-SC function is used to determine whether the
 ;;; constant has an immediate representation.
+;;; FIXME: this can create multiple boxed TNs (consuming more than one
+;;; slot in the boxed constant vector) for a given leaf when called by
+;;; EMIT-MOVES-AND-COERCIONS. That's wasteful.
 (defun make-constant-tn (constant &optional force-boxed)
   (declare (type constant constant))
   (or (leaf-info constant)
       (multiple-value-bind (immed null-offset)
           (immediate-constant-sc (constant-value constant))
+        ;; currently NULL-OFFSET is used only on ARM64
         (if null-offset
             (setf (leaf-info constant)
                   (component-live-tn
@@ -286,6 +290,11 @@
 ;;; Return a load-time constant TN with the specified KIND and INFO.
 ;;; If the desired CONSTANTS entry already exists, then reuse it,
 ;;; otherwise allocate a new load-time constant slot.
+;;; FIXME: this function deserves a comment about why it creates a new TN even
+;;; when KIND + INFO are already found. It's as if we need to maintain a 1:1
+;;; relation between TN and TN-REF for a subset of constants, but it's unclear
+;;; why that should be necessary. The shape of this algorithm suggests more than
+;;; mere oversight, and that it was a deliberate choice.
 (defun make-load-time-constant-tn (kind info)
   (declare (type keyword kind))
   (let* ((component (component-info *component-being-compiled*))
@@ -295,7 +304,7 @@
                        (svref *backend-sc-numbers* sb-vm:constant-sc-number)))
          (constants (ir2-component-constants component)))
     (setf (tn-type res) *universal-type*)
-    (do ((i 0 (1+ i)))
+    (do ((i 1 (1+ i)))
         ((= i (length constants))
          (setf (tn-offset res) i)
          (vector-push-extend (list kind info res) constants))

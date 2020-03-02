@@ -2475,17 +2475,27 @@
                (rem x 10)))))
         (assert (not (ctu:find-code-constants f :type 'bignum)))))
 
-(with-test (:name :deduplicated-fdefns)
-  (dolist (c (sb-vm::list-allocated-objects :all :type sb-vm:code-header-widetag))
-    (let (dup-fdefns names)
-      (dotimes (i (sb-kernel:code-header-words c))
-        (let ((obj (sb-kernel:code-header-ref c i)))
-          (when (sb-kernel:fdefn-p obj)
-            (let ((name (sb-kernel:fdefn-name obj)))
-              (when (member name names)
-                (push obj dup-fdefns))
-              (push name names)))))
-      (assert (not dup-fdefns)))))
+(with-test (:name :deduplicated-fdefns :fails-on (not :64-bit))
+  (flet ((scan-range (c start end)
+           (let (dup-fdefns names)
+             (loop for i from start below end
+                   do (let ((obj (sb-kernel:code-header-ref c i)))
+                        (when (sb-kernel:fdefn-p obj)
+                          (let ((name (sb-kernel:fdefn-name obj)))
+                            (when (member name names)
+                              (push obj dup-fdefns))
+                            (push name names)))))
+             (assert (not dup-fdefns)))))
+    (dolist (c (sb-vm::list-allocated-objects :all :type sb-vm:code-header-widetag))
+      (let* ((start (+ sb-vm:code-constants-offset
+                       (* (sb-kernel:code-n-entries c)
+                          sb-vm:code-slots-per-simple-fun)))
+             (end (+ start (sb-kernel:code-n-named-calls c))))
+        ;; Within each subset of FDEFNs there should be no duplicates
+        ;; by name. But there could be an fdefn that is in the union of
+        ;; the ranges twice, if used for named call and a global ref.
+        (scan-range c start end)
+        (scan-range c end (sb-kernel:code-header-words c))))))
 
 (with-test (:name :map-all-lvar-dests)
   (checked-compile-and-assert

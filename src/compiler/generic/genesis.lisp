@@ -620,12 +620,17 @@
          (gen-shift (if (= widetag sb-vm:fdefn-widetag) 8 24)))
     (write-wordindexed/raw des 0 (logior (ash gen gen-shift) header-word))))
 
-(defun write-code-header-words (descriptor boxed unboxed)
+(defun write-code-header-words (descriptor boxed unboxed n-named-calls)
+  (declare (ignorable n-named-calls))
   (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
     (write-header-word descriptor
                        (logior (ash total-words sb-vm::code-header-size-shift)
                                sb-vm:code-header-widetag)))
-  (write-wordindexed/raw descriptor 1 (* boxed sb-vm:n-word-bytes)))
+  (write-wordindexed/raw
+   descriptor
+   1
+   (logior #+64-bit (ash n-named-calls 32)
+           (* boxed sb-vm:n-word-bytes))))
 
 (defun write-header-data+tag (des header-data widetag)
   (write-header-word des (logior (ash header-data sb-vm:n-widetag-bits)
@@ -2571,7 +2576,8 @@ core and return a descriptor to it."
 (defvar *show-pre-fixup-code-p* nil)
 
 (define-cold-fop (fop-load-code (header code-size n-fixups))
-  (let* (;; The number of constants is rounded up to even (if required)
+  (let* ((n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         ;; The number of constants is rounded up to even (if required)
          ;; to ensure that the code vector will be properly aligned.
          (n-boxed-words (ash header -1))
          (aligned-n-boxed-words (align-up n-boxed-words sb-c::code-boxed-words-align))
@@ -2581,7 +2587,7 @@ core and return a descriptor to it."
                       *dynamic*)
                   (+ (ash aligned-n-boxed-words sb-vm:word-shift) code-size)
                   sb-vm:other-pointer-lowtag :code)))
-    (write-code-header-words des aligned-n-boxed-words code-size)
+    (write-code-header-words des aligned-n-boxed-words code-size n-named-calls)
     (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
     (do ((index (1- n-boxed-words) (1- index)))
         ((< index sb-vm:code-constants-offset))
@@ -2672,7 +2678,7 @@ core and return a descriptor to it."
                   (+ (ash header-n-words sb-vm:word-shift) length)
                   sb-vm:other-pointer-lowtag)))
     (setf *cold-assembler-obj* asm-code)
-    (write-code-header-words asm-code header-n-words rounded-length)
+    (write-code-header-words asm-code header-n-words rounded-length 0)
     (let ((start (+ (descriptor-byte-offset asm-code)
                     (ash header-n-words sb-vm:word-shift))))
       (read-bigvec-as-sequence-or-die (descriptor-mem asm-code)

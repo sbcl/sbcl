@@ -348,7 +348,12 @@
   ;;
   ;; A null entry in this vector is a placeholder for implementation
   ;; overhead that is eventually stuffed in somehow.
-  (constants (make-array 10 :fill-pointer 0 :adjustable t) :type vector)
+  ;; Prior to performing SORT-BOXED-CONSTANTS, the index 0 is reserved
+  ;; to signify something (other than NIL) if stored as a TN-OFFSET,
+  ;; though nothing makes use of this at present.
+  (constants (make-array 10 :fill-pointer 1 :adjustable t
+                         :initial-element :ignore)
+             :type vector :read-only t)
   ;; some kind of info about the component's run-time representation.
   ;; This is filled in by the VM supplied SELECT-COMPONENT-FORMAT function.
   format

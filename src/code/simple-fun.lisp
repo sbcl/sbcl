@@ -403,6 +403,13 @@
   (declare (type code-component code-obj))
   (ash (code-fun-table-count code-obj) -4))
 
+;;; Number of "called" fdefns, which does not count fdefns in the boxed
+;;; constants that are used in #'FUN syntax without a funcall necessarily
+;;; occuring, though it may.
+(defun code-n-named-calls (code-obj)
+  (ash (sb-vm::%code-boxed-size code-obj)
+       (+ -32 sb-vm:n-fixnum-tag-bits)))
+
 ;;; Return the offset in bytes from (CODE-INSTRUCTIONS CODE-OBJ)
 ;;; to its FUN-INDEXth function.
 (declaim (inline %code-fun-offset))

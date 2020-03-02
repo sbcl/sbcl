@@ -933,7 +933,8 @@
   (let* ((n-fixups (dump-fixups fixups fasl-output))
          (2comp (component-info component))
          (constants (sb-c:ir2-component-constants 2comp))
-         (header-length (length constants)))
+         (header-length (length constants))
+         (n-named-calls 0))
     (collect ((patches))
       ;; Dump the constants, noting any :ENTRY constants that have to
       ;; be patched.
@@ -960,7 +961,8 @@
                     (dump-fop 'fop-misc-trap fasl-output)))))
                (:load-time-value
                 (dump-push (cadr entry) fasl-output))
-               (:fdefinition
+               ((:named-call :fdefinition)
+                (when (eq (car entry) :named-call) (incf n-named-calls))
                 (dump-object (cadr entry) fasl-output)
                 (dump-fop 'fop-fdefn fasl-output))
                (:known-fun
@@ -979,7 +981,11 @@
                 (logior (ash header-length 1)
                         (if (sb-c::code-immobile-p component) 1 0))
                 code-length n-fixups)
-
+      ;; Fasl dumper/loader convention allows at most 3 integer args.
+      ;; Others have to be written with explicit calls.
+      (dump-integer-as-n-bytes (the (unsigned-byte 22) n-named-calls)
+                               4 ; output 4 bytes
+                               fasl-output)
       (dump-segment code-segment code-length fasl-output)
 
       (let ((handle (dump-pop fasl-output)))

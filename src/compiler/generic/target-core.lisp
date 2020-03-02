@@ -176,7 +176,8 @@
   (let* ((nbytes (code-object-size code))
          (boxed (code-header-words code)) ; word count
          (unboxed (- nbytes (ash boxed sb-vm:word-shift))) ; byte count
-         (copy (allocate-code-object :dynamic boxed unboxed)))
+         (copy (allocate-code-object
+                :dynamic (code-n-named-calls code) boxed unboxed)))
     (with-pinned-objects (code copy)
       (%byte-blt (code-instructions code) 0 (code-instructions copy) 0 unboxed)
       ;; copy boxed constants so that the fixup step (if needed) sees the 'fixups'
@@ -254,8 +255,10 @@
            (constants (ir2-component-constants 2comp))
            (nboxed (align-up (length constants) sb-c::code-boxed-words-align))
            (code-obj (allocate-code-object
-                      (component-mem-space component) nboxed length)))
-
+                      (component-mem-space component)
+                      (count-if (lambda (x) (typep x '(cons (eql :named-call))))
+                                constants)
+                      nboxed length)))
       ;; The following operations need the code pinned:
       ;; 1. copying into code-instructions (a SAP)
       ;; 2. apply-core-fixups and sanctify-for-execution
@@ -304,7 +307,10 @@
 
       (push debug-info (core-object-debug-info object))
 
-      (do ((index sb-vm:code-constants-offset (1+ index)))
+      (do ((index (+ sb-vm:code-constants-offset
+                     (* (length (ir2-component-entries 2comp))
+                        sb-vm:code-slots-per-simple-fun))
+                  (1+ index)))
           ((>= index (length constants)))
         (let* ((const (aref constants index))
                (kind (if (listp const) (car const) const)))
@@ -315,7 +321,7 @@
             (t
              (setf (code-header-ref code-obj index)
                    (etypecase kind
-                     ((eql :fdefinition)
+                     ((member :named-call :fdefinition)
                       (find-or-create-fdefn (cadr const)))
                      ((eql :known-fun)
                       (%coerce-name-to-fun (cadr const)))

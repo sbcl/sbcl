@@ -424,15 +424,15 @@
 ;;; 25 bits is the maximum unboxed size expressed in bytes,
 ;;; if n-word-bytes = 8 and almost the entire code object is unboxed
 ;;; which is, practically speaking, not really possible.
-(declaim (ftype (sfunction (t (unsigned-byte 22) (unsigned-byte 25))
+(declaim (ftype (sfunction (t (unsigned-byte 16) (unsigned-byte 22) (unsigned-byte 25))
                            code-component)
                 allocate-code-object))
 ;;; Allocate a code component with BOXED words in the header
 ;;; followed by UNBOXED bytes of raw data.
 ;;; BOXED must be the exact count of boxed words desired. No adjustments
 ;;; are made for alignment considerations or the fixed slots.
-(defun allocate-code-object (space boxed unboxed)
-  (declare (ignorable space))
+(defun allocate-code-object (space n-named-calls boxed unboxed)
+  (declare (ignorable space n-named-calls))
   (let* ((total-words
            (the (unsigned-byte 22) ; Enforce limit on total words as well
                 (align-up (+ boxed (ceiling unboxed n-word-bytes)) 2)))
@@ -489,7 +489,10 @@
         ;; because the boxed words will not necessarily have been pre-zeroed;
         ;; scavenging them prior to zeroing them out would see wild pointers.
         (setf (sap-ref-word sap (ash code-boxed-size-slot word-shift))
-              (ash boxed word-shift))))
+              ;; For 32-bit words, we'll have to add another primitive-object slot.
+              ;; But so far nothing makes use of the n-named-calls value.
+              (logior #+64-bit (ash n-named-calls 32)
+                      (ash boxed word-shift)))))
 
     ;; FIXME: Sort out 64-bit and cheneygc.
     #+(and 64-bit cheneygc)

@@ -512,9 +512,9 @@
 ;;; putting the implementation and version in required fields in the
 ;;; fasl file header.)
 
-;; Cold-load calls COLD-LOAD-CODE instead
 (define-fop 16 :not-host (fop-load-code ((:operands header n-code-bytes n-fixups)))
-  (let* ((n-boxed-words (ash header -1))
+  (let* ((n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
+         (n-boxed-words (ash header -1))
          (n-constants (- n-boxed-words sb-vm:code-constants-offset)))
     ;; stack has (at least) N-CONSTANTS words plus debug-info
     (with-fop-stack ((stack (operand-stack)) ptr (1+ n-constants))
@@ -522,6 +522,7 @@
              (n-boxed-words (+ sb-vm:code-constants-offset n-constants))
              (code (sb-c:allocate-code-object
                     (if (oddp header) :immobile :dynamic)
+                    n-named-calls
                     (align-up n-boxed-words sb-c::code-boxed-words-align)
                     n-code-bytes)))
         (loop for i of-type index from sb-vm:code-constants-offset

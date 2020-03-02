@@ -14,11 +14,7 @@
 (in-package "SB-C")
 
 ;;; This phase runs before IR2 conversion, initializing each XEP's
-;;; ENTRY-INFO structure. We call the VM-supplied
-;;; SELECT-COMPONENT-FORMAT function to make VM-dependent
-;;; initializations in the IR2-COMPONENT. This includes setting the
-;;; IR2-COMPONENT-KIND and allocating fixed implementation overhead in
-;;; the constant pool. If there was a forward reference to a function,
+;;; ENTRY-INFO structure.  If there was a forward reference to a function,
 ;;; then the ENTRY-INFO will already exist, but will be uninitialized.
 (defun entry-analyze (component)
   (let ((2comp (component-info component)))
@@ -28,7 +24,6 @@
                         (setf (leaf-info fun) (make-entry-info)))))
           (compute-entry-info fun info)
           (push info (ir2-component-entries 2comp))))))
-  (select-component-format component)
   (values))
 
 ;;; An "effectively" null environment captures at most

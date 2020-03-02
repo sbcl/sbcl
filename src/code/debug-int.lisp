@@ -3493,7 +3493,7 @@ register."
                                  src-start)))
            (code-object
             (sb-c:allocate-code-object
-             nil
+             nil 0
              ;; For non-x86: a single boxed constant holds the true LRA.
              ;; For x86[-64]: one boxed constant holds the code object to which
              ;; to return, and one holds the displacement into that object.
