@@ -514,7 +514,7 @@ case "$sbcl_os" in
         link_or_copy hpux-os.h target-os.h
         ;;
     haiku)
-        printf ' :unix :elf :haiku' >> $ltf
+        printf ' :unix :elf :haiku :int4-breakpoints' >> $ltf
         link_or_copy Config.$sbcl_arch-haiku Config
         link_or_copy $sbcl_arch-haiku-os.h target-arch-os.h
         link_or_copy haiku-os.h target-os.h

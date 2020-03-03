@@ -59,10 +59,7 @@ char *os_get_runtime_executable_path(int __attribute__((unused)) external)
     int cookie = 0;
     image_info info;
     int status = _get_next_image_info(0, &cookie, &info, sizeof(info));
-    if (status == 0)
-        return info.name;
-    else
-        return NULL;
+    return (status == 0) ? copied_string(info.name) : 0;
 }
 
 void

@@ -2,6 +2,10 @@
 
 (in-package "SB-SYS")
 
+(defun software-type ()
+  "Return a string describing the supporting software."
+  "Haiku")
+
 ;;; Return system time, user time and number of page faults.
 (defun get-system-info ()
   (multiple-value-bind (err? utime stime maxrss ixrss idrss

@@ -1279,7 +1279,7 @@ Users Manual for details about the PROCESS structure.
           (t
            (fail "invalid option: ~S" object))))))
 
-#+(or linux sunos hpux)
+#+(or linux sunos hpux haiku)
 (defun software-version ()
   "Return a string describing version of the supporting software, or NIL
   if not available."
@@ -1287,5 +1287,9 @@ Users Manual for details about the PROCESS structure.
       (setf sb-sys::*software-version*
             (string-trim '(#\newline)
                          (sb-kernel:with-simple-output-to-string (stream)
-                           (run-program "/bin/uname" `("-r")
+                           (run-program "/bin/uname"
+                                        ;; "-r" on haiku just prints "1"
+                                        ;; but "-v" prints some detail.
+                                        #+haiku '("-v")
+                                        #-haiku '("-r")
                                         :output stream))))))

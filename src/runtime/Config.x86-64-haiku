@@ -20,7 +20,7 @@ ifdef LISP_FEATURE_SB_THREAD
   OS_LIBS += -lpthread
 endif
 
-CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer
+CFLAGS += -Wunused-parameter -fno-omit-frame-pointer -momit-leaf-frame-pointer -gdwarf-2
 # The installed compiler won't work with no-pie.
 # The support ticket https://dev.haiku-os.org/ticket/12430 is closed,
 # but it certainly looks like my default install succumbed to the same problem
