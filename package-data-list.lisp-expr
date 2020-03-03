@@ -2339,7 +2339,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "ASTERISKS-AROUND-CONSTANT-VARIABLE-NAME"
                "&OPTIONAL-AND-&KEY-IN-LAMBDA-LIST"
                "UNDEFINED-ALIEN-STYLE-WARNING"
-               #+(or sb-eval sb-fasteval)
                "LEXICAL-ENVIRONMENT-TOO-COMPLEX"
                "CHARACTER-DECODING-ERROR-IN-COMMENT"
                "DEPRECATED-EVAL-WHEN-SITUATIONS"
