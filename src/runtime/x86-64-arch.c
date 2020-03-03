@@ -489,7 +489,6 @@ arch_install_interrupt_handlers()
     SHOW("returning from arch_install_interrupt_handlers()");
 }
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 void
 arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 {
@@ -503,7 +502,6 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
     reloc_addr[6] = 0x66; reloc_addr[7] = 0x90; /* 2-byte NOP */
     *(void**)(reloc_addr+8) = target_addr;
 }
-#endif
 
 /* These setup and check *both* the sse2 and x87 FPUs. While lisp code
    only uses the sse2 FPU, other code (such as libc) may use the x87 FPU.

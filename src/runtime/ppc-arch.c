@@ -568,8 +568,6 @@ ppc_flush_icache(os_vm_address_t address, os_vm_size_t length)
   }
 }
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
-
 /* Linkage tables for PowerPC
  *
  * Linkage entry size is 16, because we need at least 4 instructions to
@@ -732,4 +730,3 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif

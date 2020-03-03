@@ -340,7 +340,6 @@ void arch_install_interrupt_handlers()
 }
 
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 
 /* This a naive port from CMUCL/sparc, which was mostly stolen from the
  * CMUCL/x86 version, with adjustments for sparc
@@ -426,4 +425,3 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif

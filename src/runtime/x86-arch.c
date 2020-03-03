@@ -382,7 +382,6 @@ gencgc_apply_code_fixups(struct code *old_code, struct code *new_code)
     }
 }
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 void
 arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 {
@@ -405,4 +404,3 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
     /* write a nop for good measure. */
     *reloc_addr = 0x90;
 }
-#endif

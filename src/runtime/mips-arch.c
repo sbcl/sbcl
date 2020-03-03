@@ -428,8 +428,6 @@ arch_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIGTRAP,sigtrap_handler);
 }
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
-
 // Calls into C are mediated by the handwritten call_into_c routine
 // which spills registers, recomputes GP, etc.
 // So text and data entries are the same, because all we need
@@ -439,4 +437,3 @@ arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
 {
     *(unsigned int *)reloc_addr = (unsigned int)target_addr;
 }
-#endif

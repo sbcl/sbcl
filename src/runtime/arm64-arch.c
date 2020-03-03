@@ -141,8 +141,6 @@ void arch_install_interrupt_handlers()
 }
 
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
-
 /* Linkage tables
  *
  * Linkage entry size is 16, because we need 2 instructions and an 8 byte address.
@@ -179,4 +177,3 @@ void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int dat
 
   os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif

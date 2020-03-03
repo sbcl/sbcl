@@ -142,8 +142,6 @@ arch_install_interrupt_handlers(void)
     undoably_install_low_level_interrupt_handler(SIGTRAP, sigtrap_handler);
 }
 
-#ifdef LISP_FEATURE_LINKAGE_TABLE
-
 /* Linkage tables
  *
  * Linkage entry size is 8 or 20, because we need 2 instructions for the 32-bit case and we need 3 instructions and an 8 byte address in the 64-bit case.
@@ -198,4 +196,3 @@ void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int dat
 
     os_flush_icache((os_vm_address_t) reloc_addr, (char*) inst_ptr - reloc_addr);
 }
-#endif
