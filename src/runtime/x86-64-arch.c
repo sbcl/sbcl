@@ -35,7 +35,8 @@
 #include "forwarding-ptr.h"
 #include "core.h"
 
-#define INT3_INST 0xcc
+#define INT3_INST 0xCC
+#define INTO_INST 0xCE
 #define UD2_INST 0x0b0f
 #define BREAKPOINT_WIDTH 1
 
@@ -243,7 +244,11 @@ unsigned int
 arch_install_breakpoint(void *pc)
 {
     unsigned int result = *(unsigned int*)pc;
+#ifdef LISP_FEATURE_INT4_BREAKPOINTS
+    *(char*)pc = INTO_INST;
+#else
     *(char*)pc = INT3_INST;
+#endif
     *((char*)pc+1) = trap_Breakpoint;           /* Lisp trap code */
     return result;
 }
@@ -387,21 +392,21 @@ void
 sigill_handler(int __attribute__((unused)) signal,
                siginfo_t __attribute__((unused)) *siginfo,
                os_context_t *context) {
+    unsigned char* pc = (void*)*os_context_pc_addr(context);
 #ifndef LISP_FEATURE_MACH_EXCEPTION_HANDLER
-    if (*((unsigned short *)*os_context_pc_addr(context)) == UD2_INST) {
+    if (*(unsigned short *)pc == UD2_INST) {
         *os_context_pc_addr(context) += 2;
         return sigtrap_handler(signal, siginfo, context);
     }
-# ifdef LISP_FEATURE_X86_64 // handle INTO
-    if (*((unsigned char *)*os_context_pc_addr(context)) == 0xCE) {
+    // Interrupt if overflow (INTO) raises SIGILL in 64-bit mode
+    if (*(unsigned char *)pc == INTO_INST) {
         *os_context_pc_addr(context) += 1;
         return sigtrap_handler(signal, siginfo, context);
     }
-# endif
 #endif
 
     fake_foreign_function_call(context);
-    lose("Unhandled SIGILL at %p.", (void*)*os_context_pc_addr(context));
+    lose("Unhandled SIGILL at %p.", pc);
 }
 
 #ifdef X86_64_SIGFPE_FIXUP

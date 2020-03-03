@@ -83,7 +83,12 @@
 #define SIZE(name)
 #endif
 
+#ifdef LISP_FEATURE_INT4_BREAKPOINTS
+// assembler won't emit the invalid instruction INTO, so use .byte to encode
+#define TRAP .byte 0xCE
+#else
 #define TRAP int3
+#endif
 
 #define THREAD_BASE_REG %r13
 
