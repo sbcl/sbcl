@@ -156,7 +156,6 @@
   (:generator 2
     (load-inline-constant res `(:fixup ,foreign-symbol :foreign) lip)))
 
-#+linkage-table
 (define-vop (foreign-symbol-dataref-sap)
   (:translate foreign-symbol-dataref-sap)
   (:policy :fast-safe)
