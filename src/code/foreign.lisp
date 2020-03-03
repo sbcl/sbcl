@@ -35,14 +35,8 @@ On non-linkage-table ports signals an error if the symbol isn't found."
   (let ((static (find-foreign-symbol-in-table name *static-foreign-symbols*)))
     (if static
         (values static nil)
-        #+os-provides-dlopen
-        (values #-linkage-table
-                (ensure-dynamic-foreign-symbol-address name)
-                #+linkage-table
-                (ensure-foreign-symbol-linkage name datap)
-                t)
-        #-os-provides-dlopen
-        (error 'undefined-alien-error :name name))))
+        #+os-provides-dlopen (values (ensure-dynamic-foreign-symbol-address name) t)
+        #-os-provides-dlopen (error 'undefined-alien-error :name name))))
 
 (defun foreign-symbol-sap (symbol &optional datap)
   "Returns a SAP corresponding to the foreign symbol. DATAP must be true if the
