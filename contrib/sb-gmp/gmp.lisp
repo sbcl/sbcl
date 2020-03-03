@@ -18,6 +18,7 @@
    #:mpz-powm
    #:mpz-pow
    #:mpz-gcd
+   #:mpz-divisible-p
    #:mpz-lcm
    #:mpz-sqrt
    #:mpz-probably-prime-p
@@ -246,6 +247,7 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
 (declaim (inline __gmpz_mul_2exp
                  __gmpz_fdiv_q_2exp
                  __gmpz_pow_ui
+                 __gmpz_divisible_p
                  __gmpz_probab_prime_p
                  __gmpz_fac_ui
                  __gmpz_2fac_ui
@@ -269,6 +271,10 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
   (r (* (struct gmpint)))
   (b (* (struct gmpint)))
   (e unsigned-long))
+
+(define-alien-routine __gmpz_divisible_p int
+  (n (* (struct gmpint)))
+  (d (* (struct gmpint))))
 
 (define-alien-routine __gmpz_probab_prime_p int
   (n (* (struct gmpint)))
@@ -460,6 +466,14 @@ pre-allocated bignum. The allocated bignum-length must be (1+ COUNT)."
       (when (and (minusp (slot gb 'mp_size))
                  (/= 0 (slot result 'mp_size)))
         (__gmpz_add (addr result) (addr result) (addr gb))))))
+
+(defgmpfun mpz-divisible-p (n d)
+  "Returns T if (ZEROP (MOD N D))."
+  (with-mpz-vars ((n gn) (d gd))
+    (not
+      (zerop
+        (__gmpz_divisible_p (addr gn) (addr gd))))))
+
 
 (defgmpfun mpz-cdiv (n d)
   (let ((size (1+ (max (blength n)
