@@ -657,10 +657,6 @@ if [ "$sbcl_arch" = "x86" ]; then
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks :cycle-counter' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
-    case "$sbcl_os" in
-    linux | freebsd | gnu-kfreebsd | netbsd | openbsd | sunos | darwin | win32 | dragonfly)
-        printf ' :linkage-table :sb-dynamic-core' >> $ltf
-    esac
     if [ "$sbcl_os" = "win32" ]; then
         # of course it doesn't provide dlopen, but there is
         # roughly-equivalent magic nevertheless.
@@ -672,7 +668,6 @@ if [ "$sbcl_arch" = "x86" ]; then
     fi
 elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :64-bit :gencgc :stack-grows-downward-not-upward :c-stack-is-control-stack' >> $ltf
-    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :compare-and-swap-vops :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
@@ -686,14 +681,13 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
     esac
 elif [ "$sbcl_arch" = "mips" ]; then
-    printf ' :cheneygc :linkage-table :sb-dynamic-core' >> $ltf
+    printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :alien-callbacks' >> $ltf
 elif [ "$sbcl_arch" = "ppc" ]; then
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     if [ "$sbcl_os" = "linux" ]; then
         # Use a C program to detect which kind of glibc we're building on,
@@ -718,7 +712,6 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     printf ' :64-bit' >> $ltf
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf
     # there is no glibc bug that requires the 'where-is-mcontext' hack.
     # (Sufficiently new glibc uses the correct definition, which is the same as
@@ -729,7 +722,6 @@ elif [ "$sbcl_arch" = "riscv" ]; then
     printf ' :gencgc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
-    printf ' :linkage-table :sb-dynamic-core' >> $ltf
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate
@@ -747,7 +739,6 @@ elif [ "$sbcl_arch" = "sparc" ]; then
         echo '***'
         printf ' :cheneygc' >> $ltf
     fi
-    printf ' :linkage-table :sb-dynamic-core' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
     printf ' :cheneygc' >> $ltf
@@ -758,7 +749,7 @@ elif [ "$sbcl_arch" = "hppa" ]; then
     printf ' :stack-allocatable-vectors :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "arm" ]; then
-    printf ' :gencgc :linkage-table :sb-dynamic-core :alien-callbacks' >> $ltf
+    printf ' :gencgc :alien-callbacks' >> $ltf
     # As opposed to soft-float or FPA, we support VFP only (and
     # possibly VFPv2 and higher only), but we'll leave the obvious
     # hooks in for someone to add the support later.
@@ -768,7 +759,7 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
-    printf ' :64-bit :gencgc :linkage-table :sb-dynamic-core :fp-and-pc-standard-save' >> $ltf
+    printf ' :64-bit :gencgc :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
@@ -778,6 +769,14 @@ else
     # Nothing need be done in this case, but sh syntax wants a placeholder.
     echo > /dev/null
 fi
+
+# There are only two architectures that don't have linkage tables,
+# and they also don't compile for half a dozen other reasons.
+# (I plan to remove :sb-dynamic-core, as it is now equivalent to :linkage-table.)
+case "$sbcl_arch" in
+    alpha | hppa)  ;;
+    *) printf ' :linkage-table :sb-dynamic-core' >> $ltf
+esac
 
 # Use a little C program to try to guess the endianness.  Ware
 # cross-compilers!
