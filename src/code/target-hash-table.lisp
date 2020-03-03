@@ -660,7 +660,9 @@ multiple threads accessing the same hash-table without locking."
                &aux (mask (1- (length index-vector)))
                     (next-free 0)
                     (hwm (kv-vector-high-water-mark kv-vector)))
-  (declare (simple-vector kv-vector))
+  (declare (simple-vector kv-vector)
+           (type (simple-array hash-table-index (*)) next-vector index-vector)
+           (type (or null (simple-array hash-table-index (*))) hash-vector))
   (declare (ignorable table))
   (if hash-vector
       ;; Scan backwards so that chains are in ascending index order.
