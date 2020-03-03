@@ -254,8 +254,6 @@ arch_handle_allocation_trap(os_context_t *context)
     int rs1;
     int size;
     int immed;
-    int context_index;
-    boolean were_in_lisp;
     char* memory;
 
     if (foreign_function_call_active)
@@ -295,7 +293,8 @@ arch_handle_allocation_trap(os_context_t *context)
         struct interrupt_data *data =
             arch_os_get_current_thread()->interrupt_data;
         data->allocation_trap_context = context;
-        memory = alloc(size);
+        extern lispobj alloc(sword_t);
+        memory = (char*)alloc(size);
         data->allocation_trap_context = 0;
     }
     *os_context_register_addr(context, rs1) = memory;

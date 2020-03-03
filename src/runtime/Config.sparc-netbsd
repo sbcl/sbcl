@@ -11,11 +11,11 @@
 
 CC = gcc
 CFLAGS += -g -Wall -O2
-LINKFLAGS += -v
+LINKFLAGS += -export-dynamic
 NM = nm -t x -p
 
-ASSEM_SRC = sparc-assem.S ldso-stubs.S
-ARCH_SRC = sparc-arch.c undefineds.c
+ASSEM_SRC = sparc-assem.S
+ARCH_SRC = sparc-arch.c
 
 OS_SRC = bsd-os.c sparc-bsd-os.c
 OS_LIBS = # -ldl
