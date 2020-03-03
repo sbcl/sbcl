@@ -1,9 +1,9 @@
 #!/bin/sh
 
-logdir=/var/tmp/sbcl-test-logs-$$
+logdir=$HOME/sbcl-test-logs-$$
 echo ==== Writing logs to $logdir ====
-mkdir -p /var/tmp/junk $logdir
-TEST_DIRECTORY=/var/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
+mkdir -p /tmp/junk $logdir
+TEST_DIRECTORY=/tmp/junk SBCL_HOME=../obj/sbcl-home exec ../src/runtime/sbcl \
   --noinform --core ../output/sbcl.core --no-userinit --no-sysinit --noprint --disable-debugger << EOF
 (require :sb-posix)
 (let ((*evaluator-mode* :compile))
