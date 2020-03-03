@@ -53,9 +53,8 @@
            :SB-THREAD :SB-UNICODE
            ;; Things which (I think) at least one person has requested be kept around
            :SB-LDB
-           ;; Features which are public and "potentially affect" fasl format,
-           ;; though in practice they don't because every build has them.
-           ;; And/or at least one person has requested be kept around.
+           ;; We keep the :SB-PACKAGE-LOCKS feature despite it no longer
+           ;; affecting the build. (It's not a choice any more)
            :SB-PACKAGE-LOCKS
            ;; unsure, I think this is for end-user consumption,
            ;; though every release of SBCL since eons ago has had local nicknames.
