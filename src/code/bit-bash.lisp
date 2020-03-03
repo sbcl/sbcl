@@ -233,7 +233,8 @@
       (defknown ,array-fill-name (word simple-unboxed-array index index)
           simple-unboxed-array
           ()
-        :result-arg 1)
+        :result-arg 1
+        :derive-type (sb-c::result-type-nth-arg 1))
       (defun ,array-fill-name (value dst dst-offset length)
         (declare (type word value) (type index dst-offset length))
         (declare (optimize (speed 3) (safety 1)))
@@ -588,7 +589,8 @@
        (defknown ,array-fill-name (,type simple-unboxed-array index index)
            simple-unboxed-array
            ()
-         :result-arg 1)
+         :result-arg 1
+         :derive-type (sb-c::result-type-nth-arg 1))
        (defun ,array-fill-name (value dst dst-offset length)
          (declare (type ,type value) (type index dst-offset length))
          (declare (optimize (speed 3) (safety 1)))

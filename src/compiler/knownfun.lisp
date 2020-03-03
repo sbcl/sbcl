@@ -273,6 +273,11 @@
   (let ((lvar (car (last (combination-args call)))))
     (when lvar (lvar-type lvar))))
 
+(defun result-type-nth-arg (n)
+  (lambda (call)
+    (let ((lvar (nth n (combination-args call))))
+      (when lvar (lvar-type lvar)))))
+
 ;;; Derive the result type according to the float contagion rules, but
 ;;; always return a float. This is used for irrational functions that
 ;;; preserve realness of their arguments.

@@ -517,3 +517,11 @@
     ((2 10 10)  (condition 'sb-kernel:bounding-indices-bad-error))
     ((2 2 1)  (condition 'sb-kernel:bounding-indices-bad-error))
     ((2 10 nil)  (condition 'sb-kernel:bounding-indices-bad-error))))
+
+(with-test (:name :fill-transform-derive-type)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            '(lambda (x)
+              (fill (the (simple-array (unsigned-byte 32) (*)) x) 0))))
+          '(FUNCTION (T) (VALUES (SIMPLE-ARRAY (UNSIGNED-BYTE 32) (*)) &OPTIONAL)))))
