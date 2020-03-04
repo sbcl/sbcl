@@ -176,9 +176,9 @@ constructed.
 (declaim (sb-ext:freeze-type loop-minimax))
 
 (defconstant-eqx +loop-minimax-type-infinities-alist+
-  ;; FIXME: Now that SBCL supports floating point infinities again, we
-  ;; should have floating point infinities here, as cmucl-2.4.8 did.
-  '((fixnum sb-xc:most-positive-fixnum sb-xc:most-negative-fixnum))
+    '((fixnum            sb-xc:most-positive-fixnum            sb-xc:most-negative-fixnum)
+      (single-float      sb-ext:single-float-positive-infinity sb-ext:single-float-negative-infinity)
+      (double-float      sb-ext:double-float-positive-infinity sb-ext:double-float-negative-infinity))
   #'equal)
 
 (defun make-loop-minimax (answer-variable type)
