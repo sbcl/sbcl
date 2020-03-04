@@ -473,6 +473,7 @@
 (define-walker-template named-lambda walk-named-lambda)
 
 (defvar *walk-form-expand-macros-p* nil)
+(defvar *walk-form-preserve-source* nil)
 
 #+sb-fasteval
 (declaim (ftype (sfunction (sb-interpreter:basic-env &optional t) sb-kernel:lexenv)
@@ -551,9 +552,12 @@
                         (let ((newnewnewform (walk-form-internal newnewform
                                                                  context
                                                                  env)))
-                          (if (eq newnewnewform newnewform)
-                              (if *walk-form-expand-macros-p* newnewform newform)
-                              newnewnewform)))
+                          (cond ((eq newnewnewform newnewform)
+                                 (if *walk-form-expand-macros-p* newnewform newform))
+                                (*walk-form-preserve-source*
+                                 `(sb-c::with-source-form ,newform
+                                    ,newnewnewform))
+                                (t newnewnewform))))
                        ((and (symbolp fn)
                              (special-operator-p fn))
                         ;; This shouldn't happen, since this walker is now

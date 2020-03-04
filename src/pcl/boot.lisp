@@ -1827,11 +1827,13 @@ bootstrapping.
                                  (slot-value #'optimize-slot-value)
                                  (set-slot-value #'optimize-set-slot-value)
                                  (slot-boundp #'optimize-slot-boundp))))
-                      (funcall fun form slots required-parameters env))
+                      `(sb-c::with-source-form ,form
+                        ,(funcall fun form slots required-parameters env)))
                     form))
                (t form))))
 
-      (let ((walked-lambda (walk-form method-lambda env #'walk-function)))
+      (let* ((sb-walker::*walk-form-preserve-source* t)
+             (walked-lambda (walk-form method-lambda env #'walk-function)))
         ;;; FIXME: the walker's rewriting of the source code causes
         ;;; trouble when doing code coverage. The rewrites should be
         ;;; removed, and the same operations done using
