@@ -928,7 +928,7 @@
       (multiple-value-bind (vars keyp allow-other-keys aux-vars aux-vals)
           (make-lambda-vars (cadr form))
         (binding* (((*lexenv* result-type post-binding-lexenv
-                              lambda-list explicit-check)
+                              lambda-list explicit-check source-form)
                     (process-decls decls (append aux-vars vars) nil
                                    :binding-form-p t :allow-lambda-list t))
                    (debug-catch-p (and maybe-add-debug-catch
@@ -960,7 +960,7 @@
                                                         :system-lambda system-lambda)))))
           (when explicit-check
             (setf (getf (functional-plist res) 'explicit-check) explicit-check))
-          (setf (functional-inline-expansion res) form)
+          (setf (functional-inline-expansion res) (or source-form form))
           (setf (functional-arg-documentation res)
                 (if (eq lambda-list :unspecified)
                     (strip-lambda-list (cadr form) :arglist)

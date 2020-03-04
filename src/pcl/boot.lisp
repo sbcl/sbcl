@@ -527,7 +527,11 @@ bootstrapping.
               (with-current-source-form (lambda-list)
                 (parse-specialized-lambda-list lambda-list)))
              (*method-name* `(,name ,@qualifiers ,specializers))
-             (method-lambda `(lambda ,unspecialized-lambda-list ,@body))
+             (method-lambda `(lambda ,unspecialized-lambda-list
+                               (declare (sb-c::source-form
+                                         (lambda ,unspecialized-lambda-list
+                                           ,@body)))
+                               ,@body))
              ((method-function-lambda initargs new-lambda-list)
               (make-method-lambda-using-specializers
                proto-gf proto-method qualifiers specializers method-lambda env))

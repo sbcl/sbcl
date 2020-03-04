@@ -1620,6 +1620,7 @@
         (allow-explicit-check allow-lambda-list)
         (lambda-list (if allow-lambda-list :unspecified nil))
         (optimize-qualities)
+        source-form
         (post-binding-lexenv (if binding-form-p (list nil)))) ; dummy cell
     (flet ((process-it (spec decl)
              (cond ((atom spec)
@@ -1659,6 +1660,8 @@
                     (setq explicit-check (or (cdr spec) t)
                           allow-explicit-check nil)) ; at most one of this decl
                    ((equal spec '(top-level-form))) ; ignore
+                   ((typep spec '(cons (eql source-form)))
+                    (setf source-form (cadr spec)))
                    (t
                     (multiple-value-bind (new-env new-qualities)
                         (process-1-decl spec lexenv vars fvars
@@ -1675,7 +1678,7 @@
               (process-it spec decl)))))
     (warn-repeated-optimize-qualities (lexenv-policy lexenv) optimize-qualities)
     (values lexenv result-type (cdr post-binding-lexenv)
-            lambda-list explicit-check)))
+            lambda-list explicit-check source-form)))
 
 (defun process-muffle-decls (decls lexenv)
   (flet ((process-it (spec)
