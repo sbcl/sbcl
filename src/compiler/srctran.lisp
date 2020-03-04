@@ -3187,10 +3187,6 @@
              ,val
              ,(abs val)))))
 
-;;; KLUDGE: Shouldn't (/ 0.0 0.0), etc. cause exceptions in these
-;;; transformations?
-;;; Perhaps we should have to prove that the denominator is nonzero before
-;;; doing them?  -- WHN 19990917
 (macrolet ((def (name)
              `(deftransform ,name ((x y) ((constant-arg (integer 0 0)) integer)
                                    *)
