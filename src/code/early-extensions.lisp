@@ -203,49 +203,17 @@
          ,@(if ignores `((declare (ignorable ,@ignores))))
          ,@body))))
 
-;;;; some old-fashioned functions. (They're not just for old-fashioned
-;;;; code, they're also used as optimized forms of the corresponding
-;;;; general functions when the compiler can prove that they're
-;;;; equivalent.)
+;;; Functions for compatibility sake:
 
-;;; like (MEMBER ITEM LIST :TEST #'EQ)
 (defun memq (item list)
   "Return tail of LIST beginning with first element EQ to ITEM."
-  (declare (explicit-check))
-  ;; KLUDGE: These could be and probably should be defined as
-  ;;   (MEMBER ITEM LIST :TEST #'EQ)),
-  ;; but when I try to cross-compile that, I get an error from
-  ;; LTN-ANALYZE-KNOWN-CALL, "Recursive known function definition". The
-  ;; comments for that error say it "is probably a botched interpreter stub".
-  ;; Rather than try to figure that out, I just rewrote this function from
-  ;; scratch. -- WHN 19990512
-  (do ((i list (cdr i)))
-      ((null i))
-    (when (eq (car i) item)
-      (return i))))
+  (declare (inline member))
+  (member item list :test #'eq))
 
-;;; like (ASSOC ITEM ALIST :TEST #'EQ):
-;;;   Return the first pair of ALIST where ITEM is EQ to the key of
-;;;   the pair.
 (defun assq (item alist)
-  (declare (explicit-check))
-  ;; KLUDGE: CMU CL defined this with
-  ;;   (DECLARE (INLINE ASSOC))
-  ;;   (ASSOC ITEM ALIST :TEST #'EQ))
-  ;; which is pretty, but which would have required adding awkward
-  ;; build order constraints on SBCL (or figuring out some way to make
-  ;; inline definitions installable at build-the-cross-compiler time,
-  ;; which was too ambitious for now). Rather than mess with that, we
-  ;; just define ASSQ explicitly in terms of more primitive
-  ;; operations:
-  (dolist (pair alist)
-    ;; though it may look more natural to write this as
-    ;;   (AND PAIR (EQ (CAR PAIR) ITEM))
-    ;; the temptation to do so should be resisted, as pointed out by PFD
-    ;; sbcl-devel 2003-08-16, as NIL elements are rare in association
-    ;; lists.  -- CSR, 2003-08-16
-    (when (and (eq (car pair) item) (not (null pair)))
-      (return pair))))
+  "Return the first pair of alist where item is EQ to the key of pair."
+  (declare (inline assoc))
+  (assoc item alist :test #'eq))
 
 ;;; Delete just one item
 (defun delq1 (item list)

@@ -17,10 +17,9 @@
 
 (in-package "SB-IMPL")
 
-;;; like (DELETE .. :TEST #'EQ):
-;;;   Delete all LIST entries EQ to ITEM (destructively modifying
-;;;   LIST), and return the modified LIST.
 (defun delq (item list)
+  "Delete all LIST entries EQ to ITEM (destructively modifying LIST),
+and return the modified LIST."
   (declare (explicit-check))
   (let ((list list))
     (do ((x list (cdr x))
@@ -32,14 +31,10 @@
                  (rplacd splice (cdr x))))
             (t (setq splice x)))))) ; Move splice along to include element.
 
-;;; like (POSITION .. :TEST #'EQ):
-;;;   Return the position of the first element EQ to ITEM.
 (defun posq (item list)
-  (do ((i list (cdr i))
-       (j 0 (1+ j)))
-      ((null i))
-    (when (eq (car i) item)
-      (return j))))
+  "Return the position of the first element EQ to ITEM."
+  (declare (inline position))
+  (position item list :test #'eq))
 
 (defun interned-symbol-p (x) (and (symbolp x) (symbol-package x)))
 
