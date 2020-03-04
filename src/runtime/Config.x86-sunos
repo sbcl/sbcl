@@ -14,7 +14,7 @@ CFLAGS = -g -O2 -Wall -D__EXTENSIONS__ -D_POSIX_C_SOURCE=199506L -DSVR4 -D_REENT
 NM = nm -xgp
 GREP = ggrep
 
-ASSEM_SRC = x86-assem.S ldso-stubs.S
+ASSEM_SRC = x86-assem.S
 ARCH_SRC = x86-arch.c
 
 OS_SRC = sunos-os.c x86-sunos-os.c
