@@ -14,8 +14,8 @@ ASFLAGS = -m32 -fno-PIC -g -Wall -Wa,-xarch=v8plus
 LINKFLAGS += -rdynamic -m32
 NM = ./linux-nm
 
-ASSEM_SRC = sparc-assem.S ldso-stubs.S
-ARCH_SRC = sparc-arch.c #undefineds.c 
+ASSEM_SRC = sparc-assem.S
+ARCH_SRC = sparc-arch.c
 
 OS_SRC = linux-os.c linux-mman.c sparc-linux-os.c
 OS_LIBS = -ldl
