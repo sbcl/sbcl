@@ -289,7 +289,7 @@
          ("(and sb-dynamic-core (not linkage-table))"
           ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
          ("(and linkage-table (not sb-dynamic-core))"
-          ":SB-LINKAGE-TABLE must imply :SB-DYNAMIC-CORE")
+          ":LINKAGE-TABLE must imply :SB-DYNAMIC-CORE")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")
          ("(and sb-linkable-runtime (not sb-dynamic-core))"
           ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
