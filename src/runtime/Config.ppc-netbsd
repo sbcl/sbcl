@@ -12,10 +12,10 @@
 LINKFLAGS += -dynamic -export-dynamic
 CFLAGS =  -g -Wall -O2
 
-ASSEM_SRC = ppc-assem.S ldso-stubs.S
+ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c
 
-OS_SRC = bsd-os.c undefineds.c ppc-bsd-os.c
+OS_SRC = bsd-os.c ppc-bsd-os.c
 OS_LIBS = # -ldl
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
