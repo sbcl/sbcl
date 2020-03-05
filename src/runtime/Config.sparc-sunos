@@ -20,7 +20,7 @@ NM = nm -t x -p
 DISABLE_PIE=no
 
 ASSEM_SRC = sparc-assem.S
-ARCH_SRC = sparc-arch.c #undefineds.c
+ARCH_SRC = sparc-arch.c
 
 OS_SRC = sunos-os.c sparc-sunos-os.c
 OS_LIBS = -ldl -lsocket -lnsl -lrt

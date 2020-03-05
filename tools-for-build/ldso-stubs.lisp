@@ -1,9 +1,6 @@
 ;;;; Generate stubs for C-linkage library functions which we need to refer to
 ;;;; from Lisp.
 ;;;;
-;;;; (But note this is only the Linux version, as per the FIXME
-;;;; note in the BSD version in undefineds.h.)
-;;;;
 ;;;; These stubs exist for the benefit of Lisp code that needs to refer
 ;;;; to foreign symbols when dlsym() is not available (i.e. when dumping
 ;;;; cold-sbcl.core, when we may be running in a host that's not SBCL,
