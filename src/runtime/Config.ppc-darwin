@@ -21,7 +21,7 @@ endif
 
 CC = gcc
 
-ASSEM_SRC = ppc-assem.S ldso-stubs.S
+ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c
 
 CPPFLAGS += -no-cpp-precomp
