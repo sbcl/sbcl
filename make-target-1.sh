@@ -27,7 +27,6 @@ if [ -n "$SBCL_HOST_LOCATION" ]; then
     echo //copying host-1 output files to target
     rsync -a "$SBCL_HOST_LOCATION/output/" output/
     rsync -a "$SBCL_HOST_LOCATION/src/runtime/genesis" src/runtime
-    rsync -a "$SBCL_HOST_LOCATION/src/runtime/ldso-stubs.S" src/runtime/
 fi
 
 # Build the runtime system and symbol table (.nm) file.

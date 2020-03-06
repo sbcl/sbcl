@@ -113,7 +113,7 @@ sbcl.o: $(OBJS)
 libsbcl.a: $(OBJS)
 	rm -f $@ ; ar rcs $@ $^
 
-PIC_OBJS = $(subst .o,.pic.o,$(filter-out ldso-stubs.o,$(OBJS)))
+PIC_OBJS = $(subst .o,.pic.o,$(OBJS))
 libsbcl.so: $(PIC_OBJS)
 	cc -shared -o $@ $^ $(LIBS)
 # for this to work, you must have with-gcc-tls in your build features already.
@@ -134,7 +134,7 @@ pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o: $(SHRINKWRAP_DEPS)
 comma := , # "Commas ... cannot appear in the text of an argument as written"
 shrinkwrap-sbcl: shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o $(LIBSBCL)
 	$(CC) -no-pie $(filter-out -Wl$(comma)--export-dynamic, $(LINKFLAGS)) \
- $(CFLAGS) -o $@ $(filter-out ldso-stubs.o, $^) $(LIBS)
+ $(CFLAGS) -o $@ $^ $(LIBS)
 pie-shrinkwrap-sbcl: pie-shrinkwrap-sbcl.s pie-shrinkwrap-sbcl-core.o $(PIC_OBJS)
 	$(CC) -pie -o $@ $^ $(LIBS)
 semiwrap-sbcl: shrinkwrap-sbcl.s $(LIBSBCL)

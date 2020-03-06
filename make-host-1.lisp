@@ -10,7 +10,14 @@
           (format t "~&target ~S = ~S~%" sym  val))))))
 (in-package "SB-COLD")
 (progn
-  (let ((*readtable* *xc-readtable*)) (load "tools-for-build/ldso-stubs.lisp"))
+  ;; Generating ldso-stubs should be driven by GNUmakefile, but that won't work
+  ;; because we generate it using Lisp code, and we don't presume the target
+  ;; to have a lisp implementation. So we generate it on the host by knowing
+  ;; something about which Config files depend on ldso-stubs.
+  (when (or (member :alpha sb-xc:*features*)
+            (member :hppa sb-xc:*features*))
+    (let ((*readtable* *xc-readtable*)) (load "tools-for-build/ldso-stubs.lisp")))
+
   (setf *host-obj-prefix* "obj/from-host/")
   (load "src/cold/set-up-cold-packages.lisp")
   (load "src/cold/defun-load-or-cload-xcompiler.lisp")

@@ -21,21 +21,8 @@
 ;;; This is an attempt to follow DB's hint of sbcl-devel
 ;;; 2001-09-18. -- CSR
 ;;;
-;;; And an attempt to work around the Sun toolchain... --ns
 (defun ldso-stubify (index fct stream)
   (declare (ignorable index))
-  #+sparc
-  (apply #'format stream "
-.globl ldso_stub__~A ;                          \\
-        FUNCDEF(ldso_stub__~A) ;                \\
-ldso_stub__~A: ;                                \\
-        sethi %hi(~A),%g1       ;               \\
-        jmpl %g1+%lo(~A),%g0    ;               \\
-        nop /* delay slot*/     ;               \\
-.L~Ae1: ;                                       \\
-        .size    ldso_stub__~A,.L~Ae1-ldso_stub__~A ;~%"
-          (make-list 9 :initial-element fct))
-
   #+hppa
   (let ((stub (format nil "ldso_stub__~a" fct)))
     (apply #'format stream (list
@@ -47,15 +34,7 @@ ldso_stub__~A: ;                                \\
     .procend
     .import ~a,code~%" stub stub fct fct)))
 
-  ;; All we need to do is anchor the C symbol, nothing more.
-  ;; This can only be expected to work because of #+sb-dynamic-core.
-  ;; In some environments, even though we anchor the symbol,
-  ;; it may still have type "U" in the binary file, to be resolved by
-  ;; the system 'ld'; genesis can't deal with such lazily bound symbols.
-  ;; ".quad" = 8 bytes, not a Quadword as defined by the architecture (16 bytes)
-  #+ppc64 (format stream ".quad ~A~%" fct)
-
-  #-(or sparc hppa ppc64)
+  #-hppa
   (format stream "LDSO_STUBIFY(~A)~%" fct))
 
 (defvar *preludes* (list "
@@ -66,43 +45,6 @@ ldso_stub__~A: ;                                \\
 #define __ASSEMBLER__
 #endif
 #include \"sbcl.h\""
-
-#+arm "
-#define LDSO_STUBIFY(fct)               \\
-  .align                              ; \\
-  .global ldso_stub__ ## fct          ; \\
-  .type ldso_stub__ ## fct, %function ; \\
-ldso_stub__ ## fct:                   ; \\
-  ldr r8, =fct                        ; \\
-  bx r8                               ; \\
-  .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
-#+arm64"
-#define LDSO_STUBIFY(fct)               \\
-  .align                              ; \\
-  .global ldso_stub__ ## fct          ; \\
-  .type ldso_stub__ ## fct, %function ; \\
-ldso_stub__ ## fct:                   ; \\
-  ldr x8, =fct                        ; \\
-  br x8                               ; \\
-  .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
-
-#+sparc "
-#ifdef LISP_FEATURE_SPARC
-#include \"sparc-funcdef.h\"
-#endif
-        .text"
-
-#+(and (or x86 x86-64) (not darwin))
-(format nil "
-#define LDSO_STUBIFY(fct)                       \\
-        .align 16 ;                             \\
-.globl ldso_stub__ ## fct ;                     \\
-        .type    ldso_stub__ ## fct,@function ; \\
-ldso_stub__ ## fct: ;                           \\
-        jmp fct~a ;                               \\
-.L ## fct ## e1: ;                              \\
-        .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
-        (or #+(and x86-64 sb-dynamic-core (not win32)) "@PLT" ""))
 
 #+(and linux alpha) "
 #define LDSO_STUBIFY(fct)                       \\
@@ -117,107 +59,10 @@ ldso_stub__ ## fct: ;                           \\
         .level  2.0
         .text"
 
-#+(and (not darwin) ppc) "
-#define LDSO_STUBIFY(fct)                       \\
-.globl ldso_stub__ ## fct ;                     \\
-        .type    ldso_stub__ ## fct,@function ; \\
-ldso_stub__ ## fct: ;                           \\
-        b fct ;                                 \\
-.L ## fct ## e1: ;                              \\
-        .size    ldso_stub__ ## fct,.L ## fct ## e1-ldso_stub__ ## fct ;"
+))
 
-#+(and darwin ppc) "
-#define LDSO_STUBIFY(fct)                       @\\
-.text                                           @\\
-.globl  _ldso_stub__ ## fct                      @\\
-_ldso_stub__ ## fct:                             @\\
-        b _ldso_stub__ ## fct ## stub            @\\
-.symbol_stub _ldso_stub__ ## fct ## stub:        @\\
-.indirect_symbol _ ## fct                       @\\
-        lis     r11,ha16(_ldso_stub__ ## fct ## $lazy_ptr)       @\\
-        lwz     r12,lo16(_ldso_stub__ ## fct ## $lazy_ptr)(r11)  @\\
-        mtctr   r12                             @\\
-        addi    r11,r11,lo16(_ldso_stub__ ## fct ## $lazy_ptr)   @\\
-        bctr                                    @\\
-.lazy_symbol_pointer                            @\\
-_ldso_stub__ ## fct ## $lazy_ptr:                @\\
-        .indirect_symbol _ ## fct               @\\
-        .long dyld_stub_binding_helper"
-
-#+ppc64 "
-.data # can't place in read-only data because reasons
-.align 3"
-
-#+riscv "
-#define LDSO_STUBIFY(fct)                \\
-  .global ldso_stub__ ## fct           ; \\
-  .type ldso_stub__ ## fct, @function  ; \\
-ldso_stub__ ## fct:                    ; \\
-  j fct                                ; \\
-  .size ldso_stub__ ## fct, .-ldso_stub__ ## fct"
-
-;;; darwin x86 assembler is weird and follows the ppc assembler syntax
-#+(and darwin x86) "
-#define LDSO_STUBIFY(fct)                       \\
-.text                           ;               \\
-        .align 4 ;                              \\
-.globl _ldso_stub__ ## fct ;                    \\
-_ldso_stub__ ## fct: ;                          \\
-        jmp L ## fct ## $stub ;                 \\
-        .section __IMPORT,__jump_table,symbol_stubs,self_modifying_code+pure_instructions,5 ;   \\
-L ## fct ## $stub: ;                    \\
-        .indirect_symbol _ ## fct ;     \\
-        hlt                       ;     \\
-        hlt                       ;     \\
-        hlt                       ;     \\
-        hlt                       ;     \\
-        hlt                       ;     \\
-        .subsections_via_symbols  ;    "
-
-;;; darwin x86-64
-#+(and darwin x86-64) "
-#define LDSO_STUBIFY(fct)                       \\
-        .align 4 ;                              \\
-.globl _ldso_stub__ ## fct ;                    \\
-_ldso_stub__ ## fct: ;                          \\
-        jmp _ ## fct ;                          \\
-.L ## fct ## e1: ;                            "
-
-;;; KLUDGE: set up the vital fifth argument, passed on the
-;;; stack.  Do this unconditionally, even if the stub is for a
-;;; function with few arguments: it can't hurt.  We only do this for
-;;; the fifth argument, as the first four are passed in registers
-;;; and we apparently don't ever need to pass six arguments to a
-;;; libc function.  -- CSR, 2003-10-29
-;;; Expanded to 8 arguments regardless.  -- ths, 2005-03-24
-#+mips "
-#define LDSO_STUBIFY(fct)                      \\
-        .globl  ldso_stub__ ## fct ;           \\
-        .type   ldso_stub__ ## fct,@function ; \\
-        .ent    ldso_stub__ ## fct ;           \\
-ldso_stub__ ## fct: ;                  \\
-        .set noat ;                    \\
-        addiu $29,-48 ;                \\
-        sw $28,40($29) ;               \\
-        sw $31,44($29) ;               \\
-        lw $25,64($29) ;               \\
-        lw  $1,68($29) ;               \\
-        sw $25,16($29) ;               \\
-        sw  $1,20($29) ;               \\
-        lw $25,72($29) ;               \\
-        lw  $1,76($29) ;               \\
-        sw $25,24($29) ;               \\
-        sw  $1,28($29) ;               \\
-        .set at ;                      \\
-        la $25, fct ;                  \\
-        jalr $25 ;                     \\
-        lw $31,44($29) ;               \\
-        lw $28,40($29) ;               \\
-        addiu $29,48 ;                 \\
-        jr $31 ;                       \\
-        .end    ldso_stub__ ## fct ;   \\
-        .size   ldso_stub__ ## fct,.-ldso_stub__ ## fct ;"))
-
+;;; Most of the #+- in here is just noise, but so is this whole file.
+;;; So I don't really care to go through with a comb and remove the fluff.
 (defvar *stubs* (append
                  '("_exit"
                    "accept"
@@ -374,17 +219,4 @@ ldso_stub__ ## fct: ;                  \\
   (let ((i -1))
     (dolist (stub *stubs*)
       (check-type stub string)
-      (ldso-stubify (incf i) stub f)))
-  ;; For some platforms, the 'ldso-stubs.S' file never gets assembled, and
-  ;; so it doesn't really matter what it contains.
-  ;; But on SunOS (as installed on the gcc compiler farm machine that I used)
-  ;; the compiler driver command ("gcc") invokes GNU cpp and/or cc1 but uses
-  ;; the Sun assembler. That assembler can't parse "%progbits", nor "@progbits"
-  ;; in .section (see https://sourceware.org/binutils/docs/as/Section.html)
-  ;; so let's just leave it out.
-  #-sunos
-  (format f "
-#ifdef __ELF__
-// Mark the object as not requiring an executable stack.
-.section .note.GNU-stack,\"\",%progbits
-#endif~%"))
+      (ldso-stubify (incf i) stub f))))

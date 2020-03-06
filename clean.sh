@@ -118,5 +118,4 @@ find . \( \
         -name 'TAGS' -o \
         -name 'tags' -o \
         -name 'test-passed' -o \
-        -name 'ldso-stubs.S' -o \
         -name 'local-target-features.lisp-expr' \) -print | xargs rm -fr

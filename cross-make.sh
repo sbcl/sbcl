@@ -50,7 +50,7 @@ mv build-id.inc output
 
 # make-host-1 and copy over the artifacts
 sh make-host-1.sh
-tar cf - src/runtime/genesis src/runtime/ldso-stubs.S \
+tar cf - src/runtime/genesis \
   | ssh $ssh_port_opt $host tar xf - -C $root
 
 # make-target-1 and copy back the artifacts
