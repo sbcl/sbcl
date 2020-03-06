@@ -264,7 +264,6 @@ cat > $TEST_FILESTEM.test.lisp <<EOF
   ;; test late resolution
   (eval-when (:compile-toplevel :load-toplevel :execute)
    (setq *features* (union *features* sb-impl:+internal-features+)))
-  #+linkage-table
   (progn
     (note "/starting linkage table tests")
     (define-alien-variable late-foo int)
@@ -320,7 +319,7 @@ test_save() {
     run_sbcl --load $TEST_FILESTEM.$1.fasl <<EOF
 (eval-when (:compile-toplevel :load-toplevel :execute)
  (setq *features* (union *features* sb-impl:+internal-features+)))
-#+linkage-table (save-lisp-and-die "$TEST_FILESTEM.$x.core")
+(save-lisp-and-die "$TEST_FILESTEM.$x.core")
 (sb-ext:exit :code 22) ; catch this
 EOF
     check_status_maybe_lose "save $1" $? \
@@ -359,7 +358,7 @@ if [ -f $TEST_FILESTEM.fast.core ] ; then
               (invoke-restart cont)))
           (print :fell-through)
           (invoke-debugger condition)))
-   #+linkage-table (save-lisp-and-die "$TEST_FILESTEM.missing.core")
+   (save-lisp-and-die "$TEST_FILESTEM.missing.core")
    (sb-ext:exit :code 22) ; catch this
 EOF
     check_status_maybe_lose "saving-missing-so-core" $? \
