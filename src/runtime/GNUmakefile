@@ -50,17 +50,12 @@ include genesis/Makefile.features
 DISABLE_PIE=yes
 include Config
 
-# Disable PIE when possible
-# If dynamic core is enabled, we should not care whether we get a PIE or not,
-# and would prefer the default for the installed C toolchain,
-# however, when building the 32-bit x86 code without the disabling of PIE,
-# I got a linker error that was totally unhelpful in that it did not indicate
-# an offending source file:
-#  /usr/bin/ld: BFD (GNU Binutils for Debian) 2.31.1 assertion fail ../../bfd/elflink.c:14480
-# Process of elimination concluded that it's from ldso-stubs.
-# I'm disinclined to find the problem with the asm code in that file.
-# More pertinently, if sb-dynamic-core is enabled, the stubs shouldn't be needed.
-# But we link them them because of, I guess, "historical reasons".
+# Disable PIE by default.
+# We mostly do not care any more where the C code is located, and would
+# prefer that C toolchain default be used, however, the limited address
+# space in 32-bit architectures make it tricky to permit the .text segment
+# to be placed arbitrarily if there is any risk of not being able to
+# allocate the lisp readonly and static spaces on account of collision.
 ifeq ($(DISABLE_PIE),yes)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
 CFLAGS += -fno-pie
@@ -97,6 +92,11 @@ targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
 	$(SBCL_PAXCTL) $@
+
+# tests/heap-reloc/fake-mman.c assumes #+linux, so this recipe
+# only works on linux.
+heap-reloc-test: ../../tests/heap-reloc/fake-mman.c $(OBJS)
+	$(CC) ${LINKFLAGS} -o $@ ../../tests/heap-reloc/fake-mman.c $(filter-out linux-mman.o,$(OBJS)) $(LIBS)
 
 # Enable compiling gencgc with even more assertions and/or
 # data collection, with COMPILING_TESTS. Not really used yet.
