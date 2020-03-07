@@ -20,7 +20,7 @@
 (in-package "SB-IMPL")
 
 (define-alien-routine arch-write-linkage-table-entry void
-  (table-address unsigned) (real-address unsigned) (datap int))
+  (index int) (real-address unsigned) (datap int))
 
 (define-load-time-global *linkage-info*
     (make-hash-table :test 'equal :synchronized t))
@@ -29,23 +29,22 @@
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
   (let ((key (if datap (list name) name))
-        (table-base sb-vm:linkage-table-space-start)
         (ht *linkage-info*))
     (or (awhen (with-locked-system-table (ht)
                  (or (gethash key ht)
-                     (let* ((table-offset
-                             (* (hash-table-count ht) sb-vm:linkage-table-entry-size))
-                            (table-address (+ table-base table-offset)))
-                       (when (<= (+ table-address sb-vm:linkage-table-entry-size)
-                                 sb-vm:linkage-table-space-end)
+                     (let* ((index (hash-table-count ht))
+                            (capacity (floor (- sb-vm:linkage-table-space-end
+                                                sb-vm:linkage-table-space-start)
+                                             sb-vm:linkage-table-entry-size)))
+                       (when (< index capacity)
                          (let ((real-address
                                 (ensure-dynamic-foreign-symbol-address name datap)))
                            (aver real-address)
-                           (arch-write-linkage-table-entry
-                            table-address real-address (if datap 1 0))
+                           (arch-write-linkage-table-entry index real-address
+                                                           (if datap 1 0))
                            (logically-readonlyize name)
-                           (setf (gethash key ht) table-offset))))))
-               (+ table-base it))
+                           (setf (gethash key ht) index))))))
+               (sb-vm::linkage-table-entry-address it))
         (error "Linkage-table full (~D entries): cannot link ~S."
                (hash-table-count ht) name))))
 
@@ -58,17 +57,13 @@
 (defun update-linkage-table ()
   ;; This symbol is of course itself a prelinked symbol.
   (let ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int)))
-    (dohash ((key table-offset) *linkage-info* :locked t)
+    (dohash ((key index) *linkage-info* :locked t)
       (let* ((datap (listp key))
-             (table-address (+ table-offset sb-vm:linkage-table-space-start))
-             (name (if datap (car key) key))
-             (index (floor (- table-address sb-vm:linkage-table-space-start)
-                           sb-vm:linkage-table-entry-size)))
+             (name (if datap (car key) key)))
         ;; Partial fix to the above: Symbols required for Lisp startup
         ;; will not be re-pointed to a different address ever.
         ;; Nor will those referenced by ELF core.
         (when (>= index n-prelinked)
           (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
             (aver real-address)
-            (arch-write-linkage-table-entry table-address real-address
-                                            (if datap 1 0))))))))
+            (arch-write-linkage-table-entry index real-address (if datap 1 0))))))))

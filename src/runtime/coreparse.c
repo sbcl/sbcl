@@ -700,15 +700,15 @@ process_directory(int count, struct ndir_entry *entry,
         // (Rarely would a jmp indirection be used; maybe for newly compiled code?)
         lispobj* ptr = &lisp_linkage_values;
         gc_assert(ptr);
-        char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
+        int entry_index = 0;
         int count;
         extern int lisp_linkage_table_n_prelinked;
         count = lisp_linkage_table_n_prelinked = *ptr++;
-        for ( ; count-- ; link_target += LINKAGE_TABLE_ENTRY_SIZE ) {
+        for ( ; count-- ; entry_index++ ) {
             boolean datap = *ptr == (lispobj)-1; // -1 can't be a function address
             if (datap)
                 ++ptr;
-            arch_write_linkage_table_entry(link_target, (void*)*ptr++, datap);
+            arch_write_linkage_table_entry(entry_index, (void*)*ptr++, datap);
         }
 
         // unprotect the pages

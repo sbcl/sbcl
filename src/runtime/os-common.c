@@ -154,8 +154,7 @@ int lisp_linkage_table_n_prelinked;
 void os_link_runtime()
 {
 #ifdef LISP_FEATURE_SB_DYNAMIC_CORE
-    char *link_target = (char*)(intptr_t)LINKAGE_TABLE_SPACE_START;
-    void *validated_end = link_target;
+    int entry_index = 0;
     lispobj symbol_name;
     char *namechars;
     boolean datap;
@@ -175,19 +174,18 @@ void os_link_runtime()
         namechars = (void*)(intptr_t)(VECTOR(symbol_name)->data);
         result = os_dlsym_default(namechars);
 
-        if (link_target == validated_end) {
-            validated_end = (char*)validated_end + os_vm_page_size;
+        if (entry_index == 0) {
 #ifdef LISP_FEATURE_WIN32
-            os_validate_recommit(link_target,os_vm_page_size);
+            os_validate_recommit(LINKAGE_TABLE_SPACE_START, os_vm_page_size);
 #endif
         }
         if (result) {
-            arch_write_linkage_table_entry(link_target, result, datap);
+            arch_write_linkage_table_entry(entry_index, result, datap);
         } else { // startup might or might not work. ymmv
             printf("Missing required foreign symbol '%s'\n", namechars);
         }
 
-        link_target += LINKAGE_TABLE_ENTRY_SIZE;
+        ++entry_index;
     }
 #ifdef LISP_FEATURE_ARM
     lispobj* static_space = (lispobj*)STATIC_SPACE_START;

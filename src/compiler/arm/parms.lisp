@@ -112,6 +112,7 @@
 #+gencgc
 (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
+(defconstant linkage-table-growth-direction :down)
 (defconstant linkage-table-entry-size 16)
 
 #+(or linux netbsd)

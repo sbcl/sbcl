@@ -490,8 +490,9 @@ arch_install_interrupt_handlers()
 }
 
 void
-arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+    char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
     if (datap) {
         *(uword_t *)reloc_addr = (uword_t)target_addr;
         return;

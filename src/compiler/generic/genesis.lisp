@@ -2188,11 +2188,10 @@ core and return a descriptor to it."
 #+sb-dynamic-core
 (defun dyncore-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
-  (+ sb-vm:linkage-table-space-start
-     (* sb-vm:linkage-table-entry-size
-        (ensure-gethash (if datap (list symbol-name) symbol-name)
-                        *cold-foreign-symbol-table*
-                        (hash-table-count *cold-foreign-symbol-table*)))))
+  (sb-vm::linkage-table-entry-address
+   (ensure-gethash (if datap (list symbol-name) symbol-name)
+                   *cold-foreign-symbol-table*
+                   (hash-table-count *cold-foreign-symbol-table*))))
 
 ;;; *COLD-FOREIGN-SYMBOL-TABLE* becomes *!INITIAL-FOREIGN-SYMBOLS* in
 ;;; the core. When the core is loaded, !LOADER-COLD-INIT uses this to
@@ -3362,8 +3361,7 @@ III. initially undefined function references (alphabetically):
       (let ((name (car entry)))
         (format t " ~:[   ~;(D)~] ~8x = ~a~%"
                 (listp name)
-                (+ sb-vm:linkage-table-space-start
-                   (* (cdr entry) sb-vm:linkage-table-entry-size))
+                (sb-vm::linkage-table-entry-address (cdr entry))
                 (car (ensure-list name))))))
 
   (values))

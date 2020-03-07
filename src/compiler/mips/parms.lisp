@@ -104,6 +104,7 @@
   (defconstant linkage-table-space-start #x70000000)
   (defconstant linkage-table-space-end   #x71000000)
   (defconstant linkage-table-entry-size 4)
+  (defconstant linkage-table-growth-direction :up)
 
   ;; C stack grows downward from 0x80000000
   )

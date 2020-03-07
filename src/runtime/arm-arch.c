@@ -127,8 +127,10 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 
 #define LINKAGE_TEMP_REG        reg_NFP
 
-void arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+  char *reloc_addr =
+      (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
   if (datap) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
     return;

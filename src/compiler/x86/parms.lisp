@@ -202,6 +202,7 @@
 
 ;;; Size of one linkage-table entry in bytes.
 (defconstant linkage-table-entry-size 8)
+(defconstant linkage-table-growth-direction :up)
 
 
 (defenum (:start 8)

@@ -111,6 +111,7 @@
 #+gencgc
 (!gencgc-space-setup #xF0000000 :dynamic-space-start #x1000000000)
 
+(defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size 16)
 
 ;;;; other miscellaneous constants

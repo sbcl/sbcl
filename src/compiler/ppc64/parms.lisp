@@ -122,6 +122,7 @@
 ;;; While on gencgc we don't.
 #+gencgc (!gencgc-space-setup #x04000000 :dynamic-space-start #x1000000000)
 
+(defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size #+little-endian 28 #+big-endian 24)
 
 #+linux

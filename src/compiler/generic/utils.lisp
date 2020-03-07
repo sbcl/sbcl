@@ -49,6 +49,19 @@
            (- list-pointer-lowtag)))
       0))
 
+;;; the address of the linkage table entry for table index I.
+(defun linkage-table-entry-address (i)
+  (ecase linkage-table-growth-direction
+    (:up   (+ (* i linkage-table-entry-size) linkage-table-space-start))
+    (:down (- linkage-table-space-end (* (1+ i) linkage-table-entry-size)))))
+
+(defun linkage-table-index-from-address (addr)
+  (ecase linkage-table-growth-direction
+    (:up
+     (floor (- addr linkage-table-space-start) linkage-table-entry-size))
+    (:down
+     (1- (floor (- linkage-table-space-end addr) linkage-table-space-end)))))
+
 (defconstant-eqx +all-static-fdefns+
     #.(concatenate 'vector +c-callable-fdefns+ +static-fdefns+) #'equalp)
 

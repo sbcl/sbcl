@@ -132,6 +132,7 @@
                      #+openbsd #x4f000000
                      #+darwin  #x10000000)
 
+(defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size 16)
 
 #+linux

@@ -433,7 +433,8 @@ arch_install_interrupt_handlers(void)
 // So text and data entries are the same, because all we need
 // to represent a function is its address, no 'jr' instruction.
 void
-arch_write_linkage_table_entry(char *reloc_addr, void *target_addr, int datap)
+arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+    char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
     *(unsigned int *)reloc_addr = (unsigned int)target_addr;
 }
