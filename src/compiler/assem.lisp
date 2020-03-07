@@ -268,9 +268,9 @@
   (vop)
   (mnemonic)
   (operands)
-  (plist) ; put anything you want here for later passes such as instcombine
-  (prev)
-  (next))
+  (plist nil) ; put anything you want here for later passes such as instcombine
+  (prev nil)
+  (next nil))
 (declaim (freeze-type stmt))
 (defmethod print-object ((stmt stmt) stream)
   (print-unreadable-object (stmt stream :type t :identity t)

@@ -710,7 +710,7 @@
   ;; needed
   (safe-p nil :type boolean)
   ;; some kind of info used by the back end
-  info)
+  (info nil))
 (defprinter (nlx-info :identity t)
   block
   target
@@ -1368,7 +1368,7 @@
   ;; reference name for XREF.
   (%source-name (missing-arg) :type symbol :read-only t)
   ;; Constraints that cannot be expressed as NODE-DERIVED-TYPE
-  constraints)
+  (constraints nil))
 (defprinter (ref :identity t)
   (%source-name :test (neq %source-name '.anonymous.))
   leaf)
@@ -1446,7 +1446,7 @@
   ;; some kind of information attached to this node by the back end
   ;; or by CHECK-IMPORTANT-RESULT
   (info nil)
-  (step-info)
+  (step-info nil)
   ;; A plist of inline expansions
   (inline-expansions *inline-expansions* :type list :read-only t))
 

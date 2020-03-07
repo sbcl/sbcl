@@ -1086,7 +1086,7 @@
   ;; physical environment that the TN is live throughout.
   (physenv nil :type (or physenv null))
   ;; Used by pack-iterative
-  vertex)
+  (vertex nil))
 
 (declaim (freeze-type tn))
 (defmethod print-object ((tn tn) stream)
