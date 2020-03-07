@@ -22,6 +22,7 @@
              sb-posix::s-iroth sb-posix::s-iwoth sb-posix::s-ixoth))))
 
 (defmacro define-eacces-test (name form &rest values)
+  #+win32 (declare (ignore name form values))
   #-win32
   `(deftest ,name
     (block ,name

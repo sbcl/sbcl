@@ -76,10 +76,10 @@
                )))
     (let*
         ((spaces (append `((read-only ,small-space-size)
-                           #+sb-safepoint
-                           (safepoint ,(symbol-value '+backend-page-bytes+)
-                                      gc-safepoint-page-addr)
                            (linkage-table ,small-space-size)
+                           #+sb-safepoint
+                           ;; Must be just before NIL.
+                           (safepoint ,(symbol-value '+backend-page-bytes+) gc-safepoint-page-addr)
                            (static ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
