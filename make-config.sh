@@ -772,10 +772,9 @@ fi
 
 # There are only two architectures that don't have linkage tables,
 # and they also don't compile for half a dozen other reasons.
-# (I plan to remove :sb-dynamic-core, as it is now equivalent to :linkage-table.)
 case "$sbcl_arch" in
     alpha | hppa)  ;;
-    *) printf ' :linkage-table :sb-dynamic-core' >> $ltf
+    *) printf ' :linkage-table' >> $ltf
 esac
 
 # Use a little C program to try to guess the endianness.  Ware

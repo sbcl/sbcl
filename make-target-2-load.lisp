@@ -38,11 +38,6 @@
            ;; I would argue that this should not be exposed,
            ;; but I would also anticipate blowblack from removing it.
            :CHENEYGC :GENCGC ; GC: pick one and only one
-           ;; This really should not exist. For any one architecture, if it supports
-           ;; :linkage-table (which almost all do), then it should support dynamic-core,
-           ;; and we should build with both, which is to say that dynamic-core is not
-           ;; an additional yes/no choice.
-           :SB-DYNAMIC-CORE
            ;; Can't use s-l-a-d :compression safely without it
            :SB-CORE-COMPRESSION
            ;; Features that are also in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
@@ -72,7 +67,7 @@
     ;;;
     ;;; * *FEATURES* =>
     ;;; (:X86-64 :64-BIT :ANSI-CL :COMMON-LISP :ELF :GENCGC :HAIKU :IEEE-FLOATING-POINT
-    ;;; :LITTLE-ENDIAN :PACKAGE-LOCAL-NICKNAMES :SB-DYNAMIC-CORE :SB-LDB
+    ;;; :LITTLE-ENDIAN :PACKAGE-LOCAL-NICKNAMES :SB-LDB
     ;;; :SB-PACKAGE-LOCKS :SB-UNICODE :SBCL :UNIX)
     ;;;
     ;;; * (require :asdf)
@@ -81,7 +76,7 @@
     ;;; (:ASDF3.3 :ASDF3.2 :ASDF3.1 :ASDF3 :ASDF2 :ASDF :OS-UNIX
     ;;; :NON-BASE-CHARS-EXIST-P :ASDF-UNICODE :X86-64 :64-BIT :ANSI-CL :COMMON-LISP
     ;;; :ELF :GENCGC :IEEE-FLOATING-POINT :LITTLE-ENDIAN :PACKAGE-LOCAL-NICKNAMES
-    ;;; :SB-DYNAMIC-CORE :SB-LDB :SB-PACKAGE-LOCKS :SB-UNICODE :SBCL :UNIX)
+    ;;; :SB-LDB :SB-PACKAGE-LOCKS :SB-UNICODE :SBCL :UNIX)
     ;;;
     ;;; So, what the heck happened to :HAIKU? It's gone.
     ;;; Well this is pure evil. Just madness.

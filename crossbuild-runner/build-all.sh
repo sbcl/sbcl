@@ -21,9 +21,7 @@ do
   # Whether any of the :OS-PROVIDES-* features are present is mostly immaterial
   # to this cross-build test. Some of the provisions are only for C code which
   # we don't compile. Or else it doesn't matter much which lisp code is compiled.
-  # However, with :SB-DYNAMIC-CORE we need to assume that dlopen() is provided
-  # as there would otherwise be missing references due to excluding foreign-load
-  # in build-order.
+  # Assume that dlopen() is provided so that we don't try to read sbcl.nm though.
   echo '(lambda (features) (union features (list :crossbuild-test :os-provides-dlopen ' > $ltf
   cat crossbuild-runner/backends/$arch/local-target-features >> $ltf
   echo ')))' >> $ltf

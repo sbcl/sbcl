@@ -937,13 +937,13 @@
             #+alpha (* 2 n))))
     (sb-alien:sap-alien context-pointer (* os-context-t))))
 
-;;; On SB-DYNAMIC-CORE symbols which come from the runtime go through
+;;; With :LINKAGE-TABLE symbols which come from the runtime go through
 ;;; an indirection table, but the debugger needs to know the actual
 ;;; address.
 (defun static-foreign-symbol-address (name)
-  #+sb-dynamic-core
+  #+linkage-table
   (find-dynamic-foreign-symbol-address name)
-  #-sb-dynamic-core
+  #-linkage-table
   (foreign-symbol-address name))
 
 (defun catch-runaway-unwind (block)
@@ -3482,7 +3482,7 @@ register."
 (defun make-bpt-lra (real-lra)
   (declare (type #-(or x86 x86-64) lra #+(or x86 x86-64) system-area-pointer real-lra))
   (macrolet ((symbol-addr (name)
-               ;; "static" is not really correct if #+sb-dynamic-core
+               ;; "static" is not really correct if #+linkage-table
                `(static-foreign-symbol-address ,name))
              (trap-offset ()
                `(- (symbol-addr "fun_end_breakpoint_trap") src-start)))

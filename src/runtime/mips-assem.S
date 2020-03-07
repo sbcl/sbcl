@@ -275,7 +275,7 @@ lra:	.word	RETURN_PC_WIDETAG
 
 	/* from the ABI: "When calling position independent functions
 	   $25 must cotain the address of the called function." */
-	lw	$25, (reg_CFUNC) /* sb-dynamic-core indirection */
+	lw	$25, (reg_CFUNC) /* linkage-table indirection */
 
 	/* Check for interrupt */
 	.set	noreorder
@@ -286,7 +286,7 @@ lra:	.word	RETURN_PC_WIDETAG
 	subu	reg_ALLOC, 1
 	break	0x0, trap_PendingInterrupt
 	// load $25 again if 'bgez' was not taken (and reg_ALLOC was trashed)
-	lw	$25, (reg_CFUNC) /* sb-dynamic-core indirection */
+	lw	$25, (reg_CFUNC) /* linkage-table indirection */
 	nop
 1:	.set	reorder
 

@@ -664,7 +664,6 @@ arch_write_linkage_table_entry(int index, void *target_addr, int datap)
        *   word 2 = value to place in r11
        * For foreign calls, the value that we hand off to call_into_c
        * is therefore a function descriptor. To make things consistent,
-       * (so that we need not distinguish between #+/-dynamic-core or other reasons)
        * this linkage table entry itself has to look like a function descriptor.
        * We can just copy the real descriptor to here, except in one case:
        * call_into_c is not itself an ABI-compatible call. It really should be

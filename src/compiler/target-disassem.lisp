@@ -2266,7 +2266,7 @@
       (let ((code sb-fasl::*assembler-routines*))
         (invert (car (%code-debug-info code))
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
-    #-sb-dynamic-core
+    #-linkage-table
        (invert *static-foreign-symbols* #'identity))
     (loop for name across sb-vm::+all-static-fdefns+
           for address =

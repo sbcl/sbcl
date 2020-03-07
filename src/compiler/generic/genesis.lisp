@@ -1973,7 +1973,7 @@ core and return a descriptor to it."
 
 ;; Read the sbcl.nm file to find the addresses for foreign-symbols in
 ;; the C runtime.
-#-sb-dynamic-core
+#-linkage-table
 (defun load-cold-foreign-symbol-table (filename)
   (with-open-file (file filename)
     (loop for line = (read-line file nil nil)
@@ -2039,7 +2039,7 @@ core and return a descriptor to it."
                               value)))))))))
   (values))     ;; PROGN
 
-#-sb-dynamic-core
+#-linkage-table
 (defun cold-foreign-symbol-address (name)
   (declare (ignorable name))
   #+crossbuild-test #xf00fa8 ; any random 4-octet-aligned value should do
@@ -2185,8 +2185,8 @@ core and return a descriptor to it."
         (:absolute (absolute (cdr item)))))
     (number-to-core (sb-c::pack-code-fixup-locs (absolute) (relative)))))
 
-#+sb-dynamic-core
-(defun dyncore-note-symbol (symbol-name datap)
+#+linkage-table
+(defun linkage-table-note-symbol (symbol-name datap)
   "Register a symbol and return its address in proto-linkage-table."
   (sb-vm::linkage-table-entry-address
    (ensure-gethash (if datap (list symbol-name) symbol-name)
@@ -2200,14 +2200,14 @@ core and return a descriptor to it."
 (defun foreign-symbols-to-core ()
   (flet ((to-core (list transducer target-symbol)
            (cold-set target-symbol (vector-in-core (mapcar transducer list)))))
-    #-sb-dynamic-core
+    #-linkage-table
     ;; Sort by name
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'string< :key #'car)
              (lambda (symbol)
                (cold-cons (set-readonly (base-string-to-core (car symbol)))
                           (number-to-core (cdr symbol))))
              '*!initial-foreign-symbols*)
-    #+sb-dynamic-core
+    #+linkage-table
     ;; Sort by index into linkage table
     (to-core (sort (%hash-table-alist *cold-foreign-symbol-table*) #'< :key #'cdr)
              (lambda (pair &aux (key (car pair))
@@ -2720,12 +2720,12 @@ core and return a descriptor to it."
               (- (lookup-assembler-reference sym) sb-vm:nil-value))
              (:foreign
               (let ((sym (base-string-from-core sym)))
-                #+sb-dynamic-core (dyncore-note-symbol sym nil)
-                #-sb-dynamic-core (cold-foreign-symbol-address sym)))
+                #+linkage-table (linkage-table-note-symbol sym nil)
+                #-linkage-table (cold-foreign-symbol-address sym)))
              (:foreign-dataref
               (let ((sym (base-string-from-core sym)))
-                #+sb-dynamic-core (dyncore-note-symbol sym t)
-                #-sb-dynamic-core
+                #+linkage-table (linkage-table-note-symbol sym t)
+                #-linkage-table
                 (progn (maphash (lambda (k v)
                                   (format *error-output* "~&~S = #X~8X~%" k v))
                                 *cold-foreign-symbol-table*)
@@ -3267,7 +3267,7 @@ core and return a descriptor to it."
                       "layouts"
                       "type specifiers"
                       "symbols"
-                      #+sb-dynamic-core "linkage table")))
+                      #+linkage-table "linkage table")))
       (dotimes (i (length sections))
         (format t "~4<~@R~>. ~A~%" (1+ i) (nth i sections))))
     (format t "=================~2%")
@@ -3353,7 +3353,7 @@ III. initially undefined function references (alphabetically):
   (mapc (lambda (cell) (format t "~X: ~S~%" (car cell) (cdr cell)))
         (sort (%hash-table-alist *cold-symbols*) #'< :key #'car))
 
-  #+sb-dynamic-core
+  #+linkage-table
   (progn
     (format t "~%~|~%VIII. linkage table:~2%")
     (dolist (entry (sort (sb-int:%hash-table-alist *cold-foreign-symbol-table*)
@@ -3562,8 +3562,8 @@ III. initially undefined function references (alphabetically):
 
     ;; Prefill some linkage table entries perhaps
     (loop for (name datap) in sb-vm::*linkage-space-predefined-entries*
-          do (dyncore-note-symbol name datap))
-    #-(or sb-dynamic-core crossbuild-test)
+          do (linkage-table-note-symbol name datap))
+    #-(or linkage-table crossbuild-test)
     (when core-file-name
       (if symbol-table-file-name
           (load-cold-foreign-symbol-table symbol-table-file-name)

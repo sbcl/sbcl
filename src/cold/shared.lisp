@@ -286,13 +286,7 @@
           ":SB-SAFEPOINT-STRICTLY requires :SB-SAFEPOINT")
          ("(not (or elf mach-o win32))"
           "No execute object file format feature defined")
-         ("(and sb-dynamic-core (not linkage-table))"
-          ":SB-DYNAMIC-CORE requires :LINKAGE-TABLE")
-         ("(and linkage-table (not sb-dynamic-core))"
-          ":LINKAGE-TABLE must imply :SB-DYNAMIC-CORE")
          ("(and cons-profiling (not sb-thread))" ":CONS-PROFILING requires :SB-THREAD")
-         ("(and sb-linkable-runtime (not sb-dynamic-core))"
-          ":SB-LINKABLE-RUNTIME requires :SB-DYNAMIC-CORE")
          ("(and sb-linkable-runtime (not (or x86 x86-64)))"
           ":SB-LINKABLE-RUNTIME not supported on selected architecture")
          ("(and sb-linkable-runtime (not (or darwin linux win32)))"

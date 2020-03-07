@@ -14,10 +14,18 @@
 (defun find-foreign-symbol-address (name)
   "Returns the address of the foreign symbol NAME, or NIL. Does not enter the
 symbol in the linkage table, and never returns an address in the linkage-table."
-  (or #-sb-dynamic-core
+  (or #-linkage-table
       (find-foreign-symbol-in-table name *static-foreign-symbols*)
       (find-dynamic-foreign-symbol-address name)))
 
+;;; Note that much conditionalization is for nothing at this point, because all
+;;; platforms that we care about implement dlopen(). But if one did not, only
+;;; supporting static linking, we could still implement the entirety of the feature
+;;; known as :linkage-table and the feature formerly known as "dynamic core"
+;;; (folded into :linkage-table now) by mocking out dlsym() within the SBCL runtime
+;;; as a lookup table translating strings to functions needed in our runtime.
+;;; It's not our problem that shared objects aren't loadable, but we get the
+;;; flexibility of recompiling C without recompiling Lisp.
 (defun foreign-symbol-address (name &optional datap)
   "Returns the address of the foreign symbol NAME. DATAP must be true if the
 symbol designates a variable (used only on linkage-table platforms).
@@ -29,9 +37,9 @@ Dynamic symbols are entered into the linkage-table if they aren't there already.
 
 On non-linkage-table ports signals an error if the symbol isn't found."
   (declare (ignorable datap))
-  #+sb-dynamic-core
+  #+linkage-table
   (values (ensure-foreign-symbol-linkage name datap) t)
-  #-sb-dynamic-core
+  #-linkage-table
   (let ((static (find-foreign-symbol-in-table name *static-foreign-symbols*)))
     (if static
         (values static nil)
@@ -120,10 +128,10 @@ if the symbol isn't found."
 
 (defun !foreign-cold-init ()
   (declare (special *runtime-dlhandle* *shared-objects*))
-  #-sb-dynamic-core
+  #-linkage-table
   (dovector (symbol *!initial-foreign-symbols*)
     (setf (gethash (car symbol) *static-foreign-symbols*) (cdr symbol)))
-  #+sb-dynamic-core
+  #+linkage-table
   (loop for table-offset from 0
         and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
         do (setf (gethash reference *linkage-info*) table-offset))

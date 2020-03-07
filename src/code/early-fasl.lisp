@@ -41,8 +41,7 @@
 ;;; in the *FEATURES* list of this particular build.
 (defglobal *features-potentially-affecting-fasl-format*
     (append '(:sb-thread :sb-unicode :cheneygc
-              :gencgc :msan :sb-safepoint :sb-safepoint-strictly
-              :sb-dynamic-core)))
+              :gencgc :msan :sb-safepoint :sb-safepoint-strictly)))
 
 ;;; Return a string representing symbols in *FEATURES-POTENTIALLY-AFFECTING-FASL-FORMAT*
 ;;; which are present in a particular compilation.

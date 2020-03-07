@@ -210,7 +210,7 @@
     #+(and sb-thread (or ppc ppc64)) *tls-index-lock*
 
     ;; dynamic runtime linking support
-    #+sb-dynamic-core +required-foreign-symbols+
+    #+linkage-table +required-foreign-symbols+
 
     ;;; The following symbols aren't strictly required to be static
     ;;; - they are not accessed from C - but we make them static in order

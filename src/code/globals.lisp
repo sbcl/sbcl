@@ -95,7 +95,7 @@
                   *posix-argv*))
 ;;; This constant is assigned by Genesis and never read by Lisp code.
 ;;; (To prove that it isn't used, it's not a toplevel form)
-#+sb-dynamic-core
+#+linkage-table
 (let ()
   (defconstant sb-vm::+required-foreign-symbols+
     (symbol-value 'sb-vm::+required-foreign-symbols+)))

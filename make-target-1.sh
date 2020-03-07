@@ -37,7 +37,7 @@ fi
 # could come either before or after running the cross compiler; that
 # doesn't matter.)
 #
-# Note that the latter requirement does not apply to sb-dynamic-core
+# Note that the latter requirement does not apply to :linkage-table
 # builds, since the cross compiler does not depend on symbol tables in
 # that case.  Only because sbcl.nm is convenient for debugging purposes
 # is its generation left enabled even for those builds.

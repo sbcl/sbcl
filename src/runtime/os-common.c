@@ -130,7 +130,7 @@ os_sem_destroy(os_sem_t *sem)
 
 #endif
 
-/* When :SB-DYNAMIC-CORE is enabled, the special category of /static/ foreign
+/* When :LINKAGE-TABLE is enabled, the special category of /static/ foreign
  * symbols disappears. Foreign fixups are resolved to linkage table locations
  * during genesis, and for each of them a record is added to
  * REQUIRED_FOREIGN_SYMBOLS vector, of the form "name" for a function reference,
@@ -141,7 +141,7 @@ os_sem_destroy(os_sem_t *sem)
  * table entry for each element of REQUIRED_FOREIGN_SYMBOLS.
  */
 
-#if defined(LISP_FEATURE_SB_DYNAMIC_CORE) && !defined(LISP_FEATURE_WIN32)
+#if defined(LISP_FEATURE_LINKAGE_TABLE) && !defined(LISP_FEATURE_WIN32)
 void *
 os_dlsym_default(char *name)
 {
@@ -153,7 +153,12 @@ os_dlsym_default(char *name)
 int lisp_linkage_table_n_prelinked;
 void os_link_runtime()
 {
-#ifdef LISP_FEATURE_SB_DYNAMIC_CORE
+    // There is a potentially better technique we could use which would simplify
+    // this function, rendering REQUIRED_FOREIGN_SYMBOLS unnecessary, namely:
+    // all we need are two prefilled entries: one for dlsym() itself, and one
+    // for the allocation region overflow handler ("alloc" or "alloc_tramp").
+    // Lisp can fill in the linkage table as the very first action on startup.
+#ifdef LISP_FEATURE_LINKAGE_TABLE
     int entry_index = 0;
     lispobj symbol_name;
     char *namechars;
@@ -187,7 +192,7 @@ void os_link_runtime()
 
         ++entry_index;
     }
-#endif /* LISP_FEATURE_SB_DYNAMIC_CORE */
+#endif /* LISP_FEATURE_LINKAGE_TABLE */
 }
 
 void os_unlink_runtime()

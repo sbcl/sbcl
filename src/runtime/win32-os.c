@@ -311,7 +311,7 @@ void unmap_gc_page()
 
 #endif
 
-#if defined(LISP_FEATURE_SB_DYNAMIC_CORE)
+#if defined(LISP_FEATURE_LINKAGE_TABLE)
 /* This feature has already saved me more development time than it
  * took to implement.  In its current state, ``dynamic RT<->core
  * linking'' is a protocol of initialization of C runtime and Lisp
@@ -360,7 +360,7 @@ void unmap_gc_page()
  * bundle'' that rolls up your patch, redumps and -- presto -- 100MiB
  * program is fixed by sending and loading a 50KiB thingie.
  *
- * However, until LISP_FEATURE_SB_DYNAMIC_CORE, if your bug were fixed
+ * However, until LISP_FEATURE_LINKAGE_TABLE, if your bug were fixed
  * by modifying two lines of _C_ sources, a customer described above
  * had to be ready to receive and reinstall a new 100MiB
  * executable. With the aid of code below, deploying such a fix
@@ -395,7 +395,7 @@ void unmap_gc_page()
  * to leave old-style linking code in place for the sake of
  * _non-linkage-table_ platforms (they probably don't have -ldl or its
  * equivalent, like LL/GPA, at all) -- but i did it usually by moving
- * the entire `old style' code under #-sb-dynamic-core and
+ * the entire `old style' code under #-linkage-table and
  * refactoring the `new style' branch, instead of cutting the tail
  * piecemeal and increasing #+-ifdeffery amount & the world enthropy.
  *
@@ -550,7 +550,7 @@ u32 os_get_build_time_shared_libraries(u32 excl_maximum,
                    Anyway: using a module handle more than once will
                    do no harm, but it slows down the startup (even
                    now, our startup time is not a pleasant topic to
-                   discuss when it comes to :sb-dynamic-core; there is
+                   discuss when it comes to :linkage-table; there is
                    an obvious direction to go for speed, though --
                    instead of resolving symbols one-by-one, locate PE
                    export directories -- they are sorted by symbol
@@ -605,7 +605,7 @@ void* os_dlsym_default(char* name)
     return result;
 }
 
-#endif /* SB_DYNAMIC_CORE */
+#endif /* LINKAGE_TABLE */
 
 #if defined(LISP_FEATURE_SB_THREAD)
 /* We want to get a slot in TIB that (1) is available at constant

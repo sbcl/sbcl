@@ -25,7 +25,7 @@ survive in the final image.
 sb-devel without recompiling the whole thing, but probably a better
 idea is to put it into customize-target-features.lisp.
 
-The :SB-DYNAMIC-CORE feature allows the C runtime to be rebuilt
+The :LINKAGE-TABLE feature allows the C runtime to be rebuilt
 without requiring genesis/make-target-2 to be redone.
 
 Patch Submissions
