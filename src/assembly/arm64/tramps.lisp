@@ -55,13 +55,25 @@
           (inst str csp-tn (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes))))
         #-sb-thread
         (progn
-          (load-inline-constant nl1 '(:fixup "current_control_frame_pointer" :foreign))
+          ;; Each of these loads of a fixup loads the address of a linkage table entry,
+          ;; that is, if LINKAGE-TABLE-SPACE-START is #xF0200000, then the first load puts
+          ;; #xF0200000+something, not the address of current_control_frame_pointer,
+          ;; into register nl1.
+          ;; This is kinda dumb because first of all we could have calculated the address
+          ;; of the linkage entry instead of loading it. Second, it's unnecessarily
+          ;; double-indirect. I wonder if there's a way to remove double-indirection.
+          ;; The ohly way I can see doing that is for os_link_runtime() to poke bytes
+          ;; into this assembly code in the manner of the system's dynamic loader.
+          (load-inline-constant nl1 '(:fixup "current_control_frame_pointer" :foreign-dataref))
+          (inst ldr nl1 (@ nl1)) ; now load the address of the C variable
           (inst str cfp-tn (@ nl1))
-          (load-inline-constant nl1 '(:fixup "current_control_stack_pointer" :foreign))
+          (load-inline-constant nl1 '(:fixup "current_control_stack_pointer" :foreign-dataref))
+          (inst ldr nl1 (@ nl1)) ; "
           (inst str csp-tn (@ nl1))
-
-          (load-inline-constant tmp-tn '(:fixup "foreign_function_call_active" :foreign))
-          (inst str tmp-tn (@ tmp-tn)))
+          (load-inline-constant nl1 '(:fixup "foreign_function_call_active" :foreign-dataref))
+          (inst ldr nl1 (@ nl1)) ; "
+          ;; storing NULL ensures at least 1 set bit somewhere in the low 4 bytes
+          (inst str (32-bit-reg null-tn) (@ nl1))) ; (alien variable is 4 bytes, not 8)
         ;; Create a new frame
         (inst add csp-tn csp-tn (+ 32 80))
         (inst stp cfp-tn null-tn (@ csp-tn -112))
@@ -81,6 +93,13 @@
         (inst sub csp-tn csp-tn (+ 32 80)) ;; deallocate the frame
         #+sb-thread
         (inst str zr-tn (@ thread-tn (* thread-foreign-function-call-active-slot n-word-bytes)))
+        #-sb-thread
+        (progn
+          ;; We haven't restored NL1 yet, so it's ok to use as a scratch register here.
+          ;; It gets restored just prior to the RET instruction.
+          (load-inline-constant nl1 '(:fixup "foreign_function_call_active" :foreign-dataref))
+          (inst ldr nl1 (@ nl1))
+          (inst str (32-bit-reg zr-tn) (@ nl1)))
 
         (inst mov tmp-tn nl0) ;; result
 
