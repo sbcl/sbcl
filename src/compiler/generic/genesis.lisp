@@ -3560,6 +3560,9 @@ III. initially undefined function references (alphabetically):
 
   (let ((*cold-foreign-symbol-table* (make-hash-table :test 'equal)))
 
+    ;; Prefill some linkage table entries perhaps
+    (loop for (name datap) in sb-vm::*linkage-space-predefined-entries*
+          do (dyncore-note-symbol name datap))
     #-(or sb-dynamic-core crossbuild-test)
     (when core-file-name
       (if symbol-table-file-name

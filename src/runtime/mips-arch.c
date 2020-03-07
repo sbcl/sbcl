@@ -435,6 +435,8 @@ arch_install_interrupt_handlers(void)
 void
 arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
-    char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
+    // allocate successive entries downward
+    char *reloc_addr =
+        (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
     *(unsigned int *)reloc_addr = (unsigned int)target_addr;
 }

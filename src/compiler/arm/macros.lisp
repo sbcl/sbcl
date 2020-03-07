@@ -201,20 +201,19 @@
 
 #+gencgc
 (defun allocation-tramp (alloc-tn size back-label)
-  (let ((boxed-region (- (+ static-space-start (* 2 n-word-bytes))
-                         nil-value)))
-    (when (integerp size)
-      (load-immediate-word alloc-tn size))
-    ;; Using the native stack is OK - the register values have fixnum nature.
-    (inst word (logior #xe92d0000 ; PUSH {rN, lr}
-                       (ash 1 (if (integerp size) (tn-offset alloc-tn) (tn-offset size)))
-                       (ash 1 (tn-offset lr-tn))))
-    (inst ldr alloc-tn (@ null-tn (+ boxed-region (* 4 n-word-bytes))))
-    (inst blx alloc-tn)
-    (inst word (logior #xe8bd0000 ; POP {rN, lr}
-                       (ash 1 (tn-offset alloc-tn))
-                       (ash 1 (tn-offset lr-tn))))
-    (inst b back-label)))
+  (when (integerp size)
+    (load-immediate-word alloc-tn size))
+  ;; Using the native stack is OK - the register values have fixnum nature.
+  (inst word (logior #xe92d0000 ; PUSH {rN, lr}
+                     (ash 1 (if (integerp size) (tn-offset alloc-tn) (tn-offset size)))
+                     (ash 1 (tn-offset lr-tn))))
+  (inst ldr alloc-tn (@ null-tn (- (linkage-table-entry-address 0) ; = alloc_tramp
+                                   nil-value)))
+  (inst blx alloc-tn)
+  (inst word (logior #xe8bd0000 ; POP {rN, lr}
+                     (ash 1 (tn-offset alloc-tn))
+                     (ash 1 (tn-offset lr-tn))))
+  (inst b back-label))
 
 (defmacro allocation (result-tn size lowtag &key flag-tn
                                                  stack-allocate-p)

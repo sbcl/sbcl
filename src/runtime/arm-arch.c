@@ -129,9 +129,12 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 
 void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
+  // allocate successive entries downward
   char *reloc_addr =
       (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
-  if (datap) {
+  // index 0 (corresponding to 'alloc_tramp') should be written
+  // as though it were a data entry, not a code entry.
+  if (datap || index == 0) {
     *(unsigned long *)reloc_addr = (unsigned long)target_addr;
     return;
   }

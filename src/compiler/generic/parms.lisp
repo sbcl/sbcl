@@ -79,9 +79,8 @@
                            #+sb-safepoint
                            (safepoint ,(symbol-value '+backend-page-bytes+)
                                       gc-safepoint-page-addr)
+                           (linkage-table ,small-space-size)
                            (static ,small-space-size))
-                         #+linkage-table
-                         `((linkage-table ,small-space-size))
                          #+immobile-space
                          `((fixedobj ,fixedobj-space-size*)
                            (varyobj ,varyobj-space-size*))))
@@ -245,6 +244,7 @@
   (defconstant +pseudo-static-generation+ 6))
 
 (defparameter *runtime-asm-routines* nil)
+(defparameter *linkage-space-predefined-entries* nil)
 
 (push '("SB-VM" +c-callable-fdefns+ +common-static-symbols+)
       *!removable-symbols*)

@@ -62,15 +62,8 @@
     (inst addi csp-tn csp-tn lisp-framesize)
     (inst #-64-bit lw #+64-bit ld ca0 nsp-tn nbytes-start)
     (save-to-stack float-registers nsp-tn float-start t)
-    ;; Load the address of the C 'alloc' function from the word following
-    ;; the 'boxed_region' which is embedded in a lisp vector in static space.
-    ;; We mustn't affect LIP (as jumping to a fixup would do),
-    ;; or LINKAGE_TEMP_REG (as jumping to a linkage entry would do)
-    ;; because primitive allocators can't mess up any state except that which
-    ;; the caller understands to be the scratch registers or the alloc-tn.
-    ;; This load could be moved backwards, but I'm trying to get it correct
-    ;; before making microscopic improvements.
-    (loadw lr-tn null-tn 6 (- nil-value static-space-start))
+    ;; (linkage-table-entry-address 0) corresponds to C alloc()
+    (loadw lr-tn null-tn 0 (- nil-value (linkage-table-entry-address 0)))
     (inst jalr lr-tn lr-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
     (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)

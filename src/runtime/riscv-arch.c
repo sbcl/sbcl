@@ -151,8 +151,10 @@ arch_install_interrupt_handlers(void)
 
 void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
 {
-    char *reloc_addr = (char*)LINKAGE_TABLE_SPACE_START + index * LINKAGE_TABLE_ENTRY_SIZE;
-    if (datap) {
+    // allocate successive entries downward
+    char *reloc_addr =
+        (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
+    if (datap || index == 0) { // index 0 is alloc() which is just like a data entry
       *(unsigned long *)reloc_addr = (unsigned long)target_addr;
       return;
     }
