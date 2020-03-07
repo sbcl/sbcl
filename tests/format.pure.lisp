@@ -133,6 +133,7 @@
 (with-test (:name :cached-tokenized-string
             :skipped-on :interpreter)
   (let ((stream (make-string-output-stream)))
+    (format-to-string-stream 45678 stream)
     (ctu:assert-no-consing (format-to-string-stream 45678 stream))))
 
 (with-test (:name :uncached-tokenized-string)
