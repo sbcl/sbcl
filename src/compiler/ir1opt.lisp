@@ -2544,22 +2544,30 @@
 ;;; FIXME: Thus we lose possible type assertions on (LIST ...).
 (defoptimizer (values-list optimizer) ((list) node)
   (let ((use (lvar-uses list)))
-    (when (and (combination-p use)
-               (eq (lvar-fun-name (combination-fun use))
-                   'list))
+    (when (combination-p use)
+      (let ((name (lvar-fun-name (combination-fun use)))
+            (args (combination-args use)))
+        (when (or (eq name 'list)
+                  (and (eq name 'cons)
+                       (let ((cdr (second args)))
+                        (and (constant-lvar-p cdr)
+                             (null (lvar-value cdr))
+                             (progn
+                               (flush-dest cdr)
+                               (setf (cdr args) nil)
+                               t)))))
 
-      ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.
-      (change-ref-leaf (lvar-uses (combination-fun node))
-                       (find-free-fun 'values "in a strange place"))
-      (setf (combination-kind node) :full)
-      (let ((args (combination-args use)))
-        (dolist (arg args)
-          (setf (lvar-dest arg) node))
-        (setf (combination-args use) nil)
-        (flush-dest list)
-        (flush-combination use)
-        (setf (combination-args node) args))
-      t)))
+          ;; FIXME: VALUES might not satisfy an assertion on NODE-LVAR.
+          (change-ref-leaf (lvar-uses (combination-fun node))
+                           (find-free-fun 'values "in a strange place"))
+          (setf (combination-kind node) :full)
+          (dolist (arg args)
+            (setf (lvar-dest arg) node))
+          (setf (combination-args use) nil)
+          (flush-dest list)
+          (flush-combination use)
+          (setf (combination-args node) args)
+          t)))))
 
 ;;; If VALUES appears in a non-MV context, then effectively convert it
 ;;; to a PROG1. This allows the computation of the additional values

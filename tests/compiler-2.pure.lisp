@@ -2802,3 +2802,11 @@
                    (funcall z))))
     ((nil) 123)
     ((t) 123)))
+
+(with-test (:name :values-list+cons)
+  (assert
+   (equal (sb-kernel:%simple-fun-type
+           (checked-compile
+            `(lambda ()
+               (values-list (cons 1 nil)))))
+          '(function () (values (integer 1 1) &optional)))))
