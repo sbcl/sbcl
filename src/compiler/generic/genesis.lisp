@@ -2011,32 +2011,13 @@ core and return a descriptor to it."
                                 (subseq line (1+ p2)))
                         (values (parse-integer line :end p1 :radix 16)
                                 (subseq line (1+ p2))))
-                  ;; KLUDGE CLH 2010-05-31: on darwin, nm gives us
-                  ;; _function but dlsym expects us to look up
-                  ;; function, without the leading _ . Therefore, we
-                  ;; strip it off here.
-                  #+darwin
-                  (when (equal (char name 0) #\_)
-                    (setf name (subseq name 1)))
                   (multiple-value-bind (old-value found)
                       (gethash name *cold-foreign-symbol-table*)
                     (when (and found
                                (not (= old-value value)))
                       (warn "redefining ~S from #X~X to #X~X"
                             name old-value value)))
-                  (setf (gethash name *cold-foreign-symbol-table*) value)
-                  #+win32
-                  (let ((at-position (position #\@ name)))
-                    (when at-position
-                      (let ((name (subseq name 0 at-position)))
-                        (multiple-value-bind (old-value found)
-                            (gethash name *cold-foreign-symbol-table*)
-                          (when (and found
-                                     (not (= old-value value)))
-                            (warn "redefining ~S from #X~X to #X~X"
-                                  name old-value value)))
-                        (setf (gethash name *cold-foreign-symbol-table*)
-                              value)))))))))
+                  (setf (gethash name *cold-foreign-symbol-table*) value))))))
   (values))     ;; PROGN
 
 #-linkage-table
