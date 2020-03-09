@@ -23,13 +23,40 @@
   (index int) (real-address unsigned) (datap int))
 
 (define-load-time-global *linkage-info*
-    (make-hash-table :test 'equal :synchronized t))
+    ;; CDR of the cons is the list of undefineds
+    (list (make-hash-table :test 'equal :synchronized t)))
+
+(define-alien-variable undefined-alien-address unsigned)
+
+(macrolet ((dlsym-wrapper (&optional warn)
+             ;; Produce two values: an indicator of whether the foreign symbol was
+             ;; found; and the address as an integer if found, or a guard address
+             ;; which when accessed will result in an UNDEFINED-ALIEN-ERROR.
+             `(let ((addr (find-dynamic-foreign-symbol-address name)))
+                (cond (addr
+                       (values t addr))
+                      (t
+                       (when ,warn
+                         ;; If we can report the actual name when an undefined
+                         ;; alien is called don't warn.
+                         #-(or arm arm64 x86-64)
+                         (style-warn 'sb-kernel:undefined-alien-style-warning
+                                     :symbol name))
+                       (values
+                        nil
+                        (if datap
+                            undefined-alien-address
+                            (or
+                             (sb-fasl::get-asm-routine 'sb-vm::undefined-alien-tramp)
+                             (find-foreign-symbol-address "undefined_alien_function")
+                             (bug "unreachable")))))))))
 
 ;;; Add a foreign linkage entry if none exists, return the address
 ;;; in the linkage table.
 (defun ensure-foreign-symbol-linkage (name datap)
-  (let ((key (if datap (list name) name))
-        (ht *linkage-info*))
+  (let* ((key (if datap (list name) name))
+         (info *linkage-info*)
+         (ht (car info)))
     (or (awhen (with-locked-system-table (ht)
                  (or (gethash key ht)
                      (let* ((index (hash-table-count ht))
@@ -37,9 +64,8 @@
                                                 sb-vm:linkage-table-space-start)
                                              sb-vm:linkage-table-entry-size)))
                        (when (< index capacity)
-                         (let ((real-address
-                                (ensure-dynamic-foreign-symbol-address name datap)))
-                           (aver real-address)
+                         (multiple-value-bind (defined real-address) (dlsym-wrapper t)
+                           (unless defined (push key (cdr info)))
                            (arch-write-linkage-table-entry index real-address
                                                            (if datap 1 0))
                            (logically-readonlyize name)
@@ -54,16 +80,36 @@
 ;;;
 ;;; FIXME: Should figure out how to write only those entries that need
 ;;; updating.
-(defun update-linkage-table ()
+;;; The problem is that when unloading a library, lacking any way to know which
+;;; symbols came from it, we have to try to find every symbol again.
+;;; If the shared-object-handle in which each symbol was originally found were
+;;; stored in linkage-info, we could know which will become undefined on unload.
+;;; The only "problem" is my lack of motivation to change this further.
+(defun update-linkage-table (full-scan)
   ;; This symbol is of course itself a prelinked symbol.
-  (let ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int)))
-    (dohash ((key index) *linkage-info* :locked t)
-      (let* ((datap (listp key))
-             (name (if datap (car key) key)))
-        ;; Partial fix to the above: Symbols required for Lisp startup
-        ;; will not be re-pointed to a different address ever.
-        ;; Nor will those referenced by ELF core.
-        (when (>= index n-prelinked)
-          (let ((real-address (ensure-dynamic-foreign-symbol-address name datap)))
-            (aver real-address)
-            (arch-write-linkage-table-entry index real-address (if datap 1 0))))))))
+  (let* ((n-prelinked (extern-alien "lisp_linkage_table_n_prelinked" int))
+         (info *linkage-info*)
+         (ht (car info))
+         ;; for computing anew the list of undefined symbols
+         (notdef))
+    (flet ((recheck (key index)
+             (let* ((datap (listp key))
+                    (name (if datap (car key) key)))
+               ;; Symbols required for Lisp startup
+               ;; will not be re-pointed to a different address ever.
+               ;; Nor will those referenced by ELF core.
+               (when (>= index n-prelinked)
+                 (multiple-value-bind (defined real-address) (dlsym-wrapper)
+                   (unless defined (push key notdef))
+                   (arch-write-linkage-table-entry index real-address
+                                                   (if datap 1 0)))))))
+    (with-locked-system-table (ht)
+      (if full-scan
+          ;; Look up everything; this is for image restart or library unload.
+          (dohash ((key index) ht)
+            (recheck key index))
+          ;; Look up only the currently undefined foreign symbols
+          (dolist (key (cdr info))
+            (recheck key (the (not null) (gethash key ht)))))
+      (setf (cdr info) notdef)))))
+)

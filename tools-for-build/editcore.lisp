@@ -411,9 +411,10 @@
 (defun labelize (x) (concatenate 'string label-prefix x))
 
 (defun compute-linkage-symbols (spaces entry-size)
-  (let* ((hashtable (symbol-global-value
-                     (find-target-symbol "SB-SYS" "*LINKAGE-INFO*"
-                                         spaces :physical)))
+  (let* ((linkage-info (symbol-global-value
+                        (find-target-symbol "SB-SYS" "*LINKAGE-INFO*"
+                                            spaces :physical)))
+         (hashtable (car (translate linkage-info spaces)))
          (pairs (target-hash-table-alist hashtable spaces))
          (min (reduce #'min pairs :key #'cdr))
          (max (reduce #'max pairs :key #'cdr))

@@ -65,18 +65,12 @@ if the symbol isn't found."
         (int-sap addr))))
 
 (defun foreign-reinit ()
-  #+os-provides-dlopen
-  (reopen-shared-objects)
-  #+linkage-table
-  ;; Don't warn about undefined aliens on startup. The same core can
-  ;; reasonably be expected to work with different versions of the
-  ;; same library.
-  (handler-bind ((style-warning #'muffle-warning))
-    (update-linkage-table)))
+  #+os-provides-dlopen (reopen-shared-objects)
+  #+linkage-table (update-linkage-table t))
 
 ;;; Cleanups before saving a core
 (defun foreign-deinit ()
-  #+(and os-provides-dlopen (not linkage-table))
+  #+(and os-provides-dlopen (not linkage-table)) ; at most HPPA and Alpha now
   (when (dynamic-foreign-symbols-p)
     (warn "~@<Saving cores with alien definitions referring to non-static ~
            foreign symbols is unsupported on this platform: references to ~
@@ -85,6 +79,8 @@ if the symbol isn't found."
            foreign definitions and code using them in the restarted core, ~
            but no guarantees.~%~%Dynamic foreign symbols in this core: ~
            ~{~A~^, ~}~:@>" (list-dynamic-foreign-symbols)))
+  ;; Clobber list of undefineds. Reinit will figure it all out again.
+  #+linkage-table (setf (cdr *linkage-info*) nil)
   #+os-provides-dlopen
   (close-shared-objects))
 
@@ -98,7 +94,7 @@ if the symbol isn't found."
               addr
               sb-vm:linkage-table-space-end)
       (let ((table-index (sb-vm::linkage-table-index-from-address addr)))
-        (dohash ((key value) *linkage-info* :locked t)
+        (dohash ((key value) (car *linkage-info*) :locked t)
           (when (= value table-index)
             (return-from sap-foreign-symbol (if (listp key) (car key) key))))))
     #+os-provides-dladdr
@@ -134,7 +130,7 @@ if the symbol isn't found."
   #+linkage-table
   (loop for table-offset from 0
         and reference across (symbol-value 'sb-vm::+required-foreign-symbols+)
-        do (setf (gethash reference *linkage-info*) table-offset))
+        do (setf (gethash reference (car *linkage-info*)) table-offset))
   #+os-provides-dlopen
   (setf *runtime-dlhandle* (dlopen-or-lose))
   #+os-provides-dlopen
