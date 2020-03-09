@@ -36,9 +36,6 @@
 ;;; make-host-n build steps
 ;;; All uses of #+ and #- reader macros within this file refer to
 ;;; the chosen target features, and not CL:*FEATURES*.
-;;; The "host escape" syntax #+(host-feature x) must not be used,
-;;; because during the warm build phase, the reader is completely
-;;; standard and lacks the custom character macro handler.
 ;;; If you must test a host feature, use "#.(cl:if ..)" syntax.
 (
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -56,8 +53,8 @@
  ;; Declare all target special variables defined by ANSI
  ("src/code/cl-specials" :not-host)
 
- ;; Things like DX-FLET and AWHEN are available for use in both the host
- ;; and target very early, with no DEF! obfuscation necessary.
+ ;; Things like DX-FLET and AWHEN are available for use in both the
+ ;; host and target very early.
  ("src/code/primordial-extensions" :c-headers)
  ("src/code/cold-init-helper-macros" :c-headers)
  ("src/code/early-defmethod" :not-host)
@@ -456,6 +453,7 @@
 
  ;; Compiling this requires fop definitions from code/fop.lisp and
  ("src/compiler/dump")
+ ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
  ("src/compiler/ir1report") ; for COMPILER-ERROR-CONTEXT
  ("src/code/target-pathname" :not-host) ; needs "code/pathname"
@@ -674,9 +672,6 @@
 
  #-(or x86 x86-64)
  ("src/compiler/generic/sanctify" :not-host)
-
- ;; FIXME: Does this really need stuff from compiler/dump.lisp?
- ("src/compiler/target-dump" :not-host) ; needs stuff from compiler/dump.lisp
 
  ("src/code/cold-init" :not-host) ; needs (SETF EXTERN-ALIEN) macroexpansion
 
