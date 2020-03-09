@@ -5,6 +5,7 @@
 
 (in-package "SB-VM")
 
+#+gencgc
 (define-assembly-routine (alloc-tramp (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)
      (:temp nl1 unsigned-reg nl1-offset))

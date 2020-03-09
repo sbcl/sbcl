@@ -59,13 +59,6 @@ call_into_lisp:
 	@@ Enter PSEUDO-ATOMIC.
 	str     pc, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer into the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_OCFP, [reg_OCFP]
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-#endif
-
 	@@ Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
@@ -127,13 +120,6 @@ call_into_lisp:
 	@@ Set FFCA, so the runtime knows that we're not "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     pc, [reg_OCFP]
-
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
-#endif
 
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
@@ -212,13 +198,6 @@ call_into_c:
 	@@ arguments to its final resting place now.
         mov     r0, reg_OCFP
 
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_NFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
-#endif
-
 	@@ Leave PSEUDO-ATOMIC and check for interrupts.
 	str     reg_NULL, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_ATOMIC)
 	ldr     reg_OCFP, STATIC_SYMBOL_VALUE(PSEUDO_ATOMIC_INTERRUPTED)
@@ -265,13 +244,6 @@ call_into_c:
 	@@ Clear FFCA, so the runtime knows that we're "in lisp".
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_R2, [reg_OCFP]
-
-#ifndef LISP_FEATURE_GENCGC
-        @@ Copy the current allocation pointer into the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        ldr     reg_OCFP, [reg_OCFP]
-        str     reg_OCFP, STATIC_SYMBOL_VALUE(ALLOCATION_POINTER)
-#endif
 
         @@ Restore the Lisp stack and frame pointers, but store the
         @@ control frame pointer in reg_NFP (saving a register move
@@ -357,6 +329,7 @@ alloc_tramp:
 
 	ldmfd	sp!, {r4, r6, r12, lr}
 	bx	lr
+#endif
 
         .align
 	.global	do_pending_interrupt
@@ -372,7 +345,6 @@ do_pending_interrupt:
         .byte 0
         .byte 0
 	bx	lr
-#endif
 
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.

@@ -26,12 +26,13 @@
 #include "immobile-space.h"
 #include "hopscotch.h"
 #include "code.h"
+#include "pseudo-atomic.h"
 
 static boolean gcable_pointer_p(lispobj pointer)
 {
 #ifdef LISP_FEATURE_CHENEYGC
    return pointer >= (lispobj)current_dynamic_space
-       && pointer < (lispobj)dynamic_space_free_pointer;
+       && pointer < (lispobj)get_alloc_pointer();
 #endif
 #ifdef LISP_FEATURE_GENCGC
    return find_page_index((void*)pointer) >= 0 || immobile_space_p(pointer);
@@ -216,7 +217,7 @@ void coalesce_similar_objects()
 #ifdef LISP_FEATURE_GENCGC
     walk_generation(coalesce_range, -1, arg);
 #else
-    coalesce_range(current_dynamic_space, dynamic_space_free_pointer, arg);
+    coalesce_range(current_dynamic_space, get_alloc_pointer(), arg);
 #endif
     hopscotch_destroy(&ht);
 }

@@ -68,6 +68,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
+    extern void do_pending_interrupt();
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
 }
 

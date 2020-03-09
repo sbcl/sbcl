@@ -18,6 +18,14 @@
 
 #include "interr.h"
 
+/* NB: this file is not the most obvious place to #define get_alloc_pointer()
+ * and set_alloc_pointer(), but it makes some degree of sense for the machines
+ * which overlay the pseudo-atomic flag on reg_ALLOC.
+ * Except that this file never actually mentions reg_ALLOC, it only
+ * talks about the C variable for the allocation pointer,
+ * so ideally we would put [gs]et_alloc_pointer() somewhere more discoverable,
+ * but I don't want to mess things up to badly at the moment. */
+
 #if defined(LISP_FEATURE_X86) || defined(LISP_FEATURE_X86_64)
 
 #define set_alloc_pointer(value) dynamic_space_free_pointer = (lispobj*)(value)
@@ -106,6 +114,7 @@ get_pseudo_atomic_interrupted(struct thread *thread)
 static inline void
 set_pseudo_atomic_interrupted(struct thread *thread)
 {
+    extern void do_pending_interrupt();
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, thread);
 }
 
@@ -172,6 +181,6 @@ clear_pseudo_atomic_interrupted(struct thread *thread)
 #define set_alloc_pointer(value)                \
     SetSymbolValue(ALLOCATION_POINTER, value, 0)
 #define get_alloc_pointer()                     \
-    SymbolValue(ALLOCATION_POINTER, 0)
+    (lispobj*)SymbolValue(ALLOCATION_POINTER, 0)
 #endif
 #endif /* PSEUDO_ATOMIC_H */

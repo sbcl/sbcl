@@ -34,6 +34,7 @@
 #include "arch.h"
 #include "code.h"
 #include "private-cons.inc"
+#include "pseudo-atomic.h"
 
 /* So you need to debug? */
 #if 0
@@ -127,7 +128,7 @@ collect_garbage(generation_index_t ignore)
     /* Set up from space and new space pointers. */
 
     from_space = current_dynamic_space;
-    from_space_free_pointer = dynamic_space_free_pointer;
+    from_space_free_pointer = get_alloc_pointer();
 
 #ifdef PRINTNOISE
     fprintf(stderr,"from_space = %lx\n",
@@ -208,7 +209,7 @@ collect_garbage(generation_index_t ignore)
             (os_vm_size_t) dynamic_space_size);
 
     current_dynamic_space = new_space;
-    dynamic_space_free_pointer = new_space_free_pointer;
+    set_alloc_pointer((lispobj)new_space_free_pointer);
 
 #ifdef PRINTNOISE
     size_discarded = (from_space_free_pointer - from_space) * sizeof(lispobj);
@@ -349,7 +350,7 @@ lispobj *
 search_dynamic_space(void *pointer)
 {
     lispobj *start = (lispobj *) current_dynamic_space;
-    lispobj *end = (lispobj *) dynamic_space_free_pointer;
+    lispobj *end = get_alloc_pointer();
     if ((pointer < (void *)start) || (pointer >= (void *)end))
         return NULL;
     return gc_search_space(start, pointer);
@@ -376,10 +377,10 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
 
     addr = os_round_up_to_page((os_vm_address_t)current_dynamic_space
                                + dynamic_usage);
-    if (addr < (os_vm_address_t)dynamic_space_free_pointer)
+    if (addr < (os_vm_address_t)get_alloc_pointer())
         lose("set_auto_gc_trigger: tried to set gc trigger too low! (%ld < 0x%08lx)",
              (unsigned long)dynamic_usage,
-             (unsigned long)((os_vm_address_t)dynamic_space_free_pointer
+             (unsigned long)((os_vm_address_t)get_alloc_pointer()
                              - (os_vm_address_t)current_dynamic_space));
 
     if (dynamic_usage > dynamic_space_size)

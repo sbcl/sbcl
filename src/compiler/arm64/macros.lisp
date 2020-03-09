@@ -194,7 +194,7 @@
               (lowtag lowtag)
               (flag-tn flag-tn)
               (stack-allocate-p stack-allocate-p)
-              (lip lip))
+              #+gencgc (lip lip))
     `(cond (,stack-allocate-p
             (assemble ()
               (move ,result-tn csp-tn)
@@ -212,6 +212,7 @@
                 (inst add ,result-tn ,result-tn ,lowtag))))
            #-gencgc
            (t
+            (progn ,lip nil) ; cause supplied expression to be used
             (load-symbol-value ,flag-tn *allocation-pointer*)
             (inst add ,result-tn ,flag-tn ,lowtag)
             (inst add ,flag-tn ,flag-tn (add-sub-immediate ,size))

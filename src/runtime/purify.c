@@ -38,6 +38,7 @@
 #include "genesis/defstruct-description.h"
 #include "genesis/hash-table.h"
 #include "code.h"
+#include "pseudo-atomic.h"
 
 /* We don't ever do purification with GENCGC as of 1.0.5.*. There was
  * a lot of hairy and fragile ifdeffage in here to support purify on
@@ -649,7 +650,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
         return 0;
     }
 
-    dynamic_space_purify_pointer = dynamic_space_free_pointer;
+    dynamic_space_purify_pointer = get_alloc_pointer();
 
     read_only_end = read_only_free = read_only_space_free_pointer;
     static_end = static_free = static_space_free_pointer;
@@ -751,7 +752,7 @@ purify(lispobj static_roots, lispobj read_only_roots)
     read_only_space_free_pointer = read_only_free;
     static_space_free_pointer = static_free;
 
-    dynamic_space_free_pointer = current_dynamic_space;
+    set_alloc_pointer((lispobj)current_dynamic_space);
     set_auto_gc_trigger(bytes_consed_between_gcs);
 
     /* Blast away instruction cache */

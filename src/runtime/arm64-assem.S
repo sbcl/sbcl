@@ -126,14 +126,6 @@ call_into_lisp:
 #endif
         ENTER_PA
 
-
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer into the symbol.
-        ldr     reg_NL3, =dynamic_space_free_pointer
-        ldr     reg_NL3, [reg_NL3]
-        STORE_STATIC_SYMBOL_VALUE(reg_NL3, ALLOCATION_POINTER)
-#endif
-
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 #ifdef LISP_FEATURE_SB_THREAD
         str     xzr,[reg_THREAD, THREAD_FOREIGN_FUNCTION_CALL_ACTIVE_OFFSET]
@@ -207,13 +199,6 @@ no_args:
 	str     reg_OCFP, [reg_OCFP]
 #endif
 
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer out from the symbol.
-        ldr     reg_OCFP, =dynamic_space_free_pointer
-        LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
-        str     reg_NFP, [reg_OCFP]
-#endif
-
         LEAVE_PA
 
 	// Restore saved registers.
@@ -285,14 +270,6 @@ call_into_c:
 	ldr     reg_OCFP, =foreign_function_call_active
 	str     reg_OCFP, [reg_OCFP]
 #endif
-
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer out from the symbol.
-        ldr     reg_NL9, =dynamic_space_free_pointer
-        LOAD_STATIC_SYMBOL_VALUE(reg_NFP, ALLOCATION_POINTER)
-        str     reg_NFP, [reg_NL9]
-#endif
-
 	LEAVE_PA
 #ifdef LISP_FEATURE_SB_SAFEPOINT
 	/* OK to run GC without stopping this thread from this point on. */
@@ -353,13 +330,6 @@ call_into_c:
 	// Clear FFCA, so the runtime knows that we're "in lisp".
 	str     xzr, [reg_OCFP]
 
-#ifndef LISP_FEATURE_GENCGC
-        // Copy the current allocation pointer into the symbol.
-        ldr     reg_NL9, =dynamic_space_free_pointer
-        ldr     reg_NL9, [reg_NL9]
-        STORE_STATIC_SYMBOL_VALUE(reg_OCFP, ALLOCATION_POINTER)
-#endif
-
         ldr	reg_NFP, =current_control_stack_pointer
 	ldr	reg_CSP, [reg_NFP]
 	ldr	reg_NFP, =current_control_frame_pointer
@@ -391,14 +361,14 @@ fun_end_breakpoint_trap:
         b      fun_end_breakpoint_trap
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
-#ifdef LISP_FEATURE_GENCGC
+
         .align
 	.global	do_pending_interrupt
 	.type	do_pending_interrupt, %function
 do_pending_interrupt:
         brk trap_PendingInterrupt
 	ret
-#endif
+
 #ifdef __ELF__
 // Mark the object as not requiring an executable stack.
 .section .note.GNU-stack,"",%progbits

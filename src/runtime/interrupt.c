@@ -785,8 +785,13 @@ fake_foreign_function_call(os_context_t *context)
     /* context_index incrementing must not be interrupted */
     check_blockables_blocked_or_lose(0);
 
-    /* Get current Lisp state from context. */
-#if (defined(LISP_FEATURE_ARM) || defined(LISP_FEATURE_RISCV)) && !defined(LISP_FEATURE_GENCGC)
+    /* Get current Lisp state from context.
+       32-bit ARM uses ALLOCATION_POINTER, never uses 'dynamic_space_free_pointer',
+       and has no reg_ALLOC, so the allocation pointer is *always* whatever the
+       static [sic] Lisp symbol contains. Thus, the burden should be on C code
+       to access the static symbol at each pointer of use, and never upon Lisp to
+       copy the static symbol's value into a C variable */
+#if defined(LISP_FEATURE_RISCV) && defined(LISP_FEATURE_CHENEYGC)
     dynamic_space_free_pointer = SymbolValue(ALLOCATION_POINTER, thread);
 #endif
 #ifdef reg_ALLOC
@@ -901,7 +906,7 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
      * not updating them. */
     thread->pseudo_atomic_bits = 0;
 #endif
-#if (defined(LISP_FEATURE_ARM) || defined (LISP_FEATURE_RISCV)) && !defined(LISP_FEATURE_GENCGC)
+#if defined (LISP_FEATURE_RISCV) && defined(LISP_FEATURE_CHENEYGC)
     SetSymbolValue(ALLOCATION_POINTER, dynamic_space_free_pointer, thread);
 #endif
 }
