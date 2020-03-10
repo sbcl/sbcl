@@ -101,7 +101,7 @@ arch_handle_breakpoint(os_context_t *context)
 void
 arch_handle_fun_end_breakpoint(os_context_t *context)
 {
-    *os_context_pc_addr(context) = (int) handle_fun_end_breakpoint(context);
+    *os_context_pc_addr(context) = (long) handle_fun_end_breakpoint(context);
 }
 
 void
@@ -123,7 +123,7 @@ sigtrap_handler(int signal, siginfo_t *info, os_context_t *context)
     u32 trap_instruction = *((u32 *)*os_context_pc_addr(context));
 
     if (trap_instruction != 0x100073) {
-        lose("Unrecognized trap instruction %08lx in sigtrap_handler()",
+        lose("Unrecognized trap instruction %08x in sigtrap_handler()",
              trap_instruction);
     }
 
