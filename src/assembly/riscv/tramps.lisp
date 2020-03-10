@@ -20,9 +20,26 @@
                (inst #-64-bit lw #+64-bit ld tn sp-tn i))))
 
 #+gencgc
+(defmacro define-alloc-tramp-stub (alloc-tn-offset)
+  `(define-assembly-routine
+       (,(alloc-tramp-stub-name alloc-tn-offset) (:return-style :none))
+       ((:temp size unsigned-reg ,alloc-tn-offset)
+        (:temp alloc descriptor-reg ,alloc-tn-offset))
+     ;; Pass the size and result on the number stack.  Instead of
+     ;; allocating space here, we save some code size by delegating
+     ;; the stack pointer frobbing to the real assembly routine.
+     (inst subi nsp-tn nsp-tn n-word-bytes)
+     (storew lr-tn nsp-tn 0)
+     (storew size nsp-tn -1)
+     (invoke-asm-routine 'alloc-tramp nil)
+     (loadw alloc nsp-tn -1)
+     (loadw lr-tn nsp-tn 0)
+     (inst addi nsp-tn nsp-tn n-word-bytes)
+     (inst jalr zero-tn lr-tn 0)))
+
+#+gencgc
 (define-assembly-routine (alloc-tramp (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)
-
      (:temp ca0 unsigned-reg ca0-offset))
   (let* ((nl-registers
            (loop for i in (intersection non-descriptor-regs
@@ -73,6 +90,22 @@
     (pop-from-stack nl-registers nsp-tn nl-start)
     (inst addi nsp-tn nsp-tn number-framesize)
     (inst jalr zero-tn lr-tn 0)))
+
+;;; Define allocation stubs. The purpose of creating these stubs is to
+;;; reduce the number of instructions needed at the site of
+;;; allocation, offloading the call-out setup onto assembly
+;;; routines. The cost of indirection doesn't matter as this is in the
+;;; slow case.
+#+gencgc
+(macrolet ((define-alloc-tramp-stubs ()
+             `(progn
+                ,@(mapcar (lambda (tn-offset)
+                            `(define-alloc-tramp-stub ,tn-offset))
+                          (union descriptor-regs
+                                 ;; KLUDGE: sometimes we allocate into
+                                 ;; non-descriptor regs...
+                                 non-descriptor-regs)))))
+  (define-alloc-tramp-stubs))
 
 (define-assembly-routine
     (xundefined-tramp (:return-style :none)

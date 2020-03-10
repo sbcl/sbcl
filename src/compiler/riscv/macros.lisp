@@ -527,18 +527,8 @@ and
 ;;; the P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun allocation-tramp (alloc-tn size back-label)
-  (let ((size-tn (cond ((integerp size)
-                        (inst li alloc-tn size)
-                        alloc-tn)
-                       (t size))))
-    ;; Pass alloc-tn on the number stack.
-    ;; Instead of allocating space here, we save some code size by
-    ;; delegating the stack pointer frobbing to the assembly routine.
-    (storew size-tn nsp-tn -1))
-  (invoke-asm-routine 'alloc-tramp)
-  (loadw alloc-tn nsp-tn -1)
-  (inst j back-label))
+(defun alloc-tramp-stub-name (tn-offset)
+  (intern (format nil "ALLOC-TRAMP-STUB-~d" tn-offset) "SB-VM"))
 
 (defun allocation (result-tn size lowtag &key flag-tn
                                               stack-allocate-p
@@ -589,7 +579,7 @@ and
            (etypecase size
              (short-immediate
               (inst addi result-tn result-tn size))
-             (U+i-immediate
+             (u+i-immediate
               (inst li temp-tn size)
               (inst add result-tn result-tn temp-tn))
              (tn
@@ -604,11 +594,19 @@ and
              (tn
               (inst sub result-tn result-tn size)))
            (emit-label back-from-alloc)
-           (when lowtag
+           (unless (zerop lowtag)
              (inst ori result-tn result-tn lowtag))
            (assemble (:elsewhere)
              (emit-label alloc)
-             (allocation-tramp result-tn size back-from-alloc))))))
+             (etypecase size
+               (short-immediate
+                (inst li result-tn size))
+               (u+i-immediate
+                (move result-tn temp-tn))
+               (tn
+                (move result-tn size)))
+             (invoke-asm-routine (alloc-tramp-stub-name (tn-offset result-tn)))
+             (inst j back-from-alloc))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                   &key (lowtag other-pointer-lowtag)
