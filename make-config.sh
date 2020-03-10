@@ -376,6 +376,7 @@ case `uname -m` in
     mips*) guessed_sbcl_arch=mips ;;
     *arm*) guessed_sbcl_arch=arm ;;
     aarch64) guessed_sbcl_arch=arm64 ;;
+    riscv64) guessed_sbcl_arch=riscv ;;
     *)
         # If we're not building on a supported target architecture, we
         # we have no guess, but it's not an error yet, since maybe
