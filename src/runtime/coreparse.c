@@ -40,7 +40,7 @@
 #include "validate.h"
 #include "gc-internal.h"
 #include "gc-private.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "code.h"
 
 #include <errno.h>

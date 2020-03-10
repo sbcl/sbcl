@@ -29,7 +29,7 @@
 #endif
 
 #ifdef LISP_FEATURE_SB_THREAD
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #endif
 
   /* The header files may not define PT_DAR/PT_DSISR.  This definition

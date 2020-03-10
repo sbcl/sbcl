@@ -23,7 +23,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "monitor.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 
 os_vm_address_t arch_get_bad_addr(int sig, siginfo_t *code, os_context_t *context)
 {

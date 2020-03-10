@@ -37,7 +37,7 @@
 #include "interr.h"
 #include "alloc.h"
 #include "gc-internal.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "interrupt.h"
 #include "lispregs.h"
 

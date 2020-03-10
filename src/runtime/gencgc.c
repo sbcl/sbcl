@@ -46,7 +46,7 @@
 #include "gc-private.h"
 #include "gencgc-private.h"
 #include "thread.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "alloc.h"
 #include "code.h"
 #include "genesis/gc-tables.h"

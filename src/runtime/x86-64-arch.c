@@ -25,7 +25,7 @@
 #include "interr.h"
 #include "breakpoint.h"
 #include "thread.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "unaligned.h"
 #include "search.h"
 #include "globals.h" // for asm_routines_start,end

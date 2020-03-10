@@ -16,7 +16,7 @@
 #include "sbcl.h"
 #include "alloc.h"
 #include "thread.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "genesis/code.h"
 
 // Work space for the deterministic allocation profiler.

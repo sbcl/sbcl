@@ -90,7 +90,7 @@ extern lispobj *current_binding_stack_pointer;
  *  moment, it is also used by the GENCGC, to hold the pseudo_atomic
  *  bits, and is tightly coupled to reg_ALLOC by the assembly
  *  routines. */
-#if !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64)
+#if !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
 extern lispobj *dynamic_space_free_pointer;
 #endif
 extern lispobj *read_only_space_free_pointer;
@@ -177,7 +177,8 @@ EXTERN(current_control_frame_pointer, POINTERSIZE)
 EXTERN(current_binding_stack_pointer, POINTERSIZE)
 # endif
 // don't want an undefined C symbol for this in 'nm' output, it's confusing
-# if defined LISP_FEATURE_CHENEYGC && !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64)
+# if defined LISP_FEATURE_CHENEYGC && \
+  !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV|
 EXTERN(dynamic_space_free_pointer, POINTERSIZE)
 # endif
 

@@ -63,7 +63,7 @@
 #include "gc.h"
 #include "alloc.h"
 #include "dynbind.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "genesis/fdefn.h"
 #include "genesis/simple-fun.h"
 #include "genesis/cons.h"
@@ -785,15 +785,6 @@ fake_foreign_function_call(os_context_t *context)
     /* context_index incrementing must not be interrupted */
     check_blockables_blocked_or_lose(0);
 
-    /* Get current Lisp state from context.
-       32-bit ARM uses ALLOCATION_POINTER, never uses 'dynamic_space_free_pointer',
-       and has no reg_ALLOC, so the allocation pointer is *always* whatever the
-       static [sic] Lisp symbol contains. Thus, the burden should be on C code
-       to access the static symbol at each pointer of use, and never upon Lisp to
-       copy the static symbol's value into a C variable */
-#if defined(LISP_FEATURE_RISCV) && defined(LISP_FEATURE_CHENEYGC)
-    dynamic_space_free_pointer = SymbolValue(ALLOCATION_POINTER, thread);
-#endif
 #ifdef reg_ALLOC
 #ifdef LISP_FEATURE_SB_THREAD
     thread->pseudo_atomic_bits =
@@ -905,9 +896,6 @@ undo_fake_foreign_function_call(os_context_t __attribute__((unused)) *context)
     /* And clear them so we don't get bit later by call-in/call-out
      * not updating them. */
     thread->pseudo_atomic_bits = 0;
-#endif
-#if defined (LISP_FEATURE_RISCV) && defined(LISP_FEATURE_CHENEYGC)
-    SetSymbolValue(ALLOCATION_POINTER, dynamic_space_free_pointer, thread);
 #endif
 }
 

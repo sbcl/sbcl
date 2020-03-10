@@ -34,7 +34,7 @@
 #include "arch.h"
 #include "code.h"
 #include "private-cons.inc"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 
 /* So you need to debug? */
 #if 0

@@ -26,7 +26,7 @@
 #include "immobile-space.h"
 #include "hopscotch.h"
 #include "code.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 
 static boolean gcable_pointer_p(lispobj pointer)
 {

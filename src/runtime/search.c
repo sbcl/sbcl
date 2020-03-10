@@ -21,7 +21,7 @@
 #include "genesis/primitive-objects.h"
 #include "genesis/hash-table.h"
 #include "genesis/package.h"
-#include "pseudo-atomic.h" // for get_alloc_pointer()
+#include "getallocptr.h" // for get_alloc_pointer()
 
 lispobj *
 search_read_only_space(void *pointer)

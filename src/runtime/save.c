@@ -35,7 +35,7 @@
 #include "gc-internal.h"
 #include "thread.h"
 #include "arch.h"
-#include "pseudo-atomic.h"
+#include "getallocptr.h"
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "genesis/vector.h"
