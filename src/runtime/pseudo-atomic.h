@@ -114,7 +114,9 @@ get_pseudo_atomic_interrupted(struct thread *thread)
 static inline void
 set_pseudo_atomic_interrupted(struct thread *thread)
 {
+    #ifndef DO_PENDING_INTERRUPT
     extern void do_pending_interrupt();
+    #endif
     SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, thread);
 }
 
