@@ -370,15 +370,15 @@ triggers."
         (prog1
             (setf *waitable-timer-handle* (os-create-wtimer))
           (setf *timer-thread*
-                (sb-thread:make-thread
+                (sb-thread::make-ephemeral-thread
+                 "System timer watchdog thread"
                  (lambda ()
                    (loop while
-                        (or (zerop
-                             (os-wait-for-wtimer *waitable-timer-handle*))
-                            *waitable-timer-handle*)
-                        doing (run-expired-timers)))
-                 :ephemeral t
-                 :name "System timer watchdog thread")))))
+                         (or (zerop
+                              (os-wait-for-wtimer *waitable-timer-handle*))
+                             *waitable-timer-handle*)
+                         doing (run-expired-timers)))
+                 nil)))))
 
   (defun itimer-emulation-deinit ()
     (with-scheduler-lock ()

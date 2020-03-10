@@ -1618,6 +1618,7 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
          (run-thread (%make-thread :name name) function arguments)))
 
 ;;; System-internal use only
+#+sb-thread
 (defun make-ephemeral-thread (name function arguments)
   (run-thread (%make-thread :name name :%ephemeral-p t) function arguments))
 
