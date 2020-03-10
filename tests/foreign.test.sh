@@ -133,6 +133,11 @@ echo 'int bar() { return 42; }' >> $TEST_FILESTEM-b.c
 build_so $TEST_FILESTEM-b
 
 echo 'int foo = 42;' > $TEST_FILESTEM-b2.c
+# Try not to produce two more-or-less physically identical '.so' files (modulo
+# some constants in the functions), so that the test will fail if we accidentally
+# call the new bar() at the old address - as might happen if the OS maps both '.so'
+# files at the same place - as a consequence of failing to update the linkage table.
+echo 'int somerandomfun(int x) { return x?-x:bar(); }' > $TEST_FILESTEM-b2.c
 echo 'int bar() { return 13; }' >> $TEST_FILESTEM-b2.c
 build_so $TEST_FILESTEM-b2
 
