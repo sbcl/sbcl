@@ -293,7 +293,8 @@ Examples:
              (sb-thread:condition-notify *finalizer-queue*)))
           #+sb-thread
           ((eq *finalizer-thread* t) ; Create a new thread
-           (sb-thread:make-thread
+           (sb-thread::make-ephemeral-thread
+            "finalizer"
             (lambda ()
               ;; If we already called FINALIZER-THREAD-STOP, then
               ;; *FINALIZER-THREAD* is NIL, and this WHEN test is false.
@@ -314,8 +315,7 @@ Examples:
                     ;; Spurious wakeup is of no concern to us here.
                     (sb-thread:condition-wait
                      *finalizer-queue* *finalizer-queue-lock*)))))
-            :name "finalizer"
-            :ephemeral t))
+            nil))
           (t
            (scan-finalizers)))))
 

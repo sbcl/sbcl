@@ -30,7 +30,7 @@
 in future versions."
   (name          nil :type (or null simple-string)) ; C code could read this
   (%alive-p      nil :type boolean)
-  (%ephemeral-p  nil :type boolean)
+  (%ephemeral-p  nil :type boolean :read-only t)
   ;; 0 is used on thread-less builds
   (os-thread  (ldb (byte sb-vm:n-word-bits 0) -1) :type sb-vm:word)
   ;; Keep a copy of CONTROL-STACK-END from the "primitive" thread (C memory).
@@ -46,10 +46,10 @@ in future versions."
   (result 0)
   (interruptions-lock
    (make-mutex :name "thread interruptions lock")
-   :type mutex)
+   :type mutex :read-only t)
   (result-lock
    (make-mutex :name "thread result lock")
-   :type mutex)
+   :type mutex :read-only t)
   waiting-for)
 
 (declaim (inline thread-alive-p))

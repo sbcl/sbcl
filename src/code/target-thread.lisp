@@ -1597,7 +1597,7 @@ session."
                                      sb-vm:*control-stack-start*)))))))))
   (values))
 
-(defun make-thread (function &key name arguments ephemeral)
+(defun make-thread (function &key name arguments)
   "Create a new thread of NAME that runs FUNCTION with the argument
 list designator provided (defaults to no argument). Thread exits when
 the function returns. The return values of FUNCTION are kept around
@@ -1607,7 +1607,7 @@ Invoking the initial ABORT restart established by MAKE-THREAD
 terminates the thread.
 
 See also: RETURN-FROM-THREAD, ABORT-THREAD."
-  #-sb-thread (declare (ignore function name arguments ephemeral))
+  #-sb-thread (declare (ignore function name arguments))
   #-sb-thread (error "Not supported in unithread builds.")
   #+sb-thread
   (progn (assert (or (atom arguments)
@@ -1615,8 +1615,11 @@ See also: RETURN-FROM-THREAD, ABORT-THREAD."
                  (arguments)
                  "Argument passed to ~S, ~S, is an improper list."
                  'make-thread arguments)
-         (run-thread (%make-thread :name name :%ephemeral-p ephemeral)
-                     function arguments)))
+         (run-thread (%make-thread :name name) function arguments)))
+
+;;; System-internal use only
+(defun make-ephemeral-thread (name function arguments)
+  (run-thread (%make-thread :name name :%ephemeral-p t) function arguments))
 
 ;;; The purpose of splitting out RUN-THREAD from MAKE-THREAD is that when
 ;;; starting the finalizer thread, we might be able to do:
