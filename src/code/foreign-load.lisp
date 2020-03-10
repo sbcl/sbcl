@@ -99,7 +99,10 @@ will be signalled when the core is saved -- this is orthogonal from DONT-SAVE."
         ;;
         #+linkage-table
         (when (or old (cdr *linkage-info*))
-          (update-linkage-table nil))))
+          ;; If OLD is non-NIL, then we're passing "true" which causes all foreign
+          ;; symbols to get looked up again. Otherwise we're passing "false"
+          ;; which only tries to find symbols that aren't already found.
+          (update-linkage-table old))))
     pathname))
 
 (defun unload-shared-object (pathname)
