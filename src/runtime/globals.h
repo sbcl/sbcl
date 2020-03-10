@@ -178,7 +178,7 @@ EXTERN(current_binding_stack_pointer, POINTERSIZE)
 # endif
 // don't want an undefined C symbol for this in 'nm' output, it's confusing
 # if defined LISP_FEATURE_CHENEYGC && \
-  !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV|
+  !(defined LISP_FEATURE_ARM || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
 EXTERN(dynamic_space_free_pointer, POINTERSIZE)
 # endif
 
