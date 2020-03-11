@@ -1676,9 +1676,9 @@
                           (tail 0)
                           (,n-buffer (make-array buffer-length
                                                  :element-type '(unsigned-byte 8)))
-                          stream)
+                          ;; For external-format-encoding-error
+                          (stream ',name))
                      (declare (type index length buffer-length tail)
-                              (type null stream)
                               (ignorable stream))
                      (with-pinned-objects (,n-buffer)
                        (let ((sap (vector-sap ,n-buffer)))
