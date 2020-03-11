@@ -1,6 +1,7 @@
 #include "globals.h"
 #include "lispregs.h"
 #include "sbcl.h"
+#include "validate.h"
 
 #include "genesis/closure.h"
 #include "genesis/funcallable-instance.h"
@@ -49,6 +50,36 @@
 /* the CSP page sits right before the thread */
 # define THREAD_SAVED_CSP_OFFSET (-N_WORD_BYTES)
 #endif
+
+
+#ifdef OS_THREAD_STACK
+	.align 2
+	.global funcall1_switching_stack
+	.type	funcall1_switching_stack, %function
+funcall1_switching_stack:
+        /* The arguments are switched, funcall1_switching_stack(arg, function)
+           to avoid shuffling registers
+        */
+	/* save FP and LR to old stack */
+	stp	x29, x30, [sp, #-16]!
+	mov	x29, sp
+	/* switch to new stack */
+	ldr	x9, [x0, #THREAD_ALIEN_STACK_START_OFFSET]
+	add	x9, x9, #ALIEN_STACK_SIZE >> 12, lsl #12
+#if ALIEN_STACK_SIZE % 0x1000 != 0
+	add	x9, x9, #ALIEN_STACK_SIZE & 0xfff
+#endif
+	sub	sp, x9, #16
+	/* call function */
+	blr	x1
+	/* restore old SP, FP, LR and return */
+	add	sp, x29, #16
+	ldp	x29, x30, [x29]
+	ret
+	.size	funcall1_switching_stack, .-funcall1_switching_stack
+#endif
+
+
 	.align 2
 	.global	call_into_lisp
 	.type	call_into_lisp, %function
