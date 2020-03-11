@@ -4,6 +4,9 @@ changes relative to sbcl-2.0.2:
   * incompatible change: the external format now defaults to UTF-8 and is not
     affected by LANG. sb-ext:*default-external-format* is now the only way to
     change it.
+  * enhancement: on Unix-like systems the installed sbcl executable tree can
+    be renamed or moved without risk of incorrectly referencing a '.core' file
+    from an obsolete path. (lp#666086)
 
 changes in sbcl-2.0.2 relative to sbcl-2.0.1:
   * new feature: CMUCL-style block compilation support has been added,
