@@ -381,40 +381,6 @@ static void print_locale_variable(const char *name)
   }
 }
 
-static void setup_locale()
-{
-  if(setlocale(LC_ALL, "") == NULL) {
-#ifndef LISP_FEATURE_WIN32
-
-    fprintf(stderr, "WARNING: Setting locale failed.\n");
-    fprintf(stderr, "  Check the following variables for correct values:");
-
-    if (setlocale(LC_CTYPE, "") == NULL) {
-      print_locale_variable("LC_ALL");
-      print_locale_variable("LC_CTYPE");
-      print_locale_variable("LANG");
-    }
-
-    if (setlocale(LC_MESSAGES, "") == NULL) {
-      print_locale_variable("LC_MESSAGES");
-    }
-    if (setlocale(LC_COLLATE, "") == NULL) {
-      print_locale_variable("LC_COLLATE");
-    }
-    if (setlocale(LC_MONETARY, "") == NULL) {
-      print_locale_variable("LC_MONETARY");
-    }
-    if (setlocale(LC_NUMERIC, "") == NULL) {
-      print_locale_variable("LC_NUMERIC");
-    }
-    if (setlocale(LC_TIME, "") == NULL) {
-      print_locale_variable("LC_TIME");
-    }
-    fprintf(stderr, "\n");
-
-#endif
-  }
-}
 static void print_environment(int argc, char *argv[])
 {
     int n = 0;
@@ -654,8 +620,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
     // already obtained (if any) so it is unhelpful to try again here.
     allocate_lisp_dynamic_space(have_hardwired_spaces);
     gc_init();
-
-    setup_locale();
 
     #ifndef SBCL_PREFIX
     /* If built without SBCL_PREFIX defined, then set 'sbcl_home' to

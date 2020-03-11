@@ -160,8 +160,6 @@
   (unless (!c-runtime-noinform-p)
     (write `("Length(TLFs)=" ,(length *!cold-toplevels*)) :escape nil)
     (terpri))
-  ;; only the basic external formats are present at this point.
-  (setq sb-impl::*default-external-format* :latin-1)
 
   (loop with *package* = *package* ; rebind to self, as if by LOAD
         for index-in-cold-toplevels from 0
@@ -334,10 +332,6 @@ process to continue normally."
   (sb-thread::get-foreground))
 
 (defun reinit ()
-  #+win32
-  (setf sb-win32::*ansi-codepage* nil)
-  (setf *default-external-format* nil)
-  (setf sb-alien::*default-c-string-external-format* nil)
   ;; WITHOUT-GCING implies WITHOUT-INTERRUPTS.
   (without-gcing
     ;; Until *CURRENT-THREAD* has been set, nothing the slightest bit complicated

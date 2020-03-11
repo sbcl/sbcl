@@ -677,6 +677,9 @@ like *STACK-TOP-HINT* and unsupported stuff like *TRACED-FUN-LIST*."
                "*USERINIT-PATHNAME-FUNCTION*"
                "*SYSINIT-PATHNAME-FUNCTION*"
 
+               "*DEFAULT-EXTERNAL-FORMAT*"
+               "*DEFAULT-C-STRING-EXTERNAL-FORMAT*"
+               
                ;; Compare and Swap support
                "CAS"
                "COMPARE-AND-SWAP"

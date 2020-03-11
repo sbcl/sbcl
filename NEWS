@@ -1,5 +1,10 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
+changes relative to sbcl-2.0.2:
+  * incompatible change: the external format now defaults to UTF-8 and is not
+    affected by LANG. sb-ext:*default-external-format* is now the only way to
+    change it.
+
 changes in sbcl-2.0.2 relative to sbcl-2.0.1:
   * new feature: CMUCL-style block compilation support has been added,
     allowing whole program optimization. It has been documented in a new
