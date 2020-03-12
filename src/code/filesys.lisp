@@ -644,7 +644,8 @@ exist or if is a file or a symbolic link."
                                       :as-directory t)))
       (let ((env (and env (not (string= env ""))
                       (parse env))))
-        (if (probe-file env)
+        (if (and env
+                 (probe-file env))
             env
             (parse (or *sbcl-home* "")))))))
 
