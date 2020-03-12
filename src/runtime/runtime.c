@@ -246,21 +246,39 @@ search_for_core ()
         stat(env_sbcl_home, &filename_stat))
         env_sbcl_home = sbcl_home;
     lookhere = (char *) calloc(strlen(env_sbcl_home) +
+                               strlen(libpath) +
                                strlen(stem) +
                                1,
                                sizeof(char));
-    sprintf(lookhere, "%s%s", env_sbcl_home, stem);
+    sprintf(lookhere, "%s%s%s", env_sbcl_home, libpath, stem);
     core = copied_existing_filename_or_null(lookhere);
 
-    if (!core) {
+    if (core) {
+        sbcl_home = (char *) calloc(strlen(env_sbcl_home) +
+                                    strlen(libpath) +
+                                    1,
+                                    sizeof(char));
+        sprintf(sbcl_home, "%s%s", env_sbcl_home, libpath);
+        free(lookhere);
+    } else {
+        free(lookhere);
         core = copied_existing_filename_or_null ("sbcl.core");
-        if (!core) {
-            lose("can't find core file at %s", lookhere);
-        }
-        sbcl_home = ".";
+	if (core) {
+	    sbcl_home = ".";
+	} else {
+            lookhere = (char *) calloc(strlen(env_sbcl_home) +
+                                       strlen(stem) +
+                                       1,
+                                       sizeof(char));
+            sprintf(lookhere, "%s%s", env_sbcl_home, stem);
+            core = copied_existing_filename_or_null (lookhere);
+            if (core) {
+                free(lookhere);
+            } else {
+		lose("Can't find core file relative to %s", env_sbcl_home);
+            }
+	}
     }
-
-    free(lookhere);
 
     return core;
 }
@@ -440,6 +458,39 @@ sbcl_main(int argc, char *argv[], char *envp[])
      * which also populates runtime_options if the core has runtime
      * options */
     runtime_path = os_get_runtime_executable_path(0);
+
+    /* Set 'sbcl_home' to
+     * "<here>" based on how this executable was invoked. */
+    {
+        char *exename = argv[0]; // Use as-it, not truenameified
+	char slashchar =
+#ifdef LISP_FEATURE_WIN32
+	  '\\';
+#else
+	  '/';
+#endif
+
+        char *slash = strrchr(exename, slashchar);
+        if (!slash) {
+            if (runtime_path) {
+                exename = runtime_path;
+            } else if (saved_runtime_path) {
+                exename = saved_runtime_path;
+            }
+            slash = strrchr(exename, slashchar);
+        }
+
+        if (!slash) {
+            sbcl_home = libpath;
+        } else {
+            int prefixlen = slash - exename + 1; // keep the slash in the prefix
+            sbcl_home = successful_malloc(prefixlen + 1);
+            memcpy(sbcl_home, exename, prefixlen);
+	    sbcl_home[prefixlen] = 0;
+		      
+        }
+    }
+
     if (runtime_path || saved_runtime_path) {
         os_vm_offset_t offset = search_for_embedded_core(
             runtime_path ? runtime_path : saved_runtime_path,
@@ -448,47 +499,10 @@ sbcl_main(int argc, char *argv[], char *envp[])
             embedded_core_offset = offset;
             core = (runtime_path ? runtime_path :
                     copied_string(saved_runtime_path));
-        } else {
+        } else if (runtime_path) {
+            free(runtime_path);
         }
     }
-
-    /* Set 'sbcl_home' to
-     * "<here>/../lib/sbcl/" based on how this executable was invoked. */
-    {
-        char *exename = argv[0]; // Use as-it, not truenameified
-        char *slash = strrchr(exename, '/');
-        if (!slash) {
-            if (runtime_path) {
-                exename = runtime_path;
-            } else if (saved_runtime_path) {
-                exename = saved_runtime_path;
-            }
-            slash = strrchr(exename, '/');
-
-        }
-        if (!slash) {
-            sbcl_home = libpath;
-        } else {
-            int prefixlen = slash - exename + 1; // keep the slash in the prefix
-            char *tail = exename + prefixlen - 4;
-            char *suffix = libpath;
-            sbcl_home = successful_malloc(prefixlen + sizeof libpath); // sizeof incl. nul
-            // Translate "{path/}bin/sbcl" => "{path/}lib/sbcl", otherwise
-            // "{path}/sbcl" => "{path}/../lib/sbcl" so that running "./sbcl" works
-            // if sitting in "bin".
-            if (prefixlen >= 4 && !strncmp(tail, "bin/", 4)
-                // chop "bin" only if a complete word: '/' or nothing to its left.
-                && (tail-1 < exename || tail[-1] == '/')) {
-                prefixlen -= 4; // remove "bin/"
-                suffix += 3; // don't append "../"
-            }
-            memcpy(sbcl_home, exename, prefixlen);
-            strcpy(sbcl_home+prefixlen, suffix);
-        }
-    }
-
-    if (runtime_path)
-        free(runtime_path);
 
     /* Parse our part of the command line (aka "runtime options"),
      * stripping out those options that we handle. */
