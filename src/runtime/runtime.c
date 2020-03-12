@@ -219,15 +219,7 @@ SBCL is free software, provided as is, with absolutely no warranty.\n\
 It is mostly in the public domain; some portions are provided under\n\
 BSD-style licenses.  See the CREDITS and COPYING files in the\n\
 distribution for more information.\n\
-"
-#ifdef LISP_FEATURE_WIN32
-"\n\
-WARNING: the Windows port is fragile, particularly for multithreaded\n\
-code.  Unfortunately, the development team currently lacks the time\n\
-and resources this platform demands.\n\
-"
-#endif
-, SBCL_VERSION_STRING);
+", SBCL_VERSION_STRING);
 }
 
 /* Look for a core file to load, first in the directory named by the
