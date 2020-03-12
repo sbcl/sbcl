@@ -265,21 +265,7 @@
                      "Name" "PFiles")
         ("Directory" ("Id" "BaseFolder"
                       "Name" ,(application-name))
-         ("Directory" ("Id" "VersionFolder"
-                       "Name" ,(lisp-implementation-version))
-          ("Directory" ("Id" "INSTALLDIR")
-           ("Component" ("Id" "SBCL_SetHOME"
-                         "Guid" ,(make-guid)
-                         "DiskId" 1
-                         #+x86-64 "Win64" #+x86-64 "yes")
-            ("CreateFolder")
-            ("Environment" ("Id" "Env_SBCL_HOME"
-                            "System" "yes"
-                            "Action" "set"
-                            "Name" "SBCL_HOME"
-                            "Part" "all"
-                            "Value" "[INSTALLDIR]")))
-
+         ("Directory" ("Id" "INSTALLDIR")
            ("Component" ("Id" "SBCL_SetPATH"
                          "Guid" ,(make-guid)
                          "DiskId" 1
@@ -314,7 +300,7 @@
                                  "Name" ,(application-name/version+machine-type)
                                  "Directory" "ProgramMenuDir"
                                  "Arguments" "--core \"[#sbcl.core]\""))))
-           ,@(collect-contrib-components))))))
+           ,@(collect-contrib-components)))))
       ("Feature" ("Id" "Minimal"
                   "Title" "SBCL Executable"
                   "ConfigurableDirectory" "INSTALLDIR"
@@ -324,11 +310,7 @@
        ("Feature" ("Id" "Contrib" "Level" 1 "Title" "Contributed Modules")
                   ,@(ref-all-components))
        ("Feature" ("Id" "SetPath" "Level" 1 "Title" "Set Environment Variable: PATH")
-                  ("ComponentRef" ("Id" "SBCL_SetPATH")))
-       ;; SetHome is still enabled by default (level 1), because SBCL
-       ;; does not yet support running without SBCL_HOME:
-       ("Feature" ("Id" "SetHome" "Level" 1 "Title" "Set Environment Variable: SBCL_HOME")
-                  ("ComponentRef" ("Id" "SBCL_SetHOME"))))
+                  ("ComponentRef" ("Id" "SBCL_SetPATH"))))
       ("WixVariable" ("Id" "WixUILicenseRtf"
                       "Value" "License.rtf"))
       ("Property" ("Id" "WIXUI_INSTALLDIR" "Value" "INSTALLDIR"))
