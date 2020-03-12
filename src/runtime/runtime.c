@@ -374,15 +374,6 @@ char *saved_runtime_path = NULL;
 void pthreads_win32_init();
 #endif
 
-static void print_locale_variable(const char *name)
-{
-  char *value = getenv(name);
-
-  if (value) {
-    fprintf(stderr, "\n  %s=%s", name, value);
-  }
-}
-
 static void print_environment(int argc, char *argv[])
 {
     int n = 0;

@@ -3003,7 +3003,7 @@
   (let* ((package-name (gensym "SYMBOL-VALUE-CONSTANT-TEST"))
          (*package* (make-package package-name :use '(cl))))
     (ctu:file-compile
-     "(defconstant +constant+ 
+     "(defconstant +constant+
        (let (*)
          (if (boundp '+constant+)
              (symbol-value '+constant+)
