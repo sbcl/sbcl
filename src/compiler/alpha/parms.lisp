@@ -109,6 +109,9 @@
 ;;; Where to put the different spaces.
 ;;;
 
+(defconstant linkage-table-space-start #x1000)
+(defconstant linkage-table-space-end   linkage-table-space-start) ; 0 size
+
 #+linux
 (progn
   (defconstant read-only-space-start #x20000000)

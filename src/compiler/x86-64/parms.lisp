@@ -126,6 +126,7 @@
 
 #+linux
 (!gencgc-space-setup #x50000000
+                     :read-only-space-size 0
                      :fixedobj-space-size #.(* 30 1024 1024)
                      :varyobj-space-size #.(* 130 1024 1024)
                      :dynamic-space-start #x1000000000)
@@ -135,6 +136,7 @@
 
 #-linux
 (!gencgc-space-setup #x20000000
+                     :read-only-space-size 0
                      :dynamic-space-start #x1000000000
                      #+openbsd :dynamic-space-size #+openbsd #x1bcf0000)
 

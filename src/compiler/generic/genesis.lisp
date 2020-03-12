@@ -2650,8 +2650,10 @@ core and return a descriptor to it."
           ;; the code vector will be properly aligned.
           (round-up sb-vm:code-constants-offset 2))
          (space (or #+immobile-space *immobile-varyobj*
-                    #+(and gencgc (or ppc ppc64)) *static*
-                    *read-only*))
+                    ;; If there is a read-only space, use it, else use static space.
+                    (if (> sb-vm:read-only-space-end sb-vm:read-only-space-start)
+                        *read-only*
+                        *static*)))
          (asm-code
           (allocate-cold-descriptor
                   space
@@ -2739,6 +2741,8 @@ core and return a descriptor to it."
   ;;; Co-opt type machinery to check for intersections...
   (let (types)
     (flet ((check (start end space)
+             (when (= start end) ; 0 size is allowed
+               (return-from check))
              (unless (< start end)
                (error "Bogus space: ~A" space))
              (let ((type (specifier-type `(integer ,start (,end)))))

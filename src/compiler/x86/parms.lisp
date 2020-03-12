@@ -191,14 +191,17 @@
 ;;; NetBSD configuration used to have this comment regarding the linkage
 ;;; table: "In CMUCL: 0xB0000000->0xB1000000"
 
-#+win32     (!gencgc-space-setup #x22000000)
-#+linux     (!gencgc-space-setup #x01000000 :dynamic-space-start #x09000000)
-#+sunos     (!gencgc-space-setup #x20000000 :dynamic-space-start #x48000000)
-#+freebsd   (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
-#+dragonfly (!gencgc-space-setup #x01000000 :dynamic-space-start #x58000000)
-#+openbsd   (!gencgc-space-setup #x11000000 :dynamic-space-start #x8d000000)
-#+netbsd    (!gencgc-space-setup #x20000000 :dynamic-space-start #x60000000)
-#+darwin    (!gencgc-space-setup #x04000000 :dynamic-space-start #x10000000)
+(defmacro space-setup (arg &rest more)
+  `(!gencgc-space-setup ,arg :read-only-space-size 0 ,@more))
+
+#+win32     (space-setup #x22000000)
+#+linux     (space-setup #x01000000 :dynamic-space-start #x09000000)
+#+sunos     (space-setup #x20000000 :dynamic-space-start #x48000000)
+#+freebsd   (space-setup #x01000000 :dynamic-space-start #x58000000)
+#+dragonfly (space-setup #x01000000 :dynamic-space-start #x58000000)
+#+openbsd   (space-setup #x11000000 :dynamic-space-start #x8d000000)
+#+netbsd    (space-setup #x20000000 :dynamic-space-start #x60000000)
+#+darwin    (space-setup #x04000000 :dynamic-space-start #x10000000)
 
 ;;; Size of one linkage-table entry in bytes.
 (defconstant linkage-table-entry-size 8)

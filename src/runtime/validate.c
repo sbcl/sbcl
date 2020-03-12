@@ -98,15 +98,14 @@ boolean allocate_hardwired_spaces(boolean hard_failp)
         unsigned size;
     } preinit_spaces[] = {
       { READ_ONLY_SPACE_START, READ_ONLY_SPACE_SIZE },
-      { STATIC_SPACE_START, STATIC_SPACE_SIZE },
-#ifdef LISP_FEATURE_LINKAGE_TABLE
       { LINKAGE_TABLE_SPACE_START, LINKAGE_TABLE_SPACE_SIZE },
-#endif
+      { STATIC_SPACE_START, STATIC_SPACE_SIZE },
     };
     int i;
     int n_spaces = sizeof preinit_spaces / sizeof preinit_spaces[0];
     boolean success = 1;
     for (i = 0; i< n_spaces; ++i) {
+        if (!preinit_spaces[i].size) continue;
         if (hard_failp)
             ensure_space(NOT_MOVABLE | should_allocate_low,
                          preinit_spaces[i].start, preinit_spaces[i].size);

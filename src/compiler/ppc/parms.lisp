@@ -126,6 +126,7 @@
 ;;; While on gencgc we don't.
 #+gencgc
 (!gencgc-space-setup #x04000000
+                     :read-only-space-size 0
                      :dynamic-space-start
                      #+linux   #x4f000000
                      #+netbsd  #x4f000000

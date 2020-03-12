@@ -120,7 +120,9 @@
   (defconstant linkage-table-space-end   #x0b000000))
 
 ;;; While on gencgc we don't.
-#+gencgc (!gencgc-space-setup #x04000000 :dynamic-space-start #x1000000000)
+#+gencgc (!gencgc-space-setup #x04000000
+                              :read-only-space-size 0
+                              :dynamic-space-start #x1000000000)
 
 (defconstant linkage-table-growth-direction :up)
 (defconstant linkage-table-entry-size #+little-endian 28 #+big-endian 24)

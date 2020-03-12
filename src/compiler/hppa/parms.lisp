@@ -65,6 +65,9 @@
 
 ;;; Where to put the different spaces.
 ;;;
+(defconstant linkage-table-space-start #x1000)
+(defconstant linkage-table-space-end   linkage-table-space-start) ; 0 size
+
 (defconstant read-only-space-start #x4b000000)
 (defconstant read-only-space-end   #x4dff0000)
 

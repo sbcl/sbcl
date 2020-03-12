@@ -54,6 +54,8 @@
 ;;     prior to static page.
 (defmacro !gencgc-space-setup
     (small-spaces-start
+          ;; These keywords variables have to be careful not to overlap with the
+          ;; the DEFCONSTANT of the same name, hence the suffix.
           &key ((:dynamic-space-start dynamic-space-start*))
                ((:dynamic-space-size dynamic-space-size*))
                ;; The immobile-space START parameters should not be used
@@ -63,7 +65,8 @@
                ((:fixedobj-space-size  fixedobj-space-size*) (* 24 1024 1024))
                ((:varyobj-space-start  varyobj-space-start*))
                ((:varyobj-space-size   varyobj-space-size*) (* 104 1024 1024))
-               (small-space-size #x100000))
+               (small-space-size #x100000)
+               ((:read-only-space-size ro-space-size) small-space-size))
   (declare (ignorable dynamic-space-start*)) ; might be unused in make-host-2
   (flet ((defconstantish (relocatable symbol value)
            (if (not relocatable) ; easy case
@@ -75,7 +78,7 @@
                ;; but can't be due to dependency order problem.
                )))
     (let*
-        ((spaces (append `((read-only ,small-space-size)
+        ((spaces (append `((read-only ,ro-space-size)
                            (linkage-table ,small-space-size)
                            #+sb-safepoint
                            ;; Must be just before NIL.
