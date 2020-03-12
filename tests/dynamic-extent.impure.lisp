@@ -1572,3 +1572,16 @@
           (elt m 0)))
      ((t) 1)
      ((nil) 2))))
+
+(with-test (:name :notes-in-deleted-code)
+  (checked-compile
+   '(lambda ()
+     (labels ((z ()
+                (list 1))
+              (fn (&key)
+                (let ((x (z)))
+                  (declare (dynamic-extent x))
+                  (print x)
+                  1)))
+       (declare (ignorable #'fn))))
+   :allow-notes nil))

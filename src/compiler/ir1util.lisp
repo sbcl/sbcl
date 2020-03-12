@@ -766,7 +766,11 @@
                ;; Don't complain about not being able to stack allocate constants.
                (and (ref-p use) (constant-p (ref-leaf use)))
                ;; If we're flushing, don't complain if we can flush the combination.
-               (and flush (combination-p use) (flushable-combination-p use))
+               (and flush
+                    (or
+                     (node-to-be-deleted-p use)
+                     (and (combination-p use)
+                          (flushable-combination-p use))))
                ;; Don't report those with homes in :OPTIONAL -- we'd get doubled
                ;; reports that way.
                ;; Also don't report if the home is :EXTERNAL. This allows declaring
