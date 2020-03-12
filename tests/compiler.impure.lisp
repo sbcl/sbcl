@@ -2998,3 +2998,19 @@
       (assert (= (sb-kernel::code-n-entries code) 1))
       (assert (eq (aref (sb-kernel::code-entry-points code) 0)
                   #'foo1)))))
+
+(with-test (:name :symbol-value-constant)
+  (let* ((package-name (gensym "SYMBOL-VALUE-CONSTANT-TEST"))
+         (*package* (make-package package-name :use '(cl))))
+    (ctu:file-compile
+     "(defconstant +constant+ 
+       (let (*)
+         (if (boundp '+constant+)
+             (symbol-value '+constant+)
+             (complex 0.0 0.0))))"
+     :load t
+     :before-load (lambda ()
+                    (delete-package *package*)
+                    (setf *package* (make-package package-name :use '(cl)))))))
+
+

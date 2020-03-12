@@ -367,7 +367,8 @@
                        can't be dumped into fasl files."
                      (type-of value)))))))
       ;; Dump all non-trivial named constants using the name.
-      (if (and namep (not (sb-xc:typep constant '(or symbol character fixnum))))
+      (if (and namep (not (sb-xc:typep constant '(or symbol character fixnum
+                                                  #+64-bit single-float))))
           (emit-make-load-form constant name)
           (grovel constant))))
   (values))

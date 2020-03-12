@@ -4987,7 +4987,8 @@
                        (eq kind :global)
                        (and (eq kind :constant)
                             (boundp symbol)
-                            (typep (symbol-value symbol) '(or number character symbol))))
+                            (typep (symbol-value symbol) '(or character symbol
+                                                           fixnum #+64-bit single-float))))
                (return-from xform symbol))))
          fallback))
   (deftransform symbol-global-value ((symbol))
@@ -5000,7 +5001,8 @@
          (kind (info :variable :kind symbol)))
     (if (and (eq kind :constant)
              (boundp symbol)
-             (typep (symbol-value symbol) '(or number character symbol)))
+             (typep (symbol-value symbol) '(or character symbol
+                                            fixnum #+64-bit single-float)))
         symbol
         (give-up-ir1-transform))))
 
