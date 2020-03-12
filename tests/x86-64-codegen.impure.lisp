@@ -701,6 +701,7 @@ sb-vm::(define-vop (cl-user::test)
   (let ((c (nth-value 1 (ignore-errors sb-c::*compilation*))))
     (assert (eq (cell-error-name c) 'sb-c::*compilation*))))
 
+#+immobile-code
 (with-test (:name :debug-fun-from-pc-more-robust)
   (let ((trampoline
           (sb-di::code-header-from-pc
