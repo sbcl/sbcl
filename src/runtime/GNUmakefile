@@ -37,11 +37,6 @@ include ../../output/prefix.def
 CFLAGS += -g -Wall -Wundef -Wsign-compare -Wpointer-arith -O3
 ASFLAGS += $(CFLAGS)
 CPPFLAGS += -I.
-# Having any pathnames wired in to the executable is not great, but
-# I don't know how the windows installation works, so I'm leaving it.
-ifdef LISP_FEATURE_WIN32
-CPPFLAGS += -DSBCL_PREFIX=\"$(SBCL_PREFIX)\"
-endif
 
 # Give make access to the target Lisp features.
 include genesis/Makefile.features

@@ -40,20 +40,21 @@ INSTALLING SBCL
   configured at build-time: for official binary distributions under
   "/usr/local" directory.
 
-  If you install SBCL from binary distribution in other location than
-  "/usr/local", see section 1.2, "Finding ancillary files".
-
 1.2. Finding ancillary files
 
   The SBCL runtime needs to be able to find the ancillary files
   associated with it: the "sbcl.core" file, and the contrib modules.
 
-  Finding core can happen in three ways:
+  Finding sbcl.core can happen in the following ways:
 
-    1. By default, in a location configured when the system was built.
+    * By default, in a location configured when the system was built.
        For binary distributions this is in "/usr/local/lib/sbcl".
 
-    2. By environment variable, in the directory named by the
+    * In the directory ../lib/sbcl relative to the executable.
+
+    * In the current directorty.
+
+    * By environment variable, in the directory named by the
        environment variable "SBCL_HOME". Example:
 
          $ export SBCL_HOME=/foo/bar/lib/sbcl
@@ -62,20 +63,9 @@ INSTALLING SBCL
        If your "INSTALL_ROOT" was FOO, then your "SBCL_HOME" is
        "FOO/lib/sbcl".
 
-    3. By command line option:
+    * By command line option:
 
          $ sbcl --core /foo/bar/sbcl.core
-
-  The usual, recommended approach is method #1. Method #2 is useful if
-  you're installing SBCL on a system in a non-standard location
-  (e.g. in your user account), instead of installing SBCL on an entire
-  system.  Method #3 is mostly useful for testing or other special
-  cases.
-
-  Contributed modules are primarily looked for in "SBCL_HOME", or the
-  directory the core resides in if "SBCL_HOME" is not set.
-  ASDF:*CENTRAL-REGISTRY* serves as an additional fallback for
-  ASDF-based modules.
 
 1.3. Anatomy of SBCL
 
@@ -122,9 +112,6 @@ INSTALLING SBCL
   the --prefix option:
 
     $ sh make.sh --prefix=/opt/mysbcl
-
-  This also sets the default SBCL_HOME to prefix/lib/sbcl/ for the
-  built binaries.
 
   To configure SBCL with a non-standard default dynamic-space size,
   use the --dynamic-space-size option:

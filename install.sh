@@ -5,6 +5,48 @@ set -e
 
 umask 022
 
+bad_option() {
+    echo $1
+    echo "Enter \"$0 --help\" for list of valid options."
+    exit 1
+}
+
+for option
+do
+  optarg_ok=true
+  # Split --foo=bar into --foo and bar.
+  case $option in
+      *=*)
+        # For ease of scripting skip valued options with empty
+        # values.
+        optarg=`expr "X$option" : '[^=]*=\(.*\)'` || optarg_ok=false
+        option=`expr "X$option" : 'X\([^=]*=\).*'`
+        ;;
+      *)
+        optarg=""
+        ;;
+  esac
+
+  case $option in
+      --prefix=)
+      $optarg_ok || bad_option "Bad argument for --prefix="
+      INSTALL_ROOT=$optarg
+      ;;
+      --help | -help | -h)
+  cat <<EOF
+ --prefix=<path>      Specify the install location.
+
+See ./INSTALL for more information
+EOF
+          exit 0
+        ;;
+      *)
+            bad_option "Unknown command-line option to $0: \"$option\""
+        ;;
+  esac
+
+done
+
 ensure_dirs ()
 {
     for j in "$@"; do
@@ -42,7 +84,7 @@ INSTALL_ROOT=${INSTALL_ROOT:-$DEFAULT_INSTALL_ROOT}
 MAN_DIR=${MAN_DIR:-"$INSTALL_ROOT"/share/man}
 INFO_DIR=${INFO_DIR:-"$INSTALL_ROOT"/share/info}
 DOC_DIR=${DOC_DIR:-"$INSTALL_ROOT"/share/doc/sbcl}
-
+echo $INSTALL_ROOT
 # Does the environment look sane?
 if [ -n "$SBCL_HOME" -a "$INSTALL_ROOT/lib/sbcl" != "$SBCL_HOME" ];then
    echo SBCL_HOME environment variable is set, and conflicts with INSTALL_ROOT.

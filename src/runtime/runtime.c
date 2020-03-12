@@ -70,12 +70,8 @@
 #include "interr.h"
 #endif
 
-#ifdef SBCL_PREFIX
-char *sbcl_home = SBCL_PREFIX"/lib/sbcl/";
-#else
 static char libpath[] = "../lib/sbcl";
 char *sbcl_home;
-#endif
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
@@ -244,8 +240,10 @@ search_for_core ()
     char *lookhere;
     char *stem = "/sbcl.core";
     char *core;
+    struct stat filename_stat;
 
-    if (!(env_sbcl_home && *env_sbcl_home))
+    if (!(env_sbcl_home && *env_sbcl_home) ||
+        !stat(env_sbcl_home, &filename_stat))
       env_sbcl_home = sbcl_home;
     lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                strlen(stem) +
@@ -255,7 +253,11 @@ search_for_core ()
     core = copied_existing_filename_or_null(lookhere);
 
     if (!core) {
-        lose("can't find core file at %s", lookhere);
+        core = copied_existing_filename_or_null ("sbcl.core");
+        if (!core) {
+            lose("can't find core file at %s", lookhere);
+        }
+        sbcl_home = ".";
     }
 
     free(lookhere);
@@ -621,8 +623,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
     allocate_lisp_dynamic_space(have_hardwired_spaces);
     gc_init();
 
-    #ifndef SBCL_PREFIX
-    /* If built without SBCL_PREFIX defined, then set 'sbcl_home' to
+    /* Set 'sbcl_home' to
      * "<here>/../lib/sbcl/" based on how this executable was invoked. */
     {
         char *exename = argv[0]; // Use as-it, not truenameified
@@ -647,7 +648,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
             strcpy(sbcl_home+prefixlen, suffix);
         }
     }
-    #endif
 
     /* If no core file was specified, look for one. */
     if (!core) {
