@@ -243,8 +243,8 @@ search_for_core ()
     struct stat filename_stat;
 
     if (!(env_sbcl_home && *env_sbcl_home) ||
-        !stat(env_sbcl_home, &filename_stat))
-      env_sbcl_home = sbcl_home;
+        stat(env_sbcl_home, &filename_stat))
+        env_sbcl_home = sbcl_home;
     lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                strlen(stem) +
                                1,

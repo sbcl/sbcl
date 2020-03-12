@@ -637,13 +637,16 @@ exist or if is a file or a symbolic link."
   (let ((env (posix-getenv "SBCL_HOME")))
     ;; Should we absoluteize this if it was obtained automatically?
     ;; Depends whether people are in the habit of using chdir within Lisp.
-    (parse-native-namestring (if (and env (not (string= env ""))
-                                      (probe-file env))
-                                 env
-                                 (or *sbcl-home* ""))
-                             *physical-host*
-                             *default-pathname-defaults*
-                             :as-directory t)))
+    (flet ((parse (namestring)
+             (parse-native-namestring namestring
+                                      *physical-host*
+                                      *default-pathname-defaults*
+                                      :as-directory t)))
+      (let ((env (and env (not (string= env ""))
+                      (parse env))))
+        (if (probe-file env)
+            env
+            (parse (or *sbcl-home* "")))))))
 
 (flet ((not-empty (x)
          (and (not (equal x "")) x))
