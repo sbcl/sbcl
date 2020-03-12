@@ -1198,8 +1198,10 @@ register."
 ;;; SB-C::COMPILED-DEBUG-FUN.
 (defun debug-fun-from-pc (component pc &optional (escaped t))
   (let ((info (%code-debug-info component)))
-    (cond
-      ((consp info)
+    (etypecase info
+      (sb-c::compiled-debug-info
+       (make-compiled-debug-fun (compiled-debug-fun-from-pc info pc escaped) component))
+      (cons ; interrupted in an assembler routine
        (let ((routine (dohash ((name pc-range) (car info))
                         (when (<= (car pc-range) pc (cadr pc-range))
                           (return name)))))
@@ -1209,10 +1211,10 @@ register."
                                                       sb-vm::undefined-alien-tramp))
                                       "undefined function")
                                      (routine)))))
-     ((eq info :bpt-lra)
-      (make-bogus-debug-fun "function end breakpoint"))
-     (t
-      (make-compiled-debug-fun (compiled-debug-fun-from-pc info pc escaped) component)))))
+      (closure ; interrupted in an immobile code trampoline
+       (make-bogus-debug-fun "closure-calling trampoline"))
+      ((eql :bpt-lra)
+       (make-bogus-debug-fun "function end breakpoint")))))
 
 ;;; This returns a code-location for the COMPILED-DEBUG-FUN,
 ;;; DEBUG-FUN, and the pc into its code vector. If we stopped at a

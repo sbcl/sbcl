@@ -700,3 +700,12 @@ sb-vm::(define-vop (cl-user::test)
 (with-test (:name :thread-local-unbound)
   (let ((c (nth-value 1 (ignore-errors sb-c::*compilation*))))
     (assert (eq (cell-error-name c) 'sb-c::*compilation*))))
+
+(with-test (:name :debug-fun-from-pc-more-robust)
+  (let ((trampoline
+          (sb-di::code-header-from-pc
+           (sb-sys:int-sap (sb-vm::fdefn-raw-addr
+                            (sb-kernel::find-fdefn 'sb-kernel::get-internal-real-time))))))
+    (assert (zerop (sb-kernel:code-n-entries trampoline)))
+    (assert (typep (sb-di::debug-fun-from-pc trampoline 8)
+                   'sb-di::bogus-debug-fun))))
