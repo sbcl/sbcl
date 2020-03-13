@@ -187,7 +187,7 @@ void os_link_runtime()
         if (result) {
             arch_write_linkage_table_entry(entry_index, result, datap);
         } else { // startup might or might not work. ymmv
-            printf("Missing required foreign symbol '%s'\n", namechars);
+            fprintf(stderr, "Missing required foreign symbol '%s'\n", namechars);
         }
 
         ++entry_index;
