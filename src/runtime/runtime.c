@@ -255,9 +255,9 @@ search_for_core ()
     } else {
         free(lookhere);
         core = copied_existing_filename_or_null ("sbcl.core");
-	if (core) {
-	    sbcl_home = ".";
-	} else {
+        if (core) {
+            sbcl_home = ".";
+        } else {
             lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                        strlen(stem) +
                                        1,
@@ -267,9 +267,9 @@ search_for_core ()
             if (core) {
                 free(lookhere);
             } else {
-		lose("Can't find core file relative to %s", env_sbcl_home);
+                lose("Can't find core file relative to %s", env_sbcl_home);
             }
-	}
+        }
     }
 
     return core;
@@ -455,11 +455,11 @@ sbcl_main(int argc, char *argv[], char *envp[])
      * "<here>" based on how this executable was invoked. */
     {
         char *exename = argv[0]; // Use as-it, not truenameified
-	char slashchar =
+        char slashchar =
 #ifdef LISP_FEATURE_WIN32
-	  '\\';
+          '\\';
 #else
-	  '/';
+          '/';
 #endif
 
         char *slash = strrchr(exename, slashchar);
@@ -478,8 +478,8 @@ sbcl_main(int argc, char *argv[], char *envp[])
             int prefixlen = slash - exename + 1; // keep the slash in the prefix
             sbcl_home = successful_malloc(prefixlen + 1);
             memcpy(sbcl_home, exename, prefixlen);
-	    sbcl_home[prefixlen] = 0;
-		      
+            sbcl_home[prefixlen] = 0;
+
         }
     }
 
