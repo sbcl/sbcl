@@ -19,23 +19,17 @@
 #include "immobile-space.h"
 #include "code.h"
 
-// Gencgc distinguishes between "quick" and "ordinary" requests.
-// Even on cheneygc we need this flag, but it's actually just ignored.
-#define ALLOC_QUICK 1
-
 #define CUSTOM_GC_SCAVENGE_FLAG 0x800000
 
 #ifdef LISP_FEATURE_GENCGC
 #include "gencgc-alloc-region.h"
-void *
-gc_alloc_with_region(struct alloc_region *my_region, sword_t nbytes,
-                     int page_type_flag, int quick_p);
 static inline void *
 gc_general_alloc(sword_t nbytes, int page_type_flag)
 {
+    void *gc_alloc_with_region(struct alloc_region*,sword_t,int);
     if (1 <= page_type_flag && page_type_flag <= 3)
         return gc_alloc_with_region(&gc_alloc_region[page_type_flag-1],
-                                    nbytes, page_type_flag, ALLOC_QUICK);
+                                    nbytes, page_type_flag);
     lose("bad page type flag: %d", page_type_flag);
 }
 #else

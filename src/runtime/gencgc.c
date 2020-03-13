@@ -1396,47 +1396,41 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
 }
 
 /* Allocate bytes.  All the rest of the special-purpose allocation
- * functions will eventually call this  */
-
+ * functions will eventually call this.
+ * This entry point is only for use within the GC itself.
+ * The Lisp region overflow handler either directly calls gc_alloc_large
+ * or closes and opens a region if the allocation is small */
 void *
-gc_alloc_with_region(struct alloc_region *my_region, sword_t nbytes,
-                     int page_type_flag, int quick_p)
+gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type_flag)
 {
-    void *new_free_pointer;
-
-    if (nbytes>=LARGE_OBJECT_SIZE)
-        return gc_alloc_large(nbytes, page_type_flag, my_region);
-
-    /* Check whether there is room in the current alloc region. */
-    new_free_pointer = (char*)my_region->free_pointer + nbytes;
-
-    /* fprintf(stderr, "alloc %d bytes from %p to %p\n", nbytes,
-       my_region->free_pointer, new_free_pointer); */
-
-    if (new_free_pointer <= my_region->end_addr) {
-        /* If so then allocate from the current alloc region. */
-        void *new_obj = my_region->free_pointer;
-        my_region->free_pointer = new_free_pointer;
-
-        /* Unless a `quick' alloc was requested, check whether the
-           alloc region is almost empty. */
-        if (!quick_p &&
-            addr_diff(my_region->end_addr,my_region->free_pointer) <= 32) {
-            /* If so, finished with the current region. */
-            ensure_region_closed(my_region, page_type_flag);
-            /* Set up a new region. */
-            gc_alloc_new_region(32 /*bytes*/, page_type_flag, my_region);
-        }
-
-        return((void *)new_obj);
+    // If this is a normal GC, we never copy large objects (not that that's always the
+    // best strategy, because it ought to be possible to defragment by copying, say,
+    // an object occupying 5 pages). Anyway, unless we're in final GC, assert that no
+    // large objects are allocated here. The test for final GC is !conservative_stack.
+    if (nbytes>=LARGE_OBJECT_SIZE) {
+        if (!conservative_stack)
+            return gc_alloc_large(nbytes, page_type_flag, region);
+        else
+            lose("Unexpected copying of large object");
     }
 
+    void *new_obj = region->free_pointer;
+    void *new_free_pointer = (char*)new_obj + nbytes;
+    /* Check whether there is room in the current alloc region. */
+    if (new_free_pointer <= region->end_addr) {
+        /* If so then allocate from the current alloc region. */
+        region->free_pointer = new_free_pointer;
+        return new_obj;
+    }
     /* Else not enough free space in the current region: retry with a
      * new region. */
-
-    ensure_region_closed(my_region, page_type_flag);
-    gc_alloc_new_region(nbytes, page_type_flag, my_region);
-    return gc_alloc_with_region(my_region, nbytes, page_type_flag, 0);
+    ensure_region_closed(region, page_type_flag);
+    gc_alloc_new_region(nbytes, page_type_flag, region);
+    new_obj = region->free_pointer;
+    new_free_pointer = (char*)new_obj + nbytes;
+    gc_assert(new_free_pointer <= region->end_addr);
+    region->free_pointer = new_free_pointer;
+    return new_obj;
 }
 
 /* Free any trailing pages of the object starting at 'first_page'
@@ -4059,8 +4053,6 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
 #ifndef LISP_FEATURE_WIN32
     lispobj alloc_signal;
 #endif
-    void *new_obj;
-    void *new_free_pointer;
     os_vm_size_t trigger_bytes = 0;
 
     gc_assert(nbytes > 0);
@@ -4078,9 +4070,9 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
         large_allocation = nbytes;
 
     /* maybe we can do this quickly ... */
-    new_free_pointer = (char*)region->free_pointer + nbytes;
-    if (new_free_pointer <= region->end_addr) {
-        new_obj = (void*)(region->free_pointer);
+    void *new_obj = region->free_pointer;
+    char *new_free_pointer = (char*)new_obj + nbytes;
+    if (new_free_pointer <= (char*)region->end_addr) {
         region->free_pointer = new_free_pointer;
 #ifdef LISP_FEATURE_X86_64
         // Non-code allocations should never get here - it would mean there's
@@ -4135,7 +4127,23 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
             }
         }
     }
-    new_obj = gc_alloc_with_region(region, nbytes, page_type_flag, 0);
+    if (nbytes >= LARGE_OBJECT_SIZE)
+        new_obj = gc_alloc_large(nbytes, page_type_flag, region);
+    else {
+        ensure_region_closed(region, page_type_flag);
+        gc_alloc_new_region(nbytes, page_type_flag, region);
+        new_obj = region->free_pointer;
+        new_free_pointer = (char*)new_obj + nbytes;
+        gc_assert(new_free_pointer <= (char*)region->end_addr);
+        region->free_pointer = new_free_pointer;
+        // Refill now if the region is almost empty.
+        // This can often avoid the next Lisp -> C -> Lisp round-trip.
+        if (addr_diff(region->end_addr, region->free_pointer) <= 4 * N_WORD_BYTES) {
+            ensure_region_closed(region, page_type_flag);
+            // Request > 4 words, forcing a new page to be claimed.
+            gc_alloc_new_region(6 * N_WORD_BYTES, page_type_flag, region);
+        }
+    }
 
 #ifndef LISP_FEATURE_WIN32
     /* for sb-prof, and not supported on Windows yet */
