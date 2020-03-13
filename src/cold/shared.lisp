@@ -239,12 +239,17 @@
                                       (read-from-file customizer-file-name))
                              #'identity))
              (target-feature-list (funcall customizer default-features))
+             (gc (find-if (lambda (x) (member x '(:cheneygc :gencgc)))
+                          target-feature-list))
              (arch (target-platform-keyword target-feature-list)))
-        ;; Sort the arch name to the front and de-dup the rest in case the
-        ;; command line had a redundant --with-mumble option and/or the
-        ;; customizer decided to return dups.
-        (cons arch (sort (remove-duplicates (remove arch target-feature-list))
-                         #'string<))))
+        ;; Putting arch and gc choice first is visually convenient, versus
+        ;; having to parse a random place in the line to figure out the value
+        ;; of a binary choice {cheney vs gencgc} and architecture.
+        ;; De-duplicate the rest of the symbols because the command line
+        ;; can add redundant --with-mumble options.
+        (list* arch gc (sort (remove-duplicates
+                              (remove arch (remove gc target-feature-list)))
+                             #'string<))))
 
 (defvar *shebang-backend-subfeatures*
   (let* ((default-subfeatures nil)
