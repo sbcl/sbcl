@@ -31,15 +31,15 @@ void *
 gc_alloc_with_region(struct alloc_region *my_region, sword_t nbytes,
                      int page_type_flag, int quick_p);
 static inline void *
-gc_general_alloc(sword_t nbytes, int page_type_flag, int quick_p)
+gc_general_alloc(sword_t nbytes, int page_type_flag)
 {
     if (1 <= page_type_flag && page_type_flag <= 3)
         return gc_alloc_with_region(&gc_alloc_region[page_type_flag-1],
-                                    nbytes, page_type_flag, quick_p);
+                                    nbytes, page_type_flag, ALLOC_QUICK);
     lose("bad page type flag: %d", page_type_flag);
 }
 #else
-extern void *gc_general_alloc(sword_t nbytes,int page_type_flag,int quick_p);
+extern void *gc_general_alloc(sword_t nbytes,int page_type_flag);
 #endif
 
 #define CHECK_COPY_PRECONDITIONS(object, nwords) \
@@ -61,7 +61,7 @@ gc_general_copy_object(lispobj object, long nwords, int page_type_flag)
     CHECK_COPY_PRECONDITIONS(object, nwords);
 
     /* Allocate space. */
-    new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag, ALLOC_QUICK);
+    new = gc_general_alloc(nwords*N_WORD_BYTES, page_type_flag);
 
     /* Copy the object. */
     memcpy(new,native_pointer(object),nwords*N_WORD_BYTES);

@@ -442,7 +442,7 @@ static boolean root_p(lispobj ptr, int criterion)
 static lispobj mkcons(lispobj car, lispobj cdr)
 {
     struct cons *cons = (struct cons*)
-        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
     cons->car = car;
     cons->cdr = cdr;
     return make_lispobj(cons, LIST_POINTER_LOWTAG);
@@ -453,7 +453,7 @@ static lispobj liststar3(lispobj x, lispobj y, lispobj z) {
 static lispobj make_sap(char* value)
 {
     struct sap *sap = (struct sap*)
-        gc_general_alloc(sizeof(struct sap), BOXED_PAGE_FLAG, ALLOC_QUICK);
+        gc_general_alloc(sizeof(struct sap), BOXED_PAGE_FLAG);
     sap->header = (1<<N_WIDETAG_BITS) | SAP_WIDETAG;
     sap->pointer = value;
     return make_lispobj(sap, OTHER_POINTER_LOWTAG);

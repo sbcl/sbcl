@@ -467,7 +467,7 @@ trans_list(lispobj object)
 {
     /* Copy 'object'. */
     struct cons *copy = (struct cons *)
-        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+        gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
     lispobj new_list_pointer = make_lispobj(copy, LIST_POINTER_LOWTAG);
     copy->car = CONS(object)->car;
     /* Grab the cdr: set_forwarding_pointer will clobber it in GENCGC  */
@@ -484,7 +484,7 @@ trans_list(lispobj object)
         }
         /* Copy 'cdr'. */
         struct cons *cdr_copy = (struct cons*)
-            gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+            gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
         cdr_copy->car = ((struct cons*)native_cdr)->car;
         /* Grab the cdr before it is clobbered. */
         lispobj next = ((struct cons*)native_cdr)->cdr;
@@ -1379,7 +1379,7 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
                 lispobj val = kv_vector[2 * index + 1];
                 gc_assert(!is_lisp_pointer(val));
                 struct cons *cons = (struct cons*)
-                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
                 // Lisp code which manipulates the culled_values slot must use
                 // compare-and-swap, but C code need not, because GC runs in one
                 // thread and has stopped the Lisp world.
@@ -1402,14 +1402,14 @@ cull_weak_hash_table_bucket(struct hash_table *hash_table,
             struct cons *cons;
             if ((index & ~0x3FFF) | (bucket & ~0x3FFF)) { // large values
                 cons = (struct cons*)
-                  gc_general_alloc(2 * sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+                  gc_general_alloc(2 * sizeof(struct cons), BOXED_PAGE_FLAG);
                 cons->car = make_lispobj(cons + 1, LIST_POINTER_LOWTAG);
                 cons[1].car = make_fixnum(index);  // which cell became free
                 cons[1].cdr = make_fixnum(bucket); // which chain was it in
                 if (!compacting_p()) gc_mark_obj(cons->car);
             } else { // small values
                 cons = (struct cons*)
-                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG, ALLOC_QUICK);
+                  gc_general_alloc(sizeof(struct cons), BOXED_PAGE_FLAG);
                 cons->car = ((index << 14) | bucket) << N_FIXNUM_TAG_BITS;
             }
             cons->cdr = hash_table->smashed_cells;
