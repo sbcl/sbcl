@@ -40,11 +40,17 @@ then
   (cd $SBCL_PWD/../src/runtime ; make shrinkwrap-sbcl)
 fi
 
-$SBCL_PWD/../src/runtime/shrinkwrap-sbcl \
-  --disable-debugger \
-  --eval '(dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))' \
-  --quit
+$SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --noprint <<EOF
+(dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
+(let* ((code (sb-kernel:fun-code-header
+              (sb-c::vop-info-generator-function
+               (gethash 'print sb-c::*backend-template-names*))))
+       (fixups (sb-vm::%code-fixups code)))
+  (assert (typep fixups 'bignum))
+  (assert (not (heap-allocated-p fixups))))
+EOF
 # reaching here means no crash happened in the allocator
+# and that the fixups were rewritten into C data space
 echo Basic smoke test: PASS
 
 create_test_subdirectory
@@ -73,5 +79,20 @@ run_sbcl --script ../tools-for-build/editcore.lisp split \
 
 $TEST_DIRECTORY/elfcore-test $SBCL_ARGS --eval '(assert (zerop (f 1 2 3)))' --quit
 echo Custom core: PASS
+
+./run-compiler.sh -no-pie -g -o $TEST_DIRECTORY/relocating-elfcore-test \
+  $TEST_DIRECTORY/elfcore-test.s \
+  $TEST_DIRECTORY/elfcore-test-core.o \
+  $SBCL_PWD/../tests/heap-reloc/fake-mman.c \
+  $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread ${m_arg}
+
+export SBCL_FAKE_MMAP_INSTRUCTION_FILE=heap-reloc/fakemap
+i=1
+while [ $i -le 6 ]
+do
+  echo Trial $i
+  i=`expr $i + 1`
+  $TEST_DIRECTORY/relocating-elfcore-test $SBCL_ARGS --eval '(assert (zerop (f 1 2 3)))' --quit
+done
 
 exit $EXIT_TEST_WIN

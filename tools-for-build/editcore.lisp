@@ -114,6 +114,8 @@
   (linkage-symbols nil)
   (linkage-symbol-usedp nil)
   (linkage-entry-size nil)
+  (new-fixups (make-hash-table))
+  (new-fixup-words-used 0)
   ;; For assembler labels that we want to invent at random
   (label-counter 0)
   (enable-pie nil)
@@ -649,6 +651,8 @@
 ;;; This is tricky to fix because while we can relativize the CFA to the
 ;;; known frame size, we can't do that based only on a disassembly.
 
+;;; Return the list of locations which must be added to code-fixups
+;;; in the event that heap relocation occurs on image restart.
 (defun emit-lisp-function (paddr vaddr count stream emit-cfi core &optional labels)
   (when emit-cfi
     (format stream " .cfi_startproc~%"))
@@ -659,6 +663,7 @@
          (merge 'list labels
                 (list-textual-instructions (int-sap paddr) count core vaddr emit-cfi)
                 #'< :key #'car))
+        (extra-fixup-locs)
         (ptr paddr))
     (symbol-macrolet ((cur-offset (- ptr paddr)))
       (loop
@@ -711,6 +716,9 @@
                                        (core-linkage-entry-size core))))
                                (setf (bit (core-linkage-symbol-usedp core) entry-index) 1
                                      operand (aref (core-linkage-symbols core) entry-index))))
+                           (when (and (integerp operand)
+                                      (in-bounds-p operand (core-fixedobj-bounds core)))
+                             (push (+ vaddr cur-offset) extra-fixup-locs))
                            (format stream " ~A ~:[0x~X~;~a~:[~;@PLT~]~]~%"
                                    opcode (stringp operand) operand
                                    (core-enable-pie core)))
@@ -735,9 +743,10 @@
                           (t))
                 (bug "Random annotated opcode ~S" opcode))
               (incf ptr length)))
-          (when (= cur-offset count) (return))))))
-  (when emit-cfi
-    (format stream " .cfi_endproc~%")))
+          (when (= cur-offset count) (return)))))
+    (when emit-cfi
+      (format stream " .cfi_endproc~%"))
+    extra-fixup-locs))
 
 ;;; Examine CODE, returning a list of lists describing how to emit
 ;;; the contents into the assembly file.
@@ -812,6 +821,7 @@
          (text (sap-int text-sap))
          ;; Like CODE-INSTRUCTIONS, but where the text virtually was
          (text-vaddr (+ vaddr (* (code-header-words code) n-word-bytes)))
+         (additional-relative-fixups)
          (max-end 0))
     ;; There is *always* at least 1 word of unboxed data now
     (aver (eq (caar ranges) :data))
@@ -846,8 +856,11 @@
         ;; Pass the current physical address at which to disassemble,
         ;; the notional core address (which changes after linker relocation),
         ;; and the length.
-        (emit-lisp-function (+ text start) (+ text-vaddr start) (- end start)
-                            output emit-cfi core)
+        (let ((new-relative-fixups
+               (emit-lisp-function (+ text start) (+ text-vaddr start) (- end start)
+                                   output emit-cfi core)))
+          (setq additional-relative-fixups
+                (nconc new-relative-fixups additional-relative-fixups)))
         (cond ((not ranges) (return))
               ((eq (caar ranges) :pad)
                (format output " .byte ~{0x~x~^,~}~%"
@@ -863,9 +876,39 @@
             (loop for i from max-end
                   below (- (code-object-size code)
                            (* (code-header-words code) n-word-bytes))
-                  collect (sap-ref-8 text-sap i)))))
+                  collect (sap-ref-8 text-sap i)))
+    (when additional-relative-fixups
+      (binding* ((existing-fixups (sb-vm::%code-fixups code))
+                 ((absolute relative)
+                  (sb-c::unpack-code-fixup-locs
+                   (if (fixnump existing-fixups)
+                       existing-fixups
+                       (translate existing-fixups spaces))))
+                 (new-sorted
+                  (sort (mapcar (lambda (x)
+                                  ;; compute offset of the fixup from CODE-INSTRUCTIONS.
+                                  ;; X is the location of the CALL instruction,
+                                  ;; 1+ is the location of the fixup.
+                                  (- (1+ x)
+                                     (+ vaddr (ash (code-header-words code)
+                                                   sb-vm:word-shift))))
+                                additional-relative-fixups)
+                        #'<)))
+        (sb-c::pack-code-fixup-locs
+         absolute
+         (merge 'list relative new-sorted #'<))))))
 
 (defconstant +gf-name-slot+ 5)
+
+(defun output-bignum (label bignum stream)
+  (let ((nwords (sb-bignum:%bignum-length bignum)))
+    (format stream "~@[~a:~] .quad 0x~x"
+            label (logior (ash nwords 8) sb-vm:bignum-widetag))
+    (dotimes (i nwords)
+      (format stream ",0x~x" (sb-bignum:%bignum-ref bignum i)))
+    (when (evenp nwords) ; pad
+      (format stream ",0"))
+    (format stream "~%")))
 
 (defun write-preamble (output)
   (format output " .text~% .file \"sbcl.core\"
@@ -905,6 +948,7 @@
           (seen-fdefns nil)
           (seen-trampolines nil)
           (seen-gfs nil)
+          (temp-output (make-string-output-stream :element-type 'base-char))
           end-loc)
   (set-pprint-dispatch 'string
                        ;; Write strings without string quotes
@@ -913,7 +957,8 @@
                        (cdr pp-state))
   (labels ((dumpwords (sap count stream &optional (exceptions #()) logical-addr)
              (aver (sap>= sap (car spaces)))
-             ;; Make intra-code-space pointers computed at link time
+             ;; Add any new "header exceptions" that cause intra-code-space pointers
+             ;; to be computed at link time
              (dotimes (i (if logical-addr count 0))
                (unless (and (< i (length exceptions)) (svref exceptions i))
                  (let ((word (sap-ref-word sap (* i n-word-bytes))))
@@ -983,13 +1028,16 @@
                                    (- obj-size (* header-len n-word-bytes))
                                    (1+ end-offs))
                                start-offs)))
-              (format output " lasmsym ~(\"~a\"~), ~d~%" name nbytes)
-              (emit-lisp-function (+ (sap-int (code-instructions code-component))
-                                     start-offs)
-                                  (+ code-addr
-                                     (ash (code-header-words code-component) word-shift)
-                                     start-offs)
-                                  nbytes output nil core)))
+                (format output " lasmsym ~(\"~a\"~), ~d~%" name nbytes)
+                (let ((fixups
+                       (emit-lisp-function
+                        (+ (sap-int (code-instructions code-component))
+                           start-offs)
+                        (+ code-addr
+                           (ash (code-header-words code-component) word-shift)
+                           start-offs)
+                        nbytes output nil core)))
+                  (aver (null fixups)))))
             (when (endp list) (return)))
           (incf code-addr obj-size)
           (setf total-code-size obj-size))))
@@ -1035,10 +1083,30 @@
                 (format output "#x~x:~%" code-addr)
                 ;; Emit symbols before the code header data, because the symbols
                 ;; refer to "." (the current PC) which is the base of the object.
-                (let ((base (emit-symbols (code-symbols code core) core pp-state output)))
+                (let* ((base (emit-symbols (code-symbols code core) core pp-state output))
+                       (altered-fixups
+                        (emit-funs code code-addr core #'dumpwords temp-output base emit-cfi))
+                       (header-exceptions (vector nil nil nil nil))
+                       (fixups-ptr))
+                  (when altered-fixups
+                    (setf (aref header-exceptions 3)
+                          (cond ((fixnump altered-fixups)
+                                 (format nil "0x~x" (ash altered-fixups sb-vm:n-fixnum-tag-bits)))
+                                (t
+                                 (let ((ht (core-new-fixups core)))
+                                   (setq fixups-ptr (gethash altered-fixups ht))
+                                   (unless fixups-ptr
+                                     (setq fixups-ptr (ash (core-new-fixup-words-used core)
+                                                           sb-vm:word-shift))
+                                     (setf (gethash altered-fixups ht) fixups-ptr)
+                                     (incf (core-new-fixup-words-used core)
+                                           (align-up (1+ (sb-bignum:%bignum-length altered-fixups)) 2))))
+                                 ;; tag the pointer properly for a bignum
+                                 (format nil "lisp_fixups+0x~x"
+                                         (logior fixups-ptr sb-vm:other-pointer-lowtag))))))
                   (dumpwords (int-sap code-physaddr)
-                             (code-header-words code) output #() code-addr)
-                  (emit-funs code code-addr core #'dumpwords output base emit-cfi))))
+                             (code-header-words code) output header-exceptions code-addr)
+                  (write-string (get-output-stream-string temp-output) output))))
              ((functionp (%code-debug-info code))
               (unless seen-trampolines
                 (setq seen-trampolines t)
@@ -1779,6 +1847,10 @@
             (copy-bytes input output pte-nbytes)) ; Copy PTEs from input
           (let ((core (write-assembler-text map asm-file enable-pie))
                 (emit-all-c-symbols t))
+            (format asm-file " .section .rodata~% .p2align 4~%lisp_fixups:~%")
+            ;; Sort the hash-table in emit order.
+            (dolist (x (sort (%hash-table-alist (core-new-fixups core)) #'< :key #'cdr))
+              (output-bignum nil (car x) asm-file))
             (format asm-file (if (member :darwin *features*)
                                  "~% .data~%"
                                  "~% .section .rodata~%"))

@@ -361,18 +361,20 @@ adjust_code_refs(struct heap_adjust __attribute__((unused)) *adj,
             FIXUP32(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
     }
     sword_t displacement = (lispobj)code - original_vaddr;
-    if (!displacement) // if this code didn't move, do nothing
-        return;
     prev_loc = 0;
     while (varint_unpack(&unpacker, &loc) && loc != 0) {
         loc += prev_loc;
         prev_loc = loc;
         void* fixup_where = instructions + loc;
         int32_t rel32operand = UNALIGNED_LOAD32(fixup_where);
-        sword_t adjusted = (sword_t)rel32operand - displacement;
-        if (!(adjusted >= INT32_MIN && adjusted <= INT32_MAX))
+        int32_t abs_operand = (sword_t)fixup_where + 4 + rel32operand - displacement;
+        int32_t new_abs_operand = abs_operand + calc_adjustment(adj, abs_operand);
+        sword_t new_rel32operand = new_abs_operand - ((sword_t)fixup_where + 4);
+        // check for overflow before checking whether to write the new value
+        if (!(new_rel32operand >= INT32_MIN && new_rel32operand <= INT32_MAX))
             lose("Relative fixup @ %p exceeds 32 bits", fixup_where);
-        FIXUP_rel(UNALIGNED_STORE32(fixup_where, adjusted), fixup_where);
+        if (new_rel32operand != rel32operand)
+            FIXUP_rel(UNALIGNED_STORE32(fixup_where, new_rel32operand), fixup_where);
     }
 #endif
 }
@@ -606,8 +608,11 @@ static void relocate_heap(struct heap_adjust* adj)
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     // Pointers within varyobj space to varyobj space do not need adjustment
     // so remove any delta before performing the relocation pass on this space.
-    if (lisp_code_in_elf())
+    // FIXME: this was probably for PIE mode, which doesn't work.
+    if (lisp_code_in_elf() && adj->range[2].delta != 0) {
+        lose("code-in-elf + PIE not supported yet\n");
         adj->range[2].delta = 0; // FIXME: isn't this this already the case?
+    }
     relocate_space(VARYOBJ_SPACE_START, varyobj_free_pointer, adj);
 #endif
 }
@@ -780,11 +785,7 @@ process_directory(int count, struct ndir_entry *entry,
             else
 #endif
             if (request) {
-                // Avoid "Relocation of fixedobj space not supported" error by
-                // not passing relocatable flag for immobile space if text in ELF.
-                addr = (uword_t)os_validate(sub_2gb_flag ?
-                                            (lisp_code_in_elf() ? NOT_MOVABLE : MOVABLE_LOW) :
-                                            MOVABLE,
+                addr = (uword_t)os_validate(sub_2gb_flag ? MOVABLE_LOW : MOVABLE,
                                             (os_vm_address_t)addr, request);
                 if (!addr) {
                     lose("Can't allocate %#"OBJ_FMTX" bytes for space %ld",
@@ -914,9 +915,6 @@ process_directory(int count, struct ndir_entry *entry,
                    spaces[DYNAMIC_CORE_SPACE_ID].len);
 #  endif // LISP_FEATURE_GENCGC
     if (adj->range[0].delta | adj->range[1].delta | adj->range[2].delta) {
-        if (adj->range[1].delta && lisp_code_in_elf())
-            lose("Relocation of fixedobj space not supported with ELF core.\n\
-Please report this as a bug");
         relocate_heap(adj);
     }
 
