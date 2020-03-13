@@ -10,14 +10,14 @@
 # files for more information.
 
 CFLAGS += -m32
-LINKFLAGS += -rdynamic -m32
+LINKFLAGS += -m32 -Wl,--export-dynamic
 NM = ./linux-nm
 
 ASSEM_SRC = ppc-assem.S
 ARCH_SRC = ppc-arch.c
 
 OS_SRC = linux-os.c linux-mman.c ppc-linux-os.c
-OS_LIBS = -ldl
+OS_LIBS = -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_GENCGC
   GC_SRC = fullcgc.c gencgc.c traceroot.c
