@@ -4149,24 +4149,21 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
 lispobj AMD64_SYSV_ABI *
 alloc(sword_t nbytes)
 {
-#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     struct thread *self = arch_os_get_current_thread();
+#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     int was_pseudo_atomic = get_pseudo_atomic_atomic(self);
     if (!was_pseudo_atomic)
         set_pseudo_atomic_atomic(self);
 #else
-    gc_assert(get_pseudo_atomic_atomic(arch_os_get_current_thread()));
+    gc_assert(get_pseudo_atomic_atomic(self));
 #endif
 
-    struct thread *thread = arch_os_get_current_thread();
 #ifdef LISP_FEATURE_SB_THREAD
-    struct alloc_region *region = &thread->alloc_region;
-#elif defined SINGLE_THREAD_BOXED_REGION
-    struct alloc_region *region = SINGLE_THREAD_BOXED_REGION;
+    struct alloc_region *region = &self->alloc_region;
 #else
-    struct alloc_region *region = &boxed_region;
+    struct alloc_region *region = SINGLE_THREAD_BOXED_REGION;
 #endif
-    lispobj *result = lisp_alloc(region, nbytes, BOXED_PAGE_FLAG, thread);
+    lispobj *result = lisp_alloc(region, nbytes, BOXED_PAGE_FLAG, self);
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
     if (!was_pseudo_atomic)
