@@ -4330,8 +4330,6 @@ prepare_for_final_gc ()
     // Avoid tenuring of otherwise-dead objects referenced by
     // dynamic bindings which disappear on image restart.
     struct thread *thread = arch_os_get_current_thread();
-    // This calculation is valid for both old and new thread memory layout.
-    // Refer to the pictures above create_thread_struct().
     char *start = (char*)(thread + 1);
     char *end = (char*)thread + dynamic_values_bytes;
     memset(start, 0, end-start);
