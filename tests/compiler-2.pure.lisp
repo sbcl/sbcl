@@ -2810,3 +2810,12 @@
             `(lambda ()
                (values-list (cons 1 nil)))))
           '(function () (values (integer 1 1) &optional)))))
+
+(with-test (:name :xeps-and-inlining)
+  (checked-compile-and-assert
+   ()
+   `(lambda (args)
+      (flet ((fun () args))
+        (declare (inline fun))
+        (multiple-value-call #'fun (values-list args))
+        #'fun))))

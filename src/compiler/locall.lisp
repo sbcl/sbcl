@@ -488,7 +488,10 @@
                    (rest (leaf-refs original-fun))
                    ;; Some REFs are already unused bot not yet deleted,
                    ;; avoid unnecessary inlining
-                   (> (count-if #'node-lvar (leaf-refs original-fun)) 1))
+                   (> (count-if #'node-lvar (leaf-refs original-fun)) 1)
+                   ;; Don't inline if the function is not going to be
+                   ;; let-converted.
+                   (let-convertable-p call fun))
           (setq fun (maybe-expand-local-inline fun ref call)))
 
         (aver (member (functional-kind fun)
@@ -501,6 +504,15 @@
                (convert-hairy-call ref call fun))))))
 
   (values))
+
+(defun let-convertable-p (call fun)
+  (cond ((mv-combination-p call)
+         (and (looks-like-an-mv-bind fun)
+              (not (functional-entry-fun fun))))
+        ((lambda-p fun)
+         t)
+        (t ;; Hairy
+         t)))
 
 ;;; Attempt to convert a multiple-value call. The only interesting
 ;;; case is a call to a function that LOOKS-LIKE-AN-MV-BIND, has
