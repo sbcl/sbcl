@@ -642,7 +642,6 @@
 (defun copy-bignum (a &optional (len (%bignum-length a)))
   (let ((b (%allocate-bignum len)))
     (bignum-replace b a)
-    (%bignum-set-length b len)
     b))
 
 ;;; Allocate a single word bignum that holds fixnum. This is useful when
