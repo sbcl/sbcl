@@ -323,7 +323,6 @@
              (assert (logbitp 4 type)))))))
    :all))
 
-#+64-bit ; code-serialno not defined unless 64-bit
 (with-test (:name :unique-code-serialno)
   (let ((a (make-array 100000 :element-type 'bit :initial-element 0)))
     (sb-vm:map-allocated-objects
