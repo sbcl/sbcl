@@ -4082,6 +4082,15 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
     if (new_free_pointer <= region->end_addr) {
         new_obj = (void*)(region->free_pointer);
         region->free_pointer = new_free_pointer;
+#ifdef LISP_FEATURE_X86_64
+        // Non-code allocations should never get here - it would mean there's
+        // something wrong in the inline allocator. This assertion pertains
+        // to any architecture that always uses an inline allocator.
+        // That's actually most of them, but I haven't tested that they're right.
+        // e.g. x86 forgoes inline allocation depending on policy,
+        // and git revision 05047647 tweaked the edge case for PPC.
+        gc_assert(page_type_flag == CODE_PAGE_TYPE);
+#endif
         return(new_obj);        /* yup */
     }
 
