@@ -3007,7 +3007,7 @@ is :ANY, the function name is not checked."
               (funcall fun lvar dest)
               (loop for ref in (lambda-var-refs var)
                     do (multiple-value-bind (dest lvar)
-                           (principal-lvar-dest (node-lvar ref))
+                           (principal-lvar-dest-and-lvar (node-lvar ref))
                          (funcall fun lvar dest)))))
         (funcall fun lvar dest))))
 
