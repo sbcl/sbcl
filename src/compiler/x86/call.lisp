@@ -1347,40 +1347,40 @@
   (:results (result :scs (descriptor-reg)))
   (:node-var node)
   (:generator 20
-              (let ((enter (gen-label))
-                    (loop (gen-label))
-                    (done (gen-label))
-                    (stack-allocate-p (node-stack-allocate-p node)))
-                (move src context)
-                (move ecx count)
-                ;; Check to see whether there are no args, and just return NIL if so.
-                (inst mov result nil-value)
-                (inst test ecx ecx)
-                (inst jmp :z done)
-                (inst lea dst (make-ea :dword :base ecx :index ecx))
-                (pseudo-atomic (:elide-if stack-allocate-p)
-                               (allocation dst dst node stack-allocate-p list-pointer-lowtag)
-                               ;; Set up the result.
-                               (move result dst)
-                               ;; Jump into the middle of the loop, 'cause that's where we want
-                               ;; to start.
-                               (inst jmp enter)
-                               (emit-label loop)
-                               ;; Compute a pointer to the next cons.
-                               (inst add dst (* cons-size n-word-bytes))
-                               ;; Store a pointer to this cons in the CDR of the previous cons.
-                               (storew dst dst -1 list-pointer-lowtag)
-                               (emit-label enter)
-                               ;; Grab one value and stash it in the car of this cons.
-                               (inst mov eax (make-ea :dword :base src))
-                               (inst sub src n-word-bytes)
-                               (storew eax dst 0 list-pointer-lowtag)
-                               ;; Go back for more.
-                               (inst sub ecx n-word-bytes)
-                               (inst jmp :nz loop)
-                               ;; NIL out the last cons.
-                               (storew nil-value dst 1 list-pointer-lowtag))
-                (emit-label done))))
+    (let ((enter (gen-label))
+          (loop (gen-label))
+          (done (gen-label))
+          (stack-allocate-p (node-stack-allocate-p node)))
+      (move src context)
+      (move ecx count)
+      ;; Check to see whether there are no args, and just return NIL if so.
+      (inst mov result nil-value)
+      (inst test ecx ecx)
+      (inst jmp :z done)
+      (inst lea dst (make-ea :dword :base ecx :index ecx))
+      (pseudo-atomic (:elide-if stack-allocate-p)
+        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
+        ;; Set up the result.
+        (move result dst)
+        ;; Jump into the middle of the loop, 'cause that's where we want
+        ;; to start.
+        (inst jmp enter)
+        (emit-label loop)
+        ;; Compute a pointer to the next cons.
+        (inst add dst (* cons-size n-word-bytes))
+        ;; Store a pointer to this cons in the CDR of the previous cons.
+        (storew dst dst -1 list-pointer-lowtag)
+        (emit-label enter)
+        ;; Grab one value and stash it in the car of this cons.
+        (inst mov eax (make-ea :dword :base src))
+        (inst sub src n-word-bytes)
+        (storew eax dst 0 list-pointer-lowtag)
+        ;; Go back for more.
+        (inst sub ecx n-word-bytes)
+        (inst jmp :nz loop)
+        ;; NIL out the last cons.
+        (storew nil-value dst 1 list-pointer-lowtag))
+      (emit-label done))))
 
 ;;; Return the location and size of the &MORE arg glob created by
 ;;; COPY-MORE-ARG. SUPPLIED is the total number of arguments supplied
