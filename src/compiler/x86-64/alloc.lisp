@@ -124,11 +124,10 @@
   (aver (and (not (location= alloc-tn temp-reg-tn))
              (or (integerp size) (not (location= size temp-reg-tn)))))
 
+  (aver (not (sb-assem::assembling-to-elsewhere-p)))
   ;; Otherwise do the normal inline allocation thing
   (let ((NOT-INLINE (gen-label))
         (DONE (gen-label))
-        ;; Yuck.
-        (in-elsewhere (sb-assem::assembling-to-elsewhere-p))
         ;; thread->alloc_region.free_pointer
         (free-pointer
          #+sb-thread (thread-slot-ea thread-alloc-region-slot)
@@ -140,10 +139,8 @@
          #-sb-thread (ea (+ static-space-start
                             (ash (1+ vector-data-offset) word-shift)))))
 
-    (cond ((or in-elsewhere
-               ;; large objects will never be made in a per-thread region
-               (and (integerp size)
-                    (>= size large-object-size)))
+    (cond ((typep size `(integer , large-object-size))
+           ;; large objects will never be made in a per-thread region
            (%alloc-tramp node alloc-tn size lowtag))
           ((eql lowtag 0)
            (cond ((and (tn-p size) (location= size alloc-tn))
