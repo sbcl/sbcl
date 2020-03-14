@@ -41,7 +41,6 @@
                                   (if (eql op 'pop)
                                       `(inst ,',float-move ,float (ea ,i rsp-tn))
                                       `(inst ,',float-move (ea ,i rsp-tn) ,float))))))
-            (inst cld)
             (inst push rbp-tn)
             (inst mov rbp-tn rsp-tn)
             (inst and rsp-tn (- ,float-size))
