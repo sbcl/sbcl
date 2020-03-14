@@ -51,7 +51,7 @@
                                  (make-ea :dword :disp +win32-tib-arbitrary-field-offset+)
                                  :fs)
                            (inst sub ,reg (make-ea :dword :disp (ash thread-alloc-region-slot 2)
-                                                          :base  scratch-tn))))
+                                                          :base ,scratch-tn))))
                        #-win32
                        `(#+sb-thread (inst sub ,reg
                                            (make-ea :dword :disp (ash thread-alloc-region-slot 2))
