@@ -27,7 +27,7 @@
       (inst add ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                lowtag-mask))
       (inst andn ndescr lowtag-mask)
-      (allocation header ndescr other-pointer-lowtag :temp-tn gencgc-temp)
+      (allocation nil ndescr other-pointer-lowtag header :temp-tn gencgc-temp)
       (inst add ndescr rank (fixnumize (1- array-dimensions-offset)))
       (inst sll ndescr ndescr n-widetag-bits)
       (inst or ndescr ndescr type)

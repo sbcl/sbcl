@@ -35,7 +35,7 @@
     (inst or  header type)
     (inst shr header 2)
     (pseudo-atomic ()
-     (allocation result bytes node nil other-pointer-lowtag)
+     (allocation nil bytes other-pointer-lowtag node nil result)
      (storew header result 0 other-pointer-lowtag))))
 
 (define-vop (make-array-header/c)
@@ -55,7 +55,7 @@
                                 n-widetag-bits)
                            type)))
      (pseudo-atomic ()
-      (allocation result bytes node nil other-pointer-lowtag)
+      (allocation nil bytes other-pointer-lowtag node nil result)
       (storew header result 0 other-pointer-lowtag)))))
 
 ;;;; additional accessors and setters for the array header

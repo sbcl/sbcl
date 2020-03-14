@@ -50,7 +50,8 @@
                        (inst clrrwi res csp-tn n-lowtag-bits)
                        (inst ori res res list-pointer-lowtag)
                        (inst addi csp-tn csp-tn alloc))
-                     (allocation res alloc list-pointer-lowtag :temp-tn alloc-temp
+                     (allocation 'list alloc list-pointer-lowtag res
+                                 :temp-tn alloc-temp
                                  :flag-tn pa-flag))
                  (move ptr res)
                  (dotimes (i (1- cons-cells))
@@ -111,8 +112,8 @@
               (inst ori result result fun-pointer-lowtag)
               (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag)))
             (progn
-              (allocation result (pad-data-block size)
-                          fun-pointer-lowtag :temp-tn temp :flag-tn pa-flag)
+              (allocation nil (pad-data-block size) fun-pointer-lowtag result
+                          :temp-tn temp :flag-tn pa-flag)
               (inst lr temp (logior (ash (1- size) n-widetag-bits) closure-widetag))))
         (storew temp result 0 fun-pointer-lowtag)
         (storew function result closure-fun-slot fun-pointer-lowtag)))))
@@ -180,5 +181,5 @@
            (inst addi header header (+ (ash -2 n-widetag-bits) type))
            (inst clrrwi bytes bytes n-lowtag-bits)))
     (pseudo-atomic (pa-flag)
-      (allocation result bytes lowtag :temp-tn temp :flag-tn pa-flag)
+      (allocation nil bytes lowtag result :temp-tn temp :flag-tn pa-flag)
       (storew header result 0 lowtag))))

@@ -30,7 +30,7 @@
       (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
                                 lowtag-mask))
       (inst clrrwi ndescr ndescr n-lowtag-bits)
-      (allocation header ndescr other-pointer-lowtag
+      (allocation nil ndescr other-pointer-lowtag header
                   :temp-tn gc-temp
                   :flag-tn pa-flag)
       (inst addi ndescr rank (fixnumize (1- array-dimensions-offset)))

@@ -1090,7 +1090,7 @@ default-value-8
       (pseudo-atomic ()
         ;; Allocate a cons (2 words) for each item.
         (inst sll temp count 1)
-        (allocation result temp list-pointer-lowtag
+        (allocation 'list temp list-pointer-lowtag result
                     :stack-p dx-p
                     :temp-tn dst)
         (inst b enter)

@@ -120,8 +120,10 @@
   `(define-assembly-routine (,(intern (format nil "ALLOCATE-~A-TO-~A" obj arg-tn)))
      ((:temp ,arg-tn descriptor-reg ,(intern (format nil "~A-OFFSET" arg-tn))))
      (pseudo-atomic ()
-      (allocation ,arg-tn (pad-data-block ,(intern (format nil "~A-SIZE" obj))) nil)
-      (inst lea ,arg-tn (make-ea :byte :base ,arg-tn :disp ,lowtag)))))
+      (allocation 'list ; this macro is supposedly general, but actually it isn't
+                  (pad-data-block ,(intern (format nil "~A-SIZE" obj)))
+                  ,lowtag
+                  nil nil ,arg-tn))))
 
 #+sb-assembling
 (macrolet ((frob-cons-routines ()

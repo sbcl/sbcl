@@ -30,7 +30,7 @@
                              lowtag-mask))
     (inst bic ndescr ndescr lowtag-mask)
     (pseudo-atomic (pa-flag)
-      (allocation header ndescr other-pointer-lowtag :flag-tn pa-flag)
+      (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag)
       ;; Now that we have the space allocated, compute the header
       ;; value.
       (inst add ndescr rank (fixnumize (1- array-dimensions-offset)))
@@ -58,7 +58,7 @@
                                      n-widetag-bits)
                                 type)))
       (pseudo-atomic (pa-flag)
-        (allocation header bytes other-pointer-lowtag :flag-tn pa-flag)
+        (allocation nil bytes other-pointer-lowtag header :flag-tn pa-flag)
         (load-immediate-word pa-flag header-bits)
         (storew pa-flag header 0 other-pointer-lowtag)))
     (move result header)))

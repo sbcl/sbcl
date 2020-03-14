@@ -29,7 +29,7 @@
     ;; boxed words == unboxed bytes
     (inst add ndescr words (* (1+ vector-data-offset) n-word-bytes))
     (inst andn ndescr 7)
-    (allocation vector ndescr other-pointer-lowtag :temp-tn gc-temp)
+    (allocation nil ndescr other-pointer-lowtag vector :temp-tn gc-temp)
     (inst srl ndescr type word-shift)
     (storew ndescr vector 0 other-pointer-lowtag)
     (storew length vector vector-length-slot other-pointer-lowtag))

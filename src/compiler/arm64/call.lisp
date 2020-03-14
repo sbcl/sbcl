@@ -524,7 +524,7 @@
                          (t
                           (inst lsl temp count (1+ (- word-shift n-fixnum-tag-bits)))
                           temp))))
-        (allocation dst size list-pointer-lowtag
+        (allocation 'list size list-pointer-lowtag dst
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p
                     :lip lip))

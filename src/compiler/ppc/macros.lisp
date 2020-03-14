@@ -165,13 +165,13 @@
 ;;; because a temp register is needed to do inline allocation.
 ;;; TEMP-TN, in this case, can be any register, since it holds a
 ;;; double-word aligned address (essentially a fixnum).
-(defun allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
+(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
   ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
   ;; set.  If the lowtag also has a 1 bit in the same position, we're all
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
-  (declare (ignore stack-p node)
+  (declare (ignore type stack-p node)
            #-gencgc
            (ignore temp-tn flag-tn))
   #-gencgc
@@ -258,7 +258,7 @@
              (align-csp ,temp-tn)
              (inst ori ,result-tn csp-tn ,lowtag)
              (inst addi csp-tn csp-tn (pad-data-block ,size)))
-         (allocation ,result-tn (pad-data-block ,size) ,lowtag
+         (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                      :temp-tn ,temp-tn
                      :flag-tn ,flag-tn))
        (when ,type-code

@@ -530,9 +530,10 @@ and
 (defun alloc-tramp-stub-name (tn-offset)
   (intern (format nil "ALLOC-TRAMP-STUB-~d" tn-offset) "SB-VM"))
 
-(defun allocation (result-tn size lowtag &key flag-tn
-                                              stack-allocate-p
-                                              temp-tn)
+(defun allocation (type size lowtag result-tn &key flag-tn
+                                                   stack-allocate-p
+                                                   temp-tn)
+  (declare (ignore type))
   #-gencgc (declare (ignore temp-tn))
   (cond (stack-allocate-p
          ;; Stack allocation
@@ -623,7 +624,7 @@ and
               (stack-allocate-p stack-allocate-p)
               (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
-       (allocation ,result-tn (pad-data-block ,size) ,lowtag
+       (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
                    ,@(when temp-tn `(:temp-tn ,temp-tn)))

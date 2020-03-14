@@ -1042,7 +1042,7 @@
       ;; We need to do this atomically.
       (pseudo-atomic (pa-flag)
         (inst slli temp count (1+ (- word-shift n-fixnum-tag-bits)))
-        (allocation dst temp list-pointer-lowtag
+        (allocation 'list temp list-pointer-lowtag dst
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p)
         (move result dst)

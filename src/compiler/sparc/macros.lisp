@@ -146,7 +146,8 @@
 ;;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
 ;;;; applied.  The amount of space to be allocated is SIZE bytes (which
 ;;;; must be a multiple of the lisp object size).
-(defmacro allocation (result-tn size lowtag &key stack-p temp-tn)
+(defmacro allocation (type size lowtag result-tn &key stack-p temp-tn)
+  (declare (ignore type))
   #+gencgc
   ;; A temp register is needed to do inline allocation.  TEMP-TN, in
   ;; this case, can be any register, since it holds a double-word
@@ -269,7 +270,7 @@
   (once-only ((result-tn result-tn) (temp-tn temp-tn)
               (type-code type-code) (size size))
     `(pseudo-atomic ()
-       (allocation ,result-tn (pad-data-block ,size) other-pointer-lowtag
+       (allocation nil (pad-data-block ,size) other-pointer-lowtag ,result-tn
                    :temp-tn ,temp-tn)
        (inst li ,temp-tn (compute-object-header ,size ,type-code))
        (storew ,temp-tn ,result-tn 0 other-pointer-lowtag)

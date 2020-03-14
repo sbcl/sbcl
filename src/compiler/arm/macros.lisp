@@ -215,8 +215,8 @@
                      (ash 1 (tn-offset lr-tn))))
   (inst b back-label))
 
-(defmacro allocation (result-tn size lowtag &key flag-tn
-                                                 stack-allocate-p)
+(defmacro allocation (type size lowtag result-tn &key flag-tn stack-allocate-p)
+  (declare (ignore type))
   ;; Normal allocation to the heap.
   (once-only ((result-tn result-tn)
               (size size)
@@ -282,7 +282,7 @@
   (once-only ((result-tn result-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag))
     `(pseudo-atomic (,flag-tn)
-       (allocation ,result-tn (pad-data-block ,size) ,lowtag
+       (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p)
        (when ,type-code

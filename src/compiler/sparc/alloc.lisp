@@ -43,7 +43,7 @@
                     (cons-cells (if star (1- num) num))
                     (alloc (* (pad-data-block cons-size) cons-cells)))
                (pseudo-atomic ()
-                 (allocation res alloc list-pointer-lowtag
+                 (allocation 'list alloc list-pointer-lowtag res
                              :stack-p dx-p
                              :temp-tn alloc-temp)
                  (move ptr res)
@@ -96,7 +96,7 @@
     (let* ((size (+ length closure-info-offset))
            (alloc-size (pad-data-block size)))
       (pseudo-atomic ()
-        (allocation result alloc-size fun-pointer-lowtag
+        (allocation nil alloc-size fun-pointer-lowtag result
                     :stack-p stack-allocate-p
                     :temp-tn temp)
         (inst li temp (logior (ash (1- size) n-widetag-bits) closure-widetag))
@@ -137,7 +137,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 4
     (pseudo-atomic ()
-      (allocation result (pad-data-block words) lowtag :temp-tn temp)
+      (allocation nil (pad-data-block words) lowtag result :temp-tn temp)
       (when type
         (inst li temp (logior (ash (1- words) n-widetag-bits) type))
         (storew temp result 0 lowtag)))))
@@ -162,5 +162,5 @@
            (inst add header header (+ (ash -2 n-widetag-bits) type))
            (inst and bytes (lognot lowtag-mask))))
     (pseudo-atomic ()
-      (allocation result bytes lowtag :temp-tn temp)
+      (allocation nil bytes lowtag result :temp-tn temp)
       (storew header result 0 lowtag))))

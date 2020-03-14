@@ -180,13 +180,13 @@
 ;;; So at the expense of speed and code size, we can use a call/return.
 ;;; In such case, we never actually try to perform allocations inline.
 ;;;
-(defun allocation (result-tn size lowtag &key stack-p node temp-tn flag-tn)
+(defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
   ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
   ;; set.  If the lowtag also has a 1 bit in the same position, we're all
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
-  (declare (ignore stack-p node))
+  (declare (ignore type stack-p node))
 
   ;; if sigtrap is making you suffer, enable out-of-line allocator for everything
   ;;  #-alloc-use-sigtrap
@@ -292,7 +292,7 @@
              (align-csp ,temp-tn)
              (inst ori ,result-tn csp-tn ,lowtag)
              (inst addi csp-tn csp-tn (pad-data-block ,size)))
-         (allocation ,result-tn (pad-data-block ,size) ,lowtag
+         (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                      :temp-tn ,temp-tn
                      :flag-tn ,flag-tn))
        (when ,type-code

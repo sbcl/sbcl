@@ -252,8 +252,8 @@
     (inst slli y x n-fixnum-tag-bits)
     (inst beq pa-flag zero-tn done)
     (pseudo-atomic (pa-flag)
-      (allocation y (pad-data-block (+ bignum-digits-offset 2))
-                  other-pointer-lowtag :flag-tn pa-flag)
+      (allocation nil (pad-data-block (+ bignum-digits-offset 2)) other-pointer-lowtag
+                  y :flag-tn pa-flag)
       (inst slt pa-flag x zero-tn)
       (inst slli pa-flag pa-flag n-widetag-bits)
       (inst addi pa-flag pa-flag (logior (ash 1 n-widetag-bits) bignum-widetag))

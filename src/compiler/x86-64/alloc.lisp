@@ -57,7 +57,8 @@
                 (used-p (sb-c::ir2-component-normal-tns comp))
                 (used-p (sb-c::ir2-component-wired-tns comp))))))))
 
-(defun %alloc-tramp (node result-tn size lowtag)
+(defun %alloc-tramp (type node result-tn size lowtag)
+  (declare (ignore type))
   (cond ((typep size '(and integer (not (signed-byte 32))))
          ;; MOV accepts large immediate operands, PUSH does not
          (inst mov result-tn size)
@@ -117,7 +118,14 @@
 ;;; NODE may be used to make policy-based decisions.
 ;;; This function should only be used inside a pseudo-atomic section,
 ;;; which to the degree needed should also cover subsequent initialization.
-(defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
+;;; CONSP says whether we're allocating conses. But we also need LOWTAG
+;;; because the vop could want the CONS to have 0 or list-pointer lowtag.
+;;;
+;;; A mnemonic device for the argument pattern here:
+;;; 1. what to allocate: type, size, lowtag describe the object
+;;; 2. how to allocate it: policy and how to invoke the trampoline
+;;; 3. where to put the result
+(defun allocation (type size lowtag node dynamic-extent alloc-tn)
   (when dynamic-extent
     (stack-allocation alloc-tn size lowtag)
     (return-from allocation (values)))
@@ -141,7 +149,7 @@
 
     (cond ((typep size `(integer , large-object-size))
            ;; large objects will never be made in a per-thread region
-           (%alloc-tramp node alloc-tn size lowtag))
+           (%alloc-tramp type node alloc-tn size lowtag))
           ((eql lowtag 0)
            (cond ((and (tn-p size) (location= size alloc-tn))
                   (inst mov temp-reg-tn free-pointer)
@@ -161,7 +169,7 @@
                                 temp-reg-tn)
                                (t
                                 size))))
-               (%alloc-tramp node alloc-tn size 0))
+               (%alloc-tramp type node alloc-tn size 0))
              (inst jmp DONE)))
           (t
            (inst mov temp-reg-tn free-pointer)
@@ -180,9 +188,9 @@
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
                     (inst sub alloc-tn temp-reg-tn)
-                    (%alloc-tramp node temp-reg-tn alloc-tn 0))
+                    (%alloc-tramp type node temp-reg-tn alloc-tn 0))
                    (t ; SIZE is intact
-                    (%alloc-tramp node temp-reg-tn size 0)))
+                    (%alloc-tramp type node temp-reg-tn size 0)))
              (inst jmp DONE))))
     (values)))
 
@@ -193,12 +201,12 @@
                     &aux (bytes (pad-data-block size)))
   (let ((header (compute-object-header size widetag)))
     (cond (stack-allocate-p
-           (allocation result-tn bytes node t other-pointer-lowtag)
+           (allocation nil bytes other-pointer-lowtag node t result-tn)
            (storew header result-tn 0 other-pointer-lowtag))
           (t
            (instrument-alloc bytes node)
            (pseudo-atomic ()
-             (allocation result-tn bytes node nil 0)
+             (allocation nil bytes 0 node nil result-tn)
              (storew* header result-tn 0 0 t)
              (inst or :byte result-tn other-pointer-lowtag))))))
 
@@ -238,8 +246,8 @@
                (unless stack-allocate-p
                  (instrument-alloc size node))
                (pseudo-atomic (:elide-if stack-allocate-p)
-                (allocation res size node stack-allocate-p
-                            (if (= cons-cells 2) 0 list-pointer-lowtag))
+                (allocation 'list size (if (= cons-cells 2) 0 list-pointer-lowtag)
+                            node stack-allocate-p res)
                 (multiple-value-bind (last-base-reg lowtag car cdr)
                     (cond
                       ((= cons-cells 2)
@@ -347,7 +355,7 @@
       (let ((size (calc-size-in-bytes words result)))
         (instrument-alloc size node)
         (pseudo-atomic ()
-         (allocation result size node nil 0)
+         (allocation nil size 0 node nil result)
          (put-header result 0 type length t)
          (inst or :byte result other-pointer-lowtag)))))
 
@@ -497,7 +505,7 @@
              (and (sc-is element immediate) (eql (tn-value element) 0))))
         (instrument-alloc size node)
         (pseudo-atomic ()
-         (allocation result size node nil list-pointer-lowtag)
+         (allocation 'list size list-pointer-lowtag node nil result)
          (compute-end)
          (inst mov next result)
          (inst jmp entry)
@@ -540,7 +548,7 @@
      (unless stack-allocate-p
        (instrument-alloc bytes node))
      (pseudo-atomic (:elide-if stack-allocate-p)
-       (allocation result bytes node stack-allocate-p fun-pointer-lowtag)
+       (allocation nil bytes fun-pointer-lowtag node stack-allocate-p result)
        (storew* #-immobile-space header ; write the widetag and size
                 #+immobile-space        ; ... plus the layout pointer
                 (progn (inst mov temp header)
@@ -602,7 +610,7 @@
            (t
             ;; If storing a header word, defer ORing in the lowtag until after
             ;; the header is written so that displacement can be 0.
-            (allocation result bytes node stack-allocate-p (if type 0 lowtag))
+            (allocation nil bytes (if type 0 lowtag) node stack-allocate-p result)
             (when type
               (let* ((widetag (if instancep instance-widetag type))
                      (header (logior (ash (1- words) n-widetag-bits) widetag)))
@@ -654,7 +662,7 @@
             (t
              (instrument-alloc bytes node)
              (pseudo-atomic ()
-              (allocation result bytes node nil lowtag)
+              (allocation nil bytes lowtag node nil result)
               (storew header result 0 lowtag))))))
 
 (macrolet ((c-call (name)

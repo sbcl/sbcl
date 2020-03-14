@@ -517,7 +517,7 @@
                          (t
                           (inst mov temp (lsl count 1))
                           temp))))
-        (allocation dst size list-pointer-lowtag
+        (allocation 'list size list-pointer-lowtag dst
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p))
       (move result dst)

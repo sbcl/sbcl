@@ -1300,10 +1300,8 @@
       (unless stack-allocate-p
         (instrument-alloc dst node))
       (pseudo-atomic (:elide-if stack-allocate-p)
-       ;; FIXME: if COUNT >= 8192, allocates to single-object page(s).
-       ;; All we have to do is unset the '.singleton' bit,
-       ;; a permissible state change as long as pseudo-atomic.
-       (allocation dst dst node stack-allocate-p list-pointer-lowtag)
+       ;; TODO: ALLOCATION needs not to ignore the CONSP argument
+       (allocation 'list dst list-pointer-lowtag node stack-allocate-p dst)
        ;; Set up the result.
        (move result dst)
        ;; Jump into the middle of the loop, 'cause that's where we want

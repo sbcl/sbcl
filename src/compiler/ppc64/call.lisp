@@ -1168,7 +1168,7 @@ default-value-8
             (inst add csp-tn csp-tn temp))
           (progn
             (inst sldi temp count (1+ (- word-shift n-fixnum-tag-bits)))
-            (allocation result temp list-pointer-lowtag
+            (allocation 'list temp list-pointer-lowtag result
                         :temp-tn dst
                         :flag-tn pa-flag)
             (move dst result)))

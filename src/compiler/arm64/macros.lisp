@@ -183,11 +183,11 @@
     (move alloc-tn tmp-tn))
   (inst b back-label))
 
-(defmacro allocation (result-tn size lowtag &key flag-tn
-                                                 stack-allocate-p
-                                                 (lip (if stack-allocate-p
-                                                          nil
-                                                          (missing-arg))))
+(defmacro allocation (type size lowtag result-tn
+                      &key flag-tn
+                           stack-allocate-p
+                           (lip (if stack-allocate-p nil (missing-arg))))
+  (declare (ignore type))
   ;; Normal allocation to the heap.
   (once-only ((result-tn result-tn)
               (size size)
@@ -272,7 +272,7 @@
               (stack-allocate-p stack-allocate-p)
               (lip lip))
     `(pseudo-atomic (,flag-tn)
-       (allocation ,result-tn (pad-data-block ,size) ,lowtag
+       (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
                    :lip ,lip)

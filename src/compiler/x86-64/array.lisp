@@ -39,7 +39,7 @@
     (inst shr :dword header n-fixnum-tag-bits)
     (instrument-alloc bytes node)
     (pseudo-atomic ()
-     (allocation result bytes node nil 0)
+     (allocation nil bytes 0 node nil result)
      (storew header result 0 0)
      (inst or :byte result other-pointer-lowtag))))
 
@@ -59,7 +59,7 @@
                            type)))
      (instrument-alloc bytes node)
      (pseudo-atomic ()
-      (allocation result bytes node nil 0)
+      (allocation nil bytes 0 node nil result)
       (storew* header result 0 0 t)
       (inst or :byte result other-pointer-lowtag)))))
 

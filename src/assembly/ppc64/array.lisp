@@ -31,7 +31,7 @@
   (pseudo-atomic (pa-flag)
     (inst addi ndescr words (fixnumize (1+ vector-data-offset)))
     (inst rldicr ndescr ndescr (- word-shift n-fixnum-tag-bits) (- 63 n-lowtag-bits))
-    (allocation vector ndescr other-pointer-lowtag
+    (allocation nil ndescr other-pointer-lowtag vector
                 :temp-tn temp
                 :flag-tn pa-flag)
     (inst srwi ndescr type n-fixnum-tag-bits)

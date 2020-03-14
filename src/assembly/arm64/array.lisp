@@ -32,8 +32,8 @@
     (inst add ndescr ndescr (* (1+ vector-data-offset) n-word-bytes))
     (inst and ndescr ndescr (bic-mask lowtag-mask)) ; double-word align
     (move lra-save lr) ;; The call to alloc_tramp will overwrite LR
-    (allocation vector ndescr other-pointer-lowtag :flag-tn pa-flag
-                                                   :lip nil) ;; keep LR intact as per above
+    (allocation nil ndescr other-pointer-lowtag vector
+                :flag-tn pa-flag :lip nil) ;; keep LR intact as per above
 
     (move lr lra-save)
     (inst lsr ndescr type n-fixnum-tag-bits)
@@ -63,7 +63,7 @@
     (inst lsl words words (- word-shift n-fixnum-tag-bits))
     (inst add words words (* (1+ vector-data-offset) n-word-bytes))
     (inst and words words (bic-mask lowtag-mask)) ; double-word align
-    (allocation result words nil :stack-allocate-p t)
+    (allocation nil words nil result :stack-allocate-p t)
 
     (inst stp temp length (@ result))
     ;; Zero fill

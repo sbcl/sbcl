@@ -145,7 +145,12 @@
 
 ;;; (FIXME: so why aren't we asserting this?)
 
-(defun allocation (alloc-tn size node &optional dynamic-extent lowtag)
+;;; A mnemonic device for the argument pattern here:
+;;; 1. what to allocate: type, size, lowtag describe the object
+;;; 2. how to allocate it: policy and how to invoke the trampoline
+;;; 3. where to put the result
+(defun allocation (type size lowtag node dynamic-extent alloc-tn)
+  (declare (ignore type))
   (declare (ignorable node))
   (cond
     (dynamic-extent
@@ -163,8 +168,8 @@
 ;;; RESULT-TN.
 (defun alloc-other (result-tn widetag size node &optional stack-allocate-p)
   (pseudo-atomic (:elide-if stack-allocate-p)
-      (allocation result-tn (pad-data-block size) node stack-allocate-p
-                  other-pointer-lowtag)
+      (allocation nil (pad-data-block size) other-pointer-lowtag
+                  node stack-allocate-p result-tn)
       (storew (compute-object-header size widetag)
               result-tn 0 other-pointer-lowtag)))
 
@@ -197,8 +202,8 @@
              (let ((cons-cells (if star (1- num) num))
                    (stack-allocate-p (node-stack-allocate-p node)))
                (pseudo-atomic (:elide-if stack-allocate-p)
-                (allocation res (* (pad-data-block cons-size) cons-cells) node
-                            stack-allocate-p list-pointer-lowtag)
+                (allocation 'list (* (pad-data-block cons-size) cons-cells)
+                            list-pointer-lowtag node stack-allocate-p res)
                 (move ptr res)
                 (dotimes (i (1- cons-cells))
                   (store-car (tn-ref-tn things) ptr)
@@ -250,8 +255,7 @@
                    (inst and result (lognot lowtag-mask))
                    result))))
       (pseudo-atomic ()
-       (allocation result size node)
-       (inst lea result (make-ea :byte :base result :disp other-pointer-lowtag))
+       (allocation nil size other-pointer-lowtag node nil result)
        (sc-case type
          (immediate
           (aver (typep (tn-value type) '(unsigned-byte 9)))
@@ -332,9 +336,8 @@
   (:generator 10
    (pseudo-atomic (:elide-if stack-allocate-p)
      (let ((size (+ length closure-info-offset)))
-       (allocation result (pad-data-block size) node
-                   stack-allocate-p
-                   fun-pointer-lowtag)
+       (allocation nil (pad-data-block size) fun-pointer-lowtag
+                   node stack-allocate-p result)
        (storew (logior (ash (1- size) n-widetag-bits) closure-widetag)
                result 0 fun-pointer-lowtag)))
    ;; Done with pseudo-atomic
@@ -394,7 +397,7 @@
           (aver (null type))
           (inst call (make-fixup dst :assembly-routine)))
         (pseudo-atomic (:elide-if stack-allocate-p)
-         (allocation result (pad-data-block words) node stack-allocate-p lowtag)
+         (allocation nil (pad-data-block words) lowtag node stack-allocate-p result)
          (when type
            (storew (logior (ash (1- words) n-widetag-bits) type)
                    result
@@ -419,5 +422,5 @@
           (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
     (inst and bytes (lognot lowtag-mask))
     (pseudo-atomic (:elide-if stack-allocate-p)
-     (allocation result bytes node stack-allocate-p lowtag)
+     (allocation nil bytes lowtag node stack-allocate-p result)
      (storew header result 0 lowtag))))

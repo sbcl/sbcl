@@ -1359,7 +1359,7 @@
       (inst jmp :z done)
       (inst lea dst (make-ea :dword :base ecx :index ecx))
       (pseudo-atomic (:elide-if stack-allocate-p)
-        (allocation dst dst node stack-allocate-p list-pointer-lowtag)
+        (allocation 'list dst list-pointer-lowtag node stack-allocate-p dst)
         ;; Set up the result.
         (move result dst)
         ;; Jump into the middle of the loop, 'cause that's where we want
