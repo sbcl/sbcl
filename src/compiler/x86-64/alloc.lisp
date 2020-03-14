@@ -182,7 +182,7 @@
            (assemble (:elsewhere)
              (emit-label NOT-INLINE)
              (cond ((and (tn-p size) (location= size alloc-tn)) ; recover SIZE
-                    (inst sub alloc-tn free-pointer)
+                    (inst sub alloc-tn temp-reg-tn)
                     (%alloc-tramp node temp-reg-tn alloc-tn 0))
                    (t ; SIZE is intact
                     (%alloc-tramp node temp-reg-tn size 0)))
