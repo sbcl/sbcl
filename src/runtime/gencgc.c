@@ -1403,15 +1403,15 @@ gc_find_freeish_pages(page_index_t *restart_page_ptr, sword_t nbytes,
 void *
 gc_alloc_with_region(struct alloc_region *region, sword_t nbytes, int page_type_flag)
 {
-    // If this is a normal GC, we never copy large objects (not that that's always the
-    // best strategy, because it ought to be possible to defragment by copying, say,
-    // an object occupying 5 pages). Anyway, unless we're in final GC, assert that no
-    // large objects are allocated here. The test for final GC is !conservative_stack.
     if (nbytes>=LARGE_OBJECT_SIZE) {
-        if (!conservative_stack)
-            return gc_alloc_large(nbytes, page_type_flag, region);
-        else
-            lose("Unexpected copying of large object");
+        /* If this is a normal GC - as opposed to "final" GC just prior to saving
+         * a core, then we should never copy a large object (not that that's the best
+         * strategy always, because it entirely precludes defragmenting those objects).
+         * But unfortunately we can't assert that only small objects are seen here,
+         * because genesis does not use large-object pages. So cold-init could fail,
+         * depending on whether objects in the cold core are sufficiently large that
+         * they ought to have gone on large object pages if they could have. */
+        return gc_alloc_large(nbytes, page_type_flag, region);
     }
 
     void *new_obj = region->free_pointer;
