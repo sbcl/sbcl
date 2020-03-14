@@ -11,6 +11,65 @@
 
 (in-package "SB-VM")
 
+;;;; Notinline allocators
+;;;; Allocate bytes and return the start of the allocated space
+;;;; in the specified destination register.
+;;;;
+;;;; In the general case the size will be in the destination register.
+;;;;
+;;;; All registers must be preserved except the destination.
+;;;; The C conventions will preserve ebx, esi, edi, and ebp.
+;;;; So only eax, ecx, and edx need special care here.
+;;;;
+;;;; ALLOC factors out the logic of calling alloc(): stack alignment, etc.
+#+sb-assembling
+(macrolet ((alloc (size)
+             `(progn
+                (inst push ebp-tn)
+                (inst mov ebp-tn esp-tn)
+                (inst push 0)                 ; reserve space for arg
+                (inst and esp-tn #xfffffff0)  ; align stack to 16 bytes
+                (inst mov (make-ea :dword :base esp-tn) ,size)
+                (inst call (make-fixup "alloc" :foreign))
+                (inst mov esp-tn ebp-tn)
+                (inst pop ebp-tn)))
+           (preserving ((r1 r2 &optional r3) &body body)
+             `(progn (inst push ,r1) (inst push ,r2)
+                     ,@(when r3 `((inst push ,r3)))
+                     ,@body
+                     ,@(when r3 `((inst pop ,r3)))
+                     (inst pop ,r2) (inst pop ,r1)))
+           (alloc-to-reg (reg size)
+             (case reg
+               (eax-tn
+                `(preserving (ecx-tn edx-tn) (alloc ,size)))
+               (ecx-tn
+                `(preserving (eax-tn edx-tn)
+                   (alloc ,size)
+                   (inst mov ecx-tn eax-tn))) ; result to destination
+               (edx-tn
+                `(preserving (eax-tn ecx-tn)
+                   (alloc ,size)
+                   (inst mov edx-tn eax-tn))) ; result to destination
+               (t
+                `(preserving (eax-tn ecx-tn edx-tn)
+                   (alloc ,size)
+                   (inst mov ,reg eax-tn)))))
+           (def-allocators (tn &aux (reg (subseq (string tn) 0 3)))
+             `(progn
+                (define-assembly-routine (,(symbolicate "ALLOC-TO-" reg)) ()
+                  (alloc-to-reg ,tn ,tn))
+                (define-assembly-routine (,(symbolicate "ALLOC-8-TO-" reg)) ()
+                  (alloc-to-reg ,tn 8))
+                (define-assembly-routine (,(symbolicate "ALLOC-16-TO-" reg)) ()
+                  (alloc-to-reg ,tn 16)))))
+  (def-allocators eax-tn)
+  (def-allocators ecx-tn)
+  (def-allocators edx-tn)
+  (def-allocators ebx-tn)
+  (def-allocators esi-tn)
+  (def-allocators edi-tn))
+
 ;;;; Signed and unsigned bignums from word-sized integers. Argument
 ;;;; and return in the same register. No VOPs, as these are only used
 ;;;; as out-of-line versions: MOVE-FROM-[UN]SIGNED VOPs handle the

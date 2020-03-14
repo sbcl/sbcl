@@ -43,21 +43,20 @@
          ;; C call to allocate via dispatch routines. Each
          ;; destination has a special entry point. The size may be a
          ;; register or a constant.
-         (tn-text (ecase alloc-tn-offset
-                    (#.eax-offset "eax")
-                    (#.ecx-offset "ecx")
-                    (#.edx-offset "edx")
-                    (#.ebx-offset "ebx")
-                    (#.esi-offset "esi")
-                    (#.edi-offset "edi")))
-         (size-text (case size (8 "8_") (16 "16_") (t ""))))
+         (tn-name (ecase alloc-tn-offset
+                    (#.eax-offset 'eax)
+                    (#.ecx-offset 'ecx)
+                    (#.edx-offset 'edx)
+                    (#.ebx-offset 'ebx)
+                    (#.esi-offset 'esi)
+                    (#.edi-offset 'edi)))
+         (size-text (case size (8 "8-") (16 "16-") (t ""))))
     (unless (or (eql size 8) (eql size 16))
       (unless (and (tn-p size) (location= alloc-tn size))
         (inst mov alloc-tn size)))
-    (inst call (make-fixup (concatenate 'string
-                                         "alloc_" size-text
-                                         "to_" tn-text)
-                           :foreign))))
+    (let ((routine (package-symbolicate (sb-xc::symbol-package tn-name)
+                                        "ALLOC-" size-text "TO-" tn-name)))
+      (inst call (make-fixup routine :assembly-routine)))))
 
 (defun allocation-inline (alloc-tn size)
   (let* ((ok (gen-label))
