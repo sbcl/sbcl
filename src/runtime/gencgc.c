@@ -4035,13 +4035,13 @@ static void gc_allocate_ptes()
 }
 
 
-/* alloc(..) is the external interface for memory allocation. It
- * allocates to generation 0. It is not called from within the garbage
+/* alloc() and alloc_list() are external interfaces for memory allocation.
+ * They allocate to generation 0 and are not called from within the garbage
  * collector as it is only external uses that need the check for heap
  * size (GC trigger) and to disable the interrupts (interrupts are
  * always disabled during a GC).
  *
- * The vops that call alloc(..) assume that the returned space is zero-filled.
+ * The vops that allocate assume that the returned space is zero-filled.
  * (E.g. the most significant word of a 2-word bignum in MOVE-FROM-UNSIGNED.)
  *
  * The check for a GC trigger is only performed when the current
@@ -4127,9 +4127,10 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
             }
         }
     }
-    if (nbytes >= LARGE_OBJECT_SIZE)
+    if (nbytes >= LARGE_OBJECT_SIZE && !(page_type_flag & CONS_PAGE_FLAG))
         new_obj = gc_alloc_large(nbytes, page_type_flag, region);
     else {
+        page_type_flag &= ~CONS_PAGE_FLAG;
         ensure_region_closed(region, page_type_flag);
         gc_alloc_new_region(nbytes, page_type_flag, region);
         new_obj = region->free_pointer;
@@ -4163,32 +4164,31 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
     return (new_obj);
 }
 
-lispobj AMD64_SYSV_ABI *
-alloc(sword_t nbytes)
-{
-    struct thread *self = arch_os_get_current_thread();
-#ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
-    int was_pseudo_atomic = get_pseudo_atomic_atomic(self);
-    if (!was_pseudo_atomic)
-        set_pseudo_atomic_atomic(self);
-#else
-    gc_assert(get_pseudo_atomic_atomic(self));
-#endif
-
 #ifdef LISP_FEATURE_SB_THREAD
-    struct alloc_region *region = &self->alloc_region;
+# define MY_REGION &self->alloc_region
 #else
-    struct alloc_region *region = SINGLE_THREAD_BOXED_REGION;
+# define MY_REGION SINGLE_THREAD_BOXED_REGION
 #endif
-    lispobj *result = lisp_alloc(region, nbytes, BOXED_PAGE_FLAG, self);
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
-    if (!was_pseudo_atomic)
-        clear_pseudo_atomic_atomic(self);
+# define DEFINE_LISP_ENTRYPOINT(name, page_type) \
+   lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
+    struct thread *self = arch_os_get_current_thread(); \
+    int was_pseudo_atomic = get_pseudo_atomic_atomic(self); \
+    if (!was_pseudo_atomic) set_pseudo_atomic_atomic(self); \
+    lispobj *result = lisp_alloc(MY_REGION, nbytes, page_type, self); \
+    if (!was_pseudo_atomic) clear_pseudo_atomic_atomic(self); \
+    return result; \
+   }
+#else
+# define DEFINE_LISP_ENTRYPOINT(name, page_type) \
+   lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
+    struct thread *self = arch_os_get_current_thread(); \
+    return lisp_alloc(MY_REGION, nbytes, page_type, self); \
+   }
 #endif
-
-    return result;
-}
+DEFINE_LISP_ENTRYPOINT(alloc, BOXED_PAGE_FLAG)
+DEFINE_LISP_ENTRYPOINT(alloc_list, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
 
 /*
  * shared support for the OS-dependent signal handlers which

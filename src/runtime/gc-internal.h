@@ -83,6 +83,17 @@ extern struct weak_pointer *weak_pointer_chain; /* in gc-common.c */
 /* Note: MAP-ALLOCATED-OBJECTS expects this value to be 1 */
 #define BOXED_PAGE_FLAG       1
 #define UNBOXED_PAGE_FLAG     2
+/* CONS_PAGE_FLAG doesn't get stored in the page table, though I am considering
+ * doing that. If conses went on segregated pages, then testing for a valid
+ * conservative root on a cons page is as simple as seeing whether the address
+ * is correctly aligned and lowtagged.
+ * Also, we could reserve bytes at the end of each page to act as a mark bitmap
+ * which is useful since conses are headerless objects, and one GC strategy
+ * demands mark bitmaps which are currently placed in a side table.
+ * That would unfortunately complicate the task of allocating a huge list,
+ * because hitting the line of demarcation between conses and the mark bits would
+ * require chaining the final cons to another page of conses and so on. */
+#define CONS_PAGE_FLAG        4
 #define OPEN_REGION_PAGE_FLAG 8
 #define CODE_PAGE_TYPE        (BOXED_PAGE_FLAG|UNBOXED_PAGE_FLAG)
 
