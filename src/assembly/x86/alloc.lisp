@@ -23,7 +23,7 @@
 ;;;;
 ;;;; ALLOC factors out the logic of calling alloc(): stack alignment, etc.
 #+sb-assembling
-(macrolet ((alloc (size)
+(macrolet ((alloc (reg size)
              `(progn
                 (inst push ebp-tn)
                 (inst mov ebp-tn esp-tn)
@@ -32,7 +32,9 @@
                 (inst mov (make-ea :dword :base esp-tn) ,size)
                 (inst call (make-fixup "alloc" :foreign))
                 (inst mov esp-tn ebp-tn)
-                (inst pop ebp-tn)))
+                (inst pop ebp-tn)
+                ,@(unless (eq reg 'eax-tn)
+                    `((inst mov ,reg eax-tn)))))
            (preserving ((r1 r2 &optional r3) &body body)
              `(progn (inst push ,r1) (inst push ,r2)
                      ,@(when r3 `((inst push ,r3)))
@@ -40,23 +42,36 @@
                      ,@(when r3 `((inst pop ,r3)))
                      (inst pop ,r2) (inst pop ,r1)))
            (alloc-to-reg (reg size)
+             (let ((size-calc
+                     (unless size
+                       (setq size reg)
+                       #+win32 ; use edx-tn as a scratch reg unless REG is edx, then use ecx-tn
+                       (let ((scratch-tn (if (eq reg 'edx-tn) 'ecx-tn 'edx-tn)))
+                         `((inst mov ,scratch-tn
+                                 (make-ea :dword :disp +win32-tib-arbitrary-field-offset+)
+                                 :fs)
+                           (inst sub ,reg (make-ea :dword :disp (ash thread-alloc-region-slot 2)
+                                                          :base  scratch-tn))))
+                       #-win32
+                       `(#+sb-thread (inst sub ,reg
+                                           (make-ea :dword :disp (ash thread-alloc-region-slot 2))
+                                           :fs)
+                         #-sb-thread (inst sub ,reg
+                                           (make-ea :dword :disp (+ 8 static-space-start)))))))
              (case reg
-               (eax-tn
-                `(preserving (ecx-tn edx-tn) (alloc ,size)))
-               (ecx-tn
-                `(preserving (eax-tn edx-tn)
-                   (alloc ,size)
-                   (inst mov ecx-tn eax-tn))) ; result to destination
-               (edx-tn
-                `(preserving (eax-tn ecx-tn)
-                   (alloc ,size)
-                   (inst mov edx-tn eax-tn))) ; result to destination
-               (t
-                `(preserving (eax-tn ecx-tn edx-tn)
-                   (alloc ,size)
-                   (inst mov ,reg eax-tn)))))
+               (eax-tn `(preserving (ecx-tn edx-tn) ,@size-calc (alloc eax-tn ,size)))
+               (ecx-tn `(preserving (eax-tn edx-tn) ,@size-calc (alloc ecx-tn ,size)))
+               (edx-tn `(preserving (eax-tn ecx-tn) ,@size-calc (alloc edx-tn ,size)))
+               (t      `(preserving (eax-tn ecx-tn edx-tn)
+                          ,@size-calc
+                          (alloc ,reg ,size))))))
            (def-allocators (tn &aux (reg (subseq (string tn) 0 3)))
              `(progn
+                (define-assembly-routine (,(symbolicate "ALLOC-OVERFLOW-" reg)) ()
+                  (alloc-to-reg ,tn nil))
+                ;; FIXME: having decided (based on policy) not to use the inline allocator
+                ;; in Lisp, why does the assembly code not try to inline it?
+                ;; There's no reason to call into C for everything. This is horrible.
                 (define-assembly-routine (,(symbolicate "ALLOC-TO-" reg)) ()
                   (alloc-to-reg ,tn ,tn))
                 (define-assembly-routine (,(symbolicate "ALLOC-8-TO-" reg)) ()

@@ -2936,10 +2936,6 @@ core and return a descriptor to it."
             (setf prev-priority priority))
           (when (minusp value)
             (error "stub: negative values unsupported"))
-          ;; KLUDGE: x86 system assembler can not parse "U" on an integer constant.
-          ;; It makes no difference for STATIC_SPACE_START, so just remove the suffix.
-          ;; See comment in src/runtime/x86-assem.S about how to fix this.
-          #+x86 (when (string= name "STATIC_SPACE_START") (setq suffix ""))
           (format t "#define ~A ~A~A /* 0x~X ~@[ -- ~A ~]*/~%" name value suffix value doc))))
     (terpri))
 
