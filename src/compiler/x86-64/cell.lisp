@@ -767,7 +767,7 @@
                      (- instance-pointer-lowtag))
                   object index (ash 1 (- word-shift n-fixnum-tag-bits)))))))
   (macrolet
-      ((def (suffix result-sc result-type inst &optional (inst/c inst))
+      ((def (suffix result-sc result-type inst &optional (inst/c (list 'quote inst)))
          `(progn
             (define-vop (,(symbolicate "RAW-INSTANCE-REF/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-REF/" suffix))
@@ -791,7 +791,7 @@
               (:results (value :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 4
-                (inst ,inst/c value (instance-slot-ea object index))))
+                (inst* ,inst/c value (instance-slot-ea object index))))
             (define-vop (,(symbolicate "RAW-INSTANCE-SET/" suffix))
               (:translate ,(symbolicate "%RAW-INSTANCE-SET/" suffix))
               (:policy :fast-safe)
@@ -817,7 +817,7 @@
               (:results (result :scs (,result-sc)))
               (:result-types ,result-type)
               (:generator 4
-                (inst ,inst/c (instance-slot-ea object index) value)
+                (inst* ,inst/c (instance-slot-ea object index) value)
                 (move result value)))
             (define-vop (,(symbolicate "RAW-INSTANCE-INIT/" suffix))
               (:args (object :scs (descriptor-reg))
@@ -825,7 +825,7 @@
               (:arg-types * ,result-type)
               (:info index)
               (:generator 4
-                (inst ,inst/c (instance-slot-ea object index) value))))))
+                (inst* ,inst/c (instance-slot-ea object index) value))))))
     (def word unsigned-reg unsigned-num mov)
     (def signed-word signed-reg signed-num mov)
     (def single single-reg single-float movss)

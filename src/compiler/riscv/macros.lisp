@@ -60,7 +60,7 @@
                   (t 'sw))))
     (inst lui temp fixup)
     (inst #-64-bit lw #+64-bit ld temp temp fixup)
-    (inst #| silly INST macro |# (progn op) src temp 0)))
+    (inst* op src temp 0)))
 
 (defmacro load-type (target source &optional (offset 0))
   "Loads the type bits of a pointer into target independent of

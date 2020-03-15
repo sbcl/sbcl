@@ -42,4 +42,4 @@
 (define-vop (mark-covered)
   (:info path)
   (:generator 0
-    (sb-assem::%inst 'sb-assem:.coverage-mark path)))
+    (sb-assem:inst* 'sb-assem:.coverage-mark path)))

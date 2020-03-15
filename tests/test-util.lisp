@@ -885,7 +885,7 @@
                    (setq label (sb-assem:gen-label))
                    (rplaca cell label)))
                inst)
-         (apply #'sb-assem::%inst (car inst) (cdr inst)))
+         (apply #'sb-assem:inst* (car inst) (cdr inst)))
        (when label
          (sb-assem::%emit-label segment nil label)))
     (sb-assem:segment-buffer

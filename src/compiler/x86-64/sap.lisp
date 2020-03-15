@@ -171,7 +171,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
     ;; Must not clobber TEMP-REG-TN with the load.
     (aver (not (location= temp-reg-tn result)))
     (inst lea temp-reg-tn ea)
-    (sb-assem::%inst insn modifier result (ea temp-reg-tn))
+    (sb-assem:inst* insn modifier result (ea temp-reg-tn))
     (inst xor temp-reg-tn (thread-slot-ea thread-msan-xor-constant-slot))
     ;; Per the documentation, shadow is tested _after_
     (let ((mask (sb-c::masked-memory-load-p vop))
@@ -201,7 +201,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
         (inst byte (logior (ash (tn-offset result) 2) scale)))
       (emit-label good)))
    (t
-    (sb-assem::%inst insn modifier result ea))))
+    (sb-assem::inst* insn modifier result ea))))
 
 (defun emit-sap-set (size ea value result)
   #+linux

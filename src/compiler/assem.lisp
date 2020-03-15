@@ -1528,14 +1528,10 @@
 
 (defmacro inst (&whole whole mnemonic &rest args)
   "Emit the specified instruction to the current segment."
-  ;;; The test for stringablep is a bit suspicious - if you use a lexical var X
-  ;;; as a computed mnemonic, it should be spelled (INST (PROGN X) ...) I suppose.
-  (let* ((stringablep (typep mnemonic '(or symbol string character)))
-         (sym (and stringablep
-                   (find-symbol (string mnemonic) *backend-instruction-set-package*)))
+  (let* ((sym (find-symbol (string mnemonic) *backend-instruction-set-package*))
          (definedp (nth-value 1 (gethash sym *inst-encoder*))))
-    (cond ((and stringablep (not definedp))
-           ;; %INST can not execute random forms, so MNEMONIC must be a literal to be
+    (cond ((not definedp)
+           ;; INST* can not execute random forms, so MNEMONIC must be a literal to be
            ;; recognized as a macro instruction. It's basically a lisp macro that can
            ;; coexist with other identically-named lisp macros or functions.
            ;; For example, arm64 has {ASR, LSR} as DEFUNs and macro instructions.
@@ -1549,9 +1545,7 @@
            (warn "Undefined instruction: ~s in~% ~s" mnemonic whole)
            `(error "Undefined instruction: ~s in~% ~s" ',mnemonic ',whole))
           (t
-           ;; x86-64 uses computed mnemonics in RAW-INSTANCE-INIT/COMPLEX-DOUBLE
-           ;; and EMIT-SAP-REF.
-           `(%inst ,(if sym `',sym mnemonic) ,@args)))))
+           `(inst* ',sym ,@args)))))
 
 ;;; Place INST in the current assembly section (or sometimes SEGMENT)
 ;;; based on *CURRENT-DESTINATION*. The latter occurs in two scenarios:
@@ -1564,7 +1558,7 @@
 ;;;     but not its front-end. This could be changed, but it's not wrong.
 ;;; As such, we must detect that we are emitting directly to machine code.
 ;;;
-(defun %inst (mnemonic &rest operands)
+(defun inst* (mnemonic &rest operands)
   (declare (symbol mnemonic))
   (let ((action (gethash mnemonic *inst-encoder*))
         (dest *current-destination*))

@@ -350,27 +350,26 @@
   (when (integerp x) (setq x (constantize x)))
   (when (integerp y) (setq y (constantize y)))
 
-  (macrolet ((op () 'op)) ; shield OP from being treated as literal by INST macro
-    (let* ((y-is-reg-or-imm32 (or (gpr-tn-p y) (typep y '(signed-byte 32))))
-           (commutative (eq op 'add)))
+  (let* ((y-is-reg-or-imm32 (or (gpr-tn-p y) (typep y '(signed-byte 32))))
+         (commutative (eq op 'add)))
       (when (alias-p result x)
         (cond ((eql y -1) (inst dec x))
               ((eql y +1) (inst inc x))
               ((or (gpr-tn-p x) y-is-reg-or-imm32)
                ;; At most one memory operand. Result could be memory or register.
-               (inst (op) x y))
+               (inst* op x y))
               (t ; two memory operands: X is not a GPR, Y is neither GPR nor immm
                (inst mov temp-reg-tn y)
-               (inst (op) x temp-reg-tn)))
+               (inst* op x temp-reg-tn)))
         (return-from emit-inline-add-sub))
       (when (and (alias-p result y) commutative)
         ;; Result in the same location as Y can happen because we no longer specify
         ;; that RESULT is live from (:ARGUMENT 0).
         (cond ((or (gpr-tn-p x) (gpr-tn-p y))
-               (inst (op) y x))
+               (inst* op y x))
               (t
                (inst mov temp-reg-tn x)
-               (inst (op) y temp-reg-tn)))
+               (inst* op y temp-reg-tn)))
         (return-from emit-inline-add-sub))
       (let ((reg (if (and (gpr-tn-p result)
                           ;; If Y aliases RESULT in SUB, then an initial (move reg x)
@@ -386,8 +385,8 @@
                ;; If non-commutative, then RESULT could be Y, in which case REG is
                ;; TEMP-REG-TN so that we don't trash Y by moving X into it.
                (inst mov reg x)
-               (inst (op) reg y)))
-        (move result reg)))))
+               (inst* op reg y)))
+        (move result reg))))
 
 ;;; FIXME: we shouldn't need 12 variants, plus the modular variants, for what should
 ;;; be 1 vop. Certainly + and - can be done by one vop which examines lvar-fun-name.
