@@ -431,6 +431,9 @@
           (let ((nbytes (cdr (assoc '$nbytes bindings)))
                 (header (cdr (assoc '$header bindings)))
                 (lowtag (cdr (assoc '$lowtag bindings))))
+            ;; The low bit might signify something to the allocator. Clear it.
+            (when (integerp nbytes)
+              (setq nbytes (logandc2 nbytes 1)))
             ;; matchp converts NIL in a machine-ea to 0.  The disassembler uses
             ;; NIL to signify that there was no displacement, which makes sense
             ;; when register indirect mode is used without a SIB byte.

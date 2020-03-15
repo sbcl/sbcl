@@ -57,30 +57,49 @@
                 (used-p (sb-c::ir2-component-normal-tns comp))
                 (used-p (sb-c::ir2-component-wired-tns comp))))))))
 
+;;; Call an allocator trampoline and get the result in the proper register.
+;;; There are 2x2x2 choices of trampoline:
+;;;  - invoke alloc() or alloc_list() in C
+;;;  - place result into R11, or leave it on the stack
+;;;  - preserve YMM registers around the call, or don't
+;;; Rather than have 8 different DEFINE-ASSEMBLY-ROUTINEs, there are only 4,
+;;; and each has 2 entry points. The earlier entry adds 1 more instruction
+;;; to set the non-cons bit (the first of the binary choices mentioned above).
+;;; Most of the time, the inline allocation sequence wants to use the trampoline
+;;; that returns a result in TEMP-REG-TN (R11) which saves one move and
+;;; clears the size argument from the stack in the RET instruction.
+;;; If the result is returned on the stack, then we pop it below.
 (defun %alloc-tramp (type node result-tn size lowtag)
-  (declare (ignore type))
-  (cond ((typep size '(and integer (not (signed-byte 32))))
-         ;; MOV accepts large immediate operands, PUSH does not
-         (inst mov result-tn size)
-         (inst push result-tn))
-        (t
-         (inst push size)))
-  ;; This really would be better if it recognized TEMP-REG-TN as the "good" case
-  ;; rather than specializing on R11, which just happens to be the temp reg.
-  ;; But the assembly routine is hand-written, not generated, and it has to match,
-  ;; so there's not much that can be done to generalize it.
-  (let ((to-r11 (location= result-tn r11-tn)))
-    (invoke-asm-routine 'call (cond
-                                #+avx2
-                                ((avx-registers-used-p)
-                                 (if to-r11 'alloc-tramp-r11-avx2 'alloc-tramp-avx2))
-                                (t
-                                 (if to-r11 'alloc-tramp-r11 'alloc-tramp))) node)
+  (let ((consp (eq type 'list))
+        (to-r11 (location= result-tn r11-tn)))
+    (when (typep size 'integer)
+      (aver (= (align-up size (* 2 n-word-bytes)) size))
+      (when (neq type 'list)
+        (incf size) ; the low bit means we're allocating a non-cons object
+        ;; Jump into the cons entry point which saves one instruction because why not.
+        (setq consp t)))
+    (cond ((typep size '(and integer (not (signed-byte 32))))
+           ;; MOV accepts large immediate operands, PUSH does not
+           (inst mov result-tn size)
+           (inst push result-tn))
+          (t
+           (inst push size)))
+    (invoke-asm-routine
+     'call
+     (cond #+avx2
+           ((avx-registers-used-p)
+            (if to-r11
+                (if consp 'cons->r11.avx2 'alloc->r11.avx2)
+                (if consp 'cons->rnn.avx2 'alloc->rnn.avx2)))
+           (t
+            (if to-r11
+                (if consp 'cons->r11 'alloc->r11)
+                (if consp 'cons->rnn 'alloc->rnn))))
+     node)
     (unless to-r11
       (inst pop result-tn)))
   (unless (eql lowtag 0)
-    (inst or :byte result-tn lowtag))
-  (values))
+    (inst or :byte result-tn lowtag)))
 
 ;;; Insert allocation profiler instrumentation
 (defun instrument-alloc (size node)

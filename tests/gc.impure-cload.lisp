@@ -218,3 +218,30 @@
     ;; This GC would fail in the verify step because it trashes the apparently
     ;; orphaned layout, which actually does have a referer.
     (gc)))
+
+(defun foo (&rest params)
+  (if params
+      (assert (every #'null params))))
+
+(defvar *x* (make-list 10000))
+
+(defun try-very-large-rest-lists ()
+  (let ((threads
+          (loop repeat 8
+                collect
+                (sb-thread:make-thread
+                 (lambda ()
+                   (let ((stop-at (+ (get-internal-real-time)
+                                     ;; run for 1/2rd of a second
+                                     (/ internal-time-units-per-second 2))))
+                     (loop
+                       (apply #'foo *x*)
+                       (gc)
+                       (when (> (get-internal-real-time) stop-at)
+                         (return (return))))))))))
+    (dolist (thread threads)
+      (sb-thread:join-thread thread))))
+
+(with-test (:name :no-conses-on-large-object-pages
+            :skipped-on (:not (:and :sb-thread :x86-64))) ; for now
+  (try-very-large-rest-lists))

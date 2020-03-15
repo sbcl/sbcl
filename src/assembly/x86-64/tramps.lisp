@@ -42,31 +42,55 @@
        (inst mov rsp-tn rbp-tn)
        (inst pop rbp-tn)))))
 
-(define-assembly-routine (alloc-tramp) ()
+;;; It is arbitrary whether each of the next 4 routines is named ALLOC-something,
+;;; exporting an additional entry named CONS-something, versus being named CONS-something
+;;; and exporting ALLOC-something.  It just depends on which of those you would like
+;;; to have to set and clear the low bit to match ALLOC-DISPATCH.
+;;; Think of "cons" as meaning the generic sense of "consing", not as actually
+;;; allocating conses, because fixed-sized non-cons object allocation may enter
+;;; through the cons entry point. Cons cells *must* use that entry point.
+(define-assembly-routine (alloc->rnn (:export cons->rnn)) ()
+  (inst or :byte (ea 8 rsp-tn) 1)
+  CONS->RNN
   (with-registers-preserved (xmm)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup "alloc" :foreign))
+    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (alloc-tramp-avx2) ()
+(define-assembly-routine (alloc->rnn.avx2 (:export cons->rnn.avx2)) ()
+  (inst or :byte (ea 8 rsp-tn) 1)
+  CONS->RNN.AVX2
   (with-registers-preserved (ymm)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup "alloc" :foreign))
+    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-(define-assembly-routine (alloc-tramp-r11 (:return-style :none)) ()
+(define-assembly-routine (alloc->r11 (:export cons->r11) (:return-style :none)) ()
+  (inst or :byte (ea 8 rsp-tn) 1)
+  CONS->R11
   (with-registers-preserved (xmm :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup "alloc" :foreign))
+    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov r11-tn rax-tn))
   (inst ret 8)) ; pop argument
 
-(define-assembly-routine (alloc-tramp-r11-avx2 (:return-style :none)) ()
+(define-assembly-routine (alloc->r11.avx2 (:export cons->r11.avx2) (:return-style :none)) ()
+  (inst or :byte (ea 8 rsp-tn) 1)
+  CONS->R11.AVX2
   (with-registers-preserved (ymm :except r11-tn)
     (inst mov rdi-tn (ea 16 rbp-tn))
-    (inst call (make-fixup "alloc" :foreign))
+    (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov r11-tn rax-tn))
   (inst ret 8)) ; pop argument
+
+(define-assembly-routine (alloc-dispatch (:return-style :none)) ()
+  ;; If RDI has a 0 in the low bit, then we're allocating cons cells.
+  ;; A 1 bit signifies anything other than cons cells, and is equivalent
+  ;; to "could this object consume large-object pages" in gencgc.
+  (inst test :byte rdi-tn 1)
+  (inst jmp :z (make-fixup "alloc_list" :foreign))
+  (inst xor :byte rdi-tn 1) ; clear the bit
+  (inst jmp  (make-fixup "alloc" :foreign)))
 
 ;;; There's no layout allocator preserving YMM regs because MAKE-LAYOUT entails a full call.
 #+immobile-space

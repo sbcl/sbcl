@@ -1300,7 +1300,6 @@
       (unless stack-allocate-p
         (instrument-alloc dst node))
       (pseudo-atomic (:elide-if stack-allocate-p)
-       ;; TODO: ALLOCATION needs not to ignore the CONSP argument
        (allocation 'list dst list-pointer-lowtag node stack-allocate-p dst)
        ;; Set up the result.
        (move result dst)
