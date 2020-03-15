@@ -5,100 +5,88 @@
 
 (in-package "SB-VM")
 
-(macrolet
-    ((def ((name c-name pseudo-atomic &key do-not-preserve (stack-delta 0))
-           move-arg
-           move-result
-           &optional
-           (float-move 'movaps)
-           (float-size 16)
-           (float-sc 'single-reg))
-       `(define-assembly-routine
-            (,name (:return-style :none))
-            ()
-          (macrolet ((map-registers (op)
-                       (let ((registers (set-difference
-                                         '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn
-                                           r8-tn r9-tn r10-tn r11-tn)
-                                         ',do-not-preserve)))
-                         ;; Preserve alignment
-                         (when (oddp (length registers))
-                           (push (car registers) registers))
-                         `(progn
-                            ,@(loop for reg in (if (eq op 'pop)
-                                                   (reverse registers)
-                                                   registers)
-                                    collect
-                                    `(inst ,op ,reg)))))
-                     (map-floats (op)
-                       `(progn
-                          ,@(loop for i by ,float-size
-                                  for offset below 16
-                                  for float = (make-random-tn :kind :normal
-                                                              :sc (sc-or-lose ',float-sc)
-                                                              :offset offset)
-                                  collect
-                                  (if (eql op 'pop)
-                                      `(inst ,',float-move ,float (ea ,i rsp-tn))
-                                      `(inst ,',float-move (ea ,i rsp-tn) ,float))))))
-            (inst push rbp-tn)
-            (inst mov rbp-tn rsp-tn)
-            (inst and rsp-tn (- ,float-size))
-            (inst sub rsp-tn (* 16 ,float-size))
-            (map-floats push)
-            (map-registers push)
-            ,@move-arg
-            (pseudo-atomic (:elide-if (not ,pseudo-atomic))
-              ;; asm routines can always call foreign code with a relative operand
-              (inst call (make-fixup ,c-name :foreign)))
-            ,@move-result
-            (map-registers pop)
-            (map-floats pop)
-            (inst mov rsp-tn rbp-tn)
-            (inst pop rbp-tn)
-            (inst ret ,stack-delta)))))
+(defun gpr-save/restore (operation &key except)
+  (declare (type (member push pop) operation))
+  (let ((registers '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn)))
+    (when except
+      (setf registers (remove except registers)))
+    ;; Preserve alignment
+    (when (oddp (length registers))
+      (push (car registers) registers))
+    (dolist (reg (if (eq operation 'pop) (reverse registers) registers))
+      (inst* operation (symbol-value reg)))))
 
-  (def (alloc-tramp "alloc" nil)
-    ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
-    ((inst mov (ea 16 rbp-tn) rax-tn))) ; result
+(defmacro with-registers-preserved ((fpr-size &key except) &body body)
+  (multiple-value-bind (mnemonic fpr-align getter)
+      (ecase fpr-size
+        (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
+        (ymm (values 'vmovaps 32 'sb-x86-64-asm::get-avx2)))
+    (flet ((fpr-save/restore (operation)
+             (loop for regno below 16
+                   collect
+                   (ecase operation
+                     (push
+                      `(inst ,mnemonic (ea ,(* regno fpr-align) rsp-tn) (,getter ,regno)))
+                     (pop
+                      `(inst ,mnemonic (,getter ,regno) (ea ,(* regno fpr-align) rsp-tn)))))))
+    `(progn
+       (inst push rbp-tn)
+       (inst mov rbp-tn rsp-tn)
+       (inst and rsp-tn ,(- fpr-align))
+       (inst sub rsp-tn ,(* 16 fpr-align))
+       ,@(fpr-save/restore 'push)
+       (gpr-save/restore 'push :except ',except)
+       ,@body
+       (gpr-save/restore 'pop :except ',except)
+       ,@(fpr-save/restore 'pop)
+       (inst mov rsp-tn rbp-tn)
+       (inst pop rbp-tn)))))
 
-  (def (alloc-tramp-r11 "alloc" nil
-                        :do-not-preserve (r11-tn)
-                        :stack-delta 8) ;; remove the size parameter
-    ((inst mov rdi-tn (ea 16 rbp-tn))) ; arg
-    ((inst mov r11-tn rax-tn))) ; result
+(define-assembly-routine (alloc-tramp) ()
+  (with-registers-preserved (xmm)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-  #+avx2
-  (progn
-    (def (alloc-tramp-avx2 "alloc" nil)
-        ((inst mov rdi-tn (ea 16 rbp-tn)))
-      ((inst mov (ea 16 rbp-tn) rax-tn))
-      vmovaps
-      32
-      avx2-reg)
-    (def (alloc-tramp-r11-avx2 "alloc" nil
-                               :do-not-preserve (r11-tn)
-                               :stack-delta 8) ;; remove the size parameter
-        ((inst mov rdi-tn (ea 16 rbp-tn)))     ; arg
-      ((inst mov r11-tn rax-tn))
-        vmovaps
-        32
-        avx2-reg))
+(define-assembly-routine (alloc-tramp-avx2) ()
+  (with-registers-preserved (ymm)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc" :foreign))
+    (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
-  #+immobile-space
-  (def (alloc-layout "alloc_layout" nil :do-not-preserve (r11-tn))
-    () ; no arg
-    ((inst mov r11-tn rax-tn))) ; result
+(define-assembly-routine (alloc-tramp-r11 (:return-style :none)) ()
+  (with-registers-preserved (xmm :except r11-tn)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc" :foreign))
+    (inst mov r11-tn rax-tn))
+  (inst ret 8)) ; pop argument
 
-  ;; These routines are for the deterministic allocation profiler.
-  ;; The C support routine's argument is the return PC
-  (def (enable-alloc-counter "allocation_tracker_counted" t)
-    ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
-    ()) ; result
+(define-assembly-routine (alloc-tramp-r11-avx2 (:return-style :none)) ()
+  (with-registers-preserved (ymm :except r11-tn)
+    (inst mov rdi-tn (ea 16 rbp-tn))
+    (inst call (make-fixup "alloc" :foreign))
+    (inst mov r11-tn rax-tn))
+  (inst ret 8)) ; pop argument
 
-  (def (enable-sized-alloc-counter "allocation_tracker_sized" t)
-    ((inst lea rdi-tn (ea 8 rbp-tn))) ; arg
-    ())) ; result
+;;; There's no layout allocator preserving YMM regs because MAKE-LAYOUT entails a full call.
+#+immobile-space
+(define-assembly-routine (alloc-layout) ()
+  (with-registers-preserved (xmm :except r11-tn)
+    (inst call (make-fixup "alloc_layout" :foreign))
+    (inst mov r11-tn rax-tn)))
+
+;;; These routines are for the deterministic consing profiler.
+;;; The C support routine's argument is the return PC.
+;;; FIXME: we're missing routines that preserve YMM. I guess nobody cares.
+(define-assembly-routine (enable-alloc-counter) ()
+  (with-registers-preserved (xmm)
+    (inst lea rdi-tn (ea 8 rbp-tn))
+    (pseudo-atomic () (inst call (make-fixup "allocation_tracker_counted" :foreign)))))
+
+(define-assembly-routine (enable-sized-alloc-counter) ()
+  (with-registers-preserved (xmm)
+    (inst lea rdi-tn (ea 8 rbp-tn))
+    (pseudo-atomic () (inst call (make-fixup "allocation_tracker_sized" :foreign)))))
 
 (define-assembly-routine (undefined-tramp (:return-style :none))
     ((:temp rax descriptor-reg rax-offset))
