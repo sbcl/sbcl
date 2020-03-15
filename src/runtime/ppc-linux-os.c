@@ -39,8 +39,6 @@
 #include "validate.h"
 #include "ppc-linux-mcontext.h"
 
-size_t os_vm_page_size;
-
 int arch_os_thread_init(struct thread *thread) {
 #if defined(LISP_FEATURE_SB_THREAD)
     pthread_setspecific(specials,thread);

@@ -64,8 +64,6 @@ int personality (unsigned long);
 #include <sys/personality.h>
 #endif
 
-size_t os_vm_page_size;
-
 #if defined(LISP_FEATURE_SB_THREAD) && defined(LISP_FEATURE_SB_FUTEX) && !defined(LISP_FEATURE_SB_PTHREAD_FUTEX)
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -224,12 +222,6 @@ void os_init(char __attribute__((unused)) *argv[],
             "LD_ASSUME_KERNEL");
     }
 #endif
-
-    /* Don't use getpagesize(), since it's not constant across Linux
-     * kernel versions on some architectures (for example PPC). FIXME:
-     * possibly the same should be done on other architectures too.
-     */
-    os_vm_page_size = BACKEND_PAGE_BYTES;
 
 #ifdef LISP_FEATURE_X86
     /* Use SSE detector.  Recent versions of Linux enable SSE support

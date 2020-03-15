@@ -51,7 +51,6 @@ static inline int set_thread_area(struct user_desc *u_info)
 }
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;

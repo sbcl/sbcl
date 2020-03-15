@@ -49,7 +49,6 @@
 #include "thread.h"             /* dynamic_values_bytes */
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread) {
     stack_t sigstack;

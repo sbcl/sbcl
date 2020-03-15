@@ -32,6 +32,15 @@
 # include <dlfcn.h>
 #endif
 
+/*
+ * historically, this used sysconf to select the runtime page size
+ * per recent changes on other arches and discussion on sbcl-devel,
+ * however, this is not necessary -- the VM page size need not match
+ * the OS page size (and the default backend page size has been
+ * ramped up accordingly for efficiency reasons).
+*/
+os_vm_size_t os_vm_page_size = BACKEND_PAGE_BYTES;
+
 /* Expose to Lisp the value of the preprocessor define. Don't touch! */
 int install_sig_memory_fault_handler = INSTALL_SIG_MEMORY_FAULT_HANDLER;
 

@@ -6,8 +6,6 @@
 #include <image.h>
 #include <stdio.h>
 
-size_t os_vm_page_size;
-
 os_vm_address_t
 os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
 {
@@ -65,7 +63,6 @@ char *os_get_runtime_executable_path(int __attribute__((unused)) external)
 void
 os_init(char __attribute__((unused)) *argv[], char __attribute__((unused)) *envp[])
 {
-    os_vm_page_size = BACKEND_PAGE_BYTES;
 }
 
 static void

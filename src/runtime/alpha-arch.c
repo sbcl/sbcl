@@ -31,7 +31,6 @@
 
 extern char call_into_lisp_LRA[], call_into_lisp_end[];
 
-extern size_t os_vm_page_size;
 #define BREAKPOINT_INST 0x80
 
 

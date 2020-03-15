@@ -65,8 +65,6 @@
 #define WITH_GC_AT_SAFEPOINTS_ONLY() if (0) ; else
 #endif
 
-os_vm_size_t os_vm_page_size;
-
 #include "gc.h"
 #include "gencgc-internal.h"
 #include <wincrypt.h>

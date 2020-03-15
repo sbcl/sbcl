@@ -39,7 +39,6 @@
 #include "align.h"
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 int arch_os_thread_init(struct thread *thread)
 {

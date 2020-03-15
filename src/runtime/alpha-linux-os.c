@@ -37,7 +37,6 @@
 #include <asm/fpu.h>
 
 #include "validate.h"
-size_t os_vm_page_size;
 
 #ifdef LISP_FEATURE_SB_THREAD
 #error "Define threading support functions"

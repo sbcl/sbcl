@@ -26,8 +26,6 @@
 
 #define CAUSEF_BD (1 << 31)
 
-size_t os_vm_page_size;
-
 int
 arch_os_thread_init(struct thread *thread)
 {

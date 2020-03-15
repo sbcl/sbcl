@@ -49,7 +49,6 @@
 #endif
 
 
-os_vm_size_t os_vm_page_size;
 
 #ifdef __NetBSD__
 #include <sys/resource.h>
@@ -93,8 +92,6 @@ static void openbsd_init();
 void
 os_init(char *argv[], char *envp[])
 {
-    os_vm_page_size = BACKEND_PAGE_BYTES;
-
 #ifdef __NetBSD__
     netbsd_init();
 #elif defined(LISP_FEATURE_FREEBSD)

@@ -32,19 +32,9 @@
 # include <errno.h>
 #endif
 
-os_vm_size_t os_vm_page_size=0;
-
 void
 os_init(char *argv[], char *envp[])
 {
-    /*
-     * historically, this used sysconf to select the runtime page size
-     * per recent changes on other arches and discussion on sbcl-devel,
-     * however, this is not necessary -- the VM page size need not match
-     * the OS page size (and the default backend page size has been
-     * ramped up accordingly for efficiency reasons).
-     */
-    os_vm_page_size = BACKEND_PAGE_BYTES;
 }
 
 os_vm_address_t os_validate(int attributes, os_vm_address_t addr, os_vm_size_t len)
