@@ -188,10 +188,23 @@ output_space(FILE *file, int id, lispobj *addr, lispobj *end,
 
     bytes = words * sizeof(lispobj);
 
+#ifdef LISP_FEATURE_CHENEYGC
+    /* KLUDGE: cheneygc can not restart a saved core if the dynamic space is empty,
+     * because coreparse would never get to make the second semispace. That GC is such
+     * a total piece of garbage that I don't care to fix, but yet it shouldn't be in
+     * such bad shape that saved cores don't work. This seems to do the trick. */
+    if (id == DYNAMIC_CORE_SPACE_ID && bytes == 0) bytes = 2*N_WORD_BYTES;
+#endif
+
     if (!lisp_startup_options.noinform)
         printf("writing %lu bytes from the %s space at %p\n",
                (long unsigned)bytes, names[id], addr);
 
+    /* FIXME: it sure would be nice to discover and document the behavior of this function
+     * with regard to aligning up the byte count as pertains to bytes spanned by a rounded
+     * up count that were not zeroized and would not have been written had we not rounded.
+     * That seems quite bogus to operate on bytes that the caller didn't promise were OK
+     * to be saved out (and didn't contain, say, a password and social security number) */
     data = write_bytes(file, (char *)addr, ALIGN_UP(bytes, os_vm_page_size),
                        file_offset, core_compression_level);
 
