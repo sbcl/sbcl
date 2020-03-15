@@ -183,79 +183,64 @@
     (move alloc-tn tmp-tn))
   (inst b back-label))
 
-(defmacro allocation (type size lowtag result-tn
+(defun allocation (type size lowtag result-tn
                       &key flag-tn
                            stack-allocate-p
                            (lip (if stack-allocate-p nil (missing-arg))))
-  (declare (ignore type))
+  (declare (ignore type) (ignorable lip))
   ;; Normal allocation to the heap.
-  (once-only ((result-tn result-tn)
-              (size size)
-              (lowtag lowtag)
-              (flag-tn flag-tn)
-              (stack-allocate-p stack-allocate-p)
-              #+gencgc (lip lip))
-    `(cond (,stack-allocate-p
-            (assemble ()
-              (move ,result-tn csp-tn)
-              (inst tst ,result-tn lowtag-mask)
-              (inst b :eq ALIGNED)
-              (inst add ,result-tn ,result-tn n-word-bytes)
-              ALIGNED
-              (inst add csp-tn ,result-tn (add-sub-immediate ,size))
-              ;; :ne is from TST above, this needs to be done after the
-              ;; stack pointer has been stored.
-              (inst b :eq ALIGNED2)
-              (storew zr-tn ,result-tn -1 0)
-              ALIGNED2
-              (when ,lowtag
-                (inst add ,result-tn ,result-tn ,lowtag))))
-           #-gencgc
-           (t
-            (progn ,lip nil) ; cause supplied expression to be used
-            (load-symbol-value ,flag-tn *allocation-pointer*)
-            (inst add ,result-tn ,flag-tn ,lowtag)
-            (inst add ,flag-tn ,flag-tn (add-sub-immediate ,size))
-            (store-symbol-value ,flag-tn *allocation-pointer*))
-           #+gencgc
-           (t
-            (let ((alloc (gen-label))
-                  (back-from-alloc (gen-label))
-                  size)
-              #-sb-thread
-              (progn
-                (load-immediate-word ,flag-tn static-space-start)
-                (inst ldp ,result-tn ,flag-tn (@ ,flag-tn (* 2 n-word-bytes))))
-              #+sb-thread
-              (inst ldp ,result-tn ,flag-tn (@ thread-tn
-                                               (* n-word-bytes thread-alloc-region-slot)))
-              (setf size (add-sub-immediate ,size))
-              (inst add ,result-tn ,result-tn size)
-              (inst cmp ,result-tn ,flag-tn)
-              (inst b :hi ALLOC)
-              #-sb-thread
-              (inst str ,result-tn (@ null-tn  (- (+ static-space-start (* 2 n-word-bytes))
-                                                  nil-value)))
-              #+sb-thread
-              (storew ,result-tn thread-tn thread-alloc-region-slot)
-
-              ;; alloc_tramp uses tmp-tn for returning the result,
-              ;; save on a move when possible
-              (inst sub (if ,lowtag
-                            tmp-tn
-                            ,result-tn) ,result-tn size)
-
-              (emit-label BACK-FROM-ALLOC)
-              (when ,lowtag
-                (inst add ,result-tn tmp-tn ,lowtag))
-
-              (assemble (:elsewhere)
-                (emit-label ALLOC)
-                (allocation-tramp ,result-tn
-                                  ,size BACK-FROM-ALLOC
-                                  ;; see the comment above aboout alloc_tramp
-                                  (and ,lowtag t)
-                                  ,lip)))))))
+  (if stack-allocate-p
+      (assemble ()
+        (move result-tn csp-tn)
+        (inst tst result-tn lowtag-mask)
+        (inst b :eq ALIGNED)
+        (inst add result-tn result-tn n-word-bytes)
+        ALIGNED
+        (inst add csp-tn result-tn (add-sub-immediate size))
+        ;; :ne is from TST above, this needs to be done after the
+        ;; stack pointer has been stored.
+        (inst b :eq ALIGNED2)
+        (storew zr-tn result-tn -1 0)
+        ALIGNED2
+        (when lowtag
+          (inst add result-tn result-tn lowtag)))
+      #-gencgc
+      (progn
+        (load-symbol-value flag-tn *allocation-pointer*)
+        (inst add result-tn flag-tn lowtag)
+        (inst add flag-tn flag-tn (add-sub-immediate size))
+        (store-symbol-value flag-tn *allocation-pointer*))
+      #+gencgc
+      (let ((alloc (gen-label)) (back-from-alloc (gen-label)))
+        #-sb-thread
+        (progn
+          ;; load-pair can't base off null-tn because the displacement
+          ;; has to be a multiple of 8
+          (load-immediate-word flag-tn static-space-start)
+          (inst ldp result-tn flag-tn (@ flag-tn (* 2 n-word-bytes))))
+        #+sb-thread
+        (inst ldp result-tn flag-tn (@ thread-tn (* n-word-bytes thread-alloc-region-slot)))
+        (setf size (add-sub-immediate size))
+        (inst add result-tn result-tn size)
+        (inst cmp result-tn flag-tn)
+        (inst b :hi ALLOC)
+        #-sb-thread (inst str result-tn (@ null-tn  (- (+ static-space-start (* 2 n-word-bytes))
+                                                       nil-value)))
+        #+sb-thread (storew result-tn thread-tn thread-alloc-region-slot)
+        ;; alloc_tramp uses tmp-tn for returning the result,
+        ;; save on a move when possible
+        (inst sub (if lowtag tmp-tn result-tn) result-tn size)
+        (emit-label BACK-FROM-ALLOC)
+        (when lowtag
+          (inst add result-tn tmp-tn lowtag))
+        (assemble (:elsewhere)
+          (emit-label ALLOC)
+          (allocation-tramp result-tn
+                            size
+                            BACK-FROM-ALLOC
+                            ;; see the comment above aboout alloc_tramp
+                            lowtag
+                            lip)))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)
