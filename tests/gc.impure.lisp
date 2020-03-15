@@ -426,11 +426,12 @@
     (sb-thread:join-thread gc-thread)))
 
 (with-test (:name :no-conses-on-large-object-pages
-	    :skipped-on (:not (or :x86-64 :ppc :ppc64 :arm64 :arm))) ; for now
+	    :skipped-on (:not :x86-64)) ; for now
   (let* ((fun (checked-compile '(lambda (&rest params) params)))
 	 (list (make-list (/ sb-vm:large-object-size 
 			     (sb-vm::primitive-object-size '(1))
 			     1/2)))
 	 (rest (apply fun list)))
-    (sb-ext:gc :full t)
-    (assert (and (equal list rest) t))))
+    (sb-sys:with-pinned-objects (rest)
+      (sb-ext:gc :full t)
+      (assert (and (equal list rest) t)))))
