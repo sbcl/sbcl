@@ -1,4 +1,4 @@
-#ifdef __ELF__
+#ifdef __linux__
 // Mark the object as not requiring an executable stack.
 .section .note.GNU-stack,"",%progbits
 #endif

@@ -87,7 +87,11 @@ OBJS = $(C_SRC:.c=.o) $(ASSEM_SRC:.S=.o)
 
 LIBS = ${OS_LIBS} -lm
 
+ifdef LISP_FEATURE_SUNOS # don't bother running 'nm' (or 'gnm')
+targets: $(TARGET) $(OBJTARGET) sbcl.mk
+else
 targets: $(TARGET) $(OBJTARGET) sbcl.nm sbcl.mk
+endif
 
 $(TARGET): $(LIBSBCL)
 	$(CC) ${LINKFLAGS} -o $@ $(USE_LIBSBCL) $(LIBS)
