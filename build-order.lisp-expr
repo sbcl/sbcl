@@ -258,8 +258,6 @@
  ("src/code/sort"  :not-host)
  ("src/code/time"  :not-host)
 
- ("src/code/exhaust" :not-host)
-
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; compiler (and a few miscellaneous files whose dependencies make it
  ;;; convenient to stick them here)

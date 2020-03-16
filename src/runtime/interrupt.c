@@ -1723,15 +1723,6 @@ void reset_thread_control_stack_guard_page(struct thread *th)
     fprintf(stderr, "INFO: Control stack guard page reprotected\n");
 }
 
-/* Called from the REPL, too. */
-void reset_control_stack_guard_page(void)
-{
-    struct thread *th=arch_os_get_current_thread();
-    if (th->control_stack_guard_page_protected == NIL) {
-        reset_thread_control_stack_guard_page(th);
-    }
-}
-
 boolean
 handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
 {
@@ -1784,7 +1775,7 @@ handle_guard_page_triggered(os_context_t *context,os_vm_address_t addr)
          * exhaustion instead. */
         if (th->control_stack_guard_page_protected != NIL)
             lose("control_stack_guard_page_protected not NIL");
-        reset_control_stack_guard_page();
+        reset_thread_control_stack_guard_page(th);
         return 1;
     }
     else if(addr >= BINDING_STACK_HARD_GUARD_PAGE(th) &&

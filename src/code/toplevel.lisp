@@ -591,11 +591,6 @@ that provides the REPL for the system. Assumes that *STANDARD-INPUT* and
          (with-simple-restart
              (abort "~@<Exit debugger, returning to top level.~@:>")
            (catch 'toplevel-catcher
-             ;; In the event of a control-stack-exhausted-error, we
-             ;; should have unwound enough stack by the time we get
-             ;; here that this is now possible.
-             #-win32
-             (sb-kernel::reset-control-stack-guard-page)
              (funcall repl-fun noprint)
              (critically-unreachable "after REPL"))))))))
 
