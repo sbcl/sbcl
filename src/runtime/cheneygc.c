@@ -388,12 +388,21 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
              (unsigned long)dynamic_usage);
     length = os_trunc_size_to_page(dynamic_space_size - dynamic_usage);
 
+    // range has to fall entirely within either semispace
+    uword_t semispace_0_end = DYNAMIC_0_SPACE_START + dynamic_space_size;
+    uword_t semispace_1_end = DYNAMIC_1_SPACE_START + dynamic_space_size;
+    uword_t end = (uword_t)addr + length - 1;
+    if ((addr >= DYNAMIC_0_SPACE_START && end < semispace_0_end) ||
+        (addr >= DYNAMIC_1_SPACE_START && end < semispace_1_end)) {
 #if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
-    os_invalidate(addr, length);
+        os_invalidate(addr, length);
 #else
-    os_protect(addr, length, 0);
+        os_protect(addr, length, 0);
 #endif
-
+    } else {
+        lose("auto_gc_trigger can't protect %p..%p (not owned)\n",
+             (void*)addr, (char*)end-1);
+    }
     current_auto_gc_trigger = (lispobj *)addr;
 }
 

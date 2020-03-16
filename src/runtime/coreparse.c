@@ -772,7 +772,6 @@ process_directory(int count, struct ndir_entry *entry,
         }
         if (len != 0) {
             spaces[id].len = len;
-            uword_t __attribute__((unused)) aligned_start;
             // Try to map at address requested by the core file.
             size_t request = spaces[id].desired_size;
             int sub_2gb_flag = (request & 1);
@@ -806,33 +805,37 @@ process_directory(int count, struct ndir_entry *entry,
 #endif
             case DYNAMIC_CORE_SPACE_ID:
 #ifdef LISP_FEATURE_CHENEYGC
-                aligned_start = ALIGN_UP(addr, BACKEND_PAGE_BYTES);
-                /* Misalignment can happen only if page size exceeds OS page.
-                 * Drop one page to avoid overrunning the allocated space */
-                if (aligned_start > addr) // not page-aligned
-                    dynamic_space_size -= BACKEND_PAGE_BYTES;
-                DYNAMIC_0_SPACE_START = addr = aligned_start;
-                current_dynamic_space = (lispobj*)addr;
-                { // Request that much again now
+                {
+                  uword_t semispace_0_start = ALIGN_UP(addr, BACKEND_PAGE_BYTES);
+                  uword_t semispace_0_end = ALIGN_DOWN(addr + request, BACKEND_PAGE_BYTES);
+                  // assign to 'addr' too, because that's where we load the core file
+                  DYNAMIC_0_SPACE_START = addr = semispace_0_start;
+                  current_dynamic_space = (lispobj*)addr;
+                  // Request that much again now
 #ifdef LISP_FEATURE_ALPHA /* meaning: is this a 32-on-64 SBCL implementation */
                   uword_t addr1 = (uword_t)os_validate(MOVABLE_LOW, 0, request);
                   extern os_set_cheneygc_spaces(uword_t,uword_t);
                   os_set_cheneygc_spaces(addr, addr1);
 #else
                   uword_t addr1 = (uword_t)os_allocate(request);
+                  uword_t semispace_1_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
+                  uword_t semispace_1_end = ALIGN_DOWN(addr1 + request, BACKEND_PAGE_BYTES);
 #endif
-                  aligned_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
-                  if (aligned_start > addr) // same test again
-                      dynamic_space_size -= BACKEND_PAGE_BYTES;
-                  DYNAMIC_1_SPACE_START = aligned_start;
+                  DYNAMIC_1_SPACE_START = semispace_1_start;
+                  uword_t semispace_0_size = semispace_0_end - semispace_0_start;
+                  uword_t semispace_1_size = semispace_1_end - semispace_1_start;
+                  dynamic_space_size =
+                      semispace_0_size < semispace_1_size ? semispace_0_size : semispace_1_size;
                 }
-#else
-                aligned_start = ALIGN_UP(addr, GENCGC_CARD_BYTES);
+#else /* gencgc */
+                {
+                uword_t aligned_start = ALIGN_UP(addr, GENCGC_CARD_BYTES);
                 /* Misalignment can happen only if card size exceeds OS page.
                  * Drop one card to avoid overrunning the allocated space */
                 if (aligned_start > addr) // not card-aligned
                     dynamic_space_size -= GENCGC_CARD_BYTES;
                 DYNAMIC_SPACE_START = addr = aligned_start;
+                }
 #endif
                 break;
             }
