@@ -392,8 +392,8 @@ void set_auto_gc_trigger(os_vm_size_t dynamic_usage)
     uword_t semispace_0_end = DYNAMIC_0_SPACE_START + dynamic_space_size;
     uword_t semispace_1_end = DYNAMIC_1_SPACE_START + dynamic_space_size;
     uword_t end = (uword_t)addr + length - 1;
-    if ((addr >= DYNAMIC_0_SPACE_START && end < semispace_0_end) ||
-        (addr >= DYNAMIC_1_SPACE_START && end < semispace_1_end)) {
+    if ((uword_t)addr >= DYNAMIC_0_SPACE_START && end < semispace_0_end) ||
+       ((uword_t)addr >= DYNAMIC_1_SPACE_START && end < semispace_1_end)) {
 #if defined(SUNOS) || defined(SOLARIS) || defined(LISP_FEATURE_HPUX)
         os_invalidate(addr, length);
 #else

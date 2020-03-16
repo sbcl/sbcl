@@ -111,7 +111,7 @@
 ;;; (This should be a multiple of n-word-bytes so that data entries are aligned)
 (defconstant linkage-table-entry-size #-64-bit 8 #+64-bit 24)
 (defconstant linkage-table-growth-direction :down)
-(setq *linkage-space-predefined-entries* '(("alloc" nil)))
+(setq *linkage-space-predefined-entries* '(#+gencgc("alloc" nil)))
 
 #+(or linux netbsd)
 (progn

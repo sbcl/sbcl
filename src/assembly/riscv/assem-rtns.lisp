@@ -283,12 +283,7 @@
   (pseudo-atomic (pa-temp)
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
-    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp)
-    #-gencgc
-    (progn
-      (load-symbol-value temp *allocation-pointer*)
-      ;; We can destroy csp-tn without harm now.
-      (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn)))
+    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp))
 
   (restore-c-registers)
   (inst jalr zero-tn lr-tn 0))
@@ -322,12 +317,7 @@
     (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
     (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
     ;; Storing NULL-TN will put at least one 1 bit somewhere into the word
-    (store-foreign-symbol-value null-tn "foreign_function_call_active" temp)
-    #-gencgc
-    (progn
-      (load-symbol-value temp *allocation-pointer*)
-      ;; We can destroy csp-tn without harm now.
-      (store-foreign-symbol-value temp "dynamic_space_free_pointer" csp-tn)))
+    (store-foreign-symbol-value null-tn "foreign_function_call_active" temp))
 
   ;; Call into C.
   (inst jalr lr-tn cfunc 0)
@@ -347,11 +337,7 @@
     (loadw nfp-tn cfp-tn 1)
     (loadw code-tn cfp-tn 2)
     (inst add lr-tn nfp-tn code-tn)
-    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp)
-    #-gencgc
-    (progn
-      (load-foreign-symbol-value temp "dynamic_space_free_pointer" temp)
-      (store-symbol-value temp *allocation-pointer*)))
+    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
 
   ;; Reset the Lisp stack.
   (move csp-tn cfp-tn)
