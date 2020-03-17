@@ -166,9 +166,9 @@
   (def-full-data-vector-frobs simple-vector * descriptor-reg any-reg)
 
   (def-partial-data-vector-frobs simple-base-string character 1 nil character-reg)
-  #-64-bit
+  #+(and sb-unicode (not 64-bit))
   (def-full-data-vector-frobs simple-character-string character character-reg)
-  #+64-bit
+  #+(and sb-unicode 64-bit)
   (def-partial-data-vector-frobs simple-character-string character
     4 nil character-reg)
 
