@@ -256,17 +256,16 @@
   (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (loadw temp struct 0 instance-pointer-lowtag)
+    (loadw res struct 0 instance-pointer-lowtag)
     #-64-bit
-    (inst srli res temp n-widetag-bits)
+    (inst srli res res n-widetag-bits)
     #+64-bit
     (let ((n-length-bits (integer-length short-header-max-words)))
-      (inst slli temp temp (- n-word-bits n-length-bits n-widetag-bits))
-      (inst srli res temp (- n-word-bits n-length-bits)))))
+      (inst slli res res (- n-word-bits n-length-bits n-widetag-bits))
+      (inst srli res res (- n-word-bits n-length-bits)))))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)

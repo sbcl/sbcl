@@ -467,14 +467,13 @@
   (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
-  (:temporary (:scs (non-descriptor-reg)) temp)
   (:results (res :scs (unsigned-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (loadw temp struct 0 instance-pointer-lowtag)
+    (loadw res struct 0 instance-pointer-lowtag)
     ;; shift right 8 and mask 15 low bits =
     ;; rotate left 24, take bit indices 17 through 31.
-    (inst rlwinm res temp (- 32 n-widetag-bits) 17 31)))
+    (inst rlwinm res res (- 32 n-widetag-bits) 17 31)))
 
 (define-vop (instance-index-ref word-index-ref)
   (:policy :fast-safe)
