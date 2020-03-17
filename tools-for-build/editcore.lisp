@@ -31,7 +31,8 @@
                 #:seg-virtual-location #:seg-length #:seg-sap-maker
                 #:map-segment-instructions #:inst-name
                 #:dstate-next-addr #:dstate-cur-offs)
-  (:import-from "SB-X86-64-ASM" #:near-jump-displacement #:mov #:call
+  (:import-from "SB-X86-64-ASM" #:near-jump-displacement
+                #:near-cond-jump-displacement #:mov #:call
                 #:get-gpr #:reg-name)
   (:import-from "SB-IMPL" #:package-hashtable #:package-%name
                 #:package-hashtable-cells
@@ -127,6 +128,16 @@
   (jmp-inst nil :read-only t)
   (pop-inst nil :read-only t))
 
+(defglobal *editcore-ppd*
+  ;; copy no entries for macros/special-operators (flet, etc)
+  (let ((ppd (sb-pretty::make-pprint-dispatch-table nil nil nil)))
+    (set-pprint-dispatch 'string
+                         ;; Write strings without string quotes
+                         (lambda (stream string) (write-string string stream))
+                         0
+                         ppd)
+    ppd))
+    
 (defun c-name (lispname core pp-state &optional (prefix ""))
   (when (typep lispname '(string 0))
     (setq lispname "anonymous"))
@@ -148,7 +159,9 @@
                             (concatenate 'string "_" lispname))
                            (t
                             (write-to-string lispname
-                              :pretty t :pprint-dispatch (cdr pp-state)
+                              ;; Printing is a tad faster without a pretty stream
+                              :pretty (not (typep lispname 'core-sym))
+                              :pprint-dispatch *editcore-ppd*
                               ;; FIXME: should be :level 1, however see
                               ;; https://bugs.launchpad.net/sbcl/+bug/1733222
                               :escape t :level 2 :length 5
@@ -430,6 +443,11 @@
         (setf (aref vector entry-index)
               (if (consp key) (list string) string))))))
 
+(defconstant inst-call (find-inst #b11101000 (get-inst-space)))
+(defconstant inst-jmp (find-inst #b11101001 (get-inst-space)))
+(defconstant inst-jmpz (find-inst #x840f (get-inst-space)))
+(defconstant inst-pop (find-inst #x5d (get-inst-space)))
+
 (defun make-core (spaces code-bounds fixedobj-bounds &optional enable-pie)
   (let* ((linkage-bounds
           (make-bounds
@@ -456,10 +474,7 @@
            :linkage-entry-size linkage-entry-size
            :linkage-symbols linkage-symbols
            :linkage-symbol-usedp (make-array (length linkage-symbols) :element-type 'bit)
-           :enable-pie enable-pie
-           :call-inst (find-inst #b11101000 inst-space)
-           :jmp-inst (find-inst #b11101001 inst-space)
-           :pop-inst (find-inst #x5d inst-space))))
+           :enable-pie enable-pie)))
     (let ((package-table
            (symbol-global-value
             (find-target-symbol "SB-KERNEL" "*PACKAGE-NAMES*" spaces :physical)))
@@ -554,9 +569,6 @@
 (defun list-textual-instructions (sap length core load-addr emit-cfi)
   (let ((dstate (core-dstate core))
         (seg (core-seg core))
-        (call-inst (core-call-inst core))
-        (jmp-inst (core-jmp-inst core))
-        (pop-inst (core-pop-inst core))
         (next-fixup-addr
          (or (car (core-fixup-addrs core)) most-positive-word))
         (list))
@@ -603,17 +615,23 @@
                       (inst-name inst) (sap-ref-32 sap offs))))))
           (pop (core-fixup-addrs core))
           (setq next-fixup-addr (or (car (core-fixup-addrs core)) most-positive-word)))
-         ((or (eq inst jmp-inst) (eq inst call-inst))
+         ((or (eq inst inst-jmp) (eq inst inst-call))
           (let ((target-addr (+ (near-jump-displacement dchunk dstate)
                                 (dstate-next-addr dstate))))
             (when (or (in-bounds-p target-addr (core-fixedobj-bounds core))
                       (in-bounds-p target-addr (core-linkage-bounds core)))
               (push (list* (dstate-cur-offs dstate)
                            5 ; length
-                           (if (eq inst call-inst) "call" "jmp")
+                           (if (eq inst inst-call) "call" "jmp")
                            target-addr)
                     list))))
-         ((and (eq inst pop-inst) (eq (logand dchunk #xFF) #x5D))
+         ((eq inst inst-jmpz)
+          (let ((target-addr (+ (near-cond-jump-displacement dchunk dstate)
+                                (dstate-next-addr dstate))))
+            (when (in-bounds-p target-addr (core-linkage-bounds core))
+              (push (list* (dstate-cur-offs dstate) 6 "je" target-addr)
+                    list))))
+         ((and (eq inst inst-pop) (eq (logand dchunk #xFF) #x5D))
           (push (list* (dstate-cur-offs dstate) 1 "pop" "%rbp") list))))
      seg
      dstate
@@ -709,7 +727,7 @@
           ;; to see them where they belong in the instruction stream]
           (when (and instructions (= (caar instructions) cur-offset))
             (destructuring-bind (length opcode . operand) (cdr (pop instructions))
-              (when (cond ((member opcode '("jmp" "call") :test #'string=)
+              (when (cond ((member opcode '("jmp" "je" "call") :test #'string=)
                            (when (in-bounds-p operand (core-linkage-bounds core))
                              (let ((entry-index
                                     (/ (- operand (bounds-low (core-linkage-bounds core)))
@@ -940,9 +958,7 @@
           (core (make-core spaces code-bounds fixedobj-bounds enable-pie))
           (code-addr (bounds-low code-bounds))
           (total-code-size 0)
-          (pp-state (cons (make-hash-table :test 'equal)
-                          ;; copy no entries for macros/special-operators (flet, etc)
-                          (sb-pretty::make-pprint-dispatch-table nil nil nil)))
+          (pp-state (cons (make-hash-table :test 'equal) nil))
           (prev-namestring "")
           (n-linker-relocs 0)
           (seen-fdefns nil)
@@ -950,11 +966,6 @@
           (seen-gfs nil)
           (temp-output (make-string-output-stream :element-type 'base-char))
           end-loc)
-  (set-pprint-dispatch 'string
-                       ;; Write strings without string quotes
-                       (lambda (stream string) (write-string string stream))
-                       0
-                       (cdr pp-state))
   (labels ((dumpwords (sap count stream &optional (exceptions #()) logical-addr)
              (aver (sap>= sap (car spaces)))
              ;; Add any new "header exceptions" that cause intra-code-space pointers

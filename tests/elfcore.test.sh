@@ -13,8 +13,6 @@
 # absolutely no warranty. See the COPYING and CREDITS files for
 # more information.
 
-exit $EXIT_TEST_WIN             # FIXME
-
 export TEST_BASEDIR=${TMPDIR:-/tmp}
 . ./subr.sh
 
@@ -32,15 +30,8 @@ fi
 
 set -e # exit on error
 
-# If running in a test sandbox that doesn't provide Make but has already
-# provided the necessary executable file, just use that.
-# Unfortunately this removes enforcement that the test binary be up-to-date
-# with respect to sources for local builds, but I think the greater evil
-# would be to spuriously pass by exiting with success if we couldn't build.
-if [ ! -x $SBCL_PWD/../src/runtime/shrinkwrap-sbcl ]
-then
-  (cd $SBCL_PWD/../src/runtime ; make shrinkwrap-sbcl)
-fi
+# Ensure that we're not running a stale shrinkwrap-sbcl
+(cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl ; make shrinkwrap-sbcl)
 
 $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --noprint <<EOF
 (dotimes (i 100000) (sb-vm::alloc-immobile-fdefn))
