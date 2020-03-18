@@ -48,16 +48,13 @@ scp $scp_port_opt $host:$root/{remote-version.lisp-expr,local-target-features.li
 mv build-id.inc output
 #diff version.lisp-expr remote-version.lisp-expr || exit 1
 
-# make-host-1 and copy over the artifacts
+# make-host-1 and copy the generated C headers to the target machine
 sh make-host-1.sh
-tar cf - src/runtime/genesis \
-  | ssh $ssh_port_opt $host tar xf - -C $root
+tar cf - src/runtime/genesis | ssh $ssh_port_opt $host cd $root \; tar xf -
 
 # make-target-1 and copy back the artifacts
 ssh $ssh_port_opt $host cd $root \; $ENV sh make-target-1.sh
-scp $scp_port_opt $host:$root/{src/runtime/sbcl.nm,output/stuff-groveled-from-headers.lisp} .
-mv sbcl.nm src/runtime
-mv stuff-groveled-from-headers.lisp output
+scp $scp_port_opt $host:$root/output/stuff-groveled-from-headers.lisp output
 
 # make-host-2 and copy over the artifact
 sh make-host-2.sh
