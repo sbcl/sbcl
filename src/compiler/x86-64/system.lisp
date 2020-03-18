@@ -497,7 +497,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
     ;; inhibit instcombine across any barrier
     (inst .skip 0)))
 
-(define-vop (pause)
+(define-vop ()
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0

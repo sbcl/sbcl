@@ -273,7 +273,7 @@
 
 ;;;; instance hackery
 
-(define-vop (instance-length)
+(define-vop ()
   (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))

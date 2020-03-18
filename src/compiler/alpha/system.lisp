@@ -212,7 +212,7 @@
       (inst stl count offset count-vector))))
 
 ;;;; Dummy definition for a spin-loop hint VOP
-(define-vop (spin-loop-hint)
+(define-vop ()
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0))

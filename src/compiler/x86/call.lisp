@@ -1272,7 +1272,7 @@
 
     DONE))
 
-(define-vop (more-kw-arg)
+(define-vop ()
   (:translate sb-c::%more-kw-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
@@ -1334,7 +1334,7 @@
     done))
 
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:translate %listify-rest-args)
   (:policy :safe)
   (:args (context :scs (descriptor-reg) :target src)
@@ -1392,7 +1392,7 @@
 ;;; preventing this info from being returned as values. What we do is
 ;;; compute supplied - fixed, and return a pointer that many words
 ;;; below the current stack top.
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg) :target count))

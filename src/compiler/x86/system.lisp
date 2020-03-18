@@ -401,7 +401,7 @@ number of CPU cycles elapsed as secondary value. EXPERIMENTAL."
   (:translate %data-dependency-barrier)
   (:generator 3))
 
-(define-vop (pause)
+(define-vop ()
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0

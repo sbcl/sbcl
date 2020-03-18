@@ -99,7 +99,7 @@
             (ea (- (* scale (1- array-dimensions-offset)))
                 (if (= scale 2) res nil) res (if (= scale 2) 1 scale))))))
 
-(define-vop (array-rank=)
+(define-vop ()
   (:translate %array-rank=)
   (:policy :fast-safe)
   (:args (array :scs (descriptor-reg)))

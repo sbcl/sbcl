@@ -1558,7 +1558,7 @@
 ;;; :MOVE-ARGS {NIL | :FULL-CALL | :LOCAL-CALL | :KNOWN-RETURN}
 ;;;     Indicates if and how the more args should be moved into a
 ;;;     different frame.
-(defmacro define-vop ((name &optional inherits) &body specs)
+(defmacro define-vop ((&optional name inherits) &body specs)
   (declare (type symbol name))
   ;; Parse the syntax into a VOP-PARSE structure, and then expand into
   ;; code that creates the appropriate VOP-INFO structure at load time.
@@ -1570,6 +1570,11 @@
                     (copy-vop-parse inherited-parse)
                     (make-vop-parse)))
          (n-res (gensym)))
+    (unless name
+      (let ((clause (assoc :translate specs)))
+        (when (singleton-p (cdr clause))
+          (setf name (cadr clause)))))
+    (aver (typep name '(and symbol (not null))))
     (setf (vop-parse-name parse) name)
     (setf (vop-parse-inherits parse) inherits)
 

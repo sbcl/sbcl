@@ -1111,7 +1111,7 @@ default-value-8
     (loadw value context index)))
 
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:translate %listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
@@ -1172,7 +1172,7 @@ default-value-8
 ;;; supplied - fixed, and return a pointer that many words below the current
 ;;; stack top.
 ;;;
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))

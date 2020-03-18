@@ -28,7 +28,7 @@
   (:generator 1
     (move res cfp-tn)))
 
-(define-vop (read-control-stack)
+(define-vop ()
   (:translate stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
@@ -42,7 +42,7 @@
     (inst lw result sap 0)
     (inst nop)))
 
-(define-vop (write-control-stack)
+(define-vop ()
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)

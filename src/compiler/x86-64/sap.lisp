@@ -99,9 +99,9 @@
   (:generator 1
     (move sap int)))
 
-;;;; POINTER+ and POINTER-
+;;;; SAP+ and SAP-
 
-(define-vop (pointer+)
+(define-vop ()
   (:translate sap+)
   (:args (ptr :scs (sap-reg) :target res
               :load-if (not (location= ptr res)))
@@ -138,7 +138,7 @@
                        (inst mov temp value)
                        (inst add res temp))))))))))
 
-(define-vop (pointer-)
+(define-vop ()
   (:translate sap-)
   (:args (ptr1 :scs (sap-reg) :target res)
          (ptr2 :scs (sap-reg)))

@@ -11,7 +11,7 @@
 
 (in-package "SB-VM")
 
-(define-vop (debug-cur-sp)
+(define-vop ()
   (:translate current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg sap-stack)))
@@ -19,7 +19,7 @@
   (:generator 1
     (move res rsp-tn)))
 
-(define-vop (debug-cur-fp)
+(define-vop ()
   (:translate current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg sap-stack)))
@@ -30,7 +30,7 @@
 ;;; Stack-ref and %set-stack-ref can be used to read and store
 ;;; descriptor objects on the control stack. Use the sap-ref
 ;;; functions to access other data types.
-(define-vop (read-control-stack)
+(define-vop ()
   (:translate stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
@@ -46,7 +46,7 @@
           (ea (frame-byte-offset 0) sap
               temp (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
-(define-vop (write-control-stack)
+(define-vop ()
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (sap :scs (sap-reg) :to :eval)
@@ -65,7 +65,7 @@
           value)
     (move result value)))
 
-(define-vop (code-from-function)
+(define-vop ()
   (:translate fun-code-header)
   (:policy :fast-safe)
   (:args (thing :scs (descriptor-reg)))

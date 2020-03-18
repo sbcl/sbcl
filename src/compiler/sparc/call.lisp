@@ -1062,7 +1062,7 @@ default-value-8
   (:translate %more-arg))
 
 ;;; Turn more arg (context, count) into a list.
-(define-vop (listify-rest-args)
+(define-vop ()
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -1128,7 +1128,7 @@ default-value-8
 ;;; info from being returned as values.  What we do is compute
 ;;; supplied - fixed, and return a pointer that many words below the current
 ;;; stack top.
-(define-vop (more-arg-context)
+(define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
   (:args (supplied :scs (any-reg)))

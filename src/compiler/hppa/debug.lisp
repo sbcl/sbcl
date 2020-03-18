@@ -1,22 +1,22 @@
 (in-package "SB-VM")
 
-(define-vop (debug-cur-sp)
-  (:translate sb-di::current-sp)
+(define-vop ()
+  (:translate current-sp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move csp-tn res)))
 
-(define-vop (debug-cur-fp)
-  (:translate sb-di::current-fp)
+(define-vop ()
+  (:translate current-fp)
   (:policy :fast-safe)
   (:results (res :scs (sap-reg)))
   (:result-types system-area-pointer)
   (:generator 1
     (move cfp-tn res)))
 
-(define-vop (read-control-stack)
+(define-vop ()
   (:translate stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg))
@@ -27,7 +27,7 @@
   (:generator 5
     (inst ldwx offset object result)))
 
-(define-vop (write-control-stack)
+(define-vop ()
   (:translate %set-stack-ref)
   (:policy :fast-safe)
   (:args (object :scs (sap-reg) :target sap)
