@@ -42,18 +42,6 @@
     (inst lw result sap 0)
     (inst nop)))
 
-(define-vop (read-control-stack-c)
-  (:translate stack-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (sap-reg)))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 14)))
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 4
-    (inst lw result object (* offset n-word-bytes))
-    (inst nop)))
-
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
   (:policy :fast-safe)
@@ -68,20 +56,6 @@
     (inst addu sap object offset)
     (inst sw value sap 0)
     (move result value)))
-
-(define-vop (write-control-stack-c)
-  (:translate %set-stack-ref)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-         (value :scs (descriptor-reg) :target result))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte 14)) *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 1
-    (inst sw value sap (* offset n-word-bytes))
-    (move result value)))
-
 
 (define-vop (code-from-mumble)
   (:policy :fast-safe)

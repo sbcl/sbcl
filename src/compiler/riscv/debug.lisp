@@ -45,17 +45,6 @@
            (inst add sap object temp)))
     (loadw result sap 0)))
 
-(define-vop (read-control-stack-c)
-  (:translate stack-ref)
-  (:policy :fast-safe)
-  (:args (object :scs (sap-reg)))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte #.(- 12 word-shift))))
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 4
-    (loadw result object offset)))
-
 (define-vop (write-control-stack)
   (:translate %set-stack-ref)
   (:policy :fast-safe)
@@ -74,19 +63,6 @@
            (inst slli temp offset (- word-shift n-fixnum-tag-bits))
            (inst add sap object temp)))
     (storew value sap 0)
-    (move result value)))
-
-(define-vop (write-control-stack-c)
-  (:translate %set-stack-ref)
-  (:policy :fast-safe)
-  (:args (sap :scs (sap-reg))
-         (value :scs (descriptor-reg) :target result))
-  (:info offset)
-  (:arg-types system-area-pointer (:constant (signed-byte #.(- 12 word-shift))) *)
-  (:results (result :scs (descriptor-reg)))
-  (:result-types *)
-  (:generator 1
-    (storew value sap (* offset n-word-bytes))
     (move result value)))
 
 (define-vop (code-from-mumble)
