@@ -99,7 +99,9 @@
              (t t))))
         (t t)))
 
-(macrolet ((def (name error translate context &rest args)
+(macrolet ((def (error-name-prefix translate context &rest args)
+             (let* ((error (package-symbolicate "SB-KERNEL" error-name-prefix "-ERROR"))
+                    (name (or translate error)))
              `(define-vop (,name)
                 ,@(when translate
                     `((:policy :fast-safe)
@@ -120,28 +122,18 @@
                 (:vop-var vop)
                 (:save-p :compute-only)
                 (:generator 1000
-                  (error-call vop ',error ,@args)))))
-  (def arg-count-error invalid-arg-count-error
-    sb-c::%arg-count-error nil nargs)
-  (def local-arg-count-error local-invalid-arg-count-error
-    sb-c::%local-arg-count-error nil nargs fname)
-  (def type-check-error object-not-type-error sb-c::%type-check-error t
-    object ptype)
-  (def layout-invalid-error layout-invalid-error sb-c::%layout-invalid-error nil
-    object layout)
-  (def odd-key-args-error odd-key-args-error
-    sb-c::%odd-key-args-error nil)
-  (def unknown-key-arg-error unknown-key-arg-error
-    sb-c::%unknown-key-arg-error t key)
-  (def ecase-failure sb-kernel::ecase-failure-error ecase-failure
-    nil value keys)
-  (def etypecase-failure sb-kernel::etypecase-failure-error etypecase-failure
-    nil value keys)
-  (def nil-fun-returned-error nil-fun-returned-error nil nil fun)
-  (def sb-impl::unreachable sb-kernel::unreachable-error sb-impl::unreachable nil)
-  (def failed-aver sb-kernel::failed-aver-error
-    sb-impl::%failed-aver
-    nil form))
+                  (error-call vop ',error ,@args))))))
+  (def "INVALID-ARG-COUNT"       sb-c::%arg-count-error       nil nargs)
+  (def "LOCAL-INVALID-ARG-COUNT" sb-c::%local-arg-count-error nil nargs fname)
+  (def "OBJECT-NOT-TYPE"         sb-c::%type-check-error      t   object ptype)
+  (def "LAYOUT-INVALID"          sb-c::%layout-invalid-error  nil object layout)
+  (def "ODD-KEY-ARGS"            sb-c::%odd-key-args-error    nil)
+  (def "UNKNOWN-KEY-ARG"         sb-c::%unknown-key-arg-error t   key)
+  (def "ECASE-FAILURE"           ecase-failure                nil value keys)
+  (def "ETYPECASE-FAILURE"       etypecase-failure            nil value keys)
+  (def "NIL-FUN-RETURNED"        nil                          nil fun)
+  (def "UNREACHABLE"             sb-impl::unreachable         nil)
+  (def "FAILED-AVER"             sb-impl::%failed-aver        nil form))
 
 
 (defun emit-internal-error (kind code values &key trap-emitter
