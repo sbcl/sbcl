@@ -137,7 +137,7 @@
                          0
                          ppd)
     ppd))
-    
+
 (defun c-name (lispname core pp-state &optional (prefix ""))
   (when (typep lispname '(string 0))
     (setq lispname "anonymous"))

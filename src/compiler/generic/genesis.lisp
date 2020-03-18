@@ -3134,7 +3134,7 @@ core and return a descriptor to it."
       (dolist (slot (dd-slots dd))
         (let ((cell (aref names (- (dsd-index slot) sb-vm:instance-data-start)))
               (name (cstring (dsd-name slot))))
-          (if (member (dsd-raw-type slot) '(t sb-vm:word))
+          (if (member (dsd-raw-type slot) '(t sb-vm:word sb-vm:signed-word))
               (rplaca cell name)
               (rplacd cell name))))
       (loop for slot across names
