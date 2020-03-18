@@ -197,13 +197,6 @@
         (inst and :dword (ea (- other-pointer-lowtag) x)
               (lognot (ash bits n-widetag-bits))))))
 
-;;; Set the bit indicating that instances of this type require
-;;; special treatment of slot index 0.
-(define-vop (set-custom-gc-scavenge-bit)
-  (:args (x :scs (descriptor-reg)))
-  (:generator 1
-    (inst or :byte (ea (- 2 instance-pointer-lowtag) x) #x80)))
-
 (define-vop (get-header-data-high)
   (:translate get-header-data-high)
   (:policy :fast-safe)

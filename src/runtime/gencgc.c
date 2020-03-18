@@ -2102,22 +2102,22 @@ pin_object(lispobj object)
             })
     }
 
-    if (lowtag_of(object) == INSTANCE_POINTER_LOWTAG
-        && (*(lispobj*)(object - INSTANCE_POINTER_LOWTAG)
-            & CUSTOM_GC_SCAVENGE_FLAG)) {
+    if (lowtag_of(object) == INSTANCE_POINTER_LOWTAG) {
         struct instance* instance = (struct instance*)(object - INSTANCE_POINTER_LOWTAG);
-        // When pinning a logically deleted lockfree list node, always pin the
-        // successor too, since the Lisp code will reconstruct the next node's tagged
-        // pointer from the native pointer. Since we're still in the object pinning phase
-        // of GC, layouts can't have been forwarded yet. In fact we don't use bits
-        // from the layout, but it's worth noting, in case we needed to.
-        // Note also that this 'pin' does not need to happen for mark-only GC.
-        // The pin is from an address perspective, not a liveness perspective,
-        // because the instance scavenger would correctly trace this reference.
-        lispobj next = instance->slots[INSTANCE_DATA_START];
-        // Be sure to ignore 0 words.
-        if (fixnump(next) && next && from_space_p(next | INSTANCE_POINTER_LOWTAG))
-            pin_object(next | INSTANCE_POINTER_LOWTAG);
+        lispobj layout = instance_layout((lispobj*)instance);
+        if (layout && lockfree_list_node_layout_p(LAYOUT(layout))) {
+            // When pinning a logically deleted lockfree list node, always pin the
+            // successor too, since the Lisp code will reconstruct the next node's tagged
+            // pointer from the native pointer. Since we're still in the object pinning phase
+            // of GC, layouts can't have been forwarded yet.
+            // Note also that this 'pin' does not need to happen for mark-only GC.
+            // The pin is from an address perspective, not a liveness perspective,
+            // because the instance scavenger would correctly trace this reference.
+            lispobj next = instance->slots[INSTANCE_DATA_START];
+            // Be sure to ignore an uninitialized word containing 0.
+            if (fixnump(next) && next && from_space_p(next | INSTANCE_POINTER_LOWTAG))
+                pin_object(next | INSTANCE_POINTER_LOWTAG);
+        }
     }
 }
 
@@ -2952,7 +2952,7 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     lispobj bitmap = layout->bitmap;
                     gc_assert(fixnump(bitmap)
                               || widetag_of(native_pointer(bitmap))==BIGNUM_WIDETAG);
-                    if (*where & CUSTOM_GC_SCAVENGE_FLAG) {
+                    if (lockfree_list_node_layout_p(layout)) {
                         struct instance* node = (struct instance*)where;
                         lispobj next = node->slots[INSTANCE_DATA_START];
                         if (fixnump(next) && next) {

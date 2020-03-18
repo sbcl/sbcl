@@ -706,7 +706,7 @@
   (defun cold-layout-length (layout)
     (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
   (defun cold-layout-flags (layout)
-    (descriptor-fixnum (read-slot layout *host-layout-of-layout* :flags))))
+    (read-slot layout *host-layout-of-layout* :flags)))
 
 (defvar *layout-deferred-instances*)
 ;; Make a structure and set the header word and layout.
@@ -1153,7 +1153,7 @@ core and return a descriptor to it."
     (write-slots result *host-layout-of-layout*
      :depthoid (make-fixnum-descriptor depthoid)
      :length (make-fixnum-descriptor length)
-     :flags (make-fixnum-descriptor flags))
+     :flags flags)
 
     ;; Set other slot values.
     ;; leave CLASSOID uninitialized for now

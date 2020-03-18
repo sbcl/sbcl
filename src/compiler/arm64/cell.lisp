@@ -448,8 +448,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw res struct 0 instance-pointer-lowtag)
-    (inst ubfm res res n-widetag-bits
-          (+ -1 (integer-length short-header-max-words) n-widetag-bits))))
+    (inst lsr res temp n-widetag-bits)))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)

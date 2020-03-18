@@ -458,8 +458,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw res struct 0 instance-pointer-lowtag)
-    (inst shr res n-widetag-bits)
-    (inst and res short-header-max-words))) ; clear special GC bit
+    (inst shr res n-widetag-bits)))
 
 (define-full-reffer instance-index-ref *
   instance-slots-offset instance-pointer-lowtag

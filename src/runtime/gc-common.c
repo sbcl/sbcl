@@ -441,16 +441,31 @@ scav_instance_pointer(lispobj *where, lispobj object)
     *where = copy;
 
     struct instance* node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
-    // Copy chain of lockfree list nodes to consecutive memory addresses,
-    // just like trans_list does.  A logically deleted node will break the chain,
-    // as its 'next' will not satisfy instancep(), but that's ok.
-    if (node->header & CUSTOM_GC_SCAVENGE_FLAG) {
-        while (instancep(object = node->slots[INSTANCE_DATA_START]) // node.next
-               && from_space_p(object)
-               && !forwarding_pointer_p(native_pointer(object))) {
-            copy = copy_instance(object);
-            node->slots[INSTANCE_DATA_START] = copy;
-            node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
+    lispobj layout = instance_layout((lispobj*)node);
+    if (layout) {
+        if (forwarding_pointer_p((lispobj*)LAYOUT(layout)))
+            layout = forwarding_pointer_value((lispobj*)LAYOUT(layout));
+        if (lockfree_list_node_layout_p(LAYOUT(layout))) {
+            // Copy chain of lockfree list nodes to consecutive memory addresses,
+            // just like trans_list does.  A logically deleted node will break the chain,
+            // as its 'next' will not satisfy instancep(), but that's ok.
+            while (instancep(object = node->slots[INSTANCE_DATA_START]) // node.next
+                   && from_space_p(object)
+                   && !forwarding_pointer_p(native_pointer(object))) {
+                copy = copy_instance(object);
+                node->slots[INSTANCE_DATA_START] = copy;
+                node = (struct instance*)(copy - INSTANCE_POINTER_LOWTAG);
+                // We don't have to stop upon seeing an instance with a different layout.
+                // The only other object in the 'next' chain could be *TAIL-ATOM* if we reach
+                // the end. It's possible that all of the tests in the 'while' loop are met
+                // by *TAIL-ATOM* though probably not, because it is in pseudo-static space
+                // which is never from_space. But even we iterate one more time, it's fine,
+                // despite tail-atom's layout not having the custom GC bit set - it has the
+                // 'next' pointer in the required slot. So even if we somehow copy it in
+                // this loop (vs when scavenging the symbol referencing it), the iteration
+                // after this will stop because forwarding_pointer_p will be true next time
+                // due to the fact that *TAIL-ATOM* is its own 'next' (behaving like NIL).
+            }
         }
     }
 
@@ -643,9 +658,10 @@ static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
     lispobj lbitmap = make_fixnum(-1);
+    lispobj *layout = 0;
 
     if (instance_layout(where)) {
-        lispobj *layout = native_pointer(instance_layout(where));
+        layout = native_pointer(instance_layout(where));
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         if (immobile_obj_gen_bits(layout) == from_space)
             enliven_immobile_obj(layout, 1);
@@ -664,9 +680,7 @@ scav_instance(lispobj *where, lispobj header)
     // pending deletion, 'next' will satisfy fixnump() but is in fact a pointer.
     // GC doesn't care too much about the deletion algorithm, but does have to
     // ensure liveness of the pointee, which may move unless pinned.
-    // One could imagine that the strategy is further determind by layout->_flags.
-    // A single bit suffices for now, but more generality is certainly possible.
-    if (header & CUSTOM_GC_SCAVENGE_FLAG) {
+    if (lockfree_list_node_layout_p((struct layout*)layout)) {
         struct instance* node = (struct instance*)where;
         lispobj next = node->slots[INSTANCE_DATA_START];
         if (fixnump(next) && next) { // ignore initially 0 heap words

@@ -106,10 +106,12 @@
 ;;; LAYOUT-FLAGS, because the compiler will stupidly "unpack" the
 ;;; flags by masking out the stuff that aren't the "bits" and then
 ;;; mask again.
-(defconstant +structure-layout-flag+  #b0001)
-(defconstant +pcl-object-layout-flag+ #b0010)
-(defconstant +condition-layout-flag+  #b0100)
-(defconstant +pathname-layout-flag+   #b1000) ; ORed with structure-layout-flag
+(defconstant +custom-gc-scavenge-flag+    #b000001)
+(defconstant +structure-layout-flag+      #b000010)
+(defconstant +pathname-layout-flag+       #b000100)
+(defconstant +layout-layout-flag+         #b001000)
+(defconstant +condition-layout-flag+      #b010000)
+(defconstant +pcl-object-layout-flag+     #b100000)
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
@@ -126,7 +128,7 @@
 
 ;;; 64-bit layout %BITS slot:
 ;;;
-;;; | 4 bytes  | 28 bits | 4 bits |
+;;; | 4 bytes  | 24 bits | 8 bits |
 ;;; +----------+---------+--------+
 ;;;  depthoid    length     flags
 ;;;
@@ -161,8 +163,8 @@
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
   #+64-bit (%bits 0 :type (signed-byte #.sb-vm:n-word-bits))
 
-  ;; one +something-LAYOUT-FLAG+ bit or none of them
-  #-64-bit (flags 0 :type fixnum :read-only nil)
+  ;; a union of +something-LAYOUT-FLAG+ bits
+  #-64-bit (flags 0 :type word :read-only nil)
 
   ;; a pseudo-random hash value for use by CLOS.
   (clos-hash (missing-arg) :type layout-clos-hash) ; this no longer defaults to a random number
@@ -231,13 +233,13 @@
 (progn
 (defmacro pack-layout-bits (depthoid length flags)
   `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
-           (ash ,(or length 0) 4)
+           (ash ,(or length 0) 8)
            ,(or flags 0)))
 (defmacro unpack-layout-bits (bits field)
   (ecase field
     (:depthoid `(ash ,bits (- -32 sb-vm:n-fixnum-tag-bits)))
-    (:length   `(ldb (byte 28 4) ,bits))
-    (:flags    `(ldb (byte 4 0) ,bits))))
+    (:length   `(ldb (byte 24 8) ,bits))
+    (:flags    `(ldb (byte 8 0) ,bits))))
 
 (defmacro make-layout (clos-hash classoid &rest rest &key depthoid length flags &allow-other-keys)
   (setq rest (copy-list rest))

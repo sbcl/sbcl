@@ -277,7 +277,7 @@ static void trace_object(lispobj* where)
         // there is no special GC method for any slot.
         if (bitmap == make_fixnum(-1)) break;
         // Otherwise, the first slot might merit special treatment.
-        if (*where & CUSTOM_GC_SCAVENGE_FLAG) {
+        if (lockfree_list_node_layout_p((struct layout*)native_pointer(layout))) {
             struct instance* node = (struct instance*)where;
             lispobj next = node->slots[INSTANCE_DATA_START];
             if (fixnump(next) && next) // ignore initially 0 heap words

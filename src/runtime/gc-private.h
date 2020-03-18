@@ -324,4 +324,16 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #define KV_PAIRS_HIGH_WATER_MARK(kvv) fixnum_value(kvv[0])
 #define KV_PAIRS_REHASH(kvv) kvv[1]
 
+#include "genesis/layout.h"
+static inline int lockfree_list_node_layout_p(struct layout* layout)
+{
+    // Test +custom-gc-scavenge-flag+ in the _bits or flags depending.
+    // This is a raw slot in either case.
+#ifdef LISP_FEATURE_64_BIT
+    return layout->_bits & 1;
+#else
+    return layout->flags & 1;
+#endif
+}
+
 #endif /* _GC_PRIVATE_H_ */

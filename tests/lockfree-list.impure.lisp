@@ -1,6 +1,6 @@
 (in-package "SB-LOCKLESS")
 
-#-(and sb-thread (or arm64 ppc x86 x86-64)) (sb-ext:exit :code 104)
+#-gencgc (sb-ext:exit :code 104)
 
 ;;; Make sure no promotions occur so that objects will be movable
 ;;; throughout these tests.
@@ -27,13 +27,6 @@
 (defun logical-delete (n list)
   (let* ((node (lfl-nth n list))
          (succ (%node-next node)))
-    ;; Ensure that the special GC strategy bit is set.
-    ;; We could set it as late as just prior to deletion
-    ;; and things should be fine.
-    (with-pinned-objects (node)
-      (let ((sap (int-sap (get-lisp-obj-address node))))
-        (assert (logtest (sap-ref-word sap (- sb-vm:instance-pointer-lowtag))
-                         special-gc-strategy-flag))))
     (unless (fixnump succ)
       (with-pinned-objects (succ)
         (cas (%node-next node) succ (make-marked-ref succ)))))
