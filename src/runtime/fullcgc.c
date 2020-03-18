@@ -271,13 +271,13 @@ static void trace_object(lispobj* where)
 #endif
         if (!layout) break; // fall into general case
         // mixed boxed/unboxed objects
-        bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+        bitmap = LAYOUT(layout)->bitmap;
         // If no raw slots, just scan without use of the bitmap.
         // A bitmap of -1 implies that not only are all slots tagged,
         // there is no special GC method for any slot.
         if (bitmap == make_fixnum(-1)) break;
         // Otherwise, the first slot might merit special treatment.
-        if (lockfree_list_node_layout_p((struct layout*)native_pointer(layout))) {
+        if (lockfree_list_node_layout_p(LAYOUT(layout))) {
             struct instance* node = (struct instance*)where;
             lispobj next = node->slots[INSTANCE_DATA_START];
             if (fixnump(next) && next) // ignore initially 0 heap words

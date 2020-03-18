@@ -1139,14 +1139,14 @@ static void graph_visit(lispobj __attribute__((unused)) referer,
             layout = instance_layout(obj);
             graph_visit(ptr, layout, seen);
             nwords = instance_length(*obj);
-            bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+            bitmap = LAYOUT(layout)->bitmap;
             for(i=1; i<=nwords; ++i)
                 if (layout_bitmap_logbitp(i-1, bitmap)) RECURSE(obj[i]);
             break;
         case FUNCALLABLE_INSTANCE_WIDETAG:
             layout = funinstance_layout(obj);
             graph_visit(ptr, layout, seen);
-            bitmap = ((struct layout*)native_pointer(layout))->bitmap;
+            bitmap = LAYOUT(layout)->bitmap;
             nwords = SHORT_BOXED_NWORDS(*obj);
             // We don't need to scan the word at index 1 (the trampoline pointer)
             // because it either points to the FIN itself or to readonly space.
