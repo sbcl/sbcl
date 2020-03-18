@@ -112,7 +112,7 @@
                                                 single-reg double-reg
                                                 complex-single-reg complex-double-reg)
                                           #+immobile-space
-                                          ,@(if (eq name 'type-check-error)
+                                          ,@(if (eq name 'sb-c::%type-check-error)
                                                 `(:load-if (type-err-type-tn-loadp ,arg)))))
                                  args))
                 ,@(and context
