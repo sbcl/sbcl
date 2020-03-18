@@ -295,7 +295,7 @@ static inline int simple_vector_p(lispobj obj) {
            widetag_of((lispobj*)(obj-OTHER_POINTER_LOWTAG)) == SIMPLE_VECTOR_WIDETAG;
 }
 
-static inline uword_t instance_length(lispobj header)
+static inline int instance_length(lispobj header)
 {
   return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
 }

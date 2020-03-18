@@ -463,7 +463,7 @@ static boolean tagged_slot_p(struct layout *layout, int slot_index)
 static void print_struct(lispobj obj)
 {
     struct instance *instance = (struct instance *)native_pointer(obj);
-    unsigned int i;
+    short int i;
     char buffer[16];
     lispobj layout = instance_layout(native_pointer(obj));
     print_obj("type: ", layout);
@@ -727,7 +727,7 @@ static void print_otherptr(lispobj obj)
     // FIXME: This case looks unreachable. print_struct() does it
     case INSTANCE_WIDETAG:
         NEWLINE_OR_RETURN;
-        count &= SHORT_HEADER_MAX_WORDS;
+        count = instance_length(header);
         printf("length = %ld", (long) count);
         index = 0;
         while (count-- > 0) {
