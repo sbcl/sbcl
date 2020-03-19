@@ -1542,6 +1542,12 @@
     (:delay 0)
     :pinned
     (:emitter (emit-x-form-inst segment 31 (valid-tcond-encoding tcond) (reg-tn-encoding ra) (reg-tn-encoding rb) 4 0)))
+  (define-instruction td (segment tcond ra rb)
+    (:printer x-19 ((op 31) (xo 68)))
+    (:attributes branch)
+    (:delay 0)
+    :pinned
+    (:emitter (emit-x-form-inst segment 31 (valid-tcond-encoding tcond) (reg-tn-encoding ra) (reg-tn-encoding rb) 68 0)))
 
   (define-4-xo-instructions subfc 31 8 :always-writes-xer t)
   (define-4-xo-instructions addc 31 10 :always-writes-xer t)

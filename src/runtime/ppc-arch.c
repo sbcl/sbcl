@@ -271,30 +271,25 @@ arch_do_displaced_inst(os_context_t *context, unsigned int orig_inst)
 static int
 allocation_trap_p(os_context_t * context)
 {
-    unsigned int *pc;
-    unsigned inst;
-    unsigned opcode;
-    unsigned src;
-    unsigned __attribute__((unused)) dst;
-
     /*
-     * First, the instruction has to be a TWLGT temp, NL3, which has the
+     * First, the instruction has to be "Tx LGT temp, NL3, which has the
      * format.
-     * | 6| 5| 5 | 5 | 10|1|  field width
-     * |31| 1|dst|src|  4|0|  value
+     * | 6|  5| 5 | 5 | 10|1|  field width
+     * ----------------------
+     * |31| TO|dst|src|  4|0|  TW - trap word
+     * |31| TO|dst|src| 68|0|  TD - trap doubleword
+     *
+     *   TO = #b00001 for LGT
      */
-    pc = (unsigned int *) (*os_context_pc_addr(context));
-    inst = *pc;
+    unsigned *pc = (unsigned int *) *os_context_pc_addr(context);
+    unsigned inst = *pc;
+    unsigned opcode = inst >> 26;
+    unsigned src = (inst >> 11) & 0x1f;
+    // unsigned dst = (inst >> 16) & 0x1f;
+    unsigned to = (inst >> 21) & 0x1f;
+    unsigned subcode = inst & 0x7ff;
 
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "allocation_trap_p at %p:  inst = 0x%08x\n", pc, inst);
-#endif
-
-    opcode = inst >> 26;
-    src = (inst >> 11) & 0x1f;
-    dst = (inst >> 16) & 0x1f;
-    if ((opcode == 31) && (src == reg_NL3) && (1 == ((inst >> 21) & 0x1f))
-        && (4 == ((inst >> 1) & 0x3ff))) {
+    if (opcode == 31 && to == 1 && src == reg_NL3 && (subcode == 4<<1 || subcode == 68<<1)) {
         /*
          * We got the instruction.  Now, look back to make sure it was
          * proceeded by what we expected.  The previous instruction
@@ -303,10 +298,6 @@ allocation_trap_p(os_context_t * context)
         unsigned int add_inst;
 
         add_inst = pc[-1];
-#if INLINE_ALLOC_DEBUG
-        fprintf(stderr, "   add inst at %p:  inst = 0x%08x\n",
-                pc - 1, add_inst);
-#endif
         opcode = add_inst >> 26;
         if ((opcode == 31) && (266 == ((add_inst >> 1) & 0x1ff))) {
             return 1;
