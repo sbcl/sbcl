@@ -3442,6 +3442,9 @@ III. initially undefined function references (alphabetically):
 (defun write-initial-core-file (filename verbose)
 
   (when verbose
+    (let ((*print-length* nil)
+          (*print-level* nil))
+    (format t "~&SB-XC:*FEATURES* =~&~S~%" sb-xc:*features*))
     (format t "[building initial core file in ~S: ~%" filename))
 
   (with-open-file (core-file (namestring filename) ; why NAMESTRING? dunno
