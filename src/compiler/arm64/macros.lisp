@@ -174,10 +174,11 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun allocation-tramp (alloc-tn size back-label return-in-tmp lip)
+(defun allocation-tramp (type alloc-tn size back-label return-in-tmp lip)
   (unless (eq size tmp-tn)
     (inst mov tmp-tn size))
-  (load-inline-constant alloc-tn '(:fixup alloc-tramp :assembly-routine) lip)
+  (let ((asm-routine (if (eq type 'list) 'list-alloc-tramp 'alloc-tramp)))
+    (load-inline-constant alloc-tn `(:fixup ,asm-routine :assembly-routine) lip))
   (inst blr alloc-tn)
   (unless return-in-tmp
     (move alloc-tn tmp-tn))
@@ -187,7 +188,7 @@
                       &key flag-tn
                            stack-allocate-p
                            (lip (if stack-allocate-p nil (missing-arg))))
-  (declare (ignore type) (ignorable lip))
+  (declare (ignorable type lip))
   ;; Normal allocation to the heap.
   (if stack-allocate-p
       (assemble ()
@@ -235,7 +236,8 @@
           (inst add result-tn tmp-tn lowtag))
         (assemble (:elsewhere)
           (emit-label ALLOC)
-          (allocation-tramp result-tn
+          (allocation-tramp type
+                            result-tn
                             size
                             BACK-FROM-ALLOC
                             ;; see the comment above aboout alloc_tramp

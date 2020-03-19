@@ -173,11 +173,11 @@
   (opcode-l :field (byte 1 20))
   (rn :field (byte 4 16) :type 'reg)
   (reglist :field (byte 16 0)
-	   :printer (lambda (value stream dstate)
+           :printer (lambda (value stream dstate)
                       (declare (ignore dstate))
-		      (format stream "{~{R~d~^,~}}"
-			      (loop for i below 16
-				    when (logbitp i value) collect i)))))
+                      (format stream "{~{R~d~^,~}}"
+                              (loop for i below 16
+                                    when (logbitp i value) collect i)))))
 
 (define-instruction-format (swi 32
                             :default-printer '(:name cond :tab "#" swi-number))

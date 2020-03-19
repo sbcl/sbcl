@@ -200,15 +200,17 @@
 ;;; P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun allocation-tramp (alloc-tn size back-label)
+(defun allocation-tramp (type alloc-tn size back-label)
   (when (integerp size)
     (load-immediate-word alloc-tn size))
   ;; Using the native stack is OK - the register values have fixnum nature.
   (inst word (logior #xe92d0000 ; PUSH {rN, lr}
                      (ash 1 (if (integerp size) (tn-offset alloc-tn) (tn-offset size)))
                      (ash 1 (tn-offset lr-tn))))
-  (inst ldr alloc-tn (@ null-tn (- (linkage-table-entry-address 0) ; = alloc_tramp
-                                   nil-value)))
+  ;; select the C function index as per *LINKAGE-SPACE-PREDEFINED-ENTRIES*
+  (let ((index (if (eq type 'list) 1 0)))
+    (inst ldr alloc-tn (@ null-tn (- (linkage-table-entry-address index)
+                                     nil-value))))
   (inst blx alloc-tn)
   (inst word (logior #xe8bd0000 ; POP {rN, lr}
                      (ash 1 (tn-offset alloc-tn))
@@ -216,7 +218,6 @@
   (inst b back-label))
 
 (defun allocation (type size lowtag result-tn &key flag-tn stack-allocate-p)
-  (declare (ignore type))
   ;; Normal allocation to the heap.
   (cond (stack-allocate-p
          (load-csp result-tn)
@@ -263,7 +264,7 @@
 
            (assemble (:elsewhere)
              (emit-label ALLOC)
-             (allocation-tramp result-tn size BACK-FROM-ALLOC))))))
+             (allocation-tramp type result-tn size BACK-FROM-ALLOC))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size
                                             &key (lowtag other-pointer-lowtag)

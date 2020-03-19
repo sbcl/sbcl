@@ -114,7 +114,8 @@
 
 (defconstant linkage-table-growth-direction :down)
 (defconstant linkage-table-entry-size 16)
-(setq *linkage-space-predefined-entries* '(("alloc_tramp" nil)))
+(setq *linkage-space-predefined-entries* '(("alloc_tramp" nil)
+                                           ("list_alloc_tramp" nil)))
 
 #+(or linux netbsd)
 (progn

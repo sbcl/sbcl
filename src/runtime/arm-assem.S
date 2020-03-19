@@ -286,49 +286,57 @@ fun_end_breakpoint_trap:
         .global fun_end_breakpoint_end
 fun_end_breakpoint_end:
 
-#ifdef LISP_FEATURE_GENCGC
-	.align
-	.global	alloc_tramp
-	.type	alloc_tramp, %function
-alloc_tramp:
-        stmfd	sp!, {r4, r6, r12, lr}
+@@ FIXME: writing this as a lisp assembly routine would eliminate all the
+@@ preprocessor noise. There's no reasom it can't be done, but we lack
+@@ instruction encoders for: stmfd, ldmfd, stmea, ldmea, fstmfdd, fldfdd.
 
-        ldr     r4, =foreign_function_call_active
-        str     pc, [r4]
-
-        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        add     r6, r4, #8*4
-        str     r6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-
+#define DEFINE_TRAMPOLINE(name, entry) \
+	.align ;\
+	.global	name ;\
+	.type	name, %function ;\
+name: \
+        stmfd	sp!, {r4, r6, r12, lr} ;\
+\
+        ldr     r4, =foreign_function_call_active ;\
+        str     pc, [r4] ;\
+\
+        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+        add     r6, r4, #8*4 ;\
+        str     r6, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+	/*
 	@@ The following comment is misleading: GC won't need to see
 	@@ anything when we're pseudo-atomic.
         @@ Create a new frame and save descriptor regs on the stack
-	@@ for the GC to see.
-        str     reg_CFP, [r4, #0]
-        str     reg_NULL, [r4, #4]
-        str     reg_CODE, [r4, #8]
-        add     r4, r4, #3*4
-        stmea   r4, {r0-reg_LEXENV, r8}
-
-        ldr     r0,  [sp, #4*4]
-        fstmfdd sp!, {d0-d7}
-
-        mov     lr, pc
-        ldr     pc,=alloc
-
-        fldmfdd sp!, {d0-d7}
-        str     r0,  [sp, #4*4]
-        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-        ldmea   r4, {r0-reg_LEXENV, r8}
-        sub     r4, r4, #8*4
-        str     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER)
-
-        ldr     r4, =foreign_function_call_active
-        mov     r6, #0
-	str     r6, [r4]
-
-	ldmfd	sp!, {r4, r6, r12, lr}
+	@@ for the GC to see. */ \
+        str     reg_CFP, [r4, #0] ;\
+        str     reg_NULL, [r4, #4] ;\
+        str     reg_CODE, [r4, #8] ;\
+        add     r4, r4, #3*4 ;\
+        stmea   r4, {r0-reg_LEXENV, r8} ;\
+\
+        ldr     r0,  [sp, #4*4] ;\
+        fstmfdd sp!, {d0-d7} ;\
+\
+        mov     lr, pc ;\
+        ldr     pc,=entry ;\
+\
+        fldmfdd sp!, {d0-d7} ;\
+        str     r0,  [sp, #4*4] ;\
+        ldr     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+        ldmea   r4, {r0-reg_LEXENV, r8} ;\
+        sub     r4, r4, #8*4 ;\
+        str     r4, STATIC_SYMBOL_VALUE(CONTROL_STACK_POINTER) ;\
+\
+        ldr     r4, =foreign_function_call_active ;\
+        mov     r6, #0 ;\
+	str     r6, [r4] ;\
+\
+	ldmfd	sp!, {r4, r6, r12, lr} ;\
 	bx	lr
+
+#ifdef LISP_FEATURE_GENCGC
+DEFINE_TRAMPOLINE(alloc_tramp, alloc)
+DEFINE_TRAMPOLINE(list_alloc_tramp, alloc_list)
 #endif
 
         .align

@@ -6,7 +6,8 @@
 (in-package "SB-VM")
 
 #+gencgc
-(define-assembly-routine (alloc-tramp (:return-style :none))
+(macrolet ((define-alloc-tramp (lisp-name c-name)
+ `(define-assembly-routine (,lisp-name (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)
      (:temp nl1 unsigned-reg nl1-offset))
   (flet ((reg (offset sc)
@@ -83,7 +84,7 @@
         (map-pairs stp csp-tn -80 lisp-registers)
         (map-pairs stp nsp-tn 0 float-registers :pre-index -512 :delta 32)
 
-        (load-inline-constant nl1 '(:fixup "alloc" :foreign))
+        (load-inline-constant nl1 '(:fixup ,c-name :foreign))
         (inst blr nl1)
 
         (map-pairs ldp nsp-tn 480 float-registers :post-index 512 :delta -32)
@@ -105,7 +106,9 @@
         (inst mov tmp-tn nl0) ;; result
 
         (map-pairs ldp nsp-tn 64 nl-registers :post-index 80 :delta -16)
-        (inst ret)))))
+        (inst ret)))))))
+  (define-alloc-tramp alloc-tramp "alloc")
+  (define-alloc-tramp list-alloc-tramp "alloc_list"))
 
 (define-assembly-routine
     (xundefined-tramp (:return-style :none)
