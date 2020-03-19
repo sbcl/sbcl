@@ -221,7 +221,7 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         ;; See the ppc4 file for more explanation about this.
+         ;; See the ppc64 file for more explanation about this.
          ;; (Or better yet, merge the two codebases)
          (inst tw (if (eq type 'list) :lgt :lge) result-tn flag-tn)
 
