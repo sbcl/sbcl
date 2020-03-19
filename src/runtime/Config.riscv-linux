@@ -14,7 +14,7 @@ NM = ./linux-nm
 ARCH_SRC = riscv-arch.c
 
 OS_SRC = linux-os.c linux-mman.c riscv-linux-os.c
-OS_LIBS = -ldl
+OS_LIBS = -ldl -Wl,-no-as-needed
 ifdef LISP_FEATURE_SB_CORE_COMPRESSION
   OS_LIBS += -lz
 endif

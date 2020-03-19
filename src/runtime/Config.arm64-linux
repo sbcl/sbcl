@@ -15,7 +15,7 @@ ASSEM_SRC = arm64-assem.S
 ARCH_SRC = arm64-arch.c
 
 OS_SRC = linux-os.c linux-mman.c arm64-linux-os.c
-OS_LIBS = -ldl
+OS_LIBS = -ldl -Wl,-no-as-needed
 
 ifdef LISP_FEATURE_GENCGC
   GC_SRC = fullcgc.c gencgc.c traceroot.c
