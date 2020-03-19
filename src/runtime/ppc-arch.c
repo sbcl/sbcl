@@ -272,7 +272,7 @@ static int
 allocation_trap_p(os_context_t * context)
 {
     /*
-     * First, the instruction has to be "Tx LGT temp, NL3, which has the
+     * First, the instruction has to be "Tx {LGT|LGE} temp, NL3, which has the
      * format.
      * | 6|  5| 5 | 5 | 10|1|  field width
      * ----------------------
@@ -280,6 +280,7 @@ allocation_trap_p(os_context_t * context)
      * |31| TO|dst|src| 68|0|  TD - trap doubleword
      *
      *   TO = #b00001 for LGT
+     *        #b00101 for LGE
      */
     unsigned *pc = (unsigned int *) *os_context_pc_addr(context);
     unsigned inst = *pc;
@@ -289,7 +290,15 @@ allocation_trap_p(os_context_t * context)
     unsigned to = (inst >> 21) & 0x1f;
     unsigned subcode = inst & 0x7ff;
 
-    if (opcode == 31 && to == 1 && src == reg_NL3 && (subcode == 4<<1 || subcode == 68<<1)) {
+    if (opcode == 31 && (to == 1 || to == 5) && src == reg_NL3
+        && (subcode == 4<<1 || subcode == 68<<1)) {
+        /* It doesn't much matter which trap option we pick for "could be large"
+         * but I've chosen "TGE" because of the choices, that one is subject to spurious
+         * failure, and I'd prefer not to spuriously fail on a 2-word cons.
+         * (Spurious failure occurs when the EQ condition is met, meaning the allocation
+         * would have worked, but the trap happens regardless) */
+        int success = (to == 5) ? 1 : -1; // 1 = single-object page ok, -1 = not ok
+
         /*
          * We got the instruction.  Now, look back to make sure it was
          * proceeded by what we expected.  The previous instruction
@@ -300,9 +309,9 @@ allocation_trap_p(os_context_t * context)
         add_inst = pc[-1];
         opcode = add_inst >> 26;
         if ((opcode == 31) && (266 == ((add_inst >> 1) & 0x1ff))) {
-            return 1;
+            return success;
         } else if ((opcode == 14)) {
-            return 1;
+            return success;
         } else {
             fprintf(stderr,
                     "Whoa! Got allocation trap but could not find ADD or ADDI instruction: 0x%08x in the proper place\n",
@@ -319,44 +328,13 @@ allocation_trap_p(os_context_t * context)
 static int
 handle_allocation_trap(os_context_t * context)
 {
-    unsigned int *pc;
-    unsigned int opcode;
-    sword_t size = 0;
-    char *memory;
+    int alloc_trap_p = allocation_trap_p(context);
 
-    if (!allocation_trap_p(context)) return 0;
+    if (!alloc_trap_p) return 0;
     gc_assert(!foreign_function_call_active_p(arch_os_get_current_thread()));
     fake_foreign_function_call(context);
 
-    /*
-     * Look at current instruction: TWNE temp, NL3. We're here because
-     * temp > NL3 and temp is the end of the allocation, and NL3 is
-     * current-region-end-addr.
-     *
-     * We need to adjust temp and alloc-tn.
-     */
-
-    pc = (unsigned int *) (*os_context_pc_addr(context));
-#if 0
-    inst = pc[0];
-    end_addr = (inst >> 11) & 0x1f;
-    target = (inst >> 16) & 0x1f;
-
-    target_ptr = *os_context_register_addr(context, target);
-#endif
-
-#if INLINE_ALLOC_DEBUG
-    fprintf(stderr, "handle_allocation_trap at %p:\n", pc);
-    fprintf(stderr, "boxed_region.free_pointer: %p\n", boxed_region.free_pointer);
-    fprintf(stderr, "boxed_region.end_addr: %p\n", boxed_region.end_addr);
-    fprintf(stderr, "target reg: %d, end_addr reg: %ld\n", target, end_addr);
-    fprintf(stderr, "target: %"OBJ_FMTX"\n",
-            (uword_t)*os_context_register_addr(context, target));
-    fprintf(stderr, "end_addr: %"OBJ_FMTX"\n",
-            (uword_t)*os_context_register_addr(context, end_addr));
-    fprintf(stderr, "trap inst = 0x%08x\n", inst);
-    fprintf(stderr, "target reg = %s\n", lisp_register_names[target]);
-#endif
+    unsigned int *pc = (unsigned int *) (*os_context_pc_addr(context));
 
     /*
      * Go back and look at the add/addi instruction.  The second src arg
@@ -366,10 +344,11 @@ handle_allocation_trap(os_context_t * context)
 
     unsigned int inst = pc[-1];
     int target = (inst >> 21) & 0x1f;
-    opcode = inst >> 26;
+    unsigned int opcode = inst >> 26;
 #if INLINE_ALLOC_DEBUG
     fprintf(stderr, "  add inst  = 0x%08x, opcode = %d\n", inst, opcode);
 #endif
+    sword_t size = 0;
     if (opcode == 14) {
         /*
          * ADDI temp-tn, alloc-tn, size
@@ -418,12 +397,13 @@ handle_allocation_trap(os_context_t * context)
         (lispobj *) ((long) dynamic_space_free_pointer - size);
     */
 
+    char *memory;
     {
-        extern lispobj* alloc(sword_t);
+        extern lispobj *alloc(sword_t), *alloc_list(sword_t);
         struct interrupt_data *data =
             arch_os_get_current_thread()->interrupt_data;
         data->allocation_trap_context = context;
-        memory = (char *) alloc(size);
+        memory = (char*)(alloc_trap_p < 0 ? alloc_list(size) : alloc(size));
         data->allocation_trap_context = 0;
     }
 

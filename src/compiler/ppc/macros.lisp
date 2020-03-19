@@ -171,9 +171,8 @@
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
-  (declare (ignore type stack-p node)
-           #-gencgc
-           (ignore temp-tn flag-tn))
+  (declare (ignore stack-p node)
+           (ignorable type temp-tn flag-tn))
   #-gencgc
   (progn
          (if (logbitp (1- n-lowtag-bits) lowtag)
@@ -222,7 +221,9 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         (inst tw :lgt result-tn flag-tn)
+         ;; See the ppc4 file for more explanation about this.
+         ;; (Or better yet, merge the two codebases)
+         (inst tw (if (eq type 'list) :lgt :lge) result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; one machine instruction.

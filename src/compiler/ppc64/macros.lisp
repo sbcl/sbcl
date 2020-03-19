@@ -186,7 +186,7 @@
   ;; set.  Otherwise, we need to zap out the lowtag from alloc-tn, and
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
-  (declare (ignore type stack-p node))
+  (declare (ignore stack-p node))
 
   ;; if sigtrap is making you suffer, enable out-of-line allocator for everything
   ;;  #-alloc-use-sigtrap
@@ -256,7 +256,15 @@
          ;; the actual end of the region?  If so, we need a full alloc.
          ;; The C code depends on this exact form of instruction.  If
          ;; either changes, you have to change the other appropriately!
-         (inst td :lgt result-tn flag-tn)
+         ;;
+         ;; We use the EQ bit of the 5-bit TO field to indicate whether this
+         ;; allocation can go on large-object pages. The trap condition
+         ;; is :LGE in that case which "spuriously fails" in the edge case
+         ;; when it could have actually used the current open region,
+         ;; exactly touching the end pointer. But that's fine, the trap
+         ;; handler doesn't bother to see whether the failure was spurious,
+         ;; because lisp_alloc() just works.
+         (inst td (if (eq type 'list) :lgt :lge) result-tn flag-tn)
 
          ;; The C code depends on this instruction sequence taking up
          ;; one machine instruction.
