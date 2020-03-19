@@ -152,6 +152,33 @@
   (rn :field (byte 4 16) :type 'reg)
   (rd :field (byte 4 12) :type 'reg))
 
+;;; Not sure if we can coerce our disassembler to print anything resembling this:
+;;; <LDM|STM>{cond}<FD|ED|FA|EA|IA|IB|DA|DB> Rn{!},<Rlist>{^} where:
+;;;   {cond}  two-character condition mnemonic. See Table 4-2: Condition code
+;;;           summary on page 4-5.
+;;;   Rn      is an expression evaluating to a valid register number
+;;;   <Rlist> is a list of registers and register ranges enclosed in {} (For example,
+;;;           {R0,R2-R7,R10}).
+;;;   {!}     if present requests write-back (W=1), otherwise W=0
+;;;   {^}     if present set S bit to load the CPSR along with the PC, or force transfer
+;;;           of user bank when in privileged mode
+;;; not to mention the alternative mnemonics PUSH and POP
+;;; when using the native stack pointer as base register.
+(define-instruction-format
+    ;; This is just to show something in the disassembly other than BYTE ...
+    (ldm/stm 32 :default-printer '(:name cond :tab bits ", " rn ", " reglist))
+  (cond :field (byte 4 28) :type 'condition-code)
+  (opcode-3 :field (byte 3 25))
+  (bits :field (byte 4 21)) ; complicated
+  (opcode-l :field (byte 1 20))
+  (rn :field (byte 4 16) :type 'reg)
+  (reglist :field (byte 16 0)
+	   :printer (lambda (value stream dstate)
+                      (declare (ignore dstate))
+		      (format stream "{~{R~d~^,~}}"
+			      (loop for i below 16
+				    when (logbitp i value) collect i)))))
+
 (define-instruction-format (swi 32
                             :default-printer '(:name cond :tab "#" swi-number))
   (cond :field (byte 4 28) :type 'condition-code)
@@ -1049,6 +1076,11 @@
   (define-load/store-instruction ldrb :load :byte)
   (define-load/store-instruction str :store :word)
   (define-load/store-instruction strb :store :byte))
+
+(define-instruction ldm (segment &rest args) ; load multiple
+  (:printer ldm/stm ((opcode-3 #b100) (opcode-l 1))))
+(define-instruction stm (segment &rest args) ; store multiple
+  (:printer ldm/stm ((opcode-3 #b100) (opcode-l 0))))
 
 ;;; Emit a miscellaneous load/store instruction.  CONDITION is a
 ;;; condition code name, OPCODE1 is the low bit of the first opcode
