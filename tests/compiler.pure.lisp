@@ -3716,10 +3716,10 @@
 (with-test (:name :bug-316078)
   (let ((fun (checked-compile
               `(lambda (x)
-                 (declare (type (and simple-bit-vector (satisfies bar)) x)
+                 (declare (type (and simple-bit-vector (satisfies eval)) x)
                           (optimize speed))
                  (elt x 5)))))
-    (assert (not (ctu:find-named-callees fun)))
+    (assert (equal (ctu:find-named-callees fun) (list #'eval)))
     (assert (= 1 (funcall fun #*000001)))
     (assert (= 0 (funcall fun #*000010)))))
 

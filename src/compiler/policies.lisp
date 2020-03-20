@@ -22,7 +22,6 @@ modification. Defaults to SAFETY.")
     ;; places which might want to use this instead -- or
     ;; some other derived policy.
     (cond ((= safety 0) 0)
-          ((and (< safety 2) (< safety speed)) 2)
           (t 3))
   ("no" "maybe" "weak" "full")
   "Control the way to perform runtime type checking:
