@@ -750,6 +750,7 @@ returns NIL each time."
           (multiple-value-call #'%wait-for-mutex
             mutex new-owner timeout (decode-timeout timeout))))))
 
+(declaim (ftype (sfunction (mutex &key (:waitp t) (:timeout (or null (real 0)))) boolean) grab-mutex))
 (defun grab-mutex (mutex &key (waitp t) (timeout nil))
   "Acquire MUTEX for the current thread. If WAITP is true (the default) and
 the mutex is not immediately available, sleep until it is available.
@@ -793,6 +794,7 @@ Notes:
           (multiple-value-call #'%wait-for-mutex
             mutex self timeout (decode-timeout timeout))))))
 
+(declaim (ftype (sfunction (mutex &key (:if-not-owner (member :punt :warn :error :force))) null) release-mutex))
 (defun release-mutex (mutex &key (if-not-owner :punt))
   "Release MUTEX by setting it to NIL. Wake up threads waiting for
 this mutex.
@@ -813,6 +815,8 @@ IF-NOT-OWNER is :FORCE)."
         ((:punt) (return-from release-mutex nil))
         ((:warn)
          (warn "Releasing ~S, owned by another thread: ~S" mutex old-owner))
+        ((:error)
+         (error "Releasing ~S, owned by another thread: ~S" mutex old-owner))
         ((:force)))
       (setf (mutex-%owner mutex) nil)
       ;; FIXME: Is a :memory barrier too strong here?  Can we use a :write
@@ -1011,6 +1015,7 @@ IF-NOT-OWNER is :FORCE)."
          (bug "%CONDITION-WAIT: invalid status on normal return: ~S" status))))))
 (declaim (notinline %condition-wait))
 
+(declaim (ftype (sfunction (waitqueue mutex &key (:timeout t)) boolean) condition-wait))
 (defun condition-wait (queue mutex &key timeout)
   "Atomically release MUTEX and start waiting on QUEUE until another thread
 wakes us up using either CONDITION-NOTIFY or CONDITION-BROADCAST on
@@ -1050,7 +1055,6 @@ associated data:
       (push data *data*)
       (condition-notify *queue*)))
 "
-  (assert mutex)
   (locally (declare (inline %condition-wait))
     (multiple-value-bind (to-sec to-usec stop-sec stop-usec deadlinep)
         (decode-timeout timeout)
@@ -1058,6 +1062,8 @@ associated data:
        (%condition-wait queue mutex timeout
                         to-sec to-usec stop-sec stop-usec deadlinep)))))
 
+(declaim (ftype (sfunction (waitqueue &optional (and fixnum (integer 1))) null)
+                condition-notify))
 (defun condition-notify (queue &optional (n 1))
   "Notify N threads waiting on QUEUE.
 
@@ -1068,26 +1074,27 @@ must be held by this thread during this call."
   #-sb-thread
   (error "Not supported in unithread builds.")
   #+sb-thread
-  (declare (type (and fixnum (integer 1)) n))
-  #+sb-thread
   (progn
     #-sb-futex
     (with-cas-lock ((waitqueue-%owner queue))
       (%waitqueue-wakeup queue n))
     #+sb-futex
     (progn
-    ;; No problem if >1 thread notifies during the comment in condition-wait:
-    ;; as long as the value in queue-data isn't the waiting thread's id, it
-    ;; matters not what it is -- using the queue object itself is handy.
-    ;;
-    ;; XXX we should do something to ensure that the result of this setf
-    ;; is visible to all CPUs.
-    ;;
-    ;; ^-- surely futex_wake() involves a memory barrier?
+      ;; No problem if >1 thread notifies during the comment in condition-wait:
+      ;; as long as the value in queue-data isn't the waiting thread's id, it
+      ;; matters not what it is -- using the queue object itself is handy.
+      ;;
+      ;; XXX we should do something to ensure that the result of this setf
+      ;; is visible to all CPUs.
+      ;;
+      ;; ^-- surely futex_wake() involves a memory barrier?
       (setf (waitqueue-token queue) queue)
       (with-pinned-objects (queue)
-        (futex-wake (waitqueue-token-address queue) n)))))
+        (futex-wake (waitqueue-token-address queue) n))
+      nil)))
 
+
+(declaim (ftype (sfunction (waitqueue) null) condition-broadcast))
 (defun condition-broadcast (queue)
   "Notify all threads waiting on QUEUE.
 
@@ -1111,8 +1118,10 @@ future."
   (name    nil :type (or null string) :read-only t)
   (%count    0 :type (integer 0))
   (waitcount 0 :type sb-vm:word)
-  (mutex (make-mutex :name "semaphore lock") :read-only t)
-  (queue (make-waitqueue) :read-only t))
+  (mutex (make-mutex :name "semaphore lock") :read-only t
+                                             :type mutex)
+  (queue (make-waitqueue) :read-only t
+                          :type waitqueue))
 
 (setf (documentation 'semaphore-name 'function)
       "The name of the semaphore INSTANCE. Setfable."
@@ -1253,6 +1262,7 @@ with SEMAPHORE-NOTIFICATION-STATUS of NIL. If the count is decremented,
 the status is set to T."
   (%decrement-semaphore semaphore n nil notification 'try-semaphore))
 
+(declaim (ftype (sfunction (semaphore &optional (integer 1)) null) signal-semaphore))
 (defun signal-semaphore (semaphore &optional (n 1))
   "Increment the count of SEMAPHORE by N. If there are threads waiting
 on this semaphore, then N of them is woken up."
