@@ -320,6 +320,7 @@
     (store-foreign-symbol-value null-tn "foreign_function_call_active" temp))
 
   ;; Call into C.
+  (loadw cfunc cfunc) ; dereference the linkage table entry
   (inst jalr lr-tn cfunc 0)
 
   ;; Pass the return values to Lisp.

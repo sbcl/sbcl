@@ -384,7 +384,7 @@
 (setq sb-ext:*evaluator-mode* :compile)
 (sb-ext:defglobal *large-obj* nil)
 
-#+(and gencgc (or x86 x86-64 ppc) (not win32))
+#+(and gencgc (or riscv x86 x86-64 ppc) (not win32))
 (progn
   (setq *print-array* nil)
   (setq *large-obj* (make-array (* sb-vm:gencgc-card-bytes 4)

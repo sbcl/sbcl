@@ -527,13 +527,21 @@ and
 ;;; the P-A FLAG-TN is also acceptable here.
 
 #+gencgc
-(defun alloc-tramp-stub-name (tn-offset)
-  (intern (format nil "ALLOC-TRAMP-STUB-~d" tn-offset) "SB-VM"))
+(defun alloc-tramp-stub-name (tn-offset type)
+  (declare (type (unsigned-byte 5) tn-offset))
+  (aref (load-time-value
+         (let ((a (make-array 64)))
+           (dotimes (i 32 a)
+             (let ((r (write-to-string i)))
+               (setf (aref a i)  (package-symbolicate "SB-VM" "ALLOC-LIST-TO-R" r)
+                     (aref a (+ i 32)) (package-symbolicate "SB-VM" "ALLOC-TO-R" r)))))
+         t)
+        (if (eq type 'list) tn-offset (+ tn-offset 32))))
 
 (defun allocation (type size lowtag result-tn &key flag-tn
                                                    stack-allocate-p
                                                    temp-tn)
-  (declare (ignore type))
+  (declare (ignorable type))
   #-gencgc (declare (ignore temp-tn))
   (cond (stack-allocate-p
          ;; Stack allocation
@@ -606,7 +614,7 @@ and
                 (move result-tn temp-tn))
                (tn
                 (move result-tn size)))
-             (invoke-asm-routine (alloc-tramp-stub-name (tn-offset result-tn)))
+             (invoke-asm-routine (alloc-tramp-stub-name (tn-offset result-tn) type))
              (inst j back-from-alloc))))))
 
 (defmacro with-fixed-allocation ((result-tn flag-tn type-code size

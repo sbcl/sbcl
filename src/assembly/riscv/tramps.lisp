@@ -22,9 +22,22 @@
 #+gencgc
 (defmacro define-alloc-tramp-stub (alloc-tn-offset)
   `(define-assembly-routine
-       (,(alloc-tramp-stub-name alloc-tn-offset) (:return-style :none))
+       (,(alloc-tramp-stub-name alloc-tn-offset nil)
+        (:export ,(alloc-tramp-stub-name alloc-tn-offset 'list))
+        (:return-style :none))
        ((:temp size unsigned-reg ,alloc-tn-offset)
         (:temp alloc descriptor-reg ,alloc-tn-offset))
+   ;; General-purpose entry point:
+     ;; ALLOC-TRAMP needs 1 bit of extra information to select a linkage table
+     ;; entry. It could be passed in the low bit of SIZE, but bcause the object
+     ;; granularity is 2 words, it is ok to use any bit under LOWTAG-MASK.
+     ;; e.g. with 64-bit words:
+     ;;             v--- ; use this bit
+     ;;  #b________10000 ; 16 bytes is the smallest object
+     ;; By pasing it as such, it is actually an offset into the linkage table.
+     (inst ori size size (ash 1 word-shift))
+   ;; CONS entry point:
+   ,(alloc-tramp-stub-name alloc-tn-offset 'list)
      ;; Pass the size and result on the number stack.  Instead of
      ;; allocating space here, we save some code size by delegating
      ;; the stack pointer frobbing to the real assembly routine.
@@ -79,8 +92,15 @@
     (inst addi csp-tn csp-tn lisp-framesize)
     (inst #-64-bit lw #+64-bit ld ca0 nsp-tn nbytes-start)
     (save-to-stack float-registers nsp-tn float-start t)
-    ;; (linkage-table-entry-address 0) corresponds to C alloc()
-    (loadw lr-tn null-tn 0 (- nil-value (linkage-table-entry-address 0)))
+    ;; linkage entry 0 = alloc() and entry 1 = alloc_list().
+    ;; Because the linkage table grows downward from NIL, entry 1 is at a lower
+    ;; address than 0. Adding the entry point selector bit from 'size' indexes to
+    ;; entry 0 or 1. If that bit was 1, it picks out entry 0, if 0 it picks out 1.
+    (inst andi lr-tn ca0 (ash 1 sb-vm:word-shift))
+    (inst add lr-tn null-tn lr-tn)
+    (loadw lr-tn lr-tn 0 (- nil-value (linkage-table-entry-address 1)))
+    (inst andi ca0 ca0 (lognot (ash 1 sb-vm:word-shift))) ; clear the selector bit
+    ;;
     (inst jalr lr-tn lr-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
     (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)
