@@ -78,7 +78,7 @@
                   (move ocfp-tn cfp-tn)
                   (move cfp-tn ocfp)
                   (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                         (inst add ocfp-tn nvals))
+                         (inst add csp-tn ocfp-tn nvals))
                         (t
                          (inst slli temp nvals (- word-shift n-fixnum-tag-bits))
                          (inst add csp-tn ocfp-tn temp)))
