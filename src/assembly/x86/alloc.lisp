@@ -131,25 +131,14 @@
   (def esi))
 
 #+sb-assembling
-(defun frob-allocation-assembly-routine (obj lowtag arg-tn)
-  `(define-assembly-routine (,(intern (format nil "ALLOCATE-~A-TO-~A" obj arg-tn)))
-     ((:temp ,arg-tn descriptor-reg ,(intern (format nil "~A-OFFSET" arg-tn))))
-     (pseudo-atomic ()
-      (allocation 'list ; this macro is supposedly general, but actually it isn't
-                  (pad-data-block ,(intern (format nil "~A-SIZE" obj)))
-                  ,lowtag
-                  nil nil ,arg-tn))))
-
-#+sb-assembling
-(macrolet ((frob-cons-routines ()
-             (let ((routines nil))
-               (dolist (tn-offset *dword-regs*
-                        `(progn ,@routines))
-                 (push (frob-allocation-assembly-routine 'cons
-                                                         list-pointer-lowtag
-                                                         (intern (aref +dword-register-names+ tn-offset)))
-                       routines)))))
-  (frob-cons-routines))
+(macrolet ((def (tn-name &aux (reg (subseq (string tn-name) 0 3)))
+             `(define-assembly-routine (,(symbolicate "ALLOCATE-CONS-TO-" reg))
+                  ((:temp result descriptor-reg ,(tn-offset (symbol-value tn-name))))
+                (pseudo-atomic ()
+                 (allocation 'list (* 2 n-word-bytes)
+                             list-pointer-lowtag nil nil result)))))
+  (progn (def eax-tn) (def ebx-tn) (def ecx-tn)
+         (def edx-tn) (def esi-tn) (def edi-tn)))
 
 #+sb-thread
 (define-assembly-routine (alloc-tls-index
