@@ -26,6 +26,7 @@ Messages can be arbitrary objects"
   (queue (missing-arg) :type queue)
   (semaphore (missing-arg) :type semaphore)
   (name nil))
+(declaim (sb-ext:freeze-type mailbox))
 
 (setf (documentation 'mailboxp 'function)
       "Returns true if argument is a MAILBOX, NIL otherwise."

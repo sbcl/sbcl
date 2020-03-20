@@ -463,6 +463,7 @@ HOLDING-MUTEX-P."
   %owner
   %head
   %tail)
+(declaim (sb-ext:freeze-type waitqueue))
 
 ;;; Signals an error if owner of LOCK is waiting on a lock whose release
 ;;; depends on the current thread. Does not detect deadlocks from sempahores.
@@ -1122,6 +1123,7 @@ future."
                                              :type mutex)
   (queue (make-waitqueue) :read-only t
                           :type waitqueue))
+(declaim (sb-ext:freeze-type semaphore))
 
 (setf (documentation 'semaphore-name 'function)
       "The name of the semaphore INSTANCE. Setfable."
@@ -1134,6 +1136,7 @@ future."
 TRY-SEMAPHORE as the :NOTIFICATION argument. Consequences are undefined if
 multiple threads are using the same notification object in parallel."
   (%status nil :type boolean))
+(declaim (sb-ext:freeze-type semaphore-notification))
 
 (setf (documentation 'make-semaphore-notification 'function)
       "Constructor for SEMAPHORE-NOTIFICATION objects. SEMAPHORE-NOTIFICATION-STATUS
@@ -1283,6 +1286,7 @@ on this semaphore, then N of them is woken up."
   (threads nil)
   (interactive-threads nil)
   (interactive-threads-queue (make-waitqueue)))
+(declaim (sb-ext:freeze-type session))
 
 (defvar *session* nil)
 

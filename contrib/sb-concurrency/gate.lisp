@@ -27,6 +27,7 @@ the state of a gate without blocking."
   (queue (missing-arg) :type waitqueue)
   (state :closed :type (member :open :closed))
   (name  nil :type (or null simple-string)))
+(declaim (sb-ext:freeze-type gate))
 
 (setf (documentation 'gatep 'function)
       "Returns true if the argument is a GATE."

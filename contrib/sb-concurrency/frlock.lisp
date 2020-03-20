@@ -67,6 +67,7 @@ Example:
   ;; an epoch marker to keep track of that.
   (epoch (list t) :type cons)
   (name nil))
+(declaim (sb-ext:freeze-type frlock))
 
 (setf (documentation 'frlock-name 'function)
       "Name of an FRLOCK. SETFable.")

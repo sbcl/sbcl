@@ -41,6 +41,7 @@ Use ENQUEUE to add objects to the queue, and DEQUEUE to remove them."
   (head (error "No HEAD.") :type cons)
   (tail (error "No TAIL.") :type cons)
   (name nil))
+(declaim (sb-ext:freeze-type queue))
 
 (setf (documentation 'queuep 'function)
       "Returns true if argument is a QUEUE, NIL otherwise."

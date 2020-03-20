@@ -82,6 +82,8 @@ temporarily.")
   "Asynchronous signal handling thread."
   (signal-number nil :type integer))
 
+(declaim (sb-ext:freeze-type mutex thread))
+
 (defun mutex-value (mutex)
   "Current owner of the mutex, NIL if the mutex is free. May return a
 stale value, use MUTEX-OWNER instead."
