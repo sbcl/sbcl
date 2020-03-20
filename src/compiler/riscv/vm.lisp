@@ -66,6 +66,8 @@
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
   (defregset descriptor-regs a0 a1 a2 a3 a4 a5 l0 l1 l2 ocfp lra lexenv)
+  (defregset reserve-descriptor-regs lexenv)
+  (defregset reserve-non-descriptor-regs cfunc)
   (defregset boxed-regs a0 a1 a2 a3 a4 a5 l0 l1 l2 ocfp lra lexenv code)
 
   (define-argument-register-set a0 a1 a2 a3 a4 a5))
@@ -88,6 +90,8 @@
  (control-stack control-stack)
  (any-reg registers
           :locations #.(append non-descriptor-regs descriptor-regs)
+          :reserve-locations #.(append reserve-non-descriptor-regs
+                                       reserve-descriptor-regs)
           :alternate-scs (control-stack)
           :constant-scs (immediate constant)
           :save-p t)
@@ -95,6 +99,7 @@
  ;; Pointer descriptor objects.  Must be seen by GC.
  (descriptor-reg registers
                  :locations #.descriptor-regs
+                 :reserve-locations #.reserve-descriptor-regs
                  :alternate-scs (control-stack)
                  :constant-scs (immediate constant)
                  :save-p t)
@@ -110,6 +115,7 @@
  ;; Non-Descriptor characters
  (character-reg registers
                 :locations #.non-descriptor-regs
+                :reserve-locations #.reserve-non-descriptor-regs
                 :alternate-scs (character-stack)
                 :constant-scs (immediate)
                 :save-p t)
@@ -117,18 +123,21 @@
  (sap-stack non-descriptor-stack)
  (sap-reg registers
           :locations #.non-descriptor-regs
+          :reserve-locations #.reserve-non-descriptor-regs
           :constant-scs (immediate)
           :alternate-scs (sap-stack)
           :save-p t)
  (signed-stack non-descriptor-stack)
  (signed-reg registers
              :locations #.non-descriptor-regs
+             :reserve-locations #.reserve-non-descriptor-regs
              :alternate-scs (signed-stack)
              :constant-scs (immediate)
              :save-p t)
  (unsigned-stack non-descriptor-stack)
  (unsigned-reg registers
                :locations #.non-descriptor-regs
+               :reserve-locations #.reserve-non-descriptor-regs
                :alternate-scs (unsigned-stack)
                :constant-scs (immediate)
                :save-p t)
