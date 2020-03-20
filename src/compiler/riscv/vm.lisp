@@ -30,7 +30,7 @@
                 (defconstant register-arg-count ,(length args)))))
                      ; ABI register mnemonic
   (defreg zero 0)    ; zero
-  (defreg lr 1)      ; ra
+  (defreg lip 1)     ; ra
   (defreg nsp 2)     ; sp
   (defreg global 3)  ; gp
   (defreg thread 4)  ; tp
@@ -61,7 +61,7 @@
   (defreg lexenv 27) ; s11
   (defreg null 28)   ; t3
   (defreg code 29)   ; t4
-  (defreg lip 30)    ; t5
+  (defreg l4 30)     ; t5
   (defreg nargs 31)  ; t6
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
@@ -185,7 +185,6 @@
   (defregtn nsp any-reg)
 
   (defregtn code descriptor-reg)
-  (defregtn lr interior-reg)
   (defregtn lip interior-reg))
 
 ;;; If VALUE can be represented as an immediate constant, then return the

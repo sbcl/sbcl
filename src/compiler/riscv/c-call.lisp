@@ -13,12 +13,12 @@
 
 
 (defconstant-eqx c-saved-registers
-    (list* lr-offset
+    (list* lip-offset
            8 9 (loop for i from 18 to 27 collect i))
   #'equal)
 
 (defconstant-eqx c-unsaved-registers
-    (append (list lr-offset)
+    (append (list lip-offset)
             (loop for i from 5 to 7 collect i)
             (loop for i from 10 to 17 collect i)
             (loop for i from 28 to 31 collect i))

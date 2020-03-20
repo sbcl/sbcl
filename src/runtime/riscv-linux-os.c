@@ -71,7 +71,7 @@ os_context_pc_addr(os_context_t *context)
 os_context_register_t *
 os_context_lr_addr(os_context_t *context)
 {
-    return os_context_register_addr(context, reg_LR);
+    return os_context_register_addr(context, reg_LIP);
 }
 
 sigset_t *

@@ -18,7 +18,7 @@
 #define NREGS (32)
 
 #define reg_ZERO     REG(0)
-#define reg_LR       REG(1)
+#define reg_LIP      REG(1)
 #define reg_NSP      REG(2)
 #define reg_GLOBAL   REG(3)
 #define reg_THREAD   REG(4)
@@ -47,5 +47,5 @@
 #define reg_LEXENV   REG(27)
 #define reg_NULL     REG(28)
 #define reg_CODE     REG(29)
-#define reg_LIP      REG(30)
+#define reg_L4       REG(30)
 #define reg_NARGS    REG(31)

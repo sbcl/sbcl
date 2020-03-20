@@ -42,13 +42,13 @@
      ;; allocating space here, we save some code size by delegating
      ;; the stack pointer frobbing to the real assembly routine.
      (inst subi nsp-tn nsp-tn n-word-bytes)
-     (storew lr-tn nsp-tn 0)
+     (storew lip-tn nsp-tn 0)
      (storew size nsp-tn -1)
      (invoke-asm-routine 'alloc-tramp nil)
      (loadw alloc nsp-tn -1)
-     (loadw lr-tn nsp-tn 0)
+     (loadw lip-tn nsp-tn 0)
      (inst addi nsp-tn nsp-tn n-word-bytes)
-     (inst jalr zero-tn lr-tn 0)))
+     (inst jalr zero-tn lip-tn 0)))
 
 #+gencgc
 (define-assembly-routine (alloc-tramp (:return-style :none))
@@ -60,7 +60,7 @@
                  collect (make-reg-tn i 'unsigned-reg)))
          (lisp-registers
            (loop for i in (intersection
-                           (union (list ca0-offset lr-offset cfp-offset null-offset code-offset)
+                           (union (list ca0-offset lip-offset cfp-offset null-offset code-offset)
                                   descriptor-regs)
                            c-unsaved-registers)
                  collect (make-reg-tn i 'unsigned-reg)))
@@ -96,12 +96,12 @@
     ;; Because the linkage table grows downward from NIL, entry 1 is at a lower
     ;; address than 0. Adding the entry point selector bit from 'size' indexes to
     ;; entry 0 or 1. If that bit was 1, it picks out entry 0, if 0 it picks out 1.
-    (inst andi lr-tn ca0 (ash 1 sb-vm:word-shift))
-    (inst add lr-tn null-tn lr-tn)
-    (loadw lr-tn lr-tn 0 (- nil-value (linkage-table-entry-address 1)))
+    (inst andi lip-tn ca0 (ash 1 sb-vm:word-shift))
+    (inst add lip-tn null-tn lip-tn)
+    (loadw lip-tn lip-tn 0 (- nil-value (linkage-table-entry-address 1)))
     (inst andi ca0 ca0 (lognot (ash 1 sb-vm:word-shift))) ; clear the selector bit
     ;;
-    (inst jalr lr-tn lr-tn 0)
+    (inst jalr lip-tn lip-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
     (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)
     (inst subi csp-tn csp-tn lisp-framesize)
@@ -109,7 +109,7 @@
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" nl0)
     (pop-from-stack nl-registers nsp-tn nl-start)
     (inst addi nsp-tn nsp-tn number-framesize)
-    (inst jalr zero-tn lr-tn 0)))
+    (inst jalr zero-tn lip-tn 0)))
 
 ;;; Define allocation stubs. The purpose of creating these stubs is to
 ;;; reduce the number of instructions needed at the site of
