@@ -48,27 +48,27 @@
   (defreg nl2 15)    ; a5
   (defreg a3 16)     ; a6
   (defreg nl3 17)    ; a7
-  (defreg l0 18)     ; s2, callee-saved
+  (defreg a4 18)     ; s2, callee-saved
   (defreg nl4 19)    ; s3
-  (defreg l1 20)     ; s4
+  (defreg a5 20)     ; s4
   (defreg nl5 21)    ; s5
-  (defreg l2 22)     ; s6
+  (defreg l0 22)     ; s6
   (defreg nl6 23)    ; s7
-  (defreg l3 24)     ; s8
+  (defreg l1 24)     ; s8
   (defreg nl7 25)    ; s9
+  (defreg l2 26)     ; s10
 
-  (defreg cfunc 26)  ; s10
-  (defreg lexenv 27) ; s11
-  (defreg null 28)   ; t3
-  (defreg code 29)   ; t4
-  (defreg l4 30)     ; t5
+  (defreg cfunc 27)  ; s11
+  (defreg lexenv 28) ; t3
+  (defreg null 29)   ; t4
+  (defreg code 30)   ; t5
   (defreg nargs 31)  ; t6
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
-  (defregset descriptor-regs a0 a1 a2 a3 l0 l1 l2 l3 ocfp lra lexenv)
-  (defregset boxed-regs a0 a1 a2 a3 l0 l1 l2 l3 ocfp lra lexenv code)
+  (defregset descriptor-regs a0 a1 a2 a3 a4 a5 l0 l1 l2 ocfp lra lexenv)
+  (defregset boxed-regs a0 a1 a2 a3 a4 a5 l0 l1 l2 ocfp lra lexenv code)
 
-  (define-argument-register-set a0 a1 a2 a3))
+  (define-argument-register-set a0 a1 a2 a3 a4 a5))
 
 (!define-storage-bases
  (define-storage-base registers :finite :size 32)
