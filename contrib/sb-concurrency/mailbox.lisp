@@ -32,7 +32,7 @@ Messages can be arbitrary objects"
       (documentation 'mailbox-name 'function)
       "Name of a MAILBOX. SETFable.")
 
-(declaim (ftype (sfunction (&key (name t) (initial-contents sequence)) mailbox)
+(declaim (ftype (sfunction (&key (:name t) (:initial-contents sequence)) mailbox)
                 make-mailbox))
 (defun make-mailbox (&key name initial-contents)
   "Returns a new MAILBOX with messages in INITIAL-CONTENTS enqueued."

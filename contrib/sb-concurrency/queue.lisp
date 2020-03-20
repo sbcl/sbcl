@@ -48,8 +48,8 @@ Use ENQUEUE to add objects to the queue, and DEQUEUE to remove them."
       "Name of a QUEUE. Can be assigned to using SETF. Queue names
 can be arbitrary printable objects, and need not be unique.")
 
-(declaim (ftype (sfunction (&key (name t)
-                                 (initial-contents sequence)) queue)
+(declaim (ftype (sfunction (&key (:name t)
+                                 (:initial-contents sequence)) queue)
                 make-queue))
 (defun make-queue (&key name initial-contents)
   "Returns a new QUEUE with NAME and contents of the INITIAL-CONTENTS

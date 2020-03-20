@@ -1015,7 +1015,7 @@ IF-NOT-OWNER is :FORCE)."
          (bug "%CONDITION-WAIT: invalid status on normal return: ~S" status))))))
 (declaim (notinline %condition-wait))
 
-(declaim (ftype (sfunction (waitqueue mutex &key (:timeout t)) boolean) condition-wait))
+(declaim (ftype (sfunction (waitqueue mutex &key (:timeout (or null (real 0)))) boolean) condition-wait))
 (defun condition-wait (queue mutex &key timeout)
   "Atomically release MUTEX and start waiting on QUEUE until another thread
 wakes us up using either CONDITION-NOTIFY or CONDITION-BROADCAST on
