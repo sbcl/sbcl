@@ -95,9 +95,7 @@
   (defconstant read-only-space-start #x04000000)
   (defconstant read-only-space-end   #x07ff8000)
   (defconstant static-space-start    #x08000000)
-  (defconstant static-space-end      #x097fff00
-                                     ; #+64-bit #x0c7fff00
-    )
+  (defconstant static-space-end      #x097fff00)
 
   (defconstant linkage-table-space-start #x0a000000)
   (defconstant linkage-table-space-end   #x0b000000))
