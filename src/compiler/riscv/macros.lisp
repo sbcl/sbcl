@@ -150,9 +150,9 @@ byte-ordering issues."
 If we are doing [reg+offset*n-word-bytes-lowtag+index*scale]
 and
 
--2^11 ≤ offset*n-word-bytes - lowtag + index*scale < 2^11
--2^11 ≤ offset*n-word-bytes - lowtag + index*scale ≤ 2^11-1
--2^11 + lowtag -offset*n-word-bytes ≤ index*scale ≤ 2^11-1 + lowtag - offset*n-word-bytes
+-2^11 <= offset*n-word-bytes - lowtag + index*scale < 2^11
+-2^11 <= offset*n-word-bytes - lowtag + index*scale <= 2^11-1
+-2^11 + lowtag -offset*n-word-bytes <= index*scale <= 2^11-1 + lowtag - offset*n-word-bytes
 |#
 (sb-xc:deftype load/store-index (scale lowtag offset)
   (let* ((encodable (list (- (ash 1 11)) (1- (ash 1 11))))
