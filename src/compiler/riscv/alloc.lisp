@@ -93,11 +93,8 @@
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
-      (cond ((zerop (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
-            (t
-             (inst slli bytes words (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
+      (with-fixnum-as-word-index (words bytes)
+        (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
       (inst andi bytes bytes (lognot lowtag-mask))
       (allocation nil bytes other-pointer-lowtag result :flag-tn pa-flag)
       (storew type result 0 other-pointer-lowtag)
@@ -116,11 +113,8 @@
   (:policy :fast-safe)
   (:generator 100
     (pseudo-atomic (pa-flag)
-      (cond ((zerop (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
-            (t
-             (inst slli bytes words (- word-shift n-fixnum-tag-bits))
-             (inst addi bytes bytes (* (1+ vector-data-offset) n-word-bytes))))
+      (with-fixnum-as-word-index (words bytes)
+        (inst addi bytes words (* (1+ vector-data-offset) n-word-bytes)))
       (inst andi bytes bytes (lognot lowtag-mask))
 
       ;; FIXME: It would be good to check for stack overflow here.
@@ -207,11 +201,8 @@
   (:temporary (:sc non-descriptor-reg) header)
   (:results (result :scs (descriptor-reg)))
   (:generator 6
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst addi bytes extra (* (1- words) n-word-bytes)))
-          (t
-           (inst slli bytes extra (- word-shift n-fixnum-tag-bits))
-           (inst addi bytes bytes (* (1- words) n-word-bytes))))
+    (with-fixnum-as-word-index (extra bytes)
+      (inst addi bytes extra (* (1- words) n-word-bytes)))
     (inst slli header bytes (- n-widetag-bits word-shift))
     (inst addi header header type)
     ;; Add the object header to the allocation size and round up to

@@ -77,12 +77,8 @@
                   ;; Clear the stack.
                   (move ocfp-tn cfp-tn)
                   (move cfp-tn ocfp)
-                  (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                         (inst add csp-tn ocfp-tn nvals))
-                        (t
-                         (inst slli temp nvals (- word-shift n-fixnum-tag-bits))
-                         (inst add csp-tn ocfp-tn temp)))
-
+                  (with-fixnum-as-word-index (nvals temp)
+                    (inst add csp-tn ocfp-tn nvals))
                   ;; Return.
                   (lisp-return lra :multiple-values)))))
   (frob))
@@ -140,8 +136,7 @@
 
                   DONE
                   ;; We are done.  Do the jump.
-                  (unless (zerop (- word-shift n-fixnum-tag-bits))
-                    (inst srai nargs nargs (- word-shift n-fixnum-tag-bits)))
+                  (with-word-index-as-fixnum (nargs nargs))
                   (loadw temp lexenv closure-fun-slot fun-pointer-lowtag)
                   (lisp-jump temp)))))
   (frob))

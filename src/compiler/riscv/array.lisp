@@ -23,13 +23,9 @@
   (:results (result :scs (descriptor-reg)))
   (:generator 5
     ;; Compute the allocation size.
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
-                                     lowtag-mask)))
-          (t
-           (inst slli ndescr rank (- word-shift n-fixnum-tag-bits))
-           (inst addi ndescr ndescr (+ (* array-dimensions-offset n-word-bytes)
-                                       lowtag-mask))))
+    (with-fixnum-as-word-index (rank ndescr)
+      (inst addi ndescr rank (+ (* array-dimensions-offset n-word-bytes)
+                                lowtag-mask)))
     (inst andi ndescr ndescr (lognot lowtag-mask))
     (pseudo-atomic (pa-flag)
       (allocation nil ndescr other-pointer-lowtag header :flag-tn pa-flag)

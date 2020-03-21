@@ -187,12 +187,14 @@
 (define-vop (nlx-entry-multiple)
   (:args (top :target result)
          (src)
-         (count :target count-words))
+         (count . #.(cl:when sb-vm::fixnum-as-word-index-needs-temp
+                      '(:target count-words))))
   ;; Again, no SC restrictions for the args, 'cause the loading would
   ;; happen before the entry label.
   (:info label)
   (:temporary (:scs (any-reg)) dst)
   (:temporary (:scs (descriptor-reg)) temp)
+  #+#.(cl:if sb-vm::fixnum-as-word-index-needs-temp '(and) '(or))
   (:temporary (:scs (any-reg) :from (:argument 2)) count-words)
   (:results (result :scs (any-reg) :from (:argument 0))
             (num :scs (any-reg) :from (:argument 0)))
@@ -209,11 +211,8 @@
       (load-stack-tn result top)
       (move num count)
       ;; Reset the CSP.
-      (cond ((= word-shift n-fixnum-tag-bits)
-             (inst add csp-tn result count))
-            (t
-             (inst slli count-words count (- word-shift n-fixnum-tag-bits))
-             (inst add csp-tn result count-words)))
+      (with-fixnum-as-word-index (count count-words)
+        (inst add csp-tn result count))
       (inst beq count zero-tn done)
 
       (move dst result)

@@ -26,6 +26,21 @@
   (def-mem-op loadw #-64-bit lw #+64-bit ld word-shift)
   (def-mem-op storew #-64-bit sw #+64-bit sd word-shift))
 
+(macrolet ((def-coerce-op (name inst)
+             `(defmacro ,name ((reg temp-reg) &body body)
+                `(progn
+                   ,@(if (= word-shift n-fixnum-tag-bits)
+                         body
+                         `((inst ,',inst ,temp-reg ,reg ,(- word-shift n-fixnum-tag-bits))
+                           ,(when body
+                              `(let ((,reg ,temp-reg))
+                                 ,@body))))))))
+  (def-coerce-op with-word-index-as-fixnum srai)
+  (def-coerce-op with-fixnum-as-word-index slli))
+
+(defconstant fixnum-as-word-index-needs-temp
+  (cl:/= sb-vm:word-shift sb-vm:n-fixnum-tag-bits))
+
 (defmacro load-symbol (reg symbol)
   `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
 
@@ -175,11 +190,8 @@ and
        (:results (value :scs ,scs))
        (:result-types ,eltype)
        (:generator 5
-         ,@(cond ((= word-shift n-fixnum-tag-bits)
-                  `((inst add lip object index)))
-                 (t
-                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                    (inst add lip object temp))))
+         (with-fixnum-as-word-index (index temp)
+           (inst add lip object index))
          (loadw value lip ,offset ,lowtag)))
      (define-vop (,(symbolicate name "-C"))
        ,@(when translate `((:translate ,translate)))
@@ -208,11 +220,8 @@ and
        (:results (result :scs ,scs))
        (:result-types ,eltype)
        (:generator 3
-         ,@(cond ((= word-shift n-fixnum-tag-bits)
-                  `((inst add lip object index)))
-                 (t
-                  `((inst slli temp index ,(- word-shift n-fixnum-tag-bits))
-                    (inst add lip object temp))))
+         (with-fixnum-as-word-index (index temp)
+           (inst add lip object index))
          (storew value lip ,offset ,lowtag)
          (move result value)))
      (define-vop (,(symbolicate name "-C"))

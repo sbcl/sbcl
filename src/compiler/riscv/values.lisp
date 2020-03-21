@@ -107,8 +107,7 @@
 
     DONE
     (inst sub count csp-tn start)
-    (unless (zerop (- word-shift n-fixnum-tag-bits))
-      (inst srai count count (- word-shift n-fixnum-tag-bits)))))
+    (with-word-index-as-fixnum (count count))))
 
 ;;; Copy the more arg block to the top of the stack so we can use them
 ;;; as function arguments.
@@ -127,20 +126,14 @@
       (immediate
        (inst addi src context (* (tn-value skip) n-word-bytes)))
       (any-reg
-       (cond ((zerop (- word-shift n-fixnum-tag-bits))
-              (inst add src context skip))
-             (t
-              (inst slli temp skip (- word-shift n-fixnum-tag-bits))
-              (inst add src context temp)))))
+       (with-fixnum-as-word-index (skip temp)
+         (inst add src context skip))))
     (move count num)
     (move start csp-tn)
     (inst beq count zero-tn done)
     (move dst start)
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst add csp-tn csp-tn count))
-          (t
-           (inst slli temp count (- word-shift n-fixnum-tag-bits))
-           (inst add csp-tn csp-tn temp)))
+    (with-fixnum-as-word-index (count temp)
+      (inst add csp-tn csp-tn count))
     LOOP
     (loadw temp src 0)
     (storew temp dst 0)

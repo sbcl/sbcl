@@ -606,8 +606,7 @@
                         (:load-nargs
                          ,@(if variable
                                `((inst sub nargs-pass csp-tn new-fp)
-                                 (unless (zerop (- word-shift n-fixnum-tag-bits))
-                                   (inst srai nargs-pass nargs-pass (- word-shift n-fixnum-tag-bits)))
+                                 (with-word-index-as-fixnum (nargs-pass nargs-pass))
                                  ,@(let ((index -1))
                                      (mapcar (lambda (name)
                                                `(loadw ,name new-fp ,(incf index)))
@@ -907,11 +906,9 @@
       ;; Compute the end of the MORE arg area (and our overall frame
       ;; allocation) into the stack pointer.
       (cond ((zerop fixed)
-             (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result nargs-tn))
-                   (t
-                    (inst slli dest nargs-tn (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result dest)))
+             (let ((nargs nargs-tn))
+               (with-fixnum-as-word-index (nargs dest)
+                 (inst add dest result nargs)))
              (move csp-tn dest)
              (inst beq nargs-tn zero-tn done))
             (t
@@ -921,11 +918,8 @@
                (move csp-tn result)
                (inst j done)
                (emit-label skip))
-             (cond ((zerop (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result count))
-                   (t
-                    (inst slli dest count (- word-shift n-fixnum-tag-bits))
-                    (inst add dest result dest)))
+             (with-fixnum-as-word-index (count dest)
+               (inst add dest result count))
              ;; Don't leave the arguments unprotected when moving below the stack pointer
              (when (>= delta 0)
                (move csp-tn dest))))
@@ -1082,21 +1076,21 @@
 (define-vop ()
   (:policy :fast-safe)
   (:translate sb-c::%more-arg-context)
-  (:args (supplied :scs (any-reg) :target temp))
+  (:args (supplied :scs (any-reg) .
+         #.(cl:when sb-vm::fixnum-as-word-index-needs-temp
+             '(:target temp))))
   (:arg-types tagged-num (:constant fixnum))
   (:info fixed)
   (:results (context :scs (descriptor-reg))
             (count :scs (any-reg)))
+  #+#.(cl:if sb-vm::fixnum-as-word-index-needs-temp '(and) '(or))
   (:temporary (:sc non-descriptor-reg) temp)
   (:result-types t tagged-num)
   (:note "more-arg-context")
   (:generator 5
     (inst subi count supplied (fixnumize fixed))
-    (cond ((zerop (- word-shift n-fixnum-tag-bits))
-           (inst sub context csp-tn count))
-          (t
-           (inst slli temp count (- word-shift n-fixnum-tag-bits))
-           (inst sub context csp-tn temp)))))
+    (with-fixnum-as-word-index (count temp)
+      (inst sub context csp-tn count))))
 
 (define-vop (verify-arg-count)
   (:policy :fast-safe)
