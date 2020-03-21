@@ -69,6 +69,12 @@ LINKFLAGS += -nopie
 LDFLAGS += -nopie
 __LDFLAGS__ += -nopie
 endif
+ifneq ($(shell $(CC) -dM -E - < /dev/null 2>/dev/null | grep -e '__clang__'),)
+CFLAGS += -fno-pie
+LINKFLAGS += -nopie
+LDFLAGS += -nopie
+__LDFLAGS__ += -nopie
+endif
 endif
 
 COMMON_SRC = alloc.c backtrace.c breakpoint.c coalesce.c coreparse.c    \
