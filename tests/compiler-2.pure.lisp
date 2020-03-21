@@ -2758,7 +2758,7 @@
                         (cond ((>= sum '0)
                                (go end))
                               (a
-                               (ceiling 1 (unwind-protect 0))
+                               (ceiling 1 (unwind-protect 2))
                                (incf sum)))
                         (go next)
                       end))
@@ -2831,3 +2831,15 @@
               (t a))))
    ((nil nil) 1)
    ((nil t) nil)))
+
+(with-test (:name :dead-component-unused-closure)
+  (checked-compile-and-assert
+   ()
+   `(lambda ()
+      (labels ((%f1 ())
+               (%f2 (&key)
+                 (flet ((%f3 ()
+                          (unwind-protect 1)
+                          (return-from %f2 (%f1)))))))
+        (%f1)))
+   (() nil)))

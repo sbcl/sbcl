@@ -393,7 +393,8 @@
          (when (or (component-new-functionals component)
                    (component-reanalyze-functionals component))
            (setf did-something t)
-           (locall-analyze-component component))))
+           (locall-analyze-component component)
+           (clean-component component))))
      (unless did-something
        (return))))
   (values))
