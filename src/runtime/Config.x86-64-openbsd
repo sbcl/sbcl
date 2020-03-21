@@ -10,6 +10,5 @@
 # files for more information.
 
 include Config.x86-64-bsd
-include Config.generic-openbsd
-
 DISABLE_PIE=no
+include Config.generic-openbsd
