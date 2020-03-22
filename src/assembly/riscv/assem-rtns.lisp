@@ -310,6 +310,9 @@
     ;; Convert the return address to an offset and save it on the stack.
     (inst sub nfp-tn lip-tn code-tn)
     (inst addi nfp-tn nfp-tn other-pointer-lowtag)
+    ;; Ensure it has fixnum nature so GC doesn't croak.
+    (when (> n-fixnum-tag-bits 2)
+      (inst slli nfp-tn nfp-tn (- n-fixnum-tag-bits 2)))
     (storew ocfp-tn cfp-tn)
     (storew nfp-tn cfp-tn 1)
     (storew code-tn cfp-tn 2)
@@ -336,6 +339,8 @@
     (loadw ocfp-tn cfp-tn 0)
     (loadw nfp-tn cfp-tn 1)
     (loadw code-tn cfp-tn 2)
+    (when (> n-fixnum-tag-bits 2)
+      (inst srli nfp-tn nfp-tn (- n-fixnum-tag-bits 2)))
     (inst add lip-tn nfp-tn code-tn)
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
 
