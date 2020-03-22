@@ -1154,18 +1154,19 @@
                     ;; that has FUNCTION-DESIGNATOR in its arg signature
                     ;; (pretty much any CL: function). This is just sad.
                     ;; Are type checks getting in the way?
-                    (dolist (x (fun-info-transforms info))
-                      (when (eq *show-transforms-p* :all)
-                        (let* ((lvar (basic-combination-fun node))
-                               (fname (lvar-fun-name lvar t)))
-                          (format *trace-output*
-                                  "~&trying transform ~s for ~s"
-                                  (transform-type x) fname)))
-                      (unless (ir1-transform node x)
-                        (when (eq *show-transforms-p* :all)
-                          (format *trace-output*
-                                  "~&quitting because IR1-TRANSFORM result was NIL"))
-                        (return)))))))))))))
+                    (or (try-equality-constraint node)
+                        (dolist (x (fun-info-transforms info))
+                          (when (eq *show-transforms-p* :all)
+                            (let* ((lvar (basic-combination-fun node))
+                                   (fname (lvar-fun-name lvar t)))
+                              (format *trace-output*
+                                      "~&trying transform ~s for ~s"
+                                      (transform-type x) fname)))
+                          (unless (ir1-transform node x)
+                            (when (eq *show-transforms-p* :all)
+                              (format *trace-output*
+                                      "~&quitting because IR1-TRANSFORM result was NIL"))
+                            (return))))))))))))))
   (values))
 
 (defun xep-tail-combination-p (node)
@@ -1754,18 +1755,7 @@
        (cond ((not win)
               (setf (combination-kind call) :error))
              ((and (proper-list-of-length-p values 1))
-              (with-ir1-environment-from-node call
-                (let* ((lvar (node-lvar call))
-                       (prev (node-prev call))
-                       (intermediate-ctran (make-ctran)))
-                  (%delete-lvar-use call)
-                  (setf (ctran-next prev) nil)
-                  (setf (node-prev call) nil)
-                  (reference-constant prev intermediate-ctran lvar
-                                      (first values))
-                  (link-node-to-previous-ctran call intermediate-ctran)
-                  (reoptimize-lvar lvar)
-                  (flush-combination call))))
+              (replace-combination-with-constant (first values) call))
              (t (let ((dummies (make-gensym-list (length args))))
                   (transform-call
                    call

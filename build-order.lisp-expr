@@ -473,6 +473,7 @@
 
  ("src/compiler/ir1final")
  ("src/compiler/constraint")
+ ("src/compiler/equality-constraints")
  ("src/compiler/array-tran")
  ("src/compiler/seqtran")
  ("src/compiler/saptran")

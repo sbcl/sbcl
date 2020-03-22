@@ -88,14 +88,6 @@
   ;; does *not* hold.
   (not-p nil :type boolean))
 
-(defstruct (equality-constraint
-            (:include constraint)
-            (:constructor make-equality-constraint
-                (number operator x y not-p
-                 &aux (kind 'equality))))
-
-  (operator nil :type symbol))
-
 
 ;;; Historically, CMUCL and SBCL have used a sparse set implementation
 ;;; for which most operations are O(n) (see sset.lisp), but at the
@@ -489,6 +481,9 @@
            (body-fun con))
          (do-conset-constraints-intersection
              (con (,conset (lambda-var-inheritable-constraints ,variable)) ,result)
+           (body-fun con))
+         (do-conset-constraints-intersection
+             (con (,conset (lambda-var-equality-constraints ,variable)) ,result)
            (body-fun con))))))
 
 (declaim (inline conset-lvar-lambda-var-eql-p conset-add-lvar-lambda-var-eql))
@@ -684,57 +679,6 @@
               ;; the index is constant
               (values 'array-in-bounds-p array-var index-constant)
               (values 'array-in-bounds-p index-var array-var)))))))
-
-(defun find-equality-constraint (operator x y not-p)
-  (let ((constraints (lambda-var-equality-constraints x)))
-    (when constraints
-      (loop for con across constraints
-            when (and (eq (equality-constraint-operator con) operator)
-                      (eq (constraint-not-p con) not-p)
-                      (eq (constraint-y con) y))
-            return con))))
-
-(defun find-or-create-equality-constraint (operator x y not-p)
-  (or (find-equality-constraint operator x y not-p)
-      (let ((new (make-equality-constraint (length *constraint-universe*)
-                                           operator
-                                           x y not-p)))
-        (vector-push-extend new *constraint-universe* (1+ (length *constraint-universe*)))
-        (flet ((add (var)
-                 (conset-adjoin new (lambda-var-constraints var))
-                 (macrolet ((ensure-vec (place)
-                              `(or ,place
-                                   (setf ,place
-                                         (make-array 8 :adjustable t :fill-pointer 0)))))
-                   (vector-push-extend new (ensure-vec (lambda-var-equality-constraints var)))
-                   (vector-push-extend new (ensure-vec (lambda-var-inheritable-constraints var))))))
-          (add x)
-          (when (lambda-var-p y)
-            (add y)))
-        new)))
-
-(defun add-equality-constraints (operator args constraints
-                                 consequent-constraints
-                                 alternative-constraints)
-  (case operator
-    ((eq eql)
-     (when (= (length args) 2)
-       (let* ((x (ok-lvar-lambda-var (first args) constraints))
-              (second (second args))
-              (y (if (constant-lvar-p second)
-                     (find-constant (lvar-value second))
-                     (ok-lvar-lambda-var second constraints))))
-         (when (and x y)
-           ;; TODO: inherit constraints
-           (let ((con (find-or-create-equality-constraint operator x y nil))
-                 (not-con (find-or-create-equality-constraint operator x y t)))
-             (conset-adjoin con consequent-constraints)
-             (conset-adjoin not-con alternative-constraints))))))))
-
-(defun add-eq-constraint (var lvar gen)
-  (let ((var2 (ok-lvar-lambda-var lvar gen)))
-    (when var2
-      (conset-adjoin (find-or-create-equality-constraint 'eq var var2 nil) gen))))
 
 ;;; Add test constraints to the consequent and alternative blocks of
 ;;; the test represented by USE.
@@ -1001,7 +945,11 @@
             (equality
              (unless (eq (ref-constraints ref)
                          (pushnew con (ref-constraints ref)))
-               (reoptimize-lvar (node-lvar ref))))
+               (let ((lvar (node-lvar ref))
+                     (principal-lvar (nth-value 1 (principal-lvar-dest-and-lvar (node-lvar ref)))))
+                 (reoptimize-lvar lvar)
+                 (unless (eq lvar principal-lvar)
+                   (reoptimize-lvar principal-lvar)))))
             (typep
              (if not-p
                  (if (member-type-p other)

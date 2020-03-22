@@ -395,7 +395,12 @@
                    (n-node (make-symbol "NODE"))
                    ((binds lambda-vars gensyms)
                     (parse-deftransform lambda-list n-node
-                                        `(return-from ,name nil))))
+                                        `(return-from ,name
+                                           ,(if (and (consp what)
+                                                     (eq (second what)
+                                                         'equality-constraint))
+                                                :give-up
+                                                nil)))))
           (declare (ignore lambda-vars))
           `(progn
              ;; We can't stuff the BINDS as &AUX vars into the lambda list

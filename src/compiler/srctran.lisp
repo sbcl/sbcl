@@ -3281,50 +3281,15 @@
 
 ;;;; equality predicate transforms
 
-(defun find-ref-equality-constraint (operator lvar1 lvar2)
-  (let ((ref1 (lvar-uses lvar1))
-        (ref2 (lvar-uses lvar2)))
-    (when (and (ref-p ref1)
-               (ref-p ref2))
-      (let ((leaf1 (ref-leaf ref1))
-            (leaf2 (ref-leaf ref2)))
-        (flet ((find-constraint (ref)
-                 (loop for con in (ref-constraints ref)
-                       when (and (equality-constraint-p con)
-                                 (eq (equality-constraint-operator con) operator)
-                                 (or (and (eq (constraint-x con) leaf1)
-                                          (eq (constraint-y con) leaf2))
-                                     (and (eq (constraint-x con) leaf2)
-                                          (eq (constraint-y con) leaf1))))
-                       return con))
-               (has-sets (leaf)
-                 (and (lambda-var-p leaf)
-                      (lambda-var-sets leaf))))
-          (let ((ref1-con (find-constraint ref1)))
-            (when (and ref1-con
-                       ;; If the variables are set both references
-                       ;; need to have the same constraint, otherwise
-                       ;; one the references may be done before the
-                       ;; set.
-                       (or (and (not (has-sets leaf1))
-                                (not (has-sets leaf2)))
-                           (eq ref1-con (find-constraint ref2))))
-              ref1-con)))))))
-
 ;;; If X and Y are the same leaf, then the result is true. Otherwise,
 ;;; if there is no intersection between the types of the arguments,
 ;;; then the result is definitely false.
 (deftransforms (eq char=) ((x y) * *)
   "Simple equality transform"
   (let ((use (lvar-uses x))
-        arg
-        (constraint (find-ref-equality-constraint 'eq x y)))
+        arg)
     (declare (ignorable use arg))
     (cond
-      (constraint
-       (if (constraint-not-p constraint)
-           nil
-           t))
       ((same-leaf-ref-p x y) t)
       ((not (types-equal-or-intersect (lvar-type x) (lvar-type y)))
        nil)
@@ -3369,18 +3334,8 @@
   (let* ((x-type (lvar-type x))
          (y-type (lvar-type y))
          #+integer-eql-vop (int-type (specifier-type 'integer))
-         (char-type (specifier-type 'character))
-         (eql-constraint (find-ref-equality-constraint 'eql x y))
-         (eq-constraint (and (not eql-constraint)
-                             (find-ref-equality-constraint 'eq x y))))
+         (char-type (specifier-type 'character)))
     (cond
-      (eql-constraint
-       (if (constraint-not-p eql-constraint)
-           nil
-           t))
-      ((and eq-constraint
-            (not (constraint-not-p eq-constraint)))
-       t)
       ((same-leaf-ref-p x y) t)
       ((not (types-equal-or-intersect x-type y-type))
        nil)

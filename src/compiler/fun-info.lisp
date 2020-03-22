@@ -148,6 +148,7 @@
   ;; a sequence of constraints (see CONSTRAINT-PROPAGATE), for the
   ;; consequent and alternative branches, respectively.
   (constraint-propagate-if nil :type (or function null))
+  (equality-constraint nil :type (or function null))
   ;; all the templates that could be used to translate this function
   ;; into IR2, sorted by increasing cost.
   (templates nil :type list)

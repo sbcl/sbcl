@@ -2318,6 +2318,19 @@ is :ANY, the function name is not checked."
   (unlink-node combination)
   (values))
 
+(defun replace-combination-with-constant (constant combination)
+  (with-ir1-environment-from-node combination
+    (let* ((lvar (node-lvar combination))
+           (prev (node-prev combination))
+           (intermediate-ctran (make-ctran)))
+      (%delete-lvar-use combination)
+      (setf (ctran-next prev) nil)
+      (setf (node-prev combination) nil)
+      (reference-constant prev intermediate-ctran lvar constant)
+      (link-node-to-previous-ctran combination intermediate-ctran)
+      (reoptimize-lvar lvar)
+      (flush-combination combination))))
+
 
 ;;;; leaf hackery
 
