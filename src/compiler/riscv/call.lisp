@@ -971,7 +971,8 @@
       (emit-label do-regs)
       (when (< fixed register-arg-count)
         ;; Now we have to deposit any more args that showed up in registers.
-        (inst subi count nargs-tn (fixnumize fixed))
+        (when (zerop fixed)
+          (inst subi count nargs-tn (fixnumize fixed)))
         (do ((i fixed (1+ i)))
             ((>= i register-arg-count))
           ;; Don't deposit any more than there are.
