@@ -631,7 +631,7 @@ exist or if is a file or a symbolic link."
           (delete-dir physical)))))
 
 
-(sb-alien:define-alien-variable ("sbcl_home" *sbcl-home*) c-string)
+(sb-alien:define-alien-variable ("runtime_home" *runtime-home*) c-string)
 
 (defun sbcl-homedir-pathname ()
   (let ((env (posix-getenv "SBCL_HOME")))
@@ -641,13 +641,21 @@ exist or if is a file or a symbolic link."
              (parse-native-namestring namestring
                                       *physical-host*
                                       *default-pathname-defaults*
-                                      :as-directory t)))
+                                      :as-directory t))
+           (probe (path)
+             (when (probe-file (merge-pathnames "contrib/"
+                                                path))
+               path)))
       (let ((env (and env (not (string= env ""))
-                      (parse env))))
-        (if (and env
-                 (probe-file env))
-            env
-            (parse (or *sbcl-home* "")))))))
+                      (parse env)))
+            (parsed-runtime-home))
+        (or (and env
+                 (probe env))
+            (probe (setf parsed-runtime-home
+                         (parse (or *runtime-home* ""))))
+            (probe (merge-pathnames "../lib/sbcl/"
+                                    parsed-runtime-home))
+            (parse "."))))))
 
 (flet ((not-empty (x)
          (and (not (equal x "")) x))

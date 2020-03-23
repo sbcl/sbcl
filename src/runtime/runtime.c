@@ -71,7 +71,7 @@
 #endif
 
 static char libpath[] = "../lib/sbcl";
-char *sbcl_home;
+char *runtime_home;
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
@@ -236,7 +236,7 @@ search_for_core ()
 
     if (!(env_sbcl_home && *env_sbcl_home) ||
         stat(env_sbcl_home, &filename_stat))
-        env_sbcl_home = sbcl_home;
+        env_sbcl_home = runtime_home;
     lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                strlen(libpath) +
                                strlen(stem) +
@@ -246,18 +246,11 @@ search_for_core ()
     core = copied_existing_filename_or_null(lookhere);
 
     if (core) {
-        sbcl_home = (char *) calloc(strlen(env_sbcl_home) +
-                                    strlen(libpath) +
-                                    1,
-                                    sizeof(char));
-        sprintf(sbcl_home, "%s%s", env_sbcl_home, libpath);
         free(lookhere);
     } else {
         free(lookhere);
         core = copied_existing_filename_or_null ("sbcl.core");
-        if (core) {
-            sbcl_home = ".";
-        } else {
+        if (!core) {
             lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                        strlen(stem) +
                                        1,
@@ -451,7 +444,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
      * options */
     runtime_path = os_get_runtime_executable_path(0);
 
-    /* Set 'sbcl_home' to
+    /* Set 'runtime_home' to
      * "<here>" based on how this executable was invoked. */
     {
         char *exename = argv[0]; // Use as-it, not truenameified
@@ -473,12 +466,12 @@ sbcl_main(int argc, char *argv[], char *envp[])
         }
 
         if (!slash) {
-            sbcl_home = libpath;
+            runtime_home = libpath;
         } else {
             int prefixlen = slash - exename + 1; // keep the slash in the prefix
-            sbcl_home = successful_malloc(prefixlen + 1);
-            memcpy(sbcl_home, exename, prefixlen);
-            sbcl_home[prefixlen] = 0;
+            runtime_home = successful_malloc(prefixlen + 1);
+            memcpy(runtime_home, exename, prefixlen);
+            runtime_home[prefixlen] = 0;
 
         }
     }
