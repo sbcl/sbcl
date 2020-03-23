@@ -742,6 +742,7 @@ elif [ "$sbcl_arch" = "sparc" ]; then
     fi
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
 elif [ "$sbcl_arch" = "alpha" ]; then
+    printf ' :64-bit-registers' >> $ltf
     printf ' :cheneygc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-lists' >> $ltf
     printf ' :stack-allocatable-fixed-objects' >> $ltf
