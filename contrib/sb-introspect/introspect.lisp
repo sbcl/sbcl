@@ -719,7 +719,6 @@ Experimental.
 ;;;; ALLOCATION INTROSPECTION
 
 (defun allocation-information (object)
-  #+sb-doc
   "Returns information about the allocation of OBJECT. Primary return value
 indicates the general type of allocation: :IMMEDIATE, :HEAP, :STACK,
 or :FOREIGN.
