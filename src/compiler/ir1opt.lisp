@@ -806,7 +806,7 @@
                                     penultimate))
                    (next-block (or (node-ends-block penultimate)
                                    (car (block-succ (node-block penultimate)))))
-                   (ctran (make-ctran))
+                   (ctran (make-ctran :kind :block-start))
                    (new-block (make-block-key :start ctran
                                               :pred (block-pred next-block)
                                               :succ (list next-block)))

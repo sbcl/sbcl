@@ -2819,3 +2819,15 @@
         (declare (inline fun))
         (multiple-value-call #'fun (values-list args))
         #'fun))))
+
+(with-test (:name :split-let-ctran-kind)
+  (checked-compile-and-assert
+   ()
+   `(lambda (a b)
+      (let ((a-n (null a))
+            (b-n (null b)))
+        (cond (b-n 1)
+              (a-n a)
+              (t a))))
+   ((nil nil) 1)
+   ((nil t) nil)))
