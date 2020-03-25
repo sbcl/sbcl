@@ -551,9 +551,11 @@
   (:translate make-double-float)
   (:policy :fast-safe)
   (:generator 2
-    (storew hi-bits nsp-tn -1)
-    (storew lo-bits nsp-tn -2)
-    (inst fload :double res nsp-tn (* -2 n-word-bytes))))
+    (inst subi nsp-tn nsp-tn (* 2 n-word-bytes))
+    (storew lo-bits nsp-tn 0)
+    (storew hi-bits nsp-tn 1)
+    (inst fload :double res nsp-tn 0)
+    (inst addi nsp-tn nsp-tn (* 2 n-word-bytes))))
 
 #+64-bit
 (define-vop (make-double-float)
@@ -626,8 +628,10 @@
       (double-reg
        #-64-bit
        (progn
-         (inst fstore :double float nsp-tn (* -2 n-word-bytes))
-         (loadw hi-bits nsp-tn -1))
+         (inst subi nsp-tn nsp-tn (* 2 n-word-bytes))
+         (inst fstore :double float nsp-tn 0)
+         (loadw hi-bits nsp-tn 1)
+         (inst addi nsp-tn nsp-tn (* 2 n-word-bytes)))
        #+64-bit
        (progn
          (inst fmvx<- :double temp float)
