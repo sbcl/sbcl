@@ -179,7 +179,7 @@
     (:single
      (unless (location= x y)
        (inst fmove :double y x)))
-    ((#-64-bit :single #+64-bit :double)
+    ((#-64-bit :single :double)
      (unless (location= x y)
        ;; Note the complex-float-regs are aligned to every second
        ;; float register so there is not need to worry about overlap.
@@ -238,7 +238,7 @@
 (define-vop (move-from-complex-single move-from-complex-float)
   (:args (x :scs (complex-single-reg) :to :save))
   (:note "complex single float to pointer coercion")
-  (:variant :single complex-single-float-real-slot complex-double-float-imag-slot
+  (:variant :single complex-single-float-real-slot complex-single-float-imag-slot
             complex-single-float-widetag complex-single-float-size))
 
 #+64-bit
@@ -327,6 +327,7 @@
              (inst fstore :single real-tn nfp offset))
            (let ((imag-tn (complex-reg-imag-tn :single x)))
              (inst fstore :single imag-tn nfp (+ offset 4))))
+         #+64-bit
          (inst fstore :double x nfp offset))))))
 
 (define-move-vop move-complex-single-float-arg :move-arg
@@ -697,6 +698,7 @@
                :load-if (not (location= real r)))
          (imag :scs (single-reg) :to :save))
   (:arg-types single-float single-float)
+  #+64-bit
   (:temporary (:sc non-descriptor-reg) t1 t2)
   (:results (r :scs (complex-single-reg) :from (:argument 0)
                :load-if (not (sc-is r complex-single-stack))))
@@ -764,6 +766,7 @@
   (:args (x :scs (complex-single-reg) :target r
             :load-if (not (sc-is x complex-single-stack))))
   (:arg-types complex-single-float)
+  #+64-bit
   (:temporary (:sc non-descriptor-reg) temp)
   (:results (r :scs (single-reg)))
   (:result-types single-float)

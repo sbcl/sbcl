@@ -19,7 +19,7 @@
 (def!type short-immediate-fixnum () `(signed-byte ,(- 12 n-fixnum-tag-bits)))
 
 (def!type u+i-immediate ()
-  #-64-bit `(and (signed-byte 32) (unsigned-byte 32))
+  #-64-bit `(or (signed-byte 32) (unsigned-byte 32))
   #+64-bit `(or (integer #x-80000800 #x7ffff7ff)
                 (integer ,(+ (ash 1 64) #x-80000800)
                          ,(1- (ash 1 64)))))
