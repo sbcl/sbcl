@@ -994,7 +994,7 @@
 (define-vop (more-arg-or-nil)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
-         (count :scs (any-reg)))
+         (count :scs (any-reg) :to (:result 1)))
   (:temporary (:scs (any-reg)) index-temp)
   (:info index)
   (:results (value :scs (descriptor-reg any-reg)))
