@@ -596,7 +596,10 @@
   ;; analysis. (For closures this is a list of the allocating node -
   ;; during IR1, and a list of the argument LVAR of the allocator -
   ;; after physical environment analysis.)
-  (info nil :type list))
+  (info nil :type list)
+  ;; Used by propagate-ref-dx to check that the new ref is inside the
+  ;; original let
+  (lexenv nil :type (or null lexenv)))
 (defprinter (cleanup :identity t)
   kind
   mess-up

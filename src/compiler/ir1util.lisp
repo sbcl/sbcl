@@ -391,14 +391,14 @@
 ;;; (dx-let ((x (let ((m (make-array)))
 ;;;               (fill m)
 ;;;               m))))
-(defun propagate-ref-dx (new-ref old-lvar old-lambda-var)
+(defun propagate-ref-dx (new-ref old-lvar)
   (let ((dx (lvar-dynamic-extent old-lvar))
         (new-lambda-var (ref-leaf new-ref)))
     (when (and dx
                (lambda-var-p new-lambda-var)
-               ;; Make sure the let inside the dx let
+               ;; Make sure the let is inside the dx let
                (lexenv-contains-lambda (lambda-var-home new-lambda-var)
-                                       (lambda-lexenv (lambda-var-home old-lambda-var))))
+                                       (cleanup-lexenv dx)))
       (let ((new-lvar (lambda-var-ref-lvar new-ref)))
         (when new-lvar
           (propagate-lvar-dx new-lvar old-lvar t)

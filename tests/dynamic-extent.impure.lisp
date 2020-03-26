@@ -1585,3 +1585,17 @@
                   1)))
        (declare (ignorable #'fn))))
    :allow-notes nil))
+
+(with-test (:name :list+fill+make-array)
+  (let ((fun (checked-compile
+              `(lambda ()
+                 (declare (optimize speed))
+                 (let* ((v (make-array 8 :initial-element nil))
+                        (node (let ((m v))
+                                (list m m))))
+                   (declare (simple-vector v)
+                            (dynamic-extent v node))
+                   (opaque-identity node)
+                   0))
+              :allow-notes nil)))
+    (assert-no-consing (funcall fun))))
