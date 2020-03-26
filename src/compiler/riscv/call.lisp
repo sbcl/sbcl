@@ -750,7 +750,7 @@
     ;; Clear the number stack if anything is there.
     (clear-number-stack vop)
     ;; And jump to the assembly routine.
-    (invoke-asm-routine 'tail-call-variable t)))
+    (invoke-asm-routine 'tail-call-variable)))
 
 
 ;;;; Unknown values return:
@@ -862,7 +862,7 @@
     (move vals vals-arg)
     (move nvals nvals-arg)
 
-    (invoke-asm-routine 'return-multiple t)))
+    (invoke-asm-routine 'return-multiple)))
 
 
 ;;;; XEP hackery:

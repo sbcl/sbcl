@@ -44,7 +44,7 @@
      (inst subi nsp-tn nsp-tn n-word-bytes)
      (storew lip-tn nsp-tn 0)
      (storew size nsp-tn -1)
-     (invoke-asm-routine 'alloc-tramp nil)
+     (invoke-asm-routine 'alloc-tramp)
      (loadw alloc nsp-tn -1)
      (loadw lip-tn nsp-tn 0)
      (inst addi nsp-tn nsp-tn n-word-bytes)

@@ -154,7 +154,7 @@
 
   EXIT
   (move target catch) ;; TARGET coincides with UNWIND's BLOCK argument
-  (invoke-asm-routine 'unwind t))
+  (invoke-asm-routine 'unwind))
 
 (define-assembly-routine (unwind
                           (:return-style :none)

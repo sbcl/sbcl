@@ -190,7 +190,7 @@
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (move cfunc function)
-      (invoke-asm-routine 'call-into-c nil)
+      (invoke-asm-routine 'call-into-c)
       (when cur-nfp
         (load-stack-tn cur-nfp nfp-save)))))
 
