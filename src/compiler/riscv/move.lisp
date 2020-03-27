@@ -248,9 +248,13 @@
   (:note "unsigned word to integer coercion")
   (:generator 20
     (move x arg)
-    (inst srli pa-flag x n-positive-fixnum-bits)
-    (inst slli y x n-fixnum-tag-bits)
-    (inst beq pa-flag zero-tn done)
+    (cond ((= n-fixnum-tag-bits 1)
+           (inst add y x x)
+           (inst bgeu y x done))
+          (t
+           (inst srli pa-flag x n-positive-fixnum-bits)
+           (inst slli y x n-fixnum-tag-bits)
+           (inst beq pa-flag zero-tn done)))
     (pseudo-atomic (pa-flag)
       (allocation nil (pad-data-block (+ bignum-digits-offset 2)) other-pointer-lowtag
                   y :flag-tn pa-flag)
