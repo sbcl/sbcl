@@ -215,11 +215,6 @@
      (:arg nargs (any-reg) ca2-offset)
 
      (:temp a0 descriptor-reg a0-offset)
-     (:temp a1 descriptor-reg a1-offset)
-     (:temp a2 descriptor-reg a2-offset)
-     (:temp a3 descriptor-reg a3-offset)
-     (:temp a4 descriptor-reg a4-offset)
-     (:temp a5 descriptor-reg a5-offset)
 
      (:temp lra descriptor-reg lra-offset)
      (:temp value (descriptor-reg any-reg) ca0-offset)
@@ -244,12 +239,9 @@
   ;; Pass in the args.
   (move lexenv-tn function)
   (move cfp-tn arg-ptr)
-  (loadw a0 cfp-tn)
-  (loadw a1 cfp-tn 1)
-  (loadw a2 cfp-tn 2)
-  (loadw a3 cfp-tn 3)
-  (loadw a4 cfp-tn 4)
-  (loadw a5 cfp-tn 5)
+  (loop for arg in *register-arg-tns*
+        for index from 0
+        do (loadw arg cfp-tn index))
 
   (inst compute-lra lra lip-tn lra-label)
   ;; Indirect closure.
