@@ -197,7 +197,7 @@
   (:results (result :scs (unsigned-reg)))
   (:result-types unsigned-num)
   (:note "inline ASH")
-  (:generator 3
+  (:generator 1
     (cond ((< (- n-word-bits) amount n-word-bits)
            (if (plusp amount)
                (inst slli result number amount)
@@ -214,7 +214,7 @@
   (:results (result :scs (signed-reg)))
   (:result-types signed-num)
   (:note "inline ASH")
-  (:generator 3
+  (:generator 1
     (cond ((< (- n-word-bits) amount n-word-bits)
            (if (plusp amount)
                (inst slli result number amount)
@@ -230,22 +230,19 @@
          (amount))
   (:results (result))
   (:policy :fast-safe)
-  ;; ANY-REG is fine because N-WORD-BITS is even.
-  (:temporary (:sc any-reg) temp)
   (:temporary (:sc non-descriptor-reg) ndesc)
   (:variant-vars variant)
   (:generator 3
     (inst bge amount zero-tn positive)
-    (inst sub ndesc zero-tn amount)
-    (inst li temp n-word-bits)
-    (inst blt ndesc temp no-overflow)
-    ;; KLUDGE: Even though this gives the wrong answer for 64-bit
-    ;; values with a shift less than -63, I think that this VOP cannot
-    ;; be selected in that case, since any positive shift amount would
-    ;; overflow. In that case, a more correct VOP would be
-    ;; selected. More testing/thinking required.
-    (inst subi ndesc temp 1)
+    (inst li ndesc (- n-word-bits))
+    (inst blt ndesc amount no-overflow)
+    (ecase variant
+      (:signed (inst srai result number (1- n-word-bits)))
+      (:unsigned (move result zero-tn)))
+    (inst j done)
+
     NO-OVERFLOW
+    (inst sub ndesc zero-tn amount)
     (ecase variant
       (:signed (inst sra result number ndesc))
       (:unsigned (inst srl result number ndesc)))
