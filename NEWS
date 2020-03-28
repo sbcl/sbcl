@@ -19,9 +19,9 @@ changes relative to sbcl-2.0.2:
   * enhancement: the installed sbcl executable tree can be renamed or moved
     without risk of incorrectly referencing a '.core' file from an obsolete
     path. (lp#666086)
-  * optimization: the compiler can derive types of VALUES-LIST called on a
-    form with an explicit LIST call.
-
+  * optimization: transform (values-list (list one-item)) to (values one-item)
+    as multiple items were already recognized.
+    
 changes in sbcl-2.0.2 relative to sbcl-2.0.1:
   * new feature: CMUCL-style block compilation support has been added,
     allowing whole program optimization. It has been documented in a new
