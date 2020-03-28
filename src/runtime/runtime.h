@@ -367,6 +367,8 @@ fixnum_value(lispobj n)
     return (sword_t)n >> N_FIXNUM_TAG_BITS;
 }
 
+lispobj symbol_function(lispobj* symbol);
+
 #include "align.h"
 
 #if defined(LISP_FEATURE_WIN32)

@@ -56,7 +56,7 @@ static int ldb_in_fd = -1;
 
 typedef int cmd(char **ptr);
 
-static cmd dump_cmd, print_cmd, quit_cmd, help_cmd;
+static cmd call_cmd, dump_cmd, print_cmd, quit_cmd, help_cmd;
 static cmd flush_cmd, regs_cmd, exit_cmd;
 static cmd print_context_cmd, pte_cmd, search_cmd;
 static cmd backtrace_cmd, purify_cmd, catchers_cmd;
@@ -70,6 +70,7 @@ static struct cmd {
     {"help", "Display this help information.", help_cmd},
     {"?", "(an alias for help)", help_cmd},
     {"backtrace", "Backtrace up to N frames.", backtrace_cmd},
+    {"call", "Call FUNCTION with ARG1, ARG2, ...", call_cmd},
     {"catchers", "Print a list of all the active catchers.", catchers_cmd},
     {"context", "Print interrupt context number I.", print_context_cmd},
     {"dump", "Dump memory starting at ADDRESS for COUNT words.", dump_cmd},
@@ -280,10 +281,77 @@ regs_cmd(char __attribute__((unused)) **ptr)
     return 0;
 }
 
-/* (There used to be call_cmd() here, to call known-at-cold-init-time
- * Lisp functions from ldb, but it bitrotted and was deleted in
- * sbcl-0.7.5.1. See older CVS versions if you want to resuscitate
- * it.) */
+static int
+call_cmd(char **ptr)
+{
+    lispobj thing;
+    parse_lispobj(ptr, &thing);
+    lispobj function, args[3];
+    lispobj result = NIL;
+
+    int numargs;
+
+    if (lowtag_of(thing) == OTHER_POINTER_LOWTAG) {
+        lispobj *obj = native_pointer(thing);
+        switch (widetag_of(obj)) {
+          case SYMBOL_WIDETAG:
+              function = symbol_function(obj);
+              if (function == NIL) {
+                  printf("Symbol 0x%08lx is undefined.\n", (long unsigned)thing);
+                  return 0;
+              }
+              break;
+          case FDEFN_WIDETAG:
+              function = FDEFN(thing)->fun;
+              if (function == NIL) {
+                  printf("Fdefn 0x%08lx is undefined.\n", (long unsigned)thing);
+                  return 0;
+              }
+              break;
+          default:
+              printf("0x%08lx is not a function pointer, symbol, "
+                     "or fdefn object.\n",
+                     (long unsigned)thing);
+              return 0;
+        }
+    }
+    else if (lowtag_of(thing) != FUN_POINTER_LOWTAG) {
+        printf("0x%08lx is not a function pointer, symbol, or fdefn object.\n",
+               (long unsigned)thing);
+        return 0;
+    }
+    else
+        function = thing;
+
+    numargs = 0;
+    while (more_p(ptr)) {
+        if (numargs >= 3) {
+            printf("too many arguments (no more than 3 supported)\n");
+            return 0;
+        }
+        parse_lispobj(ptr, &args[numargs++]);
+    }
+
+    switch (numargs) {
+      case 0:
+          result = funcall0(function);
+          break;
+      case 1:
+          result = funcall1(function, args[0]);
+          break;
+      case 2:
+          result = funcall2(function, args[0], args[1]);
+          break;
+      case 3:
+          result = funcall3(function, args[0], args[1], args[2]);
+          break;
+      default:
+          lose("unsupported arg count made it past validity check?!");
+    }
+
+    print(result);
+    return 0;
+}
 
 static int
 flush_cmd(char __attribute__((unused)) **ptr)

@@ -569,7 +569,7 @@ static void print_slots(char **slots, int count, lispobj *ptr)
     }
 }
 
-static lispobj symbol_function(lispobj* symbol)
+lispobj symbol_function(lispobj* symbol)
 {
     lispobj info = ((struct symbol*)symbol)->info;
     if (listp(info))
