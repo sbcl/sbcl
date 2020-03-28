@@ -188,19 +188,28 @@
   (store-symbol-value target-uwp *current-unwind-protect-blocK*)
   (inst j DO-EXIT))
 
-;; Some runtime routines.
-(defun save-c-registers ()
-  (let ((framesize (* n-word-bytes (length c-saved-registers))))
+;;;; Some runtime routines.
+
+(let* ((n-saved-registers (length c-saved-registers))
+       (n-saved-float-registers (length c-saved-float-registers))
+       (framesize (+ (* n-word-bytes n-saved-registers)
+                     (* 8 n-saved-float-registers))))
+  (defun save-c-registers ()
     (inst subi nsp-tn nsp-tn framesize)
     (loop for offset from 0
           for saved-offset in c-saved-registers
-          do (storew (make-reg-tn saved-offset) nsp-tn offset))))
+          do (storew (make-reg-tn saved-offset) nsp-tn offset))
+    (loop for offset from (* n-word-bytes n-saved-registers) by 8
+          for saved-offset in c-saved-float-registers
+          do (inst fstore :double (make-reg-tn saved-offset) nsp-tn offset)))
 
-(defun restore-c-registers ()
-  (let ((framesize (* n-word-bytes (length c-saved-registers))))
+  (defun restore-c-registers ()
     (loop for offset from 0
           for saved-offset in c-saved-registers
           do (loadw (make-reg-tn saved-offset) nsp-tn offset))
+    (loop for offset from (* n-word-bytes n-saved-registers) by 8
+          for saved-offset in c-saved-float-registers
+          do (inst fload :double (make-reg-tn saved-offset) nsp-tn offset))
     (inst addi nsp-tn nsp-tn framesize)))
 
 (defun initialize-boxed-regs (&optional still-live)
@@ -223,8 +232,6 @@
      (:temp pa-temp non-descriptor-reg nl6-offset)
      (:temp temp non-descriptor-reg nl7-offset))
   (save-c-registers)
-  ;; FIXME save floating point regs
-
   (initialize-boxed-regs (list function arg-ptr nargs))
 
   ;; Tag nargs.
