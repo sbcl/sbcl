@@ -21,7 +21,7 @@
 #include "os.h"
 #include "interrupt.h"
 
-/* This is implemented in either assembly language or assembly/runtime-rtns.lisp and called from C: */
+/* This is implemented in either assembly language or assembly/assem-rtns.lisp and called from C: */
 #ifdef CALL_INTO_LISP
 #define call_into_lisp ((lispobj(*)(lispobj fun, lispobj *args, int nargs))SYMBOL(CALL_INTO_LISP)->value)
 #else
