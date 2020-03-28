@@ -680,11 +680,12 @@
 (with-test (:name :overeager-character-buffering :skipped-on :win32)
   (let ((use-threads #+sb-thread t)
         (proc nil))
-    (sb-int:dohash ((format _) sb-impl::*external-formats*)
-      (declare (ignore _))
+    (sb-int:dovector (entry sb-impl::*external-formats*)
+      (unless entry (return))
       (with-scratch-file (fifo)
         (unwind-protect
-            (progn
+            (let ((format
+                    (car (sb-impl::ef-names (car (sb-int:ensure-list entry))))))
               (sb-posix:mkfifo fifo (logior sb-posix:s-iwusr sb-posix:s-irusr))
               ;; KLUDGE: because we have both ends in the same process, we would
               ;; need to use O_NONBLOCK, but this works too.

@@ -423,15 +423,30 @@ STRING (or the subsequence bounded by START and END)."
                                  (use-value ,cname c))))
       ,@body))))
 
+;;; Vector of all available EXTERNAL-FORMAT instances. Each format is named
+;;; by one or more keyword symbols. The mapping from symbol to index into this
+;;; vector is memoized into the symbol's :EXTERNAL-FORMAT property.
+(define-load-time-global *external-formats* (make-array 60 :initial-element nil))
+
+(defun register-external-format (names &rest args)
+  ;; TODO: compare-and-swap the entry if NAME already has an index
+  ;; specifying to demand-load this format from a fasl.
+  ;; All synonyms of that name will also references the loaded format.
+  (let* ((entry (apply #'%make-external-format :names names args))
+         (table *external-formats*)
+         (free-index (position nil table)))
+    (dolist (name names)
+      (setf (get name :external-format) free-index))
+    (setf (aref table free-index) entry)))
+
 ;;; This function was moved from 'fd-stream' because it depends on
 ;;; the various error classes, two of which are defined just above.
+;;; XXX: Why does this get called with :DEFAULT and NIL when neither is
+;;; the name  of any format? Shouldn't those be handled higher up,
+;;; or else this should return the actual default?
 (defun get-external-format (external-format)
-  (flet ((keyword-external-format (keyword)
-           (declare (type keyword keyword))
-           (gethash keyword *external-formats*))
-         (replacement-handlerify (entry replacement)
-           (when entry
-             (wrap-external-format-functions
+  (flet ((replacement-handlerify (entry replacement)
+           (wrap-external-format-functions
               entry
               (lambda (fun)
                 (and fun
@@ -450,15 +465,58 @@ STRING (or the subsequence bounded by START and END)."
                              (lambda (c) (use-value replacement c)))
                             (octet-decoding-error
                              (lambda (c) (use-value replacement c))))
-                         (apply fun rest)))))))))
-    (typecase external-format
-      (keyword (keyword-external-format external-format))
-      ((cons keyword)
-       (let ((entry (keyword-external-format (car external-format)))
-             (replacement (getf (cdr external-format) :replacement)))
-         (if replacement
-             (replacement-handlerify entry replacement)
-             entry))))))
+                         (apply fun rest))))))))
+
+    (binding*
+        (((format-name replacement)
+          (etypecase external-format
+            ;; This seem like such an unnecessarily general way to
+            ;; pass an optional parameter. What's up with that???
+            ((cons keyword)
+             (values (car external-format)
+                     (getf (cdr external-format) :replacement)))
+            (symbol
+             (values external-format nil))))
+         (table-index (get format-name :external-format) :exit-if-null)
+         (formats *external-formats*)
+         (table-entry
+          ;; The table entry can be one of:
+          ;;   1. #<external-format>
+          ;;   2. (#<external-format> (#\char . #<modified-ef>) ...)
+          ;;      for a list of modified formats that alter the
+          ;;      choice of replacement character.
+          ;;   3. "namestring" - to autoload from a fasl containing
+          ;;      the named format.
+          (let ((ef (svref formats table-index)))
+            (etypecase ef
+              ((or instance list) ef)
+              #+nil
+              (string
+               ;; Theoretically allow demand-loading the external-format
+               ;; from a fasl of this name. (Not done yet)
+               ;; (module-provide-contrib ef)
+               (let ((ef (svref formats table-index)))
+                 (aver (external-format-p ef))
+                 ef)))))
+         ((base-format variations)
+          (if (listp table-entry)
+              (values (car table-entry) (cdr table-entry))
+              (values table-entry nil))))
+      (when (or (not base-format) (not replacement))
+        (return-from get-external-format base-format))
+      (loop
+        (awhen (assoc replacement variations)
+          (return (cdr it)))
+        (let* ((new-ef (replacement-handlerify base-format replacement))
+               (new-table-entry
+                (cons base-format (acons replacement new-ef variations)))
+               (old (cas (svref formats table-index) table-entry new-table-entry)))
+          (when (eq old table-entry)
+            (return new-ef))
+          ;; CAS failure -> some other thread added an entry. It's probably
+          ;; for the same replacement char which is usually #\ufffd.
+          ;; So try again. At worst this conses some more garbage.
+          (setq table-entry old))))))
 
 (push
   `("SB-IMPL"

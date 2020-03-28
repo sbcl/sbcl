@@ -859,10 +859,6 @@
       (frob ef-string-to-octets-fun))
     result))
 
-(define-load-time-global *external-formats* (make-hash-table)
-  "Hashtable of all available external formats. The table maps from
-  external-format names to EXTERNAL-FORMAT structures.")
-
 (defun get-external-format-or-lose (external-format)
   (or (get-external-format external-format)
       (error "Undefined external-format: ~S" external-format)))
@@ -1697,8 +1693,8 @@
                            ,out-expr)))
                      ,n-buffer))))))
 
-      (let ((entry (%make-external-format
-                    :names ',external-format
+      (register-external-format
+                    ',external-format
                     :default-replacement-character ,replacement-character
                     :read-n-chars-fun #',in-function
                     :read-char-fun #',in-char-function
@@ -1716,9 +1712,7 @@
                                             (apply ',octets-to-string-sym rest))
                     :string-to-octets-fun (lambda (&rest rest)
                                             (declare (dynamic-extent rest))
-                                            (apply ',string-to-octets-sym rest)))))
-        (dolist (ef ',external-format)
-          (setf (gethash ef *external-formats*) entry))))))
+                                            (apply ',string-to-octets-sym rest))))))
 
 ;;;; utility functions (misc routines, etc)
 
