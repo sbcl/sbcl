@@ -5,7 +5,7 @@
 # The relocation test binary can only be built on linux.
 # FIXME: This test _should_ work on any architecture, but it doesn't,
 #        so there must have been a regression in the heap relocator.
-run_sbcl --eval '(exit :code (or #+(and (or arm arm64 x86 x86-64) linux) 0 1))'
+run_sbcl --eval '(exit :code (or #+linux 0 1))'
 if [ $? -eq 1 ]
 then
     # shell tests don't have a way of exiting as "not applicable"

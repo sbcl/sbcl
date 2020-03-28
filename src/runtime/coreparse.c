@@ -460,7 +460,8 @@ static void relocate_space(uword_t start, lispobj* end, struct heap_adjust* adj)
             // Fixup the constant pool. The word at where+1 is a fixnum.
             code = (struct code*)where;
             adjust_pointers(where+2, code_header_words(code)-2, adj);
-#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64
+#if defined LISP_FEATURE_X86 || defined LISP_FEATURE_X86_64 || \
+    defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64
             // Fixup absolute jump table
             lispobj* jump_table = code_jumptable_start(code);
             int count = jumptable_count(jump_table);
