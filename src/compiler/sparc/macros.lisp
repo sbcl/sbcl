@@ -147,7 +147,7 @@
 ;;;; applied.  The amount of space to be allocated is SIZE bytes (which
 ;;;; must be a multiple of the lisp object size).
 (defun allocation (type size lowtag result-tn &key stack-p temp-tn)
-  (declare (ignore type))
+  (declare (ignorable type))
   #+gencgc
   ;; A temp register is needed to do inline allocation.  TEMP-TN, in
   ;; this case, can be any register, since it holds a double-word
@@ -230,33 +230,33 @@
           (if (member :sparc-v9 *backend-subfeatures*)
               (inst b :gtu full-alloc :pn)
               (inst b :gtu full-alloc))
-          (inst nop)
-          ;; Inline allocation worked, so update the free pointer
-          ;; and go.  Should really do a swap instruction here to
-          ;; swap memory with a register.
-
-          ;; Kludge: We ought to have two distinct FLAG-TN and TEMP-TN
-          ;; here, to avoid the SUB and the TEMP-TN reload which is
-          ;; causing it.  PPC gets it right.
+          ;; New algorithm: no taken branches in the fast case, utilize
+          ;; the branch delay slot to write back the free-pointer
+          ;; (on overflow restore it the trap handler to a good value),
+          ;; and fold the lowtag addition into the size subtraction.
+          ;; (Possibly not ok for the sprof_alloc_region,
+          ;; but sb-sprof didn't work on sparc prior to this change)
           (storew result-tn null-tn 0 (- boxed-region))
-
-          (inst b done)
-          (inst sub result-tn size)
-
-          (emit-label full-alloc)
-          ;; Full alloc via trap to the C allocator.  Tell the
-          ;; allocator what the result-tn and size are, using the
-          ;; OR instruction.  Then trap to the allocator.
-          (inst or zero-tn result-tn size)
-          ;; DFL: Not certain why we use two kinds of traps: T for p/a
-          ;; and UNIMP for all other traps.  But the C code in the runtime
-          ;; for the UNIMP case is a lot nicer, so I'm hooking into that.
-          ;; (inst t :t allocation-trap)
-          (inst unimp allocation-trap)
-
+          ;; Compute the base pointer and add lowtag.
+          (cond ((integerp size)
+                 (inst sub result-tn (- size lowtag)))
+                (t
+                 (inst sub result-tn size)
+                 (inst or result-tn lowtag)))
           (emit-label done)
-          ;; Set lowtag appropriately
-          (inst or result-tn lowtag))))))
+          (assemble (:elsewhere)
+            (without-scheduling ()
+              ;; Encode the RESULT-TN, SIZE, and TYPE in an OR instruction
+              ;; which is never executed.
+              (inst or (make-random-tn :sc (sc-or-lose 'unsigned-reg)
+                                       :kind :normal
+                                       :offset (if (eq type 'list) 1 0))
+                    result-tn size)
+              (emit-label FULL-ALLOC)
+              ;; Trap into the C allocator
+              (inst unimp allocation-trap)
+              (inst b done)
+              (inst or result-tn lowtag))))))))
 
 (defmacro with-fixed-allocation ((result-tn temp-tn type-code size)
                                  &body body)

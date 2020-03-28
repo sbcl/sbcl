@@ -4185,6 +4185,17 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
 #endif
 DEFINE_LISP_ENTRYPOINT(alloc, BOXED_PAGE_FLAG)
 DEFINE_LISP_ENTRYPOINT(alloc_list, BOXED_PAGE_FLAG|CONS_PAGE_FLAG)
+
+#ifdef LISP_FEATURE_SPARC
+void boxed_region_rollback(sword_t size)
+{
+    struct alloc_region *region = MY_REGION;
+    gc_assert(region->free_pointer > region->end_addr);
+    region->free_pointer = (char*)region->free_pointer - size;
+    gc_assert(region->free_pointer >= region->start_addr
+              && region->free_pointer <= region->end_addr);
+}
+#endif
 
 /*
  * shared support for the OS-dependent signal handlers which

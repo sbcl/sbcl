@@ -426,7 +426,7 @@
     (sb-thread:join-thread gc-thread)))
 
 (with-test (:name :no-conses-on-large-object-pages
-            :skipped-on (or :sparc :x86)) ; for now
+            :skipped-on (or :x86)) ; for now
   (let* ((fun (checked-compile '(lambda (&rest params) params)))
          (list (make-list #+gencgc (/ sb-vm:large-object-size
                                       (sb-vm::primitive-object-size '(1))

@@ -2396,7 +2396,6 @@ handle_trap(os_context_t *context, int trap)
 #if defined(LISP_FEATURE_SPARC) && defined(LISP_FEATURE_GENCGC)
     case trap_Allocation:
         arch_handle_allocation_trap(context);
-        arch_skip_instruction(context);
         break;
 #endif
 #if defined(LISP_FEATURE_C_STACK_IS_CONTROL_STACK) && !defined(LISP_FEATURE_WIN32)
