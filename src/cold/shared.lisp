@@ -318,7 +318,7 @@
           ":SB-THREAD not supported on selected architecture")))
       (failed-test-descriptions nil))
   (dolist (test feature-compatibility-tests)
-    (let ((cl:*features* sb-xc:*features*))
+    (let ((*readtable* *xc-readtable*))
       (when (read-from-string (concatenate 'string "#+" (first test) "T NIL"))
         (push (second test) failed-test-descriptions))))
   (when failed-test-descriptions
