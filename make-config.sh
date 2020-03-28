@@ -376,7 +376,8 @@ case `uname -m` in
     mips*) guessed_sbcl_arch=mips ;;
     *arm*) guessed_sbcl_arch=arm ;;
     aarch64) guessed_sbcl_arch=arm64 ;;
-    riscv64) guessed_sbcl_arch=riscv ;;
+    riscv32) guessed_sbcl_arch=riscv xlen=32;;
+    riscv64) guessed_sbcl_arch=riscv xlen=64;;
     *)
         # If we're not building on a supported target architecture, we
         # we have no guess, but it's not an error yet, since maybe
@@ -400,6 +401,16 @@ if test -n "$SBCL_ARCH"
 then
     # Normalize it.
     SBCL_ARCH=`echo $SBCL_ARCH | tr '[A-Z]' '[a-z]' | tr _ -`
+    case $SBCL_ARCH in
+        riscv*)
+            case $SBCL_ARCH in
+                riscv32) SBCL_ARCH=riscv xlen=32;;
+                riscv64) SBCL_ARCH=riscv xlen=64;;
+                *)
+                    echo "Please choose between riscv32 and riscv64."
+                    exit 1
+            esac
+    esac
 fi
 sbcl_arch=${SBCL_ARCH:-$guessed_sbcl_arch}
 echo sbcl_arch=\"$sbcl_arch\"
@@ -719,7 +730,9 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     # 2.3.1, so define our constant for that)
     echo '#define GLIBC231_STYLE_UCONTEXT 1' > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "riscv" ]; then
-    printf ' :64-bit' >> $ltf
+    if [[ $xlen -eq 64 ]]; then
+        printf ' :64-bit' >> $ltf
+    fi
     printf ' :gencgc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
