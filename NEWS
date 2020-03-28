@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.2:
+changes in sbcl-2.0.3 relative to sbcl-2.0.2:
   * incompatible change: the external format now defaults to UTF-8 and is not
     affected by LANG. sb-ext:*default-external-format* is now the only way to
     change it.
