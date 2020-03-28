@@ -4,9 +4,23 @@ changes relative to sbcl-2.0.2:
   * incompatible change: the external format now defaults to UTF-8 and is not
     affected by LANG. sb-ext:*default-external-format* is now the only way to
     change it.
+  * minor incompatible change: the undocumented :EPHEMERAL argument to
+    MAKE-THREAD has been removed.
+  * minor incompatible change: DECLARE type testing of structure types when
+    the SAFETY optimization quality is less than SPEED (but greater than 0) is
+    precise, rather than merely testing that an object is a (general)
+    STRUCTURE-OBJECT.
+  * platform support
+    ** respect sunos platform assembler flag handling
+    ** riscv architecture can be detected during the build
+    ** enabled the sb-dynamic-core feature on riscv, sparc, and made it
+       unconditional everywhere
+    ** cheneygc is an option for arm and arm64
   * enhancement: the installed sbcl executable tree can be renamed or moved
     without risk of incorrectly referencing a '.core' file from an obsolete
     path. (lp#666086)
+  * optimization: the compiler can derive types of VALUES-LIST called on a
+    form with an explicit LIST call.
 
 changes in sbcl-2.0.2 relative to sbcl-2.0.1:
   * new feature: CMUCL-style block compilation support has been added,
