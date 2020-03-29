@@ -65,8 +65,21 @@
                    ,@(unless supertype '((:include structure!object)))
                    ,@options)
          ,@slots))))
+
+;;; Workaround for questionable behavior of CCL - it issues a warning about
+;;; a duplicate definition in src/code/defstruct if we use DEFMACRO here,
+;;; despite the second occurrence being preceded by FMAKUNBOUND.
+;;; The warning can not be remedied by putting this in its own compilation unit,
+;;; which I can't even explain. I would have expected at worst a "redefinition"
+;;; warning, not a "duplicate" in that case.
+#+nil ; It would be this
 (defmacro sb-xc:defstruct (&rest args)
   `(push (make-delayed-defstruct ',args) *delayed-defstructs*))
+;;; But instead it's this. No eval-when needed, since we LOAD this file.
+(setf (macro-function 'sb-xc:defstruct)
+      (lambda (form environment)
+        (declare (ignore environment))
+        `(push (make-delayed-defstruct ',(cdr form)) *delayed-defstructs*)))
 ) ; end PROGN
 
 #-sb-xc-host
