@@ -49,16 +49,12 @@
 
 (define-arg-type accum
   :printer (lambda (value stream dstate)
-             (declare (ignore value)
-                      (type stream stream)
-                      (type disassem-state dstate))
+             (declare (ignore value))
              (print-reg 0 stream dstate)))
 
 (define-arg-type word-accum
   :printer (lambda (value stream dstate)
-             (declare (ignore value)
-                      (type stream stream)
-                      (type disassem-state dstate))
+             (declare (ignore value))
              (print-word-reg 0 stream dstate)))
 
 (define-arg-type reg :printer #'print-reg)
