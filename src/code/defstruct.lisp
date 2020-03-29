@@ -131,7 +131,7 @@
              (:constructor make-dsd (name type accessor-name bits default))
              (:conc-name dsd-)
              (:copier nil)
-             #-sb-xc-host (:pure t))
+             (:pure t))
   (name nil :read-only t)                       ; name of slot
   (type t :read-only t)                         ; declared type specifier
   (accessor-name nil :type symbol :read-only t) ; name of the accessor function

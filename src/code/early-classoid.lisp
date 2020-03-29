@@ -22,7 +22,7 @@
 (def!struct (defstruct-description
              (:conc-name dd-)
              (:copier nil)
-             #-sb-xc-host (:pure t)
+             (:pure t)
              (:constructor make-defstruct-description (null-lexenv-p name)))
   ;; name of the structure
   (name (missing-arg) :type symbol :read-only t)

@@ -70,3 +70,5 @@
                           (setf seen (logior (ash 1 index) seen)
                                 (nth index list) (copy-symbol key)))))
             (push (list var (pop keys)) bind))))))
+
+(defmacro def!struct (&rest args) `(defstruct ,@args))

@@ -583,7 +583,7 @@
 ;;; a known function.
 (def!struct (template (:constructor nil)
                       (:copier nil)
-                      #-sb-xc-host (:pure t))
+                      (:pure t))
   ;; the symbol name of this VOP. This is used when printing the VOP
   ;; and is also used to provide a handle for definition and
   ;; translation.

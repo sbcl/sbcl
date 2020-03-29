@@ -15,32 +15,25 @@
 
 (in-package "SB-KERNEL")
 
-;;; Has the type system been properly initialized? (I.e. is it OK to
-;;; use it?)
-(!define-load-time-global *type-system-initialized* nil)
-
 ;;; machinery used in the implementation of SB-XC:DEFSTRUCT delaying
-#+sb-xc-host
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  ;; a description of a SB-XC:DEFSTRUCT call to be stored until we get
-  ;; enough of the system running to finish processing it
-  (defstruct (delayed-defstruct (:constructor make-delayed-defstruct (args)))
-    (args nil :type cons)
-    ;; because the expansion autogenerates slot names based on current package
-    (package (package-name *package*) :type string))
-  ;; a list of DELAYED-DEFSTRUCTs stored until we get SB-XC:DEFSTRUCT
-  ;; working fully so that we can apply it to them then. After
-  ;; SB-XC:DEFSTRUCT is made to work fully, this list is processed, then
-  ;; made unbound, and should no longer be used.
-  (defvar *delayed-defstructs* nil))
+
+;; a description of a SB-XC:DEFSTRUCT call to be stored until we get
+;; enough of the system running to finish processing it
+(defstruct (delayed-defstruct (:constructor make-delayed-defstruct (args)))
+  (args nil :type cons)
+  ;; because the expansion autogenerates slot names based on current package
+  (package (package-name *package*) :type string))
+;; a list of DELAYED-DEFSTRUCTs stored until we get SB-XC:DEFSTRUCT
+;; working fully so that we can apply it to them then. After
+;; SB-XC:DEFSTRUCT is made to work fully, this list is processed, then
+;; made unbound, and should no longer be used.
+(defvar *delayed-defstructs* nil)
 
 ;;; DEF!STRUCT defines a structure for both the host and target.
 ;;; The host's structure inherits from STRUCTURE!OBJECT so that we can test
 ;;; for containment in the target's type hierarchy with minimal fuss.
 ;;; (A similar thing could be achieved by testing the package probably)
 ;;; When executed by the cross-compiler, DEF!STRUCT is just DEFSTRUCT.
-#+sb-xc-host
-(progn
 (defmacro def!struct (&rest args)
   (multiple-value-bind (name supertype options slots)
       (destructuring-bind (nameoid &rest slots) args
@@ -63,7 +56,7 @@
            `((aver (subtypep ',supertype 'structure!object))))
        (defstruct (,name
                    ,@(unless supertype '((:include structure!object)))
-                   ,@options)
+                   ,@(remove :pure options :key #'car))
          ,@slots))))
 
 ;;; Workaround for questionable behavior of CCL - it issues a warning about
@@ -80,7 +73,3 @@
       (lambda (form environment)
         (declare (ignore environment))
         `(push (make-delayed-defstruct ',(cdr form)) *delayed-defstructs*)))
-) ; end PROGN
-
-#-sb-xc-host
-(defmacro def!struct (&rest args) `(defstruct ,@args))

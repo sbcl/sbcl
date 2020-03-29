@@ -251,7 +251,7 @@
 (def!struct (ctype (:conc-name type-)
                    (:constructor nil)
                    (:copier nil)
-                   #-sb-xc-host (:pure t))
+                   (:pure t))
   ;; bits  0..19: 20 bits for opaque hash
   ;; bit      20: 1 if interned: specifier -> object is guaranteed unique
   ;; bit      21: 1 if admits type= optimization: NEQ implies (NOT TYPE=)

@@ -9,6 +9,10 @@
 
 (in-package "SB-IMPL")
 
+;;; Has the type system been properly initialized? (I.e. is it OK to
+;;; use it?)
+(!define-load-time-global *type-system-initialized* nil)
+
 (defun constant-type-expander (name expansion)
   (declare (optimize safety))
   ;; Dummy implementation of SET-CLOSURE-NAME for the host.

@@ -133,7 +133,7 @@
  ("src/code/ansi-stream" :not-host)
  ("src/code/early-fasl" :c-headers)
 
- ("src/code/defbangstruct" :c-headers)
+ ("src/code/defbangstruct" :c-headers :not-target)
  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
  ;;; basic machinery for the target Lisp. Note that although most of these
  ;;; files are flagged :NOT-HOST, a few might not be.
