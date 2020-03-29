@@ -84,9 +84,10 @@
                            canonical-name names))
              (format stream "@end table~%")))
       (let (result)
-        (sb-int:dohash ((key val) sb-impl::*external-formats*)
-          (declare (ignore key))
-          (pushnew (sb-impl::ef-names val) result :test #'equal))
+        (loop for ef across sb-impl::*external-formats*
+              when (sb-impl::external-format-p ef)
+              do
+              (pushnew (sb-impl::ef-names ef) result :test #'equal))
         (table (sort result #'string< :key #'car))))))
 
 ;;;; Entry point
