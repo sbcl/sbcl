@@ -16,4 +16,11 @@
 
 (in-package "SB-KERNEL")
 
-#+sb-xc-host (force-delayed-def!structs)
+(macrolet ((do-delayed-structs ()
+             `(progn
+                ,@(mapcan (lambda (x)
+                            (list `(in-package ,(delayed-defstruct-package x))
+                                  `(sb-xc:defstruct ,@(delayed-defstruct-args x))))
+                          (reverse *delayed-defstructs*)))))
+  (do-delayed-structs)
+  (makunbound '*delayed-defstructs*))

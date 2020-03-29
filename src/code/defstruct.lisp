@@ -382,11 +382,14 @@
            ',name))))
 
 #+sb-xc-host
+(progn
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (fmakunbound 'sb-xc:defstruct))
 (defmacro sb-xc:defstruct (name-and-options &rest slot-descriptions)
   "Cause information about a target structure to be built into the
   cross-compiler."
   `(progn ,@(!expander-for-defstruct
-             t nil name-and-options slot-descriptions :host)))
+             t nil name-and-options slot-descriptions :host))))
 
 (sb-xc:defmacro defstruct (name-and-options &rest slot-descriptions
                            &environment env)
