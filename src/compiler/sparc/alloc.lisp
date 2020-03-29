@@ -139,7 +139,7 @@
     (pseudo-atomic ()
       (allocation nil (pad-data-block words) lowtag result :temp-tn temp)
       (when type
-        (inst li temp (logior (ash (1- words) n-widetag-bits) type))
+        (inst li temp (logior (ash (1- words) (length-field-shift type)) type))
         (storew temp result 0 lowtag)))))
 
 (define-vop (var-alloc)
@@ -153,13 +153,13 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:generator 6
     (inst add bytes extra (* (1+ words) n-word-bytes))
-    (inst sll header bytes (- n-widetag-bits 2))
+    (inst sll header bytes (- (length-field-shift type) 2))
     ;; The specified EXTRA value is the exact value placed in the header
     ;; as the word count when allocating code.
     (cond ((= type code-header-widetag)
            (inst add header header type))
           (t
-           (inst add header header (+ (ash -2 n-widetag-bits) type))
+           (inst add header header (+ (ash -2 (length-field-shift type)) type))
            (inst and bytes (lognot lowtag-mask))))
     (pseudo-atomic ()
       (allocation nil bytes lowtag result :temp-tn temp)

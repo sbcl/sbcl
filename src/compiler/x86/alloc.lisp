@@ -399,7 +399,7 @@
         (pseudo-atomic (:elide-if stack-allocate-p)
          (allocation nil (pad-data-block words) lowtag node stack-allocate-p result)
          (when type
-           (storew (logior (ash (1- words) n-widetag-bits) type)
+           (storew (logior (ash (1- words) (length-field-shift type)) type)
                    result
                    0
                    lowtag))))))
@@ -417,9 +417,10 @@
     (inst lea bytes
           (make-ea :dword :base extra :disp (* (1+ words) n-word-bytes)))
     (inst mov header bytes)
-    (inst shl header (- n-widetag-bits 2)) ; w+1 to length field
+    (inst shl header (- (length-field-shift type) 2)) ; w+1 to length field
     (inst lea header                    ; (w-1 << 8) | type
-          (make-ea :dword :base header :disp (+ (ash -2 n-widetag-bits) type)))
+          (make-ea :dword :base header
+                          :disp (+ (ash -2 (length-field-shift type)) type)))
     (inst and bytes (lognot lowtag-mask))
     (pseudo-atomic (:elide-if stack-allocate-p)
      (allocation nil bytes lowtag node stack-allocate-p result)

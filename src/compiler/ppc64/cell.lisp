@@ -475,7 +475,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw res struct 0 instance-pointer-lowtag)
-    (inst srwi res res n-widetag-bits)))
+    (inst srwi res res instance-length-shift)))
 
 (define-vop (instance-index-ref word-index-ref)
   (:policy :fast-safe)

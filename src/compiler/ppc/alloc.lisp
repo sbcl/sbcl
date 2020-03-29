@@ -172,13 +172,13 @@
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:generator 6
     (inst addi bytes extra (* (1+ words) n-word-bytes))
-    (inst slwi header bytes (- n-widetag-bits n-fixnum-tag-bits))
+    (inst slwi header bytes (- (length-field-shift type) n-fixnum-tag-bits))
     ;; The specified EXTRA value is the exact value placed in the header
     ;; as the word count when allocating code.
     (cond ((= type code-header-widetag)
            (inst addi header header type))
           (t
-           (inst addi header header (+ (ash -2 n-widetag-bits) type))
+           (inst addi header header (+ (ash -2 (length-field-shift type)) type))
            (inst clrrwi bytes bytes n-lowtag-bits)))
     (pseudo-atomic (pa-flag)
       (allocation nil bytes lowtag result :temp-tn temp :flag-tn pa-flag)

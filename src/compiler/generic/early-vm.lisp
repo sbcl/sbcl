@@ -121,16 +121,20 @@
 ;; To get a layout, you must call %INSTANCE-LAYOUT - don't assume index 0.
 (defconstant instance-data-start (+ #-compact-instance-header 1))
 
-;; The largest number that may appear in the header-data for an instance,
-;; and some other mostly-boxed objects, such as FDEFNs.
-;; This constraint exists because for objects managed by the immobile GC,
-;; their generation number is stored in the header, so we have to know
-;; how much to mask off to obtain the payload size.
-;; Objects whose payload gets capped to this limit are considered
-;; "short_boxed" objects in the sizetab[] array in 'gc-common'.
-;; Additionally there are "tiny_boxed" objects, the payload length of
-;; which can be expressed in 8 bits.
+;;; The largest number that may appear in the header-data for closures
+;;; and funcallable instances.
+;;; This constraint exists because for objects managed by the immobile GC,
+;;; their generation number is stored in the header, so we have to know
+;;; how much to mask off to obtain the payload size.
+;;; Objects whose payload gets capped to this limit are considered
+;;; "short_boxed" objects in the sizetab[] array in 'gc-common'.
+;;; Additionally there are "tiny_boxed" objects, the payload length of
+;;; which can be expressed in 8 bits.
 (defconstant short-header-max-words #x7fff)
+
+;;; Amount to righ-shift an instance header to get the length.
+;;; Similar consideration as above with regard to use of generation# byte.
+(defconstant instance-length-shift 10)
 
 ;;; Is X a fixnum in the target Lisp?
 #+sb-xc-host

@@ -632,7 +632,7 @@
             (allocation nil bytes (if type 0 lowtag) node stack-allocate-p result)
             (when type
               (let* ((widetag (if instancep instance-widetag type))
-                     (header (logior (ash (1- words) n-widetag-bits) widetag)))
+                     (header (logior (ash (1- words) (length-field-shift widetag)) widetag)))
                 (if (or #+compact-instance-header
                         (and (eq name '%make-structure-instance) stack-allocate-p))
                     ;; Write a :DWORD, not a :QWORD, because the high half will be
@@ -671,9 +671,9 @@
             (ea (* (1+ words) n-word-bytes) nil
                 extra (ash 1 (- word-shift n-fixnum-tag-bits))))
       (inst mov operand-size header bytes)
-      (inst shl operand-size header (- n-widetag-bits word-shift)) ; w+1 to length field
+      (inst shl operand-size header (- (length-field-shift type) word-shift)) ; w+1 to length field
       (inst lea operand-size header                    ; (w-1 << 8) | type
-            (ea (+ (ash -2 n-widetag-bits) type) header))
+            (ea (+ (ash -2 (length-field-shift type)) type) header))
       (inst and operand-size bytes (lognot lowtag-mask)))
       (cond (stack-allocate-p
              (stack-allocation result bytes lowtag)
@@ -721,7 +721,7 @@
    ;; which has that effect
    (inst and rsp-tn -16)
    (pseudo-atomic () (c-call "alloc_code_object"))
-   ;; C-RESULT is a tagged ptr. MOV doesn't need to be pseudo-atomic.
+   ;; C-RESULT is a tagged ptr. MOV doesn't need to be inside the PSEUDO-ATOMIC.
    (inst mov result c-result)))
 
 ) ; end MACROLET

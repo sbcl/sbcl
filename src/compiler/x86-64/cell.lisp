@@ -683,13 +683,14 @@
   (:policy :fast-safe)
   (:translate %instance-length)
   (:args (struct :scs (descriptor-reg)))
-  ;; Explicitly fixnumizing admits a 32-bit left-shift which might encode
-  ;; in 1 less byte. (Other backends return an UNSIGNED-REG here.)
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
   (:generator 4
-    (inst movzx '(:word :dword) res (ea (1+ (- instance-pointer-lowtag)) struct))
-    (inst shl :dword res n-fixnum-tag-bits)))
+    (inst mov :dword res (ea (- instance-pointer-lowtag) struct))
+    ;; Returning fixnum/any-reg elides some REX prefixes due to the shifts
+    ;; being small. Maybe the asm optimizer could figure it out now?
+    (inst shr :dword res (- instance-length-shift n-fixnum-tag-bits))
+    (inst and :dword res (lognot fixnum-tag-mask))))
 
 #+compact-instance-header
 (progn

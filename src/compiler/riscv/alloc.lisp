@@ -203,7 +203,7 @@
   (:generator 6
     (with-fixnum-as-word-index (extra bytes)
       (inst addi bytes extra (* (1- words) n-word-bytes)))
-    (inst slli header bytes (- n-widetag-bits word-shift))
+    (inst slli header bytes (- (length-field-shift type) word-shift))
     (inst addi header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity.

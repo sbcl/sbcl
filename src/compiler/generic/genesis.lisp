@@ -730,7 +730,7 @@
     (write-header-word
      des
      (logior #+compact-instance-header (ash (descriptor-bits layout) 32)
-             (ash layout-length sb-vm:n-widetag-bits)
+             (ash layout-length sb-vm:instance-length-shift)
              sb-vm:instance-widetag))
     #-compact-instance-header
     (write-wordindexed des sb-vm:instance-slots-offset layout)

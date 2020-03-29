@@ -165,7 +165,7 @@
     (if (= type code-header-widetag)
         (inst add bytes extra 0)
         (inst add bytes extra (* (1- words) n-word-bytes)))
-    (inst mov header (lsl bytes (- n-widetag-bits n-fixnum-tag-bits)))
+    (inst mov header (lsl bytes (- (length-field-shift type) n-fixnum-tag-bits)))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity

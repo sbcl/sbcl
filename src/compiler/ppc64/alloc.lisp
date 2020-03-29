@@ -181,9 +181,9 @@
            (inst sldi bytes extra (- word-shift n-fixnum-tag-bits))
            (inst addi bytes bytes (* (1+ words) n-word-bytes))))
     ;; store 1+nwords into header-data, downscaling bytes to words
-    (inst sldi header bytes (- n-widetag-bits word-shift))
+    (inst sldi header bytes (- (length-field-shift type) word-shift))
     ;; subtract the excess length and add in the widetag
-    (inst addi header header (+ (ash -2 n-widetag-bits) type))
+    (inst addi header header (+ (ash -2 (length-field-shift type)) type))
     (inst clrrdi bytes bytes n-lowtag-bits) ; round down to even
     (pseudo-atomic (pa-flag)
       (allocation nil bytes lowtag result :temp-tn temp :flag-tn pa-flag)

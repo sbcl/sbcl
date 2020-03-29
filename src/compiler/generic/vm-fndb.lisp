@@ -204,8 +204,7 @@
   ())
 (defknown %set-funcallable-instance-layout (funcallable-instance layout) layout
   ())
-(defknown %instance-length (instance) (integer 0 #.sb-vm:short-header-max-words)
-  (foldable flushable))
+(defknown %instance-length (instance) (unsigned-byte 14) (foldable flushable))
 (defknown %instance-cas (instance index t t) t ())
 (defknown %instance-ref (instance index) t
   (flushable always-translatable))

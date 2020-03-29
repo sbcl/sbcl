@@ -162,7 +162,7 @@
     ;; but should not be in the header
     (inst lsl bytes extra (- word-shift n-fixnum-tag-bits))
     (inst add bytes bytes (add-sub-immediate (* (1- words) n-word-bytes)))
-    (inst lsl header bytes (- n-widetag-bits word-shift))
+    (inst lsl header bytes (- (length-field-shift type) word-shift))
     (inst add header header type)
     ;; Add the object header to the allocation size and round up to
     ;; the allocation granularity

@@ -1475,7 +1475,7 @@ lispobj AMD64_SYSV_ABI alloc_layout()
         alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,
                                      ALIGN_UP(LAYOUT_SIZE,2),
                                      0),
-                           (LAYOUT_SIZE-1)<<N_WIDETAG_BITS | INSTANCE_WIDETAG);
+                           (LAYOUT_SIZE-1)<<INSTANCE_LENGTH_SHIFT | INSTANCE_WIDETAG);
     return make_lispobj(l, INSTANCE_POINTER_LOWTAG);
 }
 
@@ -1661,8 +1661,7 @@ static void fixup_space(lispobj* where, size_t n_words)
         case FUNCALLABLE_INSTANCE_WIDETAG:
 #endif
         case INSTANCE_WIDETAG:
-          instance_scan(adjust_words, where+1,
-                        instance_length(header_word) | 1,
+          instance_scan(adjust_words, where+1, size-1,
                         fix_object_layout(where)->bitmap,
                         0);
           break;

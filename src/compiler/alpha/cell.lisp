@@ -281,7 +281,7 @@
   (:result-types positive-fixnum)
   (:generator 4
     (loadw res struct 0 instance-pointer-lowtag)
-    (inst srl res n-widetag-bits res)))
+    (inst srl res instance-length-shift res)))
 
 (define-full-reffer instance-index-ref * instance-slots-offset
   instance-pointer-lowtag (descriptor-reg any-reg) * %instance-ref)

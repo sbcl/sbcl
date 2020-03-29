@@ -297,7 +297,13 @@ static inline int simple_vector_p(lispobj obj) {
 
 static inline int instance_length(lispobj header)
 {
-  return HeaderValue(header) & SHORT_HEADER_MAX_WORDS;
+    // Byte 3 of an instance header word holds the immobile gen# and visited bit,
+    // so those have to be masked off.
+    // Additionally, 'fullcgc' uses bit index 31 as a mark bit, so that has to
+    // be cleared. Lisp does not have to clear bit 31 because fullcgc does not
+    // operate concurrently.
+    // 64-bit machines do not need to do an 8-byte right-shift, so truncate to int.
+    return ((unsigned int)header >> INSTANCE_LENGTH_SHIFT) & 0x3FFF;
 }
 
 /* Define an assignable instance_layout() macro taking a native pointer */
@@ -513,9 +519,8 @@ extern struct lisp_startup_options lisp_startup_options;
 #define BOXED_NWORDS(obj) ((HeaderValue(obj) & 0x7FFFFF) | 1)
 
 /* Medium-sized payload count is expressed in 15 bits. Objects in this category
- * may reside in immobile space: CLOSURE, INSTANCE, FUNCALLABLE-INSTANCE.
- * The single data bit is used as a closure's NAMED flag,
- * or an instance's "special GC strategy" flag.
+ * may reside in immobile space: CLOSURE, FUNCALLABLE-INSTANCE.
+ * The single data bit is used as a closure's NAMED flag.
  *
  * Header:  gen# |  data |     size |    tag
  *         -----   -----    -------   ------

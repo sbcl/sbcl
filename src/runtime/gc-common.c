@@ -657,21 +657,18 @@ instance_scan(void (*proc)(lispobj*, sword_t, uword_t),
 static sword_t
 scav_instance(lispobj *where, lispobj header)
 {
-    lispobj lbitmap = make_fixnum(-1);
-    lispobj *layout = 0;
+    int nslots = instance_length(header) | 1;
+    if (!instance_layout(where)) return 1 + nslots;
 
-    if (instance_layout(where)) {
-        layout = native_pointer(instance_layout(where));
+    lispobj *layout = native_pointer(instance_layout(where));
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
-        if (immobile_obj_gen_bits(layout) == from_space)
-            enliven_immobile_obj(layout, 1);
+    if (immobile_obj_gen_bits(layout) == from_space)
+        enliven_immobile_obj(layout, 1);
 #else
-        if (forwarding_pointer_p(layout))
-            layout = native_pointer(forwarding_pointer_value(layout));
+    if (forwarding_pointer_p(layout))
+        layout = native_pointer(forwarding_pointer_value(layout));
 #endif
-        lbitmap = ((struct layout*)layout)->bitmap;
-    }
-    sword_t nslots = instance_length(header) | 1;
+    lispobj lbitmap = ((struct layout*)layout)->bitmap;
     if (lbitmap == make_fixnum(-1)) {
         scavenge(where+1, nslots);
         return 1 + nslots;
@@ -702,7 +699,7 @@ scav_instance(lispobj *where, lispobj header)
                       where+1, nslots, lbitmap, 0);
     } else {
         sword_t bitmap = fixnum_value(lbitmap); // signed integer!
-        sword_t n = nslots;
+        int n = nslots;
         lispobj obj;
         for ( ; n-- ; bitmap >>= 1) {
             ++where;
@@ -713,16 +710,34 @@ scav_instance(lispobj *where, lispobj header)
     return 1 + nslots;
 }
 
+static sword_t size_instance(lispobj *where) {
+    return 1 + (instance_length(*where) | 1);
+}
+
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
 static sword_t
 scav_funinstance(lispobj *where, lispobj header)
 {
-    // This works because the layout is in the header word of all instances,
-    // ordinary and funcallable, when compact headers are enabled.
-    // The trampoline slot in the funcallable-instance is raw, but can be
-    // scavenged, because it points to readonly space, never oldspace.
-    // (And for certain backends it looks like a fixnum, not a pointer)
-    return scav_instance(where, header);
+    // Do a similar thing as scav_instance but do not split into 3 cases
+    // based on whether the bitmap is a fixnum or a bignum or the special
+    // case of all tagged; it's always a fixnum, with at least 1 raw slot.
+    int nslots = SHORT_BOXED_NWORDS(header);
+    if (!instance_layout(where)) return 1 + nslots;
+
+    lispobj *layout = native_pointer(instance_layout(where));
+    if (immobile_obj_gen_bits(layout) == from_space)
+        enliven_immobile_obj(layout, 1);
+    lispobj lbitmap = ((struct layout*)layout)->bitmap;
+    gc_assert(fixnump(lbitmap));
+    sword_t bitmap = fixnum_value(lbitmap);
+    int n = nslots;
+    lispobj obj;
+    for ( ; n-- ; bitmap >>= 1) {
+        ++where;
+        if ((bitmap & 1) && is_lisp_pointer(obj = *where))
+            scav1(where, obj);
+    }
+    return 1 + nslots;
 }
 #endif
 

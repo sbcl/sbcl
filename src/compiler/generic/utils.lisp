@@ -190,8 +190,13 @@
                                instance
                                character))))))
 
+(defun length-field-shift (widetag)
+  (if (= widetag instance-widetag)
+      instance-length-shift
+      n-widetag-bits))
+
 (defun compute-object-header (size widetag)
   (logior (case widetag
             (#.fdefn-widetag 0)
-            (t (ash (1- size) n-widetag-bits)))
+            (t (ash (1- size) (length-field-shift widetag))))
           widetag))

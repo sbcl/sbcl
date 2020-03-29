@@ -76,7 +76,7 @@
     (sap "unboxed")
     (unbound-marker "immediate")
     (weak-pointer "weak_pointer" "weak_pointer" "boxed")
-    (instance "instance" "lose" "short_boxed")
+    (instance "instance" "lose" "instance")
     (fdefn "fdefn")
 
     (no-tls-value-marker "immediate")

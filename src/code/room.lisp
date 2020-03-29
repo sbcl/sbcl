@@ -272,7 +272,10 @@
           (:instance
            (values (tagged-object instance-pointer-lowtag)
                    widetag
-                   (boxed-size (logand header-value short-header-max-words))))
+                   (boxed-size
+                    (logand (ash header (- instance-length-shift))
+                            ;; a minor KLUDGE of hardcoding the mask I guess
+                            #x3FFF))))
 
           (:closure ; also funcallable-instance
            (values (tagged-object fun-pointer-lowtag)
