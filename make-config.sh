@@ -730,8 +730,13 @@ elif [ "$sbcl_arch" = "ppc64" ]; then
     # 2.3.1, so define our constant for that)
     echo '#define GLIBC231_STYLE_UCONTEXT 1' > src/runtime/ppc-linux-mcontext.h
 elif [ "$sbcl_arch" = "riscv" ]; then
-    if [[ $xlen -eq 64 ]]; then
+    if [ "$xlen" = "64" ]; then
         printf ' :64-bit' >> $ltf
+    elif [ "$xlen" = "32" ]; then
+        :
+    else
+        echo 'Architecture word width unspecified. (Either 32-bit or 64-bit.)'
+        exit 1
     fi
     printf ' :gencgc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
