@@ -135,6 +135,7 @@
 ;;; Amount to righ-shift an instance header to get the length.
 ;;; Similar consideration as above with regard to use of generation# byte.
 (defconstant instance-length-shift 10)
+(defconstant instance-length-mask #x3FFF)
 
 ;;; Is X a fixnum in the target Lisp?
 #+sb-xc-host

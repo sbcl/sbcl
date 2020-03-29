@@ -690,7 +690,7 @@
     ;; Returning fixnum/any-reg elides some REX prefixes due to the shifts
     ;; being small. Maybe the asm optimizer could figure it out now?
     (inst shr :dword res (- instance-length-shift n-fixnum-tag-bits))
-    (inst and :dword res (lognot fixnum-tag-mask))))
+    (inst and :dword res (fixnumize instance-length-mask))))
 
 #+compact-instance-header
 (progn

@@ -274,8 +274,7 @@
                    widetag
                    (boxed-size
                     (logand (ash header (- instance-length-shift))
-                            ;; a minor KLUDGE of hardcoding the mask I guess
-                            #x3FFF))))
+                            instance-length-mask))))
 
           (:closure ; also funcallable-instance
            (values (tagged-object fun-pointer-lowtag)
