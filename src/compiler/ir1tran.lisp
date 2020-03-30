@@ -640,6 +640,11 @@
                    leaf))
          (ref (make-ref leaf name)))
     (push ref (leaf-refs leaf))
+    (when (and (functional-p leaf)
+               (functional-ignore leaf))
+      (#-sb-xc-host compiler-style-warn
+       #+sb-xc-host warn
+       "Calling an ignored function: ~S" (leaf-debug-name leaf)))
     (setf (leaf-ever-used leaf) t)
     (link-node-to-previous-ctran ref start)
     (cond (type (let* ((ref-ctran (make-ctran))
@@ -1449,7 +1454,9 @@
          ;; for unused macrolet or symbol-macros, so there's no need to do anything.
          )
         ((functional-p var)
-         (setf (leaf-ever-used var) t))
+         (setf (leaf-ever-used var) t)
+         (when (eq (first spec) 'ignore)
+           (setf (functional-ignore var) t)))
         ((and (lambda-var-specvar var) (eq (first spec) 'ignore))
          ;; ANSI's definition for "Declaration IGNORE, IGNORABLE"
          ;; requires that this be a STYLE-WARNING, not a full WARNING.

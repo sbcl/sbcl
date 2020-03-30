@@ -511,3 +511,13 @@
     (check '(f (&rest args) args))
     (check '(f (&optional o) o))
     (check '(f (&optional)))))
+
+(with-test (:name :calling-ignored-local)
+  (assert
+   (nth-value 3
+              (checked-compile
+               `(lambda ()
+                  (flet ((f ()))
+                    (declare (ignore #'f))
+                    (f)))
+               :allow-style-warnings t))))
