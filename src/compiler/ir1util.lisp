@@ -1621,6 +1621,15 @@
     (clambda (delete-lambda fun)))
   (values))
 
+(defun lambda-ever-used-p (lambda)
+  (let ((optional-dispatch (lambda-optional-dispatch lambda)))
+    (if optional-dispatch
+        (or (leaf-ever-used optional-dispatch)
+            ;; Warn only for the main entry
+            (not (eq (optional-dispatch-main-entry optional-dispatch)
+                     lambda)))
+        (leaf-ever-used lambda))))
+
 ;;; Deal with deleting the last reference to a CLAMBDA, which means
 ;;; that the lambda is unreachable, so that its body may be
 ;;; deleted. We set FUNCTIONAL-KIND to :DELETED and rely on
@@ -1659,7 +1668,7 @@
               (component (block-component bind-block))
               (return (lambda-return clambda))
               (return-block (and return (node-block return))))
-         (unless (leaf-ever-used clambda)
+         (unless (lambda-ever-used-p clambda)
            (let ((*compiler-error-context* bind))
              (compiler-notify 'code-deletion-note
                               :format-control "deleting unused function~:[.~;~:*~%  ~S~]"

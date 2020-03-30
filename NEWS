@@ -6,6 +6,8 @@ changes relative to sbcl-2.0.2:
   * bug fix: backtracing through assembly routines now works properly on RISC-V.
   * bug fix: ASH no longer gets miscompiled in certain edge cases on RISC-V.
   * bug fix: more args have been slightly optimized and are more correct on RISC-V.
+  * bug fix: unused local functions with &rest/&key/&optional now also issue a
+    deletion note.
 
 changes in sbcl-2.0.3 relative to sbcl-2.0.2:
   * incompatible change: the external format now defaults to UTF-8 and is not
