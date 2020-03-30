@@ -4057,11 +4057,6 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
     gc_assert((((uword_t)region->free_pointer & LOWTAG_MASK) == 0)
               && ((nbytes & LOWTAG_MASK) == 0));
 
-#if !(defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD))
-    /* Must be inside a PA section. */
-    gc_assert(get_pseudo_atomic_atomic(thread));
-#endif
-
     if ((os_vm_size_t) nbytes > large_allocation)
         large_allocation = nbytes;
 
@@ -4167,6 +4162,8 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
 #endif
 
 #ifdef LISP_FEATURE_SB_SAFEPOINT_STRICTLY
+// FIXME: I suspect that we can forgo manipulation of the PA flag, which appears
+// to have been present here only to satisfy an assertion in lisp_alloc.
 # define DEFINE_LISP_ENTRYPOINT(name, page_type) \
    lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = arch_os_get_current_thread(); \
@@ -4180,6 +4177,7 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
 # define DEFINE_LISP_ENTRYPOINT(name, page_type) \
    lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = arch_os_get_current_thread(); \
+    gc_assert(get_pseudo_atomic_atomic(self)); \
     return lisp_alloc(MY_REGION, nbytes, page_type, self); \
    }
 #endif

@@ -47,10 +47,6 @@ lispobj alloc_code_object (unsigned total_words)
      * pseudo atomic. Here, we rely on gc being inhibited. */
     if (read_TLS(GC_INHIBIT, th) == NIL)
         lose("alloc_code_object called with GC enabled.");
-    /* Since alloc_code_object is run under WITHOUT-GCING it doesn't
-     * actaully need to be pseudo-atomic, this is just to appease the
-     * assertions in general_alloc() */
-    set_pseudo_atomic_atomic(th);
 #endif
 
     /* Allocations of code are all serialized. We might also acquire
@@ -62,10 +58,6 @@ lispobj alloc_code_object (unsigned total_words)
                  CODE_PAGE_TYPE, th);
     result = thread_mutex_unlock(&allocation_lock);
     gc_assert(!result);
-
-#if REQUIRE_GC_INHIBIT
-    clear_pseudo_atomic_atomic(th);
-#endif
 
     code->header = ((uword_t)total_words << CODE_HEADER_SIZE_SHIFT) | CODE_HEADER_WIDETAG;
     code->boxed_size = 0;
