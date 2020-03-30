@@ -371,7 +371,7 @@ x:
 	li reg_L2,0
 #endif
 	li reg_LIP,0
-#ifdef LISP_FEATURE_DARWIN	
+#ifdef LISP_FEATURE_DARWIN
 	lis reg_NULL,hi16(NIL)
 	ori reg_NULL,reg_NULL,lo16(NIL)
 #else

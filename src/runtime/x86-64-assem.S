@@ -30,7 +30,7 @@
 #endif
 #include "genesis/ratio.h"
 #include "genesis/complex.h"
-	
+
 /* Minimize conditionalization for different OS naming schemes. */
 #if defined __linux__  || defined LISP_FEATURE_HAIKU || defined LISP_FEATURE_FREEBSD || \
    defined __OpenBSD__ || defined __NetBSD__ || defined __sun || defined _WIN64 || defined __DragonFly__
@@ -65,9 +65,9 @@
 #else
 #define	align_4byte	2
 #define	align_8byte	3
-#define	align_16byte	4	
+#define	align_16byte	4
 #define	align_page	15
-#endif			
+#endif
 
 /*
  * The assembler used for win32 doesn't like .type or .size directives,
@@ -113,14 +113,14 @@ GNAME(funcall1_switching_stack):
         SIZE(GNAME(funcall1_switching_stack))
 #endif
 
-	.text	
+	.text
 	.globl  GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
-		
-/* We don't worry too much about saving registers 
- * here, because we never expect to return from the initial call to lisp 
+
+/* We don't worry too much about saving registers
+ * here, because we never expect to return from the initial call to lisp
  * anyway */
-	
+
 	.align	align_16byte,0x90
 	.cfi_startproc
 GNAME(call_into_lisp_first_time):
@@ -138,10 +138,10 @@ GNAME(lspmain): # so much easier to type 'b lspmain' in gdb
 	mov     THREAD_CONTROL_STACK_END_OFFSET(%rax) ,%rsp
 	jmp     Lstack
 
-	.text	
+	.text
 	.globl  GNAME(call_into_lisp)
 	TYPE(GNAME(call_into_lisp))
-		
+
 /*
  * amd64 calling convention: C expects that
  * arguments go in rdi rsi rdx rcx r8 r9
@@ -169,7 +169,7 @@ Lstack:
 	.cfi_offset  rbp, -16
 	/* FIXME x86 saves FPU state here */
 	push	%rbx  	# these regs are callee-saved according to C
-	push	%r12	# so must be preserved and restored when 
+	push	%r12	# so must be preserved and restored when
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
@@ -196,8 +196,8 @@ Lstack:
 
 	# Why do we care what goes in unused argument-passing regs?
 	# These just seem like wasted instructions.
-	xor	%rdx,%rdx	# clear any descriptor registers 
-	xor	%rdi,%rdi	# that we can't be sure we'll 
+	xor	%rdx,%rdx	# clear any descriptor registers
+	xor	%rdi,%rdi	# that we can't be sure we'll
 	xor	%rsi,%rsi	# initialise properly.  XX do r8-r15 too?
 	cmp	$2,%rcx
 	je	Ltwo
@@ -223,12 +223,12 @@ Lzero:
 	.cfi_escape 0x0f, 5, 0x76, 0, 6, 0x40, 0x22
 Lcall:
 	call	*CLOSURE_FUN_OFFSET(%rax)
-	
+
 	/* If the function returned multiple values, the carry flag will be set.
            Lose them */
-	jnc	LsingleValue	
+	jnc	LsingleValue
 	mov	%rbx, %rsp
-LsingleValue:	
+LsingleValue:
 
 /* Restore C regs */
 	pop	%r15
@@ -251,7 +251,7 @@ LsingleValue:
 	.cfi_endproc
 	SIZE(GNAME(call_into_lisp))
 
-	.text	
+	.text
 	.globl  GNAME(funcall_alien_callback)
 	TYPE(GNAME(funcall_alien_callback))
 	.align	align_16byte,0x90
@@ -262,12 +262,12 @@ GNAME(funcall_alien_callback):
    rdx arg0
    rcx thread #+sb-thread
 */
-        
+
 	push	%rbp		# Save old frame pointer.
 	mov	%rsp,%rbp	# Establish new frame.
 
 	push	%rbx  	# these regs are callee-saved according to C
-	push	%r12	# so must be preserved and restored when 
+	push	%r12	# so must be preserved and restored when
 	push	%r13    # the lisp function returns
 	push	%r14    #
 	push	%r15    #
@@ -326,7 +326,7 @@ GNAME(fun_end_breakpoint_guts):
 	mov	$(NIL),%rdi	# default second value
 	mov	$(NIL),%rsi	# default third value
 multiple_value_return:
-	
+
 	.globl  GNAME(fun_end_breakpoint_trap)
 	.align	align_16byte,0x90
 GNAME(fun_end_breakpoint_trap):
@@ -380,7 +380,7 @@ GNAME(memory_fault_emulation_trap):
 	.align	align_16byte,0x90
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
- 	 * doesn't exist.  This is where call_into_lisp returns when called 
+ 	 * doesn't exist.  This is where call_into_lisp returns when called
 	 * using return_to_lisp_function */
 	popq %r15
 	popq %r14

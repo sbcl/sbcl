@@ -26,11 +26,11 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 #include "genesis/thread.h"
-	
-/* Minimize conditionalization for different OS naming schemes. 
+
+/* Minimize conditionalization for different OS naming schemes.
  *
- * (As of sbcl-0.8.10, this seems no longer to be much of an issue, 
- * since everyone has converged on ELF. If this generality really 
+ * (As of sbcl-0.8.10, this seems no longer to be much of an issue,
+ * since everyone has converged on ELF. If this generality really
  * turns out not to matter, perhaps it's just clutter we could get
  * rid of? -- WHN 2004-04-18)
  *
@@ -44,11 +44,11 @@
 #endif
 
 /* Get the right type of alignment. Linux, FreeBSD and NetBSD (but not OpenBSD)
- * want alignment in bytes. 
+ * want alignment in bytes.
  *
- * (As in the GNAME() definitions above, as of sbcl-0.8.10, this seems 
+ * (As in the GNAME() definitions above, as of sbcl-0.8.10, this seems
  * no longer to be much of an issue, since everyone has converged on
- * the same value. If this generality really turns out not to 
+ * the same value. If this generality really turns out not to
  * matter any more, perhaps it's just clutter we could get
  * rid of? -- WHN 2004-04-18)
  */
@@ -61,9 +61,9 @@
 #else
 #define	align_4byte	2
 #define	align_8byte	3
-#define	align_16byte	4	
+#define	align_16byte	4
 #define align_page	12
-#endif			
+#endif
 
 /*
  * The assembler used for win32 doesn't like .type or .size directives,
@@ -171,7 +171,7 @@
 	.globl	GNAME(all_threads)
 
 /*
- * A call to call_into_c preserves esi, edi, and ebp.	
+ * A call to call_into_c preserves esi, edi, and ebp.
  * (The C function will preserve ebx, esi, edi, and ebp across its
  * function call, but we trash ebx ourselves by using it to save the
  * return Lisp address.)
@@ -341,21 +341,21 @@ GNAME(funcall1_switching_stack):
         push    %edx
         push    %eax
         call    *%edx
-        
+
         mov     %ebp, %esp
         pop     %ebp
         ret
         SIZE(GNAME(funcall1_switching_stack))
 #endif
 
-	.text	
+	.text
 	.globl GNAME(call_into_lisp_first_time)
 	TYPE(GNAME(call_into_lisp_first_time))
-		
-/* We don't worry too much about saving registers 
- * here, because we never expect to return from the initial call to lisp 
+
+/* We don't worry too much about saving registers
+ * here, because we never expect to return from the initial call to lisp
  * anyway */
-	
+
 	.align	align_16byte,0x90
 GNAME(call_into_lisp_first_time):
 GNAME(lspmain):
@@ -371,13 +371,13 @@ GNAME(lspmain):
 #endif
 	jmp     Lstack
 
-	.text	
+	.text
 	.globl GNAME(call_into_lisp)
 	TYPE(GNAME(call_into_lisp))
-		
+
 /* The C conventions require that ebx, esi, edi, and ebp be preserved
  * across function calls. */
-	
+
 	.align	align_16byte,0x90
 GNAME(call_into_lisp):
 	pushl	%ebp		# Save old frame pointer.
@@ -404,12 +404,12 @@ Lstack:
 	fldz
 	fldz
 	fldz
-	
+
 /* Save C regs: ebx esi edi. */
 	pushl	%ebx
 	pushl	%esi
 	pushl	%edi
-	
+
 /* Clear descriptor regs. */
 	xorl	%eax,%eax	# lexenv
 	xorl	%ebx,%ebx	# available
@@ -432,7 +432,7 @@ Lstack:
 	cmpl	$8,%ecx
 	je	Ldone
 	movl	8(%ebx),%esi	# arg2
-Ldone:	
+Ldone:
 	/* Registers eax, ecx, edx, edi, and esi are now live. */
 
 #ifdef LISP_FEATURE_WIN32
@@ -460,7 +460,7 @@ Ldone:
 	sub	$4,%esp		# Ensure 3 slots are allocated, two above.
 
 	call	*CLOSURE_FUN_OFFSET(%eax)
-	
+
 	/* If the function returned multiple values, it will return to
 	   this point.  Lose them */
 	jnc	LsingleValue
@@ -483,7 +483,7 @@ LsingleValue:
 /* Restore the NPX state. */
 	frstor  (%esp)
 	addl	$108, %esp
-	
+
 	popl	%ebp		# c-sp
 	movl	%edx,%eax	# c-val
 	ret
@@ -532,9 +532,9 @@ GNAME(fun_end_breakpoint_guts):
 	movl	$(1 << N_FIXNUM_TAG_BITS),%ecx		# Setup ecx for one return value.
 	movl	$(NIL),%edi	# default second value
 	movl	$(NIL),%esi	# default third value
-		
+
 multiple_value_return:
-	
+
 	.globl GNAME(fun_end_breakpoint_trap)
 GNAME(fun_end_breakpoint_trap):
 	TRAP
@@ -665,16 +665,16 @@ GNAME(call_into_lisp_tramp):
         popfl
         leave
         ret
-        
+
         SIZE(call_into_lisp_tramp)
 #endif
-        
+
 	.align	align_16byte,0x90
 	.globl	GNAME(post_signal_tramp)
 	TYPE(GNAME(post_signal_tramp))
 GNAME(post_signal_tramp):
 	/* this is notionally the second half of a function whose first half
- 	 * doesn't exist.  This is where call_into_lisp returns when called 
+ 	 * doesn't exist.  This is where call_into_lisp returns when called
 	 * using return_to_lisp_function */
 	addl $12,%esp  	/* clear call_into_lisp args from stack */
 	popal           /* restore registers */
@@ -705,12 +705,12 @@ GNAME(fast_bzero_pointer):
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero)
 	TYPE(GNAME(fast_bzero))
-GNAME(fast_bzero):        
+GNAME(fast_bzero):
         /* Indirect function call */
         jmp *GNAME(fast_bzero_pointer)
 	SIZE(GNAME(fast_bzero))
-        
-      
+
+
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_detect)
@@ -738,26 +738,26 @@ Lbase:
 Lsse2:
         movl $(GNAME(fast_bzero_sse)), GNAME(fast_bzero_pointer)
         jmp Lrestore
-        
+
 Lrestore:
         pop %edx
         pop %ecx
         pop %ebx
         pop %eax
         jmp *GNAME(fast_bzero_pointer)
-        
+
 	SIZE(GNAME(fast_bzero_detect))
-        
+
 
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_sse)
 	TYPE(GNAME(fast_bzero_sse))
-        
+
 GNAME(fast_bzero_sse):
         /* A fast routine for zero-filling blocks of memory that are
          * guaranteed to start and end at a 4096-byte aligned address.
-         */        
+         */
         push %esi                 /* Save temporary registers */
         push %edi
         mov 16(%esp), %esi        /* Parameter: amount of bytes to fill */
@@ -779,7 +779,7 @@ Lloop_sse:
         movntdq %xmm7, 16(%edi)
         movntdq %xmm7, 32(%edi)
         movntdq %xmm7, 48(%edi)
- 
+
         add $64, %edi /* Advance pointer */
         dec %esi      /* Decrement 64-byte block count */
         jnz Lloop_sse
@@ -793,17 +793,17 @@ Lend_sse:
         pop %esi
 	ret
 	SIZE(GNAME(fast_bzero_sse))
-                
+
 
 	.text
 	.align	align_16byte,0x90
 	.globl GNAME(fast_bzero_base)
 	TYPE(GNAME(fast_bzero_base))
-        
+
 GNAME(fast_bzero_base):
         /* A fast routine for zero-filling blocks of memory that are
          * guaranteed to start and end at a 4096-byte aligned address.
-         */        
+         */
         push %eax                 /* Save temporary registers */
         push %ecx
         push %edi
@@ -816,8 +816,8 @@ GNAME(fast_bzero_base):
         rep
         stosl                     /* Store EAX to *EDI, ECX times, incrementing
                                    * EDI by 4 after each store */
-        
-Lend_base:        
+
+Lend_base:
         pop %edi                  /* Restore temp registers */
         pop %ecx
         pop %eax

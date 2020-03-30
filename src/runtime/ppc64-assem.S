@@ -37,7 +37,7 @@ From PPC-elf64abi:
 The following figure shows the stack frame organization.
 SP in the figure denotes the stack pointer (general purpose register r1) of the called
 function after it has executed code establishing its stack frame.
-	
+
 High Address
 
           +-> Back chain
@@ -56,12 +56,12 @@ SP  --->  +-- Back chain             (SP + 0)
 Low Address
 
 */
-	
+
 /* "Floating-point register fN is saved in the doubleword located 8x(32-N)
     bytes before the back-chain word of the previous frame.
     General-purpose register rN is saved in the doubleword located 8x(32-N)
     bytes below the floating-point save area."
-	
+
     While not entirely obvious from that description, it seems conventional
     to spill the nonvolatile registers such that the higher the register number
     the higher the address in which it is stored.
@@ -76,7 +76,7 @@ Low Address
     exactly calculated to allow spilling every nonvolatile GPR and FPR (18 of each)
     without lowering the stack pointer (36 doublewords = 288 bytes).
 */
-	
+
 // We don't need a frame pointer since the frame is fixed in size.
 // Access the spill/restore areas off the stack pointer.
 #define sp 1
@@ -113,7 +113,7 @@ Low Address
 	SAVE_GPR(23) ; SAVE_GPR(22) ; SAVE_GPR(21) ; SAVE_GPR(20) ; \
 	SAVE_GPR(19) ; SAVE_GPR(18) ; SAVE_GPR(17) ; SAVE_GPR(16) ; \
 	SAVE_GPR(15) ; SAVE_GPR(14)
-	
+
 #define C_FULL_EPILOG \
 	RESTORE_GPR(14) ; RESTORE_GPR(15) ; \
 	RESTORE_GPR(16) ; RESTORE_GPR(17) ; RESTORE_GPR(18) ; RESTORE_GPR(19) ; \
@@ -261,7 +261,7 @@ lra:
 
 	/* Turn on  pseudo-atomic */
 	la reg_ALLOC,flag_PseudoAtomic(reg_ALLOC)
-	
+
 	/* Lisp does not understand the TOC register, so we have to restore it
 	   now - prior to the epilogue - because there are memory accesses
 	   by way of the TOC register in this code, in particular
@@ -397,7 +397,7 @@ lra:
 	mtctr reg_CFUNC
 #else
 	mfctr reg_CFUNC
-#endif 
+#endif
         /* Into C we go. */
 	bctrl
 
@@ -473,7 +473,7 @@ lra:
 	ld reg_LIP,8(reg_CFP)
 #if 	N_FIXNUM_TAG_BITS == 3
 	srdi reg_LIP,reg_LIP,1
-#endif	
+#endif
 	ld reg_CODE,16(reg_CFP)
 	add reg_LIP,reg_CODE,reg_LIP
 
