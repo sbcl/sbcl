@@ -26,10 +26,8 @@
 /* constants derived from the fundamental constants in passed by GENESIS */
 #define READ_ONLY_SPACE_SIZE (READ_ONLY_SPACE_END - READ_ONLY_SPACE_START)
 #define STATIC_SPACE_SIZE (STATIC_SPACE_END - STATIC_SPACE_START)
-#ifdef LISP_FEATURE_LINKAGE_TABLE
 #define LINKAGE_TABLE_SPACE_SIZE \
     (LINKAGE_TABLE_SPACE_END - LINKAGE_TABLE_SPACE_START)
-#endif
 
 #if !defined(__ASSEMBLER__)
 #include "thread.h"

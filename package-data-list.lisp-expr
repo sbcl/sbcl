@@ -3342,9 +3342,9 @@ structure representations"
                                  "*VARYOBJ-SPACE-FREE-POINTER*")
                "READ-ONLY-SPACE-START" "READ-ONLY-SPACE-END"
                "STATIC-SPACE-START" "STATIC-SPACE-END"
-               #+linkage-table("LINKAGE-TABLE-SPACE-START"
-                                "LINKAGE-TABLE-SPACE-END"
-                                "LINKAGE-TABLE-ENTRY-SIZE")
+               ("LINKAGE-TABLE-SPACE-START"
+                "LINKAGE-TABLE-SPACE-END"
+                "LINKAGE-TABLE-ENTRY-SIZE")
                #+sb-safepoint "GC-SAFEPOINT-PAGE-ADDR"
                #+sb-safepoint "GC-SAFEPOINT-TRAP-OFFSET"
                "TLS-SIZE" "N-WIDETAG-BITS" "WIDETAG-MASK"

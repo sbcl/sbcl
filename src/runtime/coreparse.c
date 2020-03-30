@@ -819,9 +819,10 @@ process_directory(int count, struct ndir_entry *entry,
                   os_set_cheneygc_spaces(addr, addr1);
 #else
                   uword_t addr1 = (uword_t)os_allocate(request);
+#endif
                   uword_t semispace_1_start = ALIGN_UP(addr1, BACKEND_PAGE_BYTES);
                   uword_t semispace_1_end = ALIGN_DOWN(addr1 + request, BACKEND_PAGE_BYTES);
-#endif
+
                   DYNAMIC_1_SPACE_START = semispace_1_start;
                   uword_t semispace_0_size = semispace_0_end - semispace_0_start;
                   uword_t semispace_1_size = semispace_1_end - semispace_1_start;
