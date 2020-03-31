@@ -283,9 +283,8 @@
   (remf rest :flags)
   `(%make-layout ,clos-hash ,classoid (pack-layout-bits ,depthoid ,length ,flags) ,@rest))
 
+;;; LAYOUT-DEPTHOID gets a vop and a stub
 (declaim (inline layout-length layout-flags))
-(defun layout-depthoid (layout) ; This is a VOP in 64-bit targets
-  (unpack-layout-bits (layout-%bits layout) :depthoid))
 (defun layout-length (layout)
   (unpack-layout-bits (layout-%bits layout) :length))
 (defun layout-flags (layout)
