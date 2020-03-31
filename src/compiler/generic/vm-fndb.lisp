@@ -515,14 +515,14 @@
 ;;;; code/function/fdefn object manipulation routines
 
 ;;; Return a SAP pointing to the instructions part of CODE-OBJ.
-(defknown code-instructions (t) system-area-pointer (flushable movable))
+(defknown code-instructions (code-component) system-area-pointer (flushable movable))
 ;;; Extract the INDEXth element from the header of CODE-OBJ. Can be
 ;;; set with SETF.
-(defknown code-header-ref (t index) t (flushable))
-(defknown code-header-set (t index t) t ())
+(defknown code-header-ref (code-component index) t (flushable))
+(defknown code-header-set (code-component index t) t ())
 ;;; Extract a 4-byte element relative to the end of CODE-OBJ.
 ;;; The index should be strictly negative and a multiple of 4.
-(defknown code-trailer-ref (t fixnum) (unsigned-byte 32)
+(defknown code-trailer-ref (code-component fixnum) (unsigned-byte 32)
   (flushable #-(or sparc alpha hppa ppc64) always-translatable))
 
 (defknown fun-subtype (function) (member . #.sb-vm::+function-widetags+)
