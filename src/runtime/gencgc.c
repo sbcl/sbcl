@@ -1749,6 +1749,9 @@ conservative_root_p(lispobj addr, page_index_t addr_page_index)
     return object_start;
 }
 #elif defined LISP_FEATURE_PPC64
+static inline int untagged_fdefn_p(lispobj addr) {
+    return ((addr & LOWTAG_MASK) == 0) && widetag_of((lispobj*)addr) == FDEFN_WIDETAG;
+}
 /* "Less conservative" than above - only consider code pointers as ambiguous
  * roots, not all pointers.  Eventually every architecture could use this
  * because life is so much easier when on-stack code does not move */
@@ -1756,8 +1759,9 @@ static lispobj*
 conservative_root_p(lispobj addr, page_index_t addr_page_index)
 {
     struct page* page = &page_table[addr_page_index];
-    // We allow ambiguous pointers to code, and only code.
-    if ((page->type & PAGE_TYPE_MASK) != CODE_PAGE_TYPE)
+    // We allow ambiguous pointers to code and untagged fdefn pointers.
+    if (!((page->type & PAGE_TYPE_MASK) == CODE_PAGE_TYPE
+          || untagged_fdefn_p(addr)))
         return 0;
 
     // quick check 1: within from_space and within page usage
@@ -2222,6 +2226,15 @@ update_page_write_prot(page_index_t page)
     if (!ENABLE_PAGE_PROTECTION) return 0;
 
     /* Skip if it's unboxed, already write-protected, or pinned */
+    /* The 'pinned' check is sort of bogus but sort of necessary,
+     * but doesn't completely fix the problem that it tries to, which is
+     * passing a memory address to the OS for it to write into.
+     * An object on a never-written protected page would still fail.
+     * It's probably rare to pass boxed pages to the OS, but it could be
+     * to read fixnums into a simple-vector.
+     * If we had soft write protection (mark bits) instead of physical
+     * protection, then we could/would protect pinned pages.
+     * (See git rev 216e37a316) */
     if (page_table[page].write_protected || !page_boxed_p(page) ||
         page_table[page].pinned)
         return (0);
@@ -2243,8 +2256,15 @@ update_page_write_prot(page_index_t page)
 #ifdef LISP_FEATURE_COMPACT_INSTANCE_HEADER
         else if (lowtag_of(word>>32)==INSTANCE_POINTER_LOWTAG &&
                  (header_widetag(word)==INSTANCE_WIDETAG||
-                  header_widetag(word)==FUNCALLABLE_INSTANCE_WIDETAG))
+                  header_widetag(word)==FUNCALLABLE_INSTANCE_WIDETAG)) {
             ptr = (void*)(word >> 32);
+        }
+#endif
+#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
+        else if (!(word & LOWTAG_MASK) && (find_page_index((void*)word) >= 0)
+                 && widetag_of((lispobj*)word) == FDEFN_WIDETAG) {
+            ptr = (void*)word;
+        }
 #endif
         else
             continue;
@@ -2750,6 +2770,8 @@ struct verify_state {
     generation_index_t object_gen;
     generation_index_t min_pointee_gen;
     unsigned char widetag;
+    lispobj *implicit_tagged_subrange_start,
+            *implicit_tagged_subrange_end;
 };
 
 #define VERIFY_VERBOSE    1
@@ -2832,6 +2854,11 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
         }
         count = 1;
         lispobj thing = *where;
+        if (where >= state->implicit_tagged_subrange_start &&
+            where < state->implicit_tagged_subrange_end) {
+            if (thing != 0) thing |= OTHER_POINTER_LOWTAG;
+        }
+
         lispobj callee;
 
 #define GC_WARN(str) \
@@ -2970,7 +2997,15 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                 gc_assert(fixnump(where[1])); // boxed size
                 /* Verify the boxed section of the code data block */
                 state->min_pointee_gen = 8; // initialize to "positive infinity"
+#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
+                state->implicit_tagged_subrange_start =
+                  code->constants + code_n_funs(code) * 4;
+                state->implicit_tagged_subrange_end =
+                  state->implicit_tagged_subrange_start + code_n_named_calls(code);
+#endif
                 verify_range(where + 2, nheader_words - 2, state);
+                state->implicit_tagged_subrange_start = 0;
+                state->implicit_tagged_subrange_end = 0;
 
                 /* Verify the boxed section of each simple-fun */
                 for_each_simple_fun(i, fheaderp, code, 1, {
@@ -4666,6 +4701,8 @@ sword_t scav_code_header(lispobj *object, lispobj header)
                            find_page_index(object)));
         my_gen = new_space;
     }
+    struct code* code = (struct code*)object;
+
     // If the header's 'written' flag is off and it was not copied by GC
     // into newspace, then the object should be ignored.
 
@@ -4686,6 +4723,27 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         /* Scavenge the boxed section of the code data block. */
         sword_t n_header_words = code_header_words((struct code *)object);
         scavenge(object + 2, n_header_words - 2);
+
+#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
+        // Process each untagged fdefn pointer.
+        // If CODE_PAGES_USE_SOFT_PROTECTION were enabled along with untagged fdefns,
+        // then the generation check at the bottom of this function would have to be
+        // modified to take into account untagged pointers.
+        lispobj* fdefns_start = code->constants + code_n_funs(code) * 4;
+        int n_fdefns = code_n_named_calls(code);
+        int i;
+        for (i=0; i<n_fdefns; ++i) {
+            lispobj word = fdefns_start[i];
+            if ((word & LOWTAG_MASK) == 0 && word != 0) {
+                lispobj tagged_word = word | OTHER_POINTER_LOWTAG;
+                scavenge(&tagged_word, 1);
+                if (tagged_word - OTHER_POINTER_LOWTAG != word) {
+                    fdefns_start[i] = tagged_word - OTHER_POINTER_LOWTAG;
+                }
+            }
+        }
+#endif
+
 #ifdef LISP_FEATURE_64_BIT
         /* If any function in this code object redirects to a function outside
          * the object, then scavenge all entry points. Otherwise there is no need,
@@ -4696,7 +4754,6 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         { /* Not enough spare bits in the header to hold random flags.
            * Just do the extra work always */
 #endif
-            struct code* code = (struct code*)object;
             for_each_simple_fun(i, fun, code, 1, {
                 if (simplefun_is_wrapped(fun)) {
                     lispobj target_fun = fun_taggedptr_from_self(fun->self);
@@ -4722,5 +4779,5 @@ sword_t scav_code_header(lispobj *object, lispobj header)
         ++n_scav_skipped[CODE_HEADER_WIDETAG/4];
     }
 done:
-    return code_total_nwords((struct code*)object);
+    return code_total_nwords(code);
 }

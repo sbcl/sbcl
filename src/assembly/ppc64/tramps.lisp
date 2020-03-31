@@ -37,7 +37,16 @@
     (closure-tramp (:return-style :none)
                    (:align n-lowtag-bits))
     ((:temp fdefn-tn descriptor-reg fdefn-offset))
-  (loadw lexenv-tn fdefn-tn fdefn-fun-slot other-pointer-lowtag)
+  ;; More complicated code allows an fdefn to be either tagged or untagged
+  ;; when referenced from a code header.
+  ;;  (inst andi. temp-reg-tn fdefn-tn 15)
+  ;;  (inst beq untagged)
+  ;;  (loadw lexenv-tn fdefn-tn fdefn-fun-slot other-pointer-lowtag)
+  ;;  (inst b continue)
+  ;;  untagged
+  ;;  (loadw lexenv-tn fdefn-tn fdefn-fun-slot 0)
+  ;;  continue
+  (loadw lexenv-tn fdefn-tn fdefn-fun-slot (+ #-untagged-fdefns other-pointer-lowtag))
   (loadw code-tn lexenv-tn closure-fun-slot fun-pointer-lowtag)
   (inst addi lip-tn code-tn (- (ash simple-fun-insts-offset word-shift)
                                fun-pointer-lowtag))
@@ -105,7 +114,7 @@
     (inst std r0 machine-sp 16)
     ;; Allocate a new minimal C frame.
     (inst stdu machine-sp machine-sp -32)
-    (inst lr r12 (make-fixup "alloc_tramp" :foreign))
+    (inst lr r12 (make-fixup "alloc" :foreign))
     ;; We assume that little-endian machines use V2 of the ABI.
     ;; In V2 you can call a function via its global entry point
     ;; without loading r2. Just r12 is enough, because the callee

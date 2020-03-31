@@ -328,6 +328,20 @@ static void trace_object(lispobj* where)
 #endif
     case CODE_HEADER_WIDETAG:
         scan_to = code_header_words((struct code*)where);
+#ifdef LISP_FEATURE_UNTAGGED_FDEFNS
+        struct code* code = (struct code*)where;
+        lispobj* fdefns_start = code->constants + code_n_funs(code) * 4;
+        lispobj* fdefns_end  = fdefns_start + code_n_named_calls(code);
+        lispobj* limit = where + scan_to;
+        where = where + scan_from;
+        while (where < limit) {
+            lispobj word = *where;
+            if (where >= fdefns_start && where < fdefns_end) word |= OTHER_POINTER_LOWTAG;
+            gc_mark_obj(word);
+            ++where;
+        }
+        return;
+#endif
         break;
     case FDEFN_WIDETAG:
         gc_mark_obj(fdefn_callee_lispobj((struct fdefn*)where));

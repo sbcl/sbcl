@@ -319,15 +319,26 @@
              (reference-core-fun code-obj index (cadr const) object))
             ((nil))
             (t
-             (setf (code-header-ref code-obj index)
-                   (etypecase kind
+             (let ((referent
+                    (etypecase kind
                      ((member :named-call :fdefinition)
                       (find-or-create-fdefn (cadr const)))
                      ((eql :known-fun)
                       (%coerce-name-to-fun (cadr const)))
                      (constant
-                      (constant-value const))))))))))
-  (values))
+                      (constant-value const)))))
+               (if (eq kind :named-call)
+                   (set-code-fdefn code-obj index referent)
+                   (setf (code-header-ref code-obj index) referent))))))))))
+
+(defun set-code-fdefn (code index fdefn)
+  #+untagged-fdefns
+  (with-pinned-objects (fdefn)
+    (setf (code-header-ref code index)
+          (%make-lisp-obj (logandc2 (get-lisp-obj-address fdefn)
+                                    sb-vm:lowtag-mask))))
+  #-untagged-fdefns
+  (setf (code-header-ref code index) fdefn))
 
 ;;; Backpatch all the DEBUG-INFOs dumped so far with the specified
 ;;; SOURCE-INFO list. We also check that there are no outstanding

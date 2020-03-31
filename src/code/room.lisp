@@ -1431,7 +1431,12 @@ We could try a few things to mitigate this:
     (with-pinned-objects (obj)
       (dotimes (i count)
         (let ((word (sap-ref-word (int-sap addr) (ash i word-shift))))
-          (multiple-value-bind (lispobj ok) (if decode (make-lisp-obj word nil))
+          (multiple-value-bind (lispobj ok)
+              (cond ((and (typep thing 'code-component)
+                          (< 1 i (code-header-words thing)))
+                     (values (code-header-ref thing i) t))
+                    (decode
+                     (make-lisp-obj word nil)))
             (let ((*print-lines* 1)
                   (*print-pretty* t))
               (format t "~x: ~v,'0x~:[~; = ~S~]~%"

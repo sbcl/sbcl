@@ -525,9 +525,6 @@
                     n-named-calls
                     (align-up n-boxed-words sb-c::code-boxed-words-align)
                     n-code-bytes)))
-        (loop for i of-type index from sb-vm:code-constants-offset
-              for j of-type index from ptr below debug-info-index
-              do (setf (code-header-ref code i) (svref stack j)))
         (with-pinned-objects (code)
           ;; * DO * NOT * SEPARATE * THESE * STEPS *
           ;; For a full explanation, refer to the comment above MAKE-CORE-COMPONENT
@@ -537,6 +534,18 @@
           ;; Assign debug-info last. A code object that has no debug-info will never
           ;; have its fun table accessed in conservative_root_p() or pin_object().
           (setf (%code-debug-info code) (svref stack debug-info-index))
+          ;; Boxed constants can be assigned only after figuring out where the range
+          ;; of implicitly tagged words is, which requires knowing how many functions
+          ;; are in the code component, which requires reading the code trailer.
+          (let* ((fdefns-start (sb-impl::code-fdefns-start-index code))
+                 (fdefns-end (1- (+ fdefns-start n-named-calls)))) ; inclusive bound
+            (loop for i of-type index from sb-vm:code-constants-offset
+                  for j of-type index from ptr below debug-info-index
+                  do (let ((constant (svref stack j)))
+                       (if (<= fdefns-start i fdefns-end)
+                           (sb-c::set-code-fdefn code i constant)
+                           (setf (code-header-ref code i) constant)))))
+          ;; Now apply fixups. The fixups to perform are popped from the fasl stack.
           (sb-c::apply-fasl-fixups stack code n-fixups))
         #-sb-xc-host
         (when (typep (code-header-ref code (1- n-boxed-words))

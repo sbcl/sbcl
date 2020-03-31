@@ -2586,6 +2586,12 @@ Legal values for OFFSET are -4, -8, -12, ..."
 ;;; fixups (or function headers) are applied.
 (defvar *show-pre-fixup-code-p* nil)
 
+(defun store-named-call-fdefn (code index fdefn)
+  #+untagged-fdefns
+  (write-wordindexed/raw code index (- (descriptor-bits fdefn)
+                                       sb-vm:other-pointer-lowtag))
+  #-untagged-fdefns (write-wordindexed code index fdefn))
+
 (define-cold-fop (fop-load-code (header code-size n-fixups))
   (let* ((n-named-calls (read-unsigned-byte-32-arg (fasl-input-stream)))
          ;; The number of constants is rounded up to even (if required)
@@ -2600,12 +2606,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   sb-vm:other-pointer-lowtag :code)))
     (write-code-header-words des aligned-n-boxed-words code-size n-named-calls)
     (write-wordindexed des sb-vm:code-debug-info-slot debug-info)
-    (do ((index (1- n-boxed-words) (1- index)))
-        ((< index sb-vm:code-constants-offset))
-        (let ((obj (pop-stack)))
-          (if (and (consp obj) (eq (car obj) :known-fun))
-              (push (list* (cdr obj) des index) *deferred-known-fun-refs*)
-              (write-wordindexed des index obj))))
+
     (let* ((start (+ (descriptor-byte-offset des)
                      (ash aligned-n-boxed-words sb-vm:word-shift)))
            (end (+ start code-size)))
@@ -2627,6 +2628,19 @@ Legal values for OFFSET are -4, -8, -12, ..."
                   (+ i (gspace-byte-address (descriptor-gspace des)))
                   (* 2 sb-vm:n-word-bytes)
                   (bvref-word (descriptor-mem des) i)))))
+
+    (let* ((fdefns-start (code-fdefns-start-index des))
+           (fdefns-end (1- (+ fdefns-start n-named-calls)))) ; inclusive bound
+      (do ((index (1- n-boxed-words) (1- index)))
+          ((< index sb-vm:code-constants-offset))
+        (let ((obj (pop-stack)))
+          (cond ((and (consp obj) (eq (car obj) :known-fun))
+                 (push (list* (cdr obj) des index) *deferred-known-fun-refs*))
+                ((<= fdefns-start index fdefns-end)
+                 (store-named-call-fdefn des index obj))
+                (t
+                 (write-wordindexed des index obj))))))
+
     (apply-fixups (%fasl-input-stack (fasl-input)) des n-fixups)))
 
 (defun resolve-deferred-known-funs ()

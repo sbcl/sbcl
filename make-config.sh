@@ -721,7 +721,7 @@ elif [ "$sbcl_arch" = "ppc" ]; then
 	fi
     fi
 elif [ "$sbcl_arch" = "ppc64" ]; then
-    printf ' :64-bit' >> $ltf
+    printf ' :64-bit :untagged-fdefns' >> $ltf
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf

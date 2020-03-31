@@ -664,6 +664,12 @@ default-value-8
                      15
                      (if (eq return :unknown) 25 0))
 
+       ,@(when (eq named t)
+           '((aver (sc-is name constant))
+             ;; It has to be an fdefinition constant, not a normal IR1 constant.
+             ;; This is the best we can assert without peeking into IR2-COMPONENT-CONSTANTS.
+             (aver (not (sb-c::tn-leaf name)))))
+
        (let* ((cur-nfp (current-nfp-tn vop))
               ,@(unless (eq return :tail)
                   '((lra-label (gen-label))))
@@ -775,10 +781,9 @@ default-value-8
                   ;; pointer) that the function itself be in a
                   ;; register before the raw-addr is loaded.
                   (sb-assem:without-scheduling ()
-                    (loadw function name-pass fdefn-fun-slot
-                        other-pointer-lowtag)
-                    (loadw entry-point name-pass fdefn-raw-addr-slot
-                        other-pointer-lowtag))
+                    (let ((tag (+ #-untagged-fdefns other-pointer-lowtag)))
+                      (loadw function name-pass fdefn-fun-slot tag)
+                      (loadw entry-point name-pass fdefn-raw-addr-slot tag)))
                   (do-next-filler)))
                ((nil)
                 `((sc-case arg-fun

@@ -403,6 +403,12 @@
   (declare (type code-component code-obj))
   (ash (code-fun-table-count code-obj) -4))
 
+;;; Index to start of named-call fdefns
+;;; FIXME: Naming symmetry between this and code-n-named-calls might be nice.
+(defun code-fdefns-start-index (code-obj)
+  (+ sb-vm:code-constants-offset
+     (* (code-n-entries code-obj) sb-vm:code-slots-per-simple-fun)))
+
 ;;; Number of "called" fdefns, which does not count fdefns in the boxed
 ;;; constants that are used in #'FUN syntax without a funcall necessarily
 ;;; occuring, though it may.

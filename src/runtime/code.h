@@ -91,6 +91,14 @@ static inline unsigned int code_serialno(struct code* code) {
     return table ? *table >> 14 : 0;
 }
 
+static inline unsigned int code_n_named_calls(struct code* code) {
+#ifdef LISP_FEATURE_64_BIT
+    return code->boxed_size >> 32;
+#else
+    return 0;
+#endif
+}
+
 // How many elements in 'code->constants[]' are taken by each simple-fun
 #define CODE_SLOTS_PER_SIMPLE_FUN 4
 
