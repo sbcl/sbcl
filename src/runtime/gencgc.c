@@ -4078,8 +4078,9 @@ static void gc_allocate_ptes()
  * The check for a GC trigger is only performed when the current
  * region is full, so in most cases it's not needed. */
 
-lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
-                    int page_type_flag, struct thread *thread)
+NO_SANITIZE_MEMORY lispobj*
+lisp_alloc(struct alloc_region *region, sword_t nbytes,
+           int page_type_flag, struct thread *thread)
 {
 #ifndef LISP_FEATURE_WIN32
     lispobj alloc_signal;
@@ -4210,7 +4211,7 @@ lispobj *lisp_alloc(struct alloc_region *region, sword_t nbytes,
    }
 #else
 # define DEFINE_LISP_ENTRYPOINT(name, page_type) \
-   lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
+   NO_SANITIZE_MEMORY lispobj AMD64_SYSV_ABI *name(sword_t nbytes) { \
     struct thread *self = arch_os_get_current_thread(); \
     gc_assert(get_pseudo_atomic_atomic(self)); \
     return lisp_alloc(MY_REGION, nbytes, page_type, self); \
