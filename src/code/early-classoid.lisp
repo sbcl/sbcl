@@ -148,7 +148,7 @@
 
 ;;; 32-bit is not done yet. Three slots are still used, instead of two.
 
-(def!struct (layout
+(sb-xc:defstruct (layout
              #+64-bit
              ;; Accept a specific subset of keywords
              (:constructor %make-layout (clos-hash classoid %bits
@@ -229,8 +229,41 @@
   (depth4-ancestor 0))
 (declaim (freeze-type layout))
 
-#+64-bit
+;;; The cross-compiler representation of a LAYOUT omits several things:
+;;;   * BITMAP - obtainable via (DD-MAPMAP (LAYOUT-INFO layout)).
+;;;     GC wants it in the layout to avoid double indirection.
+;;;   * EQUALP-TESTS - needed only for the target's implementation of EQUALP.
+;;;   * SLOT-TABLE, and SLOT-LIST - used only by the CLOS implementation.
+;;;   * DEPTHn-ANCESTOR are optimizations for TYPEP.
+;;; So none of those really make sense on the host.
+;;; Also, we eschew the packed representation of length+depthoid+flags.
+;;; FLAGS are not even strictly necessary, since they are for optimizing
+;;; various type checks.
+#+sb-xc-host
 (progn
+  (defmacro layout-%bits (x) `(layout-flags ,x))
+  (defstruct (layout (:include structure!object)
+                     (:constructor %make-layout (clos-hash classoid flags invalid
+                                                 inherits depthoid length info)))
+    (clos-hash nil :type layout-clos-hash) ; needed for cross-compiling some TYPECASE forms
+    (classoid nil :type classoid)
+    (flags 0 :type word)
+    (invalid :uninitialized :type (or cons (member nil t :uninitialized)))
+    (inherits #() :type simple-vector)
+    (depthoid -1 :type layout-depthoid)
+    (length 0 :type layout-length)
+    (info nil :type (or null defstruct-description)))
+  (defun layout-bitmap (layout)
+    (if (layout-info layout) (dd-bitmap (layout-info layout)) -1))
+  ;; This is more-or-less the non-bit-packed constructor,
+  ;; but we explicitly ignore BITMAP and DEPTHn-ANCESTOR.
+  (defun make-layout (clos-hash classoid &key (flags 0) (invalid :uninitialized)
+                                (inherits #()) (depthoid -1) (length 0) info
+                                bitmap depth2-ancestor depth3-ancestor depth4-ancestor)
+    (declare (ignore bitmap depth2-ancestor depth3-ancestor depth4-ancestor))
+    (%make-layout clos-hash classoid flags invalid inherits depthoid length info)))
+
+;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-bits (depthoid length flags)
   `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
            (ash ,(or length 0) 8)
@@ -241,6 +274,8 @@
     (:length   `(ldb (byte 24 8) ,bits))
     (:flags    `(ldb (byte 8 0) ,bits))))
 
+#+(and (not sb-xc-host) 64-bit)
+(progn
 (defmacro make-layout (clos-hash classoid &rest rest &key depthoid length flags &allow-other-keys)
   (setq rest (copy-list rest))
   (remf rest :depthoid)
@@ -249,8 +284,7 @@
   `(%make-layout ,clos-hash ,classoid (pack-layout-bits ,depthoid ,length ,flags) ,@rest))
 
 (declaim (inline layout-length layout-flags))
-#+sb-xc-host
-(defun layout-depthoid (layout)
+(defun layout-depthoid (layout) ; This is a VOP in 64-bit targets
   (unpack-layout-bits (layout-%bits layout) :depthoid))
 (defun layout-length (layout)
   (unpack-layout-bits (layout-%bits layout) :length))
@@ -268,7 +302,7 @@
   (setf (unpack-layout-bits (layout-%bits layout) :flags) val))
 ) ; end PROGN
 
-#-64-bit
+#+(and (not sb-xc-host) (not 64-bit))
 (progn
 (defmacro layout-%bits (x) `(layout-flags ,x))
 )

@@ -143,24 +143,30 @@
                             layout-depthoid layout-bitmap) layout)
                 %init-or-check-layout))
 (defun %init-or-check-layout (layout classoid length flags inherits depthoid bitmap)
+  ;; BITMAP is redundant information about the primitive object representation
+  ;; which is fully captured by the defstruct description, and not stored in the
+  ;; host layout.
+  #+sb-xc-host (declare (ignore bitmap))
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
-         (macrolet ((inherit (n) `(if (> struct-depth ,n) (svref inherits ,n) 0)))
+         (setf (layout-length layout) length
+               (layout-flags layout) flags
+               (layout-inherits layout) inherits
+               (layout-depthoid layout) depthoid
+               (layout-classoid layout) classoid)
+         #-sb-xc-host ; Assign target-only slots
+         (let ((struct-depth
+                (if (logtest +structure-layout-flag+ flags) depthoid 0)))
            ;; struct-depth is generally the depthoid when the depthoid is >0,
            ;; but not for FILE-STREAM which has depthoid=4 but is not a structure.
-           (let ((struct-depth
-                  (if (logtest +structure-layout-flag+ flags) depthoid 0)))
-             (setf (layout-length layout) length
-                   (layout-flags layout) flags
-                   (layout-inherits layout) inherits
-                   (layout-depthoid layout) depthoid
+           (macrolet ((inherit (n) `(if (> struct-depth ,n) (svref inherits ,n) 0)))
+             (setf (layout-bitmap layout) bitmap
                    (layout-depth2-ancestor layout) (inherit 2)
                    (layout-depth3-ancestor layout) (inherit 3)
-                   (layout-depth4-ancestor layout) (inherit 4)
-                   (layout-bitmap layout) bitmap
-                   (layout-classoid layout) classoid
-                   (layout-invalid layout) nil))))
+                   (layout-depth4-ancestor layout) (inherit 4))))
+         ;; Finally, make it valid.
+         (setf (layout-invalid layout) nil))
         ;; FIXME: Now that LAYOUTs are born :UNINITIALIZED, maybe this
         ;; clause is not needed?
         ((not *type-system-initialized*)
@@ -206,13 +212,13 @@
      `(find-layout ',name)
      ;; "initialization" form (which actually doesn't initialize
      ;; preexisting LAYOUTs, just checks that they're consistent).
-     `(%init-or-check-layout ',layout
-                             ',(layout-classoid layout)
-                             ',(layout-length layout)
-                             ',(layout-flags layout)
-                             ',(layout-inherits layout)
-                             ',(layout-depthoid layout)
-                             ',(layout-bitmap layout)))))
+     `(%init-or-check-layout ,layout
+                             ,(layout-classoid layout)
+                             ,(layout-length layout)
+                             ,(layout-flags layout)
+                             ,(layout-inherits layout)
+                             ,(layout-depthoid layout)
+                             ,(layout-bitmap layout)))))
 
 ;;; If LAYOUT's slot values differ from the specified slot values in
 ;;; any interesting way, then give a warning and return T.
@@ -362,17 +368,18 @@ between the ~A definition and the ~A definition"
                 (depthoid (layout-depthoid layout)))
             (aver (logtest +structure-layout-flag+ (layout-%bits layout)))
             (aver (= (length inherits) depthoid))
+            (setf (layout-invalid destruct-layout) nil
+                  (layout-inherits destruct-layout) inherits
+                  (layout-depthoid destruct-layout) (layout-depthoid layout)
+                  (layout-length destruct-layout) (layout-length layout)
+                  (layout-info destruct-layout) (layout-info layout))
+            #-sb-xc-host
             (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
-              (setf (layout-invalid destruct-layout) nil
-                    (layout-inherits destruct-layout) inherits
-                    (layout-depthoid destruct-layout) (layout-depthoid layout)
-                    (layout-depth2-ancestor destruct-layout) (inherit 2)
+              (setf (layout-depth2-ancestor destruct-layout) (inherit 2)
                     (layout-depth3-ancestor destruct-layout) (inherit 3)
                     (layout-depth4-ancestor destruct-layout) (inherit 4)
-                    (layout-length destruct-layout) (layout-length layout)
-                    (layout-bitmap destruct-layout) (layout-bitmap layout)
-                    (layout-info destruct-layout) (layout-info layout)
-                    (classoid-layout classoid) destruct-layout)))
+                    (layout-bitmap destruct-layout) (layout-bitmap layout)))
+            (setf (classoid-layout classoid) destruct-layout))
           (setf (layout-invalid layout) nil
                 (classoid-layout classoid) layout))
 
