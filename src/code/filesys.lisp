@@ -658,7 +658,7 @@ exist or if is a file or a symbolic link."
                          (parse (or *runtime-home* ""))))
             (probe (merge-pathnames "../lib/sbcl/"
                                     parsed-runtime-home))
-            (parse "."))))))
+            (parse "./contrib/"))))))
 
 (flet ((not-empty (x)
          (and (not (equal x "")) x))
