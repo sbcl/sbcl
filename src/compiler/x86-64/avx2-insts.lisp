@@ -545,19 +545,21 @@
 
 (macrolet
     ((def (name prefix opcode)
-       `(define-instruction ,name (segment dst src src2)
-          ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix opcode :nds t
-                                                               :opcode-prefix #x0f3a)
+       `(define-instruction ,name (segment dst src src2 imm)
+          ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm prefix opcode :opcode-prefix #x0f3a)
           (:emitter
            (emit-avx2-inst segment src2 dst ,prefix ,opcode
                            :opcode-prefix #x0f3a
-                           :vvvv src))))
+                           :vvvv src)
+           (emit-byte segment imm))))
      (def-two (name prefix opcode)
-       `(define-instruction ,name (segment dst src)
-          ,@(avx2-inst-printer-list 'ymm-ymm/mem prefix opcode :opcode-prefix #x0f3a)
+       `(define-instruction ,name (segment dst src imm)
+          ,@(avx2-inst-printer-list 'ymm-ymm/mem-imm prefix opcode :opcode-prefix #x0f3a
+                                    :printer '(:name :tab reg ", " reg/mem ", " imm))
           (:emitter
            (emit-avx2-inst segment src dst ,prefix ,opcode
-                           :opcode-prefix #x0f3a)))))
+                           :opcode-prefix #x0f3a)
+           (emit-byte segment imm)))))
   (def-two vroundps #x66 #x08)
   (def-two vroundpd #x66 #x09)
   (def-two vroundss #x66 #x0a)
