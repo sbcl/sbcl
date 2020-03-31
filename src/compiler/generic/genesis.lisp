@@ -2037,7 +2037,7 @@ core and return a descriptor to it."
 (defvar *cold-static-call-fixups*)
 
 ;;: See picture in 'objdef'
-(defun code-total-size (code-object) ; Return total size in bytes
+(defun code-object-size (code-object) ; Return total size in bytes
   (* (ash (get-header-data code-object) (+ #+64-bit -24))
      sb-vm:n-word-bytes))
 
@@ -2046,6 +2046,37 @@ core and return a descriptor to it."
   (ldb (byte 32 0) (read-bits-wordindexed code-object sb-vm:code-boxed-size-slot)))
 (defun code-header-words (code-object) ; same, but expressed in words
   (ash (code-header-bytes code-object) (- sb-vm:word-shift)))
+
+;;; These are fairly straightforward translations of the similarly named accessor
+;;; from src/code/simple-fun.lisp
+(defun code-trailer-ref (code offset)
+  "Reference a uint_32 relative to the end of code at byte offset OFFSET.
+Legal values for OFFSET are -4, -8, -12, ..."
+  (bvref-32 (descriptor-mem code)
+            (+ (descriptor-byte-offset code) (code-object-size code) offset)))
+(defun code-fun-table-count (code)
+  "Return the COUNT trailer word in CODE. The COUNT is a packed integer containing
+ the number of embedded SIMPLE-FUNs and the number of padding bytes in the
+ instructions prior to the start of the simple-fun offset list"
+  ;; The case of trailer-len = 0 (no trailer payload) can't happen during genesis,
+  ;; so we don't check for it.
+  (let ((word (code-trailer-ref code -4)))
+    ;; TRAILER-REF returns 4-byte quantities. Extract a two-byte quantity.
+    #+little-endian (ldb (byte 16  0) word)
+    #+big-endian    (ldb (byte 16 16) word)))
+
+;;; These three are literally identical between cross-compiler and target.
+;;; TODO: Maybe put them somewhere that gets defined for both?
+;;; (Minor problem of CODE-COMPONENT not being a primitive type though)
+(defun code-n-entries (code)
+  (ash (code-fun-table-count code) -4))
+(defun code-fdefns-start-index (code)
+  (+ sb-vm:code-constants-offset
+     (* (code-n-entries code) sb-vm:code-slots-per-simple-fun)))
+(defun %code-fun-offset (code fun-index)
+  ;; The 4-byte quantity at "END" - 4 is the trailer count, the word at -8 is
+  ;; the offset to the 0th simple-fun, -12 is the next, etc...
+  (code-trailer-ref code (* -4 (+ fun-index 2))))
 
 (defun lookup-assembler-reference (symbol &optional (mode :direct))
   (let* ((code-component *cold-assembler-obj*)
@@ -2088,7 +2119,7 @@ core and return a descriptor to it."
     #+(or x86 x86-64)
     (let* ((gspace-data (descriptor-mem code-object))
            (obj-start-addr (logandc2 (descriptor-bits code-object) sb-vm:lowtag-mask))
-           (code-end-addr (+ obj-start-addr (code-total-size code-object)))
+           (code-end-addr (+ obj-start-addr (code-object-size code-object)))
            (gspace-base (gspace-byte-address (descriptor-gspace code-object)))
            (in-dynamic-space
             (= (gspace-identifier (descriptor-intuit-gspace code-object))
@@ -2605,23 +2636,14 @@ core and return a descriptor to it."
       (write-wordindexed (car place) (cdr place) fun))))
 
 (defun compute-fun (code-object fun-index)
-  (let ((fun-offset
-         ;; The final uint16 in the unboxed area is the count of simple-funs.
-         ;; Preceding it is a uint16 (always zero) for alignment.
-         ;; One uint32 prior to that is the offset of the 0th entry, so subtract
-         ;; 8 bytes from the total object size to get the index of the 0th entry.
-         ;; See related function %CODE-FUN-OFFSET.
-         (bvref-32 (descriptor-mem code-object)
-                   (+ (descriptor-byte-offset code-object)
-                      (code-total-size code-object)
-                      -8
-                      (* fun-index -4))))) ; and back to the desired index
-    (let ((fun (+ (logandc2 (descriptor-bits code-object) sb-vm:lowtag-mask)
-                  (code-header-bytes code-object)
-                  fun-offset)))
-      (unless (zerop (logand fun sb-vm:lowtag-mask))
-        (error "unaligned function entry ~S ~S" code-object fun-index))
-      (make-descriptor (logior fun sb-vm:fun-pointer-lowtag)))))
+  (let* ((code-instructions
+          (+ (descriptor-bits code-object)
+             (- sb-vm:other-pointer-lowtag)
+             (code-header-bytes code-object)))
+         (fun (+ code-instructions (%code-fun-offset code-object fun-index))))
+    (unless (zerop (logand fun sb-vm:lowtag-mask))
+      (error "unaligned function entry ~S ~S" code-object fun-index))
+    (make-descriptor (logior fun sb-vm:fun-pointer-lowtag))))
 
 (define-cold-fop (fop-fun-entry (fun-index))
   (let* ((code-object (pop-stack))
