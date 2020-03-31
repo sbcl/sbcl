@@ -478,11 +478,28 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
+#ifdef LISP_FEATURE_SIGILL_TRAPS
+    if (signal == SIGILL) {
+        uword_t pc = *os_context_pc_addr(context);
+        unsigned int code = *(u32*)pc;
+        if (code == 0x7C0002A6) { // allocation region overflow trap
+            // there is an actual trap instruction located 2 instructions later.
+            // pretend the trap happened there.
+            *os_context_pc_addr(context) = pc + 8;
+            if (handle_allocation_trap(context)) return;
+        }
+        if (code == 0x7C2002A6) { // pending interrupt
+            arch_clear_pseudo_atomic_interrupted(context);
+            arch_skip_instruction(context);
+            interrupt_handle_pending(context);
+            return;
+        }
+        lose("sigill traps enabled but got unexpected sigill");
+    }
+#endif
     if (signal == SIGTRAP && handle_allocation_trap(context)) return;
 
-    unsigned int code;
-
-    code=*((u32 *)(*os_context_pc_addr(context)));
+    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
     if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))||
         /* trap instruction from do_pending_interrupt */
         code == 0x7fe00008) {

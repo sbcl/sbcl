@@ -177,8 +177,7 @@
 ;;;
 ;;; Using trap instructions for not-very-exceptional situations, such as
 ;;; allocating, is clever but not very convenient when using gdb to debug.
-;;; So at the expense of speed and code size, we can use a call/return.
-;;; In such case, we never actually try to perform allocations inline.
+;;; Set the :sigill-traps feature to use SIGILL instead of SIGTRAP.
 ;;;
 (defun allocation (type size lowtag result-tn &key stack-p node temp-tn flag-tn)
   ;; We assume we're in a pseudo-atomic so the pseudo-atomic bit is
@@ -187,34 +186,6 @@
   ;; then or in the lowtag.
   ;; Normal allocation to the heap.
   (declare (ignore stack-p node))
-
-  ;; if sigtrap is making you suffer, enable out-of-line allocator for everything
-  ;;  #-alloc-use-sigtrap
-  #+nil
-  (let ((lip (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
-                             :offset lip-offset)))
-    (inst addi lip null-tn (make-fixup 'alloc-tramp :asm-routine-nil-offset))
-    (if (numberp size)
-        (inst lr temp-tn size)
-        (move temp-tn size))
-    (inst std temp-tn lip -8)
-    ;; the asm routine is not allowed to mess up the link register - it has to
-    ;; be truly "invisible", like the trap signal. Obviously it's impossible
-    ;; to avoid messing up LR, which means we need to save it now because we don't
-    ;; know whether we're inside a context that needs it saved.
-    (inst mflr temp-tn)
-    (inst std temp-tn lip -16)
-    (inst mtctr lip)
-    (inst bctrl)
-    ;; LIP once again points to the static spill area from which we can
-    ;; recover the LR
-    (inst ld temp-tn lip -16)
-    (inst mtlr temp-tn)
-    ;; asm routine returns its result in the count register.
-    (inst mfctr result-tn)
-    (inst ori result-tn result-tn lowtag)
-    (return-from allocation))
-
   (binding* ((imm-size (typep size '(unsigned-byte 15)))
              ((region-base-tn field-offset)
                #-sb-thread (values thread-base-tn ; will be STATIC-SPACE-START
@@ -264,10 +235,20 @@
          ;; exactly touching the end pointer. But that's fine, the trap
          ;; handler doesn't bother to see whether the failure was spurious,
          ;; because lisp_alloc() just works.
-         (inst td (if (eq type 'list) :lgt :lge) result-tn flag-tn)
-
-         ;; The C code depends on this instruction sequence taking up
-         ;; one machine instruction.
+         (let ((ok (gen-label)))
+           (declare (ignorable ok))
+           #+sigill-traps
+           (progn (inst cmpld result-tn flag-tn)
+                  (inst ble ok)
+                  (inst mfmq temp-reg-tn) ; an illegal instructions
+                  ;; KLUDGE: emit another ADD so that the sigtrap handler
+                  ;; can behave just as if the trap happened at the TD.
+                  (if imm-size
+                      (inst addi result-tn result-tn size)
+                      (inst add result-tn result-tn temp-tn)))
+           (inst td (if (eq type 'list) :lgt :lge) result-tn flag-tn)
+           #+sigill-traps (emit-label ok))
+         ;; The C code depends on exactly 1 instruction here.
          (inst std result-tn region-base-tn field-offset))
 
        ;; Should the allocation trap above have fired, the runtime
@@ -353,23 +334,19 @@
   `(progn ,flag-tn ,@forms (emit-safepoint))
   #-sb-safepoint-strictly
   `(progn
-     (without-scheduling ()
-       ;; Extra debugging stuff:
-       #+debug
-       (progn
-         (inst andi. ,flag-tn alloc-tn lowtag-mask)
-         (inst twi :ne ,flag-tn 0))
-       (inst ori alloc-tn alloc-tn pseudo-atomic-flag))
+     (inst ori alloc-tn alloc-tn pseudo-atomic-flag)
      ,@forms
      (inst sync)
      (without-scheduling ()
        (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
        ;; Now test to see if the pseudo-atomic interrupted bit is set.
        (inst andi. ,flag-tn alloc-tn pseudo-atomic-interrupted-flag)
-       (inst twi :ne ,flag-tn 0))
-     #+debug
-     (progn
-       (inst andi. ,flag-tn alloc-tn lowtag-mask)
+       #+sigill-traps
+       (let ((continue (gen-label)))
+         (inst beq continue)
+         (inst mfmq (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg) :offset 1))
+         (emit-label continue))
+       #-sigill-traps
        (inst twi :ne ,flag-tn 0))
      #+sb-safepoint
      (emit-safepoint)))

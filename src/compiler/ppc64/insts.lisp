@@ -1616,6 +1616,8 @@
   (define-2-x-5-instructions eqv 31 284)
   (define-2-x-5-instructions xor 31 316)
 
+  ;; This instruction existed on processor model 601; it is the same as 'mfspr'
+  ;; with a spr encoding that is now an illegal one.
   (define-instruction mfmq (segment rt)
     (:printer xfx ((op 31) (xo 339) (spr 0)) '(:name :tab rt))
     (:delay 1)
