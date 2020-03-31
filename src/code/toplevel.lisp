@@ -18,7 +18,7 @@
 (defun sysinit-pathname ()
   (or (let ((sbcl-homedir (sbcl-homedir-pathname)))
         (when sbcl-homedir
-          (probe-file (merge-pathnames "sbclrc" sbcl-homedir))))
+          (probe-file (merge-pathnames "../sbclrc" sbcl-homedir))))
       #+win32
       (merge-pathnames "sbcl\\sbclrc"
                        (sb-win32::get-folder-pathname

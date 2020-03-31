@@ -79,11 +79,10 @@
    $SBCL_HOME/name/name"
   (let* ((filesys-name (string-downcase name))
          (unadorned-path
-          (merge-pathnames
-           (make-pathname :directory (list :relative "contrib")
-                          :name filesys-name)
-           (truename (or (sbcl-homedir-pathname)
-                         (return-from module-provide-contrib nil)))))
+           (make-pathname :name filesys-name
+                          :defaults
+                          (truename (or (sbcl-homedir-pathname)
+                                        (return-from module-provide-contrib nil)))))
          (fasl-path (merge-pathnames
                      (make-pathname :type *fasl-file-type*)
                      unadorned-path))

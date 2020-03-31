@@ -633,6 +633,9 @@ exist or if is a file or a symbolic link."
 
 (sb-alien:define-alien-variable ("runtime_home" *runtime-home*) c-string)
 
+;;; KLUDGE: now it includes contrib/ as ASDF sets up some translations
+;;; for contribs but doesn't actually restrict them to the contrib
+;;; directory.
 (defun sbcl-homedir-pathname ()
   (let ((env (posix-getenv "SBCL_HOME")))
     ;; Should we absoluteize this if it was obtained automatically?
@@ -643,9 +646,9 @@ exist or if is a file or a symbolic link."
                                       *default-pathname-defaults*
                                       :as-directory t))
            (probe (path)
-             (when (probe-file (merge-pathnames "contrib/"
-                                                path))
-               path)))
+             (let ((contrib (merge-pathnames "contrib/" path)))
+               (when (probe-file contrib)
+                 contrib))))
       (let ((env (and env (not (string= env ""))
                       (parse env)))
             (parsed-runtime-home))
