@@ -64,12 +64,6 @@
 #include "genesis/static-symbols.h"
 #include "genesis/symbol.h"
 
-
-#ifdef irix
-#include <string.h>
-#include "interr.h"
-#endif
-
 static char libpath[] = "../lib/sbcl";
 char *runtime_home;
 

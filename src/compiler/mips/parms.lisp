@@ -72,20 +72,6 @@
 
 ;;;; Description of the target address space.
 
-#+irix
-(progn
-  ;; Where to put the different spaces.
-  ;; Old definitions, might be still relevant for an IRIX port.
-  ;;
-  (defconstant read-only-space-start #x01000000)
-  (defconstant read-only-space-end   #x05000000)
-
-  (defconstant static-space-start    #x06000000)
-  (defconstant static-space-end      #x08000000)
-
-  (defparameter dynamic-0-space-start #x08000000)
-  (defparameter dynamic-0-space-end   #x0c000000))
-
 #+linux
 (progn
   ;; Where to put the address spaces on Linux.
