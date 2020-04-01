@@ -1,11 +1,17 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
 changes relative to sbcl-2.0.2:
-  * platform support: 32-bit RISC-V is now fully supported. Unlike other ports, its backend is entirely shared with 64-bit RISC-V.
-  * bug fix: defstructs with empty initforms in the sbcl source are now explicitly intiialized with NIL, as that is undefined behavior under ANSI. This helps cross compilation hosts which do not implicitly initialize empty initform slots to NIL. (Thanks to Karsten Poeck)
-  * bug fix: backtracing through assembly routines now works properly on RISC-V.
+  * platform support: 32-bit RISC-V is now fully supported. Unlike other
+    ports, its backend is entirely shared with 64-bit RISC-V.
+  * bug fix: defstructs with empty initforms in the sbcl source are now
+    explicitly intiialized with NIL, as that is undefined behavior under
+    ANSI. This helps cross compilation hosts which do not implicitly
+    initialize empty initform slots to NIL. (Thanks to Karsten Poeck)
+  * bug fix: backtracing through assembly routines now works properly on
+    RISC-V.
   * bug fix: ASH no longer gets miscompiled in certain edge cases on RISC-V.
-  * bug fix: more args have been slightly optimized and are more correct on RISC-V.
+  * bug fix: more args have been slightly optimized and are more correct on
+    RISC-V.
   * bug fix: unused local functions with &rest/&key/&optional now also issue a
     deletion note.
 
