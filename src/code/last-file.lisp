@@ -16,9 +16,18 @@
 ;;; Parallelized build doesn't get the full set of data because the side effect
 ;;; of data recording when invoking compile-time functions aren't propagated
 ;;; back to process that forked the children doing the grunt work.
-(defvar sb-c::*sxhash-crosscheck* '#.sb-c::*sxhash-crosscheck*)
+(defvar sb-c::*sxhash-crosscheck*
+  '#.(let (pairs)
+       ;; De-duplicate, which reduces the list from ~8000 entries to ~1000 entries.
+       ;; But make sure that any key which is repeated has the same value
+       ;; at each repetition.
+       (dolist (pair sb-c::*sxhash-crosscheck* (coerce pairs 'simple-vector))
+         (let ((found (assoc (car pair) pairs)))
+           (if found
+               (aver (= (cdr found) (cdr pair)))
+               (push pair pairs))))))
 (defun check-compile-time-sxhashes ()
-  (loop for (object . hash) in sb-c::*sxhash-crosscheck*
+  (loop for (object . hash) across sb-c::*sxhash-crosscheck*
         unless (= (sxhash object) hash)
         do (error "SB-XC:SXHASH computed wrong answer for ~S. Got ~x should be ~x"
                   object hash (sxhash object))))
