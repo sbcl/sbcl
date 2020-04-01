@@ -44,7 +44,9 @@
 ;;; before.  In order for this to work, we need to reload the stems
 ;;; and flags from build-order.lisp-expr, the user needs to have added
 ;;; :trace-file as a flag.
-(setf *stems-and-flags* (read-from-file "build-order.lisp-expr" nil))
+(setf *stems-and-flags*
+      (let ((*readtable* *xc-readtable*))
+        (read-from-file "build-order.lisp-expr" nil)))
 
 ;;; Don't care about deftransforms that get redefined.
 ;;; The target condition is defined in 'condition' which is a :not-host file.
