@@ -502,8 +502,7 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
                 size_t *runtime_size)
 {
     FILE *file;
-    char *runtime_path;
-    extern char *saved_runtime_path; // path computed from argv[0]
+    extern char *sbcl_runtime;
 
     // SB-IMPL::DEINIT already checked for exactly 1 thread,
     // so this really shouldn't happen.
@@ -513,19 +512,11 @@ prepare_to_save(char *filename, boolean prepend_runtime, void **runtime_bytes,
     }
 
     if (prepend_runtime) {
-        runtime_path = os_get_runtime_executable_path(0);
-
-        if (runtime_path == NULL && saved_runtime_path == NULL) {
+        if (!sbcl_runtime) {
             fprintf(stderr, "Unable to get default runtime path.\n");
             return NULL;
         }
-
-        if (runtime_path == NULL)
-            *runtime_bytes = load_runtime(saved_runtime_path, runtime_size);
-        else {
-            *runtime_bytes = load_runtime(runtime_path, runtime_size);
-            free(runtime_path);
-        }
+        *runtime_bytes = load_runtime(sbcl_runtime, runtime_size);
 
         if (*runtime_bytes == NULL)
             return 0;

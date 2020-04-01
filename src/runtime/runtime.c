@@ -367,7 +367,6 @@ parse_size_arg(char *arg, char *arg_name)
 char **posix_argv;
 char *core_string;
 
-char *saved_runtime_path = NULL;
 #if defined(LISP_FEATURE_WIN32) && defined(LISP_FEATURE_SB_THREAD)
 void pthreads_win32_init();
 #endif
@@ -430,7 +429,6 @@ sbcl_main(int argc, char *argv[], char *envp[])
     char *core = 0;
     char **sbcl_argv = 0;
     os_vm_offset_t embedded_core_offset = 0;
-    char *runtime_path = 0;
 
     /* other command line options */
     boolean end_runtime_options = 0;
@@ -456,41 +454,21 @@ sbcl_main(int argc, char *argv[], char *envp[])
     interrupt_init();
     block_blockable_signals(0);
 
-    /* Save the argv[0] derived runtime path in case
-     * os_get_runtime_executable_path(1) isn't able to get an
-     * externally-usable path later on. */
-    saved_runtime_path = search_for_executable(argv[0]);
-
     /* Check early to see if this executable has an embedded core,
      * which also populates runtime_options if the core has runtime
      * options */
-    runtime_path = os_get_runtime_executable_path(0);
+    if (!(sbcl_runtime = os_get_runtime_executable_path(0)))
+        sbcl_runtime = search_for_executable(argv[0]);
 
-    /* Set 'sbcl_runtime_home' to
-     * "<here>" based on how this executable was invoked. */
-    char *exename = argv[0]; // Use as-it, not truenameified
-    if ((sbcl_runtime_home = dir_name(exename)))
-      ;
-    else if ((sbcl_runtime_home = dir_name(runtime_path)))
-        exename = copied_string(runtime_path);
-    else if ((sbcl_runtime_home = dir_name(saved_runtime_path)))
-        exename = copied_string(saved_runtime_path);
-    else {
-        exename = NULL;
+    if (!(sbcl_runtime_home = dir_name(argv[0])))
+      if (!(sbcl_runtime_home = dir_name(sbcl_runtime)))
         sbcl_runtime_home = libpath;
-    }
-    sbcl_runtime = exename;
 
-    if (runtime_path || saved_runtime_path) {
-        os_vm_offset_t offset = search_for_embedded_core(
-            runtime_path ? runtime_path : saved_runtime_path,
-            &memsize_options);
+    if (sbcl_runtime) {
+        os_vm_offset_t offset = search_for_embedded_core(sbcl_runtime, &memsize_options);
         if (offset != -1) {
             embedded_core_offset = offset;
-            core = (runtime_path ? runtime_path :
-                    copied_string(saved_runtime_path));
-        } else if (runtime_path) {
-            free(runtime_path);
+            core = sbcl_runtime;
         }
     }
 
@@ -654,25 +632,23 @@ sbcl_main(int argc, char *argv[], char *envp[])
     gc_init();
 
     /* If no core file was specified, look for one. */
-    if (!core) {
-        if ((core = search_for_core())) {
-        }
-        else {
-            if (exename) {
-                free(sbcl_runtime_home);
-                char* real = sb_realpath(exename);
-                if (!real)
-                    goto lose;
-                sbcl_runtime_home = dir_name(real);
-                free(real);
-                if (!sbcl_runtime_home)
-                    goto lose;
-                if(!(core = search_for_core()))
-                    goto lose;
-            } else
-              lose:
-                lose("Can't find sbcl.core");
-        }
+    if (!core && !(core = search_for_core())) {
+      /* Try resolving symlinks */
+      if (sbcl_runtime) {
+        free(sbcl_runtime_home);
+        char* real = sb_realpath(sbcl_runtime);
+        if (!real)
+          goto lose;
+        sbcl_runtime_home = dir_name(real);
+        free(real);
+        if (!sbcl_runtime_home)
+          goto lose;
+        if(!(core = search_for_core()))
+          goto lose;
+      } else {
+      lose:
+        lose("Can't find sbcl.core");
+      }
     }
 
     if (embedded_core_offset)
