@@ -775,7 +775,7 @@
            (let* ((suppliedp (car sup-p-var)) ; could be nil
                   (vals (gen-test sense sup-p-form
                                   (if sup-p-var `(values ,val-form t) val-form)
-                                  def)))
+                                  (if sup-p-var `(values ,def nil) def))))
              (cond ((not sup-p-var) (bind-pat var vals))
                    ((not (symbolp var))
                     (let ((var-temp (sb-xc:gensym))

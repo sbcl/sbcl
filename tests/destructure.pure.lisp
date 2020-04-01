@@ -1,4 +1,4 @@
-;;;; tests, with side effects, of DESTRUCTURING-BIND-ish functionality
+;;;; tests of DESTRUCTURING-BIND-ish functionality
 
 ;;;; This software is part of the SBCL system. See the README file for
 ;;;; more information.
@@ -15,10 +15,12 @@
 ;;;   (DESTRUCTURING-BIND (...) 1 ...)
 ;;; contained the implicit assumption that the bad datum was a list,
 ;;; so that attempting to print the condition caused a new error.
-(defun frob-1-0-7-8 (x)
-  (destructuring-bind (y . z) x (list y z)))
 (with-test (:name (destructuring-bind :dotted-list error :printable 1))
-  (let ((error (nth-value 1 (ignore-errors (frob-1-0-7-8 1)))))
+  (let ((error (nth-value 1 (ignore-errors
+                             (funcall
+                              (checked-compile
+                               `(lambda (x) (destructuring-bind (y . z) x (list y z))))
+                              1)))))
     ;; Printing ERROR shouldn't cause an error.
     (assert (search "(Y . Z)" (princ-to-string error)))))
 
@@ -39,3 +41,12 @@
                            :name 'foo
                            :kind 'macro)))
     (assert (search "(A B . C)" (write-to-string c :escape nil)))))
+
+(with-test (:name :supplied-p-multiple-values)
+  (checked-compile-and-assert
+      ()
+      `(lambda (x)
+         (destructuring-bind
+             (&key (x (funcall x) x-supplied)) ()
+           (list x x-supplied)))
+    (((lambda () (values 1 2))) '(1 nil) :test #'equal)))
