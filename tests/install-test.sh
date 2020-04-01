@@ -13,7 +13,14 @@ PATH=/tmp/test-sbcl-install/bin sbcl --noinform --core /tmp/test-sbcl-install/li
 (cd /tmp/test-sbcl-install/bin; ./sbcl --noinform --core /tmp/test-sbcl-install/lib/sbcl/sbcl.core --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)')
 
 cd /tmp/test-sbcl-install/
-mv bin/sbcl lib/sbcl/sbcl.core lib/sbcl/contrib .
+ln -s bin/sbcl sym-sbcl
+./sym-sbcl --noinform --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'
+
+mv bin/sbcl .
+ln -s /tmp/test-sbcl-install/sbcl ./bin/sbcl
+./bin/sbcl --noinform --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'
+
+mv lib/sbcl/sbcl.core lib/sbcl/contrib .
 ./sbcl --noinform --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'
 PATH=. sbcl --noinform --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'
 ./sbcl --noinform --core sbcl.core --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'

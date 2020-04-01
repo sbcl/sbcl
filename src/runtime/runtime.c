@@ -254,7 +254,7 @@ search_for_core ()
             if (core) {
                 free(lookhere);
             } else {
-                lose("Can't find core file relative to %s", env_sbcl_home);
+                return NULL;
             }
         }
     }
@@ -386,6 +386,33 @@ static void print_environment(int argc, char *argv[])
         ++n;
     }
 }
+
+char * sb_realpath (char *);
+char *dir_name(char *path) {
+    if (path == NULL)
+        return NULL;
+
+    char* result;
+    char slashchar =
+#ifdef LISP_FEATURE_WIN32
+        '\\';
+#else
+    '/';
+#endif
+
+    char *slash = strrchr(path, slashchar);
+
+    if (slash) {
+        int prefixlen = slash - path + 1; // keep the slash in the prefix
+        result = successful_malloc(prefixlen + 1);
+        memcpy(result, path, prefixlen);
+        result[prefixlen] = 0;
+        return result;
+    } else {
+        return NULL;
+    }
+}
+
 
 extern void write_protect_immobile_space();
 struct lisp_startup_options lisp_startup_options;
@@ -440,35 +467,18 @@ sbcl_main(int argc, char *argv[], char *envp[])
 
     /* Set 'runtime_home' to
      * "<here>" based on how this executable was invoked. */
-    {
-        char *exename = argv[0]; // Use as-it, not truenameified
-        char slashchar =
-#ifdef LISP_FEATURE_WIN32
-          '\\';
-#else
-          '/';
-#endif
-
-        char *slash = strrchr(exename, slashchar);
-        if (!slash) {
-            if (runtime_path) {
-                exename = runtime_path;
-            } else if (saved_runtime_path) {
-                exename = saved_runtime_path;
-            }
-            slash = strrchr(exename, slashchar);
-        }
-
-        if (!slash) {
-            runtime_home = libpath;
-        } else {
-            int prefixlen = slash - exename + 1; // keep the slash in the prefix
-            runtime_home = successful_malloc(prefixlen + 1);
-            memcpy(runtime_home, exename, prefixlen);
-            runtime_home[prefixlen] = 0;
-
-        }
+    char *exename = argv[0]; // Use as-it, not truenameified
+    if ((runtime_home = dir_name(exename)))
+        ;
+    else if ((runtime_home = dir_name(runtime_path)))
+        exename = copied_string(runtime_path);
+    else if ((runtime_home = dir_name(saved_runtime_path)))
+        exename = copied_string(saved_runtime_path);
+    else {
+        exename = NULL;
+        runtime_home = libpath;
     }
+
 
     if (runtime_path || saved_runtime_path) {
         os_vm_offset_t offset = search_for_embedded_core(
@@ -644,7 +654,24 @@ sbcl_main(int argc, char *argv[], char *envp[])
 
     /* If no core file was specified, look for one. */
     if (!core) {
-        core = search_for_core();
+        if ((core = search_for_core())) {
+        }
+        else {
+            if (exename) {
+                free(runtime_home);
+                char* real = sb_realpath(exename);
+                if (!real)
+                    goto lose;
+                runtime_home = dir_name(real);
+                free(real);
+                if (!runtime_home)
+                    goto lose;
+                if(!(core = search_for_core()))
+                    goto lose;
+            } else
+              lose:
+                lose("Can't find sbcl.core");
+        }
     }
 
     if (embedded_core_offset)
