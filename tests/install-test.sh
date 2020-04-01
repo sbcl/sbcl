@@ -15,6 +15,7 @@ PATH=/tmp/test-sbcl-install/bin sbcl --noinform --core /tmp/test-sbcl-install/li
 cd /tmp/test-sbcl-install/
 ln -s bin/sbcl sym-sbcl
 ./sym-sbcl --noinform --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'
+./sym-sbcl --noinform --core /tmp/test-sbcl-install/lib/sbcl/sbcl.core --disable-debugger --eval '(print (require :asdf))' --disable-debugger --eval '(quit)'
 
 mv bin/sbcl .
 ln -s /tmp/test-sbcl-install/sbcl ./bin/sbcl

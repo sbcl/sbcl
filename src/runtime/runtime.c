@@ -65,7 +65,8 @@
 #include "genesis/symbol.h"
 
 static char libpath[] = "../lib/sbcl";
-char *runtime_home;
+char *sbcl_runtime_home;
+char *sbcl_runtime;
 
 #ifdef LISP_FEATURE_HPUX
 extern void *return_from_lisp_stub;
@@ -230,7 +231,7 @@ search_for_core ()
 
     if (!(env_sbcl_home && *env_sbcl_home) ||
         stat(env_sbcl_home, &filename_stat))
-        env_sbcl_home = runtime_home;
+        env_sbcl_home = sbcl_runtime_home;
     lookhere = (char *) calloc(strlen(env_sbcl_home) +
                                strlen(libpath) +
                                strlen(stem) +
@@ -465,20 +466,20 @@ sbcl_main(int argc, char *argv[], char *envp[])
      * options */
     runtime_path = os_get_runtime_executable_path(0);
 
-    /* Set 'runtime_home' to
+    /* Set 'sbcl_runtime_home' to
      * "<here>" based on how this executable was invoked. */
     char *exename = argv[0]; // Use as-it, not truenameified
-    if ((runtime_home = dir_name(exename)))
-        ;
-    else if ((runtime_home = dir_name(runtime_path)))
+    if ((sbcl_runtime_home = dir_name(exename)))
+      ;
+    else if ((sbcl_runtime_home = dir_name(runtime_path)))
         exename = copied_string(runtime_path);
-    else if ((runtime_home = dir_name(saved_runtime_path)))
+    else if ((sbcl_runtime_home = dir_name(saved_runtime_path)))
         exename = copied_string(saved_runtime_path);
     else {
         exename = NULL;
-        runtime_home = libpath;
+        sbcl_runtime_home = libpath;
     }
-
+    sbcl_runtime = exename;
 
     if (runtime_path || saved_runtime_path) {
         os_vm_offset_t offset = search_for_embedded_core(
@@ -658,13 +659,13 @@ sbcl_main(int argc, char *argv[], char *envp[])
         }
         else {
             if (exename) {
-                free(runtime_home);
+                free(sbcl_runtime_home);
                 char* real = sb_realpath(exename);
                 if (!real)
                     goto lose;
-                runtime_home = dir_name(real);
+                sbcl_runtime_home = dir_name(real);
                 free(real);
-                if (!runtime_home)
+                if (!sbcl_runtime_home)
                     goto lose;
                 if(!(core = search_for_core()))
                     goto lose;
