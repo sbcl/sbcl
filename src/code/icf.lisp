@@ -291,7 +291,12 @@
                       (plusp (code-n-entries obj)))
              (setf (aref code-objects i) obj)
              (incf i)))
-         :all))
+         :all)
+        ;; GC in between the first and second heap walk might somehow free
+        ;; a code object. It's possible apparently, because a user encountered
+        ;; an error at (COMPUTE-CODE-HASH-KEY 0) in save-lisp-and-die.
+        (unless (= i (length code-objects))
+          (%shrink-vector code-objects i)))
       (unless aggressive
         ;; Figure out which of those are referenced by any object
         ;; except for an fdefn.
