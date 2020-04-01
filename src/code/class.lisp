@@ -146,7 +146,6 @@
   ;; BITMAP is redundant information about the primitive object representation
   ;; which is fully captured by the defstruct description, and not stored in the
   ;; host layout.
-  #+sb-xc-host (declare (ignore bitmap))
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
