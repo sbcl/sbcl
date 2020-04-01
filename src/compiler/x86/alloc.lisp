@@ -38,7 +38,7 @@
   (inst lea alloc-tn (make-ea :byte :base esp-tn :disp lowtag))
   (values))
 
-(defun allocation-notinline (alloc-tn size)
+(defun allocation-notinline (type alloc-tn size)
   (let* ((alloc-tn-offset (tn-offset alloc-tn))
          ;; C call to allocate via dispatch routines. Each
          ;; destination has a special entry point. The size may be a
@@ -50,7 +50,11 @@
                     (#.ebx-offset 'ebx)
                     (#.esi-offset 'esi)
                     (#.edi-offset 'edi)))
-         (size-text (case size (8 "8-") (16 "16-") (t ""))))
+         (size-text
+           (case size
+             (8  "8-")
+             (16 "16-")
+             (t  (if (eq type 'list) "LIST-" "")))))
     (unless (or (eql size 8) (eql size 16))
       (unless (and (tn-p size) (location= alloc-tn size))
         (inst mov alloc-tn size)))
@@ -58,7 +62,7 @@
                                         "ALLOC-" size-text "TO-" tn-name)))
       (inst call (make-fixup routine :assembly-routine)))))
 
-(defun allocation-inline (alloc-tn size)
+(defun allocation-inline (type alloc-tn size)
   (let* ((ok (gen-label))
          (done (gen-label))
          #+(and sb-thread win32)
@@ -101,13 +105,21 @@
     (inst add alloc-tn free-pointer tls-prefix)
     (inst cmp alloc-tn end-addr tls-prefix)
     (inst jmp :be ok)
-    (let ((dst (ecase (tn-offset alloc-tn)
-                 (#.eax-offset 'alloc-overflow-eax)
-                 (#.ecx-offset 'alloc-overflow-ecx)
-                 (#.edx-offset 'alloc-overflow-edx)
-                 (#.ebx-offset 'alloc-overflow-ebx)
-                 (#.esi-offset 'alloc-overflow-esi)
-                 (#.edi-offset 'alloc-overflow-edi))))
+    (let ((dst (if (eq type 'list)
+                   (ecase (tn-offset alloc-tn)
+                     (#.eax-offset 'alloc-list-overflow-eax)
+                     (#.ecx-offset 'alloc-list-overflow-ecx)
+                     (#.edx-offset 'alloc-list-overflow-edx)
+                     (#.ebx-offset 'alloc-list-overflow-ebx)
+                     (#.esi-offset 'alloc-list-overflow-esi)
+                     (#.edi-offset 'alloc-list-overflow-edi))
+                   (ecase (tn-offset alloc-tn)
+                     (#.eax-offset 'alloc-overflow-eax)
+                     (#.ecx-offset 'alloc-overflow-ecx)
+                     (#.edx-offset 'alloc-overflow-edx)
+                     (#.ebx-offset 'alloc-overflow-ebx)
+                     (#.esi-offset 'alloc-overflow-esi)
+                     (#.edi-offset 'alloc-overflow-edi)))))
       (inst call (make-fixup dst :assembly-routine)))
     (inst jmp done)
     (emit-label ok)
@@ -150,16 +162,18 @@
 ;;; 2. how to allocate it: policy and how to invoke the trampoline
 ;;; 3. where to put the result
 (defun allocation (type size lowtag node dynamic-extent alloc-tn)
-  (declare (ignore type))
   (declare (ignorable node))
   (cond
     (dynamic-extent
      (stack-allocation alloc-tn size lowtag))
     ((or (null node) (policy node (>= speed space)))
-     (allocation-inline alloc-tn size))
+     (allocation-inline type alloc-tn size))
     (t
-     (allocation-notinline alloc-tn size)))
+     (allocation-notinline type alloc-tn size)))
   (when (and lowtag (not dynamic-extent))
+    ;; This is dumb, it should be an ADD or an OR, but a better solution
+    ;; would be to pass lowtag into the allocation-inline function so that
+    ;; for a fixed size we don't emit code such as "SUB r, 8 ; ADD r, 3".
     (inst lea alloc-tn (make-ea :byte :base alloc-tn :disp lowtag)))
   (values))
 

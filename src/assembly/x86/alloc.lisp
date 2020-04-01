@@ -23,14 +23,14 @@
 ;;;;
 ;;;; ALLOC factors out the logic of calling alloc(): stack alignment, etc.
 #+sb-assembling
-(macrolet ((alloc (reg size)
+(macrolet ((alloc (reg size c-fun)
              `(progn
                 (inst push ebp-tn)
                 (inst mov ebp-tn esp-tn)
                 (inst push 0)                 ; reserve space for arg
                 (inst and esp-tn #xfffffff0)  ; align stack to 16 bytes
                 (inst mov (make-ea :dword :base esp-tn) ,size)
-                (inst call (make-fixup "alloc" :foreign))
+                (inst call (make-fixup ,c-fun :foreign))
                 (inst mov esp-tn ebp-tn)
                 (inst pop ebp-tn)
                 ,@(unless (eq reg 'eax-tn)
@@ -41,7 +41,7 @@
                      ,@body
                      ,@(when r3 `((inst pop ,r3)))
                      (inst pop ,r2) (inst pop ,r1)))
-           (alloc-to-reg (reg size)
+           (alloc-to-reg (reg size &optional (c-fun "alloc"))
              (let ((size-calc
                      (unless size
                        (setq size reg)
@@ -59,21 +59,30 @@
                          #-sb-thread (inst sub ,reg
                                            (make-ea :dword :disp (+ 8 static-space-start)))))))
              (case reg
-               (eax-tn `(preserving (ecx-tn edx-tn) ,@size-calc (alloc eax-tn ,size)))
-               (ecx-tn `(preserving (eax-tn edx-tn) ,@size-calc (alloc ecx-tn ,size)))
-               (edx-tn `(preserving (eax-tn ecx-tn) ,@size-calc (alloc edx-tn ,size)))
+               ;; Now that we're using lisp asm code instead of a .S file
+               ;; this could be done more intelligently - the macro can decide
+               ;; on a temp register.
+               (eax-tn `(preserving (ecx-tn edx-tn)
+                          ,@size-calc (alloc eax-tn ,size ,c-fun)))
+               (ecx-tn `(preserving (eax-tn edx-tn)
+                          ,@size-calc (alloc ecx-tn ,size ,c-fun)))
+               (edx-tn `(preserving (eax-tn ecx-tn)
+                          ,@size-calc (alloc edx-tn ,size ,c-fun)))
                (t      `(preserving (eax-tn ecx-tn edx-tn)
-                          ,@size-calc
-                          (alloc ,reg ,size))))))
+                          ,@size-calc (alloc ,reg ,size ,c-fun))))))
            (def-allocators (tn &aux (reg (subseq (string tn) 0 3)))
              `(progn
                 (define-assembly-routine (,(symbolicate "ALLOC-OVERFLOW-" reg)) ()
                   (alloc-to-reg ,tn nil))
+                (define-assembly-routine (,(symbolicate "ALLOC-LIST-OVERFLOW-" reg)) ()
+                  (alloc-to-reg ,tn nil "alloc_list"))
                 ;; FIXME: having decided (based on policy) not to use the inline allocator
                 ;; in Lisp, why does the assembly code not try to inline it?
                 ;; There's no reason to call into C for everything. This is horrible.
                 (define-assembly-routine (,(symbolicate "ALLOC-TO-" reg)) ()
                   (alloc-to-reg ,tn ,tn))
+                (define-assembly-routine (,(symbolicate "ALLOC-LIST-TO-" reg)) ()
+                  (alloc-to-reg ,tn ,tn "alloc_list"))
                 (define-assembly-routine (,(symbolicate "ALLOC-8-TO-" reg)) ()
                   (alloc-to-reg ,tn 8))
                 (define-assembly-routine (,(symbolicate "ALLOC-16-TO-" reg)) ()
