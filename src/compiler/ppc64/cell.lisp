@@ -232,8 +232,10 @@
 
 ;;;; Fdefinition (fdefn) objects.
 
-(define-vop (fdefn-fun cell-ref)
+(define-vop (fdefn-fun cell-ref) ; does not translate anything
   (:variant fdefn-fun-slot other-pointer-lowtag))
+(define-vop (untagged-fdefn-fun cell-ref) ; does not translate anything
+  (:variant fdefn-fun-slot 0))
 
 (define-vop (safe-fdefn-fun)
   (:translate safe-fdefn-fun)
@@ -246,6 +248,31 @@
   (:generator 10
     (move obj-temp object)
     (loadw value obj-temp fdefn-fun-slot other-pointer-lowtag)
+    (inst cmpd value null-tn)
+    (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
+      (inst beq err-lab))))
+;;; We need the ordinary safe-fdefn-fun *and* the untagged one. The tagged vop
+;;; translates calls which store and pass fdefns as objects:
+;;;  - a readtable can map a character to an fdefn (or a function)
+;;;  - handler clusters can bind a condition to an fdefn (or function)
+;;;  - maybe more
+;;; Those uses want the lazy lookup aspect while being faster than symbol-function.
+;;; References within code never manipulate the fdefn as an object.
+;;; Luckily there is no ambiguity in the undefined-fun trap when it receives
+;;; an integer in a descriptor register: it's a "stealth mode" fdefn.
+(define-vop (safe-untagged-fdefn-fun) ; does not translate anything
+  (:policy :fast-safe)
+  ;; I've given up on the idea that untagged fdefns shall only be loaded into fdefn-tn.
+  ;; Because of error handling, the GC has to allow them to be seen anywhere,
+  ;; conservatively not touching the bits.
+  (:args (object :scs (descriptor-reg) :target obj-temp))
+  (:results (value :scs (descriptor-reg any-reg)))
+  (:vop-var vop)
+  (:save-p :compute-only)
+  (:temporary (:scs (descriptor-reg) :from (:argument 0)) obj-temp)
+  (:generator 10
+    (move obj-temp object)
+    (loadw value obj-temp fdefn-fun-slot 0)
     (inst cmpd value null-tn)
     (let ((err-lab (generate-error-code vop 'undefined-fun-error obj-temp)))
       (inst beq err-lab))))

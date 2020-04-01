@@ -157,6 +157,12 @@
               (emit-move node block (make-load-time-constant-tn :known-fun name)
                          res))
              (t
+              #+untagged-fdefns
+              (let ((fdefn-tn (make-load-time-constant-tn :named-call name)))
+                (if unsafe
+                    (vop sb-vm::untagged-fdefn-fun node block fdefn-tn res)
+                    (vop sb-vm::safe-untagged-fdefn-fun node block fdefn-tn res)))
+              #-untagged-fdefns
               (let ((fdefn-tn (make-load-time-constant-tn :fdefinition name)))
                 (if unsafe
                     (vop fdefn-fun node block fdefn-tn res)
