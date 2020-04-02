@@ -346,18 +346,16 @@
                                    'sb-vm::allocate-vector-on-stack
                                    'sb-vm::allocate-vector-on-heap))
 
-  (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template &optional not-dx-template)
+  (defun vectorish-ltn-annotate-helper (call ltn-policy dx-template not-dx-template)
     (let* ((args (basic-combination-args call))
            (template-name (if (node-stack-allocate-p call)
                               dx-template
                               not-dx-template))
-           (template (and template-name
-                          (template-or-lose template-name))))
+           (template (template-or-lose template-name)))
       (dolist (arg args)
         (setf (lvar-info arg)
               (make-ir2-lvar (primitive-type (lvar-type arg)))))
-      (unless (and template
-                   (is-ok-template-use template call (ltn-policy-safe-p ltn-policy)))
+      (unless (is-ok-template-use template call (ltn-policy-safe-p ltn-policy))
         (ltn-default-call call)
         (return-from vectorish-ltn-annotate-helper (values)))
       (setf (basic-combination-info call) template)
