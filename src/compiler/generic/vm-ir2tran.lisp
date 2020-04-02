@@ -407,7 +407,8 @@
   (defoptimizer (%make-list ltn-annotate) ((length element) call ltn-policy)
     (declare (ignore length element))
     (vectorish-ltn-annotate-helper call ltn-policy
-                                   'sb-vm::allocate-list-on-stack)))
+                                   'sb-vm::allocate-list-on-stack
+                                   'sb-vm::allocate-list-on-heap)))
 
 
 (in-package "SB-VM")
