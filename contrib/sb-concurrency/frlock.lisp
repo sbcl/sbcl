@@ -66,7 +66,7 @@
 ;;;  - thread B wants to set them to (x1,y1)
 
 ;;; Using all correct barriers except for one misplaced rmb(), the
-;;; "observe pre" and "observe X" steps can occur out-of-order thusly:
+;;; "observe post" and "observe X" steps can occur out-of-order thusly:
 ;;;
 ;;;     Thread A                    Thread B
 ;;;   ------------                ------------
@@ -78,10 +78,10 @@
 ;;;                                 X <- x1
 ;;;                                 wmb()
 ;;;                                 post <- 4
-;;;   observe pre, gets 4
+;;;   observe post, gets 4
 ;;;   observe Y, gets y1
 ;;;   rmb()
-;;;   observe post, gets 4
+;;;   observe pre, gets 4
 ;;;
 ;;; Thread A thinks it saw a consistent view of (x0,y1) because pre = post = 4.
 ;;; The correct C code would have been
