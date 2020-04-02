@@ -76,14 +76,15 @@
   ;; unknown types.
   (with-current-source-form (specifier)
     (handler-case
-        (specifier-type specifier)
+        (and (specifier-type specifier)
+             (sb-impl::%check-deprecated-type specifier))
       (parse-unknown-type (c)
         (when (typep specifier '(cons (eql quote)))
           (signal c)))
       (error (condition)
         (destructuring-bind (operator . class-name) context
           (sb-c:compiler-warn "Invalid :TYPE for slot ~S in ~S ~S: ~A."
-                               slot-name operator class-name condition))))))
+                              slot-name operator class-name condition))))))
 
 ;;; These functions are used as method for types which need a complex
 ;;; subtypep method to handle some superclasses, but cover a subtree
