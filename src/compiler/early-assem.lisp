@@ -88,7 +88,6 @@
           (values (car name&options) (cdr name&options)))
     (let ((regs (mapcar (lambda (var) (apply #'sb-c::parse-reg-spec var))
                         vars)))
-      (declare (special sb-c::*emit-assembly-code-not-vops-p*))
-      (if sb-c::*emit-assembly-code-not-vops-p*
+      (if (member :sb-assembling sb-xc:*features*)
           (sb-c::emit-assemble name options regs code)
           (sb-c::emit-assemble-vop name options regs))))))

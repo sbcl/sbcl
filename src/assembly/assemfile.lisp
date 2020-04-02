@@ -12,9 +12,6 @@
 
 (in-package "SB-C")
 
-;;; If non-NIL, emit assembly code. If NIL, emit VOP templates.
-(defvar *emit-assembly-code-not-vops-p* nil)
-
 ;;; a list of (NAME LABEL OFFSET) for every entry point
 (defvar *entry-points* nil)
 
@@ -27,8 +24,7 @@
   (declare (ignore print))
   (when sb-cold::*compile-for-effect-only*
     (return-from assemble-file t))
-  (let* ((*emit-assembly-code-not-vops-p* t)
-         (name (pathname name))
+  (let* ((name (pathname name))
          ;; the fasl file currently being output to
          (lap-fasl-output (open-fasl-output (pathname output-file) name))
          (*entry-points* nil)
