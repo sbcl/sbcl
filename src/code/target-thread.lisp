@@ -1931,7 +1931,7 @@ assume that unknown code can safely be terminated using TERMINATE-THREAD."
 
   (sb-ext:define-load-time-global sb-vm::*free-tls-index* 0)
   ;; Keep in sync with 'compiler/generic/parms.lisp'
-  #+(or ppc ppc64) ; only PPC uses a separate symbol for the TLS index lock
+  #+ppc ; only 32-bit PPC uses a separate symbol for the TLS index lock
   (!define-load-time-global sb-vm::*tls-index-lock* 0)
 
   (defun %symbol-value-in-thread (symbol thread)

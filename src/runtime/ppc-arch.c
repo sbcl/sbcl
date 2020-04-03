@@ -440,6 +440,83 @@ handle_allocation_trap(os_context_t * context)
 }
 #endif
 
+#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_PPC64
+static int
+handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
+{
+#ifdef LISP_FEATURE_LITTLE_ENDIAN
+# define TLS_INDEX_FIELD_DISPLACEMENT (4-OTHER_POINTER_LOWTAG)
+#else
+# define TLS_INDEX_FIELD_DISPLACEMENT (-OTHER_POINTER_LOWTAG)
+#endif
+
+    /* LWZ ra,-k(rb) followed by TWI :eq ra,0 is the "unassigned symbol TLS" trap.
+     * LWZ and TWI coincidentally have a similar format as follows:
+     *      | 6|  5|  5| 16|  field width
+     *      ----------------------
+     * LWZ: |32| RT| RA|  D|
+     * TWI: | 3| TO| RA|imm|  TO bits: EQ = 4
+     *
+     */
+
+    boolean handle_it = 0;
+    unsigned prev_inst;
+    // In actual fact, the trap will always be on register R0,
+    // so I could constrain this test some more.
+    if ((code & ~(31 << 16)) == ((3<<26)|(4<<21))) { // mask out RA for test
+        prev_inst= ((u32*)pc)[-1];
+        int16_t disp = (prev_inst & 0xFFFF);
+        handle_it = (prev_inst >> 26) == 32 // a load
+          // RT of the load must be RA of the trap
+          && ((prev_inst >> 21) & 31) == ((code >> 16) & 31)
+          && (disp == TLS_INDEX_FIELD_DISPLACEMENT);
+    }
+    if (!handle_it) return 0;
+
+    struct thread *thread = arch_os_get_current_thread();
+    set_pseudo_atomic_atomic(thread);
+
+    int symbol_reg = (prev_inst >> 16) & 31;
+    struct symbol *specvar =
+      SYMBOL(*os_context_register_addr(context, symbol_reg));
+    struct symbol *free_tls_index = SYMBOL(FREE_TLS_INDEX);
+
+    // *FREE-TLS-INDEX* value is [lock][tls-index] each field being 32 bits.
+    uword_t* pvalue = &free_tls_index->value;
+    uword_t old;
+    do {
+        old = __sync_fetch_and_or(pvalue, 1L<<32);
+        if (old & (1L<<32)) sched_yield(); else break;
+    } while (1);
+    // sync_fetch_and_or acts as a barrier which prevents
+    // speculatively loading tls_index_of().
+    uint32_t tls_index = tls_index_of(specvar);
+    if (tls_index != 0) { // someone else assigned
+        free_tls_index->value = old; // just release the spinlock
+        // fprintf(stderr, "TLS index trap: special var = %p, data race\n", specvar);
+    } else {
+        tls_index = old;
+        // XXX: need to be careful here if GC uses any bits of the header
+        // for concurrent marking. Would need to do a 4-byte write in that case.
+        // This is simpler because it works for either endianness.
+        specvar->header |= (uword_t)tls_index << 32;
+        // A barrier here ensures that nobody else thinks this symbol
+        // doesn't have a TLS index.  compare-and-swap is the barrier.
+        // It doesn't really need to be a CAS, because we hold the spinlock.
+        int res = __sync_bool_compare_and_swap(pvalue,
+                                               old | 1L<<32,
+                                               old + N_WORD_BYTES);
+        gc_assert(res);
+        // fprintf(stderr, "TLS index trap: special var = %p, assigned %x\n", specvar, tls_index);
+    }
+    // This is actually always going to be 0
+    int tlsindex_reg = (code >> 16) & 31; // the register we trapped on
+    *os_context_register_addr(context, tlsindex_reg) = tls_index;
+    clear_pseudo_atomic_atomic(thread);
+    return 1; // handled this signal
+}
+#endif
+
 void
 arch_handle_breakpoint(os_context_t *context)
 {
@@ -478,10 +555,11 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {
+  uword_t pc = *os_context_pc_addr(context);
+  unsigned int code = *(u32*)pc;
+
 #ifdef LISP_FEATURE_SIGILL_TRAPS
     if (signal == SIGILL) {
-        uword_t pc = *os_context_pc_addr(context);
-        unsigned int code = *(u32*)pc;
         if (code == 0x7C0002A6) { // allocation region overflow trap
             // there is an actual trap instruction located 2 instructions later.
             // pretend the trap happened there.
@@ -499,7 +577,10 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 #endif
     if (signal == SIGTRAP && handle_allocation_trap(context)) return;
 
-    unsigned int code = *((u32 *)(*os_context_pc_addr(context)));
+#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_PPC64
+    if (signal == SIGTRAP && handle_tls_trap(context, pc, code)) return;
+#endif
+
     if (code == ((3 << 26) | (0x18 << 21) | (reg_NL3 << 16))||
         /* trap instruction from do_pending_interrupt */
         code == 0x7fe00008) {
