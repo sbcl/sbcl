@@ -296,53 +296,10 @@
 (define-vop (dynbind)
   (:args (val :scs (any-reg descriptor-reg))
          (symbol :scs (descriptor-reg)))
-  (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:temporary (:scs (descriptor-reg)) temp tls-index)
   (:generator 5
      (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-     (inst cmpwi tls-index 0)
-     (inst bne TLS-VALID)
-
-     ;; No TLS slot allocated, so allocate one.
-     ;; FIXME: this is a ridiculous number of instructions to emit inline.
-     (pseudo-atomic (pa-flag)
-       (without-scheduling ()
-         (assemble ()
-           (inst li temp (+ (static-symbol-offset '*tls-index-lock*)
-                            (ash symbol-value-slot word-shift)
-                            (- other-pointer-lowtag)))
-           OBTAIN-LOCK
-           (inst lwarx tls-index null-tn temp)
-           (inst cmpwi tls-index 0)
-           (inst bne OBTAIN-LOCK)
-           (inst stwcx. thread-base-tn null-tn temp)
-           (inst bne OBTAIN-LOCK)
-           (inst isync)
-
-           ;; Check to see if the TLS index was set while we were waiting.
-           (loadw tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-           (inst cmpwi tls-index 0)
-           (inst bne RELEASE-LOCK)
-
-           (load-symbol-value tls-index *free-tls-index*)
-           ;; FIXME: Check for TLS index overflow.
-           (inst addi tls-index tls-index n-word-bytes)
-           (store-symbol-value tls-index *free-tls-index*)
-           (inst addi tls-index tls-index (- n-word-bytes))
-           (storew tls-index symbol symbol-tls-index-slot other-pointer-lowtag)
-
-           ;; The sync instruction doesn't need to happen if we branch
-           ;; directly to RELEASE-LOCK as we didn't do any stores in that
-           ;; case.
-           (inst sync)
-           RELEASE-LOCK
-           (inst stwx zero-tn null-tn temp)
-
-           ;; temp is a boxed register, but we've been storing crap in it.
-           ;; fix it before we leave pseudo-atomic.
-           (inst li temp 0))))
-
-     TLS-VALID
+     (inst twi :eq tls-index 0)
      (inst lwzx temp thread-base-tn tls-index)
      (inst addi bsp-tn bsp-tn (* binding-size n-word-bytes))
      (storew temp bsp-tn (- binding-value-slot binding-size))

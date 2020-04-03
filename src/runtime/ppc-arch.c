@@ -440,14 +440,19 @@ handle_allocation_trap(os_context_t * context)
 }
 #endif
 
-#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_PPC64
+#if defined LISP_FEATURE_SB_THREAD
 static int
 handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
 {
-#ifdef LISP_FEATURE_LITTLE_ENDIAN
-# define TLS_INDEX_FIELD_DISPLACEMENT (4-OTHER_POINTER_LOWTAG)
+#ifdef LISP_FEATURE_PPC64
+# ifdef LISP_FEATURE_LITTLE_ENDIAN
+#  define TLS_INDEX_FIELD_DISPLACEMENT (4-OTHER_POINTER_LOWTAG)
+# else
+#  define TLS_INDEX_FIELD_DISPLACEMENT (-OTHER_POINTER_LOWTAG)
+# endif
 #else
-# define TLS_INDEX_FIELD_DISPLACEMENT (-OTHER_POINTER_LOWTAG)
+# define TLS_INDEX_FIELD_DISPLACEMENT \
+    (offsetof(struct symbol,tls_index)-OTHER_POINTER_LOWTAG)
 #endif
 
     /* LWZ ra,-k(rb) followed by TWI :eq ra,0 is the "unassigned symbol TLS" trap.
@@ -461,8 +466,6 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
 
     boolean handle_it = 0;
     unsigned prev_inst;
-    // In actual fact, the trap will always be on register R0,
-    // so I could constrain this test some more.
     if ((code & ~(31 << 16)) == ((3<<26)|(4<<21))) { // mask out RA for test
         prev_inst= ((u32*)pc)[-1];
         int16_t disp = (prev_inst & 0xFFFF);
@@ -481,12 +484,13 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
       SYMBOL(*os_context_register_addr(context, symbol_reg));
     struct symbol *free_tls_index = SYMBOL(FREE_TLS_INDEX);
 
-    // *FREE-TLS-INDEX* value is [lock][tls-index] each field being 32 bits.
+    // *FREE-TLS-INDEX* value is [lock][tls-index]
     uword_t* pvalue = &free_tls_index->value;
     uword_t old;
+    const uword_t spinlock_bit = (uword_t)1<<31;
     do {
-        old = __sync_fetch_and_or(pvalue, 1L<<32);
-        if (old & (1L<<32)) sched_yield(); else break;
+        old = __sync_fetch_and_or(pvalue, spinlock_bit);
+        if (old & spinlock_bit) sched_yield(); else break;
     } while (1);
     // sync_fetch_and_or acts as a barrier which prevents
     // speculatively loading tls_index_of().
@@ -499,17 +503,21 @@ handle_tls_trap(os_context_t * context, uword_t pc, unsigned int code)
         // XXX: need to be careful here if GC uses any bits of the header
         // for concurrent marking. Would need to do a 4-byte write in that case.
         // This is simpler because it works for either endianness.
+#ifdef LISP_FEATURE_PPC64
         specvar->header |= (uword_t)tls_index << 32;
+#else
+        specvar->tls_index = tls_index;
+#endif
         // A barrier here ensures that nobody else thinks this symbol
         // doesn't have a TLS index.  compare-and-swap is the barrier.
         // It doesn't really need to be a CAS, because we hold the spinlock.
         int res = __sync_bool_compare_and_swap(pvalue,
-                                               old | 1L<<32,
+                                               old | spinlock_bit,
                                                old + N_WORD_BYTES);
         gc_assert(res);
         // fprintf(stderr, "TLS index trap: special var = %p, assigned %x\n", specvar, tls_index);
     }
-    // This is actually always going to be 0
+    // This is actually always going to be 0 for 64-bit code
     int tlsindex_reg = (code >> 16) & 31; // the register we trapped on
     *os_context_register_addr(context, tlsindex_reg) = tls_index;
     clear_pseudo_atomic_atomic(thread);
@@ -577,7 +585,7 @@ sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 #endif
     if (signal == SIGTRAP && handle_allocation_trap(context)) return;
 
-#if defined LISP_FEATURE_SB_THREAD && defined LISP_FEATURE_PPC64
+#ifdef LISP_FEATURE_SB_THREAD
     if (signal == SIGTRAP && handle_tls_trap(context, pc, code)) return;
 #endif
 

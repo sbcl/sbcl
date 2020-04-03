@@ -208,9 +208,6 @@
 
     ;; threading support
     #+sb-thread *free-tls-index*
-    ;; Keep in sync with 'code/target-thread.lisp':
-    ;;  "only PPC uses a separate symbol for the TLS index lock"
-    #+(and sb-thread ppc) *tls-index-lock*
 
     ;; dynamic runtime linking support
     #+linkage-table +required-foreign-symbols+
