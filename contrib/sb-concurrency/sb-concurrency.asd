@@ -28,10 +28,6 @@
      (:file "test-frlock"  :depends-on ("package" "test-utils"))
      (:file "test-queue"   :depends-on ("package" "test-utils"))
      (:file "test-mailbox" :depends-on ("package" "test-utils"))
-     ;; ppc64be hangs forever in sys_futex. Possibly a bit in the wrong place.
-     ;; I think there is no other 64-bit big-endian arch to test on
-     ;; to confirm this theory.
-     #-(and ppc64 big-endian)
      (:file "test-gate"    :depends-on ("package" "test-utils"))))))
 
 (defmethod perform ((o test-op)

@@ -424,9 +424,13 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
 #+(and sb-thread sb-futex)
 (progn
   (locally (declare (sb-ext:muffle-conditions sb-ext:compiler-note))
+    ;; """ (Futexes are 32 bits in size on all platforms, including 64-bit systems.) """
+    ;; which means we need to add 4 bytes to get to the low 32 bits of the slot contents
+    ;; where we store state. This would be prettier if we had 32-bit raw slots.
     (define-structure-slot-addressor mutex-state-address
         :structure mutex
-        :slot state))
+        :slot state
+        #+(and 64-bit big-endian) :bias #+(and 64-bit big-endian) 4))
   ;; Important: current code assumes these are fixnums or other
   ;; lisp objects that don't need pinning.
   (defconstant +lock-free+ 0)
