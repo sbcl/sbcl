@@ -99,6 +99,9 @@ futex_wake_op()
 
 static inline int sys_futex(void *futex, int op, int val, struct timespec *rel)
 {
+#if defined LISP_FEATURE_64_BIT && defined LISP_FEATURE_BIG_ENDIAN
+    futex = (char*)futex + 4; // off by 4 because the slot is 64 bits
+#endif
     return syscall(SYS_futex, futex, op, val, rel);
 }
 

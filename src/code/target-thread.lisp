@@ -429,8 +429,7 @@ See also: RETURN-FROM-THREAD and SB-EXT:EXIT."
     ;; where we store state. This would be prettier if we had 32-bit raw slots.
     (define-structure-slot-addressor mutex-state-address
         :structure mutex
-        :slot state
-        #+(and 64-bit big-endian) :bias #+(and 64-bit big-endian) 4))
+        :slot state))
   ;; Important: current code assumes these are fixnums or other
   ;; lisp objects that don't need pinning.
   (defconstant +lock-free+ 0)

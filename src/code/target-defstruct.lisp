@@ -244,7 +244,7 @@
 
 ;;; Used internally, but it would be nice to provide something
 ;;; like this for users as well.
-(defmacro define-structure-slot-addressor (name &key structure slot (bias 0))
+(defmacro define-structure-slot-addressor (name &key structure slot)
   (let* ((dd (find-defstruct-description structure t))
          (slotd (or (and dd (find slot (dd-slots dd) :key #'dsd-name))
                     (error "Slot ~S not found in ~S." slot structure)))
@@ -258,7 +258,6 @@
           (+ (get-lisp-obj-address instance)
              ,(+ (- sb-vm:instance-pointer-lowtag)
                  (* (+ sb-vm:instance-slots-offset index)
-                    sb-vm:n-word-bytes)
-                 bias)))))))
+                    sb-vm:n-word-bytes))))))))
 
 (/show0 "target-defstruct.lisp end of file")
