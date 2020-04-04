@@ -1158,21 +1158,6 @@ static void gc_init_immobile()
     immobile_scav_queue = malloc(QCAPACITY * sizeof(lispobj));
 }
 
-/* Because the immobile page table is not dumped into a core image,
-   we have to reverse-engineer the characteristics of each page,
-   which means figuring out what the object spacing should be.
-   This is not difficult, but is a bit of a kludge */
-
-static inline int immobile_obj_spacing(lispobj header_word, lispobj *obj,
-                                       int actual_size)
-{
-    if (header_widetag(header_word) == INSTANCE_WIDETAG &&
-        instance_layout(obj) == LAYOUT_OF_LAYOUT)
-        return LAYOUT_ALIGN / N_WORD_BYTES;
-    else
-        return actual_size; // in words
-}
-
 // Signify that scan_start is initially not reliable
 static int page_attributes_valid;
 
@@ -1220,8 +1205,7 @@ void immobile_space_coreparse(uword_t fixedobj_len, uword_t varyobj_len)
                 gc_assert(other_immediate_lowtag_p(*obj));
                 int size = sizetab[header_widetag(header)](obj);
                 fixedobj_pages[page].attr.parts.obj_size = size;
-                fixedobj_pages[page].attr.parts.obj_align
-                  = immobile_obj_spacing(header, obj, size);
+                fixedobj_pages[page].attr.parts.obj_align = size;
                 fixedobj_pages[page].gens |= 1 << immobile_obj_gen_bits(obj);
                 if (gen != 0 && ENABLE_PAGE_PROTECTION)
                     fixedobj_pages[page].attr.parts.flags = WRITE_PROTECT;
@@ -1468,14 +1452,15 @@ lispobj* AMD64_SYSV_ABI alloc_fixedobj(int nwords, uword_t header)
                               header);
 }
 
+static const int LAYOUT_NWORDS = sizeof (struct layout)/N_WORD_BYTES;
+
 lispobj AMD64_SYSV_ABI alloc_layout()
 {
-    const int LAYOUT_SIZE = sizeof (struct layout)/N_WORD_BYTES;
     lispobj* l =
-        alloc_immobile_obj(MAKE_ATTR(LAYOUT_ALIGN / N_WORD_BYTES,
-                                     ALIGN_UP(LAYOUT_SIZE,2),
+        alloc_immobile_obj(MAKE_ATTR(ALIGN_UP(LAYOUT_NWORDS,2),
+                                     ALIGN_UP(LAYOUT_NWORDS,2),
                                      0),
-                           (LAYOUT_SIZE-1)<<INSTANCE_LENGTH_SHIFT | INSTANCE_WIDETAG);
+                           (LAYOUT_NWORDS-1)<<INSTANCE_LENGTH_SHIFT | INSTANCE_WIDETAG);
     return make_lispobj(l, INSTANCE_POINTER_LOWTAG);
 }
 
@@ -1615,8 +1600,8 @@ static struct layout* fix_object_layout(lispobj* obj)
 #endif
     }
     struct layout* native_layout = (struct layout*)tempspace_addr(LAYOUT(layout));
-    gc_assert(widetag_of(&native_layout->header) == INSTANCE_WIDETAG);
-    gc_assert(instance_layout((lispobj*)native_layout) == LAYOUT_OF_LAYOUT);
+    gc_assert(header_widetag(native_layout->header) == INSTANCE_WIDETAG);
+    gc_assert(layoutp(make_lispobj(native_layout, INSTANCE_POINTER_LOWTAG)));
     return native_layout;
 }
 
@@ -1945,9 +1930,8 @@ static void defrag_immobile_space(boolean verbose)
     // page order is: layouts, symbols, fdefns, trampolines, GFs
     // If the text segment is writable, then the last 3 of those are
     // moved into varyobj space.
-    int n_layout_pages = calc_n_fixedobj_pages(
-        obj_type_histo[INSTANCE_WIDETAG/4],
-        LAYOUT_ALIGN / N_WORD_BYTES);
+    int n_layout_pages = calc_n_fixedobj_pages(obj_type_histo[INSTANCE_WIDETAG/4],
+                                               LAYOUT_NWORDS);
     char* layout_alloc_ptr = defrag_base;
     char* symbol_alloc_ptrs[N_SYMBOL_KINDS+1];
     symbol_alloc_ptrs[0]    = layout_alloc_ptr + n_layout_pages * IMMOBILE_CARD_BYTES;

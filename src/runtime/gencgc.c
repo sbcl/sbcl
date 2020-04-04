@@ -2791,13 +2791,6 @@ struct verify_state {
 #define VERIFYING_HEAP_OBJECTS 64
 #define VERIFYING_GENERATIONAL 128
 
-// Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
-static inline lispobj layout_of(lispobj* instance) { // native ptr
-    // Smart C compilers eliminate the ternary operator if exprs are the same
-    return widetag_of(instance) == FUNCALLABLE_INSTANCE_WIDETAG
-      ? funinstance_layout(instance) : instance_layout(instance);
-}
-
 // Helpers for verify_range
 generation_index_t gc_gen_of(lispobj obj, int defaultval) {
     int page = find_page_index((void*)obj);
@@ -2965,12 +2958,8 @@ verify_range(lispobj *where, sword_t nwords, struct verify_state *state)
                     state->vaddr = where;
                     verify_range(&layout_word, 1, state);
                     state->vaddr = 0;
+                    gc_assert(layoutp(layout_word));
                     struct layout *layout = LAYOUT(layout_word);
-#ifdef LISP_FEATURE_IMMOBILE_SPACE
-                    if (instance_layout(layout) != LAYOUT_OF_LAYOUT)
-                        lose("Implausible layout. obj=%p layout=%p",
-                             where, (void*)layout);
-#endif
                     sword_t nslots = instance_length(thing) | 1;
                     lispobj bitmap = layout->bitmap;
                     gc_assert(fixnump(bitmap)

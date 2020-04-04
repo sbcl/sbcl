@@ -443,11 +443,7 @@
                  (setf found (cons 0 free-word-index))
                  (push (cons key found) *immobile-space-map*)))
              (destructuring-bind (page-word-index . page-base-index) found
-               (let ((next-word
-                      (+ page-word-index
-                         (if (logbitp 0 page-attributes)
-                             (/ sb-vm:layout-align sb-vm:n-word-bytes)
-                             n-words))))
+               (let ((next-word (+ page-word-index n-words)))
                  (if (> next-word (- page-n-words n-words))
                      ;; no more objects fit on this page
                      (setf *immobile-space-map*
@@ -1310,7 +1306,10 @@ core and return a descriptor to it."
                           (length inherits)))
              (make-cold-layout name
                                (layout-depthoid warm-layout)
-                               (layout-flags warm-layout)
+                               (logior (layout-flags warm-layout)
+                                       (if (eq name 'layout)
+                                           sb-kernel::+layout-layout-flag+
+                                           0))
                                (layout-length warm-layout)
                                (number-to-core (layout-bitmap warm-layout))
                                (vector-in-core inherits)))))
@@ -2337,7 +2336,10 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                       :bitmap)))
               (old-inherits (read-slot existing-layout *host-layout-of-layout*
                                        :inherits)))
-          (cond ((and (= flags old-flags)
+          (cond ((and (or (= flags old-flags)
+                          ;; A hack needed only for genesis, because normally
+                          ;; we never "reconstruct" the layout of layout.
+                          (eq name 'layout))
                       (= depthoid old-depthoid)
                       (= length old-length)
                       (= (host-object-from-core bitmap) old-bitmap)
@@ -3209,13 +3211,9 @@ Legal values for OFFSET are -4, -8, -12, ..."
         (format stream "#define ~A (*)~%" c-symbol))
       (format stream "#define ~A_tlsindex 0x~X~%"
               c-symbol (ensure-symbol-tls-index symbol))))
-  ;; These #defines are quasi-constant - they must be relativized to the
-  ;; start of the fixedobj space. Wiring in the absolute address from genesis
-  ;; will cause failure in heap relocation.
+  ;; This #define is relative to the start of the fixedobj space to allow heap relocation.
   #+immobile-space
   (format stream "~@{#define LAYOUT_OF_~A (lispobj)(FIXEDOBJ_SPACE_START+0x~x)~%~}"
-          "LAYOUT" (- (descriptor-bits (gethash 'layout *cold-layouts*))
-                      (gspace-byte-address *immobile-fixedobj*))
           "FUNCTION" (- (descriptor-bits (gethash 'function *cold-layouts*))
                         (gspace-byte-address *immobile-fixedobj*)))
   ;; For immobile code, define a constant for the address of the vector of

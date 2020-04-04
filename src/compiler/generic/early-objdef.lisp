@@ -326,9 +326,6 @@
 
 #+immobile-space
 (progn
-  ;; See 'doc/internal-notes/compact-instance' for rationale
-  (defconstant layout-align #+64-bit 128 #-64-bit 256) ; in bytes
-
   ;; FUNCTION-LAYOUT is a fixnum whose bits are ORed in "as-is" with the
   ;; low half of a closure header to form the full header word.
   #-sb-thread

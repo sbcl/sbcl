@@ -325,15 +325,36 @@ static inline void protect_page(void* page_addr, page_index_t page_index)
 #define KV_PAIRS_REHASH(kvv) kvv[1]
 
 #include "genesis/layout.h"
-static inline int lockfree_list_node_layout_p(struct layout* layout)
+static inline int layout_flags(struct layout* layout)
 {
-    // Test +custom-gc-scavenge-flag+ in the _bits or flags depending.
-    // This is a raw slot in either case.
 #ifdef LISP_FEATURE_64_BIT
-    return layout->_bits & 1;
+    return layout->_bits & 0xFF;
 #else
-    return layout->flags & 1;
+    return layout->flags;
 #endif
+}
+
+// Generalize over INSTANCEish things. (Not general like SB-KERNEL:LAYOUT-OF)
+static inline lispobj layout_of(lispobj* instance) { // native ptr
+    // Smart C compilers eliminate the ternary operator if exprs are the same
+    return widetag_of(instance) == FUNCALLABLE_INSTANCE_WIDETAG
+      ? funinstance_layout(instance) : instance_layout(instance);
+}
+#include <stdio.h>
+/// Return true if 'thing' is a layout.
+static inline boolean layoutp(lispobj thing)
+{
+    lispobj base_ptr = thing - INSTANCE_POINTER_LOWTAG;
+    lispobj layout;
+    if ((base_ptr & LOWTAG_MASK) || !(layout = layout_of((lispobj*)base_ptr)))
+        return 0;
+    else
+        return layout_flags(LAYOUT(layout)) & 8;
+}
+
+/// Test +custom-gc-scavenge-flag+ in the layout bits.
+static inline int lockfree_list_node_layout_p(struct layout* layout) {
+    return layout_flags(layout) & 1;
 }
 
 #endif /* _GC_PRIVATE_H_ */
