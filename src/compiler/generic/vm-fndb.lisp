@@ -396,7 +396,7 @@
 (defknown stack-ref (system-area-pointer index) t (flushable))
 (defknown %set-stack-ref (system-area-pointer index t) t ())
 (defknown lra-code-header (t) t (movable flushable))
-(defknown fun-code-header (t) t (movable flushable))
+(defknown fun-code-header (function) code-component (movable flushable))
 (defknown %make-lisp-obj (sb-vm:word) t (movable flushable))
 (defknown get-lisp-obj-address (t) sb-vm:word (flushable))
 
