@@ -313,12 +313,12 @@
   (define-load-instruction lhu #b101))
 
 (macrolet ((define-store-instruction (name funct3 &optional wordp)
-             `(define-instruction ,name (segment rs1 rs2 offset)
+             `(define-instruction ,name (segment rs2 rs1 offset)
                 (:printer s ((funct3 ,funct3) (opcode #b0100011))
                           '(:name :tab rs2 ", " "(" imm ")" rs1
                             ,(when wordp 'store-annotation)))
                 (:emitter
-                 (emit-s-inst segment offset rs1 rs2 ,funct3 #b0100011)))))
+                 (emit-s-inst segment offset rs2 rs1 ,funct3 #b0100011)))))
   (define-store-instruction sb #b000)
   (define-store-instruction sh #b001)
   (define-store-instruction sw #b010 #-64-bit t)
@@ -682,11 +682,11 @@
 
 ;;; Floating point
 (defconstant-eqx r-float-printer
-    '(:name :tab fmt ", " rd ", " rs1 ", " rs2 ", " rm)
+    '(:name fmt :tab rd ", " rs1 ", " rs2 ", " rm)
   #'equal)
 
 (defconstant-eqx r-float-unop-printer
-    '(:name :tab fmt ", " rd ", " rs1 ", " rm)
+    '(:name fmt :tab rd ", " rs1 ", " rm)
   #'equal)
 
 (define-instruction-format (r-float 32 :default-printer r-float-printer)
@@ -816,7 +816,7 @@
                  (rs1 nil :type 'reg)
                  (funct3 nil :printer #'funct3-printer)
                  (imm nil :sign-extend t))
-              '(:name :tab funct3 ", " rd ", (" imm ")" rs1))
+              '(:name funct3 :tab rd ", (" imm ")" rs1))
     (:emitter
      (emit-i-inst segment offset rs (fmt-funct3 fmt) rd #b0000111)))
 
@@ -826,7 +826,7 @@
                  (rs2 nil :type 'fp-reg)
                  (funct3 nil :printer #'funct3-printer)
                  (imm nil :type 's-imm))
-              '(:name :tab funct3 ", " rs2 ", " "(" imm ")" rs1))
+              '(:name funct3 :tab rs2 ", " "(" imm ")" rs1))
     (:emitter
      (emit-s-inst segment offset rs1 rs2 (fmt-funct3 fmt) #b0100111))))
 

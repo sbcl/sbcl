@@ -28,9 +28,9 @@ Otherwise, use the RISC-V register names")
 
 ;; FIXME: Can this be a property of DSTATE instead?
 (defvar *note-u-inst* (make-array 32 :initial-element nil)
-  "An map for the disassembler indicating the target register and
-value used in a u-type instruction.  This is used to make annotations
-about function addresses and register values.")
+  "A map for the disassembler indicating the target register and value
+used in a u-type instruction.  This is used to make annotations about
+function addresses and register values.")
 
 (defconstant-eqx lisp-reg-symbols
   (map 'vector
