@@ -3119,13 +3119,13 @@ Legal values for OFFSET are -4, -8, -12, ..."
       (dotimes (i (length a))
         (setf (aref a i)
               (format nil "~a_~a" flavor
-                      (if (logand i sb-vm:fixnum-tag-mask) "fixnum" "otherimm"))))
+                      (if (logtest i sb-vm:fixnum-tag-mask) "otherimm" "fixnum"))))
       (setf (aref a sb-vm:instance-pointer-lowtag) (format nil "~a_struct" flavor)
             (aref a sb-vm:list-pointer-lowtag) (format nil "~a_list" flavor)
             (aref a sb-vm:fun-pointer-lowtag) (format nil "~a_fun_or_otherptr" flavor)
             (aref a sb-vm:other-pointer-lowtag) (format nil "~a_fun_or_otherptr" flavor))
       (format out "static void (*~a_fns[])(lispobj obj) = {~
-~{~% ~a, ~a, ~a, ~a~^,~}};~%" flavor (coerce a 'list)))))
+~{~% ~a, ~a, ~a, ~a~^,~}~%};~%" flavor (coerce a 'list)))))
 
 (defun write-cast-operator (name c-name lowtag)
   (format t "static inline struct ~A* ~A(lispobj obj) {
