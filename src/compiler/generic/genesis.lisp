@@ -3113,6 +3113,20 @@ Legal values for OFFSET are -4, -8, -12, ..."
                                       :key 'sb-vm:primitive-object-name))))))
   (values))
 
+(defun write-c-print-dispatch (out)
+  (dolist (flavor '("print" "brief"))
+    (let ((a (make-array (1+ sb-vm:lowtag-mask))))
+      (dotimes (i (length a))
+        (setf (aref a i)
+              (format nil "~a_~a" flavor
+                      (if (logand i sb-vm:fixnum-tag-mask) "fixnum" "otherimm"))))
+      (setf (aref a sb-vm:instance-pointer-lowtag) (format nil "~a_struct" flavor)
+            (aref a sb-vm:list-pointer-lowtag) (format nil "~a_list" flavor)
+            (aref a sb-vm:fun-pointer-lowtag) (format nil "~a_fun_or_otherptr" flavor)
+            (aref a sb-vm:other-pointer-lowtag) (format nil "~a_fun_or_otherptr" flavor))
+      (format out "static void (*~a_fns[])(lispobj obj) = {~
+~{~% ~a, ~a, ~a, ~a~^,~}};~%" flavor (coerce a 'list)))))
+
 (defun write-cast-operator (name c-name lowtag)
   (format t "static inline struct ~A* ~A(lispobj obj) {
   return (struct ~A*)(obj - ~D);~%}~%" c-name name c-name lowtag))
@@ -3779,20 +3793,24 @@ III. initially undefined function references (alphabetically):
           (write-makefile-features stream)))
 
       (macrolet ((out-to (name &body body) ; write boilerplate and inclusion guard
-                   `(with-open-file (stream (format nil "~A/~A.h" c-header-dir-name ,name)
-                                            :direction :output :if-exists :supersede)
-                       (write-boilerplate stream)
-                       (format stream
-                               "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~:*~A~%"
-                               (c-name (string-upcase ,name)))
-                       ,@body
-                       (format stream "#endif~%"))))
+                   (let ((headerp (if (and (stringp name) (position #\. name)) nil ".h")))
+                     `(with-open-file (stream (format nil "~A/~A~@[~A~]"
+                                                      c-header-dir-name ,name ,headerp)
+                                              :direction :output :if-exists :supersede)
+                         (write-boilerplate stream)
+                         ,(when headerp
+                            `(format stream
+                                     "#ifndef SBCL_GENESIS_~A~%#define SBCL_GENESIS_~:*~A~%"
+                                     (c-name (string-upcase ,name))))
+                         ,@body
+                         ,(when headerp `(format stream "#endif~%"))))))
         (out-to "config" (write-config-h stream))
         (out-to "constants" (write-constants-h stream))
         (out-to "regnames" (write-regnames-h stream))
         (out-to "errnames" (write-errnames-h stream))
         (out-to "gc-tables" (sb-vm::write-gc-tables stream))
         (out-to "tagnames" (write-tagnames-h stream))
+        (out-to "print.inc" (write-c-print-dispatch stream))
         (let ((structs (sort (copy-list sb-vm:*primitive-objects*) #'string<
                              :key #'sb-vm:primitive-object-name)))
           (dolist (obj structs)
