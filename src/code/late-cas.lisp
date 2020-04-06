@@ -28,10 +28,14 @@
   (def %compare-and-swap-car (cons) car)
   (def %compare-and-swap-cdr (cons) cdr)
   (def %instance-cas (instance index) %instance-ref %instance-set)
-  #+(or x86-64 x86)
+  #+(or x86-64 x86 riscv)
   (def %raw-instance-cas/word (instance index)
        %raw-instance-ref/word
        %raw-instance-set/word)
+  #+riscv
+  (def %raw-instance-cas/signed-word (instance index)
+       %raw-instance-ref/signed-word
+       %raw-instance-set/signed-word)
   (def %compare-and-swap-symbol-info (symbol) symbol-info)
   (def %compare-and-swap-symbol-value (symbol) symbol-value)
   (def %compare-and-swap-svref (vector index) svref))

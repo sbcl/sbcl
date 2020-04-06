@@ -41,8 +41,22 @@
 (defconstant fixnum-as-word-index-needs-temp
   (cl:/= sb-vm:word-shift sb-vm:n-fixnum-tag-bits))
 
-(defmacro load-symbol (reg symbol)
-  `(inst addi ,reg null-tn (static-symbol-offset ,symbol)))
+(defun load-symbol (reg symbol)
+  (inst addi reg null-tn (static-symbol-offset symbol)))
+
+#+sb-thread
+(progn
+  (defun load-tls-index (reg symbol)
+    #-64-bit
+    (loadw reg symbol symbol-tls-index-slot other-pointer-lowtag)
+    #+64-bit
+    (inst lwu reg symbol (- 4 other-pointer-lowtag)))
+
+  (defun store-tls-index (reg symbol)
+    #-64-bit
+    (storew reg symbol symbol-tls-index-slot other-pointer-lowtag)
+    #+64-bit
+    (inst sw reg symbol (- 4 other-pointer-lowtag))))
 
 (defmacro load-symbol-value (reg symbol)
   `(inst #-64-bit lw #+64-bit ld ,reg null-tn
@@ -55,6 +69,29 @@
          (+ (static-symbol-offset ',symbol)
             (ash symbol-value-slot word-shift)
             (- other-pointer-lowtag))))
+
+(macrolet ((define-tls-accessors (reader setter slot-offset variable)
+             (declare (ignore #-sb-thread slot-offset
+                              #+sb-thread variable))
+             `(progn
+                (defun ,reader (reg)
+                  #+sb-thread
+                  (loadw reg thread-base-tn ,slot-offset)
+                  #-sb-thread
+                  (load-symbol-value reg ,variable))
+                (defun ,setter (reg)
+                  #+sb-thread
+                  (storew reg thread-base-tn ,slot-offset)
+                  #-sb-thread
+                  (store-symbol-value reg ,variable)))))
+  (define-tls-accessors load-binding-stack-pointer store-binding-stack-pointer
+    thread-binding-stack-pointer-slot *binding-stack-pointer*)
+  (define-tls-accessors load-current-catch-block store-current-catch-block
+    thread-current-catch-block-slot *current-catch-block*)
+  (define-tls-accessors load-current-unwind-protect-block store-current-unwind-protect-block
+    thread-current-unwind-protect-block-slot *current-unwind-protect-block*)
+  (define-tls-accessors load-stepping store-stepping
+    thread-stepping-slot sb-impl::*stepping*))
 
 ;;; TODO: these two macros would benefit from linkage-table space being
 ;;; located below static space with linkage entries allocated downward
@@ -145,16 +182,38 @@ byte-ordering issues."
 
 ;;;; PSEUDO-ATOMIC
 
+(defun set-pseudo-atomic-bit ()
+  #-sb-thread
+  (store-symbol-value csp-tn *pseudo-atomic-atomic*)
+  #+sb-thread
+  (inst sh null-tn thread-base-tn
+        (* thread-pseudo-atomic-bits-slot n-word-bytes)))
+
+(defun clear-pseudo-atomic-bit ()
+  #-sb-thread
+  (store-symbol-value null-tn *pseudo-atomic-atomic*)
+  #+sb-thread
+  (inst sh zero-tn thread-base-tn (* thread-pseudo-atomic-bits-slot n-word-bytes)))
+
+(defun load-pseudo-atomic-interrupted (reg)
+  #-sb-thread
+  (load-symbol-value reg *pseudo-atomic-interrupted*)
+  #+sb-thread
+  (inst lh reg thread-base-tn
+        (+ (* thread-pseudo-atomic-bits-slot n-word-bytes) 2)))
+
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn) &body forms)
   `(progn
      (without-scheduling ()
-       (store-symbol-value csp-tn *pseudo-atomic-atomic*))
+       (set-pseudo-atomic-bit))
      (assemble ()
        ,@forms)
+     #+sb-thread
+     (inst fence :rw :w)
      (without-scheduling ()
-       (store-symbol-value null-tn *pseudo-atomic-atomic*)
-       (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*)
+       (clear-pseudo-atomic-bit)
+       (load-pseudo-atomic-interrupted ,flag-tn)
        (let ((not-interrupted (gen-label)))
          (inst beq ,flag-tn zero-tn not-interrupted)
          (inst ebreak pending-interrupt-trap)
@@ -185,7 +244,7 @@ and
               (index :scs (any-reg)))
        (:arg-types ,type tagged-num)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(unless (= word-shift n-fixnum-tag-bits)
+       ,@(when fixnum-as-word-index-needs-temp
            `((:temporary (:sc non-descriptor-reg) temp)))
        (:results (value :scs ,scs))
        (:result-types ,eltype)
@@ -215,7 +274,7 @@ and
               (value :scs ,scs :target result))
        (:arg-types ,type tagged-num ,eltype)
        (:temporary (:scs (interior-reg)) lip)
-       ,@(unless (= word-shift n-fixnum-tag-bits)
+       ,@(when fixnum-as-word-index-needs-temp
            `((:temporary (:sc non-descriptor-reg) temp)))
        (:results (result :scs ,scs))
        (:result-types ,eltype)
@@ -478,6 +537,51 @@ and
                   (inst fstore ,format imag-tn lip (- (+ (* ,offset n-word-bytes) ,size) ,lowtag))))))
          (move-complex ,format result value)))))
 
+(defmacro define-full-casser (name type offset lowtag scs eltype &optional translate)
+  `(define-vop (,name)
+     ,@(when translate `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg) :target temp)
+            (old-value :scs ,scs)
+            (new-value :scs ,scs))
+     (:arg-types ,type positive-fixnum ,eltype ,eltype)
+     (:temporary (:scs (interior-reg)) lip)
+     (:temporary (:sc non-descriptor-reg) temp)
+     (:results (result :scs ,scs :from :load))
+     (:result-types ,eltype)
+     (:generator 5
+       (with-fixnum-as-word-index (index temp)
+         (inst add lip object index))
+       (inst addi lip lip (- (* ,offset n-word-bytes) ,lowtag))
+       LOOP
+       (inst lr result lip :aq)
+       (inst bne result old-value EXIT)
+       (inst sc temp new-value lip :aq :rl)
+       (inst bne temp zero-tn LOOP)
+       EXIT)))
+
+(defmacro define-atomic-frobber (name op type offset lowtag scs eltype &optional translate)
+  `(define-vop (,name)
+     ,@(when translate `((:translate ,translate)))
+     (:policy :fast-safe)
+     (:args (object :scs (descriptor-reg))
+            (index :scs (any-reg)
+                   ,@(when fixnum-as-word-index-needs-temp
+                       '(:target temp)))
+            (operand :scs ,scs :target result))
+     (:arg-types ,type positive-fixnum ,eltype)
+     (:results (result :scs ,scs))
+     (:result-types unsigned-num)
+     (:temporary (:sc interior-reg) lip)
+     ,@(when fixnum-as-word-index-needs-temp
+         '((:temporary (:sc any-reg) temp)))
+     (:generator 3
+       (with-fixnum-as-word-index (index temp)
+         (inst add lip object index))
+       (inst addi lip lip (- (* ,offset n-word-bytes) ,lowtag))
+       (inst ,op result operand lip :aq :rl))))
+
 
 ;;;; Stack TN's
 
@@ -588,12 +692,19 @@ and
         (t
          (let ((alloc (gen-label))
                (back-from-alloc (gen-label))
+               #-sb-thread
                (boxed-region (- (+ static-space-start
                                    ;; skip over the array header
                                    (* 2 n-word-bytes))
                                 nil-value)))
-           (loadw result-tn null-tn 0 (- boxed-region))
-           (loadw flag-tn null-tn 1 (- boxed-region))
+           #-sb-thread
+           (progn
+             (loadw result-tn null-tn 0 (- boxed-region))
+             (loadw flag-tn null-tn 1 (- boxed-region)))
+           #+sb-thread
+           (progn
+             (loadw result-tn thread-base-tn thread-alloc-region-slot)
+             (loadw flag-tn thread-base-tn (+ thread-alloc-region-slot 1)))
            (etypecase size
              (short-immediate
               (inst addi result-tn result-tn size))
@@ -603,7 +714,10 @@ and
              (tn
               (inst add result-tn result-tn size)))
            (inst blt flag-tn result-tn alloc)
+           #-sb-thread
            (storew result-tn null-tn 0 (- boxed-region))
+           #+sb-thread
+           (storew result-tn thread-base-tn thread-alloc-region-slot)
            (etypecase size
              (short-immediate
               (inst subi result-tn result-tn size))
@@ -649,9 +763,3 @@ and
          (inst li ,flag-tn (compute-object-header ,size ,type-code))
          (storew ,flag-tn ,result-tn 0 ,lowtag))
        ,@body)))
-
-(defun load-binding-stack-pointer (reg)
-  (load-symbol-value reg *binding-stack-pointer*))
-
-(defun store-binding-stack-pointer (reg)
-  (store-symbol-value reg *binding-stack-pointer*))

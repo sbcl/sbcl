@@ -644,7 +644,7 @@
                   (insert-step-instrumenting (callable-tn)
                     ;; Conditionally insert a conditional trap:
                     (when step-instrumenting
-                      (load-symbol-value stepping sb-impl::*stepping*)
+                      (load-stepping stepping)
                       ;; If it's not 0, trap.
                       (inst beq stepping zero-tn STEP-DONE-LABEL)
                       ;; CONTEXT-PC will be pointing here when the
@@ -1125,7 +1125,7 @@
   (:policy :fast-safe)
   (:vop-var vop)
   (:generator 3
-    (load-symbol-value stepping sb-impl::*stepping*)
+    (load-stepping stepping)
     ;; If it's not 0, trap.
     (inst beq stepping zero-tn DONE)
     ;; CONTEXT-PC will be pointing here when the interrupt is handled,

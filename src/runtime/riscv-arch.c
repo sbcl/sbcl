@@ -22,6 +22,7 @@
 #include "interrupt.h"
 #include "interr.h"
 #include "breakpoint.h"
+#include "getallocptr.h"
 
 os_vm_address_t
 arch_get_bad_addr(int signam, siginfo_t *siginfo, os_context_t *context)
@@ -59,7 +60,7 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
      * to arch_pseudo_atomic_atomic, but this seems clearer.
      * --NS 2007-05-15 */
 #ifdef LISP_FEATURE_GENCGC
-    return SymbolValue(PSEUDO_ATOMIC_ATOMIC, 0) != NIL;
+    return get_pseudo_atomic_atomic(arch_os_get_current_thread());
 #else
     return (!foreign_function_call_active)
         && (NIL != SymbolValue(PSEUDO_ATOMIC_ATOMIC,0));
@@ -68,12 +69,12 @@ boolean arch_pseudo_atomic_atomic(os_context_t *context)
 
 void arch_set_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, (lispobj)do_pending_interrupt, 0);
+    set_pseudo_atomic_interrupted(arch_os_get_current_thread());
 }
 
 void arch_clear_pseudo_atomic_interrupted(os_context_t *context)
 {
-    SetSymbolValue(PSEUDO_ATOMIC_INTERRUPTED, 0, 0);
+    clear_pseudo_atomic_interrupted(arch_os_get_current_thread());
 }
 
 unsigned int arch_install_breakpoint(void *pc)
@@ -149,4 +150,9 @@ void arch_write_linkage_table_entry(int index, void *target_addr, int datap)
     char *reloc_addr =
         (char*)LINKAGE_TABLE_SPACE_END - (index + 1) * LINKAGE_TABLE_ENTRY_SIZE;
     *(uword_t*)reloc_addr = (uword_t)target_addr;
+}
+
+lispobj call_into_lisp(lispobj fun, lispobj *args, int nargs) {
+    return ((lispobj(*)(lispobj, lispobj *, int, struct thread*))SYMBOL(CALL_INTO_LISP)->value)
+      (fun, args, nargs, arch_os_get_current_thread());
 }

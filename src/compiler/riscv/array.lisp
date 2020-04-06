@@ -360,3 +360,8 @@
   (unsigned-reg) unsigned-num %vector-raw-bits)
 (define-full-setter set-vector-raw-bits * vector-data-offset other-pointer-lowtag
   (unsigned-reg) unsigned-num %set-vector-raw-bits)
+
+(define-full-casser data-vector-cas/simple-vector simple-vector vector-data-offset other-pointer-lowtag
+  (any-reg descriptor-reg) * %compare-and-swap-svref)
+(define-atomic-frobber array-atomic-incf/word amoadd * vector-data-offset
+  other-pointer-lowtag (unsigned-reg) unsigned-num %array-atomic-incf/word)

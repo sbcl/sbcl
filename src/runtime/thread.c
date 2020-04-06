@@ -203,7 +203,7 @@ initial_thread_trampoline(struct thread *th)
 # endif
 #endif
 #if defined THREADS_USING_GCSIGNAL && \
-    (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64)
+    (defined LISP_FEATURE_PPC || defined LISP_FEATURE_PPC64 || defined LISP_FEATURE_ARM64 || defined LISP_FEATURE_RISCV)
     /* SIG_STOP_FOR_GC defaults to blocked on PPC? */
     unblock_gc_signals(0,0);
 #endif

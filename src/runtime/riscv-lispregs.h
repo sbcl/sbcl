@@ -21,7 +21,7 @@
 #define reg_LIP      REG(1)
 #define reg_NSP      REG(2)
 #define reg_GLOBAL   REG(3)
-#define reg_THREAD   REG(4)
+#define reg_TP       REG(4)
 #define reg_LRA      REG(5)
 #define reg_CFP      REG(6)
 #define reg_OCFP     REG(7)
@@ -43,7 +43,11 @@
 #define reg_NL6      REG(23)
 #define reg_L1       REG(24)
 #define reg_NL7      REG(25)
+#ifdef LISP_FEATURE_SB_THREAD
+#define reg_THREAD   REG(26)
+#else
 #define reg_L2       REG(26)
+#endif
 #define reg_CFUNC    REG(27)
 #define reg_LEXENV   REG(28)
 #define reg_NULL     REG(29)

@@ -267,6 +267,31 @@
     (inst ebreak pending-interrupt-trap)
     (emit-alignment 2)))
 
+#+sb-thread
+(define-vop (current-thread-offset-sap)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:args (n :scs (signed-reg) :target sap))
+  (:temporary (:scs (interior-reg)) lip)
+  (:arg-types signed-num)
+  (:policy :fast-safe)
+  (:generator 3
+    (inst slli n n word-shift)
+    (inst add lip thread-base-tn n)
+    (loadw sap lip)))
+
+#+sb-thread
+(define-vop (current-thread-offset-sap/c)
+  (:results (sap :scs (sap-reg)))
+  (:result-types system-area-pointer)
+  (:translate current-thread-offset-sap)
+  (:info n)
+  (:arg-types (:constant short-immediate))
+  (:policy :fast-safe)
+  (:generator 1
+    (loadw sap thread-base-tn n)))
+
 (define-vop (halt)
   (:generator 1
     (inst ebreak halt-trap)
@@ -277,3 +302,32 @@
   (:translate spin-loop-hint)
   (:policy :fast-safe)
   (:generator 0))
+
+;;; Barriers
+(define-vop (%compiler-barrier)
+  (:policy :fast-safe)
+  (:translate %compiler-barrier)
+  (:generator 3))
+
+(define-vop (%memory-barrier)
+  (:policy :fast-safe)
+  (:translate %memory-barrier)
+  (:generator 3
+    (inst fence :rw :rw)))
+
+(define-vop (%read-barrier)
+  (:policy :fast-safe)
+  (:translate %read-barrier)
+  (:generator 3
+    (inst fence :r :r)))
+
+(define-vop (%write-barrier)
+  (:policy :fast-safe)
+  (:translate %write-barrier)
+  (:generator 3
+    (inst fence :w :w)))
+
+(define-vop (%data-dependency-barrier)
+  (:policy :fast-safe)
+  (:translate %data-dependency-barrier)
+  (:generator 3))

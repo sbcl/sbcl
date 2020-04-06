@@ -33,7 +33,7 @@
   (defreg lip 1)     ; ra
   (defreg nsp 2)     ; sp
   (defreg global 3)  ; gp
-  (defreg thread 4)  ; tp
+  (defreg tp 4)      ; tp
   (defreg lra 5)     ; t0, alternate link register
   (defreg cfp 6)     ; t1
   (defreg ocfp 7)    ; t2
@@ -56,7 +56,7 @@
   (defreg nl6 23)    ; s7
   (defreg l1 24)     ; s8
   (defreg nl7 25)    ; s9
-  (defreg l2 26)     ; s10
+  (defreg #-sb-thread l2 #+sb-thread thread 26) ; s10
 
   (defreg cfunc 27)  ; s11
   (defreg lexenv 28) ; t3
@@ -65,10 +65,12 @@
   (defreg nargs 31)  ; t6
 
   (defregset non-descriptor-regs nl0 nl1 nl2 nl3 nl4 nl5 nl6 nl7 nargs nfp cfunc)
-  (defregset descriptor-regs a0 a1 a2 a3 a4 a5 l0 l1 l2 ocfp lra lexenv)
+  (defregset descriptor-regs a0 a1 a2 a3 a4 a5 l0 l1 #-sb-thread l2 ocfp lra lexenv)
   (defregset reserve-descriptor-regs lexenv)
   (defregset reserve-non-descriptor-regs cfunc)
-  (defregset boxed-regs a0 a1 a2 a3 a4 a5 l0 l1 l2 ocfp lra lexenv code)
+  (defregset boxed-regs a0 a1 a2 a3 a4 a5 l0 l1
+    #-sb-thread l2 #+sb-thread thread
+    ocfp lra lexenv code)
 
   (define-argument-register-set a0 a1 a2 a3 a4 a5))
 
@@ -232,6 +234,11 @@
     (flet ((make (n) (make-random-tn :kind :normal :sc drsc :offset n)))
       (mapcar #'make *register-arg-offsets*))))
 
+#+sb-thread
+(defparameter thread-base-tn
+  (make-random-tn :kind :normal :sc (sc-or-lose 'unsigned-reg)
+                  :offset thread-offset))
+
 ;;; This is used by the debugger.  Our calling convention for
 ;;; unknown-values-return does not involve manipulating return
 ;;; addresses.
@@ -257,3 +264,8 @@
 (defun primitive-type-indirect-cell-type (ptype)
   (declare (ignore ptype))
   nil)
+
+#+sb-thread
+(progn
+  (defconstant pseudo-atomic-flag (ash list-pointer-lowtag 0))
+  (defconstant pseudo-atomic-interrupted-flag (ash list-pointer-lowtag 16)))

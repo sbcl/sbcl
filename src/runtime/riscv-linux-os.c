@@ -42,7 +42,7 @@ int
 arch_os_thread_init(struct thread *thread)
 {
 #ifdef LISP_FEATURE_SB_THREAD
-#warning "Check threading support functions"
+    pthread_setspecific(specials,thread);
 #endif
     return 1;                  /* success */
 }
@@ -50,9 +50,6 @@ arch_os_thread_init(struct thread *thread)
 int
 arch_os_thread_cleanup(struct thread *thread)
 {
-#ifdef LISP_FEATURE_SB_THREAD
-#warning "Check threading support functions"
-#endif
     return 1;                  /* success */
 }
 

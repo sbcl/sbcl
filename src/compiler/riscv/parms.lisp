@@ -146,12 +146,11 @@
 (defconstant-eqx +static-symbols+
  `#(,@+common-static-symbols+
     *allocation-pointer*
-
-    *binding-stack-pointer*
-    ;; interrupt handling
-    *pseudo-atomic-atomic*
-    *pseudo-atomic-interrupted*
-
+    #-sb-thread
+    ,@'(*binding-stack-pointer*
+        ;; interrupt handling
+        *pseudo-atomic-atomic*
+        *pseudo-atomic-interrupted*)
     ,@*runtime-asm-routines*)
   #'equalp)
 

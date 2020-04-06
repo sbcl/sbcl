@@ -82,10 +82,7 @@
          (float-start (- nl-start float-framesize)))
     (inst subi nsp-tn nsp-tn number-framesize)
     (save-to-stack nl-registers nsp-tn nl-start)
-    ;; Storing NULL-TN will put at least one 1 bit somewhere into the word
-    (store-foreign-symbol-value null-tn "foreign_function_call_active" nl0)
-    (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" nl0)
-    (store-foreign-symbol-value csp-tn "current_control_stack_pointer" nl0)
+    (save-lisp-context csp-tn cfp-tn nl0)
     ;; Create a new frame and save descriptor regs on the stack for GC
     ;; to see.
     (save-to-stack lisp-registers csp-tn)
@@ -106,7 +103,10 @@
     (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)
     (inst subi csp-tn csp-tn lisp-framesize)
     (pop-from-stack lisp-registers csp-tn)
+    #-sb-thread
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" nl0)
+    #+sb-thread
+    (storew null-tn thread-base-tn thread-foreign-function-call-active-slot)
     (pop-from-stack nl-registers nsp-tn nl-start)
     (inst addi nsp-tn nsp-tn number-framesize)
     (inst jalr zero-tn lip-tn 0)))

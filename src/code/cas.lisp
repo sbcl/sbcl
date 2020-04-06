@@ -18,8 +18,10 @@
          (casser
           (case (dsd-raw-type slotd)
             ((t) '%instance-cas)
-            #+(or x86 x86-64)
-            ((word) '%raw-instance-cas/word))))
+            #+(or x86 x86-64 riscv)
+            ((word) '%raw-instance-cas/word)
+            #+riscv
+            ((signed-word) '%raw-instance-cas/signed-word))))
     (unless casser
       (error "Cannot use COMPARE-AND-SWAP with structure accessor ~
                 for a typed slot: ~S"

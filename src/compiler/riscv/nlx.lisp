@@ -31,7 +31,7 @@
             (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 13
-    (load-symbol-value catch *current-catch-block*)
+    (load-current-catch-block catch)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (move nfp cur-nfp)))
@@ -43,7 +43,7 @@
          (nsp :scs (descriptor-reg)))
   (:vop-var vop)
   (:generator 10
-    (store-symbol-value catch *current-catch-block*)
+    (store-current-catch-block catch)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
         (move cur-nfp nfp)))
@@ -82,7 +82,7 @@
   (:temporary (:scs (interior-reg)) lip)
   (:generator 22
     (inst addi block cfp-tn (tn-byte-offset tn))
-    (load-symbol-value temp *current-unwind-protect-block*)
+    (load-current-unwind-protect-block temp)
     (storew temp block unwind-block-uwp-slot)
     (storew cfp-tn block unwind-block-cfp-slot)
     (storew code-tn block unwind-block-code-slot)
@@ -101,7 +101,7 @@
   (:temporary (:scs (interior-reg)) lip)
   (:generator 44
     (inst addi result cfp-tn (tn-byte-offset tn))
-    (load-symbol-value temp *current-unwind-protect-block*)
+    (load-current-unwind-protect-block temp)
     (storew temp result catch-block-uwp-slot)
     (storew cfp-tn result catch-block-cfp-slot)
     (storew code-tn result catch-block-code-slot)
@@ -109,9 +109,9 @@
     (storew temp result catch-block-entry-pc-slot)
 
     (storew tag result catch-block-tag-slot)
-    (load-symbol-value temp *current-catch-block*)
+    (load-current-catch-block temp)
     (storew temp result catch-block-previous-catch-slot)
-    (store-symbol-value result *current-catch-block*)
+    (store-current-catch-block result)
 
     (move block result)))
 
@@ -120,25 +120,25 @@
 (define-vop (set-unwind-protect)
   (:args (uwp :scs (any-reg)))
   (:generator 7
-    (store-symbol-value uwp *current-unwind-protect-block*)))
+    (store-current-unwind-protect-block uwp)))
 
 (define-vop (unlink-catch-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
   (:translate %catch-breakup)
   (:generator 17
-    (load-symbol-value block *current-catch-block*)
+    (load-current-catch-block block)
     (loadw block block catch-block-previous-catch-slot)
-    (store-symbol-value block *current-catch-block*)))
+    (store-current-catch-block block)))
 
 (define-vop (unlink-unwind-protect)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
   (:translate %unwind-protect-breakup)
   (:generator 17
-    (load-symbol-value block *current-unwind-protect-block*)
+    (load-current-unwind-protect-block block)
     (loadw block block unwind-block-uwp-slot)
-    (store-symbol-value block *current-unwind-protect-block*)))
+    (store-current-unwind-protect-block block)))
 
 ;;;; NLX entry VOPs:
 

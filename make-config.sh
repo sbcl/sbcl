@@ -507,7 +507,7 @@ case "$sbcl_os" in
             x86 | x86-64)
 		printf ' :sb-futex :largefile' >> $ltf
 		;;
-            ppc | ppc64 | arm64)
+            ppc | ppc64 | arm64 | riscv)
 		printf ' :sb-futex' >> $ltf
 		;;
         esac
@@ -741,6 +741,7 @@ elif [ "$sbcl_arch" = "riscv" ]; then
     printf ' :gencgc' >> $ltf
     printf ' :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
+    printf ' :compare-and-swap-vops :memory-barrier-vops' >> $ltf
 elif [ "$sbcl_arch" = "sparc" ]; then
     # Test the compiler in order to see if we are building on Sun
     # toolchain as opposed to GNU binutils, and write the appropriate

@@ -185,11 +185,12 @@
     ;; never the symbol-value slot
     #-sb-thread ,@(mapcar (lambda (x) (car (ensure-list x)))
                            !per-thread-c-interface-symbols)
-    ;; NLX variables are thread slots on x86-64.  A static sym is needed
+    ;; NLX variables are thread slots on x86-64 and RISC-V.  A static sym is needed
     ;; for arm64, ppc, and x86 because we haven't implemented TLS index fixups,
     ;; so must lookup the TLS index given the symbol.
-    #+(and sb-thread (not x86-64)) ,@'(*current-catch-block*
-                                        *current-unwind-protect-block*)
+    #+(and sb-thread (not x86-64) (not riscv))
+    ,@'(*current-catch-block*
+        *current-unwind-protect-block*)
 
     ;; sb-safepoint in addition to accessing this symbol via TLS,
     ;; uses the symbol itself as a value. Kinda weird.

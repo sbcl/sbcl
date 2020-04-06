@@ -141,7 +141,7 @@
    (:temp tag descriptor-reg a2-offset))
   (declare (ignore start count)) ; We only need them in the registers.
 
-  (load-symbol-value catch *current-catch-block*)
+  (load-current-catch-block catch)
 
   LOOP
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
@@ -171,7 +171,7 @@
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst beq block zero-tn error))
 
-  (load-symbol-value cur-uwp *current-unwind-protect-block*)
+  (load-current-unwind-protect-block cur-uwp)
   (loadw target-uwp block unwind-block-uwp-slot)
   (inst bne cur-uwp target-uwp DO-UWP)
 
@@ -185,7 +185,7 @@
 
   DO-UWP
   (loadw target-uwp cur-uwp unwind-block-uwp-slot)
-  (store-symbol-value target-uwp *current-unwind-protect-blocK*)
+  (store-current-unwind-protect-blocK target-uwp)
   (inst j DO-EXIT))
 
 ;;;; Some runtime routines.
@@ -218,10 +218,42 @@
       (inst li (make-reg-tn boxed-reg-offset) 0)))
   (inst li null-tn nil-value))
 
+(defun set-up-lisp-context (stack-pointer frame-pointer temp)
+  #+sb-thread
+  (declare (ignore temp))
+  ;; Initializing the allocation pointer is done already in
+  ;; coreparse.
+  #+sb-thread
+  (progn
+    (loadw stack-pointer thread-base-tn thread-control-stack-pointer-slot)
+    (loadw frame-pointer thread-base-tn thread-control-frame-pointer-slot)
+    (storew zero-tn thread-base-tn thread-foreign-function-call-active-slot))
+  #-sb-thread
+  (progn
+    (load-foreign-symbol-value stack-pointer "current_control_stack_pointer" temp)
+    (load-foreign-symbol-value frame-pointer "current_control_frame_pointer" temp)
+    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp)))
+
+(defun save-lisp-context (stack-pointer frame-pointer temp)
+  #+sb-thread
+  (declare (ignore temp))
+  #+sb-thread
+  (progn
+    (storew stack-pointer thread-base-tn thread-control-stack-pointer-slot)
+    (storew frame-pointer thread-base-tn thread-control-frame-pointer-slot)
+    (storew null-tn thread-base-tn thread-foreign-function-call-active-slot))
+  #-sb-thread
+  (progn
+    (store-foreign-symbol-value stack-pointer "current_control_stack_pointer" temp)
+    (store-foreign-symbol-value frame-pointer "current_control_frame_pointer" temp)
+    (store-foreign-symbol-value null-tn "foreign_function_call_active" temp)))
+
 (define-assembly-routine (call-into-lisp (:return-style :none))
     ((:arg function (descriptor-reg any-reg) ca0-offset)
      (:arg arg-ptr (descriptor-reg any-reg) ca1-offset)
      (:arg nargs (any-reg) ca2-offset)
+     #+sb-thread
+     (:arg tls-ptr (any-reg) ca3-offset)
 
      (:temp a0 descriptor-reg a0-offset)
 
@@ -232,16 +264,15 @@
      (:temp pa-temp non-descriptor-reg nl6-offset)
      (:temp temp non-descriptor-reg nl7-offset))
   (save-c-registers)
-  (initialize-boxed-regs (list function arg-ptr nargs))
+
+  (initialize-boxed-regs (list function arg-ptr nargs #+sb-thread tls-ptr))
+  #+sb-thread
+  (move thread-base-tn tls-ptr)
 
   ;; Tag nargs.
   (inst slli nargs-tn nargs n-fixnum-tag-bits)
   (pseudo-atomic (pa-temp)
-    ;; Initializing the allocation pointer is done already in
-    ;; coreparse.
-    (load-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
-    (load-foreign-symbol-value ocfp-tn "current_control_frame_pointer" temp)
-    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
+    (set-up-lisp-context csp-tn ocfp-tn temp))
 
   ;; Pass in the args.
   (move lexenv-tn function)
@@ -268,9 +299,7 @@
   (move value a0)
   ;; Save Lisp state.
   (pseudo-atomic (pa-temp)
-    (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
-    (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
-    (store-foreign-symbol-value csp-tn "foreign_function_call_active" temp))
+    (save-lisp-context csp-tn cfp-tn temp))
 
   (restore-c-registers)
   (inst jalr zero-tn lip-tn 0))
@@ -304,10 +333,8 @@
     (storew ocfp-tn cfp-tn)
     (storew nfp-tn cfp-tn 1)
     (storew code-tn cfp-tn 2)
-    (store-foreign-symbol-value csp-tn "current_control_stack_pointer" temp)
-    (store-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
-    ;; Storing NULL-TN will put at least one 1 bit somewhere into the word
-    (store-foreign-symbol-value null-tn "foreign_function_call_active" temp))
+
+    (save-lisp-context csp-tn cfp-tn temp))
 
   ;; Call into C.
   (loadw cfunc cfunc) ; dereference the linkage table entry
@@ -317,20 +344,20 @@
   (move value0-pass ca0)
   (move value1-pass ca1)
 
-  (initialize-boxed-regs)
+  ;; FIXME: Don't need to initialize all. e.g. callee saved or ones that get initialized anyway.
+  (initialize-boxed-regs (list #+sb-thread thread-base-tn))
 
   (pseudo-atomic (pa-temp)
     ;; FIXME: We could do some trickery like in other backends where
-    ;; we allocate these registers to C's callee saved registers and
-    ;; not bother loading out of the symbol.
-    (load-foreign-symbol-value cfp-tn "current_control_frame_pointer" temp)
+    ;; we save the lisp context registers to C's callee saved
+    ;; registers and not bother loading them out again..
+    (set-up-lisp-context csp-tn cfp-tn temp)
     (loadw ocfp-tn cfp-tn 0)
     (loadw nfp-tn cfp-tn 1)
     (loadw code-tn cfp-tn 2)
     (when (> n-fixnum-tag-bits 2)
       (inst srli nfp-tn nfp-tn (- n-fixnum-tag-bits 2)))
-    (inst add lip-tn nfp-tn code-tn)
-    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp))
+    (inst add lip-tn nfp-tn code-tn))
 
   ;; Reset the Lisp stack.
   (move csp-tn cfp-tn)
