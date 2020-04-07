@@ -29,56 +29,53 @@
         (:temp alloc descriptor-reg ,alloc-tn-offset))
    ;; General-purpose entry point:
      ;; ALLOC-TRAMP needs 1 bit of extra information to select a linkage table
-     ;; entry. It could be passed in the low bit of SIZE, but bcause the object
+     ;; entry. It could be passed in the low bit of SIZE, but because the object
      ;; granularity is 2 words, it is ok to use any bit under LOWTAG-MASK.
      ;; e.g. with 64-bit words:
      ;;             v--- ; use this bit
      ;;  #b________10000 ; 16 bytes is the smallest object
-     ;; By pasing it as such, it is actually an offset into the linkage table.
+     ;; By passing it as such, it is actually an offset into the linkage table.
      (inst ori size size (ash 1 word-shift))
    ;; CONS entry point:
    ,(alloc-tramp-stub-name alloc-tn-offset 'list)
-     ;; Pass the size and result on the number stack.  Instead of
-     ;; allocating space here, we save some code size by delegating
-     ;; the stack pointer frobbing to the real assembly routine.
-     (inst subi nsp-tn nsp-tn n-word-bytes)
-     (storew lip-tn nsp-tn 0)
-     (storew size nsp-tn -1)
+     (inst addi csp-tn csp-tn n-word-bytes)
+     (storew size csp-tn -1)
+     (move size lip-tn)
      (invoke-asm-routine 'alloc-tramp)
-     (loadw alloc nsp-tn -1)
-     (loadw lip-tn nsp-tn 0)
-     (inst addi nsp-tn nsp-tn n-word-bytes)
+     (move lip-tn alloc)
+     (loadw alloc csp-tn -1)
+     (inst subi csp-tn csp-tn n-word-bytes)
      (inst jalr zero-tn lip-tn 0)))
 
 #+gencgc
 (define-assembly-routine (alloc-tramp (:return-style :none))
     ((:temp nl0 unsigned-reg nl0-offset)
-     (:temp ca0 unsigned-reg ca0-offset))
+     (:temp ca0 any-reg ca0-offset))
   (let* ((nl-registers
            (loop for i in (intersection non-descriptor-regs
                                         c-unsaved-registers)
                  collect (make-reg-tn i 'unsigned-reg)))
          (lisp-registers
            (loop for i in (intersection
-                           (union (list ca0-offset lip-offset cfp-offset null-offset code-offset)
+                           (union (list ca0-offset lip-offset cfp-offset
+                                        null-offset code-offset
+                                        #+sb-thread thread-offset)
                                   descriptor-regs)
                            c-unsaved-registers)
-                 collect (make-reg-tn i 'unsigned-reg)))
+                 collect (make-reg-tn i 'descriptor-reg)))
          (float-registers
            (loop for i in c-unsaved-float-registers
-                 collect (make-reg-tn i 'complex-double-reg)))
+                 collect (make-reg-tn i 'double-reg)))
          (float-framesize (* (length float-registers) 8))
          (nl-framesize (* (length nl-registers) n-word-bytes))
          (number-framesize
            ;; New space for the number stack, making sure to respect
-           ;; number stack alignment. Don't forget about the nbytes
-           ;; argument.
-           (logandc2 (+ (+ n-word-bytes nl-framesize float-framesize)
+           ;; number stack alignment.
+           (logandc2 (+ (+ nl-framesize float-framesize)
                         +number-stack-alignment-mask+)
                      +number-stack-alignment-mask+))
          (lisp-framesize (* (length lisp-registers) n-word-bytes))
-         (nbytes-start (- number-framesize n-word-bytes))
-         (nl-start (- nbytes-start nl-framesize))
+         (nl-start (- number-framesize nl-framesize))
          (float-start (- nl-start float-framesize)))
     (inst subi nsp-tn nsp-tn number-framesize)
     (save-to-stack nl-registers nsp-tn nl-start)
@@ -86,8 +83,8 @@
     ;; Create a new frame and save descriptor regs on the stack for GC
     ;; to see.
     (save-to-stack lisp-registers csp-tn)
+    (loadw ca0 csp-tn -1)
     (inst addi csp-tn csp-tn lisp-framesize)
-    (inst #-64-bit lw #+64-bit ld ca0 nsp-tn nbytes-start)
     (save-to-stack float-registers nsp-tn float-start t)
     ;; linkage entry 0 = alloc() and entry 1 = alloc_list().
     ;; Because the linkage table grows downward from NIL, entry 1 is at a lower
@@ -100,8 +97,8 @@
     ;;
     (inst jalr lip-tn lip-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
-    (inst #-64-bit sw #+64-bit sd ca0 nsp-tn nbytes-start)
     (inst subi csp-tn csp-tn lisp-framesize)
+    (storew ca0 csp-tn -1)
     (pop-from-stack lisp-registers csp-tn)
     #-sb-thread
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" nl0)
@@ -121,10 +118,7 @@
              `(progn
                 ,@(mapcar (lambda (tn-offset)
                             `(define-alloc-tramp-stub ,tn-offset))
-                          (union descriptor-regs
-                                 ;; KLUDGE: sometimes we allocate into
-                                 ;; non-descriptor regs...
-                                 non-descriptor-regs)))))
+                          (union descriptor-regs non-descriptor-regs)))))
   (define-alloc-tramp-stubs))
 
 (define-assembly-routine
