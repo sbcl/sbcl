@@ -3,6 +3,7 @@
 changes relative to sbcl-2.0.2:
   * platform support: 32-bit RISC-V is now fully supported. Unlike other
     ports, its backend is entirely shared with 64-bit RISC-V.
+  * enhancement: Both 32-bit and 64-bit RISC-V support native threads.
   * bug fix: defstructs with empty initforms in the sbcl source are now
     explicitly intiialized with NIL, as that is undefined behavior under
     ANSI. This helps cross compilation hosts which do not implicitly

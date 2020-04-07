@@ -12,8 +12,8 @@ SB-THREAD package.
 Threads are part of the default build on x86[-64]/ARM64 Linux and Windows.
 
 They are also supported on: x86[-64] Darwin (Mac OS X), x86[-64]
-FreeBSD, x86 SunOS (Solaris), PPC Linux, ARM64 Linux. On these
-platforms threads must be explicitly enabled at build-time, see
+FreeBSD, x86 SunOS (Solaris), PPC Linux, ARM64 Linux, RISC-V Linux. On
+these platforms threads must be explicitly enabled at build-time, see
 @file{INSTALL} for directions.
 
 @menu
@@ -279,8 +279,8 @@ it.
 @section Barriers
 
 These are based on the Linux kernel barrier design, which is in turn
-based on the Alpha CPU memory model. They are presently implemented
-for x86, x86-64, PPC, and ARM64 systems, and behave as compiler
+based on the Alpha CPU memory model. They are presently implemented for
+x86, x86-64, PPC, ARM64, and RISC-V systems, and behave as compiler
 barriers on all other CPUs.
 
 In addition to explicit use of the @code{sb-thread:barrier} macro, the

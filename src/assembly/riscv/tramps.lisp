@@ -106,7 +106,7 @@
     #-sb-thread
     (store-foreign-symbol-value zero-tn "foreign_function_call_active" nl0)
     #+sb-thread
-    (storew null-tn thread-base-tn thread-foreign-function-call-active-slot)
+    (storew zero-tn thread-base-tn thread-foreign-function-call-active-slot)
     (pop-from-stack nl-registers nsp-tn nl-start)
     (inst addi nsp-tn nsp-tn number-framesize)
     (inst jalr zero-tn lip-tn 0)))
