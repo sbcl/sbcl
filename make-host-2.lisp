@@ -14,6 +14,9 @@
 ;; Supress function/macro redefinition warnings under clisp.
 #+clisp (setf custom:*suppress-check-redefinition* t)
 
+;; Avoid natively compiling new code under ecl
+#+ecl (ext:install-bytecodes-compiler)
+
 ;;; Run the cross-compiler to produce cold fasl files.
 (setq sb-c::*track-full-called-fnames* :minimal) ; Change this as desired
 (setq sb-c::*static-vop-usage-counts* (make-hash-table))
