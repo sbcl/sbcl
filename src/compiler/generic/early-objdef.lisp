@@ -92,7 +92,8 @@
        ;; prior to the words of NIL.
        ;; If you change this, then also change MAKE-NIL-DESCRIPTOR in genesis.
        #+(and gencgc (not sb-thread)) (ash 8 word-shift)
-       n-word-bytes other-pointer-lowtag))
+       (* 2 n-word-bytes)
+       list-pointer-lowtag))
 
 (defconstant-eqx fixnum-lowtags
     #.(let ((fixtags nil))
@@ -171,6 +172,7 @@
 ;; and simple vector of T to SIMPLE-VECTOR-T. Just because CL says that
 ;; SIMPLE-VECTOR means the latter doesn't make it right for SBCL internals.
 
+(defconstant widetag-spacing 4)
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defenum (;; The first widetag must be greater than SB-VM:LOWTAG-LIMIT
           ;; otherwise code in generic/early-type-vops will suffer

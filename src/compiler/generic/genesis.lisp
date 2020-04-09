@@ -213,6 +213,8 @@
   ;; Each free-range is (START . LENGTH) in words.
   (code-free-ranges (list nil))
   (non-code-free-ranges (list nil))
+  ;; Address of every object created in this space.
+  (objects (or #+sb-devel (make-array 700000 :fill-pointer 0 :adjustable t)))
   ;; the index of the next unwritten word (i.e. chunk of
   ;; SB-VM:N-WORD-BYTES bytes) in DATA, or equivalently the number of
   ;; words actually written in DATA. In order to convert to an actual
@@ -310,10 +312,12 @@
 (defun allocate-cold-descriptor (gspace length lowtag &optional page-attributes)
   (let* ((word-index
           (gspace-claim-n-bytes gspace length page-attributes))
-         (ptr (+ (gspace-word-address gspace) word-index)))
-    (make-descriptor (logior (ash ptr sb-vm:word-shift) lowtag)
-                     gspace
-                     word-index)))
+         (ptr (+ (gspace-word-address gspace) word-index))
+         (des (make-descriptor (logior (ash ptr sb-vm:word-shift) lowtag)
+                               gspace
+                               word-index)))
+    (awhen (gspace-objects gspace) (vector-push-extend des it))
+    des))
 
 (defun gspace-claim-n-words (gspace n-words)
   (let* ((old-free-word-index (gspace-free-word-index gspace))
@@ -883,6 +887,10 @@ core and return a descriptor to it."
 ;;; Allocate a cons cell in GSPACE and fill it in with CAR and CDR.
 (defun cold-cons (car cdr &optional (gspace *dynamic*))
   (let ((dest (allocate-object gspace 2 sb-vm:list-pointer-lowtag)))
+    (let* ((objs (gspace-objects gspace))
+           (n (1- (length objs))))
+      (when objs
+        (setf (aref objs n) (list (aref objs n)))))
     (write-wordindexed dest sb-vm:cons-car-slot car)
     (write-wordindexed dest sb-vm:cons-cdr-slot cdr)
     dest))
@@ -1569,12 +1577,15 @@ core and return a descriptor to it."
          (nil-val (make-descriptor (+ (descriptor-bits des)
                                      (* 2 sb-vm:n-word-bytes)
                                      (- sb-vm:list-pointer-lowtag
+                                        ;; ALLOCATE-HEADER+OBJECT always adds in
+                                        ;; OTHER-POINTER-LOWTAG, so subtract it.
                                         sb-vm:other-pointer-lowtag))))
          (header (make-other-immediate-descriptor 0 sb-vm:symbol-widetag))
          (initial-info (cold-cons nil-val nil-val))
          ;; NIL's name is in dynamic space because any extra bytes allocated
          ;; in static space need to be accounted for by STATIC-SYMBOL-OFFSET.
          (name (set-readonly (base-string-to-core "NIL" *dynamic*))))
+    (aver (= (descriptor-bits nil-val) sb-vm:nil-value))
     (write-wordindexed des 1 header)
     (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
     (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
@@ -3781,6 +3792,27 @@ III. initially undefined function references (alphabetically):
 
       ;; Write results to files.
       (when map-file-name
+        (let ((all-objects (gspace-objects *dynamic*)))
+          (when all-objects
+            (with-open-file (stream "output/cold-sbcl.fullmap"
+                                    :direction :output
+                                    :if-exists :supersede)
+              (format t "~&Headered objects: ~d, Conses: ~d~%"
+                      (count-if-not #'consp all-objects)
+                      (count-if #'consp all-objects))
+              ;; Code/data separation causes nonlinear allocations
+              (dovector (x (sort all-objects #'<
+                                 :key (lambda (x)
+                                        (descriptor-bits
+                                         (if (consp x) (car x) x)))))
+                (let* ((des (if (consp x) (car x) x))
+                       (word (read-bits-wordindexed des 0)))
+                  (format stream "~x: ~x~@[ ~x~]~%"
+                          (logandc2 (descriptor-bits des) sb-vm:lowtag-mask)
+                          word
+                          (when (and (not (consp x))
+                                     (>= (logand word sb-vm:widetag-mask) #x80))
+                            (read-bits-wordindexed x 1))))))))
         (with-open-file (stream map-file-name :direction :output :if-exists :supersede)
           (write-map stream)))
       (when core-file-name
