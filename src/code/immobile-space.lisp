@@ -183,10 +183,9 @@
           (fdefn-entry (sb-vm::fdefn-entry-address fdefn)))
       ;; Examine only those code components which potentially use FDEFN.
       (do-immobile-functions
-         (code fun addr :if (loop for i downfrom (1- (sb-kernel:code-header-words code))
+         (code fun addr :if (loop for i downfrom (1- (code-header-words code))
                                   to sb-vm:code-constants-offset
-                                  thereis (eq (sb-kernel:code-header-ref code i)
-                                              fdefn)))
+                                  thereis (eq (code-header-ref code i) fdefn)))
         (map-segment-instructions
          (lambda (chunk inst)
            (when (or (eq inst jmp) (eq inst call))

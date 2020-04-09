@@ -541,9 +541,9 @@ status slot."
       (declare (type (simple-array (unsigned-byte 8) (*)) octets))
       (let ((size (length octets)))
         ;; Copy string.
-        (sb-kernel:copy-ub8-to-system-area octets 0 string-sap 0 size)
+        (copy-ub8-to-system-area octets 0 string-sap 0 size)
         ;; NULL-terminate it
-        (sb-kernel:system-area-ub8-fill 0 string-sap size 4)
+        (system-area-ub8-fill 0 string-sap size 4)
         ;; Put the pointer in the vector.
         (setf (sap-ref-sap vec-sap vec-index-offset) string-sap)
         ;; Advance string-sap for the next string.
@@ -1286,7 +1286,7 @@ Users Manual for details about the PROCESS structure.
   (or sb-sys::*software-version*
       (setf sb-sys::*software-version*
             (string-trim '(#\newline)
-                         (sb-kernel:with-simple-output-to-string (stream)
+                         (with-simple-output-to-string (stream)
                            (run-program "/bin/uname"
                                         ;; "-r" on haiku just prints "1"
                                         ;; but "-v" prints some detail.

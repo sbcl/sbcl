@@ -112,7 +112,7 @@
 (define-load-time-global *room-info* (!compute-room-infos))
 
 (defconstant-eqx +heap-spaces+
-  '((:dynamic   "Dynamic space"   sb-kernel:dynamic-usage)
+  '((:dynamic   "Dynamic space"   dynamic-usage)
     #+immobile-space
     (:immobile  "Immobile space"  sb-kernel::immobile-space-usage)
     (:read-only "Read-only space" sb-kernel::read-only-space-usage)

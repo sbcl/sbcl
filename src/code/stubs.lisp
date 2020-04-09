@@ -135,7 +135,7 @@
   (def %set-stack-ref (s n value))
   (def fun-code-header)
   (def sb-vm::symbol-extra)
-  #+sb-thread (def sb-kernel:symbol-tls-index)
+  #+sb-thread (def symbol-tls-index)
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
   (def get-lisp-obj-address)
