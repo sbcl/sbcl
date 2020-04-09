@@ -624,7 +624,8 @@
                     thereis (let ((obj (code-header-ref code i)))
                               (typecase obj
                                 (fdefn (awhen (fdefn-fun obj)
-                                         (gethash (fun-code-header it) replacements)))
+                                         (gethash (fun-code-header (%fun-fun it))
+                                                  replacements)))
                                 (simple-fun
                                  (gethash (fun-code-header obj) replacements)))))
           (let ((dstate (make-dstate))
