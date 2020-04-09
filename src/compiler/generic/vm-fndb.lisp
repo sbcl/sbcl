@@ -400,7 +400,11 @@
 (defknown stack-ref (system-area-pointer index) t (flushable))
 (defknown %set-stack-ref (system-area-pointer index t) t ())
 (defknown lra-code-header (t) t (movable flushable))
-(defknown fun-code-header (function) code-component (movable flushable))
+;; FUN-CODE-HEADER returns NIL for assembly routines that have a simple-fun header
+;; with 0 as the data value. We should probably ensure that assembly routines
+;; referenced by tagged pointers have correct code backpointers.
+(defknown fun-code-header (simple-fun) (or code-component null)
+  (movable flushable))
 (defknown %make-lisp-obj (sb-vm:word) t (movable flushable))
 (defknown get-lisp-obj-address (t) sb-vm:word (flushable))
 
