@@ -57,6 +57,7 @@
     (inst call (make-fixup 'alloc-dispatch :assembly-routine))
     (inst mov (ea 16 rbp-tn) rax-tn))) ; result onto stack
 
+#+avx2
 (define-assembly-routine (alloc->rnn.avx2 (:export cons->rnn.avx2)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->RNN.AVX2
@@ -74,6 +75,7 @@
     (inst mov r11-tn rax-tn))
   (inst ret 8)) ; pop argument
 
+#+avx2
 (define-assembly-routine (alloc->r11.avx2 (:export cons->r11.avx2) (:return-style :none)) ()
   (inst or :byte (ea 8 rsp-tn) 1)
   CONS->R11.AVX2
