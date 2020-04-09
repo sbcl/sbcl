@@ -37,31 +37,15 @@
 
 ;;; Due to the encoding restrictione that doubleword accesses can not displace
 ;;; from the base register by an arbitrarily aligned value, but only an even
-;;; multiple of 4, it would behoove us to invent a different lowtag scheme,
-;;; something like:
+;;; multiple of 4. By using a certain arrangement of lowtags we can get two of
+;;; the pointer types to get lowtag subtraction for free:
+;;;    #b0100 list - good
 ;;;    #b0110 function
-;;;    #b0100 instance
-;;;    #b1000 list
-;;;    #b1100 other
-;;; All lowtags except FUN-POINTER-LOWTAG become 4-byte-aligned.
-;;; We would need to increase N-FIXNUM-TAG-BITS to 4 for this to work, and it
-;;; may cause some breakage due to assumptions that lowtags are spaced evenly
-;;; and that N-FIXNUM-TAG-BITS is not more than WORD-SHIFT.
-;;; Both those constraints may be impossible to remove - I don't know.
-;;; The alternatives are far worse - constantly computing into the LIP
-;;; register, or else allowing native pointers to pin objects.
-;;;
-;;; Potentially it will much simpler to have N-FIXNUM-TAG-BITS be 3,
-;;; and then we have two lowtags that allow use of single-instruction load/store
-;;; forms, and two that do not; something like this:
-;;;    #b0110 function
-;;;    #b0100 instance - good
-;;;    #b1100 list     - good
-;;;    #b1111 other
+;;;    #b1100 instance - good
+;;;    #b1110 other
 ;;; The misalignment of OTHER is not a huge problem, because array access requires
 ;;; calculating the displacement anyway, and the remaining OTHER pointer types
 ;;; like VALUE-CELL are not as prevalent. SYMBOL remains a bit of a problem.
-;;; Also, we can't load static symbol values using the NULL register as a base.
 
 ;;; NB: this macro uses an inverse of the 'shift' convention in the 32-bit file.
 ;;; Here is the convention is that 'scale' how much to left-shift a natural

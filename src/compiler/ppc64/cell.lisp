@@ -14,13 +14,29 @@
 
 ;;;; Data object ref/set stuff.
 
+;;; PPC64 can't use the NIL-as-CONS + NIL-as-symbol trick *and* avoid using
+;;; temp-reg-tn to access symbol slots.
+;;; Since the NIL-as-CONS is necessary, and efficient accessor to lists and
+;;; instances is desirable, we lose a little on symbol access by being forced
+;;; to pre-check for NIL. There is trick that can get back some performance
+;;; on SYMBOL-VALUE which I plan to implement after this much works right.
 (define-vop (slot)
   (:args (object :scs (descriptor-reg)))
   (:info name offset lowtag)
-  (:ignore name)
   (:results (result :scs (descriptor-reg any-reg)))
   (:generator 1
-    (loadw result object offset lowtag)))
+    (cond ((member name '(symbol-name symbol-info sb-xc:symbol-package))
+           (let ((null-label (gen-label))
+                 (done-label (gen-label)))
+             (inst cmpld object null-tn)
+             (inst beq null-label)
+             (loadw result object offset lowtag)
+             (inst b done-label)
+             (emit-label null-label)
+             (loadw result object (1- offset) list-pointer-lowtag)
+             (emit-label done-label)))
+          (t
+           (loadw result object offset lowtag)))))
 
 (define-vop (set-slot)
   (:args (object :scs (descriptor-reg))
@@ -114,16 +130,32 @@
 (define-vop (symbol-global-value checked-cell-ref)
   (:translate sym-global-val)
   (:generator 9
+    ;; TODO: can this be made branchless somehow?
+    (inst cmpld object null-tn)
+    (inst beq NULL)
     (move obj-temp object)
     (loadw value obj-temp symbol-value-slot other-pointer-lowtag)
     (let ((err-lab (generate-error-code vop 'unbound-symbol-error obj-temp)))
       (inst cmpwi value unbound-marker-widetag)
-      (inst beq err-lab))))
+      (inst beq err-lab))
+    (inst b DONE)
+    NULL
+    (move value object)
+    DONE))
 
 (define-vop (fast-symbol-global-value cell-ref)
   (:variant symbol-value-slot other-pointer-lowtag)
   (:policy :fast)
-  (:translate sym-global-val))
+  (:translate sym-global-val)
+  (:ignore offset lowtag)
+  (:generator 7
+    (inst cmpld object null-tn)
+    (inst beq NULL)
+    (loadw value object symbol-value-slot other-pointer-lowtag)
+    (inst b DONE)
+    NULL
+    (move value object)
+    DONE))
 
 #+sb-thread
 (progn
@@ -152,6 +184,8 @@
     (:vop-var vop)
     (:save-p :compute-only)
     (:generator 9
+      (inst cmpld object null-tn)
+      (inst beq NULL)
       (load-tls-index value object)
       (inst ldx value thread-base-tn value)
       (inst cmpdi value no-tls-value-marker-widetag)
@@ -159,7 +193,11 @@
       (loadw value object symbol-value-slot other-pointer-lowtag)
       CHECK-UNBOUND
       (inst cmpdi value unbound-marker-widetag)
-      (inst beq (generate-error-code vop 'unbound-symbol-error object))))
+      (inst beq (generate-error-code vop 'unbound-symbol-error object))
+      (inst b DONE)
+      NULL
+      (move value object)
+      DONE))
 
   (define-vop (fast-symbol-value symbol-value)
     ;; KLUDGE: not really fast, in fact, because we're going to have to
@@ -170,11 +208,16 @@
     (:policy :fast)
     (:translate symeval)
     (:generator 8
+      (inst cmpld object null-tn)
+      (inst beq NULL)
       (load-tls-index value object)
       (inst ldx value thread-base-tn value)
       (inst cmpdi value no-tls-value-marker-widetag)
       (inst bne DONE)
       (loadw value object symbol-value-slot other-pointer-lowtag)
+      (inst b DONE)
+      NULL
+      (move value object)
       DONE)))
 
 ;;; On unithreaded builds these are just copies of the global versions.
@@ -199,6 +242,8 @@
 (define-vop (boundp boundp-frob)
   (:translate boundp)
   (:generator 9
+    (inst cmpld object null-tn)
+    (inst beq (if not-p out target))
     (load-tls-index value object)
     (inst ldx value thread-base-tn value)
     (inst cmpdi value no-tls-value-marker-widetag)
@@ -206,7 +251,8 @@
     (loadw value object symbol-value-slot other-pointer-lowtag)
     CHECK-UNBOUND
     (inst cmpdi value unbound-marker-widetag)
-    (inst b? (if not-p :eq :ne) target)))
+    (inst b? (if not-p :eq :ne) target)
+    OUT))
 
 #-sb-thread
 (define-vop (boundp boundp-frob)
@@ -222,13 +268,35 @@
   (:args (symbol :scs (descriptor-reg)))
   (:results (res :scs (any-reg)))
   (:result-types positive-fixnum)
-  (:generator 2
-    ;; The symbol-hash slot of NIL holds NIL because it is also the
-    ;; car slot, so we have to strip off the fixnum-tag-mask to make sure
-    ;; it is a fixnum.  The lowtag selection magic that is required to
-    ;; ensure this is explained in the comment in objdef.lisp
+  (:generator 4
+    (inst cmpld symbol null-tn)
+    (inst beq NULL)
     (loadw res symbol symbol-hash-slot other-pointer-lowtag)
-    (inst clrrdi res res n-fixnum-tag-bits)))
+    (inst b DONE)
+    NULL
+    (inst addi res null-tn (- (logand sb-vm:nil-value sb-vm:fixnum-tag-mask)))
+    DONE))
+(define-vop (symbol-plist)
+  (:policy :fast-safe)
+  (:translate symbol-plist)
+  (:args (symbol :scs (descriptor-reg)))
+  (:results (res :scs (descriptor-reg)))
+  (:temporary (:scs (unsigned-reg)) temp)
+  (:generator 6
+    (inst cmpld symbol null-tn)
+    (inst beq NULL)
+    (loadw res symbol symbol-info-slot other-pointer-lowtag)
+    (inst andi. temp res lowtag-mask)
+    (inst cmpwi temp list-pointer-lowtag)
+    (inst beq take-car)
+    (move res null-tn) ; if INFO is a non-list, then the PLIST is NIL
+    (inst b DONE)
+    NULL
+    (loadw res symbol (1- symbol-info-slot) list-pointer-lowtag)
+    ;; fallthru. NULL's info slot always holds a cons
+    TAKE-CAR
+    (loadw res res cons-car-slot list-pointer-lowtag)
+    DONE))
 
 ;;;; Fdefinition (fdefn) objects.
 

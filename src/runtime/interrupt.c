@@ -294,7 +294,7 @@ get_current_sigmask(sigset_t *sigset)
 }
 
 // Stringify sigset into the supplied result buffer.
-static void
+void
 sigset_tostring(const sigset_t *sigset, char* result, int result_length)
 {
     int i;

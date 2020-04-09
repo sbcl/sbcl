@@ -56,7 +56,7 @@
   ;; The EVAL-WHEN is necessary (at least for Lispworks), because the
   ;; second DEFENUM uses the value of OTHER-IMMEDIATE-0-LOWTAG, which is
   ;; defined in the first DEFENUM. -- AL 20000216
-  #+64-bit
+  #+(and 64-bit (not ppc64))
   (defenum ()
     even-fixnum-lowtag
     other-immediate-0-lowtag
@@ -74,6 +74,24 @@
     other-immediate-3-lowtag
     pad5-lowtag
     other-pointer-lowtag)
+  #+ppc64
+  (defenum ()
+    even-fixnum-lowtag
+    other-immediate-0-lowtag
+    unused1-lowtag
+    unused2-lowtag
+    list-pointer-lowtag
+    unused3-lowtag
+    fun-pointer-lowtag
+    unused4-lowtag
+    odd-fixnum-lowtag
+    unused5-lowtag
+    unused6-lowtag
+    unused7-lowtag
+    instance-pointer-lowtag
+    unused8-lowtag
+    other-pointer-lowtag
+    unused9-lowtag)
   #-64-bit
   (defenum ()
     even-fixnum-lowtag

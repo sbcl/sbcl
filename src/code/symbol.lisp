@@ -196,6 +196,7 @@ distinct from the global value. Can also be SETF."
   ;; gets the fixnum which is the VECTOR-LENGTH of the info vector.
   ;; So all we have to do is turn any fixnum to NIL, and we have a plist.
   ;; Ensure that this pun stays working.
+  #-ppc64 ; ppc64 has unevenly spaced lowtags
   (assert (= (- (* sb-vm:n-word-bytes sb-vm:cons-car-slot)
                 sb-vm:list-pointer-lowtag)
              (- (* sb-vm:n-word-bytes sb-vm:vector-length-slot)

@@ -560,6 +560,33 @@ arch_handle_single_step_trap(os_context_t *context, int trap)
     arch_skip_instruction(context);
 }
 
+#if 0
+static void dump_cpu_state(char *reason, os_context_t* context)
+{
+    extern void sigset_tostring(const sigset_t *sigset, char* result, int result_length);
+    int i,j,r=0;
+    sigset_t cur_sigset;
+    char buf[100];
+    sigset_t *sigset = os_context_sigmask_addr(context); sigset_tostring(sigset, buf, sizeof buf);
+    fprintf(stderr, "%s\n", reason);
+    fprintf(stderr, " oldmask=%s\n", buf);
+    pthread_sigmask(0, 0, &cur_sigset); sigset_tostring(&cur_sigset, buf, sizeof buf);
+    fprintf(stderr, " curmask=%s\n", buf);
+    fprintf(stderr, "  $pc=%16lx  $lr=%16lx $ctr=%16lx  $cr=%16lx\n",
+            *os_context_pc_addr(context),
+            *os_context_lr_addr(context),
+            *os_context_ctr_addr(context),
+            *os_context_cr_addr(context));
+    for(i=0; i<4; ++i) {
+        for(j=0; j<8 && r<32; ++j,++r)
+            fprintf(stderr, " %s%d=%16lx",
+                    r<10 ? " $r" : "$r", r,
+                    *os_context_register_addr(context, r));
+        putchar('\n');
+    }
+}
+#endif
+
 static void
 sigtrap_handler(int signal, siginfo_t *siginfo, os_context_t *context)
 {

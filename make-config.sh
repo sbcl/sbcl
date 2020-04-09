@@ -721,7 +721,9 @@ elif [ "$sbcl_arch" = "ppc" ]; then
 	fi
     fi
 elif [ "$sbcl_arch" = "ppc64" ]; then
-    printf ' :64-bit :untagged-fdefns' >> $ltf
+    # threads are required because differing versions of the vops for BOUNDP
+    # and [fast-]symbol-[global-]value and CAS create extra maintenance burden.
+    printf ' :64-bit :untagged-fdefns :sb-thread' >> $ltf
     printf ' :gencgc :stack-allocatable-closures :stack-allocatable-vectors' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :compare-and-swap-vops :alien-callbacks' >> $ltf

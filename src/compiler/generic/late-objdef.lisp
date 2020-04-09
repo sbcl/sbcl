@@ -175,7 +175,7 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                     ;; trailing comma on the last item is OK in C
                     collect (subseq contents i (+ i 64))))))
   (let ((scavtab  (make-array 256 :initial-element nil))
-        (ptrtab   (make-array 4   :initial-element nil))
+        (ptrtab   (make-list #+ppc64 16 #-ppc64 4))
         (transtab (make-array 64  :initial-element nil))
         (sizetab  (make-array 256 :initial-element nil)))
     (dotimes (i 256)
@@ -188,10 +188,19 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
                                    (#.fun-pointer-lowtag      "fun")
                                    (#.other-pointer-lowtag    "other"))))
                (when pointer-kind
-                 (setf (svref ptrtab (ldb (byte 2 (- sb-vm:n-lowtag-bits 2)) i))
-                       pointer-kind)
+                 #-ppc64
+                 (let ((n (ldb (byte 2 (- sb-vm:n-lowtag-bits 2)) i)))
+                   (unless (nth n ptrtab)
+                     (setf (nth n ptrtab) (format nil "scav_~A_pointer" pointer-kind))))
                  (setf (svref scavtab i) (format nil "~A_pointer" pointer-kind)
                        (svref sizetab i) "pointer"))))))
+    #+ppc64
+    (progn
+      (fill ptrtab "scav_lose")
+      (setf (nth instance-pointer-lowtag ptrtab) "scav_instance_pointer"
+            (nth list-pointer-lowtag ptrtab)     "scav_list_pointer"
+            (nth fun-pointer-lowtag ptrtab)      "scav_fun_pointer"
+            (nth other-pointer-lowtag ptrtab)    "scav_other_pointer"))
     (dolist (entry *scav/trans/size*)
       (destructuring-bind (widetag scav &optional (trans scav) (size trans)) entry
         ;; immediates use trans_lose which is what trans_immediate did anyway.
@@ -213,9 +222,8 @@ static inline lispobj compute_lispobj(lispobj* base_addr) {
              (format stream "~%};~%")))
       (write-table "sword_t (*const scavtab[256])(lispobj *where, lispobj object)"
                    "scav_" scavtab)
-      (format stream "static void (*scav_ptr[4])(lispobj *where, lispobj object)~
- = {~{~%  (void(*)(lispobj*,lispobj))scav_~A_pointer~^,~}~%};~%"
-              (coerce ptrtab 'list))
+      (format stream "static void (*scav_ptr[~d])(lispobj *where, lispobj object)~
+ = {~{~%  (void(*)(lispobj*,lispobj))~A~^,~}~%};~%" (length ptrtab) ptrtab)
       (write-table "static lispobj (*transother[64])(lispobj object)"
                    "trans_" transtab)
       (format stream "#define size_pointer size_immediate~%")

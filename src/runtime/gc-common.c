@@ -92,7 +92,15 @@ copy_object(lispobj object, sword_t nwords)
     return gc_general_copy_object(object, nwords, BOXED_PAGE_FLAG);
 }
 
+#ifdef LISP_FEATURE_PPC64
+// unevenly spaced pointer lowtags
+static void (*scav_ptr[16])(lispobj *where, lispobj object); /* forward decl */
+#define PTR_SCAVTAB_INDEX(ptr) (ptr & 15)
+#else
+// evenly spaced pointer lowtags
 static void (*scav_ptr[4])(lispobj *where, lispobj object); /* forward decl */
+#define PTR_SCAVTAB_INDEX(ptr) ((uint32_t)ptr>>(N_LOWTAG_BITS-2))&3
+#endif
 
 static inline void scav1(lispobj* object_ptr, lispobj object)
 {
@@ -122,7 +130,7 @@ static inline void scav1(lispobj* object_ptr, lispobj object)
     if (forwarding_pointer_p(ptr)) \
         *object_ptr = LOW_WORD(forwarding_pointer_value(ptr)); \
     else /* Scavenge that pointer. */ \
-        scav_ptr[(object>>(N_LOWTAG_BITS-2))&3](object_ptr, object); \
+        scav_ptr[PTR_SCAVTAB_INDEX(object)](object_ptr, object);  \
     }
 #ifdef LISP_FEATURE_IMMOBILE_SPACE
     page_index_t page;
@@ -1196,7 +1204,7 @@ void weakobj_init()
     unsigned i;                                                                \
     for (i = 1; i <= hwm; i++) {                                               \
         lispobj key = data[2*i], value = data[2*i+1];                          \
-        if (is_lisp_pointer(key|value)) {                                      \
+        if (at_least_one_pointer_p(key,value)) {                               \
           if (!entry_alivep) { defer; any_deferred = 1; } else {               \
             /* Scavenge the key and value. */                                  \
             scav_entry(&data[2*i]);                                            \
