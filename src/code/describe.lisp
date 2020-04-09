@@ -9,7 +9,6 @@
 ;;;; provided with absolutely no warranty. See the COPYING and CREDITS
 ;;;; files for more information.
 
-;;; SB-IMPL, not SB-IMPL, since we're built in warm load.
 (in-package "SB-IMPL")
 
 ;;;; Utils, move elsewhere.
