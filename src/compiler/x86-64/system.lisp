@@ -312,15 +312,15 @@
                result))))
 
 ;;;; symbol frobbing
-(defun load-symbol-info-vector (result symbol temp)
+(defun load-symbol-info-vector (result symbol)
   (loadw result symbol symbol-info-slot other-pointer-lowtag)
   ;; If RES has list-pointer-lowtag, take its CDR. If not, use it as-is.
   ;; This CMOV safely reads from memory when it does not move, because if
   ;; there is an info-vector in the slot, it has at least one element.
   ;; This would compile to almost the same code without a VOP,
   ;; but using a jmp around a mov instead.
-  (inst lea :dword temp (ea (- list-pointer-lowtag) result))
-  (inst test :byte temp lowtag-mask)
+  (aver (= (logior list-pointer-lowtag #b1000) other-pointer-lowtag))
+  (inst test :byte result #b1000)
   (inst cmov :e result
         (object-slot-ea result cons-cdr-slot list-pointer-lowtag)))
 
@@ -329,9 +329,7 @@
   (:translate symbol-info-vector)
   (:args (x :scs (descriptor-reg)))
   (:results (res :scs (descriptor-reg)))
-  (:temporary (:sc unsigned-reg :offset rax-offset) rax)
-  (:generator 1
-    (load-symbol-info-vector res x rax)))
+  (:generator 1 (load-symbol-info-vector res x)))
 
 (define-vop (symbol-plist)
   (:policy :fast-safe)

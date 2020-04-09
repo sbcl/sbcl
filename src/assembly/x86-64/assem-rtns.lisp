@@ -237,7 +237,7 @@
   (inst jmp :nz not-callable)
   (inst cmp :byte (ea (- other-pointer-lowtag) fun) symbol-widetag)
   (inst jmp :ne not-callable)
-  (load-symbol-info-vector vector fun r11-tn)
+  (load-symbol-info-vector vector fun)
   ;; info-vector-fdefn
   (inst cmp vector nil-value)
   (inst jmp :e undefined)

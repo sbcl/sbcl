@@ -136,6 +136,7 @@
   (def fun-code-header)
   (def sb-vm::symbol-extra)
   #+sb-thread (def symbol-tls-index)
+  #.(if (fboundp 'symbol-info-vector) (values) '(def symbol-info-vector))
   #-(or x86 x86-64) (def lra-code-header)
   (def %make-lisp-obj)
   (def get-lisp-obj-address)
