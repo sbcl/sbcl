@@ -1796,11 +1796,11 @@ CONTROL-ERROR if the restart does not exist.")
   (def step-next
       "Transfers control to the STEP-NEXT restart associated with the
 condition, executing the current form without stepping and continuing
-stepping with the next form. Signals CONTROL-ERROR is the restart does
-not exists.")
+stepping with the next form. Signals CONTROL-ERROR if the restart does
+not exist.")
   (def step-into
       "Transfers control to the STEP-INTO restart associated with the
-condition, stepping into the current form. Signals a CONTROL-ERROR is
+condition, stepping into the current form. Signals a CONTROL-ERROR if
 the restart does not exist."))
 
 ;;; Compiler macro magic
