@@ -22,6 +22,34 @@
       (symbol-value '+assem-max-locations+)
       0))
 
+;;;; Constants.
+
+;;; ASSEMBLY-UNIT-BITS -- the number of bits in the minimum assembly
+;;; unit, (also referred to as a ``byte''). Hopefully, different
+;;; instruction sets won't require changing this.
+(defconstant assembly-unit-bits 8)
+(defconstant assembly-unit-mask (1- (ash 1 assembly-unit-bits)))
+
+(deftype assembly-unit ()
+  `(unsigned-byte ,assembly-unit-bits))
+
+;;; Some functions which accept assembly units can meaningfully accept
+;;; signed values with the same number of bits and silently munge them
+;;; into appropriate unsigned values. (This is handy behavior e.g.
+;;; when assembling branch instructions on the X86.)
+(deftype possibly-signed-assembly-unit ()
+  `(or assembly-unit
+       (signed-byte ,assembly-unit-bits)))
+
+;;; the maximum alignment we can guarantee given the object format. If
+;;; the loader only loads objects 8-byte aligned, we can't do any
+;;; better than that ourselves.
+(defconstant max-alignment 5)
+
+(deftype alignment ()
+  `(integer 0 ,max-alignment))
+
+
 ;;;; the SEGMENT structure
 
 ;;; This structure holds the state of the assembler.
