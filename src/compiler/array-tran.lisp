@@ -905,12 +905,22 @@
                           :node node)
   (delay-ir1-transform node :constraint)
   (when (and initial-contents initial-element)
-    (compiler-warn "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS")
-    (give-up-ir1-transform))
+    (abort-ir1-transform "Can't specify both :INITIAL-ELEMENT and :INITIAL-CONTENTS"))
   (when (and displaced-index-offset
              (not displaced-to))
-    (compiler-warn "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO")
-    (give-up-ir1-transform))
+    (abort-ir1-transform "Can't specify :DISPLACED-INDEX-OFFSET without :DISPLACED-TO"))
+  (when (and displaced-to
+             (or initial-element initial-contents))
+    (if (types-equal-or-intersect (lvar-type displaced-to)
+                                  (specifier-type 'null))
+        (give-up-ir1-transform ":DISPLACED-TO potentially used with ~S"
+                               (if initial-element
+                                   :initial-element
+                                   :initial-contents))
+        (abort-ir1-transform "Can't specify :DISPLACED-TO and ~S"
+                             (if initial-element
+                                 :initial-element
+                                 :initial-contents))))
   (let ((fp-type (and fill-pointer
                       (lvar-type fill-pointer)) ))
     (when (and fp-type
