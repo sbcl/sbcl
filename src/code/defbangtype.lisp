@@ -21,6 +21,8 @@
 ;;; if necessary, until the cross-compiler's DEFTYPE machinery has been
 ;;; set up.
 
+(defvar *delayed-def!types* nil)
+
 (defmacro def!type (name &rest rest)
   ;; Attempting to define a type named by a CL symbol is an error.
   ;; Therefore NAME is wrong if it uncrosses to something other than itself.
@@ -32,21 +34,3 @@
         (if (boundp '*delayed-def!types*)
             `(push ',form *delayed-def!types*)
             form))))
-
-;;; machinery to implement DEF!TYPE delays
-#+sb-xc-host
-(progn
-  (/show "binding *DELAYED-DEF!TYPES*")
-  (defvar *delayed-def!types* nil)
-  (/show "done binding *DELAYED-DEF!TYPES*")
-  (defun force-delayed-def!types ()
-    (if (boundp '*delayed-def!types*)
-        (progn
-          (mapc #'eval *delayed-def!types*)
-          (makunbound '*delayed-def!types*))
-        ;; This condition is probably harmless if it comes up when
-        ;; interactively experimenting with the system by loading a
-        ;; source file into it more than once. But it's worth warning
-        ;; about it because it definitely shouldn't come up in an
-        ;; ordinary build process.
-        (warn "*DELAYED-DEF!TYPES* is already unbound."))))

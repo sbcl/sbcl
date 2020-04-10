@@ -17,10 +17,11 @@
 ;;;; be honored.
 
 #+sb-xc-host
-(progn
-  (/show "about to force delayed DEF!TYPEs")
-  (force-delayed-def!types)
-  (/show "done forcing delayed DEF!TYPEs"))
+(macrolet ((do-delayed-def!types ()
+             `(progn ,@(nreverse *delayed-def!types*))))
+  (do-delayed-def!types)
+  (makunbound '*delayed-def!types*))
+
 
 ;;;; standard types
 
