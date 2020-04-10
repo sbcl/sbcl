@@ -1,6 +1,6 @@
 ;;;; -*- coding: utf-8; fill-column: 78 -*-
 
-changes relative to sbcl-2.0.2:
+changes relative to sbcl-2.0.3:
   * platform support:
     ** 32-bit RISC-V is now fully supported. Unlike other ports, its backend
     is entirely shared with 64-bit RISC-V.
