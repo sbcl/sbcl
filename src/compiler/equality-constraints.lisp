@@ -54,7 +54,7 @@
                                  alternative-constraints)
   (case operator
     ((eq eql char= two-arg-char-equal
-      > <)
+      > < =)
      (when (= (length args) 2)
        (let* ((x (ok-lvar-lambda-var (first args) constraints))
               (second (second args))
@@ -140,7 +140,8 @@
      (equality-constraint char=)
      (equality-constraint two-arg-char-equal false)
      (equality-constraint > inverse)
-     (equality-constraint < inverse))
+     (equality-constraint < inverse)
+     (equality-constraint = false))
     result))
 
 (defoptimizer (eq equality-constraint) ((x y))
@@ -150,6 +151,17 @@
      (equality-constraint eql)
      (equality-constraint char=)
      (equality-constraint two-arg-char-equal false)
+     (equality-constraint > inverse)
+     (equality-constraint < inverse)
+     (equality-constraint = false))
+    result))
+
+(defoptimizer (= equality-constraint) ((x y))
+  (let ((result :give-up))
+    (or
+     (equality-constraint =)
+     (equality-constraint eq true)
+     (equality-constraint eql true)
      (equality-constraint > inverse)
      (equality-constraint < inverse))
     result))
@@ -178,7 +190,8 @@
      (equality-constraint > nil nil)
      (equality-constraint < inverse nil)
      (equality-constraint eq inverse)
-     (equality-constraint eql inverse))
+     (equality-constraint eql inverse)
+     (equality-constraint = inverse))
     result))
 
 (defoptimizer (< equality-constraint) ((x y))
@@ -187,5 +200,6 @@
      (equality-constraint < nil nil)
      (equality-constraint > inverse nil)
      (equality-constraint eq inverse)
-     (equality-constraint eql inverse))
+     (equality-constraint eql inverse)
+     (equality-constraint = inverse))
     result))
