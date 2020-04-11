@@ -771,6 +771,14 @@
     (cond ((eq *wild-type* element-ctype)
            (delay-ir1-transform node :constraint)
            `(vector-fill* seq item start end))
+          #+x86-64
+          ((and (type= element-ctype *universal-type*)
+                (csubtypep (lvar-type seq) (specifier-type '(simple-array * (*))))
+                (or (not start)
+                    (and (constant-lvar-p start)
+                         (eql (lvar-value start) 0)))
+                (not end))
+           '(vector-fill/t seq item 0 (length seq)))
           ((and saetp (sb-vm:valid-bit-bash-saetp-p saetp))
            (multiple-value-bind (basher bash-value) (find-basher saetp item node)
              (values
