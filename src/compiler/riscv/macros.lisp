@@ -651,6 +651,24 @@ and
          t)
         (if (eq type 'list) tn-offset (+ tn-offset 32))))
 
+(defun load-alloc-free-pointer (reg)
+  #-sb-thread
+  (loadw reg null-tn 0 (- boxed-region))
+  #+sb-thread
+  (loadw reg thread-base-tn thread-alloc-region-slot))
+
+(defun load-alloc-end-addr (reg)
+  #-sb-thread
+  (loadw reg null-tn 1 (- boxed-region))
+  #+sb-thread
+  (loadw reg thread-base-tn (+ thread-alloc-region-slot 1)))
+
+(defun store-alloc-free-pointer (reg)
+  #-sb-thread
+  (storew reg null-tn 0 (- boxed-region))
+  #+sb-thread
+  (storew reg thread-base-tn thread-alloc-region-slot))
+
 (defun allocation (type size lowtag result-tn &key flag-tn
                                                    stack-allocate-p
                                                    temp-tn)
@@ -691,20 +709,8 @@ and
         #+gencgc
         (t
          (let ((alloc (gen-label))
-               (back-from-alloc (gen-label))
-               #-sb-thread
-               (boxed-region (- (+ static-space-start
-                                   ;; skip over the array header
-                                   (* 2 n-word-bytes))
-                                nil-value)))
-           #-sb-thread
-           (progn
-             (loadw result-tn null-tn 0 (- boxed-region))
-             (loadw flag-tn null-tn 1 (- boxed-region)))
-           #+sb-thread
-           (progn
-             (loadw result-tn thread-base-tn thread-alloc-region-slot)
-             (loadw flag-tn thread-base-tn (+ thread-alloc-region-slot 1)))
+               (back-from-alloc (gen-label)))
+           (load-alloc-free-pointer result-tn)
            (etypecase size
              (short-immediate
               (inst addi result-tn result-tn size))
@@ -713,11 +719,9 @@ and
               (inst add result-tn result-tn temp-tn))
              (tn
               (inst add result-tn result-tn size)))
+           (load-alloc-end-addr flag-tn)
            (inst blt flag-tn result-tn alloc)
-           #-sb-thread
-           (storew result-tn null-tn 0 (- boxed-region))
-           #+sb-thread
-           (storew result-tn thread-base-tn thread-alloc-region-slot)
+           (store-alloc-free-pointer result-tn)
            (etypecase size
              (short-immediate
               (inst subi result-tn result-tn size))
@@ -726,17 +730,9 @@ and
              (tn
               (inst sub result-tn result-tn size)))
            (emit-label back-from-alloc)
-           (unless (zerop lowtag)
-             (inst ori result-tn result-tn lowtag))
+           (inst ori result-tn result-tn lowtag)
            (assemble (:elsewhere)
              (emit-label alloc)
-             (etypecase size
-               (short-immediate
-                (inst li result-tn size))
-               (u+i-immediate
-                (move result-tn temp-tn))
-               (tn
-                (move result-tn size)))
              (invoke-asm-routine (alloc-tramp-stub-name (tn-offset result-tn) type))
              (inst j back-from-alloc))))))
 

@@ -25,22 +25,22 @@
        (,(alloc-tramp-stub-name alloc-tn-offset nil)
         (:export ,(alloc-tramp-stub-name alloc-tn-offset 'list))
         (:return-style :none))
-       ((:temp size unsigned-reg ,alloc-tn-offset)
+       ((:temp free+size unsigned-reg ,alloc-tn-offset)
         (:temp alloc descriptor-reg ,alloc-tn-offset))
    ;; General-purpose entry point:
      ;; ALLOC-TRAMP needs 1 bit of extra information to select a linkage table
-     ;; entry. It could be passed in the low bit of SIZE, but because the object
-     ;; granularity is 2 words, it is ok to use any bit under LOWTAG-MASK.
-     ;; e.g. with 64-bit words:
+     ;; entry. It could be passed in the low bit of FREE+SIZE, but
+     ;; because the object granularity is 2 words, it is ok to use any
+     ;; bit under LOWTAG-MASK.  e.g. with 64-bit words:
      ;;             v--- ; use this bit
      ;;  #b________10000 ; 16 bytes is the smallest object
      ;; By passing it as such, it is actually an offset into the linkage table.
-     (inst ori size size (ash 1 word-shift))
+     (inst ori free+size free+size (ash 1 word-shift))
    ;; CONS entry point:
    ,(alloc-tramp-stub-name alloc-tn-offset 'list)
      (inst addi csp-tn csp-tn n-word-bytes)
-     (storew size csp-tn -1)
-     (move size lip-tn)
+     (storew free+size csp-tn -1)
+     (move free+size lip-tn)
      (invoke-asm-routine 'alloc-tramp)
      (move lip-tn alloc)
      (loadw alloc csp-tn -1)
@@ -49,7 +49,7 @@
 
 #+gencgc
 (define-assembly-routine (alloc-tramp (:return-style :none))
-    ((:temp nl0 unsigned-reg nl0-offset)
+    ((:temp temp unsigned-reg nl0-offset)
      (:temp ca0 any-reg ca0-offset))
   (let* ((nl-registers
            (loop for i in (intersection non-descriptor-regs
@@ -79,29 +79,31 @@
          (float-start (- nl-start float-framesize)))
     (inst subi nsp-tn nsp-tn number-framesize)
     (save-to-stack nl-registers nsp-tn nl-start)
-    (save-lisp-context csp-tn cfp-tn nl0)
+    (save-lisp-context csp-tn cfp-tn temp)
     ;; Create a new frame and save descriptor regs on the stack for GC
     ;; to see.
     (save-to-stack lisp-registers csp-tn)
+    (load-alloc-free-pointer temp)
     (loadw ca0 csp-tn -1)
+    ;; Recover the size.
+    (inst sub ca0 ca0 temp)
     (inst addi csp-tn csp-tn lisp-framesize)
     (save-to-stack float-registers nsp-tn float-start t)
     ;; linkage entry 0 = alloc() and entry 1 = alloc_list().
     ;; Because the linkage table grows downward from NIL, entry 1 is at a lower
     ;; address than 0. Adding the entry point selector bit from 'size' indexes to
     ;; entry 0 or 1. If that bit was 1, it picks out entry 0, if 0 it picks out 1.
-    (inst andi lip-tn ca0 (ash 1 sb-vm:word-shift))
-    (inst add lip-tn null-tn lip-tn)
-    (loadw lip-tn lip-tn 0 (- nil-value (linkage-table-entry-address 1)))
+    (inst andi temp ca0 (ash 1 sb-vm:word-shift))
+    (inst add temp null-tn temp)
+    (loadw lip-tn temp 0 (- nil-value (linkage-table-entry-address 1)))
     (inst andi ca0 ca0 (lognot (ash 1 sb-vm:word-shift))) ; clear the selector bit
-    ;;
     (inst jalr lip-tn lip-tn 0)
     (pop-from-stack float-registers nsp-tn float-start t)
     (inst subi csp-tn csp-tn lisp-framesize)
     (storew ca0 csp-tn -1)
     (pop-from-stack lisp-registers csp-tn)
     #-sb-thread
-    (store-foreign-symbol-value zero-tn "foreign_function_call_active" nl0)
+    (store-foreign-symbol-value zero-tn "foreign_function_call_active" temp)
     #+sb-thread
     (storew zero-tn thread-base-tn thread-foreign-function-call-active-slot)
     (pop-from-stack nl-registers nsp-tn nl-start)

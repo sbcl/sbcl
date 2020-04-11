@@ -109,6 +109,9 @@
 (setq *linkage-space-predefined-entries* '(#+gencgc("alloc" nil)
                                            #+gencgc("alloc_list" nil)))
 
+#-sb-thread
+(defconstant boxed-area (- (+ static-space-start (* 2 n-word-bytes)) nil-value))
+
 #+(or linux netbsd)
 (progn
   #-gencgc
