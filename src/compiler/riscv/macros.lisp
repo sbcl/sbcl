@@ -625,20 +625,6 @@ and
 
 ;;;; Storage allocation:
 
-;;; This is the main mechanism for allocating memory in the lisp heap.
-;;;
-;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
-;;; applied.  The amount of space to be allocated is SIZE bytes (which
-;;; must be a multiple of the lisp object size).
-;;;
-;;; Each platform seems to have its own slightly different way to do
-;;; heap allocation, taking various different options as parameters.
-;;; For RISC-V, we take the bare minimum parameters, RESULT-TN, SIZE,
-;;; and LOWTAG, and we require a single temporary register called
-;;; FLAG-TN to emphasize the parallelism with PSEUDO-ATOMIC (which
-;;; must surround a call to ALLOCATION anyway), and to indicate that
-;;; the P-A FLAG-TN is also acceptable here.
-
 #+gencgc
 (defun alloc-tramp-stub-name (tn-offset type)
   (declare (type (unsigned-byte 5) tn-offset))
@@ -669,6 +655,19 @@ and
   #+sb-thread
   (storew reg thread-base-tn thread-alloc-region-slot))
 
+;;; This is the main mechanism for allocating memory in the lisp heap.
+;;;
+;;; The allocated space is stored in RESULT-TN with the lowtag LOWTAG
+;;; applied.  The amount of space to be allocated is SIZE bytes (which
+;;; must be a multiple of the lisp object size).
+;;;
+;;; Each platform seems to have its own slightly different way to do
+;;; heap allocation, taking various different options as parameters.
+;;; For RISC-V, we take the bare minimum parameters, RESULT-TN, SIZE,
+;;; and LOWTAG, and we require a single temporary register called
+;;; FLAG-TN to emphasize the parallelism with PSEUDO-ATOMIC (which
+;;; must surround a call to ALLOCATION anyway), and to indicate that
+;;; the P-A FLAG-TN is also acceptable here.
 (defun allocation (type size lowtag result-tn &key flag-tn
                                                    stack-allocate-p
                                                    temp-tn)
@@ -722,15 +721,17 @@ and
            (load-alloc-end-addr flag-tn)
            (inst blt flag-tn result-tn alloc)
            (store-alloc-free-pointer result-tn)
+           (emit-label back-from-alloc)
+           ;; Compute the base pointer and add the lowtag.
            (etypecase size
              (short-immediate
-              (inst subi result-tn result-tn size))
+              (inst subi result-tn result-tn (- size lowtag)))
              (u+i-immediate
-              (inst sub result-tn result-tn temp-tn))
+              (inst sub result-tn result-tn temp-tn)
+              (inst ori result-tn result-tn lowtag))
              (tn
-              (inst sub result-tn result-tn size)))
-           (emit-label back-from-alloc)
-           (inst ori result-tn result-tn lowtag)
+              (inst sub result-tn result-tn size)
+              (inst ori result-tn result-tn lowtag)))
            (assemble (:elsewhere)
              (emit-label alloc)
              (invoke-asm-routine (alloc-tramp-stub-name (tn-offset result-tn) type))
