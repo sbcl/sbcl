@@ -759,11 +759,13 @@ code to be loaded.
                              '(complex float)))
                       (t
                        init)))))
-           ((csubtypep ctype (specifier-type 'vector))
-            (when (array-type-p ctype)
-              (let ((etype (type-*-to-t
-                            (array-type-specialized-element-type ctype))))
-                (make-array 0 :element-type (type-specifier etype)))))
+          ((csubtypep ctype (specifier-type 'vector))
+           (cond ((array-type-p ctype)
+                  (let ((etype (type-*-to-t
+                                (array-type-specialized-element-type ctype))))
+                    (make-array 0 :element-type (type-specifier etype))))
+                 ((csubtypep ctype (specifier-type 'string))
+                  "")))
            #+sb-unicode
            ((csubtypep ctype (specifier-type 'extended-char))
             (code-char base-char-code-limit))
