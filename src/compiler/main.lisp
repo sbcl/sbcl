@@ -1378,16 +1378,42 @@ necessary, since type inference may take arbitrarily long to converge.")
                  (convert-and-maybe-compile `(progn ,@body) path)))))
       (if (null *macro-policy*)
           (frob)
-          (let* ((*lexenv*
-                   (make-lexenv
-                    :policy (process-optimize-decl
+          ;; Macro policy is such a kludge. Most of the effect is conferred by
+          ;; injecting declarations into any sexpr coming from MAKE-MACRO-LAMBDA.
+          ;; But that's not enough - we need all code in EVAL-WHEN :COMPILE-TOPLEVEL
+          ;; situations to run under the macro policy. This somewhat works by binding
+          ;; *LEXENV*, but fails anywhere we use MAKE-NULL-LEXENV, which sees only
+          ;; the policy in *POLICY* from the perspective of that lexenv.
+          ;; So we have to change *POLICY* also, but without binding it, because
+          ;; binding prevents toplevel DECLAIMs from taking effect.  As a workaround,
+          ;; we assign *POLICY* but restore the original qualities whose values
+          ;; were present in the macro policy.
+          ;; e.g: 
+          ;;  - macro policy of (safety 3)
+          ;;  - global policy of (safety 0) and (store-coverage-data 3)
+          ;;  - some file wants to declaim (safety 1) (store-coverage-data 0)
+          ;; So because the DECLAIM is an EVAL-WHEN :COMPILE-TOPLEVEL with a macro policy,
+          ;; we would try to restore *POLICY* to (safety 0) (store-coverage-data 3)
+          ;; immediately after eval'ing the DECLAIM, making it totally effectless.
+          (let ((new-policy (process-optimize-decl
                              `(optimize ,@(policy-to-decl-spec *macro-policy*))
-                             (lexenv-policy *lexenv*))
-                    :default *lexenv*))
-                 ;; In case a null lexenv is created, it needs to get the newly
-                 ;; effective global policy, not the policy currently in *POLICY*.
-                 (*policy* (lexenv-policy *lexenv*)))
-            (frob))))))
+                             (lexenv-policy *lexenv*)))
+                (old-policy *policy*))
+            (unwind-protect
+                 (let ((*lexenv* (make-lexenv :policy new-policy :default *lexenv*)))
+                   (setf (saved-optimize-decls *compilation*) nil)
+                   (setq *policy* new-policy)
+                   (frob))
+              ;; There are other ways to do this. e.g.: only save a declaim if it contained
+              ;; a quality names intersecting with the ones in macro policy; then don't
+              ;; restore everything to the start sate, merely undo changes from macro-policy,
+              ;; but keeping the changes that were expressed by toplevel forms.
+              ;; This is easiest and I really don't care to think about it.
+              (let ((saved (saved-optimize-decls *compilation*)))
+                (setf (saved-optimize-decls *compilation*) :none)
+                (dolist (expr (nreverse saved)) ;; seldom anything here
+                  (setq old-policy (process-optimize-decl expr old-policy)))
+                (setq *policy* old-policy))))))))
 
 ;;; Process a top level FORM with the specified source PATH.
 ;;;  * If this is a magic top level form, then do stuff.

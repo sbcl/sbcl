@@ -363,6 +363,10 @@ the stack without triggering overflow protection.")
   ;; for constant coalescing across code components, and/or for situations
   ;; where SIMILARP does not do what you want.
   (constant-cache)
+  ;; When compiling within the extent of *macro-policy* we have to store up
+  ;; any DECLAIMs for later replay. The logic is explained in EVAL-COMPILE-TLF.
+  ;; This slot is set to NIL before use and reset when done.
+  (saved-optimize-decls :none)
   (coverage-metadata nil :type (or (cons hash-table hash-table) null) :read-only t)
   (msan-unpoison nil :read-only t)
   (sset-counter 1 :type fixnum)

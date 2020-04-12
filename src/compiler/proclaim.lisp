@@ -334,6 +334,10 @@
         (optimize
          (multiple-value-bind (new-policy specified-qualities)
              (process-optimize-decl form *policy*)
+           (when (and (boundp '*compilation*)
+                      ;; Should I also examine *COMPILE-TIME-EVAL* here? I don't think so.
+                      (listp (saved-optimize-decls *compilation*)))
+             (push form (saved-optimize-decls *compilation*)))
            (setq *policy* new-policy)
            (warn-repeated-optimize-qualities new-policy specified-qualities)))
         (muffle-conditions

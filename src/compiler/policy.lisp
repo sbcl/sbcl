@@ -394,16 +394,10 @@ See also :POLICY option in WITH-COMPILATION-UNIT."
 ;; Same for {UN}MUFFLE-CONDITIONS or anything else that can be proclaimed.
 ;;
 (defun set-macro-policy (list)
-  ;: Note that *MACRO-POLICY* does not represent absence of any primary quality,
-  ;; and therefore whenever it is injected into a macro, you get all baseline
-  ;; values of 1, augmented by the specified changes.
-  ;; There are two alternative behaviors that might make sense:
-  ;; - use the value of *POLICY* when SET-MACRO-POLICY is called as the baseline
-  ;;   augmented by the specifiers in LIST
-  ;; - use the lexical policy at the time of expansion, augmented by LIST
-  ;; But most probably the current behavior is entirely reasonable.
+  ;; Unlike most constructs that involve a policy, assume total absence of all
+  ;; standard qualities. Record only the qualities expressed in LIST.
   (setq *macro-policy* (process-optimize-decl `(optimize ,@list)
-                                              **baseline-policy**)))
+                                              (make-policy 0 0 0))))
 
 ;; Turn the macro policy into an OPTIMIZE declaration for insertion
 ;; into a macro body for DEFMACRO, MACROLET, or DEFINE-COMPILER-MACRO.
