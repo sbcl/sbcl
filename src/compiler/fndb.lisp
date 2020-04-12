@@ -1748,7 +1748,7 @@
 ;;; We can't fold this in general because of SATISFIES. There is a
 ;;; special optimizer anyway.
 (defknown %typep (t (or type-specifier ctype)) boolean (movable flushable))
-(defknown %instance-typep (t (or type-specifier ctype)) boolean
+(defknown %instance-typep (t (or type-specifier ctype layout)) boolean
   (movable flushable always-translatable))
 ;;; We should never emit a call to %typep-wrapper
 (defknown %typep-wrapper (t t (or type-specifier ctype)) t

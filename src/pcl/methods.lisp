@@ -1089,6 +1089,12 @@
      `(or (std-instance-p ,arg) (fsc-instance-p ,arg)))
     ((eq class *the-class-funcallable-standard-object*)
      `(fsc-instance-p ,arg))
+    ;; This is going to be cached (in *fgens*),
+    ;; and structure type tests do not check for invalid layout.
+    ;; Cache the wrapper itself, which is going to be different after
+    ;; redifinition.
+    ((structure-class-p class)
+     `(sb-c::%instance-typep ,arg ,(class-wrapper class)))
     (t
      `(typep ,arg ',(class-name class)))))
 

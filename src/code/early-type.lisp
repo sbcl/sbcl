@@ -975,6 +975,8 @@
               ;; We don't want to create another way of representing
               ;; the type NULL = (MEMBER NIL), for example.
               (sb-pcl::eql-specializer-to-ctype type-specifier))
+             ((layout-p type-specifier)
+              (layout-classoid type-specifier))
              (t (fail type-specifier))))))
   (when (atom type-specifier)
     ;; Try to bypass the cache, which avoids using a cache line for standard
