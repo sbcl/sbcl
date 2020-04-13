@@ -551,33 +551,19 @@ os_get_runtime_executable_path(int external)
 {
     char path[PATH_MAX + 1];
 
-#ifndef __GLIBC__
-    if (getosreldate() >= 600024) {
-#endif
-        /* KERN_PROC_PATHNAME is available */
-        size_t len = PATH_MAX + 1;
-        int mib[4];
+    /* KERN_PROC_PATHNAME is available */
+    size_t len = PATH_MAX + 1;
+    int mib[4];
 
-        mib[0] = CTL_KERN;
-        mib[1] = KERN_PROC;
-        mib[2] = KERN_PROC_PATHNAME;
-        mib[3] = -1;
-        if (sysctl(mib, 4, &path, &len, NULL, 0) != 0)
-            return NULL;
-#ifndef __GLIBC__
-    } else {
-        int size;
-        size = readlink("/proc/curproc/file", path, sizeof(path) - 1);
-        if (size < 0)
-            return NULL;
-        path[size] = '\0';
-    }
-#endif
-    if (strcmp(path, "unknown") == 0)
+    mib[0] = CTL_KERN;
+    mib[1] = KERN_PROC;
+    mib[2] = KERN_PROC_PATHNAME;
+    mib[3] = -1;
+    if (sysctl(mib, 4, &path, &len, NULL, 0) != 0)
         return NULL;
-    return copied_string(path);
+
 }
-#elif defined(LISP_FEATURE_DRAGONFLY)
+#elif defined(LISP_FEATURE_DRAGONFLY) || defined(LISP_FEATURE_NETBSD)
 char *
 os_get_runtime_executable_path(int external)
 {
@@ -591,16 +577,7 @@ os_get_runtime_executable_path(int external)
         return NULL;
     return copied_string(path);
 }
-#elif defined(LISP_FEATURE_NETBSD) || defined(LISP_FEATURE_OPENBSD)
-char *
-os_get_runtime_executable_path(int external)
-{
-    struct stat sb;
-    if (!external && stat("/proc/curproc/file", &sb) == 0)
-        return copied_string("/proc/curproc/file");
-    return NULL;
-}
-#else /* Not DARWIN or FREEBSD or NETBSD or OPENBSD or DragonFly */
+#else /* Not DARWIN or FREEBSD or NETBSD or DragonFly */
 char *
 os_get_runtime_executable_path(int external)
 {
