@@ -568,7 +568,13 @@ char *
 os_get_runtime_executable_path(int external)
 {
     char path[PATH_MAX + 1];
-    int size = readlink("/proc/curproc/file", path, sizeof(path) - 1);
+    int size = readlink("/proc/curproc/"
+#ifdef LISP_FEATURE_NETBSD
+                        "exe"
+#else
+                        "file"
+#endif
+                        , path, sizeof(path) - 1);
     if (size < 0)
         return NULL;
     path[size] = '\0';
