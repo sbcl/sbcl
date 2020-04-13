@@ -1388,7 +1388,7 @@ necessary, since type inference may take arbitrarily long to converge.")
           ;; binding prevents toplevel DECLAIMs from taking effect.  As a workaround,
           ;; we assign *POLICY* but restore the original qualities whose values
           ;; were present in the macro policy.
-          ;; e.g: 
+          ;; e.g:
           ;;  - macro policy of (safety 3)
           ;;  - global policy of (safety 0) and (store-coverage-data 3)
           ;;  - some file wants to declaim (safety 1) (store-coverage-data 0)

@@ -100,14 +100,11 @@
   "Return to RETURN-PC."
   `(let* ((function ,function)
           (lip ,lip))
-     ;; Indicate a single-valued return by clearing all of the status
-     ;; flags, or a multiple-valued return by setting all of the status
-     ;; flags.
      (aver (sc-is lip interior-reg))
+     ;; Indicate a single-valued return by clearing the Z flag
      ,@(ecase return-style
-         (:single-value '((inst msr :nzcv zr-tn)))
-         (:multiple-values '((inst orr tmp-tn zr-tn #xf0000000)
-                             (inst msr :nzcv tmp-tn)))
+         (:single-value '((inst cmp null-tn 0)))
+         (:multiple-values '((inst cmp zr-tn zr-tn)))
          (:known))
      (inst sub lip function (- other-pointer-lowtag 8))
      (inst ret lip)))
