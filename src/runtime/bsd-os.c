@@ -551,7 +551,6 @@ os_get_runtime_executable_path(int external)
 {
     char path[PATH_MAX + 1];
 
-    /* KERN_PROC_PATHNAME is available */
     size_t len = PATH_MAX + 1;
     int mib[4];
 
@@ -562,6 +561,7 @@ os_get_runtime_executable_path(int external)
     if (sysctl(mib, 4, &path, &len, NULL, 0) != 0)
         return NULL;
 
+    return copied_string(path);
 }
 #elif defined(LISP_FEATURE_DRAGONFLY) || defined(LISP_FEATURE_NETBSD)
 char *
