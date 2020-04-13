@@ -457,7 +457,7 @@ sbcl_main(int argc, char *argv[], char *envp[])
     /* Check early to see if this executable has an embedded core,
      * which also populates runtime_options if the core has runtime
      * options */
-    if (!(sbcl_runtime = os_get_runtime_executable_path(0)))
+    if (!(sbcl_runtime = os_get_runtime_executable_path()))
         sbcl_runtime = search_for_executable(argv[0]);
 
     if (!(sbcl_runtime_home = dir_name(argv[0])))

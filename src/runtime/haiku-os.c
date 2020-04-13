@@ -52,7 +52,7 @@ os_protect(os_vm_address_t address, os_vm_size_t length, os_vm_prot_t prot)
     }
 }
 
-char *os_get_runtime_executable_path(int __attribute__((unused)) external)
+char *os_get_runtime_executable_path()
 {
     int cookie = 0;
     image_info info;

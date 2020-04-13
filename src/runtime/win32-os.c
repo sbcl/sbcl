@@ -2108,8 +2108,7 @@ void scratch(void)
     CryptGenRandom(0, 0, 0);
 }
 
-char *
-os_get_runtime_executable_path(int __attribute__((__unused__)) external)
+char *os_get_runtime_executable_path()
 {
     char path[MAX_PATH + 1];
     DWORD bufsize = sizeof(path);

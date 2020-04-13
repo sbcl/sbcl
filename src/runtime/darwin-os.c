@@ -42,8 +42,7 @@
 # include <sys/time.h>
 #endif
 
-char *
-os_get_runtime_executable_path(int external)
+char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
     uint32_t size = sizeof(path);

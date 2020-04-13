@@ -416,8 +416,7 @@ os_install_interrupt_handlers(void)
 #endif
 }
 
-char *
-os_get_runtime_executable_path(int __attribute__((unused)) external)
+char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
     int size;

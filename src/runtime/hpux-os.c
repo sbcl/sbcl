@@ -95,8 +95,7 @@ os_install_interrupt_handlers(void)
                                                  sigsegv_handler);
 }
 
-char *
-os_get_runtime_executable_path(int external)
+char *os_get_runtime_executable_path()
 {
     return NULL;
 }

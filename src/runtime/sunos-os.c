@@ -128,8 +128,7 @@ os_install_interrupt_handlers()
 #endif
 }
 
-char *
-os_get_runtime_executable_path(int external)
+char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
     int size = readlink("/proc/self/path/a.out", path, sizeof(path) - 1);

@@ -546,8 +546,7 @@ futex_wake(int *lock_word, int n)
 #define KERN_PROC_PATHNAME 12
 #endif
 
-char *
-os_get_runtime_executable_path(int external)
+char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
 
@@ -564,8 +563,7 @@ os_get_runtime_executable_path(int external)
     return copied_string(path);
 }
 #elif defined(LISP_FEATURE_DRAGONFLY) || defined(LISP_FEATURE_NETBSD)
-char *
-os_get_runtime_executable_path(int external)
+char *os_get_runtime_executable_path()
 {
     char path[PATH_MAX + 1];
     int size = readlink("/proc/curproc/"
@@ -585,7 +583,7 @@ os_get_runtime_executable_path(int external)
 }
 #else /* Not DARWIN or FREEBSD or NETBSD or DragonFly */
 char *
-os_get_runtime_executable_path(int external)
+os_get_runtime_executable_path()
 {
     return NULL;
 }
