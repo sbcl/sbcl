@@ -131,11 +131,14 @@ os_install_interrupt_handlers()
 char *
 os_get_runtime_executable_path(int external)
 {
-    char path[] = "/proc/self/object/a.out";
-
-    if (external || access(path, R_OK) == -1)
+    char path[PATH_MAX + 1];
+    int size = readlink("/proc/self/path/a.out", path, sizeof(path) - 1);
+    if (size < 0)
         return NULL;
+    path[size] = '\0';
 
+    if (strcmp(path, "unknown") == 0)
+        return NULL;
     return copied_string(path);
 }
 
