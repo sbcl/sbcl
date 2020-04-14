@@ -310,6 +310,7 @@
 
 ;;; handy macro for making sequences look atomic
 (defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
+  (declare (ignorable sync))
   #+sb-safepoint-strictly
   `(progn ,@forms (emit-safepoint))
   #-sb-safepoint-strictly
