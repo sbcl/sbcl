@@ -48,3 +48,40 @@
      `((inst clc)
        (inst ret)))
     ((:none :full-call-no-return))))
+
+(defmacro with-registers-preserved ((fpr-size &key except) &body body)
+  (multiple-value-bind (mnemonic fpr-align getter)
+      (ecase fpr-size
+        (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
+        (ymm (values 'vmovaps 32 'sb-x86-64-asm::get-avx2)))
+    (flet ((fpr-save/restore (operation)
+             (loop for regno below 16
+                   collect
+                   (ecase operation
+                     (push
+                      `(inst ,mnemonic (ea ,(* regno fpr-align) rsp-tn) (,getter ,regno)))
+                     (pop
+                      `(inst ,mnemonic (,getter ,regno) (ea ,(* regno fpr-align) rsp-tn))))))
+           (gpr-save/restore (operation except)
+             (declare (type (member push pop) operation))
+             (let ((registers '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn)))
+               (when except
+                 (setf registers (remove except registers)))
+               ;; Preserve alignment
+               (when (oddp (length registers))
+                 (push (car registers) registers))
+               (mapcar (lambda (reg)
+                         `(inst ,operation ,reg))
+                       (if (eq operation 'pop) (reverse registers) registers)))))
+    `(progn
+       (inst push rbp-tn)
+       (inst mov rbp-tn rsp-tn)
+       (inst and rsp-tn ,(- fpr-align))
+       (inst sub rsp-tn ,(* 16 fpr-align))
+       ,@(fpr-save/restore 'push)
+       ,@(gpr-save/restore 'push except)
+       ,@body
+       ,@(gpr-save/restore 'pop except)
+       ,@(fpr-save/restore 'pop)
+       (inst mov rsp-tn rbp-tn)
+       (inst pop rbp-tn)))))

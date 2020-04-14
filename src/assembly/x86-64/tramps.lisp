@@ -5,43 +5,6 @@
 
 (in-package "SB-VM")
 
-(defun gpr-save/restore (operation &key except)
-  (declare (type (member push pop) operation))
-  (let ((registers '(rax-tn rcx-tn rdx-tn rsi-tn rdi-tn r8-tn r9-tn r10-tn r11-tn)))
-    (when except
-      (setf registers (remove except registers)))
-    ;; Preserve alignment
-    (when (oddp (length registers))
-      (push (car registers) registers))
-    (dolist (reg (if (eq operation 'pop) (reverse registers) registers))
-      (inst* operation (symbol-value reg)))))
-
-(defmacro with-registers-preserved ((fpr-size &key except) &body body)
-  (multiple-value-bind (mnemonic fpr-align getter)
-      (ecase fpr-size
-        (xmm (values 'movaps 16 'sb-x86-64-asm::get-fpr))
-        (ymm (values 'vmovaps 32 'sb-x86-64-asm::get-avx2)))
-    (flet ((fpr-save/restore (operation)
-             (loop for regno below 16
-                   collect
-                   (ecase operation
-                     (push
-                      `(inst ,mnemonic (ea ,(* regno fpr-align) rsp-tn) (,getter ,regno)))
-                     (pop
-                      `(inst ,mnemonic (,getter ,regno) (ea ,(* regno fpr-align) rsp-tn)))))))
-    `(progn
-       (inst push rbp-tn)
-       (inst mov rbp-tn rsp-tn)
-       (inst and rsp-tn ,(- fpr-align))
-       (inst sub rsp-tn ,(* 16 fpr-align))
-       ,@(fpr-save/restore 'push)
-       (gpr-save/restore 'push :except ',except)
-       ,@body
-       (gpr-save/restore 'pop :except ',except)
-       ,@(fpr-save/restore 'pop)
-       (inst mov rsp-tn rbp-tn)
-       (inst pop rbp-tn)))))
-
 ;;; It is arbitrary whether each of the next 4 routines is named ALLOC-something,
 ;;; exporting an additional entry named CONS-something, versus being named CONS-something
 ;;; and exporting ALLOC-something.  It just depends on which of those you would like
