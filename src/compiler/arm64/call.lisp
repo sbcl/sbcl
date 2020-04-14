@@ -495,6 +495,7 @@
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop ()
+  (:translate %listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -505,7 +506,6 @@
   (:temporary (:sc non-descriptor-reg) pa-flag)
   (:temporary (:scs (interior-reg)) lip)
   (:results (result :scs (descriptor-reg)))
-  (:translate %listify-rest-args)
   (:policy :safe)
   (:node-var node)
   (:generator 20
@@ -516,7 +516,7 @@
     (inst cbz count DONE)
 
     ;; We need to do this atomically.
-    (pseudo-atomic (pa-flag)
+    (pseudo-atomic (pa-flag :sync nil)
       ;; Allocate a cons (2 words) for each item.
       (let* ((dx-p (node-stack-allocate-p node))
              (size (cond (dx-p

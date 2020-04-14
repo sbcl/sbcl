@@ -40,7 +40,7 @@
                         temp)))))
              (let* ((cons-cells (if star (1- num) num))
                     (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag)
+               (pseudo-atomic (pa-flag :sync nil)
                  (allocation 'list alloc list-pointer-lowtag res
                              :flag-tn pa-flag
                              :stack-allocate-p (node-stack-allocate-p node)

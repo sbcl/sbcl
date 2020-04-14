@@ -255,7 +255,7 @@
               (type-code type-code) (size size) (lowtag lowtag)
               (stack-allocate-p stack-allocate-p)
               (lip lip))
-    `(pseudo-atomic (,flag-tn)
+    `(pseudo-atomic (,flag-tn :sync ,type-code)
        (allocation nil (pad-data-block ,size) ,lowtag ,result-tn
                    :flag-tn ,flag-tn
                    :stack-allocate-p ,stack-allocate-p
@@ -299,7 +299,7 @@
                            other-pointer-lowtag)))))
 
 ;;; handy macro for making sequences look atomic
-(defmacro pseudo-atomic ((flag-tn) &body forms)
+(defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   #+sb-safepoint-strictly
   `(progn ,@forms (emit-safepoint))
   #-sb-safepoint-strictly
@@ -320,7 +320,8 @@
          (load-symbol-value ,flag-tn *pseudo-atomic-interrupted*))
        #+sb-thread
        (progn
-         (inst dmb)
+         (when ,sync
+           (inst dmb))
          (inst str (32-bit-reg zr-tn)
                (@ thread-tn
                   (* n-word-bytes thread-pseudo-atomic-bits-slot)))
