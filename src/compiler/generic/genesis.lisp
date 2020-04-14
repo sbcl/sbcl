@@ -684,57 +684,47 @@
                        (make-fixnum-descriptor length))
     des))
 
+(defstruct (cold-layout (:constructor %make-cold-layout))
+  depthoid length bitmap flags inherits descriptor)
+
 ;;; the hosts's representation of LAYOUT-of-LAYOUT
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *host-layout-of-layout* (find-layout 'layout)))
+(defvar *host-layout-of-layout* (find-layout 'layout))
 
-#+64-bit
-(progn
-  (defun cold-layout-depthoid (layout)
-    (let ((bits (read-slot layout *host-layout-of-layout* :%bits)))
-      (sb-kernel::unpack-layout-bits bits :depthoid)))
-  (defun cold-layout-length (layout)
-    (let ((bits (read-slot layout *host-layout-of-layout* :%bits)))
-      (sb-kernel::unpack-layout-bits bits :length)))
-  (defun cold-layout-flags (layout)
-    (let ((bits (read-slot layout *host-layout-of-layout* :%bits)))
-      (sb-kernel::unpack-layout-bits bits :flags))))
-#-64-bit
-(progn
-  (defun cold-layout-depthoid (layout)
-    (descriptor-fixnum (read-slot layout *host-layout-of-layout* :depthoid)))
-  (defun cold-layout-length (layout)
-    (descriptor-fixnum (read-slot layout *host-layout-of-layout* :length)))
-  (defun cold-layout-flags (layout)
-    (read-slot layout *host-layout-of-layout* :flags)))
+;;; a map from name as a host symbol to the descriptor of its target layout
+(defvar *cold-layouts*)
+(defun cold-layout-descriptor-bits (name)
+  (descriptor-bits (cold-layout-descriptor (gethash name *cold-layouts*))))
 
+;;; Instances whose layout needs to be backpatched
 (defvar *layout-deferred-instances*)
+
 ;; Make a structure and set the header word and layout.
-;; LAYOUT-LENGTH is as returned by the like-named function.
-(defun allocate-struct
-    (gspace layout &optional (layout-length
-                              (etypecase layout
-                                (symbol (+ sb-vm:instance-data-start
-                                           (length (get layout 'dd-slots))))
-                                (descriptor
-                                 (cold-layout-length layout))))
-                             is-layout)
-  ;; Count +1 for the header word when allocating.
-  (let ((des (allocate-object gspace (1+ layout-length)
-                              sb-vm:instance-pointer-lowtag is-layout)))
-    (when (symbolp layout)
-      (push des (gethash layout *layout-deferred-instances*))
-      (setq layout (make-fixnum-descriptor 0)))
+;; NWORDS is the payload length (= DD-LENGTH = LAYOUT-LENGTH)
+(defun allocate-struct (nwords type &optional (gspace *dynamic*) is-layout)
+  ;; Add +1 for the header word when allocating.
+  (let* ((object (allocate-object gspace (1+ nwords)
+                                  sb-vm:instance-pointer-lowtag is-layout))
+         (layout
+          (if (symbolp type)
+              (let ((layout (gethash type *cold-layouts*)))
+                (cond (layout
+                       (cold-layout-descriptor layout))
+                      (t
+                       (push object (gethash type *layout-deferred-instances*))
+                       (make-fixnum-descriptor 0))))
+              type)))
     ;; Length as stored in the header is the exact number of useful words
     ;; that follow, as is customary. A padding word, if any is not "useful"
     (write-header-word
-     des
+     object
      (logior #+compact-instance-header (ash (descriptor-bits layout) 32)
-             (ash layout-length sb-vm:instance-length-shift)
+             (ash nwords sb-vm:instance-length-shift)
              sb-vm:instance-widetag))
     #-compact-instance-header
-    (write-wordindexed des sb-vm:instance-slots-offset layout)
-    des))
+    (write-wordindexed object sb-vm:instance-slots-offset layout)
+    object))
+(defun allocate-struct-of-type (type)
+  (allocate-struct (struct-size type) type))
 
 ;;;; copying simple objects into the cold core
 
@@ -936,11 +926,6 @@ core and return a descriptor to it."
 (defun cold-svref (vector i)
   (declare (type index i))
   (read-wordindexed vector (+ i sb-vm:vector-data-offset)))
-(defun cold-vector-elements-eq (a b)
-  (and (eql (cold-vector-len a) (cold-vector-len b))
-       (dotimes (k (cold-vector-len a) t)
-         (unless (descriptor= (cold-svref a k) (cold-svref b k))
-           (return nil)))))
 (defun vector-from-core (descriptor &optional (transform #'identity))
   (let* ((len (cold-vector-len descriptor))
          (vector (make-array len)))
@@ -1042,9 +1027,6 @@ core and return a descriptor to it."
 ;;; WHN 19990816] is initializing layout's layout, which must point to
 ;;; itself.
 
-;;; a map from name as a host symbol to the descriptor of its target layout
-(defvar *cold-layouts*)
-
 ;;; a map from DESCRIPTOR-BITS of cold layouts to the name, for inverting
 ;;; mapping
 (defvar *cold-layout-names*)
@@ -1053,11 +1035,6 @@ core and return a descriptor to it."
 (defvar *layout-layout*)
 
 (defvar *known-structure-classoids*)
-
-(defconstant target-layout-length
-  ;; LAYOUT-LENGTH counts the number of words in an instance,
-  ;; including the layout itself as 1 word
-  (layout-length *host-layout-of-layout*))
 
 ;;; Trivial methods [sic] require that we sort possible methods by the depthoid.
 ;;; Most of the objects printed in cold-init are ordered hierarchically in our
@@ -1075,24 +1052,19 @@ core and return a descriptor to it."
     ;; In reality it is type disjoint from structure-object.
     (condition 2)
     (t
-     (let ((target-layout (gethash class-name *cold-layouts*)))
-       (if target-layout
-           (cold-layout-depthoid target-layout)
-           (let ((host-layout (find-layout class-name)))
-             (if (layout-invalid host-layout)
-                 (error "~S has neither a host not target layout" class-name)
-                 (layout-depthoid host-layout))))))))
-
-;;; Return a list of names created from the cold layout INHERITS data
-;;; in X.
-(defun listify-cold-inherits (x)
-  (map 'list (lambda (cold-layout)
-               (or (gethash (descriptor-bits cold-layout) *cold-layout-names*)
-                   (error "~S is not the descriptor of a cold-layout" cold-layout)))
-       (vector-from-core x)))
+     (acond ((gethash class-name *cold-layouts*)
+             (cold-layout-depthoid it))
+            ((info :type :compiler-layout class-name)
+             (layout-depthoid it))
+            (t
+             (error "Unknown depthoid for ~S" class-name))))))
 
 (defun type-dd-slots-or-lose (type)
-  (or (get type 'dd-slots) (error "NO DD-SLOTS: ~S" type)))
+  (or (car (get type 'dd-proxy)) (error "NO DD-SLOTS: ~S" type)))
+;;; Return the value to supply as the first argument to ALLOCATE-STRUCT
+(defun struct-size (thing)
+  ;; ASSUMPTION: all slots consume 1 storage word
+  (+ sb-vm:instance-data-start (length (type-dd-slots-or-lose thing))))
 
 (declaim (ftype function read-slot write-slots))
 (flet ((get-slots (host-layout-or-type)
@@ -1134,12 +1106,16 @@ core and return a descriptor to it."
        (when (char= ch #\;)
          (return))
        (let* ((classoid-name (read stream))
-             (*package* (find-package (cl:symbol-package classoid-name))))
-         (setf (get classoid-name 'dd-slots)
-               (mapcar (lambda (x)
-                         (destructuring-bind (bits name acc) x
-                           (sb-kernel::make-dsd name nil acc bits nil)))
-                       (read stream))))))))
+              (flags+depthoid (read stream))
+              (*package* (find-package (cl:symbol-package classoid-name))))
+         (setf (get classoid-name 'dd-proxy)
+               (list (map 'vector
+                          (lambda (x)
+                            (destructuring-bind (bits name acc) x
+                              (sb-kernel::make-dsd name nil acc bits nil)))
+                          (read stream))
+                     :depthoid (cadr flags+depthoid)
+                     :flags (car flags+depthoid))))))))
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
@@ -1148,8 +1124,10 @@ core and return a descriptor to it."
                           descriptor)
                 make-cold-layout))
 (defun make-cold-layout (name depthoid flags length bitmap inherits)
-  (let ((result (allocate-struct (symbol-value *cold-layout-gspace*) *layout-layout*
-                                 target-layout-length t)))
+  ;; Can't call STRUCT-SIZE in first genesis - no metadata yet
+  (let ((result (allocate-struct (dd-length (find-defstruct-description 'layout))
+                                 *layout-layout*
+                                 (symbol-value *cold-layout-gspace*) t)))
     #+64-bit
     (write-slots result *host-layout-of-layout*
      :%bits (sb-kernel::pack-layout-bits depthoid length flags))
@@ -1196,7 +1174,13 @@ core and return a descriptor to it."
                (incf dsd-index)))
 
     (setf (gethash (descriptor-bits result) *cold-layout-names*) name
-          (gethash name *cold-layouts*) result)))
+          (gethash name *cold-layouts*) (%make-cold-layout :depthoid depthoid
+                                                           :length length
+                                                           :bitmap bitmap
+                                                           :flags flags
+                                                           :inherits inherits
+                                                           :descriptor result))
+    result))
 
 (defun predicate-for-specializer (type-name)
   (let ((classoid (find-classoid type-name nil)))
@@ -1258,8 +1242,6 @@ core and return a descriptor to it."
 ;;; The helper function is responsible for dealing with shared substructure.
 (defun struct-to-core (obj obj-to-core-helper)
   (let* ((host-type (type-of obj))
-         (target-layout (or (gethash host-type *cold-layouts*)
-                            (error "No target layout for ~S" obj)))
          (simple-slots
           ;; Precompute a list of slots that should be initialized to a
           ;; trivially dumpable constant in lieu of whatever complicated
@@ -1271,12 +1253,13 @@ core and return a descriptor to it."
               ;; we nonetheless must set LAYOUT to NIL or else warm build fails
               ;; in the twisty maze of class initializations.
               (,(get-dsd-index built-in-classoid layout) . nil)))))
-         (result (allocate-struct *dynamic* target-layout))
-         (dd-slots (type-dd-slots-or-lose host-type)))
+         (dd-slots (type-dd-slots-or-lose host-type))
+         ;; ASSUMPTION: all slots consume 1 storage word
+         (dd-len (+ sb-vm:instance-data-start (length dd-slots)))
+         (result (allocate-struct-of-type host-type)))
     ;; Dump the slots.
-    (do ((len (cold-layout-length target-layout))
-         (index sb-vm:instance-data-start (1+ index)))
-        ((= index len) result)
+    (do ((index sb-vm:instance-data-start (1+ index)))
+        ((= index dd-len) result)
       (let* ((dsd (find index dd-slots :key #'dsd-index))
              (host-val (funcall (dsd-accessor-name dsd) obj))
              (override (assq index simple-slots)))
@@ -1304,7 +1287,6 @@ core and return a descriptor to it."
   (write-wordindexed thing sb-vm:instance-slots-offset layout))
 
 (defun initialize-layouts ()
-  (clrhash *cold-layouts*)
   (setq *layout-layout* (make-fixnum-descriptor 0))
   (flet ((chill-layout (name &rest inherits)
            ;; Check that the number of specified INHERITS matches
@@ -1350,11 +1332,9 @@ core and return a descriptor to it."
 (defun cold-find-classoid-cell (name &key create)
   (aver (eq create t))
   (or (gethash name *classoid-cells*)
-      (let ((layout (gethash 'sb-kernel::classoid-cell *cold-layouts*))
-            (host-layout (find-layout 'sb-kernel::classoid-cell)))
+      (let ((host-layout (find-layout 'sb-kernel::classoid-cell)))
         (setf (gethash name *classoid-cells*)
-              (write-slots (allocate-struct *dynamic* layout
-                                            (layout-length host-layout))
+              (write-slots (allocate-struct-of-type 'sb-kernel::classoid-cell)
                            host-layout
                            :name name
                            :pcl-class *nil-descriptor*
@@ -1385,8 +1365,7 @@ core and return a descriptor to it."
         (package-layout (find-layout 'package))
         (target-pkg-list nil))
     (labels ((init-cold-package (name &optional docstring)
-               (let ((cold-package
-                      (allocate-struct *dynamic* (gethash 'package *cold-layouts*))))
+               (let ((cold-package (allocate-struct-of-type 'package)))
                  (setf (gethash name *cold-package-symbols*)
                        (cons (cons nil nil) cold-package))
                  ;; Initialize string slots
@@ -1532,27 +1511,26 @@ core and return a descriptor to it."
                          sb-vm:extended-symbol-size
                          sb-vm:symbol-size)
                      name :gspace gspace)))
-        ;; All interned symbols need a hash
-        (when core-file-name
-          ;; If not writing a core file, do not try to call SB-XC:SXHASH
-          ;; as it might not be defined (as when running make-c-runtime)
-          (write-wordindexed handle sb-vm:symbol-hash-slot
-                             (make-fixnum-descriptor (sb-xc:sxhash symbol))))
         (setf (get symbol 'cold-intern-info) handle)
         ;; maintain reverse map from target descriptor to host symbol
         (setf (gethash (descriptor-bits handle) *cold-symbols*) symbol)
-        (let ((pkg-info (or (gethash (package-name package) *cold-package-symbols*)
-                            (error "No target package descriptor for ~S" package))))
-          (write-wordindexed handle sb-vm:symbol-package-slot (cdr pkg-info))
-          (record-accessibility
-           (or access (nth-value 1 (find-symbol name package)))
-           pkg-info handle package symbol))
         #+sb-thread
         (let ((index (info :variable :wired-tls symbol)))
           (when (integerp index) ; thread slot or known TLS
             (cold-assign-tls-index handle index)))
-        (when (eq package *keyword-package*)
-          (cold-set handle handle))
+        ;; Steps that only make sense when writing a core file
+        (when core-file-name
+          ;; All interned symbols need a hash
+          (write-wordindexed handle sb-vm:symbol-hash-slot
+                             (make-fixnum-descriptor (sb-xc:sxhash symbol)))
+          (let ((pkg-info (or (gethash (package-name package) *cold-package-symbols*)
+                              (error "No target package descriptor for ~S" package))))
+            (write-wordindexed handle sb-vm:symbol-package-slot (cdr pkg-info))
+            (record-accessibility
+             (or access (nth-value 1 (find-symbol name package)))
+             pkg-info handle package symbol))
+          (when (eq package *keyword-package*)
+            (cold-set handle handle)))
         handle)))
 
 (defun record-accessibility (accessibility target-pkg-info symbol-descriptor
@@ -1604,7 +1582,8 @@ core and return a descriptor to it."
     ;; -1 is magic having to do with nil-as-cons vs. nil-as-symbol
     (write-wordindexed *nil-descriptor* (- sb-vm:symbol-package-slot 1)
                        (cdr target-cl-pkg-info))
-    (record-accessibility :external target-cl-pkg-info *nil-descriptor*))
+    (when core-file-name
+      (record-accessibility :external target-cl-pkg-info *nil-descriptor*)))
   ;; Intern the others.
   (dovector (symbol sb-vm:+static-symbols+)
     (let* ((des (cold-intern symbol :gspace *static*))
@@ -1636,7 +1615,7 @@ core and return a descriptor to it."
   #+compact-instance-header
   (write-wordindexed/raw (cold-intern 'sb-vm:function-layout)
                          sb-vm:symbol-value-slot
-                         (ash (descriptor-bits (gethash 'function *cold-layouts*)) 32))
+                         (ash (cold-layout-descriptor-bits 'function) 32))
 
   #+immobile-space
   (cold-set '**primitive-object-layouts**
@@ -1694,15 +1673,16 @@ core and return a descriptor to it."
 ;;; Sort *COLD-LAYOUTS* to return them in a deterministic order.
 (defun sort-cold-layouts ()
   (sort (%hash-table-alist *cold-layouts*) #'<
-        :key (lambda (x) (descriptor-bits (cdr x)))))
+        :key (lambda (x) (descriptor-bits (cold-layout-descriptor (cdr x))))))
 
 ;;; Establish initial values for magic symbols.
 ;;;
 (defun finish-symbols ()
   (cold-set '*!initial-layouts*
             (vector-in-core
-             (mapcar (lambda (layout)
-                       (cold-cons (cold-intern (car layout)) (cdr layout)))
+             (mapcar (lambda (pair)
+                       (cold-cons (cold-intern (car pair))
+                                  (cold-layout-descriptor (cdr pair))))
                      (sort-cold-layouts))))
 
   #+sb-thread
@@ -1928,7 +1908,8 @@ core and return a descriptor to it."
 
 (defun attach-classoid-cells-to-symbols (hashtable)
   (let ((num (sb-c::meta-info-number (sb-c::meta-info :type :classoid-cell)))
-        (layout (gethash 'sb-kernel::classoid-cell *cold-layouts*)))
+        (layout (cold-layout-descriptor
+                 (gethash 'sb-kernel::classoid-cell *cold-layouts*))))
     (when (plusp (hash-table-count *classoid-cells*))
       (aver layout))
     ;; Iteration order is immaterial. The symbols will get sorted later.
@@ -2301,7 +2282,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
 
 (define-cold-fop (fop-struct (size)) ; n-words incl. layout, excluding header
   (let* ((layout (pop-stack))
-         (result (allocate-struct *dynamic* layout size))
+         (result (allocate-struct size layout))
          (bitmap (descriptor-fixnum
                   (read-slot layout *host-layout-of-layout* :bitmap))))
     ;; Raw slots can not possibly work because dump-struct uses
@@ -2333,37 +2314,34 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (if (eq name 'condition) +condition-layout-flag+ flags)))
     (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
-    (when (member name '(pathname logical-pathname))
-      (setf flags (logior flags sb-kernel::+pathname-layout-flag+)))
+    (cond ((member name '(pathname logical-pathname))
+           (setf flags (logior flags sb-kernel::+pathname-layout-flag+)))
+          ((eq name 'layout)
+           (setq flags (logior flags sb-kernel::+layout-layout-flag+))))
+    ;; parameter have to match an existing FOP-LAYOUT invocation if there was one
+    (when existing-layout
+      (let ((old-flags (cold-layout-flags existing-layout))
+            (old-depthoid (cold-layout-depthoid existing-layout))
+            (old-length (cold-layout-length existing-layout))
+            (old-bitmap (cold-layout-bitmap existing-layout))
+            (old-inherits (cold-layout-inherits existing-layout)))
+        (unless (and (= flags old-flags)
+                     (= depthoid old-depthoid)
+                     (= length old-length)
+                     (= (descriptor-fixnum bitmap) (descriptor-fixnum old-bitmap))
+                     (eql (cold-vector-len inherits) (cold-vector-len old-inherits))
+                     (dotimes (i (cold-vector-len inherits) t)
+                       (unless (descriptor= (cold-svref inherits i)
+                                            (cold-svref old-inherits i))
+                         (return nil))))
+          ;; Users will never see this.
+          (format t "old=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
+                  old-flags old-depthoid old-length old-bitmap old-inherits)
+          (format t "new=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
+                  flags depthoid length (descriptor-fixnum bitmap) inherits)
+          (bug "Messed up fop-layout for ~s" name))))
     (if existing-layout
-        ;; If a layout of this name has been defined already, then
-        ;; enforce consistency between the existing and current definition,
-        ;; and return the existing.
-        (let ((old-flags (cold-layout-flags existing-layout))
-              (old-depthoid (cold-layout-depthoid existing-layout))
-              (old-length (cold-layout-length existing-layout))
-              (old-bitmap (host-object-from-core
-                           (read-slot existing-layout *host-layout-of-layout*
-                                      :bitmap)))
-              (old-inherits (read-slot existing-layout *host-layout-of-layout*
-                                       :inherits)))
-          (cond ((and (or (= flags old-flags)
-                          ;; A hack needed only for genesis, because normally
-                          ;; we never "reconstruct" the layout of layout.
-                          (eq name 'layout))
-                      (= depthoid old-depthoid)
-                      (= length old-length)
-                      (= (host-object-from-core bitmap) old-bitmap)
-                      (cold-vector-elements-eq inherits old-inherits))
-                 existing-layout)
-                (t
-                 ;; Users will never see this.
-                 (format t "old=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
-                         old-flags old-depthoid old-length old-bitmap old-inherits)
-                 (format t "new=(flags=~d depthoid=~d length=~d bitmap=~d inherits=~s)~%"
-                         flags depthoid length (descriptor-fixnum bitmap) inherits)
-                 (bug "can't alter layout of ~s" name))))
-        ;; Make a new definition from scratch.
+        (cold-layout-descriptor existing-layout)
         (make-cold-layout name depthoid flags length bitmap inherits))))
 
 ;;;; cold fops for loading symbols
@@ -2509,9 +2487,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
               (ctype-to-core spec (funcall fun spec))))
            (sb-thread:make-mutex
             (aver (eq (car args) :name))
-            (write-slots (allocate-struct *dynamic*
-                                          (gethash 'sb-thread:mutex *cold-layouts*
-                                                   'sb-thread:mutex))
+            (write-slots (allocate-struct-of-type 'sb-thread:mutex)
                          'sb-thread:mutex
                          :name (cadr args)
                          :%owner *nil-descriptor*))
@@ -2765,8 +2741,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
              (:code-object (descriptor-bits code-obj))
              #+sb-thread ; ENSURE-SYMBOL-TLS-INDEX isn't defined otherwise
              (:symbol-tls-index (ensure-symbol-tls-index sym))
-             (:layout (descriptor-bits (or (gethash sym *cold-layouts*)
-                                           (error "No cold-layout for ~S~%" sym))))
+             (:layout (cold-layout-descriptor-bits sym))
              (:immobile-symbol
               ;; an interned symbol is represented by its host symbol,
               ;; but an uninterned symbol is a descriptor.
@@ -3239,7 +3214,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
   ;; This #define is relative to the start of the fixedobj space to allow heap relocation.
   #+immobile-space
   (format stream "~@{#define LAYOUT_OF_~A (lispobj)(FIXEDOBJ_SPACE_START+0x~x)~%~}"
-          "FUNCTION" (- (descriptor-bits (gethash 'function *cold-layouts*))
+          "FUNCTION" (- (cold-layout-descriptor-bits 'function)
                         (gspace-byte-address *immobile-fixedobj*)))
   ;; For immobile code, define a constant for the address of the vector of
   ;; C-callable fdefns, and then fdefns in terms of indices to that vector.
@@ -3373,11 +3348,11 @@ III. initially undefined function references (alphabetically):
                 name)))
 
     (format t "~%~|~%V. layout names:~2%")
-    (dolist (x (sort-cold-layouts))
-      (let* ((des (cdr x))
-             (inherits (read-slot des *host-layout-of-layout* :inherits)))
-        (format t "~8,'0X: ~S[~D]~%~10T~:S~%" (descriptor-bits des) (car x)
-                  (cold-layout-length des) (listify-cold-inherits inherits))))
+    (dolist (pair (sort-cold-layouts))
+      (let* ((descriptor (cold-layout-descriptor (cdr pair)))
+             (addr (descriptor-bits descriptor)))
+        (format t "~8,'0X: ~S[~D]~%"
+                addr (car pair) (cold-layout-length (cdr pair)))))
 
     (format t "~%~|~%VI. parsed type specifiers:~2%")
     (mapc (lambda (cell)
@@ -3681,10 +3656,10 @@ III. initially undefined function references (alphabetically):
 
       ;; Prepare for cold load.
       (initialize-layouts)
-      (initialize-packages)
-      (initialize-static-space tls-init)
       (when core-file-name
-        (read-structure-definitions defstruct-descriptions))
+        (read-structure-definitions defstruct-descriptions)
+        (initialize-packages))
+      (initialize-static-space tls-init)
 
       ;; Load all assembler code
       (flet ((assembler-file-p (name) (tailwise-equal (namestring name) ".assem-obj")))
@@ -3736,7 +3711,8 @@ III. initially undefined function references (alphabetically):
                    (name (warm-symbol (read-slot dd dd-layout :name)))
                    (layout (gethash name *cold-layouts*)))
               (aver layout)
-              (write-slots layout *host-layout-of-layout* :info dd))))
+              (write-slots (cold-layout-descriptor layout) *host-layout-of-layout*
+                           :info dd))))
         (when verbose
           (format t "~&; SB-Loader: (~D~@{+~D~}) structs/vars/funs/methods/other~%"
                   (length *known-structure-classoids*)

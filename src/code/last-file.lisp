@@ -43,16 +43,21 @@
                           #'string<
                           ;; pair = (#<classoid> . #<layout>)
                           :key (lambda (pair) (classoid-name (car pair)))))
-        (let ((dd (layout-info (cdr pair))))
-          (when dd
+        (let* ((layout (cdr pair))
+               (dd (layout-info layout)))
+          (cond
+           (dd
             (let* ((*print-pretty* nil) ; output should be insensitive to host pprint
                    (*print-readably* t)
                    (classoid-name (classoid-name (car pair)))
                    (*package* (cl:symbol-package classoid-name)))
-              (format output "~/sb-ext:print-symbol-with-prefix/ (~%" classoid-name)
+              (format output "~/sb-ext:print-symbol-with-prefix/ (~D ~D) (~%"
+                      classoid-name (layout-flags layout) (layout-depthoid layout))
               (dolist (dsd (dd-slots dd) (format output ")~%"))
                 (format output "  (~d ~S ~S)~%"
                         (sb-kernel::dsd-bits dsd)
                         (dsd-name dsd)
-                        (dsd-accessor-name dsd))))))))
+                        (dsd-accessor-name dsd)))))
+           (t
+            (error "Missing DD for ~S" pair))))))
     (format output ";; EOF~%")))
