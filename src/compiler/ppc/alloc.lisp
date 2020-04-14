@@ -43,7 +43,7 @@
              (let* ((dx-p (node-stack-allocate-p node))
                     (cons-cells (if star (1- num) num))
                     (alloc (* (pad-data-block cons-size) cons-cells)))
-               (pseudo-atomic (pa-flag)
+               (pseudo-atomic (pa-flag :sync nil)
                  (if dx-p
                      (progn
                        (align-csp res)

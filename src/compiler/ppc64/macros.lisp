@@ -275,7 +275,7 @@
   initializes the object."
   (once-only ((result-tn result-tn) (temp-tn temp-tn) (flag-tn flag-tn)
               (type-code type-code) (size size) (lowtag lowtag))
-    `(pseudo-atomic (,flag-tn)
+    `(pseudo-atomic (,flag-tn :sync ,type-code)
        (if ,stack-allocate-p
            (progn
              (align-csp ,temp-tn)
@@ -329,14 +329,15 @@
 ;;; aligns ALLOC-TN again and (b) makes ALLOC-TN go negative. We then
 ;;; trap if ALLOC-TN's negative (handling the deferred interrupt) and
 ;;; using FLAG-TN - minus the large constant - to correct ALLOC-TN.
-(defmacro pseudo-atomic ((flag-tn) &body forms)
+(defmacro pseudo-atomic ((flag-tn &key (sync t)) &body forms)
   #+sb-safepoint-strictly
   `(progn ,flag-tn ,@forms (emit-safepoint))
   #-sb-safepoint-strictly
   `(progn
      (inst ori alloc-tn alloc-tn pseudo-atomic-flag)
      ,@forms
-     (inst sync)
+     (when ,sync
+      (inst sync))
      (without-scheduling ()
        (inst subi alloc-tn alloc-tn pseudo-atomic-flag)
        ;; Now test to see if the pseudo-atomic interrupted bit is set.

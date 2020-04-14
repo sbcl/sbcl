@@ -1136,6 +1136,7 @@ default-value-8
 
 ;;; Turn more arg (context, count) into a list.
 (define-vop ()
+  (:translate %listify-rest-args)
   (:args (context-arg :target context :scs (descriptor-reg))
          (count-arg :target count :scs (any-reg)))
   (:arg-types * tagged-num)
@@ -1145,7 +1146,6 @@ default-value-8
   (:temporary (:scs (non-descriptor-reg) :from :eval) dst)
   (:temporary (:sc non-descriptor-reg :offset nl3-offset) pa-flag)
   (:results (result :scs (descriptor-reg)))
-  (:translate %listify-rest-args)
   (:policy :safe)
   (:node-var node)
   (:generator 20
@@ -1161,7 +1161,7 @@ default-value-8
       (inst beq done)
 
     ;; We need to do this atomically.
-    (pseudo-atomic (pa-flag)
+    (pseudo-atomic (pa-flag :sync nil)
       ;; Allocate a cons (2 words) for each item.
       (if dx-p
           (progn
