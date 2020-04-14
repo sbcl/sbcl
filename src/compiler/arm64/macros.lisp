@@ -490,18 +490,12 @@
 
 (defmacro load-tl-symbol-value (reg symbol)
   #+sb-thread
-  `(let ((reg ,reg))
-     (load-symbol tmp-tn ',symbol)
-     (inst ldr (32-bit-reg tmp-tn) (tls-index-of tmp-tn))
-     (inst ldr reg (@ thread-tn tmp-tn)))
+  `(inst ldr ,reg (@ thread-tn ,(info :variable :wired-tls symbol)))
   #-sb-thread
   `(load-symbol-value ,reg ,symbol))
 
 (defmacro store-tl-symbol-value (reg symbol)
   #+sb-thread
-  `(let ((reg ,reg))
-     (load-symbol tmp-tn ',symbol)
-     (inst ldr (32-bit-reg tmp-tn) (tls-index-of tmp-tn))
-     (inst str reg (@ thread-tn tmp-tn)))
+  `(inst str ,reg (@ thread-tn ,(info :variable :wired-tls symbol)))
   #-sb-thread
   `(store-symbol-value ,reg ,symbol))
