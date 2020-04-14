@@ -55,6 +55,16 @@
   (def loadw ldr word-shift)
   (def storew str word-shift))
 
+(defmacro storew-pair (object1 offset1 object2 offset2
+                       base)
+  (assert (= (eval offset1) (1- (eval offset2))))
+  `(inst stp ,object1 ,object2 (@ ,base (* ,(eval offset1) n-word-bytes))))
+
+(defmacro loadw-pair (object1 offset1 object2 offset2
+                       base)
+  (assert (= (eval offset1) (1- (eval offset2))))
+  `(inst ldp ,object1 ,object2 (@ ,base (* ,(eval offset1) n-word-bytes))))
+
 (defmacro load-symbol (reg symbol)
   (once-only ((reg reg) (symbol symbol))
     `(inst add ,reg null-tn (add-sub-immediate  (static-symbol-offset ,symbol)))))

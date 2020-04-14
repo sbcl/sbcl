@@ -159,9 +159,7 @@
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst cbz catch error))
 
-  #.(assert (= catch-block-previous-catch-slot
-               (1- catch-block-tag-slot)))
-  (inst ldp tmp-tn tag (@ catch (* catch-block-previous-catch-slot n-word-bytes)))
+  (loadw-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot catch)
   (inst cmp tag target)
   (inst b :eq DONE)
   (inst mov catch tmp-tn)
@@ -201,19 +199,15 @@
   (unbind-to-here where symbol value tmp-tn)
 
   (store-tl-symbol-value next-uwp *current-unwind-protect-block*)
-  #.(assert (= unwind-block-cfp-slot
-               (1- unwind-block-code-slot)))
-  (inst ldp cfp-tn code-tn (@ cur-uwp (* unwind-block-cfp-slot n-word-bytes)))
+  (loadw-pair cfp-tn unwind-block-cfp-slot code-tn unwind-block-code-slot cur-uwp)
 
   (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value next-uwp *current-catch-block*)
 
-  (loadw next-uwp cur-uwp unwind-block-nsp-slot)
+  (loadw-pair tmp-tn unwind-block-nfp-slot next-uwp unwind-block-nsp-slot cur-uwp)
   (inst mov-sp nsp-tn next-uwp)
-
-  (loadw next-uwp cur-uwp unwind-block-nfp-slot)
-  (inst cbz next-uwp SKIP)
-  (inst mov (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset) next-uwp)
+  (inst cbz tmp-tn SKIP)
+  (inst mov (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset) tmp-tn)
   SKIP
 
   (loadw lra cur-uwp unwind-block-entry-pc-slot)

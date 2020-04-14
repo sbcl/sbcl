@@ -53,23 +53,23 @@
   (:generator 22
     (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    #.(assert (= unwind-block-uwp-slot
-                 (1- unwind-block-cfp-slot)))
-    (inst stp temp cfp-tn (@ block (* unwind-block-uwp-slot n-word-bytes)))
+    (storew-pair temp unwind-block-uwp-slot cfp-tn unwind-block-cfp-slot block)
     (inst compute-lra temp lip entry-label)
-    #.(assert (= unwind-block-code-slot
-                 (1- unwind-block-entry-pc-slot)))
-    (inst stp code-tn temp (@ block (* unwind-block-code-slot n-word-bytes)))
+    (storew-pair code-tn unwind-block-code-slot temp unwind-block-entry-pc-slot block)
+    #+sb-thread
+    (loadw-pair 
+     temp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)
+     tmp-tn (/ (info :variable :wired-tls '*current-catch-block*) n-word-bytes)
+     thread-tn)
+    #-sb-thread
     (progn
       (load-binding-stack-pointer temp)
-      (storew temp block unwind-block-bsp-slot)
-      (load-tl-symbol-value temp *current-catch-block*)
-      (storew temp block unwind-block-current-catch-slot)
-      (storew (or (current-nfp-tn vop)
-                  zr-tn)
-          block unwind-block-nfp-slot)
-      (inst mov-sp temp nsp-tn)
-      (storew temp block unwind-block-nsp-slot))))
+      (load-tl-symbol-value tmp-tn *current-catch-block*))
+    (storew-pair temp unwind-block-bsp-slot tmp-tn unwind-block-current-catch-slot block)
+    (inst mov-sp temp nsp-tn)
+    (storew-pair (or (current-nfp-tn vop) zr-tn) unwind-block-nfp-slot
+                 temp unwind-block-nsp-slot
+                 block)))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
@@ -84,25 +84,25 @@
   (:generator 44
     (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    #.(assert (= catch-block-uwp-slot
-                 (1- catch-block-cfp-slot)))
-    (inst stp temp cfp-tn (@ block (* catch-block-uwp-slot n-word-bytes)))
-    #.(assert (= catch-block-code-slot
-                 (1- catch-block-entry-pc-slot)))
+    (storew-pair temp catch-block-uwp-slot cfp-tn catch-block-cfp-slot block)
     (inst compute-lra temp lip entry-label)
-    (inst stp code-tn temp (@ block (* catch-block-code-slot n-word-bytes)))
-    #.(assert (= catch-block-previous-catch-slot
-                 (1- catch-block-tag-slot)))
-    (load-tl-symbol-value temp *current-catch-block*)
-    (inst stp temp tag (@ block (* catch-block-previous-catch-slot n-word-bytes)))
+    (storew-pair code-tn catch-block-code-slot temp catch-block-entry-pc-slot block)
+    
+    #+sb-thread
+    (loadw-pair 
+     temp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)
+     tmp-tn (/ (info :variable :wired-tls '*current-catch-block*) n-word-bytes)
+     thread-tn)
+    #-sb-thread
     (progn
       (load-binding-stack-pointer temp)
-      (storew temp block catch-block-bsp-slot)
-      (storew (or (current-nfp-tn vop)
-                  zr-tn)
-          block catch-block-nfp-slot)
-      (inst mov-sp temp nsp-tn)
-      (storew temp block catch-block-nsp-slot))
+      (load-tl-symbol-value tmp-tn *current-catch-block*))
+    (storew-pair tmp-tn catch-block-previous-catch-slot tag catch-block-tag-slot block)
+    (storew temp block catch-block-bsp-slot)
+    (inst mov-sp temp nsp-tn)
+    (storew-pair (or (current-nfp-tn vop) zr-tn) unwind-block-nfp-slot
+                 temp unwind-block-nsp-slot
+                 block)
     (store-tl-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to UWP.  This
