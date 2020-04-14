@@ -1564,6 +1564,33 @@ core and return a descriptor to it."
          ;; in static space need to be accounted for by STATIC-SYMBOL-OFFSET.
          (name (set-readonly (base-string-to-core "NIL" *dynamic*))))
     (aver (= (descriptor-bits nil-val) sb-vm:nil-value))
+
+    ;; Alter the first word to 0 instead of the symbol size. It reads as a fixnum,
+    ;; but is meaningless. Not only that, the widetag is relatively meaningless too,
+    ;; even though you can access memory at [NIL - other-pointer-lowtag].
+    ;; In practice, you can never utilize the fact that NIL has a widetag,
+    ;; and therefore any use of NIL-as-symbol must pre-check for NIL. Consider:
+    ;;   50100000: 0000000000000000 = 0
+    ;;   50100008: 0000000000000045
+    ;;   50100010: 0000000050100017 = NIL              <-- base address of NIL
+    ;;   50100018: 0000000050100017 = NIL
+    ;;   50100020: 0000001000000007 = (NIL ..)
+    ;;   50100028: 000000100000800F = "NIL"
+    ;;   50100030: 0000001000000013 = #<PACKAGE "COMMON-LISP">
+    ;;   50100038: 0000000000000000 = 0
+    ;;
+    ;; Indeed *(char*)(NIL-0xf) = *(char*)0x50100008 = 0x45, /* if little-endian */
+    ;; so why can't we exploit this to improve SYMBOLP? Hypothetically:
+    ;;    if (((ptr & 7) == 7) && *(char*)(ptr-15) == SYMBOL_WIDETAG) { }
+    ;; which is true of NIL and all other symbols, but wrong, because it assumes
+    ;; that _any_ cons cell could be accessed at a negative displacement from its
+    ;; base address. Only NIL (viewed as a cons) has this property.
+    ;; Performing that test on a cons at the first word of a page following an
+    ;; unreadable page would fault. Moreover, the word preceding a random cons would
+    ;; not necessarily be a widetag - it could be raw bits of a struct. Finally,
+    ;; the above sequence would not necessarily decrease the instruction count!
+
+    (write-wordindexed des 0 (make-fixnum-descriptor 0))
     (write-wordindexed des 1 header)
     (write-wordindexed des (+ 1 sb-vm:symbol-value-slot) nil-val)
     (write-wordindexed des (+ 1 sb-vm:symbol-hash-slot) nil-val)
