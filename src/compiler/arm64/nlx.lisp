@@ -57,7 +57,7 @@
     (inst compute-lra temp lip entry-label)
     (storew-pair code-tn unwind-block-code-slot temp unwind-block-entry-pc-slot block)
     #+sb-thread
-    (loadw-pair 
+    (loadw-pair
      temp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)
      tmp-tn (/ (info :variable :wired-tls '*current-catch-block*) n-word-bytes)
      thread-tn)
@@ -87,9 +87,9 @@
     (storew-pair temp catch-block-uwp-slot cfp-tn catch-block-cfp-slot block)
     (inst compute-lra temp lip entry-label)
     (storew-pair code-tn catch-block-code-slot temp catch-block-entry-pc-slot block)
-    
+
     #+sb-thread
-    (loadw-pair 
+    (loadw-pair
      temp (/ (info :variable :wired-tls '*binding-stack-pointer*) n-word-bytes)
      tmp-tn (/ (info :variable :wired-tls '*current-catch-block*) n-word-bytes)
      thread-tn)
