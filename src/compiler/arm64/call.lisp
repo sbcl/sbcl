@@ -757,9 +757,8 @@
     (move csp-tn cfp-tn)
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp (add-sub-immediate
-                                   (bytes-needed-for-non-descriptor-stack-frame)))
-        (inst mov-sp nsp-tn cur-nfp)))
+        (inst add nsp-tn cur-nfp (add-sub-immediate
+                                  (bytes-needed-for-non-descriptor-stack-frame)))))
     (move cfp-tn old-fp-temp)
     (lisp-return return-pc-temp lip :known)))
 
@@ -931,9 +930,8 @@
                             '((:load-return-pc
                                (error "RETURN-PC not in its passing location"))
                               (:frob-nfp
-                               (inst add cur-nfp cur-nfp (add-sub-immediate
-                                                          (bytes-needed-for-non-descriptor-stack-frame)))
-                               (inst mov-sp nsp-tn cur-nfp)))
+                               (inst add nsp-tn cur-nfp (add-sub-immediate
+                                                         (bytes-needed-for-non-descriptor-stack-frame)))))
                             `((:comp-lra
                                (inst compute-lra lip lip lra-label)
                                (inst str lip (@ new-fp (* lra-save-offset
@@ -1054,9 +1052,8 @@
     ;; Clear the number stack if anything is there.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp (add-sub-immediate
-                                   (bytes-needed-for-non-descriptor-stack-frame)))
-        (inst mov-sp nsp-tn cur-nfp)))
+        (inst add nsp-tn cur-nfp (add-sub-immediate
+                                  (bytes-needed-for-non-descriptor-stack-frame)))))
     (load-inline-constant tmp-tn '(:fixup tail-call-variable :assembly-routine) lip)
     (inst br tmp-tn)))
 
@@ -1074,9 +1071,8 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp (add-sub-immediate
-                                   (bytes-needed-for-non-descriptor-stack-frame)))
-        (inst mov-sp nsp-tn cur-nfp)))
+        (inst add nsp-tn cur-nfp (add-sub-immediate
+                                  (bytes-needed-for-non-descriptor-stack-frame)))))
     ;; Clear the control stack, and restore the frame pointer.
     (move csp-tn cfp-tn)
     (move cfp-tn old-fp)
@@ -1115,9 +1111,8 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp (add-sub-immediate
-                                   (bytes-needed-for-non-descriptor-stack-frame)))
-        (inst mov-sp nsp-tn cur-nfp)))
+        (inst add nsp-tn cur-nfp (add-sub-immediate
+                                  (bytes-needed-for-non-descriptor-stack-frame)))))
     (cond ((= nvals 1)
            ;; Clear the control stack, and restore the frame pointer.
            (move csp-tn cfp-tn)
@@ -1163,9 +1158,8 @@
     ;; Clear the number stack.
     (let ((cur-nfp (current-nfp-tn vop)))
       (when cur-nfp
-        (inst add cur-nfp cur-nfp (add-sub-immediate
-                                   (bytes-needed-for-non-descriptor-stack-frame)))
-        (inst mov-sp nsp-tn cur-nfp)))
+        (inst add nsp-tn cur-nfp (add-sub-immediate
+                                  (bytes-needed-for-non-descriptor-stack-frame)))))
 
     ;; Check for the single case.
     (inst cmp nvals-arg (fixnumize 1))
