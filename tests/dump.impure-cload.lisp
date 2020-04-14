@@ -423,6 +423,7 @@
     (assert (eq (aref pairs 4) 'second))))
 
 (defun list-coalescing-test-fun-1 ()
+  (declare (optimize (debug 1)))
   ;; base coalesces with base, non-base coalesces with non-base
   (values '#.`(foo ,(coerce "a" 'base-string))
           '#.`(foo ,(coerce "a" '(array character)))
@@ -430,6 +431,7 @@
           '#.`(foo ,(coerce "a" '(array character)))))
 
 (defun list-coalescing-test-fun-2 ()
+  (declare (optimize (debug 1)))
   (values '#.`(foo ,(coerce "a" '(array character)))
           '#.`(foo ,(coerce "a" 'base-string))))
 

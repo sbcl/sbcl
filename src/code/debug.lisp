@@ -1790,7 +1790,7 @@ forms that explicitly control this kind of evaluation.")
       (sb-vm::%primitive sb-vm::unwind-to-frame-and-call
                          (sb-di::frame-pointer frame)
                          (find-enclosing-uwp frame)
-                         #-x86-64
+                         #-unbind-in-unwind
                          (lambda ()
                            ;; Before calling the user-specified
                            ;; function, we need to restore the binding
@@ -1800,9 +1800,9 @@ forms that explicitly control this kind of evaluation.")
                                               unbind-to)
                            (setf sb-vm::*current-catch-block* catch-block)
                            (funcall thunk))
-                         #+x86-64 thunk
-                         #+x86-64 unbind-to
-                         #+x86-64 catch-block)))
+                         #+unbind-in-unwind thunk
+                         #+unbind-in-unwind unbind-to
+                         #+unbind-in-unwind catch-block)))
   #-unwind-to-frame-and-call-vop
   (let ((tag (gensym)))
     (replace-frame-catch-tag frame

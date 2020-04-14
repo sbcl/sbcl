@@ -330,7 +330,7 @@
   ;; argument's CURRENT-UWP-SLOT?
   (inst cmp uwp
         (object-slot-ea block unwind-block-uwp-slot 0))
-  ;; If a match, return to conitext in arg block.
+  ;; If a match, return to context in arg block.
   (inst jmp :e DO-EXIT)
 
   ;; Not a match - return to *CURRENT-UNWIND-PROTECT-BLOCK* context.

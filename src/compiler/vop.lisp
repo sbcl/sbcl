@@ -500,17 +500,16 @@
   ;; the saved control stack pointer
   (save-sp nil :type (or tn null))
   ;; the list of dynamic state save TNs
-
-  (dynamic-state #-x86-64
-                 (list* (make-stack-pointer-tn)
+  #-unbind-in-unwind
+  (dynamic-state (list* (make-stack-pointer-tn)
                         (make-dynamic-state-tns))
-                 #+x86-64 nil
                  :type list)
   ;; the target label for NLX entry
   (target (gen-label) :type label))
 (defprinter (ir2-nlx-info)
   home
   save-sp
+  #-unbind-in-unwind
   dynamic-state)
 
 ;;;; VOPs and templates

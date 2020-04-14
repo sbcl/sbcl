@@ -159,9 +159,9 @@
   (let ((error (generate-error-code nil 'unseen-throw-tag-error target)))
     (inst cbz catch error))
 
-  #.(assert (and (= catch-block-previous-catch-slot 4)
-                 (= catch-block-tag-slot 5)))
-  (inst ldp tmp-tn tag (@ catch (* 4 n-word-bytes)))
+  #.(assert (= catch-block-previous-catch-slot
+               (1- catch-block-tag-slot)))
+  (inst ldp tmp-tn tag (@ catch (* catch-block-previous-catch-slot n-word-bytes)))
   (inst cmp tag target)
   (inst b :eq DONE)
   (inst mov catch tmp-tn)
@@ -180,21 +180,41 @@
      (:temp ocfp any-reg ocfp-offset)
      (:temp lra descriptor-reg lexenv-offset)
      (:temp cur-uwp any-reg nl2-offset)
-     (:temp lip interior-reg lr-offset))
+     (:temp lip interior-reg lr-offset)
+     (:temp next-uwp any-reg nl3-offset)
+     ;; for unbind-to-here
+     (:temp where any-reg r1-offset)
+     (:temp symbol descriptor-reg r2-offset)
+     (:temp value descriptor-reg r3-offset))
   (declare (ignore start count))
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst cbz block error))
   (load-tl-symbol-value cur-uwp *current-unwind-protect-block*)
   (loadw ocfp block unwind-block-uwp-slot)
+  (inst mov next-uwp cur-uwp)
   (inst cmp cur-uwp ocfp)
   (inst b :eq EQ)
-  (loadw ocfp cur-uwp unwind-block-uwp-slot)
-  (store-tl-symbol-value ocfp *current-unwind-protect-block*)
+  (loadw next-uwp cur-uwp unwind-block-uwp-slot)
   EQ
   (inst csel cur-uwp block cur-uwp :eq)
+  (loadw where cur-uwp unwind-block-bsp-slot)
+  (unbind-to-here where symbol value tmp-tn)
 
-  #.(assert (and (= unwind-block-cfp-slot 1)
-                 (= unwind-block-code-slot 2)))
-  (inst ldp cfp-tn code-tn (@ cur-uwp n-word-bytes))
+  (store-tl-symbol-value next-uwp *current-unwind-protect-block*)
+  #.(assert (= unwind-block-cfp-slot
+               (1- unwind-block-code-slot)))
+  (inst ldp cfp-tn code-tn (@ cur-uwp (* unwind-block-cfp-slot n-word-bytes)))
+
+  (loadw next-uwp cur-uwp unwind-block-current-catch-slot)
+  (store-tl-symbol-value next-uwp *current-catch-block*)
+
+  (loadw next-uwp cur-uwp unwind-block-nsp-slot)
+  (inst mov-sp nsp-tn next-uwp)
+
+  (loadw next-uwp cur-uwp unwind-block-nfp-slot)
+  (inst cbz next-uwp SKIP)
+  (inst mov (make-random-tn :kind :normal :sc (sc-or-lose 'any-reg) :offset nfp-offset) next-uwp)
+  SKIP
+
   (loadw lra cur-uwp unwind-block-entry-pc-slot)
   (lisp-return lra lip :known))

@@ -325,9 +325,10 @@ during backtrace.
   entry-pc
   #+(and win32 x86) next-seh-frame
   #+(and win32 x86) seh-frame-handler
-  #+x86-64 bsp
-  #+x86-64
-  current-catch)
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
+  #+unbind-in-unwind bsp
+  #+unbind-in-unwind current-catch)
 
 (define-primitive-object (catch-block)
   (uwp :c-type #-alpha "struct unwind_block *" #+alpha "u32")
@@ -336,7 +337,9 @@ during backtrace.
   entry-pc
   #+(and win32 x86) next-seh-frame
   #+(and win32 x86) seh-frame-handler
-  #+x86-64 bsp
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nfp
+  #+(and unbind-in-unwind (not c-stack-is-control-stack)) nsp
+  #+unbind-in-unwind bsp
   (previous-catch :c-type #-alpha "struct catch_block *" #+alpha "u32")
   tag)
 

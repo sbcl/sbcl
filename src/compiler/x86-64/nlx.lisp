@@ -24,28 +24,6 @@
   (ea (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size)) rbp-tn))
 
 ;;;; Save and restore dynamic environment.
-;;;;
-;;;; These VOPs are used in the reentered function to restore the
-;;;; appropriate dynamic environment. Currently we only save the
-;;;; Current-Catch. (Before sbcl-0.7.0,
-;;;; when there were IR1 and byte interpreters, we had to save
-;;;; the interpreter "eval stack" too.)
-;;;;
-;;;; We don't need to save/restore the current UNWIND-PROTECT, since
-;;;; UNWIND-PROTECTs are implicitly processed during unwinding.
-;;;;
-;;;; We don't need to save the BSP, because that is handled automatically.
-
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg)))
-  (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)))
-
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg)))
-  (:generator 10
-    (store-tl-symbol-value catch *current-catch-block*)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg control-stack)))
   (:generator 1

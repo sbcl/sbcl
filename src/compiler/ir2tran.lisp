@@ -1937,10 +1937,10 @@ not stack-allocated LVAR ~S." source-lvar)))))
                     (node-physenv node)))
          (res (make-stack-pointer-tn))
          (target-label (ir2-nlx-info-target 2info)))
-    #-x86-64
+    #-unbind-in-unwind
     (vop current-binding-pointer node block
          (car (ir2-nlx-info-dynamic-state 2info)))
-    #-x86-64
+    #-unbind-in-unwind
     (vop* save-dynamic-state node block
           (nil)
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) t)))
@@ -2045,11 +2045,11 @@ not stack-allocated LVAR ~S." source-lvar)))))
     ;; Make sure this is done before NSP is reset, as that may leave
     ;; *free-interrupt-context-index* unprotected below the stack
     ;; pointer.
-    #-x86-64
+    #-unbind-in-unwind
     (vop unbind-to-here node block
          (car (ir2-nlx-info-dynamic-state 2info)))
 
-    #-x86-64
+    #-unbind-in-unwind
     (vop* restore-dynamic-state node block
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
           (nil))))

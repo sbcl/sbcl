@@ -230,6 +230,8 @@
     (emit-return-pc label)
     (note-this-location vop :non-local-entry)))
 
+;;; Doesn't handle NSP and is disabled.
+#+unwind-to-frame-and-call-vop
 (define-vop (unwind-to-frame-and-call)
   (:args (ofp :scs (descriptor-reg))
          (uwp :scs (descriptor-reg))

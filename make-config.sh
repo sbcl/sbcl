@@ -687,7 +687,7 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :alien-callbacks :cycle-counter' >> $ltf
     printf ' :integer-eql-vop' >> $ltf
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf
-    printf ' :undefined-fun-restarts :call-symbol' >> $ltf
+    printf ' :undefined-fun-restarts :call-symbol :unbind-in-unwind' >> $ltf
     case "$sbcl_os" in
     linux | darwin | *bsd)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
@@ -779,14 +779,13 @@ elif [ "$sbcl_arch" = "arm" ]; then
     printf ' :arm-vfp :arm-vfpv2' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :unwind-to-frame-and-call-vop' >> $ltf
     printf ' :fp-and-pc-standard-save' >> $ltf
 elif [ "$sbcl_arch" = "arm64" ]; then
     printf ' :64-bit :gencgc :fp-and-pc-standard-save' >> $ltf
     printf ' :alien-callbacks' >> $ltf
     printf ' :stack-allocatable-lists :stack-allocatable-fixed-objects' >> $ltf
     printf ' :stack-allocatable-vectors :stack-allocatable-closures' >> $ltf
-    printf ' :unwind-to-frame-and-call-vop' >> $ltf
+    printf ' :unbind-in-unwind' >> $ltf
     printf ' :compare-and-swap-vops :undefined-fun-restarts' >> $ltf
 else
     # Nothing need be done in this case, but sh syntax wants a placeholder.

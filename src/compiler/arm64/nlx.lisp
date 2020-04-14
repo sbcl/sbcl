@@ -18,38 +18,6 @@
   (make-wired-tn *fixnum-primitive-type* immediate-arg-scn r8-offset))
 
 ;;; Save and restore dynamic environment.
-;;;
-;;; These VOPs are used in the reentered function to restore the appropriate
-;;; dynamic environment.  Currently we only save the Current-Catch and binding
-;;; stack pointer.  We don't need to save/restore the current unwind-protect,
-;;; since unwind-protects are implicitly processed during unwinding.  If there
-;;; were any additional stacks, then this would be the place to restore the top
-;;; pointers.
-
-(define-vop (save-dynamic-state)
-  (:results (catch :scs (descriptor-reg))
-            (nfp :scs (descriptor-reg))
-            (nsp :scs (descriptor-reg)))
-  (:vop-var vop)
-  (:generator 13
-    (load-tl-symbol-value catch *current-catch-block*)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move nfp cur-nfp)))
-    (inst mov-sp nsp nsp-tn)))
-
-(define-vop (restore-dynamic-state)
-  (:args (catch :scs (descriptor-reg))
-         (nfp :scs (descriptor-reg))
-         (nsp :scs (descriptor-reg)))
-  (:vop-var vop)
-  (:generator 10
-    (store-tl-symbol-value catch *current-catch-block*)
-    (let ((cur-nfp (current-nfp-tn vop)))
-      (when cur-nfp
-        (move cur-nfp nfp)))
-    (inst mov-sp nsp-tn nsp)))
-
 (define-vop (current-stack-pointer)
   (:results (res :scs (any-reg descriptor-reg)))
   (:generator 1
@@ -81,16 +49,27 @@
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
   (:temporary (:scs (interior-reg)) lip)
+  (:vop-var vop)
   (:generator 22
     (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    #.(assert (and (= unwind-block-uwp-slot 0)
-                   (= unwind-block-cfp-slot 1)))
-    (inst stp temp cfp-tn (@ block))
+    #.(assert (= unwind-block-uwp-slot
+                 (1- unwind-block-cfp-slot)))
+    (inst stp temp cfp-tn (@ block (* unwind-block-uwp-slot n-word-bytes)))
     (inst compute-lra temp lip entry-label)
-    #.(assert (and (= unwind-block-code-slot 2)
-                   (= unwind-block-entry-pc-slot 3)))
-    (inst stp code-tn temp (@ block (* n-word-bytes 2)))))
+    #.(assert (= unwind-block-code-slot
+                 (1- unwind-block-entry-pc-slot)))
+    (inst stp code-tn temp (@ block (* unwind-block-code-slot n-word-bytes)))
+    (progn
+      (load-binding-stack-pointer temp)
+      (storew temp block unwind-block-bsp-slot)
+      (load-tl-symbol-value temp *current-catch-block*)
+      (storew temp block unwind-block-current-catch-slot)
+      (storew (or (current-nfp-tn vop)
+                  zr-tn)
+          block unwind-block-nfp-slot)
+      (inst mov-sp temp nsp-tn)
+      (storew temp block unwind-block-nsp-slot))))
 
 ;;; Like Make-Unwind-Block, except that we also store in the specified tag, and
 ;;; link the block into the Current-Catch list.
@@ -100,25 +79,31 @@
   (:info entry-label)
   (:results (block :scs (any-reg)))
   (:temporary (:scs (descriptor-reg)) temp)
-  (:temporary (:scs (descriptor-reg) :target block :to (:result 0)) result)
   (:temporary (:scs (interior-reg)) lip)
+  (:vop-var vop)
   (:generator 44
-    (inst add result cfp-tn (add-sub-immediate (tn-byte-offset tn)))
+    (inst add block cfp-tn (add-sub-immediate (tn-byte-offset tn)))
     (load-tl-symbol-value temp *current-unwind-protect-block*)
-    #.(assert (and (= catch-block-uwp-slot 0)
-                   (= catch-block-cfp-slot 1)))
-    (inst stp temp cfp-tn (@ result))
-    #.(assert (and (= catch-block-code-slot 2)
-                   (= catch-block-entry-pc-slot 3)))
+    #.(assert (= catch-block-uwp-slot
+                 (1- catch-block-cfp-slot)))
+    (inst stp temp cfp-tn (@ block (* catch-block-uwp-slot n-word-bytes)))
+    #.(assert (= catch-block-code-slot
+                 (1- catch-block-entry-pc-slot)))
     (inst compute-lra temp lip entry-label)
-    (inst stp code-tn temp (@ result (* n-word-bytes 2)))
-    #.(assert (and (= catch-block-previous-catch-slot 4)
-                   (= catch-block-tag-slot 5)))
+    (inst stp code-tn temp (@ block (* catch-block-code-slot n-word-bytes)))
+    #.(assert (= catch-block-previous-catch-slot
+                 (1- catch-block-tag-slot)))
     (load-tl-symbol-value temp *current-catch-block*)
-    (inst stp temp tag (@ result (* n-word-bytes 4)))
-    (store-tl-symbol-value result *current-catch-block*)
-
-    (move block result)))
+    (inst stp temp tag (@ block (* catch-block-previous-catch-slot n-word-bytes)))
+    (progn
+      (load-binding-stack-pointer temp)
+      (storew temp block catch-block-bsp-slot)
+      (storew (or (current-nfp-tn vop)
+                  zr-tn)
+          block catch-block-nfp-slot)
+      (inst mov-sp temp nsp-tn)
+      (storew temp block catch-block-nsp-slot))
+    (store-tl-symbol-value block *current-catch-block*)))
 
 ;;; Just set the current unwind-protect to UWP.  This
 ;;; instantiates an unwind block as an unwind-protect.
@@ -243,11 +228,15 @@
     (emit-return-pc label)
     (note-this-location vop :non-local-entry)))
 
+;;; Doesn't handle NSP and is disabled.
+#+unwind-to-frame-and-call-vop
 (define-vop (unwind-to-frame-and-call)
   (:args (ofp :scs (descriptor-reg))
          (uwp :scs (descriptor-reg))
-         (function :scs (descriptor-reg) :to :load :target saved-function))
-  (:arg-types system-area-pointer system-area-pointer t)
+         (function :scs (descriptor-reg) :to :load :target saved-function)
+         (bsp :scs (any-reg descriptor-reg))
+         (catch-block :scs (any-reg descriptor-reg)))
+  (:arg-types system-area-pointer system-area-pointer t t t)
   (:temporary (:sc unsigned-reg) temp)
   (:temporary (:sc descriptor-reg :offset r8-offset) saved-function)
   (:temporary (:sc unsigned-reg :offset r0-offset) block)
@@ -273,6 +262,8 @@
       (storew temp block unwind-block-uwp-slot)
       (loadw temp ofp sap-pointer-slot other-pointer-lowtag)
       (storew temp block unwind-block-cfp-slot)
+      (storew bsp block unwind-block-bsp-slot)
+      (storew catch-block block unwind-block-current-catch-slot)
       ;; Don't need to save code at unwind-block-code-slot since
       ;; it's not going to be used and will be overwritten after the
       ;; function call
