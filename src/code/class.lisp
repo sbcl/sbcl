@@ -149,11 +149,9 @@
   (cond ((eq (layout-invalid layout) :uninitialized)
          ;; There was no layout before, we just created one which
          ;; we'll now initialize with our information.
-         (setf (layout-length layout) length
-               (layout-flags layout) flags
-               (layout-inherits layout) inherits
-               (layout-depthoid layout) depthoid
+         (setf (layout-inherits layout) inherits
                (layout-classoid layout) classoid)
+         (assign-layout-slots layout :depthoid depthoid :length length :flags flags)
          #-sb-xc-host ; Assign target-only slots
          (let ((struct-depth
                 (if (logtest +structure-layout-flag+ flags) depthoid 0)))
@@ -361,18 +359,20 @@ between the ~A definition and the ~A definition"
           (setf (classoid-subclasses classoid) nil)))
 
       (if destruct-layout
+          #+sb-xc-host (error "Why mutate a layout in XC host?")
+          #-sb-xc-host
           ;; Destructively modifying a layout is not threadsafe at all.
           ;; Use at your own risk (interactive use only).
           (let ((inherits (layout-inherits layout))
                 (depthoid (layout-depthoid layout)))
             (aver (logtest +structure-layout-flag+ (layout-%bits layout)))
             (aver (= (length inherits) depthoid))
+            (assign-layout-slots destruct-layout
+                                 :depthoid depthoid
+                                 :length (layout-length layout))
             (setf (layout-invalid destruct-layout) nil
                   (layout-inherits destruct-layout) inherits
-                  (layout-depthoid destruct-layout) (layout-depthoid layout)
-                  (layout-length destruct-layout) (layout-length layout)
                   (layout-info destruct-layout) (layout-info layout))
-            #-sb-xc-host
             (macrolet ((inherit (n) `(if (> depthoid ,n) (svref inherits ,n) 0)))
               (setf (layout-depth2-ancestor destruct-layout) (inherit 2)
                     (layout-depth3-ancestor destruct-layout) (inherit 3)
@@ -1236,8 +1236,9 @@ between the ~A definition and the ~A definition"
 ;;; use those slots as indexes into tables.
 (defun %invalidate-layout (layout)
   (declare (type layout layout))
-  (setf (layout-invalid layout) t
-        (layout-depthoid layout) -1)
+  #+sb-xc-host (warn "Why are we invalidating layout ~S?" layout)
+  (setf (layout-invalid layout) t)
+  (assign-layout-slots layout :depthoid -1)
   (setf (layout-clos-hash layout) 0)
   (let ((inherits (layout-inherits layout))
         (classoid (layout-classoid layout)))

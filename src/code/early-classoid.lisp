@@ -128,8 +128,8 @@
 
 ;;; 64-bit layout %BITS slot:
 ;;;
-;;; | 4 bytes  | 24 bits | 8 bits |
-;;; +----------+---------+--------+
+;;; | 4 bytes  | 16 bits | 16 bits |
+;;; +----------+---------+---------+
 ;;;  depthoid    length     flags
 ;;;
 ;;; depthoid is stored as a tagged fixnum in its 4 byte field.
@@ -266,13 +266,8 @@
 ;;; Applicable only if bit-packed (for 64-bit architectures)
 (defmacro pack-layout-bits (depthoid length flags)
   `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
-           (ash ,(or length 0) 8)
+           (ash ,(or length 0) 16)
            ,(or flags 0)))
-(defmacro unpack-layout-bits (bits field)
-  (ecase field
-    (:depthoid `(ash ,bits (- -32 sb-vm:n-fixnum-tag-bits)))
-    (:length   `(ldb (byte 24 8) ,bits))
-    (:flags    `(ldb (byte 8 0) ,bits))))
 
 #+(and (not sb-xc-host) 64-bit)
 (progn
@@ -284,27 +279,34 @@
   `(%make-layout ,clos-hash ,classoid (pack-layout-bits ,depthoid ,length ,flags) ,@rest))
 
 ;;; LAYOUT-DEPTHOID gets a vop and a stub
-(declaim (inline layout-length layout-flags))
-(defun layout-length (layout)
-  (unpack-layout-bits (layout-%bits layout) :length))
-(defun layout-flags (layout)
-  (unpack-layout-bits (layout-%bits layout) :flags))
-
-(declaim (inline (setf layout-depthoid) (setf layout-length) (setf layout-flags)))
-(defun (setf layout-depthoid) (val layout)
-  (declare (type (integer -1 #x7fff) val))
-  (setf (layout-%bits layout) (logior (ash val (+ 32 sb-vm:n-fixnum-tag-bits))
-                                      (ldb (byte 32 0) (layout-%bits layout)))))
-(defun (setf layout-length) (val layout)
-  (setf (unpack-layout-bits (layout-%bits layout) :length) val))
-(defun (setf layout-flags) (val layout)
-  (setf (unpack-layout-bits (layout-%bits layout) :flags) val))
+(defmacro layout-length (layout) ; SETFable
+  `(ldb (byte 16 16) (layout-%bits ,layout)))
+(declaim (inline layout-flags)) ; not SETFable
+(defun layout-flags (layout) (ldb (byte 16 0) (layout-%bits layout)))
 ) ; end PROGN
 
 #+(and (not sb-xc-host) (not 64-bit))
 (progn
 (defmacro layout-%bits (x) `(layout-flags ,x))
 )
+
+;;; Abstract out the differences between {32-bit,64-bit} target and XC layouts.
+;;; FLAGS can't change once assigned.
+(defmacro assign-layout-slots (layout &key depthoid length
+                                           (flags `(layout-flags ,layout)) flagsp)
+  (let ((invalidate-p (and (eql depthoid -1) (not length) (not flagsp))))
+    #+(and 64-bit (not xc-host)) ; packed slot
+    `(setf (layout-%bits ,layout)
+           ,(if invalidate-p
+                `(logior (ash -1 (+ 32 sb-vm:n-fixnum-tag-bits))
+                         (ldb (byte 32 0) (layout-%bits ,layout)))
+                `(pack-layout-bits ,depthoid ,length ,flags)))
+    #+(or (not 64-bit) sb-xc-host) ; ordinary slot
+    (if invalidate-p
+        `(setf (layout-depthoid ,layout) -1)
+        `(setf (layout-depthoid ,layout) ,depthoid
+               (layout-length ,layout) ,length
+               (layout-flags ,layout) ,flags))))
 
 (declaim (inline layout-for-std-class-p))
 (defun layout-for-std-class-p (x)
