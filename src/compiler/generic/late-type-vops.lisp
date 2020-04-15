@@ -257,3 +257,14 @@
 
 (define-type-vop unbound-marker-p (unbound-marker-widetag))
 
+;;; Not type vops, but generic over all backends
+(macrolet ((def (name lowtag)
+             `(define-vop ()
+                (:translate ,name)
+                (:policy :fast-safe)
+                (:args (x :scs (descriptor-reg)))
+                (:results (res :scs (unsigned-reg)))
+                (:result-types unsigned-num)
+                (:generator 2 (loadw res x 0 ,lowtag)))))
+  (def function-header-word fun-pointer-lowtag)
+  (def instance-header-word instance-pointer-lowtag))

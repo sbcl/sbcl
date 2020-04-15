@@ -154,11 +154,12 @@
   (unsigned-byte #.sb-vm:n-widetag-bits)
   (flushable movable))
 
-;;; Return the data from the header of object, which for GET-HEADER-DATA
-;;; must be an other-pointer, and for FUN-HEADER-DATA a fun-pointer.
-(defknown (get-header-data fun-header-data) (t)
+;;; Return the data from the header of an OTHER-POINTER object.
+(defknown (get-header-data) (t)
     (unsigned-byte #.(- sb-vm:n-word-bits sb-vm:n-widetag-bits))
   (flushable))
+(defknown (function-header-word) (function) sb-vm:word (flushable))
+(defknown (instance-header-word) (instance) sb-vm:word (flushable))
 
 ;;; This unconventional setter returns its first arg, not the newval.
 (defknown set-header-data

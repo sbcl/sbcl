@@ -25,20 +25,21 @@
 (define-load-time-global **closure-extra-values**
     (make-hash-table :test 'eq :weakness :key :synchronized t))
 
-(defconstant closure-extra-data-indicator #x8000)
+;;; This is the bit pattern ORed into the haader word with no further shifting.
+(defconstant closure-extra-data-indicator #x800000)
+;;                                              -- widetag
+;;                                          ---- length (masked to #x7FFF)
 (eval-when (:compile-toplevel)
-  (aver (zerop (logand sb-vm:short-header-max-words
+  ;; Ensure no overlap of the packed fields
+  (aver (zerop (logand (ash sb-vm:short-header-max-words sb-vm:n-widetag-bits)
                        closure-extra-data-indicator))))
 
 (declaim (inline get-closure-length))
 (defun get-closure-length (f)
-  (logand (fun-header-data f) sb-vm:short-header-max-words))
+  (logand (ash (function-header-word f) (- sb-vm:n-widetag-bits))
+          sb-vm:short-header-max-words))
 
-(macrolet ((extendedp-bit ()
-             ;; The closure header is updated using sap-ref-n.
-             ;; (SET-HEADER-DATA expects other-pointer-lowtag, not fun-pointer)
-             (ash closure-extra-data-indicator sb-vm:n-widetag-bits))
-           (%closure-index-set (closure index val)
+(macrolet ((%closure-index-set (closure index val)
              ;; Use the identical convention as %CLOSURE-INDEX-REF for the index.
              ;; There are no closure slot setters, and in fact SLOT-SET
              ;; does not exist in a variant that takes a non-constant index.
@@ -73,9 +74,11 @@
                                         sb-vm::thread-function-layout-slot))
                               #+(and immobile-space 64-bit (not sb-thread))
                               (get-lisp-obj-address sb-vm:function-layout)
-                              (closure-header-word copy)
+                              (function-header-word copy)
                               ,extra-bit)))))
 
+  ;; This is factored out because of a cutting-edge implementation
+  ;; of tracing wrappers that I'm trying to finish.
   (defun copy-closure (closure)
     (declare (closure closure))
     (let* ((payload-len (get-closure-length (truly-the function closure)))
@@ -94,7 +97,8 @@
   (defun set-closure-extra-values (closure permit-copy data)
     (declare (closure closure))
     (let ((payload-len (get-closure-length (truly-the function closure)))
-          (extendedp (logtest (fun-header-data closure) closure-extra-data-indicator)))
+          (extendedp (logtest (function-header-word closure)
+                              closure-extra-data-indicator)))
       (when (and (not extendedp) permit-copy (oddp payload-len))
         ;; PAYLOAD-LEN includes the trampoline, so the number of slots we would
         ;; pass to %ALLOC-CLOSURE is 1 less than that, were it not for
@@ -102,7 +106,7 @@
         ;; So in effect, asking for PAYLOAD-LEN does exactly the right thing.
         (let ((copy (new-closure payload-len)))
           (with-pinned-objects (copy)
-            (copy-slots (extendedp-bit))
+            (copy-slots closure-extra-data-indicator)
             ;; We copy only if there was no padding, which means that adding 1 slot
             ;; physically adds 2 slots. You might think that the added data go in the
             ;; first new slot, followed by padding. Nope! Take an example of a
@@ -122,7 +126,8 @@
       (unless (with-pinned-objects (closure)
                 (unless extendedp ; Set the header bit
                   (setf (closure-header-word closure)
-                        (logior (extendedp-bit) (closure-header-word closure))))
+                        (logior (function-header-word closure)
+                                closure-extra-data-indicator)))
                 (when (evenp payload-len)
                   (%closure-index-set closure (1- payload-len) data)
                   t))
@@ -153,15 +158,18 @@
     ;; an even-length payload takes the last slot for the name,
     ;; and an odd-length payload uses the global hashtable.
   (declare (closure closure))
-  (let ((header-data (fun-header-data closure)))
-      (if (not (logtest closure-extra-data-indicator header-data))
+  (let ((header-word (function-header-word closure)))
+      (if (not (logtest header-word closure-extra-data-indicator))
           (values unbound unbound)
-          (let* ((len (logand header-data sb-vm:short-header-max-words))
+          (let* ((len (logand (ash header-word (- sb-vm:n-widetag-bits))
+                              sb-vm:short-header-max-words))
                  (data
-                  ;; GET-CLOSURE-LENGTH counts the 'fun' slot in the length,
-                  ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
                   (if (oddp len)
+                      ;; Boxed length odd implies total length even which implies
+                      ;; no extra slot in which to store ancillary data.
                       (gethash closure **closure-extra-values** 0)
+                      ;; GET-CLOSURE-LENGTH counts the 'fun' slot in the length,
+                      ;; but %CLOSURE-INDEX-REF starts indexing from the value slots.
                       (%closure-index-ref closure (1- len)))))
             ;; There can be a concurrency glitch, because the 'extended' flag is
             ;; toggled to indicate that extra data are present before the data
@@ -175,12 +183,15 @@
              (t (values data unbound)))))))
 
 ;; Return T if and only if CLOSURE has extra values that are physically
-;; in the object, not in the external hash-table.
+;; in the padding slot of the object and not in the external hash-table.
 (defun closure-has-extra-values-slot-p (closure)
   (declare (closure closure))
-  (let ((header-data (fun-header-data closure)))
-    (and (logtest closure-extra-data-indicator header-data)
-         (evenp (logand header-data sb-vm:short-header-max-words)))))
+  (let ((header-word (function-header-word closure)))
+    (and (logtest header-word closure-extra-data-indicator)
+         ;; If the boxed payload length is even, adding the header makes it odd,
+         ;; so there's a padding slot for alignment to an even total word count.
+         ;; i.e. if the least-significant bit of the size field is 0, there's padding.
+         (not (logbitp sb-vm:n-widetag-bits header-word)))))
 
 (defconstant +closure-name-index+ 0)
 (defconstant +closure-doc-index+ 1)
@@ -354,7 +365,12 @@
   ;; A fun header can't really point backwards this many words, but it's ok-
   ;; the point is to mask out the layout pointer bits (if compact-instance-header).
   ;; The largest representable code size (in words) is ~22 bits for 32-bit words.
-  (ash (ldb (byte 24 0) (fun-header-data simple-fun)) sb-vm:word-shift))
+  ;; It would be possible to optimize out one shift here for 32-bit headers:
+  ;;   #bxxxxxxx..xxxxxxxx00101010 (header widetag = #x2A)
+  ;; so we don't need to right shift out all 8 widetag bits and then
+  ;; left-shift by 2 (= word-shift). We could just right-shift 6, and mask.
+  (ash (ldb (byte 24 sb-vm:n-widetag-bits) (function-header-word simple-fun))
+       sb-vm:word-shift))
 
 ;;;; CODE-COMPONENT
 
