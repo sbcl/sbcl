@@ -348,7 +348,7 @@
   ;; interrupted here it can still run the clean up form. While the
   ;; cleanup form itself cannot be protected from interrupts (can't
   ;; run it twice) one of the variables being unbound can be
-  ;; *interrupts-enabled*  
+  ;; *interrupts-enabled*
   (loadw where uwp unwind-block-bsp-slot)
   (unbind-to-here where symbol value temp-reg-tn zero)
 
@@ -360,7 +360,7 @@
 
   (loadw block uwp unwind-block-current-catch-slot)
   (store-tl-symbol-value block *current-catch-block*)
-  
+
   (inst call (ea (* unwind-block-entry-pc-slot n-word-bytes) uwp))
   (inst pop count)
   (inst pop start)
