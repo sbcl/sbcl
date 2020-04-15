@@ -1381,19 +1381,11 @@ code to be loaded.
 ;;;; list iteration
 
 (defun loop-list-step (listvar)
-  ;; We are not equipped to analyze whether 'FOO is the same as #'FOO
-  ;; here in any sensible fashion, so let's give an obnoxious warning
-  ;; whenever 'FOO is used as the stepping function.
-  ;;
-  ;; While a Discerning Compiler may deal intelligently with
-  ;; (FUNCALL 'FOO ...), not recognizing FOO may defeat some LOOP
-  ;; optimizations.
   (let ((stepper (cond ((loop-tequal (car (source-code *loop*)) :by)
                         (loop-pop-source)
                         (loop-get-form))
                        (t '(function cdr)))))
     (cond ((and (consp stepper) (eq (car stepper) 'quote))
-           (loop-warn "Use of QUOTE around stepping function in LOOP will be left verbatim.")
            `(funcall ,stepper ,listvar))
           ((and (consp stepper) (eq (car stepper) 'function))
            (list (cadr stepper) listvar))
