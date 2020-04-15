@@ -303,11 +303,17 @@
   ;; the :return-style to :none because that also affects the call sequence.
   (inst jmp (make-fixup 'unwind :assembly-routine)))
 
-;;;; non-local exit noise
+;;; Simply return and enter the loop in UNWIND instead of calling
+;;; UNWIND directly
+(define-vop ()
+  (:translate %continue-unwind)
+  (:policy :fast-safe)
+  (:generator 0
+    (inst ret)))
 
 (define-assembly-routine (unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) rax-offset)
                           (:arg start (any-reg descriptor-reg) rbx-offset)
@@ -319,7 +325,7 @@
                           (:temp value unsigned-reg r10-offset)
                           (:temp zero complex-double-reg float0-offset))
   (declare (ignore start count))
-
+  AGAIN
   (let ((error (generate-error-code nil 'invalid-unwind-error)))
     (inst test block block)             ; check for NULL pointer
     (inst jmp :z error))
@@ -334,29 +340,41 @@
   (inst jmp :e DO-EXIT)
 
   ;; Not a match - return to *CURRENT-UNWIND-PROTECT-BLOCK* context.
-  ;; Important! Must save (and return) the arg 'block' for later use!!
-  (move rdx-tn block)
-  (move block uwp)
-  ;; Set next unwind protect context.
-  (loadw uwp uwp unwind-block-uwp-slot)
-
-  DO-EXIT
+  (inst push block)
+  (inst push start)
+  (inst push count)
 
   ;; Need to perform unbinding before unlinking the UWP so that if
   ;; interrupted here it can still run the clean up form. While the
   ;; cleanup form itself cannot be protected from interrupts (can't
   ;; run it twice) one of the variables being unbound can be
-  ;; *interrupts-enabled*
-  (loadw where block unwind-block-bsp-slot)
+  ;; *interrupts-enabled*  
+  (loadw where uwp unwind-block-bsp-slot)
   (unbind-to-here where symbol value temp-reg-tn zero)
 
-  (store-tl-symbol-value uwp *current-unwind-protect-block*)
+  ;; Set next unwind protect context.
+  (loadw block uwp unwind-block-uwp-slot)
+  (store-tl-symbol-value block *current-unwind-protect-block*)
+
+  (loadw rbp-tn uwp unwind-block-cfp-slot)
+
+  (loadw block uwp unwind-block-current-catch-slot)
+  (store-tl-symbol-value block *current-catch-block*)
+  
+  (inst call (ea (* unwind-block-entry-pc-slot n-word-bytes) uwp))
+  (inst pop count)
+  (inst pop start)
+  (inst pop block)
+  (inst jmp AGAIN)
+
+  DO-EXIT
+  (loadw where block unwind-block-bsp-slot)
+  (unbind-to-here where symbol value temp-reg-tn zero)
 
   (loadw rbp-tn block unwind-block-cfp-slot)
 
   (loadw uwp block unwind-block-current-catch-slot)
   (store-tl-symbol-value uwp *current-catch-block*)
-
 
   ;; Uwp-entry expects some things in known locations so that they can
   ;; be saved on the stack: the block in rdx-tn, start in rbx-tn, and

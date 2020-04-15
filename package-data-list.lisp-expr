@@ -240,7 +240,7 @@ of SBCL which maintained the CMU-CL-style split into two packages.)"
       ;; But why do we need SLOT re-exported?
       :reexport ("SLOT" "FLUSHABLE")
       :export ("%ALIEN-FUNCALL"
-               "%CATCH-BREAKUP" "%CONTINUE-UNWIND"
+               "%CATCH-BREAKUP" "%CONTINUE-UNWIND" "%UNWIND"
                "%LISTIFY-REST-ARGS" "%MORE-ARG" "%MORE-ARG-VALUES"
                "%UNWIND-PROTECT-BREAKUP"
 

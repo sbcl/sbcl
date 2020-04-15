@@ -161,7 +161,7 @@
 
 (define-assembly-routine
     (unwind
-     (:translate %continue-unwind)
+     (:translate %unwind)
      (:policy :fast-safe))
     ((:arg block (any-reg descriptor-reg) a0-offset)
      (:arg start (any-reg descriptor-reg) ocfp-offset)

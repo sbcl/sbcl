@@ -1322,12 +1322,14 @@ due to normal completion or a non-local exit such as THROW)."
   ;; an XEP.
   (ir1-convert
    start next result
-   (with-unique-names (cleanup-fun drop-thru-tag exit-tag next start count)
+   (with-unique-names (cleanup-fun drop-thru-tag exit-tag . #-no-continue-unwind (next start count)
+                                                            #+no-continue-unwind ())
      `(flet ((,cleanup-fun ()
                ,@cleanup
                (values)))
         ;; FIXME: Maybe %ESCAPE-FUN could dynamic extent too.
         (declare (dynamic-extent #',cleanup-fun))
+        #-no-continue-unwind
         (block ,drop-thru-tag
           (multiple-value-bind (,next ,start ,count)
               (block ,exit-tag
@@ -1338,14 +1340,28 @@ due to normal completion or a non-local exit such as THROW)."
                  (return-from ,drop-thru-tag ,protected)))
             (declare (optimize (insert-debug-catch 0)))
             (,cleanup-fun)
-            (%continue-unwind ,next ,start ,count)))))))
+            (%unwind ,next ,start ,count)))
+        #+no-continue-unwind
+        (block ,drop-thru-tag
+          (block ,exit-tag
+            (%within-cleanup
+             :unwind-protect
+             (%unwind-protect (%escape-fun ,exit-tag)
+                              (%cleanup-fun ,cleanup-fun))
+             (return-from ,drop-thru-tag ,protected)))
+          (locally
+              (declare (optimize (insert-debug-catch 0)))
+            (,cleanup-fun)
+            (%continue-unwind)))))))
 
 (def-ir1-translator inspect-unwinding
     ((protected inspect-fun) start next result)
   (ir1-convert
    start next result
-   (with-unique-names (drop-thru-tag exit-tag next start count)
+   (with-unique-names (drop-thru-tag exit-tag next . #-no-continue-unwind (start count)
+                                                     #+no-continue-unwind ())
      `(block ,drop-thru-tag
+        #-no-continue-unwind
         (multiple-value-bind (,next ,start ,count)
             (block ,exit-tag
               (%within-cleanup
@@ -1355,15 +1371,40 @@ due to normal completion or a non-local exit such as THROW)."
                (return-from ,drop-thru-tag ,protected)))
           (declare (optimize (insert-debug-catch 0)))
           (funcall ,inspect-fun ,next)
-          (%continue-unwind ,next ,start ,count))))))
+          (%unwind ,next ,start ,count))
+        #+no-continue-unwind
+        (let ((,next
+                (block ,exit-tag
+                  (%within-cleanup
+                   :unwind-protect
+                   (%unwind-protect (%escape-fun ,exit-tag)
+                                    nil)
+                   (return-from ,drop-thru-tag ,protected)))))
+          (declare (optimize (insert-debug-catch 0)))
+          (funcall ,inspect-fun ,next)
+          (%continue-unwind))))))
 
 ;;; Evaluate CLEANUP iff PROTECTED does a non-local exit.
 (def-ir1-translator nlx-protect
     ((protected &body cleanup) start next result)
   (ir1-convert
    start next result
-   (with-unique-names (drop-thru-tag exit-tag next start count)
+   (with-unique-names (drop-thru-tag exit-tag . #-no-continue-unwind (next start count)
+                                                #+no-continue-unwind ())
      `(block ,drop-thru-tag
+        #+no-continue-unwind
+        (progn
+          (block ,exit-tag
+            (%within-cleanup
+             :unwind-protect
+             (%unwind-protect (%escape-fun ,exit-tag)
+                              nil)
+             (return-from ,drop-thru-tag ,protected)))
+          (locally
+              (declare (optimize (insert-debug-catch 0)))
+            ,@cleanup
+            (%continue-unwind)))
+        #-no-continue-unwind
         (multiple-value-bind (,next ,start ,count)
             (block ,exit-tag
               (%within-cleanup
@@ -1373,7 +1414,7 @@ due to normal completion or a non-local exit such as THROW)."
                (return-from ,drop-thru-tag ,protected)))
           (declare (optimize (insert-debug-catch 0)))
           ,@cleanup
-          (%continue-unwind ,next ,start ,count))))))
+          (%unwind ,next ,start ,count))))))
 
 ;;;; multiple-value stuff
 

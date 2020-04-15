@@ -2010,14 +2010,14 @@ not stack-allocated LVAR ~S." source-lvar)))))
   (let* ((info (lvar-value info-lvar))
          (lvar (node-lvar node))
          (2info (nlx-info-info info))
-         (top-loc (ir2-nlx-info-save-sp 2info))
-         (start-loc (make-nlx-entry-arg-start-location))
-         (count-loc (make-arg-count-location))
          (target (ir2-nlx-info-target 2info)))
 
     (ecase (cleanup-kind (nlx-info-cleanup info))
       ((:catch :block :tagbody)
-       (let ((2lvar (and lvar (lvar-info lvar))))
+       (let ((top-loc (ir2-nlx-info-save-sp 2info))
+             (start-loc (make-nlx-entry-arg-start-location))
+             (count-loc (make-arg-count-location))
+             (2lvar (and lvar (lvar-info lvar))))
          (if (and 2lvar (eq (ir2-lvar-kind 2lvar) :unknown))
              (vop* nlx-entry-multiple node block
                    (top-loc start-loc count-loc nil)
@@ -2030,13 +2030,22 @@ not stack-allocated LVAR ~S." source-lvar)))))
                      target
                      (length locs))
                (move-lvar-result node block locs lvar)))))
-      (:unwind-protect
-       (let ((block-loc (standard-arg-location 0)))
+      #-no-continue-unwind
+      ((:unwind-protect)
+       (let ((start-loc (make-nlx-entry-arg-start-location))
+             (count-loc (make-arg-count-location))
+             (block-loc (standard-arg-location 0)))
          (vop uwp-entry node block target block-loc start-loc count-loc)
          (move-lvar-result
           node block
           (list block-loc start-loc count-loc)
-          lvar))))
+          lvar)))
+      #+no-continue-unwind
+      ((:unwind-protect)
+       (if lvar
+           (vop sb-vm::uwp-entry-block node block target
+                (car (ir2-lvar-locs (lvar-info lvar))))
+           (vop uwp-entry node block target))))
 
     #+sb-dyncount
     (when *collect-dynamic-statistics*

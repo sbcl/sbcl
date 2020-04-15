@@ -263,7 +263,7 @@
 #-win32
 (define-assembly-routine (unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) eax-offset)
                           (:arg start (any-reg descriptor-reg) ebx-offset)
@@ -399,7 +399,7 @@
   ;; we need to do the same stack frame hackery for the debugger
   ;; as we do for the main exception handler?
 
-  ;; When the UWP block calls %continue-unwind, we come back to
+  ;; When the UWP block calls %unwind, we come back to
   ;; the next assembly routine, below, which reinitializes for C
   ;; and returns to the Win32 unwind machinery.
 
@@ -448,7 +448,7 @@
 #+win32
 (define-assembly-routine (continue-unwind
                           (:return-style :none)
-                          (:translate %continue-unwind)
+                          (:translate %unwind)
                           (:policy :fast-safe))
                          ((:arg block (any-reg descriptor-reg) eax-offset)
                           (:arg start (any-reg descriptor-reg) ebx-offset)

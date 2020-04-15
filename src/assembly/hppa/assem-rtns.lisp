@@ -118,7 +118,7 @@
 
 (define-assembly-routine
     (unwind
-     (:translate %continue-unwind)
+     (:translate %unwind)
      (:return-style :none)
      (:policy :fast-safe))
     ((:arg block (any-reg descriptor-reg) a0-offset)

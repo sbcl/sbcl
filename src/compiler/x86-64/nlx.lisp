@@ -53,12 +53,11 @@
     (inst lea temp (rip-relative-ea entry-label))
     (storew temp block unwind-block-entry-pc-slot)
     #+sb-thread
-    (progn
-      (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
-        #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
-                       (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
-        (inst movapd xmm-temp (thread-tls-ea bsp))
-        (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp)))
+    (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
+      #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
+                     (= (- unwind-block-current-catch-slot unwind-block-bsp-slot) 1)))
+      (inst movapd xmm-temp (thread-tls-ea bsp))
+      (inst movupd (ea (* unwind-block-bsp-slot n-word-bytes) block) xmm-temp))
     #-sb-thread
     (progn
       (load-binding-stack-pointer temp)
@@ -85,13 +84,12 @@
     (storew temp block catch-block-entry-pc-slot)
     (storew tag block catch-block-tag-slot)
     #+sb-thread
-    (progn
-      (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
-        #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
-                       (= (- catch-block-previous-catch-slot catch-block-bsp-slot) 1)))
-        (inst movapd xmm-temp (thread-tls-ea bsp))
-        (inst movupd (ea (* catch-block-bsp-slot n-word-bytes) block) xmm-temp)
-        (store-tl-symbol-value block *current-catch-block*)))
+    (let ((bsp #1=(info :variable :wired-tls '*binding-stack-pointer*)))
+      #.(assert (and (= (- (info :variable :wired-tls '*current-catch-block*) #1#) n-word-bytes)
+                     (= (- catch-block-previous-catch-slot catch-block-bsp-slot) 1)))
+      (inst movapd xmm-temp (thread-tls-ea bsp))
+      (inst movupd (ea (* catch-block-bsp-slot n-word-bytes) block) xmm-temp)
+      (store-tl-symbol-value block *current-catch-block*))
     #-sb-thread
     (progn
       (load-tl-symbol-value temp *current-catch-block*)
@@ -227,12 +225,21 @@
 (define-vop (uwp-entry)
   (:info label)
   (:save-p :force-to-stack)
-  (:results (block) (start) (count))
-  (:ignore block start count)
   (:vop-var vop)
   (:generator 0
     (emit-label label)
     (note-this-location vop :non-local-entry)))
+
+(define-vop (uwp-entry-block)
+  (:info label)
+  (:save-p :force-to-stack)
+  (:results (block))
+  (:vop-var vop)
+  (:generator 0
+    (emit-label label)
+    (note-this-location vop :non-local-entry)
+    ;; Get the saved block in UNWIND
+    (inst mov block (ea (* 3 n-word-bytes) rsp-tn))))
 
 (define-vop (unwind-to-frame-and-call)
     (:args (ofp :scs (descriptor-reg))

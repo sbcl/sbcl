@@ -1782,7 +1782,8 @@
 (defknown %unwind-protect (t t) t)
 (defknown (%catch-breakup %unwind-protect-breakup) () t)
 (defknown %lexical-exit-breakup (t) t)
-(defknown %continue-unwind (t t t) nil)
+(defknown %unwind (t t t) nil)
+(defknown %continue-unwind () nil)
 (defknown %throw (t &rest t) nil) ; This is MV-called.
 (defknown %nlx-entry (t) *)
 (defknown %%primitive (t t &rest t) *)

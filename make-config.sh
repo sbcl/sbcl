@@ -687,7 +687,9 @@ elif [ "$sbcl_arch" = "x86-64" ]; then
     printf ' :alien-callbacks :cycle-counter' >> $ltf
     printf ' :integer-eql-vop' >> $ltf
     printf ' :sb-simd-pack :sb-simd-pack-256 :avx2' >> $ltf
-    printf ' :undefined-fun-restarts :call-symbol :unbind-in-unwind' >> $ltf
+    printf ' :undefined-fun-restarts :call-symbol' >> $ltf
+    printf ' :unbind-in-unwind :no-continue-unwind' >> $ltf
+
     case "$sbcl_os" in
     linux | darwin | *bsd)
         printf ' :immobile-space :immobile-code :compact-instance-header' >> $ltf
