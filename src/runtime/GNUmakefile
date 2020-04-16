@@ -174,7 +174,7 @@ TAGS tags: $(SRCS) $(HEADERS)
 	@etags $(SRCS) $(HEADERS) || true
 
 clean:
-	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES)
+	-rm -f *.[do] $(TARGET) sbcl.nm sbcl.h core *.tmp $(OS_CLEAN_FILES) libsbcl.a shrinkwrap-sbcl* sbcl.mk
 
 %.d: %.c sbcl.h
 	@$(CC) $(DEPEND_FLAGS) $(CPPFLAGS) $< > $@.tmp; \
