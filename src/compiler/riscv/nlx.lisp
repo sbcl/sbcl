@@ -122,19 +122,21 @@
   (:generator 7
     (store-current-unwind-protect-block uwp)))
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
     (load-current-catch-block block)
     (loadw block block catch-block-previous-catch-slot)
     (store-current-catch-block block)))
 
-(define-vop (unlink-unwind-protect)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
     (load-current-unwind-protect-block block)
     (loadw block block unwind-block-uwp-slot)

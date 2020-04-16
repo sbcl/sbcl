@@ -1926,15 +1926,7 @@ not stack-allocated LVAR ~S." source-lvar)))))
            (type (or lvar null) tag))
   (let* ((2info (nlx-info-info info))
          (kind (cleanup-kind (nlx-info-cleanup info)))
-         (block-tn (physenv-live-tn
-                    (make-normal-tn
-                     (primitive-type-or-lose
-                      (ecase kind
-                        (:catch
-                         'catch-block)
-                        ((:unwind-protect :block :tagbody)
-                         'unwind-block))))
-                    (node-physenv node)))
+         (block-tn (ir2-nlx-info-block-tn 2info))
          (res (make-stack-pointer-tn))
          (target-label (ir2-nlx-info-target 2info)))
     #-unbind-in-unwind
@@ -2062,6 +2054,12 @@ not stack-allocated LVAR ~S." source-lvar)))))
     (vop* restore-dynamic-state node block
           ((reference-tn-list (cdr (ir2-nlx-info-dynamic-state 2info)) nil))
           (nil))))
+
+(defoptimizer (%unwind-protect-breakup ir2-convert) ((info-lvar) node block)
+  (vop %unwind-protect-breakup node block (ir2-nlx-info-block-tn (nlx-info-info (lvar-value info-lvar)))))
+
+(defoptimizer (%catch-breakup ir2-convert) ((info-lvar) node block)
+  (vop %catch-breakup node block (ir2-nlx-info-block-tn (nlx-info-info (lvar-value info-lvar)))))
 
 ;;;; n-argument functions
 

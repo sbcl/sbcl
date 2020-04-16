@@ -505,7 +505,8 @@
                         (make-dynamic-state-tns))
                  :type list)
   ;; the target label for NLX entry
-  (target (gen-label) :type label))
+  (target (gen-label) :type label)
+  (block-tn nil :type (or tn null)))
 (defprinter (ir2-nlx-info)
   home
   save-sp

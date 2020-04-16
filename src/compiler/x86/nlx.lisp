@@ -122,20 +122,22 @@
       (inst mov (make-ea :dword :disp 0) seh-frame :fs))
     (store-tl-symbol-value uwp *current-unwind-protect-block* tls)))
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:sc unsigned-reg) #+sb-thread tls block)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
     (store-tl-symbol-value block *current-catch-block* tls)))
 
-(define-vop (unlink-unwind-protect)
-    ;; NOTE: When we have both #+sb-thread and #+win32, we only need one temp
-    (:temporary (:sc unsigned-reg) block #+sb-thread tls #+win32 seh-frame)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:ignore current-block)
+  ;; NOTE: When we have both #+sb-thread and #+win32, we only need one temp
+  (:temporary (:sc unsigned-reg) block #+sb-thread tls #+win32 seh-frame)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
     #+win32

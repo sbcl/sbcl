@@ -15,13 +15,13 @@
 (defun make-nlx-entry-arg-start-location ()
     (make-wired-tn *fixnum-primitive-type* any-reg-sc-number rbx-offset))
 
-(defun catch-block-ea (tn)
+(defun catch-block-ea (tn &optional (offset 0))
   (aver (sc-is tn catch-block))
-  (ea (frame-byte-offset (+ -1 (tn-offset tn) catch-block-size)) rbp-tn))
+  (ea (frame-byte-offset (- (+ -1 (tn-offset tn) catch-block-size) offset)) rbp-tn))
 
-(defun unwind-block-ea (tn)
+(defun unwind-block-ea (tn &optional (offset 0))
   (aver (sc-is tn unwind-block))
-  (ea (frame-byte-offset (+ -1 (tn-offset tn) unwind-block-size)) rbp-tn))
+  (ea (frame-byte-offset (- (+ -1 (tn-offset tn) unwind-block-size offset) offset)) rbp-tn))
 
 ;;;; Save and restore dynamic environment.
 (define-vop (current-stack-pointer)
@@ -105,23 +105,25 @@
   (:generator 7
     (store-tl-symbol-value uwp *current-unwind-protect-block*)))
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
   (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
+    (inst mov block (catch-block-ea current-block
+                                    catch-block-previous-catch-slot))
     (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
     (store-tl-symbol-value block *current-catch-block*)))
 
-(define-vop (unlink-unwind-protect)
-    (:temporary (:sc unsigned-reg) block)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:temporary (:sc unsigned-reg) block)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
-    (load-tl-symbol-value block *current-unwind-protect-block*)
-    (loadw block block unwind-block-uwp-slot)
-    (store-tl-symbol-value block *current-unwind-protect-block*)))
+     (inst mov block (unwind-block-ea current-block
+                                      unwind-block-uwp-slot))
+     (store-tl-symbol-value block *current-unwind-protect-block*)))
 
 ;;;; NLX entry VOPs
 (define-vop (nlx-entry)

@@ -468,9 +468,9 @@
             (:special-bind
              (code `(%special-unbind ',(lvar-value (car args)))))
             (:catch
-             (code `(%catch-breakup)))
+             (code `(%catch-breakup ,(car (cleanup-info cleanup)))))
             (:unwind-protect
-              (code `(%unwind-protect-breakup))
+                 (code `(%unwind-protect-breakup ,(car (cleanup-info cleanup))))
               (let ((fun (ref-leaf (lvar-uses (second args)))))
                 (when (functional-p fun)
                   (reanalyze-funs fun)

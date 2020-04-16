@@ -1780,8 +1780,7 @@
 (defknown %unknown-values () *)
 (defknown %catch (t t) t)
 (defknown %unwind-protect (t t) t)
-(defknown (%catch-breakup %unwind-protect-breakup) () t)
-(defknown %lexical-exit-breakup (t) t)
+(defknown (%catch-breakup %unwind-protect-breakup %lexical-exit-breakup) (t) t)
 (defknown %unwind (t t t) nil)
 (defknown %continue-unwind () nil)
 (defknown %throw (t &rest t) nil) ; This is MV-called.

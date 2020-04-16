@@ -131,21 +131,23 @@
     (store-tl-symbol-value uwp *current-unwind-protect-block* temp)))
 
 
-(define-vop (unlink-catch-block)
+(define-vop (%catch-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   #+sb-thread (:temporary (:scs (any-reg)) temp)
   (:policy :fast-safe)
-  (:translate %catch-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-catch-block*)
     (loadw block block catch-block-previous-catch-slot)
     (store-tl-symbol-value block *current-catch-block* temp)))
 
-(define-vop (unlink-unwind-protect)
+(define-vop (%unwind-protect-breakup)
+  (:args (current-block))
+  (:ignore current-block)
   (:temporary (:scs (any-reg)) block)
   #+sb-thread (:temporary (:scs (any-reg)) temp)
   (:policy :fast-safe)
-  (:translate %unwind-protect-breakup)
   (:generator 17
     (load-tl-symbol-value block *current-unwind-protect-block*)
     (loadw block block unwind-block-uwp-slot)

@@ -237,5 +237,14 @@
                          (make-stack-pointer-tn)))
              :save-sp (unless (eq (cleanup-kind (nlx-info-cleanup nlx))
                                   :unwind-protect)
-                        (make-nlx-sp-tn physenv))))))
+                        (make-nlx-sp-tn physenv))
+             :block-tn (physenv-live-tn
+                        (make-normal-tn
+                         (primitive-type-or-lose
+                          (ecase (cleanup-kind (nlx-info-cleanup nlx))
+                            (:catch
+                                'catch-block)
+                            ((:unwind-protect :block :tagbody)
+                             'unwind-block))))
+                        physenv)))))
   (values))
