@@ -112,8 +112,6 @@
   (:generator 17
     (inst mov block (catch-block-ea current-block
                                     catch-block-previous-catch-slot))
-    (load-tl-symbol-value block *current-catch-block*)
-    (loadw block block catch-block-previous-catch-slot)
     (store-tl-symbol-value block *current-catch-block*)))
 
 (define-vop (%unwind-protect-breakup)
