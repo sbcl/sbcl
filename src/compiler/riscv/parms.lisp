@@ -104,13 +104,10 @@
 #+gencgc
 (!gencgc-space-setup #x04000000 :dynamic-space-start #x4f000000)
 
-(defconstant linkage-table-entry-size #-64-bit 4 #+64-bit 8) ; N-WORD-BYTES (not defined yet)
+(defconstant linkage-table-entry-size (/ n-word-bits 8)) ; N-WORD-BYTES (not defined yet)
 (defconstant linkage-table-growth-direction :down)
 (setq *linkage-space-predefined-entries* '(#+gencgc("alloc" nil)
                                            #+gencgc("alloc_list" nil)))
-
-#-sb-thread
-(defconstant boxed-area (- (+ static-space-start (* 2 n-word-bytes)) nil-value))
 
 #+(or linux netbsd)
 (progn
