@@ -2417,6 +2417,53 @@ is :ANY, the function name is not checked."
            ;; This area of the language spec seems to have been a clusterfsck.
            (equal x y)))))
 
+;;; FIXME: FIND-CONSTANT is rife with problems.
+;;;
+;;; - We sometimes fail to use `(SYMBOL-VALUE ,a-defconstant) when we should,
+;;;   which can break some EQ tests in user code. [This is not a conformance issue,
+;;;   but goes against what we try so very hard to do: reference non-EQL-comparable
+;;;   constants only through the global symbol at load time]
+;;;
+;;; - We can't detect similar arrays other than BIT-VECTOR and STRING.
+;;;
+;;; - There is no general notion of similarity for INSTANCE, yet CORE-COALESCE-P used to
+;;;   return T of instances ever since git rev 45bc305be4 "refactor handling of constants".
+;;;   What was it trying to achieve? Maybe capture PATHNAME , HASH-TABLE and RANDOM-STATE,
+;;;   which are implemented as INSTANCE types, except EQUAL does not descend into
+;;;   any of them but PATHNAME.
+;;;
+;;; - What was it trying to achieve with SYMBOLS beyond the EQ test? I guess it's ok
+;;;   to collapse uninterned symbols by STRING=, but EQUAL won't do that.
+;;;
+;;; - Overall the CORE-COALESCE-P is just massively confusing. The only constants that can
+;;    legally be collapsed when compiling to memory are numbers.  Characters would be EQ
+;;;   if they were EQL. Symbol and instances, as I expressed already - WTF is up with that?
+
+;;; I think the only way forward is twofold:
+;;; - design a hash-table that correctly implements SIMILAR,
+;;; - always prefer a named constant over an anonymous constant when they are similar.
+;;;   We'll have to do this by never coalescing a named constant with an unnamed,
+;;;   then postprocess the constants to remove any unnamed that are similar to
+;;;   a named constant that got inserted later. Minimal problem example:
+#|
+(defconstant +foo+ (if (boundp '+foo+) +foo+ (cons nil nil)))
+;;; A-MACRO by pure coincidence expands to contain a constant that
+;;; is similar to +FOO+ but not EQ to it.
+(defmacro a-macro () ''(nil))
+;;; Because A-MACRO is opaque, you don't know that it injects a constant
+;;; EQUAL to +FOO+. The compiler assumes that the "second" use of the same
+;;; constant might as well use the value from the first occurrence,
+;;; not realizing that you actually relied on the EQ-ness condition.
+(defun getfoo () (values (a-macro) +foo+))
+;;; Counterintuitively, compiled (ISFOO (NTH-VALUE 1 (GETFOO))) returns NIL.
+(defun isfoo (x) (eq x +foo+))
+;;;
+* (load "try.lisp")
+* (ISFOO (NTH-VALUE 1 (GETFOO))) => T
+* (load (compile-file "try.lisp"))
+* (ISFOO (NTH-VALUE 1 (GETFOO))) => NIL
+|#
+
 ;;; Return a LEAF which represents the specified constant object. If
 ;;; the object is not in (CONSTANTS *IR1-NAMESPACE*), then we create a new
 ;;; constant LEAF and enter it. If we are producing a fasl file, make sure that
@@ -2441,10 +2488,7 @@ is :ANY, the function name is not checked."
   (let ((faslp (producing-fasl-file))
         (ns (if (boundp '*ir1-namespace*) *ir1-namespace*)))
     (labels ((core-coalesce-p (x)
-               ;; True for things which retain their identity under EQUAL,
-               ;; so we can safely share the same CONSTANT leaf between
-               ;; multiple references.
-               (typep x '(or symbol number character instance)))
+               (sb-xc:typep x '(or symbol number character instance)))
              (cons-coalesce-p (x)
                (if (eq +code-coverage-unmarked+ (cdr x))
                    ;; These are already coalesced, and the CAR should
@@ -2488,11 +2532,17 @@ is :ANY, the function name is not checked."
       ;; Has this identical object been seen before? Bail out early if so.
       (awhen (and ns (gethash object (eq-constants ns)))
         (return-from find-constant it))
-      (let ((coalescep (and ns
-                            (if faslp
-                                (file-coalesce-p object)
-                                (core-coalesce-p object)))))
-        (when coalescep
+      (let* ((coalescep (and ns
+                             (if faslp
+                                 (file-coalesce-p object)
+                                 (core-coalesce-p object))))
+             (effectively-coalescible
+              (and coalescep
+                   ;; No instance subtype except a pathname can be coalesced
+                   ;; by the similarity table (as currently implemented)
+                   (or (not (sb-xc:typep object 'instance))
+                       (sb-xc:typep object 'pathname)))))
+        (when effectively-coalescible
           (dolist (candidate (gethash object (similar-constants ns)))
             (when (similarp (constant-value candidate) object)
               (return-from find-constant candidate))))
@@ -2503,7 +2553,7 @@ is :ANY, the function name is not checked."
         (let ((new (make-constant object)))
           (when ns
             (setf (gethash object (eq-constants ns)) new)
-            (when coalescep
+            (when effectively-coalescible
               (push new (gethash object (similar-constants ns)))))
           new)))))
 

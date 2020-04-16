@@ -140,25 +140,28 @@
         ;; provided that SB-XC:CHAR-CODE doesn't fail, the answer is certain
         (values (test-character-type type) t))
        (classoid ; = {built-in,structure,condition,standard,static}-classoid
-        (if (built-in-classoid-p type)
-            (ecase (classoid-name type)
-              (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
-              (function
-               (if (functionp obj)
-                   (uncertain)
-                   ;; probably not a function. What about FMT-CONTROL instances?
-                   (values nil t)))
-              ((system-area-pointer stream fdefn weak-pointer file-stream
-                code-component lra)
-               (values nil t)))
-            (if (not (%instancep obj))
-                (values nil t) ; false certainly
-                (let ((name (classoid-name type)))
-                  (if (and (cl:find-class name nil) ; see if the host knows the type
-                           ;; and it's in our object hierarchy
-                           (cl:subtypep name 'structure!object))
-                      (values (cl:typep obj name) t)
-                      (unimplemented))))))
+        (let ((name (classoid-name type)))
+          (if (built-in-classoid-p type)
+              (ecase name
+                (symbol (values (symbolp obj) t)) ; 1:1 correspondence with host
+                (function
+                 (if (functionp obj)
+                     (uncertain)
+                     ;; probably not a function. What about FMT-CONTROL instances?
+                     (values nil t)))
+                ((system-area-pointer stream fdefn weak-pointer file-stream
+                  code-component lra)
+                 (values nil t)))
+              (cond ((eq name 'pathname)
+                     (values (pathnamep obj) t))
+                    ((not (%instancep obj))
+                     (values nil t)) ; false certainly
+                    (t
+                     (if (and (cl:find-class name nil) ; see if the host knows the type
+                              ;; and it's in our object hierarchy
+                              (cl:subtypep name 'structure!object))
+                         (values (cl:typep obj name) t)
+                       (unimplemented)))))))
        (fun-type
         (if (fun-designator-type-p type)
              (values (typep obj '(or symbol function)) t)
