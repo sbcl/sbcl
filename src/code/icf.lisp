@@ -229,19 +229,35 @@
              (return nil))))))
 
 ;;; Compute a key for binning purposes.
-(defun compute-code-hash-key (code)
-  (with-pinned-objects (code)
-    (list* (code-header-words code)
-           (collect ((offs))
-             (dotimes (i (code-n-entries code) (offs))
-               (offs (%code-fun-offset code i)
-                     (%simple-fun-text-len (%code-entry-point code i) i))))
-           ;; Ignore the debug-info, fixups, and simple-fun metadata.
-           ;; (Same things that are ignored by the CODE-EQUIVALENT-P predicate)
-           (loop for i from (+ code-constants-offset
-                               (* code-slots-per-simple-fun (code-n-entries code)))
-                   below (code-header-words code)
-                   collect (code-header-ref code i)))))
+(defun compute-code-hash-key (code constants)
+  (flet ((constant-to-moniker (object)
+           ;; Prevent EQUAL from descending into certain objects by assigning
+           ;; a sequential integer as its moniker.
+           ;; - CONS is obvious: just don't do it.
+           ;; - Do not collapse STRING, because doing so would break the concept
+           ;;   of similarity as applied to strings of differing element types
+           ;;   which are EQUAL but dissimilar.
+           ;; - Do not collapse PATHNAME because those contain strings.
+           ;; - Additionally, as I intend to implement lazy stable hash values on
+           ;;   all INSTANCE types stored in EQUAL tables, assign them a moniker
+           ;;   so that extra GC work is avoided. (This subsumes PATHNAME too)
+           ;; BIT-VECTOR is the only remaining nontrivial type for which EQUAL
+           ;; does anything other than EQL. That's fine.
+           (if (typep object '(or cons instance string pathname))
+               (ensure-gethash object constants (hash-table-count constants))
+               object)))
+    (with-pinned-objects (code)
+      (list* (code-header-words code)
+             (collect ((offs))
+               (dotimes (i (code-n-entries code) (offs))
+                 (offs (%code-fun-offset code i)
+                       (%simple-fun-text-len (%code-entry-point code i) i))))
+             ;; Ignore the debug-info, fixups, and simple-fun metadata.
+             ;; (Same things that are ignored by the CODE-EQUIVALENT-P predicate)
+             (loop for i from (+ code-constants-offset
+                                 (* code-slots-per-simple-fun (code-n-entries code)))
+                     below (code-header-words code)
+                     collect (constant-to-moniker (code-header-ref code i)))))))
 
 (declaim (inline default-allow-icf-p))
 (defun default-allow-icf-p (code)
@@ -264,7 +280,7 @@
                        sb-c::deftransform
                        :source-transform))))))
 
-(defun fold-identical-code (&key aggressive preserve-docstrings print)
+(defun fold-identical-code (&key aggressive preserve-docstrings (print nil))
   (loop
     #+gencgc (gc :gen 7)
     ;; Pass 1: count code objects.  I'd like to enhance MAP-ALLOCATED-OBJECTS
@@ -326,12 +342,16 @@
            :all)))
       ;; Now place objects that possibly match into the same bin.
       (let ((bins (make-hash-table :test 'equal))
+            ;; Constants all need to be treated as though they are atoms.
+            ;; Map each one to a fixnum so that the EQUAL table doesn't
+            ;; recurse into constants during the binning step.
+            (constants (make-hash-table :test 'eq))
             (n 0))
         (dovector (x code-objects)
           (when (or (not (gethash x referenced-objects))
                     (default-allow-icf-p x))
             (incf n)
-            (push x (gethash (compute-code-hash-key x) bins))))
+            (push x (gethash (compute-code-hash-key x constants) bins))))
         (when print
           (format t "ICF: ~d objects, ~d candidates, ~d bins~%"
                   (length code-objects) n (hash-table-count bins)))

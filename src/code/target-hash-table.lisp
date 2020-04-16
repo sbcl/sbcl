@@ -1889,7 +1889,7 @@ table itself."
       (format t "smashed=~d~%"
               (mapcar (lambda (x)
                         (if (fixnump x)
-                            (cons (ldb (byte (14 14) x)) (ldb (byte (14 0) x)))
+                            (cons (ldb (byte 14 14) x) (ldb (byte 14 0) x))
                             x))
                       it)))))
 
