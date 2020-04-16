@@ -59,10 +59,10 @@
                 (declaim (type (simple-array (and fixnum unsigned-byte) (1))
                                *ctype-hash-state*)
                          (type (simple-vector 32) *type-classes*))
-                ;; To be pedantic, these array are immutable, as with all literals
-                ;; appearing in code. Avoiding that minor infraction would require
-                ;; FOPCOMPILE to emit the MAKE-ARRAY expression to be executed in
-                ;; genesis; which is more of a project than I want to tackle.
+                ;; Strictly speaking these array are immutable, as with all literals
+                ;; appearing in code. We mutate them anyway. Avoiding that minor infraction
+                ;; would require FOPCOMPILE to emit the MAKE-ARRAY expression to be executed
+                ;; in genesis; which is more of a project than I want to tackle.
                 (!define-load-time-global *ctype-hash-state* ,generator-state)
                 (!define-load-time-global *type-classes* ,classes)
                 (!cold-init-forms (fill *type-classes* (make-type-class :name :bogus)))))))

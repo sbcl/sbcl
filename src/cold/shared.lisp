@@ -120,7 +120,8 @@
 
 ;;; a function of one functional argument, which calls its functional argument
 ;;; in an environment suitable for compiling the target. (This environment
-;;; includes e.g. a suitable *FEATURES* value.)
+;;; includes e.g. a suitable *READTABLE* that looks in SB-XC:*FEATURES*
+;;; when it reads #- and #+ syntax)
 (declaim (type function *in-target-compilation-mode-fn*))
 (defvar *in-target-compilation-mode-fn*)
 
