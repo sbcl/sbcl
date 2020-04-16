@@ -51,8 +51,12 @@
                    (*print-readably* t)
                    (classoid-name (classoid-name (car pair)))
                    (*package* (cl:symbol-package classoid-name)))
-              (format output "~/sb-ext:print-symbol-with-prefix/ (~D ~D) (~%"
-                      classoid-name (layout-flags layout) (layout-depthoid layout))
+              (format output "~/sb-ext:print-symbol-with-prefix/ ~S (~%"
+                      classoid-name
+                      (list* (layout-flags layout) (layout-depthoid layout)
+                             (map 'list
+                                  (lambda (x) (classoid-name (layout-classoid x)))
+                                  (layout-inherits layout))))
               (dolist (dsd (dd-slots dd) (format output ")~%"))
                 (format output "  (~d ~S ~S)~%"
                         (sb-kernel::dsd-bits dsd)

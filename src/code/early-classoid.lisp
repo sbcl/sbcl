@@ -106,12 +106,13 @@
 ;;; LAYOUT-FLAGS, because the compiler will stupidly "unpack" the
 ;;; flags by masking out the stuff that aren't the "bits" and then
 ;;; mask again.
-(defconstant +custom-gc-scavenge-flag+    #b000001)
-(defconstant +structure-layout-flag+      #b000010)
-(defconstant +pathname-layout-flag+       #b000100)
-(defconstant +layout-layout-flag+         #b001000)
-(defconstant +condition-layout-flag+      #b010000)
-(defconstant +pcl-object-layout-flag+     #b100000)
+(defconstant +custom-gc-scavenge-flag+   #b0000001)
+(defconstant +structure-layout-flag+     #b0000010)
+(defconstant +pathname-layout-flag+      #b0000100)
+(defconstant +layout-layout-flag+        #b0001000)
+(defconstant +ctype-layout-flag+         #b0010000)
+(defconstant +condition-layout-flag+     #b0100000)
+(defconstant +pcl-object-layout-flag+    #b1000000)
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for

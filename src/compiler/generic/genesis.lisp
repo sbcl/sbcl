@@ -1106,16 +1106,17 @@ core and return a descriptor to it."
        (when (char= ch #\;)
          (return))
        (let* ((classoid-name (read stream))
-              (flags+depthoid (read stream))
-              (*package* (find-package (cl:symbol-package classoid-name))))
+              (*package* (find-package (cl:symbol-package classoid-name)))
+              (flags+depthoid+inherits (read stream)))
          (setf (get classoid-name 'dd-proxy)
                (list (map 'vector
                           (lambda (x)
                             (destructuring-bind (bits name acc) x
                               (sb-kernel::make-dsd name nil acc bits nil)))
                           (read stream))
-                     :depthoid (cadr flags+depthoid)
-                     :flags (car flags+depthoid))))))))
+                     :flags (car flags+depthoid+inherits)
+                     :depthoid (cadr flags+depthoid+inherits)
+                     :inherits (cddr flags+depthoid+inherits))))))))
 
 (defvar *simple-vector-0-descriptor*)
 (defvar *vacuous-slot-table*)
@@ -2341,10 +2342,14 @@ Legal values for OFFSET are -4, -8, -12, ..."
           (if (eq name 'condition) +condition-layout-flag+ flags)))
     (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
-    (cond ((member name '(pathname logical-pathname))
-           (setf flags (logior flags sb-kernel::+pathname-layout-flag+)))
-          ((eq name 'layout)
-           (setq flags (logior flags sb-kernel::+layout-layout-flag+))))
+    (setq flags
+          (logior flags (cond ((eq name 'layout)
+                               sb-kernel:+layout-layout-flag+)
+                              ((member name '(pathname logical-pathname))
+                               sb-kernel:+pathname-layout-flag+)
+                              ((member 'ctype (getf (cdr (get name 'dd-proxy)) :inherits))
+                               sb-kernel:+ctype-layout-flag+)
+                              (t 0))))
     ;; parameter have to match an existing FOP-LAYOUT invocation if there was one
     (when existing-layout
       (let ((old-flags (cold-layout-flags existing-layout))
