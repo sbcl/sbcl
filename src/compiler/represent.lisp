@@ -816,7 +816,7 @@
                       (setf (tn-sc tn)
                             (svref *backend-sc-numbers* sc)))
                      ;; Translate primitive type scs into constant scs
-                     ((= sc sb-vm::descriptor-reg-sc-number)
+                     ((= sc sb-vm:descriptor-reg-sc-number)
                       (setf (tn-sc tn)
                             (svref *backend-sc-numbers* sb-vm:constant-sc-number)
                             (tn-offset tn)

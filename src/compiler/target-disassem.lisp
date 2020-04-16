@@ -1697,7 +1697,7 @@
 ;;; variable mappings from DEBUG-FUN.
 (defun storage-info-for-debug-fun (debug-fun)
   (declare (type debug-fun debug-fun))
-  (let ((sc-vec sb-c::*backend-sc-numbers*)
+  (let ((sc-vec sb-c:*backend-sc-numbers*)
         (groups nil)
         (debug-vars (sb-di::debug-fun-debug-vars debug-fun)))
     (and debug-vars
@@ -2142,7 +2142,7 @@
            (code-component thing)))
          (dstate (make-dstate))
          (segments
-          (if (eq code-component sb-fasl::*assembler-routines*)
+          (if (eq code-component sb-fasl:*assembler-routines*)
               (collect ((segs))
                 (dohash ((name locs) (car (%code-debug-info code-component)))
                   (destructuring-bind (start end . index) locs
@@ -2263,7 +2263,7 @@
              (maphash (lambda (name address)
                         (setf (gethash (funcall addr-xform address) addr->name) name))
                       name->addr)))
-      (let ((code sb-fasl::*assembler-routines*))
+      (let ((code sb-fasl:*assembler-routines*))
         (invert (car (%code-debug-info code))
                 (lambda (x) (sap-int (sap+ (code-instructions code) (car x))))))
     #-linkage-table
@@ -2271,7 +2271,7 @@
     (loop for name across sb-vm::+all-static-fdefns+
           for address =
           #+immobile-code (sb-vm::function-raw-address name)
-          #-immobile-code (+ sb-vm:nil-value (sb-vm::static-fun-offset name))
+          #-immobile-code (+ sb-vm:nil-value (sb-vm:static-fun-offset name))
           do (setf (gethash address addr->name) name))
     ;; Not really a routine, but it uses the similar logic for annotations
     #+sb-safepoint
@@ -2283,7 +2283,7 @@
     (cond (found
            (values found 0))
           (t
-           (let* ((code sb-fasl::*assembler-routines*)
+           (let* ((code sb-fasl:*assembler-routines*)
                   (hashtable (car (%code-debug-info code)))
                   (start (sap-int (code-instructions code)))
                   (end (+ start (1- (%code-text-size code)))))

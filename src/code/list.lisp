@@ -310,15 +310,15 @@
                 returned-list)))
 
   (defun %last0 (list)
-    (declare (optimize speed (sb-c::verify-arg-count 0)))
+    (declare (optimize speed (sb-c:verify-arg-count 0)))
     (last0-macro))
 
   (defun %last1 (list)
-    (declare (optimize speed (sb-c::verify-arg-count 0)))
+    (declare (optimize speed (sb-c:verify-arg-count 0)))
     (last1-macro))
 
   (defun %lastn/fixnum (list n)
-    (declare (optimize speed (sb-c::verify-arg-count 0))
+    (declare (optimize speed (sb-c:verify-arg-count 0))
              (type (and unsigned-byte fixnum) n))
     (case n
       (1 (last1-macro))
@@ -326,7 +326,7 @@
       (t (lastn-macro fixnum))))
 
   (defun %lastn/bignum (list n)
-    (declare (optimize speed (sb-c::verify-arg-count 0))
+    (declare (optimize speed (sb-c:verify-arg-count 0))
              (type (and unsigned-byte bignum) n))
     (lastn-macro unsigned-byte))
 
@@ -419,7 +419,7 @@
        (cdr result)))))
 
 (defun append2 (x y)
-  (declare (optimize (sb-c::verify-arg-count 0)))
+  (declare (optimize (sb-c:verify-arg-count 0)))
   (if (null x)
       y
       (let ((result (list (car x))))
@@ -1414,7 +1414,7 @@
                                  body-loop)))
                   `(defun ,(intern (format nil "%~A~{-~A~}~@[-~A~]" name funs variant))
                        (x list ,@funs)
-                     (declare (optimize speed (sb-c::verify-arg-count 0)))
+                     (declare (optimize speed (sb-c:verify-arg-count 0)))
                      ,@(when funs `((declare (function ,@funs)
                                              (dynamic-extent ,@funs))))
                      ,@(unless (member name '(member assoc adjoin rassoc))

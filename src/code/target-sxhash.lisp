@@ -214,7 +214,7 @@
   (if (fixnump x) (sxhash (truly-the fixnum x)) (sb-bignum:sxhash-bignum x)))
 
 (defun number-sxhash (x)
-  (declare (optimize (sb-c::verify-arg-count 0) speed))
+  (declare (optimize (sb-c:verify-arg-count 0) speed))
   (labels ((hash-ratio (x)
              (let ((result 127810327))
                (declare (type fixnum result))

@@ -1040,7 +1040,7 @@
     ((define-replace-transforms ()
        (loop for saetp across sb-vm:*specialized-array-element-type-properties*
              for sequence-type = `(simple-array ,(sb-vm:saetp-specifier saetp) (*))
-             unless (= (sb-vm:saetp-typecode saetp) sb-vm::simple-array-nil-widetag)
+             unless (= (sb-vm:saetp-typecode saetp) sb-vm:simple-array-nil-widetag)
              collect (!make-replace-transform saetp sequence-type sequence-type)
              into forms
              finally (return `(progn ,@forms))))

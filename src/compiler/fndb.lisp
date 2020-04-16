@@ -1447,7 +1447,7 @@
     ())
 (defknown sb-format::format-error* (string list &rest t &key &allow-other-keys)
     nil)
-(defknown sb-format::format-error (string &rest t) nil)
+(defknown sb-format:format-error (string &rest t) nil)
 (defknown sb-format::format-error-at* ((or null string) (or null index) string list
                                        &rest t &key &allow-other-keys)
     nil)

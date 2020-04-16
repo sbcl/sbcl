@@ -80,7 +80,7 @@
                (locally (declare (optimize (sb-c::type-check 0)))
                  (setf sb-c::*current-path* (make-unbound-marker)))
                (setf (sb-c::source-info-stream info) stream)
-               (sb-c::do-forms-from-info ((form current-index) info
+               (sb-c:do-forms-from-info ((form current-index) info
                                           'sb-c::input-error-in-load)
                  (sb-c::with-source-paths
                    (sb-c::find-source-paths form current-index)

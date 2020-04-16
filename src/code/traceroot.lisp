@@ -24,7 +24,7 @@
       (when (= (sb-kernel:symbol-tls-index symbol) index)
         (return-from find-symbol-from-tls-index symbol)))
     ;; A specially bound uninterned symbol? how awesome
-    (sb-vm::map-allocated-objects
+    (sb-vm:map-allocated-objects
      (lambda (obj type size)
        (declare (ignore size))
        (when (and (= type sb-vm:symbol-widetag)

@@ -1172,7 +1172,7 @@
   (declare (muffle-conditions compiler-note))
   (let ((hi (dpb exp
                  sb-vm:double-float-exponent-byte
-                 (logandc2 (ecase sb-vm::n-word-bits
+                 (logandc2 (ecase sb-vm:n-word-bits
                              (32 (%bignum-ref bits 2))
                              (64 (ash (%bignum-ref bits 1) -32)))
                            sb-vm:double-float-hidden-bit)))

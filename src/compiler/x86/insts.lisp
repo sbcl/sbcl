@@ -576,11 +576,11 @@
         (t
          (format stream "~A PTR [" (symbol-name (ea-size ea)))
          (when (ea-base ea)
-           (write-string (sb-c::location-print-name (ea-base ea)) stream)
+           (write-string (sb-c:location-print-name (ea-base ea)) stream)
            (when (ea-index ea)
              (write-string "+" stream)))
          (when (ea-index ea)
-           (write-string (sb-c::location-print-name (ea-index ea)) stream))
+           (write-string (sb-c:location-print-name (ea-index ea)) stream))
          (unless (= (ea-scale ea) 1)
            (format stream "*~A" (ea-scale ea)))
          (typecase (ea-disp ea)

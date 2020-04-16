@@ -1068,7 +1068,7 @@ nnnn 1_    any       linear scan
   `(defun ,name (key table default
                      &aux (hash-table (truly-the hash-table table))
                           (kv-vector (hash-table-pairs hash-table)))
-     (declare (optimize speed (sb-c::verify-arg-count 0)))
+     (declare (optimize speed (sb-c:verify-arg-count 0)))
      (let ((cache (hash-table-cache hash-table)))
        ;; First check the cache using EQ, not the test fun, for speed.
        ;; [we prefer to guard calls to the test fun by comparing hashes first,
@@ -1324,19 +1324,19 @@ nnnn 1_    any       linear scan
                   (t     (,wrapping gethash/equalp puthash/equalp remhash/equalp))))
             (locked-methods (getter setter remover)
               `(values (named-lambda ,(symbolicate getter "/LOCK") (key table default)
-                         (declare (optimize speed (sb-c::verify-arg-count 0)))
+                         (declare (optimize speed (sb-c:verify-arg-count 0)))
                          (truly-the (values t t &optional)
                            (sb-thread::with-recursive-system-lock
                                ((hash-table-lock (truly-the hash-table table)))
                              (,getter key table default))))
                        (named-lambda ,(symbolicate setter "/LOCK") (key table value)
-                         (declare (optimize speed (sb-c::verify-arg-count 0)))
+                         (declare (optimize speed (sb-c:verify-arg-count 0)))
                          (truly-the (values t &optional)
                            (sb-thread::with-recursive-system-lock
                                ((hash-table-lock (truly-the hash-table table)))
                              (,setter key table value))))
                        (named-lambda ,(symbolicate remover "/LOCK") (key table)
-                         (declare (optimize speed (sb-c::verify-arg-count 0)))
+                         (declare (optimize speed (sb-c:verify-arg-count 0)))
                          (truly-the (values t &optional)
                            (sb-thread::with-recursive-system-lock
                                ((hash-table-lock (truly-the hash-table table)))
@@ -1402,7 +1402,7 @@ nnnn 1_    any       linear scan
 (defmacro define-ht-setter (name std-fn)
   `(named-lambda ,name (key table value &aux (hash-table (truly-the hash-table table))
                                              (kv-vector (hash-table-pairs hash-table)))
-     (declare (optimize speed (sb-c::verify-arg-count 0)))
+     (declare (optimize speed (sb-c:verify-arg-count 0)))
      (block done
        (let ((cache (hash-table-cache hash-table)))
          ;; Check the cache
@@ -1561,7 +1561,7 @@ nnnn 1_    any       linear scan
 (defmacro define-remhash (name std-fn)
   `(named-lambda ,name (key table &aux (hash-table (truly-the hash-table table))
                                        (kv-vector (hash-table-pairs hash-table)))
-     (declare (optimize speed (sb-c::verify-arg-count 0)))
+     (declare (optimize speed (sb-c:verify-arg-count 0)))
      ;; The cache provides no benefit to REMHASH. A hit would just mean there is work
      ;; to do in removing the item from a chain, whereas a miss means we don't know
      ;; if there is work to do, so effectively there is work to do either way.

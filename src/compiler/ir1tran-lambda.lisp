@@ -1014,8 +1014,8 @@
           (t (return nil)))))
 
 (defun block-compilation-non-entry-point (name)
-  (and (boundp 'sb-c::*compilation*)
-       (let* ((compilation sb-c::*compilation*)
+  (and (boundp 'sb-c:*compilation*)
+       (let* ((compilation sb-c:*compilation*)
               (entry-points (sb-c::entry-points compilation)))
          (and (sb-c::block-compile compilation)
               entry-points

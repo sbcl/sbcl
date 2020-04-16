@@ -19,7 +19,7 @@
   (let ((fun (compile nil
                       `(sb-int:named-lambda test ()
                          (declare (optimize (debug 0) (safety ,safety)
-                                            (sb-c::verify-arg-count 0)))
+                                            (sb-c:verify-arg-count 0)))
                          ,expr))))
     (sb-int:encapsulate 'sb-disassem::add-debugging-hooks 'test
                         (lambda (f &rest args) (declare (ignore f args))))
@@ -342,7 +342,7 @@
 (defun bbb (x y z)
   ;; I don't want the number of expected comparisons to depend on whether
   ;; the code gets disassembled with versus without the initial segment.
-  (declare (optimize (sb-c::verify-arg-count 0)))
+  (declare (optimize (sb-c:verify-arg-count 0)))
   (if x
       (ecase y
         (-2 'a) (2 'b) (3 'c) (4 (error "no")) (5 'd) (6 'e) (7 'wat) (8 '*) (9 :hi))
@@ -350,7 +350,7 @@
         (#\a :a) (#\b :b) (#\e :c) (#\f :d) (#\g :e) (#\h :f) (t nil))))
 
 (defun try-case-known-fixnum (x)
-  (declare (optimize (sb-c::verify-arg-count 0)))
+  (declare (optimize (sb-c:verify-arg-count 0)))
   (case (the fixnum x)
     (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah)))
 (defun try-case-maybe-fixnum (x)
@@ -359,11 +359,11 @@
       (0 :a) (1 :b) (2 :c) (5 :d) (6 :c) (-1 :blah))))
 
 (defun try-case-known-char (x)
-  (declare (optimize (sb-c::verify-arg-count 0)))
+  (declare (optimize (sb-c:verify-arg-count 0)))
   (case (the character x)
     (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :b)))
 (defun try-case-maybe-char (x)
-  (declare (optimize (sb-c::verify-arg-count 0)))
+  (declare (optimize (sb-c:verify-arg-count 0)))
   (when (characterp x)
     (case x (#\a :a) (#\b :b)(#\c :c) (#\d :d) (#\e :e) (#\f :a))))
 
@@ -494,7 +494,7 @@
 (with-test (:name :disassembler-label-jump-table-targets)
   (let* ((f (checked-compile
              '(lambda (x)
-               (declare (optimize (sb-c::verify-arg-count 0)))
+               (declare (optimize (sb-c:verify-arg-count 0)))
                (case (truly-the fixnum x)
                  (0 (a)) (1 (b)) (2 (c)) (3 (d))))
              :allow-style-warnings t))

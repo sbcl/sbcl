@@ -683,7 +683,7 @@ type specifies the argument and result types."
                        (parms (make-gensym-list (length args))))
                    (compile nil
                             `(lambda (,fun ,@parms)
-                               (declare (optimize (sb-c::insert-step-conditions 0)))
+                               (declare (optimize (sb-c:insert-step-conditions 0)))
                                (declare (type (alien ,type) ,fun))
                                (alien-funcall ,fun ,@parms)))))
            (setf (alien-fun-type-stub type) stub))

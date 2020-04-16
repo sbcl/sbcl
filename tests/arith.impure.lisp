@@ -92,12 +92,12 @@
 
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
-  (defvar *n-fixnum-bits* (- sb-vm::n-word-bits sb-vm::n-fixnum-tag-bits))
+  (defvar *n-fixnum-bits* (- sb-vm:n-word-bits sb-vm::n-fixnum-tag-bits))
   (defvar *shifts* (let ((list (list 0
                                      1
-                                     (1- sb-vm::n-word-bits)
-                                     sb-vm::n-word-bits
-                                     (1+ sb-vm::n-word-bits))))
+                                     (1- sb-vm:n-word-bits)
+                                     sb-vm:n-word-bits
+                                     (1+ sb-vm:n-word-bits))))
                      (append list (mapcar #'- list)))))
 
 (macrolet ((nc-list ()

@@ -33,7 +33,7 @@
         (error "Update (DEFUN INTERNAL-ERROR) for ~D error arguments" max))))
   `(setf (svref **internal-error-handlers** ,(error-number-or-lose name))
          (named-lambda ,(string name) (,@args)
-           (declare (optimize (sb-c::verify-arg-count 0)))
+           (declare (optimize (sb-c:verify-arg-count 0)))
            ,@body)))
 
 ;;; Backtrace code may want to know the error that caused

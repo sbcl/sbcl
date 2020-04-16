@@ -96,7 +96,7 @@
                        `(named-lambda (slot-typecheck ,type) (value)
                           (declare (optimize (sb-c:store-coverage-data 0)
                                              (sb-c::type-check 3)
-                                             (sb-c::verify-arg-count 0)))
+                                             (sb-c:verify-arg-count 0)))
                           (the ,type value)))))
              (setf (gethash type **typecheck-cache**) fun
                    (slot-info-typecheck info) fun))))))))

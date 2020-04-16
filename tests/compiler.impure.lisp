@@ -2598,19 +2598,19 @@
   (declare (ignore a b))
   (multiple-value-call 'list
     'start
-    (sb-c::%more-arg-values context 1 (1- (truly-the fixnum count)))
+    (sb-c:%more-arg-values context 1 (1- (truly-the fixnum count)))
     'end))
 (defun skip-2-passthrough (a b sb-int:&more context count)
   (declare (ignore a b))
   (multiple-value-call 'list
     'start
-    (sb-c::%more-arg-values context 2 (- (truly-the fixnum count) 2))
+    (sb-c:%more-arg-values context 2 (- (truly-the fixnum count) 2))
     'end))
 (defun skip-n-passthrough (n-skip n-copy sb-int:&more context count)
   (assert (>= count (+ n-copy n-skip))) ; prevent crashes
   (multiple-value-call 'list
     'start
-    (sb-c::%more-arg-values context n-skip n-copy)
+    (sb-c:%more-arg-values context n-skip n-copy)
     'end))
 
 ;; %MORE-ARG-VALUES was wrong on x86 and x86-64 with nonzero 'skip'.

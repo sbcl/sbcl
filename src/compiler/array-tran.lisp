@@ -346,11 +346,11 @@
                           node))
 
 (defoptimizer (make-array-header* derive-type) ((&rest inits))
-  (let* ((data-position #.(sb-vm::slot-offset
+  (let* ((data-position #.(sb-vm:slot-offset
                            (find 'sb-vm::data (sb-vm:primitive-object-slots
                                                (find 'array sb-vm:*primitive-objects*
                                                      :key 'sb-vm:primitive-object-name))
-                                 :key 'sb-vm::slot-name)))
+                                 :key 'sb-vm:slot-name)))
          (data (nth data-position inits))
          (type (lvar-type data)))
     (when (array-type-p type)

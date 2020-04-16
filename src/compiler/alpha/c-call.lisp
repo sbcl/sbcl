@@ -161,7 +161,7 @@
   (:temporary (:scs (non-descriptor-reg)) temp)
   (:vop-var vop)
   (:generator 0
-    (let ((cur-nfp (sb-c::current-nfp-tn vop)))
+    (let ((cur-nfp (sb-c:current-nfp-tn vop)))
       (when cur-nfp
         (store-stack-tn nfp-save cur-nfp))
       (move function cfunc)

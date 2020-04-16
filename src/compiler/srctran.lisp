@@ -4465,11 +4465,11 @@
 
 ;; Can these appear in the expansion of FORMATTER?
 #+sb-xc-host
-(dolist (fun '(sb-format::format-error
+(dolist (fun '(sb-format:format-error
                sb-format::format-error-at
                sb-format::format-error-at*))
   (setf (fun-info-optimizer (fun-info-or-lose fun))
-        (let ((arg-n (if (eq fun 'sb-format::format-error) 0 2))
+        (let ((arg-n (if (eq fun 'sb-format:format-error) 0 2))
               (fun fun))
           (lambda (node) (check-format-args node fun arg-n nil)))))
 

@@ -19,7 +19,7 @@
 ;;; Also note that (DEFTYPE FORMAT-CONTROL) = (OR STRING FUNCTION).
 ;;; And it's possible that we could decide to install a closure as
 ;;; the fin-fun but I don't think that's necessary.
-(sb-kernel::!defstruct-with-alternate-metaclass fmt-control
+(sb-kernel:!defstruct-with-alternate-metaclass fmt-control
   :slot-names (string symbols memo)
   :constructor %make-fmt-control
   :superclass-name function

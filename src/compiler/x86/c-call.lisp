@@ -453,7 +453,7 @@ pointer to the arguments."
     (finalize-segment segment)
     ;; Now that the segment is done, convert it to a static
     ;; vector we can point foreign code to.
-    (let ((buffer (sb-assem::segment-buffer segment)))
+    (let ((buffer (sb-assem:segment-buffer segment)))
       (make-static-vector (length buffer)
                           :element-type '(unsigned-byte 8)
                           :initial-contents buffer))))

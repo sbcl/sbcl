@@ -50,7 +50,7 @@
            (expect     (append normal restricted wired))
            (comp       (sb-c::make-empty-component))
            (ir2-comp   (sb-c::make-ir2-component)))
-      (setf (sb-c::component-info comp) ir2-comp
+      (setf (sb-c:component-info comp) ir2-comp
             (sb-c::ir2-component-normal-tns ir2-comp) (link normal)
             (sb-c::ir2-component-restricted-tns ir2-comp) (link restricted)
             (sb-c::ir2-component-wired-tns ir2-comp) (link wired))

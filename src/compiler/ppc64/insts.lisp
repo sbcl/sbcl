@@ -2344,11 +2344,11 @@
 
 ;;; Unboxed constant support
 
-(defun sb-vm::canonicalize-inline-constant (constant)
+(defun sb-vm:canonicalize-inline-constant (constant)
   (destructuring-bind (value size) constant
     (cons size value)))
 
-(defun sb-vm::inline-constant-value (constant)
+(defun sb-vm:inline-constant-value (constant)
   (declare (ignore constant))
   (let ((label (gen-label)))
     (values label label)))

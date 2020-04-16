@@ -242,7 +242,7 @@
   (setq *print-level* nil *print-length* nil) ; restore defaults
 
   ;; Enable normal (post-cold-init) behavior of INFINITE-ERROR-PROTECT.
-  (setf sb-kernel::*maximum-error-depth* 10)
+  (setf sb-kernel:*maximum-error-depth* 10)
   (/show0 "enabling internal errors")
   (setf (extern-alien "internal_errors_enabled" int) 1)
   (setf (symbol-function '%failed-aver) real-failed-aver-fun)

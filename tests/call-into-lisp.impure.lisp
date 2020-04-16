@@ -33,7 +33,7 @@
            (let ((segment (sb-assem:make-segment)))
              (sb-assem:assemble (segment)
                (dolist (instruction (subst n :ARGC c-prog)
-                                    (sb-assem::segment-buffer segment))
+                                    (sb-assem:segment-buffer segment))
                  (apply #'sb-assem:inst* (car instruction) (cdr instruction)))))))
     (dotimes (n-args 4)
       (let ((the-code (assemble-it n-args)))

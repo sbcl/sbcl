@@ -160,7 +160,7 @@
 (defun convert-conditional-move-p (node dst-tn x-tn y-tn)
   (declare (ignore node))
   (let* ((ptype (sb-c::tn-primitive-type dst-tn))
-         (name  (sb-c::primitive-type-name ptype))
+         (name  (sb-c:primitive-type-name ptype))
          (param (cdr (or (assoc name *cmov-ptype-representation-vop*)
                          '(t descriptor-reg move-if/t)))))
     (when param

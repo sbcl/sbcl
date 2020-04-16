@@ -120,7 +120,7 @@
            (aver (not abs64-fixups)) ; no preserved 64-bit fixups
            (when (or abs-fixups rel-fixups)
              (setf (sb-vm::%code-fixups code-obj)
-                   (sb-c::pack-code-fixup-locs abs-fixups rel-fixups))))
+                   (sb-c:pack-code-fixup-locs abs-fixups rel-fixups))))
          (awhen (elt preserved-lists 4)
            (setf (gethash code-obj *allocation-point-fixups*)
                  (convert-alloc-point-fixups code-obj it)))

@@ -181,7 +181,7 @@ unspecified."
   ;; Needless to say, this also excludes some internal bits, but
   ;; getting there is too much detail when "unspecified" says what
   ;; is important -- unpredictable, but harmless.
-  `(sb-thread::with-recursive-lock ((hash-table-lock ,hash-table))
+  `(sb-thread:with-recursive-lock ((hash-table-lock ,hash-table))
      ,@body))
 
 (defmacro with-locked-system-table ((hash-table) &body body)

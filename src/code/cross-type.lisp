@@ -220,7 +220,7 @@
                              condition restart
                              synonym-stream
                              ;; why on earth is LABEL needed here?
-                             sb-assem::label))))
+                             sb-assem:label))))
                  #+nil (format t "~&(XTYPEP '~S '~S) -> (NIL T)~%" obj spec)
                  (values nil t))
                 (t

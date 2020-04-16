@@ -201,7 +201,7 @@ https://llvm.org/doxygen/MemorySanitizer_8cpp.html
         (inst byte (logior (ash (tn-offset result) 2) scale)))
       (emit-label good)))
    (t
-    (sb-assem::inst* insn modifier result ea))))
+    (sb-assem:inst* insn modifier result ea))))
 
 (defun emit-sap-set (size ea value result)
   #+linux

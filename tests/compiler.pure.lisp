@@ -1945,7 +1945,7 @@
      and v-max = (1- (ash 1 n-bits))
      while (<= n-bits sb-vm:n-word-bits)
      do
-       (let* ((n (* 2 (1+ (- sb-vm::n-word-bits n-bits))))
+       (let* ((n (* 2 (1+ (- sb-vm:n-word-bits n-bits))))
               (array1 (make-array n :element-type type))
               (array2 (make-array n :element-type type)))
          (dotimes (i n)
@@ -5230,7 +5230,7 @@
                   (with-output-to-string (s)
                     (disassemble
                      `(lambda (x)
-                        (declare (optimize (sb-c::verify-arg-count 0)))
+                        (declare (optimize (sb-c:verify-arg-count 0)))
                         (typep x ',type-expr))
                      :stream s)))))
     ;; These are fragile, but less bad than the possibility of messing up

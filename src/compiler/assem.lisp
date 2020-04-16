@@ -141,12 +141,12 @@
 (defprinter (segment :identity t))
 
 ;;; Record a FIXUP of KIND occurring at the current position in SEGMENT
-(defun sb-c::note-fixup (segment kind fixup)
+(defun sb-c:note-fixup (segment kind fixup)
   (emit-back-patch
    segment
    0
    (lambda (segment posn)
-     (push (sb-c::make-fixup-note kind fixup
+     (push (sb-c:make-fixup-note kind fixup
                                   (- posn (segment-header-skew segment)))
            (segment-fixup-notes segment)))))
 

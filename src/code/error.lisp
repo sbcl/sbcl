@@ -160,7 +160,7 @@
                        `(find-classoid-cell ',type :create t))
                       (t ; No runtime consing here- not a closure.
                        `(named-lambda (%handler-bind ,type) (c)
-                          (declare (optimize (sb-c::verify-arg-count 0)))
+                          (declare (optimize (sb-c:verify-arg-count 0)))
                           (typep c ',type))))
                 ;; Compute the handler expression.
                 ;; Unless the expression is ({FUNCTION|QUOTE} <sym>), then create a

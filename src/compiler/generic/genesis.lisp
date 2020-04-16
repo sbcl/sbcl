@@ -624,7 +624,7 @@
   (declare (ignorable n-named-calls))
   (let ((total-words (align-up (+ boxed (ceiling unboxed sb-vm:n-word-bytes)) 2)))
     (write-header-word descriptor
-                       (logior (ash total-words sb-vm::code-header-size-shift)
+                       (logior (ash total-words sb-vm:code-header-size-shift)
                                sb-vm:code-header-widetag)))
   (write-wordindexed/raw
    descriptor
@@ -1299,7 +1299,7 @@ core and return a descriptor to it."
                                (layout-depthoid warm-layout)
                                (logior (layout-flags warm-layout)
                                        (if (eq name 'layout)
-                                           sb-kernel::+layout-layout-flag+
+                                           sb-kernel:+layout-layout-flag+
                                            0))
                                (layout-length warm-layout)
                                (number-to-core (layout-bitmap warm-layout))
@@ -2133,7 +2133,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
          (gspace-byte-offset (+ (descriptor-byte-offset code-object)
                                 offset-within-code-object)))
     #-(or x86 x86-64)
-    (sb-vm::fixup-code-object code-object gspace-byte-offset value kind flavor)
+    (sb-vm:fixup-code-object code-object gspace-byte-offset value kind flavor)
 
     #+(or x86 x86-64)
     (let* ((gspace-data (descriptor-mem code-object))
@@ -2214,7 +2214,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
         ;; There should be no absolute64 fixups to preserve
         (:relative (relative (cdr item)))
         (:absolute (absolute (cdr item)))))
-    (number-to-core (sb-c::pack-code-fixup-locs (absolute) (relative)))))
+    (number-to-core (sb-c:pack-code-fixup-locs (absolute) (relative)))))
 
 #+linkage-table
 (defun linkage-table-note-symbol (symbol-name datap)
@@ -3126,7 +3126,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
             (c-name (string-downcase prim-obj))
             (mapcar (lambda (x) (c-name (string-downcase (sb-vm:slot-name x))))
                     (remove-if 'sb-vm:slot-rest-p
-                               (sb-vm::primitive-object-slots
+                               (sb-vm:primitive-object-slots
                                 (find prim-obj sb-vm:*primitive-objects*
                                       :key 'sb-vm:primitive-object-name))))))
   (values))

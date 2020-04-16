@@ -304,7 +304,7 @@
 (defun emit-miss (miss-fn args applyp)
   (if applyp
       `(multiple-value-call ,miss-fn ,@args
-                            (sb-c::%more-arg-values .more-context.
+                            (sb-c:%more-arg-values .more-context.
                                                     0
                                                     .more-count.))
       `(funcall ,miss-fn ,@args)))

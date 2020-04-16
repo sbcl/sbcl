@@ -811,11 +811,11 @@
 ;;; VOP can't handle them.
 
 (deftransform sb-vm::get-lisp-obj-address ((obj) ((constant-arg fixnum)))
-  (ash (lvar-value obj) sb-vm::n-fixnum-tag-bits))
+  (ash (lvar-value obj) sb-vm:n-fixnum-tag-bits))
 
 (deftransform sb-vm::get-lisp-obj-address ((obj) ((constant-arg character)))
-  (logior sb-vm::character-widetag
-          (ash (char-code (lvar-value obj)) sb-vm::n-widetag-bits)))
+  (logior sb-vm:character-widetag
+          (ash (char-code (lvar-value obj)) sb-vm:n-widetag-bits)))
 
 ;; So that the PCL code walker doesn't observe any use of %PRIMITIVE,
 ;; MAKE-UNBOUND-MARKER is an ordinary function, not a macro.

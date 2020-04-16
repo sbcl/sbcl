@@ -369,7 +369,7 @@
   ;; This is the byte offset into the component.
   (offset nil :type index :read-only t)
   ;; The original instruction replaced by the breakpoint.
-  (instruction nil :type (or null sb-vm::word))
+  (instruction nil :type (or null sb-vm:word))
   ;; A list of user breakpoints at this location.
   (breakpoints nil :type list))
 (defmethod print-object ((obj breakpoint-data) str)
@@ -3590,7 +3590,7 @@ register."
     ;; sense in signaling the condition.
     (when step-info
       (let ((*step-frame*
-             (signal-context-frame (sb-alien::alien-sap context))))
+             (signal-context-frame (sb-alien:alien-sap context))))
         (sb-impl::step-form step-info
                             ;; We could theoretically store information in
                             ;; the debug-info about to determine the

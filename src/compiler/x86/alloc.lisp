@@ -58,7 +58,7 @@
     (unless (or (eql size 8) (eql size 16))
       (unless (and (tn-p size) (location= alloc-tn size))
         (inst mov alloc-tn size)))
-    (let ((routine (package-symbolicate (sb-xc::symbol-package tn-name)
+    (let ((routine (package-symbolicate (sb-xc:symbol-package tn-name)
                                         "ALLOC-" size-text "TO-" tn-name)))
       (inst call (make-fixup routine :assembly-routine)))))
 

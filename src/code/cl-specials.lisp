@@ -89,7 +89,7 @@
                          cl:*print-readably* cl:*read-eval*
                          cl:*read-suppress*))
 
-(declaim (type sb-pretty::pprint-dispatch-table cl:*print-pprint-dispatch*))
+(declaim (type sb-pretty:pprint-dispatch-table cl:*print-pprint-dispatch*))
 
 (declaim (type readtable cl:*readtable*))
 

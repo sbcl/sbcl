@@ -72,7 +72,7 @@
                 #-sb-unicode (base-char 'character)
                 (t element-type))
               sb-vm:*specialized-array-element-type-properties*
-              :key #'sb-vm::saetp-specifier :test 'equal))
+              :key #'sb-vm:saetp-specifier :test 'equal))
 
   (let ((array (cl:make-array dims
                               :element-type element-type

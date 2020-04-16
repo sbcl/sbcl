@@ -527,8 +527,8 @@
     (dolist (layout (sort (loop for v being each hash-value
                                 of (classoid-subclasses (find-classoid 't))
                                 collect v)
-                          #'< :key #'sb-kernel::layout-flags))
-      (let ((flags (sb-kernel::layout-flags layout)))
+                          #'< :key #'sb-kernel:layout-flags))
+      (let ((flags (sb-kernel:layout-flags layout)))
         (unless (= flags prev)
           (format t "Layout flags = ~d~%" flags)
           (setq prev flags)))

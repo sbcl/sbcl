@@ -187,7 +187,7 @@
 (defmethod make-load-form ((layout layout) &optional env)
   (declare (ignore env))
   (when (layout-invalid layout)
-    (sb-c::compiler-error "can't dump reference to obsolete class: ~S"
+    (sb-c:compiler-error "can't dump reference to obsolete class: ~S"
                           (layout-classoid layout)))
   (let* ((classoid (layout-classoid layout))
          (name (classoid-name classoid)))
@@ -199,7 +199,7 @@
                 (bug "xc MAKE-LOAD-FORM on undefined layout"))
                (t 0))))
     (unless name
-      (sb-c::compiler-error "can't dump anonymous LAYOUT: ~S" layout))
+      (sb-c:compiler-error "can't dump anonymous LAYOUT: ~S" layout))
     ;; Since LAYOUT refers to a class which refers back to the LAYOUT,
     ;; we have to do this in two stages, like the TREE-WITH-PARENT
     ;; example in the MAKE-LOAD-FORM entry in the ANSI spec.

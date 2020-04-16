@@ -76,7 +76,7 @@ echo //checking for leftover cold-init symbols
  --lose-on-corruption --noinform $SBCL_MAKE_TARGET_2_OPTIONS --no-sysinit --no-userinit --eval '
     (restart-case
       (let (l1 l2)
-        (sb-vm::map-allocated-objects
+        (sb-vm:map-allocated-objects
          (lambda (obj type size)
            (declare (ignore size))
            (when (and (= type sb-vm:symbol-widetag) (not (symbol-package obj))

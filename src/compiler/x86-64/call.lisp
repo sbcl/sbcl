@@ -1233,7 +1233,7 @@
                            (ash 1 (- word-shift n-fixnum-tag-bits))))))
 
 (define-vop (more-arg/c)
-  (:translate sb-c::%more-arg)
+  (:translate sb-c:%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1)))
   (:info index)
@@ -1244,7 +1244,7 @@
     (inst mov value (ea (- (* index n-word-bytes)) object))))
 
 (define-vop (more-arg)
-  (:translate sb-c::%more-arg)
+  (:translate sb-c:%more-arg)
   (:policy :fast-safe)
   (:args (object :scs (descriptor-reg) :to (:result 1))
          (index :scs (any-reg) :to (:result 1) :target value))

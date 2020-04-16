@@ -468,8 +468,8 @@ error if any of PACKAGES is not a valid package designator."
 
 (defun lexically-unlocked-symbol-p (symbol)
   (member symbol
-          (if (boundp 'sb-c::*lexenv*)
-              (let ((list (sb-c::lexenv-disabled-package-locks sb-c::*lexenv*)))
+          (if (boundp 'sb-c:*lexenv*)
+              (let ((list (sb-c::lexenv-disabled-package-locks sb-c:*lexenv*)))
                 ;; The so-called LIST might be an interpreter env.
                 #+sb-fasteval
                 (unless (listp list)
