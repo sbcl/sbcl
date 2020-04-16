@@ -42,6 +42,8 @@ $SBCL_PWD/../src/runtime/shrinkwrap-sbcl --disable-debugger --noprint <<EOF
   (assert (typep fixups 'bignum))
   (assert (not (heap-allocated-p fixups))))
 EOF
+(cd $SBCL_PWD/../src/runtime ; rm -f shrinkwrap-sbcl shrinkwrap-sbcl.s shrinkwrap-sbcl-core.o shrinkwrap-sbcl.core)
+
 # reaching here means no crash happened in the allocator
 # and that the fixups were rewritten into C data space
 echo Basic smoke test: PASS
@@ -59,7 +61,7 @@ EOF
 
 m_arg=`run_sbcl --eval '(progn #+sb-core-compression (princ " -lz") #+x86 (princ " -m32"))' --quit`
 
-(cd $SBCL_PWD/../src/runtime ; make libsbcl.a)
+(cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a; make libsbcl.a)
 run_sbcl --script ../tools-for-build/editcore.lisp split \
   ${tmpcore} $TEST_DIRECTORY/elfcore-test.s
 # I guess we're going to have to hardwire the system libraries
@@ -78,6 +80,8 @@ echo Custom core: PASS
   $TEST_DIRECTORY/elfcore-test-core.o \
   $SBCL_PWD/../tests/heap-reloc/fake-mman.c \
   $SBCL_PWD/../src/runtime/libsbcl.a -ldl -lm -lpthread ${m_arg}
+
+(cd $SBCL_PWD/../src/runtime ; rm -f libsbcl.a)
 
 export SBCL_FAKE_MMAP_INSTRUCTION_FILE=heap-reloc/fakemap
 i=1
