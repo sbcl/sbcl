@@ -305,16 +305,14 @@
 
 (defun variable-symbol-macro-p (var env)
   ;; FIXME: crufty return convention
+  (declare (symbol var))
   (let ((entry (or (member var (env-lexical-variables env) :key #'car :test #'eq)
                    (and env (member var (sb-c::lexenv-vars env) :key #'car :test #'eq)))))
     (when (and (consp (cdar entry)) (eq (cadar entry) 'sb-sys:macro))
       (return-from variable-symbol-macro-p entry))
     (unless entry
-      (when (var-globally-symbol-macro-p var)
+      (when (eq (info :variable :kind var) :macro)
         (list (list* var 'sb-sys:macro (info :variable :macro-expansion var)))))))
-
-(defun var-globally-symbol-macro-p (var)
-  (eq (info :variable :kind var) :macro))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
 (defun walked-var-declaration-p (declaration)
@@ -521,7 +519,8 @@
             ((and (not (consp newform))
                   (or (eql context :eval)
                       (eql context :set)))
-             (let ((symmac (car (variable-symbol-macro-p newform env))))
+             (let ((symmac (and (symbolp newform)
+                                (car (variable-symbol-macro-p newform env)))))
                (if symmac
                    (let* ((newnewform (walk-form-internal (cddr symmac)
                                                           context
@@ -856,7 +855,7 @@
 (defun walk-multiple-value-setq (form context env)
   (let ((vars (cadr form)))
     (if (some (lambda (var)
-                (variable-symbol-macro-p var env))
+                (and (symbolp var) (variable-symbol-macro-p var env)))
               vars)
         (let* ((temps (mapcar (lambda (var)
                                 (declare (ignore var))
@@ -943,7 +942,7 @@
             `(progn ,@walked)))
       (let* ((var (cadr form))
              (val (caddr form))
-             (symmac (car (variable-symbol-macro-p var env))))
+             (symmac (and (symbolp var) (car (variable-symbol-macro-p var env)))))
         (if symmac
             (let* ((type (env-var-type var env))
                    (expanded (if (eq t type)
