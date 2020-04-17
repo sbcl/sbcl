@@ -102,14 +102,10 @@
 
 ;;; Careful here: if you add more bits, then adjust the bit packing for
 ;;; 64-bit layouts which also store LENGTH + DEPTHOID in the same word.
-;;; When testing these, you usually want to use LAYOUT-%BITS rather than
-;;; LAYOUT-FLAGS, because the compiler will stupidly "unpack" the
-;;; flags by masking out the stuff that aren't the "bits" and then
-;;; mask again.
 (defconstant +custom-gc-scavenge-flag+   #b0000001)
 (defconstant +structure-layout-flag+     #b0000010)
 (defconstant +pathname-layout-flag+      #b0000100)
-(defconstant +layout-layout-flag+        #b0001000)
+(defconstant +layout-layout-flag+        #b0001000) ; used in gc-private.h
 (defconstant +ctype-layout-flag+         #b0010000)
 (defconstant +condition-layout-flag+     #b0100000)
 (defconstant +pcl-object-layout-flag+    #b1000000)
@@ -127,7 +123,7 @@
 ;;;
 ;;; FIXME: ...it would be better to automate this, of course...
 
-;;; 64-bit layout %BITS slot:
+;;; 64-bit layout FLAGS slot:
 ;;;
 ;;; | 4 bytes  | 16 bits | 16 bits |
 ;;; +----------+---------+---------+
@@ -152,7 +148,7 @@
 (sb-xc:defstruct (layout
              #+64-bit
              ;; Accept a specific subset of keywords
-             (:constructor %make-layout (clos-hash classoid %bits
+             (:constructor %make-layout (clos-hash classoid flags
                                          &key inherits bitmap info invalid
                                            depth2-ancestor depth3-ancestor depth4-ancestor))
              #-64-bit
@@ -162,7 +158,7 @@
              (:copier nil))
 
   ;; A packed field containing the DEPTHOID, LENGTH, and FLAGS
-  #+64-bit (%bits 0 :type (signed-byte #.sb-vm:n-word-bits))
+  #+64-bit (flags 0 :type (signed-byte #.sb-vm:n-word-bits))
 
   ;; a union of +something-LAYOUT-FLAG+ bits
   #-64-bit (flags 0 :type word :read-only nil)
@@ -242,7 +238,6 @@
 ;;; various type checks.
 #+sb-xc-host
 (progn
-  (defmacro layout-%bits (x) `(layout-flags ,x))
   (defstruct (layout (:include structure!object)
                      (:constructor %make-layout (clos-hash classoid flags invalid
                                                  inherits depthoid length info)))
@@ -265,7 +260,7 @@
     (%make-layout clos-hash classoid flags invalid inherits depthoid length info)))
 
 ;;; Applicable only if bit-packed (for 64-bit architectures)
-(defmacro pack-layout-bits (depthoid length flags)
+(defmacro pack-layout-flags (depthoid length flags)
   `(logior (ash ,(or depthoid -1) (+ 32 sb-vm:n-fixnum-tag-bits))
            (ash ,(or length 0) 16)
            ,(or flags 0)))
@@ -277,19 +272,13 @@
   (remf rest :depthoid)
   (remf rest :length)
   (remf rest :flags)
-  `(%make-layout ,clos-hash ,classoid (pack-layout-bits ,depthoid ,length ,flags) ,@rest))
+  `(%make-layout ,clos-hash ,classoid (pack-layout-flags ,depthoid ,length ,flags) ,@rest))
 
 ;;; LAYOUT-DEPTHOID gets a vop and a stub
 (defmacro layout-length (layout) ; SETFable
-  `(ldb (byte 16 16) (layout-%bits ,layout)))
-(declaim (inline layout-flags)) ; not SETFable
-(defun layout-flags (layout) (ldb (byte 16 0) (layout-%bits layout)))
+  `(ldb (byte 16 16) (layout-flags ,layout)))
 ) ; end PROGN
-
-#+(and (not sb-xc-host) (not 64-bit))
-(progn
-(defmacro layout-%bits (x) `(layout-flags ,x))
-)
+(defconstant layout-flags-mask #xffff) ; "strictly flags" bits from the packed field
 
 ;;; Abstract out the differences between {32-bit,64-bit} target and XC layouts.
 ;;; FLAGS can't change once assigned.
@@ -297,11 +286,12 @@
                                            (flags `(layout-flags ,layout)) flagsp)
   (let ((invalidate-p (and (eql depthoid -1) (not length) (not flagsp))))
     #+(and 64-bit (not xc-host)) ; packed slot
-    `(setf (layout-%bits ,layout)
+    `(setf (layout-flags ,layout)
            ,(if invalidate-p
                 `(logior (ash -1 (+ 32 sb-vm:n-fixnum-tag-bits))
-                         (ldb (byte 32 0) (layout-%bits ,layout)))
-                `(pack-layout-bits ,depthoid ,length ,flags)))
+                         (ldb (byte 32 0) (layout-flags ,layout)))
+                `(pack-layout-flags ,depthoid ,length
+                                    (logand ,flags layout-flags-mask))))
     #+(or (not 64-bit) sb-xc-host) ; ordinary slot
     (if invalidate-p
         `(setf (layout-depthoid ,layout) -1)
@@ -311,7 +301,7 @@
 
 (declaim (inline layout-for-std-class-p))
 (defun layout-for-std-class-p (x)
-  (logtest (layout-%bits x) +pcl-object-layout-flag+))
+  (logtest (layout-flags x) +pcl-object-layout-flag+))
 
 (declaim (inline sb-fasl:dumpable-layout-p))
 (defun sb-fasl:dumpable-layout-p (x)

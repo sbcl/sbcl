@@ -932,12 +932,12 @@
                 (structure-object
                  (return-from transform-instance-typep
                    `(and (%instancep object)
-                         (logtest (layout-%bits (%instance-layout object))
+                         (logtest (layout-flags (%instance-layout object))
                                   +structure-layout-flag+))))
                 (pathname
                  (return-from transform-instance-typep
                    `(and (%instancep object)
-                         (logtest (layout-%bits (%instance-layout object))
+                         (logtest (layout-flags (%instance-layout object))
                                   +pathname-layout-flag+)))))
               ;; For shallow hierarchies, we can avoid reading the 'inherits'
               ;; because the layout has the ancestor layouts directly in it.

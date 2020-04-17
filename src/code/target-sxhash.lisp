@@ -296,29 +296,33 @@
                (symbol (sxhash x)) ; through DEFTRANSFORM
                (fixnum (sxhash x)) ; through DEFTRANSFORM
                (instance
-                (case (layout-flags (%instance-layout x))
-                  (#.(logior +pathname-layout-flag+ +structure-layout-flag+)
-                   ;; Pathnames are EQUAL if all the components are EQUAL, so
-                   ;; we hash all of the components of a pathname together.
-                   (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
-                     (mixf hash (sxhash-recurse (pathname-device x) depthoid))
-                     (mixf hash (%pathname-dir-hash x))
-                     (mixf hash (%pathname-stem-hash x))
-                     ;; Hash :NEWEST the same as NIL because EQUAL for
-                     ;; pathnames assumes that :newest and nil are equal.
-                     (let ((version (%pathname-version x)))
-                       (mixf hash (sxhash-recurse (if (eq version :newest)
-                                                      nil
-                                                      version)
-                                                  depthoid)))))
-                  (#.+structure-layout-flag+
-                   (typecase x
-                     (layout (layout-clos-hash x))
-                     (t (logxor 422371266
-                                (layout-clos-hash (%instance-layout x))))))
-                  (#.+condition-layout-flag+ (!condition-hash x))
-                  (#.+pcl-object-layout-flag+ (std-instance-hash x))
-                  (t 0))) ; can't get here
+                (let ((flags (layout-flags (%instance-layout x))))
+                  (cond
+                   ((logtest flags +structure-layout-flag+)
+                    (cond ((logtest flags +pathname-layout-flag+)
+                           ;; Pathnames are EQUAL if all the components are EQUAL, so
+                           ;; we hash all of the components of a pathname together.
+                           (let ((hash (sxhash-recurse (pathname-host x) depthoid)))
+                             (mixf hash (sxhash-recurse (pathname-device x) depthoid))
+                             (mixf hash (%pathname-dir-hash x))
+                             (mixf hash (%pathname-stem-hash x))
+                             ;; Hash :NEWEST the same as NIL because EQUAL for
+                             ;; pathnames assumes that :newest and nil are equal.
+                             (let ((version (%pathname-version x)))
+                               (mixf hash (sxhash-recurse (if (eq version :newest)
+                                                              nil
+                                                            version)
+                                                          depthoid)))))
+                          ((logtest flags +layout-layout-flag+)
+                           (layout-clos-hash x))
+                          (t
+                           (logxor 422371266
+                                   (layout-clos-hash (%instance-layout x))))))
+                   ((logtest flags +condition-layout-flag+)
+                    (!condition-hash x))
+                   ((logtest flags +pcl-object-layout-flag+)
+                    (std-instance-hash x))
+                   (t 0)))) ; can't get here
                (array
                 (typecase x
                   ;; If we could do something smart for widetag-based jump tables,

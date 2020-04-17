@@ -61,12 +61,10 @@
   (node-key 0 :read-only t)
   (node-data))
 
-(macrolet ((flags (x)
-             #+64-bit `(sb-kernel::layout-%bits ,x)
-             #-64-bit `(sb-kernel::layout-flags ,x)))
-  (let ((layout (sb-kernel:find-layout 'keyed-node)))
-    (setf (flags layout) (logior (flags layout)
-                                 sb-kernel::+custom-gc-scavenge-flag+))))
+(let ((layout (sb-kernel:find-layout 'keyed-node)))
+  (setf (sb-kernel:layout-flags layout)
+        (logior (sb-kernel:layout-flags layout)
+                sb-kernel::+custom-gc-scavenge-flag+)))
 
 (declaim (inline ptr-markedp node-markedp))
 (defun ptr-markedp (bits) (fixnump bits))

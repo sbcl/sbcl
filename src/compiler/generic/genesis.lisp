@@ -1131,7 +1131,7 @@ core and return a descriptor to it."
                                  (symbol-value *cold-layout-gspace*) t)))
     #+64-bit
     (write-slots result *host-layout-of-layout*
-     :%bits (sb-kernel::pack-layout-bits depthoid length flags))
+     :flags (sb-kernel::pack-layout-flags depthoid length flags))
     #-64-bit
     (write-slots result *host-layout-of-layout*
      :depthoid (make-fixnum-descriptor depthoid)

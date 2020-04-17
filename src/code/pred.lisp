@@ -437,7 +437,7 @@ length and have identical components. Other arrays must be EQ to be EQUAL."
   (let ((layout-x (%instance-layout x)))
     (and
      (eq layout-x (%instance-layout y))
-     (logtest +structure-layout-flag+ (layout-%bits layout-x))
+     (logtest +structure-layout-flag+ (layout-flags layout-x))
      (macrolet ((slot-ref-equalp ()
                   `(let ((x-el (%instance-ref x i))
                          (y-el (%instance-ref y i)))

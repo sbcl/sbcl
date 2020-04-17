@@ -53,7 +53,8 @@
                    (*package* (cl:symbol-package classoid-name)))
               (format output "~/sb-ext:print-symbol-with-prefix/ ~S (~%"
                       classoid-name
-                      (list* (layout-flags layout) (layout-depthoid layout)
+                      (list* (the (unsigned-byte 16) (layout-flags layout))
+                             (layout-depthoid layout)
                              (map 'list
                                   (lambda (x) (classoid-name (layout-classoid x)))
                                   (layout-inherits layout))))

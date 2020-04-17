@@ -365,7 +365,7 @@ between the ~A definition and the ~A definition"
           ;; Use at your own risk (interactive use only).
           (let ((inherits (layout-inherits layout))
                 (depthoid (layout-depthoid layout)))
-            (aver (logtest +structure-layout-flag+ (layout-%bits layout)))
+            (aver (logtest +structure-layout-flag+ (layout-flags layout)))
             (aver (= (length inherits) depthoid))
             (assign-layout-slots destruct-layout
                                  :depthoid depthoid

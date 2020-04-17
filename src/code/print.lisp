@@ -378,7 +378,7 @@ variable: an unreadable object representing the error is printed instead.")
       ;; (There is no update-instance protocol for conditions)
       (when (or (sb-kernel::undefined-classoid-p classoid)
                 (and (layout-invalid layout)
-                     (logtest (layout-%bits layout) +condition-layout-flag+)))
+                     (logtest (layout-flags layout) +condition-layout-flag+)))
         ;; not only is this unreadable, it's unprintable too.
         (return-from output-ugly-object
           (print-unreadable-object (object stream :identity t)

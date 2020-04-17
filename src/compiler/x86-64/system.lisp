@@ -48,7 +48,7 @@
 
 (macrolet ((read-depthoid ()
              `(ea (- (+ 4 (ash (+ instance-slots-offset
-                                  (get-dsd-index layout sb-kernel::%bits))
+                                  (get-dsd-index layout sb-kernel::flags))
                                word-shift))
                      instance-pointer-lowtag)
                   layout)))
