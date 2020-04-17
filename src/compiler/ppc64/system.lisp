@@ -58,7 +58,7 @@
   (:generator 1
     (inst lr temp (- (+ #+little-endian 4
                         (ash (+ instance-slots-offset
-                                (get-dsd-index layout sb-kernel::%bits))
+                                (get-dsd-index layout sb-kernel::flags))
                              word-shift))
                      instance-pointer-lowtag))
     (inst lwax res object temp)))

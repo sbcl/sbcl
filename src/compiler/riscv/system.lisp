@@ -63,7 +63,7 @@
   (:generator 1
     (inst lw values object
           (- (+ (ash (+ instance-slots-offset
-                        (get-dsd-index layout sb-kernel::%bits))
+                        (get-dsd-index layout sb-kernel::flags))
                      word-shift)
                 4)
              instance-pointer-lowtag))))
