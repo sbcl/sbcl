@@ -23,6 +23,7 @@
       (loop for con across constraints
             when (and (eq (equality-constraint-operator con) operator)
                       (eq (constraint-not-p con) not-p)
+                      (eq (constraint-x con) x)
                       (eq (constraint-y con) y))
             return con))))
 

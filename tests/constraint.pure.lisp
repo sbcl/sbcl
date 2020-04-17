@@ -73,3 +73,16 @@
             x)))
     ((#c(1 2)) #c(1 2))
     ((#c(2 1)) nil)))
+
+(with-test (:name :compare-both-operands)
+  (checked-compile-and-assert
+      ()
+      `(lambda (a b)
+         (declare (type real a b))
+         (if (>= a a)
+             (if (= b a)
+                 1
+                 2)
+             t))
+    ((0 1) 2)
+    ((1 1) 1)))
