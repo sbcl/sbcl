@@ -133,8 +133,6 @@
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
 
-(declaim (freeze-type ctor))
-
 ;;; All defined ctors.
 (defglobal *all-ctors* (make-hash-table :test #'equal
                                         :weakness :value))

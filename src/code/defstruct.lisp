@@ -2015,7 +2015,9 @@ or they must be declared locally notinline at each call site.~@:>"
                       object)))))
     `(progn
          (eval-when (:compile-toplevel :load-toplevel :execute)
-           (%compiler-defstruct ',dd ',(!inherits-for-structure dd)))
+           (%compiler-defstruct ',dd ',(!inherits-for-structure dd))
+           ,@(when (eq metaclass-name 'static-classoid)
+               `((declaim (freeze-type ,class-name)))))
          ,@(accessor-definitions dd)
          ,@(when constructor
              `((defun ,constructor (,@slot-names &aux (object ,raw-maker-form))

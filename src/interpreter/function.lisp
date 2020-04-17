@@ -50,7 +50,6 @@
  :metaclass-constructor make-static-classoid
  :dd-type funcallable-structure)
 
-(declaim (freeze-type interpreted-function))
 (deftype compiled-function ()
   '(and function (not interpreted-function)))
 

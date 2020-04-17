@@ -27,8 +27,6 @@
   :metaclass-constructor make-static-classoid
   :dd-type funcallable-structure)
 
-(declaim (freeze-type fmt-control))
-
 (defmethod print-object ((self fmt-control) stream)
   (print-unreadable-object (self stream :type t)
     (write-string (unparse-fmt-control self) stream)))

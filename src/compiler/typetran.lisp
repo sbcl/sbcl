@@ -816,8 +816,8 @@
 
 ;;; This transform contains more comments than code. I wish there were some way
 ;;; to express it more simply.
-(defun transform-instance-typep (class)
-  (let* ((name (classoid-name class))
+(defun transform-instance-typep (classoid)
+  (let* ((name (classoid-name classoid))
           (layout (let ((res (info :type :compiler-layout name)))
                    (if (and res (not (layout-invalid res)))
                        res
@@ -831,10 +831,10 @@
 
        ;; Otherwise transform the type test.
        (binding* (((pred get-layout)
-                   (cond ((csubtypep class (specifier-type 'funcallable-instance))
+                   (cond ((csubtypep classoid (specifier-type 'funcallable-instance))
                           (values '(funcallable-instance-p object)
                                   '(%funcallable-instance-layout object)))
-                         ((csubtypep class (specifier-type 'instance))
+                         ((csubtypep classoid (specifier-type 'instance))
                           (values '(%instancep object)
                                   '(%instance-layout object)))))
                   (get-layout-or-return-false
@@ -855,9 +855,9 @@
            ;; It's possible to seal a STANDARD-CLASS, not just a STRUCTURE-CLASS,
            ;; though probably extremely weird. Also the PRED should be set in
            ;; that event, but it isn't.
-           ((and (eq (classoid-state class) :sealed) layout
-                 (or (not (classoid-subclasses class))
-                     (eql (hash-table-count (classoid-subclasses class))
+           ((and (eq (classoid-state classoid) :sealed) layout
+                 (or (not (classoid-subclasses classoid))
+                     (eql (hash-table-count (classoid-subclasses classoid))
                           1)))
             ;; Sealed and at most one subclass.
             ;; The crummy dual expressions for the same result are because
@@ -865,9 +865,9 @@
             ;; passing case, but AND emits a forward branch in the failing
             ;; case which I believe is the better choice.
             (let ((other-layout (and
-                                 (classoid-subclasses class)
+                                 (classoid-subclasses classoid)
                                  (dohash ((classoid layout)
-                                          (classoid-subclasses class)
+                                          (classoid-subclasses classoid)
                                           :locked t)
                                    (declare (ignore classoid))
                                    (return layout)))))
@@ -889,7 +889,7 @@
                     `(and ,pred ,(check-layout get-layout))
                     `(block typep ,(check-layout get-layout-or-return-false))))))
 
-           ((and (typep class 'structure-classoid) layout)
+           ((and (typep classoid 'structure-classoid) layout)
             ;; structure type tests; hierarchical layout depths
             (let* ((depthoid (layout-depthoid layout))
                    ;; If a structure is apparently an abstract base type,
@@ -972,6 +972,9 @@
                                  `(cond ((eq ,n-layout ,layout) t)
                                         (,deeper-p ,ancestor-layout-eq)))))))))
            ((and layout (>= (layout-depthoid layout) 0))
+            #+sb-xc-host (when (typep classoid 'static-classoid)
+                           ;; should have use :SEALED code above
+                           (bug "Non-frozen static classoids?"))
             ;; hierarchical layout depths for other things (e.g.
             ;; CONDITION, STREAM)
             ;; The quasi-hierarchical types are abstract base types,
