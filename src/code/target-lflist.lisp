@@ -61,10 +61,9 @@
   (node-key 0 :read-only t)
   (node-data))
 
-(let ((layout (sb-kernel:find-layout 'keyed-node)))
-  (setf (sb-kernel:layout-flags layout)
-        (logior (sb-kernel:layout-flags layout)
-                sb-kernel::+custom-gc-scavenge-flag+)))
+(let ((layout (find-layout 'keyed-node)))
+  (setf (layout-flags layout)
+        (logior (layout-flags layout) sb-vm:lockfree-list-node-flag)))
 
 (declaim (inline ptr-markedp node-markedp))
 (defun ptr-markedp (bits) (fixnump bits))

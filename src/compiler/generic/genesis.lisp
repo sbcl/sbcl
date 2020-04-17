@@ -1298,9 +1298,7 @@ core and return a descriptor to it."
              (make-cold-layout name
                                (layout-depthoid warm-layout)
                                (logior (layout-flags warm-layout)
-                                       (if (eq name 'layout)
-                                           sb-kernel:+layout-layout-flag+
-                                           0))
+                                       (if (eq name 'layout) sb-vm:layout-layout-flag 0))
                                (layout-length warm-layout)
                                (number-to-core (layout-bitmap warm-layout))
                                (vector-in-core inherits)))))
@@ -2343,8 +2341,7 @@ Legal values for OFFSET are -4, -8, -12, ..."
     (declare (type descriptor bitmap inherits))
     (declare (type symbol name))
     (setq flags
-          (logior flags (cond ((eq name 'layout)
-                               sb-kernel:+layout-layout-flag+)
+          (logior flags (cond ((eq name 'layout) sb-vm:layout-layout-flag)
                               ((member name '(pathname logical-pathname))
                                sb-kernel:+pathname-layout-flag+)
                               ((member 'ctype (getf (cdr (get name 'dd-proxy)) :inherits))

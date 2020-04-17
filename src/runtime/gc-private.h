@@ -338,12 +338,11 @@ static inline boolean layoutp(lispobj thing)
     lispobj layout;
     if ((base_ptr & LOWTAG_MASK) || !(layout = layout_of((lispobj*)base_ptr)))
         return 0;
-    return LAYOUT(layout)->flags & 8;
+    return LAYOUT(layout)->flags & flag_LayoutLayout;
 }
 
-/// Test +custom-gc-scavenge-flag+ in the layout bits.
 static inline int lockfree_list_node_layout_p(struct layout* layout) {
-    return layout->flags & 1;
+    return layout->flags & flag_LockfreeListNode;
 }
 
 #endif /* _GC_PRIVATE_H_ */

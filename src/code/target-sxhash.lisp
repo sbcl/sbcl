@@ -313,7 +313,7 @@
                                                               nil
                                                             version)
                                                           depthoid)))))
-                          ((logtest flags +layout-layout-flag+)
+                          ((logtest flags sb-vm:layout-layout-flag)
                            (layout-clos-hash x))
                           (t
                            (logxor 422371266

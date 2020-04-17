@@ -2299,7 +2299,6 @@ is a good idea, but see SB-SYS re. blurring of boundaries."
                "MAKE-LAYOUT" "REDEFINE-LAYOUT-WARNING"
                "INSURED-FIND-CLASSOID" "ORDER-LAYOUT-INHERITS"
                "STD-COMPUTE-CLASS-PRECEDENCE-LIST"
-               "+LAYOUT-LAYOUT-FLAG+"
                "+CTYPE-LAYOUT-FLAG+"
                "+STRUCTURE-LAYOUT-FLAG+"
                "+PCL-OBJECT-LAYOUT-FLAG+"
@@ -3212,8 +3211,9 @@ structure representations"
                "INTERRUPTED-FLAG"
                "IS-LISP-POINTER"
                #+gencgc "LARGE-OBJECT-SIZE"
-               "LAYOUT-ALIGN"
+               "LAYOUT-LAYOUT-FLAG"
                "LIST-ALLOCATED-OBJECTS" "LIST-POINTER-LOWTAG"
+               "LOCKFREE-LIST-NODE-FLAG"
                ;; FIXME: Possibly these other parameters (see
                ;; compiler/{x86,sparc}/parms.lisp) should be defined
                ;; conditionally on #+LONG-FLOAT)

@@ -102,13 +102,13 @@
 
 ;;; Careful here: if you add more bits, then adjust the bit packing for
 ;;; 64-bit layouts which also store LENGTH + DEPTHOID in the same word.
-(defconstant +custom-gc-scavenge-flag+   #b0000001)
-(defconstant +structure-layout-flag+     #b0000010)
-(defconstant +pathname-layout-flag+      #b0000100)
-(defconstant +layout-layout-flag+        #b0001000) ; used in gc-private.h
-(defconstant +ctype-layout-flag+         #b0010000)
-(defconstant +condition-layout-flag+     #b0100000)
-(defconstant +pcl-object-layout-flag+    #b1000000)
+(defconstant +structure-layout-flag+         #b00000001)
+(defconstant +pathname-layout-flag+          #b00000010)
+(defconstant +ctype-layout-flag+             #b00000100)
+(defconstant +condition-layout-flag+         #b00001000)
+(defconstant +pcl-object-layout-flag+        #b00010000)
+(defconstant sb-vm:lockfree-list-node-flag   #b01000000) ; exported for use in gc-private.h
+(defconstant sb-vm:layout-layout-flag        #b10000000) ; "
 
 ;;; The LAYOUT structure is pointed to by the first cell of instance
 ;;; (or structure) objects. It represents what we need to know for
