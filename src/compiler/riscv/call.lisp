@@ -1041,23 +1041,21 @@
                     :flag-tn pa-flag
                     :stack-allocate-p dx-p)
         (move result dst)
-
         (inst j enter)
 
         ;; Compute the next cons and store it in the current one.
         (emit-label loop)
-        (inst addi dst dst (* 2 n-word-bytes))
+        (inst addi dst dst (* cons-size n-word-bytes))
         (storew dst dst -1 list-pointer-lowtag)
 
         (emit-label enter)
         ;; Grab one value
         (loadw temp context)
         (inst addi context context n-word-bytes)
-
-        ;; Dec count, and if != zero, go back for more.
-        (inst subi count count (fixnumize 1))
         ;; Store the value into the car of the current cons.
         (storew temp dst 0 list-pointer-lowtag)
+        ;; Dec count, and if != zero, go back for more.
+        (inst subi count count (fixnumize 1))
         (inst bne count zero-tn loop)
 
         ;; NIL out the last cons.
