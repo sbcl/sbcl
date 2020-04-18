@@ -72,7 +72,7 @@
       (unless (or (eq :deleted (functional-kind functional))
                   ;; If the block came from an inlined global
                   ;; function, ignore it.
-                  (and (functional-inlinep functional)
+                  (and (functional-inline-expanded functional)
                        (symbolp (functional-debug-name functional))))
         (handle-functional functional)))))
 

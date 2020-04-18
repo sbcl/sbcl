@@ -2999,6 +2999,22 @@
       (assert (eq (aref (sb-kernel::code-entry-points code) 0)
                   #'foo1)))))
 
+(with-test (:name (:block-compile :inline))
+  (with-scratch-file (fasl "fasl")
+    (compile-file "block-compile-test-3.lisp" :output-file fasl :block-compile t)
+    (load fasl)
+    ;; Ensure all functions get inlined properly, so that there are no
+    ;; local calls between them. The result will be that NONE of the
+    ;; functions will share a code component.
+    (let ((components '()))
+      (flet ((frob (fun)
+               (pushnew (sb-kernel::fun-code-header fun) components)))
+        (frob #'inl)
+        (frob #'a)
+        (frob #'foo2)
+        (frob #'bar2))
+      (assert (= (length components) 4)))))
+
 (with-test (:name :symbol-value-constant)
   (let* ((package-name (gensym "SYMBOL-VALUE-CONSTANT-TEST"))
          (*package* (make-package package-name :use '(cl))))

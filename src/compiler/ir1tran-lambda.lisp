@@ -1045,6 +1045,7 @@
                                           :maybe-add-debug-catch t
                                           :source-name name))
                  (info (info :function :info name)))
+             (setf (functional-inlinep res) (info :function :inlinep name))
              (when (has-toplevelness-decl lambda-expression)
                (setf (functional-top-level-defun-p res) t))
              ;; FIXME: Should non-entry block compiled defuns have
@@ -1190,7 +1191,14 @@
           (free-funs (free-funs *ir1-namespace*)))
       (note-name-defined name :function)
       (cond ((not (defined-fun-p found))
-             (aver (not (info :function :inlinep name)))
+             ;; This assertion is wrong in block compilation mode, for
+             ;; instance
+             ;;
+             ;; (defun foo (x) (bar x))
+             ;; (declaim (inline bar))
+             ;; (defun bar (x) x)
+             (aver (or (block-compile *compilation*)
+                       (not (info :function :inlinep name))))
              (let* ((where-from (leaf-where-from found))
                     (res (make-defined-fun
                           :%source-name name
@@ -1283,12 +1291,17 @@
         (note-inlining (optional-dispatch-more-entry fun))
         (mapc #'note-inlining (optional-dispatch-entry-points fun))))
     ;; substitute for any old references
-    (unless (or (not (block-compile *compilation*))
+    (unless (or (eq (defined-fun-inlinep var) :notinline)
+                (not (block-compile *compilation*))
                 (and info
                      (or (fun-info-transforms info)
                          (fun-info-templates info)
                          (fun-info-ir2-convert info))))
-      (substitute-leaf fun var))
+      (substitute-leaf fun var)
+      ;; If in a simple environment, then we can allow backward references
+      ;; to this function from following top-level forms.
+      (when expansion
+        (push fun (defined-fun-functionals var))))
     fun))
 
 ;;; Store INLINE-LAMBDA as the inline expansion of NAME.

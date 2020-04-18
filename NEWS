@@ -19,6 +19,8 @@ changes relative to sbcl-2.0.3:
   * bug fix: APPLY on a large list ("large" being in excess of 2k to 16k items
     depending on the platform) can no longer crash the gencgc collector.
   * bug fix: sb-concurrency FRLOCK algorithm has been corrected. (lp#1087955)
+  * bug fix: block compilation now respects inlining declarations better (like
+    CMUCL).
 
 changes in sbcl-2.0.3 relative to sbcl-2.0.2:
   * incompatible change: the external format now defaults to UTF-8 and is not
