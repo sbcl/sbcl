@@ -852,13 +852,18 @@
                 ,@(avx2-inst-printer-list 'ymm-ymm/mem #x66 opcode
                                           :opcode-prefix #x0f38
                                           ;;:reg-mem-size size FIXME
-                                          :w 0 :l l)
+                                          :w 0 :l (if (eq l 'size)
+                                                      nil
+                                                      l))
                 (:emitter
-                 (aver (ea-p src))
-                 (emit-avx2-inst segment src dst #x66 ,opcode
+                   (emit-avx2-inst segment src dst #x66 ,opcode
                                  :opcode-prefix #x0f38
-                                 :w 0 :l ,l)))))
-  (def vbroadcastss #x18)
+                                 :w 0 :l ,(if (eq l 'size)
+                                              `(if (is-avx2-id-p (reg-id dst))
+                                                   1
+                                                   0)
+                                              l))))))
+  (def vbroadcastss #x18 size)
   (def vbroadcastsd #x19 1)
   (def vbroadcastf128 #x1a 1)
   (def vbroadcasti128 #x5a 1)
