@@ -210,12 +210,12 @@
   ;; run the PROCLAIMs.
   (show-and-call !late-proclaim-cold-init)
 
+  (show-and-call !loader-cold-init)
   (show-and-call os-cold-init-or-reinit)
   (show-and-call !pathname-cold-init)
 
   (show-and-call stream-cold-init-or-reset)
   (/show "Enabled buffered streams")
-  (show-and-call !loader-cold-init)
   (show-and-call !foreign-cold-init)
   #-(and win32 (not sb-thread))
   (show-and-call signal-cold-init-or-reinit)
